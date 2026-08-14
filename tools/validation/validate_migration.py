@@ -192,9 +192,27 @@ def validate_null_semantics(pg, lite, r: Results) -> None:
                 pg_one(pg, f"SELECT count(*) FROM player_match_stats WHERE {pg_col} IS NULL"),
                 lite_one(lite, f"SELECT COUNT(*) FROM games WHERE {lite_col} IS NULL"))
 
-    r.check("players with DOB (rest NULL, not defaulted)",
-            pg_one(pg, "SELECT count(*) FROM players WHERE dob IS NOT NULL"),
-            lite_one(lite, "SELECT COUNT(*) FROM players WHERE dob IS NOT NULL"))
+    # DELIBERATE DIVERGENCE. The legacy players table carries 945 dates.
+    # AFLDB carries 12,478, recovered from club_player_register.raw_row_json
+    # after the scraper collapsed a malformed table header and left the
+    # parsed dob column empty for all 15,310 rows. This is a correction,
+    # so it is asserted against the recovered figure, not against legacy.
+    legacy_dob = lite_one(lite, "SELECT COUNT(*) FROM players WHERE dob IS NOT NULL")
+    afldb_dob = pg_one(pg, "SELECT count(*) FROM players WHERE dob IS NOT NULL")
+    r.check("players with DOB (recovered from raw source rows)", afldb_dob, 12478,
+            "Recovered by tools/migration/enrich_birth_dates.py.")
+    r.check("players without DOB are NULL, not defaulted",
+            pg_one(pg, "SELECT count(*) FROM players WHERE dob IS NULL "
+                       "AND dob_confidence <> 'unknown'"), 0)
+    r.check("every recovered date cites its evidence",
+            pg_one(pg, "SELECT count(*) FROM players WHERE dob IS NOT NULL "
+                       "AND dob_confidence = 'unknown'"), 0)
+    r.check("conflicting dates flagged, not resolved by import order",
+            pg_one(pg, "SELECT count(*) FROM players WHERE dob_disputed"), 2,
+            "Jack Hayes (12949) and Roan Steele (13248); both keep the existing value.")
+    r.note(f"AFLDB carries {afldb_dob - legacy_dob:,} more birth dates than the legacy "
+           f"database ({afldb_dob:,} against {legacy_dob:,}). The dates were always in "
+           f"raw_row_json; the legacy parsed column was empty for every row.")
 
     section("6. Statistic availability (per season, per grain)")
     # 1935-1983 is 49 seasons. 45 of them had a medal whose per-match

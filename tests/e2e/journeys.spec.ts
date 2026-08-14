@@ -99,6 +99,50 @@ test('a mid-century career shows authoritative Brownlow votes', async ({ page })
   await expect(brownlowStat.locator('.note')).toHaveText('3× medallist');
 });
 
+test('an unfinished season is visibly provisional', async ({ page }) => {
+  // 2026 is loaded to 9 August with no finals played.
+  await page.goto('/seasons/2026');
+  const notice = page.locator('.notice').filter({ hasText: 'Season in progress' });
+  await expect(notice).toBeVisible();
+  await expect(notice).toContainText('provisional');
+  // No premier may be claimed while the season is still being played.
+  await expect(page.locator('.subtitle')).not.toContainText('Premiers:');
+});
+
+test('a pending Brownlow reads as not yet awarded, never as zero', async ({ page }) => {
+  // Max Gawn is still playing; the 2026 medal has not been awarded.
+  await page.goto('/players/max-gawn-11966');
+  const seasonTable = page.getByRole('table', { name: /not recorded in that era/ });
+  const row2026 = seasonTable.locator('tr').filter({ hasText: '2026' }).first();
+  await expect(row2026).toContainText('Not yet awarded');
+  await expect(row2026).toContainText('In progress');
+});
+
+test('a club page names each era by the identity of the time', async ({ page }) => {
+  // Footscray's ladder history was empty until rows were resolved to the
+  // identity trading that season, so its 1954 premiership had nowhere to
+  // sit. Scope to the season history table: the leaders tables also have
+  // a "Seasons" column and would otherwise match first.
+  await page.goto('/clubs/footscray');
+  const history = page
+    .locator('section')
+    .filter({ has: page.getByRole('heading', { name: 'Season history' }) })
+    .locator('table');
+  await expect(history).toContainText('1954');
+  await expect(history).toContainText('1925');
+  // The Western Bulldogs era belongs to the other identity's page.
+  await expect(history).not.toContainText('2026');
+});
+
+test('a merger is presented as a link, not a merged record', async ({ page }) => {
+  await page.goto('/clubs/fitzroy');
+  // "counted towards" is unique to the merger notice; filtering on the
+  // club name alone also matches the club's own historical note.
+  const notice = page.locator('.notice').filter({ hasText: 'counted towards' });
+  await expect(notice).toContainText('Brisbane Lions');
+  await expect(notice).toContainText('kept separate');
+});
+
 test('health endpoint reports database reachability', async ({ request }) => {
   const response = await request.get('/api/health');
   expect(response.status()).toBe(200);

@@ -17,7 +17,7 @@ bash tools/maintenance/backup.sh --dir /mnt/other/location
 | Location | `~/backups/afldb/` (mode 700) |
 | Naming | `afldb_dev-YYYYmmdd-HHMMSS.dump` (mode 600) |
 | Role | `afldb_backup` — `pg_read_all_data`, no write access |
-| Measured | **15 MB in 5 s**, 469 objects |
+| Measured | **16 MB in 6 s**, 560 objects |
 
 Custom format is used rather than plain SQL because it compresses, restores in parallel (`--jobs`), and supports selective restore. `--no-owner` keeps the dump restorable under a different role name.
 
@@ -43,7 +43,9 @@ afldb_restore_test          ← never afldb_dev
 9 parity checks against the source
 ```
 
-Restoring into `afldb_restore_test` means a verification run can never damage development data. The database is created once by `tools/maintenance/01_setup_service.sh`.
+Restoring into `afldb_restore_test` means a verification run can never damage development data. The database is created once by `tools/maintenance/01_setup_service.sh`, which has been run: the restore path is verified end to end, not merely written down.
+
+`pg_restore` emits "must be owner of extension" for `pg_trgm` and `unaccent` because the restoring role does not own them. Both messages are harmless — the extensions already exist in the target and must stay — and are filtered by exact message. Errors are never suppressed wholesale: the parity checks are what decide whether the restore worked, and they exit non-zero on any difference.
 
 ### Parity checks
 

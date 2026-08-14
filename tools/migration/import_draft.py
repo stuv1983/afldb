@@ -304,6 +304,15 @@ def main() -> int:
         # Record the backlog as a data issue rather than leaving it in a
         # column nobody reads.
         with pg.cursor() as cur:
+            # draft_persons is truncated and reloaded, so old issues point
+            # at ids that no longer exist. Clear the unresolved ones this
+            # pass owns; adjudicated issues are history and stay.
+            cur.execute("""
+                DELETE FROM data_issues
+                 WHERE entity_type = 'draft_person'
+                   AND issue_type = 'unlinked_player_with_games'
+                   AND resolved_at IS NULL
+            """)
             cur.execute("""
                 INSERT INTO data_issues
                     (entity_type, entity_id, issue_type, severity, description, details)

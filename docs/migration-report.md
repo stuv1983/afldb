@@ -4,21 +4,26 @@ Result of migrating the legacy AFL SQLite database into AFLDB PostgreSQL.
 
 | | |
 |---|---|
-| Date | 2026-08-14 |
+| Date | 2026-08-15 |
 | Source | `/home/arm/projects/sports_data_lab/data/afl/afl.db` (read-only, built 2026-08-12) |
 | Target | `afldb_dev` on PostgreSQL 16.14, dev server `10.0.40.100` |
-| Core import | 119 s |
-| Derived rebuild | 18 s |
-| Validation | **88 / 88 checks passed** |
+| Core import | 114 s |
+| Enrichment | 8 s (birth dates, draft) |
+| Derived rebuild | 30 s |
+| Validation | **93 / 93 checks passed** |
 | Rows rejected | 0 |
 
 Reproduce with:
 
 ```bash
 python tools/migration/import_legacy_afl.py     # idempotent full load
+python tools/migration/enrich_birth_dates.py    # birth dates from raw rows
+python tools/migration/import_draft.py          # draft rows and people
 python tools/migration/rebuild_derived.py       # derived summaries
-python tools/validation/validate_migration.py   # 88 parity checks
+python tools/validation/validate_migration.py   # 93 parity checks
 ```
+
+The whole pipeline was re-run from an empty schema after the corrections below, so every figure here comes from a clean load rather than from incremental patching.
 
 ---
 
@@ -37,15 +42,20 @@ python tools/validation/validate_migration.py   # 88 parity checks
 | `player_match_stats` | **694,210** | legacy `games` (bulk `COPY`, 84 s) |
 | `brownlow_season_votes` | 16,120 | `brownlow_results` (79,113 votes) |
 | `brownlow_round_votes` | 194,033 | 1984–2025 only |
-| `stat_availability` | 2,860 | computed per season per statistic |
+| `stat_availability` | 2,860 | computed per season, per statistic, per grain |
 | `staging.team_seasons` | 1,640 | legacy `team_seasons`, all clubs resolved |
+| `club_organizations` | 21 | derived from the 24 identities |
+| `player_birth_evidence` | 12,472 | recovered from `club_player_register.raw_row_json` |
+| `draft_persons` | 5,057 | keyed on the source's own person id |
+| `draft_picks` | 6,810 | every row retained, linked or not |
 
 ### Derived (rebuilt, never migrated)
 
 | Table | Rows |
 |---|---:|
 | `player_clubs` | 16,841 |
-| `player_season_stats` | 59,092 |
+| `player_club_season_stats` | 59,092 |
+| `player_season_stats` | 58,843 |
 | `player_career_stats` | 13,361 |
 | `club_seasons` | 1,640 |
 
@@ -116,9 +126,54 @@ Found by a failing validation check during this migration. Counting distinct *hi
 
 Before the fix, "debuted 1960s AND exactly two clubs" returned 109 players instead of 110.
 
+`clubs_played` counts distinct `clubs.organization_id`, which expresses the same lineage as a first-class entity. A **merger** is deliberately not a rename: a player who appeared for both Fitzroy and Brisbane Lions played for two clubs, because those are two organizations.
+
 ### 3.3 `seasons.premier_club_id` removed
 
 The column created a circular foreign key with `clubs`, which made `TRUNCATE clubs CASCADE` silently truncate `seasons` mid-import. It was also a second copy of a fact already in `matches`. Premiers now resolve from Grand Final results only.
+
+### 3.4 Brownlow stored at player-season grain
+
+`player_season_stats` was keyed by club and repeated the whole season's Brownlow total on every club row. Summing it gave **79,280** against the authoritative **79,113**: 44 polling player-seasons split across two clubs duplicated 167 votes.
+
+The source cannot allocate a season total between clubs, and AFLDB does not invent an allocation. The table was split:
+
+| Table | Grain | Rows | Awards |
+|---|---|---:|---|
+| `player_club_season_stats` | player · season · club | 59,092 | none, structurally |
+| `player_season_stats` | player · season | 58,843 | the only season-grain Brownlow |
+
+Season records and leading goalkickers now read the player grain, so a mid-season transfer is one entry rather than two smaller part-seasons ranked below the real figure.
+
+### 3.5 Grand Final replays resolved to the decisive match
+
+1948, 1977 and 2010 each have two Grand Final rows — a draw and its replay. Joining on `round_type` alone returned both, producing **133 rows for 130 seasons** and leaving one copy of each replay season with a null premier. Premier queries now select the non-drawn match: Melbourne 1948, North Melbourne 1977, Collingwood 2010.
+
+### 3.6 Ladder rows attached to the identity of the era
+
+`club_seasons` was built from the source ladder, which names every club by its **modern** name. Sydney therefore had ladder rows back to 1897 and Western Bulldogs back to 1925, while Footscray, South Melbourne and Kangaroos had none at all — club pages showed empty ladder histories beside historical player leaders drawn from the correct identities.
+
+Rows now resolve through `afldb_identity_for_season()`:
+
+| Organization | Eras | Rows |
+|---|---|---:|
+| Western Bulldogs | Footscray 1925–1996 / Western Bulldogs 1997–2026 | 72 + 30 = 102 |
+| Sydney | South Melbourne 1897–1981 / Sydney 1982–2026 | 84 + 45 = 129 |
+| North Melbourne | North Melbourne 1925–2026 / Kangaroos 1999–2007 | 93 + 9 = 102 |
+
+Premiership flags follow the identity, so South Melbourne keeps its three flags and the 1999 flag sits with Kangaroos.
+
+### 3.7 Birth dates recovered from raw source rows
+
+The legacy `players` table carries 945 dates; AFLDB carries **12,478**, a rise from 7.1% to 93.4%. The dates were never missing — the club register scraper collapsed a malformed table header, leaving `club_player_register.dob` empty for all 15,310 rows while `raw_row_json` kept the payload.
+
+Players are matched on the AFL Tables profile URL, never on the name. Two conflicts (Jack Hayes, Roan Steele) keep their existing value and are flagged rather than resolved by import order. 883 players remain honestly without a date.
+
+### 3.8 Draft identity resolved per person
+
+All 6,810 draft rows are imported. Resolving identity once per **person** rather than per row — the source describes 5,057 people — recovered 89 links that the data already justified elsewhere, and makes it impossible for the same person to be linked in one row and unlinked in the next.
+
+The 1,664 unmatched rows are two populations, not one defect: **1,498 people never played a senior game**, so having no AFLDB player is correct; **100 people did play** and are a genuine matching backlog, flagged and raised as open data issues.
 
 ---
 

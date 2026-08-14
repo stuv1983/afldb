@@ -87,23 +87,61 @@ Ports already in use on the dev server: 3000, 8080, 8081, 8082, 8085, 8086, 6881
 
 ### 4.2 Derived data
 
-`player_season_stats`, `player_career_stats`, `club_seasons` and record leaderboards are **always reproducible** from the authoritative tables by a single documented rebuild command. They are never hand-edited and never the only copy of a fact.
+`player_season_stats`, `player_club_season_stats`, `player_career_stats`, `club_seasons` and record leaderboards are **always reproducible** from the authoritative tables by a single documented rebuild command. They are never hand-edited and never the only copy of a fact.
 
 ### 4.3 The Brownlow correctness rule
 
 Per-game Brownlow votes exist only for **1931–1934** and **1984–2025**. The legacy `players.career_brownlow` column, derived from per-game votes, therefore understates career totals by **32,134 votes (40.6%)** and reports NULL for players such as Bob Skilton (actually 180 votes across three medals).
 
-**Rule.** Career and season Brownlow totals come from `brownlow_results`. Per-game votes are displayed only within the two covered windows, and the UI must render *"not recorded"* rather than `0` outside them.
+**Rule.** Career and season Brownlow totals come from `brownlow_season_votes`. Per-game votes are displayed only within the two covered windows, and the UI must render *"not recorded"* rather than `0` outside them.
 
-### 4.4 Historical identity
+### 4.4 Grain
+
+A statistic must be stored at the grain at which it is decided.
+
+| Table | Grain | Rows |
+|---|---|---|
+| `player_club_season_stats` | player · season · club | 59,092 |
+| `player_season_stats` | player · season | 58,843 |
+
+A season award is decided once, for a player, and the source cannot allocate it between the clubs a mid-season transfer played for. When Brownlow votes lived on the club-grained table, 44 polling player-seasons split across two clubs contributed their total twice: the table summed to **79,280** against an authoritative **79,113**.
+
+**Rule.** `player_season_stats` is the only season-grain source of Brownlow votes, and `player_club_season_stats` has no award column at all — so no future query can reintroduce the double count. Season records and leading goalkickers read the player grain, so a transfer season is one entry rather than two part-seasons.
+
+### 4.5 Historical identity
 
 - **Players** are identified by a stable numeric ID, never by name — `peter brown` alone maps to 6 distinct players. URLs are `/players/{slug}-{id}`; the ID is authoritative and the slug cosmetic.
-- **Clubs** keep all 24 historical identities (Fitzroy, South Melbourne, Footscray, Kangaroos, University, Brisbane Bears, …) with alias and successor relationships, rather than being flattened to the 18 modern clubs.
+- **Clubs** are two layers. **24 historical identities** (`clubs`) carry matches, player stints, ladder rows and era pages; **21 organizations** (`club_organizations`) carry "clubs played", lineage totals and navigation. Three organizations span two identities each: South Melbourne/Sydney, Footscray/Western Bulldogs, North Melbourne/Kangaroos.
+- A **merger is not a rename.** Fitzroy, Brisbane Bears and Brisbane Lions remain three separate organizations; `club_organization_relations` makes the 1997 merger navigable **without combining statistics**, so the Lions' record still starts in 1997 and Fitzroy keeps its 100 seasons.
+- Ladder rows resolve through `afldb_identity_for_season()` to the identity trading that season. Without it the source ladder's modern-only names gave Sydney rows back to 1897 and Footscray none at all.
 - **Venues** become entities with canonical names and aliases (`M.C.G.` → Melbourne Cricket Ground).
+- **External sources** are joined on durable keys, never names: AFL Tables profile URLs for birth dates, DraftGuru person ids for draft rows.
 
-### 4.5 NULL semantics
+### 4.6 NULL semantics
 
-`NULL` means *not recorded*; `0` means *recorded as zero*. This distinction is preserved end-to-end — through the schema, the query layer, and the UI — and is driven by the `stat_availability` table. Because `stat_coverage`'s min/max ranges hide the Brownlow gap, AFLDB records **per-season** availability.
+`NULL` means *not recorded*; `0` means *recorded as zero*. This distinction is preserved end-to-end — through the schema, the query layer, and the UI.
+
+A boolean cannot carry that distinction, so `coverage_status` records **why** a value is absent:
+
+| Status | Meaning |
+|---|---|
+| `complete` | collected for every eligible row; a `0` is a fact |
+| `partial` | collected for some; absence is unknown |
+| `not_collected` | it existed, nobody recorded it |
+| `not_applicable` | there was nothing to collect |
+| `pending` | expected to exist, not yet published |
+
+Availability is recorded **per season, per grain**. The three Brownlow grains genuinely disagree — season totals run 1924–2025 bar the war years, round votes only from 1984, and match votes are `partial` even inside 1931–1934, because no season in that window has every home-and-away match fully polled. Conflating them into one `brownlow` key is what let the 40.6% shortfall pass unnoticed.
+
+The same rule governs attendance: 1,651 matches have none, and `attendance_status` distinguishes *not recorded* from a genuine zero. A zero crowd must cite a source; several 2020–21 matches truly were played to empty stands, but "we have no figure" and "the figure was zero" are different claims.
+
+### 4.7 Provisional seasons
+
+`seasons.status` is `in_progress` or `complete`, with `data_through_date`, `last_loaded_round` and `completed_at`. Only the most recently loaded season can be in progress, and it stays so until a Grand Final has been decided — 1897 and 1924 have no Grand Final at all, so "no Grand Final" alone cannot mean "unfinished".
+
+For an in-progress season every derived figure is provisional: no premier, no wooden spoon (the raw ladder flags whoever is currently last, which is a standing, not an honour), and Brownlow reads *"Not yet awarded"* rather than zero. The raw source flag is preserved untouched in `staging`.
+
+**Grand Final replays.** 1948, 1977 and 2010 each have two Grand Final rows. Joining on `round_type` alone returns both, duplicating the season and leaving one copy with a null premier. Premier queries select the decisive, non-drawn match.
 
 ## 5. Application structure
 

@@ -47,13 +47,28 @@ fi
 START=$(date +%s)
 
 # --clean --if-exists makes the restore repeatable.
+#
+# The restoring role does not own pg_trgm or unaccent, so --clean's
+# DROP EXTENSION and the COMMENT ON EXTENSION statements always fail with
+# "must be owner of extension". Both are harmless: the extensions already
+# exist in the target and must stay. They are filtered by exact message
+# rather than by suppressing errors wholesale, because red lines in a
+# verification tool make a REAL failure easy to miss.
+#
+# Nothing here decides whether the restore worked — the parity checks
+# below do that, and they exit non-zero on any difference.
 pg_restore \
   --dbname="$RESTORE_DSN" \
   --clean --if-exists \
   --no-owner \
   --no-privileges \
+  --no-comments \
   --jobs=4 \
-  "$BACKUP" 2>&1 | grep -v '^pg_restore: warning' || true
+  "$BACKUP" 2>&1 \
+  | grep -v '^pg_restore: warning' \
+  | grep -v 'must be owner of extension' \
+  | grep -v 'Command was: DROP EXTENSION' \
+  || true
 
 ELAPSED=$(( $(date +%s) - START ))
 echo "    restored in ${ELAPSED}s"

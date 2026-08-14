@@ -308,6 +308,16 @@ def main() -> int:
                     (disputed,),
                 )
 
+            # Re-running must not stack duplicate issues. Only UNRESOLVED
+            # ones this pass owns are cleared; anything already
+            # adjudicated is history and stays.
+            cur.execute(
+                """DELETE FROM data_issues
+                    WHERE entity_type = 'player'
+                      AND issue_type IN ('dob_conflict', 'dob_internal_conflict')
+                      AND resolved_at IS NULL"""
+            )
+
             for afldb_id, existing, asserted in source_conflicts:
                 cur.execute(
                     """INSERT INTO data_issues

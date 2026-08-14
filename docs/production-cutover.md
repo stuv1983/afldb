@@ -9,20 +9,21 @@
 ## 1. Readiness gate
 
 ### Data
-- [x] Migration verified — 88/88 parity checks
+- [x] Migration verified — 93/93 parity checks
 - [x] Historical parity verified — exact Advanced Search ID sets
+- [x] Release gates green — 55 assertions, immutable and snapshot separated
 - [ ] **Data-quality blockers reviewed** — see §2
 
 ### Application
-- [x] Production build stable (1,451 pages, 61 s)
-- [x] Pages stable — 25 E2E tests, desktop and mobile
+- [x] Production build stable
+- [x] Pages stable — 33 E2E tests, desktop and mobile
 - [x] Search stable
-- [x] Advanced Search stable — 4 regression cases exact
+- [x] Advanced Search stable — 4 regression cases exact, driven through the real service
 
 ### Database
 - [x] Indexes tuned — verified with `EXPLAIN`
 - [ ] **Backups automated** — script exists, timer not installed
-- [x] Restore tested — 9 parity checks
+- [x] Restore tested — 9 parity checks, run against `afldb_restore_test`
 - [x] Least privilege verified — `afldb_app` cannot write
 
 ### Security
@@ -44,15 +45,17 @@
 - [x] robots.txt gated on `AFLDB_ENV`
 
 ### Operations
-- [x] systemd unit
-- [x] Reverse proxy
+- [x] systemd unit — installed, `enabled`, running as a 4-worker cluster
+- [x] Reverse proxy — Caddy active on :8090
 - [x] Logs (journald)
-- [x] Health endpoint
+- [x] Health endpoint — verified direct and proxied
 - [x] Deployment documentation
 - [x] Rollback documentation
 - [ ] **Monitoring/alerting** — not configured
 
 **Three gate items remain open.** Do not cut over until they are closed.
+
+> **Restarting the service needs root.** `sudo systemctl restart afldb` prompts for a password, so a deployment cannot complete unattended. The service does pick up a new build on its next restart, but do not assume a build alone has deployed it.
 
 ## 2. Outstanding data-quality items
 
@@ -60,13 +63,18 @@ None are correctness blockers; each is a documented gap, and the decision to lau
 
 | Item | Extent | Current handling |
 |---|---|---|
-| Missing DOB | 12,416 of 13,361 (93%) | shown as "Not recorded" |
+| Missing DOB | 883 of 13,361 (6.6%) | shown as "Not recorded" |
+| Disputed DOB | 2 players | existing value kept, badged "Disputed", open `data_issue` |
 | Display names lost apostrophes | 803 players | logged in `data_issues`; search unaffected |
-| Awards / draft / HOF / relationships | not migrated | tables exist; sections not exposed |
+| Draft matching backlog | 100 people | imported unlinked, flagged, 100 open `data_issues` |
+| Awards / HOF / relationships | not migrated | tables exist; sections not exposed |
 | Venue canonicalisation | 49 of 52 unexpanded | raw names displayed |
-| Unmatched draft picks | 1,664 (24%) | will import with `player_id` NULL |
+| Unknown attendance | 1,651 matches | `attendance_status = not_collected`; never rendered as 0 |
+| 2026 incomplete | loaded to 9 Aug | labelled provisional; no premier, spoon or Brownlow |
 
-**Recommendation:** launch without the award/draft/relationship sections rather than expose partially linked data. Requirement #42 — only expose sections backed by validated data.
+Two of these have improved materially since the last review. **DOB coverage rose from 7.1% to 93.4%** by recovering dates from raw source rows the legacy scraper had failed to parse. **Draft data is now imported in full** — all 6,810 rows — with identity resolved per person rather than per row, which reduced the genuinely unlinked-but-played population to 100 people; the other 1,498 unlinked people never played a senior game, so having no AFLDB player is the correct outcome rather than a defect.
+
+**Recommendation:** the draft section can now be exposed if desired, because unresolved links are visible as such rather than silently absent. Awards, Hall of Fame and relationships remain unmigrated and should stay unexposed. Requirement #42 — only expose sections backed by validated data.
 
 ## 3. Proposed staging step (recommended, needs approval)
 

@@ -104,28 +104,40 @@ Returns `{"status":"ok","database":"ok","latencyMs":N}`, or HTTP 503 with `"data
 
 ## 7. Data refresh
 
+Run in this order. Each step is idempotent and safe to repeat.
+
 ```bash
 cd ~/projects/afldb
 source .venv/bin/activate    # or use ./.venv/bin/python directly
 
-./.venv/bin/python tools/migration/import_legacy_afl.py       # idempotent reload
-./.venv/bin/python tools/migration/rebuild_derived.py         # summaries
-./.venv/bin/python tools/validation/validate_migration.py     # 88 parity checks
+./.venv/bin/python tools/migration/import_legacy_afl.py       # ~114s  core reload
+./.venv/bin/python tools/migration/enrich_birth_dates.py      # ~6s    DOB recovery
+./.venv/bin/python tools/migration/import_draft.py            # ~2s    draft links
+./.venv/bin/python tools/migration/rebuild_derived.py         # ~30s   summaries
+./.venv/bin/python tools/validation/validate_migration.py     # 93 parity checks
 
 npm run build && sudo systemctl restart afldb                 # refresh cached pages
 ```
 
-Import options: `--dry-run`, `--groups <name>...`, `--list-groups`.
+The order matters. `rebuild_derived.py` must run last: it reads the tables the earlier steps write, and its first target, `season_metadata`, decides whether a season is still in progress — which in turn decides whether that season's Brownlow reads as a zero or as "not yet awarded".
+
+Options: `--dry-run` on every script, plus `--groups <name>...` and `--list-groups` on the legacy import and `--targets` on the rebuild.
+
+**Enrichment never overwrites.** `enrich_birth_dates.py` fills only NULL dates and flags disagreements rather than resolving them, so re-running it after a manual correction cannot undo that correction.
 
 **Cache invalidation.** Historical pages are cached for 1–24 hours. After an import, a rebuild and restart refreshes them; a full restart is not otherwise required. Rebuilding is preferred over waiting for revalidation, because prerendered pages are regenerated at build time.
 
 ## 8. Testing
 
 ```bash
-npm run test                 # 54 unit + integration (against afldb_test)
-npx playwright test          # 25 E2E, desktop and mobile
+npm run test                 # 111 unit + integration (against afldb_test)
+npx playwright test          # 33 E2E, desktop and mobile
 node tools/maintenance/loadtest.mjs --concurrency 20 --duration 20
 ```
+
+`tests/integration/release-gates.test.ts` holds the conditions that must never regress, and separates **immutable** historical assertions from **snapshot** ones pinned to the loaded 2026 data. A snapshot failure after importing newer data means "re-pin", not "bug"; an immutable failure is a real defect.
+
+Playwright starts its own server and refuses to reuse one already on 3100. That is deliberate: a leftover process previously caused the suite to report failures for code that had already been fixed. Clear it with `fuser -k 3100/tcp`.
 
 Playwright needs `libasound2`, extracted without root into `~/.local/chromedeps`:
 

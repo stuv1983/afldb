@@ -456,6 +456,19 @@ describe('gate: draft links', () => {
     expect(row.n).toBe(100);
   });
 
+  it('does not stack duplicate issues when a pass is re-run', async () => {
+    // The enrichment passes are re-runnable, so their issue writes must
+    // be too. Left unchecked, each run appended another copy.
+    const rows = await sql<{ issueType: string; n: number }[]>`
+      SELECT issue_type AS "issueType", count(*)::int AS n FROM (
+        SELECT issue_type, entity_type, entity_id, count(*) AS c
+          FROM data_issues WHERE resolved_at IS NULL
+         GROUP BY 1, 2, 3 HAVING count(*) > 1
+      ) d GROUP BY issue_type
+    `;
+    expect(rows).toEqual([]);
+  });
+
   it('keeps the source person key as the durable identity', async () => {
     const [row] = await sql<{ missing: number; dupes: number }[]>`
       SELECT count(*) FILTER (WHERE dg_person_id IS NULL)::int AS missing,

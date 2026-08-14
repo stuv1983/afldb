@@ -89,6 +89,24 @@ CLUBS = [
     ("Western Bulldogs",       "Western Bulldogs",       "Western Bulldogs","WB",  None,                "current",   True,  "VIC"),
 ]
 
+# Links BETWEEN organizations, as opposed to renames within one.
+# (from_slug, to_slug, relation, effective_season, note)
+#
+# A merger transfers no history. Fitzroy's 100 seasons stay Fitzroy's;
+# folding them into Brisbane Lions would invent a history the club never
+# had. These rows make the link navigable without combining statistics.
+CLUB_ORGANIZATION_RELATIONS = [
+    ("fitzroy", "brisbane-lions", "merged_into", 1997,
+     "Fitzroy and Brisbane Bears combined to form Brisbane Lions in 1997. "
+     "Statistics are not combined: each organization keeps its own record."),
+    ("brisbane-bears", "brisbane-lions", "merged_into", 1997,
+     "Brisbane Bears and Fitzroy combined to form Brisbane Lions in 1997. "
+     "Statistics are not combined."),
+    ("university", None, "folded", 1915,
+     "University withdrew from the competition after the 1914 season and "
+     "never returned."),
+]
+
 CLUB_NOTES = {
     "Fitzroy": "Merged with Brisbane Bears in 1997 to form the Brisbane Lions. "
                "Retained as a distinct identity because the source data keeps its record separate.",
@@ -215,18 +233,24 @@ def import_seasons(pg: psycopg.Connection, lite, rep: Reporter) -> None:
         for r in rows:
             season = r["season"]
             cur.execute(
+                # status, not is_complete: is_complete is a generated
+                # mirror of it. The provisionality columns are a first
+                # guess here and are settled properly by the
+                # season_metadata rebuild, which can see whether a Grand
+                # Final has actually been decided.
                 """INSERT INTO seasons
-                     (year, league, is_complete, first_match_date, last_match_date,
-                      match_count, club_count, notes)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                     (year, league, status, first_match_date, last_match_date,
+                      match_count, club_count, data_through_date, notes)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 (
                     season,
                     "VFL" if season <= 1989 else "AFL",
-                    season < max_season,
+                    "complete" if season < max_season else "in_progress",
                     r["first_date"],
                     r["last_date"],
                     r["matches"],
                     r["clubs"],
+                    r["last_date"],
                     "Season in progress at time of import." if season == max_season else None,
                 ),
             )
@@ -321,6 +345,65 @@ def import_clubs(pg: psycopg.Connection, lite, rep: Reporter) -> None:
     rep.result("clubs", scalar(pg, "SELECT count(*) FROM clubs"),
                f"({scalar(pg, 'SELECT count(*) FROM clubs WHERE is_current_afl_club')} current)")
     rep.result("club_aliases", scalar(pg, "SELECT count(*) FROM club_aliases"))
+
+    import_club_organizations(pg, rep)
+
+
+def import_club_organizations(pg: psycopg.Connection, rep: Reporter) -> None:
+    """Derive the 21 continuing clubs from the 24 historical identities.
+
+    Runs immediately after clubs, in the same import, because clubs are
+    truncated and reloaded with fresh ids. The organization is the club
+    that is its own current identity; every other identity is one of its
+    eras.
+
+    A MERGER is not a rename, so Fitzroy, Brisbane Bears and Brisbane
+    Lions stay three organizations and their records are never combined.
+    The link is recorded as a relation instead.
+    """
+    with pg.cursor() as cur:
+        # Relations cascade from organizations, so they go first.
+        cur.execute("DELETE FROM club_organization_relations")
+        cur.execute("UPDATE clubs SET organization_id = NULL")
+        cur.execute("DELETE FROM club_organizations")
+
+        cur.execute("""
+            INSERT INTO club_organizations
+                  (id, name, slug, first_season, last_season, is_active)
+            SELECT cur.id, cur.name, cur.slug,
+                   min(mem.first_season), max(mem.last_season),
+                   max(mem.last_season) = (SELECT max(year) FROM seasons)
+              FROM clubs cur
+              JOIN clubs mem ON mem.current_identity_id = cur.id
+             WHERE cur.id = cur.current_identity_id
+             GROUP BY cur.id, cur.name, cur.slug
+        """)
+        cur.execute("""
+            SELECT setval(pg_get_serial_sequence('club_organizations', 'id'),
+                          (SELECT max(id) FROM club_organizations))
+        """)
+        cur.execute("UPDATE clubs SET organization_id = current_identity_id")
+
+        for from_slug, to_slug, relation, season, note in CLUB_ORGANIZATION_RELATIONS:
+            cur.execute(
+                """INSERT INTO club_organization_relations
+                     (from_organization_id, to_organization_id, relation,
+                      effective_season, notes)
+                   SELECT f.id,
+                          (SELECT id FROM club_organizations WHERE slug = %s),
+                          %s, %s, %s
+                     FROM club_organizations f WHERE f.slug = %s""",
+                (to_slug, relation, season, note, from_slug),
+            )
+    pg.commit()
+
+    orphans = scalar(pg, "SELECT count(*) FROM clubs WHERE organization_id IS NULL")
+    if orphans:
+        raise RuntimeError(f"{orphans} club identities have no organization")
+
+    rep.result("club_organizations",
+               scalar(pg, "SELECT count(*) FROM club_organizations"),
+               f"({scalar(pg, 'SELECT count(*) FROM clubs')} identities)")
 
 
 def import_venues(pg: psycopg.Connection, lite, rep: Reporter) -> None:
@@ -464,6 +547,7 @@ def import_matches(pg: psycopg.Connection, lite, rep: Reporter, batch) -> None:
                 result, winner = "draw", None
 
             d = details.get(r["match_id"])
+            attendance = to_int(d["attendance"]) if d else to_int(r["attendance"])
             yield (
                 r["match_id"], r["match_id"], r["match_key"], r["season"],
                 round_code, round_number, round_type, round_type != "home_and_away",
@@ -479,7 +563,10 @@ def import_matches(pg: psycopg.Connection, lite, rep: Reporter, batch) -> None:
                 to_int(d["away_q4_behinds"]) if d else None,
                 away_score,
                 result, winner, abs(home_score - away_score),
-                to_int(d["attendance"]) if d else to_int(r["attendance"]),
+                attendance,
+                # No source recorded a crowd. This is NOT zero, and the
+                # status keeps the two apart permanently.
+                "complete" if attendance is not None else "not_collected",
                 events.get(r["match_id"]),
             )
 
@@ -490,7 +577,8 @@ def import_matches(pg: psycopg.Connection, lite, rep: Reporter, batch) -> None:
          "venue_id", "venue_raw", "home_club_id", "away_club_id",
          "home_goals", "home_behinds", "home_score",
          "away_goals", "away_behinds", "away_score",
-         "result", "winner_club_id", "margin", "attendance", "match_event"],
+         "result", "winner_club_id", "margin",
+         "attendance", "attendance_status", "match_event"],
         build(), batch,
     )
 
@@ -717,21 +805,140 @@ def import_stat_availability(pg: psycopg.Connection, lite, rep: Reporter) -> Non
         ).fetchall():
             if r["season"] not in seasons:
                 continue
-            rows.append((key, r["season"], (r["populated"] or 0) > 0,
-                         r["populated"] or 0, r["total"]))
+            populated, total = r["populated"] or 0, r["total"] or 0
+            # A boolean cannot say WHY a statistic is absent. 'partial'
+            # in particular is invisible to is_recorded, and it is the
+            # state that most easily reads as a factual zero.
+            if total == 0 or populated == 0:
+                coverage = "not_collected"
+            elif populated >= total:
+                coverage = "complete"
+            else:
+                coverage = "partial"
+            rows.append((key, r["season"], populated > 0, coverage, populated, total))
 
     copy_rows(pg, "stat_availability",
-              ["stat_key", "season", "is_recorded", "populated_rows", "total_rows"], rows)
+              ["stat_key", "season", "is_recorded", "coverage",
+               "populated_rows", "total_rows"], rows)
     pg.commit()
 
     recorded = scalar(pg, "SELECT count(*) FROM stat_availability WHERE is_recorded")
     rep.result("stat_availability", len(rows), f"({recorded} season/stat pairs recorded)")
 
+    import_brownlow_availability(pg, rep)
+
+
+def import_brownlow_availability(pg: psycopg.Connection, rep: Reporter) -> None:
+    """Per-season coverage for each of the three Brownlow grains.
+
+    The single 'brownlow' key gave one answer to three questions. The
+    grains genuinely disagree: season totals run 1924-2025 (bar the war
+    years), round votes only from 1984, and match votes are partial even
+    inside 1931-1934 -- no season in that window has every home-and-away
+    match fully polled. Finals are never polled at all.
+
+    Computed from the loaded data, so a future reload that fills a gap
+    reports the improvement rather than repeating a hardcoded claim.
+    """
+    with pg.cursor() as cur:
+        for key, label, short, description, order in (
+            ("brownlow_match_votes", "Brownlow Votes (per match)", "BV/match",
+             "Umpire votes recorded against an individual match. Home-and-away "
+             "only; finals are never polled.", 90),
+            ("brownlow_round_votes", "Brownlow Votes (per round)", "BV/round",
+             "Umpire votes aggregated to a round.", 91),
+            ("brownlow_season_total", "Brownlow Votes (season total)", "BV",
+             "Official season vote total. The authoritative figure for career "
+             "and season aggregates.", 92),
+        ):
+            cur.execute(
+                """INSERT INTO stat_definitions
+                     (key, label, short_label, description, display_order)
+                   VALUES (%s,%s,%s,%s,%s)
+                   ON CONFLICT (key) DO UPDATE
+                     SET label = EXCLUDED.label,
+                         short_label = EXCLUDED.short_label,
+                         description = EXCLUDED.description""",
+                (key, label, short, description, order),
+            )
+
+        cur.execute("""
+            WITH season_ctx AS (
+                SELECT s.year AS season, s.status AS season_status,
+                       EXISTS (SELECT 1 FROM brownlow_season_votes b
+                                WHERE b.season = s.year) AS medal_awarded
+                FROM seasons s
+            ),
+            match_ctx AS (
+                -- A fully polled match distributes exactly 3 + 2 + 1 = 6 votes.
+                SELECT mt.season,
+                       count(*) FILTER (WHERE NOT mt.is_final)                  AS ha_matches,
+                       count(*) FILTER (WHERE NOT mt.is_final AND vs.total = 6) AS ha_complete,
+                       count(*) FILTER (WHERE NOT mt.is_final AND vs.total > 0) AS ha_any
+                FROM matches mt
+                LEFT JOIN LATERAL (
+                    SELECT COALESCE(sum(pms.brownlow_votes), 0) AS total
+                    FROM player_match_stats pms WHERE pms.match_id = mt.id
+                ) vs ON true
+                GROUP BY mt.season
+            ),
+            round_ctx AS (
+                SELECT season, count(*) AS vote_rows
+                FROM brownlow_round_votes GROUP BY season
+            ),
+            resolved AS (
+                SELECT c.season,
+                    CASE WHEN c.medal_awarded                 THEN 'complete'
+                         WHEN c.season_status = 'in_progress' THEN 'pending'
+                         ELSE 'not_applicable' END::coverage_status AS season_total,
+                    CASE WHEN COALESCE(r.vote_rows, 0) > 0    THEN 'complete'
+                         WHEN c.season_status = 'in_progress' THEN 'pending'
+                         WHEN c.medal_awarded                 THEN 'not_collected'
+                         ELSE 'not_applicable' END::coverage_status AS round_votes,
+                    CASE WHEN m.ha_matches > 0 AND m.ha_complete = m.ha_matches
+                                                              THEN 'complete'
+                         WHEN COALESCE(m.ha_any, 0) > 0       THEN 'partial'
+                         WHEN c.season_status = 'in_progress' THEN 'pending'
+                         WHEN c.medal_awarded                 THEN 'not_collected'
+                         ELSE 'not_applicable' END::coverage_status AS match_votes,
+                    m.ha_matches, m.ha_complete
+                FROM season_ctx c
+                LEFT JOIN match_ctx m ON m.season = c.season
+                LEFT JOIN round_ctx r ON r.season = c.season
+            )
+            INSERT INTO stat_availability (stat_key, season, is_recorded, coverage,
+                                           populated_rows, total_rows)
+            SELECT 'brownlow_season_total', season, season_total = 'complete',
+                   season_total, NULL::integer, NULL::integer FROM resolved
+            UNION ALL
+            SELECT 'brownlow_round_votes', season, round_votes = 'complete',
+                   round_votes, NULL::integer, NULL::integer FROM resolved
+            UNION ALL
+            SELECT 'brownlow_match_votes', season,
+                   match_votes IN ('complete', 'partial'), match_votes,
+                   ha_complete::integer, ha_matches::integer FROM resolved
+            ON CONFLICT (stat_key, season) DO UPDATE
+               SET is_recorded    = EXCLUDED.is_recorded,
+                   coverage       = EXCLUDED.coverage,
+                   populated_rows = EXCLUDED.populated_rows,
+                   total_rows     = EXCLUDED.total_rows
+        """)
+        # The generic key claimed one answer for three questions.
+        cur.execute("DELETE FROM stat_definitions WHERE key = 'brownlow'")
+    pg.commit()
+
     gap = scalar(pg, """
         SELECT count(*) FROM stat_availability
-         WHERE stat_key = 'brownlow' AND NOT is_recorded AND season BETWEEN 1935 AND 1983
+         WHERE stat_key = 'brownlow_match_votes' AND coverage = 'not_collected'
+           AND season BETWEEN 1935 AND 1983
     """)
-    rep.step(f"Brownlow per-game gap confirmed: {gap} seasons 1935-1983 marked not recorded")
+    war = scalar(pg, """
+        SELECT count(*) FROM stat_availability
+         WHERE stat_key = 'brownlow_season_total' AND coverage = 'not_applicable'
+           AND season >= 1924
+    """)
+    rep.step(f"Brownlow match-vote gap: {gap} seasons 1935-1983 not collected; "
+             f"{war} war years with no medal awarded")
 
 
 # ---------------------------------------------------------------------------

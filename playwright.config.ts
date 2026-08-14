@@ -24,4 +24,24 @@ export default defineConfig({
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
     { name: 'mobile', use: { ...devices['Pixel 7'] } },
   ],
+
+  /**
+   * Start the server rather than testing whatever happens to be on 3100.
+   *
+   * Without this the suite silently ran against a stale process still
+   * bound to the port, reporting failures for code that had already been
+   * fixed. `reuseExistingServer: false` makes a leftover server an
+   * immediate, loud EADDRINUSE instead of a misleading test result —
+   * clear it with `fuser -k 3100/tcp`.
+   *
+   * Skipped when pointing at an external deployment.
+   */
+  webServer: process.env.AFLDB_E2E_BASE_URL ? undefined : {
+    command: 'node .next/standalone/server.js',
+    url: 'http://127.0.0.1:3100/api/health',
+    reuseExistingServer: false,
+    timeout: 60_000,
+    stdout: 'ignore',
+    stderr: 'pipe',
+  },
 });
