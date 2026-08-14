@@ -390,6 +390,78 @@ describe('gate: absence is never zero', () => {
 });
 
 // ---------------------------------------------------------------------
+// IMMUTABLE — birth-date evidence
+// ---------------------------------------------------------------------
+describe('gate: birth dates', () => {
+  it('populates 12,478 players with two visible conflicts', async () => {
+    const [row] = await sql<{ withDob: number; disputed: number }[]>`
+      SELECT count(*) FILTER (WHERE dob IS NOT NULL)::int AS "withDob",
+             count(*) FILTER (WHERE dob_disputed)::int    AS disputed
+        FROM players
+    `;
+    // 945 before recovery, 7.1% -> 93.4%.
+    expect(row.withDob).toBe(12_478);
+    expect(row.disputed).toBe(2);
+  });
+
+  it('retains the existing date wherever a source disagrees', async () => {
+    const rows = await sql<{ id: number; dob: string; register: string }[]>`
+      SELECT p.id, p.dob::text, e.dob::text AS register
+        FROM players p JOIN player_birth_evidence e ON e.player_id = p.id
+       WHERE p.dob_disputed ORDER BY p.id
+    `;
+    expect(rows).toHaveLength(2);
+    // The register is not automatically preferred: a disagreement is
+    // adjudicated by a person, not by import order.
+    for (const row of rows) expect(row.dob).not.toBe(row.register);
+  });
+
+  it('opens a data issue for every disputed date', async () => {
+    const [row] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM data_issues
+       WHERE issue_type = 'dob_conflict' AND resolved_at IS NULL
+    `;
+    expect(row.n).toBe(2);
+  });
+
+  it('keeps the evidence behind every recovered date', async () => {
+    const [row] = await sql<{ evidence: number; linked: number }[]>`
+      SELECT (SELECT count(*)::int FROM player_birth_evidence)          AS evidence,
+             (SELECT count(*)::int FROM players WHERE dob_evidence_id IS NOT NULL)
+                                                                        AS linked
+    `;
+    expect(row.evidence).toBe(12_472);
+    // Every filled date points back at the row that justified it.
+    expect(row.linked).toBe(11_533);
+  });
+
+  it('matches players on the profile URL rather than the name', async () => {
+    const [row] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM external_identities
+       WHERE match_method = 'afltables_profile_url' AND status = 'unique'
+    `;
+    expect(row.n).toBe(12_472);
+  });
+
+  it('never claims a date whose origin is unknown', async () => {
+    const [row] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM players
+       WHERE dob IS NOT NULL AND dob_confidence = 'unknown'
+    `;
+    expect(row.n).toBe(0);
+  });
+
+  it('leaves 883 players honestly without a date', async () => {
+    const [row] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM players
+       WHERE dob IS NULL AND dob_confidence = 'unknown'
+    `;
+    // Not backfilled with a guess: these are shown as "Not recorded".
+    expect(row.n).toBe(883);
+  });
+});
+
+// ---------------------------------------------------------------------
 // IMMUTABLE — Grand Final replays
 // ---------------------------------------------------------------------
 describe('gate: Grand Final replays', () => {

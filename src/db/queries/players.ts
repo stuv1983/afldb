@@ -91,6 +91,7 @@ export type PlayerProfile = {
   displayName: string;
   dob: Date | null;
   dobConfidence: string;
+  dobDisputed: boolean;
   birthYear: number | null;
   birthYearConfidence: string;
   games: number;
@@ -123,6 +124,7 @@ export async function getPlayer(id: number): Promise<PlayerProfile | null> {
   const [row] = await sql<PlayerProfile[]>`
     SELECT p.id, p.slug, p.display_name AS "displayName",
            p.dob, p.dob_confidence AS "dobConfidence",
+           p.dob_disputed AS "dobDisputed",
            p.birth_year AS "birthYear",
            p.birth_year_confidence AS "birthYearConfidence",
            c.games, c.goals, c.behinds, c.disposals,

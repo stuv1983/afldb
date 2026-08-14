@@ -205,6 +205,18 @@ export default async function PlayerPage({
                   {player.dob
                     ? formatDate(player.dob)
                     : <span className="not-recorded">Not recorded</span>}
+                  {/* Sources disagree. The date shown is the one AFLDB
+                      already held; the conflict is recorded rather than
+                      resolved by picking a winner. */}
+                  {player.dobDisputed && (
+                    <span
+                      className="badge badge-warn"
+                      style={{ marginLeft: '0.4rem' }}
+                      title="Sources disagree on this date. The existing value is shown pending review."
+                    >
+                      Disputed
+                    </span>
+                  )}
                 </td>
                 <th scope="row">Best game (disposals)</th>
                 <td>{formatStat(player.bestDisposalsGame)}</td>
