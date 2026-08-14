@@ -23,8 +23,14 @@
 ### Database
 - [x] Indexes tuned — verified with `EXPLAIN`
 - [ ] **Backups automated** — script exists, timer not installed
-- [x] Restore tested — 9 parity checks, run against `afldb_restore_test`
+- [x] Restore tested — the successful path: target cleared first, every
+      unexpected `pg_restore` error fatal, then 9 parity checks against
+      `afldb_restore_test`
+- [ ] **Restore failure paths untested** — a corrupt dump and a wrong target
+      have not been exercised, only guarded against
 - [x] Least privilege verified — `afldb_app` cannot write
+- [x] Web process holds only the app credential — the unit drops the import,
+      owner, test and backup DSNs from the service environment
 
 ### Security
 - [x] Secrets externalised (`.env`, mode 600)
@@ -41,8 +47,18 @@
 ### SEO
 - [x] Canonical URLs
 - [x] Metadata
-- [x] Segmented sitemap
-- [x] robots.txt gated on `AFLDB_ENV`
+- [x] Segmented sitemap, with a published index at `/sitemap.xml`
+- [x] robots.txt gated on `AFLDB_ENV`, and smoke-tested per environment
+
+### Reload safety
+- [x] A partial `--groups` import cannot `CASCADE` into tables it will not
+      rebuild
+- [x] Clubs and their organizations commit together, so a null organization
+      is never observable
+- [ ] **Crash recovery and concurrent-update behaviour untested** — a
+      successful full rebuild does not exercise either. There is still no
+      advisory lock, shadow generation or atomic cutover: a reload is
+      visible in stages to anything reading during it
 
 ### Operations
 - [x] systemd unit — installed, `enabled`, running as a 4-worker cluster
@@ -53,7 +69,13 @@
 - [x] Rollback documentation
 - [ ] **Monitoring/alerting** — not configured
 
-**Three gate items remain open.** Do not cut over until they are closed.
+**Six gate items remain open.** Do not cut over until they are closed.
+
+> **What "green" covers.** Every assertion above that is ticked passes on the
+> successful development path. That is not the same as proven under failure:
+> restore failure paths, reload crash recovery and concurrent-update
+> behaviour are explicitly untested, and are listed as open rather than
+> folded into the ticks around them.
 
 > **Restarting the service needs root.** `sudo systemctl restart afldb` prompts for a password, so a deployment cannot complete unattended. The service does pick up a new build on its next restart, but do not assume a build alone has deployed it.
 
@@ -94,51 +116,96 @@ Each step is reversible until step 8.
 
 ### Step 1 — Production database
 
+Production roles are **separate roles**, not the development ones with new
+passwords — see step 2. Create them first, then the database.
+
 ```bash
-sudo -u postgres createdb -O afldb_owner afldb_prod
+sudo -u postgres createdb -O afldb_prod_owner afldb_prod
 sudo -u postgres psql -d afldb_prod -c 'CREATE EXTENSION pg_trgm; CREATE EXTENSION unaccent;'
 
-AFLDB_MIGRATE_TARGET=prod npm run db:migrate
-AFLDB_IMPORT_DATABASE_URL=<prod> python tools/migration/import_legacy_afl.py
-AFLDB_IMPORT_DATABASE_URL=<prod> python tools/migration/rebuild_derived.py
-DATABASE_URL=<prod> python tools/validation/validate_migration.py   # must be 88/88
+# The migration runner resolves prod through AFLDB_PROD_DATABASE_URL and
+# refuses to run if it is unset. It does NOT fall back to development.
+AFLDB_PROD_DATABASE_URL=<prod-owner-dsn> AFLDB_MIGRATE_TARGET=prod npm run db:migrate
+
+AFLDB_IMPORT_DATABASE_URL=<prod-import-dsn> python tools/migration/import_legacy_afl.py
+AFLDB_IMPORT_DATABASE_URL=<prod-import-dsn> python tools/migration/enrich_birth_dates.py
+AFLDB_IMPORT_DATABASE_URL=<prod-import-dsn> python tools/migration/import_draft.py
+AFLDB_IMPORT_DATABASE_URL=<prod-import-dsn> python tools/migration/rebuild_derived.py
+DATABASE_URL=<prod-dsn> python tools/validation/validate_migration.py
 ```
 
-Do not proceed unless validation is 88/88.
+Do not proceed unless **every** validation check passes. Confirm the printed
+failure count is zero rather than matching a number written here: the check
+count grows as the schema gains guarantees.
 
-### Step 2 — Production secrets
+### Step 2 — Production roles and secrets
 
-Generate **new** passwords; never reuse development credentials.
+Create **separate production roles**. Rotating the passwords of the roles
+development uses would repoint the development deployment at credentials it
+no longer holds, and would leave one compromised password affecting both
+environments.
 
 ```bash
-sudo -u postgres psql -c "ALTER ROLE afldb_app PASSWORD '<new>';"
-# ... repeat per role, then write /home/arm/projects/afldb/.env.production (mode 600)
+sudo -u postgres psql <<'SQL'
+CREATE ROLE afldb_prod_owner  LOGIN PASSWORD '<new>';
+CREATE ROLE afldb_prod_app    LOGIN PASSWORD '<new>';
+CREATE ROLE afldb_prod_import LOGIN PASSWORD '<new>';
+CREATE ROLE afldb_prod_backup LOGIN PASSWORD '<new>';
+SQL
 ```
 
-Set `AFLDB_ENV=production` and `AFLDB_BASE_URL=https://afldb.com`.
+Grants belong in a migration, not a manual `GRANT`. Then write
+`/home/arm/projects/afldb/.env.production` (mode 600) with those DSNs.
+
+Set `AFLDB_ENV=production`, `AFLDB_BASE_URL=https://afldb.com` and a `PORT`
+that is **not** 3100 — see step 3.
 
 > Setting `AFLDB_ENV=production` **enables search-engine indexing**. Do not set it until the site is publicly correct.
 
 ### Step 3 — Production service
 
+The development service already owns 3100. Production must listen elsewhere,
+or the two will fight over the port and whichever starts second will fail —
+or worse, the proxy will serve development data on the production domain.
+
 ```bash
 sudo cp deploy/afldb.service /etc/systemd/system/afldb-prod.service
-# point EnvironmentFile at .env.production; raise AFLDB_WORKERS to suit the host
+sudo sed -i \
+  -e 's|/afldb/.env|/afldb/.env.production|' \
+  -e '/^Environment=AFLDB_WORKERS/a Environment=PORT=3200' \
+  /etc/systemd/system/afldb-prod.service
 sudo systemctl daemon-reload && sudo systemctl enable --now afldb-prod
+```
+
+Confirm the two are actually separate before going further:
+
+```bash
+curl -s http://127.0.0.1:3100/api/health   # development
+curl -s http://127.0.0.1:3200/api/health   # production
+sudo ss -ltnp | grep -E '3100|3200'        # two distinct processes
 ```
 
 ### Step 4 — Reverse proxy
 
+The apex and `www` need **separate blocks**. Naming both on one block and
+redirecting to the apex makes the apex redirect to itself — an infinite loop
+that takes the site down the moment DNS resolves.
+
 ```caddy
-afldb.com, www.afldb.com {
-	redir https://afldb.com{uri} permanent    # single canonical host
-	reverse_proxy 127.0.0.1:3100 {
+# www redirects to the apex. This block serves nothing else.
+www.afldb.com {
+	redir https://afldb.com{uri} permanent
+}
+
+# The apex is the only origin that serves the application.
+afldb.com {
+	reverse_proxy 127.0.0.1:3200 {
 		health_uri /api/health
 		health_interval 30s
 	}
 	encode gzip zstd
 	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy strict-origin-when-cross-origin
@@ -148,9 +215,17 @@ afldb.com, www.afldb.com {
 }
 ```
 
-Serve `www` as a redirect, not a second indexable origin.
+Serve `www` as a redirect, not a second indexable origin. Note the upstream
+port is 3200, the production service from step 3 — not the development one.
 
-> **HSTS is a commitment.** `max-age=31536000` means browsers refuse plain HTTP for a year. Deploy it only once HTTPS is confirmed working. Do **not** add `preload` on the first deployment.
+Validate before reloading, which catches a redirect loop as a configuration
+error rather than as an outage:
+
+```bash
+sudo caddy validate --config /etc/caddy/Caddyfile
+```
+
+> **HSTS is a commitment.** `max-age=31536000` means browsers refuse plain HTTP for a year. Deploy it only once HTTPS is confirmed working. `preload` is deliberately absent above: adding it on a first deployment is close to irreversible.
 
 ### Step 5 — Firewall
 

@@ -49,7 +49,7 @@ export async function listPlayers(options: {
   // Sort key is resolved through a fixed map; user input never reaches SQL.
   const orderBy = PLAYER_SORTS[sort];
 
-  const rows = await sql<PlayerListRow[]>`
+  const rows = await sql<(PlayerListRow & { total: string })[]>`
     WITH filtered AS (
       SELECT p.id
         FROM players p
@@ -81,8 +81,25 @@ export async function listPlayers(options: {
      LIMIT ${limit} OFFSET ${offset}
   `;
 
-  const total = rows.length > 0 ? Number((rows[0] as unknown as { total: string }).total) : 0;
-  return { rows, total };
+  if (rows.length > 0) return { rows, total: Number(rows[0].total) };
+
+  // An offset past the end returns no rows, and a window count carried on
+  // those rows would report the collection as empty. Count separately so
+  // "13,361 players" stays true on a page that happens to be past the last
+  // one, and so the caller can redirect to a page that exists.
+  const [counted] = await sql<{ total: string }[]>`
+    SELECT count(*) AS total
+      FROM players p
+      JOIN player_career_stats c ON c.player_id = p.id
+     WHERE (${club ?? null}::text IS NULL OR EXISTS (
+             SELECT 1 FROM player_clubs pc
+               JOIN clubs cl ON cl.id = pc.club_id
+              WHERE pc.player_id = p.id AND cl.slug = ${club ?? null}))
+       AND (${season ?? null}::int IS NULL OR EXISTS (
+             SELECT 1 FROM player_season_stats ps
+              WHERE ps.player_id = p.id AND ps.season = ${season ?? null}))
+  `;
+  return { rows: [], total: Number(counted.total) };
 }
 
 export type PlayerProfile = {
@@ -305,8 +322,17 @@ export async function getPlayerMatches(
      ORDER BY m.match_date DESC, m.id DESC
      LIMIT ${limit} OFFSET ${offset}
   `;
-  const total = rows.length > 0 ? Number(rows[0].total) : 0;
-  return { rows, total };
+  if (rows.length > 0) return { rows, total: Number(rows[0].total) };
+
+  // Same reason as listPlayers: a window count cannot survive an empty page.
+  const [counted] = await sql<{ total: string }[]>`
+    SELECT count(*) AS total
+      FROM player_match_stats s
+      JOIN matches m ON m.id = s.match_id
+     WHERE s.player_id = ${playerId}
+       AND (${season ?? null}::int IS NULL OR m.season = ${season ?? null})
+  `;
+  return { rows: [], total: Number(counted.total) };
 }
 
 /** Season Brownlow votes from the authoritative source. */

@@ -21,6 +21,7 @@ import {
   MATCH_TYPES,
   buildMatchQueryString,
   describeMatchQuery,
+  matchFieldValue,
   parseMatchSearchQuery,
 } from '@/search/match-spec';
 
@@ -45,7 +46,7 @@ export default async function MatchSearchPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const { query, errors } = parseMatchSearchQuery(params);
+  const { query, errors, notices } = parseMatchSearchQuery(params);
   const first = (name: string) => {
     const raw = params[name];
     return (Array.isArray(raw) ? raw[0] : raw) ?? '';
@@ -72,7 +73,9 @@ export default async function MatchSearchPage({
 
   const groups = ['scoreline', 'when'] as const;
   const canonicalQuery = buildMatchQueryString({ ...query, page: 1 });
-  const selectedClub = clubs.find((club) => club.slug === query.clubSlugs[0]);
+  const selectedClubs = query.clubSlugs
+    .map((slug) => clubs.find((club) => club.slug === slug))
+    .filter((club): club is NonNullable<typeof club> => club !== undefined);
   const descriptions = describeMatchQuery(query);
 
   return (
@@ -121,7 +124,7 @@ export default async function MatchSearchPage({
                         placeholder="min"
                         min={field.min}
                         max={field.max}
-                        defaultValue={first(`${field.key}_min`)}
+                        defaultValue={matchFieldValue(query, field.key, 'min')}
                         aria-label={`${field.label} minimum`}
                       />
                       <input
@@ -133,7 +136,7 @@ export default async function MatchSearchPage({
                         placeholder="max"
                         min={field.min}
                         max={field.max}
-                        defaultValue={first(`${field.key}_max`)}
+                        defaultValue={matchFieldValue(query, field.key, 'max')}
                         aria-label={`${field.label} maximum`}
                       />
                     </div>
@@ -167,14 +170,30 @@ export default async function MatchSearchPage({
           <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))' }}>
             <div>
               <label htmlFor="club">Club</label>
-              <select id="club" name="club" defaultValue={query.clubSlugs[0] ?? ''}>
-                <option value="">Any club</option>
+              {/* Two clubs can be combined, and the parser has always
+                  accepted both. A single select silently dropped the second
+                  on every resubmission. */}
+              <select
+                id="club"
+                name="club"
+                multiple
+                size={6}
+                defaultValue={query.clubSlugs}
+                aria-describedby="club-help"
+              >
                 {clubs.map((club) => (
                   <option key={club.slug} value={club.slug}>
                     {club.name}{club.isCurrent ? '' : ' (historical)'}
                   </option>
                 ))}
               </select>
+              <div
+                id="club-help"
+                style={{ fontSize: '0.72rem', color: 'var(--text-faint)', marginTop: '0.2rem' }}
+              >
+                Select up to two. Leave empty for any club; two clubs match games
+                involving either.
+              </div>
             </div>
             <div>
               <label htmlFor="outcome">Result</label>
@@ -215,13 +234,27 @@ export default async function MatchSearchPage({
         </div>
       )}
 
+      {/* Input that was accepted but adjusted. Saying so is what keeps the
+          form, the URL and the query that actually ran in agreement. */}
+      {errors.length === 0 && notices.length > 0 && (
+        <div className="notice">
+          {notices.map((notice) => <div key={notice}>{notice}</div>)}
+        </div>
+      )}
+
       {hasSearch && errors.length === 0 && (
         <section className="section">
           <h2>Results</h2>
           <p className="section-note">
             {formatNumber(results.total)} matches
             {descriptions.length > 0 && <> · {descriptions.join(' · ')}</>}
-            {selectedClub && <> · Club: {selectedClub.name}</>}
+            {selectedClubs.length > 0 && (
+              <>
+                {' · '}
+                {selectedClubs.length > 1 ? 'Clubs (either): ' : 'Club: '}
+                {selectedClubs.map((club) => club.name).join(' or ')}
+              </>
+            )}
           </p>
 
           {results.total === 0 ? (

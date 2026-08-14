@@ -143,7 +143,8 @@ export default async function HomePage() {
             { href: '/seasons', title: 'Seasons', meta: 'Ladders, results and finals' },
             { href: '/records', title: 'Records', meta: 'Career, season and single-game' },
             { href: '/brownlow', title: 'Brownlow', meta: 'Vote counts by season' },
-            { href: '/advanced-search', title: 'Advanced Search', meta: 'Filter by career statistics' },
+            { href: '/advanced-search', title: 'Player Search', meta: 'Filter by career statistics' },
+            { href: '/match-search', title: 'Match Search', meta: 'Find games by scoreline and margin' },
           ].map((item) => (
             <Link key={item.href} href={item.href} className="card">
               <h3>{item.title}</h3>

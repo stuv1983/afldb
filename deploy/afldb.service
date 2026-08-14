@@ -21,6 +21,18 @@ ExecStart=/home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.m
 # Credentials come from .env (mode 600, owned by arm) and are never
 # baked into the unit file or the environment of other services.
 EnvironmentFile=/home/arm/projects/afldb/.env
+
+# .env is the whole project's configuration, so it also holds the import,
+# owner, test-owner and backup DSNs. The website needs exactly one of
+# them: the read-only app role. Loading the file and then dropping the
+# rest keeps one source of configuration while giving the web process
+# only the credential it uses — a compromise there cannot reach a role
+# that can write, migrate or dump.
+#
+# These are removed from the environment the service is started with;
+# migrations, imports and backups read .env directly and are unaffected.
+UnsetEnvironment=AFLDB_IMPORT_DATABASE_URL AFLDB_OWNER_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL
+
 Environment=NODE_ENV=production
 Environment=HOSTNAME=127.0.0.1
 # Each worker holds its own PostgreSQL pool, so this is deliberately not

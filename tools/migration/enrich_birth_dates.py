@@ -106,19 +106,32 @@ def parse_dob(raw: str | None) -> date | None:
     return value if value >= EARLIEST_PLAUSIBLE else None
 
 
-def collect_evidence(lite, rep: Reporter) -> tuple[dict[int, dict[date, int]], int, int]:
+def collect_evidence(
+    lite, rep: Reporter
+) -> tuple[dict[int, dict[date, int]], dict[int, str], int, int]:
     """Read the register and group asserted birth dates by legacy player id.
 
-    Returns (evidence, rows_read, rows_unmatched).
+    Returns (evidence, profile_urls, rows_read, rows_unmatched).
+
+    profile_urls carries the AFL Tables profile URL each legacy id was
+    matched on. Migration 018 defines external_id as that URL, and it is
+    the thing the match was actually made on, so it has to be what gets
+    stored: a legacy row number is not evidence of anything a later
+    reader could check.
     """
     index: dict[str, int] = {}
+    profile_urls: dict[int, str] = {}
     for profile_url, legacy_id in lite.execute(
         "SELECT profile_url, player_id FROM afltables_player_index "
-        "WHERE profile_url IS NOT NULL AND player_id IS NOT NULL"
+        "WHERE profile_url IS NOT NULL AND player_id IS NOT NULL "
+        "ORDER BY player_id, profile_url"
     ):
         key = normalise_profile_url(profile_url)
         if key:
             index[key] = legacy_id
+            # Deterministic when a legacy id has more than one profile
+            # row: ORDER BY above fixes which one wins.
+            profile_urls.setdefault(legacy_id, key)
 
     rep.result("player index entries", len(index))
 
@@ -144,7 +157,7 @@ def collect_evidence(lite, rep: Reporter) -> tuple[dict[int, dict[date, int]], i
         if dob is not None:
             evidence[legacy_id][dob] += 1
 
-    return evidence, rows_read, unmatched
+    return evidence, profile_urls, rows_read, unmatched
 
 
 def main() -> int:
@@ -170,7 +183,7 @@ def main() -> int:
     pg = connect_pg(dsn)
     started = time.time()
 
-    evidence, rows_read, unmatched = collect_evidence(lite, rep)
+    evidence, profile_urls, rows_read, unmatched = collect_evidence(lite, rep)
     rep.result("register rows read", rows_read)
     if unmatched:
         rep.warn(f"{unmatched} register rows did not resolve to a player index entry")
@@ -244,9 +257,14 @@ def main() -> int:
                 if entry is None:
                     continue
                 afldb_id, _ = entry
+                # The profile URL is the durable key migration 018 defines
+                # this column as, and the key the match was made on.
+                external_id = profile_urls.get(legacy_id)
+                if external_id is None:
+                    continue
                 for dob, occurrences in dates.items():
                     rows.append((
-                        afldb_id, source_id, str(legacy_id), dob,
+                        afldb_id, source_id, external_id, dob,
                         "club_player_register", "sourced", occurrences, batch.id,
                         "Recovered from raw_row_json; the scraper's parsed dob "
                         "column was empty for every row.",
@@ -264,19 +282,94 @@ def main() -> int:
             )
             batch.records_inserted = len(rows)
 
-            # 2. Register the AFL Tables profile key as an external identity.
+            # 2. Register the AFL Tables profile URL as an external identity.
+            #
+            #    The URL is stored, not the legacy row id: the whole point
+            #    of match_method = 'afltables_profile_url' is that a later
+            #    reader can follow the evidence back to the source.
+            #
+            #    An existing row pointing at a DIFFERENT player is left
+            #    alone. Overwriting it would silently move a player's
+            #    identity on re-run; the disagreement is reported below and
+            #    adjudicated by a person instead.
+            identity_rows = [
+                (source_id, profile_urls[legacy], players[legacy][0])
+                for legacy in evidence
+                if legacy in players and legacy in profile_urls
+            ]
+            # Nothing truncates external_identities, so rows this pass wrote
+            # under the old key (the legacy row id) would otherwise survive
+            # alongside the URL-keyed ones and double the count. Remove the
+            # rows this pass owns that it is no longer asserting.
+            cur.execute(
+                """DELETE FROM external_identities
+                    WHERE source_id = %s
+                      AND match_method = 'afltables_profile_url'
+                      AND external_id <> ALL(%s)""",
+                (source_id, [ext for _, ext, _ in identity_rows]),
+            )
+
             cur.executemany(
                 """INSERT INTO external_identities
-                     (source_id, external_id, player_id, status, match_method, notes)
-                   VALUES (%s, %s, %s, 'unique', 'afltables_profile_url',
+                     (source_id, external_id, external_url, player_id, status,
+                      match_method, notes)
+                   VALUES (%s, %s, %s, %s, 'unique', 'afltables_profile_url',
                            'Matched on profile URL, not name.')
                    ON CONFLICT (source_id, external_id) DO UPDATE
-                     SET player_id = EXCLUDED.player_id,
-                         status    = EXCLUDED.status,
-                         match_method = EXCLUDED.match_method""",
-                [(source_id, str(legacy), players[legacy][0])
-                 for legacy in evidence if legacy in players],
+                     SET status       = EXCLUDED.status,
+                         match_method = EXCLUDED.match_method,
+                         external_url = EXCLUDED.external_url
+                   WHERE external_identities.player_id = EXCLUDED.player_id""",
+                [(sid, ext, ext, pid) for sid, ext, pid in identity_rows],
             )
+
+            # Anything the upsert declined to touch is a real conflict: the
+            # same profile URL already mapped to a different player. Read
+            # back what is stored and compare it with what was intended.
+            intended = {ext: pid for _, ext, pid in identity_rows}
+            cur.execute(
+                """SELECT external_id, player_id
+                     FROM external_identities
+                    WHERE source_id = %s AND external_id = ANY(%s)""",
+                (source_id, list(intended)),
+            )
+            identity_conflicts = [
+                (ext, stored, intended[ext])
+                for ext, stored in cur.fetchall()
+                if stored != intended[ext]
+            ]
+
+            for external_id, stored, wanted in identity_conflicts:
+                rep.warn(
+                    f"    profile {external_id} already maps to player {stored}, "
+                    f"not {wanted}; left unchanged"
+                )
+            cur.executemany(
+                """INSERT INTO data_issues
+                     (entity_type, entity_id, issue_type, severity,
+                      description, details)
+                   VALUES ('player', %s, 'external_identity_conflict', 'warning',
+                           %s, %s)""",
+                [
+                    (
+                        stored,
+                        f"AFL Tables profile {external_id} is already linked to "
+                        f"player {stored}; this pass would have linked it to "
+                        f"player {wanted}. The existing link was kept.",
+                        json.dumps({
+                            "external_id": external_id,
+                            "stored_player_id": stored,
+                            "asserted_player_id": wanted,
+                        }),
+                    )
+                    for external_id, stored, wanted in identity_conflicts
+                ],
+            )
+            if identity_conflicts:
+                rep.warn(
+                    f"{len(identity_conflicts)} profile URLs already map to another "
+                    "player; each is now an open data issue"
+                )
 
             # 3. Fill only what is missing. The WHERE dob IS NULL guard is
             #    what makes "never overwrite" true even if this is re-run

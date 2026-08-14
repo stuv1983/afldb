@@ -173,10 +173,31 @@ def validate_integrity(pg, r: Results) -> None:
          "SELECT count(*) FROM (SELECT player_id, match_id FROM player_match_stats GROUP BY 1,2 HAVING count(*)>1) x"),
         ("clubs with no current identity",
          "SELECT count(*) FROM clubs c LEFT JOIN clubs t ON t.id=c.current_identity_id WHERE t.id IS NULL"),
+        # Migration 021 dropped the NOT NULL so a reload could start, and
+        # named this validator as where the rule now lives. This is it.
+        ("clubs with no organization",
+         "SELECT count(*) FROM clubs WHERE organization_id IS NULL"),
+        ("clubs with an unresolved organization",
+         "SELECT count(*) FROM clubs c LEFT JOIN club_organizations o "
+         "ON o.id = c.organization_id WHERE o.id IS NULL"),
         ("club_seasons with unresolved club",
          "SELECT count(*) FROM staging.team_seasons WHERE club_id IS NULL"),
         ("match margin disagrees with scores",
          "SELECT count(*) FROM matches WHERE margin <> abs(home_score-away_score)"),
+        ("match result disagrees with scores",
+         "SELECT count(*) FROM matches WHERE NOT ("
+         "  (result='home_win' AND home_score > away_score) OR"
+         "  (result='away_win' AND away_score > home_score) OR"
+         "  (result='draw'     AND home_score = away_score))"),
+        ("match score disagrees with goals and behinds",
+         "SELECT count(*) FROM matches WHERE"
+         " (home_goals IS NOT NULL AND home_behinds IS NOT NULL"
+         "  AND home_score <> 6*home_goals + home_behinds)"
+         " OR (away_goals IS NOT NULL AND away_behinds IS NOT NULL"
+         "  AND away_score <> 6*away_goals + away_behinds)"),
+        ("known attendance with no cited source",
+         "SELECT count(*) FROM matches "
+         "WHERE attendance IS NOT NULL AND attendance_source_id IS NULL"),
     ]:
         r.check(label, pg_one(pg, sql), 0)
 

@@ -23,7 +23,7 @@ async function getWinners() {
       FROM brownlow_season_votes b
       JOIN players p ON p.id = b.player_id
      WHERE b.is_winner
-     ORDER BY b.season DESC
+     ORDER BY b.season DESC, p.sort_name
   `;
 }
 
@@ -96,7 +96,12 @@ export default async function BrownlowPage() {
         <h2>Winners by season</h2>
         <div className="table-wrap">
           <table>
-            <caption>{winners.length} medals awarded</caption>
+            {/* Shared counts put more than one winner in a season, so these
+                two numbers are genuinely different. */}
+            <caption>
+              {winners.length} winners across{' '}
+              {new Set(winners.map((w) => w.season)).size} seasons
+            </caption>
             <thead>
               <tr>
                 <th scope="col">Season</th>

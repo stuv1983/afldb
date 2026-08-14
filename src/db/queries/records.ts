@@ -74,7 +74,11 @@ export const RECORD_CATEGORIES: Record<string, RecordCategory> = {
   'most-goals-in-a-season': {
     slug: 'most-goals-in-a-season',
     title: 'Most Goals in a Season',
-    definition: 'Highest goals by one player for one club in a single season, including finals.',
+    definition: 'Highest goals by one player in a single season, including finals.',
+    coverage:
+      'A season total is the player\'s, not a club\'s: a player who transferred '
+      + 'mid-season is ranked on the whole season. The club column names the club '
+      + 'of most games that year.',
     unit: 'Goals',
   },
 };

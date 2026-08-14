@@ -101,6 +101,13 @@ export type MatchSearchQuery = {
 export type MatchParseResult = {
   query: MatchSearchQuery;
   errors: string[];
+  /**
+   * Advisory messages for input that was accepted after adjustment — an
+   * out-of-range bound, or a page past the cap. The form and the result
+   * description both read the parsed query, so without these the page
+   * would silently execute something other than what was asked for.
+   */
+  notices: string[];
 };
 
 function first(value: string | string[] | undefined): string | undefined {
@@ -110,24 +117,36 @@ function first(value: string | string[] | undefined): string | undefined {
 function clampInt(
   raw: string | undefined,
   definition: MatchFieldDefinition,
-): number | undefined {
-  if (raw === undefined || raw.trim() === '') return undefined;
+): { value: number | undefined; clamped: boolean } {
+  if (raw === undefined || raw.trim() === '') return { value: undefined, clamped: false };
   const value = Number(raw);
-  if (!Number.isFinite(value)) return undefined;
-  return Math.min(Math.max(Math.trunc(value), definition.min), definition.max);
+  if (!Number.isFinite(value)) return { value: undefined, clamped: false };
+  const truncated = Math.trunc(value);
+  const bounded = Math.min(Math.max(truncated, definition.min), definition.max);
+  return { value: bounded, clamped: bounded !== truncated };
 }
 
 export function parseMatchSearchQuery(
   params: Record<string, string | string[] | undefined>,
 ): MatchParseResult {
   const errors: string[] = [];
+  const notices: string[] = [];
   const filters: MatchRangeFilter[] = [];
 
   for (const key of MATCH_FIELD_KEYS) {
     const definition = MATCH_FIELDS[key];
-    const min = clampInt(first(params[`${key}_min`]), definition);
-    const max = clampInt(first(params[`${key}_max`]), definition);
+    const { value: min, clamped: minClamped } = clampInt(first(params[`${key}_min`]), definition);
+    const { value: max, clamped: maxClamped } = clampInt(first(params[`${key}_max`]), definition);
     if (min === undefined && max === undefined) continue;
+
+    if (minClamped || maxClamped) {
+      notices.push(
+        `${definition.label} is limited to ${definition.min}–${definition.max};`
+        + ` the search used ${min !== undefined ? `minimum ${min}` : ''}`
+        + `${min !== undefined && max !== undefined ? ' and ' : ''}`
+        + `${max !== undefined ? `maximum ${max}` : ''}.`,
+      );
+    }
 
     if (min !== undefined && max !== undefined && min > max) {
       errors.push(
@@ -145,11 +164,19 @@ export function parseMatchSearchQuery(
     filters.length = MATCH_LIMITS.maxFilters;
   }
 
-  const clubRaw = first(params.club);
-  const clubSlugs = [...new Set((clubRaw ? clubRaw.split(',') : [])
+  // Accepts both club=a,b and a repeated club parameter, because a
+  // multiple-select posts the second form and shareable URLs use the first.
+  const clubParam = params.club;
+  const clubRaw = Array.isArray(clubParam) ? clubParam.join(',') : clubParam;
+  const requestedClubs = [...new Set((clubRaw ? clubRaw.split(',') : [])
     .map((slug) => slug.trim().toLowerCase())
-    .filter((slug) => /^[a-z0-9-]{1,80}$/.test(slug)))]
-    .slice(0, MATCH_LIMITS.maxClubFilters);
+    .filter((slug) => /^[a-z0-9-]{1,80}$/.test(slug)))];
+  const clubSlugs = requestedClubs.slice(0, MATCH_LIMITS.maxClubFilters);
+  if (requestedClubs.length > clubSlugs.length) {
+    notices.push(
+      `Only ${MATCH_LIMITS.maxClubFilters} clubs can be combined; the rest were ignored.`,
+    );
+  }
 
   const outcomeRaw = first(params.outcome);
   const outcome: MatchOutcome = outcomeRaw && Object.hasOwn(MATCH_OUTCOMES, outcomeRaw)
@@ -170,6 +197,9 @@ export function parseMatchSearchQuery(
   const page = Number.isSafeInteger(pageRaw) && pageRaw >= 1
     ? Math.min(pageRaw, MATCH_LIMITS.maxPage)
     : 1;
+  if (Number.isSafeInteger(pageRaw) && pageRaw > MATCH_LIMITS.maxPage) {
+    notices.push(`Paging stops at page ${MATCH_LIMITS.maxPage}; showing that page.`);
+  }
 
   return {
     query: {
@@ -182,6 +212,7 @@ export function parseMatchSearchQuery(
       pageSize: MATCH_LIMITS.defaultPageSize,
     },
     errors,
+    notices,
   };
 }
 
@@ -204,6 +235,21 @@ export function buildMatchQueryString(query: Partial<MatchSearchQuery>): string 
   if (query.sort && query.sort !== DEFAULT_MATCH_SORT) params.set('sort', query.sort);
   if (query.page && query.page > 1) params.set('page', String(query.page));
   return params.toString();
+}
+
+/**
+ * The value a range input should show, taken from the parsed query rather
+ * than the raw URL. Echoing the raw value let the form display 999 while
+ * the search actually ran at the 400 cap.
+ */
+export function matchFieldValue(
+  query: MatchSearchQuery,
+  field: string,
+  bound: 'min' | 'max',
+): string {
+  const filter = query.filters.find((f) => f.field === field);
+  const value = filter?.[bound];
+  return value === undefined ? '' : String(value);
 }
 
 export function describeMatchQuery(query: MatchSearchQuery): string[] {

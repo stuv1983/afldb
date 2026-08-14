@@ -46,11 +46,16 @@ export async function generateMetadata({
   if (!match) return { title: 'Match not found' };
 
   const round = formatRound(match.roundType, match.roundNumber);
+  // Home team first, so the verb has to follow the result rather than
+  // being fixed: "defeated by" read backwards on every home win.
+  const outcome = match.result === 'draw'
+    ? `${match.homeName} ${match.homeScore} drew with ${match.awayName} ${match.awayScore}`
+    : match.result === 'home_win'
+      ? `${match.homeName} ${match.homeScore} defeated ${match.awayName} ${match.awayScore}`
+      : `${match.homeName} ${match.homeScore} defeated by ${match.awayName} ${match.awayScore}`;
   return {
     title: `${match.homeName} v ${match.awayName}, ${round} ${match.season}`,
-    description:
-      `${match.homeName} ${match.homeScore} defeated by ${match.awayName} ${match.awayScore}`
-      + ` — ${round}, ${match.season} at ${match.venueName}.`,
+    description: `${outcome} — ${round}, ${match.season} at ${match.venueName}.`,
     alternates: { canonical: matchPath(match.id) },
   };
 }
@@ -82,6 +87,14 @@ export default async function MatchPage({
 
   // Brownlow votes are only present for 1931-1934 and 1984-2025.
   const hasBrownlow = players.some((p) => p.brownlowVotes !== null);
+
+  // The schema allows periods 1-8 so extra time can be recorded. Render the
+  // periods this match actually has: hard-coding four quarters silently drops
+  // any period beyond them.
+  const lastPeriod = periods.reduce((max, p) => Math.max(max, p.period), 4);
+  const periodNumbers = Array.from({ length: lastPeriod }, (_, i) => i + 1);
+  const periodLabel = (period: number) =>
+    period === lastPeriod ? 'Final' : period <= 4 ? `Q${period}` : `ET${period - 4}`;
 
   return (
     <>
@@ -132,14 +145,16 @@ export default async function MatchPage({
         <h2>Quarter by quarter</h2>
         <div className="table-wrap">
           <table>
-            <caption>Cumulative score at each quarter, as published.</caption>
+            <caption>
+              Cumulative score at each break, as published.
+              {lastPeriod > 4 && ' ET periods are extra time.'}
+            </caption>
             <thead>
               <tr>
                 <th scope="col">Club</th>
-                <th scope="col" className="num">Q1</th>
-                <th scope="col" className="num">Q2</th>
-                <th scope="col" className="num">Q3</th>
-                <th scope="col" className="num">Final</th>
+                {periodNumbers.map((period) => (
+                  <th key={period} scope="col" className="num">{periodLabel(period)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -150,7 +165,7 @@ export default async function MatchPage({
                     <td className="wide">
                       <Link href={clubPath(side.slug)}>{side.name}</Link>
                     </td>
-                    {[1, 2, 3, 4].map((q) => {
+                    {periodNumbers.map((q) => {
                       const period = own.find((p) => p.period === q);
                       return (
                         <td key={q} className="num nowrap">

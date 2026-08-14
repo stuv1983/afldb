@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 import { Pagination } from '@/components/Pagination';
 import { isPlayerSort, listPlayers, type PlayerSort } from '@/db/queries/players';
@@ -47,6 +48,21 @@ export default async function PlayersPage({
   });
 
   const linkParams = { sort, club, season: season ? String(season) : undefined };
+
+  // A page past the end is a real URL people arrive at from stale links and
+  // hand-edited query strings. Send them to the last page that exists rather
+  // than rendering an empty table under a full result count.
+  if (total > 0 && rows.length === 0) {
+    const lastPage = Math.ceil(total / DEFAULT_PAGE_SIZE);
+    if (page > lastPage) {
+      const query = new URLSearchParams();
+      query.set('sort', sort);
+      if (club) query.set('club', club);
+      if (season) query.set('season', String(season));
+      if (lastPage > 1) query.set('page', String(lastPage));
+      redirect(`/players?${query}`);
+    }
+  }
 
   return (
     <>

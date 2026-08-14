@@ -36,6 +36,7 @@ from common import (  # noqa: E402
     require_env,
     safe_dsn,
     scalar,
+    set_reload_scope,
     to_int,
     truncate,
 )
@@ -335,8 +336,14 @@ def import_clubs(pg: psycopg.Connection, lite, rep: Reporter) -> None:
                        VALUES (%s,%s,'source_string') ON CONFLICT DO NOTHING""",
                     (ids[match], club_now),
                 )
-    pg.commit()
 
+    # Deliberately NOT committed here. Migration 021 relaxed
+    # clubs.organization_id to nullable so a reload could get off the
+    # ground, on the understanding that the importer fills it in the same
+    # run. Committing clubs first made that a promise rather than a
+    # guarantee: a crash in between left null organizations visible and
+    # permanent. Clubs and their organizations now land in one
+    # transaction, so the intermediate state is never observable.
     missing = {r["club_hist"] for r in
                lite.execute("SELECT DISTINCT club_hist FROM games").fetchall()} - set(ids)
     if missing:
@@ -360,6 +367,10 @@ def import_club_organizations(pg: psycopg.Connection, rep: Reporter) -> None:
     A MERGER is not a rename, so Fitzroy, Brisbane Bears and Brisbane
     Lions stay three organizations and their records are never combined.
     The link is recorded as a relation instead.
+
+    Called from import_clubs inside its open transaction: the single
+    commit at the end of this function is what makes clubs and their
+    organizations appear together or not at all.
     """
     with pg.cursor() as cur:
         # Relations cascade from organizations, so they go first.
@@ -515,6 +526,12 @@ def import_matches(pg: psycopg.Connection, lite, rep: Reporter, batch) -> None:
 
     rows = lite.execute("SELECT * FROM matches ORDER BY match_id").fetchall()
 
+    # Where a known crowd figure came from. Migration 020 added the column
+    # and made a stored 0 require a citation; leaving it NULL for every
+    # match meant the absences were documented but the figures that ARE
+    # present had no stated origin.
+    attendance_source_id = scalar(pg, "SELECT id FROM sources WHERE key = 'afltables'")
+
     def build():
         for r in rows:
             batch.records_read += 1
@@ -567,6 +584,8 @@ def import_matches(pg: psycopg.Connection, lite, rep: Reporter, batch) -> None:
                 # No source recorded a crowd. This is NOT zero, and the
                 # status keeps the two apart permanently.
                 "complete" if attendance is not None else "not_collected",
+                # A figure cites its source; an absence has none to cite.
+                attendance_source_id if attendance is not None else None,
                 events.get(r["match_id"]),
             )
 
@@ -578,7 +597,7 @@ def import_matches(pg: psycopg.Connection, lite, rep: Reporter, batch) -> None:
          "home_goals", "home_behinds", "home_score",
          "away_goals", "away_behinds", "away_score",
          "result", "winner_club_id", "margin",
-         "attendance", "attendance_status", "match_event"],
+         "attendance", "attendance_status", "attendance_source_id", "match_event"],
         build(), batch,
     )
 
@@ -957,6 +976,21 @@ GROUPS = {
 DEFAULT_ORDER = ["reference", "players", "matches", "stats", "brownlow",
                  "ladders", "coverage"]
 
+# What each group actually rebuilds. Used to decide whether a partial run
+# would leave a table emptied by CASCADE and never refilled — see
+# common.set_reload_scope().
+GROUP_TABLES = {
+    "reference": ("sources", "seasons", "clubs", "club_aliases",
+                  "venues", "venue_aliases", "club_organizations",
+                  "club_organization_relations"),
+    "players": ("players",),
+    "matches": ("matches", "match_period_scores"),
+    "stats": ("player_match_stats",),
+    "brownlow": ("brownlow_season_votes", "brownlow_round_votes"),
+    "ladders": ("staging.team_seasons",),
+    "coverage": ("stat_definitions", "stat_availability"),
+}
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Migrate legacy AFL data into AFLDB PostgreSQL.")
@@ -965,6 +999,9 @@ def main() -> int:
     parser.add_argument("--groups", nargs="+", choices=DEFAULT_ORDER,
                         help="import only these groups (dependency order is preserved)")
     parser.add_argument("--list-groups", action="store_true")
+    parser.add_argument("--allow-cascade", action="store_true",
+                        help="permit a partial run to empty tables it will not "
+                             "rebuild (TRUNCATE ... CASCADE); off by default")
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args()
 
@@ -991,6 +1028,24 @@ def main() -> int:
         return 0
 
     groups = [g for g in DEFAULT_ORDER if not args.groups or g in args.groups]
+
+    # A full run rebuilds everything, so CASCADE has nothing to destroy
+    # that is not coming back. A partial run must say what it rebuilds, so
+    # truncate() can refuse to empty anything else.
+    is_partial = bool(args.groups) and len(groups) < len(DEFAULT_ORDER)
+    if is_partial and not args.allow_cascade:
+        scope: set[str] = set()
+        for group in groups:
+            scope.update(GROUP_TABLES[group])
+        set_reload_scope(scope)
+        rep.step(f"partial run: {len(groups)} of {len(DEFAULT_ORDER)} groups; "
+                 "tables outside them are protected from CASCADE")
+    else:
+        set_reload_scope(None)
+        if is_partial:
+            rep.warn("--allow-cascade: a partial run may empty tables it does "
+                     "not rebuild")
+
     pg = connect_pg(dsn)
     started = time.time()
 

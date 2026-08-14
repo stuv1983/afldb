@@ -18,7 +18,8 @@ export const PRIMARY_NAV = [
   { href: '/seasons', label: 'Seasons' },
   { href: '/records', label: 'Records' },
   { href: '/brownlow', label: 'Brownlow' },
-  { href: '/advanced-search', label: 'Advanced Search' },
+  { href: '/advanced-search', label: 'Player Search' },
+  { href: '/match-search', label: 'Match Search' },
 ];
 
 const TABS = [

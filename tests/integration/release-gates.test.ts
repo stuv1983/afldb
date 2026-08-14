@@ -16,13 +16,17 @@
  *               EXPECTED to change when newer data is imported. A failure
  *               means "re-pin", not "bug".
  */
+import './guard';
+
 import { createHash } from 'node:crypto';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
 import { runAdvancedSearch } from '@/db/queries/advanced-search';
+import { runMatchSearch } from '@/db/queries/match-search';
 import { parseAdvancedQuery } from '@/search/advanced-spec';
+import { parseMatchSearchQuery } from '@/search/match-spec';
 
 afterAll(async () => {
   await sql.end();
@@ -252,6 +256,16 @@ describe('gate: club organizations and identities', () => {
     `;
     expect(row.identities).toBe(24);
     expect(row.orgs).toBe(21);
+  });
+
+  it('gives every club identity an organization', async () => {
+    // Migration 021 relaxed this column to nullable so a reload could
+    // start, and named this gate as the thing that keeps the guarantee.
+    // It has to assert the guarantee directly to be that.
+    const [row] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM clubs WHERE organization_id IS NULL
+    `;
+    expect(row.n).toBe(0);
   });
 
   it('groups exactly the three renamed clubs into shared organizations', async () => {
@@ -604,6 +618,28 @@ describe('gate: birth dates', () => {
     expect(row.n).toBe(12_472);
   });
 
+  it('stores the profile URL it matched on, not a legacy row id', async () => {
+    // The label said "matched on profile URL" while external_id held the
+    // legacy id, so the retained evidence did not support the claim.
+    // Migration 018 defines this column as the durable profile key.
+    const [row] = await sql<{ total: number; numeric: number }[]>`
+      SELECT count(*)::int                                        AS total,
+             count(*) FILTER (WHERE external_id ~ '^[0-9]+$')::int AS numeric
+        FROM external_identities
+       WHERE match_method = 'afltables_profile_url'
+    `;
+    expect(row.total).toBeGreaterThan(0);
+    expect(row.numeric).toBe(0);
+  });
+
+  it('keeps the same profile key on the evidence rows', async () => {
+    const [row] = await sql<{ numeric: number }[]>`
+      SELECT count(*) FILTER (WHERE external_id ~ '^[0-9]+$')::int AS numeric
+        FROM player_birth_evidence
+    `;
+    expect(row.numeric).toBe(0);
+  });
+
   it('never claims a date whose origin is unknown', async () => {
     const [row] = await sql<{ n: number }[]>`
       SELECT count(*)::int AS n FROM players
@@ -668,6 +704,95 @@ describe('gate: Grand Final replays', () => {
     `;
     const [seasons] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM seasons`;
     expect(row.n).toBe(seasons.n);
+  });
+});
+
+// ---------------------------------------------------------------------
+// IMMUTABLE — Match Search
+// ---------------------------------------------------------------------
+// The feature shipped with no test of its own: the parser had coverage
+// only after this suite gained tests/match-spec.test.ts, and the query
+// itself had none. These drive the real service, as the Advanced Search
+// gates do.
+describe('gate: Match Search', () => {
+  it('finds the drawn Grand Finals and nothing else', async () => {
+    const { query } = parseMatchSearchQuery({
+      outcome: 'draw', match_type: 'finals', sort: 'date_asc',
+    });
+    const { rows, total } = await runMatchSearch(query);
+    const grandFinals = rows.filter((r) => r.roundType === 'grand_final');
+    // 1948, 1977 and 2010 are the drawn Grand Finals; the replays are
+    // separate matches and are not draws.
+    expect(grandFinals.map((r) => r.season)).toEqual([1948, 1977, 2010]);
+    expect(total).toBeGreaterThanOrEqual(grandFinals.length);
+    for (const row of rows) expect(row.margin).toBe(0);
+  });
+
+  it('applies a range filter on both bounds', async () => {
+    const { query } = parseMatchSearchQuery({ margin_min: '1', margin_max: '5' });
+    const { rows } = await runMatchSearch(query);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.margin).toBeGreaterThanOrEqual(1);
+      expect(row.margin).toBeLessThanOrEqual(5);
+    }
+  });
+
+  it('treats two clubs as either, not both', async () => {
+    const both = await runMatchSearch(
+      parseMatchSearchQuery({ club: 'collingwood,carlton' }).query,
+    );
+    const collingwood = await runMatchSearch(
+      parseMatchSearchQuery({ club: 'collingwood' }).query,
+    );
+    const carlton = await runMatchSearch(
+      parseMatchSearchQuery({ club: 'carlton' }).query,
+    );
+    // Either-club is a union, so it exceeds each single club but is less
+    // than their sum by the number of games they played each other.
+    expect(both.total).toBeGreaterThan(collingwood.total);
+    expect(both.total).toBeGreaterThan(carlton.total);
+    expect(both.total).toBeLessThan(collingwood.total + carlton.total);
+    for (const row of both.rows) {
+      expect(['collingwood', 'carlton'].some(
+        (slug) => row.homeSlug === slug || row.awaySlug === slug,
+      )).toBe(true);
+    }
+  });
+
+  it('keeps the true total on a page past the last result', async () => {
+    const first = await runMatchSearch(
+      parseMatchSearchQuery({ outcome: 'draw', match_type: 'finals' }).query,
+    );
+    const far = await runMatchSearch(
+      parseMatchSearchQuery({
+        outcome: 'draw', match_type: 'finals', page: '300',
+      }).query,
+    );
+    expect(far.rows).toHaveLength(0);
+    // A window count carried on the page rows would report 0 here.
+    expect(far.total).toBe(first.total);
+  });
+
+  it('reconciles every returned scoreline with its components', async () => {
+    const { rows } = await runMatchSearch(
+      parseMatchSearchQuery({ high_score_min: '180', sort: 'high_score_desc' }).query,
+    );
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.highScore).toBe(Math.max(row.homeScore, row.awayScore));
+      expect(row.lowScore).toBe(Math.min(row.homeScore, row.awayScore));
+      expect(row.totalScore).toBe(row.homeScore + row.awayScore);
+      expect(row.margin).toBe(Math.abs(row.homeScore - row.awayScore));
+    }
+  });
+
+  it('sorts by the requested key', async () => {
+    const { rows } = await runMatchSearch(
+      parseMatchSearchQuery({ match_type: 'finals', sort: 'margin_desc' }).query,
+    );
+    const margins = rows.map((r) => r.margin);
+    expect([...margins].sort((a, b) => b - a)).toEqual(margins);
   });
 });
 

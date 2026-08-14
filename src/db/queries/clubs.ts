@@ -16,8 +16,30 @@ export type ClubSummary = {
   currentIdentityId: number;
   currentIdentityName: string;
   currentIdentitySlug: string;
+  /**
+   * Where a merged or relocated organization went, from
+   * club_organization_relations. Null for a club that simply carried on
+   * or was renamed — that lineage is current_identity_id.
+   */
+  successorRelation: string | null;
+  successorName: string | null;
+  successorSlug: string | null;
+  successorSeason: number | null;
   notes: string | null;
 };
+
+const CLUB_SUCCESSOR = sql`
+  LEFT JOIN LATERAL (
+    SELECT r.relation::text AS relation,
+           t.name, t.slug,
+           r.effective_season
+      FROM club_organization_relations r
+      LEFT JOIN club_organizations t ON t.id = r.to_organization_id
+     WHERE r.from_organization_id = c.organization_id
+     ORDER BY r.effective_season, r.relation
+     LIMIT 1
+  ) succ ON true
+`;
 
 export async function listClubs(): Promise<ClubSummary[]> {
   return sql<ClubSummary[]>`
@@ -27,9 +49,14 @@ export async function listClubs(): Promise<ClubSummary[]> {
            c.last_season AS "lastSeason", c.home_state AS "homeState",
            c.current_identity_id AS "currentIdentityId",
            ci.name AS "currentIdentityName", ci.slug AS "currentIdentitySlug",
+           succ.relation AS "successorRelation",
+           succ.name     AS "successorName",
+           succ.slug     AS "successorSlug",
+           succ.effective_season AS "successorSeason",
            c.notes
       FROM clubs c
       JOIN clubs ci ON ci.id = c.current_identity_id
+      ${CLUB_SUCCESSOR}
      ORDER BY c.is_current_afl_club DESC, c.name
   `;
 }
@@ -42,9 +69,14 @@ export async function getClub(slug: string): Promise<ClubSummary | null> {
            c.last_season AS "lastSeason", c.home_state AS "homeState",
            c.current_identity_id AS "currentIdentityId",
            ci.name AS "currentIdentityName", ci.slug AS "currentIdentitySlug",
+           succ.relation AS "successorRelation",
+           succ.name     AS "successorName",
+           succ.slug     AS "successorSlug",
+           succ.effective_season AS "successorSeason",
            c.notes
       FROM clubs c
       JOIN clubs ci ON ci.id = c.current_identity_id
+      ${CLUB_SUCCESSOR}
      WHERE c.slug = ${slug}
   `;
   return row ?? null;

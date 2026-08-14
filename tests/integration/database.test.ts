@@ -6,6 +6,8 @@
  * carries the full migrated dataset, because a query that is fast and
  * correct against 100 rows proves nothing about 694,210.
  */
+import './guard';
+
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
@@ -13,6 +15,36 @@ import { sql } from '@/db/client';
 afterAll(async () => {
   await sql.end();
 });
+
+/** Thrown to force a rollback once a statement has been accepted. */
+class Rollback extends Error {}
+
+/**
+ * Assert a statement is rejected, without leaving anything behind.
+ *
+ * These tests previously issued bare INSERTs. That is safe only while the
+ * constraints hold: the first run after a constraint regressed would
+ * COMMIT the bogus row, and later runs would then "pass" because the
+ * duplicate key threw instead of the constraint — a regression that hides
+ * itself after one run.
+ *
+ * The statement now runs inside a transaction that always ends in a
+ * throw, so nothing is ever committed either way, and `accepted` records
+ * which of the two throws happened.
+ */
+async function expectRejected(
+  statement: (tx: typeof sql) => Promise<unknown>,
+): Promise<void> {
+  let accepted = false;
+  await expect(
+    sql.begin(async (tx) => {
+      await statement(tx as unknown as typeof sql);
+      accepted = true;
+      throw new Rollback('statement was accepted');
+    }),
+  ).rejects.toThrow();
+  expect(accepted).toBe(false);
+}
 
 describe('schema', () => {
   it('has pg_trgm and unaccent enabled', async () => {
@@ -35,30 +67,74 @@ describe('schema', () => {
   });
 
   it('refuses a match whose margin disagrees with its scores', async () => {
-    await expect(sql`
+    await expectRejected((tx) => tx`
       INSERT INTO matches (match_key, season, round_code, round_number, round_type,
                            is_final, match_date, venue_raw, home_club_id, away_club_id,
                            home_score, away_score, result, winner_club_id, margin)
       VALUES ('bogus-margin', 2000, '1', 1, 'home_and_away', false, '2000-01-01',
               'Nowhere', 1, 2, 100, 50, 'home_win', 1, 999)
-    `).rejects.toThrow();
+    `);
   });
 
   it('refuses a Brownlow vote outside 0-3 in a single game', async () => {
-    await expect(sql`
+    await expectRejected((tx) => tx`
       INSERT INTO player_match_stats (player_id, match_id, club_id, brownlow_votes)
       VALUES (1, 1, 1, 9)
-    `).rejects.toThrow();
+    `);
   });
 
   it('refuses a match between a club and itself', async () => {
-    await expect(sql`
+    await expectRejected((tx) => tx`
       INSERT INTO matches (match_key, season, round_code, round_number, round_type,
                            is_final, match_date, venue_raw, home_club_id, away_club_id,
                            home_score, away_score, result, margin)
       VALUES ('bogus-self', 2000, '1', 1, 'home_and_away', false, '2000-01-01',
               'Nowhere', 1, 1, 10, 10, 'draw', 0)
-    `).rejects.toThrow();
+    `);
+  });
+
+  // Migration 022. The importer derives result from the scores, so the
+  // data has always agreed; nothing stopped a future writer disagreeing.
+  it('refuses a home_win the away team actually won', async () => {
+    await expectRejected((tx) => tx`
+      INSERT INTO matches (match_key, season, round_code, round_number, round_type,
+                           is_final, match_date, venue_raw, home_club_id, away_club_id,
+                           home_score, away_score, result, winner_club_id, margin)
+      VALUES ('bogus-result', 2000, '1', 1, 'home_and_away', false, '2000-01-01',
+              'Nowhere', 1, 2, 50, 100, 'home_win', 1, 50)
+    `);
+  });
+
+  it('refuses a draw whose scores differ', async () => {
+    await expectRejected((tx) => tx`
+      INSERT INTO matches (match_key, season, round_code, round_number, round_type,
+                           is_final, match_date, venue_raw, home_club_id, away_club_id,
+                           home_score, away_score, result, margin)
+      VALUES ('bogus-draw', 2000, '1', 1, 'home_and_away', false, '2000-01-01',
+              'Nowhere', 1, 2, 60, 50, 'draw', 10)
+    `);
+  });
+
+  it('refuses a score that disagrees with its goals and behinds', async () => {
+    await expectRejected((tx) => tx`
+      INSERT INTO matches (match_key, season, round_code, round_number, round_type,
+                           is_final, match_date, venue_raw, home_club_id, away_club_id,
+                           home_goals, home_behinds, home_score,
+                           away_goals, away_behinds, away_score,
+                           result, winner_club_id, margin)
+      VALUES ('bogus-components', 2000, '1', 1, 'home_and_away', false, '2000-01-01',
+              'Nowhere', 1, 2, 10, 5, 999, 5, 5, 35, 'home_win', 1, 964)
+    `);
+  });
+
+  it('refuses a negative score', async () => {
+    await expectRejected((tx) => tx`
+      INSERT INTO matches (match_key, season, round_code, round_number, round_type,
+                           is_final, match_date, venue_raw, home_club_id, away_club_id,
+                           home_score, away_score, result, winner_club_id, margin)
+      VALUES ('bogus-negative', 2000, '1', 1, 'home_and_away', false, '2000-01-01',
+              'Nowhere', 1, 2, -10, 50, 'away_win', 2, 60)
+    `);
   });
 });
 

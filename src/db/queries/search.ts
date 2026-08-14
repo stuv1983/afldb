@@ -55,49 +55,66 @@ export async function searchPlayers(query: string, limit = 20): Promise<SearchRe
   `;
 }
 
+/**
+ * DISTINCT ON must sort by its own key first, so de-duplication and
+ * relevance ordering cannot happen in one pass: applying LIMIT there
+ * would take the lowest-numbered clubs and only then rank them. These
+ * queries de-duplicate in a subquery and rank the whole candidate set.
+ */
 export async function searchClubs(query: string, limit = 6): Promise<SearchResult[]> {
   return sql<SearchResult[]>`
-    WITH q AS (SELECT afldb_normalise_name(${query}) AS term)
-    SELECT DISTINCT ON (c.id)
-           'club'::text AS type,
-           c.id,
-           c.slug,
-           c.name AS title,
-           CASE WHEN c.is_current_afl_club THEN 'Current AFL club'
-                ELSE initcap(c.succession::text) || ' · '
-                     || c.first_season || '–' || c.last_season END AS subtitle,
-           (CASE WHEN afldb_normalise_name(c.name) = q.term THEN 1000
-                 WHEN afldb_normalise_name(c.name) LIKE q.term || '%' THEN 500
-                 ELSE 200 END
-            + similarity(afldb_normalise_name(c.name), q.term) * 100)::float AS rank
-      FROM clubs c
-      LEFT JOIN club_aliases a ON a.club_id = c.id
-     CROSS JOIN q
-     WHERE afldb_normalise_name(c.name)  LIKE '%' || q.term || '%'
-        OR afldb_normalise_name(a.alias) LIKE '%' || q.term || '%'
-     ORDER BY c.id, rank DESC
+    WITH q AS (SELECT afldb_normalise_name(${query}) AS term),
+    matched AS (
+      SELECT DISTINCT ON (c.id)
+             'club'::text AS type,
+             c.id,
+             c.slug,
+             c.name AS title,
+             CASE WHEN c.is_current_afl_club THEN 'Current AFL club'
+                  ELSE initcap(c.succession::text) || ' · '
+                       || c.first_season || '–' || c.last_season END AS subtitle,
+             (CASE WHEN afldb_normalise_name(c.name) = q.term THEN 1000
+                   WHEN afldb_normalise_name(c.name) LIKE q.term || '%' THEN 500
+                   ELSE 200 END
+              + similarity(afldb_normalise_name(c.name), q.term) * 100)::float AS rank
+        FROM clubs c
+        LEFT JOIN club_aliases a ON a.club_id = c.id
+       CROSS JOIN q
+       WHERE afldb_normalise_name(c.name)  LIKE '%' || q.term || '%'
+          OR afldb_normalise_name(a.alias) LIKE '%' || q.term || '%'
+       ORDER BY c.id, rank DESC
+    )
+    SELECT type, id, slug, title, subtitle, rank
+      FROM matched
+     ORDER BY rank DESC, title
      LIMIT ${limit}
   `;
 }
 
 export async function searchVenues(query: string, limit = 6): Promise<SearchResult[]> {
   return sql<SearchResult[]>`
-    WITH q AS (SELECT afldb_normalise_name(${query}) AS term)
-    SELECT DISTINCT ON (v.id)
-           'venue'::text AS type,
-           v.id,
-           v.slug,
-           v.canonical_name AS title,
-           (v.first_season || '–' || v.last_season) AS subtitle,
-           (CASE WHEN afldb_normalise_name(v.canonical_name) = q.term THEN 1000
-                 WHEN afldb_normalise_name(v.canonical_name) LIKE q.term || '%' THEN 500
-                 ELSE 200 END)::float AS rank
-      FROM venues v
-      LEFT JOIN venue_aliases a ON a.venue_id = v.id
-     CROSS JOIN q
-     WHERE afldb_normalise_name(v.canonical_name) LIKE '%' || q.term || '%'
-        OR afldb_normalise_name(a.alias)          LIKE '%' || q.term || '%'
-     ORDER BY v.id, rank DESC
+    WITH q AS (SELECT afldb_normalise_name(${query}) AS term),
+    matched AS (
+      SELECT DISTINCT ON (v.id)
+             'venue'::text AS type,
+             v.id,
+             v.slug,
+             v.canonical_name AS title,
+             (v.first_season || '–' || v.last_season) AS subtitle,
+             (CASE WHEN afldb_normalise_name(v.canonical_name) = q.term THEN 1000
+                   WHEN afldb_normalise_name(v.canonical_name) LIKE q.term || '%' THEN 500
+                   ELSE 200 END
+              + similarity(afldb_normalise_name(v.canonical_name), q.term) * 100)::float AS rank
+        FROM venues v
+        LEFT JOIN venue_aliases a ON a.venue_id = v.id
+       CROSS JOIN q
+       WHERE afldb_normalise_name(v.canonical_name) LIKE '%' || q.term || '%'
+          OR afldb_normalise_name(a.alias)          LIKE '%' || q.term || '%'
+       ORDER BY v.id, rank DESC
+    )
+    SELECT type, id, slug, title, subtitle, rank
+      FROM matched
+     ORDER BY rank DESC, title
      LIMIT ${limit}
   `;
 }

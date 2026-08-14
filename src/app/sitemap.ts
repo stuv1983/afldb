@@ -30,10 +30,14 @@ export async function generateSitemaps() {
 }
 
 export default async function sitemap({
-  id,
+  id: rawId,
 }: {
-  id: number;
+  id: number | string;
 }): Promise<MetadataRoute.Sitemap> {
+  // Next passes the segment id back as the string from the URL, so a strict
+  // comparison against 0 never matched and segment 0 rendered empty.
+  const id = Number(rawId);
+
   // Segment 0: static routes plus the small reference collections.
   if (id === 0) {
     const [clubs, seasons, venues] = await Promise.all([
@@ -50,6 +54,7 @@ export default async function sitemap({
       { url: `${baseUrl}/records`, changeFrequency: 'weekly', priority: 0.9 },
       { url: `${baseUrl}/brownlow`, changeFrequency: 'weekly', priority: 0.8 },
       { url: `${baseUrl}/advanced-search`, changeFrequency: 'monthly', priority: 0.8 },
+      { url: `${baseUrl}/match-search`, changeFrequency: 'monthly', priority: 0.8 },
       ...clubs.map((c) => ({
         url: `${baseUrl}/clubs/${c.slug}`,
         changeFrequency: 'weekly' as const,

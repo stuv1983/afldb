@@ -228,6 +228,59 @@ def copy_rows(conn: psycopg.Connection, table: str, columns: Sequence[str],
     return count
 
 
+# Tables the current run undertakes to rebuild. None means "everything":
+# a full reload repopulates whatever CASCADE empties, so there is nothing
+# to protect against. A partial run sets this to the tables its selected
+# groups actually write, and truncate() then refuses to empty anything
+# outside it.
+_reload_scope: set[str] | None = None
+
+
+def set_reload_scope(tables: Iterable[str] | None) -> None:
+    """Declare which tables this run will rebuild.
+
+    A partial reload is the dangerous case: TRUNCATE ... CASCADE reaches
+    every table with a foreign key onto the one being emptied, so
+    reloading only the reference group would silently take the match and
+    statistics tables with it and then finish, reporting success, with
+    the database missing 700K rows.
+    """
+    global _reload_scope
+    _reload_scope = None if tables is None else {normalise_table(t) for t in tables}
+
+
+def normalise_table(name: str) -> str:
+    """Compare table names without the public schema qualifier."""
+    lowered = name.strip().lower().replace('"', "")
+    return lowered[len("public."):] if lowered.startswith("public.") else lowered
+
+
+def cascade_dependents(conn: psycopg.Connection, tables: Sequence[str]) -> set[str]:
+    """Tables TRUNCATE ... CASCADE would also empty, transitively."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            WITH RECURSIVE fk AS (
+              SELECT c.conrelid::regclass::text  AS child,
+                     c.confrelid::regclass::text AS parent
+                FROM pg_constraint c
+               WHERE c.contype = 'f' AND c.conrelid <> c.confrelid
+            ),
+            seed AS (
+              SELECT unnest(%s::text[])::regclass::text AS t
+            ),
+            reached AS (
+              SELECT fk.child FROM fk JOIN seed ON fk.parent = seed.t
+              UNION
+              SELECT fk.child FROM fk JOIN reached r ON fk.parent = r.child
+            )
+            SELECT DISTINCT child FROM reached
+            """,
+            (list(tables),),
+        )
+        return {normalise_table(r[0]) for r in cur.fetchall()}
+
+
 def truncate(conn: psycopg.Connection, *tables: str) -> None:
     """Truncate tables, making reruns idempotent.
 
@@ -236,9 +289,28 @@ def truncate(conn: psycopg.Connection, *tables: str) -> None:
     Tables whose ids must stay stable across reloads (players, matches)
     are loaded with explicit ids and have their sequence fast-forwarded
     with setval() afterwards.
+
+    CASCADE is required — the dependants must go for the parent to be
+    replaceable — but it is only safe when this run rebuilds them. See
+    set_reload_scope().
     """
     if not tables:
         return
+
+    if _reload_scope is not None:
+        dependents = cascade_dependents(conn, list(tables))
+        unrebuilt = sorted(dependents - _reload_scope - {normalise_table(t) for t in tables})
+        if unrebuilt:
+            raise RuntimeError(
+                "refusing to TRUNCATE "
+                + ", ".join(tables)
+                + ": CASCADE would also empty "
+                + ", ".join(unrebuilt)
+                + ", which this run does not rebuild.\n"
+                "Run the full import, add the groups that rebuild those tables, "
+                "or pass --allow-cascade if emptying them is genuinely intended."
+            )
+
     with conn.cursor() as cur:
         cur.execute(f"TRUNCATE {', '.join(tables)} CASCADE")
 

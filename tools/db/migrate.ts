@@ -21,20 +21,70 @@ import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const MIGRATIONS_DIR = join(__dirname, '..', '..', 'src', 'db', 'migrations');
+const PROJECT_ROOT = join(__dirname, '..', '..');
+const MIGRATIONS_DIR = join(PROJECT_ROOT, 'src', 'db', 'migrations');
+
+/**
+ * Load .env, as the Python tooling does.
+ *
+ * Without this the documented `npm run db:migrate` could only work if the
+ * caller had already exported the DSN, so the command in the deployment
+ * guide failed on a clean shell. An already-set variable always wins, so
+ * `AFLDB_MIGRATE_TARGET=prod` with an exported DSN still overrides .env.
+ */
+function loadEnv(): void {
+  let contents: string;
+  try {
+    contents = readFileSync(join(PROJECT_ROOT, '.env'), 'utf8');
+  } catch {
+    return; // Absent in CI; variables are expected to be set already.
+  }
+  for (const line of contents.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue;
+    const [key, ...rest] = trimmed.split('=');
+    const name = key.trim();
+    if (!process.env[name]) process.env[name] = rest.join('=').trim();
+  }
+}
+
+loadEnv();
 
 const statusOnly = process.argv.includes('--status');
-const target = process.env.AFLDB_MIGRATE_TARGET === 'test' ? 'test' : 'dev';
 
-const connectionString =
-  target === 'test'
-    ? process.env.AFLDB_TEST_DATABASE_URL
-    : process.env.AFLDB_OWNER_DATABASE_URL;
+/**
+ * Every target is named explicitly.
+ *
+ * The previous form treated anything that was not 'test' as 'dev', so
+ * AFLDB_MIGRATE_TARGET=prod — the command the cutover plan documented —
+ * silently migrated development instead. An unrecognised target is now a
+ * refusal, because guessing which database to alter is the one thing a
+ * migration runner must never do.
+ */
+const TARGETS = {
+  dev: 'AFLDB_OWNER_DATABASE_URL',
+  test: 'AFLDB_TEST_DATABASE_URL',
+  prod: 'AFLDB_PROD_DATABASE_URL',
+} as const;
+
+type Target = keyof typeof TARGETS;
+
+const requested = process.env.AFLDB_MIGRATE_TARGET ?? 'dev';
+
+if (!Object.hasOwn(TARGETS, requested)) {
+  console.error(
+    `ERROR: unknown AFLDB_MIGRATE_TARGET '${requested}'.`
+    + `\n       Valid targets: ${Object.keys(TARGETS).join(', ')}.`,
+  );
+  process.exit(1);
+}
+
+const target = requested as Target;
+const variable = TARGETS[target];
+const connectionString = process.env[variable];
 
 if (!connectionString) {
-  console.error(
-    `ERROR: ${target === 'test' ? 'AFLDB_TEST_DATABASE_URL' : 'AFLDB_OWNER_DATABASE_URL'} is not set.`,
-  );
+  console.error(`ERROR: ${variable} is not set (target '${target}').`);
   process.exit(1);
 }
 

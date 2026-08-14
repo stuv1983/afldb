@@ -94,8 +94,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 AFLDB — Australian Football statistics, 1897 to present.
                 Data derived from publicly available sources including AFL Tables and Wikipedia.
               </p>
+              <p>AFLDB is an independent hobby project.</p>
               <p>
                 Statistics not collected in a given era are shown as “—”, never as zero.
+              </p>
+              <p>
+                Contact: <a href="mailto:admin@afldb.com">admin@afldb.com</a>
               </p>
             </div>
           </div>

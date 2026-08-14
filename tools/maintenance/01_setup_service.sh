@@ -69,9 +69,23 @@ echo "    unit installed and enabled at boot"
 echo "==> [3/5] Installing the development Caddyfile"
 mkdir -p /etc/caddy /var/log/caddy
 chown -R caddy:caddy /var/log/caddy 2>/dev/null || true
-if [[ -f /etc/caddy/Caddyfile && ! -f /etc/caddy/Caddyfile.pre-afldb ]]; then
-  cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.pre-afldb
-  echo "    existing Caddyfile preserved as /etc/caddy/Caddyfile.pre-afldb"
+
+# The system Caddyfile may serve sites that have nothing to do with AFLDB.
+# One .pre-afldb copy is not a safety net: a second run would overwrite an
+# already-replaced file and leave the original unrecoverable. Every
+# replacement is kept, and a Caddyfile this script did not write is only
+# replaced when the operator says so.
+if [[ -f /etc/caddy/Caddyfile ]]; then
+  if ! grep -q 'AFLDB' /etc/caddy/Caddyfile && [[ "${AFLDB_REPLACE_CADDYFILE:-}" != "1" ]]; then
+    echo "ERROR: /etc/caddy/Caddyfile exists and was not written by AFLDB." >&2
+    echo "       It may serve other sites. Merge deploy/Caddyfile into it by hand," >&2
+    echo "       or re-run with AFLDB_REPLACE_CADDYFILE=1 to replace it." >&2
+    echo "       A timestamped copy is kept either way." >&2
+    exit 1
+  fi
+  BACKUP="/etc/caddy/Caddyfile.pre-afldb.$(date +%Y%m%d-%H%M%S)"
+  cp /etc/caddy/Caddyfile "$BACKUP"
+  echo "    existing Caddyfile preserved as ${BACKUP}"
 fi
 cp "${PROJECT_DIR}/deploy/Caddyfile" /etc/caddy/Caddyfile
 caddy validate --config /etc/caddy/Caddyfile > /dev/null 2>&1 \

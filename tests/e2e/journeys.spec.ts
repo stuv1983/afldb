@@ -154,9 +154,129 @@ test('health endpoint reports database reachability', async ({ request }) => {
   expect(JSON.stringify(body)).not.toMatch(/postgres|password|@|5432/i);
 });
 
-test('development deployment is not indexable', async ({ request }) => {
-  const response = await request.get('/robots.txt');
-  expect(await response.text()).toContain('Disallow: /');
+test('robots.txt matches the deployment it is serving', async ({ request }) => {
+  // AFLDB_ENV gates indexing, so the correct answer differs by
+  // environment. Asserting "Disallow: /" unconditionally meant a
+  // correctly indexable production site would fail its own smoke test.
+  const body = await (await request.get('/robots.txt')).text();
+
+  if (process.env.AFLDB_ENV === 'production') {
+    expect(body).not.toMatch(/^Disallow: \/$/m);
+    expect(body).toContain('Allow: /');
+    // Whatever it advertises as the sitemap has to exist.
+    const advertised = body.match(/^Sitemap:\s*(\S+)$/m)?.[1];
+    expect(advertised).toBeTruthy();
+    const sitemap = await request.get(advertised!);
+    expect(sitemap.status()).toBe(200);
+  } else {
+    expect(body).toContain('Disallow: /');
+  }
+});
+
+test('the sitemap index resolves to segments that have URLs in them', async ({ request }) => {
+  // /sitemap.xml returned 404 while the segments existed, so nothing
+  // published pointed at any of them.
+  const index = await request.get('/sitemap.xml');
+  expect(index.status()).toBe(200);
+
+  const body = await index.text();
+  const locations = [...body.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  expect(locations.length).toBeGreaterThan(1);
+
+  // Segment 0 carries the static routes and the reference collections; it
+  // came back as an empty urlset because the id arrived as a string.
+  const segment0 = await request.get(new URL(locations[0]).pathname);
+  expect(segment0.status()).toBe(200);
+  const segment0Body = await segment0.text();
+  expect(segment0Body).toContain('/clubs/');
+  expect(segment0Body).toContain('/match-search');
+
+  const last = await request.get(new URL(locations[locations.length - 1]).pathname);
+  expect((await last.text()).match(/<url>/g)?.length).toBeGreaterThan(0);
+});
+
+test('match search → results → match', async ({ page }) => {
+  await page.goto('/match-search');
+  await page.getByLabel('Margin (points) maximum').fill('3');
+  await page.getByLabel('Match type').selectOption('finals');
+  await page.getByRole('button', { name: 'Search matches' }).click();
+
+  await expect(page).toHaveURL(/margin_max=3/);
+  await expect(page.locator('.section-note')).toContainText('matches');
+
+  await page.getByRole('row').nth(1).getByRole('link').first().click();
+  await expect(page).toHaveURL(/\/matches\/\d+/);
+});
+
+test('match search describes the search it actually ran', async ({ page }) => {
+  // The form echoed the raw 999 while the query was capped at 400.
+  await page.goto('/match-search?search=1&margin_min=999');
+  await expect(page.getByLabel('Margin (points) minimum')).toHaveValue('400');
+  await expect(page.locator('.notice')).toContainText('400');
+});
+
+test('match search shows every active club filter', async ({ page }) => {
+  await page.goto('/match-search?search=1&club=collingwood,carlton');
+  const note = page.locator('.section-note');
+  await expect(note).toContainText('Collingwood');
+  // The second club was applied but invisible, and was lost on resubmit.
+  await expect(note).toContainText('Carlton');
+});
+
+test('match search is reachable from the primary navigation', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'the masthead nav is hidden on a phone');
+
+  await page.goto('/');
+  await page.getByRole('navigation', { name: 'Primary' })
+    .getByRole('link', { name: 'Match Search' }).click();
+  await expect(page).toHaveURL(/\/match-search/);
+});
+
+test('a drawn match reads as a draw, not as a defeat', async ({ page }) => {
+  // The description was a fixed "defeated by", which was backwards for
+  // every home win and wrong for every draw.
+  await page.goto('/match-search?search=1&outcome=draw&match_type=finals&sort=date_asc');
+  await page.getByRole('row').nth(1).getByRole('link').first().click();
+
+  const description = page.locator('meta[name="description"]');
+  await expect(description).toHaveAttribute('content', /drew with/);
+});
+
+test('a home win is not described as a defeat', async ({ page }) => {
+  // Match 16887: Adelaide 103, St Kilda 102. The home side won by a
+  // point, and the description read "Adelaide 103 defeated by St Kilda".
+  await page.goto('/matches/16887');
+  const description = page.locator('meta[name="description"]');
+  await expect(description).toHaveAttribute('content', /Adelaide 103 defeated St Kilda 102/);
+});
+
+test('a shared Brownlow names every winner', async ({ page }) => {
+  // 2003 was shared by Buckley, Goodes and Ricciuto; the summary named
+  // only whichever one sorted first.
+  await page.goto('/brownlow/2003');
+  const subtitle = page.locator('.subtitle').first();
+  await expect(subtitle).toContainText('Shared by');
+  await expect(subtitle).toContainText('Nathan Buckley');
+  await expect(subtitle).toContainText('Adam Goodes');
+  await expect(subtitle).toContainText('Mark Ricciuto');
+});
+
+test('a merged club names its successor in the clubs index', async ({ page }) => {
+  await page.goto('/clubs');
+  const fitzroy = page.getByRole('row').filter({ hasText: 'Fitzroy' }).first();
+  // "Continues as —" told the reader nothing about where Fitzroy went.
+  await expect(fitzroy).toContainText('Brisbane Lions');
+
+  const university = page.getByRole('row').filter({ hasText: 'University' }).first();
+  await expect(university).toContainText('no successor');
+});
+
+test('a page past the last one lands on a page that exists', async ({ page }) => {
+  await page.goto('/players?page=999');
+  // Previously reported "0 players" while claiming 13,361 in the same view.
+  await expect(page).toHaveURL(/page=\d+/);
+  await expect(page.locator('.subtitle')).toContainText('13,361 players');
+  await expect(page.getByRole('row').nth(1)).toBeVisible();
 });
 
 test('the reader can choose light or dark, and the choice survives navigation', async ({ page }) => {

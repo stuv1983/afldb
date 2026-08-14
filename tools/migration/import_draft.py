@@ -38,6 +38,7 @@ Idempotent: truncates and reloads both tables.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
@@ -141,7 +142,18 @@ def main() -> int:
         clubs = dict(cur.fetchall())
 
     # ---- Fold rows into people -------------------------------------
+    # Source row order is not guaranteed, so fold in a fixed order: which
+    # row wins decides the person's name, URL and link, and that must not
+    # change between runs over identical data.
+    rows.sort(key=lambda r: (r["dg_person_id"] is None, r["dg_person_id"] or 0,
+                             r["draft_rowid"]))
+
     people: dict[int, dict] = {}
+    # dg_person_id -> the distinct AFLDB players trusted rows point at.
+    # More than one means the source contradicts itself about who this
+    # person is, which is a fact worth surfacing rather than resolving by
+    # taking whichever row was read first.
+    trusted_targets: dict[int, dict[int, int]] = {}
     for row in rows:
         dg = row["dg_person_id"]
         if dg is None:
@@ -171,11 +183,14 @@ def main() -> int:
 
         # A trusted link on ANY of the person's rows resolves the person.
         # Rows disagreeing is exactly the inconsistency this prevents.
-        if status in TRUSTED and afldb_pid is not None and person["player_id"] is None:
-            person["player_id"] = afldb_pid
-            person["link_status"] = status
-            person["match_method"] = clean_text(row["match_method"])
-            person["confidence_notes"] = clean_text(row["confidence_notes"])
+        if status in TRUSTED and afldb_pid is not None:
+            targets = trusted_targets.setdefault(dg, {})
+            targets[afldb_pid] = targets.get(afldb_pid, 0) + 1
+            if person["player_id"] is None:
+                person["player_id"] = afldb_pid
+                person["link_status"] = status
+                person["match_method"] = clean_text(row["match_method"])
+                person["confidence_notes"] = clean_text(row["confidence_notes"])
         elif person["player_id"] is None and status in ("ambiguous", "implausible"):
             # Keep the more informative unlinked state.
             person["link_status"] = status
@@ -187,6 +202,17 @@ def main() -> int:
         person["is_matching_backlog"] = (
             person["player_id"] is None and person["reported_games"] > 0
         )
+
+    # Trusted rows that point at different players for the same person.
+    # Keeping the first and discarding the rest would present a resolved
+    # link the source does not actually support.
+    contradictions = {dg: targets for dg, targets in trusted_targets.items()
+                      if len(targets) > 1}
+    if contradictions:
+        rep.warn(f"{len(contradictions)} draft people have trusted links to more "
+                 "than one AFLDB player; the first is used and each is flagged")
+        for dg, targets in sorted(contradictions.items()):
+            rep.warn(f"    dg_person_id {dg}: players {sorted(targets)}")
 
     linked = sum(1 for p in people.values() if p["player_id"] is not None)
     backlog = sum(1 for p in people.values() if p["is_matching_backlog"])
@@ -275,6 +301,7 @@ def main() -> int:
                     clean_text(row["competition"]),
                     clean_text(row["signing"]),
                     clean_text(row["signing_kind"]),
+                    clean_text(row["signing_detail"]),
                     clean_text(row["detail"]),
                     source_id,
                     str(row["draft_rowid"]),
@@ -293,7 +320,8 @@ def main() -> int:
              "candidate_count", "match_method", "confidence_notes",
              "club_id", "club_name_raw", "original_club_raw", "draft_age",
              "height_cm", "weight_kg", "grade", "competition", "signing",
-             "signing_kind", "detail", "source_id", "source_record_id",
+             "signing_kind", "signing_detail", "detail",
+             "source_id", "source_record_id",
              "import_batch_id", "draft_person_id", "dg_person_id",
              "player_url", "reported_games", "reported_goals"),
             pick_rows(),
@@ -325,6 +353,43 @@ def main() -> int:
                   FROM draft_persons dp
                  WHERE dp.is_matching_backlog
             """)
+
+            # Contradictory trusted links, recorded for the same reason:
+            # a link the source disagrees with itself about should be
+            # visible, not resolved silently by read order.
+            cur.execute("""
+                DELETE FROM data_issues
+                 WHERE entity_type = 'draft_person'
+                   AND issue_type = 'contradictory_trusted_link'
+                   AND resolved_at IS NULL
+            """)
+            if contradictions:
+                cur.executemany(
+                    """INSERT INTO data_issues
+                         (entity_type, entity_id, issue_type, severity,
+                          description, details)
+                       SELECT 'draft_person', dp.id, 'contradictory_trusted_link',
+                              'warning', %s, %s::jsonb
+                         FROM draft_persons dp
+                        WHERE dp.dg_person_id = %s""",
+                    [
+                        (
+                            f"The source reports trusted links from this person to "
+                            f"{len(targets)} different AFLDB players "
+                            f"({', '.join(str(p) for p in sorted(targets))}). "
+                            f"Player {people[dg]['player_id']} was used; the "
+                            f"disagreement is unresolved.",
+                            json.dumps({
+                                "dg_person_id": dg,
+                                "player_ids": sorted(targets),
+                                "row_counts": {str(k): v for k, v in sorted(targets.items())},
+                                "used_player_id": people[dg]["player_id"],
+                            }),
+                            dg,
+                        )
+                        for dg, targets in sorted(contradictions.items())
+                    ],
+                )
         pg.commit()
 
     analyze(pg, "draft_picks", "draft_persons")

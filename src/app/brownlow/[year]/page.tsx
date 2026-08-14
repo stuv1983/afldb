@@ -59,7 +59,9 @@ export default async function BrownlowYearPage({
   const rows = await getCount(parsed);
   if (rows.length === 0) notFound();
 
-  const winner = rows.find((r) => r.isWinner);
+  // 2003 was shared by Buckley, Goodes and Ricciuto, and several earlier
+  // counts were shared too. Taking the first winner named only one of them.
+  const winners = rows.filter((r) => r.isWinner);
 
   return (
     <>
@@ -72,11 +74,16 @@ export default async function BrownlowYearPage({
       <div className="page-header">
         <h1>{parsed} Brownlow Medal</h1>
         <p className="subtitle">
-          {winner ? (
+          {winners.length > 0 ? (
             <>
-              Won by{' '}
-              <Link href={playerPath(winner.slug, winner.playerId)}>{winner.displayName}</Link>
-              {' '}with {winner.votes} votes ·{' '}
+              {winners.length > 1 ? 'Shared by ' : 'Won by '}
+              {winners.map((w, i) => (
+                <span key={w.playerId}>
+                  <Link href={playerPath(w.slug, w.playerId)}>{w.displayName}</Link>
+                  {i < winners.length - 2 ? ', ' : i === winners.length - 2 ? ' and ' : ''}
+                </span>
+              ))}
+              {' '}with {winners[0].votes} votes ·{' '}
             </>
           ) : null}
           <Link href={seasonPath(parsed)}>{parsed} season</Link>

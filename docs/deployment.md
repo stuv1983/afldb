@@ -114,7 +114,7 @@ source .venv/bin/activate    # or use ./.venv/bin/python directly
 ./.venv/bin/python tools/migration/enrich_birth_dates.py      # ~6s    DOB recovery
 ./.venv/bin/python tools/migration/import_draft.py            # ~2s    draft links
 ./.venv/bin/python tools/migration/rebuild_derived.py         # ~30s   summaries
-./.venv/bin/python tools/validation/validate_migration.py     # 93 parity checks
+./.venv/bin/python tools/validation/validate_migration.py     # every check must pass
 
 npm run build && sudo systemctl restart afldb                 # refresh cached pages
 ```
@@ -123,6 +123,18 @@ The order matters. `rebuild_derived.py` must run last: it reads the tables the e
 
 Options: `--dry-run` on every script, plus `--groups <name>...` and `--list-groups` on the legacy import and `--targets` on the rebuild.
 
+**A partial import protects what it will not rebuild.** Reloading a subset
+with `--groups` refuses to start if `TRUNCATE … CASCADE` would empty a table
+outside those groups — reloading only `reference` would otherwise take the
+match and statistics tables with it and still report success. Override with
+`--allow-cascade` only when emptying them is the intention.
+
+**A reload is not atomic.** Each group commits separately, so a reader during
+one sees it in stages, and a crash part-way leaves it part-applied. Clubs and
+their organizations are the one pair that commit together, because a null
+organization would otherwise be permanent. Prefer running a refresh when
+nothing else is reading, and re-run from the start after any failure.
+
 **Enrichment never overwrites.** `enrich_birth_dates.py` fills only NULL dates and flags disagreements rather than resolving them, so re-running it after a manual correction cannot undo that correction.
 
 **Cache invalidation.** Historical pages are cached for 1–24 hours. After an import, a rebuild and restart refreshes them; a full restart is not otherwise required. Rebuilding is preferred over waiting for revalidation, because prerendered pages are regenerated at build time.
@@ -130,10 +142,17 @@ Options: `--dry-run` on every script, plus `--groups <name>...` and `--list-grou
 ## 8. Testing
 
 ```bash
-npm run test                 # 111 unit + integration (against afldb_test)
-npx playwright test          # 33 E2E, desktop and mobile
+npm run test                 # unit + integration (integration needs afldb_test)
+npx playwright test          # E2E, desktop and mobile
 node tools/maintenance/loadtest.mjs --concurrency 20 --duration 20
 ```
+
+Unit tests (formatting, query-spec parsing) need no database. Integration
+tests do, and refuse to run unless `AFLDB_TEST_DATABASE_URL` names a database
+whose name ends in `_test` — they issue real mutations, so the guard is an
+allowlist rather than a check for `afldb_dev`. Constraint tests run inside a
+transaction that always rolls back, so a regressed constraint cannot commit
+the row that proves it.
 
 `tests/integration/release-gates.test.ts` holds the conditions that must never regress, and separates **immutable** historical assertions from **snapshot** ones pinned to the loaded 2026 data. A snapshot failure after importing newer data means "re-pin", not "bug"; an immutable failure is a real defect.
 
@@ -145,7 +164,29 @@ Playwright needs `libasound2`, extracted without root into `~/.local/chromedeps`
 export LD_LIBRARY_PATH="$HOME/.local/chromedeps/extracted/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
 ```
 
-Integration tests refuse to run if `AFLDB_TEST_DATABASE_URL` points at `afldb_dev`.
+## 8a. Backups
+
+```bash
+tools/maintenance/backup.sh              # dump AFLDB_BACKUP_DATABASE_URL
+tools/maintenance/restore-test.sh        # prove the newest dump restores
+```
+
+`backup.sh` requires `AFLDB_BACKUP_DATABASE_URL` and does **not** fall back to
+the owner DSN: a backup must not run with write privileges. The dump is
+written under a `.partial` name and renamed only after `pg_restore --list`
+reads it back, so an interrupted dump cannot become the newest restore
+candidate. Filenames take the database name from the DSN, so each database
+keeps its own retention series.
+
+`restore-test.sh` restores into `afldb_restore_test` and nothing else — it
+replaces the database name in the DSN rather than substituting a string, and
+refuses any other target. It empties the target first, so a failed restore
+cannot leave the previous generation in place for the parity checks to pass
+against. Only the two known extension-ownership errors are tolerated; any
+other `pg_restore` output is fatal.
+
+A restore that succeeds proves this dump. It does not prove behaviour on a
+corrupt dump or a wrong target — neither is exercised.
 
 ## 9. Configuration
 
@@ -157,12 +198,23 @@ All configuration is in `/home/arm/projects/afldb/.env` (mode 600, owner `arm`),
 |---|---|
 | `DATABASE_URL` | read-only app role (`afldb_app`) |
 | `AFLDB_IMPORT_DATABASE_URL` | ETL writes (`afldb_import`) |
-| `AFLDB_OWNER_DATABASE_URL` | migrations (`afldb_owner`) |
-| `AFLDB_TEST_DATABASE_URL` | integration tests |
+| `AFLDB_OWNER_DATABASE_URL` | migrations, target `dev` (`afldb_owner`) |
+| `AFLDB_PROD_DATABASE_URL` | migrations, target `prod` — unset here |
+| `AFLDB_TEST_DATABASE_URL` | integration tests (must name a `_test` database) |
 | `AFLDB_BACKUP_DATABASE_URL` | `pg_dump` (`afldb_backup`, read-only) |
 | `AFLDB_ENV` | `development` \| `production` — **gates indexing** |
 | `AFLDB_WORKERS` | cluster worker count |
 | `AFLDB_STATEMENT_TIMEOUT_MS` | per-connection statement timeout |
+
+**The web service does not receive them all.** `.env` is the whole project's
+configuration, so the unit loads it and then drops the import, owner, test and
+backup DSNs with `UnsetEnvironment=`. The service process holds only
+`DATABASE_URL`, which cannot write. Migrations, imports and backups read
+`.env` directly and are unaffected.
+
+`npm run db:migrate` targets `dev`. `AFLDB_MIGRATE_TARGET` accepts `dev`,
+`test` or `prod` and **refuses to run on anything else** rather than falling
+back to development.
 
 ## 10. Indexing safety
 
