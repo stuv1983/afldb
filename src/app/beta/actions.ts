@@ -4,7 +4,8 @@ import { redirect } from 'next/navigation';
 
 import { authSql } from '@/db/authClient';
 import { generateToken, sha256Hex } from '@/lib/auth/crypto';
-import { audit, grantBetaAccess } from '@/lib/auth/session';
+import { RateLimiter } from '@/lib/auth/rate-limit';
+import { audit, grantBetaAccess, requestIp } from '@/lib/auth/session';
 
 /**
  * The two ways into the beta: an access code, or a magic link to an
@@ -24,25 +25,26 @@ export type BetaFormState = {
 const GENERIC_FAILURE =
   'That code or email was not accepted. Check it and try again, or contact the person who invited you.';
 
-// A visitor who fails repeatedly is guessing. Small in-memory limiter,
-// per worker: crude, but the right shape for a beta of dozens of people.
-const attempts = new Map<string, { count: number; resetAt: number }>();
-
-function rateLimited(key: string, max = 10, windowMs = 15 * 60 * 1000): boolean {
-  const now = Date.now();
-  const entry = attempts.get(key);
-  if (!entry || entry.resetAt < now) {
-    attempts.set(key, { count: 1, resetAt: now + windowMs });
-    return false;
-  }
-  entry.count += 1;
-  return entry.count > max;
-}
+// A visitor who fails repeatedly is guessing. Small in-memory limiters, per
+// worker: crude, but the right shape for a beta of dozens of people. Keyed on
+// the caller's IP, never on the code or email they supply — keying on content
+// let an attacker rotate it to dodge the limit, and because every real code
+// starts "afldb-" it also collapsed all genuine redemptions into one bucket a
+// few bad guesses could exhaust for everyone.
+const REDEEM_LIMIT = new RateLimiter(10, 15 * 60 * 1000);
+const MAGIC_LINK_LIMIT = new RateLimiter(5, 15 * 60 * 1000);
 
 /** Where to send an admitted visitor: only ever an internal path. */
 function safeDestination(from: FormDataEntryValue | null): string {
   if (typeof from !== 'string') return '/';
-  if (!from.startsWith('/') || from.startsWith('//')) return '/';
+  // Must be an absolute same-origin path: a leading '/' whose next character
+  // is neither '/' nor '\'. Browsers fold '/\' (and '\/') into '//', so the
+  // old '//' check alone let `/\evil.com` through as a protocol-relative,
+  // off-origin redirect. Also reject control characters (header/redirect
+  // splitting).
+  if (!/^\/[^/\\]/.test(from)) return '/';
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(from)) return '/';
   return from;
 }
 
@@ -56,7 +58,7 @@ export async function redeemAccessCode(
   if (code.length < 8 || code.length > 100) {
     return { error: GENERIC_FAILURE };
   }
-  if (rateLimited(`code:${code.slice(0, 4)}`)) {
+  if (REDEEM_LIMIT.check(`ip:${(await requestIp()) ?? 'unknown'}`)) {
     return { error: 'Too many attempts. Wait a few minutes and try again.' };
   }
 
@@ -91,7 +93,7 @@ export async function requestMagicLink(
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 200) {
     return { error: GENERIC_FAILURE };
   }
-  if (rateLimited(`email:${email}`, 5)) {
+  if (MAGIC_LINK_LIMIT.check(`ip:${(await requestIp()) ?? 'unknown'}`)) {
     return { error: 'Too many attempts. Wait a few minutes and try again.' };
   }
 
@@ -112,10 +114,16 @@ export async function requestMagicLink(
     const base = process.env.AFLDB_BASE_URL ?? 'http://localhost:3100';
     const link = `${base}/beta/verify?token=${token}`;
 
-    // No SMTP is configured in development, and wiring one into a beta
-    // of this size is premature. The link goes to the server log, where
-    // the operator can pass it on; the SMTP hook is one function.
-    console.info(`[beta] magic link for ${email}: ${link}`);
+    // The link carries a live 30-minute credential, so it must never reach a
+    // production log. In development there is no SMTP and the operator reads
+    // the link from the log to pass it on; in production the token stays out
+    // of the journal and the SMTP hook (still one function) must deliver it.
+    if (process.env.AFLDB_ENV === 'production') {
+      // TODO: deliver `link` by email. Deliberately NOT logged.
+      console.info(`[beta] magic link issued for ${email}`);
+    } else {
+      console.info(`[beta] magic link for ${email}: ${link}`);
+    }
     await audit('beta.magic_link_issued', { email }, { label: email });
   } else {
     await audit('beta.magic_link_refused', { email }, { label: email });

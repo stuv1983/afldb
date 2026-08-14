@@ -2,9 +2,15 @@ import { NextResponse } from 'next/server';
 
 import { authSql } from '@/db/authClient';
 import { sha256Hex } from '@/lib/auth/crypto';
-import { audit, grantBetaAccess } from '@/lib/auth/session';
+import { RateLimiter } from '@/lib/auth/rate-limit';
+import { audit, grantBetaAccess, requestIp } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
+
+// Unauthenticated, and it runs a DB UPDATE on every hit, so cap it per caller
+// to keep a flood off the small auth pool. Guessing the token is already
+// infeasible (128-bit); this is purely load protection.
+const VERIFY_LIMIT = new RateLimiter(20, 15 * 60 * 1000);
 
 /**
  * Magic-link landing. Single use: the token is burned in the same
@@ -17,6 +23,12 @@ export async function GET(request: Request) {
 
   if (token.length < 20 || token.length > 100) {
     return NextResponse.redirect(new URL('/beta', url));
+  }
+
+  if (VERIFY_LIMIT.check(`ip:${(await requestIp()) ?? 'unknown'}`)) {
+    return new NextResponse('Too many requests. Wait a few minutes and try again.', {
+      status: 429,
+    });
   }
 
   const [row] = await authSql<{ email: string }[]>`

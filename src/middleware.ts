@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { ADMIN_COOKIE, BETA_COOKIE, verifyClaim } from '@/lib/auth/tokens';
+import { ADMIN_COOKIE, BETA_COOKIE, betaEpoch, betaGateOn, verifyClaim } from '@/lib/auth/tokens';
 
 /**
  * Access control at the door.
@@ -57,14 +57,24 @@ export async function middleware(request: NextRequest) {
   }
 
   // Beta gate, when enabled.
-  if (process.env.AFLDB_BETA_GATE === 'on' && !isPublicPath(pathname)) {
+  if (betaGateOn() && !isPublicPath(pathname)) {
     if (!secret) {
       // Misconfiguration must fail closed, but explicably.
       return new NextResponse('Beta gate is on but AFLDB_SESSION_SECRET is not set.', {
         status: 503,
       });
     }
-    const minEpoch = Number(process.env.AFLDB_BETA_EPOCH ?? 1);
+    // A present-but-invalid epoch throws rather than silently disabling the
+    // kill switch (see betaEpoch). Fail closed and explicably, as above.
+    let minEpoch: number;
+    try {
+      minEpoch = betaEpoch();
+    } catch {
+      return new NextResponse(
+        'Beta gate is on but AFLDB_BETA_EPOCH is not a valid integer.',
+        { status: 503 },
+      );
+    }
     const beta = await verifyClaim(
       request.cookies.get(BETA_COOKIE)?.value, secret, { kind: 'beta', minEpoch },
     );

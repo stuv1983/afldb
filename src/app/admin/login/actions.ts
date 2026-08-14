@@ -4,26 +4,22 @@ import { redirect } from 'next/navigation';
 
 import { authSql } from '@/db/authClient';
 import { verifyPassword, verifyTotp } from '@/lib/auth/crypto';
-import { audit, createAdminSession } from '@/lib/auth/session';
+import { RateLimiter } from '@/lib/auth/rate-limit';
+import { audit, createAdminSession, requestIp } from '@/lib/auth/session';
 
 export type LoginState = { error?: string };
 
 const FAILURE = 'Sign-in failed. Check the email, password and authenticator code.';
 
-// Per-worker limiter. An online guess against scrypt+TOTP is already
-// hopeless; this just keeps the log readable.
-const attempts = new Map<string, { count: number; resetAt: number }>();
-
-function rateLimited(key: string): boolean {
-  const now = Date.now();
-  const entry = attempts.get(key);
-  if (!entry || entry.resetAt < now) {
-    attempts.set(key, { count: 1, resetAt: now + 15 * 60 * 1000 });
-    return false;
-  }
-  entry.count += 1;
-  return entry.count > 8;
-}
+// Per-worker limiter, keyed on the caller's IP and checked BEFORE the scrypt
+// verification below. That ordering is the point: verifyPassword runs a full
+// scrypt (N=2^15) on every attempt — including a dummy hash for unknown users
+// — so without an up-front per-caller cap an unauthenticated client could
+// send a burst of logins and pin every worker's CPU (public pages included).
+// Keying on the attacker-chosen email, as this used to, neither bounded that
+// work (a fresh email is a fresh bucket) nor was safe (a known admin address
+// could be locked out on demand).
+const LOGIN_LIMIT = new RateLimiter(8, 15 * 60 * 1000);
 
 export async function adminLogin(
   _previous: LoginState,
@@ -34,7 +30,7 @@ export async function adminLogin(
   const code = String(formData.get('totp') ?? '').trim();
 
   if (!email || !password || !code) return { error: FAILURE };
-  if (rateLimited(email)) {
+  if (LOGIN_LIMIT.check(`ip:${(await requestIp()) ?? 'unknown'}`)) {
     return { error: 'Too many attempts. Wait fifteen minutes.' };
   }
 

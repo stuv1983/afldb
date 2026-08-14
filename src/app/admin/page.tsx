@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 
 import { adminLogout } from '@/app/admin/logout-action';
 import { authSql } from '@/db/authClient';
-import { getAdminUser } from '@/lib/auth/session';
+import { requireAdmin } from '@/lib/auth/session';
 import { formatNumber } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -15,8 +14,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminDashboard() {
-  const admin = await getAdminUser();
-  if (!admin) redirect('/admin/login');
+  const admin = await requireAdmin();
 
   const [submissions, recentAudit] = await Promise.all([
     authSql<{

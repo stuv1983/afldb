@@ -104,6 +104,40 @@ export async function verifyClaim(
   return claim;
 }
 
+/**
+ * Whether the beta gate is on. Kept here in the edge-safe module so the
+ * middleware door and the server-only mint/check side (session.ts) share one
+ * definition of "on" rather than each inlining `=== 'on'`.
+ */
+export function betaGateOn(): boolean {
+  return process.env.AFLDB_BETA_GATE === 'on';
+}
+
+/**
+ * Read and validate the beta revocation epoch.
+ *
+ * Absent (or empty) means the default epoch 1, which every cookie is minted
+ * at. A value that is PRESENT but not an integer is an operator error —
+ * almost always a fumbled kill-switch bump — and must fail LOUD rather than
+ * silently disable the switch. `Number('epoch-2')` is NaN and `claim.epoch <
+ * NaN` is always false, so the previous inline `Number(process.env... ?? 1)`
+ * admitted every outstanding cookie at exactly the moment someone was trying
+ * to revoke them. Throwing turns that fail-open into a fail-closed the caller
+ * surfaces (a 503 at the edge, an error on the mint side).
+ */
+export function betaEpoch(): number {
+  const raw = process.env.AFLDB_BETA_EPOCH;
+  if (raw === undefined || raw === '') return 1;
+  const epoch = Number(raw);
+  if (!Number.isInteger(epoch)) {
+    throw new Error(
+      `AFLDB_BETA_EPOCH must be an integer; got ${JSON.stringify(raw)}. `
+      + 'Refusing to run rather than silently disable the beta kill switch.',
+    );
+  }
+  return epoch;
+}
+
 export const BETA_COOKIE = 'afldb_beta';
 export const ADMIN_COOKIE = 'afldb_admin';
 

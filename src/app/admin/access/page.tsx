@@ -1,10 +1,8 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
 
 import { AccessManager } from '@/app/admin/access/AccessManager';
 import { authSql } from '@/db/authClient';
-import { betaGateEnabled } from '@/lib/auth/session';
-import { getAdminUser } from '@/lib/auth/session';
+import { betaGateEnabled, requireAdmin } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,8 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AccessPage() {
-  const admin = await getAdminUser();
-  if (!admin) redirect('/admin/login');
+  await requireAdmin();
 
   const [codes, emails] = await Promise.all([
     authSql<{

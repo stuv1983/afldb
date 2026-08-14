@@ -21,6 +21,7 @@ export const PRIMARY_NAV = [
   { href: '/awards', label: 'Awards' },
   { href: '/advanced-search', label: 'Player Search' },
   { href: '/match-search', label: 'Match Search' },
+  { href: '/aflw', label: 'AFLW' },
 ];
 
 const TABS = [
@@ -28,6 +29,7 @@ const TABS = [
   { href: '/players', label: 'Players' },
   { href: '/seasons', label: 'Seasons' },
   { href: '/records', label: 'Records' },
+  { href: '/aflw', label: 'AFLW' },
 ];
 
 /** True for the section's own page and anything beneath it. */

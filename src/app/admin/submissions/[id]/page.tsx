@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 
 import { ReviewControls } from '@/app/admin/submissions/[id]/ReviewControls';
 import { authSql } from '@/db/authClient';
-import { getAdminUser } from '@/lib/auth/session';
+import { requireAdmin } from '@/lib/auth/session';
 import { formatNumber } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -18,8 +18,7 @@ export default async function SubmissionPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const admin = await getAdminUser();
-  if (!admin) redirect('/admin/login');
+  await requireAdmin();
 
   const { id: idText } = await params;
   const id = Number(idText);

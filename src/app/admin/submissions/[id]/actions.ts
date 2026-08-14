@@ -1,19 +1,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 
 import { authSql } from '@/db/authClient';
-import { audit, getAdminUser } from '@/lib/auth/session';
+import { audit, requireAdmin } from '@/lib/auth/session';
 import { promoteSubmission, validateSubmission } from '@/lib/ingest/pipeline';
 
 export type ReviewState = { error?: string; message?: string };
-
-async function requireAdmin() {
-  const admin = await getAdminUser();
-  if (!admin) redirect('/admin/login');
-  return admin;
-}
 
 export async function runValidation(
   _previous: ReviewState,

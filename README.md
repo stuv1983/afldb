@@ -95,8 +95,10 @@ Copy [.env.example](.env.example) and provide the values appropriate to the envi
 
 | Variable | Purpose |
 |---|---|
-| `AFLDB_ENV` | `development`, `staging`, or `production`; also gates indexing |
-| `AFLDB_BASE_URL` | Canonical public base URL |
+| `AFLDB_ENV` | `development`, `staging`, or `production`; gates indexing, HSTS, and `Secure` session cookies |
+| `AFLDB_BASE_URL` | Canonical public base URL (metadata and magic-link links) |
+| `AFLDB_BETA_GATE` | `on` enables the closed-beta gate |
+| `AFLDB_BETA_EPOCH` | Beta revocation epoch; must be an integer (a bad value fails closed) |
 | `PORT` | Next.js port; defaults to 3100 in project scripts |
 | `DATABASE_URL` | Read-only application connection |
 | `AFLDB_OWNER_DATABASE_URL` | Development schema migration connection |
@@ -136,6 +138,36 @@ Three rules are central to the implementation:
 3. **Historical identity is explicit.** Renames and relocations share an organization without rewriting historical club identities; mergers remain separate organizations. Player identity uses stable numeric IDs rather than names.
 
 Derived career, season, and club-season summaries are reproducible from authoritative tables and are rebuilt rather than hand-edited. See [Architecture](docs/architecture.md) and [Migration report](docs/migration-report.md) for the full model and validation evidence.
+
+## Security hardening
+
+A security review of the auth, beta-gate, and deployment surfaces produced the following changes. Public-facing pages, SQL builders (allowlisted identifiers, parameterised values), CSV upload, and the HMAC token core were reviewed and left unchanged.
+
+**Authentication and sessions**
+
+- Admin authorization is now a single `requireAdmin()` exported from `src/lib/auth/session.ts`, replacing a guard that was hand-copied into seven routes. This DB-session check is the only layer that honours session revocation, so centralising it prevents a new admin route from silently shipping without it.
+- Admin and beta cookies derive their `Secure` attribute from `AFLDB_ENV === 'production'` (the single source of truth for production posture) rather than from `AFLDB_BASE_URL`, which could ship non-`Secure` cookies if that URL was misconfigured at cutover.
+- The beta revocation epoch (`AFLDB_BETA_EPOCH`) is parsed and validated once in the edge-safe token module. A non-integer value now fails **closed** (a 503 at the gate) instead of becoming `NaN` and silently disabling the kill switch.
+
+**Denial-of-service and abuse**
+
+- A shared, bounded rate limiter (`src/lib/auth/rate-limit.ts`) is keyed on the real client IP and applied to admin login, beta code redemption, magic-link requests, magic-link verification, and autocomplete. It replaces per-worker maps that grew without bound and were keyed on attacker-supplied content. In particular the admin login now rate-limits **before** running scrypt (previously an unauthenticated request could pin every worker's CPU), and the beta limiter no longer collapses every real code into one shared bucket.
+- The cluster supervisor (`deploy/server-cluster.mjs`) restarts crashed workers with exponential backoff and gives up after a burst, so a boot-time crash loop can no longer peg a core or bypass systemd's crash-loop protection.
+
+**Redirects, headers, and logging**
+
+- `safeDestination()` on the beta-gate return path now rejects the `/\` (backslash) form that browsers fold into a protocol-relative URL, closing an open redirect.
+- Caddy overwrites `X-Forwarded-For` with the real client address and `requestIp()` reads the trusted hop, so a client-supplied header can no longer forge the IP recorded in `auth_sessions` and `auth_audit_log`. **The production reverse proxy must apply the same rule.**
+- The Content-Security-Policy drops `'unsafe-eval'` in production. Removing `'unsafe-inline'` for scripts (a per-request nonce migration) is the remaining hardening step and is tracked separately, to be verified against a running build.
+- Beta magic-link tokens (live 30-minute credentials) are no longer written to the production log.
+
+**Operational scripts and data**
+
+- `tools/maintenance/backup.sh` and `restore-test.sh` pass the database password via `PGPASSWORD` instead of on the command line, keeping it out of the world-readable process list on the shared host.
+- Non-integer `maxUses`/`days` on the access-code form are rejected up front (via `parseIntInRange`) instead of reaching the SQL `INSERT` as `NaN`.
+- Corrected a code comment that claimed a privilege test enforced the read-only `afldb_app` role; the invariant comes from the migration `GRANT`s, and adding an automated privilege check remains a recommended follow-up.
+
+Verification: `npm run typecheck` passes and the 68 database-free unit tests pass. The integration and release-gate suites require `AFLDB_TEST_DATABASE_URL` and were not run in this environment; the changes do not touch schema, queries, or the data those suites exercise.
 
 ## Documentation
 

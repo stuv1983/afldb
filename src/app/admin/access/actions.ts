@@ -1,11 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 
 import { authSql } from '@/db/authClient';
 import { generateToken, sha256Hex } from '@/lib/auth/crypto';
-import { audit, getAdminUser } from '@/lib/auth/session';
+import { audit, requireAdmin } from '@/lib/auth/session';
+import { parseIntInRange } from '@/lib/params';
 
 export type AccessState = {
   error?: string;
@@ -14,20 +14,18 @@ export type AccessState = {
   newCode?: string;
 };
 
-async function requireAdmin() {
-  const admin = await getAdminUser();
-  if (!admin) redirect('/admin/login');
-  return admin;
-}
-
 export async function createAccessCode(
   _previous: AccessState,
   formData: FormData,
 ): Promise<AccessState> {
   const admin = await requireAdmin();
   const label = String(formData.get('label') ?? '').trim();
-  const maxUses = Math.min(Math.max(Number(formData.get('maxUses') ?? 1), 1), 500);
-  const days = Math.min(Math.max(Number(formData.get('days') ?? 90), 1), 365);
+  // parseIntInRange rejects non-integers up front; the old hand-rolled
+  // Math.min(Math.max(Number(...))) let a non-numeric field become NaN and
+  // flow straight into the INSERT's integer column (a 500), and passed
+  // fractional values through.
+  const maxUses = parseIntInRange(String(formData.get('maxUses') ?? ''), 1, 500) ?? 1;
+  const days = parseIntInRange(String(formData.get('days') ?? ''), 1, 365) ?? 90;
 
   if (label.length < 2 || label.length > 100) {
     return { error: 'Give the code a label: whose is it?' };

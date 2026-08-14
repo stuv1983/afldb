@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
 
 import { UploadForm } from '@/app/admin/upload/UploadForm';
-import { getAdminUser } from '@/lib/auth/session';
+import { requireAdmin } from '@/lib/auth/session';
 import { DATASETS } from '@/lib/ingest/datasets';
 
 export const dynamic = 'force-dynamic';
@@ -13,8 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default async function UploadPage() {
-  const admin = await getAdminUser();
-  if (!admin) redirect('/admin/login');
+  await requireAdmin();
 
   const datasets = Object.values(DATASETS).map((d) => ({
     key: d.key,

@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { cookies, headers } from 'next/headers';
+import { redirect } from 'next/navigation';
 
 import { authSql } from '@/db/authClient';
 import { generateToken, sha256Hex } from '@/lib/auth/crypto';
@@ -9,9 +10,16 @@ import {
   ADMIN_TTL_SECONDS,
   BETA_COOKIE,
   BETA_TTL_SECONDS,
+  betaEpoch,
+  betaGateOn,
   signClaim,
   verifyClaim,
 } from '@/lib/auth/tokens';
+
+// Re-exported so server-side callers keep one import site for these; the
+// definitions themselves live in the edge-safe tokens module so middleware
+// and this module cannot disagree about the gate flag or the epoch default.
+export { betaEpoch };
 
 /**
  * Sessions, in two layers.
@@ -33,36 +41,49 @@ export function sessionSecret(): string {
 }
 
 function secureCookies(): boolean {
-  // The dev server serves plain HTTP inside the LAN; Secure cookies
-  // would silently fail there. Production always sets them.
-  return (process.env.AFLDB_BASE_URL ?? '').startsWith('https://');
+  // Keyed on AFLDB_ENV, the single source of truth for production posture
+  // (HSTS and indexing key off it too). The dev server serves plain HTTP on
+  // the LAN, where a Secure cookie would silently fail to set; deriving this
+  // from AFLDB_BASE_URL instead let a production deploy that set AFLDB_ENV but
+  // fumbled AFLDB_BASE_URL ship non-Secure session cookies while looking fine.
+  return process.env.AFLDB_ENV === 'production';
 }
 
+/**
+ * The client's IP, for the audit trail.
+ *
+ * Behind our single reverse proxy (deploy/Caddyfile) the trustworthy value is
+ * the LAST entry of X-Forwarded-For — the address Caddy itself observed —
+ * because any earlier entries are whatever the client chose to send. Taking
+ * the FIRST (leftmost) entry, as this used to, recorded a fully
+ * attacker-controlled value: a request with `X-Forwarded-For: 8.8.8.8` poisoned
+ * auth_sessions.ip and auth_audit_log.ip. Caddy is also configured to
+ * overwrite the header, so in production only its own value is present; the
+ * rightmost read is defence in depth for that. Assumes exactly one trusted
+ * proxy hop.
+ */
 export async function requestIp(): Promise<string | null> {
   const h = await headers();
   const forwarded = h.get('x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0].trim();
+  if (forwarded) {
+    const hops = forwarded.split(',');
+    const last = hops[hops.length - 1]?.trim();
+    if (last) return last;
+  }
   return h.get('x-real-ip');
 }
 
 // ---------------------------------------------------------------------------
-// Beta epoch
+// Beta epoch and gate
+//
+// Both read the environment through the edge-safe helpers in tokens.ts so the
+// mint side here and the check side in middleware share one definition.
+// betaEpoch is re-exported at the top of this module; a non-numeric
+// AFLDB_BETA_EPOCH makes it throw, which fails admission closed.
 // ---------------------------------------------------------------------------
 
-/**
- * Current beta revocation epoch.
- *
- * Bumping AFLDB_BETA_EPOCH invalidates every outstanding beta cookie at
- * once — the kill switch if a code leaks somewhere unpleasant. Individual
- * codes are revoked in the database and stop admitting anyone new; the
- * epoch is for revoking what has already been admitted.
- */
-export function betaEpoch(): number {
-  return Number(process.env.AFLDB_BETA_EPOCH ?? 1);
-}
-
 export function betaGateEnabled(): boolean {
-  return process.env.AFLDB_BETA_GATE === 'on';
+  return betaGateOn();
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +191,22 @@ export async function getAdminUser(): Promise<AdminUser | null> {
        AND u.role = 'admin'
   `;
   return row ?? null;
+}
+
+/**
+ * Require an admin session, or redirect to the login form.
+ *
+ * This is the ONE guard every admin page and server action must call. The
+ * middleware cookie check is not enough: it verifies only the signed cookie,
+ * whereas this re-checks the database row, which is the only layer that
+ * honours revocation and disablement. It was hand-copied into seven files;
+ * centralising it means a new admin route cannot quietly ship with a weaker
+ * (or missing) check.
+ */
+export async function requireAdmin(): Promise<AdminUser> {
+  const admin = await getAdminUser();
+  if (!admin) redirect('/admin/login');
+  return admin;
 }
 
 export async function destroyAdminSession(): Promise<void> {

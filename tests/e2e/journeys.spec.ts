@@ -232,6 +232,20 @@ test('match search is reachable from the primary navigation', async ({ page, isM
   await expect(page).toHaveURL(/\/match-search/);
 });
 
+test('the AFLW placeholder is reachable from site navigation', async ({ page, isMobile }) => {
+  // Start on a static route so this UI-only check does not depend on the database.
+  await page.goto('/not-a-real-page');
+
+  const navigation = page.getByRole('navigation', {
+    name: isMobile ? 'Sections' : 'Primary',
+  });
+  await navigation.getByRole('link', { name: 'AFLW' }).click();
+
+  await expect(page).toHaveURL(/\/aflw$/);
+  await expect(page.getByRole('heading', { name: 'AFLW is coming to AFLDB' })).toBeVisible();
+  await expect(page.getByText('Coming soon')).toHaveCount(5);
+});
+
 test('a drawn match reads as a draw, not as a defeat', async ({ page }) => {
   // The description was a fixed "defeated by", which was backwards for
   // every home win and wrong for every draw.

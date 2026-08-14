@@ -17,6 +17,23 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 [ -f .env ] && set -a && . ./.env && set +a
 
+# Move a postgres DSN's password out of argv and into PGPASSWORD.
+#
+# A DSN on a command line is visible in `ps` and world-readable through
+# /proc/<pid>/cmdline; libpq instead reads PGPASSWORD from the environment
+# (/proc/<pid>/environ, readable only by the owner). This exports PGPASSWORD
+# and assigns a password-less DSN to the named variable.
+dsn_scrub() {
+  local __out_var="$1" dsn="$2"
+  if [[ "$dsn" =~ ^([a-zA-Z][a-zA-Z0-9+.-]*://)([^:/@]+):([^@]*)@(.*)$ ]]; then
+    export PGPASSWORD="${BASH_REMATCH[3]}"
+    printf -v "$__out_var" '%s%s@%s' \
+      "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[4]}"
+  else
+    printf -v "$__out_var" '%s' "$dsn"
+  fi
+}
+
 BACKUP_DIR="${AFLDB_BACKUP_DIR:-$HOME/backups/afldb}"
 OWNER_DSN="${AFLDB_OWNER_DATABASE_URL:-}"
 
@@ -62,6 +79,12 @@ if [[ -z "$BACKUP" || ! -f "$BACKUP" ]]; then
   echo "ERROR: no backup found in ${BACKUP_DIR}" >&2
   exit 1
 fi
+
+# The DSNs are only used to connect from here on, so move the password out of
+# argv into PGPASSWORD. Both carry the same owner credentials, so either scrub
+# sets the same PGPASSWORD.
+dsn_scrub OWNER_DSN "$OWNER_DSN"
+dsn_scrub RESTORE_DSN "$RESTORE_DSN"
 
 echo "==> Restoring $(basename "$BACKUP") into afldb_restore_test"
 

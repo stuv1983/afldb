@@ -6,9 +6,14 @@ const isProduction = process.env.AFLDB_ENV === 'production';
  * Security headers.
  *
  * The CSP is deliberately not maximally strict: Next.js injects inline
- * bootstrap scripts and this project uses inline styles, so
- * 'unsafe-inline' is required for the site to render. It is tightened at
- * the same time as any move to nonce-based styling, not before.
+ * bootstrap scripts and this project uses inline styles, so 'unsafe-inline'
+ * is required for the site to render. 'unsafe-eval' is now dropped in
+ * production — only the dev server's React Refresh / HMR needs it — so an
+ * injected string-to-code path has no CSP grant in prod. Removing
+ * 'unsafe-inline' for scripts is the remaining hardening step: it needs a
+ * per-request nonce plumbed through middleware and the one inline <script>
+ * (the theme init in src/lib/theme.ts) and must be verified against a running
+ * build, so it is tracked separately rather than changed blind.
  *
  * HSTS is only sent in production, since the development server is
  * reached over plain HTTP on the LAN and sending it would poison
@@ -27,7 +32,9 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      isProduction
+        ? "script-src 'self' 'unsafe-inline'"
+        : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data:",
       "font-src 'self'",

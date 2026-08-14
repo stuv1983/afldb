@@ -20,6 +20,23 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 [ -f .env ] && set -a && . ./.env && set +a
 
+# Move a postgres DSN's password out of argv and into PGPASSWORD.
+#
+# A DSN on a command line is visible in `ps` and world-readable through
+# /proc/<pid>/cmdline; libpq instead reads PGPASSWORD from the environment
+# (/proc/<pid>/environ, readable only by the owner). This exports PGPASSWORD
+# and assigns a password-less DSN to the named variable.
+dsn_scrub() {
+  local __out_var="$1" dsn="$2"
+  if [[ "$dsn" =~ ^([a-zA-Z][a-zA-Z0-9+.-]*://)([^:/@]+):([^@]*)@(.*)$ ]]; then
+    export PGPASSWORD="${BASH_REMATCH[3]}"
+    printf -v "$__out_var" '%s%s@%s' \
+      "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[4]}"
+  else
+    printf -v "$__out_var" '%s' "$dsn"
+  fi
+}
+
 BACKUP_DIR="${AFLDB_BACKUP_DIR:-$HOME/backups/afldb}"
 KEEP=7
 SOURCE_DSN="${AFLDB_BACKUP_DATABASE_URL:-}"
@@ -73,8 +90,12 @@ trap cleanup_partial EXIT
 echo "==> Backing up ${DB_NAME} to ${TARGET}"
 START=$(date +%s)
 
+# Keep the password out of the process list: move it to PGPASSWORD and hand
+# pg_dump a password-less DSN.
+dsn_scrub SOURCE_DSN_SAFE "$SOURCE_DSN"
+
 # --no-owner keeps the dump restorable under a different role name.
-pg_dump "$SOURCE_DSN" \
+pg_dump "$SOURCE_DSN_SAFE" \
   --format=custom \
   --compress=6 \
   --no-owner \

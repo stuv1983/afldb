@@ -15,6 +15,13 @@
 		health_uri /api/health
 		health_interval 30s
 		health_timeout 5s
+
+		# Overwrite (not append) X-Forwarded-For with the real client address,
+		# so a client-supplied "X-Forwarded-For: 1.2.3.4" cannot reach the app
+		# and forge the IP recorded in auth_sessions / auth_audit_log. The app
+		# (requestIp) reads the rightmost hop; the two together keep the audit
+		# trail honest. The production reverse proxy MUST do the same.
+		header_up X-Forwarded-For {remote_host}
 	}
 
 	encode gzip zstd
