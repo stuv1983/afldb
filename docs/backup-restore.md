@@ -1,0 +1,143 @@
+# AFLDB — Backup and Restore
+
+**A backup is not proven until it has been restored.** Both halves are automated and both are run.
+
+## 1. Backup
+
+```bash
+cd ~/projects/afldb
+bash tools/maintenance/backup.sh              # default retention: 7
+bash tools/maintenance/backup.sh --keep 14
+bash tools/maintenance/backup.sh --dir /mnt/other/location
+```
+
+| | |
+|---|---|
+| Format | `pg_dump --format=custom --compress=6 --no-owner` |
+| Location | `~/backups/afldb/` (mode 700) |
+| Naming | `afldb_dev-YYYYmmdd-HHMMSS.dump` (mode 600) |
+| Role | `afldb_backup` — `pg_read_all_data`, no write access |
+| Measured | **15 MB in 5 s**, 469 objects |
+
+Custom format is used rather than plain SQL because it compresses, restores in parallel (`--jobs`), and supports selective restore. `--no-owner` keeps the dump restorable under a different role name.
+
+The script verifies the archive's table of contents with `pg_restore --list` before reporting success, so a truncated dump fails immediately rather than at restore time. Old backups beyond the retention count are pruned.
+
+## 2. Restore verification
+
+```bash
+bash tools/maintenance/restore-test.sh                 # newest backup
+bash tools/maintenance/restore-test.sh <file.dump>     # a specific one
+```
+
+```text
+afldb_dev
+    │  pg_dump
+    ▼
+afldb_dev-*.dump
+    │  pg_restore --clean --if-exists --jobs=4
+    ▼
+afldb_restore_test          ← never afldb_dev
+    │
+    ▼
+9 parity checks against the source
+```
+
+Restoring into `afldb_restore_test` means a verification run can never damage development data. The database is created once by `tools/maintenance/01_setup_service.sh`.
+
+### Parity checks
+
+Each value is read from both the source and the restored copy and compared:
+
+| Check | Guards against |
+|---|---|
+| `player_match_stats` rows | truncated fact table |
+| `players`, `matches`, `clubs` rows | missing tables |
+| Career games total | partial row restore |
+| Career goals total | numeric corruption |
+| Brownlow votes total | missing awards data |
+| **Unrecorded disposals count** | NULLs silently becoming 0 |
+| `stat_availability` rows | missing era metadata |
+
+The NULL check matters: a restore that converted "not recorded" into `0` would pass a row count but destroy the correctness rule the whole database is built on.
+
+The script exits non-zero if any check differs.
+
+## 3. Scheduling
+
+Not yet scheduled — backups are run manually during development. For production, a `systemd` timer is preferred over cron (better logging, no mail dependency):
+
+```ini
+# /etc/systemd/system/afldb-backup.service
+[Unit]
+Description=AFLDB database backup
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=arm
+WorkingDirectory=/home/arm/projects/afldb
+ExecStart=/bin/bash tools/maintenance/backup.sh --keep 14
+```
+
+```ini
+# /etc/systemd/system/afldb-backup.timer
+[Unit]
+Description=Nightly AFLDB backup
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+`Persistent=true` runs a missed backup after downtime. Enable with `systemctl enable --now afldb-backup.timer`.
+
+**Restore verification should be scheduled too** — weekly is reasonable. An unverified backup schedule is a false sense of security.
+
+## 4. Off-host copies
+
+Backups currently live on the same host as the database, which protects against data corruption but **not** against host loss. Before production, copy to separate storage. This is listed in the production readiness gate and is not yet done.
+
+## 5. What is not backed up
+
+| Item | Why | Recovery |
+|---|---|---|
+| `afldb_test` | reproducible | re-run import against the test DSN |
+| `.next/` build output | reproducible | `npm run build` |
+| `node_modules/` | reproducible | `npm ci` |
+| Legacy `afl.db` | belongs to Sports Data Lab | that project's own backups |
+| `.env` | contains secrets | regenerate via `00_install_postgres.sh`, or copy manually to protected storage |
+
+`.env` is the one item with no automated recovery path. Losing it means regenerating role passwords, which the install script does idempotently.
+
+## 6. Full disaster recovery
+
+```bash
+# 1. Rebuild the database layer
+sudo bash tools/maintenance/00_install_postgres.sh
+
+# 2. Restore the newest backup into afldb_dev
+pg_restore --dbname="$AFLDB_OWNER_DATABASE_URL" --clean --if-exists \
+           --no-owner --no-privileges --jobs=4 ~/backups/afldb/<newest>.dump
+
+# 3. Verify
+./.venv/bin/python tools/validation/validate_migration.py
+
+# 4. Rebuild and restart the application
+npm ci && npm run build
+sudo bash tools/maintenance/01_setup_service.sh
+```
+
+If no backup is usable, the database can be rebuilt from the legacy source in roughly 2.5 minutes:
+
+```bash
+./.venv/bin/python tools/migration/import_legacy_afl.py    # ~119s
+./.venv/bin/python tools/migration/rebuild_derived.py      # ~18s
+./.venv/bin/python tools/validation/validate_migration.py  # 88 checks
+```
+
+This is the ultimate safety net: while the legacy `afl.db` exists and the migration is idempotent, AFLDB is fully reconstructible from source.
