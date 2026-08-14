@@ -196,12 +196,32 @@ def validate_null_semantics(pg, lite, r: Results) -> None:
             pg_one(pg, "SELECT count(*) FROM players WHERE dob IS NOT NULL"),
             lite_one(lite, "SELECT COUNT(*) FROM players WHERE dob IS NOT NULL"))
 
-    section("6. Statistic availability (per season, not min/max)")
+    section("6. Statistic availability (per season, per grain)")
+    # 1935-1983 is 49 seasons. 45 of them had a medal whose per-match
+    # breakdown was never published ('not_collected'); the other 4 are the
+    # war years 1942-1945, when no medal was awarded at all
+    # ('not_applicable'). The legacy stat_coverage range of 1931-2025
+    # concealed the whole gap, and a single boolean would still conflate
+    # these two quite different facts.
     gap = pg_one(pg, """SELECT count(*) FROM stat_availability
-                         WHERE stat_key='brownlow' AND NOT is_recorded
+                         WHERE stat_key='brownlow_match_votes'
+                           AND coverage='not_collected'
                            AND season BETWEEN 1935 AND 1983""")
-    r.check("Brownlow per-game gap 1935-1983 recorded as absent", gap, 49,
+    r.check("Brownlow match votes 1935-1983 not collected", gap, 45,
             "The legacy stat_coverage range of 1931-2025 concealed this gap.")
+    war = pg_one(pg, """SELECT count(*) FROM stat_availability
+                         WHERE stat_key='brownlow_season_total'
+                           AND coverage='not_applicable'
+                           AND season BETWEEN 1935 AND 1983""")
+    r.check("Brownlow war years recorded as not applicable", war, 4,
+            "1942-1945: no medal was awarded, which is not the same as no votes.")
+    total_known = pg_one(pg, """SELECT count(*) FROM stat_availability
+                                 WHERE stat_key='brownlow_season_total'
+                                   AND coverage='complete'
+                                   AND season BETWEEN 1935 AND 1983""")
+    r.check("Brownlow season totals complete 1935-1983", total_known, 45,
+            "The same seasons are fully known at season grain: this is why AFLDB "
+            "reads career totals from brownlow_season_votes.")
     r.check("goals recorded in every season",
             pg_one(pg, """SELECT count(*) FROM stat_availability
                            WHERE stat_key='goals' AND NOT is_recorded"""), 0)

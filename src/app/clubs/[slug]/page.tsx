@@ -6,6 +6,8 @@ import {
   getClub,
   getClubGoalkickers,
   getClubLeaders,
+  getClubLineage,
+  getClubRelations,
   getClubSeasons,
   getClubTotals,
   listClubs,
@@ -60,11 +62,13 @@ export default async function ClubPage({
   const club = await getClub(parsed);
   if (!club) notFound();
 
-  const [totals, seasons, leaders, goalkickers] = await Promise.all([
+  const [totals, seasons, leaders, goalkickers, lineage, relations] = await Promise.all([
     getClubTotals(club.id),
     getClubSeasons(club.id),
     getClubLeaders(club.id),
     getClubGoalkickers(club.id),
+    getClubLineage(club.id),
+    getClubRelations(club.id),
   ]);
 
   const winRate = totals.played > 0
@@ -90,13 +94,47 @@ export default async function ClubPage({
 
       {club.notes && <p className="notice">{club.notes}</p>}
 
-      {club.currentIdentityId !== club.id && (
+      {/* Renames within the same club: the seasons are continuous and
+          belong to one record, so the other eras are offered as
+          navigation rather than merged into these totals. */}
+      {lineage.length > 1 && (
         <p className="notice">
-          This identity continues as{' '}
-          <Link href={clubPath(club.currentIdentitySlug)}>{club.currentIdentityName}</Link>.
-          Records here cover only the {club.name} era.
+          {club.name} is one era of a club that has also played as{' '}
+          {lineage.filter((l) => !l.isSelf).map((l, i, arr) => (
+            <span key={l.id}>
+              <Link href={clubPath(l.slug)}>{l.name}</Link>
+              {' '}({formatSpan(l.firstSeason, l.lastSeason, false)})
+              {i < arr.length - 1 ? ', ' : ''}
+            </span>
+          ))}
+          . The figures on this page cover only the {club.name} era.
         </p>
       )}
+
+      {/* Mergers link to a DIFFERENT club. Statistics are never combined
+          across such a link: a merged club's record is its own. */}
+      {relations.map((r) => (
+        <p className="notice" key={`${r.relation}-${r.direction}-${r.slug ?? 'none'}`}>
+          {r.relation === 'folded' ? (
+            <>
+              {club.name} left the competition after {(r.effectiveSeason ?? 1) - 1}.
+            </>
+          ) : r.direction === 'from' ? (
+            <>
+              {club.name} combined with another club to form{' '}
+              <Link href={clubPath(r.slug!)}>{r.name}</Link> in {r.effectiveSeason}.
+              The two clubs&rsquo; records are kept separate: nothing on this page is
+              counted towards {r.name}.
+            </>
+          ) : (
+            <>
+              <Link href={clubPath(r.slug!)}>{r.name}</Link> combined into {club.name}{' '}
+              in {r.effectiveSeason}. Its earlier seasons are recorded against{' '}
+              {r.name}, not here.
+            </>
+          )}
+        </p>
+      ))}
 
       <div className="stat-strip">
         <div className="stat">

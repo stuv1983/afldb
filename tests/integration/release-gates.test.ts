@@ -242,6 +242,127 @@ describe('gate: name collisions resolve by ID', () => {
 });
 
 // ---------------------------------------------------------------------
+// IMMUTABLE — organizations versus historical identities
+// ---------------------------------------------------------------------
+describe('gate: club organizations and identities', () => {
+  it('has 24 identities across 21 organizations', async () => {
+    const [row] = await sql<{ identities: number; orgs: number }[]>`
+      SELECT (SELECT count(*)::int FROM clubs)              AS identities,
+             (SELECT count(*)::int FROM club_organizations) AS orgs
+    `;
+    expect(row.identities).toBe(24);
+    expect(row.orgs).toBe(21);
+  });
+
+  it('groups exactly the three renamed clubs into shared organizations', async () => {
+    const rows = await sql<{ name: string; n: number }[]>`
+      SELECT o.name, count(c.id)::int AS n
+        FROM club_organizations o JOIN clubs c ON c.organization_id = o.id
+       GROUP BY o.name HAVING count(c.id) > 1 ORDER BY o.name
+    `;
+    expect(rows.map((r) => r.name)).toEqual([
+      'North Melbourne', 'Sydney', 'Western Bulldogs',
+    ]);
+    expect(rows.every((r) => r.n === 2)).toBe(true);
+  });
+
+  it('keeps Fitzroy, Brisbane Bears and University as separate organizations', async () => {
+    const rows = await sql<{ slug: string; n: number }[]>`
+      SELECT o.slug, count(c.id)::int AS n
+        FROM club_organizations o JOIN clubs c ON c.organization_id = o.id
+       WHERE o.slug IN ('fitzroy', 'brisbane-bears', 'brisbane-lions', 'university')
+       GROUP BY o.slug ORDER BY o.slug
+    `;
+    // A merger is not a rename: four distinct organizations, one identity
+    // each. Fitzroy's 100 seasons must never be counted as the Lions'.
+    expect(rows).toHaveLength(4);
+    expect(rows.every((r) => r.n === 1)).toBe(true);
+  });
+
+  it('records the merger as a navigable link without combining records', async () => {
+    const rows = await sql<{ from: string; to: string; season: number }[]>`
+      SELECT f.slug AS "from", t.slug AS "to", r.effective_season AS season
+        FROM club_organization_relations r
+        JOIN club_organizations f ON f.id = r.from_organization_id
+        JOIN club_organizations t ON t.id = r.to_organization_id
+       WHERE r.relation = 'merged_into' ORDER BY f.slug
+    `;
+    expect(rows).toEqual([
+      { from: 'brisbane-bears', to: 'brisbane-lions', season: 1997 },
+      { from: 'fitzroy', to: 'brisbane-lions', season: 1997 },
+    ]);
+
+    // ... and the Lions' record still starts in 1997.
+    const [lions] = await sql<{ first: number }[]>`
+      SELECT min(season)::int AS first FROM club_seasons
+       WHERE club_id = (SELECT id FROM clubs WHERE slug = 'brisbane-lions')
+    `;
+    expect(lions.first).toBe(1997);
+  });
+
+  it('attaches every ladder row to the identity trading that season', async () => {
+    const rows = await sql<{
+      slug: string; n: number; from: number; to: number;
+    }[]>`
+      SELECT c.slug, count(cs.season)::int AS n,
+             min(cs.season)::int AS from, max(cs.season)::int AS to
+        FROM clubs c JOIN club_seasons cs ON cs.club_id = c.id
+       WHERE c.slug IN ('footscray', 'western-bulldogs',
+                        'south-melbourne', 'sydney',
+                        'kangaroos', 'north-melbourne')
+       GROUP BY c.slug ORDER BY c.slug
+    `;
+    const by = Object.fromEntries(rows.map((r) => [r.slug, r]));
+
+    // Before this was fixed, the source ladder's modern-only club names
+    // gave Sydney rows back to 1897 and Footscray none at all.
+    expect(by['footscray']).toMatchObject({ from: 1925, to: 1996 });
+    expect(by['western-bulldogs']).toMatchObject({ from: 1997, to: 2026 });
+    expect(by['south-melbourne']).toMatchObject({ from: 1897, to: 1981 });
+    expect(by['sydney']).toMatchObject({ from: 1982, to: 2026 });
+    expect(by['kangaroos']).toMatchObject({ from: 1999, to: 2007 });
+    expect(by['north-melbourne']).toMatchObject({ from: 1925, to: 2026 });
+
+    // The eras partition the lineage: no season is lost or duplicated.
+    expect(by['footscray'].n + by['western-bulldogs'].n).toBe(102);
+    expect(by['south-melbourne'].n + by['sydney'].n).toBe(129);
+    expect(by['kangaroos'].n + by['north-melbourne'].n).toBe(102);
+  });
+
+  it('resolves a season to exactly one identity per organization', async () => {
+    const [row] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM (
+        SELECT club_id, season FROM club_seasons GROUP BY 1, 2 HAVING count(*) > 1
+      ) t
+    `;
+    expect(row.n).toBe(0);
+  });
+
+  it('prefers the narrower identity where spans nest', async () => {
+    // Kangaroos (1999-2007) sits inside North Melbourne (1925-).
+    const [row] = await sql<{ slug: string }[]>`
+      SELECT c.slug FROM clubs c
+       WHERE c.id = afldb_identity_for_season(
+         (SELECT id FROM club_organizations WHERE slug = 'north-melbourne'),
+         2003::smallint)
+    `;
+    expect(row.slug).toBe('kangaroos');
+  });
+
+  it('counts a rename once but a merger twice in clubs played', async () => {
+    // Brent Harvey played as Kangaroos and North Melbourne: one club.
+    const [harvey] = await sql<{ n: number }[]>`
+      SELECT clubs_played::int AS n FROM player_career_stats
+       WHERE player_id = (
+         SELECT p.id FROM players p JOIN player_career_stats c ON c.player_id = p.id
+          WHERE p.search_name = afldb_normalise_name('Brent Harvey')
+          ORDER BY c.games DESC LIMIT 1)
+    `;
+    expect(harvey.n).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------
 // IMMUTABLE — absence is never zero
 // ---------------------------------------------------------------------
 describe('gate: absence is never zero', () => {

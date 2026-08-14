@@ -54,9 +54,12 @@ SELECT
     pms.player_id,
     pms.match_id,
     pms.club_id,
-    -- Modern identity of the club the player represented. "Clubs played"
-    -- counts these, so a rename or relocation is not counted twice.
-    cl.current_identity_id AS modern_club_id,
+    -- The continuing organization behind the identity the player
+    -- represented. "Clubs played" counts these, so a rename is not
+    -- counted twice. A MERGER is not a rename: Fitzroy and Brisbane
+    -- Bears remain separate organizations, so a player who appeared for
+    -- both Fitzroy and Brisbane Lions did play for two clubs.
+    cl.organization_id AS modern_club_id,
     m.season,
     m.match_date,
     m.is_final,
@@ -295,41 +298,61 @@ LEFT JOIN (
 """
 
 # --- club_seasons ----------------------------------------------------------
-# Ladder positions come from the legacy team_seasons table; premiership
-# flags are resolved from Grand Final results so there is one definition.
+# Ladder positions come from the source ladder; premiership flags are
+# resolved from Grand Final results so there is one definition.
+#
+# The source ladder names every club by its MODERN name, so its rows must
+# be re-pointed at the identity that was actually trading in that season.
+# Without this, Sydney had ladder rows back to 1897 and Footscray had
+# none at all, while both clubs' player leaders came from the historical
+# identities — a club page that disagreed with itself.
+#
+# Everything downstream (premierships, finals counts) joins on the
+# RESOLVED identity, because matches also store historical identities.
 REBUILDS["club_seasons"] = """
 TRUNCATE club_seasons;
 INSERT INTO club_seasons
       (season, club_id, played, wins, draws, losses, points_for, points_against,
        premiership_points, percentage, ladder_rank, wooden_spoon, is_premier,
        finals_played, source_id)
+WITH resolved AS (
+    SELECT
+        s.*,
+        se.status AS season_status,
+        COALESCE(
+            afldb_identity_for_season(rc.organization_id, s.season),
+            s.club_id
+        ) AS identity_id
+    FROM staging.team_seasons s
+    JOIN seasons se ON se.year = s.season
+    JOIN clubs   rc ON rc.id = s.club_id
+)
 SELECT
-    s.season,
-    s.club_id,
-    s.played, s.wins, s.draws, s.losses, s.points_for, s.points_against,
-    s.premiership_points, s.percentage, s.ladder_rank,
+    r.season,
+    r.identity_id,
+    r.played, r.wins, r.draws, r.losses, r.points_for, r.points_against,
+    r.premiership_points, r.percentage, r.ladder_rank,
     -- A wooden spoon is only awarded once a season has finished. The raw
     -- ladder flags whoever is currently last, which for an in-progress
     -- season is a standing, not an honour.
-    s.wooden_spoon AND se.status = 'complete',
+    r.wooden_spoon AND r.season_status = 'complete',
     COALESCE(gf.won, false),
     COALESCE(f.finals, 0),
     (SELECT id FROM sources WHERE key = 'sports_data_lab')
-FROM staging.team_seasons s
-JOIN seasons se ON se.year = s.season
+FROM resolved r
 LEFT JOIN (
     -- winner_club_id is NULL for a drawn Grand Final, so the 1948, 1977
     -- and 2010 draws drop out and only the replays count.
     SELECT season, winner_club_id AS club_id, true AS won
     FROM matches WHERE round_type = 'grand_final' AND winner_club_id IS NOT NULL
-) gf ON gf.season = s.season AND gf.club_id = s.club_id
+) gf ON gf.season = r.season AND gf.club_id = r.identity_id
 LEFT JOIN (
     SELECT season, club_id, count(*) AS finals FROM (
         SELECT season, home_club_id AS club_id FROM matches WHERE is_final
         UNION ALL
         SELECT season, away_club_id FROM matches WHERE is_final
     ) x GROUP BY season, club_id
-) f ON f.season = s.season AND f.club_id = s.club_id;
+) f ON f.season = r.season AND f.club_id = r.identity_id;
 """
 
 # --- search ranking --------------------------------------------------------

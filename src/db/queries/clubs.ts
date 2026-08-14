@@ -50,6 +50,68 @@ export async function getClub(slug: string): Promise<ClubSummary | null> {
   return row ?? null;
 }
 
+export type ClubLineageRow = {
+  id: number;
+  name: string;
+  slug: string;
+  firstSeason: number | null;
+  lastSeason: number | null;
+  isSelf: boolean;
+};
+
+/**
+ * The other names this club has traded under.
+ *
+ * Same organization only — this is a rename, so the seasons are
+ * genuinely continuous and belong to one club's record.
+ */
+export async function getClubLineage(clubId: number): Promise<ClubLineageRow[]> {
+  return sql<ClubLineageRow[]>`
+    SELECT c.id, c.name, c.slug,
+           c.first_season AS "firstSeason", c.last_season AS "lastSeason",
+           (c.id = ${clubId}) AS "isSelf"
+      FROM clubs c
+     WHERE c.organization_id = (SELECT organization_id FROM clubs WHERE id = ${clubId})
+     ORDER BY c.first_season
+  `;
+}
+
+export type ClubRelationRow = {
+  relation: string;
+  direction: 'from' | 'to';
+  name: string | null;
+  slug: string | null;
+  effectiveSeason: number | null;
+  notes: string | null;
+};
+
+/**
+ * Links to OTHER organizations — mergers, not renames.
+ *
+ * Kept separate from lineage on purpose. Fitzroy merged into Brisbane
+ * Lions in 1997, but Fitzroy's 100 seasons remain Fitzroy's: the link is
+ * navigable without the statistics being combined.
+ */
+export async function getClubRelations(clubId: number): Promise<ClubRelationRow[]> {
+  return sql<ClubRelationRow[]>`
+    WITH org AS (SELECT organization_id AS id FROM clubs WHERE id = ${clubId})
+    SELECT r.relation::text, 'from' AS direction,
+           t.name, t.slug,
+           r.effective_season AS "effectiveSeason", r.notes
+      FROM club_organization_relations r
+      LEFT JOIN club_organizations t ON t.id = r.to_organization_id
+     WHERE r.from_organization_id = (SELECT id FROM org)
+    UNION ALL
+    SELECT r.relation::text, 'to' AS direction,
+           f.name, f.slug,
+           r.effective_season AS "effectiveSeason", r.notes
+      FROM club_organization_relations r
+      JOIN club_organizations f ON f.id = r.from_organization_id
+     WHERE r.to_organization_id = (SELECT id FROM org)
+     ORDER BY 1, 3
+  `;
+}
+
 export type ClubTotals = {
   seasons: number;
   played: number;
