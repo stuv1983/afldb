@@ -4,6 +4,7 @@ import { authSql } from '@/db/authClient';
 import { sha256Hex } from '@/lib/auth/crypto';
 import { RateLimiter } from '@/lib/auth/rate-limit';
 import { audit, grantBetaAccess, requestIp } from '@/lib/auth/session';
+import { redirectTo } from '@/lib/redirect';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
   const token = url.searchParams.get('token') ?? '';
 
   if (token.length < 20 || token.length > 100) {
-    return NextResponse.redirect(new URL('/beta', url));
+    return redirectTo('/beta');
   }
 
   if (VERIFY_LIMIT.check(`ip:${(await requestIp()) ?? 'unknown'}`)) {
@@ -43,7 +44,7 @@ export async function GET(request: Request) {
   if (!row) {
     // Expired, used or never issued: back to the gate, which explains
     // nothing — the distinction is only useful to someone probing.
-    return NextResponse.redirect(new URL('/beta', url));
+    return redirectTo('/beta');
   }
 
   // The email must STILL be allowlisted: revocation between the link
@@ -54,10 +55,10 @@ export async function GET(request: Request) {
   `;
   if (!allowed) {
     await audit('beta.magic_link_revoked_email', { email: row.email }, { label: row.email });
-    return NextResponse.redirect(new URL('/beta', url));
+    return redirectTo('/beta');
   }
 
   await audit('beta.magic_link_verified', { email: row.email }, { label: row.email });
   await grantBetaAccess(`email:${row.email}`);
-  return NextResponse.redirect(new URL('/', url));
+  return redirectTo('/');
 }

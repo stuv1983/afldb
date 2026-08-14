@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { ADMIN_COOKIE, BETA_COOKIE, betaEpoch, betaGateOn, verifyClaim } from '@/lib/auth/tokens';
+import { redirectTo } from '@/lib/redirect';
 
 /**
  * Access control at the door.
@@ -48,10 +49,7 @@ export async function middleware(request: NextRequest) {
       ? await verifyClaim(request.cookies.get(ADMIN_COOKIE)?.value, secret, { kind: 'admin' })
       : null;
     if (!claim) {
-      const login = request.nextUrl.clone();
-      login.pathname = '/admin/login';
-      login.search = '';
-      return NextResponse.redirect(login);
+      return redirectTo('/admin/login');
     }
     return NextResponse.next();
   }
@@ -84,11 +82,9 @@ export async function middleware(request: NextRequest) {
       request.cookies.get(ADMIN_COOKIE)?.value, secret, { kind: 'admin' },
     );
     if (!beta && !admin) {
-      const gate = request.nextUrl.clone();
-      gate.pathname = '/beta';
       // Return the visitor to what they asked for once admitted.
-      gate.search = pathname === '/' ? '' : `?from=${encodeURIComponent(pathname)}`;
-      return NextResponse.redirect(gate);
+      const search = pathname === '/' ? '' : `?from=${encodeURIComponent(pathname)}`;
+      return redirectTo('/beta', search);
     }
   }
 
