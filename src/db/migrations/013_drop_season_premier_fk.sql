@@ -1,0 +1,22 @@
+-- =====================================================================
+-- AFLDB 013 — Remove seasons.premier_club_id
+-- =====================================================================
+-- seasons.premier_club_id referenced clubs, while clubs.first_season and
+-- clubs.last_season reference seasons. That circular dependency meant
+-- TRUNCATE clubs CASCADE also truncated seasons, silently destroying
+-- reference data mid-import.
+--
+-- The column was redundant regardless: the premier of a season is the
+-- winner of its Grand Final, already recorded in matches. Keeping a
+-- second copy would let the two disagree, which requirement #95
+-- (one definition per statistic) forbids.
+--
+-- Premiers are now resolved through matches:
+--   SELECT winner_club_id FROM matches
+--    WHERE season = $1 AND round_type = 'grand_final'
+--
+-- club_seasons.is_premier remains as a DERIVED convenience column,
+-- rebuilt from that same query.
+-- =====================================================================
+
+ALTER TABLE seasons DROP COLUMN premier_club_id;

@@ -1,0 +1,50 @@
+import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+
+import { UploadForm } from '@/app/admin/upload/UploadForm';
+import { getAdminUser } from '@/lib/auth/session';
+import { DATASETS } from '@/lib/ingest/datasets';
+
+export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Upload data',
+  robots: { index: false, follow: false },
+};
+
+export default async function UploadPage() {
+  const admin = await getAdminUser();
+  if (!admin) redirect('/admin/login');
+
+  const datasets = Object.values(DATASETS).map((d) => ({
+    key: d.key,
+    title: d.title,
+    description: d.description,
+    requiredColumns: d.requiredColumns,
+  }));
+
+  return (
+    <>
+      <div className="page-header">
+        <h1>Upload data</h1>
+        <p className="subtitle">
+          CSV in, staged for review. Nothing touches the statistical tables until a
+          validated file is approved and promoted.
+        </p>
+      </div>
+
+      <UploadForm datasets={datasets} />
+
+      <section className="section">
+        <h2>Accepted layouts</h2>
+        {datasets.map((d) => (
+          <p className="section-note" key={d.key}>
+            <strong>{d.title}</strong> — {d.description}
+            <br />
+            Required columns: <code>{d.requiredColumns.join(', ')}</code>
+          </p>
+        ))}
+      </section>
+    </>
+  );
+}

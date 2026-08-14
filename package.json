@@ -1,0 +1,37 @@
+{
+  "name": "afldb",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Public historical Australian Football (AFL/VFL) statistics database",
+  "scripts": {
+    "dev": "next dev -p ${PORT:-3100}",
+    "build": "next build && node tools/build/prepare-standalone.mjs",
+    "start": "next start -p ${PORT:-3100}",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "tsx tools/db/migrate.ts",
+    "db:status": "tsx tools/db/migrate.ts --status",
+    "db:migrate:test": "AFLDB_MIGRATE_TARGET=test tsx tools/db/migrate.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "next": "^15.5.0",
+    "postgres": "^3.4.9",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.23.12",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.10"
+  }
+}
