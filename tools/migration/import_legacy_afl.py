@@ -644,6 +644,53 @@ def import_brownlow(pg: psycopg.Connection, lite, rep: Reporter, batch) -> None:
                "(1984-2025 only)")
 
 
+def import_ladders(pg: psycopg.Connection, lite, rep: Reporter, batch) -> None:
+    """Load season ladders into staging.
+
+    The raw source club string is kept alongside the resolved club_id, so
+    a future improvement to club resolution can be re-applied without
+    re-reading the legacy database.
+    """
+    truncate(pg, "staging.team_seasons")
+
+    # Resolve club strings through the alias table, which already holds
+    # every club_hist, club_now, short name and abbreviation variant.
+    aliases = {r[0]: r[1] for r in
+               pg.execute("SELECT alias, club_id FROM club_aliases").fetchall()}
+    seasons = {r[0] for r in pg.execute("SELECT year FROM seasons").fetchall()}
+
+    def build():
+        for r in lite.execute("SELECT * FROM team_seasons ORDER BY season, club_now"):
+            batch.records_read += 1
+            club_raw = clean_text(r["club_now"])
+            if r["season"] not in seasons:
+                batch.reject(f"{r['season']}:{club_raw}", "season not present in AFLDB", dict(r))
+                continue
+            club_id = aliases.get(club_raw)
+            if club_id is None:
+                batch.reject(f"{r['season']}:{club_raw}",
+                             f"unresolved club string {club_raw!r}", dict(r))
+            yield (
+                r["season"], club_raw, club_id,
+                to_int(r["played"]), to_int(r["wins"]), to_int(r["draws"]),
+                to_int(r["losses"]), to_int(r["points_for"]), to_int(r["points_against"]),
+                to_int(r["premiership_points"]), r["percentage"],
+                to_int(r["ladder_rank"]), bool(r["wooden_spoon"]),
+            )
+
+    copy_rows(
+        pg, "staging.team_seasons",
+        ["season", "club_raw", "club_id", "played", "wins", "draws", "losses",
+         "points_for", "points_against", "premiership_points", "percentage",
+         "ladder_rank", "wooden_spoon"],
+        build(), batch,
+    )
+    pg.commit()
+    unresolved = scalar(pg, "SELECT count(*) FROM staging.team_seasons WHERE club_id IS NULL")
+    rep.result("staging.team_seasons", scalar(pg, "SELECT count(*) FROM staging.team_seasons"),
+               f"({unresolved} unresolved clubs)" if unresolved else "(all clubs resolved)")
+
+
 def import_stat_availability(pg: psycopg.Connection, lite, rep: Reporter) -> None:
     """Record per-season presence of each statistic.
 
@@ -697,9 +744,11 @@ GROUPS = {
     "matches": "matches and quarter scores",
     "stats": "player match statistics (694K rows)",
     "brownlow": "Brownlow season and round votes",
+    "ladders": "season ladders into staging",
     "coverage": "stat definitions and per-season availability",
 }
-DEFAULT_ORDER = ["reference", "players", "matches", "stats", "brownlow", "coverage"]
+DEFAULT_ORDER = ["reference", "players", "matches", "stats", "brownlow",
+                 "ladders", "coverage"]
 
 
 def main() -> int:
@@ -760,6 +809,10 @@ def main() -> int:
                 with import_batch(pg, "afltables", "import_legacy_afl.py",
                                   "brownlow_season_votes") as b:
                     import_brownlow(pg, lite, rep, b)
+            elif group == "ladders":
+                with import_batch(pg, "sports_data_lab", "import_legacy_afl.py",
+                                  "staging.team_seasons") as b:
+                    import_ladders(pg, lite, rep, b)
             elif group == "coverage":
                 import_stat_availability(pg, lite, rep)
     finally:
