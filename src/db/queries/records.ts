@@ -182,13 +182,16 @@ export type SeasonRecordRow = {
 
 export async function getSeasonRecord(limit = 50): Promise<SeasonRecordRow[]> {
   return sql<SeasonRecordRow[]>`
+    -- Player-season grain: a season total is the player's, not a club's.
+    -- Reading the club-grained table here would split a transfer season
+    -- into two smaller totals and rank both below the real figure.
     SELECT rank() OVER (ORDER BY s.goals DESC)::int AS rank,
            p.id AS "playerId", p.slug, p.display_name AS "displayName",
            s.goals AS value, s.season,
            cl.name AS "clubName", cl.slug AS "clubSlug", s.games
       FROM player_season_stats s
       JOIN players p ON p.id = s.player_id
-      JOIN clubs  cl ON cl.id = s.club_id
+      LEFT JOIN clubs cl ON cl.id = s.primary_club_id
      WHERE s.goals IS NOT NULL
      ORDER BY s.goals DESC, s.season
      LIMIT ${limit}

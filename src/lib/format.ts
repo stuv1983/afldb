@@ -22,6 +22,46 @@ export function formatNumber(value: number | null | undefined): string {
   return value.toLocaleString('en-AU');
 }
 
+/**
+ * A Brownlow figure, rendered according to why it may be absent.
+ *
+ * An absent vote count has three quite different meanings and they must
+ * never collapse into "0". A player in 1943 did not fail to poll — there
+ * was no medal. A 2026 player has not polled zero — the count is not yet
+ * published. Only `complete` makes 0 a fact about the player.
+ */
+export function formatBrownlow(
+  votes: number | null | undefined,
+  status: string,
+): string {
+  switch (status) {
+    case 'complete':
+      return votes === null || votes === undefined ? NOT_RECORDED : votes.toLocaleString('en-AU');
+    case 'pending':
+      return 'Not yet awarded';
+    case 'not_applicable':
+      return 'No medal';
+    case 'not_collected':
+      return 'Not recorded';
+    default:
+      return NOT_RECORDED;
+  }
+}
+
+/** Long-form explanation for a tooltip or footnote. */
+export function brownlowStatusNote(status: string): string | null {
+  switch (status) {
+    case 'pending':
+      return 'The season is still in progress; the Brownlow Medal has not been awarded.';
+    case 'not_applicable':
+      return 'No Brownlow Medal was awarded for this season.';
+    case 'not_collected':
+      return 'Votes for this season were not recorded in the source data.';
+    default:
+      return null;
+  }
+}
+
 /** Australian football score: "12.8 (80)". */
 export function formatScore(
   goals: number | null,

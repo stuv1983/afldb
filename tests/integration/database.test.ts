@@ -132,13 +132,43 @@ describe('Brownlow correctness', () => {
     expect(row.medals).toBe(3);
   });
 
-  it('marks 1935-1983 as having no per-game votes recorded', async () => {
+  it('marks 1935-1983 as not collected at match grain, not as absent', async () => {
     const [row] = await sql<{ n: number }[]>`
       SELECT count(*)::int AS n FROM stat_availability
-       WHERE stat_key = 'brownlow' AND NOT is_recorded
+       WHERE stat_key = 'brownlow_match_votes'
+         AND coverage = 'not_collected'
          AND season BETWEEN 1935 AND 1983
     `;
-    expect(row.n).toBe(49);
+    // 45, not 49: the span is 49 seasons, but 1942-1945 are
+    // 'not_applicable' because no medal was awarded during the war.
+    // 'not_collected' means the medal existed and the per-match
+    // breakdown simply was not kept — a different fact, and conflating
+    // the two is what produced the 40.6% shortfall.
+    expect(row.n).toBe(45);
+  });
+
+  it('keeps the season total complete across the same years', async () => {
+    const [row] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM stat_availability
+       WHERE stat_key = 'brownlow_season_total'
+         AND coverage = 'complete'
+         AND season BETWEEN 1935 AND 1983
+    `;
+    // The same 45 seasons are fully known at season grain. This pair of
+    // assertions is the whole argument for splitting the key.
+    expect(row.n).toBe(45);
+  });
+
+  it('separates the war years from merely uncollected seasons', async () => {
+    const rows = await sql<{ season: number }[]>`
+      SELECT season FROM stat_availability
+       WHERE stat_key = 'brownlow_season_total'
+         AND coverage = 'not_applicable' AND season >= 1924
+       ORDER BY season
+    `;
+    // No Brownlow Medal was awarded in these four seasons. A player who
+    // appeared in 1943 did not poll zero votes; there was nothing to poll.
+    expect(rows.map((r) => r.season)).toEqual([1942, 1943, 1944, 1945]);
   });
 });
 

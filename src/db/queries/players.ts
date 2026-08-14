@@ -171,6 +171,8 @@ export type PlayerSeasonRow = {
   season: number;
   clubName: string;
   clubSlug: string;
+  /** Clubs represented that season. >1 means a mid-season transfer. */
+  clubCount: number;
   games: number;
   finals: number;
   wins: number;
@@ -184,22 +186,62 @@ export type PlayerSeasonRow = {
   tackles: number | null;
   hitouts: number | null;
   brownlowVotes: number | null;
+  /** Why brownlowVotes is null: 'complete' | 'not_applicable' | 'pending'. */
+  brownlowStatus: string;
   isPremier: boolean;
+  seasonStatus: string;
 };
 
+/**
+ * One row per season, not per club.
+ *
+ * A player-season is the grain at which season awards are decided, so
+ * reading it this way is what keeps a mid-season transfer from showing
+ * its Brownlow total twice. Where a player represented two clubs, the
+ * club column names the club of most games and clubCount is 2; the
+ * club-by-club playing record lives in player_club_season_stats and is
+ * shown separately.
+ */
 export async function getPlayerSeasons(playerId: number): Promise<PlayerSeasonRow[]> {
   return sql<PlayerSeasonRow[]>`
-    SELECT s.season, cl.name AS "clubName", cl.slug AS "clubSlug",
+    SELECT s.season,
+           cl.name AS "clubName", cl.slug AS "clubSlug",
+           s.club_count AS "clubCount",
            s.games, s.finals, s.wins, s.draws, s.losses,
            s.goals, s.behinds, s.disposals,
            s.disposals_recorded_games AS "disposalsRecordedGames",
            s.marks, s.tackles, s.hitouts,
            s.brownlow_votes AS "brownlowVotes",
-           s.is_premier AS "isPremier"
+           s.brownlow_status AS "brownlowStatus",
+           s.is_premier AS "isPremier",
+           se.status AS "seasonStatus"
       FROM player_season_stats s
+      JOIN seasons se ON se.year = s.season
+      LEFT JOIN clubs cl ON cl.id = s.primary_club_id
+     WHERE s.player_id = ${playerId}
+     ORDER BY s.season
+  `;
+}
+
+export type PlayerClubSeasonRow = {
+  season: number;
+  clubName: string;
+  clubSlug: string;
+  games: number;
+  goals: number | null;
+};
+
+/** Club-by-club breakdown, used only for seasons split across two clubs. */
+export async function getPlayerClubSeasons(playerId: number): Promise<PlayerClubSeasonRow[]> {
+  return sql<PlayerClubSeasonRow[]>`
+    SELECT s.season, cl.name AS "clubName", cl.slug AS "clubSlug",
+           s.games, s.goals
+      FROM player_club_season_stats s
       JOIN clubs cl ON cl.id = s.club_id
      WHERE s.player_id = ${playerId}
-     ORDER BY s.season, cl.name
+       AND s.season IN (SELECT season FROM player_season_stats
+                         WHERE player_id = ${playerId} AND club_count > 1)
+     ORDER BY s.season, s.games DESC, cl.name
   `;
 }
 

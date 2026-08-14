@@ -104,9 +104,13 @@ export default async function SeasonPage({
         </p>
       </div>
 
-      {!season.isComplete && (
+      {season.status === 'in_progress' && (
         <p className="notice">
-          This season is still in progress. Ladder positions and totals will change.
+          <strong>Season in progress.</strong>{' '}
+          Every figure on this page is provisional and current only as at{' '}
+          {formatDate(season.dataThroughDate)}
+          {season.lastLoadedRound && <> (round {season.lastLoadedRound})</>}.
+          No premier, wooden spoon or Brownlow Medal has been decided.
         </p>
       )}
 

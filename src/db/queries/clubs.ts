@@ -93,18 +93,24 @@ export type ClubSeasonRow = {
   isPremier: boolean;
   woodenSpoon: boolean;
   finalsPlayed: number | null;
+  /** 'in_progress' means every figure on this row is provisional. */
+  seasonStatus: string;
+  dataThroughDate: Date | null;
 };
 
 export async function getClubSeasons(clubId: number): Promise<ClubSeasonRow[]> {
   return sql<ClubSeasonRow[]>`
-    SELECT season, played, wins, draws, losses,
-           points_for AS "pointsFor", points_against AS "pointsAgainst",
-           percentage, ladder_rank AS "ladderRank",
-           is_premier AS "isPremier", wooden_spoon AS "woodenSpoon",
-           finals_played AS "finalsPlayed"
-      FROM club_seasons
-     WHERE club_id = ${clubId}
-     ORDER BY season DESC
+    SELECT cs.season, cs.played, cs.wins, cs.draws, cs.losses,
+           cs.points_for AS "pointsFor", cs.points_against AS "pointsAgainst",
+           cs.percentage, cs.ladder_rank AS "ladderRank",
+           cs.is_premier AS "isPremier", cs.wooden_spoon AS "woodenSpoon",
+           cs.finals_played AS "finalsPlayed",
+           se.status AS "seasonStatus",
+           se.data_through_date AS "dataThroughDate"
+      FROM club_seasons cs
+      JOIN seasons se ON se.year = cs.season
+     WHERE cs.club_id = ${clubId}
+     ORDER BY cs.season DESC
   `;
 }
 

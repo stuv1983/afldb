@@ -11,7 +11,10 @@ import {
   listMostViewedPlayers,
 } from '@/db/queries/players';
 import {
+  NOT_RECORDED,
+  brownlowStatusNote,
   clubPath,
+  formatBrownlow,
   formatDate,
   formatNumber,
   formatRoundShort,
@@ -263,12 +266,26 @@ export default async function PlayerPage({
             </thead>
             <tbody>
               {seasons.map((s) => (
-                <tr key={`${s.season}-${s.clubSlug}`}>
+                <tr key={s.season}>
                   <td>
                     <Link href={seasonPath(s.season)}>{s.season}</Link>
                     {s.isPremier && <span className="badge" style={{ marginLeft: '0.3rem' }}>P</span>}
+                    {s.seasonStatus === 'in_progress' && (
+                      <span className="badge badge-warn" style={{ marginLeft: '0.3rem' }}>
+                        In progress
+                      </span>
+                    )}
                   </td>
-                  <td><Link href={clubPath(s.clubSlug)}>{s.clubName}</Link></td>
+                  <td>
+                    {s.clubSlug
+                      ? <Link href={clubPath(s.clubSlug)}>{s.clubName}</Link>
+                      : NOT_RECORDED}
+                    {/* A season split across clubs is one row; the club
+                        column names the club of most games. */}
+                    {s.clubCount > 1 && (
+                      <span className="muted"> +{s.clubCount - 1}</span>
+                    )}
+                  </td>
                   <td className="num">{s.games}</td>
                   <td className="num nowrap">{s.wins}–{s.losses}–{s.draws}</td>
                   <td className="num">{formatStat(s.goals)}</td>
@@ -277,7 +294,9 @@ export default async function PlayerPage({
                   <td className="num">{formatStat(s.marks)}</td>
                   <td className="num">{formatStat(s.tackles)}</td>
                   <td className="num">{formatStat(s.hitouts)}</td>
-                  <td className="num">{formatStat(s.brownlowVotes)}</td>
+                  <td className="num" title={brownlowStatusNote(s.brownlowStatus) ?? undefined}>
+                    {formatBrownlow(s.brownlowVotes, s.brownlowStatus)}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -12,6 +12,7 @@ import {
 } from '@/db/queries/clubs';
 import {
   clubPath,
+  formatDate,
   formatNumber,
   formatPercentage,
   formatSpan,
@@ -213,8 +214,23 @@ export default async function ClubPage({
                   <td className="num">{formatPercentage(s.percentage)}</td>
                   <td className="num">{s.ladderRank ?? '—'}</td>
                   <td>
-                    {s.isPremier && <strong>Premiers</strong>}
-                    {s.woodenSpoon && <span className="badge badge-warn">Wooden spoon</span>}
+                    {/* Honours are only shown once the season has been
+                        decided. A club leading, or last, in an unfinished
+                        season has a standing, not an honour. */}
+                    {s.seasonStatus === 'in_progress' ? (
+                      <span className="badge badge-warn" title={
+                        s.dataThroughDate
+                          ? `Provisional, as at ${formatDate(s.dataThroughDate)}`
+                          : undefined
+                      }>
+                        In progress
+                      </span>
+                    ) : (
+                      <>
+                        {s.isPremier && <strong>Premiers</strong>}
+                        {s.woodenSpoon && <span className="badge badge-warn">Wooden spoon</span>}
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
