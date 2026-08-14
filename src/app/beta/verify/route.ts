@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   const token = url.searchParams.get('token') ?? '';
 
   if (token.length < 20 || token.length > 100) {
-    return redirectTo('/beta');
+    return redirectTo(request, '/beta');
   }
 
   if (VERIFY_LIMIT.check(`ip:${(await requestIp()) ?? 'unknown'}`)) {
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
   if (!row) {
     // Expired, used or never issued: back to the gate, which explains
     // nothing — the distinction is only useful to someone probing.
-    return redirectTo('/beta');
+    return redirectTo(request, '/beta');
   }
 
   // The email must STILL be allowlisted: revocation between the link
@@ -55,10 +55,10 @@ export async function GET(request: Request) {
   `;
   if (!allowed) {
     await audit('beta.magic_link_revoked_email', { email: row.email }, { label: row.email });
-    return redirectTo('/beta');
+    return redirectTo(request, '/beta');
   }
 
   await audit('beta.magic_link_verified', { email: row.email }, { label: row.email });
   await grantBetaAccess(`email:${row.email}`);
-  return redirectTo('/');
+  return redirectTo(request, '/');
 }

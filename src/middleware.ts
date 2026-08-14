@@ -49,7 +49,7 @@ export async function middleware(request: NextRequest) {
       ? await verifyClaim(request.cookies.get(ADMIN_COOKIE)?.value, secret, { kind: 'admin' })
       : null;
     if (!claim) {
-      return redirectTo('/admin/login');
+      return redirectTo(request, '/admin/login');
     }
     return NextResponse.next();
   }
@@ -84,7 +84,7 @@ export async function middleware(request: NextRequest) {
     if (!beta && !admin) {
       // Return the visitor to what they asked for once admitted.
       const search = pathname === '/' ? '' : `?from=${encodeURIComponent(pathname)}`;
-      return redirectTo('/beta', search);
+      return redirectTo(request, '/beta', search);
     }
   }
 
