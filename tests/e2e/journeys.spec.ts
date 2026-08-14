@@ -6,7 +6,9 @@ import { expect, test } from '@playwright/test';
 
 test('home → search → player', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'AFLDB', level: 1 })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: /Every player\. Every game\./, level: 1 }),
+  ).toBeVisible();
 
   const search = page.getByRole('combobox');
   await search.fill('pendlebury');
@@ -155,6 +157,29 @@ test('health endpoint reports database reachability', async ({ request }) => {
 test('development deployment is not indexable', async ({ request }) => {
   const response = await request.get('/robots.txt');
   expect(await response.text()).toContain('Disallow: /');
+});
+
+test('the reader can choose light or dark, and the choice survives navigation', async ({ page }) => {
+  await page.goto('/');
+  const root = page.locator('html');
+
+  // Nothing stored: the palette follows the operating system and no
+  // choice is stamped on the document.
+  await expect(root).not.toHaveAttribute('data-theme', /.*/);
+
+  // The control offers exactly one action, named for what it will do.
+  await page.getByRole('button', { name: /Switch to (dark|light) mode/ }).click();
+  const chosen = await root.getAttribute('data-theme');
+  expect(chosen === 'dark' || chosen === 'light').toBe(true);
+
+  // Persisted, and applied before paint on the next page rather than
+  // flashing the other palette first.
+  await page.goto('/players');
+  await expect(root).toHaveAttribute('data-theme', chosen!);
+
+  // Toggling back returns the other palette.
+  await page.getByRole('button', { name: /Switch to (dark|light) mode/ }).click();
+  await expect(root).toHaveAttribute('data-theme', chosen === 'dark' ? 'light' : 'dark');
 });
 
 test('statistical tables stay usable on mobile', async ({ page, isMobile }) => {

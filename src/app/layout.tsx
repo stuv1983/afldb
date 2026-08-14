@@ -1,9 +1,39 @@
 import type { Metadata } from 'next';
+import { IBM_Plex_Mono, IBM_Plex_Sans, Newsreader } from 'next/font/google';
 import Link from 'next/link';
 
+import { PrimaryNav, TabBar } from '@/components/SiteNav';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { THEME_INIT_SCRIPT } from '@/lib/theme';
 import '@/styles/globals.css';
 
 const baseUrl = process.env.AFLDB_BASE_URL ?? 'http://localhost:3100';
+
+/**
+ * Fonts are self-hosted by `next/font`, which matters twice over: the
+ * Content-Security-Policy allows `font-src 'self'` only, so a Google Fonts
+ * CDN link would simply be blocked, and the files are subset and preloaded
+ * rather than fetched from a third party at runtime.
+ */
+const newsreader = Newsreader({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-newsreader',
+});
+
+const plexSans = IBM_Plex_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  display: 'swap',
+  variable: '--font-plex-sans',
+});
+
+const plexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  display: 'swap',
+  variable: '--font-plex-mono',
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
@@ -26,29 +56,30 @@ export const metadata: Metadata = {
     : { index: false, follow: false },
 };
 
-const NAV = [
-  { href: '/players', label: 'Players' },
-  { href: '/clubs', label: 'Clubs' },
-  { href: '/seasons', label: 'Seasons' },
-  { href: '/records', label: 'Records' },
-  { href: '/brownlow', label: 'Brownlow' },
-  { href: '/advanced-search', label: 'Advanced Search' },
-];
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const fonts = `${newsreader.variable} ${plexSans.variable} ${plexMono.variable}`;
+
   return (
-    <html lang="en-AU">
+    // The pre-paint script below sets data-theme on this element, so the
+    // server markup and the first client render legitimately differ.
+    <html lang="en-AU" className={fonts} suppressHydrationWarning>
+      <head>
+        {/* Blocking and first in <head>: the stored theme must be applied
+            before any styled markup paints, or a reader who chose dark
+            gets a frame of cream paper on every navigation. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body>
         <a className="skip-link" href="#main">Skip to content</a>
 
         <header className="site-header">
           <div className="container">
-            <Link href="/" className="brand">AFLDB</Link>
-            <nav className="site-nav" aria-label="Primary">
-              {NAV.map((item) => (
-                <Link key={item.href} href={item.href}>{item.label}</Link>
-              ))}
-            </nav>
+            <div className="masthead">
+              <Link href="/" className="brand">AFLDB</Link>
+              <span className="span">1897 — Present</span>
+            </div>
+            <PrimaryNav />
+            <ThemeToggle />
           </div>
         </header>
 
@@ -58,15 +89,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         <footer className="site-footer">
           <div className="container">
-            <p>
-              AFLDB — Australian Football statistics, 1897 to present.
-              Data derived from publicly available sources including AFL Tables and Wikipedia.
-            </p>
-            <p className="muted">
-              Statistics not collected in a given era are shown as “—”, never as zero.
-            </p>
+            <div className="colophon">
+              <p>
+                AFLDB — Australian Football statistics, 1897 to present.
+                Data derived from publicly available sources including AFL Tables and Wikipedia.
+              </p>
+              <p>
+                Statistics not collected in a given era are shown as “—”, never as zero.
+              </p>
+            </div>
           </div>
         </footer>
+
+        <TabBar />
       </body>
     </html>
   );
