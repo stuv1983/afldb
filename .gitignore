@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+build/
+next-env.d.ts
+
+# Environment / secrets — never commit
+.env
+.env.local
+.env.*.local
+.env.production
+*.pem
+*.key
+
+# Databases, dumps and backups — never commit
+data/
+*.db
+*.db-journal
+*.db-wal
+*.sqlite
+*.sqlite3
+*.dump
+*.sql.gz
+backups/
+
+# Source caches
+.cache/
+tools/**/cache/
+tools/**/raw/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Testing
+coverage/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
