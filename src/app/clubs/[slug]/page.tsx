@@ -8,6 +8,7 @@ import {
   getClubLeaders,
   getClubSeasons,
   getClubTotals,
+  listClubs,
 } from '@/db/queries/clubs';
 import {
   clubPath,
@@ -20,6 +21,12 @@ import {
 import { parseSlug } from '@/lib/params';
 
 export const revalidate = 86400;
+
+/** Only 24 clubs: prerender them all. */
+export async function generateStaticParams() {
+  const clubs = await listClubs();
+  return clubs.map((c) => ({ slug: c.slug }));
+}
 
 export async function generateMetadata({
   params,

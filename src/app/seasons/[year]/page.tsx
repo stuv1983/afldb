@@ -9,6 +9,7 @@ import {
   getSeasonBrownlow,
   getSeasonGoalkickers,
   getSeasonLadder,
+  listSeasons,
 } from '@/db/queries/seasons';
 import {
   clubPath,
@@ -23,6 +24,17 @@ import {
 import { parseSeason } from '@/lib/params';
 
 export const revalidate = 3600;
+
+/**
+ * Prerender every season. There are only ~130, and they are the pages
+ * most likely to be linked to. Without this the route is rendered on
+ * demand and not stored in the full route cache, which under load costs
+ * roughly a second per request.
+ */
+export async function generateStaticParams() {
+  const seasons = await listSeasons();
+  return seasons.map((s) => ({ year: String(s.year) }));
+}
 
 export async function generateMetadata({
   params,

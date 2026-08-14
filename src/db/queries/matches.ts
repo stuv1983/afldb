@@ -155,3 +155,15 @@ export async function getRecentMatches(limit = 8): Promise<MatchListRow[]> {
      LIMIT ${limit}
   `;
 }
+
+/**
+ * Matches most likely to be requested: every grand final, then the most
+ * recent matches. Used to seed the static params of the match route.
+ */
+export async function listNotableMatchIds(limit: number) {
+  return sql<{ id: number }[]>`
+    (SELECT id FROM matches WHERE round_type = 'grand_final')
+    UNION
+    (SELECT id FROM matches ORDER BY match_date DESC LIMIT ${limit})
+  `;
+}

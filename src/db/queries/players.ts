@@ -289,3 +289,17 @@ export async function getPlayerSlug(id: number): Promise<string | null> {
   `;
   return row?.slug ?? null;
 }
+
+/**
+ * Players most likely to be requested, used to seed the static params of
+ * the player route so it participates in the incremental cache.
+ */
+export async function listMostViewedPlayers(limit: number) {
+  return sql<{ id: number; slug: string }[]>`
+    SELECT p.id, p.slug
+      FROM players p
+      JOIN player_career_stats c ON c.player_id = p.id
+     ORDER BY c.games DESC, c.brownlow_votes DESC
+     LIMIT ${limit}
+  `;
+}

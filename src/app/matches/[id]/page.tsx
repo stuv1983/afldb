@@ -2,7 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { getMatch, getMatchPeriods, getMatchPlayers } from '@/db/queries/matches';
+import {
+  getMatch,
+  getMatchPeriods,
+  getMatchPlayers,
+  listNotableMatchIds,
+} from '@/db/queries/matches';
 import {
   clubPath,
   formatAttendance,
@@ -17,6 +22,16 @@ import {
 } from '@/lib/format';
 
 export const revalidate = 3600;
+
+/**
+ * Seed the route so it is cached at all (see the note on the player
+ * route). Grand finals and recent matches are the ones actually linked
+ * to; the other ~16,000 are cached on first request.
+ */
+export async function generateStaticParams() {
+  const matches = await listNotableMatchIds(500);
+  return matches.map((m) => ({ id: String(m.id) }));
+}
 
 export async function generateMetadata({
   params,

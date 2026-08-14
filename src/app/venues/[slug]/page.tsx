@@ -16,6 +16,12 @@ import { parseSlug } from '@/lib/params';
 
 export const revalidate = 86400;
 
+/** Only 52 venues: prerender them all. */
+export async function generateStaticParams() {
+  const rows = await sql<{ slug: string }[]>`SELECT slug FROM venues`;
+  return rows.map((v) => ({ slug: v.slug }));
+}
+
 async function getVenue(slug: string) {
   const [row] = await sql<{
     id: number; slug: string; canonicalName: string; legacyName: string | null;

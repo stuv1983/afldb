@@ -21,8 +21,16 @@ function createClient() {
 
   const statementTimeout = Number(process.env.AFLDB_STATEMENT_TIMEOUT_MS ?? 5000);
 
+  // Next.js prerenders with several worker processes, each of which
+  // builds its own pool. At the serving default that multiplies out past
+  // PostgreSQL's max_connections and the build fails with "too many
+  // clients". Prerendering is throughput-bound, not latency-bound, so a
+  // small pool per worker is sufficient.
+  const isBuild = process.env.NEXT_PHASE === 'phase-production-build';
+  const poolMax = isBuild ? 2 : Number(process.env.AFLDB_POOL_MAX ?? 10);
+
   return postgres(connectionString, {
-    max: Number(process.env.AFLDB_POOL_MAX ?? 10),
+    max: poolMax,
     idle_timeout: 30,
     connect_timeout: 10,
     // A public Advanced Search could otherwise pin a backend indefinitely.

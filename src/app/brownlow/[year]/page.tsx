@@ -8,6 +8,14 @@ import { parseSeason } from '@/lib/params';
 
 export const revalidate = 3600;
 
+/** One page per season that recorded votes (1924 onwards). */
+export async function generateStaticParams() {
+  const rows = await sql<{ season: number }[]>`
+    SELECT DISTINCT season FROM brownlow_season_votes ORDER BY season
+  `;
+  return rows.map((r) => ({ year: String(r.season) }));
+}
+
 async function getCount(year: number) {
   return sql<{
     playerId: number; slug: string; displayName: string;

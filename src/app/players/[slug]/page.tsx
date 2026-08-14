@@ -2,13 +2,13 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 
-import { Pagination } from '@/components/Pagination';
 import {
   getPlayer,
   getPlayerBrownlow,
   getPlayerClubs,
   getPlayerMatches,
   getPlayerSeasons,
+  listMostViewedPlayers,
 } from '@/db/queries/players';
 import {
   clubPath,
@@ -22,11 +22,30 @@ import {
   playerPath,
   seasonPath,
 } from '@/lib/format';
-import { firstValue, parsePage, parseSeason } from '@/lib/params';
 
+// Player careers are historical and change only when an import runs.
+// This page deliberately reads no searchParams: doing so would force
+// dynamic rendering and cost roughly 2s per request under load.
 export const revalidate = 3600;
 
 const MATCH_PAGE_SIZE = 50;
+
+/**
+ * Seed the route with the most-viewed players.
+ *
+ * A dynamic segment with no generateStaticParams at all is treated as
+ * fully dynamic and is never cached, which costs ~1.5s per request under
+ * load. Declaring even a subset puts the route in the incremental cache,
+ * so the remaining ~12,900 players are rendered once on demand and
+ * served from cache thereafter.
+ *
+ * Prerendering all 13,361 would add roughly 20 minutes to every build
+ * for pages that are rarely requested.
+ */
+export async function generateStaticParams() {
+  const players = await listMostViewedPlayers(500);
+  return players.map((p) => ({ slug: `${p.slug}-${p.id}` }));
+}
 
 export async function generateMetadata({
   params,
@@ -56,13 +75,10 @@ export async function generateMetadata({
 
 export default async function PlayerPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { slug } = await params;
-  const query = await searchParams;
 
   const parsed = parseEntitySlug(slug);
   if (!parsed) notFound();
@@ -75,18 +91,14 @@ export default async function PlayerPage({
     permanentRedirect(playerPath(player.slug, player.id));
   }
 
-  const page = parsePage(firstValue(query.page));
-  const seasonFilter = parseSeason(firstValue(query.season));
-
   const [clubs, seasons, brownlow, matches] = await Promise.all([
     getPlayerClubs(player.id),
     getPlayerSeasons(player.id),
     getPlayerBrownlow(player.id),
-    getPlayerMatches(player.id, {
-      limit: MATCH_PAGE_SIZE,
-      offset: (page - 1) * MATCH_PAGE_SIZE,
-      season: seasonFilter,
-    }),
+    // Most recent matches only. The full paged log lives at
+    // /players/[slug]/matches, which keeps this page free of
+    // searchParams and therefore cacheable.
+    getPlayerMatches(player.id, { limit: MATCH_PAGE_SIZE, offset: 0 }),
   ]);
 
   const stillPlaying = player.finalSeason !== null && seasons.at(-1)?.season === player.finalSeason
@@ -314,8 +326,9 @@ export default async function PlayerPage({
         <div className="table-wrap">
           <table>
             <caption>
-              {formatNumber(matches.total)} matches
-              {seasonFilter ? ` in ${seasonFilter}` : ''}
+              {matches.total > MATCH_PAGE_SIZE
+                ? `Most recent ${MATCH_PAGE_SIZE} of ${formatNumber(matches.total)} matches`
+                : `${formatNumber(matches.total)} matches`}
             </caption>
             <thead>
               <tr>
@@ -362,13 +375,14 @@ export default async function PlayerPage({
           </table>
         </div>
 
-        <Pagination
-          basePath={playerPath(player.slug, player.id)}
-          params={{ season: seasonFilter ? String(seasonFilter) : undefined }}
-          page={page}
-          pageSize={MATCH_PAGE_SIZE}
-          total={matches.total}
-        />
+        {matches.total > MATCH_PAGE_SIZE && (
+          <p style={{ marginTop: '0.75rem' }}>
+            <Link className="btn btn-secondary"
+                  href={`${playerPath(player.slug, player.id)}/matches`}>
+              View all {formatNumber(matches.total)} matches →
+            </Link>
+          </p>
+        )}
       </section>
     </>
   );

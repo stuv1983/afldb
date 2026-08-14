@@ -1,0 +1,50 @@
+# AFLDB reverse proxy — DEVELOPMENT SERVER ONLY
+#
+# This configuration deliberately does NOT reference afldb.com. It binds
+# a dedicated port on the development server so it cannot disturb the
+# other services already running on this host, and so the production
+# domain remains untouched.
+#
+# The production configuration is set out in docs/production-cutover.md
+# and must not be applied until the readiness gate passes.
+
+:8090 {
+	# Next.js listens on loopback only; the proxy is the sole public face.
+	# PostgreSQL is never exposed.
+	reverse_proxy 127.0.0.1:3100 {
+		health_uri /api/health
+		health_interval 30s
+		health_timeout 5s
+	}
+
+	encode gzip zstd
+
+	header {
+		# Next.js also sets these; the proxy enforces them for any
+		# response it serves itself (errors, health failures).
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+
+		# Do NOT send HSTS here: the dev server is reached over plain
+		# HTTP on the LAN, and HSTS would poison browsers for this host.
+
+		# Never advertise the stack.
+		-Server
+		-X-Powered-By
+	}
+
+	# Health checks should not be cached anywhere.
+	@health path /api/health
+	header @health Cache-Control "no-store"
+
+	log {
+		output file /var/log/caddy/afldb-access.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+		format json
+		# Do not log query strings: Advanced Search URLs are user input.
+		level INFO
+	}
+}

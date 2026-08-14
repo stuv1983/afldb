@@ -1,0 +1,67 @@
+[Unit]
+Description=AFLDB — Australian Football statistics database
+Documentation=https://github.com/afldb
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=arm
+Group=arm
+WorkingDirectory=/home/arm/projects/afldb
+
+# Clustered entry point over the Next.js standalone bundle. SSR is
+# CPU-bound and single-threaded, so one process caps out around 46 req/s
+# on this host; four workers reach ~214 req/s with p95 under 400ms.
+# Node is installed per-user via nvm, so the path is pinned rather than
+# relying on PATH.
+ExecStart=/home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs
+
+# Credentials come from .env (mode 600, owned by arm) and are never
+# baked into the unit file or the environment of other services.
+EnvironmentFile=/home/arm/projects/afldb/.env
+Environment=NODE_ENV=production
+Environment=HOSTNAME=127.0.0.1
+# Each worker holds its own PostgreSQL pool, so this is deliberately not
+# one worker per core: 24 x 10 connections would exhaust max_connections.
+Environment=AFLDB_WORKERS=4
+
+KillMode=mixed
+Restart=always
+RestartSec=5
+# Give up only after repeated rapid failures, so a crash loop is visible
+# rather than silently retried forever.
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+# Logging goes to the journal: journalctl -u afldb
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=afldb
+
+# --- Hardening -------------------------------------------------------
+# The service reads its own directory and talks to PostgreSQL over a
+# local socket. It needs nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/arm/projects/afldb/.next
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target
