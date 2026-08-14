@@ -363,6 +363,113 @@ describe('gate: club organizations and identities', () => {
 });
 
 // ---------------------------------------------------------------------
+// IMMUTABLE — draft links
+// ---------------------------------------------------------------------
+describe('gate: draft links', () => {
+  it('retains all 6,810 rows, including unresolved ones', async () => {
+    const [row] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM draft_picks
+    `;
+    // An unmatched row is still a fact about the draft. Dropping it
+    // would silently shrink the historical record.
+    expect(row.n).toBe(6_810);
+  });
+
+  it('keeps the raw name on every row whether linked or not', async () => {
+    const [row] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM draft_picks
+       WHERE player_name_raw IS NULL OR player_name_raw = ''
+    `;
+    expect(row.n).toBe(0);
+  });
+
+  it('resolves identity once per person across 5,057 people', async () => {
+    const [row] = await sql<{ people: number; linked: number }[]>`
+      SELECT count(*)::int AS people, count(player_id)::int AS linked
+        FROM draft_persons
+    `;
+    expect(row.people).toBe(5_057);
+    expect(row.linked).toBe(3_459);
+  });
+
+  it('propagates a person link to every row of that person', async () => {
+    // The defect this prevents: the same human linked on one row and
+    // unlinked on the next, because each row was matched separately.
+    const [row] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM (
+        SELECT draft_person_id FROM draft_picks
+         WHERE draft_person_id IS NOT NULL
+         GROUP BY draft_person_id
+        HAVING count(DISTINCT coalesce(player_id, -1)) > 1
+      ) t
+    `;
+    expect(row.n).toBe(0);
+  });
+
+  it('refuses a trusted link that points at no player', async () => {
+    const [row] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM draft_picks
+       WHERE (link_status_value IN ('unique', 'resolved')) <> (player_id IS NOT NULL)
+    `;
+    expect(row.n).toBe(0);
+
+    await expect(sql`
+      INSERT INTO draft_persons
+        (source_id, dg_person_id, player_url, display_name_raw, name_key,
+         player_id, link_status)
+      VALUES ((SELECT id FROM sources WHERE key = 'draftguru'),
+              -1, '/x', 'Nobody', 'nobody', NULL, 'unique')
+    `).rejects.toThrow();
+  });
+
+  it('separates genuine non-players from a real matching backlog', async () => {
+    const [row] = await sql<{
+      backlog: number; neverPlayed: number;
+    }[]>`
+      SELECT count(*) FILTER (WHERE is_matching_backlog)::int AS backlog,
+             count(*) FILTER (WHERE player_id IS NULL
+                                AND NOT is_matching_backlog)::int AS "neverPlayed"
+        FROM draft_persons
+    `;
+    // 1,498 people were drafted and never played a senior game. Having
+    // no AFLDB player is the CORRECT outcome, not a defect to fix.
+    expect(row.neverPlayed).toBe(1_498);
+    // 100 people did play but are unlinked: 85 'unmatched' plus 15
+    // 'implausible'. This is the backlog worth working.
+    expect(row.backlog).toBe(100);
+  });
+
+  it('never flags a linked or non-playing person as backlog', async () => {
+    const [row] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM draft_persons
+       WHERE is_matching_backlog
+         AND (player_id IS NOT NULL OR coalesce(reported_games, 0) = 0)
+    `;
+    expect(row.n).toBe(0);
+  });
+
+  it('records the backlog as open data issues', async () => {
+    const [row] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM data_issues
+       WHERE issue_type = 'unlinked_player_with_games' AND resolved_at IS NULL
+    `;
+    expect(row.n).toBe(100);
+  });
+
+  it('keeps the source person key as the durable identity', async () => {
+    const [row] = await sql<{ missing: number; dupes: number }[]>`
+      SELECT count(*) FILTER (WHERE dg_person_id IS NULL)::int AS missing,
+             (SELECT count(*)::int FROM (
+                SELECT dg_person_id FROM draft_persons
+                 GROUP BY dg_person_id HAVING count(*) > 1) d) AS dupes
+        FROM draft_persons
+    `;
+    expect(row.missing).toBe(0);
+    expect(row.dupes).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------
 // IMMUTABLE — absence is never zero
 // ---------------------------------------------------------------------
 describe('gate: absence is never zero', () => {
@@ -376,6 +483,47 @@ describe('gate: absence is never zero', () => {
     // never recorded, which is not the same as nobody attending.
     expect(row.nulls).toBe(1_651);
     expect(row.zeroes).toBe(0);
+  });
+
+  it('records why each attendance is missing', async () => {
+    const rows = await sql<{ status: string; n: number }[]>`
+      SELECT attendance_status AS status, count(*)::int AS n
+        FROM matches GROUP BY 1 ORDER BY 2 DESC
+    `;
+    expect(rows).toEqual([
+      { status: 'complete', n: 15_376 },
+      { status: 'not_collected', n: 1_651 },
+    ]);
+  });
+
+  it('does not infer empty pandemic crowds as zero', async () => {
+    const rows = await sql<{ season: number; n: number }[]>`
+      SELECT season, count(*)::int AS n FROM matches
+       WHERE attendance IS NULL AND season >= 2020
+       GROUP BY season ORDER BY season
+    `;
+    // Some 2020-21 matches genuinely were played to empty stands, but
+    // "no figure" and "the figure was zero" are different claims. Only
+    // a cited source can turn one into the other.
+    expect(rows).toEqual([
+      { season: 2020, n: 29 },
+      { season: 2021, n: 37 },
+    ]);
+  });
+
+  it('refuses a zero crowd that cites no source', async () => {
+    await expect(sql`
+      UPDATE matches SET attendance = 0, attendance_status = 'complete'
+       WHERE id = (SELECT id FROM matches WHERE season = 2020
+                    AND attendance IS NULL LIMIT 1)
+    `).rejects.toThrow();
+  });
+
+  it('refuses a status that disagrees with the figure', async () => {
+    await expect(sql`
+      UPDATE matches SET attendance_status = 'complete'
+       WHERE attendance IS NULL
+    `).rejects.toThrow();
   });
 
   it('keeps era-limited statistics NULL before they were collected', async () => {
