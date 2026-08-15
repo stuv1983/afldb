@@ -10,6 +10,7 @@ import {
   RECORD_CATEGORIES,
   getCareerRecord,
   getMatchRecord,
+  getRecordCategory,
   getSeasonRecord,
 } from '@/db/queries/records';
 import {
@@ -43,7 +44,7 @@ export async function generateMetadata({
   params: Promise<{ category: string }>;
 }): Promise<Metadata> {
   const { category } = await params;
-  const definition = RECORD_CATEGORIES[category];
+  const definition = getRecordCategory(category);
   if (!definition) return { title: 'Record not found' };
 
   return {
@@ -66,7 +67,7 @@ export default async function RecordCategoryPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const [{ category }, query] = await Promise.all([params, searchParams]);
-  const definition = RECORD_CATEGORIES[category];
+  const definition = getRecordCategory(category);
   if (!definition) notFound();
 
   const isCareer = CAREER.has(category);

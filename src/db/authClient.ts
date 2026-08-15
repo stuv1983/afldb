@@ -3,14 +3,14 @@
  *
  * A second pool with a second role, on purpose. The public site runs as
  * afldb_app, which is read-only — an invariant established by the migration
- * GRANTs (afldb_app is granted SELECT only). Note this is NOT yet checked by
- * an automated test: the integration suite connects as afldb_owner, so a
- * regression that widened afldb_app's grants would pass CI unnoticed. A
- * privilege test (a write attempted as afldb_app expecting "permission
- * denied") is a worthwhile addition. Logins and uploads genuinely write, so
- * they run as afldb_auth, whose grants cover ONLY the tables from migration
- * 023. A SQL injection in a public page still cannot write; a compromise of
- * the auth path still cannot touch statistics.
+ * GRANTs (afldb_app is granted SELECT only) and enforced against the live
+ * cluster by tests/integration/privileges.test.ts, which interrogates the
+ * catalogue so it also catches privileges the role holds but has never
+ * exercised. Logins and uploads genuinely write, so they run as afldb_auth,
+ * whose grants cover ONLY the tables from migration 023 — the same test file
+ * asserts that role holds no write on the statistical tables. A SQL injection
+ * in a public page still cannot write; a compromise of the auth path still
+ * cannot touch statistics.
  */
 import 'server-only';
 

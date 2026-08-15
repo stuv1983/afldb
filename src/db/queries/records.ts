@@ -116,6 +116,20 @@ export const RECORD_CATEGORIES: Record<string, RecordCategory> = {
   },
 };
 
+/**
+ * The category for a slug, or null when there is none.
+ *
+ * `Object.hasOwn` rather than a truthiness check on the index: the slug is a
+ * URL segment, and a plain index also finds inherited properties, so
+ * /records/constructor would sail past a `if (!definition) notFound()` guard
+ * and render a page built from Object's constructor. Same discipline the
+ * search specs apply to their own catalogue lookups (isGridStatKey,
+ * isPlayerSort).
+ */
+export function getRecordCategory(slug: string): RecordCategory | null {
+  return Object.hasOwn(RECORD_CATEGORIES, slug) ? RECORD_CATEGORIES[slug] : null;
+}
+
 export type CareerRecordRow = {
   rank: number;
   playerId: number;

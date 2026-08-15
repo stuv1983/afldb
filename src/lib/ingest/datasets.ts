@@ -737,3 +737,18 @@ export const DATASETS: Record<string, DatasetSpec> = {
   [matchResults.key]: matchResults,
   [playerMatchStats.key]: playerMatchStats,
 };
+
+/**
+ * The spec for a dataset key, or null when there is none.
+ *
+ * `Object.hasOwn`, not `DATASETS[key]` plus a truthiness check: the dataset
+ * key arrives from a request (an upload form field, an emailed subject line),
+ * and a plain index also finds inherited properties -- "constructor" returns a
+ * function, which is truthy, so the "unknown dataset" guard passes it through
+ * and the next line reads .requiredColumns off Object's constructor. Same
+ * discipline the search specs already apply to their own catalogue lookups
+ * (isGridStatKey, isPlayerSort).
+ */
+export function getDataset(key: string): DatasetSpec | null {
+  return Object.hasOwn(DATASETS, key) ? DATASETS[key] : null;
+}

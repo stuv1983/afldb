@@ -34,6 +34,7 @@ import email
 import imaplib
 import json
 import os
+import ssl
 import sys
 import urllib.error
 import urllib.request
@@ -83,7 +84,15 @@ def imap_connect() -> imaplib.IMAP4_SSL:
     password = require_env("AFLDB_INTAKE_IMAP_PASSWORD")
     mailbox = os.environ.get("AFLDB_INTAKE_IMAP_MAILBOX", "INBOX")
 
-    conn = imaplib.IMAP4_SSL(host, port)
+    # An explicit default context, not imaplib's own default: verification of
+    # the server certificate and hostname only became the stdlib default in
+    # Python 3.13 (gh-91826). Under 3.12 and earlier, IMAP4_SSL(host, port)
+    # accepts ANY certificate, so anything on the path between this poller and
+    # the mail server could read the mailbox password below and feed the
+    # intake route attachments of its own. create_default_context() verifies
+    # on every version, so the behaviour no longer depends on which python3
+    # the server happens to have.
+    conn = imaplib.IMAP4_SSL(host, port, ssl_context=ssl.create_default_context())
     conn.login(user, password)
     conn.select(mailbox)
     return conn

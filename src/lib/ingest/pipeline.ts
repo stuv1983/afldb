@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import postgres from 'postgres';
 
 import { authSql } from '@/db/authClient';
-import { DATASETS } from '@/lib/ingest/datasets';
+import { getDataset } from '@/lib/ingest/datasets';
 import { CsvError, parseCsv, toObjects } from '@/lib/ingest/csv';
 
 /**
@@ -30,7 +30,7 @@ export async function stageSubmission(
   content: Buffer,
   uploadedBy: number,
 ): Promise<StageResult> {
-  const spec = DATASETS[dataset];
+  const spec = getDataset(dataset);
   if (!spec) return { ok: false, error: `Unknown dataset "${dataset}".` };
   if (content.length === 0) return { ok: false, error: 'The file is empty.' };
   if (content.length > MAX_UPLOAD_BYTES) {
@@ -103,7 +103,7 @@ export async function validateSubmission(submissionId: number): Promise<Validati
   if (!['staged', 'validated', 'rejected'].includes(submission.status)) {
     throw new Error(`submission is ${submission.status}; only staged files can be validated`);
   }
-  const spec = DATASETS[submission.dataset];
+  const spec = getDataset(submission.dataset);
   if (!spec) throw new Error(`dataset ${submission.dataset} is no longer registered`);
 
   const rows = await authSql<{ rowNo: number; payload: Record<string, string | null> }[]>`
@@ -185,7 +185,7 @@ export async function promoteSubmission(submissionId: number): Promise<PromoteRe
   if (submission.status !== 'approved') {
     return { ok: false, error: `Submission is ${submission.status}; only approved files promote.` };
   }
-  const spec = DATASETS[submission.dataset];
+  const spec = getDataset(submission.dataset);
   if (!spec) return { ok: false, error: 'Dataset is no longer registered.' };
 
   const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
