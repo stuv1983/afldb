@@ -67,6 +67,10 @@ export default async function AdminDashboard() {
             <Link href="/admin/db-health">Database health →</Link>{' '}
             — table inventory, derived-data reconciliation and link quality.
           </p>
+          <p className="section-note">
+            <Link href="/admin/grid-solver">Grid solver →</Link>{' '}
+            — a 3×3 board of named questions, for spot-checking data by intersection.
+          </p>
         </>
       )}
 

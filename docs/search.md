@@ -162,7 +162,41 @@ does not need it), so a query built once is a shareable, reproducible
 link like every other search on the site. Limits: 6 cards, 8 conditions
 per card, 50 rows per page.
 
-## 7. Regression cases
+## 7. Grid solver (internal, super-admin only)
+
+`/admin/grid-solver` is a sibling to Data QA search above, not a
+replacement of it: a 3×3 board of named questions instead of raw
+column/operator/value conditions — the "grid squares" shape modelled on
+`sports_data_lab`'s Grid Solver (`app_pages/11_Grid_Solver.py`,
+`afl/constraints.py`). Pick a question for each of three rows and three
+columns; every square is solved as soon as both its row and column are
+set, showing an eligible-player count and a top-ranked answer, with a
+drill-down to the full ranked list.
+
+**Named builders, not user-chosen columns.** `src/search/grid-solver-spec.ts`
+holds `GRID_BUILDERS`: ~30 fixed, parameterised questions across nine
+categories (clubs & journeys, career milestones, season & era, finals &
+premierships, grounds & venues, teammates, captaincy, awards & honours,
+draft & recruitment) — a real cross-section of what the schema supports,
+not the reference's 100+. Each compiles in `src/db/queries/grid-solver.ts`
+to a fixed SQL shape with bound parameters; there is no request-selected
+column or operator at all here, so most of the catalogue needs no
+allowlist check beyond "is this a known builder key" — the one exception
+is the `stat` parameter on the two stat-total builders, checked against
+`GRID_STATS` before it can reach `sql.unsafe`. Runs through the same
+`afldb_app` client as everything above.
+
+Not ported from the reference, deliberately: the daily board fetch from
+an external trivia site, saved-grids-per-account (AFLDB has no
+regular-user accounts), practice/auto-grid modes, and the obscurity/
+star-rating system — AFLDB has no precomputed rarity score, so ranking
+falls back to the honest, simple "fewest career games first."
+
+Board state lives in one `g` URL parameter (same JSON/base64url encoding
+as `q` above, now shared via `src/lib/urlState.ts`), so a built board is
+a shareable link. Limits: 200 rows per cell drill-down, 25 per page.
+
+## 8. Regression cases
 
 Compared as **exact player-ID sets** with SHA-256 hashes, not merely counts, in both `tools/validation/validate_migration.py` and the integration tests.
 

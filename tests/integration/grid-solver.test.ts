@@ -1,0 +1,124 @@
+/**
+ * Runs against real data. The "every builder compiles" loop is the
+ * single most likely maintenance bug in a catalogue-of-functions design
+ * like this one: a new entry in GRID_BUILDERS with no matching case in
+ * grid-solver.ts's compileAxis would otherwise only be discovered by a
+ * super admin clicking into it on the live site. The rest cross-check the
+ * compiler against either a hand-written equivalent query or a real,
+ * dynamically-discovered pair of players -- never a hardcoded name.
+ */
+import './guard';
+
+import { afterAll, describe, expect, it } from 'vitest';
+
+import { sql } from '@/db/client';
+import { solveCellRows, solveCellSummary } from '@/db/queries/grid-solver';
+import { getPlayerOverlapSummary } from '@/db/queries/player-compare';
+import {
+  GRID_BUILDER_KEYS,
+  GRID_BUILDERS,
+  GRID_LIMITS,
+  isAxisComplete,
+  type GridAxisState,
+} from '@/search/grid-solver-spec';
+
+afterAll(async () => {
+  await sql.end();
+});
+
+/** Syntactically valid params for any builder -- real ids are not needed: every param lands as a bound literal inside a WHERE clause, never an identifier, so a nonexistent id is safe SQL that just matches nothing. */
+function fillerAxis(builderKey: string): GridAxisState {
+  const def = GRID_BUILDERS[builderKey];
+  const params: Record<string, string> = {};
+  for (const p of def.params) {
+    params[p.key] = p.kind === 'stat' ? 'disposals' : '1';
+  }
+  return { builder: builderKey, params };
+}
+
+describe('every grid builder compiles and solves', () => {
+  const partner = fillerAxis('career_games_min');
+
+  it.each(GRID_BUILDER_KEYS)('solves a cell using "%s" without throwing', async (builderKey) => {
+    const axis = fillerAxis(builderKey);
+    expect(isAxisComplete(axis), builderKey).toBe(true);
+    const summary = await solveCellSummary(axis, partner, 'games_asc');
+    expect(summary.eligible, builderKey).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('grid solver correctness', () => {
+  it('career_games_min(200) AND career_games_min(0) matches a hand-written equivalent count', async () => {
+    const summary = await solveCellSummary(
+      { builder: 'career_games_min', params: { games: '200' } },
+      { builder: 'career_games_min', params: { games: '0' } },
+      'games_asc',
+    );
+    const [expected] = await sql<{ count: string }[]>`
+      SELECT count(*) FROM player_career_stats WHERE games >= 200
+    `;
+    expect(summary.eligible).toBe(Number(expected.count));
+  });
+
+  it('no premiership player is also flagged as never having played a final', async () => {
+    // A logical invariant of the data, not an arbitrary check: winning a
+    // premiership means winning a Grand Final, which is itself a final.
+    const summary = await solveCellSummary(
+      { builder: 'premiership_player', params: {} },
+      { builder: 'never_played_finals', params: {} },
+      'games_asc',
+    );
+    expect(summary.eligible).toBe(0);
+  });
+
+  it('teammate_of includes a player independently known to share a club in a match', async () => {
+    // Anchored on one long-career player first so the discovery query is
+    // an index seek rather than an unbounded self-join -- see the
+    // identical reasoning in tests/integration/player-compare.test.ts.
+    const [anchor] = await sql<{ playerId: number }[]>`
+      SELECT player_id AS "playerId" FROM player_career_stats ORDER BY games DESC LIMIT 1
+    `;
+    const [pairRow] = await sql<{ other: number }[]>`
+      SELECT pms2.player_id AS other
+        FROM player_match_stats pms1
+        JOIN player_match_stats pms2
+          ON pms2.match_id = pms1.match_id AND pms2.club_id = pms1.club_id AND pms2.player_id <> pms1.player_id
+       WHERE pms1.player_id = ${anchor.playerId}
+       GROUP BY pms2.player_id
+       ORDER BY count(*) DESC
+       LIMIT 1
+    `;
+    expect(pairRow, `no teammate of player ${anchor.playerId} was found`).toBeDefined();
+
+    const { rows } = await solveCellRows(
+      { builder: 'teammate_of', params: { player: String(pairRow.other) } },
+      { builder: 'career_games_min', params: { games: '0' } },
+      'games_asc',
+      { limit: GRID_LIMITS.maxRowsPerCell, offset: 0 },
+    );
+    expect(rows.some((r) => r.id === anchor.playerId)).toBe(true);
+
+    // Cross-checked against the query Phase 2's Player Compare already
+    // ships: the anchor and its teammate must actually show up as
+    // teammates there too.
+    const overlap = await getPlayerOverlapSummary(anchor.playerId, pairRow.other);
+    expect(overlap.together).toBeGreaterThan(0);
+  });
+
+  it('solveCellRows returns exactly min(eligible, limit) rows for a real cell', async () => {
+    const row: GridAxisState = { builder: 'brownlow_medallist', params: {} };
+    const col: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+    const summary = await solveCellSummary(row, col, 'games_asc');
+    const { rows, total } = await solveCellRows(row, col, 'games_asc', { limit: GRID_LIMITS.maxRowsPerCell, offset: 0 });
+    expect(total).toBe(summary.eligible);
+    expect(rows.length).toBe(Math.min(summary.eligible, GRID_LIMITS.maxRowsPerCell));
+  });
+
+  it('rejects an incomplete axis rather than silently matching everything', async () => {
+    await expect(solveCellSummary(
+      { builder: 'played_for_club', params: {} },
+      { builder: 'career_games_min', params: { games: '0' } },
+      'games_asc',
+    )).rejects.toThrow();
+  });
+});

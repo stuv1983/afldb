@@ -31,11 +31,14 @@ export function PlayerPicker({
   name,
   label,
   initialSelected = null,
+  onSelect,
 }: {
-  /** The hidden field's name, e.g. "a" or "b". */
-  name: string;
+  /** The hidden field's name, e.g. "a" or "b". Omit when only `onSelect` is used (no wrapping native form). */
+  name?: string;
   label: string;
   initialSelected?: { id: number; label: string } | null;
+  /** Called with the new selection (or null on "Change"), for a parent that holds its own state instead of relying on the hidden field -- e.g. GridSolverForm, which has no native form submission at all. */
+  onSelect?: (selected: { id: number; label: string } | null) => void;
 }) {
   const listId = useId();
   const [selected, setSelected] = useState(initialSelected);
@@ -84,15 +87,18 @@ export function PlayerPicker({
   }, []);
 
   function choose(suggestion: PlayerSuggestion) {
-    setSelected({ id: suggestion.id, label: suggestion.title });
+    const next = { id: suggestion.id, label: suggestion.title };
+    setSelected(next);
     setQuery('');
     setSuggestions([]);
     setOpen(false);
+    onSelect?.(next);
   }
 
   function change() {
     setSelected(null);
     setQuery('');
+    onSelect?.(null);
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -114,7 +120,7 @@ export function PlayerPicker({
   if (selected) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <input type="hidden" name={name} value={selected.id} />
+        {name && <input type="hidden" name={name} value={selected.id} />}
         <strong>{selected.label}</strong>
         <button type="button" className="btn btn-secondary" onClick={change}>
           Change

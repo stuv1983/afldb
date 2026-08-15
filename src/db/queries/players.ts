@@ -399,6 +399,15 @@ export async function getPlayerSlug(id: number): Promise<string | null> {
   return row?.slug ?? null;
 }
 
+/** Display names for a handful of player ids, e.g. resolving the grid solver's Teammates axes for display. */
+export async function getPlayerNames(ids: number[]): Promise<Map<number, string>> {
+  if (ids.length === 0) return new Map();
+  const rows = await sql<{ id: number; displayName: string }[]>`
+    SELECT id, display_name AS "displayName" FROM players WHERE id = ANY(${ids})
+  `;
+  return new Map(rows.map((r) => [r.id, r.displayName]));
+}
+
 /**
  * Players most likely to be requested, used to seed the static params of
  * the player route so it participates in the incremental cache.

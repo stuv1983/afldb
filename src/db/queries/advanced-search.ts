@@ -93,3 +93,26 @@ export async function getClubOptions() {
      ORDER BY is_current_afl_club DESC, name
   `;
 }
+
+/**
+ * Club organizations (lineage-level, not the 24 historical identities)
+ * for the grid solver's club-scoped builders -- "played for" means the
+ * continuing club, so a Footscray-era row must match a Western Bulldogs
+ * pick the same way club pages already treat the lineage as one entity.
+ */
+export async function getClubOrganizationOptions() {
+  return sql<{ id: number; name: string; isActive: boolean }[]>`
+    SELECT id, name, is_active AS "isActive"
+      FROM club_organizations
+     ORDER BY is_active DESC, name
+  `;
+}
+
+/** Venues for a picker, e.g. the grid solver's Grounds & venues category. */
+export async function getVenueOptions() {
+  return sql<{ id: number; name: string }[]>`
+    SELECT id, canonical_name AS name
+      FROM venues
+     ORDER BY canonical_name
+  `;
+}

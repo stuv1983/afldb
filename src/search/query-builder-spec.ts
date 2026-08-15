@@ -30,6 +30,8 @@
  * form, so it carries no server-only imports.
  */
 
+import { decodeUrlState, encodeUrlState } from '@/lib/urlState';
+
 export type ColumnKind = 'integer' | 'float' | 'text' | 'date' | 'boolean';
 
 export type ColumnDef = {
@@ -258,61 +260,19 @@ export function emptyState(table: string): QueryBuilderState {
 // ------------------------------------------------------------ URL state
 
 /**
- * Isomorphic base64url, because this module has no server-only import
- * and is bundled into the Client Component form too: `Buffer` is a Node
- * global the browser bundle does not carry, so encoding goes through
- * TextEncoder/TextDecoder (both environments) and the browser-standard
- * btoa/atob instead. Node has provided both as globals since v16.
- */
-function toBase64Url(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function fromBase64Url(token: string): Uint8Array | null {
-  try {
-    const padded = token.replace(/-/g, '+').replace(/_/g, '/');
-    const binary = atob(padded);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * The builder's state as a compact, shareable URL token: JSON, then
- * base64url. Not compressed (the reference's zlib step): this state is
- * a handful of conditions, not a whole DNF-expanded query, so the extra
- * dependency and decompression-bomb surface would buy nothing here.
+ * base64url (lib/urlState.ts). Not compressed (the reference's zlib
+ * step): this state is a handful of conditions, not a whole DNF-expanded
+ * query, so the extra dependency and decompression-bomb surface would
+ * buy nothing here.
  */
 export function serializeQueryState(state: QueryBuilderState): string {
-  const json = JSON.stringify(state);
-  if (json.length > QB_LIMITS.maxStateChars) {
-    throw new Error('Query is too large to share.');
-  }
-  return toBase64Url(new TextEncoder().encode(json));
+  return encodeUrlState(state, QB_LIMITS.maxStateChars);
 }
 
 export function parseQueryState(token: string): QueryBuilderState | null {
-  if (!token || token.length > QB_LIMITS.maxStateChars) return null;
-  const bytes = fromBase64Url(token);
-  if (!bytes) return null;
-  let json: string;
-  try {
-    json = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  } catch {
-    return null;
-  }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(json);
-  } catch {
-    return null;
-  }
-  return validateState(raw);
+  const raw = decodeUrlState(token, QB_LIMITS.maxStateChars);
+  return raw === null ? null : validateState(raw);
 }
 
 /** Structural validation of a decoded payload; returns null rather than throwing on anything malformed. */
