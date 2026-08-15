@@ -104,13 +104,13 @@ function careerStatAtLeast(statKey: GridStatKey, n: number): SqlFragment {
 }
 
 /**
- * "X+ of a stat in one season" -- does at least one of the player's
- * (player, season, club) rows clear the threshold. Precomputed stats
- * check the real player_season_stats column directly; live_only stats
- * fall back to grouping player_match_stats by player and season. Both
- * branches keep the existing per-row (not summed-across-clubs) semantics:
- * a player traded mid-season is checked one club-stint at a time, same as
- * the original implementation.
+ * "X+ of a stat in one season" -- does the player's whole-season total (as
+ * player_season_stats defines it: player_id+season grain, regardless of
+ * club -- migration 015 split what used to be a club-grained table into
+ * this player-season table plus a separate player_club_season_stats)
+ * clear the threshold. Precomputed stats check the real column directly;
+ * live_only stats fall back to grouping player_match_stats by player and
+ * season only, matching that same whole-season (not per-club-stint) grain.
  */
 function seasonStatAtLeast(statKey: GridStatKey, n: number): SqlFragment {
   if (GRID_STATS[statKey].grain !== 'live_only') {
@@ -118,28 +118,31 @@ function seasonStatAtLeast(statKey: GridStatKey, n: number): SqlFragment {
   }
   return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                         JOIN matches m ON m.id = pms.match_id
-                       GROUP BY pms.player_id, m.season, pms.club_id
+                       GROUP BY pms.player_id, m.season
                       HAVING sum(${sql.unsafe(statKey)}) >= ${n})`;
 }
 
 /**
  * (player_id, season, club_id) rows where that player was at least
  * equal-top of their own club's season total for a stat -- ties both
- * "led". Precomputed stats compare the real player_season_stats column
- * directly; live_only stats aggregate player_match_stats by player,
- * season and club on both sides of the comparison. Shared by
- * club_season_stat_leader and its "X+ times" sibling.
+ * "led". Club-scoped by design ("led CLUB in a stat"), so this reads
+ * player_club_season_stats (migration 015's club-grained table), not
+ * player_season_stats (player-season grain, no club dimension at all).
+ * Precomputed stats compare the real column directly; live_only stats
+ * aggregate player_match_stats by player, season and club on both sides
+ * of the comparison. Shared by club_season_stat_leader and its "X+ times"
+ * sibling.
  */
 function ledSeasonRows(statKey: GridStatKey): SqlFragment {
   const col = sql.unsafe(statKey);
   if (GRID_STATS[statKey].grain !== 'live_only') {
-    return sql`SELECT pss.player_id, pss.season, pss.club_id
-                  FROM player_season_stats pss
-                 WHERE pss.${col} IS NOT NULL
+    return sql`SELECT pcs.player_id, pcs.season, pcs.club_id
+                  FROM player_club_season_stats pcs
+                 WHERE pcs.${col} IS NOT NULL
                    AND NOT EXISTS (
-                     SELECT 1 FROM player_season_stats pss2
-                      WHERE pss2.season = pss.season AND pss2.club_id = pss.club_id
-                        AND pss2.${col} > pss.${col})`;
+                     SELECT 1 FROM player_club_season_stats pcs2
+                      WHERE pcs2.season = pcs.season AND pcs2.club_id = pcs.club_id
+                        AND pcs2.${col} > pcs.${col})`;
   }
   return sql`SELECT t.player_id, t.season, t.club_id FROM (
                 SELECT pms.player_id, m.season, pms.club_id, sum(pms.${col}) AS total
@@ -224,13 +227,16 @@ function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`${careerStatValueExpr(statA)} > ${careerStatValueExpr(statB)}`;
     }
     case 'career_teammates_min': {
+      // "Teammate" means same club, same season -- player_club_season_stats
+      // (migration 015's club-grained table), not player_season_stats
+      // (player-season grain, no club dimension at all).
       const n = requireInt(axis, 'x', 'At least');
-      return sql`p.id IN (SELECT pss1.player_id FROM player_season_stats pss1
-                            JOIN player_season_stats pss2
-                              ON pss2.season = pss1.season AND pss2.club_id = pss1.club_id
-                             AND pss2.player_id <> pss1.player_id
-                           GROUP BY pss1.player_id
-                          HAVING count(DISTINCT pss2.player_id) >= ${n})`;
+      return sql`p.id IN (SELECT pcs1.player_id FROM player_club_season_stats pcs1
+                            JOIN player_club_season_stats pcs2
+                              ON pcs2.season = pcs1.season AND pcs2.club_id = pcs1.club_id
+                             AND pcs2.player_id <> pcs1.player_id
+                           GROUP BY pcs1.player_id
+                          HAVING count(DISTINCT pcs2.player_id) >= ${n})`;
     }
 
     // -- Single-game feats -- the per-game sibling of the career/season
@@ -300,23 +306,23 @@ function compileAxis(axis: GridAxisState): SqlFragment {
                            GROUP BY player_id HAVING count(*) >= ${n})`;
     }
     case 'wooden_spoon_season':
-      return sql`EXISTS (SELECT 1 FROM player_season_stats pss
-                           JOIN club_seasons cs ON cs.season = pss.season AND cs.club_id = pss.club_id
-                          WHERE pss.player_id = p.id AND cs.wooden_spoon)`;
+      return sql`EXISTS (SELECT 1 FROM player_club_season_stats pcs
+                           JOIN club_seasons cs ON cs.season = pcs.season AND cs.club_id = pcs.club_id
+                          WHERE pcs.player_id = p.id AND cs.wooden_spoon)`;
     case 'minor_premiership_season':
-      return sql`EXISTS (SELECT 1 FROM player_season_stats pss
-                           JOIN club_seasons cs ON cs.season = pss.season AND cs.club_id = pss.club_id
-                          WHERE pss.player_id = p.id AND cs.ladder_rank = 1)`;
+      return sql`EXISTS (SELECT 1 FROM player_club_season_stats pcs
+                           JOIN club_seasons cs ON cs.season = pcs.season AND cs.club_id = pcs.club_id
+                          WHERE pcs.player_id = p.id AND cs.ladder_rank = 1)`;
     case 'never_minor_premier':
-      return sql`NOT EXISTS (SELECT 1 FROM player_season_stats pss
-                               JOIN club_seasons cs ON cs.season = pss.season AND cs.club_id = pss.club_id
-                              WHERE pss.player_id = p.id AND cs.ladder_rank = 1)`;
+      return sql`NOT EXISTS (SELECT 1 FROM player_club_season_stats pcs
+                               JOIN club_seasons cs ON cs.season = pcs.season AND cs.club_id = pcs.club_id
+                              WHERE pcs.player_id = p.id AND cs.ladder_rank = 1)`;
     case 'minor_premierships_min': {
       const n = requireInt(axis, 'times', 'Times');
-      return sql`p.id IN (SELECT pss.player_id FROM player_season_stats pss
-                            JOIN club_seasons cs ON cs.season = pss.season AND cs.club_id = pss.club_id
+      return sql`p.id IN (SELECT pcs.player_id FROM player_club_season_stats pcs
+                            JOIN club_seasons cs ON cs.season = pcs.season AND cs.club_id = pcs.club_id
                            WHERE cs.ladder_rank = 1
-                           GROUP BY pss.player_id HAVING count(*) >= ${n})`;
+                           GROUP BY pcs.player_id HAVING count(*) >= ${n})`;
     }
 
     // -- Finals & premierships ------------------------------------------

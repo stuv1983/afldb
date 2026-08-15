@@ -158,11 +158,11 @@ describe('grid solver correctness', () => {
     for (const r of rows) {
       const [led] = await sql<{ found: boolean }[]>`
         SELECT EXISTS (
-          SELECT 1 FROM player_season_stats pss
-           WHERE pss.player_id = ${r.id}
+          SELECT 1 FROM player_club_season_stats pcs
+           WHERE pcs.player_id = ${r.id}
              AND NOT EXISTS (
-               SELECT 1 FROM player_season_stats pss2
-                WHERE pss2.season = pss.season AND pss2.club_id = pss.club_id AND pss2.goals > pss.goals
+               SELECT 1 FROM player_club_season_stats pcs2
+                WHERE pcs2.season = pcs.season AND pcs2.club_id = pcs.club_id AND pcs2.goals > pcs.goals
              )
         ) AS found
       `;
