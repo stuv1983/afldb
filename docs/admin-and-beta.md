@@ -17,6 +17,17 @@ statistics; a vetted submission is promoted by the same import role, with
 the same import-batch bookkeeping, as the bulk migration. There is one
 way into the statistical tables.
 
+**`afldb_app` must not be able to *read* the operational tables either**,
+and that takes more than simply never granting it: `public` carries a
+schema-wide default privilege (set during role setup) that hands
+`afldb_app` `SELECT` on every table `afldb_owner` creates, statistical or
+not. Migration 023 assumed omission was enough and was wrong — migration
+031 explicitly revokes it from the auth/beta/submission/invite tables.
+**Every future operational (non-statistical) table's migration must
+include its own `REVOKE ALL ... FROM afldb_app`**, verified by
+`tests/integration/privileges.test.ts`'s `OPERATIONAL_TABLES` list —
+add the table there too, or the test cannot catch a repeat.
+
 ### One-time setup on the server
 
 ```bash

@@ -36,9 +36,15 @@ const APP_ROLE = 'afldb_app';
 const DATA_SCHEMAS = ['public', 'aflw'];
 
 /**
- * Operational tables from migrations 023/024. The public role should not
- * even be able to read these: sessions, hashed access codes and the
- * audit log never render on a public page.
+ * Operational tables from migrations 023/024/030. The public role should
+ * not even be able to read these: sessions, hashed access/invite codes
+ * and the audit log never render on a public page.
+ *
+ * A table landing in this list is not enough on its own to protect it:
+ * `public` carries a schema-wide default privilege (see migration 031)
+ * that grants afldb_app SELECT on every table afldb_owner creates,
+ * statistical or not. Adding a table here without also revoking it in a
+ * migration documents the gap; it does not close it.
  */
 const OPERATIONAL_TABLES = [
   'auth_users',
@@ -50,6 +56,7 @@ const OPERATIONAL_TABLES = [
   'beta_join_requests',
   'data_submissions',
   'data_submission_rows',
+  'admin_invites',
 ];
 
 beforeAll(async () => {
