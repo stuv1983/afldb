@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 
 import { authSql } from '@/db/authClient';
 import { RateLimiter } from '@/lib/auth/rate-limit';
-import { audit, requestIp } from '@/lib/auth/session';
+import { audit, lastForwardedIp } from '@/lib/auth/session';
 import { MAX_UPLOAD_BYTES, stageSubmission, validateSubmission } from '@/lib/ingest/pipeline';
 
 export const dynamic = 'force-dynamic';
@@ -57,7 +57,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Email intake is not configured on this server.' }, { status: 503 });
   }
 
-  if (INTAKE_LIMIT.check(`ip:${(await requestIp()) ?? 'unknown'}`)) {
+  const ip = lastForwardedIp(request.headers.get('x-forwarded-for'));
+  if (INTAKE_LIMIT.check(`ip:${ip ?? 'unknown'}`)) {
     return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
   }
 

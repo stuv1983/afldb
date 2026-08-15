@@ -72,16 +72,37 @@ function secureCookies(): boolean {
  * Returning null when there is no trustworthy value is the safe direction:
  * callers key their limiters on 'unknown', which shares one bucket rather
  * than minting a fresh one per forged header.
+ *
+ * next/headers()'s headers() throws outside a real Next.js request scope
+ * (a bare script, a test invoking a Route Handler directly). audit() calls
+ * this on every write path in the app purely to enrich a log column, so a
+ * context it cannot read is exactly the "no trustworthy value" case above,
+ * not a reason to fail whatever action was being audited — caught and
+ * treated the same as an absent header.
  */
 export async function requestIp(): Promise<string | null> {
-  const h = await headers();
-  const forwarded = h.get('x-forwarded-for');
-  if (forwarded) {
-    const hops = forwarded.split(',');
-    const last = hops[hops.length - 1]?.trim();
-    if (last) return last;
+  try {
+    const h = await headers();
+    return lastForwardedIp(h.get('x-forwarded-for'));
+  } catch {
+    return null;
   }
-  return null;
+}
+
+/**
+ * The same X-Forwarded-For logic as requestIp, exported separately for
+ * Route Handlers, which uniquely receive the platform Request directly
+ * and so can read its headers synchronously — unlike Server Components/
+ * Actions, which have no Request object and must go through the async
+ * next/headers() API (and, not incidentally, than which only works
+ * inside a real Next.js request context: calling it from a hand-built
+ * Request in a test throws "called outside a request scope").
+ */
+export function lastForwardedIp(forwardedFor: string | null): string | null {
+  if (!forwardedFor) return null;
+  const hops = forwardedFor.split(',');
+  const last = hops[hops.length - 1]?.trim();
+  return last || null;
 }
 
 // ---------------------------------------------------------------------------
