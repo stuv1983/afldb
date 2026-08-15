@@ -20,19 +20,31 @@ afterAll(async () => {
 
 describe('player-compare queries', () => {
   it('overlap summary agrees with the head-to-head match counts, split by relationship', async () => {
-    // A real pair with a comfortable, deterministic margin under the
-    // 500-match defensive cap on getHeadToHeadMatches.
-    const [pair] = await sql<{ a: number; b: number }[]>`
-      SELECT pms1.player_id AS a, pms2.player_id AS b
+    // Anchored on one long-career player first, rather than grouping the
+    // unbounded self-join over all 694k rows: that first version of this
+    // query hit the statement timeout, because grouping by (pms1, pms2)
+    // with no WHERE forces PostgreSQL to materialise every co-occurring
+    // pair in the whole fact table before the HAVING filter narrows
+    // anything. Anchoring pms1 to a single player_id turns it into an
+    // index seek (ix_pms_player) over ~300-400 rows instead.
+    const [anchor] = await sql<{ playerId: number }[]>`
+      SELECT player_id AS "playerId" FROM player_career_stats ORDER BY games DESC LIMIT 1
+    `;
+    expect(anchor).toBeDefined();
+
+    const [pairRow] = await sql<{ other: number }[]>`
+      SELECT pms2.player_id AS other
         FROM player_match_stats pms1
         JOIN player_match_stats pms2
-          ON pms2.match_id = pms1.match_id AND pms2.player_id > pms1.player_id
-       GROUP BY pms1.player_id, pms2.player_id
+          ON pms2.match_id = pms1.match_id AND pms2.player_id <> pms1.player_id
+       WHERE pms1.player_id = ${anchor.playerId}
+       GROUP BY pms2.player_id
       HAVING count(*) BETWEEN 50 AND 400
        ORDER BY count(*) DESC
        LIMIT 1
     `;
-    expect(pair, 'no pair of players with 50-400 shared matches was found in this database').toBeDefined();
+    expect(pairRow, `no teammate/opponent of player ${anchor.playerId} with 50-400 shared matches was found`).toBeDefined();
+    const pair = { a: anchor.playerId, b: pairRow.other };
 
     const [overlap, all, teammates, opponents] = await Promise.all([
       getPlayerOverlapSummary(pair.a, pair.b),
