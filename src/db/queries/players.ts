@@ -13,6 +13,7 @@ export type PlayerListRow = {
   games: number;
   goals: number;
   finals: number;
+  premierships: number;
   brownlowVotes: number;
   clubsPlayed: number;
   clubNames: string | null;
@@ -26,6 +27,9 @@ export const PLAYER_SORTS = {
   final_game: 'c.final_season DESC NULLS LAST, p.sort_name',
   brownlow_votes: 'c.brownlow_votes DESC, p.sort_name',
   finals: 'c.finals DESC, p.sort_name',
+  // Ties on a small integer are the norm here, so games breaks them: four
+  // premierships in 120 games is the more remarkable career.
+  premierships: 'c.premierships DESC, c.games DESC, p.sort_name',
 } as const;
 
 export type PlayerSort = keyof typeof PLAYER_SORTS;
@@ -101,7 +105,7 @@ export async function listPlayers(options: PlayerListFilters & {
            p.display_name       AS "displayName",
            c.debut_season       AS "debutSeason",
            c.final_season       AS "finalSeason",
-           c.games, c.goals, c.finals,
+           c.games, c.goals, c.finals, c.premierships,
            c.brownlow_votes     AS "brownlowVotes",
            c.clubs_played       AS "clubsPlayed",
            (SELECT string_agg(DISTINCT cl.short_name, ', ' ORDER BY cl.short_name)

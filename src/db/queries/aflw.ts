@@ -4,6 +4,7 @@ import { cache } from 'react';
 
 import { sql } from '@/db/client';
 import { allOf, containsPattern, prefixPattern, rangeConditions } from '@/db/queries/filters';
+import { aflwLeaderCategory, type AflwLeaderCategory } from '@/lib/site-settings';
 import {
   AFLW_MATCH_OUTCOME_FILTERS,
   AFLW_MATCH_SORTS,
@@ -592,6 +593,92 @@ export async function getAflwRecentMatches(limit = 8): Promise<AflwMatchRow[]> {
     SELECT ${MATCH_COLUMNS}
       FROM aflw.matches m
      ORDER BY m.match_date DESC, m.match_key DESC
+     LIMIT ${limit}
+  `;
+}
+
+export type AflwVaultMeeting = AflwMatchRow & {
+  meetings: number;
+  latestKey: string;
+  latestDate: Date;
+};
+
+/**
+ * The AFLW half of "From the vault" — see `getVaultMeetings` in matches.ts
+ * for what this is and why.
+ *
+ * Nine seasons rather than 129, so a pairing here has met a handful of times
+ * at most and the two clubs in a first-ever meeting are common. The LATERAL
+ * drops those pairings for the same reason it does on the AFL side.
+ */
+export async function getAflwVaultMeetings(limit = 6): Promise<AflwVaultMeeting[]> {
+  return sql<AflwVaultMeeting[]>`
+    WITH latest AS (
+      SELECT match_key, home_team_code, away_team_code, match_date
+        FROM aflw.matches
+       ORDER BY match_date DESC, match_key DESC
+       LIMIT ${limit}
+    ),
+    pairs AS (
+      SELECT DISTINCT ON (least(home_team_code, away_team_code),
+                          greatest(home_team_code, away_team_code))
+             least(home_team_code, away_team_code)    AS team_a,
+             greatest(home_team_code, away_team_code) AS team_b,
+             match_key AS latest_key, match_date AS latest_date
+        FROM latest
+       ORDER BY least(home_team_code, away_team_code),
+                greatest(home_team_code, away_team_code),
+                match_date DESC, match_key DESC
+    )
+    SELECT ${MATCH_COLUMNS},
+           p.latest_key  AS "latestKey",
+           p.latest_date AS "latestDate",
+           (SELECT count(*) FROM aflw.matches c
+             WHERE (c.home_team_code = p.team_a AND c.away_team_code = p.team_b)
+                OR (c.home_team_code = p.team_b AND c.away_team_code = p.team_a))::int AS meetings
+      FROM pairs p
+      CROSS JOIN LATERAL (
+        SELECT e.*
+          FROM aflw.matches e
+         WHERE ((e.home_team_code = p.team_a AND e.away_team_code = p.team_b)
+             OR (e.home_team_code = p.team_b AND e.away_team_code = p.team_a))
+           AND e.match_key <> p.latest_key
+         ORDER BY random()
+         LIMIT 1
+      ) m
+     ORDER BY p.latest_date DESC, p.latest_key DESC
+  `;
+}
+
+export type AflwLeaderRow = {
+  slug: string;
+  displayName: string;
+  clubNames: string | null;
+  value: number;
+};
+
+/**
+ * Career leaders in one statistic, for the AFLW front page's meter panel.
+ *
+ * The statistic is named by key, not by column: the caller passes one of the
+ * values in AFLW_LEADER_CATEGORIES and the column is looked up here, so no
+ * request value ever reaches the ORDER BY — the same allowlist-then-bind
+ * discipline every other sort on the site follows.
+ */
+export async function getAflwLeaders(
+  category: AflwLeaderCategory,
+  limit = 5,
+): Promise<AflwLeaderRow[]> {
+  // One whole expression per fragment rather than a bare column name spliced
+  // next to `c.`, so the statement reads the same way the other allowlisted
+  // sorts on the site do.
+  const expression = `c.${aflwLeaderCategory(category).column}`;
+  return sql<AflwLeaderRow[]>`
+    SELECT p.slug, p.display_name AS "displayName", c.club_names AS "clubNames",
+           ${sql.unsafe(expression)}::int AS value
+      FROM aflw.players p
+      JOIN aflw.player_careers c ON c.player_slug = p.slug
+     ORDER BY ${sql.unsafe(`${expression} DESC`)}, p.sort_name
      LIMIT ${limit}
   `;
 }

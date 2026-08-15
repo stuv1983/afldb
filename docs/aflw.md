@@ -18,6 +18,16 @@ read before touching the data itself.
 | `src/search/aflw-filters.ts` | The filter panel each AFLW table offers |
 | `src/app/aflw/**` | Pages |
 
+`/aflw` is laid out as the AFL front page, block for block: the same hero
+and search, the same statistics strip, the same two ruled panels, the
+same card grid — and the same `home.sections` setting (see
+`docs/admin-and-beta.md` §2), because "the two home pages match" is only
+true if one setting drives both. What differs is what the right-hand
+panel can say: AFLW has no `/records` section to lead with, so it ranks
+career totals off `aflw.player_careers` (`home.aflw_leaders`) instead,
+and none of those categories needs a coverage caveat because every AFLW
+statistic is recorded for every AFLW season.
+
 ## Why the read model is views, not tables
 
 `seasons.year` is the season primary key on the AFL side, and AFLW played

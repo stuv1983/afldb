@@ -86,7 +86,7 @@ export default async function MatchSearchPage({
         <p className="subtitle">
           Find games by scoreline, season, club and match type. Every result set
           is a shareable URL. Looking for career statistics?{' '}
-          <Link href="/advanced-search">Search players</Link>.
+          <Link href="/players">Search players</Link>.
         </p>
       </div>
 

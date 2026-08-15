@@ -4,8 +4,10 @@ import Link from 'next/link';
 import { adminLogout } from '@/app/admin/logout-action';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { authSql } from '@/db/authClient';
+import { getSiteSettingsForAdmin } from '@/db/queries/site-settings';
 import { requireAdmin } from '@/lib/auth/session';
 import { formatNumber } from '@/lib/format';
+import { GRID_AUDIENCES } from '@/lib/site-settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +19,8 @@ export const metadata: Metadata = {
 export default async function AdminDashboard() {
   const admin = await requireAdmin();
 
-  const [submissions, recentAudit] = await Promise.all([
+  const [{ gridAudience }, submissions, recentAudit] = await Promise.all([
+    getSiteSettingsForAdmin(),
     authSql<{
       id: number; dataset: string; filename: string; status: string;
       rowCount: number | null; uploadedAt: Date; email: string;
@@ -60,6 +63,10 @@ export default async function AdminDashboard() {
       {admin.role === 'super_admin' && (
         <>
           <p className="section-note">
+            <Link href="/admin/settings">Site settings →</Link>{' '}
+            — what the home pages show, and who may reach the grid solver.
+          </p>
+          <p className="section-note">
             <Link href="/admin/query-builder">Data QA search →</Link>{' '}
             — build ad-hoc queries against the underlying tables to check data.
           </p>
@@ -71,8 +78,9 @@ export default async function AdminDashboard() {
       )}
 
       <p className="section-note">
-        <Link href="/admin/grid-solver">Grid solver →</Link>{' '}
+        <Link href="/grid-solver">Grid solver →</Link>{' '}
         — a 3×3 board of named questions, for spot-checking data by intersection.
+        Currently open to {GRID_AUDIENCES.find((a) => a.value === gridAudience)?.label.toLowerCase()}.
       </p>
 
       <section className="section">

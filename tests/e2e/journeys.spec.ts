@@ -48,22 +48,31 @@ test('season → match', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Quarter by quarter' })).toBeVisible();
 });
 
-test('advanced search → results → player', async ({ page }) => {
-  await page.goto('/advanced-search');
-  await page.getByLabel('Career games minimum').fill('300');
-  await page.getByRole('button', { name: 'Search' }).click();
+test('player search → results → player', async ({ page }) => {
+  // Advanced Player Search merged into the index; the filter panel there is
+  // the search, so it has to be opened before it can be filled.
+  await page.goto('/players');
+  await page.locator('summary', { hasText: 'Advanced search' }).click();
+  await page.getByLabel('Games minimum').fill('300');
+  await page.getByRole('button', { name: 'Apply filters' }).click();
 
   await expect(page).toHaveURL(/games_min=300/);
-  await expect(page.getByText(/players match/)).toBeVisible();
 
   await page.getByRole('row').nth(1).getByRole('link').first().click();
   await expect(page).toHaveURL(/\/players\/[a-z0-9-]+-\d+/);
 });
 
-test('advanced search state is shareable via URL', async ({ page }) => {
+test('player search state is shareable via URL', async ({ page }) => {
+  await page.goto('/players?games_min=200&games_max=249&finals_min=16');
+  // The known regression case must hold through the UI, and must survive the
+  // merge: this is the same 117 the standalone search page returned.
+  await expect(page.locator('.subtitle')).toContainText('117 players');
+});
+
+test('the old advanced-search URL still resolves, filters intact', async ({ page }) => {
   await page.goto('/advanced-search?games_min=200&games_max=249&finals_min=16');
-  // The known regression case must hold through the UI.
-  await expect(page.locator('.section-note')).toContainText('117 players match');
+  await expect(page).toHaveURL('/players?games_min=200&games_max=249&finals_min=16');
+  await expect(page.locator('.subtitle')).toContainText('117 players');
 });
 
 test('records → category', async ({ page }) => {

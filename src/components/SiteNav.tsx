@@ -26,7 +26,8 @@ export const PRIMARY_NAV = [
   { href: '/brownlow', label: 'Brownlow' },
   { href: '/awards', label: 'Awards' },
   { href: '/draft', label: 'Draft' },
-  { href: '/advanced-search', label: 'Player Search' },
+  // No separate "Player Search": Players IS the search — the index carries
+  // the whole career filter set that Advanced Player Search used to.
   { href: '/match-search', label: 'Match Search' },
   { href: '/aflw', label: 'AFLW' },
 ];

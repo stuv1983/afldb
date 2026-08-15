@@ -28,6 +28,14 @@ include its own `REVOKE ALL ... FROM afldb_app`**, verified by
 `tests/integration/privileges.test.ts`'s `OPERATIONAL_TABLES` list —
 add the table there too, or the test cannot catch a repeat.
 
+`site_settings` (migration 034) is the one deliberate exception: the
+public role is *meant* to read it, because the home page renders the
+layout and record-of-the-week choices stored there. It holds no secret
+and never should; the write grant is still `afldb_auth`'s alone, and the
+"holds no write privilege on any table" assertion covers it like every
+other table. It is listed in the test's positive read check rather than
+in `OPERATIONAL_TABLES`.
+
 ### One-time setup on the server
 
 ```bash
@@ -142,6 +150,31 @@ same 30-second window means waiting for the authenticator to roll.
 Admin sessions are database rows (sha256 of the cookie token),
 individually revocable, 12-hour TTL. Everything an administrator does
 lands in `auth_audit_log`, which the app role can only INSERT into.
+
+### Site settings (`/admin/settings`, super admin only)
+
+The handful of choices that used to be hard-coded, stored one jsonb row
+per key in `site_settings` (migration 034) and audited as
+`settings.saved`:
+
+| Key | Controls |
+|---|---|
+| `home.sections` | Which of the four home-page blocks are shown, and in what order. Applies to `/` and `/aflw` alike — the two pages carry the same layout, so one setting drives both. |
+| `home.record_of_the_week` | Which career record the AFL front page leads with. Limited to the five categories the career leaderboard can answer. |
+| `home.aflw_leaders` | The AFLW counterpart, ranked off `aflw.player_careers`. |
+| `grid_solver.audience` | Who may reach `/grid-solver`: super admins (default), admins, any signed-in staff account, or everyone. |
+
+Not open to a plain admin, delegated or not: what the front page shows
+and who may reach the grid solver are publication decisions, the same
+line `requireSuperAdmin()` already draws for the query builder.
+
+Every value is re-parsed on the way in through the same functions the
+read path uses (`src/lib/site-settings.ts`), so a hand-posted form field
+lands on the default rather than in the database. On the way out, a row
+that names a section this build no longer has is dropped and a new one is
+appended, which is what lets a settings row survive a deploy in either
+direction. Saving revalidates both home pages, which are otherwise
+ISR-cached for an hour.
 
 ## 3. Beta gate
 

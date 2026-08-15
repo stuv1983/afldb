@@ -28,6 +28,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin/access">Beta access</Link>
             <span aria-hidden="true">·</span>
             <Link href="/admin/admins">Administrators</Link>
+            {admin?.role === 'super_admin' && (
+              <>
+                <span aria-hidden="true">·</span>
+                <Link href="/admin/settings">Settings</Link>
+              </>
+            )}
           </>
         )}
         <span aria-hidden="true">·</span>

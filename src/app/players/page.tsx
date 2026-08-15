@@ -26,8 +26,9 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'Players',
   description:
-    'Every player to appear in a VFL/AFL match since 1897, with career games, '
-    + 'goals, finals and Brownlow votes.',
+    'Every player to appear in a VFL/AFL match since 1897. Search by name or '
+    + 'filter by career games, goals, finals, premierships, Brownlow votes, '
+    + 'clubs and debut season. Every search is a shareable link.',
   alternates: { canonical: '/players' },
 };
 
@@ -36,8 +37,40 @@ const SORT_OPTIONS: { value: PlayerSort; label: string }[] = [
   { value: 'goals', label: 'Goals' },
   { value: 'brownlow_votes', label: 'Brownlow' },
   { value: 'finals', label: 'Finals' },
+  { value: 'premierships', label: 'Premierships' },
   { value: 'debut', label: 'Debut' },
   { value: 'name', label: 'Name' },
+];
+
+/**
+ * Searches worth starting from, shown only on an unfiltered index.
+ *
+ * These came across from Advanced Player Search when the two pages merged:
+ * the filter panel answers the same questions the standalone form did, but a
+ * panel of empty min/max pairs does not suggest what to ask it. Every link is
+ * a plain URL against this page's own parameters.
+ */
+const EXAMPLE_SEARCHES: { href: string; label: string }[] = [
+  {
+    href: '/players?games_min=200&goals_min=100&finals_min=15',
+    label: '200+ games, 100+ goals and 15+ finals',
+  },
+  {
+    href: '/players?debut_min=1960&debut_max=1969&clubs_min=2&clubs_max=2',
+    label: 'Debuted in the 1960s and played for exactly two clubs',
+  },
+  {
+    href: '/players?games_min=200&games_max=249&finals_min=16',
+    label: '200–249 games with 16 or more finals',
+  },
+  {
+    href: '/players?goals_min=50&goals_max=199&brownlow_votes_max=0',
+    label: '50–199 career goals and no Brownlow votes',
+  },
+  {
+    href: '/players?premierships_min=4&sort=premierships',
+    label: 'Four or more premierships',
+  },
 ];
 
 export default async function PlayersPage({
@@ -105,8 +138,9 @@ export default async function PlayersPage({
           {described.length > 0 ? ` · ${described.join(' · ')}` : ''}
         </p>
         <p className="section-note">
-          <Link href="/players/compare">Compare two players →</Link>{' '}
-          — career stats side by side, from any club or era, plus every match they shared.
+          Search by name or combine career criteria in the filters below — every
+          search is a shareable URL.{' '}
+          <Link href="/players/compare">Compare two players →</Link>
         </p>
       </div>
 
@@ -157,6 +191,7 @@ export default async function PlayersPage({
                     <th scope="col" className="num">Games</th>
                     <th scope="col" className="num">Goals</th>
                     <th scope="col" className="num">Finals</th>
+                    <th scope="col" className="num">Prem</th>
                     <th scope="col" className="num">Brownlow</th>
                   </tr>
                 </thead>
@@ -173,6 +208,7 @@ export default async function PlayersPage({
                       <td className="num">{formatNumber(p.games)}</td>
                       <td className="num">{formatNumber(p.goals)}</td>
                       <td className="num">{formatNumber(p.finals)}</td>
+                      <td className="num">{formatNumber(p.premierships)}</td>
                       <td className="num">{formatNumber(p.brownlowVotes)}</td>
                     </tr>
                   ))}
@@ -190,6 +226,19 @@ export default async function PlayersPage({
           </>
         )}
       </CollapsibleTable>
+
+      {values.active === 0 && (
+        <section className="section">
+          <h2>Example searches</h2>
+          <ul>
+            {EXAMPLE_SEARCHES.map((example) => (
+              <li key={example.href}>
+                <Link href={example.href}>{example.label}</Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </>
   );
 }

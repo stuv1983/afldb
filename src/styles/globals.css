@@ -425,9 +425,8 @@ details.table-details[open] > summary::before { transform: rotate(90deg); }
 .table-details-note { font-size: 0.78rem; font-weight: 400; color: var(--text-muted); }
 
 /* Reorderable table sections -------------------------------------------
-   A drag handle plus an up/down button pair sit to the left of a section;
-   the buttons are the accessible path (keyboard, touch, screen reader),
-   the handle is the pointer-drag shortcut. See ReorderableSections. */
+   One grab handle to the left of each section — drag it, or focus it and
+   press the arrow keys. See ReorderableSections. */
 .reorderable-section {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -440,53 +439,25 @@ details.table-details[open] > summary::before { transform: rotate(90deg); }
   border-radius: var(--radius-lg);
 }
 .reorderable-section .reorder-handle {
-  display: none;
-}
-.reorder-controls {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.15rem;
+  /* Roughly level with the section heading it belongs to. */
   margin-top: 1.6rem;
-}
-.reorder-btn {
-  width: 1.6rem;
-  height: 1.6rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-subtle);
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 0.7rem;
+  color: var(--text-faint);
+  letter-spacing: -0.2em;
+  font-size: 0.85rem;
   line-height: 1;
+  cursor: grab;
+  user-select: none;
 }
-.reorder-btn:hover:not(:disabled) {
+.reorderable-section .reorder-handle:hover { color: var(--text-muted); }
+.reorderable-section .reorder-handle:active { cursor: grabbing; }
+.reorderable-section .reorder-handle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius);
   color: var(--text);
-  border-color: var(--border-strong);
-}
-.reorder-btn:disabled {
-  opacity: 0.35;
-  cursor: default;
 }
 .reorderable-section-content {
   min-width: 0;
-}
-@media (min-width: 640px) {
-  .reorderable-section .reorder-handle {
-    display: block;
-    order: -1;
-    color: var(--text-faint);
-    letter-spacing: -0.2em;
-    font-size: 0.85rem;
-    cursor: grab;
-    margin-bottom: 0.15rem;
-  }
-  .reorderable-section .reorder-handle:active {
-    cursor: grabbing;
-  }
 }
 
 /* Per-table filter panel ---------------------------------------------- */
@@ -885,6 +856,14 @@ label {
   color: var(--text);
 }
 .ledger-row .fixture:hover { color: var(--accent); text-decoration: none; }
+/* Second line under a fixture: how often the two have met, and when last. */
+.ledger-row .ledger-note {
+  display: block;
+  margin-top: 0.15rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--text-faint);
+}
 .ledger-row .figures {
   display: flex;
   flex-direction: column;

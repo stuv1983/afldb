@@ -1,6 +1,8 @@
 # AFLDB — Search
 
-Two distinct systems: **global search** (find an entity by name) and **Advanced Search** (find players by statistical criteria).
+Two distinct systems: **global search** (find an entity by name) and **player search** (find players by statistical criteria).
+
+Player search lives on `/players`, the player index itself. It used to be a second page, `/advanced-search`, until the two had converged: `playerFilterFields` declared the same field set against the same career columns, and the index added a name search, a sort row and paging on top. The index absorbed the standalone form's remaining differences (a premierships column, a premierships sort, the example searches) and `/advanced-search` is now a 308 that carries every parameter across unchanged — the two pages always read `<field>_min` / `<field>_max`, `club`, `sort` and `page`, so a published link still resolves to the same result set. The one narrowing: `club` accepted up to five comma-separated slugs and the index offers a single-club select, so a multi-club link keeps its first slug.
 
 ## 1. Normalisation
 
@@ -73,9 +75,9 @@ The control is a `role="combobox"` with `aria-activedescendant`, arrow-key navig
 
 On error it returns `{"results": [], "error": "search_unavailable"}` with HTTP 503; the cause is logged server-side only.
 
-## 5. Advanced Search
+## 5. Player search (`/players`)
 
-The differentiator: statistical questions without SQL.
+The differentiator: statistical questions without SQL. Served by the filter panel on the player index; `src/search/advanced-spec.ts` remains the field registry both it and `src/search/list-filters.ts` read.
 
 ### Security model
 
@@ -115,7 +117,7 @@ Values outside a field's range are **clamped**, not rejected, so a hand-edited U
 All query state lives in the URL, so any search is a shareable, indexable link:
 
 ```text
-/advanced-search?games_min=200&goals_min=100&finals_min=15
+/players?games_min=200&goals_min=100&finals_min=15
 ```
 
 `buildQueryString` round-trips a parsed specification, verified by test.
@@ -162,9 +164,9 @@ does not need it), so a query built once is a shareable, reproducible
 link like every other search on the site. Limits: 6 cards, 8 conditions
 per card, 50 rows per page.
 
-## 7. Grid solver (internal, super-admin only)
+## 7. Grid solver (`/grid-solver`, audience configurable)
 
-`/admin/grid-solver` is a sibling to Data QA search above, not a
+`/grid-solver` is a sibling to Data QA search above, not a
 replacement of it: a 3×3 board of named questions instead of raw
 column/operator/value conditions — the "grid squares" shape modelled on
 `sports_data_lab`'s Grid Solver (`app_pages/11_Grid_Solver.py`,
@@ -188,6 +190,19 @@ builder key" — the exception is the `stat`/`statA`/`statB` family of
 params (every stat-based builder, not just the original two), checked
 against `GRID_STATS` before it can reach `sql.unsafe`. Runs through the
 same `afldb_app` client as everything above.
+
+**Who may reach it is a setting, not a route.** `grid_solver.audience` in
+`site_settings` (migration 034) names the least privileged session
+admitted — `super_admin` (the default), `admin`, `contributor` or
+`public` — and a super admin changes it at `/admin/settings`. That is why
+the page sits on a public path rather than under `/admin`, which
+middleware gates unconditionally: `src/lib/auth/audience.ts` is the gate
+instead, and at the default setting it is exactly as strict as
+`requireAdmin()`, re-checking the database session rather than trusting
+the cookie. A signed-out visitor gets the login form; a signed-in account
+that ranks too low gets a 404. An unparseable setting value falls back to
+super-admin-only, so a bad row can never open the page up. The page is
+`noindex` at every setting.
 
 **`GRID_STATS` covers all 21 real per-game statistics** (every
 `player_match_stats` column plus goals), each tagged with how far it's

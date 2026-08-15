@@ -58,11 +58,11 @@ export function GridSolverForm({
   }
 
   function solve() {
-    router.push(`/admin/grid-solver?g=${serializeBoardState(state)}`);
+    router.push(`/grid-solver?g=${serializeBoardState(state)}`);
   }
 
   function reset() {
-    router.push('/admin/grid-solver');
+    router.push('/grid-solver');
   }
 
   return (

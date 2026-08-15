@@ -11,9 +11,15 @@ import { useEffect, useRef, useState } from 'react';
  * keeps hydration matching the server render; a reader with a saved order
  * sees one reflow right after load rather than a hydration mismatch.
  *
- * Both a native HTML5 drag (mouse/trackpad) and Move up/down buttons
- * (keyboard, touch, screen reader) drive the same `move`/`reorder` state,
- * so nobody needs the drag gesture to actually use this.
+ * One control does this, the grab handle: drag it with a mouse, or focus it
+ * and press the arrow keys. Both drive the same `move`/`reorder` state, so
+ * the drag gesture is a shortcut rather than the only way in — which is what
+ * keeps the handle usable from the keyboard and legible to a screen reader,
+ * now that the Move up/down buttons that used to sit beside it are gone.
+ *
+ * The one input this leaves out is touch: HTML5 drag-and-drop does not fire
+ * for a finger, and there is no longer a button to tap instead. A phone
+ * therefore reads the default order, which is the order the server sent.
  */
 export function ReorderableSections({
   storageKey,
@@ -151,42 +157,37 @@ export function ReorderableSections({
             }}
             onDrop={(e) => { e.preventDefault(); dropOn(id); }}
           >
-            <div className="reorder-controls">
-              <div
-                className="reorder-handle"
-                aria-hidden="true"
-                title="Drag to reorder"
-                draggable
-                onDragStart={(e) => {
-                  dragId.current = id;
-                  // Firefox starts no drag at all unless dragstart puts
-                  // something on the DataTransfer; the ref alone left the
-                  // handle inert there, buttons the only way to reorder.
-                  e.dataTransfer.setData('text/plain', id);
-                  e.dataTransfer.effectAllowed = 'move';
-                }}
-                onDragEnd={() => { dragId.current = null; setDragOverId(null); }}
-              >
-                ⠿⠿
-              </div>
-              <button
-                type="button"
-                className="reorder-btn"
-                aria-label={`Move ${section.label} up`}
-                disabled={i === 0}
-                onClick={() => move(id, -1)}
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                className="reorder-btn"
-                aria-label={`Move ${section.label} down`}
-                disabled={i === order.length - 1}
-                onClick={() => move(id, 1)}
-              >
-                ↓
-              </button>
+            <div
+              className="reorder-handle"
+              role="button"
+              tabIndex={0}
+              aria-label={
+                `Reorder ${section.label}. Position ${i + 1} of ${order.length}. `
+                + 'Press the up or down arrow key to move it.'
+              }
+              title="Drag, or press ↑ / ↓, to reorder"
+              draggable
+              onDragStart={(e) => {
+                dragId.current = id;
+                // Firefox starts no drag at all unless dragstart puts
+                // something on the DataTransfer; the ref alone left the
+                // handle inert there, with no other way to reorder.
+                e.dataTransfer.setData('text/plain', id);
+                e.dataTransfer.effectAllowed = 'move';
+              }}
+              onDragEnd={() => { dragId.current = null; setDragOverId(null); }}
+              onKeyDown={(e) => {
+                if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+                // Or the page scrolls under the reorder, leaving the reader
+                // looking at whatever the section used to sit above.
+                e.preventDefault();
+                move(id, e.key === 'ArrowUp' ? -1 : 1);
+                // Focus rides along: the ids are React keys, so a reorder
+                // moves these DOM nodes rather than rebuilding them, and the
+                // handle keeps focus through as many presses as it takes.
+              }}
+            >
+              ⠿⠿
             </div>
             <div className="reorderable-section-content">{section.node}</div>
           </div>

@@ -156,6 +156,82 @@ export async function getRecentMatches(limit = 8): Promise<MatchListRow[]> {
   `;
 }
 
+export type VaultMeeting = MatchListRow & {
+  /** Every match these two clubs have played, this one included. */
+  meetings: number;
+  /** The recent fixture whose pairing selected this meeting. */
+  latestId: number;
+  latestSeason: number;
+  latestDate: Date;
+};
+
+/**
+ * "From the vault": for each pairing in the most recent round, one random
+ * earlier meeting between the same two clubs.
+ *
+ * The home page used to list the latest results, which in a historical
+ * database is the least interesting thing on it — the same six lines from the
+ * end of last season, every visit, until the next import. Keeping the
+ * pairings but rolling the meeting back to a random point in their shared
+ * history turns the same fixtures into a different page every time the
+ * hourly ISR window turns over, and every line is a real match with a link.
+ *
+ * Pairings are matched on club identity in either direction — the 1958
+ * meeting is as valid as the modern one whichever side had the home ground —
+ * and on identity rather than organization, so a rename's two eras are not
+ * silently folded together (see docs/architecture.md §4.5).
+ *
+ * A pairing that has met exactly once (an expansion club's first meeting)
+ * yields no earlier match, so the LATERAL drops it: the panel then shows
+ * fewer rows rather than repeating the fixture it was supposed to replace.
+ */
+export async function getVaultMeetings(limit = 6): Promise<VaultMeeting[]> {
+  return sql<VaultMeeting[]>`
+    WITH latest AS (
+      SELECT id, home_club_id, away_club_id, season, match_date
+        FROM matches
+       ORDER BY match_date DESC, id DESC
+       LIMIT ${limit}
+    ),
+    pairs AS (
+      SELECT DISTINCT ON (least(home_club_id, away_club_id), greatest(home_club_id, away_club_id))
+             least(home_club_id, away_club_id)    AS club_a,
+             greatest(home_club_id, away_club_id) AS club_b,
+             id AS latest_id, season AS latest_season, match_date AS latest_date
+        FROM latest
+       ORDER BY least(home_club_id, away_club_id), greatest(home_club_id, away_club_id),
+                match_date DESC, id DESC
+    )
+    SELECT m.id, m.season, m.round_type AS "roundType",
+           m.round_number AS "roundNumber", m.match_date AS "matchDate",
+           h.name AS "homeName", h.slug AS "homeSlug",
+           a.name AS "awayName", a.slug AS "awaySlug",
+           m.home_score AS "homeScore", m.away_score AS "awayScore",
+           COALESCE(v.canonical_name, m.venue_raw) AS "venueName",
+           m.attendance,
+           p.latest_id     AS "latestId",
+           p.latest_season AS "latestSeason",
+           p.latest_date   AS "latestDate",
+           (SELECT count(*) FROM matches c
+             WHERE (c.home_club_id = p.club_a AND c.away_club_id = p.club_b)
+                OR (c.home_club_id = p.club_b AND c.away_club_id = p.club_a))::int AS meetings
+      FROM pairs p
+      CROSS JOIN LATERAL (
+        SELECT e.*
+          FROM matches e
+         WHERE ((e.home_club_id = p.club_a AND e.away_club_id = p.club_b)
+             OR (e.home_club_id = p.club_b AND e.away_club_id = p.club_a))
+           AND e.id <> p.latest_id
+         ORDER BY random()
+         LIMIT 1
+      ) m
+      JOIN clubs h ON h.id = m.home_club_id
+      JOIN clubs a ON a.id = m.away_club_id
+      LEFT JOIN venues v ON v.id = m.venue_id
+     ORDER BY p.latest_date DESC, p.latest_id DESC
+  `;
+}
+
 /**
  * Matches most likely to be requested: every grand final, then the most
  * recent matches. Used to seed the static params of the match route.

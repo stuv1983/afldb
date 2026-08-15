@@ -176,10 +176,18 @@ describe(`${APP_ROLE} is read-only`, () => {
   it('still reads the statistical tables it serves', async () => {
     // The counterweight: a role with no privileges at all would pass
     // every test above and serve a blank site.
+    //
+    // site_settings (migration 034) is in this list rather than in
+    // OPERATIONAL_TABLES on purpose: it is the one operational table the
+    // public role is MEANT to read, because the home page renders the
+    // layout and record choices stored in it. It holds no secret, and the
+    // write side of it is afldb_auth's alone — which the "holds no write
+    // privilege on any table" test above already enforces for this role.
     const rows = await sql<{ name: string; readable: boolean }[]>`
       SELECT t.name, has_table_privilege(${APP_ROLE}, t.name, 'SELECT') AS readable
         FROM unnest(ARRAY['players', 'clubs', 'matches', 'seasons',
-                          'player_career_stats', 'player_match_stats']) AS t(name)
+                          'player_career_stats', 'player_match_stats',
+                          'site_settings']) AS t(name)
     `;
     expect(rows.every((r) => r.readable)).toBe(true);
   });

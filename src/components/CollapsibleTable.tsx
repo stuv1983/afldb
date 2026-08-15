@@ -1,12 +1,12 @@
+import { CollapsiblePanel } from '@/components/CollapsiblePanel';
+
 /**
  * A table section that can be collapsed.
  *
  * Wraps the existing `.table-wrap` convention rather than replacing it, so
  * every page keeps its own `<table>` markup and gets a `<summary>` header
- * for free. Native `<details>`, so this works as a plain server component —
- * no client JS, and the content stays in the DOM (and indexable) whether
- * open or collapsed. Defaults open: collapsing is an option a reader picks,
- * not a change to what a page shows on first load.
+ * for free. The disclosure itself is `CollapsiblePanel`; this adds the one
+ * thing a table needs that other collapsed blocks do not.
  *
  * `filters` renders above the table and inside this element, so a table's
  * filters collapse with the table they belong to. It is a second, nested
@@ -37,13 +37,9 @@ export function CollapsibleTable({
   children: React.ReactNode;
 }) {
   return (
-    <details id={id} className="table-details" open={defaultOpen}>
-      <summary>
-        <span className="table-details-title">{title}</span>
-        {note && <span className="table-details-note">{note}</span>}
-      </summary>
+    <CollapsiblePanel id={id} title={title} note={note} defaultOpen={defaultOpen}>
       {filters}
       {children}
-    </details>
+    </CollapsiblePanel>
   );
 }
