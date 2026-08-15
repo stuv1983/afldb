@@ -231,8 +231,11 @@ def load(conn, in_dir: Path) -> None:
         for name, columns in TABLES:
             rows = read(in_dir, name)
             target = ", ".join(columns)
-            statement = (f"COPY staging_aflw.{name} ({target}) "
-                         f"FROM STDIN WITH (FORMAT csv, NULL '')")
+            # Postgres TEXT format, not CSV: copy.write_row() emits
+            # tab-delimited rows with \N for None regardless of what the
+            # statement declares, so declaring CSV makes the server read
+            # a whole line as one column.
+            statement = f"COPY staging_aflw.{name} ({target}) FROM STDIN"
             with cur.copy(statement) as copy:
                 for row in rows:
                     copy.write_row([row[column] if row[column] != "" else None
