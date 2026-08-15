@@ -92,6 +92,13 @@ describe('resolveIntent — Draft', () => {
     expect(match?.href).toBe('/draft?origin=Essendon');
   });
 
+  it('reads a feeder club straight off the query, since most are not AFL clubs', () => {
+    // Claremont is a WAFL club — it isn't in the `clubs` table at all, so
+    // this only works by parsing "from <text>" directly, not via `club`.
+    const match = intentFor('draft picks from claremont');
+    expect(match?.href).toBe('/draft?origin=Claremont');
+  });
+
   it('falls back to a bare link when no club or year is present', () => {
     expect(intentFor('draft')?.href).toBe('/draft');
   });

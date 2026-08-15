@@ -100,6 +100,10 @@ export function extractQuerySignals(
   };
 }
 
+function titleCase(text: string): string {
+  return text.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function buildHref(
   path: string,
   params: Record<string, string | undefined>,
@@ -167,18 +171,24 @@ export function resolveIntent(
   }
 
   // 2. Draft: the recruiting club ("drafted to") vs. the feeder club
-  // ("drafted from") are different filters on the same page.
+  // ("drafted from") are different filters on the same page. The feeder
+  // club is almost never an AFL club — it's a WAFL/SANFL/TAC Cup side
+  // (Claremont, Oakleigh, ...) that the `clubs` table (and so `club`,
+  // detected against AFL club names) knows nothing about. So "from"/"out
+  // of" wording is read directly off the raw query rather than off the
+  // shared club signal, taking whatever text follows it verbatim — which
+  // is also why /draft's "Drafted from" filter is free text, not a select.
   if (/\bdraft(ed)?\b/.test(lower)) {
     const params: Record<string, string | undefined> = { year: yearStr };
     let detail = 'Draft picks';
-    if (club) {
-      if (/\bfrom\b|\bout of\b/.test(topicWords)) {
-        params.origin = club.name;
-        detail = `Recruited from ${club.name}`;
-      } else {
-        params.club = club.slug;
-        detail = `Drafted to ${club.name}`;
-      }
+    const fromMatch = /\b(?:from|out of)\s+(.+)$/.exec(lower);
+    const origin = fromMatch ? fromMatch[1].replace(YEAR_RE, '').trim() : '';
+    if (origin) {
+      params.origin = titleCase(origin);
+      detail = `Recruited from ${titleCase(origin)}`;
+    } else if (club) {
+      params.club = club.slug;
+      detail = `Drafted to ${club.name}`;
     }
     if (year !== null) detail += ` in ${year}`;
     return {
