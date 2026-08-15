@@ -83,6 +83,8 @@ export default async function BrownlowPage({
       <FilterErrors errors={errors} />
 
       <section className="section">
+        {/* Anchor target for /brownlow#brownlow-leaders links from search. */}
+        <div id="brownlow-leaders" style={{ scrollMarginTop: '4rem' }}>
         <CollapsibleTable
           title="Career vote leaders"
           note={
@@ -138,9 +140,12 @@ export default async function BrownlowPage({
             </div>
           )}
         </CollapsibleTable>
+        </div>
       </section>
 
       <section className="section">
+        {/* Anchor target for /brownlow#brownlow-winners links from search. */}
+        <div id="brownlow-winners" style={{ scrollMarginTop: '4rem' }}>
         <CollapsibleTable
           title="Winners by season"
           note={`${winners.length} winners`}
@@ -200,6 +205,7 @@ export default async function BrownlowPage({
             </div>
           )}
         </CollapsibleTable>
+        </div>
       </section>
     </>
   );

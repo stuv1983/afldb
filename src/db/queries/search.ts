@@ -1,9 +1,11 @@
 import 'server-only';
 
+import { getClubOptions } from '@/db/queries/advanced-search';
 import { searchAflwClubs, searchAflwPlayers } from '@/db/queries/aflw';
 import { sql } from '@/db/client';
 import { RECORD_CATEGORIES } from '@/db/queries/records';
 import { normalisedSearchTerm } from '@/lib/like';
+import { type IntentMatch, extractQuerySignals, resolveIntent } from '@/search/query-intent';
 
 /**
  * Global search across players, clubs, venues, seasons, rounds, awards
@@ -239,6 +241,13 @@ export async function searchAwards(query: string, limit = 6): Promise<SearchResu
      LIMIT ${limit}
   `;
 
+  // The Brownlow Medal has a dedicated, richer page (full vote history,
+  // career leaders) at /brownlow, distinct from the generic awards-row
+  // page this query would otherwise link to. Route search there instead
+  // — same absolute-path trick as the Hall of Fame below.
+  const brownlow = results.find((r) => r.slug === 'brownlow-medal');
+  if (brownlow) brownlow.slug = '/brownlow';
+
   // The Hall of Fame is a page, not an awards row; surfaced by name
   // here. An absolute-path slug routes as-is.
   const term = query.trim().toLowerCase();
@@ -349,13 +358,15 @@ export type GlobalSearchResults = {
   records: SearchResult[];
   aflwPlayers: SearchResult[];
   aflwClubs: SearchResult[];
+  /** A recognised intent, e.g. "brownlow winner richmond" -> filtered deep link. */
+  intent: IntentMatch | null;
   total: number;
 };
 
 const EMPTY_RESULTS: GlobalSearchResults = {
   players: [], clubs: [], venues: [], seasons: [],
   rounds: [], awards: [], records: [],
-  aflwPlayers: [], aflwClubs: [], total: 0,
+  aflwPlayers: [], aflwClubs: [], intent: null, total: 0,
 };
 
 export async function globalSearch(
@@ -365,7 +376,18 @@ export async function globalSearch(
   const trimmed = query.trim();
   if (trimmed.length < MIN_QUERY_LENGTH) return EMPTY_RESULTS;
 
-  const [players, clubs, venues, seasons, rounds, awards, aflw] = await Promise.all([
+  // A query naming a club or a season often also names a record category
+  // or an award ("most goals richmond", "coleman medal 1989"), but the
+  // full phrase never matches a category or award name outright — only
+  // the words left once the club/year are stripped do. That stripped
+  // form is used only to find a stronger record/award hit for the intent
+  // link below; every other entity is still searched on the full query.
+  const clubDirectory = await getClubOptions();
+  const signals = extractQuerySignals(trimmed, clubDirectory);
+  const topicText = (signals.club || signals.year !== null) ? signals.topicWords : '';
+  const runTopicSearch = topicText.length >= MIN_QUERY_LENGTH && topicText !== trimmed;
+
+  const [players, clubs, venues, seasons, rounds, awards, aflw, topicAwards] = await Promise.all([
     searchPlayers(trimmed, playerLimit),
     searchClubs(trimmed),
     searchVenues(trimmed),
@@ -373,13 +395,23 @@ export async function globalSearch(
     searchRounds(trimmed),
     searchAwards(trimmed),
     aflwResults(trimmed, { players: 10, clubs: 4 }),
+    runTopicSearch ? searchAwards(topicText, 3) : Promise.resolve([] as SearchResult[]),
   ]);
   const records = searchRecords(trimmed);
+  const topicRecords = runTopicSearch ? searchRecords(topicText, 3) : [];
+
+  const bestAward = topicAwards[0] ?? awards[0] ?? null;
+  const bestRecord = topicRecords[0] ?? records[0] ?? null;
+  const intent = resolveIntent(trimmed, signals, {
+    bestRecord: bestRecord && { slug: bestRecord.slug, title: bestRecord.title, score: bestRecord.rank },
+    bestAward: bestAward && { slug: bestAward.slug, title: bestAward.title, score: bestAward.rank },
+  });
 
   return {
     players, clubs, venues, seasons, rounds, awards, records,
     aflwPlayers: aflw.players,
     aflwClubs: aflw.clubs,
+    intent,
     total: players.length + clubs.length + venues.length + seasons.length
       + rounds.length + awards.length + records.length
       + aflw.players.length + aflw.clubs.length,
@@ -387,16 +419,54 @@ export async function globalSearch(
 }
 
 /**
- * Autocomplete across every entity type.
+ * AFLW-only search, for the scoped box on /aflw.
+ *
+ * A thin wrapper around `aflwResults`: AFLW has no rounds, awards or
+ * record categories of its own yet, so players and clubs are the whole
+ * result set rather than a subset of a larger one.
+ */
+export type AflwSearchResults = {
+  players: SearchResult[];
+  clubs: SearchResult[];
+  total: number;
+};
+
+export async function aflwOnlySearch(
+  query: string,
+  limits: { players: number; clubs: number } = { players: 20, clubs: 6 },
+): Promise<AflwSearchResults> {
+  const trimmed = query.trim();
+  if (trimmed.length < MIN_QUERY_LENGTH) return { players: [], clubs: [], total: 0 };
+
+  const { players, clubs } = await aflwResults(trimmed, limits);
+  return { players, clubs, total: players.length + clubs.length };
+}
+
+export type SearchScope = 'aflw';
+
+/**
+ * Autocomplete across every entity type, or — with `scope: 'aflw'` — just
+ * AFLW players and clubs, for the scoped box on /aflw.
  *
  * Players fill whatever the other types leave free, which in practice is
  * most of the list: a season, round or award match is close to exact
  * when it fires at all, while player matches are fuzzy and plentiful.
  */
-export async function autocomplete(query: string, limit = 8): Promise<SearchResult[]> {
+export async function autocomplete(
+  query: string,
+  limit = 8,
+  scope?: SearchScope,
+): Promise<SearchResult[]> {
   const trimmed = query.trim();
   if (trimmed.length < MIN_QUERY_LENGTH) return [];
   const capped = Math.min(limit, 10);
+
+  if (scope === 'aflw') {
+    const aflw = await aflwResults(trimmed, { players: capped, clubs: 2 });
+    return [...aflw.clubs, ...aflw.players]
+      .sort((a, b) => b.rank - a.rank)
+      .slice(0, capped);
+  }
 
   const [players, clubs, venues, seasons, rounds, awards, aflw] = await Promise.all([
     searchPlayers(trimmed, capped),

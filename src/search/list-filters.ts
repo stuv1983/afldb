@@ -183,8 +183,13 @@ export function draftFilterFields(options: {
       options: options.years, anyLabel: 'Any year',
     },
     {
-      kind: 'select', key: 'club', label: 'Club',
+      kind: 'select', key: 'club', label: 'Drafted to',
       options: options.clubs, anyLabel: 'Any club',
+    },
+    {
+      kind: 'text', key: 'origin', label: 'Drafted from',
+      placeholder: 'e.g. Claremont, Subiaco, Oakleigh',
+      help: 'The feeder or state-league club a player came from, as recorded by the source.',
     },
     {
       kind: 'select', key: 'type', label: 'Draft type',

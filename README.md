@@ -10,19 +10,23 @@ The development deployment runs as a four-worker Next.js standalone service behi
 
 ## What is available
 
-- Global search and autocomplete for players, clubs, venues, and seasons
+- Global search and autocomplete for players, clubs, venues, seasons, rounds, awards, and record categories, with intent-aware routing: a query naming a club or season alongside a record, award, or draft class (e.g. "brownlow winner richmond", "most goals essendon") links straight to that filtered view instead of a bare unfiltered page
 - Player profiles, career and season totals, club history, and match logs
 - Historical club identities and organization lineage across renames and relocations
 - Season ladders, results, finals, premiers, and leading players
 - Match scorecards, team lists, player statistics, attendance, and venue details
 - Career, season, and single-match record leaderboards
-- Brownlow leaderboards using authoritative season totals
+- Brownlow Medal: full season-by-season winners and vote history from 1924, plus career vote leaders
+- Draft and recruitment history from 1981, filterable by year, drafting club, feeder/state-league club, and type
+- Awards and honours: Coleman, Norm Smith, Rising Star, All-Australian, club best-and-fairests, and other competition and club awards, each with a winners history
+- Australian Football Hall of Fame inductees, and honour teams (teams of the century)
+- Records index and per-category leaderboards (most games, goals, finals, premierships, Brownlow votes, and single-match/season bests)
 - Typed, shareable player and match searches with allowlisted filters and sorting
-- AFLW as a separate competition: players, clubs, seasons, ladders, matches, scoring progressions and match search
+- AFLW as a separate competition: players, clubs, seasons, ladders, matches, scoring progressions, match search, and its own scoped global search
 - A collapsible filter panel on every table, with the applied filters carried in the URL
 - Responsive navigation, light/dark themes, canonical metadata, robots controls, and segmented sitemaps
 
-Draft data has been imported, but draft pages are not yet exposed. Family relationships have not been migrated and are intentionally absent from the public site.
+Family relationships have not been migrated and are intentionally absent from the public site.
 
 AFLW is served from a read-only `aflw` schema of views over the staged scrape rather than from the normalised model, because AFLW played two seasons in calendar 2022 and the core model keys a season by year. See [AFLW](docs/aflw.md) for the reasoning and the identity rules that follow from it.
 

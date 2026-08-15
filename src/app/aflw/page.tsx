@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { SearchBox } from '@/components/SearchBox';
 import {
   getAflwOverview,
   getAflwRecentMatches,
@@ -59,6 +60,10 @@ export default async function AflwPage() {
           held separately from the AFL record because it is a separate competition —
           its own seasons, its own clubs and its own statistics.
         </p>
+      </div>
+
+      <div className="hero-search" style={{ margin: '0 0 1.5rem' }}>
+        <SearchBox scope="aflw" placeholder="Search AFLW players and clubs…" />
       </div>
 
       <div className="stat-strip">

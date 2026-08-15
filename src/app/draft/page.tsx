@@ -49,6 +49,7 @@ export default async function DraftPage({
   const { rows, total } = await listDraftPicks({
     year: values.select.year ? Number(values.select.year) : undefined,
     clubSlug: values.select.club,
+    origin: values.text.origin,
     draftType: values.select.type,
     q: values.text.q,
     ranges: values,
@@ -97,7 +98,8 @@ export default async function DraftPage({
                     <th scope="col" className="num">Year</th>
                     <th scope="col" className="num">Pick</th>
                     <th scope="col">Player</th>
-                    <th scope="col">Club</th>
+                    <th scope="col">Drafted to</th>
+                    <th scope="col">Drafted from</th>
                     <th scope="col">Type</th>
                     <th scope="col" className="num">Age</th>
                     <th scope="col" className="num">Games</th>
@@ -124,6 +126,7 @@ export default async function DraftPage({
                           pick.clubNameRaw ?? <span className="muted">—</span>
                         )}
                       </td>
+                      <td className="muted">{pick.originClub ?? <span className="not-recorded">—</span>}</td>
                       <td className="nowrap muted">{pick.draftType}</td>
                       <td className="num">{pick.draftAge ?? '—'}</td>
                       <td className="num">

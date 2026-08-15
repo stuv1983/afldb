@@ -18,6 +18,7 @@ export type DraftPickRow = {
   clubSlug: string | null;
   clubName: string | null;
   clubNameRaw: string | null;
+  originClub: string | null;
   draftAge: number | null;
   /** Career games of the linked player; null when the pick is unlinked. */
   careerGames: number | null;
@@ -40,6 +41,7 @@ export const DRAFT_FILTER_COLUMNS: Record<string, string> = {
 export type DraftPickFilters = {
   year?: number;
   clubSlug?: string;
+  origin?: string;
   draftType?: string;
   q?: string;
   ranges?: FilterValues;
@@ -68,6 +70,9 @@ export async function listDraftPicks(
   if (filters.clubSlug) {
     conditions.push(sql`c.slug = ${filters.clubSlug}`);
   }
+  if (filters.origin) {
+    conditions.push(sql`dp.original_club_raw ILIKE ${containsPattern(filters.origin)}`);
+  }
   if (filters.draftType) {
     conditions.push(sql`dp.draft_type = ${filters.draftType}`);
   }
@@ -86,6 +91,7 @@ export async function listDraftPicks(
            p.display_name AS "playerDisplayName", dp.player_name_raw AS "playerNameRaw",
            dp.link_status_value::text AS "linkStatus",
            c.slug AS "clubSlug", c.name AS "clubName", dp.club_name_raw AS "clubNameRaw",
+           dp.original_club_raw AS "originClub",
            dp.draft_age AS "draftAge",
            pcs.games AS "careerGames",
            count(*) OVER () AS total

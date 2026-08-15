@@ -29,10 +29,13 @@ export function SearchBox({
   autoFocus = false,
   placeholder = 'Search players, clubs, venues…',
   initialQuery = '',
+  scope,
 }: {
   autoFocus?: boolean;
   placeholder?: string;
   initialQuery?: string;
+  /** Restrict search to AFLW players and clubs, on `/aflw` and `/search?scope=aflw`. */
+  scope?: 'aflw';
 }) {
   const router = useRouter();
   const listId = useId();
@@ -56,7 +59,8 @@ export function SearchBox({
       const controller = new AbortController();
       abortRef.current = controller;
       try {
-        const res = await fetch(`/api/search/autocomplete?q=${encodeURIComponent(term)}`, {
+        const scopeParam = scope ? `&scope=${scope}` : '';
+        const res = await fetch(`/api/search/autocomplete?q=${encodeURIComponent(term)}${scopeParam}`, {
           signal: controller.signal,
         });
         if (!res.ok) return;
@@ -70,7 +74,7 @@ export function SearchBox({
     }, 180);
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, scope]);
 
   useEffect(() => {
     function onClickOutside(event: MouseEvent) {
@@ -107,8 +111,9 @@ export function SearchBox({
     <div ref={boxRef} style={{ position: 'relative' }}>
       <form className="search-form" action="/search" role="search">
         <label htmlFor={`${listId}-input`} className="visually-hidden">
-          Search AFL history
+          {scope === 'aflw' ? 'Search AFLW' : 'Search AFL history'}
         </label>
+        {scope && <input type="hidden" name="scope" value={scope} />}
         <input
           id={`${listId}-input`}
           name="q"

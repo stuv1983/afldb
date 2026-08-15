@@ -674,6 +674,21 @@ label {
   text-wrap: pretty;
 }
 
+/* Search-intent callout: a recognised "brownlow winner richmond"-style
+   query, upgraded to a direct link with the filter already applied. */
+.search-intent { margin-bottom: 1.25rem; }
+.search-intent-link {
+  display: block;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  padding: 0.85rem 1rem;
+  text-decoration: none;
+  color: inherit;
+}
+.search-intent-link:hover { border-color: var(--accent); }
+.search-intent-link strong { color: var(--accent); }
+
 /* Honours roll ------------------------------------------------------- */
 .honours {
   list-style: none;

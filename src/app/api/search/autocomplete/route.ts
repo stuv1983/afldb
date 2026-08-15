@@ -22,6 +22,9 @@ const RATE_LIMIT = new RateLimiter(60, 60 * 1000);
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const query = (searchParams.get('q') ?? '').slice(0, 100).trim();
+  // Allowlisted, not passed through: an unrecognised value is treated as
+  // no scope rather than reaching the query layer.
+  const scope = searchParams.get('scope') === 'aflw' ? 'aflw' : undefined;
 
   if (query.length < MIN_QUERY_LENGTH) {
     return NextResponse.json({ results: [] });
@@ -32,7 +35,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const results = await autocomplete(query, AUTOCOMPLETE_LIMIT);
+    const results = await autocomplete(query, AUTOCOMPLETE_LIMIT, scope);
     return NextResponse.json(
       { results },
       { headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300' } },
