@@ -13,7 +13,7 @@ type Session = {
   userAgent: string | null;
 };
 
-type Admin = { email: string; sessions: Session[] };
+type Admin = { email: string; role: string; canManageAdmins: boolean; sessions: Session[] };
 
 function SessionRow({ session }: { session: Session }) {
   const [state, action, pending] = useActionState<AdminSessionState, FormData>(revokeSession, {});
@@ -41,34 +41,38 @@ function SessionRow({ session }: { session: Session }) {
 export function AdminSessionsClient({ admins }: { admins: Admin[] }) {
   return (
     <>
-      {admins.map((admin) => (
-        <CollapsibleTable
-          key={admin.email}
-          title={admin.email}
-          note={`${admin.sessions.length} live session${admin.sessions.length === 1 ? '' : 's'}`}
-        >
-          {admin.sessions.length === 0 ? (
-            <p className="muted">No live sessions.</p>
-          ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th scope="col">Signed in</th>
-                    <th scope="col">Expires</th>
-                    <th scope="col">IP</th>
-                    <th scope="col">Device</th>
-                    <th scope="col" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {admin.sessions.map((s) => <SessionRow key={s.sessionId} session={s} />)}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CollapsibleTable>
-      ))}
+      {admins.map((admin) => {
+        const roleLabel = admin.role === 'super_admin' ? 'Super admin'
+          : admin.canManageAdmins ? 'Admin · can manage admins' : 'Admin';
+        return (
+          <CollapsibleTable
+            key={admin.email}
+            title={`${admin.email} · ${roleLabel}`}
+            note={`${admin.sessions.length} live session${admin.sessions.length === 1 ? '' : 's'}`}
+          >
+            {admin.sessions.length === 0 ? (
+              <p className="muted">No live sessions.</p>
+            ) : (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Signed in</th>
+                      <th scope="col">Expires</th>
+                      <th scope="col">IP</th>
+                      <th scope="col">Device</th>
+                      <th scope="col" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {admin.sessions.map((s) => <SessionRow key={s.sessionId} session={s} />)}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CollapsibleTable>
+        );
+      })}
     </>
   );
 }

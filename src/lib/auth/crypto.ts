@@ -36,6 +36,9 @@ function scrypt(
   });
 }
 
+/** Shared by the CLI tool and the web invite-acceptance flow, so the two can never disagree. */
+export const MIN_PASSWORD_LENGTH = 12;
+
 // scrypt parameters: N=2^15, r=8, p=1 — the OWASP-recommended setting
 // for interactive login (~100ms). Encoded in the hash so parameters can
 // be raised later without invalidating existing hashes.

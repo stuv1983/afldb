@@ -24,6 +24,7 @@ import { redirectTo } from '@/lib/redirect';
 const PUBLIC_PREFIXES = [
   '/beta',           // the gate itself, and its magic-link verifier
   '/admin/login',    // admins must be able to reach the login form
+  '/admin/invite',   // invite acceptance: gated by the unguessable token in the path, not a session
   '/api/health',     // uptime checks predate any visitor
   '/robots.txt',     // crawlers must read the disallow, not a redirect
   '/favicon.ico',

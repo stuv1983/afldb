@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 
 import { AdminSessionsClient } from '@/app/admin/admins/AdminSessionsClient';
+import { InviteManager } from '@/app/admin/admins/InviteManager';
 import { authSql } from '@/db/authClient';
-import { requireAdmin } from '@/lib/auth/session';
+import { hasAdminManagementAccess, requireAdmin } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,8 @@ export const metadata: Metadata = {
 type SessionRow = {
   userId: number;
   email: string;
+  role: string;
+  canManageAdmins: boolean;
   sessionId: number | null;
   createdAt: Date | null;
   expiresAt: Date | null;
@@ -21,18 +24,44 @@ type SessionRow = {
   userAgent: string | null;
 };
 
-export default async function AdminsPage() {
-  await requireAdmin();
+type InviteRow = {
+  id: number;
+  email: string;
+  role: string;
+  canManageAdmins: boolean;
+  invitedByEmail: string;
+  createdAt: Date;
+  expiresAt: Date;
+  usedAt: Date | null;
+  revokedAt: Date | null;
+};
 
-  const rows = await authSql<SessionRow[]>`
-    SELECT u.id AS "userId", u.email,
-           s.id AS "sessionId", s.created_at AS "createdAt", s.expires_at AS "expiresAt",
-           s.ip::text AS ip, s.user_agent AS "userAgent"
-      FROM auth_users u
-      LEFT JOIN auth_sessions s
-        ON s.user_id = u.id AND s.revoked_at IS NULL AND s.expires_at > now()
-     ORDER BY u.email, s.created_at DESC
-  `;
+export default async function AdminsPage() {
+  const admin = await requireAdmin();
+  const canManage = hasAdminManagementAccess(admin);
+
+  const [rows, invites] = await Promise.all([
+    authSql<SessionRow[]>`
+      SELECT u.id AS "userId", u.email, u.role, u.can_manage_admins AS "canManageAdmins",
+             s.id AS "sessionId", s.created_at AS "createdAt", s.expires_at AS "expiresAt",
+             s.ip::text AS ip, s.user_agent AS "userAgent"
+        FROM auth_users u
+        LEFT JOIN auth_sessions s
+          ON s.user_id = u.id AND s.revoked_at IS NULL AND s.expires_at > now()
+       ORDER BY u.email, s.created_at DESC
+    `,
+    canManage
+      ? authSql<InviteRow[]>`
+          SELECT i.id, i.email, i.role, i.can_manage_admins AS "canManageAdmins",
+                 inv.email AS "invitedByEmail", i.created_at AS "createdAt",
+                 i.expires_at AS "expiresAt", i.used_at AS "usedAt", i.revoked_at AS "revokedAt"
+            FROM admin_invites i
+            JOIN auth_users inv ON inv.id = i.invited_by
+           ORDER BY i.created_at DESC
+           LIMIT 100
+        `
+      : Promise.resolve([]),
+  ]);
 
   const admins = new Map<string, SessionRow[]>();
   for (const row of rows) {
@@ -45,14 +74,17 @@ export default async function AdminsPage() {
       <div className="page-header">
         <h1>Administrators</h1>
         <p className="subtitle">
-          Accounts are created and disabled from the server shell only. This page can
-          sign a live session out.
+          {canManage
+            ? 'Invite new admins below, or sign a live session out.'
+            : 'This page can sign a live session out. Ask a super admin for an invite link.'}
         </p>
       </div>
 
       <AdminSessionsClient
         admins={[...admins.entries()].map(([email, sessions]) => ({
           email,
+          role: sessions[0].role,
+          canManageAdmins: sessions[0].canManageAdmins,
           sessions: sessions
             .filter((s) => s.sessionId !== null)
             .map((s) => ({
@@ -64,6 +96,23 @@ export default async function AdminsPage() {
             })),
         }))}
       />
+
+      {canManage && (
+        <InviteManager
+          canGrantSuperAdmin={admin.role === 'super_admin'}
+          invites={invites.map((i) => ({
+            id: i.id,
+            email: i.email,
+            role: i.role,
+            canManageAdmins: i.canManageAdmins,
+            invitedByEmail: i.invitedByEmail,
+            createdAt: i.createdAt.toISOString(),
+            expiresAt: i.expiresAt.toISOString(),
+            usedAt: i.usedAt?.toISOString() ?? null,
+            revokedAt: i.revokedAt?.toISOString() ?? null,
+          }))}
+        />
+      )}
     </>
   );
 }

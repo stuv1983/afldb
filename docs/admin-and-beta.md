@@ -59,6 +59,42 @@ own password and scans a QR code to enrol MFA; nobody but them ever sees
 their TOTP secret, which the CLI path above cannot say. The CLI remains
 available for break-glass account recovery.
 
+### Inviting a new admin
+
+`/admin/admins` shows an "Invite an admin" form to anyone with admin-
+management access. Only an actual `super_admin` may set the invited
+role to `super_admin` or tick "can also invite/manage admins" — a
+delegated admin manager can only invite plain admins, so delegation can
+never compound into a peer or better.
+
+Creating an invite writes a row to `admin_invites` (only the token's
+sha256, exactly like `beta_login_tokens`) with a 7-day expiry, and
+returns the link **once**, in the page, for the inviting admin to copy
+and send however they like — there is no email sending, matching the
+beta-access codes above.
+
+Accepting an invite at `/admin/invite/<token>` is two steps, and nothing
+sensitive ever round-trips through the browser between them:
+
+1. **Choose a password.** The server hashes it and mints a fresh TOTP
+   secret, storing both on the invite row (`pending_password_hash`,
+   `pending_totp_secret`) — the `auth_users` row does not exist yet.
+2. **Scan the QR code and confirm a live code.** The secret is rendered
+   as a scannable QR (`qrcode`'s `toDataURL`, the same library the CLI
+   already depends on) with the raw key available only as a "can't scan
+   it?" fallback. Only once a real 6-digit code from that secret
+   verifies does the server create (or update, on a re-invited email)
+   the `auth_users` row, immediately burn that code's step the same way
+   login does, revoke any sessions the email already had, and mark the
+   invite used.
+
+An invite that is never finished leaves no account behind — only a dead
+row in `admin_invites` with a password hash and secret nobody can reach
+without also holding the one-time link. `/admin/invite/*` is reachable
+without a session (the unguessable token in the path is the gate, same
+trust model as `/beta/verify`); every write it triggers still goes
+through `afldb_auth`, same as everything else in this document.
+
 Passwords are scrypt-hashed (N=2¹⁵, r=8, p=1); TOTP is RFC 6238 with ±1
 step of drift; both are implemented on Node's own crypto with no
 third-party auth dependency. Each code is accepted **once**: the step it

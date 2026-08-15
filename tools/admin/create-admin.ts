@@ -35,10 +35,10 @@ import QRCode from 'qrcode';
 
 // Reuse the app's own crypto so the CLI and the login path can never
 // disagree about hash formats.
-import { generateTotpSecret, hashPassword, totpUri } from '../../src/lib/auth/crypto';
+import {
+  MIN_PASSWORD_LENGTH, generateTotpSecret, hashPassword, totpUri,
+} from '../../src/lib/auth/crypto';
 import { CTRL_C, applyEditing, takeLine } from '../../src/lib/auth/line-input';
-
-const MIN_PASSWORD_LENGTH = 12;
 
 function loadEnv(): void {
   // Same tolerant .env loader the migration tools use, inlined to keep
