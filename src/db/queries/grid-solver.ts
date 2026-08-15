@@ -18,8 +18,8 @@ import {
  * no request-selected column or operator here at all, unlike
  * query-builder.ts, so most of this file needs no allowlist check beyond
  * "is this a known builder key". The one place a request value reaches an
- * identifier position is the `stat` parameter on the two stat-total
- * builders, and that is checked against GRID_STATS (isGridStatKey) before
+ * identifier position is the `stat`/`statA`/`statB` family of params
+ * (requireStatKeyAt), checked against GRID_STATS (isGridStatKey) before
  * sql.unsafe ever sees it -- the same discipline query-builder.ts applies
  * to its column picker.
  *
@@ -35,6 +35,12 @@ function parseIntParam(raw: string, label: string): number {
   return n;
 }
 
+function parseDecimalParam(raw: string, label: string): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) throw new Error(`${label} must be a number.`);
+  return n;
+}
+
 function requireParam(axis: GridAxisState, key: string, label: string): string {
   const value = axis.params[key];
   if (value === undefined || value.trim() === '') throw new Error(`${label} is required.`);
@@ -45,17 +51,28 @@ function requireInt(axis: GridAxisState, key: string, label: string): number {
   return parseIntParam(requireParam(axis, key, label), label);
 }
 
+function requireDecimal(axis: GridAxisState, key: string, label: string): number {
+  return parseDecimalParam(requireParam(axis, key, label), label);
+}
+
 /**
- * The validated stat key, checked against GRID_STATS before it can ever
- * reach sql.unsafe. Returned as a plain string, not a fragment: each call
- * site builds its own fully-qualified `sql.unsafe('<alias>.<key>')` in one
- * shot, the same way filters.ts's rangeConditions does, rather than
- * splicing an unsafe fragment next to literal template text.
+ * The validated stat key at a given param key, checked against GRID_STATS
+ * before it can ever reach sql.unsafe. Returned as a plain string, not a
+ * fragment: each call site builds its own fully-qualified
+ * `sql.unsafe('<alias>.<key>')` in one shot, the same way filters.ts's
+ * rangeConditions does, rather than splicing an unsafe fragment next to
+ * literal template text. Parameterised by key so the two-stat builders
+ * (career_stat_exceeds, single_game_two_stats_min) can validate `statA`/
+ * `statB` with the same check as every single-stat builder's `stat`.
  */
-function requireStatKey(axis: GridAxisState): GridStatKey {
-  const value = requireParam(axis, 'stat', 'Statistic');
+function requireStatKeyAt(axis: GridAxisState, key: string, label: string): GridStatKey {
+  const value = requireParam(axis, key, label);
   if (!isGridStatKey(value)) throw new Error(`Unknown statistic: ${value}`);
   return value;
+}
+
+function requireStatKey(axis: GridAxisState): GridStatKey {
+  return requireStatKeyAt(axis, 'stat', 'Statistic');
 }
 
 /** Ascending [lo, hi], regardless of which order the two params were entered in. */
@@ -66,19 +83,24 @@ function orderedRange(axis: GridAxisState, loKey: string, loLabel: string, hiKey
 }
 
 /**
- * "X+ of a stat in a career", grain-aware: player_career_stats precomputes
- * a real total column for the 8 'always'/'era_limited' stats (goals plus
- * the original 7), so those compare directly against `c`. The other 13
- * 'live_only' stats (migration 007 never precomputed them) fall back to a
- * correlated SUM over player_match_stats, scoped to this player by the
- * existing ix_pms_player index. Shared by career_stat_total_min and any
- * other career-grain "X+ of a stat" builder.
+ * The player's career total for a stat, grain-aware: player_career_stats
+ * precomputes a real total column for the 8 'always'/'era_limited' stats
+ * (goals plus the original 7), so those read directly from `c`. The other
+ * 13 'live_only' stats (migration 007 never precomputed them) fall back to
+ * a correlated SUM over player_match_stats, scoped to this player by the
+ * existing ix_pms_player index. Shared by every career-grain stat builder
+ * (total, average, and the two-stat comparison) so each one gets the cheap
+ * path automatically wherever it exists.
  */
-function careerStatAtLeast(statKey: GridStatKey, n: number): SqlFragment {
+function careerStatValueExpr(statKey: GridStatKey): SqlFragment {
   if (GRID_STATS[statKey].grain !== 'live_only') {
-    return sql`${sql.unsafe(`c.${statKey}`)} >= ${n}`;
+    return sql`${sql.unsafe(`c.${statKey}`)}`;
   }
-  return sql`(SELECT sum(${sql.unsafe(statKey)}) FROM player_match_stats WHERE player_id = p.id) >= ${n}`;
+  return sql`(SELECT sum(${sql.unsafe(statKey)}) FROM player_match_stats WHERE player_id = p.id)`;
+}
+
+function careerStatAtLeast(statKey: GridStatKey, n: number): SqlFragment {
+  return sql`${careerStatValueExpr(statKey)} >= ${n}`;
 }
 
 /**
@@ -98,6 +120,39 @@ function seasonStatAtLeast(statKey: GridStatKey, n: number): SqlFragment {
                         JOIN matches m ON m.id = pms.match_id
                        GROUP BY pms.player_id, m.season, pms.club_id
                       HAVING sum(${sql.unsafe(statKey)}) >= ${n})`;
+}
+
+/**
+ * (player_id, season, club_id) rows where that player was at least
+ * equal-top of their own club's season total for a stat -- ties both
+ * "led". Precomputed stats compare the real player_season_stats column
+ * directly; live_only stats aggregate player_match_stats by player,
+ * season and club on both sides of the comparison. Shared by
+ * club_season_stat_leader and its "X+ times" sibling.
+ */
+function ledSeasonRows(statKey: GridStatKey): SqlFragment {
+  const col = sql.unsafe(statKey);
+  if (GRID_STATS[statKey].grain !== 'live_only') {
+    return sql`SELECT pss.player_id, pss.season, pss.club_id
+                  FROM player_season_stats pss
+                 WHERE pss.${col} IS NOT NULL
+                   AND NOT EXISTS (
+                     SELECT 1 FROM player_season_stats pss2
+                      WHERE pss2.season = pss.season AND pss2.club_id = pss.club_id
+                        AND pss2.${col} > pss.${col})`;
+  }
+  return sql`SELECT t.player_id, t.season, t.club_id FROM (
+                SELECT pms.player_id, m.season, pms.club_id, sum(pms.${col}) AS total
+                  FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
+                 GROUP BY pms.player_id, m.season, pms.club_id
+              ) t
+              WHERE NOT EXISTS (
+                SELECT 1 FROM (
+                  SELECT pms2.player_id, m2.season, pms2.club_id, sum(pms2.${col}) AS total
+                    FROM player_match_stats pms2 JOIN matches m2 ON m2.id = pms2.match_id
+                   GROUP BY pms2.player_id, m2.season, pms2.club_id
+                ) t2
+                WHERE t2.season = t.season AND t2.club_id = t.club_id AND t2.total > t.total)`;
 }
 
 // One dispatch per builder is the clearest shape here; splitting it up
@@ -127,6 +182,20 @@ function compileAxis(axis: GridAxisState): SqlFragment {
       const n = requireInt(axis, 'games', 'Games');
       return sql`p.id IN (SELECT player_id FROM player_clubs WHERE games >= ${n})`;
     }
+    case 'clubs_played_min':
+      return sql`c.clubs_played >= ${requireInt(axis, 'clubs', 'Clubs')}`;
+    case 'goals_at_multiple_clubs_min': {
+      const goals = requireInt(axis, 'goals', 'Goals');
+      const clubs = requireInt(axis, 'clubs', 'Clubs');
+      return sql`p.id IN (SELECT player_id FROM player_clubs WHERE goals >= ${goals}
+                           GROUP BY player_id HAVING count(*) >= ${clubs})`;
+    }
+    case 'games_at_multiple_clubs_min': {
+      const games = requireInt(axis, 'games', 'Games');
+      const clubs = requireInt(axis, 'clubs', 'Clubs');
+      return sql`p.id IN (SELECT player_id FROM player_clubs WHERE games >= ${games}
+                           GROUP BY player_id HAVING count(*) >= ${clubs})`;
+    }
 
     // -- Career milestones ----------------------------------------------
     case 'career_games_min':
@@ -135,8 +204,58 @@ function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`c.games < ${requireInt(axis, 'games', 'Games')}`;
     case 'career_goals_min':
       return sql`c.goals >= ${requireInt(axis, 'goals', 'Goals')}`;
+    case 'career_goals_max':
+      return sql`c.goals <= ${requireInt(axis, 'goals', 'Goals')}`;
     case 'career_stat_total_min':
       return careerStatAtLeast(requireStatKey(axis), requireInt(axis, 'x', 'At least'));
+    case 'career_stat_avg_min': {
+      const statKey = requireStatKey(axis);
+      const avg = requireDecimal(axis, 'avg', 'At least (average)');
+      const minGames = requireInt(axis, 'minGames', 'Minimum games');
+      const col = sql.unsafe(statKey);
+      return sql`p.id IN (SELECT player_id FROM player_match_stats
+                            WHERE ${col} IS NOT NULL
+                           GROUP BY player_id
+                          HAVING avg(${col}) >= ${avg} AND count(*) >= ${minGames})`;
+    }
+    case 'career_stat_exceeds': {
+      const statA = requireStatKeyAt(axis, 'statA', 'Statistic A');
+      const statB = requireStatKeyAt(axis, 'statB', 'Statistic B');
+      return sql`${careerStatValueExpr(statA)} > ${careerStatValueExpr(statB)}`;
+    }
+    case 'career_teammates_min': {
+      const n = requireInt(axis, 'x', 'At least');
+      return sql`p.id IN (SELECT pss1.player_id FROM player_season_stats pss1
+                            JOIN player_season_stats pss2
+                              ON pss2.season = pss1.season AND pss2.club_id = pss1.club_id
+                             AND pss2.player_id <> pss1.player_id
+                           GROUP BY pss1.player_id
+                          HAVING count(DISTINCT pss2.player_id) >= ${n})`;
+    }
+
+    // -- Single-game feats -- the per-game sibling of the career/season
+    // stat-total builders; same GRID_STATS mechanism, no grain branching
+    // needed since player_match_stats has every stat as a real column. --
+    case 'single_game_stat_min': {
+      const statKey = requireStatKey(axis);
+      const n = requireInt(axis, 'x', 'At least');
+      return sql`p.id IN (SELECT player_id FROM player_match_stats WHERE ${sql.unsafe(statKey)} >= ${n})`;
+    }
+    case 'single_game_two_stats_min': {
+      const statA = requireStatKeyAt(axis, 'statA', 'Statistic A');
+      const xA = requireInt(axis, 'xA', 'At least (A)');
+      const statB = requireStatKeyAt(axis, 'statB', 'Statistic B');
+      const xB = requireInt(axis, 'xB', 'At least (B)');
+      return sql`p.id IN (SELECT player_id FROM player_match_stats
+                            WHERE ${sql.unsafe(statA)} >= ${xA} AND ${sql.unsafe(statB)} >= ${xB})`;
+    }
+    case 'games_with_stat_min_count': {
+      const statKey = requireStatKey(axis);
+      const y = requireInt(axis, 'y', 'At least (per game)');
+      const times = requireInt(axis, 'times', 'In this many games');
+      return sql`p.id IN (SELECT player_id FROM player_match_stats WHERE ${sql.unsafe(statKey)} >= ${y}
+                           GROUP BY player_id HAVING count(*) >= ${times})`;
+    }
 
     // -- Season & era -----------------------------------------------------
     case 'debuted_between': {
@@ -156,6 +275,49 @@ function compileAxis(axis: GridAxisState): SqlFragment {
       return seasonStatAtLeast(requireStatKey(axis), requireInt(axis, 'x', 'At least'));
     case 'games_in_season_min':
       return sql`p.id IN (SELECT player_id FROM player_season_stats WHERE games >= ${requireInt(axis, 'games', 'Games')})`;
+    case 'season_stat_avg_min': {
+      const statKey = requireStatKey(axis);
+      const avg = requireDecimal(axis, 'avg', 'At least (average)');
+      const col = sql.unsafe(statKey);
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE ${col} IS NOT NULL
+                           GROUP BY pms.player_id, m.season
+                          HAVING avg(${col}) >= ${avg})`;
+    }
+    case 'season_wins_min':
+      return sql`p.id IN (SELECT player_id FROM player_season_stats WHERE wins >= ${requireInt(axis, 'times', 'Wins')})`;
+    case 'season_losses_min':
+      return sql`p.id IN (SELECT player_id FROM player_season_stats WHERE losses >= ${requireInt(axis, 'times', 'Losses')})`;
+    case 'club_season_stat_leader': {
+      const statKey = requireStatKey(axis);
+      return sql`p.id IN (SELECT DISTINCT player_id FROM (${ledSeasonRows(statKey)}) led)`;
+    }
+    case 'club_season_stat_leader_min_times': {
+      const statKey = requireStatKey(axis);
+      const n = requireInt(axis, 'times', 'Times');
+      return sql`p.id IN (SELECT player_id FROM (${ledSeasonRows(statKey)}) led
+                           GROUP BY player_id HAVING count(*) >= ${n})`;
+    }
+    case 'wooden_spoon_season':
+      return sql`EXISTS (SELECT 1 FROM player_season_stats pss
+                           JOIN club_seasons cs ON cs.season = pss.season AND cs.club_id = pss.club_id
+                          WHERE pss.player_id = p.id AND cs.wooden_spoon)`;
+    case 'minor_premiership_season':
+      return sql`EXISTS (SELECT 1 FROM player_season_stats pss
+                           JOIN club_seasons cs ON cs.season = pss.season AND cs.club_id = pss.club_id
+                          WHERE pss.player_id = p.id AND cs.ladder_rank = 1)`;
+    case 'never_minor_premier':
+      return sql`NOT EXISTS (SELECT 1 FROM player_season_stats pss
+                               JOIN club_seasons cs ON cs.season = pss.season AND cs.club_id = pss.club_id
+                              WHERE pss.player_id = p.id AND cs.ladder_rank = 1)`;
+    case 'minor_premierships_min': {
+      const n = requireInt(axis, 'times', 'Times');
+      return sql`p.id IN (SELECT pss.player_id FROM player_season_stats pss
+                            JOIN club_seasons cs ON cs.season = pss.season AND cs.club_id = pss.club_id
+                           WHERE cs.ladder_rank = 1
+                           GROUP BY pss.player_id HAVING count(*) >= ${n})`;
+    }
 
     // -- Finals & premierships ------------------------------------------
     case 'played_in_a_final':

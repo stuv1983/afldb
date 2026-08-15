@@ -39,6 +39,19 @@ describe('grid solver URL state', () => {
     expect(parseBoardState(token)).toEqual(state);
   });
 
+  it('round-trips the decimal param kind (career average builders)', () => {
+    const state: GridBoardState = {
+      ...DEFAULT_BOARD_STATE,
+      rows: [
+        { builder: 'career_stat_avg_min', params: { stat: 'disposals', avg: '18.5', minGames: '50' } },
+        DEFAULT_BOARD_STATE.rows[1],
+        DEFAULT_BOARD_STATE.rows[2],
+      ],
+    };
+    const token = serializeBoardState(state);
+    expect(parseBoardState(token)).toEqual(state);
+  });
+
   it('rejects a token naming an unknown builder', () => {
     const bad = { ...DEFAULT_BOARD_STATE, rows: [{ builder: 'delete_everything', params: {} }, DEFAULT_BOARD_STATE.rows[1], DEFAULT_BOARD_STATE.rows[2]] };
     expect(parseBoardState(tokenFor(bad))).toBeNull();

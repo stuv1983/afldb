@@ -121,4 +121,52 @@ describe('grid solver correctness', () => {
       'games_asc',
     )).rejects.toThrow();
   });
+
+  it('career_stat_total_min on a live_only stat (clangers) matches a hand-written SUM', async () => {
+    // clangers has no precomputed career total (unlike the original 7
+    // GRID_STATS), so this exercises careerStatValueExpr's live-SUM branch.
+    const summary = await solveCellSummary(
+      { builder: 'career_stat_total_min', params: { stat: 'clangers', x: '300' } },
+      { builder: 'career_games_min', params: { games: '0' } },
+      'games_asc',
+    );
+    const [expected] = await sql<{ count: string }[]>`
+      SELECT count(*) FROM (
+        SELECT player_id FROM player_match_stats GROUP BY player_id HAVING sum(clangers) >= 300
+      ) t
+    `;
+    expect(summary.eligible).toBe(Number(expected.count));
+  });
+
+  it('no minor_premiership_season player is also flagged never_minor_premier', async () => {
+    const summary = await solveCellSummary(
+      { builder: 'minor_premiership_season', params: {} },
+      { builder: 'never_minor_premier', params: {} },
+      'games_asc',
+    );
+    expect(summary.eligible).toBe(0);
+  });
+
+  it('club_season_stat_leader(goals) rows really did lead a club-season in goals', async () => {
+    const { rows } = await solveCellRows(
+      { builder: 'club_season_stat_leader', params: { stat: 'goals' } },
+      { builder: 'career_games_min', params: { games: '0' } },
+      'games_asc',
+      { limit: 5, offset: 0 },
+    );
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      const [led] = await sql<{ found: boolean }[]>`
+        SELECT EXISTS (
+          SELECT 1 FROM player_season_stats pss
+           WHERE pss.player_id = ${r.id}
+             AND NOT EXISTS (
+               SELECT 1 FROM player_season_stats pss2
+                WHERE pss2.season = pss.season AND pss2.club_id = pss.club_id AND pss2.goals > pss.goals
+             )
+        ) AS found
+      `;
+      expect(led.found, `player ${r.id} (${r.displayName})`).toBe(true);
+    }
+  });
 });

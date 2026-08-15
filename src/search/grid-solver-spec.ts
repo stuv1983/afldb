@@ -145,12 +145,10 @@ const draftType = (label = 'Draft type'): GridParamDef => ({ key: 'draftType', l
 const signingKind = (label = 'Recruited from'): GridParamDef => ({ key: 'signingKind', label, kind: 'signingKind' });
 const aaPosition = (label = 'Position'): GridParamDef => ({ key: 'position', label, kind: 'aaPosition' });
 
-// "Single-game feats" is added in Phase B once builders actually populate
-// it -- an empty category here would let the form select a category whose
-// Question dropdown has nothing in it.
 export const GRID_GROUP_ORDER = [
   'Clubs & journeys',
   'Career milestones',
+  'Single-game feats',
   'Season & era',
   'Finals & premierships',
   'Grounds & venues',
@@ -175,12 +173,25 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   one_club_player: { key: 'one_club_player', label: 'One-club player', group: 'Clubs & journeys', params: [] },
   multi_club_player: { key: 'multi_club_player', label: 'Multi-club player', group: 'Clubs & journeys', params: [] },
   games_at_one_club_min: { key: 'games_at_one_club_min', label: 'X+ games at one club', group: 'Clubs & journeys', params: [int('games', 'Games')] },
+  clubs_played_min: { key: 'clubs_played_min', label: 'Played for X+ clubs', group: 'Clubs & journeys', params: [int('clubs', 'Clubs')] },
+  goals_at_multiple_clubs_min: { key: 'goals_at_multiple_clubs_min', label: 'X+ goals at 2+ clubs', group: 'Clubs & journeys', params: [int('goals', 'Goals'), int('clubs', 'Clubs')] },
+  games_at_multiple_clubs_min: { key: 'games_at_multiple_clubs_min', label: 'X+ games at 2+ clubs', group: 'Clubs & journeys', params: [int('games', 'Games'), int('clubs', 'Clubs')] },
 
   // Career milestones
   career_games_min: { key: 'career_games_min', label: 'X+ career games', group: 'Career milestones', params: [int('games', 'Games')] },
   career_games_max: { key: 'career_games_max', label: 'Fewer than X career games', group: 'Career milestones', params: [int('games', 'Games')] },
   career_goals_min: { key: 'career_goals_min', label: 'X+ career goals', group: 'Career milestones', params: [int('goals', 'Goals')] },
+  career_goals_max: { key: 'career_goals_max', label: 'X or fewer career goals', group: 'Career milestones', params: [int('goals', 'Goals')] },
   career_stat_total_min: { key: 'career_stat_total_min', label: 'X+ of a stat in a career', group: 'Career milestones', params: [stat(), int('x', 'At least')] },
+  career_stat_avg_min: { key: 'career_stat_avg_min', label: 'Career average of a stat', group: 'Career milestones', params: [stat(), decimal('avg', 'At least (average)'), int('minGames', 'Minimum games')] },
+  career_stat_exceeds: { key: 'career_stat_exceeds', label: 'More of stat A than stat B (career)', group: 'Career milestones', params: [stat('statA', 'Statistic A'), stat('statB', 'Statistic B')] },
+  career_teammates_min: { key: 'career_teammates_min', label: 'X+ career teammates', group: 'Career milestones', params: [int('x', 'At least')] },
+
+  // Single-game feats -- the per-game sibling of the career/season
+  // stat-total builders; shares the same GRID_STATS mechanism.
+  single_game_stat_min: { key: 'single_game_stat_min', label: 'X+ of a stat in one game', group: 'Single-game feats', params: [stat(), int('x', 'At least')] },
+  single_game_two_stats_min: { key: 'single_game_two_stats_min', label: 'Two stats in the same game', group: 'Single-game feats', params: [stat('statA', 'Statistic A'), int('xA', 'At least (A)'), stat('statB', 'Statistic B'), int('xB', 'At least (B)')] },
+  games_with_stat_min_count: { key: 'games_with_stat_min_count', label: 'X+ games with Y+ of a stat', group: 'Single-game feats', params: [stat(), int('y', 'At least (per game)'), int('times', 'In this many games')] },
 
   // Season & era
   debuted_between: { key: 'debuted_between', label: 'Debuted between seasons', group: 'Season & era', params: [season('from', 'From season'), season('to', 'To season')] },
@@ -188,6 +199,15 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   played_between_seasons: { key: 'played_between_seasons', label: 'Played between seasons', group: 'Season & era', params: [season('from', 'From season'), season('to', 'To season')] },
   season_stat_total_min: { key: 'season_stat_total_min', label: 'X+ of a stat in one season', group: 'Season & era', params: [stat(), int('x', 'At least')] },
   games_in_season_min: { key: 'games_in_season_min', label: 'X+ games in one season', group: 'Season & era', params: [int('games', 'Games')] },
+  season_stat_avg_min: { key: 'season_stat_avg_min', label: 'Season average of a stat', group: 'Season & era', params: [stat(), decimal('avg', 'At least (average)')] },
+  season_wins_min: { key: 'season_wins_min', label: 'X+ wins in one season', group: 'Season & era', params: [int('times', 'Wins')] },
+  season_losses_min: { key: 'season_losses_min', label: 'X+ losses in one season', group: 'Season & era', params: [int('times', 'Losses')] },
+  club_season_stat_leader: { key: 'club_season_stat_leader', label: 'Led club in a stat (season)', group: 'Season & era', params: [stat()] },
+  club_season_stat_leader_min_times: { key: 'club_season_stat_leader_min_times', label: 'Led club in a stat, X+ times', group: 'Season & era', params: [stat(), int('times', 'Times')] },
+  wooden_spoon_season: { key: 'wooden_spoon_season', label: 'Wooden spoon season', group: 'Season & era', params: [] },
+  minor_premiership_season: { key: 'minor_premiership_season', label: 'Minor premiership', group: 'Season & era', params: [] },
+  never_minor_premier: { key: 'never_minor_premier', label: 'No minor premierships', group: 'Season & era', params: [] },
+  minor_premierships_min: { key: 'minor_premierships_min', label: 'X+ minor premierships', group: 'Season & era', params: [int('times', 'Times')] },
 
   // Finals & premierships
   played_in_a_final: { key: 'played_in_a_final', label: 'Played in a final', group: 'Finals & premierships', params: [] },
