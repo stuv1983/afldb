@@ -13,6 +13,7 @@
  * inside calendar 2022.
  */
 
+import { SEASON_STATUSES } from '@/search/list-filters';
 import type { FilterField, SelectOption } from '@/search/table-filters';
 
 export const AFLW_PLAYER_GROUPS: Record<string, string> = {
@@ -100,17 +101,38 @@ export function aflwPlayerFilterFields(options: {
   ];
 }
 
-export const AFLW_PLAYER_SORT_OPTIONS: SelectOption[] = [
-  { value: 'games', label: 'Games' },
-  { value: 'goals', label: 'Goals' },
-  { value: 'disposals', label: 'Disposals' },
-  { value: 'marks', label: 'Marks' },
-  { value: 'tackles', label: 'Tackles' },
-  { value: 'premierships', label: 'Premierships' },
-  { value: 'finals', label: 'Finals' },
-  { value: 'debut', label: 'Debut season' },
-  { value: 'name', label: 'Name' },
-];
+/**
+ * Sort keys, each with the label the control shows and the fixed ORDER BY
+ * the query runs.
+ *
+ * One declaration rather than a label list here and an ORDER BY map in
+ * the query module: a sort offered in the UI but missing from the SQL
+ * would render a link that silently falls back to the default order, and
+ * nothing would catch it. The SQL is fixed text, never built from a
+ * request — the same arrangement `advanced-spec.ts` uses.
+ */
+export const AFLW_PLAYER_SORTS = {
+  games: { label: 'Games', sql: 'c.games DESC, p.sort_name' },
+  goals: { label: 'Goals', sql: 'c.goals DESC, p.sort_name' },
+  disposals: { label: 'Disposals', sql: 'c.disposals DESC, p.sort_name' },
+  marks: { label: 'Marks', sql: 'c.marks DESC, p.sort_name' },
+  tackles: { label: 'Tackles', sql: 'c.tackles DESC, p.sort_name' },
+  premierships: {
+    label: 'Premierships', sql: 'c.premierships DESC, c.games DESC, p.sort_name',
+  },
+  finals: { label: 'Finals', sql: 'c.finals DESC, p.sort_name' },
+  debut: { label: 'Debut season', sql: 'c.debut_season_ordinal, p.sort_name' },
+  name: { label: 'Name', sql: 'p.sort_name' },
+} as const;
+
+export type AflwPlayerSort = keyof typeof AFLW_PLAYER_SORTS;
+
+export function isAflwPlayerSort(value: string | undefined): value is AflwPlayerSort {
+  return value !== undefined && Object.hasOwn(AFLW_PLAYER_SORTS, value);
+}
+
+export const AFLW_PLAYER_SORT_OPTIONS: SelectOption[] =
+  Object.entries(AFLW_PLAYER_SORTS).map(([value, { label }]) => ({ value, label }));
 
 export function aflwClubFilterFields(): FilterField[] {
   return [
@@ -123,11 +145,6 @@ export function aflwClubFilterFields(): FilterField[] {
   ];
 }
 
-export const AFLW_SEASON_STATUSES: SelectOption[] = [
-  { value: 'complete', label: 'Complete' },
-  { value: 'in_progress', label: 'In progress' },
-];
-
 export function aflwSeasonFilterFields(premiers: SelectOption[]): FilterField[] {
   return [
     {
@@ -138,8 +155,10 @@ export function aflwSeasonFilterFields(premiers: SelectOption[]): FilterField[] 
       kind: 'range', key: 'ordinal', label: 'Season number', min: 1, max: MAX_SEASON_ORDINAL,
     },
     {
+      // Both competitions' season views emit the same two values, so they
+      // share one vocabulary rather than each keeping a copy to drift.
       kind: 'select', key: 'status', label: 'Status',
-      options: AFLW_SEASON_STATUSES, anyLabel: 'Any status',
+      options: SEASON_STATUSES, anyLabel: 'Any status',
     },
     {
       kind: 'select', key: 'premier', label: 'Premier',
@@ -152,26 +171,49 @@ export function aflwSeasonFilterFields(premiers: SelectOption[]): FilterField[] 
   ];
 }
 
-export const AFLW_MATCH_OUTCOMES: SelectOption[] = [
-  { value: 'decided', label: 'Decided' },
-  { value: 'draw', label: 'Drawn' },
-];
+/**
+ * Result and match-type options, each with the condition it selects.
+ *
+ * Declared the same way as the sorts, and for the same reason: an option
+ * the query has no branch for passes the parse allowlist, counts as an
+ * active filter and is described above the table while the search returns
+ * everything.
+ */
+export const AFLW_MATCH_OUTCOME_FILTERS = {
+  decided: { label: 'Decided', sql: "m.result <> 'draw'" },
+  draw: { label: 'Drawn', sql: "m.result = 'draw'" },
+} as const;
 
-export const AFLW_MATCH_TYPES: SelectOption[] = [
-  { value: 'home_and_away', label: 'Home and away' },
-  { value: 'finals', label: 'Finals' },
-  { value: 'grand_final', label: 'Grand Finals' },
-];
+export const AFLW_MATCH_TYPE_FILTERS = {
+  home_and_away: { label: 'Home and away', sql: 'NOT m.is_final' },
+  finals: { label: 'Finals', sql: 'm.is_final' },
+  grand_final: { label: 'Grand Finals', sql: "m.round_type = 'grand_final'" },
+} as const;
 
-export const AFLW_MATCH_SORT_OPTIONS: SelectOption[] = [
-  { value: 'date_desc', label: 'Most recent' },
-  { value: 'date_asc', label: 'Oldest' },
-  { value: 'margin_desc', label: 'Biggest margin' },
-  { value: 'margin_asc', label: 'Closest margin' },
-  { value: 'total_desc', label: 'Highest combined score' },
-  { value: 'total_asc', label: 'Lowest combined score' },
-  { value: 'high_score_desc', label: 'Highest team score' },
-];
+export const AFLW_MATCH_SORTS = {
+  date_desc: { label: 'Most recent', sql: 'm.match_date DESC, m.match_key DESC' },
+  date_asc: { label: 'Oldest', sql: 'm.match_date, m.match_key' },
+  margin_desc: { label: 'Biggest margin', sql: 'm.margin DESC, m.match_date DESC' },
+  margin_asc: { label: 'Closest margin', sql: 'm.margin, m.match_date DESC' },
+  total_desc: { label: 'Highest combined score', sql: 'm.total_score DESC, m.match_date DESC' },
+  total_asc: { label: 'Lowest combined score', sql: 'm.total_score, m.match_date DESC' },
+  high_score_desc: { label: 'Highest team score', sql: 'm.high_score DESC, m.match_date DESC' },
+} as const;
+
+export type AflwMatchSort = keyof typeof AFLW_MATCH_SORTS;
+
+export function isAflwMatchSort(value: string | undefined): value is AflwMatchSort {
+  return value !== undefined && Object.hasOwn(AFLW_MATCH_SORTS, value);
+}
+
+const options = (
+  entries: Record<string, { label: string }>,
+): SelectOption[] =>
+  Object.entries(entries).map(([value, { label }]) => ({ value, label }));
+
+export const AFLW_MATCH_OUTCOMES: SelectOption[] = options(AFLW_MATCH_OUTCOME_FILTERS);
+export const AFLW_MATCH_TYPES: SelectOption[] = options(AFLW_MATCH_TYPE_FILTERS);
+export const AFLW_MATCH_SORT_OPTIONS: SelectOption[] = options(AFLW_MATCH_SORTS);
 
 export function aflwMatchFilterFields(options: {
   clubs: SelectOption[];

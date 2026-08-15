@@ -2,8 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { FilterErrors } from '@/components/FilterErrors';
 import { TableFilters } from '@/components/TableFilters';
-import { listAflwClubs, listAflwSeasons } from '@/db/queries/aflw';
+import { getAflwClubOptions, listAflwSeasons } from '@/db/queries/aflw';
 import {
   aflwClubPath,
   aflwSeasonPath,
@@ -29,12 +30,8 @@ export default async function AflwSeasonsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const clubs = await listAflwClubs();
-  const fields = aflwSeasonFilterFields(
-    clubs
-      .map((club) => ({ value: club.code, label: club.name }))
-      .sort((a, b) => a.label.localeCompare(b.label)),
-  );
+  const clubs = await getAflwClubOptions();
+  const fields = aflwSeasonFilterFields(clubs);
   const values = parseFilterValues(fields, params);
 
   const seasons = await listAflwSeasons({
@@ -62,11 +59,7 @@ export default async function AflwSeasonsPage({
         </p>
       </div>
 
-      {values.errors.length > 0 && (
-        <div className="notice filter-errors" role="alert">
-          {values.errors.map((error) => <div key={error}>{error}</div>)}
-        </div>
-      )}
+      <FilterErrors errors={values.errors} />
 
       <CollapsibleTable
         title="Seasons"

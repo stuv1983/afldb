@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { FilterErrors } from '@/components/FilterErrors';
 import { TableFilters } from '@/components/TableFilters';
 import { listAflwClubs, listAflwSeasons } from '@/db/queries/aflw';
 import { aflwClubPath, formatNumber, formatPercentage } from '@/lib/format';
@@ -52,11 +53,7 @@ export default async function AflwClubsPage({
         </p>
       </div>
 
-      {values.errors.length > 0 && (
-        <div className="notice filter-errors" role="alert">
-          {values.errors.map((error) => <div key={error}>{error}</div>)}
-        </div>
-      )}
+      <FilterErrors errors={values.errors} />
 
       <CollapsibleTable
         title="Club records"

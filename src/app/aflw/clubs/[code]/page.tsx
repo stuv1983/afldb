@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { FilterErrors } from '@/components/FilterErrors';
 import { TableFilters } from '@/components/TableFilters';
 import {
   getAflwClub,
@@ -50,10 +51,16 @@ export default async function AflwClubPage({
   const [{ code: rawCode }, query] = await Promise.all([params, searchParams]);
   const code = decodeURIComponent(rawCode);
 
-  const club = await getAflwClub(code);
+  // Everything except the player list depends only on the code, so one
+  // wave rather than three: the season options exist to build the filter
+  // panel and have no reason to wait on the club row.
+  const [club, seasonOptions, seasons] = await Promise.all([
+    getAflwClub(code),
+    getAflwSeasonOptions(),
+    getAflwClubSeasons(code),
+  ]);
   if (!club) notFound();
 
-  const seasonOptions = await getAflwSeasonOptions();
   const playerFields: FilterField[] = [
     { kind: 'text', key: 'q', label: 'Name', placeholder: 'Search by name' },
     {
@@ -68,18 +75,15 @@ export default async function AflwClubPage({
   ];
   const values = parseFilterValues(playerFields, query);
 
-  const [seasons, players] = await Promise.all([
-    getAflwClubSeasons(code),
-    listAflwPlayers({
-      sort: 'games',
-      limit: PLAYER_LIMIT,
-      offset: 0,
-      club: code,
-      name: values.text.q,
-      seasonKey: values.select.season,
-      ranges: values,
-    }),
-  ]);
+  const players = await listAflwPlayers({
+    sort: 'games',
+    limit: PLAYER_LIMIT,
+    offset: 0,
+    club: code,
+    name: values.text.q,
+    seasonKey: values.select.season,
+    ranges: values,
+  });
 
   return (
     <>
@@ -97,6 +101,8 @@ export default async function AflwClubPage({
           AFLW · {club.seasonsContested} seasons · {formatNumber(club.matches)} matches
         </p>
       </div>
+
+      <FilterErrors errors={values.errors} />
 
       <div className="stat-strip">
         <div className="stat">

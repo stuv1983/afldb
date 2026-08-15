@@ -88,14 +88,32 @@ const ROUND_SHORT: Record<string, string> = {
   grand_final: 'GF',
 };
 
-export function formatRound(roundType: string, roundNumber: number | null): string {
-  if (roundType === 'home_and_away') return `Round ${roundNumber}`;
-  return ROUND_LABELS[roundType] ?? roundType;
+/**
+ * `fallback` is what a source calls the round in its own words — AFLW
+ * carries a `round_code` alongside the type. It stands in for a type this
+ * map has never seen and for a home-and-away row with no round number,
+ * either of which would otherwise render as a bare identifier or "Rnull".
+ */
+export function formatRound(
+  roundType: string,
+  roundNumber: number | null,
+  fallback?: string | null,
+): string {
+  if (roundType === 'home_and_away') {
+    return roundNumber === null ? (fallback ?? NOT_RECORDED) : `Round ${roundNumber}`;
+  }
+  return ROUND_LABELS[roundType] ?? fallback ?? roundType;
 }
 
-export function formatRoundShort(roundType: string, roundNumber: number | null): string {
-  if (roundType === 'home_and_away') return `R${roundNumber}`;
-  return ROUND_SHORT[roundType] ?? roundType;
+export function formatRoundShort(
+  roundType: string,
+  roundNumber: number | null,
+  fallback?: string | null,
+): string {
+  if (roundType === 'home_and_away') {
+    return roundNumber === null ? (fallback ?? NOT_RECORDED) : `R${roundNumber}`;
+  }
+  return ROUND_SHORT[roundType] ?? fallback ?? roundType;
 }
 
 export function formatDate(value: Date | string | null): string {
@@ -128,6 +146,19 @@ export function formatSpan(from: number | null, to: number | null, ongoing = fal
   if (from === null) return NOT_RECORDED;
   if (ongoing) return `${from}–`;
   if (to === null || to === from) return String(from);
+  return `${from}–${to}`;
+}
+
+/**
+ * The same span rule for endpoints that are labels rather than years.
+ *
+ * AFLW seasons are named, not numbered — two of them fall in 2022 — so a
+ * span there runs between display labels. One season must still collapse
+ * to a single label rather than reading "Season 3–Season 3".
+ */
+export function formatSpanLabel(from: string | null, to: string | null): string {
+  if (!from) return to || NOT_RECORDED;
+  if (!to || to === from) return from;
   return `${from}–${to}`;
 }
 

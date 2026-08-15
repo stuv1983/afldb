@@ -1,20 +1,22 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { FilterErrors } from '@/components/FilterErrors';
 import { Pagination } from '@/components/Pagination';
 import { TableFilters } from '@/components/TableFilters';
 import { getClubOptions } from '@/db/queries/advanced-search';
 import { isPlayerSort, listPlayers, type PlayerSort } from '@/db/queries/players';
 import { getSeasonBounds } from '@/db/queries/seasons';
 import { formatNumber, playerPath } from '@/lib/format';
+import { redirectPastEnd } from '@/lib/pagination';
 import { firstValue, parsePage } from '@/lib/params';
 import { DEFAULT_PAGE_SIZE } from '@/search/constants';
 import { CAREER_GROUPS, clubOptions, playerFilterFields } from '@/search/list-filters';
 import {
   describeFilters,
   filterQueryParams,
+  filterSearchParams,
   parseFilterValues,
   yearOptions,
 } from '@/search/table-filters';
@@ -67,38 +69,21 @@ export default async function PlayersPage({
 
   const linkParams = { ...filterQueryParams(fields, values), sort };
 
-  // A page past the end is a real URL people arrive at from stale links and
-  // hand-edited query strings. Send them to the last page that exists rather
-  // than rendering an empty table under a full result count.
-  if (total > 0 && rows.length === 0) {
-    const lastPage = Math.ceil(total / DEFAULT_PAGE_SIZE);
-    if (page > lastPage) {
-      const query = new URLSearchParams();
-      for (const [key, value] of Object.entries(linkParams)) {
-        if (value === undefined) continue;
-        if (Array.isArray(value)) for (const item of value) query.append(key, item);
-        else query.set(key, value);
-      }
-      if (lastPage > 1) query.set('page', String(lastPage));
-      redirect(`/players?${query}`);
-    }
-  }
+  redirectPastEnd({
+    basePath: '/players',
+    params: linkParams,
+    page,
+    pageSize: DEFAULT_PAGE_SIZE,
+    total,
+  });
 
   const described = describeFilters(fields, values);
 
   // Sort is a row of links rather than a control inside the panel: it is
   // one click, it stays shareable, and it survives a filter submission
   // through the hidden field below.
-  const sortHref = (key: PlayerSort) => {
-    const query = new URLSearchParams();
-    for (const [name, value] of Object.entries(filterQueryParams(fields, values))) {
-      if (value === undefined) continue;
-      if (Array.isArray(value)) for (const item of value) query.append(name, item);
-      else query.set(name, value);
-    }
-    query.set('sort', key);
-    return `/players?${query}`;
-  };
+  const sortHref = (key: PlayerSort) =>
+    `/players?${filterSearchParams(fields, values, { sort: key })}`;
 
   const filters = (
     <TableFilters
@@ -120,11 +105,7 @@ export default async function PlayersPage({
         </p>
       </div>
 
-      {values.errors.length > 0 && (
-        <div className="notice filter-errors" role="alert">
-          {values.errors.map((error) => <div key={error}>{error}</div>)}
-        </div>
-      )}
+      <FilterErrors errors={values.errors} />
 
       <nav aria-label="Sort players" style={{ marginBottom: '0.75rem' }}>
         <span className="muted" style={{ fontSize: '0.8125rem', marginRight: '0.5rem' }}>

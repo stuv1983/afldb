@@ -11,6 +11,7 @@
  * URL asking for a billion goals, not to encode the current record.
  */
 
+import { FIELDS } from '@/search/advanced-spec';
 import type { FilterField, SelectOption } from '@/search/table-filters';
 
 export const CAREER_GROUPS: Record<string, string> = {
@@ -31,6 +32,28 @@ export function clubOptions(
     value: club.slug,
     label: club.isCurrent ? club.name : `${club.name} (historical)`,
   }));
+}
+
+/**
+ * A career range field, taken from the Advanced Search field registry.
+ *
+ * Bounds, grouping and the caveats attached to a statistic describe the
+ * data rather than the layout, so they are read from `FIELDS` rather than
+ * restated: a new bound or a reworded caveat then reaches both surfaces
+ * at once. Only the label may differ — a panel beside a table has less
+ * room than a dedicated search form, so "Career games" becomes "Games".
+ */
+function careerRange(key: string, label?: string): FilterField {
+  const definition = FIELDS[key];
+  return {
+    kind: 'range',
+    key,
+    label: label ?? definition.label,
+    min: definition.min,
+    max: definition.max,
+    group: definition.group,
+    help: definition.help,
+  };
 }
 
 /**
@@ -57,40 +80,17 @@ export function playerFilterFields(options: {
       kind: 'select', key: 'season', label: 'Played in season', group: 'identity',
       options: options.seasons, anyLabel: 'Any season',
     },
-    { kind: 'range', key: 'games', label: 'Games', min: 0, max: 1000, group: 'career' },
-    { kind: 'range', key: 'goals', label: 'Goals', min: 0, max: 2000, group: 'career' },
-    { kind: 'range', key: 'finals', label: 'Finals', min: 0, max: 100, group: 'career' },
-    { kind: 'range', key: 'wins', label: 'Wins', min: 0, max: 500, group: 'career' },
-    {
-      kind: 'range', key: 'seasons', label: 'Seasons played',
-      min: 1, max: 30, group: 'career',
-    },
-    {
-      kind: 'range', key: 'clubs', label: 'Clubs played for',
-      min: 1, max: 10, group: 'career',
-      help: 'Counts actual clubs: a rename such as Kangaroos to North Melbourne counts once.',
-    },
-    {
-      kind: 'range', key: 'premierships', label: 'Premierships',
-      min: 0, max: 20, group: 'honours',
-    },
-    {
-      kind: 'range', key: 'brownlow_votes', label: 'Brownlow votes',
-      min: 0, max: 400, group: 'honours',
-      help: 'Career total from the official season counts, available from 1924.',
-    },
-    {
-      kind: 'range', key: 'brownlow_medals', label: 'Brownlow medals',
-      min: 0, max: 10, group: 'honours',
-    },
-    {
-      kind: 'range', key: 'debut', label: 'Debut season',
-      min: SEASON_MIN, max: SEASON_MAX, group: 'span',
-    },
-    {
-      kind: 'range', key: 'final', label: 'Final season',
-      min: SEASON_MIN, max: SEASON_MAX, group: 'span',
-    },
+    careerRange('games', 'Games'),
+    careerRange('goals', 'Goals'),
+    careerRange('finals', 'Finals'),
+    careerRange('wins', 'Wins'),
+    careerRange('seasons'),
+    careerRange('clubs'),
+    careerRange('premierships'),
+    careerRange('brownlow_votes'),
+    careerRange('brownlow_medals'),
+    careerRange('debut'),
+    careerRange('final'),
   ];
 }
 

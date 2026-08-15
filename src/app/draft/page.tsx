@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { FilterErrors } from '@/components/FilterErrors';
 import { Pagination } from '@/components/Pagination';
 import { TableFilters } from '@/components/TableFilters';
 import { getClubOptions } from '@/db/queries/advanced-search';
@@ -70,11 +71,7 @@ export default async function DraftPage({
         </p>
       </div>
 
-      {values.errors.length > 0 && (
-        <div className="notice filter-errors" role="alert">
-          {values.errors.map((error) => <div key={error}>{error}</div>)}
-        </div>
-      )}
+      <FilterErrors errors={values.errors} />
 
       <CollapsibleTable
         title="Draft picks"

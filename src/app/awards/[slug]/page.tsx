@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { FilterErrors } from '@/components/FilterErrors';
 import { TableFilters } from '@/components/TableFilters';
 import {
   getAward,
@@ -110,8 +111,13 @@ export default async function AwardPage({
   const filteredWinners = winners.filter((w) => {
     if (nameTerm && !w.playerName.toLowerCase().includes(nameTerm)) return false;
     if (clubSlug && w.clubSlug !== clubSlug) return false;
-    if (seasonRange?.min !== undefined && (w.season ?? 0) < seasonRange.min) return false;
-    if (seasonRange?.max !== undefined && (w.season ?? 9999) > seasonRange.max) return false;
+    // A winner with no recorded season is outside any season range, the
+    // same way a NULL fails both halves of a SQL BETWEEN. Substituting a
+    // sentinel would drop those rows from a minimum and keep them under a
+    // maximum, which is the one thing a range filter must not do.
+    if (seasonRange && w.season === null) return false;
+    if (seasonRange?.min !== undefined && w.season! < seasonRange.min) return false;
+    if (seasonRange?.max !== undefined && w.season! > seasonRange.max) return false;
     return true;
   });
   const showVotes = winners.some((w) => w.votes !== null);
@@ -329,11 +335,7 @@ export default async function AwardPage({
               />
             }
           >
-          {winnerValues.errors.length > 0 && (
-            <div className="notice filter-errors" role="alert">
-              {winnerValues.errors.map((error) => <div key={error}>{error}</div>)}
-            </div>
-          )}
+          <FilterErrors errors={winnerValues.errors} />
           {filteredWinners.length === 0 ? (
             <div className="empty">
               <h2>No winners match those filters</h2>

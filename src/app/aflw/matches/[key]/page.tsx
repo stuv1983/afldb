@@ -15,6 +15,7 @@ import {
   aflwSeasonPath,
   formatDateLong,
   formatNumber,
+  formatRound,
   formatScore,
 } from '@/lib/format';
 
@@ -47,13 +48,14 @@ export default async function AflwMatchPage({
   const { key: rawKey } = await params;
   const matchKey = decodeURIComponent(rawKey);
 
-  const match = await getAflwMatch(matchKey);
-  if (!match) notFound();
-
-  const [players, scoring] = await Promise.all([
+  // The team sheet and the scoring events are keyed by the match key, not
+  // by anything on the match row, so all three run together.
+  const [match, players, scoring] = await Promise.all([
+    getAflwMatch(matchKey),
     getAflwMatchPlayers(matchKey),
     getAflwMatchScoring(matchKey),
   ]);
+  if (!match) notFound();
 
   const teams = [
     { code: match.homeTeamCode, name: match.homeClubName, score: match.homeScore },
@@ -81,9 +83,7 @@ export default async function AflwMatchPage({
           {formatDateLong(match.matchDate)}
           {match.matchTime ? ` · ${match.matchTime}` : ''}
           {' · '}
-          {match.roundType === 'home_and_away'
-            ? `Round ${match.roundNumber}`
-            : match.roundCode}
+          {formatRound(match.roundType, match.roundNumber, match.roundCode)}
           {' · '}{match.venueName}
           {match.weatherRaw ? ` · ${match.weatherRaw}` : ''}
         </p>

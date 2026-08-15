@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { FilterErrors } from '@/components/FilterErrors';
 import { TableFilters } from '@/components/TableFilters';
 import { getHallOfFameCategories, listHallOfFame } from '@/db/queries/awards';
 import { formatNumber, isLinked, playerPath } from '@/lib/format';
@@ -81,11 +82,7 @@ export default async function HallOfFamePage({
         rather than filtered out.
       </p>
 
-      {values.errors.length > 0 && (
-        <div className="notice filter-errors" role="alert">
-          {values.errors.map((error) => <div key={error}>{error}</div>)}
-        </div>
-      )}
+      <FilterErrors errors={values.errors} />
 
       {/* Both tables below are views of the same filtered list, so the
           panel governs the page rather than sitting inside one of them. */}

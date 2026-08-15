@@ -285,33 +285,46 @@ export function searchRecords(query: string, limit = 5): SearchResult[] {
  * and nothing links the two sides of the database. Merging the two into
  * one "Players" list would imply a shared record that does not exist, so
  * the results are grouped separately and labelled.
+ *
+ * AFLW is keyed by slug rather than by a numeric id, so — as with record
+ * categories — the position in the list stands in for one, negative to
+ * keep it clear of any real row id.
+ *
+ * A failure here degrades to no AFLW results rather than failing the
+ * search: the read model lives behind its own migration, so an app
+ * deployed ahead of it must still answer every other kind of query.
  */
 async function aflwResults(
   query: string,
   limits: { players: number; clubs: number },
 ): Promise<{ players: SearchResult[]; clubs: SearchResult[] }> {
   const [players, clubs] = await Promise.all([
-    searchAflwPlayers(query, limits.players),
-    searchAflwClubs(query, limits.clubs),
+    searchAflwPlayers(query, limits.players).catch(aflwUnavailable),
+    searchAflwClubs(query, limits.clubs).catch(aflwUnavailable),
   ]);
   return {
-    players: players.map((row) => ({
+    players: players.map((row, i) => ({
       type: 'aflw_player' as const,
-      id: 0,
+      id: -(i + 1),
       slug: row.slug,
       title: row.title,
       subtitle: row.subtitle,
       rank: row.rank,
     })),
-    clubs: clubs.map((row) => ({
+    clubs: clubs.map((row, i) => ({
       type: 'aflw_club' as const,
-      id: 0,
+      id: -(i + 1),
       slug: row.slug,
       title: row.title,
       subtitle: row.subtitle,
       rank: row.rank,
     })),
   };
+}
+
+function aflwUnavailable(error: unknown): [] {
+  console.error('AFLW search unavailable', error);
+  return [];
 }
 
 export type GlobalSearchResults = {

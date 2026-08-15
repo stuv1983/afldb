@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { FilterErrors } from '@/components/FilterErrors';
 import { TableFilters } from '@/components/TableFilters';
 import { getClubOptions } from '@/db/queries/advanced-search';
 import {
@@ -31,6 +32,10 @@ import {
 // Reading searchParams already makes this render per request; the route
 // keeps its generateStaticParams so the category list still seeds the cache.
 export const revalidate = 3600;
+
+export function generateStaticParams() {
+  return Object.keys(RECORD_CATEGORIES).map((category) => ({ category }));
+}
 
 export async function generateMetadata({
   params,
@@ -145,11 +150,7 @@ export default async function RecordCategoryPage({
 
       {definition.coverage && <p className="notice">{definition.coverage}</p>}
 
-      {values.errors.length > 0 && (
-        <div className="notice filter-errors" role="alert">
-          {values.errors.map((error) => <div key={error}>{error}</div>)}
-        </div>
-      )}
+      <FilterErrors errors={values.errors} />
 
       {/* Filtering never renumbers the board: the # column is the position
           in the full record, so a club filter shows its players at 1, 4

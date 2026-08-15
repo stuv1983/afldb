@@ -1,13 +1,21 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { FilterErrors } from '@/components/FilterErrors';
 import { TableFilters } from '@/components/TableFilters';
 import { getClubOptions } from '@/db/queries/advanced-search';
 import { getSeasonLeagues, listSeasons } from '@/db/queries/seasons';
 import { clubPath, formatNumber, seasonPath } from '@/lib/format';
+import { firstValue, parseSeason } from '@/lib/params';
 import { clubOptions, seasonFilterFields } from '@/search/list-filters';
-import { describeFilters, optionsFrom, parseFilterValues } from '@/search/table-filters';
+import {
+  describeFilters,
+  optionsFrom,
+  parseFilterValues,
+  toSearchParams,
+} from '@/search/table-filters';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +31,25 @@ export default async function SeasonsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
+
+  // This page filtered on ?from=/?to= before it moved to the declarative
+  // fields, and those links are bookmarked and shared. Translating them
+  // to the current names keeps them filtering; ignoring them would render
+  // the full list with no sign that the range had been dropped.
+  const legacyFrom = parseSeason(firstValue(params.from));
+  const legacyTo = parseSeason(firstValue(params.to));
+  if (legacyFrom !== undefined || legacyTo !== undefined) {
+    const { from: _from, to: _to, ...rest } = params;
+    const search = toSearchParams(rest);
+    if (legacyFrom !== undefined && !search.has('year_min')) {
+      search.set('year_min', String(legacyFrom));
+    }
+    if (legacyTo !== undefined && !search.has('year_max')) {
+      search.set('year_max', String(legacyTo));
+    }
+    redirect(`/seasons?${search}`);
+  }
+
   const [leagues, clubs] = await Promise.all([getSeasonLeagues(), getClubOptions()]);
   const fields = seasonFilterFields({
     leagues: optionsFrom(leagues),
@@ -50,11 +77,7 @@ export default async function SeasonsPage({
         </p>
       </div>
 
-      {values.errors.length > 0 && (
-        <div className="notice filter-errors" role="alert">
-          {values.errors.map((error) => <div key={error}>{error}</div>)}
-        </div>
-      )}
+      <FilterErrors errors={values.errors} />
 
       <CollapsibleTable
         title="Seasons"

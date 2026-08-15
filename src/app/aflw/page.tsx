@@ -44,6 +44,12 @@ export default async function AflwPage() {
 
   const current = seasons.find((season) => season.status === 'in_progress');
 
+  // Counted rather than written down: a season that awarded no premiership
+  // is not always the abandoned one — a season still being played has not
+  // awarded one yet either, and next year there is one more of each.
+  const decided = seasons.filter((season) => season.premierCode !== null).length;
+  const undecided = seasons.length - decided;
+
   return (
     <>
       <div className="page-header">
@@ -159,8 +165,13 @@ export default async function AflwPage() {
           <div className="table-wrap">
             <table>
               <caption>
-                2020 was abandoned at the semi-finals and awarded no premiership, so
-                ten seasons have produced a premier rather than eleven.
+                {decided} of {seasons.length} seasons have produced a premier
+                {undecided > 0 && (
+                  <>
+                    {' '}— 2020 was abandoned at the semi-finals and awarded no
+                    premiership, and a season still being played has yet to award one
+                  </>
+                )}.
               </caption>
               <thead>
                 <tr>

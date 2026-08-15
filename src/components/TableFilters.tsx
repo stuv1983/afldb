@@ -38,8 +38,13 @@ export function TableFilters({
   /** Fieldset legends, keyed by the `group` a field declares. */
   groups?: Record<string, string>;
   sort?: { name: string; label: string; value: string; options: SelectOption[] };
-  /** Parameters the form must carry through, such as a search sentinel. */
-  hidden?: Record<string, string>;
+  /**
+   * Parameters the form must carry through, such as a search sentinel or,
+   * where two panels share one URL, the other panel's applied filters —
+   * a GET form submits only its own inputs, so anything not repeated here
+   * is dropped from the query string when this panel is applied.
+   */
+  hidden?: Record<string, string | string[] | undefined>;
   submitLabel?: string;
   defaultOpen?: boolean;
 }) {
@@ -62,9 +67,13 @@ export function TableFilters({
       </summary>
 
       <form method="get" action={action}>
-        {Object.entries(hidden ?? {}).map(([name, value]) => (
-          <input key={name} type="hidden" name={name} value={value} />
-        ))}
+        {Object.entries(hidden ?? {}).flatMap(([name, value]) => {
+          if (value === undefined) return [];
+          const items = Array.isArray(value) ? value : [value];
+          return items.map((item, i) => (
+            <input key={`${name}-${i}`} type="hidden" name={name} value={item} />
+          ));
+        })}
 
         {ungrouped.length > 0 && (
           <div className="filter-grid">
@@ -118,7 +127,7 @@ function Field({ field, values }: { field: FilterField; values: FilterValues }) 
             name={`${field.key}_min`}
             type="number"
             inputMode="numeric"
-            step={field.step ?? 1}
+            step={1}
             placeholder="min"
             min={field.min}
             max={field.max}
@@ -130,7 +139,7 @@ function Field({ field, values }: { field: FilterField; values: FilterValues }) 
             name={`${field.key}_max`}
             type="number"
             inputMode="numeric"
-            step={field.step ?? 1}
+            step={1}
             placeholder="max"
             min={field.min}
             max={field.max}
@@ -182,7 +191,7 @@ function Field({ field, values }: { field: FilterField; values: FilterValues }) 
         id={field.key}
         name={field.key}
         multiple
-        size={field.size ?? 6}
+        size={6}
         defaultValue={values.multi[field.key] ?? []}
       >
         {field.options.map((option) => (

@@ -138,6 +138,18 @@ describe('round-tripping a filter through the URL', () => {
     expect(filterSearchParams(FIELDS, values).toString()).toBe('state=VIC&state=SA');
   });
 
+  it('appends extra parameters without losing a repeated key', () => {
+    const values = parseFilterValues(FIELDS, { state: ['VIC', 'SA'] });
+    expect(filterSearchParams(FIELDS, values, { sort: 'goals' }).toString())
+      .toBe('state=VIC&state=SA&sort=goals');
+  });
+
+  it('drops an undefined extra rather than writing it as a value', () => {
+    const values = parseFilterValues(FIELDS, { games_min: '10' });
+    expect(filterSearchParams(FIELDS, values, { sort: undefined }).toString())
+      .toBe('games_min=10');
+  });
+
   it('shows the clamped value in the control, not the value typed', () => {
     const values = parseFilterValues(FIELDS, { games_min: '99999' });
     expect(fieldValue(values, FIELDS[0], 'min')).toBe('1000');

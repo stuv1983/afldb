@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { FilterErrors } from '@/components/FilterErrors';
 import { TableFilters } from '@/components/TableFilters';
 import { getClubStates, listClubs } from '@/db/queries/clubs';
 import { clubPath, formatSpan } from '@/lib/format';
@@ -48,11 +49,7 @@ export default async function ClubsPage({
         </p>
       </div>
 
-      {values.errors.length > 0 && (
-        <div className="notice filter-errors" role="alert">
-          {values.errors.map((error) => <div key={error}>{error}</div>)}
-        </div>
-      )}
+      <FilterErrors errors={values.errors} />
 
       {/* One panel, not one per section: these filters narrow the current
           clubs and the historical identities together, and splitting them

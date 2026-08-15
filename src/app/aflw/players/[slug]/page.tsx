@@ -19,9 +19,12 @@ import {
   formatAverage,
   formatDate,
   formatNumber,
+  formatRoundShort,
+  formatSpanLabel,
 } from '@/lib/format';
+import { redirectPastEnd } from '@/lib/pagination';
 import { firstValue, parsePage } from '@/lib/params';
-import { parseFilterValues, type FilterField } from '@/search/table-filters';
+import { filterQueryParams, parseFilterValues, type FilterField } from '@/search/table-filters';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,13 +57,17 @@ export default async function AflwPlayerPage({
   const [{ slug: rawSlug }, query] = await Promise.all([params, searchParams]);
   const slug = decodeURIComponent(rawSlug);
 
-  const player = await getAflwPlayer(slug);
+  // All three are keyed by the slug alone, so they run together rather
+  // than one waiting on the last.
+  const [player, seasonOptions, seasons] = await Promise.all([
+    getAflwPlayer(slug),
+    getAflwSeasonOptions(),
+    getAflwPlayerSeasons(slug),
+  ]);
   if (!player) notFound();
 
-  const seasonOptions = await getAflwSeasonOptions();
   // Only the seasons this player actually appeared in are offered, so the
   // control cannot produce an empty match log.
-  const seasons = await getAflwPlayerSeasons(slug);
   const playedKeys = new Set(seasons.map((season) => season.seasonKey));
   const matchFields: FilterField[] = [
     {
@@ -82,6 +89,14 @@ export default async function AflwPlayerPage({
     seasonKey: values.select.season,
   });
 
+  redirectPastEnd({
+    basePath: aflwPlayerPath(slug),
+    params: filterQueryParams(matchFields, values),
+    page,
+    pageSize: MATCHES_PER_PAGE,
+    total: matches.total,
+  });
+
   return (
     <>
       <nav className="breadcrumbs" aria-label="Breadcrumb">
@@ -97,9 +112,7 @@ export default async function AflwPlayerPage({
         <p className="subtitle">
           {player.clubNames ?? 'AFLW'}
           {' · '}
-          {player.debutSeasonLabel === player.finalSeasonLabel
-            ? player.debutSeasonLabel
-            : `${player.debutSeasonLabel}–${player.finalSeasonLabel}`}
+          {formatSpanLabel(player.debutSeasonLabel, player.finalSeasonLabel)}
           {' · '}
           {formatNumber(player.games)} games
         </p>
@@ -308,9 +321,7 @@ export default async function AflwPlayerPage({
                         </td>
                         <td className="nowrap">{match.seasonLabel}</td>
                         <td className="nowrap">
-                          {match.roundType === 'home_and_away'
-                            ? `R${match.roundNumber}`
-                            : match.roundCode}
+                          {formatRoundShort(match.roundType, match.roundNumber, match.roundCode)}
                         </td>
                         <td className="wide">
                           <Link href={aflwClubPath(match.opponentCode)}>

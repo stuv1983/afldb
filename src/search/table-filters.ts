@@ -17,6 +17,8 @@
  * server-only imports.
  */
 
+import { clampBound, firstValue, invertedRangeError } from '@/lib/params';
+
 export type SelectOption = { value: string; label: string };
 
 type FieldBase = {
@@ -32,8 +34,6 @@ export type RangeField = FieldBase & {
   kind: 'range';
   min: number;
   max: number;
-  /** Rendered on the inputs; the parser always works in whole numbers. */
-  step?: number;
 };
 
 export type TextField = FieldBase & {
@@ -54,7 +54,6 @@ export type MultiSelectField = FieldBase & {
   kind: 'multi';
   options: SelectOption[];
   max: number;
-  size?: number;
 };
 
 export type FilterField = RangeField | TextField | SelectField | MultiSelectField;
@@ -74,24 +73,9 @@ export type FilterValues = {
 
 export const MAX_TEXT_LENGTH = 100;
 
-function first(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
-
 function all(value: string | string[] | undefined): string[] {
   if (value === undefined) return [];
   return Array.isArray(value) ? value : [value];
-}
-
-function clampInt(
-  raw: string | undefined,
-  min: number,
-  max: number,
-): number | undefined {
-  if (raw === undefined || raw.trim() === '') return undefined;
-  const value = Number(raw);
-  if (!Number.isFinite(value)) return undefined;
-  return Math.min(Math.max(Math.trunc(value), min), max);
 }
 
 /**
@@ -114,13 +98,15 @@ export function parseFilterValues(
   for (const field of fields) {
     switch (field.kind) {
       case 'range': {
-        const min = clampInt(first(params[`${field.key}_min`]), field.min, field.max);
-        const max = clampInt(first(params[`${field.key}_max`]), field.min, field.max);
+        const { value: min } = clampBound(
+          firstValue(params[`${field.key}_min`]), field.min, field.max,
+        );
+        const { value: max } = clampBound(
+          firstValue(params[`${field.key}_max`]), field.min, field.max,
+        );
         if (min === undefined && max === undefined) break;
         if (min !== undefined && max !== undefined && min > max) {
-          values.errors.push(
-            `${field.label}: minimum (${min}) is above maximum (${max}).`,
-          );
+          values.errors.push(invertedRangeError(field.label, min, max));
           break;
         }
         values.range[field.key] = { min, max };
@@ -128,14 +114,14 @@ export function parseFilterValues(
         break;
       }
       case 'text': {
-        const raw = first(params[field.key])?.trim() ?? '';
+        const raw = firstValue(params[field.key])?.trim() ?? '';
         if (!raw) break;
         values.text[field.key] = raw.slice(0, field.maxLength ?? MAX_TEXT_LENGTH);
         values.active += 1;
         break;
       }
       case 'select': {
-        const raw = first(params[field.key])?.trim() ?? '';
+        const raw = firstValue(params[field.key])?.trim() ?? '';
         if (!raw) break;
         if (!field.options.some((option) => option.value === raw)) break;
         values.select[field.key] = raw;
@@ -209,17 +195,53 @@ export function filterQueryParams(
   return params;
 }
 
-export function filterSearchParams(
-  fields: readonly FilterField[],
-  values: FilterValues,
+/**
+ * Array-aware encoding, the one place a repeated parameter is written.
+ *
+ * A multi-select carries its key once per selected value, so anything
+ * building a URL by hand risks keeping only the first — which turns a
+ * two-club filter into a one-club filter the moment the reader re-sorts.
+ */
+export function toSearchParams(
+  params: Record<string, string | string[] | undefined>,
 ): URLSearchParams {
   const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(filterQueryParams(fields, values))) {
+  for (const [key, value] of Object.entries(params)) {
     if (value === undefined) continue;
     if (Array.isArray(value)) for (const item of value) search.append(key, item);
     else search.set(key, value);
   }
   return search;
+}
+
+/**
+ * The applied filters as a query string, plus whatever the caller adds.
+ *
+ * `extra` is where sort and page belong: `filterQueryParams` deliberately
+ * omits both, and a caller that needs them should not rebuild the rest.
+ */
+export function filterSearchParams(
+  fields: readonly FilterField[],
+  values: FilterValues,
+  extra: Record<string, string | string[] | undefined> = {},
+): URLSearchParams {
+  return toSearchParams({ ...filterQueryParams(fields, values), ...extra });
+}
+
+/**
+ * "Games 100–200", "Games ≥ 100", "Games ≤ 200".
+ *
+ * Every filtered surface prints its ranges through this, so the summary
+ * line above a table reads the same way whichever page produced it.
+ */
+export function describeRange(
+  label: string,
+  min: number | undefined,
+  max: number | undefined,
+): string {
+  if (min !== undefined && max !== undefined) return `${label} ${min}–${max}`;
+  if (min !== undefined) return `${label} ≥ ${min}`;
+  return `${label} ≤ ${max}`;
 }
 
 /** One short phrase per applied filter, for the summary line above a table. */
@@ -236,13 +258,7 @@ export function describeFilters(
       case 'range': {
         const range = values.range[field.key];
         if (!range) break;
-        if (range.min !== undefined && range.max !== undefined) {
-          described.push(`${field.label} ${range.min}–${range.max}`);
-        } else if (range.min !== undefined) {
-          described.push(`${field.label} ≥ ${range.min}`);
-        } else {
-          described.push(`${field.label} ≤ ${range.max}`);
-        }
+        described.push(describeRange(field.label, range.min, range.max));
         break;
       }
       case 'text':

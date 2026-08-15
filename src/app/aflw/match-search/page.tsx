@@ -2,13 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { FilterErrors } from '@/components/FilterErrors';
 import { Pagination } from '@/components/Pagination';
 import { TableFilters } from '@/components/TableFilters';
 import {
-  type AflwMatchSort,
+  getAflwClubOptions,
   getAflwSeasonOptions,
-  isAflwMatchSort,
-  listAflwClubs,
   listAflwVenues,
   runAflwMatchSearch,
 } from '@/db/queries/aflw';
@@ -18,13 +17,17 @@ import {
   aflwSeasonPath,
   formatDate,
   formatNumber,
+  formatRoundShort,
   formatScore,
 } from '@/lib/format';
+import { redirectPastEnd } from '@/lib/pagination';
 import { firstValue, parsePage } from '@/lib/params';
 import {
   AFLW_MATCH_GROUPS,
   AFLW_MATCH_SORT_OPTIONS,
+  type AflwMatchSort,
   aflwMatchFilterFields,
+  isAflwMatchSort,
 } from '@/search/aflw-filters';
 import { DEFAULT_PAGE_SIZE } from '@/search/constants';
 import {
@@ -54,14 +57,12 @@ export default async function AflwMatchSearchPage({
   const sort: AflwMatchSort = isAflwMatchSort(sortParam) ? sortParam : 'date_desc';
 
   const [clubs, seasons, venues] = await Promise.all([
-    listAflwClubs(),
+    getAflwClubOptions(),
     getAflwSeasonOptions(),
     listAflwVenues(),
   ]);
   const fields = aflwMatchFilterFields({
-    clubs: clubs
-      .map((club) => ({ value: club.code, label: club.name }))
-      .sort((a, b) => a.label.localeCompare(b.label)),
+    clubs,
     seasons: seasons.map((season) => ({ value: season.key, label: season.label })),
     venues: venues.map((venue) => ({
       value: venue.slug,
@@ -83,6 +84,15 @@ export default async function AflwMatchSearchPage({
   });
 
   const linkParams = { ...filterQueryParams(fields, values), sort };
+
+  redirectPastEnd({
+    basePath: '/aflw/match-search',
+    params: linkParams,
+    page,
+    pageSize: DEFAULT_PAGE_SIZE,
+    total,
+  });
+
   const described = describeFilters(fields, values);
 
   const filters = (
@@ -116,11 +126,7 @@ export default async function AflwMatchSearchPage({
         </p>
       </div>
 
-      {values.errors.length > 0 && (
-        <div className="notice filter-errors" role="alert">
-          {values.errors.map((error) => <div key={error}>{error}</div>)}
-        </div>
-      )}
+      <FilterErrors errors={values.errors} />
 
       <CollapsibleTable
         title="Matches"
@@ -164,9 +170,7 @@ export default async function AflwMatchSearchPage({
                         </Link>
                       </td>
                       <td className="nowrap">
-                        {match.roundType === 'home_and_away'
-                          ? `R${match.roundNumber}`
-                          : match.roundCode}
+                        {formatRoundShort(match.roundType, match.roundNumber, match.roundCode)}
                       </td>
                       <td className="wide">
                         <Link href={aflwClubPath(match.homeTeamCode)}>

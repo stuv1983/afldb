@@ -3,12 +3,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { FilterErrors } from '@/components/FilterErrors';
 import { TableFilters } from '@/components/TableFilters';
 import {
+  getAflwClubOptions,
   getAflwLadder,
   getAflwSeason,
   getAflwSeasonMatches,
-  listAflwClubs,
   listAflwPlayers,
 } from '@/db/queries/aflw';
 import {
@@ -19,8 +20,10 @@ import {
   formatDate,
   formatNumber,
   formatPercentage,
+  formatRoundShort,
   formatScore,
 } from '@/lib/format';
+import { AFLW_MATCH_TYPES } from '@/search/aflw-filters';
 import { type FilterField, parseFilterValues } from '@/search/table-filters';
 
 export const dynamic = 'force-dynamic';
@@ -54,13 +57,18 @@ export default async function AflwSeasonPage({
   const [{ key: rawKey }, query] = await Promise.all([params, searchParams]);
   const seasonKey = decodeURIComponent(rawKey);
 
-  const season = await getAflwSeason(seasonKey);
+  // Nothing in this wave depends on anything else in it: every query is
+  // keyed by the season alone, and the club list only fills a dropdown.
+  const [season, clubOptions, ladder, allMatches, leaders] = await Promise.all([
+    getAflwSeason(seasonKey),
+    getAflwClubOptions(),
+    getAflwLadder(seasonKey),
+    getAflwSeasonMatches(seasonKey),
+    listAflwPlayers({
+      sort: 'goals', limit: LEADER_LIMIT, offset: 0, seasonKey,
+    }),
+  ]);
   if (!season) notFound();
-
-  const clubs = await listAflwClubs();
-  const clubOptions = clubs
-    .map((club) => ({ value: club.code, label: club.name }))
-    .sort((a, b) => a.label.localeCompare(b.label));
 
   const matchFields: FilterField[] = [
     {
@@ -70,27 +78,18 @@ export default async function AflwSeasonPage({
     },
     {
       kind: 'select', key: 'type', label: 'Match type', anyLabel: 'Any match',
-      options: [
-        { value: 'home_and_away', label: 'Home and away' },
-        { value: 'finals', label: 'Finals' },
-      ],
+      options: AFLW_MATCH_TYPES,
     },
     { kind: 'range', key: 'margin', label: 'Margin', min: 0, max: 300 },
     { kind: 'range', key: 'round', label: 'Round', min: 1, max: 30 },
   ];
   const matchValues = parseFilterValues(matchFields, query);
 
-  const [ladder, allMatches, leaders] = await Promise.all([
-    getAflwLadder(seasonKey),
-    getAflwSeasonMatches(seasonKey),
-    listAflwPlayers({
-      sort: 'goals', limit: LEADER_LIMIT, offset: 0, seasonKey,
-    }),
-  ]);
-
-  // The season's match list is 108 rows at most, so it is filtered here
-  // rather than in a second query: one round trip, and the filter reads
-  // the same way as the SQL one it stands in for.
+  // The season's match list is 108 rows at most and is already loaded for
+  // the results table, so it is filtered here rather than in a second
+  // query. The vocabulary is Match Search's own `AFLW_MATCH_TYPES`, and
+  // each branch mirrors the condition `runAflwMatchSearch` builds, so the
+  // same `type` value means the same thing on both pages.
   const club = matchValues.select.club;
   const type = matchValues.select.type;
   const margin = matchValues.range.margin;
@@ -99,10 +98,15 @@ export default async function AflwSeasonPage({
     if (club && match.homeTeamCode !== club && match.awayTeamCode !== club) return false;
     if (type === 'finals' && !match.isFinal) return false;
     if (type === 'home_and_away' && match.isFinal) return false;
+    if (type === 'grand_final' && match.roundType !== 'grand_final') return false;
     if (margin?.min !== undefined && match.margin < margin.min) return false;
     if (margin?.max !== undefined && match.margin > margin.max) return false;
-    if (round?.min !== undefined && (match.roundNumber ?? 0) < round.min) return false;
-    if (round?.max !== undefined && (match.roundNumber ?? 99) > round.max) return false;
+    // A final has no round number, so it is outside every round range —
+    // the same way a NULL fails both halves of a SQL BETWEEN. Sentinels
+    // would drop finals from a minimum and keep them under a maximum.
+    if (round && match.roundNumber === null) return false;
+    if (round?.min !== undefined && match.roundNumber! < round.min) return false;
+    if (round?.max !== undefined && match.roundNumber! > round.max) return false;
     return true;
   });
 
@@ -126,6 +130,8 @@ export default async function AflwSeasonPage({
           {' · '}{formatNumber(season.clubCount)} clubs
         </p>
       </div>
+
+      <FilterErrors errors={matchValues.errors} />
 
       {!season.hasGrandFinal && (
         <p className="notice">
@@ -230,9 +236,7 @@ export default async function AflwSeasonPage({
                         </Link>
                       </td>
                       <td className="nowrap">
-                        {match.roundType === 'home_and_away'
-                          ? `R${match.roundNumber}`
-                          : match.roundCode}
+                        {formatRoundShort(match.roundType, match.roundNumber, match.roundCode)}
                       </td>
                       <td className="wide">
                         <Link href={aflwClubPath(match.homeTeamCode)}>

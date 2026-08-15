@@ -2,9 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { FilterErrors } from '@/components/FilterErrors';
 import { TableFilters } from '@/components/TableFilters';
 import { listAflwVenues } from '@/db/queries/aflw';
-import { formatNumber } from '@/lib/format';
+import { formatNumber, formatSpanLabel } from '@/lib/format';
 import { aflwVenueFilterFields } from '@/search/aflw-filters';
 import { describeFilters, parseFilterValues } from '@/search/table-filters';
 
@@ -44,11 +45,7 @@ export default async function AflwVenuesPage({
         </p>
       </div>
 
-      {values.errors.length > 0 && (
-        <div className="notice filter-errors" role="alert">
-          {values.errors.map((error) => <div key={error}>{error}</div>)}
-        </div>
-      )}
+      <FilterErrors errors={values.errors} />
 
       <CollapsibleTable
         title="Venues"
@@ -86,9 +83,7 @@ export default async function AflwVenuesPage({
                       </Link>
                     </td>
                     <td className="num nowrap">
-                      {venue.firstSeasonLabel === venue.lastSeasonLabel
-                        ? venue.firstSeasonLabel
-                        : `${venue.firstSeasonLabel}–${venue.lastSeasonLabel}`}
+                      {formatSpanLabel(venue.firstSeasonLabel, venue.lastSeasonLabel)}
                     </td>
                     <td className="num">{formatNumber(venue.matches)}</td>
                   </tr>

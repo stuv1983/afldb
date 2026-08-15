@@ -7,6 +7,9 @@
  * the database.
  */
 
+import { clampBound, firstValue, invertedRangeError } from '@/lib/params';
+import { describeRange } from '@/search/table-filters';
+
 export type MatchFieldDefinition = {
   key: string;
   label: string;
@@ -110,20 +113,13 @@ export type MatchParseResult = {
   notices: string[];
 };
 
-function first(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
+const first = firstValue;
 
 function clampInt(
   raw: string | undefined,
   definition: MatchFieldDefinition,
 ): { value: number | undefined; clamped: boolean } {
-  if (raw === undefined || raw.trim() === '') return { value: undefined, clamped: false };
-  const value = Number(raw);
-  if (!Number.isFinite(value)) return { value: undefined, clamped: false };
-  const truncated = Math.trunc(value);
-  const bounded = Math.min(Math.max(truncated, definition.min), definition.max);
-  return { value: bounded, clamped: bounded !== truncated };
+  return clampBound(raw, definition.min, definition.max);
 }
 
 export function parseMatchSearchQuery(
@@ -149,9 +145,7 @@ export function parseMatchSearchQuery(
     }
 
     if (min !== undefined && max !== undefined && min > max) {
-      errors.push(
-        `${definition.label}: minimum (${min}) is above maximum (${max}).`,
-      );
+      errors.push(invertedRangeError(definition.label, min, max));
       continue;
     }
     filters.push({ field: key, min, max });
@@ -253,14 +247,8 @@ export function matchFieldValue(
 }
 
 export function describeMatchQuery(query: MatchSearchQuery): string[] {
-  const descriptions = query.filters.map((filter) => {
-    const definition = MATCH_FIELDS[filter.field];
-    if (filter.min !== undefined && filter.max !== undefined) {
-      return `${definition.label} ${filter.min}–${filter.max}`;
-    }
-    if (filter.min !== undefined) return `${definition.label} ≥ ${filter.min}`;
-    return `${definition.label} ≤ ${filter.max}`;
-  });
+  const descriptions = query.filters.map((filter) =>
+    describeRange(MATCH_FIELDS[filter.field].label, filter.min, filter.max));
 
   if (query.outcome !== 'all') descriptions.push(MATCH_OUTCOMES[query.outcome]);
   if (query.matchType !== 'all') descriptions.push(MATCH_TYPES[query.matchType]);

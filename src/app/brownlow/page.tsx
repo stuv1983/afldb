@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { FilterErrors } from '@/components/FilterErrors';
 import { TableFilters } from '@/components/TableFilters';
 import { getClubOptions } from '@/db/queries/advanced-search';
 import { getBrownlowCareerLeaders, getBrownlowWinners } from '@/db/queries/brownlow';
@@ -11,7 +12,7 @@ import {
   brownlowWinnerFilterFields,
   clubOptions,
 } from '@/search/list-filters';
-import { describeFilters, parseFilterValues } from '@/search/table-filters';
+import { describeFilters, filterQueryParams, parseFilterValues } from '@/search/table-filters';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,11 +35,16 @@ export default async function BrownlowPage({
   const clubs = await getClubOptions();
 
   // Two independent tables on one URL, so each panel owns its own
-  // parameter names and neither can disturb the other's controls.
+  // parameter names and neither can disturb the other's controls. Each
+  // form also carries the other's applied values as hidden inputs: a GET
+  // form submits only the inputs it contains, so without them applying
+  // one panel would silently clear the other table's filters.
   const winnerFields = brownlowWinnerFilterFields(clubOptions(clubs));
   const leaderFields = brownlowLeaderFilterFields();
   const winnerValues = parseFilterValues(winnerFields, params);
   const leaderValues = parseFilterValues(leaderFields, params);
+  const winnerCarried = filterQueryParams(winnerFields, winnerValues);
+  const leaderCarried = filterQueryParams(leaderFields, leaderValues);
 
   const [winners, leaders] = await Promise.all([
     getBrownlowWinners({
@@ -74,11 +80,7 @@ export default async function BrownlowPage({
         per-game vote means it was not published, not that no vote was polled.
       </p>
 
-      {errors.length > 0 && (
-        <div className="notice filter-errors" role="alert">
-          {errors.map((error) => <div key={error}>{error}</div>)}
-        </div>
-      )}
+      <FilterErrors errors={errors} />
 
       <section className="section">
         <CollapsibleTable
@@ -94,6 +96,7 @@ export default async function BrownlowPage({
               fields={leaderFields}
               values={leaderValues}
               title="Filter career leaders"
+              hidden={winnerCarried}
             />
           }
         >
@@ -119,9 +122,9 @@ export default async function BrownlowPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {leaders.rows.map((row, i) => (
+                  {leaders.rows.map((row) => (
                     <tr key={row.playerId}>
-                      <td className="num">{i + 1}</td>
+                      <td className="num">{row.rank}</td>
                       <td className="wide">
                         <Link href={playerPath(row.slug, row.playerId)}>{row.displayName}</Link>
                       </td>
@@ -147,6 +150,7 @@ export default async function BrownlowPage({
               fields={winnerFields}
               values={winnerValues}
               title="Filter winners"
+              hidden={leaderCarried}
             />
           }
         >

@@ -1,28 +1,30 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { FilterErrors } from '@/components/FilterErrors';
 import { Pagination } from '@/components/Pagination';
 import { TableFilters } from '@/components/TableFilters';
 import {
-  type AflwPlayerSort,
+  getAflwClubOptions,
   getAflwSeasonOptions,
-  isAflwPlayerSort,
-  listAflwClubs,
   listAflwPlayers,
 } from '@/db/queries/aflw';
-import { aflwPlayerPath, formatNumber } from '@/lib/format';
+import { aflwPlayerPath, formatNumber, formatSpanLabel } from '@/lib/format';
+import { redirectPastEnd } from '@/lib/pagination';
 import { firstValue, parsePage } from '@/lib/params';
 import {
   AFLW_PLAYER_GROUPS,
   AFLW_PLAYER_SORT_OPTIONS,
+  type AflwPlayerSort,
   aflwPlayerFilterFields,
+  isAflwPlayerSort,
 } from '@/search/aflw-filters';
 import { DEFAULT_PAGE_SIZE } from '@/search/constants';
 import {
   describeFilters,
   filterQueryParams,
+  filterSearchParams,
   parseFilterValues,
 } from '@/search/table-filters';
 
@@ -46,11 +48,12 @@ export default async function AflwPlayersPage({
   const sortParam = firstValue(params.sort);
   const sort: AflwPlayerSort = isAflwPlayerSort(sortParam) ? sortParam : 'games';
 
-  const [clubs, seasons] = await Promise.all([listAflwClubs(), getAflwSeasonOptions()]);
+  const [clubs, seasons] = await Promise.all([
+    getAflwClubOptions(),
+    getAflwSeasonOptions(),
+  ]);
   const fields = aflwPlayerFilterFields({
-    clubs: clubs
-      .map((club) => ({ value: club.code, label: club.name }))
-      .sort((a, b) => a.label.localeCompare(b.label)),
+    clubs,
     seasons: seasons.map((season) => ({ value: season.key, label: season.label })),
   });
   const values = parseFilterValues(fields, params);
@@ -67,34 +70,20 @@ export default async function AflwPlayersPage({
 
   const linkParams = { ...filterQueryParams(fields, values), sort };
 
-  if (total > 0 && rows.length === 0) {
-    const lastPage = Math.ceil(total / DEFAULT_PAGE_SIZE);
-    if (page > lastPage) {
-      const query = new URLSearchParams();
-      for (const [key, value] of Object.entries(linkParams)) {
-        if (value === undefined) continue;
-        if (Array.isArray(value)) for (const item of value) query.append(key, item);
-        else query.set(key, value);
-      }
-      if (lastPage > 1) query.set('page', String(lastPage));
-      redirect(`/aflw/players?${query}`);
-    }
-  }
+  redirectPastEnd({
+    basePath: '/aflw/players',
+    params: linkParams,
+    page,
+    pageSize: DEFAULT_PAGE_SIZE,
+    total,
+  });
 
   const described = describeFilters(fields, values);
 
   // Same arrangement as the AFL player index: sort is a row of links, and
   // the panel carries the current sort through a submission.
-  const sortHref = (key: string) => {
-    const query = new URLSearchParams();
-    for (const [name, value] of Object.entries(filterQueryParams(fields, values))) {
-      if (value === undefined) continue;
-      if (Array.isArray(value)) for (const item of value) query.append(name, item);
-      else query.set(name, value);
-    }
-    query.set('sort', key);
-    return `/aflw/players?${query}`;
-  };
+  const sortHref = (key: string) =>
+    `/aflw/players?${filterSearchParams(fields, values, { sort: key })}`;
 
   const filters = (
     <TableFilters
@@ -122,11 +111,7 @@ export default async function AflwPlayersPage({
         </p>
       </div>
 
-      {values.errors.length > 0 && (
-        <div className="notice filter-errors" role="alert">
-          {values.errors.map((error) => <div key={error}>{error}</div>)}
-        </div>
-      )}
+      <FilterErrors errors={values.errors} />
 
       <nav aria-label="Sort players" style={{ marginBottom: '0.75rem' }}>
         <span className="muted" style={{ fontSize: '0.8125rem', marginRight: '0.5rem' }}>
@@ -189,9 +174,7 @@ export default async function AflwPlayersPage({
                       </td>
                       <td className="wide">{player.clubNames ?? '—'}</td>
                       <td className="num nowrap">
-                        {player.debutSeasonLabel === player.finalSeasonLabel
-                          ? player.debutSeasonLabel
-                          : `${player.debutSeasonLabel}–${player.finalSeasonLabel}`}
+                        {formatSpanLabel(player.debutSeasonLabel, player.finalSeasonLabel)}
                       </td>
                       <td className="num">{formatNumber(player.games)}</td>
                       <td className="num">{formatNumber(player.goals)}</td>

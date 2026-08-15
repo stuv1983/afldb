@@ -1,7 +1,17 @@
 import 'server-only';
 
+import { cache } from 'react';
+
 import { sql } from '@/db/client';
 import { allOf, containsPattern, rangeConditions } from '@/db/queries/filters';
+import {
+  AFLW_MATCH_OUTCOME_FILTERS,
+  AFLW_MATCH_SORTS,
+  AFLW_MATCH_TYPE_FILTERS,
+  AFLW_PLAYER_SORTS,
+  type AflwMatchSort,
+  type AflwPlayerSort,
+} from '@/search/aflw-filters';
 import type { FilterValues } from '@/search/table-filters';
 
 /**
@@ -17,6 +27,11 @@ import type { FilterValues } from '@/search/table-filters';
  * A club, player, venue and match are identified by the source's own key.
  * The scrape carries no AFLW rename history and applies current club
  * names retroactively, so a name is a label, not an identity.
+ *
+ * The single-row getters are wrapped in React's `cache`, because every
+ * detail page asks for the same row twice: once in `generateMetadata` and
+ * once in the page body. Without it each request runs the aggregate over
+ * the whole player-match table twice to render one page.
  */
 
 // ---------------------------------------------------------------------------
@@ -84,15 +99,17 @@ export async function listAflwSeasons(filters: {
   `;
 }
 
-export async function getAflwSeason(seasonKey: string): Promise<AflwSeasonSummary | null> {
-  const [row] = await sql<AflwSeasonSummary[]>`
-    SELECT ${SEASON_COLUMNS}
-      FROM aflw.seasons s
-      LEFT JOIN aflw.clubs pc ON pc.code = s.premier_team_code
-     WHERE s.season_key = ${seasonKey}
-  `;
-  return row ?? null;
-}
+export const getAflwSeason = cache(
+  async (seasonKey: string): Promise<AflwSeasonSummary | null> => {
+    const [row] = await sql<AflwSeasonSummary[]>`
+      SELECT ${SEASON_COLUMNS}
+        FROM aflw.seasons s
+        LEFT JOIN aflw.clubs pc ON pc.code = s.premier_team_code
+       WHERE s.season_key = ${seasonKey}
+    `;
+    return row ?? null;
+  },
+);
 
 /** Season options for a filter control, newest first. */
 export async function getAflwSeasonOptions(): Promise<{ key: string; label: string }[]> {
@@ -158,6 +175,16 @@ export const AFLW_CLUB_FILTER_COLUMNS: Record<string, string> = {
   premierships: 'c.premierships',
 };
 
+const CLUB_COLUMNS = sql`
+  c.code, c.name,
+  c.first_season_ordinal AS "firstSeasonOrdinal",
+  c.last_season_ordinal  AS "lastSeasonOrdinal",
+  c.seasons_contested    AS "seasonsContested",
+  c.matches, c.wins, c.draws, c.losses, c.finals, c.premierships,
+  c.points_for     AS "pointsFor",
+  c.points_against AS "pointsAgainst"
+`;
+
 export async function listAflwClubs(filters: {
   q?: string;
   ranges?: FilterValues;
@@ -169,32 +196,31 @@ export async function listAflwClubs(filters: {
   const where = allOf(conditions);
 
   return sql<AflwClubRow[]>`
-    SELECT c.code, c.name,
-           c.first_season_ordinal AS "firstSeasonOrdinal",
-           c.last_season_ordinal  AS "lastSeasonOrdinal",
-           c.seasons_contested    AS "seasonsContested",
-           c.matches, c.wins, c.draws, c.losses, c.finals, c.premierships,
-           c.points_for     AS "pointsFor",
-           c.points_against AS "pointsAgainst"
+    SELECT ${CLUB_COLUMNS}
       FROM aflw.club_totals c
      WHERE ${where}
      ORDER BY c.premierships DESC, c.wins DESC, c.name
   `;
 }
 
-export async function getAflwClub(code: string): Promise<AflwClubRow | null> {
+export const getAflwClub = cache(async (code: string): Promise<AflwClubRow | null> => {
   const [row] = await sql<AflwClubRow[]>`
-    SELECT c.code, c.name,
-           c.first_season_ordinal AS "firstSeasonOrdinal",
-           c.last_season_ordinal  AS "lastSeasonOrdinal",
-           c.seasons_contested    AS "seasonsContested",
-           c.matches, c.wins, c.draws, c.losses, c.finals, c.premierships,
-           c.points_for     AS "pointsFor",
-           c.points_against AS "pointsAgainst"
-      FROM aflw.club_totals c
-     WHERE c.code = ${code}
+    SELECT ${CLUB_COLUMNS} FROM aflw.club_totals c WHERE c.code = ${code}
   `;
   return row ?? null;
+});
+
+/**
+ * Clubs as filter options, in label order.
+ *
+ * Reads the club list rather than `club_totals`: a dropdown needs a code
+ * and a name, and the totals view recomputes every club's win-loss ledger
+ * over the whole match table to produce them.
+ */
+export async function getAflwClubOptions(): Promise<{ value: string; label: string }[]> {
+  return sql<{ value: string; label: string }[]>`
+    SELECT code AS value, name AS label FROM aflw.clubs ORDER BY name
+  `;
 }
 
 export type AflwClubSeasonRow = {
@@ -270,26 +296,7 @@ export const AFLW_PLAYER_FILTER_COLUMNS: Record<string, string> = {
   seasons: 'c.seasons_played',
   clubs: 'c.clubs_played',
   debut: 'c.debut_season_ordinal',
-  final: 'c.final_season_ordinal',
 };
-
-export const AFLW_PLAYER_SORTS = {
-  games: 'c.games DESC, p.sort_name',
-  goals: 'c.goals DESC, p.sort_name',
-  disposals: 'c.disposals DESC, p.sort_name',
-  marks: 'c.marks DESC, p.sort_name',
-  tackles: 'c.tackles DESC, p.sort_name',
-  premierships: 'c.premierships DESC, c.games DESC, p.sort_name',
-  finals: 'c.finals DESC, p.sort_name',
-  debut: 'c.debut_season_ordinal, p.sort_name',
-  name: 'p.sort_name',
-} as const;
-
-export type AflwPlayerSort = keyof typeof AFLW_PLAYER_SORTS;
-
-export function isAflwPlayerSort(value: string | undefined): value is AflwPlayerSort {
-  return value !== undefined && Object.hasOwn(AFLW_PLAYER_SORTS, value);
-}
 
 export async function listAflwPlayers(options: {
   sort: AflwPlayerSort;
@@ -301,7 +308,7 @@ export async function listAflwPlayers(options: {
   ranges?: FilterValues;
 }): Promise<{ rows: AflwPlayerListRow[]; total: number }> {
   const { sort, limit, offset, name, club, seasonKey, ranges } = options;
-  const orderBy = AFLW_PLAYER_SORTS[sort];
+  const orderBy = AFLW_PLAYER_SORTS[sort].sql;
 
   const conditions = ranges ? rangeConditions(ranges, AFLW_PLAYER_FILTER_COLUMNS) : [];
   if (name) conditions.push(sql`p.display_name ILIKE ${containsPattern(name)}`);
@@ -381,7 +388,7 @@ export type AflwPlayerProfile = {
   bestDisposalsGame: number;
 };
 
-export async function getAflwPlayer(slug: string): Promise<AflwPlayerProfile | null> {
+export const getAflwPlayer = cache(async (slug: string): Promise<AflwPlayerProfile | null> => {
   const [row] = await sql<AflwPlayerProfile[]>`
     SELECT p.slug, p.display_name AS "displayName",
            p.current_club_name AS "currentClubName",
@@ -407,7 +414,7 @@ export async function getAflwPlayer(slug: string): Promise<AflwPlayerProfile | n
      WHERE p.slug = ${slug}
   `;
   return row ?? null;
-}
+});
 
 export type AflwPlayerSeasonRow = {
   seasonKey: string;
@@ -564,12 +571,12 @@ const MATCH_COLUMNS = sql`
   m.result, m.winner_team_code AS "winnerTeamCode"
 `;
 
-export async function getAflwMatch(matchKey: string): Promise<AflwMatchRow | null> {
+export const getAflwMatch = cache(async (matchKey: string): Promise<AflwMatchRow | null> => {
   const [row] = await sql<AflwMatchRow[]>`
     SELECT ${MATCH_COLUMNS} FROM aflw.matches m WHERE m.match_key = ${matchKey}
   `;
   return row ?? null;
-}
+});
 
 export async function getAflwSeasonMatches(seasonKey: string): Promise<AflwMatchRow[]> {
   return sql<AflwMatchRow[]>`
@@ -663,27 +670,7 @@ export const AFLW_MATCH_FILTER_COLUMNS: Record<string, string> = {
   total_score: 'm.total_score',
   high_score: 'm.high_score',
   low_score: 'm.low_score',
-  home_score: 'm.home_score',
-  away_score: 'm.away_score',
-  season: 'm.season_ordinal',
-  year: 'm.calendar_year',
 };
-
-export const AFLW_MATCH_SORTS = {
-  date_desc: 'm.match_date DESC, m.match_key DESC',
-  date_asc: 'm.match_date, m.match_key',
-  margin_desc: 'm.margin DESC, m.match_date DESC',
-  margin_asc: 'm.margin, m.match_date DESC',
-  total_desc: 'm.total_score DESC, m.match_date DESC',
-  total_asc: 'm.total_score, m.match_date DESC',
-  high_score_desc: 'm.high_score DESC, m.match_date DESC',
-} as const;
-
-export type AflwMatchSort = keyof typeof AFLW_MATCH_SORTS;
-
-export function isAflwMatchSort(value: string | undefined): value is AflwMatchSort {
-  return value !== undefined && Object.hasOwn(AFLW_MATCH_SORTS, value);
-}
 
 export async function runAflwMatchSearch(options: {
   sort: AflwMatchSort;
@@ -706,18 +693,23 @@ export async function runAflwMatchSearch(options: {
   }
   if (seasonKey) conditions.push(sql`m.season_key = ${seasonKey}`);
   if (venue) conditions.push(sql`m.venue_slug = ${venue}`);
-  if (outcome === 'draw') conditions.push(sql`m.result = 'draw'`);
-  if (outcome === 'decided') conditions.push(sql`m.result <> 'draw'`);
-  if (matchType === 'finals') conditions.push(sql`m.is_final`);
-  if (matchType === 'home_and_away') conditions.push(sql`NOT m.is_final`);
-  if (matchType === 'grand_final') conditions.push(sql`m.round_type = 'grand_final'`);
+  // The condition comes from the same declaration the select options are
+  // built from, so an option can never exist without the SQL behind it.
+  const outcomeFilter = outcome ? AFLW_MATCH_OUTCOME_FILTERS[
+    outcome as keyof typeof AFLW_MATCH_OUTCOME_FILTERS
+  ] : undefined;
+  if (outcomeFilter) conditions.push(sql`${sql.unsafe(outcomeFilter.sql)}`);
+  const typeFilter = matchType ? AFLW_MATCH_TYPE_FILTERS[
+    matchType as keyof typeof AFLW_MATCH_TYPE_FILTERS
+  ] : undefined;
+  if (typeFilter) conditions.push(sql`${sql.unsafe(typeFilter.sql)}`);
   const where = allOf(conditions);
 
   const rows = await sql<(AflwMatchRow & { total: string })[]>`
     SELECT ${MATCH_COLUMNS}, count(*) OVER () AS total
       FROM aflw.matches m
      WHERE ${where}
-     ORDER BY ${sql.unsafe(AFLW_MATCH_SORTS[sort])}
+     ORDER BY ${sql.unsafe(AFLW_MATCH_SORTS[sort].sql)}
      LIMIT ${limit} OFFSET ${offset}
   `;
   if (rows.length > 0) return { rows, total: Number(rows[0].total) };

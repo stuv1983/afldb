@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   NOT_RECORDED,
+  formatRound,
+  formatRoundShort,
   formatScore,
   formatSpan,
+  formatSpanLabel,
   formatStat,
   parseEntitySlug,
   playerPath,
@@ -50,6 +53,44 @@ describe('formatSpan', () => {
 
   it('reports an unknown span as not recorded', () => {
     expect(formatSpan(null, null)).toBe(NOT_RECORDED);
+  });
+});
+
+describe('formatSpanLabel', () => {
+  it('renders a span between two season labels', () => {
+    expect(formatSpanLabel('2017', 'Season Seven')).toBe('2017–Season Seven');
+  });
+
+  it('collapses a single season to one label', () => {
+    expect(formatSpanLabel('Season Six', 'Season Six')).toBe('Season Six');
+  });
+
+  it('reports an unknown span as not recorded', () => {
+    expect(formatSpanLabel(null, null)).toBe(NOT_RECORDED);
+  });
+});
+
+describe('formatRound', () => {
+  it('numbers a home-and-away round', () => {
+    expect(formatRound('home_and_away', 12)).toBe('Round 12');
+    expect(formatRoundShort('home_and_away', 12)).toBe('R12');
+  });
+
+  it('names a final from its type', () => {
+    expect(formatRound('grand_final', null)).toBe('Grand Final');
+    expect(formatRoundShort('grand_final', null)).toBe('GF');
+  });
+
+  // A round type this map has never seen, or a home-and-away row with no
+  // number, must not render as an identifier or as "Rnull".
+  it('falls back to the source label for an unknown type', () => {
+    expect(formatRound('finals_week_1', null, 'Finals Week 1')).toBe('Finals Week 1');
+    expect(formatRoundShort('finals_week_1', null, 'FW1')).toBe('FW1');
+  });
+
+  it('falls back when a home-and-away round has no number', () => {
+    expect(formatRoundShort('home_and_away', null, 'Opening Round')).toBe('Opening Round');
+    expect(formatRoundShort('home_and_away', null)).toBe(NOT_RECORDED);
   });
 });
 

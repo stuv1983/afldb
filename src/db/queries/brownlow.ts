@@ -65,6 +65,7 @@ export async function getBrownlowWinners(filters: {
 }
 
 export type BrownlowLeaderRow = {
+  rank: number;
   playerId: number;
   slug: string;
   displayName: string;
@@ -74,9 +75,9 @@ export type BrownlowLeaderRow = {
 };
 
 export const BROWNLOW_LEADER_FILTER_COLUMNS: Record<string, string> = {
-  lvotes: 'c.brownlow_votes',
-  lmedals: 'c.brownlow_medals',
-  lgames: 'c.games',
+  lvotes: 'r.votes',
+  lmedals: 'r.medals',
+  lgames: 'r.games',
 };
 
 /**
@@ -86,6 +87,11 @@ export const BROWNLOW_LEADER_FILTER_COLUMNS: Record<string, string> = {
  * table share one URL: unprefixed `votes` belongs to the winners panel,
  * and two panels writing the same parameter would move each other's
  * controls.
+ *
+ * Rank is computed over every player with a vote and the filters applied
+ * outside that subquery, for the reason the record boards state: a
+ * narrowed leaderboard must show real positions rather than renumbering
+ * whoever survives the filter into an all-time lead they do not hold.
  */
 export async function getBrownlowCareerLeaders(filters: {
   q?: string;
@@ -95,17 +101,25 @@ export async function getBrownlowCareerLeaders(filters: {
   const conditions = filters.ranges
     ? rangeConditions(filters.ranges, BROWNLOW_LEADER_FILTER_COLUMNS)
     : [];
-  if (filters.q) conditions.push(sql`p.display_name ILIKE ${containsPattern(filters.q)}`);
+  if (filters.q) conditions.push(sql`r."displayName" ILIKE ${containsPattern(filters.q)}`);
   const where = allOf(conditions);
 
   const rows = await sql<(BrownlowLeaderRow & { total: string })[]>`
-    SELECT p.id AS "playerId", p.slug, p.display_name AS "displayName",
-           c.brownlow_votes AS votes, c.brownlow_medals AS medals, c.games,
+    WITH ranked AS (
+      SELECT rank() OVER (ORDER BY c.brownlow_votes DESC)::int AS rank,
+             p.id AS "playerId", p.slug, p.display_name AS "displayName",
+             p.sort_name AS "sortName",
+             c.brownlow_votes AS votes, c.brownlow_medals AS medals, c.games
+        FROM player_career_stats c
+        JOIN players p ON p.id = c.player_id
+       WHERE c.brownlow_votes > 0
+    )
+    SELECT r.rank, r."playerId", r.slug, r."displayName",
+           r.votes, r.medals, r.games,
            count(*) OVER () AS total
-      FROM player_career_stats c
-      JOIN players p ON p.id = c.player_id
-     WHERE c.brownlow_votes > 0 AND ${where}
-     ORDER BY c.brownlow_votes DESC, p.sort_name
+      FROM ranked r
+     WHERE ${where}
+     ORDER BY r.votes DESC, r."sortName"
      LIMIT ${filters.limit}
   `;
 

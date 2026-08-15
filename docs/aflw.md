@@ -13,7 +13,7 @@ read before touching the data itself.
 | Layer | What it is |
 |---|---|
 | `staging_aflw` | Migration 025. The aflwstats.com scrape as published, 51,018 rows |
-| `aflw` | Migration 026. Views over staging: the read model the site queries |
+| `aflw` | Migration 026, corrected by 027. Views over staging: the read model the site queries |
 | `src/db/queries/aflw.ts` | Every AFLW query |
 | `src/search/aflw-filters.ts` | The filter panel each AFLW table offers |
 | `src/app/aflw/**` | Pages |
@@ -92,7 +92,12 @@ only; `aflw.fixtures` carries the full published list with
 Six matches) and `scheduled` (106 in 2026).
 
 **A season is complete when nothing is still scheduled.** Season Six is
-complete despite two fixtures never being played; 2026 is not.
+complete despite two fixtures never being played; 2026 is not. `status`
+and `is_complete` are two readings of that one test, computed once.
+
+**A venue slug comes from `aflw.venue_slug()`.** `aflw.matches` builds the
+link and `aflw.venues` answers it, so the rule is a function rather than
+an expression written out in each view.
 
 **An empty scoring cell is a real zero.** For goals, behinds and score
 points the source prints an empty cell rather than `0.0` for a player who

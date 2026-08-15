@@ -11,6 +11,9 @@
  * Component form, so it must stay free of server-only imports.
  */
 
+import { clampBound, firstValue, invertedRangeError } from '@/lib/params';
+import { describeRange } from '@/search/table-filters';
+
 export type FieldType = 'integer' | 'season';
 
 export type FieldDefinition = {
@@ -130,10 +133,7 @@ function clampInt(
   raw: string | undefined,
   def: FieldDefinition,
 ): number | undefined {
-  if (raw === undefined || raw === '') return undefined;
-  const value = Number(raw);
-  if (!Number.isFinite(value)) return undefined;
-  return Math.min(Math.max(Math.trunc(value), def.min), def.max);
+  return clampBound(raw, def.min, def.max).value;
 }
 
 /**
@@ -148,8 +148,7 @@ export function parseAdvancedQuery(
   params: Record<string, string | string[] | undefined>,
 ): ParseResult {
   const errors: string[] = [];
-  const first = (v: string | string[] | undefined) =>
-    Array.isArray(v) ? v[0] : v;
+  const first = firstValue;
 
   const filters: RangeFilter[] = [];
   for (const key of FIELD_KEYS) {
@@ -159,7 +158,7 @@ export function parseAdvancedQuery(
     if (min === undefined && max === undefined) continue;
 
     if (min !== undefined && max !== undefined && min > max) {
-      errors.push(`${def.label}: minimum (${min}) is above maximum (${max}).`);
+      errors.push(invertedRangeError(def.label, min, max));
       continue;
     }
     filters.push({ field: key, min, max });
@@ -204,12 +203,6 @@ export function buildQueryString(query: Partial<AdvancedQuery>): string {
 }
 
 export function describeQuery(query: AdvancedQuery): string[] {
-  return query.filters.map((filter) => {
-    const def = FIELDS[filter.field];
-    if (filter.min !== undefined && filter.max !== undefined) {
-      return `${def.label} ${filter.min}–${filter.max}`;
-    }
-    if (filter.min !== undefined) return `${def.label} ≥ ${filter.min}`;
-    return `${def.label} ≤ ${filter.max}`;
-  });
+  return query.filters.map((filter) =>
+    describeRange(FIELDS[filter.field].label, filter.min, filter.max));
 }

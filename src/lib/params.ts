@@ -58,3 +58,31 @@ export function firstValue(
 ): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
+
+/**
+ * One end of a range filter, clamped into the field's declared bounds.
+ *
+ * Every filtered surface on the site — the list panels, Advanced Player
+ * Search and Match Search — reads its bounds through this, so they agree
+ * on what a hand-edited URL means: whole numbers only, out-of-range
+ * clamped rather than rejected, and anything unparseable treated as
+ * absent. `clamped` says whether the value the query will run with is the
+ * one that was asked for, which the surfaces that show notices report.
+ */
+export function clampBound(
+  raw: string | undefined,
+  min: number,
+  max: number,
+): { value: number | undefined; clamped: boolean } {
+  if (raw === undefined || raw.trim() === '') return { value: undefined, clamped: false };
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return { value: undefined, clamped: false };
+  const truncated = Math.trunc(value);
+  const bounded = Math.min(Math.max(truncated, min), max);
+  return { value: bounded, clamped: bounded !== truncated };
+}
+
+/** The one wording for a range that cannot be honoured. */
+export function invertedRangeError(label: string, min: number, max: number): string {
+  return `${label}: minimum (${min}) is above maximum (${max}).`;
+}
