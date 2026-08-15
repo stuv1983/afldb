@@ -58,10 +58,16 @@ export default async function AdminDashboard() {
       )}
 
       {admin.role === 'super_admin' && (
-        <p className="section-note">
-          <Link href="/admin/query-builder">Data QA search →</Link>{' '}
-          — build ad-hoc queries against the underlying tables to check data.
-        </p>
+        <>
+          <p className="section-note">
+            <Link href="/admin/query-builder">Data QA search →</Link>{' '}
+            — build ad-hoc queries against the underlying tables to check data.
+          </p>
+          <p className="section-note">
+            <Link href="/admin/db-health">Database health →</Link>{' '}
+            — table inventory, derived-data reconciliation and link quality.
+          </p>
+        </>
       )}
 
       <section className="section">
