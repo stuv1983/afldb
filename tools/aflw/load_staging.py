@@ -84,6 +84,14 @@ def zero(value: str) -> int:
     return int(value) if value not in ("", None) else 0
 
 
+# A blank in a numeric or date column means NULL. In these two text columns
+# it is the value itself: conference is '' in every season except 2020 and
+# is part of the ladder primary key, and player_name_raw is '' for the 80%
+# of scores whose worm names only the club. Converting either to NULL
+# violates NOT NULL and loses the distinction.
+BLANK_IS_EMPTY_STRING = {"conference", "player_name_raw"}
+
+
 # ---------------------------------------------------------------------------
 # Constraint pre-flight — mirrors staging_schema.sql exactly
 # ---------------------------------------------------------------------------
@@ -238,8 +246,11 @@ def load(conn, in_dir: Path) -> None:
             statement = f"COPY staging_aflw.{name} ({target}) FROM STDIN"
             with cur.copy(statement) as copy:
                 for row in rows:
-                    copy.write_row([row[column] if row[column] != "" else None
-                                    for column in columns])
+                    copy.write_row([
+                        row[column]
+                        if row[column] != "" or column in BLANK_IS_EMPTY_STRING
+                        else None
+                        for column in columns])
             print(f"  staging_aflw.{name:<22} {len(rows):>7,} rows")
             total += len(rows)
         cur.execute("ANALYZE staging_aflw.player_match_stats")
