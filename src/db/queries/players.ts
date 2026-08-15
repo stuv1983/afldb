@@ -142,12 +142,19 @@ export type PlayerProfile = {
   games: number;
   goals: number;
   behinds: number | null;
+  behindsRecordedGames: number;
+  kicks: number | null;
+  kicksRecordedGames: number;
+  handballs: number | null;
+  handballsRecordedGames: number;
   disposals: number | null;
   disposalsRecordedGames: number;
   marks: number | null;
+  marksRecordedGames: number;
   tackles: number | null;
   tacklesRecordedGames: number;
   hitouts: number | null;
+  hitoutsRecordedGames: number;
   finals: number;
   premierships: number;
   wins: number;
@@ -172,11 +179,15 @@ export async function getPlayer(id: number): Promise<PlayerProfile | null> {
            p.dob_disputed AS "dobDisputed",
            p.birth_year AS "birthYear",
            p.birth_year_confidence AS "birthYearConfidence",
-           c.games, c.goals, c.behinds, c.disposals,
-           c.disposals_recorded_games AS "disposalsRecordedGames",
-           c.marks, c.tackles,
-           c.tackles_recorded_games AS "tacklesRecordedGames",
-           c.hitouts, c.finals, c.premierships, c.wins, c.draws, c.losses,
+           c.games, c.goals,
+           c.behinds, c.behinds_recorded_games AS "behindsRecordedGames",
+           c.kicks, c.kicks_recorded_games AS "kicksRecordedGames",
+           c.handballs, c.handballs_recorded_games AS "handballsRecordedGames",
+           c.disposals, c.disposals_recorded_games AS "disposalsRecordedGames",
+           c.marks, c.marks_recorded_games AS "marksRecordedGames",
+           c.tackles, c.tackles_recorded_games AS "tacklesRecordedGames",
+           c.hitouts, c.hitouts_recorded_games AS "hitoutsRecordedGames",
+           c.finals, c.premierships, c.wins, c.draws, c.losses,
            c.brownlow_votes AS "brownlowVotes",
            c.brownlow_medals AS "brownlowMedals",
            c.clubs_played AS "clubsPlayed",

@@ -152,6 +152,9 @@ export default async function PlayerPage({
           {' · '}
           {formatSpan(player.debutSeason, player.finalSeason, stillPlaying)}
         </p>
+        <p className="section-note">
+          <Link href={`/players/compare?a=${player.id}`}>Compare with another player →</Link>
+        </p>
       </div>
 
       <div className="stat-strip">

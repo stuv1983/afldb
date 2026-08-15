@@ -103,6 +103,10 @@ export default async function PlayersPage({
           {formatNumber(total)} players
           {described.length > 0 ? ` · ${described.join(' · ')}` : ''}
         </p>
+        <p className="section-note">
+          <Link href="/players/compare">Compare two players →</Link>{' '}
+          — career stats side by side, from any club or era, plus every match they shared.
+        </p>
       </div>
 
       <FilterErrors errors={values.errors} />

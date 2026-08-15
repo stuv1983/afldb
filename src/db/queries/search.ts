@@ -442,11 +442,15 @@ export async function aflwOnlySearch(
   return { players, clubs, total: players.length + clubs.length };
 }
 
-export type SearchScope = 'aflw';
+export type SearchScope = 'aflw' | 'players';
 
 /**
- * Autocomplete across every entity type, or — with `scope: 'aflw'` — just
- * AFLW players and clubs, for the scoped box on /aflw.
+ * Autocomplete across every entity type, or scoped: `'aflw'` for just AFLW
+ * players and clubs (the box on /aflw), `'players'` for AFL/VFL players
+ * only (the PlayerPicker used by /players/compare and the grid solver's
+ * Teammates category) -- a straight pass-through to searchPlayers rather
+ * than the mixed fan-out below, since a picker filling one slot has no use
+ * for a season or venue suggestion mixed in.
  *
  * Players fill whatever the other types leave free, which in practice is
  * most of the list: a season, round or award match is close to exact
@@ -460,6 +464,10 @@ export async function autocomplete(
   const trimmed = query.trim();
   if (trimmed.length < MIN_QUERY_LENGTH) return [];
   const capped = Math.min(limit, 10);
+
+  if (scope === 'players') {
+    return searchPlayers(trimmed, capped);
+  }
 
   if (scope === 'aflw') {
     const aflw = await aflwResults(trimmed, { players: capped, clubs: 2 });

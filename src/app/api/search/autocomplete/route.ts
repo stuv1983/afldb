@@ -24,7 +24,8 @@ export async function GET(request: Request) {
   const query = (searchParams.get('q') ?? '').slice(0, 100).trim();
   // Allowlisted, not passed through: an unrecognised value is treated as
   // no scope rather than reaching the query layer.
-  const scope = searchParams.get('scope') === 'aflw' ? 'aflw' : undefined;
+  const scopeParam = searchParams.get('scope');
+  const scope = scopeParam === 'aflw' || scopeParam === 'players' ? scopeParam : undefined;
 
   if (query.length < MIN_QUERY_LENGTH) {
     return NextResponse.json({ results: [] });
