@@ -511,6 +511,17 @@ const matchResults: DatasetSpec = {
     if (row.attendance && (attendance === null || attendance < 0)) {
       return { verdict: 'error', reasons: [`attendance "${row.attendance}" must be a non-negative whole number`] };
     }
+    // matches.attendance_status (migration 020) must agree with attendance
+    // in both directions, and a genuine zero crowd requires a cited
+    // source this CSV format has no column for -- refuse rather than
+    // violate the constraint or silently invent a citation.
+    if (attendance === 0) {
+      return {
+        verdict: 'error',
+        reasons: ['attendance of exactly 0 needs a cited source; leave attendance blank if merely unknown'],
+      };
+    }
+    const attendanceStatus = attendance !== null ? 'complete' : 'not_collected';
 
     const result = homeScore === awayScore ? 'draw' : homeScore > awayScore ? 'home_win' : 'away_win';
     const winnerClubId = result === 'draw' ? null : result === 'home_win' ? home.id : away.id;
@@ -526,7 +537,8 @@ const matchResults: DatasetSpec = {
         venue_id: venue?.id ?? null,
         home_score: homeScore, home_goals: homeGoals, home_behinds: homeBehinds,
         away_score: awayScore, away_goals: awayGoals, away_behinds: awayBehinds,
-        attendance, result, winner_club_id: winnerClubId, margin,
+        attendance, attendance_status: attendanceStatus,
+        result, winner_club_id: winnerClubId, margin,
       },
     };
   },
@@ -544,7 +556,7 @@ const matchResults: DatasetSpec = {
         (match_key, season, round_code, round_number, round_type, is_final,
          match_date, venue_id, venue_raw, home_club_id, away_club_id,
          home_goals, home_behinds, home_score, away_goals, away_behinds, away_score,
-         result, winner_club_id, margin, attendance)
+         result, winner_club_id, margin, attendance, attendance_status)
       VALUES
         (${matchKey}, ${resolved.season}, ${row.round_code}, ${resolved.round_number},
          ${resolved.round_type}::round_type, ${resolved.round_type !== 'home_and_away'},
@@ -553,7 +565,7 @@ const matchResults: DatasetSpec = {
          ${resolved.home_goals}, ${resolved.home_behinds}, ${resolved.home_score},
          ${resolved.away_goals}, ${resolved.away_behinds}, ${resolved.away_score},
          ${resolved.result}::match_result, ${resolved.winner_club_id}, ${resolved.margin},
-         ${resolved.attendance})
+         ${resolved.attendance}, ${resolved.attendance_status}::coverage_status)
       ON CONFLICT (match_key) DO UPDATE SET
          round_number = EXCLUDED.round_number,
          round_type   = EXCLUDED.round_type,
@@ -566,10 +578,11 @@ const matchResults: DatasetSpec = {
          away_goals   = EXCLUDED.away_goals,
          away_behinds = EXCLUDED.away_behinds,
          away_score   = EXCLUDED.away_score,
-         result          = EXCLUDED.result,
-         winner_club_id  = EXCLUDED.winner_club_id,
-         margin          = EXCLUDED.margin,
-         attendance      = EXCLUDED.attendance
+         result            = EXCLUDED.result,
+         winner_club_id    = EXCLUDED.winner_club_id,
+         margin            = EXCLUDED.margin,
+         attendance        = EXCLUDED.attendance,
+         attendance_status = EXCLUDED.attendance_status
     `;
   },
 };
