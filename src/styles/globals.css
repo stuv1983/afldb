@@ -420,6 +420,64 @@ details.table-details[open] > summary::before { transform: rotate(90deg); }
 .table-details-title { font-size: 1rem; }
 .table-details-note { font-size: 0.78rem; font-weight: 400; color: var(--text-muted); }
 
+/* Per-table filter panel ---------------------------------------------- */
+/* Nested inside a .table-details, so it is deliberately quieter than the
+   table header it sits under: a boxed disclosure rather than a ruled one,
+   which is what keeps two stacked triangles legible as a hierarchy. */
+details.filter-details {
+  margin: 0 0 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-subtle);
+}
+details.filter-details > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  list-style: none;
+  cursor: pointer;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 550;
+}
+details.filter-details > summary::-webkit-details-marker { display: none; }
+details.filter-details > summary::before {
+  content: '▸';
+  display: inline-block;
+  color: var(--text-faint);
+  transition: transform 0.15s ease;
+}
+details.filter-details[open] > summary::before { transform: rotate(90deg); }
+details.filter-details[open] > summary { border-bottom: 1px solid var(--border); }
+details.filter-details > form { padding: 0.85rem; }
+.filter-details-title { letter-spacing: 0.03em; }
+.filter-details-note { font-size: 0.75rem; font-weight: 400; color: var(--text-muted); }
+
+.filter-grid {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr));
+}
+.filter-grid + .filter-grid, .filter-group + .filter-grid { margin-top: 0.7rem; }
+.filter-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem 0.8rem;
+  margin: 0 0 0.7rem;
+}
+.filter-group > legend {
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 0 0.3rem;
+}
+.filter-range { display: flex; gap: 0.35rem; margin-top: 0.15rem; }
+.filter-range input { min-width: 0; flex: 1; }
+.filter-help { font-size: 0.72rem; color: var(--text-faint); margin-top: 0.2rem; }
+.filter-actions { display: flex; gap: 0.5rem; margin-top: 0.85rem; flex-wrap: wrap; }
+.filter-errors { border-left-color: var(--loss); }
+
 /* Result markers */
 .result-W { color: var(--win); font-weight: 600; }
 .result-L { color: var(--loss); }

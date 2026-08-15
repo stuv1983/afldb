@@ -180,6 +180,42 @@ export function honourTeamPath(slug: string): string {
 }
 
 /**
+ * AFLW URLs.
+ *
+ * Every one is built on the source's own key rather than on a display
+ * name: a club is `ade`, not `kuwarna`, and a player is the source's
+ * name-derived slug. The scrape applies current club names to historical
+ * pages, so a name-based URL would break at the next rename while the
+ * code stays put. Keys can contain characters that must not travel raw in
+ * a path, so each is encoded.
+ */
+export function aflwPlayerPath(slug: string): string {
+  return `/aflw/players/${encodeURIComponent(slug)}`;
+}
+
+export function aflwClubPath(code: string): string {
+  return `/aflw/clubs/${encodeURIComponent(code)}`;
+}
+
+export function aflwSeasonPath(seasonKey: string): string {
+  return `/aflw/seasons/${encodeURIComponent(seasonKey)}`;
+}
+
+export function aflwMatchPath(matchKey: string): string {
+  return `/aflw/matches/${encodeURIComponent(matchKey)}`;
+}
+
+/**
+ * A player's name as the AFLW source slugs it, made readable.
+ *
+ * Only used where the source names a scorer without a slug — the scoring
+ * worm before Season Six — so the two spellings can be compared.
+ */
+export function aflwSlugToName(slug: string): string {
+  return slug.replace(/_/g, ' ').replace(/(\D)\d+$/, '$1').trim();
+}
+
+/**
  * A source name is only a link when the link is trusted.
  *
  * `ambiguous`, `unmatched` and `implausible` all mean AFLDB does not know

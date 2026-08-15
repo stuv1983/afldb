@@ -2,11 +2,13 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { TableFilters } from '@/components/TableFilters';
 import { getClubStates, listClubs } from '@/db/queries/clubs';
 import { clubPath, formatSpan } from '@/lib/format';
-import { firstValue, parseSearchTerm } from '@/lib/params';
+import { clubFilterFields } from '@/search/list-filters';
+import { describeFilters, optionsFrom, parseFilterValues } from '@/search/table-filters';
 
-export const revalidate = 86400;
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Clubs',
@@ -22,15 +24,19 @@ export default async function ClubsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const q = parseSearchTerm(firstValue(params.q));
-  const state = firstValue(params.state) || undefined;
+  const states = await getClubStates();
+  const fields = clubFilterFields(optionsFrom(states));
+  const values = parseFilterValues(fields, params);
 
-  const [clubs, states] = await Promise.all([
-    listClubs({ q, state }),
-    getClubStates(),
-  ]);
+  const clubs = await listClubs({
+    q: values.text.q,
+    state: values.select.state,
+    succession: values.select.succession,
+    ranges: values,
+  });
   const current = clubs.filter((c) => c.isCurrent);
   const historical = clubs.filter((c) => !c.isCurrent);
+  const described = describeFilters(fields, values);
 
   return (
     <>
@@ -38,28 +44,20 @@ export default async function ClubsPage({
         <h1>Clubs</h1>
         <p className="subtitle">
           {current.length} current clubs and {historical.length} historical identities.
+          {described.length > 0 ? ` · ${described.join(' · ')}` : ''}
         </p>
       </div>
 
-      <form method="get" action="/clubs">
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))' }}>
-          <div>
-            <label htmlFor="q">Name</label>
-            <input id="q" name="q" type="search" placeholder="Search by name" defaultValue={q ?? ''} />
-          </div>
-          <div>
-            <label htmlFor="state">State</label>
-            <select id="state" name="state" defaultValue={state ?? ''}>
-              <option value="">Any state</option>
-              {states.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
+      {values.errors.length > 0 && (
+        <div className="notice filter-errors" role="alert">
+          {values.errors.map((error) => <div key={error}>{error}</div>)}
         </div>
-        <div style={{ marginTop: '0.9rem', display: 'flex', gap: '0.5rem' }}>
-          <button className="btn" type="submit">Filter</button>
-          <Link className="btn btn-secondary" href="/clubs">Reset</Link>
-        </div>
-      </form>
+      )}
+
+      {/* One panel, not one per section: these filters narrow the current
+          clubs and the historical identities together, and splitting them
+          would let the two lists disagree about what is being asked. */}
+      <TableFilters action="/clubs" fields={fields} values={values} />
 
       <section className="section">
         <h2>Current clubs</h2>

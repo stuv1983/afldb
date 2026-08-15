@@ -1,42 +1,196 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
+
+import { CollapsibleTable } from '@/components/CollapsibleTable';
+import {
+  getAflwOverview,
+  getAflwRecentMatches,
+  listAflwClubs,
+  listAflwSeasons,
+} from '@/db/queries/aflw';
+import {
+  aflwClubPath,
+  aflwMatchPath,
+  aflwSeasonPath,
+  formatDate,
+  formatNumber,
+  formatScore,
+} from '@/lib/format';
+
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: 'AFLW',
-  description: 'AFLW statistics are coming to AFLDB.',
-  robots: { index: false, follow: true },
+  description:
+    'AFLW statistics from the competition’s first season in 2017: every match, '
+    + 'player, club and season, with ladders, scoring progressions and search.',
+  alternates: { canonical: '/aflw' },
 };
 
 const SECTIONS = [
-  { title: 'Players', meta: 'Career profiles and match statistics' },
-  { title: 'Clubs', meta: 'Teams, lists and club records' },
-  { title: 'Seasons', meta: 'Ladders, fixtures and results' },
-  { title: 'Records', meta: 'Career, season and single-game leaders' },
+  { href: '/aflw/players', title: 'Players', meta: 'Career profiles, season totals and match logs' },
+  { href: '/aflw/clubs', title: 'Clubs', meta: 'Records, premierships and season-by-season finishes' },
+  { href: '/aflw/seasons', title: 'Seasons', meta: 'Ladders, fixtures, results and premiers' },
+  { href: '/aflw/match-search', title: 'Match Search', meta: 'Every match by scoreline, club and season' },
 ];
 
-export default function AflwPage() {
+export default async function AflwPage() {
+  const [overview, seasons, clubs, recent] = await Promise.all([
+    getAflwOverview(),
+    listAflwSeasons(),
+    listAflwClubs(),
+    getAflwRecentMatches(6),
+  ]);
+
+  const current = seasons.find((season) => season.status === 'in_progress');
+
   return (
     <>
-      <div className="page-header aflw-header">
-        <p className="eyebrow">A new part of the record</p>
-        <h1>AFLW is coming to AFLDB</h1>
+      <div className="page-header">
+        <h1>AFLW</h1>
         <p className="subtitle">
-          A dedicated home for the women&apos;s competition is being prepared.
-          The sections below are a preview and will become available as the data is connected.
+          The women’s competition from its first match in {formatDate(overview.firstDate)},
+          held separately from the AFL record because it is a separate competition —
+          its own seasons, its own clubs and its own statistics.
         </p>
-        <span className="aflw-status">Coming soon</span>
       </div>
+
+      <div className="stat-strip">
+        <div className="stat">
+          <div className="value">{formatNumber(overview.seasons)}</div>
+          <div className="label">Seasons</div>
+        </div>
+        <div className="stat">
+          <div className="value">{formatNumber(overview.clubs)}</div>
+          <div className="label">Clubs</div>
+        </div>
+        <div className="stat">
+          <div className="value">{formatNumber(overview.players)}</div>
+          <div className="label">Players</div>
+        </div>
+        <div className="stat">
+          <div className="value">{formatNumber(overview.matches)}</div>
+          <div className="label">Matches</div>
+        </div>
+        <div className="stat">
+          <div className="value">{formatNumber(overview.playerMatchRows)}</div>
+          <div className="label">Player-match rows</div>
+        </div>
+      </div>
+
+      <p className="notice">
+        Two seasons were played in calendar 2022 — Season Six from January to April
+        and Season Seven from August to November — so a season here is identified by
+        name rather than by year. Disposals, tackles, contested possessions and
+        metres gained are recorded for every AFLW season, which is not true of the
+        AFL record before the 1960s.
+        {current && (
+          <>
+            {' '}The {current.displayLabel} season is still being played:{' '}
+            {formatNumber(current.playedCount)} of {formatNumber(current.fixtureCount)}{' '}
+            fixtures have been completed.
+          </>
+        )}
+      </p>
 
       <section className="section" aria-labelledby="aflw-sections">
         <h2 id="aflw-sections">Explore AFLW</h2>
         <div className="grid aflw-grid">
           {SECTIONS.map((section) => (
-            <div className="aflw-card" key={section.title}>
+            <Link className="aflw-card" key={section.href} href={section.href}>
               <h3>{section.title}</h3>
               <p>{section.meta}</p>
-              <span>Coming soon</span>
-            </div>
+              <span>Browse</span>
+            </Link>
           ))}
         </div>
+      </section>
+
+      <section className="section">
+        <CollapsibleTable title="Most recent matches" note={`${recent.length} shown`}>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Date</th>
+                  <th scope="col">Season</th>
+                  <th scope="col">Home</th>
+                  <th scope="col" className="num">Score</th>
+                  <th scope="col">Away</th>
+                  <th scope="col">Venue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recent.map((match) => (
+                  <tr key={match.matchKey}>
+                    <td className="nowrap">
+                      <Link href={aflwMatchPath(match.matchKey)}>
+                        {formatDate(match.matchDate)}
+                      </Link>
+                    </td>
+                    <td>
+                      <Link href={aflwSeasonPath(match.seasonKey)}>{match.seasonLabel}</Link>
+                    </td>
+                    <td className="wide">
+                      <Link href={aflwClubPath(match.homeTeamCode)}>{match.homeClubName}</Link>
+                    </td>
+                    <td className="num nowrap">
+                      {formatScore(match.homeGoals, match.homeBehinds, match.homeScore)}–
+                      {formatScore(match.awayGoals, match.awayBehinds, match.awayScore)}
+                    </td>
+                    <td className="wide">
+                      <Link href={aflwClubPath(match.awayTeamCode)}>{match.awayClubName}</Link>
+                    </td>
+                    <td>{match.venueName}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CollapsibleTable>
+      </section>
+
+      <section className="section">
+        <CollapsibleTable
+          title="Premierships"
+          note={`${clubs.length} clubs`}
+          defaultOpen={false}
+        >
+          <div className="table-wrap">
+            <table>
+              <caption>
+                2020 was abandoned at the semi-finals and awarded no premiership, so
+                ten seasons have produced a premier rather than eleven.
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Club</th>
+                  <th scope="col" className="num">Seasons</th>
+                  <th scope="col" className="num">Matches</th>
+                  <th scope="col" className="num">Won</th>
+                  <th scope="col" className="num">Finals</th>
+                  <th scope="col" className="num">Premierships</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clubs.map((club) => (
+                  <tr key={club.code}>
+                    <td className="wide">
+                      <Link href={aflwClubPath(club.code)}>{club.name}</Link>
+                    </td>
+                    <td className="num">{club.seasonsContested}</td>
+                    <td className="num">{formatNumber(club.matches)}</td>
+                    <td className="num">{formatNumber(club.wins)}</td>
+                    <td className="num">{formatNumber(club.finals)}</td>
+                    <td className="num">
+                      {club.premierships > 0 ? <strong>{club.premierships}</strong> : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CollapsibleTable>
       </section>
     </>
   );

@@ -1,6 +1,8 @@
 import 'server-only';
 
 import { sql } from '@/db/client';
+import { allOf, containsPattern, rangeConditions } from '@/db/queries/filters';
+import type { FilterValues } from '@/search/table-filters';
 
 export type ClubSummary = {
   id: number;
@@ -41,13 +43,29 @@ const CLUB_SUCCESSOR = sql`
   ) succ ON true
 `;
 
-export type ClubFilters = { q?: string; state?: string };
+/** Season columns the club index may be filtered on. */
+export const CLUB_FILTER_COLUMNS: Record<string, string> = {
+  first_season: 'c.first_season',
+  last_season: 'c.last_season',
+};
+
+export type ClubFilters = {
+  q?: string;
+  state?: string;
+  succession?: string;
+  ranges?: FilterValues;
+};
 
 export async function listClubs(filters: ClubFilters = {}): Promise<ClubSummary[]> {
-  const conditions: ReturnType<typeof sql>[] = [sql`TRUE`];
-  if (filters.q) conditions.push(sql`c.name ILIKE ${`%${filters.q}%`}`);
+  const conditions: ReturnType<typeof sql>[] = filters.ranges
+    ? rangeConditions(filters.ranges, CLUB_FILTER_COLUMNS)
+    : [];
+  if (filters.q) conditions.push(sql`c.name ILIKE ${containsPattern(filters.q)}`);
   if (filters.state) conditions.push(sql`c.home_state = ${filters.state}`);
-  const where = conditions.reduce((acc, cond) => sql`${acc} AND ${cond}`);
+  // The enum is compared as text, so an unknown value simply matches
+  // nothing instead of raising a cast error on a hand-edited URL.
+  if (filters.succession) conditions.push(sql`c.succession::text = ${filters.succession}`);
+  const where = allOf(conditions);
 
   return sql<ClubSummary[]>`
     SELECT c.id, c.slug, c.name, c.short_name AS "shortName",

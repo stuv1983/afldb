@@ -2,10 +2,18 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
-import { sql } from '@/db/client';
-import { formatNumber, playerPath } from '@/lib/format';
+import { TableFilters } from '@/components/TableFilters';
+import { getClubOptions } from '@/db/queries/advanced-search';
+import { getBrownlowCareerLeaders, getBrownlowWinners } from '@/db/queries/brownlow';
+import { clubPath, formatNumber, playerPath } from '@/lib/format';
+import {
+  brownlowLeaderFilterFields,
+  brownlowWinnerFilterFields,
+  clubOptions,
+} from '@/search/list-filters';
+import { describeFilters, parseFilterValues } from '@/search/table-filters';
 
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Brownlow Medal',
@@ -14,37 +22,41 @@ export const metadata: Metadata = {
   alternates: { canonical: '/brownlow' },
 };
 
-async function getWinners() {
-  return sql<{
-    season: number; playerId: number; slug: string;
-    displayName: string; votes: number;
-  }[]>`
-    SELECT b.season, p.id AS "playerId", p.slug,
-           p.display_name AS "displayName", b.votes
-      FROM brownlow_season_votes b
-      JOIN players p ON p.id = b.player_id
-     WHERE b.is_winner
-     ORDER BY b.season DESC, p.sort_name
-  `;
-}
+/** Career leaders are a leaderboard, so the list stays bounded. */
+const LEADER_LIMIT = 50;
 
-async function getCareerLeaders() {
-  return sql<{
-    playerId: number; slug: string; displayName: string;
-    votes: number; medals: number; games: number;
-  }[]>`
-    SELECT p.id AS "playerId", p.slug, p.display_name AS "displayName",
-           c.brownlow_votes AS votes, c.brownlow_medals AS medals, c.games
-      FROM player_career_stats c
-      JOIN players p ON p.id = c.player_id
-     WHERE c.brownlow_votes > 0
-     ORDER BY c.brownlow_votes DESC, p.sort_name
-     LIMIT 25
-  `;
-}
+export default async function BrownlowPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const clubs = await getClubOptions();
 
-export default async function BrownlowPage() {
-  const [winners, leaders] = await Promise.all([getWinners(), getCareerLeaders()]);
+  // Two independent tables on one URL, so each panel owns its own
+  // parameter names and neither can disturb the other's controls.
+  const winnerFields = brownlowWinnerFilterFields(clubOptions(clubs));
+  const leaderFields = brownlowLeaderFilterFields();
+  const winnerValues = parseFilterValues(winnerFields, params);
+  const leaderValues = parseFilterValues(leaderFields, params);
+
+  const [winners, leaders] = await Promise.all([
+    getBrownlowWinners({
+      q: winnerValues.text.q,
+      club: winnerValues.select.club,
+      ranges: winnerValues,
+    }),
+    getBrownlowCareerLeaders({
+      q: leaderValues.text.lq,
+      ranges: leaderValues,
+      limit: LEADER_LIMIT,
+    }),
+  ]);
+
+  const errors = [...winnerValues.errors, ...leaderValues.errors];
+  const winnersDescribed = describeFilters(winnerFields, winnerValues);
+  const leadersDescribed = describeFilters(leaderFields, leaderValues);
+  const seasonCount = new Set(winners.map((w) => w.season)).size;
 
   return (
     <>
@@ -62,68 +74,127 @@ export default async function BrownlowPage() {
         per-game vote means it was not published, not that no vote was polled.
       </p>
 
-      <section className="section">
-        <CollapsibleTable title="Career vote leaders">
-        <div className="table-wrap">
-          <table>
-            <caption>Most career Brownlow votes</caption>
-            <thead>
-              <tr>
-                <th scope="col" className="num">#</th>
-                <th scope="col">Player</th>
-                <th scope="col" className="num">Votes</th>
-                <th scope="col" className="num">Medals</th>
-                <th scope="col" className="num">Games</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leaders.map((row, i) => (
-                <tr key={row.playerId}>
-                  <td className="num">{i + 1}</td>
-                  <td className="wide">
-                    <Link href={playerPath(row.slug, row.playerId)}>{row.displayName}</Link>
-                  </td>
-                  <td className="num"><strong>{formatNumber(row.votes)}</strong></td>
-                  <td className="num">{row.medals > 0 ? row.medals : '—'}</td>
-                  <td className="num">{formatNumber(row.games)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {errors.length > 0 && (
+        <div className="notice filter-errors" role="alert">
+          {errors.map((error) => <div key={error}>{error}</div>)}
         </div>
+      )}
+
+      <section className="section">
+        <CollapsibleTable
+          title="Career vote leaders"
+          note={
+            leaders.total > LEADER_LIMIT
+              ? `Top ${LEADER_LIMIT} of ${formatNumber(leaders.total)}`
+              : `${formatNumber(leaders.total)} players`
+          }
+          filters={
+            <TableFilters
+              action="/brownlow"
+              fields={leaderFields}
+              values={leaderValues}
+              title="Filter career leaders"
+            />
+          }
+        >
+          {leadersDescribed.length > 0 && (
+            <p className="section-note">{leadersDescribed.join(' · ')}</p>
+          )}
+          {leaders.rows.length === 0 ? (
+            <div className="empty">
+              <h2>No players match those filters</h2>
+              <p>Try widening the vote or games range.</p>
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <caption>Most career Brownlow votes</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className="num">#</th>
+                    <th scope="col">Player</th>
+                    <th scope="col" className="num">Votes</th>
+                    <th scope="col" className="num">Medals</th>
+                    <th scope="col" className="num">Games</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaders.rows.map((row, i) => (
+                    <tr key={row.playerId}>
+                      <td className="num">{i + 1}</td>
+                      <td className="wide">
+                        <Link href={playerPath(row.slug, row.playerId)}>{row.displayName}</Link>
+                      </td>
+                      <td className="num"><strong>{formatNumber(row.votes)}</strong></td>
+                      <td className="num">{row.medals > 0 ? row.medals : '—'}</td>
+                      <td className="num">{formatNumber(row.games)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CollapsibleTable>
       </section>
 
       <section className="section">
-        <CollapsibleTable title="Winners by season">
-        <div className="table-wrap">
-          <table>
-            {/* Shared counts put more than one winner in a season, so these
-                two numbers are genuinely different. */}
-            <caption>
-              {winners.length} winners across{' '}
-              {new Set(winners.map((w) => w.season)).size} seasons
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">Season</th>
-                <th scope="col">Winner</th>
-                <th scope="col" className="num">Votes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {winners.map((row) => (
-                <tr key={`${row.season}-${row.playerId}`}>
-                  <td><Link href={`/brownlow/${row.season}`}>{row.season}</Link></td>
-                  <td className="wide">
-                    <Link href={playerPath(row.slug, row.playerId)}>{row.displayName}</Link>
-                  </td>
-                  <td className="num">{row.votes}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <CollapsibleTable
+          title="Winners by season"
+          note={`${winners.length} winners`}
+          filters={
+            <TableFilters
+              action="/brownlow"
+              fields={winnerFields}
+              values={winnerValues}
+              title="Filter winners"
+            />
+          }
+        >
+          {winnersDescribed.length > 0 && (
+            <p className="section-note">{winnersDescribed.join(' · ')}</p>
+          )}
+          {winners.length === 0 ? (
+            <div className="empty">
+              <h2>No winners match those filters</h2>
+              <p>Try widening the season range or clearing the club.</p>
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                {/* Shared counts put more than one winner in a season, so these
+                    two numbers are genuinely different. */}
+                <caption>
+                  {winners.length} winners across {seasonCount} seasons
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Season</th>
+                    <th scope="col">Winner</th>
+                    <th scope="col">Club</th>
+                    <th scope="col" className="num">Votes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {winners.map((row) => (
+                    <tr key={`${row.season}-${row.playerId}`}>
+                      <td><Link href={`/brownlow/${row.season}`}>{row.season}</Link></td>
+                      <td className="wide">
+                        <Link href={playerPath(row.slug, row.playerId)}>{row.displayName}</Link>
+                      </td>
+                      <td>
+                        {row.clubSlug ? (
+                          <Link href={clubPath(row.clubSlug)}>{row.clubName}</Link>
+                        ) : (
+                          <span className="not-recorded">—</span>
+                        )}
+                      </td>
+                      <td className="num">{row.votes}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CollapsibleTable>
       </section>
     </>

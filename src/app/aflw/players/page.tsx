@@ -5,40 +5,38 @@ import { redirect } from 'next/navigation';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { Pagination } from '@/components/Pagination';
 import { TableFilters } from '@/components/TableFilters';
-import { getClubOptions } from '@/db/queries/advanced-search';
-import { isPlayerSort, listPlayers, type PlayerSort } from '@/db/queries/players';
-import { getSeasonBounds } from '@/db/queries/seasons';
-import { formatNumber, playerPath } from '@/lib/format';
+import {
+  type AflwPlayerSort,
+  getAflwSeasonOptions,
+  isAflwPlayerSort,
+  listAflwClubs,
+  listAflwPlayers,
+} from '@/db/queries/aflw';
+import { aflwPlayerPath, formatNumber } from '@/lib/format';
 import { firstValue, parsePage } from '@/lib/params';
+import {
+  AFLW_PLAYER_GROUPS,
+  AFLW_PLAYER_SORT_OPTIONS,
+  aflwPlayerFilterFields,
+} from '@/search/aflw-filters';
 import { DEFAULT_PAGE_SIZE } from '@/search/constants';
-import { CAREER_GROUPS, clubOptions, playerFilterFields } from '@/search/list-filters';
 import {
   describeFilters,
   filterQueryParams,
   parseFilterValues,
-  yearOptions,
 } from '@/search/table-filters';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Players',
+  title: 'AFLW Players',
   description:
-    'Every player to appear in a VFL/AFL match since 1897, with career games, '
-    + 'goals, finals and Brownlow votes.',
-  alternates: { canonical: '/players' },
+    'Every player to appear in an AFLW match since 2017, searchable by games, '
+    + 'goals, disposals, tackles, marks, premierships and club.',
+  alternates: { canonical: '/aflw/players' },
 };
 
-const SORT_OPTIONS: { value: PlayerSort; label: string }[] = [
-  { value: 'games', label: 'Games' },
-  { value: 'goals', label: 'Goals' },
-  { value: 'brownlow_votes', label: 'Brownlow' },
-  { value: 'finals', label: 'Finals' },
-  { value: 'debut', label: 'Debut' },
-  { value: 'name', label: 'Name' },
-];
-
-export default async function PlayersPage({
+export default async function AflwPlayersPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -46,30 +44,29 @@ export default async function PlayersPage({
   const params = await searchParams;
   const page = parsePage(firstValue(params.page));
   const sortParam = firstValue(params.sort);
-  const sort: PlayerSort = isPlayerSort(sortParam) ? sortParam : 'games';
+  const sort: AflwPlayerSort = isAflwPlayerSort(sortParam) ? sortParam : 'games';
 
-  const [clubs, bounds] = await Promise.all([getClubOptions(), getSeasonBounds()]);
-  const fields = playerFilterFields({
-    clubs: clubOptions(clubs),
-    seasons: yearOptions(bounds.min, bounds.max),
+  const [clubs, seasons] = await Promise.all([listAflwClubs(), getAflwSeasonOptions()]);
+  const fields = aflwPlayerFilterFields({
+    clubs: clubs
+      .map((club) => ({ value: club.code, label: club.name }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+    seasons: seasons.map((season) => ({ value: season.key, label: season.label })),
   });
   const values = parseFilterValues(fields, params);
 
-  const { rows, total } = await listPlayers({
+  const { rows, total } = await listAflwPlayers({
     sort,
     limit: DEFAULT_PAGE_SIZE,
     offset: (page - 1) * DEFAULT_PAGE_SIZE,
-    club: values.select.club,
-    season: values.select.season ? Number(values.select.season) : undefined,
     name: values.text.name,
+    club: values.select.club,
+    seasonKey: values.select.season,
     ranges: values,
   });
 
   const linkParams = { ...filterQueryParams(fields, values), sort };
 
-  // A page past the end is a real URL people arrive at from stale links and
-  // hand-edited query strings. Send them to the last page that exists rather
-  // than rendering an empty table under a full result count.
   if (total > 0 && rows.length === 0) {
     const lastPage = Math.ceil(total / DEFAULT_PAGE_SIZE);
     if (page > lastPage) {
@@ -80,16 +77,15 @@ export default async function PlayersPage({
         else query.set(key, value);
       }
       if (lastPage > 1) query.set('page', String(lastPage));
-      redirect(`/players?${query}`);
+      redirect(`/aflw/players?${query}`);
     }
   }
 
   const described = describeFilters(fields, values);
 
-  // Sort is a row of links rather than a control inside the panel: it is
-  // one click, it stays shareable, and it survives a filter submission
-  // through the hidden field below.
-  const sortHref = (key: PlayerSort) => {
+  // Same arrangement as the AFL player index: sort is a row of links, and
+  // the panel carries the current sort through a submission.
+  const sortHref = (key: string) => {
     const query = new URLSearchParams();
     for (const [name, value] of Object.entries(filterQueryParams(fields, values))) {
       if (value === undefined) continue;
@@ -97,23 +93,29 @@ export default async function PlayersPage({
       else query.set(name, value);
     }
     query.set('sort', key);
-    return `/players?${query}`;
+    return `/aflw/players?${query}`;
   };
 
   const filters = (
     <TableFilters
-      action="/players"
+      action="/aflw/players"
       fields={fields}
       values={values}
-      groups={CAREER_GROUPS}
+      groups={AFLW_PLAYER_GROUPS}
       hidden={{ sort }}
     />
   );
 
   return (
     <>
+      <nav className="breadcrumbs" aria-label="Breadcrumb">
+        <Link href="/aflw">AFLW</Link>
+        <span aria-hidden="true">/</span>
+        <span>Players</span>
+      </nav>
+
       <div className="page-header">
-        <h1>Players</h1>
+        <h1>AFLW Players</h1>
         <p className="subtitle">
           {formatNumber(total)} players
           {described.length > 0 ? ` · ${described.join(' · ')}` : ''}
@@ -130,7 +132,7 @@ export default async function PlayersPage({
         <span className="muted" style={{ fontSize: '0.8125rem', marginRight: '0.5rem' }}>
           Sort by:
         </span>
-        {SORT_OPTIONS.map((option) => (
+        {AFLW_PLAYER_SORT_OPTIONS.map((option) => (
           <Link
             key={option.value}
             href={sortHref(option.value)}
@@ -161,7 +163,11 @@ export default async function PlayersPage({
           <>
             <div className="table-wrap">
               <table>
-                <caption>Career totals. Brownlow votes are season totals from 1924.</caption>
+                <caption>
+                  Career totals across every AFLW season. A player who did not score
+                  in a match is recorded as nought, which is what the source means by
+                  an empty scoring cell.
+                </caption>
                 <thead>
                   <tr>
                     <th scope="col">Player</th>
@@ -169,24 +175,32 @@ export default async function PlayersPage({
                     <th scope="col" className="num">Span</th>
                     <th scope="col" className="num">Games</th>
                     <th scope="col" className="num">Goals</th>
-                    <th scope="col" className="num">Finals</th>
-                    <th scope="col" className="num">Brownlow</th>
+                    <th scope="col" className="num">Disposals</th>
+                    <th scope="col" className="num">Marks</th>
+                    <th scope="col" className="num">Tackles</th>
+                    <th scope="col" className="num">Prem</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((p) => (
-                    <tr key={p.id}>
+                  {rows.map((player) => (
+                    <tr key={player.slug}>
                       <td className="wide">
-                        <Link href={playerPath(p.slug, p.id)}>{p.displayName}</Link>
+                        <Link href={aflwPlayerPath(player.slug)}>{player.displayName}</Link>
                       </td>
-                      <td className="wide">{p.clubNames ?? '—'}</td>
+                      <td className="wide">{player.clubNames ?? '—'}</td>
                       <td className="num nowrap">
-                        {p.debutSeason}–{p.finalSeason}
+                        {player.debutSeasonLabel === player.finalSeasonLabel
+                          ? player.debutSeasonLabel
+                          : `${player.debutSeasonLabel}–${player.finalSeasonLabel}`}
                       </td>
-                      <td className="num">{formatNumber(p.games)}</td>
-                      <td className="num">{formatNumber(p.goals)}</td>
-                      <td className="num">{formatNumber(p.finals)}</td>
-                      <td className="num">{formatNumber(p.brownlowVotes)}</td>
+                      <td className="num">{formatNumber(player.games)}</td>
+                      <td className="num">{formatNumber(player.goals)}</td>
+                      <td className="num">{formatNumber(player.disposals)}</td>
+                      <td className="num">{formatNumber(player.marks)}</td>
+                      <td className="num">{formatNumber(player.tackles)}</td>
+                      <td className="num">
+                        {player.premierships > 0 ? player.premierships : '—'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -194,7 +208,7 @@ export default async function PlayersPage({
             </div>
 
             <Pagination
-              basePath="/players"
+              basePath="/aflw/players"
               params={linkParams}
               page={page}
               pageSize={DEFAULT_PAGE_SIZE}

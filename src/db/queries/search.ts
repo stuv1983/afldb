@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { searchAflwClubs, searchAflwPlayers } from '@/db/queries/aflw';
 import { sql } from '@/db/client';
 import { RECORD_CATEGORIES } from '@/db/queries/records';
 
@@ -277,6 +278,42 @@ export function searchRecords(query: string, limit = 5): SearchResult[] {
   }));
 }
 
+/**
+ * AFLW results, kept in their own groups.
+ *
+ * AFLW is a separate competition with its own clubs and its own players,
+ * and nothing links the two sides of the database. Merging the two into
+ * one "Players" list would imply a shared record that does not exist, so
+ * the results are grouped separately and labelled.
+ */
+async function aflwResults(
+  query: string,
+  limits: { players: number; clubs: number },
+): Promise<{ players: SearchResult[]; clubs: SearchResult[] }> {
+  const [players, clubs] = await Promise.all([
+    searchAflwPlayers(query, limits.players),
+    searchAflwClubs(query, limits.clubs),
+  ]);
+  return {
+    players: players.map((row) => ({
+      type: 'aflw_player' as const,
+      id: 0,
+      slug: row.slug,
+      title: row.title,
+      subtitle: row.subtitle,
+      rank: row.rank,
+    })),
+    clubs: clubs.map((row) => ({
+      type: 'aflw_club' as const,
+      id: 0,
+      slug: row.slug,
+      title: row.title,
+      subtitle: row.subtitle,
+      rank: row.rank,
+    })),
+  };
+}
+
 export type GlobalSearchResults = {
   players: SearchResult[];
   clubs: SearchResult[];
@@ -285,12 +322,15 @@ export type GlobalSearchResults = {
   rounds: SearchResult[];
   awards: SearchResult[];
   records: SearchResult[];
+  aflwPlayers: SearchResult[];
+  aflwClubs: SearchResult[];
   total: number;
 };
 
 const EMPTY_RESULTS: GlobalSearchResults = {
   players: [], clubs: [], venues: [], seasons: [],
-  rounds: [], awards: [], records: [], total: 0,
+  rounds: [], awards: [], records: [],
+  aflwPlayers: [], aflwClubs: [], total: 0,
 };
 
 export async function globalSearch(
@@ -300,20 +340,24 @@ export async function globalSearch(
   const trimmed = query.trim();
   if (trimmed.length < MIN_QUERY_LENGTH) return EMPTY_RESULTS;
 
-  const [players, clubs, venues, seasons, rounds, awards] = await Promise.all([
+  const [players, clubs, venues, seasons, rounds, awards, aflw] = await Promise.all([
     searchPlayers(trimmed, playerLimit),
     searchClubs(trimmed),
     searchVenues(trimmed),
     searchSeasons(trimmed),
     searchRounds(trimmed),
     searchAwards(trimmed),
+    aflwResults(trimmed, { players: 10, clubs: 4 }),
   ]);
   const records = searchRecords(trimmed);
 
   return {
     players, clubs, venues, seasons, rounds, awards, records,
+    aflwPlayers: aflw.players,
+    aflwClubs: aflw.clubs,
     total: players.length + clubs.length + venues.length + seasons.length
-      + rounds.length + awards.length + records.length,
+      + rounds.length + awards.length + records.length
+      + aflw.players.length + aflw.clubs.length,
   };
 }
 
@@ -329,17 +373,21 @@ export async function autocomplete(query: string, limit = 8): Promise<SearchResu
   if (trimmed.length < MIN_QUERY_LENGTH) return [];
   const capped = Math.min(limit, 10);
 
-  const [players, clubs, venues, seasons, rounds, awards] = await Promise.all([
+  const [players, clubs, venues, seasons, rounds, awards, aflw] = await Promise.all([
     searchPlayers(trimmed, capped),
     searchClubs(trimmed, 2),
     searchVenues(trimmed, 2),
     searchSeasons(trimmed, 1),
     searchRounds(trimmed),
     searchAwards(trimmed, 2),
+    aflwResults(trimmed, { players: 2, clubs: 1 }),
   ]);
   const records = searchRecords(trimmed, 2);
 
-  const others = [...rounds, ...seasons, ...awards, ...records, ...clubs, ...venues]
+  const others = [
+    ...rounds, ...seasons, ...awards, ...records, ...clubs, ...venues,
+    ...aflw.clubs, ...aflw.players,
+  ]
     .sort((a, b) => b.rank - a.rank)
     .slice(0, Math.max(2, capped - Math.min(players.length, capped - 2)));
 

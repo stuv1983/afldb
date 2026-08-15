@@ -1,6 +1,8 @@
 import 'server-only';
 
 import { sql } from '@/db/client';
+import { allOf, rangeConditions } from '@/db/queries/filters';
+import type { FilterValues } from '@/search/table-filters';
 
 export type SeasonSummary = {
   year: number;
@@ -39,13 +41,34 @@ const PREMIER_JOIN = `
       ) gf ON true
       LEFT JOIN clubs c ON c.id = gf.winner_club_id`;
 
-export type SeasonFilters = { fromYear?: number; toYear?: number };
+/** Season columns the index may be filtered on. */
+export const SEASON_FILTER_COLUMNS: Record<string, string> = {
+  year: 's.year',
+  matches: 's.match_count',
+  clubs: 's.club_count',
+};
+
+export type SeasonFilters = {
+  league?: string;
+  status?: string;
+  /** Club slug of the season's premier. */
+  premier?: string;
+  ranges?: FilterValues;
+};
 
 export async function listSeasons(filters: SeasonFilters = {}): Promise<SeasonSummary[]> {
-  const conditions: ReturnType<typeof sql>[] = [sql`TRUE`];
-  if (filters.fromYear !== undefined) conditions.push(sql`s.year >= ${filters.fromYear}`);
-  if (filters.toYear !== undefined) conditions.push(sql`s.year <= ${filters.toYear}`);
-  const where = conditions.reduce((acc, cond) => sql`${acc} AND ${cond}`);
+  const conditions = filters.ranges
+    ? rangeConditions(filters.ranges, SEASON_FILTER_COLUMNS)
+    : [];
+  if (filters.league) conditions.push(sql`s.league = ${filters.league}`);
+  if (filters.status) conditions.push(sql`s.status = ${filters.status}`);
+  // Premier is read from the decided Grand Final joined below, and only
+  // for a completed season — the same rule the projection applies, so the
+  // filter can never select a season whose premier column reads "—".
+  if (filters.premier) {
+    conditions.push(sql`s.status = 'complete' AND c.slug = ${filters.premier}`);
+  }
+  const where = allOf(conditions);
 
   return sql<SeasonSummary[]>`
     SELECT s.year, s.league, s.is_complete AS "isComplete",
@@ -63,6 +86,13 @@ export async function listSeasons(filters: SeasonFilters = {}): Promise<SeasonSu
      WHERE ${where}
      ORDER BY s.year DESC
   `;
+}
+
+export async function getSeasonLeagues(): Promise<string[]> {
+  const rows = await sql<{ league: string }[]>`
+    SELECT DISTINCT league FROM seasons ORDER BY league
+  `;
+  return rows.map((r) => r.league);
 }
 
 export async function getSeason(year: number): Promise<SeasonSummary | null> {

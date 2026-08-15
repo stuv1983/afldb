@@ -137,6 +137,53 @@ export default async function SearchPage({
               </ul>
             </section>
           )}
+
+          {/* AFLW results stay in their own section. The competitions
+              share no players, clubs or records, so a combined list would
+              imply a continuity of record that does not exist. */}
+          {results.aflwPlayers.length > 0 && (
+            <section className="section">
+              <CollapsibleTable
+                title="AFLW players"
+                note={`${results.aflwPlayers.length} found`}
+              >
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th scope="col">Player</th>
+                        <th scope="col">AFLW career</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {results.aflwPlayers.map((r) => (
+                        <tr key={r.slug}>
+                          <td className="wide">
+                            <Link href={searchResultHref(r)}>{r.title}</Link>
+                          </td>
+                          <td className="wide muted">{r.subtitle}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CollapsibleTable>
+            </section>
+          )}
+
+          {results.aflwClubs.length > 0 && (
+            <section className="section">
+              <h2>AFLW clubs</h2>
+              <ul>
+                {results.aflwClubs.map((r) => (
+                  <li key={r.slug}>
+                    <Link href={searchResultHref(r)}>{r.title}</Link>{' '}
+                    <span className="muted">— {r.subtitle}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </>
       )}
     </>

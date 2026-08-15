@@ -1,6 +1,8 @@
 import 'server-only';
 
 import { sql } from '@/db/client';
+import { allOf, containsPattern, rangeConditions } from '@/db/queries/filters';
+import type { FilterValues } from '@/search/table-filters';
 
 export type PlayerListRow = {
   id: number;
@@ -33,35 +35,67 @@ export function isPlayerSort(value: string | undefined): value is PlayerSort {
 }
 
 /**
+ * Career columns the player index may be filtered on.
+ *
+ * The allowlist that `rangeConditions` resolves against: a filter key with
+ * no entry here produces no SQL. Era-limited statistics are deliberately
+ * absent for the reason `advanced-spec.ts` gives — filtering on disposals
+ * would quietly exclude everyone who played before they were recorded.
+ */
+export const PLAYER_FILTER_COLUMNS: Record<string, string> = {
+  games: 'c.games',
+  goals: 'c.goals',
+  finals: 'c.finals',
+  premierships: 'c.premierships',
+  brownlow_votes: 'c.brownlow_votes',
+  brownlow_medals: 'c.brownlow_medals',
+  clubs: 'c.clubs_played',
+  seasons: 'c.seasons_played',
+  wins: 'c.wins',
+  debut: 'c.debut_season',
+  final: 'c.final_season',
+};
+
+export type PlayerListFilters = {
+  club?: string;
+  season?: number;
+  name?: string;
+  ranges?: FilterValues;
+};
+
+/**
  * Paged player index.
  *
  * Club names are aggregated in the same query rather than fetched per
  * player, so a 50-row page costs one round trip, not 51.
  */
-export async function listPlayers(options: {
+export async function listPlayers(options: PlayerListFilters & {
   sort: PlayerSort;
   limit: number;
   offset: number;
-  club?: string;
-  season?: number;
 }): Promise<{ rows: PlayerListRow[]; total: number }> {
-  const { sort, limit, offset, club, season } = options;
+  const { sort, limit, offset, club, season, name, ranges } = options;
   // Sort key is resolved through a fixed map; user input never reaches SQL.
   const orderBy = PLAYER_SORTS[sort];
 
+  const conditions = ranges ? rangeConditions(ranges, PLAYER_FILTER_COLUMNS) : [];
+  if (name) conditions.push(sql`p.display_name ILIKE ${containsPattern(name)}`);
+  if (club) {
+    conditions.push(sql`
+      EXISTS (SELECT 1 FROM player_clubs pc
+                JOIN clubs cl ON cl.id = pc.club_id
+               WHERE pc.player_id = p.id AND cl.slug = ${club})
+    `);
+  }
+  if (season !== undefined) {
+    conditions.push(sql`
+      EXISTS (SELECT 1 FROM player_season_stats ps
+               WHERE ps.player_id = p.id AND ps.season = ${season})
+    `);
+  }
+  const where = allOf(conditions);
+
   const rows = await sql<(PlayerListRow & { total: string })[]>`
-    WITH filtered AS (
-      SELECT p.id
-        FROM players p
-        JOIN player_career_stats c ON c.player_id = p.id
-       WHERE (${club ?? null}::text IS NULL OR EXISTS (
-               SELECT 1 FROM player_clubs pc
-                 JOIN clubs cl ON cl.id = pc.club_id
-                WHERE pc.player_id = p.id AND cl.slug = ${club ?? null}))
-         AND (${season ?? null}::int IS NULL OR EXISTS (
-               SELECT 1 FROM player_season_stats ps
-                WHERE ps.player_id = p.id AND ps.season = ${season ?? null}))
-    )
     SELECT p.id,
            p.slug,
            p.display_name       AS "displayName",
@@ -76,7 +110,7 @@ export async function listPlayers(options: {
            count(*) OVER ()     AS total
       FROM players p
       JOIN player_career_stats c ON c.player_id = p.id
-     WHERE p.id IN (SELECT id FROM filtered)
+     WHERE ${where}
      ORDER BY ${sql.unsafe(orderBy)}
      LIMIT ${limit} OFFSET ${offset}
   `;
@@ -91,13 +125,7 @@ export async function listPlayers(options: {
     SELECT count(*) AS total
       FROM players p
       JOIN player_career_stats c ON c.player_id = p.id
-     WHERE (${club ?? null}::text IS NULL OR EXISTS (
-             SELECT 1 FROM player_clubs pc
-               JOIN clubs cl ON cl.id = pc.club_id
-              WHERE pc.player_id = p.id AND cl.slug = ${club ?? null}))
-       AND (${season ?? null}::int IS NULL OR EXISTS (
-             SELECT 1 FROM player_season_stats ps
-              WHERE ps.player_id = p.id AND ps.season = ${season ?? null}))
+     WHERE ${where}
   `;
   return { rows: [], total: Number(counted.total) };
 }

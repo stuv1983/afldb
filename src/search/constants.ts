@@ -17,7 +17,8 @@ export const MAX_PAGE_SIZE = 100;
 export const DEFAULT_PAGE_SIZE = 50;
 
 export type SearchResultType =
-  | 'player' | 'club' | 'venue' | 'season' | 'round' | 'award' | 'record';
+  | 'player' | 'club' | 'venue' | 'season' | 'round' | 'award' | 'record'
+  | 'aflw_player' | 'aflw_club';
 
 /**
  * Route a search result to its page.
@@ -42,6 +43,11 @@ export function searchResultHref(result: {
     case 'round': return `/seasons/${result.slug}`;
     case 'award': return `/awards/${result.slug}`;
     case 'record': return `/records/${result.slug}`;
+    // AFLW keys are the source's own and may contain characters that must
+    // not travel raw in a path, so they are encoded rather than
+    // interpolated. A club is keyed by its code, a player by their slug.
+    case 'aflw_player': return `/aflw/players/${encodeURIComponent(result.slug)}`;
+    case 'aflw_club': return `/aflw/clubs/${encodeURIComponent(result.slug)}`;
   }
 }
 
@@ -54,4 +60,6 @@ export const SEARCH_TYPE_LABELS: Record<SearchResultType, string> = {
   round: 'Round',
   award: 'Award',
   record: 'Record',
+  aflw_player: 'AFLW player',
+  aflw_club: 'AFLW club',
 };

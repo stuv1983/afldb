@@ -12,7 +12,8 @@ export function Pagination({
   total,
 }: {
   basePath: string;
-  params: Record<string, string | undefined>;
+  /** A repeated parameter (a multi-select filter) is carried as an array. */
+  params: Record<string, string | string[] | undefined>;
   page: number;
   pageSize: number;
   total: number;
@@ -23,7 +24,9 @@ export function Pagination({
   const href = (target: number) => {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined && value !== '') query.set(key, value);
+      if (value === undefined || value === '') continue;
+      if (Array.isArray(value)) for (const item of value) query.append(key, item);
+      else query.set(key, value);
     }
     if (target > 1) query.set('page', String(target));
     else query.delete('page');

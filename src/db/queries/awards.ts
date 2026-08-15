@@ -1,6 +1,8 @@
 import 'server-only';
 
 import { sql } from '@/db/client';
+import { allOf, containsPattern, rangeConditions } from '@/db/queries/filters';
+import type { FilterValues } from '@/search/table-filters';
 
 /**
  * Awards, honours and captaincies.
@@ -269,15 +271,26 @@ export type HallOfFameRow = {
   removedYear: number | null;
 };
 
-export type HallOfFameFilters = { q?: string; category?: string };
+/** Hall of Fame columns the list may be filtered on. */
+export const HALL_OF_FAME_FILTER_COLUMNS: Record<string, string> = {
+  inducted: 'h.inducted_year',
+};
+
+export type HallOfFameFilters = {
+  q?: string;
+  category?: string;
+  ranges?: FilterValues;
+};
 
 export async function listHallOfFame(
   filters: HallOfFameFilters = {},
 ): Promise<HallOfFameRow[]> {
-  const conditions: ReturnType<typeof sql>[] = [sql`TRUE`];
-  if (filters.q) conditions.push(sql`h.name ILIKE ${`%${filters.q}%`}`);
+  const conditions = filters.ranges
+    ? rangeConditions(filters.ranges, HALL_OF_FAME_FILTER_COLUMNS)
+    : [];
+  if (filters.q) conditions.push(sql`h.name ILIKE ${containsPattern(filters.q)}`);
   if (filters.category) conditions.push(sql`h.category = ${filters.category}`);
-  const where = conditions.reduce((acc, cond) => sql`${acc} AND ${cond}`);
+  const where = allOf(conditions);
 
   return sql<HallOfFameRow[]>`
     SELECT h.id, h.name,

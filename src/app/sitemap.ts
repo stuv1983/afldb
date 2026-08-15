@@ -26,6 +26,9 @@ export async function generateSitemaps() {
   const ids = [{ id: 0 }]; // 0 = static pages, clubs, seasons, venues
   for (let i = 0; i < row.playerPages; i += 1) ids.push({ id: 100 + i });
   for (let i = 0; i < row.matchPages; i += 1) ids.push({ id: 200 + i });
+  // 300 = the whole AFLW competition. It is under 2,000 URLs in total, so
+  // it needs no splitting and gets one segment of its own.
+  ids.push({ id: 300 });
   return ids;
 }
 
@@ -86,6 +89,54 @@ export default async function sitemap({
       changeFrequency: 'monthly' as const,
       priority: 0.6,
     }));
+  }
+
+  // Segment 300: AFLW. Keys are the source's own and are encoded for the
+  // same reason the page links encode them.
+  if (id === 300) {
+    const [clubs, seasons, players, matches] = await Promise.all([
+      sql<{ code: string }[]>`SELECT code FROM aflw.clubs ORDER BY code`,
+      sql<{ seasonKey: string }[]>`
+        SELECT season_key AS "seasonKey" FROM aflw.seasons ORDER BY ordinal
+      `,
+      sql<{ slug: string }[]>`SELECT slug FROM aflw.players ORDER BY slug`,
+      sql<{ matchKey: string }[]>`
+        SELECT match_key AS "matchKey" FROM aflw.matches ORDER BY match_date
+      `,
+    ]);
+
+    return [
+      { url: `${baseUrl}/aflw`, changeFrequency: 'weekly' as const, priority: 0.9 },
+      { url: `${baseUrl}/aflw/players`, changeFrequency: 'weekly' as const, priority: 0.8 },
+      { url: `${baseUrl}/aflw/clubs`, changeFrequency: 'monthly' as const, priority: 0.8 },
+      { url: `${baseUrl}/aflw/seasons`, changeFrequency: 'weekly' as const, priority: 0.8 },
+      { url: `${baseUrl}/aflw/venues`, changeFrequency: 'monthly' as const, priority: 0.5 },
+      {
+        url: `${baseUrl}/aflw/match-search`,
+        changeFrequency: 'monthly' as const,
+        priority: 0.7,
+      },
+      ...clubs.map((c) => ({
+        url: `${baseUrl}/aflw/clubs/${encodeURIComponent(c.code)}`,
+        changeFrequency: 'weekly' as const,
+        priority: 0.7,
+      })),
+      ...seasons.map((s) => ({
+        url: `${baseUrl}/aflw/seasons/${encodeURIComponent(s.seasonKey)}`,
+        changeFrequency: 'monthly' as const,
+        priority: 0.7,
+      })),
+      ...players.map((p) => ({
+        url: `${baseUrl}/aflw/players/${encodeURIComponent(p.slug)}`,
+        changeFrequency: 'monthly' as const,
+        priority: 0.6,
+      })),
+      ...matches.map((m) => ({
+        url: `${baseUrl}/aflw/matches/${encodeURIComponent(m.matchKey)}`,
+        changeFrequency: 'yearly' as const,
+        priority: 0.4,
+      })),
+    ];
   }
 
   // Segments 200+: matches, 5,000 per file.

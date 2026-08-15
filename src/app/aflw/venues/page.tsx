@@ -3,46 +3,43 @@ import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { TableFilters } from '@/components/TableFilters';
-import { getVenueStates, listVenues } from '@/db/queries/venues';
-import { formatNumber, formatSpan, venuePath } from '@/lib/format';
-import { venueFilterFields } from '@/search/list-filters';
-import { describeFilters, optionsFrom, parseFilterValues } from '@/search/table-filters';
+import { listAflwVenues } from '@/db/queries/aflw';
+import { formatNumber } from '@/lib/format';
+import { aflwVenueFilterFields } from '@/search/aflw-filters';
+import { describeFilters, parseFilterValues } from '@/search/table-filters';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Venues',
-  description: 'Every ground to host a VFL/AFL match since 1897.',
-  alternates: { canonical: '/venues' },
+  title: 'AFLW Venues',
+  description: 'Every ground to host an AFLW match since 2017.',
+  alternates: { canonical: '/aflw/venues' },
 };
 
-export default async function VenuesPage({
+export default async function AflwVenuesPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const states = await getVenueStates();
-  const fields = venueFilterFields(optionsFrom(states));
+  const fields = aflwVenueFilterFields();
   const values = parseFilterValues(fields, params);
 
-  const venues = await listVenues({
-    q: values.text.q,
-    state: values.select.state,
-    ranges: values,
-  });
+  const venues = await listAflwVenues({ q: values.text.q, ranges: values });
   const described = describeFilters(fields, values);
-
-  const filters = (
-    <TableFilters action="/venues" fields={fields} values={values} />
-  );
 
   return (
     <>
+      <nav className="breadcrumbs" aria-label="Breadcrumb">
+        <Link href="/aflw">AFLW</Link>
+        <span aria-hidden="true">/</span>
+        <span>Venues</span>
+      </nav>
+
       <div className="page-header">
-        <h1>Venues</h1>
+        <h1>AFLW Venues</h1>
         <p className="subtitle">
-          {formatNumber(venues.length)} grounds have hosted VFL/AFL matches.
+          {venues.length} grounds have hosted AFLW matches
           {described.length > 0 ? ` · ${described.join(' · ')}` : ''}
         </p>
       </div>
@@ -55,17 +52,22 @@ export default async function VenuesPage({
 
       <CollapsibleTable
         title="Venues"
-        note={`${formatNumber(venues.length)} matching`}
-        filters={filters}
+        note={`${venues.length} matching`}
+        filters={<TableFilters action="/aflw/venues" fields={fields} values={values} />}
       >
         {venues.length === 0 ? (
           <div className="empty">
             <h2>No venues match those filters</h2>
-            <p>Try widening the name, state or match count.</p>
+            <p>Try widening the name or the match count.</p>
           </div>
         ) : (
           <div className="table-wrap">
             <table>
+              <caption>
+                Venue names are the free-text strings the AFLW source publishes. They
+                have not been reconciled with the AFL venue records, so a ground that
+                hosts both competitions appears in each under its own name.
+              </caption>
               <thead>
                 <tr>
                   <th scope="col">Venue</th>
@@ -75,12 +77,18 @@ export default async function VenuesPage({
               </thead>
               <tbody>
                 {venues.map((venue) => (
-                  <tr key={venue.id}>
+                  <tr key={venue.slug}>
                     <td className="wide">
-                      <Link href={venuePath(venue.slug)}>{venue.canonicalName}</Link>
+                      <Link
+                        href={`/aflw/match-search?venue=${encodeURIComponent(venue.slug)}`}
+                      >
+                        {venue.name}
+                      </Link>
                     </td>
                     <td className="num nowrap">
-                      {formatSpan(venue.firstSeason, venue.lastSeason)}
+                      {venue.firstSeasonLabel === venue.lastSeasonLabel
+                        ? venue.firstSeasonLabel
+                        : `${venue.firstSeasonLabel}–${venue.lastSeasonLabel}`}
                     </td>
                     <td className="num">{formatNumber(venue.matches)}</td>
                   </tr>

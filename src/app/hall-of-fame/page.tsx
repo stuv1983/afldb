@@ -2,11 +2,13 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { TableFilters } from '@/components/TableFilters';
 import { getHallOfFameCategories, listHallOfFame } from '@/db/queries/awards';
 import { formatNumber, isLinked, playerPath } from '@/lib/format';
-import { firstValue, parseSearchTerm } from '@/lib/params';
+import { hallOfFameFilterFields } from '@/search/list-filters';
+import { describeFilters, parseFilterValues } from '@/search/table-filters';
 
-export const revalidate = 86400;
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Australian Football Hall of Fame',
@@ -33,13 +35,18 @@ export default async function HallOfFamePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const q = parseSearchTerm(firstValue(params.q));
-  const category = firstValue(params.category) || undefined;
+  const categories = await getHallOfFameCategories();
+  const fields = hallOfFameFilterFields(
+    categories.map((value) => ({ value, label: CATEGORY_LABELS[value] ?? value })),
+  );
+  const values = parseFilterValues(fields, params);
 
-  const [inductees, categories] = await Promise.all([
-    listHallOfFame({ q, category }),
-    getHallOfFameCategories(),
-  ]);
+  const inductees = await listHallOfFame({
+    q: values.text.q,
+    category: values.select.category,
+    ranges: values,
+  });
+  const described = describeFilters(fields, values);
 
   const legends = inductees.filter((i) => i.isLegend);
   const linked = inductees.filter((i) => i.playerId !== null && isLinked(i.linkStatus));
@@ -62,6 +69,7 @@ export default async function HallOfFamePage({
         <h1>Australian Football Hall of Fame</h1>
         <p className="subtitle">
           {formatNumber(inductees.length)} inductees, of whom {legends.length} are Legends.
+          {described.length > 0 ? ` · ${described.join(' · ')}` : ''}
         </p>
       </div>
 
@@ -73,27 +81,15 @@ export default async function HallOfFamePage({
         rather than filtered out.
       </p>
 
-      <form method="get" action="/hall-of-fame">
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))' }}>
-          <div>
-            <label htmlFor="q">Name</label>
-            <input id="q" name="q" type="search" placeholder="Search by name" defaultValue={q ?? ''} />
-          </div>
-          <div>
-            <label htmlFor="category">Category</label>
-            <select id="category" name="category" defaultValue={category ?? ''}>
-              <option value="">Any category</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>{CATEGORY_LABELS[c] ?? c}</option>
-              ))}
-            </select>
-          </div>
+      {values.errors.length > 0 && (
+        <div className="notice filter-errors" role="alert">
+          {values.errors.map((error) => <div key={error}>{error}</div>)}
         </div>
-        <div style={{ marginTop: '0.9rem', display: 'flex', gap: '0.5rem' }}>
-          <button className="btn" type="submit">Filter</button>
-          <Link className="btn btn-secondary" href="/hall-of-fame">Reset</Link>
-        </div>
-      </form>
+      )}
+
+      {/* Both tables below are views of the same filtered list, so the
+          panel governs the page rather than sitting inside one of them. */}
+      <TableFilters action="/hall-of-fame" fields={fields} values={values} />
 
       <div className="stat-strip">
         <div className="stat">

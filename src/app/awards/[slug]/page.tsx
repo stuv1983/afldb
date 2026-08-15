@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { TableFilters } from '@/components/TableFilters';
 import {
   getAward,
   getAwardLeaders,
@@ -21,7 +22,11 @@ import {
   playerPath,
   seasonPath,
 } from '@/lib/format';
+import { SEASON_MAX, SEASON_MIN } from '@/search/list-filters';
+import { type FilterField, parseFilterValues } from '@/search/table-filters';
 
+// Reading searchParams already makes this render per request; the route
+// keeps its generateStaticParams so the award list still seeds the cache.
 export const revalidate = 86400;
 
 const RISING_STAR = 'rising-star';
@@ -52,10 +57,12 @@ export async function generateMetadata({
 
 export default async function AwardPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { slug } = await params;
+  const [{ slug }, query] = await Promise.all([params, searchParams]);
   const award = await getAward(slug);
   if (!award) notFound();
 
@@ -77,6 +84,37 @@ export default async function AwardPage({
     : [];
 
   const unlinked = winners.filter((w) => !isLinked(w.linkStatus)).length;
+
+  // An award's winner list is one row a season, so it is filtered here
+  // rather than in SQL: the rows are already loaded for the summary
+  // counts above and a second query would read the same handful again.
+  const winnerFields: FilterField[] = [
+    { kind: 'text', key: 'q', label: 'Player', placeholder: 'Search by name' },
+    {
+      kind: 'select', key: 'club', label: 'Club', anyLabel: 'Any club',
+      options: [...new Map(
+        winners
+          .filter((w) => w.clubSlug && w.clubName)
+          .map((w) => [w.clubSlug!, { value: w.clubSlug!, label: w.clubName! }]),
+      ).values()].sort((a, b) => a.label.localeCompare(b.label)),
+    },
+    {
+      kind: 'range', key: 'season', label: 'Season',
+      min: award.firstSeason ?? SEASON_MIN, max: award.lastSeason ?? SEASON_MAX,
+    },
+  ];
+  const winnerValues = parseFilterValues(winnerFields, query);
+  const nameTerm = winnerValues.text.q?.toLowerCase();
+  const clubSlug = winnerValues.select.club;
+  const seasonRange = winnerValues.range.season;
+  const filteredWinners = winners.filter((w) => {
+    if (nameTerm && !w.playerName.toLowerCase().includes(nameTerm)) return false;
+    if (clubSlug && w.clubSlug !== clubSlug) return false;
+    if (seasonRange?.min !== undefined && (w.season ?? 0) < seasonRange.min) return false;
+    if (seasonRange?.max !== undefined && (w.season ?? 9999) > seasonRange.max) return false;
+    return true;
+  });
+  const showVotes = winners.some((w) => w.votes !== null);
 
   return (
     <>
@@ -274,7 +312,34 @@ export default async function AwardPage({
 
       {!isTeam && (
         <section className="section">
-          <CollapsibleTable title="Every winner">
+          <CollapsibleTable
+            title="Every winner"
+            note={
+              filteredWinners.length === winners.length
+                ? `${winners.length} winners`
+                : `${filteredWinners.length} of ${winners.length} winners`
+            }
+            filters={
+              <TableFilters
+                action={awardPath(award.slug)}
+                fields={winnerFields}
+                values={winnerValues}
+                title="Filter winners"
+                submitLabel="Apply"
+              />
+            }
+          >
+          {winnerValues.errors.length > 0 && (
+            <div className="notice filter-errors" role="alert">
+              {winnerValues.errors.map((error) => <div key={error}>{error}</div>)}
+            </div>
+          )}
+          {filteredWinners.length === 0 ? (
+            <div className="empty">
+              <h2>No winners match those filters</h2>
+              <p>Try clearing the club or widening the season range.</p>
+            </div>
+          ) : (
           <div className="table-wrap">
             <table>
               <thead>
@@ -282,13 +347,13 @@ export default async function AwardPage({
                   <th scope="col">Season</th>
                   <th scope="col">Player</th>
                   <th scope="col">Club</th>
-                  {winners.some((w) => w.votes !== null) && (
+                  {showVotes && (
                     <th scope="col" className="num">Votes</th>
                   )}
                 </tr>
               </thead>
               <tbody>
-                {winners.map((w) => (
+                {filteredWinners.map((w) => (
                   <tr key={w.id}>
                     <td>
                       {w.season
@@ -309,7 +374,7 @@ export default async function AwardPage({
                         ? <Link href={clubPath(w.clubSlug)}>{w.clubName}</Link>
                         : <span className="muted">{w.clubNameRaw ?? '—'}</span>}
                     </td>
-                    {winners.some((x) => x.votes !== null) && (
+                    {showVotes && (
                       <td className="num">{w.votes ?? <span className="muted">—</span>}</td>
                     )}
                   </tr>
@@ -317,6 +382,7 @@ export default async function AwardPage({
               </tbody>
             </table>
           </div>
+          )}
           </CollapsibleTable>
         </section>
       )}

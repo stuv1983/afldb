@@ -18,9 +18,13 @@ The development deployment runs as a four-worker Next.js standalone service behi
 - Career, season, and single-match record leaderboards
 - Brownlow leaderboards using authoritative season totals
 - Typed, shareable player and match searches with allowlisted filters and sorting
+- AFLW as a separate competition: players, clubs, seasons, ladders, matches, scoring progressions and match search
+- A collapsible filter panel on every table, with the applied filters carried in the URL
 - Responsive navigation, light/dark themes, canonical metadata, robots controls, and segmented sitemaps
 
-Draft data has been imported, but draft pages are not yet exposed. Awards, Hall of Fame, and family relationships have not been migrated and are intentionally absent from the public site.
+Draft data has been imported, but draft pages are not yet exposed. Family relationships have not been migrated and are intentionally absent from the public site.
+
+AFLW is served from a read-only `aflw` schema of views over the staged scrape rather than from the normalised model, because AFLW played two seasons in calendar 2022 and the core model keys a season by year. See [AFLW](docs/aflw.md) for the reasoning and the identity rules that follow from it.
 
 ## Data snapshot
 
@@ -178,6 +182,7 @@ Verification: `npm run typecheck` passes and the 68 database-free unit tests pas
 | [Migration inventory](docs/migration-inventory.md) | Source-to-target mapping and validation baselines |
 | [Migration report](docs/migration-report.md) | Latest migrated volumes, corrections, and validation results |
 | [Search](docs/search.md) | Search normalization, ranking, filters, limits, and performance |
+| [AFLW](docs/aflw.md) | The AFLW read model, its identity rules, and what the source does and does not carry |
 | [Admin and beta](docs/admin-and-beta.md) | Administrator accounts (MFA), the closed-beta gate, and the vetted CSV upload pipeline |
 | [Deployment](docs/deployment.md) | Development-server setup, release workflow, and operations |
 | [Backup and restore](docs/backup-restore.md) | Backup policy and tested restore procedure |

@@ -1,6 +1,8 @@
 import 'server-only';
 
 import { sql } from '@/db/client';
+import { allOf, containsPattern, rangeConditions } from '@/db/queries/filters';
+import type { FilterValues } from '@/search/table-filters';
 
 export type DraftPickRow = {
   id: number;
@@ -17,6 +19,22 @@ export type DraftPickRow = {
   clubName: string | null;
   clubNameRaw: string | null;
   draftAge: number | null;
+  /** Career games of the linked player; null when the pick is unlinked. */
+  careerGames: number | null;
+};
+
+/**
+ * Draft columns the index may be filtered on.
+ *
+ * `games` is the drafted player's career total, which exists only for a
+ * selection that was linked to a player. A range on it therefore excludes
+ * unlinked rows rather than treating them as zero games — the filter help
+ * text says so, because a quarter of legacy rows are unlinked.
+ */
+export const DRAFT_FILTER_COLUMNS: Record<string, string> = {
+  pick: 'dp.pick_number',
+  age: 'dp.draft_age',
+  games: 'pcs.games',
 };
 
 export type DraftPickFilters = {
@@ -24,6 +42,7 @@ export type DraftPickFilters = {
   clubSlug?: string;
   draftType?: string;
   q?: string;
+  ranges?: FilterValues;
   page: number;
   pageSize: number;
 };
@@ -39,7 +58,9 @@ export type DraftPickFilters = {
 export async function listDraftPicks(
   filters: DraftPickFilters,
 ): Promise<{ rows: DraftPickRow[]; total: number }> {
-  const conditions: ReturnType<typeof sql>[] = [sql`TRUE`];
+  const conditions = filters.ranges
+    ? rangeConditions(filters.ranges, DRAFT_FILTER_COLUMNS)
+    : [];
 
   if (filters.year !== undefined) {
     conditions.push(sql`dp.draft_year = ${filters.year}`);
@@ -51,11 +72,11 @@ export async function listDraftPicks(
     conditions.push(sql`dp.draft_type = ${filters.draftType}`);
   }
   if (filters.q) {
-    const like = `%${filters.q}%`;
+    const like = containsPattern(filters.q);
     conditions.push(sql`(dp.player_name_raw ILIKE ${like} OR p.display_name ILIKE ${like})`);
   }
 
-  const where = conditions.reduce((acc, cond) => sql`${acc} AND ${cond}`);
+  const where = allOf(conditions);
   const offset = (filters.page - 1) * filters.pageSize;
 
   const rows = await sql<(DraftPickRow & { total: string })[]>`
@@ -66,9 +87,11 @@ export async function listDraftPicks(
            dp.link_status_value::text AS "linkStatus",
            c.slug AS "clubSlug", c.name AS "clubName", dp.club_name_raw AS "clubNameRaw",
            dp.draft_age AS "draftAge",
+           pcs.games AS "careerGames",
            count(*) OVER () AS total
       FROM draft_picks dp
       LEFT JOIN players p ON p.id = dp.player_id
+      LEFT JOIN player_career_stats pcs ON pcs.player_id = dp.player_id
       LEFT JOIN clubs c ON c.id = dp.club_id
      WHERE ${where}
      ORDER BY dp.draft_year DESC, dp.pick_number NULLS LAST

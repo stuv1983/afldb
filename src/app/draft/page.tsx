@@ -3,13 +3,21 @@ import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { Pagination } from '@/components/Pagination';
+import { TableFilters } from '@/components/TableFilters';
 import { getClubOptions } from '@/db/queries/advanced-search';
 import { getDraftTypes, getDraftYears, listDraftPicks } from '@/db/queries/draft';
 import { clubPath, formatNumber, isLinked, playerPath } from '@/lib/format';
-import { firstValue, parseIntInRange, parsePage, parseSearchTerm, parseSlug } from '@/lib/params';
+import { firstValue, parsePage } from '@/lib/params';
 import { DEFAULT_PAGE_SIZE } from '@/search/constants';
+import { clubOptions, draftFilterFields } from '@/search/list-filters';
+import {
+  describeFilters,
+  filterQueryParams,
+  optionsFrom,
+  parseFilterValues,
+} from '@/search/table-filters';
 
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Draft',
@@ -24,26 +32,33 @@ export default async function DraftPage({
 }) {
   const params = await searchParams;
   const page = parsePage(firstValue(params.page));
-  const year = parseIntInRange(firstValue(params.year), 1981, 2100);
-  const club = parseSlug(firstValue(params.club));
-  const draftType = firstValue(params.type) || undefined;
-  const q = parseSearchTerm(firstValue(params.q));
 
-  const [{ rows, total }, years, types, clubs] = await Promise.all([
-    listDraftPicks({
-      year, clubSlug: club, draftType, q, page, pageSize: DEFAULT_PAGE_SIZE,
-    }),
+  const [years, types, clubs] = await Promise.all([
     getDraftYears(),
     getDraftTypes(),
     getClubOptions(),
   ]);
+  const fields = draftFilterFields({
+    years: optionsFrom(years.map(String)),
+    clubs: clubOptions(clubs),
+    types: optionsFrom(types),
+  });
+  const values = parseFilterValues(fields, params);
 
-  const linkParams = {
-    year: year ? String(year) : undefined,
-    club,
-    type: draftType,
-    q,
-  };
+  const { rows, total } = await listDraftPicks({
+    year: values.select.year ? Number(values.select.year) : undefined,
+    clubSlug: values.select.club,
+    draftType: values.select.type,
+    q: values.text.q,
+    ranges: values,
+    page,
+    pageSize: DEFAULT_PAGE_SIZE,
+  });
+
+  const linkParams = filterQueryParams(fields, values);
+  const described = describeFilters(fields, values);
+
+  const filters = <TableFilters action="/draft" fields={fields} values={values} />;
 
   return (
     <>
@@ -51,57 +66,35 @@ export default async function DraftPage({
         <h1>Draft</h1>
         <p className="subtitle">
           {formatNumber(total)} draft and recruitment selections since 1981.
+          {described.length > 0 ? ` · ${described.join(' · ')}` : ''}
         </p>
       </div>
 
-      <form method="get" action="/draft">
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))' }}>
-          <div>
-            <label htmlFor="q">Player</label>
-            <input id="q" name="q" type="search" placeholder="Search by name" defaultValue={q ?? ''} />
-          </div>
-          <div>
-            <label htmlFor="year">Year</label>
-            <select id="year" name="year" defaultValue={year ?? ''}>
-              <option value="">Any year</option>
-              {years.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="club">Club</label>
-            <select id="club" name="club" defaultValue={club ?? ''}>
-              <option value="">Any club</option>
-              {clubs.map((c) => (
-                <option key={c.slug} value={c.slug}>
-                  {c.name}{c.isCurrent ? '' : ' (historical)'}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="type">Draft type</label>
-            <select id="type" name="type" defaultValue={draftType ?? ''}>
-              <option value="">Any type</option>
-              {types.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
+      {values.errors.length > 0 && (
+        <div className="notice filter-errors" role="alert">
+          {values.errors.map((error) => <div key={error}>{error}</div>)}
         </div>
-        <div style={{ marginTop: '0.9rem', display: 'flex', gap: '0.5rem' }}>
-          <button className="btn" type="submit">Filter</button>
-          <Link className="btn btn-secondary" href="/draft">Reset</Link>
-        </div>
-      </form>
+      )}
 
-      {rows.length === 0 ? (
-        <div className="empty">
-          <h2>No draft picks match those filters</h2>
-          <p>Try widening the year, club or search term.</p>
-        </div>
-      ) : (
-        <>
-          <CollapsibleTable title="Draft picks">
+      <CollapsibleTable
+        title="Draft picks"
+        note={`${formatNumber(total)} matching`}
+        filters={filters}
+      >
+        {rows.length === 0 ? (
+          <div className="empty">
+            <h2>No draft picks match those filters</h2>
+            <p>Try widening the year, club or search term.</p>
+          </div>
+        ) : (
+          <>
             <div className="table-wrap">
               <table>
+                <caption>
+                  Career games count everything the player went on to play, not
+                  only for the club that drafted them. A selection never linked
+                  to a player has no career total to show.
+                </caption>
                 <thead>
                   <tr>
                     <th scope="col" className="num">Year</th>
@@ -110,6 +103,7 @@ export default async function DraftPage({
                     <th scope="col">Club</th>
                     <th scope="col">Type</th>
                     <th scope="col" className="num">Age</th>
+                    <th scope="col" className="num">Games</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -135,22 +129,27 @@ export default async function DraftPage({
                       </td>
                       <td className="nowrap muted">{pick.draftType}</td>
                       <td className="num">{pick.draftAge ?? '—'}</td>
+                      <td className="num">
+                        {pick.careerGames === null
+                          ? <span className="not-recorded">—</span>
+                          : formatNumber(pick.careerGames)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </CollapsibleTable>
 
-          <Pagination
-            basePath="/draft"
-            params={linkParams}
-            page={page}
-            pageSize={DEFAULT_PAGE_SIZE}
-            total={total}
-          />
-        </>
-      )}
+            <Pagination
+              basePath="/draft"
+              params={linkParams}
+              page={page}
+              pageSize={DEFAULT_PAGE_SIZE}
+              total={total}
+            />
+          </>
+        )}
+      </CollapsibleTable>
     </>
   );
 }
