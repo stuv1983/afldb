@@ -1,0 +1,118 @@
+import './guard';
+
+import { describe, expect, it } from 'vitest';
+
+import { authSql } from '@/db/authClient';
+import { POST } from '@/app/api/admin/email-intake/route';
+
+// authSql cleanup note: see datasets.test.ts -- no afterAll(authSql.end())
+// here for the same reason (the proxy's .end() is not safe to call with
+// `this` bound to the proxy rather than the real client).
+
+function request(body: unknown, headers: Record<string, string> = {}): Request {
+  return new Request('http://localhost/api/admin/email-intake', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  });
+}
+
+describe('POST /api/admin/email-intake', () => {
+  it('refuses to run at all when no secret is configured', async () => {
+    if (process.env.AFLDB_EMAIL_INTAKE_SECRET) return; // covered by the tests below instead
+    const res = await POST(request(
+      { senderEmail: 'nobody@example.com', dataset: 'match_results', contentBase64: 'eA==' },
+    ));
+    expect(res.status).toBe(503);
+  });
+
+  it('rejects a request with the wrong secret', async () => {
+    if (!process.env.AFLDB_EMAIL_INTAKE_SECRET) return; // not configured in this environment
+    const res = await POST(request(
+      { senderEmail: 'nobody@example.com', dataset: 'match_results', contentBase64: 'eA==' },
+      { 'x-intake-secret': 'definitely-not-the-real-secret' },
+    ));
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a request with no secret header at all', async () => {
+    if (!process.env.AFLDB_EMAIL_INTAKE_SECRET) return;
+    const res = await POST(request(
+      { senderEmail: 'nobody@example.com', dataset: 'match_results', contentBase64: 'eA==' },
+    ));
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects malformed JSON', async () => {
+    const secret = process.env.AFLDB_EMAIL_INTAKE_SECRET;
+    if (!secret) return; // not configured in this environment; covered by the tests above
+    const res = await POST(new Request('http://localhost/api/admin/email-intake', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-intake-secret': secret },
+      body: 'not json',
+    }));
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a sender who is not a known, enabled admin', async () => {
+    const secret = process.env.AFLDB_EMAIL_INTAKE_SECRET;
+    if (!secret) return;
+    const res = await POST(request(
+      { senderEmail: 'definitely-not-an-admin@example.invalid', dataset: 'match_results', contentBase64: 'eA==' },
+      { 'x-intake-secret': secret },
+    ));
+    expect(res.status).toBe(403);
+  });
+
+  it('stages and validates a real CSV from a real admin end to end', async () => {
+    const secret = process.env.AFLDB_EMAIL_INTAKE_SECRET;
+    if (!secret) return;
+    const [admin] = await authSql<{ email: string }[]>`
+      SELECT email FROM auth_users WHERE role = 'super_admin' AND disabled_at IS NULL LIMIT 1
+    `;
+    if (!admin) return; // no admin fixture in this environment
+
+    const csv = 'player,year,club,position,captain\nA Real Sounding Name,2024,Carlton,Half Back,\n';
+    const contentBase64 = Buffer.from(csv, 'utf8').toString('base64');
+
+    const res = await POST(request(
+      { senderEmail: admin.email, dataset: 'all_australian', filename: 'test.csv', contentBase64 },
+      { 'x-intake-secret': secret },
+    ));
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.rowCount).toBe(1);
+    expect(body.report).toBeDefined();
+
+    const [row] = await authSql<{ status: string; uploadedBy: string }[]>`
+      SELECT s.status::text, u.email AS "uploadedBy"
+        FROM data_submissions s JOIN auth_users u ON u.id = s.uploaded_by
+       WHERE s.id = ${body.submissionId}
+    `;
+    expect(row.status).toBe('validated');
+    expect(row.uploadedBy).toBe(admin.email);
+
+    // Cleanup: this submission was never approved/promoted, so removing
+    // it touches only the operational tables, never statistics.
+    await authSql`DELETE FROM data_submission_rows WHERE submission_id = ${body.submissionId}`;
+    await authSql`DELETE FROM data_submissions WHERE id = ${body.submissionId}`;
+  });
+
+  it('rejects an oversized payload', async () => {
+    const secret = process.env.AFLDB_EMAIL_INTAKE_SECRET;
+    if (!secret) return;
+    const [admin] = await authSql<{ email: string }[]>`
+      SELECT email FROM auth_users WHERE role = 'super_admin' AND disabled_at IS NULL LIMIT 1
+    `;
+    if (!admin) return;
+
+    const big = 'x'.repeat(6 * 1024 * 1024); // over the 5 MB MAX_UPLOAD_BYTES limit
+    const contentBase64 = Buffer.from(big, 'utf8').toString('base64');
+    const res = await POST(request(
+      { senderEmail: admin.email, dataset: 'match_results', contentBase64 },
+      { 'x-intake-secret': secret },
+    ));
+    expect(res.status).toBe(400);
+  });
+});

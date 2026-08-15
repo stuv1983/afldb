@@ -26,6 +26,7 @@ const PUBLIC_PREFIXES = [
   '/admin/login',    // admins must be able to reach the login form
   '/admin/invite',   // invite acceptance: gated by the unguessable token in the path, not a session
   '/api/health',     // uptime checks predate any visitor
+  '/api/admin/email-intake', // machine-to-machine, gated by its own shared secret, not a session
   '/robots.txt',     // crawlers must read the disallow, not a redirect
   '/favicon.ico',
 ];

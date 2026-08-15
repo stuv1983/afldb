@@ -1,0 +1,47 @@
+[Unit]
+Description=AFLDB — email CSV intake (one poll)
+Documentation=https://github.com/afldb
+After=network-online.target afldb.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=arm
+Group=arm
+WorkingDirectory=/home/arm/projects/afldb
+
+# Standard library only (imaplib/email/urllib) -- plain python3, no
+# venv. This never touches PostgreSQL directly: it POSTs to afldb's own
+# /api/admin/email-intake route, which does the actual staging under
+# the app's own database roles.
+ExecStart=/usr/bin/python3 tools/email_intake/fetch_and_stage.py
+
+# Needs AFLDB_EMAIL_INTAKE_SECRET, AFLDB_BASE_URL and AFLDB_INTAKE_IMAP_*
+# only -- not any database DSN. UnsetEnvironment below drops everything
+# else .env carries, the same "load the file, keep only what this
+# process uses" pattern as afldb.service.
+EnvironmentFile=/home/arm/projects/afldb/.env
+UnsetEnvironment=AFLDB_IMPORT_DATABASE_URL AFLDB_OWNER_DATABASE_URL AFLDB_AUTH_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL DATABASE_URL
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=afldb-email-intake
+
+# --- Hardening -------------------------------------------------------
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM

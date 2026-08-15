@@ -207,7 +207,56 @@ tables that `player_career_stats` (and Advanced Search) are derived
 from. Run `tools/migration/rebuild_derived.py` afterward — the
 submission page does not trigger this automatically.
 
-## 5. Bulk award history (Phase 3b)
+## 5. Email-in CSV intake
+
+A second channel into the same pipeline, for an admin who would rather
+email a file than open the browser. `tools/email_intake/
+fetch_and_stage.py` polls a mailbox on a systemd timer; for each unseen
+message it finds with a CSV attachment, it reads the **subject line as
+the dataset key** (`match_results`, `player_match_stats`,
+`rising_star`, `all_australian` — spaces become underscores, so
+"match results" also works) and POSTs the attachment to
+`POST /api/admin/email-intake`.
+
+**This route is authenticated by a shared secret
+(`AFLDB_EMAIL_INTAKE_SECRET`), never a session** — the poller runs
+unattended on the server, machine to machine. The secret proves the
+*caller* is the trusted poller; it says nothing about who *sent* the
+email, so the route independently re-resolves the claimed `From`
+address against `auth_users` itself and refuses anything that is not a
+known, enabled admin or super admin. Nothing the poller or the email
+claims is trusted beyond that.
+
+**The script never touches PostgreSQL directly** and carries no
+database credential — it calls `stageSubmission` then
+`validateSubmission` through the HTTP route, the exact same two pipeline
+functions `/admin/upload`'s form calls. Deliberately **not**
+`promoteSubmission`: an emailed file reaches `staged`/`validated` only,
+exactly like a web upload, so a human still reviews the report and
+approves/promotes at `/admin/submissions/<id>`. "Processed by a
+script" means *validated*, not auto-applied — nothing about this
+channel is allowed to bypass the human-approval step the web path has.
+
+The script never deletes mail. A processed message — success or
+failure — is copied to a `Processed` or `Errors` IMAP folder (created
+automatically) and marked `\Seen` so it is not picked up again; the
+original always stays in the mailbox as a record.
+
+### One-time server setup
+
+```bash
+# .env: AFLDB_EMAIL_INTAKE_SECRET and AFLDB_INTAKE_IMAP_* (see .env.example)
+sudo cp deploy/afldb-email-intake.service deploy/afldb-email-intake.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now afldb-email-intake.timer
+```
+
+Polls every 5 minutes (`OnUnitActiveSec=5min` in the timer unit).
+`journalctl -u afldb-email-intake` shows each run. Dry-run without
+touching the mailbox or the app: `python3 tools/email_intake/
+fetch_and_stage.py --dry-run`.
+
+## 6. Bulk award history (Phase 3b)
 
 The historical award load remains a Python importer, run on the server:
 
