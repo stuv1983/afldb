@@ -81,8 +81,6 @@ export function QueryBuilderForm({ initialState }: { initialState: QueryBuilderS
   }
 
   function runSearch() {
-    // eslint-disable-next-line no-console -- temporary diagnostic, removed before merge
-    console.log('DIAG runSearch state', JSON.stringify(state));
     router.push(`/admin/query-builder?q=${serializeQueryState({ ...state, page: 1 })}`);
   }
 
