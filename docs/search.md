@@ -174,23 +174,52 @@ set, showing an eligible-player count and a top-ranked answer, with a
 drill-down to the full ranked list.
 
 **Named builders, not user-chosen columns.** `src/search/grid-solver-spec.ts`
-holds `GRID_BUILDERS`: ~30 fixed, parameterised questions across nine
-categories (clubs & journeys, career milestones, season & era, finals &
-premierships, grounds & venues, teammates, captaincy, awards & honours,
-draft & recruitment) — a real cross-section of what the schema supports,
-not the reference's 100+. Each compiles in `src/db/queries/grid-solver.ts`
-to a fixed SQL shape with bound parameters; there is no request-selected
-column or operator at all here, so most of the catalogue needs no
-allowlist check beyond "is this a known builder key" — the one exception
-is the `stat` parameter on the two stat-total builders, checked against
-`GRID_STATS` before it can reach `sql.unsafe`. Runs through the same
-`afldb_app` client as everything above.
+holds `GRID_BUILDERS`: 93 fixed, parameterised questions across ten
+categories (clubs & journeys, career milestones, single-game feats,
+season & era, finals & premierships, grounds & venues, teammates,
+captaincy, awards & honours, draft & recruitment) — checked one category
+at a time against the reference's own generated criteria doc
+(`afl_grid_criteria.md`, ~133 questions across 13 categories) and against
+AFLDB's live data, not ported wholesale. Each compiles in
+`src/db/queries/grid-solver.ts` to a fixed SQL shape with bound
+parameters; there is no request-selected column or operator at all here,
+so most of the catalogue needs no allowlist check beyond "is this a known
+builder key" — the exception is the `stat`/`statA`/`statB` family of
+params (every stat-based builder, not just the original two), checked
+against `GRID_STATS` before it can reach `sql.unsafe`. Runs through the
+same `afldb_app` client as everything above.
+
+**`GRID_STATS` covers all 21 real per-game statistics** (every
+`player_match_stats` column plus goals), each tagged with how far it's
+precomputed: `career_stat_total_min`/`season_stat_total_min` and their
+siblings use the real `player_career_stats`/`player_season_stats` column
+for the 8 stats that have one, and fall back to a live `SUM()` over
+`player_match_stats` for the other 13 — migration 007 precomputes exactly
+*because* aggregating 694K rows per request is expensive, so builders use
+that precomputation wherever it exists.
+
+**A generic `award` parameter replaces one-off builders per medal.**
+`awards`/`award_winners` hold 39 real rows — Brownlow, Coleman, Norm
+Smith, eight state-league medals, all 18 club best-and-fairests, the
+All-Australian squad, National Draft Pick #1 — so three generic builders
+(`award_winner`, `award_winner_min_times`, `award_winner_between_seasons`)
+cover what would otherwise be a dozen-plus near-identical questions.
+Picking a specific club's B&F award already scopes to that club's full
+lineage, since the award keeps one id across renames. Brownlow and Hall
+of Fame stay as dedicated builders reading their own authoritative
+tables rather than going through this generic mechanism.
 
 Not ported from the reference, deliberately: the daily board fetch from
 an external trivia site, saved-grids-per-account (AFLDB has no
 regular-user accounts), practice/auto-grid modes, and the obscurity/
 star-rating system — AFLDB has no precomputed rarity score, so ranking
-falls back to the honest, simple "fewest career games first."
+falls back to the honest, simple "fewest career games first." Also cut,
+for lack of underlying data verified live rather than assumed: player
+family relationships and physical attributes (both genuinely unpopulated
+on the live database, not merely unexposed), any derby/rivalry pairing
+(no such definition exists in the schema), and win-streak questions
+(the only builder shape that would need a full per-player chronological
+scan rather than a bound predicate on indexed or precomputed columns).
 
 Board state lives in one `g` URL parameter (same JSON/base64url encoding
 as `q` above, now shared via `src/lib/urlState.ts`), so a built board is
