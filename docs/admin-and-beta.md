@@ -95,6 +95,19 @@ returns the link **once**, in the page, for the inviting admin to copy
 and send however they like — there is no email sending, matching the
 beta-access codes above.
 
+Because accepting an invite upserts on email (see below), an invite aimed
+at an address that already has an account is a **credential reset** for
+it, not just a new account — so the same "never a peer or better" line is
+drawn over the target as over the role. A delegated admin manager may
+only invite an address that is free or belongs to a contributor;
+`createInvite` refuses one that already belongs to an admin or super
+admin and audits the refusal as `admin.invite_refused`. Acceptance checks
+again, and independently: `confirmEnrolment` refuses to overwrite an
+account whose current role outranks what the invite grants
+(`admin.invite_rejected`), which is what covers an invite issued before
+the target was promoted. Between them, an invite can never be the route
+by which someone is demoted or locked out.
+
 Accepting an invite at `/admin/invite/<token>` is two steps, and nothing
 sensitive ever round-trips through the browser between them:
 
@@ -235,8 +248,14 @@ unattended on the server, machine to machine. The secret proves the
 *caller* is the trusted poller; it says nothing about who *sent* the
 email, so the route independently re-resolves the claimed `From`
 address against `auth_users` itself and refuses anything that is not a
-known, enabled admin or super admin. Nothing the poller or the email
-claims is trusted beyond that.
+known, enabled account. Nothing the poller or the email claims is
+trusted beyond that.
+
+Contributors count as senders here, the same as they do at
+`/admin/upload`: this is that form's email counterpart, submitting data
+is the whole reason the role exists, and an emailed file reaches exactly
+as far as a web upload does — staged and validated, with an admin still
+reviewing before promotion.
 
 **The script never touches PostgreSQL directly** and carries no
 database credential — it calls `stageSubmission` then

@@ -2,6 +2,7 @@ import 'server-only';
 
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { cache } from 'react';
 
 import { authSql } from '@/db/authClient';
 import { generateToken, sha256Hex } from '@/lib/auth/crypto';
@@ -162,6 +163,18 @@ export type AdminUser = {
   canManageAdmins: boolean;
 };
 
+/**
+ * The roles in privilege order, for the one comparison the invite flow
+ * needs: accepting an invite upserts on email, so it can overwrite an
+ * account that already exists at that address. Both ends of that flow ask
+ * whether the account being written outranks what is being granted.
+ */
+export const ROLE_RANK: Record<AdminUser['role'], number> = {
+  contributor: 0,
+  admin: 1,
+  super_admin: 2,
+};
+
 /** Create a database session and set the admin cookie. */
 export async function createAdminSession(userId: number, email: string): Promise<void> {
   const token = generateToken();
@@ -200,8 +213,14 @@ export async function createAdminSession(userId: number, email: string): Promise
  * The signed cookie is necessary but not sufficient: the database row
  * must exist, be unexpired and be unrevoked. Returns null rather than
  * throwing so callers choose between redirect and 401.
+ *
+ * Wrapped in React.cache so the several guards a single admin request runs
+ * -- the layout's display-only read plus the page's own requireAdmin/
+ * requireUploader -- share one lookup instead of repeating the identical
+ * auth_sessions JOIN. The cache is per request, so nothing is held across
+ * requests and a revoked session is still noticed on the next one.
  */
-export async function getAdminUser(): Promise<AdminUser | null> {
+export const getAdminUser = cache(async function getAdminUser(): Promise<AdminUser | null> {
   const jar = await cookies();
   const claim = await verifyClaim(
     jar.get(ADMIN_COOKIE)?.value,
@@ -228,7 +247,7 @@ export async function getAdminUser(): Promise<AdminUser | null> {
        AND u.role IN ('admin', 'super_admin', 'contributor')
   `;
   return row ?? null;
-}
+});
 
 /**
  * Require a signed-in staff session of any role, or redirect to the login

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 
 import { authSql } from '@/db/authClient';
 import { generateToken, sha256Hex } from '@/lib/auth/crypto';
-import { audit, requireAdminManager } from '@/lib/auth/session';
+import { type AdminUser, audit, requireAdminManager } from '@/lib/auth/session';
 
 export type InviteState = {
   error?: string;
@@ -38,6 +38,28 @@ export async function createInvite(
     ? 'super_admin'
     : requestedRole === 'contributor' ? 'contributor' : 'admin';
   const canManageAdmins = admin.role === 'super_admin' && role !== 'contributor' && requestedManage;
+
+  // Accepting an invite is also a credential RESET: confirmEnrolment upserts
+  // on email, overwriting whatever account already holds that address --
+  // role, password hash and TOTP secret alike. So an invite aimed at an
+  // existing address is a way to take that account over, and the delegated
+  // manage-admins power must not reach a peer or better any more than it
+  // reaches the super_admin role above. Only a delegated manager is
+  // constrained here; a super admin already outranks everyone.
+  if (admin.role !== 'super_admin') {
+    const [existing] = await authSql<{ role: AdminUser['role'] }[]>`
+      SELECT role FROM auth_users WHERE email = ${email}
+    `;
+    if (existing && existing.role !== 'contributor') {
+      await audit('admin.invite_refused',
+        { email, role, existingRole: existing.role },
+        { userId: admin.id, label: admin.email });
+      return {
+        error: 'That address already belongs to an administrator. '
+          + 'Only a super admin can re-issue an invite for it.',
+      };
+    }
+  }
 
   const token = generateToken();
   await authSql`

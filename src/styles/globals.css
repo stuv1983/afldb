@@ -456,7 +456,7 @@ details.table-details[open] > summary::before { transform: rotate(90deg); }
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--bg-subtle);
   color: var(--text-muted);
   cursor: pointer;

@@ -85,15 +85,22 @@ export async function POST(request: Request) {
   }
 
   // The secret proves the CALLER is the trusted poller; it says nothing
-  // about who SENT the email. The sender still has to be a real,
-  // enabled admin -- resolved here, not trusted from the request body.
+  // about who SENT the email. The sender still has to be a real, enabled
+  // account -- resolved here, not trusted from the request body.
+  //
+  // Contributors count: this is the email counterpart of /admin/upload,
+  // which admits them via requireUploader, and submitting data is the whole
+  // reason that role exists. It reaches no further than the form does --
+  // staged and validated only, with an admin still reviewing before promotion.
   const [admin] = await authSql<{ id: number; email: string }[]>`
     SELECT id, email FROM auth_users
-     WHERE email = ${senderEmail} AND role IN ('admin', 'super_admin') AND disabled_at IS NULL
+     WHERE email = ${senderEmail}
+       AND role IN ('admin', 'super_admin', 'contributor')
+       AND disabled_at IS NULL
   `;
   if (!admin) {
     await audit('email_intake.rejected', { senderEmail, dataset, filename }, { label: senderEmail });
-    return NextResponse.json({ error: 'Sender is not a known, enabled admin.' }, { status: 403 });
+    return NextResponse.json({ error: 'Sender is not a known, enabled account.' }, { status: 403 });
   }
 
   let content: Buffer;

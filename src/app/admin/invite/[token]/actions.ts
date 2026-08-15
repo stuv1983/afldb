@@ -11,7 +11,7 @@ import {
   generateTotpSecret, hashPassword, sha256Hex, totpUri, verifyTotpStep,
 } from '@/lib/auth/crypto';
 import { RateLimiter } from '@/lib/auth/rate-limit';
-import { audit, requestIp } from '@/lib/auth/session';
+import { ROLE_RANK, type AdminUser, audit, requestIp } from '@/lib/auth/session';
 
 export type InviteAcceptState = {
   error?: string;
@@ -117,8 +117,26 @@ export async function confirmEnrolment(
   const dsn = process.env.AFLDB_AUTH_DATABASE_URL;
   if (!dsn) return { step: 'confirm', error: 'Server is not configured (AFLDB_AUTH_DATABASE_URL).' };
   const tx = postgres(dsn, { max: 1, onnotice: () => {} });
+  // Set inside the transaction; read after it. A plain `let` would be
+  // narrowed to null by the compiler, which cannot see the closure write.
+  const outranked: { role: AdminUser['role'] | null } = { role: null };
   try {
     await tx.begin(async (t) => {
+      // The upsert below overwrites any account that already holds this
+      // email -- role, password and TOTP secret. Refuse when that account
+      // outranks what the invite grants, so an invite can never be the way
+      // someone is demoted: not when it was aimed at them deliberately, and
+      // not when they were promoted in the days since it was issued.
+      // createInvite blocks the first case at source; this is the check that
+      // holds regardless of who issued the invite or when.
+      const [existing] = await t<{ role: AdminUser['role'] }[]>`
+        SELECT role FROM auth_users WHERE email = ${invite.email} FOR UPDATE
+      `;
+      if (existing && ROLE_RANK[existing.role] > ROLE_RANK[invite.role]) {
+        outranked.role = existing.role;
+        return;
+      }
+
       const [user] = await t<{ id: number }[]>`
         INSERT INTO auth_users (email, role, password_hash, totp_secret, can_manage_admins)
         VALUES (${invite.email}, ${invite.role}, ${pending.pendingPasswordHash},
@@ -146,6 +164,17 @@ export async function confirmEnrolment(
     });
   } finally {
     await tx.end({ timeout: 5 });
+  }
+
+  if (outranked.role) {
+    await audit('admin.invite_rejected',
+      { email: invite.email, role: invite.role, existingRole: outranked.role },
+      { label: invite.email });
+    return {
+      step: 'confirm',
+      error: 'This invite cannot be used: the account for this address already holds a higher role. '
+        + 'Ask a super admin to sort it out.',
+    };
   }
 
   await audit('admin.invite_accepted', { email: invite.email, role: invite.role }, { label: invite.email });
