@@ -260,12 +260,33 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   hall_of_fame_player: { key: 'hall_of_fame_player', label: 'Hall of Fame player', group: 'Awards & honours', params: [] },
   brownlow_medallist: { key: 'brownlow_medallist', label: 'Brownlow medallist', group: 'Awards & honours', params: [] },
   brownlow_votes_career_min: { key: 'brownlow_votes_career_min', label: 'X+ career Brownlow votes', group: 'Awards & honours', params: [int('votes', 'Votes')] },
+  award_winner: { key: 'award_winner', label: 'Won an award…', group: 'Awards & honours', params: [award()] },
+  award_winner_min_times: { key: 'award_winner_min_times', label: 'Won an award X+ times', group: 'Awards & honours', params: [award(), int('times', 'Times')] },
+  award_winner_between_seasons: { key: 'award_winner_between_seasons', label: 'Won an award between years', group: 'Awards & honours', params: [award(), season('from', 'From season'), season('to', 'To season')] },
+  all_australian_captain: { key: 'all_australian_captain', label: 'All-Australian captain', group: 'Awards & honours', params: [] },
+  all_australian_position: { key: 'all_australian_position', label: 'All-Australian in a position', group: 'Awards & honours', params: [aaPosition()] },
+  club_best_and_fairest_min_times: { key: 'club_best_and_fairest_min_times', label: 'Club best and fairest, X+ times', group: 'Awards & honours', params: [int('times', 'Times')] },
+  best_and_fairest_multi_club: { key: 'best_and_fairest_multi_club', label: 'Best and fairest at 2+ clubs', group: 'Awards & honours', params: [int('clubs', 'Clubs')] },
+  brownlow_finish_exact: { key: 'brownlow_finish_exact', label: 'Exact Brownlow finish', group: 'Awards & honours', params: [int('place', 'Finishing place')] },
+  brownlow_top_finish: { key: 'brownlow_top_finish', label: 'Top X Brownlow finish', group: 'Awards & honours', params: [int('place', 'Top place')] },
+  brownlow_top_finish_min_times: { key: 'brownlow_top_finish_min_times', label: 'Top X Brownlow finish, X+ times', group: 'Awards & honours', params: [int('place', 'Top place'), int('times', 'Times')] },
+  brownlow_winner_votes_min: { key: 'brownlow_winner_votes_min', label: 'Won the Brownlow with X+ votes', group: 'Awards & honours', params: [int('votes', 'Votes')] },
+  brownlow_season_votes_min: { key: 'brownlow_season_votes_min', label: 'X+ Brownlow votes in a season', group: 'Awards & honours', params: [int('votes', 'Votes')] },
+  rising_star_nominee: { key: 'rising_star_nominee', label: 'Rising Star nominee', group: 'Awards & honours', params: [] },
+  rising_star_nominee_between_seasons: { key: 'rising_star_nominee_between_seasons', label: 'Rising Star nominee between seasons', group: 'Awards & honours', params: [season('from', 'From season'), season('to', 'To season')] },
+  rising_star_nominee_for_club: { key: 'rising_star_nominee_for_club', label: 'Rising Star nominee for club', group: 'Awards & honours', params: [club()] },
+  rising_star_nominee_for_club_between_seasons: { key: 'rising_star_nominee_for_club_between_seasons', label: 'Rising Star nominee for club, between seasons', group: 'Awards & honours', params: [club(), season('from', 'From season'), season('to', 'To season')] },
+  rising_star_nominee_in_season: { key: 'rising_star_nominee_in_season', label: 'Rising Star nominee in season', group: 'Awards & honours', params: [season('season', 'Season')] },
 
   // Draft & recruitment -- linked rows only (link_status_value IN
   // ('unique','resolved')), the same rule every other draft query follows.
   drafted_by_club: { key: 'drafted_by_club', label: 'Drafted by club', group: 'Draft & recruitment', params: [club()] },
   draft_pick_between: { key: 'draft_pick_between', label: 'Draft pick between', group: 'Draft & recruitment', params: [int('from', 'From pick'), int('to', 'To pick')] },
   draft_year_between: { key: 'draft_year_between', label: 'Drafted between years', group: 'Draft & recruitment', params: [season('from', 'From year'), season('to', 'To year')] },
+  draft_type_is: { key: 'draft_type_is', label: 'Draft type', group: 'Draft & recruitment', params: [draftType()] },
+  drafted_by_club_never_played: { key: 'drafted_by_club_never_played', label: 'Drafted by club, never played there', group: 'Draft & recruitment', params: [club()] },
+  recruited_via: { key: 'recruited_via', label: 'Recruited from…', group: 'Draft & recruitment', params: [signingKind()] },
+  traded_min_times: { key: 'traded_min_times', label: 'Traded X+ times', group: 'Draft & recruitment', params: [int('times', 'Times')] },
 };
 
 export const GRID_BUILDER_KEYS = Object.keys(GRID_BUILDERS);

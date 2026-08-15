@@ -180,6 +180,40 @@ describe('grid solver correctness', () => {
     expect(rows.some((r) => r.id === loser.playerId)).toBe(true);
   });
 
+  it('brownlow_top_finish(1) matches a hand-written equivalent count', async () => {
+    const summary = await solveCellSummary(
+      { builder: 'brownlow_top_finish', params: { place: '1' } },
+      { builder: 'career_games_min', params: { games: '0' } },
+      'games_asc',
+    );
+    const [expected] = await sql<{ count: string }[]>`
+      SELECT count(DISTINCT player_id) FROM brownlow_season_votes WHERE eligible_rank <= 1
+    `;
+    expect(summary.eligible).toBe(Number(expected.count));
+  });
+
+  it('drafted_by_club_never_played matches a hand-written equivalent for a real club', async () => {
+    const [org] = await sql<{ id: number }[]>`SELECT id FROM club_organizations ORDER BY id LIMIT 1`;
+    expect(org, 'no club_organizations row found').toBeDefined();
+    const summary = await solveCellSummary(
+      { builder: 'drafted_by_club_never_played', params: { club: String(org.id) } },
+      { builder: 'career_games_min', params: { games: '0' } },
+      'games_asc',
+    );
+    const [expected] = await sql<{ count: string }[]>`
+      SELECT count(*) FROM (
+        SELECT dp.player_id FROM draft_picks dp
+         WHERE dp.link_status_value IN ('unique', 'resolved')
+           AND dp.club_id IN (SELECT id FROM clubs WHERE organization_id = ${org.id})
+           AND NOT EXISTS (
+             SELECT 1 FROM player_clubs pc WHERE pc.player_id = dp.player_id
+               AND pc.club_id IN (SELECT id FROM clubs WHERE organization_id = ${org.id})
+           )
+      ) t
+    `;
+    expect(summary.eligible).toBe(Number(expected.count));
+  });
+
   it('club_season_stat_leader(goals) rows really did lead a club-season in goals', async () => {
     const { rows } = await solveCellRows(
       { builder: 'club_season_stat_leader', params: { stat: 'goals' } },

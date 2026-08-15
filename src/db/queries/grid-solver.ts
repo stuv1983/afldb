@@ -560,9 +560,129 @@ function compileAxis(axis: GridAxisState): SqlFragment {
     case 'brownlow_votes_career_min':
       return sql`c.brownlow_votes >= ${requireInt(axis, 'votes', 'Votes')}`;
 
+    // -- Awards & honours (generic) -- award_winners/award_nominations,
+    // linked rows only, same discipline as everywhere else. 'rising-star'
+    // and 'all-australian' are fixed literal slugs (not request-selected),
+    // the same status as a hardcoded table name -- only the `award`
+    // param itself (an id) is ever request-supplied, and it is always a
+    // bound value, never an identifier. ------------------------------
+    case 'award_winner': {
+      const awardId = requireInt(axis, 'award', 'Award');
+      return sql`p.id IN (SELECT player_id FROM award_winners
+                            WHERE player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
+                              AND award_id = ${awardId})`;
+    }
+    case 'award_winner_min_times': {
+      const awardId = requireInt(axis, 'award', 'Award');
+      const n = requireInt(axis, 'times', 'Times');
+      return sql`p.id IN (SELECT player_id FROM award_winners
+                            WHERE player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
+                              AND award_id = ${awardId}
+                           GROUP BY player_id HAVING count(*) >= ${n})`;
+    }
+    case 'award_winner_between_seasons': {
+      const awardId = requireInt(axis, 'award', 'Award');
+      const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
+      return sql`p.id IN (SELECT player_id FROM award_winners
+                            WHERE player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
+                              AND award_id = ${awardId} AND season BETWEEN ${lo} AND ${hi})`;
+    }
+    case 'all_australian_captain':
+      return sql`p.id IN (SELECT w.player_id FROM award_winners w
+                            JOIN awards a ON a.id = w.award_id
+                           WHERE a.slug = 'all-australian' AND w.is_captain
+                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
+    case 'all_australian_position': {
+      const position = requireParam(axis, 'position', 'Position');
+      return sql`p.id IN (SELECT w.player_id FROM award_winners w
+                            JOIN awards a ON a.id = w.award_id
+                           WHERE a.slug = 'all-australian' AND w.position = ${position}
+                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
+    }
+    case 'club_best_and_fairest_min_times': {
+      const n = requireInt(axis, 'times', 'Times');
+      return sql`p.id IN (SELECT w.player_id FROM award_winners w
+                            JOIN awards a ON a.id = w.award_id
+                           WHERE a.category = 'club_best_and_fairest'
+                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved')
+                           GROUP BY w.player_id HAVING count(*) >= ${n})`;
+    }
+    case 'best_and_fairest_multi_club': {
+      // Each of the 18 club_best_and_fairest awards already IS one
+      // current club identity (its winner rows carry the historical club
+      // as it was at the time, but the award_id itself never changes
+      // across a rename) -- counting distinct award_id is exactly
+      // "distinct clubs' B&F won" with no separate lineage lookup needed.
+      const n = requireInt(axis, 'clubs', 'Clubs');
+      return sql`p.id IN (SELECT w.player_id FROM award_winners w
+                            JOIN awards a ON a.id = w.award_id
+                           WHERE a.category = 'club_best_and_fairest'
+                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved')
+                           GROUP BY w.player_id HAVING count(DISTINCT w.award_id) >= ${n})`;
+    }
+    case 'brownlow_finish_exact':
+      return sql`p.id IN (SELECT player_id FROM brownlow_season_votes
+                            WHERE eligible_rank = ${requireInt(axis, 'place', 'Finishing place')})`;
+    case 'brownlow_top_finish':
+      return sql`p.id IN (SELECT player_id FROM brownlow_season_votes
+                            WHERE eligible_rank <= ${requireInt(axis, 'place', 'Top place')})`;
+    case 'brownlow_top_finish_min_times': {
+      const place = requireInt(axis, 'place', 'Top place');
+      const n = requireInt(axis, 'times', 'Times');
+      return sql`p.id IN (SELECT player_id FROM brownlow_season_votes WHERE eligible_rank <= ${place}
+                           GROUP BY player_id HAVING count(*) >= ${n})`;
+    }
+    case 'brownlow_winner_votes_min': {
+      const votes = requireInt(axis, 'votes', 'Votes');
+      return sql`p.id IN (SELECT player_id FROM brownlow_season_votes WHERE is_winner AND votes >= ${votes})`;
+    }
+    case 'brownlow_season_votes_min':
+      return sql`p.id IN (SELECT player_id FROM brownlow_season_votes WHERE votes >= ${requireInt(axis, 'votes', 'Votes')})`;
+    case 'rising_star_nominee':
+      return sql`p.id IN (SELECT n.player_id FROM award_nominations n
+                            JOIN awards a ON a.id = n.award_id
+                           WHERE a.slug = 'rising-star'
+                             AND n.player_id IS NOT NULL AND n.link_status_value IN ('unique', 'resolved'))`;
+    case 'rising_star_nominee_between_seasons': {
+      const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
+      return sql`p.id IN (SELECT n.player_id FROM award_nominations n
+                            JOIN awards a ON a.id = n.award_id
+                           WHERE a.slug = 'rising-star' AND n.season BETWEEN ${lo} AND ${hi}
+                             AND n.player_id IS NOT NULL AND n.link_status_value IN ('unique', 'resolved'))`;
+    }
+    case 'rising_star_nominee_for_club': {
+      const orgId = requireInt(axis, 'club', 'Club');
+      return sql`p.id IN (SELECT n.player_id FROM award_nominations n
+                            JOIN awards a ON a.id = n.award_id
+                           WHERE a.slug = 'rising-star'
+                             AND n.club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgId})
+                             AND n.player_id IS NOT NULL AND n.link_status_value IN ('unique', 'resolved'))`;
+    }
+    case 'rising_star_nominee_for_club_between_seasons': {
+      const orgId = requireInt(axis, 'club', 'Club');
+      const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
+      return sql`p.id IN (SELECT n.player_id FROM award_nominations n
+                            JOIN awards a ON a.id = n.award_id
+                           WHERE a.slug = 'rising-star'
+                             AND n.club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgId})
+                             AND n.season BETWEEN ${lo} AND ${hi}
+                             AND n.player_id IS NOT NULL AND n.link_status_value IN ('unique', 'resolved'))`;
+    }
+    case 'rising_star_nominee_in_season': {
+      const seasonYear = requireInt(axis, 'season', 'Season');
+      return sql`p.id IN (SELECT n.player_id FROM award_nominations n
+                            JOIN awards a ON a.id = n.award_id
+                           WHERE a.slug = 'rising-star' AND n.season = ${seasonYear}
+                             AND n.player_id IS NOT NULL AND n.link_status_value IN ('unique', 'resolved'))`;
+    }
+
     // -- Draft & recruitment -- draft_picks_link_ck (migration 019)
     // already guarantees link_status_value IN ('unique','resolved')
-    // implies player_id IS NOT NULL, so that check is not repeated here. --
+    // implies player_id IS NOT NULL, so that check is not repeated here.
+    // draftType/signingKind are bound values from a fixed, hand-verified
+    // vocabulary (GRID_DRAFT_TYPES/GRID_SIGNING_KINDS); like club/venue
+    // ids, an unrecognised value is just safe SQL that matches nothing,
+    // not an identifier that needs an isXxx() check. --------------------
     case 'drafted_by_club': {
       const orgId = requireInt(axis, 'club', 'Club');
       return sql`p.id IN (SELECT dp.player_id FROM draft_picks dp
@@ -580,6 +700,33 @@ function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`p.id IN (SELECT player_id FROM draft_picks
                             WHERE link_status_value IN ('unique', 'resolved')
                               AND draft_year BETWEEN ${lo} AND ${hi})`;
+    }
+    case 'draft_type_is': {
+      const draftTypeValue = requireParam(axis, 'draftType', 'Draft type');
+      return sql`p.id IN (SELECT player_id FROM draft_picks
+                            WHERE link_status_value IN ('unique', 'resolved') AND draft_type = ${draftTypeValue})`;
+    }
+    case 'drafted_by_club_never_played': {
+      const orgId = requireInt(axis, 'club', 'Club');
+      return sql`p.id IN (SELECT dp.player_id FROM draft_picks dp
+                            WHERE dp.link_status_value IN ('unique', 'resolved')
+                              AND dp.club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgId})
+                              AND NOT EXISTS (
+                                SELECT 1 FROM player_clubs pc
+                                 WHERE pc.player_id = dp.player_id
+                                   AND pc.club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgId})
+                              ))`;
+    }
+    case 'recruited_via': {
+      const signingKindValue = requireParam(axis, 'signingKind', 'Recruited from');
+      return sql`p.id IN (SELECT player_id FROM draft_picks
+                            WHERE link_status_value IN ('unique', 'resolved') AND signing_kind = ${signingKindValue})`;
+    }
+    case 'traded_min_times': {
+      const n = requireInt(axis, 'times', 'Times');
+      return sql`p.id IN (SELECT player_id FROM draft_picks
+                            WHERE link_status_value IN ('unique', 'resolved') AND draft_kind = 'trade'
+                           GROUP BY player_id HAVING count(*) >= ${n})`;
     }
 
     default:
