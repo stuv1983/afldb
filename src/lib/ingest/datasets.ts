@@ -302,7 +302,7 @@ const risingStar: DatasetSpec = {
          ${resolved.link_status === 'unique' ? 'unique' : resolved.link_status}::link_status,
          ${resolved.club_id}, ${resolved.opponent_club_id},
          ${row.is_season_winner === '1'}, ${row.ineligible === '1'},
-         ${row.ineligible_reason}, ${toIntOrNull(row.votes)},
+         ${row.ineligible_reason ?? null}, ${toIntOrNull(row.votes)},
          ${Object.keys(stats).length ? sql.json(stats) : null},
          ${sourceId}, ${row.source_key}, ${batchId})
       ON CONFLICT (award_id, source_record_id) WHERE source_record_id IS NOT NULL
@@ -386,7 +386,7 @@ const allAustralian: DatasetSpec = {
       VALUES
         (${awardId}, ${resolved.season}, ${resolved.player_id}, ${row.player},
          ${resolved.link_status === 'unique' ? 'unique' : resolved.link_status}::link_status,
-         0, ${resolved.club_id}, ${row.club}, ${row.position},
+         0, ${resolved.club_id}, ${row.club ?? null}, ${row.position ?? null},
          ${(row.captain ?? '').toLowerCase() === 'c' || row.captain === '1'},
          ${(row.captain ?? '').toLowerCase() === 'vc'},
          ${sourceId}, ${recordId}, ${batchId})
@@ -669,6 +669,12 @@ const playerMatchStats: DatasetSpec = {
       player_id: player.playerId,
       club_id: club.id,
       career_game_no: toIntOrNull(row.career_game_no),
+      // jumper_number is optional and pass-through text; coerced here
+      // (not read from `row` directly in promoteRow) because an admin's
+      // CSV is free to omit the column entirely, in which case `row.
+      // jumper_number` is `undefined`, not `null` -- and postgres.js
+      // refuses an undefined parameter outright rather than sending NULL.
+      jumper_number: row.jumper_number ?? null,
       brownlow_votes: brownlowVotes,
     };
     for (const key of STAT_COLUMNS) resolved[key] = toIntOrNull(row[key]);
@@ -687,7 +693,7 @@ const playerMatchStats: DatasetSpec = {
          bounces, goal_assists, brownlow_votes, source_id, import_batch_id)
       VALUES
         (${resolved.player_id}, ${resolved.match_id}, ${resolved.club_id},
-         ${resolved.career_game_no}, ${row.jumper_number},
+         ${resolved.career_game_no}, ${resolved.jumper_number},
          ${s('kicks')}, ${s('marks')}, ${s('handballs')}, ${s('disposals')}, ${s('goals')},
          ${s('behinds')}, ${s('hitouts')}, ${s('tackles')}, ${s('rebounds')}, ${s('inside_50s')},
          ${s('clearances')}, ${s('clangers')}, ${s('frees_for')}, ${s('frees_against')},
