@@ -63,13 +63,18 @@ export async function stageSubmission(
     RETURNING id
   `;
 
-  // Bulk insert rows in chunks; jsonb payload per row.
+  // Bulk insert rows in chunks; jsonb payload per row. `sql(array)`
+  // negotiates each column's real type from the table (including
+  // `payload`'s jsonb) and serialises accordingly -- pre-stringifying
+  // here double-encodes it: the column ends up holding a JSON STRING
+  // containing the row's JSON text, not the row object itself, so
+  // every `row.payload.<field>` downstream reads back as undefined.
   const chunkSize = 500;
   for (let start = 0; start < objects.length; start += chunkSize) {
     const chunk = objects.slice(start, start + chunkSize).map((payload, offset) => ({
       submission_id: submission.id,
       row_no: start + offset + 1,
-      payload: JSON.stringify(payload),
+      payload,
     }));
     await authSql`INSERT INTO data_submission_rows ${authSql(chunk)}`;
   }
