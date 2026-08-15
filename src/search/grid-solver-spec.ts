@@ -215,10 +215,30 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   finals_games_min: { key: 'finals_games_min', label: 'X+ finals games', group: 'Finals & premierships', params: [int('games', 'Games')] },
   premiership_player: { key: 'premiership_player', label: 'Premiership player', group: 'Finals & premierships', params: [] },
   won_a_final: { key: 'won_a_final', label: 'Won a final', group: 'Finals & premierships', params: [] },
+  finals_wins_min: { key: 'finals_wins_min', label: 'X+ finals wins', group: 'Finals & premierships', params: [int('x', 'At least')] },
+  never_won_a_final: { key: 'never_won_a_final', label: 'Never won a final', group: 'Finals & premierships', params: [] },
+  played_finals_no_wins: { key: 'played_finals_no_wins', label: 'Played finals, never won one', group: 'Finals & premierships', params: [] },
+  finals_clubs_min: { key: 'finals_clubs_min', label: 'Played finals for X+ clubs', group: 'Finals & premierships', params: [int('clubs', 'Clubs')] },
+  final_game_stat_min: { key: 'final_game_stat_min', label: 'X+ of a stat in a final', group: 'Finals & premierships', params: [stat(), int('x', 'At least')] },
+  grand_final_game_stat_min: { key: 'grand_final_game_stat_min', label: 'X+ of a stat in a grand final', group: 'Finals & premierships', params: [stat(), int('x', 'At least')] },
+  finals_stat_total_min: { key: 'finals_stat_total_min', label: 'X+ of a stat in finals (career)', group: 'Finals & premierships', params: [stat(), int('x', 'At least')] },
+  finals_stat_avg_min: { key: 'finals_stat_avg_min', label: 'Finals average of a stat', group: 'Finals & premierships', params: [stat(), decimal('avg', 'At least (average)')] },
+  played_a_grand_final: { key: 'played_a_grand_final', label: 'Played a grand final', group: 'Finals & premierships', params: [] },
+  never_played_grand_final: { key: 'never_played_grand_final', label: 'No grand finals', group: 'Finals & premierships', params: [] },
+  grand_finals_played_min: { key: 'grand_finals_played_min', label: 'Played in X+ Grand Finals', group: 'Finals & premierships', params: [int('times', 'Times')] },
+  prelim_finals_played_min: { key: 'prelim_finals_played_min', label: 'Played in X+ Preliminary Finals', group: 'Finals & premierships', params: [int('times', 'Times')] },
+  grand_final_clubs_min: { key: 'grand_final_clubs_min', label: 'Grand Final for X+ clubs', group: 'Finals & premierships', params: [int('clubs', 'Clubs')] },
+  grand_final_between_seasons: { key: 'grand_final_between_seasons', label: 'Grand Final between seasons', group: 'Finals & premierships', params: [season('from', 'From season'), season('to', 'To season')] },
+  premierships_min: { key: 'premierships_min', label: 'Won X+ premierships', group: 'Finals & premierships', params: [int('times', 'Premierships')] },
+  premiership_between_seasons: { key: 'premiership_between_seasons', label: 'Premiership between seasons', group: 'Finals & premierships', params: [season('from', 'From season'), season('to', 'To season')] },
+  grand_finals_lost_min: { key: 'grand_finals_lost_min', label: 'Lost X+ Grand Finals', group: 'Finals & premierships', params: [int('times', 'Times')] },
+  lost_grand_final_against: { key: 'lost_grand_final_against', label: 'Lost a Grand Final against…', group: 'Finals & premierships', params: [player()] },
 
   // Grounds & venues
   played_at_venue: { key: 'played_at_venue', label: 'Played at venue', group: 'Grounds & venues', params: [venue()] },
   games_at_venue_min: { key: 'games_at_venue_min', label: 'X+ games at venue', group: 'Grounds & venues', params: [venue(), int('games', 'Games')] },
+  won_final_at_venue: { key: 'won_final_at_venue', label: 'Won a final at venue', group: 'Grounds & venues', params: [venue()] },
+  venue_game_stat_min: { key: 'venue_game_stat_min', label: 'X+ of a stat in a game at venue', group: 'Grounds & venues', params: [venue(), stat(), int('x', 'At least')] },
 
   // Teammates -- the same player_match_stats self-join as
   // getPlayerOverlapSummary in db/queries/player-compare.ts.

@@ -357,6 +357,122 @@ function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                             JOIN matches m ON m.id = pms.match_id
                            WHERE m.is_final AND m.winner_club_id = pms.club_id)`;
+    case 'finals_wins_min': {
+      const n = requireInt(axis, 'x', 'At least');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.is_final AND m.winner_club_id = pms.club_id
+                           GROUP BY pms.player_id HAVING count(*) >= ${n})`;
+    }
+    case 'never_won_a_final':
+      return sql`NOT EXISTS (SELECT 1 FROM player_match_stats pms
+                               JOIN matches m ON m.id = pms.match_id
+                              WHERE pms.player_id = p.id AND m.is_final AND m.winner_club_id = pms.club_id)`;
+    case 'played_finals_no_wins':
+      return sql`c.finals > 0 AND NOT EXISTS (
+                    SELECT 1 FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
+                     WHERE pms.player_id = p.id AND m.is_final AND m.winner_club_id = pms.club_id)`;
+    case 'finals_clubs_min': {
+      const n = requireInt(axis, 'clubs', 'Clubs');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.is_final
+                           GROUP BY pms.player_id HAVING count(DISTINCT pms.club_id) >= ${n})`;
+    }
+    case 'final_game_stat_min': {
+      const statKey = requireStatKey(axis);
+      const n = requireInt(axis, 'x', 'At least');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.is_final AND ${sql.unsafe(`pms.${statKey}`)} >= ${n})`;
+    }
+    case 'grand_final_game_stat_min': {
+      const statKey = requireStatKey(axis);
+      const n = requireInt(axis, 'x', 'At least');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.round_type = 'grand_final' AND ${sql.unsafe(`pms.${statKey}`)} >= ${n})`;
+    }
+    case 'finals_stat_total_min': {
+      const statKey = requireStatKey(axis);
+      const n = requireInt(axis, 'x', 'At least');
+      const col = sql.unsafe(`pms.${statKey}`);
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.is_final
+                           GROUP BY pms.player_id HAVING sum(${col}) >= ${n})`;
+    }
+    case 'finals_stat_avg_min': {
+      const statKey = requireStatKey(axis);
+      const avg = requireDecimal(axis, 'avg', 'At least (average)');
+      const col = sql.unsafe(`pms.${statKey}`);
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.is_final AND ${col} IS NOT NULL
+                           GROUP BY pms.player_id HAVING avg(${col}) >= ${avg})`;
+    }
+    case 'played_a_grand_final':
+      return sql`EXISTS (SELECT 1 FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
+                          WHERE pms.player_id = p.id AND m.round_type = 'grand_final')`;
+    case 'never_played_grand_final':
+      return sql`NOT EXISTS (SELECT 1 FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
+                              WHERE pms.player_id = p.id AND m.round_type = 'grand_final')`;
+    case 'grand_finals_played_min': {
+      const n = requireInt(axis, 'times', 'Times');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.round_type = 'grand_final'
+                           GROUP BY pms.player_id HAVING count(*) >= ${n})`;
+    }
+    case 'prelim_finals_played_min': {
+      const n = requireInt(axis, 'times', 'Times');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.round_type = 'preliminary_final'
+                           GROUP BY pms.player_id HAVING count(*) >= ${n})`;
+    }
+    case 'grand_final_clubs_min': {
+      const n = requireInt(axis, 'clubs', 'Clubs');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.round_type = 'grand_final'
+                           GROUP BY pms.player_id HAVING count(DISTINCT pms.club_id) >= ${n})`;
+    }
+    case 'grand_final_between_seasons': {
+      const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
+      return sql`EXISTS (SELECT 1 FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
+                          WHERE pms.player_id = p.id AND m.round_type = 'grand_final'
+                            AND m.season BETWEEN ${lo} AND ${hi})`;
+    }
+    case 'premierships_min':
+      return sql`c.premierships >= ${requireInt(axis, 'times', 'Premierships')}`;
+    case 'premiership_between_seasons': {
+      const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
+      return sql`EXISTS (SELECT 1 FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
+                          WHERE pms.player_id = p.id AND m.round_type = 'grand_final'
+                            AND m.winner_club_id = pms.club_id
+                            AND m.season BETWEEN ${lo} AND ${hi})`;
+    }
+    case 'grand_finals_lost_min': {
+      // A drawn Grand Final (winner_club_id IS NULL) counts as neither a
+      // win nor a loss -- the replay is what actually decided it.
+      const n = requireInt(axis, 'times', 'Times');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.round_type = 'grand_final'
+                             AND m.winner_club_id IS NOT NULL AND m.winner_club_id <> pms.club_id
+                           GROUP BY pms.player_id HAVING count(*) >= ${n})`;
+    }
+    case 'lost_grand_final_against': {
+      const otherId = requireInt(axis, 'player', 'Player');
+      return sql`p.id IN (SELECT pms1.player_id FROM player_match_stats pms1
+                            JOIN matches m ON m.id = pms1.match_id
+                            JOIN player_match_stats pms2
+                              ON pms2.match_id = pms1.match_id AND pms2.club_id <> pms1.club_id
+                           WHERE m.round_type = 'grand_final'
+                             AND pms2.player_id = ${otherId}
+                             AND m.winner_club_id = pms2.club_id)`;
+    }
 
     // -- Grounds & venues -------------------------------------------------
     case 'played_at_venue': {
@@ -372,6 +488,20 @@ function compileAxis(axis: GridAxisState): SqlFragment {
                             JOIN matches m ON m.id = pms.match_id
                            WHERE m.venue_id = ${venueId}
                            GROUP BY pms.player_id HAVING count(*) >= ${n})`;
+    }
+    case 'won_final_at_venue': {
+      const venueId = requireInt(axis, 'venue', 'Venue');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.venue_id = ${venueId} AND m.is_final AND m.winner_club_id = pms.club_id)`;
+    }
+    case 'venue_game_stat_min': {
+      const venueId = requireInt(axis, 'venue', 'Venue');
+      const statKey = requireStatKey(axis);
+      const n = requireInt(axis, 'x', 'At least');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.venue_id = ${venueId} AND ${sql.unsafe(`pms.${statKey}`)} >= ${n})`;
     }
 
     // -- Teammates -- the same self-join as getPlayerOverlapSummary

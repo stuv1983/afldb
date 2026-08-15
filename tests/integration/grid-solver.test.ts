@@ -147,6 +147,39 @@ describe('grid solver correctness', () => {
     expect(summary.eligible).toBe(0);
   });
 
+  it('no won_a_final player is also flagged never_won_a_final', async () => {
+    const summary = await solveCellSummary(
+      { builder: 'won_a_final', params: {} },
+      { builder: 'never_won_a_final', params: {} },
+      'games_asc',
+    );
+    expect(summary.eligible).toBe(0);
+  });
+
+  it('lost_grand_final_against finds a real losing-side player against a real winning-side player', async () => {
+    const [gf] = await sql<{ matchId: number; winnerClubId: number }[]>`
+      SELECT id AS "matchId", winner_club_id AS "winnerClubId"
+        FROM matches WHERE round_type = 'grand_final' AND winner_club_id IS NOT NULL
+       ORDER BY season DESC LIMIT 1
+    `;
+    expect(gf, 'no decided grand final found in the test data').toBeDefined();
+    const [winner] = await sql<{ playerId: number }[]>`
+      SELECT player_id AS "playerId" FROM player_match_stats
+       WHERE match_id = ${gf.matchId} AND club_id = ${gf.winnerClubId} LIMIT 1
+    `;
+    const [loser] = await sql<{ playerId: number }[]>`
+      SELECT player_id AS "playerId" FROM player_match_stats
+       WHERE match_id = ${gf.matchId} AND club_id <> ${gf.winnerClubId} LIMIT 1
+    `;
+    const { rows } = await solveCellRows(
+      { builder: 'lost_grand_final_against', params: { player: String(winner.playerId) } },
+      { builder: 'career_games_min', params: { games: '0' } },
+      'games_asc',
+      { limit: GRID_LIMITS.maxRowsPerCell, offset: 0 },
+    );
+    expect(rows.some((r) => r.id === loser.playerId)).toBe(true);
+  });
+
   it('club_season_stat_leader(goals) rows really did lead a club-season in goals', async () => {
     const { rows } = await solveCellRows(
       { builder: 'club_season_stat_leader', params: { stat: 'goals' } },
