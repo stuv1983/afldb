@@ -35,11 +35,17 @@ export default async function UploadPage() {
 
       <section className="section">
         <h2>Accepted layouts</h2>
+        <p className="section-note">
+          Each sample below shows the expected columns with a couple of placeholder rows —
+          a format template, not real data to promote as-is.
+        </p>
         {datasets.map((d) => (
           <p className="section-note" key={d.key}>
             <strong>{d.title}</strong> — {d.description}
             <br />
             Required columns: <code>{d.requiredColumns.join(', ')}</code>
+            <br />
+            <a href={`/samples/${d.key.replace(/_/g, '-')}.csv`} download>Download sample CSV</a>
           </p>
         ))}
       </section>

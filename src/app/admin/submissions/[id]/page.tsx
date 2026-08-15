@@ -117,6 +117,10 @@ export default async function SubmissionPage({
           Applied as import batch {submission.importBatchId} on{' '}
           {submission.promotedAt?.toISOString().slice(0, 16).replace('T', ' ')}.
           Re-promoting a corrected file updates the same source records.
+          {['match_results', 'player_match_stats'].includes(submission.dataset) && (
+            <> This changed source fact tables — run <code>tools/migration/rebuild_derived.py</code> on
+              the server so career/season summaries and Advanced Search reflect it.</>
+          )}
         </p>
       )}
 

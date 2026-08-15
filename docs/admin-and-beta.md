@@ -179,10 +179,33 @@ staged  ->  validated  ->  approved  ->  promoted
 |---|---|---|
 | `rising_star` | `award_nominations` | FootyWire export (`source_key, season, round_number, player, club`, stats…) |
 | `all_australian` | `award_winners` | DraftGuru export (`Player, Club, Position, Captain, Year`) |
+| `match_results` | `matches` | One row per match: `season, round_code, match_date, venue, home_club, away_club, home_score, away_score`, optional goals/behinds/attendance |
+| `player_match_stats` | `player_match_stats` | One row per player per match: `season, round_code, home_club, away_club, player, club`, plus the box score (kicks, disposals, goals, …) |
+
+A sample CSV for every registered dataset is linked from `/admin/upload`
+itself (`public/samples/<dataset-key-with-dashes>.csv`) — a format
+template with placeholder rows, not real data to promote as-is.
 
 Adding a dataset is one `DatasetSpec` in `src/lib/ingest/datasets.ts`
 (columns, file key, per-row validator, per-row upsert); the UI and
-pipeline are generic.
+pipeline are generic. `awardSlug` is optional on a spec — set it only
+for datasets that feed the `awards` tables; `match_results` and
+`player_match_stats` feed their fact tables directly and leave it unset.
+
+**Match/player-stat datasets differ from the award ones in one
+important way**: `matches.home_club_id`/`away_club_id` and
+`player_match_stats.player_id` are all `NOT NULL`, so unlike an
+unmatched player on an award row (a warning, imported unlinked with the
+source spelling), an unmatched club or player on these two datasets is
+a hard **error** — there is no unlinked representation the schema can
+hold for a match or a player-game row. `player_match_stats` also
+requires its match to already exist (upload `match_results` first);
+`resolveMatch()` looks it up by season, round and the two clubs.
+
+Promoting either of these two datasets changes source-of-truth fact
+tables that `player_career_stats` (and Advanced Search) are derived
+from. Run `tools/migration/rebuild_derived.py` afterward — the
+submission page does not trigger this automatically.
 
 ## 5. Bulk award history (Phase 3b)
 

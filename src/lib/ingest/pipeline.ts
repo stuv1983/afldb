@@ -206,10 +206,17 @@ export async function promoteSubmission(submissionId: number): Promise<PromoteRe
   const importSql = postgres(importUrl, { max: 1, onnotice: () => {} });
   try {
     const batchId = await importSql.begin(async (tx) => {
-      const [award] = await tx<{ id: number }[]>`
-        SELECT id FROM awards WHERE slug = ${spec.awardSlug}
-      `;
-      if (!award) throw new Error(`award "${spec.awardSlug}" is missing; run the awards import`);
+      // Award-shaped datasets (rising_star, all_australian) feed one row
+      // in `awards`; match/player-stat datasets feed the fact tables
+      // directly and have no award to resolve. awardId is null for those.
+      let awardId: number | null = null;
+      if (spec.awardSlug) {
+        const [award] = await tx<{ id: number }[]>`
+          SELECT id FROM awards WHERE slug = ${spec.awardSlug}
+        `;
+        if (!award) throw new Error(`award "${spec.awardSlug}" is missing; run the awards import`);
+        awardId = award.id;
+      }
 
       const [source] = await tx<{ id: number }[]>`
         SELECT id FROM sources WHERE key = 'sports_data_lab'
@@ -224,7 +231,7 @@ export async function promoteSubmission(submissionId: number): Promise<PromoteRe
       for (const row of rows) {
         await spec.promoteRow(row.payload, row.reasons?.resolved ?? {}, {
           sql: tx as unknown as typeof importSql,
-          awardId: award.id,
+          awardId,
           sourceId: source?.id ?? 0,
           batchId: batch.id,
         });

@@ -1,0 +1,3 @@
+source_key,season,round_number,player,club,opponent,kicks,handballs,disposals,marks,goals,behinds,tackles,hitouts,frees_for,frees_against,is_season_winner,ineligible,ineligible_reason,votes,supercoach,afl_fantasy
+2024-r1-001,2024,1,Sam Example,Carlton,Richmond,14,8,22,5,2,1,4,0,2,1,0,0,,0,110,118
+2024-r1-002,2024,1,Alex Sample,Richmond,Carlton,9,6,15,3,0,0,6,0,1,0,0,0,,0,88,95
