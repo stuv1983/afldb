@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { Pagination } from '@/components/Pagination';
 import { getClubOptions, runAdvancedSearch } from '@/db/queries/advanced-search';
 import { formatNumber, playerPath } from '@/lib/format';
@@ -169,6 +170,7 @@ export default async function AdvancedSearchPage({
             </div>
           ) : (
             <>
+              <CollapsibleTable title="Results">
               <div className="table-wrap">
                 <table>
                   <thead>
@@ -201,6 +203,7 @@ export default async function AdvancedSearchPage({
                   </tbody>
                 </table>
               </div>
+              </CollapsibleTable>
 
               <Pagination
                 basePath="/advanced-search"

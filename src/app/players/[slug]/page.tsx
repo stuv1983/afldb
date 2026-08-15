@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { getPlayerHonours } from '@/db/queries/awards';
 import {
   getPlayer,
@@ -196,7 +197,7 @@ export default async function PlayerPage({
 
       {/* Career summary --------------------------------------------------- */}
       <section className="section">
-        <h2>Career</h2>
+        <CollapsibleTable title="Career">
         <div className="table-wrap">
           <table>
             <tbody>
@@ -243,6 +244,7 @@ export default async function PlayerPage({
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       </section>
 
       {/* Honours ----------------------------------------------------------
@@ -340,7 +342,7 @@ export default async function PlayerPage({
       {/* Clubs ------------------------------------------------------------ */}
       {clubs.length > 1 && (
         <section className="section">
-          <h2>Clubs</h2>
+          <CollapsibleTable title="Clubs">
           <div className="table-wrap">
             <table>
               <thead>
@@ -363,12 +365,13 @@ export default async function PlayerPage({
               </tbody>
             </table>
           </div>
+          </CollapsibleTable>
         </section>
       )}
 
       {/* Season by season -------------------------------------------------- */}
       <section className="section">
-        <h2>Season by season</h2>
+        <CollapsibleTable title="Season by season">
         <div className="table-wrap">
           <table>
             <caption>“—” means the statistic was not recorded in that era.</caption>
@@ -425,15 +428,16 @@ export default async function PlayerPage({
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       </section>
 
       {/* Brownlow --------------------------------------------------------- */}
       {brownlow.length > 0 && (
         <section className="section">
-          <h2>Brownlow Medal</h2>
           <p className="section-note">
             Season vote totals from the official count, available from 1924.
           </p>
+          <CollapsibleTable title="Brownlow Medal">
           <div className="table-wrap">
             <table>
               <thead>
@@ -459,12 +463,13 @@ export default async function PlayerPage({
               </tbody>
             </table>
           </div>
+          </CollapsibleTable>
         </section>
       )}
 
       {/* Match log -------------------------------------------------------- */}
       <section className="section">
-        <h2>Match log</h2>
+        <CollapsibleTable title="Match log">
         <div className="table-wrap">
           <table>
             <caption>
@@ -516,6 +521,7 @@ export default async function PlayerPage({
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
 
         {matches.total > MATCH_PAGE_SIZE && (
           <p style={{ marginTop: '0.75rem' }}>

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import {
   getAward,
   getAwardSeason,
@@ -120,7 +121,7 @@ export default async function AwardSeasonPage({
 
       {members.length > 0 && (
         <section className="section">
-          <h2>{award.category === 'honour_team' ? 'The team' : 'Winner'}</h2>
+          <CollapsibleTable title={award.category === 'honour_team' ? 'The team' : 'Winner'}>
           <div className="table-wrap">
             <table>
               <thead>
@@ -159,16 +160,17 @@ export default async function AwardSeasonPage({
               </tbody>
             </table>
           </div>
+          </CollapsibleTable>
         </section>
       )}
 
       {nominations.length > 0 && (
         <section className="section">
-          <h2>Round-by-round nominations</h2>
           <p className="section-note">
             The nominee’s figures are from the match that earned the nomination. A dash
             means the statistic was not collected that season, not that none was recorded.
           </p>
+          <CollapsibleTable title="Round-by-round nominations">
           <div className="table-wrap">
             <table>
               <thead>
@@ -222,6 +224,7 @@ export default async function AwardSeasonPage({
               </tbody>
             </table>
           </div>
+          </CollapsibleTable>
         </section>
       )}
     </>

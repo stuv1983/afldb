@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { sql } from '@/db/client';
 import { formatNumber, playerPath, seasonPath } from '@/lib/format';
 import { parseSeason } from '@/lib/params';
@@ -90,6 +91,7 @@ export default async function BrownlowYearPage({
         </p>
       </div>
 
+      <CollapsibleTable title="Full vote count">
       <div className="table-wrap">
         <table>
           <caption>{rows.length} players polled votes</caption>
@@ -120,6 +122,7 @@ export default async function BrownlowYearPage({
           </tbody>
         </table>
       </div>
+      </CollapsibleTable>
     </>
   );
 }

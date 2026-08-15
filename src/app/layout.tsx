@@ -93,6 +93,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <p>
                 AFLDB — Australian Football statistics, 1897 to present.
                 Data derived from publicly available sources including AFL Tables and Wikipedia.
+                {' '}<Link href="/about">About this data →</Link>
               </p>
               <p>AFLDB is an independent hobby project.</p>
               <p>

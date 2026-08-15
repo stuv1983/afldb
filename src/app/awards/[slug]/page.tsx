@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import {
   getAward,
   getAwardLeaders,
@@ -137,11 +138,11 @@ export default async function AwardPage({
 
       {isRisingStar && (
         <section className="section">
-          <h2>Nominations by season</h2>
           <p className="section-note">
             One player is nominated each round. Every nomination since 1993 is recorded,
             with the match statistics that earned it.
           </p>
+          <CollapsibleTable title="Nominations by season">
           <div className="table-wrap">
             <table>
               <thead>
@@ -164,12 +165,13 @@ export default async function AwardPage({
               </tbody>
             </table>
           </div>
+          </CollapsibleTable>
         </section>
       )}
 
       {isTeam && (
         <section className="section">
-          <h2>Teams by season</h2>
+          <CollapsibleTable title="Teams by season">
           <div className="table-wrap">
             <table>
               <thead>
@@ -206,12 +208,13 @@ export default async function AwardPage({
               </tbody>
             </table>
           </div>
+          </CollapsibleTable>
         </section>
       )}
 
       {leaders.length > 0 && (
         <section className="section">
-          <h2>Multiple winners</h2>
+          <CollapsibleTable title="Multiple winners">
           <div className="table-wrap">
             <table>
               <thead>
@@ -234,16 +237,17 @@ export default async function AwardPage({
               </tbody>
             </table>
           </div>
+          </CollapsibleTable>
         </section>
       )}
 
       {isRisingStar && nominationClubs.length > 0 && (
         <section className="section">
-          <h2>Nominations by club</h2>
           <p className="section-note">
             Counted by club as a continuing entity, so Footscray and Western Bulldogs
             nominations are one club’s.
           </p>
+          <CollapsibleTable title="Nominations by club">
           <div className="table-wrap">
             <table>
               <thead>
@@ -264,12 +268,13 @@ export default async function AwardPage({
               </tbody>
             </table>
           </div>
+          </CollapsibleTable>
         </section>
       )}
 
       {!isTeam && (
         <section className="section">
-          <h2>Every winner</h2>
+          <CollapsibleTable title="Every winner">
           <div className="table-wrap">
             <table>
               <thead>
@@ -312,6 +317,7 @@ export default async function AwardPage({
               </tbody>
             </table>
           </div>
+          </CollapsibleTable>
         </section>
       )}
     </>

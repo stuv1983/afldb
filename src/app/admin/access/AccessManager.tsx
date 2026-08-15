@@ -2,9 +2,13 @@
 
 import { useActionState } from 'react';
 
+import { CollapsibleTable } from '@/components/CollapsibleTable';
+
 import {
   addAllowedEmail,
+  approveJoinRequest,
   createAccessCode,
+  denyJoinRequest,
   revokeAccessCode,
   revokeAllowedEmail,
   type AccessState,
@@ -18,8 +22,16 @@ type EmailRow = {
   id: number; email: string; note: string | null;
   addedAt: string; revokedAt: string | null;
 };
+type JoinRequestRow = {
+  id: number; email: string; name: string | null; message: string | null;
+  requestedAt: string;
+};
 
-export function AccessManager({ codes, emails }: { codes: CodeRow[]; emails: EmailRow[] }) {
+export function AccessManager({
+  codes, emails, requests,
+}: {
+  codes: CodeRow[]; emails: EmailRow[]; requests: JoinRequestRow[];
+}) {
   const [createState, createAction, creating] =
     useActionState<AccessState, FormData>(createAccessCode, {});
   const [revokeCodeState, revokeCodeAction] =
@@ -28,9 +40,67 @@ export function AccessManager({ codes, emails }: { codes: CodeRow[]; emails: Ema
     useActionState<AccessState, FormData>(addAllowedEmail, {});
   const [revokeEmailState, revokeEmailAction] =
     useActionState<AccessState, FormData>(revokeAllowedEmail, {});
+  const [approveState, approveAction] =
+    useActionState<AccessState, FormData>(approveJoinRequest, {});
+  const [denyState, denyAction] =
+    useActionState<AccessState, FormData>(denyJoinRequest, {});
 
   return (
     <>
+      <section className="section">
+        <p className="section-note">
+          Visitors who asked for access on the beta page rather than using a code or an
+          allowlisted email. Approving allowlists the email immediately.
+        </p>
+
+        {approveState.message && <p className="notice">{approveState.message}</p>}
+        {approveState.error && <p className="notice" role="alert">{approveState.error}</p>}
+        {denyState.message && <p className="notice">{denyState.message}</p>}
+        {denyState.error && <p className="notice" role="alert">{denyState.error}</p>}
+
+        {requests.length === 0 ? (
+          <p className="muted">No pending requests.</p>
+        ) : (
+          <CollapsibleTable title="Requests" note={`${requests.length} pending`}>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Email</th>
+                  <th scope="col">Name</th>
+                  <th scope="col">Message</th>
+                  <th scope="col">Requested</th>
+                  <th scope="col" />
+                </tr>
+              </thead>
+              <tbody>
+                {requests.map((request) => (
+                  <tr key={request.id}>
+                    <td className="wide">{request.email}</td>
+                    <td className="muted">{request.name ?? ''}</td>
+                    <td className="wide muted">{request.message ?? ''}</td>
+                    <td className="nowrap muted">{request.requestedAt.slice(0, 10)}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.35rem' }}>
+                        <form action={approveAction}>
+                          <input type="hidden" name="id" value={request.id} />
+                          <button className="btn" type="submit">Approve</button>
+                        </form>
+                        <form action={denyAction}>
+                          <input type="hidden" name="id" value={request.id} />
+                          <button className="btn btn-secondary" type="submit">Deny</button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          </CollapsibleTable>
+        )}
+      </section>
+
       <section className="section">
         <h2>Access codes</h2>
         <form action={createAction} style={{
@@ -68,6 +138,7 @@ export function AccessManager({ codes, emails }: { codes: CodeRow[]; emails: Ema
         {revokeCodeState.message && <p className="notice">{revokeCodeState.message}</p>}
         {revokeCodeState.error && <p className="notice" role="alert">{revokeCodeState.error}</p>}
 
+        <CollapsibleTable title="Existing codes">
         <div className="table-wrap">
           <table>
             <thead>
@@ -108,6 +179,7 @@ export function AccessManager({ codes, emails }: { codes: CodeRow[]; emails: Ema
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       </section>
 
       <section className="section">
@@ -138,6 +210,7 @@ export function AccessManager({ codes, emails }: { codes: CodeRow[]; emails: Ema
         {revokeEmailState.message && <p className="notice">{revokeEmailState.message}</p>}
         {revokeEmailState.error && <p className="notice" role="alert">{revokeEmailState.error}</p>}
 
+        <CollapsibleTable title="Allowed addresses">
         <div className="table-wrap">
           <table>
             <thead>
@@ -171,6 +244,7 @@ export function AccessManager({ codes, emails }: { codes: CodeRow[]; emails: Ema
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       </section>
     </>
   );

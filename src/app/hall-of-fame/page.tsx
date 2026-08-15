@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { listHallOfFame } from '@/db/queries/awards';
+import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { getHallOfFameCategories, listHallOfFame } from '@/db/queries/awards';
 import { formatNumber, isLinked, playerPath } from '@/lib/format';
+import { firstValue, parseSearchTerm } from '@/lib/params';
 
 export const revalidate = 86400;
 
@@ -25,8 +27,19 @@ const CATEGORY_LABELS: Record<string, string> = {
   removed: 'Removed',
 };
 
-export default async function HallOfFamePage() {
-  const inductees = await listHallOfFame();
+export default async function HallOfFamePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const q = parseSearchTerm(firstValue(params.q));
+  const category = firstValue(params.category) || undefined;
+
+  const [inductees, categories] = await Promise.all([
+    listHallOfFame({ q, category }),
+    getHallOfFameCategories(),
+  ]);
 
   const legends = inductees.filter((i) => i.isLegend);
   const linked = inductees.filter((i) => i.playerId !== null && isLinked(i.linkStatus));
@@ -60,6 +73,28 @@ export default async function HallOfFamePage() {
         rather than filtered out.
       </p>
 
+      <form method="get" action="/hall-of-fame">
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))' }}>
+          <div>
+            <label htmlFor="q">Name</label>
+            <input id="q" name="q" type="search" placeholder="Search by name" defaultValue={q ?? ''} />
+          </div>
+          <div>
+            <label htmlFor="category">Category</label>
+            <select id="category" name="category" defaultValue={category ?? ''}>
+              <option value="">Any category</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>{CATEGORY_LABELS[c] ?? c}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div style={{ marginTop: '0.9rem', display: 'flex', gap: '0.5rem' }}>
+          <button className="btn" type="submit">Filter</button>
+          <Link className="btn btn-secondary" href="/hall-of-fame">Reset</Link>
+        </div>
+      </form>
+
       <div className="stat-strip">
         <div className="stat">
           <div className="value">{formatNumber(inductees.length)}</div>
@@ -76,10 +111,10 @@ export default async function HallOfFamePage() {
       </div>
 
       <section className="section">
-        <h2>Legends</h2>
         <p className="section-note">
           Elevated to Legend status, the Hall of Fame’s highest honour.
         </p>
+        <CollapsibleTable title="Legends">
         <div className="table-wrap">
           <table>
             <thead>
@@ -110,10 +145,11 @@ export default async function HallOfFamePage() {
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       </section>
 
       <section className="section">
-        <h2>All inductees</h2>
+        <CollapsibleTable title="All inductees">
         <div className="table-wrap">
           <table>
             <thead>
@@ -150,6 +186,7 @@ export default async function HallOfFamePage() {
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       </section>
     </>
   );

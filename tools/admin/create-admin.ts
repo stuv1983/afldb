@@ -10,9 +10,9 @@
  * `AFLDB_ADMIN_PASSWORD=... npx tsx ...` DOES land in shell history.
  *
  * Runs on the server, against AFLDB_AUTH_DATABASE_URL. Prints the TOTP
- * secret and otpauth:// URI ONCE — enter it into an authenticator app
- * (manual entry works everywhere) before signing in, because login
- * requires the code from day one.
+ * secret, otpauth:// URI and a scannable QR code ONCE — enter it into an
+ * authenticator app (by scan or manual entry) before signing in, because
+ * login requires the code from day one.
  *
  * Re-running for an existing email resets the password and secret and
  * revokes every live session for that account.
@@ -22,6 +22,7 @@ import { resolve } from 'node:path';
 import { stdin, stdout } from 'node:process';
 
 import postgres from 'postgres';
+import QRCode from 'qrcode';
 
 // Reuse the app's own crypto so the CLI and the login path can never
 // disagree about hash formats.
@@ -164,6 +165,8 @@ async function main(): Promise<number> {
     console.log(`  Secret (to paste) : ${secret}`);
     console.log(`  Settings          : time-based, SHA-1, 6 digits, 30 seconds`);
     console.log(`  URI (for a QR)    : ${totpUri(secret, email)}\n`);
+    console.log('Scan this with your authenticator app (or enter the secret above manually):\n');
+    console.log(await QRCode.toString(totpUri(secret, email), { type: 'terminal', small: true }));
     console.log('Authy: Add Account -> Enter key manually -> paste the secret,');
     console.log('and make sure the token length is set to 6 digits, not 7 or 8.\n');
     console.log('Sign in at /admin/login with the password and a current code.');

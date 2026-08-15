@@ -17,6 +17,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <span aria-hidden="true">·</span>
         <Link href="/admin/access">Beta access</Link>
         <span aria-hidden="true">·</span>
+        <Link href="/admin/admins">Administrators</Link>
+        <span aria-hidden="true">·</span>
         <Link href="/">View site</Link>
       </nav>
       {children}

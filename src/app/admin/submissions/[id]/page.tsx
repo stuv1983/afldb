@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { ReviewControls } from '@/app/admin/submissions/[id]/ReviewControls';
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { authSql } from '@/db/authClient';
 import { requireAdmin } from '@/lib/auth/session';
 import { formatNumber } from '@/lib/format';
@@ -121,11 +122,11 @@ export default async function SubmissionPage({
 
       {problemRows.length > 0 && (
         <section className="section">
-          <h2>Rows needing attention</h2>
           <p className="section-note">
             Errors block approval. Warnings do not: an unmatched player imports with the
             source spelling and no link, which is AFLDB’s standard treatment.
           </p>
+          <CollapsibleTable title="Rows needing attention">
           <div className="table-wrap">
             <table>
               <thead>
@@ -154,11 +155,12 @@ export default async function SubmissionPage({
               </tbody>
             </table>
           </div>
+          </CollapsibleTable>
         </section>
       )}
 
       <section className="section">
-        <h2>File sample</h2>
+        <CollapsibleTable title="File sample">
         <div className="table-wrap">
           <table>
             <tbody>
@@ -173,6 +175,7 @@ export default async function SubmissionPage({
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       </section>
     </>
   );

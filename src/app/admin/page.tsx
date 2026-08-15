@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { adminLogout } from '@/app/admin/logout-action';
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { authSql } from '@/db/authClient';
 import { requireAdmin } from '@/lib/auth/session';
 import { formatNumber } from '@/lib/format';
@@ -64,6 +65,7 @@ export default async function AdminDashboard() {
         {submissions.length === 0 ? (
           <p className="muted">Nothing uploaded yet.</p>
         ) : (
+          <CollapsibleTable title="Submissions log">
           <div className="table-wrap">
             <table>
               <thead>
@@ -95,11 +97,12 @@ export default async function AdminDashboard() {
               </tbody>
             </table>
           </div>
+          </CollapsibleTable>
         )}
       </section>
 
       <section className="section">
-        <h2>Recent activity</h2>
+        <CollapsibleTable title="Recent activity">
         <div className="table-wrap">
           <table>
             <tbody>
@@ -113,6 +116,7 @@ export default async function AdminDashboard() {
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       </section>
     </>
   );

@@ -22,6 +22,11 @@ export type BetaFormState = {
   sent?: boolean;
 };
 
+export type JoinRequestState = {
+  error?: string;
+  requested?: boolean;
+};
+
 const GENERIC_FAILURE =
   'That code or email was not accepted. Check it and try again, or contact the person who invited you.';
 
@@ -33,6 +38,7 @@ const GENERIC_FAILURE =
 // few bad guesses could exhaust for everyone.
 const REDEEM_LIMIT = new RateLimiter(10, 15 * 60 * 1000);
 const MAGIC_LINK_LIMIT = new RateLimiter(5, 15 * 60 * 1000);
+const JOIN_REQUEST_LIMIT = new RateLimiter(5, 15 * 60 * 1000);
 
 /** Where to send an admitted visitor: only ever an internal path. */
 function safeDestination(from: FormDataEntryValue | null): string {
@@ -130,4 +136,36 @@ export async function requestMagicLink(
   }
 
   return { sent: true };
+}
+
+/**
+ * A visitor with neither a code nor an allowlisted email can ask instead.
+ * This never admits anyone by itself — it only queues a row for a human at
+ * /admin/access to approve or deny, at which point approval allowlists the
+ * email through the normal path.
+ */
+export async function requestJoin(
+  _previous: JoinRequestState,
+  formData: FormData,
+): Promise<JoinRequestState> {
+  const email = String(formData.get('email') ?? '').trim().toLowerCase();
+  const name = String(formData.get('name') ?? '').trim().slice(0, 200) || null;
+  const message = String(formData.get('message') ?? '').trim().slice(0, 1000) || null;
+
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 200) {
+    return { error: 'That is not an email address.' };
+  }
+  if (JOIN_REQUEST_LIMIT.check(`ip:${(await requestIp()) ?? 'unknown'}`)) {
+    return { error: 'Too many attempts. Wait a few minutes and try again.' };
+  }
+
+  const ip = await requestIp();
+  await authSql`
+    INSERT INTO beta_join_requests (email, name, message, ip)
+    VALUES (${email}, ${name}, ${message}, ${ip})
+    ON CONFLICT (email) WHERE status = 'pending' DO NOTHING
+  `;
+  await audit('beta.join_requested', { email }, { label: email });
+
+  return { requested: true };
 }

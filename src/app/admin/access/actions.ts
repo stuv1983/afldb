@@ -90,6 +90,53 @@ export async function addAllowedEmail(
   return { message: `${email} can now request a sign-in link on the beta page.` };
 }
 
+export async function approveJoinRequest(
+  _previous: AccessState,
+  formData: FormData,
+): Promise<AccessState> {
+  const admin = await requireAdmin();
+  const id = Number(formData.get('id'));
+  if (!Number.isInteger(id)) return { error: 'Bad request id.' };
+
+  const [row] = await authSql<{ email: string }[]>`
+    UPDATE beta_join_requests SET status = 'approved', reviewed_by = ${admin.id}, reviewed_at = now()
+     WHERE id = ${id} AND status = 'pending'
+    RETURNING email
+  `;
+  if (!row) return { error: 'Already reviewed or not found.' };
+
+  await authSql`
+    INSERT INTO beta_allowed_emails (email, note, added_by)
+    VALUES (${row.email}, 'via join request', ${admin.id})
+    ON CONFLICT (email) DO UPDATE SET revoked_at = NULL, note = EXCLUDED.note
+  `;
+  await audit('access.join_approved', { requestId: id, email: row.email },
+    { userId: admin.id, label: admin.email });
+  revalidatePath('/admin/access');
+  return { message: `${row.email} approved and allowlisted.` };
+}
+
+export async function denyJoinRequest(
+  _previous: AccessState,
+  formData: FormData,
+): Promise<AccessState> {
+  const admin = await requireAdmin();
+  const id = Number(formData.get('id'));
+  if (!Number.isInteger(id)) return { error: 'Bad request id.' };
+
+  const [row] = await authSql<{ email: string }[]>`
+    UPDATE beta_join_requests SET status = 'denied', reviewed_by = ${admin.id}, reviewed_at = now()
+     WHERE id = ${id} AND status = 'pending'
+    RETURNING email
+  `;
+  if (!row) return { error: 'Already reviewed or not found.' };
+
+  await audit('access.join_denied', { requestId: id, email: row.email },
+    { userId: admin.id, label: admin.email });
+  revalidatePath('/admin/access');
+  return { message: `${row.email} denied.` };
+}
+
 export async function revokeAllowedEmail(
   _previous: AccessState,
   formData: FormData,

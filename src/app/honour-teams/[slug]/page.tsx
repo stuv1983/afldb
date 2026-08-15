@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { getHonourTeam, listHonourTeams } from '@/db/queries/awards';
 import { honourTeamPath, isLinked, playerPath } from '@/lib/format';
 import { honourTeamSlug, matchHonourTeam } from '@/lib/slugs';
@@ -70,6 +71,7 @@ export default async function HonourTeamPage({
         </p>
       )}
 
+      <CollapsibleTable title="Selections">
       <div className="table-wrap">
         <table>
           <thead>
@@ -102,6 +104,7 @@ export default async function HonourTeamPage({
           </tbody>
         </table>
       </div>
+      </CollapsibleTable>
     </>
   );
 }

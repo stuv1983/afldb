@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { getClubBestAndFairest, getClubCaptains } from '@/db/queries/awards';
 import {
   getClub,
@@ -201,7 +202,7 @@ export default async function ClubPage({
       </div>
 
       <section className="section">
-        <h2>Games leaders</h2>
+        <CollapsibleTable title="Games leaders">
         <div className="table-wrap">
           <table>
             <caption>
@@ -230,10 +231,11 @@ export default async function ClubPage({
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       </section>
 
       <section className="section">
-        <h2>Goalkicking leaders</h2>
+        <CollapsibleTable title="Goalkicking leaders">
         <div className="table-wrap">
           <table>
             <caption>
@@ -262,17 +264,18 @@ export default async function ClubPage({
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       </section>
 
       {bestAndFairest.length > 0 && (
         <section className="section">
-          <h2>Best and fairest</h2>
           <p className="section-note">
             {bestAndFairest[0].awardName}
             {hasLineage && ', across every era of the club'}. The source record begins in
             1980.{' '}
             <Link href={awardPath(bestAndFairest[0].awardSlug)}>Full history →</Link>
           </p>
+          <CollapsibleTable title="Best and fairest">
           <div className="table-wrap">
             <table>
               <thead>
@@ -297,16 +300,17 @@ export default async function ClubPage({
               </tbody>
             </table>
           </div>
+          </CollapsibleTable>
         </section>
       )}
 
       {captains.length > 0 && (
         <section className="section">
-          <h2>Captains</h2>
           <p className="section-note">
             {formatNumber(captains.length)} recorded captaincy seasons
             {hasLineage && ', across every era of the club'}.
           </p>
+          <CollapsibleTable title="Captains">
           <div className="table-wrap">
             <table>
               <thead>
@@ -333,11 +337,11 @@ export default async function ClubPage({
               </tbody>
             </table>
           </div>
+          </CollapsibleTable>
         </section>
       )}
 
       <section className="section">
-        <h2>Season history</h2>
         {hasLineage && (
           <p className="section-note">
             {isContinuing ? (
@@ -356,6 +360,7 @@ export default async function ClubPage({
             )}
           </p>
         )}
+        <CollapsibleTable title="Season history">
         <div className="table-wrap">
           <table>
             <thead>
@@ -418,6 +423,7 @@ export default async function ClubPage({
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       </section>
     </>
   );

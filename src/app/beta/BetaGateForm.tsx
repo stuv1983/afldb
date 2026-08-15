@@ -2,7 +2,13 @@
 
 import { useActionState } from 'react';
 
-import { redeemAccessCode, requestMagicLink, type BetaFormState } from '@/app/beta/actions';
+import {
+  redeemAccessCode,
+  requestJoin,
+  requestMagicLink,
+  type BetaFormState,
+  type JoinRequestState,
+} from '@/app/beta/actions';
 
 /**
  * The two admission paths, one form each. Kept as a Client Component for
@@ -14,6 +20,9 @@ export function BetaGateForm({ from }: { from: string }) {
   );
   const [emailState, emailAction, emailPending] = useActionState<BetaFormState, FormData>(
     requestMagicLink, {},
+  );
+  const [joinState, joinAction, joinPending] = useActionState<JoinRequestState, FormData>(
+    requestJoin, {},
   );
 
   return (
@@ -65,6 +74,39 @@ export function BetaGateForm({ from }: { from: string }) {
         )}
         {emailState.error && (
           <p className="notice" role="alert">{emailState.error}</p>
+        )}
+      </form>
+
+      <form action={joinAction} className="section">
+        <h2 style={{ fontSize: '1rem' }}>Neither — request access</h2>
+        <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.5rem' }}>
+          <label htmlFor="join-email" className="visually-hidden">Email address</label>
+          <input
+            id="join-email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@example.com"
+            required
+          />
+          <label htmlFor="join-name" className="visually-hidden">Name (optional)</label>
+          <input id="join-name" name="name" placeholder="Name (optional)" />
+          <label htmlFor="join-message" className="visually-hidden">Message (optional)</label>
+          <textarea
+            id="join-message"
+            name="message"
+            placeholder="Anything you'd like us to know (optional)"
+            rows={2}
+          />
+          <button className="btn btn-secondary" type="submit" disabled={joinPending}>
+            {joinPending ? 'Sending…' : 'Request access'}
+          </button>
+        </div>
+        {joinState.requested && (
+          <p className="notice">Thanks — your request has been received and will be reviewed.</p>
+        )}
+        {joinState.error && (
+          <p className="notice" role="alert">{joinState.error}</p>
         )}
       </form>
     </div>

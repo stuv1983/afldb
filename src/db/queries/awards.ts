@@ -269,7 +269,16 @@ export type HallOfFameRow = {
   removedYear: number | null;
 };
 
-export async function listHallOfFame(): Promise<HallOfFameRow[]> {
+export type HallOfFameFilters = { q?: string; category?: string };
+
+export async function listHallOfFame(
+  filters: HallOfFameFilters = {},
+): Promise<HallOfFameRow[]> {
+  const conditions: ReturnType<typeof sql>[] = [sql`TRUE`];
+  if (filters.q) conditions.push(sql`h.name ILIKE ${`%${filters.q}%`}`);
+  if (filters.category) conditions.push(sql`h.category = ${filters.category}`);
+  const where = conditions.reduce((acc, cond) => sql`${acc} AND ${cond}`);
+
   return sql<HallOfFameRow[]>`
     SELECT h.id, h.name,
            h.player_id AS "playerId", p.slug AS "playerSlug",
@@ -281,8 +290,17 @@ export async function listHallOfFame(): Promise<HallOfFameRow[]> {
            h.removed_year AS "removedYear"
       FROM hall_of_fame h
       LEFT JOIN players p ON p.id = h.player_id
+     WHERE ${where}
      ORDER BY h.inducted_year NULLS LAST, h.name
   `;
+}
+
+export async function getHallOfFameCategories(): Promise<string[]> {
+  const rows = await sql<{ category: string }[]>`
+    SELECT DISTINCT category FROM hall_of_fame
+     WHERE category IS NOT NULL ORDER BY category
+  `;
+  return rows.map((r) => r.category);
 }
 
 export type HonourTeamMemberRow = {

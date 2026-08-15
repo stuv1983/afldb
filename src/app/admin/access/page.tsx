@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default async function AccessPage() {
   await requireAdmin();
 
-  const [codes, emails] = await Promise.all([
+  const [codes, emails, requests] = await Promise.all([
     authSql<{
       id: number; label: string; maxUses: number; useCount: number;
       createdAt: Date; expiresAt: Date | null; revokedAt: Date | null;
@@ -34,6 +34,16 @@ export default async function AccessPage() {
         FROM beta_allowed_emails
        ORDER BY added_at DESC
        LIMIT 200
+    `,
+    authSql<{
+      id: number; email: string; name: string | null; message: string | null;
+      requestedAt: Date;
+    }[]>`
+      SELECT id, email, name, message, requested_at AS "requestedAt"
+        FROM beta_join_requests
+       WHERE status = 'pending'
+       ORDER BY requested_at
+       LIMIT 100
     `,
   ]);
 
@@ -65,6 +75,10 @@ export default async function AccessPage() {
           ...e,
           addedAt: e.addedAt.toISOString(),
           revokedAt: e.revokedAt?.toISOString() ?? null,
+        }))}
+        requests={requests.map((r) => ({
+          ...r,
+          requestedAt: r.requestedAt.toISOString(),
         }))}
       />
     </>

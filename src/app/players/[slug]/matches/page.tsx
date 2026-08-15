@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { Pagination } from '@/components/Pagination';
 import { getPlayer, getPlayerMatches } from '@/db/queries/players';
 import {
@@ -96,6 +97,7 @@ export default async function PlayerMatchesPage({
         </div>
       ) : (
         <>
+          <CollapsibleTable title="Match log">
           <div className="table-wrap">
             <table>
               <caption>“—” means the statistic was not recorded in that era.</caption>
@@ -149,6 +151,7 @@ export default async function PlayerMatchesPage({
               </tbody>
             </table>
           </div>
+          </CollapsibleTable>
 
           <Pagination
             basePath={`${profilePath}/matches`}

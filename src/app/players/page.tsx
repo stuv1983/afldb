@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { Pagination } from '@/components/Pagination';
 import { isPlayerSort, listPlayers, type PlayerSort } from '@/db/queries/players';
 import { formatNumber, playerPath } from '@/lib/format';
@@ -109,6 +110,7 @@ export default async function PlayersPage({
         </div>
       ) : (
         <>
+          <CollapsibleTable title="Players">
           <div className="table-wrap">
             <table>
               <caption>Career totals. Brownlow votes are season totals from 1924.</caption>
@@ -142,6 +144,7 @@ export default async function PlayersPage({
               </tbody>
             </table>
           </div>
+          </CollapsibleTable>
 
           <Pagination
             basePath="/players"

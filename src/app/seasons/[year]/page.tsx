@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { getSeasonMatches } from '@/db/queries/matches';
 import {
   getSeason,
@@ -125,7 +126,7 @@ export default async function SeasonPage({
       </nav>
 
       <section className="section">
-        <h2>Ladder</h2>
+        <CollapsibleTable title="Ladder">
         <div className="table-wrap">
           <table>
             <thead>
@@ -163,11 +164,12 @@ export default async function SeasonPage({
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       </section>
 
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
         <section className="section">
-          <h2>Leading goalkickers</h2>
+          <CollapsibleTable title="Leading goalkickers">
           <div className="table-wrap">
             <table>
               <thead>
@@ -188,16 +190,20 @@ export default async function SeasonPage({
               </tbody>
             </table>
           </div>
+          </CollapsibleTable>
         </section>
 
         <section className="section">
-          <h2>Brownlow Medal</h2>
           {brownlow.length === 0 ? (
-            <p className="muted">
-              No Brownlow votes recorded for {season.year}
-              {season.year < 1924 ? ' — the medal was first awarded in 1924.' : '.'}
-            </p>
+            <>
+              <h2>Brownlow Medal</h2>
+              <p className="muted">
+                No Brownlow votes recorded for {season.year}
+                {season.year < 1924 ? ' — the medal was first awarded in 1924.' : '.'}
+              </p>
+            </>
           ) : (
+            <CollapsibleTable title="Brownlow Medal">
             <div className="table-wrap">
               <table>
                 <thead>
@@ -221,6 +227,7 @@ export default async function SeasonPage({
                 </tbody>
               </table>
             </div>
+            </CollapsibleTable>
           )}
         </section>
       </div>
@@ -234,7 +241,7 @@ export default async function SeasonPage({
             id={roundName.toLowerCase().replace(/\s+/g, '-')}
             style={{ marginBottom: '1.25rem', scrollMarginTop: '4rem' }}
           >
-            <h3 style={{ marginBottom: '0.4rem' }}>{roundName}</h3>
+            <CollapsibleTable title={roundName}>
             <div className="table-wrap">
               <table>
                 <thead>
@@ -265,6 +272,7 @@ export default async function SeasonPage({
                 </tbody>
               </table>
             </div>
+            </CollapsibleTable>
           </div>
         ))}
       </section>

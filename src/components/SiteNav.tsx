@@ -19,6 +19,7 @@ export const PRIMARY_NAV = [
   { href: '/records', label: 'Records' },
   { href: '/brownlow', label: 'Brownlow' },
   { href: '/awards', label: 'Awards' },
+  { href: '/draft', label: 'Draft' },
   { href: '/advanced-search', label: 'Player Search' },
   { href: '/match-search', label: 'Match Search' },
   { href: '/aflw', label: 'AFLW' },

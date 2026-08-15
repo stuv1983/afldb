@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { sql } from '@/db/client';
 import {
   clubPath,
@@ -122,7 +123,7 @@ export default async function VenuePage({
       </div>
 
       <section className="section">
-        <h2>Recent matches</h2>
+        <CollapsibleTable title="Recent matches">
         <div className="table-wrap">
           <table>
             <caption>Most recent {recent.length} matches at this venue</caption>
@@ -150,6 +151,7 @@ export default async function VenuePage({
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       </section>
     </>
   );

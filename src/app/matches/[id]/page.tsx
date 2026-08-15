@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import {
   getMatch,
   getMatchPeriods,
@@ -142,7 +143,7 @@ export default async function MatchPage({
       </div>
 
       <section className="section">
-        <h2>Quarter by quarter</h2>
+        <CollapsibleTable title="Quarter by quarter">
         <div className="table-wrap">
           <table>
             <caption>
@@ -181,6 +182,7 @@ export default async function MatchPage({
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       </section>
 
       {sides.map((side) => {
@@ -188,7 +190,10 @@ export default async function MatchPage({
         if (squad.length === 0) return null;
         return (
           <section className="section" key={side.clubId}>
-            <h2><Link href={clubPath(side.slug)}>{side.name}</Link></h2>
+            <p className="section-note">
+              <Link href={clubPath(side.slug)}>{side.name}</Link>
+            </p>
+            <CollapsibleTable title={side.name}>
             <div className="table-wrap">
               <table>
                 <caption>{squad.length} players</caption>
@@ -226,6 +231,7 @@ export default async function MatchPage({
                 </tbody>
               </table>
             </div>
+            </CollapsibleTable>
           </section>
         );
       })}

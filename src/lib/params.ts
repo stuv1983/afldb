@@ -45,6 +45,14 @@ export function parseSlug(value: string | undefined): string | undefined {
   return trimmed;
 }
 
+/** Free-text search term: trimmed and length-capped; empty becomes undefined. */
+export function parseSearchTerm(value: string | undefined, maxLength = 100): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return trimmed.slice(0, maxLength);
+}
+
 export function firstValue(
   value: string | string[] | undefined,
 ): string | undefined {

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { sql } from '@/db/client';
 import { formatNumber, playerPath } from '@/lib/format';
 
@@ -62,7 +63,7 @@ export default async function BrownlowPage() {
       </p>
 
       <section className="section">
-        <h2>Career vote leaders</h2>
+        <CollapsibleTable title="Career vote leaders">
         <div className="table-wrap">
           <table>
             <caption>Most career Brownlow votes</caption>
@@ -90,10 +91,11 @@ export default async function BrownlowPage() {
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       </section>
 
       <section className="section">
-        <h2>Winners by season</h2>
+        <CollapsibleTable title="Winners by season">
         <div className="table-wrap">
           <table>
             {/* Shared counts put more than one winner in a season, so these
@@ -122,6 +124,7 @@ export default async function BrownlowPage() {
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       </section>
     </>
   );

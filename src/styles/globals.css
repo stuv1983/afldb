@@ -394,6 +394,32 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); }
 td.wide { white-space: normal; min-width: 12rem; }
 .not-recorded { color: var(--text-faint); }
 
+/* Collapsible table sections ------------------------------------------ */
+details.table-details {
+  margin: 1.5rem 0;
+}
+details.table-details > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  list-style: none;
+  cursor: pointer;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-strong);
+  font-weight: 650;
+}
+details.table-details > summary::-webkit-details-marker { display: none; }
+details.table-details > summary::before {
+  content: '▸';
+  display: inline-block;
+  color: var(--text-faint);
+  transition: transform 0.15s ease;
+}
+details.table-details[open] > summary::before { transform: rotate(90deg); }
+.table-details-title { font-size: 1rem; }
+.table-details-note { font-size: 0.78rem; font-weight: 400; color: var(--text-muted); }
+
 /* Result markers */
 .result-W { color: var(--win); font-weight: 600; }
 .result-L { color: var(--loss); }

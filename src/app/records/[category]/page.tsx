@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import {
   RECORD_CATEGORIES,
   getCareerRecord,
@@ -75,6 +76,7 @@ export default async function RecordCategoryPage({
       {definition.coverage && <p className="notice">{definition.coverage}</p>}
 
       {careerRows.length > 0 && (
+        <CollapsibleTable title="Career leaders">
         <div className="table-wrap">
           <table>
             <caption>Top {careerRows.length} by career total</caption>
@@ -106,9 +108,11 @@ export default async function RecordCategoryPage({
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       )}
 
       {matchRows.length > 0 && (
+        <CollapsibleTable title="Match performances">
         <div className="table-wrap">
           <table>
             <caption>Top {matchRows.length} single-match performances</caption>
@@ -144,9 +148,11 @@ export default async function RecordCategoryPage({
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       )}
 
       {seasonRows.length > 0 && (
+        <CollapsibleTable title="Season leaders">
         <div className="table-wrap">
           <table>
             <caption>Top {seasonRows.length} single seasons</caption>
@@ -176,6 +182,7 @@ export default async function RecordCategoryPage({
             </tbody>
           </table>
         </div>
+        </CollapsibleTable>
       )}
     </>
   );

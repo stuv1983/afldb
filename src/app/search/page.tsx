@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { SearchBox } from '@/components/SearchBox';
 import { globalSearch } from '@/db/queries/search';
 import { clubPath, playerPath, seasonPath, venuePath } from '@/lib/format';
@@ -70,7 +71,7 @@ export default async function SearchPage({
 
           {results.players.length > 0 && (
             <section className="section">
-              <h2>Players</h2>
+              <CollapsibleTable title="Players">
               <div className="table-wrap">
                 <table>
                   <thead>
@@ -91,6 +92,7 @@ export default async function SearchPage({
                   </tbody>
                 </table>
               </div>
+              </CollapsibleTable>
             </section>
           )}
 

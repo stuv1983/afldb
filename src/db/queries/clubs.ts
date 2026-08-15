@@ -41,7 +41,14 @@ const CLUB_SUCCESSOR = sql`
   ) succ ON true
 `;
 
-export async function listClubs(): Promise<ClubSummary[]> {
+export type ClubFilters = { q?: string; state?: string };
+
+export async function listClubs(filters: ClubFilters = {}): Promise<ClubSummary[]> {
+  const conditions: ReturnType<typeof sql>[] = [sql`TRUE`];
+  if (filters.q) conditions.push(sql`c.name ILIKE ${`%${filters.q}%`}`);
+  if (filters.state) conditions.push(sql`c.home_state = ${filters.state}`);
+  const where = conditions.reduce((acc, cond) => sql`${acc} AND ${cond}`);
+
   return sql<ClubSummary[]>`
     SELECT c.id, c.slug, c.name, c.short_name AS "shortName",
            c.abbreviation, c.is_current_afl_club AS "isCurrent",
@@ -57,8 +64,17 @@ export async function listClubs(): Promise<ClubSummary[]> {
       FROM clubs c
       JOIN clubs ci ON ci.id = c.current_identity_id
       ${CLUB_SUCCESSOR}
+     WHERE ${where}
      ORDER BY c.is_current_afl_club DESC, c.name
   `;
+}
+
+export async function getClubStates(): Promise<string[]> {
+  const rows = await sql<{ state: string }[]>`
+    SELECT DISTINCT home_state AS state FROM clubs
+     WHERE home_state IS NOT NULL ORDER BY state
+  `;
+  return rows.map((r) => r.state);
 }
 
 export async function getClub(slug: string): Promise<ClubSummary | null> {

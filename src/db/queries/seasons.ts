@@ -39,7 +39,14 @@ const PREMIER_JOIN = `
       ) gf ON true
       LEFT JOIN clubs c ON c.id = gf.winner_club_id`;
 
-export async function listSeasons(): Promise<SeasonSummary[]> {
+export type SeasonFilters = { fromYear?: number; toYear?: number };
+
+export async function listSeasons(filters: SeasonFilters = {}): Promise<SeasonSummary[]> {
+  const conditions: ReturnType<typeof sql>[] = [sql`TRUE`];
+  if (filters.fromYear !== undefined) conditions.push(sql`s.year >= ${filters.fromYear}`);
+  if (filters.toYear !== undefined) conditions.push(sql`s.year <= ${filters.toYear}`);
+  const where = conditions.reduce((acc, cond) => sql`${acc} AND ${cond}`);
+
   return sql<SeasonSummary[]>`
     SELECT s.year, s.league, s.is_complete AS "isComplete",
            s.status, s.data_through_date AS "dataThroughDate",
@@ -53,6 +60,7 @@ export async function listSeasons(): Promise<SeasonSummary[]> {
            CASE WHEN s.status = 'complete' THEN c.slug END AS "premierSlug"
       FROM seasons s
       ${sql.unsafe(PREMIER_JOIN)}
+     WHERE ${where}
      ORDER BY s.year DESC
   `;
 }
