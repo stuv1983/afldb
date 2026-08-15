@@ -1,30 +1,36 @@
 #!/usr/bin/env python3
 """Load the parsed AFLW files into the staging_aflw schema.
 
-    python tools/aflw/load_staging.py --check          # no database needed
-    python tools/aflw/load_staging.py --create --load  # apply DDL, then COPY
+    python tools/aflw/load_staging.py --check    # no database needed
+    python tools/aflw/load_staging.py --load     # TRUNCATE + COPY
 
---check validates the CSVs against every constraint in staging_schema.sql
+The schema itself is src/db/migrations/025_staging_aflw.sql, applied the
+normal way with `npm run db:migrate` — not by this script. Grants belong
+in a migration, not a script-issued GRANT (see docs/deployment.md §12), so
+this tool only ever loads rows into a schema that migration already
+created.
+
+--check validates the CSVs against every constraint the migration defines,
 without touching a database, so a load can be proven safe from a machine
-that has no connection to one. --create and --load require AFLDB_DSN (or
-.env) and psycopg.
+that has no connection to one. --load requires AFLDB_IMPORT_DATABASE_URL
+(read from .env, same as every other importer in tools/migration) and
+psycopg.
 
 Loading is a full replace: staging holds one parse of one scrape, and a
-re-parse supersedes it entirely. Tables are truncated in dependency order
-inside a single transaction, so a failure leaves the previous load intact.
+re-parse supersedes it entirely. Tables are truncated in dependency order,
+then reloaded, inside a single transaction, so a failure leaves the
+previous load intact.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
-import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_IN = ROOT / "data" / "aflw" / "parsed"
-DDL = Path(__file__).resolve().parent / "staging_schema.sql"
 
 # Load order is dependency order; truncation is the reverse.
 TABLES = [
@@ -201,31 +207,24 @@ def check(in_dir: Path) -> int:
 # ---------------------------------------------------------------------------
 
 def connect():
+    # Imported here, not at module scope: tools/migration/common.py imports
+    # psycopg on import, and --check must keep working on a machine that has
+    # no database driver and no database.
+    sys.path.insert(0, str(ROOT / "tools" / "migration"))
     try:
-        import psycopg
+        from common import load_env, require_env
     except ImportError:
         sys.exit("ERROR: psycopg is not installed. "
-                 "Run: pip install 'psycopg[binary]'")
-    env = ROOT / ".env"
-    if env.exists():
-        for line in env.read_text().splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                key, _, value = line.partition("=")
-                os.environ.setdefault(key.strip(), value.strip())
-    dsn = os.environ.get("AFLDB_DSN") or os.environ.get("DATABASE_URL")
-    if not dsn:
-        sys.exit("ERROR: set AFLDB_DSN (or DATABASE_URL) to load.")
-    return psycopg.connect(dsn)
-
-
-def create(conn) -> None:
-    print(f"Applying {DDL.name}")
-    with conn.cursor() as cur:
-        cur.execute(DDL.read_text(encoding="utf-8"))
+                 "On the dev server use ~/projects/afldb/.venv/bin/python.")
+    load_env()
+    import psycopg
+    # afldb_import: the role every ETL script writes with (see common.py).
+    # Not the owner role — this script never alters schema, only rows.
+    return psycopg.connect(require_env("AFLDB_IMPORT_DATABASE_URL"))
 
 
 def load(conn, in_dir: Path) -> None:
+    total = 0
     with conn.cursor() as cur:
         for name, _ in reversed(TABLES):
             cur.execute(f"TRUNCATE staging_aflw.{name} CASCADE")
@@ -239,32 +238,35 @@ def load(conn, in_dir: Path) -> None:
                     copy.write_row([row[column] if row[column] != "" else None
                                     for column in columns])
             print(f"  staging_aflw.{name:<22} {len(rows):>7,} rows")
+            total += len(rows)
+        cur.execute("ANALYZE staging_aflw.player_match_stats")
+        cur.execute("ANALYZE staging_aflw.scoring_events")
+    print(f"  {'':<22} {total:>7,} rows total")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--in", dest="in_dir", type=Path, default=DEFAULT_IN)
     parser.add_argument("--check", action="store_true",
-                        help="validate the CSVs against the DDL, no database")
-    parser.add_argument("--create", action="store_true", help="apply the DDL")
-    parser.add_argument("--load", action="store_true", help="COPY the CSVs in")
+                        help="validate the CSVs against the schema, no database")
+    parser.add_argument("--load", action="store_true", help="TRUNCATE + COPY")
     args = parser.parse_args()
 
-    if not (args.check or args.create or args.load):
-        parser.error("choose at least one of --check, --create, --load")
+    if not (args.check or args.load):
+        parser.error("choose at least one of --check, --load")
 
-    if args.check and check(args.in_dir) != 0:
+    # A load always validates first: the constraints are cheap to check in
+    # Python and a rejection mid-COPY is far harder to read than this report.
+    if check(args.in_dir) != 0:
         return 1
-    if not (args.create or args.load):
+    if not args.load:
         return 0
 
+    print()
     conn = connect()
     try:
         with conn:
-            if args.create:
-                create(conn)
-            if args.load:
-                load(conn, args.in_dir)
+            load(conn, args.in_dir)
         print("Committed.")
     finally:
         conn.close()

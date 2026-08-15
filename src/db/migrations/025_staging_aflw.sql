@@ -1,17 +1,21 @@
 -- =====================================================================
--- AFLW staging — source rows as published, before any resolution
+-- AFLDB 025 — AFLW staging: source rows as published, before resolution
 -- =====================================================================
--- Loaded by tools/aflw/load_staging.py from data/aflw/parsed/*.csv.
+-- Loaded by tools/aflw/load_staging.py from data/aflw/parsed/*.csv,
+-- produced by tools/aflw/parse_aflw.py from the aflwstats.com scrape.
+-- See tools/aflw/README.md for the source's shape and its traps.
 --
 -- This schema deliberately has NO foreign key into the normalised model.
 -- The whole reason AFLW cannot be added under the current keys is that
 -- seasons.year is the season primary key and AFLW has two seasons inside
--- calendar 2022, so staging must be loadable BEFORE that is fixed. Season
--- is text here (`2022`, `7`) exactly as the source keys it.
+-- calendar 2022 (Season Six and Season Seven), so staging must be
+-- loadable BEFORE that is fixed. Season is text here ('2022', '7') exactly
+-- as the source keys it.
 --
--- Every table follows the existing staging convention: the source string
--- is kept, the resolved AFLDB key sits beside it and is NULL until a
--- resolution pass fills it. Unresolved rows are reported, never dropped.
+-- Every table follows the staging convention from 014_staging_schema.sql:
+-- the source string is kept, the resolved AFLDB key sits beside it and is
+-- NULL until a resolution pass fills it. Unresolved rows are reported,
+-- never dropped.
 --
 -- Statistics are signed. Metres gained reaches -52 and fantasy points -5
 -- in real rows, so no non-negative CHECK belongs on them.

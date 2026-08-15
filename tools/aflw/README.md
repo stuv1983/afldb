@@ -5,16 +5,23 @@ a staging schema, so the real data can be inspected before any decision is
 made about the normalised model.
 
 ```
-python tools/aflw/parse_aflw.py                    # HTML  -> data/aflw/parsed/*.csv
-python tools/aflw/profile_aflw.py                  # reconcile and describe
-python tools/aflw/load_staging.py --check          # validate against the DDL, no database
-python tools/aflw/load_staging.py --create --load  # apply DDL, then COPY (needs AFLDB_DSN)
+python tools/aflw/parse_aflw.py            # HTML -> data/aflw/parsed/*.csv
+python tools/aflw/profile_aflw.py          # reconcile and describe
+python tools/aflw/load_staging.py --check  # validate against the schema, no database
+npm run db:migrate                         # create staging_aflw (migration 025)
+python tools/aflw/load_staging.py --load   # TRUNCATE + COPY
 ```
+
+The schema is `src/db/migrations/025_staging_aflw.sql`, applied like any
+other migration. `load_staging.py` only ever loads rows; it never creates a
+table or issues a grant. `--load` always runs `--check` first, so a bad parse
+is reported as a readable list rather than a `COPY` failure halfway through.
 
 Nothing here resolves an entity. Team codes, player slugs and venue strings
 are staged exactly as published, with the resolution columns left NULL for a
 later pass. `data/` is gitignored, so the parsed files are rebuildable
-artefacts, never inputs.
+artefacts, never inputs — the parse runs on the workstation where the scrape
+lives, and only the CSVs travel to the server.
 
 ## What the source is
 
