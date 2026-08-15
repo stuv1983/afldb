@@ -93,10 +93,11 @@ describe('POST /api/admin/email-intake', () => {
     expect(row.status).toBe('validated');
     expect(row.uploadedBy).toBe(admin.email);
 
-    // Cleanup: this submission was never approved/promoted, so removing
-    // it touches only the operational tables, never statistics.
-    await authSql`DELETE FROM data_submission_rows WHERE submission_id = ${body.submissionId}`;
-    await authSql`DELETE FROM data_submissions WHERE id = ${body.submissionId}`;
+    // No cleanup: afldb_auth has DELETE on data_submission_rows but not
+    // on data_submissions itself (migration 023 grants), matching this
+    // table's real purpose as a standing log every real upload adds to
+    // -- a test-created row is left exactly as a real one would be,
+    // rather than reaching for owner-level credentials just to tidy up.
   });
 
   it('rejects an oversized payload', async () => {
