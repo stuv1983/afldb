@@ -139,6 +139,35 @@ nothing else is reading, and re-run from the start after any failure.
 
 **Cache invalidation.** Historical pages are cached for 1–24 hours. After an import, a rebuild and restart refreshes them; a full restart is not otherwise required. Rebuilding is preferred over waiting for revalidation, because prerendered pages are regenerated at build time.
 
+## 7a. AFLW staging refresh
+
+AFLW lives in `staging_aflw` only. It is not yet in the normalised model, is
+not read by the website, and therefore needs **no build and no restart**.
+
+The parse runs on the workstation, where the scrape lives; only the CSVs
+travel. `data/` is gitignored, so they are never committed.
+
+```bash
+# workstation
+python tools/aflw/parse_aflw.py            # scrape -> data/aflw/parsed/*.csv
+python tools/aflw/load_staging.py --check  # no database needed
+scp data/aflw/parsed/*.csv arm@10.0.40.100:~/projects/afldb/data/aflw/parsed/
+
+# server
+cd ~/projects/afldb
+./.venv/bin/python tools/aflw/load_staging.py --load
+```
+
+`--load` re-runs `--check` first and loads inside one transaction, so a bad
+parse is a readable report and a failure leaves the previous load intact.
+See [tools/aflw/README.md](../tools/aflw/README.md) for what the source is
+and where it lies.
+
+Running SQL against the server from the workstation is easiest by piping a
+file into `psql` over stdin — `cat q.sql | ssh arm@10.0.40.100 '... psql "$DSN" -f -'`.
+An inline heredoc inside a quoted `ssh` argument silently eats `''`, which
+turns `WHERE conference = ''` into a syntax error.
+
 ## 8. Testing
 
 ```bash
