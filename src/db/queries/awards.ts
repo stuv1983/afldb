@@ -55,6 +55,19 @@ export async function listAwards(): Promise<AwardSummary[]> {
   `;
 }
 
+/**
+ * All 39 awards, for a dropdown -- the grid solver's generic "won an
+ * award…" builders. Grouped by category (award / club_best_and_fairest /
+ * draft_pick / honour_team) so the picker can render an <optgroup>;
+ * mirrors getClubOptions() in advanced-search.ts.
+ */
+export async function getAwardOptions() {
+  return sql<{ id: number; name: string; category: string }[]>`
+    SELECT id, name, category FROM awards
+     ORDER BY category, name
+  `;
+}
+
 export async function getAward(slug: string): Promise<AwardSummary | null> {
   const [row] = await sql<AwardSummary[]>`
     SELECT ${AWARD_SUMMARY_COLUMNS}

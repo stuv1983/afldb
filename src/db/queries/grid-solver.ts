@@ -4,9 +4,11 @@ import { sql } from '@/db/client';
 import {
   GRID_BUILDERS,
   GRID_LIMITS,
+  GRID_STATS,
   isGridStatKey,
   type GridAxisState,
   type GridOrder,
+  type GridStatKey,
 } from '@/search/grid-solver-spec';
 
 /**
@@ -50,7 +52,7 @@ function requireInt(axis: GridAxisState, key: string, label: string): number {
  * shot, the same way filters.ts's rangeConditions does, rather than
  * splicing an unsafe fragment next to literal template text.
  */
-function requireStatKey(axis: GridAxisState): string {
+function requireStatKey(axis: GridAxisState): GridStatKey {
   const value = requireParam(axis, 'stat', 'Statistic');
   if (!isGridStatKey(value)) throw new Error(`Unknown statistic: ${value}`);
   return value;
@@ -61,6 +63,41 @@ function orderedRange(axis: GridAxisState, loKey: string, loLabel: string, hiKey
   const a = requireInt(axis, loKey, loLabel);
   const b = requireInt(axis, hiKey, hiLabel);
   return a <= b ? [a, b] : [b, a];
+}
+
+/**
+ * "X+ of a stat in a career", grain-aware: player_career_stats precomputes
+ * a real total column for the 8 'always'/'era_limited' stats (goals plus
+ * the original 7), so those compare directly against `c`. The other 13
+ * 'live_only' stats (migration 007 never precomputed them) fall back to a
+ * correlated SUM over player_match_stats, scoped to this player by the
+ * existing ix_pms_player index. Shared by career_stat_total_min and any
+ * other career-grain "X+ of a stat" builder.
+ */
+function careerStatAtLeast(statKey: GridStatKey, n: number): SqlFragment {
+  if (GRID_STATS[statKey].grain !== 'live_only') {
+    return sql`${sql.unsafe(`c.${statKey}`)} >= ${n}`;
+  }
+  return sql`(SELECT sum(${sql.unsafe(statKey)}) FROM player_match_stats WHERE player_id = p.id) >= ${n}`;
+}
+
+/**
+ * "X+ of a stat in one season" -- does at least one of the player's
+ * (player, season, club) rows clear the threshold. Precomputed stats
+ * check the real player_season_stats column directly; live_only stats
+ * fall back to grouping player_match_stats by player and season. Both
+ * branches keep the existing per-row (not summed-across-clubs) semantics:
+ * a player traded mid-season is checked one club-stint at a time, same as
+ * the original implementation.
+ */
+function seasonStatAtLeast(statKey: GridStatKey, n: number): SqlFragment {
+  if (GRID_STATS[statKey].grain !== 'live_only') {
+    return sql`p.id IN (SELECT player_id FROM player_season_stats WHERE ${sql.unsafe(statKey)} >= ${n})`;
+  }
+  return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                        JOIN matches m ON m.id = pms.match_id
+                       GROUP BY pms.player_id, m.season, pms.club_id
+                      HAVING sum(${sql.unsafe(statKey)}) >= ${n})`;
 }
 
 // One dispatch per builder is the clearest shape here; splitting it up
@@ -98,11 +135,8 @@ function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`c.games < ${requireInt(axis, 'games', 'Games')}`;
     case 'career_goals_min':
       return sql`c.goals >= ${requireInt(axis, 'goals', 'Goals')}`;
-    case 'career_stat_total_min': {
-      const column = sql.unsafe(`c.${requireStatKey(axis)}`);
-      const n = requireInt(axis, 'x', 'At least');
-      return sql`${column} >= ${n}`;
-    }
+    case 'career_stat_total_min':
+      return careerStatAtLeast(requireStatKey(axis), requireInt(axis, 'x', 'At least'));
 
     // -- Season & era -----------------------------------------------------
     case 'debuted_between': {
@@ -118,11 +152,8 @@ function compileAxis(axis: GridAxisState): SqlFragment {
       const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
       return sql`p.id IN (SELECT player_id FROM player_season_stats WHERE season BETWEEN ${lo} AND ${hi})`;
     }
-    case 'season_stat_total_min': {
-      const column = sql.unsafe(requireStatKey(axis));
-      const n = requireInt(axis, 'x', 'At least');
-      return sql`p.id IN (SELECT player_id FROM player_season_stats WHERE ${column} >= ${n})`;
-    }
+    case 'season_stat_total_min':
+      return seasonStatAtLeast(requireStatKey(axis), requireInt(axis, 'x', 'At least'));
     case 'games_in_season_min':
       return sql`p.id IN (SELECT player_id FROM player_season_stats WHERE games >= ${requireInt(axis, 'games', 'Games')})`;
 
@@ -188,6 +219,19 @@ function compileAxis(axis: GridAxisState): SqlFragment {
                             WHERE player_id IS NOT NULL
                               AND link_status_value IN ('unique', 'resolved')
                               AND season BETWEEN ${lo} AND ${hi})`;
+    }
+    case 'club_captain_any':
+      return sql`p.id IN (SELECT player_id FROM captaincies
+                            WHERE player_id IS NOT NULL
+                              AND link_status_value IN ('unique', 'resolved'))`;
+    case 'captain_of_club_between_seasons': {
+      const orgId = requireInt(axis, 'club', 'Club');
+      const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
+      return sql`p.id IN (SELECT cp.player_id FROM captaincies cp
+                            WHERE cp.player_id IS NOT NULL
+                              AND cp.link_status_value IN ('unique', 'resolved')
+                              AND cp.club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgId})
+                              AND cp.season BETWEEN ${lo} AND ${hi})`;
     }
 
     // -- Awards & honours -------------------------------------------------

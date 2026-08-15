@@ -6,9 +6,12 @@ import { useState } from 'react';
 import { PlayerPicker } from '@/components/PlayerPicker';
 import {
   buildersByGroup,
+  GRID_AA_POSITIONS,
   GRID_BUILDERS,
+  GRID_DRAFT_TYPES,
   GRID_GROUP_ORDER,
   GRID_ORDER_LABELS,
+  GRID_SIGNING_KINDS,
   GRID_STAT_KEYS,
   GRID_STATS,
   serializeBoardState,
@@ -19,6 +22,7 @@ import {
 } from '@/search/grid-solver-spec';
 
 type Option = { id: number; name: string };
+type AwardOption = { id: number; name: string; category: string };
 
 /**
  * Six axis editors (three rows, three columns) plus a rank-by control --
@@ -32,11 +36,13 @@ export function GridSolverForm({
   initialState,
   clubs,
   venues,
+  awards,
   playerNames,
 }: {
   initialState: GridBoardState;
   clubs: Option[];
   venues: Option[];
+  awards: AwardOption[];
   /** id -> display name, for axes already carrying a Teammates-category player id. */
   playerNames: Record<string, string>;
 }) {
@@ -63,12 +69,12 @@ export function GridSolverForm({
     <div style={{ display: 'grid', gap: '1rem' }}>
       <AxisGroup
         title="Columns" side="cols" axes={state.cols}
-        clubs={clubs} venues={venues} playerNames={playerNames}
+        clubs={clubs} venues={venues} awards={awards} playerNames={playerNames}
         onChange={(i, next) => setAxis('cols', i, next)}
       />
       <AxisGroup
         title="Rows" side="rows" axes={state.rows}
-        clubs={clubs} venues={venues} playerNames={playerNames}
+        clubs={clubs} venues={venues} awards={awards} playerNames={playerNames}
         onChange={(i, next) => setAxis('rows', i, next)}
       />
 
@@ -93,13 +99,14 @@ export function GridSolverForm({
 }
 
 function AxisGroup({
-  title, side, axes, clubs, venues, playerNames, onChange,
+  title, side, axes, clubs, venues, awards, playerNames, onChange,
 }: {
   title: string;
   side: 'rows' | 'cols';
   axes: GridBoardState['rows'];
   clubs: Option[];
   venues: Option[];
+  awards: AwardOption[];
   playerNames: Record<string, string>;
   onChange: (index: number, next: GridAxisState) => void;
 }) {
@@ -116,6 +123,7 @@ function AxisGroup({
             onChange={(next) => onChange(i, next)}
             clubs={clubs}
             venues={venues}
+            awards={awards}
             playerNames={playerNames}
           />
         ))}
@@ -125,13 +133,14 @@ function AxisGroup({
 }
 
 function AxisEditor({
-  axisLabel, axis, onChange, clubs, venues, playerNames,
+  axisLabel, axis, onChange, clubs, venues, awards, playerNames,
 }: {
   axisLabel: string;
   axis: GridAxisState;
   onChange: (next: GridAxisState) => void;
   clubs: Option[];
   venues: Option[];
+  awards: AwardOption[];
   playerNames: Record<string, string>;
 }) {
   const def = GRID_BUILDERS[axis.builder];
@@ -180,6 +189,7 @@ function AxisEditor({
             onChange={(v) => setParam(p.key, v)}
             clubs={clubs}
             venues={venues}
+            awards={awards}
             playerNames={playerNames}
           />
         ))}
@@ -189,7 +199,7 @@ function AxisEditor({
 }
 
 function ParamInput({
-  axisKey, param, value, onChange, clubs, venues, playerNames,
+  axisKey, param, value, onChange, clubs, venues, awards, playerNames,
 }: {
   axisKey: string;
   param: GridParamDef;
@@ -197,6 +207,7 @@ function ParamInput({
   onChange: (value: string) => void;
   clubs: Option[];
   venues: Option[];
+  awards: AwardOption[];
   playerNames: Record<string, string>;
 }) {
   if (param.kind === 'club' || param.kind === 'venue') {
@@ -224,6 +235,50 @@ function ParamInput({
     );
   }
 
+  if (param.kind === 'award') {
+    const categories = [...new Set(awards.map((a) => a.category))];
+    return (
+      <label>
+        {param.label}
+        <select value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">Choose…</option>
+          {categories.map((cat) => (
+            <optgroup key={cat} label={cat.replace(/_/g, ' ')}>
+              {awards.filter((a) => a.category === cat).map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+    );
+  }
+
+  if (param.kind === 'draftType' || param.kind === 'signingKind') {
+    const options = param.kind === 'draftType' ? GRID_DRAFT_TYPES : GRID_SIGNING_KINDS;
+    return (
+      <label>
+        {param.label}
+        <select value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">Choose…</option>
+          {options.map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+      </label>
+    );
+  }
+
+  if (param.kind === 'aaPosition') {
+    return (
+      <label>
+        {param.label}
+        <select value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">Choose…</option>
+          {GRID_AA_POSITIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </label>
+    );
+  }
+
   if (param.kind === 'player') {
     const id = Number(value);
     const name = Number.isSafeInteger(id) ? playerNames[id] : undefined;
@@ -243,12 +298,13 @@ function ParamInput({
     );
   }
 
-  // integer / season
+  // integer / decimal / season
   return (
     <label>
       {param.label}
       <input
         type="number"
+        step={param.kind === 'decimal' ? '0.1' : '1'}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         style={{ width: '7rem' }}

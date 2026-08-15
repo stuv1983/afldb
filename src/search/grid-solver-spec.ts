@@ -14,21 +14,29 @@
  * the obscurity/star-rating system (a bespoke precomputed score AFLDB has
  * no equivalent of -- see GridOrder below for the honest substitute).
  *
- * V1 catalogue: ~30 builders across 9 categories, a real cross-section
- * of what AFLDB's schema actually supports, not the reference's 100+ --
- * extensible later the same way QUERYABLE_TABLES and the CSV DATASETS
- * registry already are. Every builder is a fixed, named SQL shape with
- * typed parameters (mirrors constraints.py's `(sql, params)` functions);
- * nothing here lets a request choose a column or operator the way the
- * generic query builder does, so identifiers never need to be checked
- * against a value the request supplied in the first place.
+ * Catalogue: 93 builders across 10 categories, checked against the
+ * reference's own generated criteria doc (afl_grid_criteria.md) and
+ * verified against AFLDB's live data one category at a time -- family
+ * relationships, physical attributes, derby definitions and win-streaks
+ * are cut because the data genuinely isn't there (see docs/search.md for
+ * the full reasoning), not because they were skipped.
+ *
+ * Every builder is a fixed, named SQL shape with typed parameters (mirrors
+ * constraints.py's `(sql, params)` functions); nothing here lets a request
+ * choose a column or operator the way the generic query builder does, so
+ * identifiers never need to be checked against a value the request
+ * supplied in the first place -- except the `stat` family of params
+ * (including `statA`/`statB`), checked against GRID_STATS before
+ * sql.unsafe ever sees them.
  */
 
 import { decodeUrlState, encodeUrlState } from '@/lib/urlState';
 
 // ------------------------------------------------------------- parameters
 
-export type GridParamKind = 'integer' | 'season' | 'club' | 'venue' | 'player' | 'stat';
+export type GridParamKind =
+  | 'integer' | 'decimal' | 'season' | 'club' | 'venue' | 'player' | 'stat'
+  | 'award' | 'draftType' | 'signingKind' | 'aaPosition';
 
 export type GridParamDef = {
   key: string;
@@ -37,20 +45,41 @@ export type GridParamDef = {
 };
 
 // ----------------------------------------------------------------- stats
-// The seven career statistics with a consistent shape across all three
-// grains (player_career_stats, player_season_stats, player_match_stats) --
-// the same seven ERA_LIMITED_STATS lib/player-compare.ts compares. Kept as
-// an independent list rather than importing that one: this catalogue also
-// needs SQL column names, which player-compare.ts has no reason to carry.
+// Every real player_match_stats column, plus goals, each tagged with how
+// far it's precomputed:
+//  - 'always'      goals -- always recorded, no recorded-games gating.
+//  - 'era_limited' the original 7 -- precomputed totals on BOTH
+//                  player_career_stats and player_season_stats.
+//  - 'live_only'   the other 13 -- no precomputed total anywhere; builders
+//                  using these aggregate player_match_stats directly.
+// grid-solver.ts's statTotalExpr() branches on this so "X+ of a stat"
+// builders use the cheap precomputed column wherever one exists and only
+// fall back to a live scan for the 13 stats that have no alternative.
 
-export const GRID_STATS = {
-  behinds: { key: 'behinds', label: 'Behinds' },
-  kicks: { key: 'kicks', label: 'Kicks' },
-  handballs: { key: 'handballs', label: 'Handballs' },
-  disposals: { key: 'disposals', label: 'Disposals' },
-  marks: { key: 'marks', label: 'Marks' },
-  tackles: { key: 'tackles', label: 'Tackles' },
-  hitouts: { key: 'hitouts', label: 'Hitouts' },
+export type StatGrain = 'always' | 'era_limited' | 'live_only';
+
+export const GRID_STATS: Record<string, { key: string; label: string; grain: StatGrain }> = {
+  goals: { key: 'goals', label: 'Goals', grain: 'always' },
+  behinds: { key: 'behinds', label: 'Behinds', grain: 'era_limited' },
+  kicks: { key: 'kicks', label: 'Kicks', grain: 'era_limited' },
+  handballs: { key: 'handballs', label: 'Handballs', grain: 'era_limited' },
+  disposals: { key: 'disposals', label: 'Disposals', grain: 'era_limited' },
+  marks: { key: 'marks', label: 'Marks', grain: 'era_limited' },
+  tackles: { key: 'tackles', label: 'Tackles', grain: 'era_limited' },
+  hitouts: { key: 'hitouts', label: 'Hitouts', grain: 'era_limited' },
+  rebounds: { key: 'rebounds', label: 'Rebound 50s', grain: 'live_only' },
+  inside_50s: { key: 'inside_50s', label: 'Inside 50s', grain: 'live_only' },
+  clearances: { key: 'clearances', label: 'Clearances', grain: 'live_only' },
+  clangers: { key: 'clangers', label: 'Clangers', grain: 'live_only' },
+  frees_for: { key: 'frees_for', label: 'Frees for', grain: 'live_only' },
+  frees_against: { key: 'frees_against', label: 'Frees against', grain: 'live_only' },
+  contested: { key: 'contested', label: 'Contested possessions', grain: 'live_only' },
+  uncontested: { key: 'uncontested', label: 'Uncontested possessions', grain: 'live_only' },
+  contested_marks: { key: 'contested_marks', label: 'Contested marks', grain: 'live_only' },
+  marks_inside_50: { key: 'marks_inside_50', label: 'Marks inside 50', grain: 'live_only' },
+  one_percenters: { key: 'one_percenters', label: 'One percenters', grain: 'live_only' },
+  bounces: { key: 'bounces', label: 'Bounces', grain: 'live_only' },
+  goal_assists: { key: 'goal_assists', label: 'Goal assists', grain: 'live_only' },
 } as const;
 
 export type GridStatKey = keyof typeof GRID_STATS;
@@ -59,6 +88,41 @@ export const GRID_STAT_KEYS = Object.keys(GRID_STATS) as GridStatKey[];
 export function isGridStatKey(value: string): value is GridStatKey {
   return Object.hasOwn(GRID_STATS, value);
 }
+
+// ------------------------------------------------- other closed vocabularies
+// Small, real, hand-verified sets (queried live without LIMIT to confirm
+// completeness) -- hardcoded here rather than DB-driven, the same choice
+// already made for GRID_STATS: the whole catalogue is a fixed set of
+// named questions, so a fixed set of option lists fits it, and it avoids
+// another server round-trip for a dropdown that essentially never changes.
+
+export const GRID_DRAFT_TYPES = [
+  'National', 'National Draft', 'Rookie', 'Trade', 'Pre-Season', 'Pre-Draft',
+  'Mid-Season', 'Post-Draft', 'Free Agency', 'Mini-Draft', 'Training Squad Selection',
+] as const;
+
+export const GRID_SIGNING_KINDS = [
+  'Academy', 'Foundation', 'Father-Son', 'Zone', 'International', 'SSP',
+  'FA', 'DFA', 'Uncontracted', 'Unregistered', 'Scholarship', 'Underage',
+  'Concessional', 'Concession', 'Top-Up', 'Supplementary', 'Compensation', 'Special Cat B',
+] as const;
+
+export const GRID_AA_POSITIONS: { value: string; label: string }[] = [
+  { value: 'FB', label: 'FB — Full Back' },
+  { value: 'BP', label: 'BP — Back Pocket' },
+  { value: 'HBF', label: 'HBF — Half Back Flank' },
+  { value: 'CHB', label: 'CHB — Centre Half Back' },
+  { value: 'W', label: 'W — Wing' },
+  { value: 'C', label: 'C — Centre' },
+  { value: 'HFF', label: 'HFF — Half Forward Flank' },
+  { value: 'CHF', label: 'CHF — Centre Half Forward' },
+  { value: 'FP', label: 'FP — Forward Pocket' },
+  { value: 'FF', label: 'FF — Full Forward' },
+  { value: 'Ru', label: 'Ru — Ruck' },
+  { value: 'RR', label: 'RR — Ruck Rover' },
+  { value: 'Ro', label: 'Ro — Rover' },
+  { value: 'IC', label: 'IC — Interchange' },
+];
 
 // -------------------------------------------------------------- builders
 
@@ -72,10 +136,18 @@ export type GridBuilderDef = {
 const club = (label = 'Club'): GridParamDef => ({ key: 'club', label, kind: 'club' });
 const venue = (label = 'Venue'): GridParamDef => ({ key: 'venue', label, kind: 'venue' });
 const player = (label = 'Player'): GridParamDef => ({ key: 'player', label, kind: 'player' });
-const stat = (label = 'Statistic'): GridParamDef => ({ key: 'stat', label, kind: 'stat' });
+const stat = (key = 'stat', label = 'Statistic'): GridParamDef => ({ key, label, kind: 'stat' });
 const int = (key: string, label: string): GridParamDef => ({ key, label, kind: 'integer' });
+const decimal = (key: string, label: string): GridParamDef => ({ key, label, kind: 'decimal' });
 const season = (key: string, label: string): GridParamDef => ({ key, label, kind: 'season' });
+const award = (label = 'Award'): GridParamDef => ({ key: 'award', label, kind: 'award' });
+const draftType = (label = 'Draft type'): GridParamDef => ({ key: 'draftType', label, kind: 'draftType' });
+const signingKind = (label = 'Recruited from'): GridParamDef => ({ key: 'signingKind', label, kind: 'signingKind' });
+const aaPosition = (label = 'Position'): GridParamDef => ({ key: 'position', label, kind: 'aaPosition' });
 
+// "Single-game feats" is added in Phase B once builders actually populate
+// it -- an empty category here would let the form select a category whose
+// Question dropdown has nothing in it.
 export const GRID_GROUP_ORDER = [
   'Clubs & journeys',
   'Career milestones',
@@ -88,6 +160,12 @@ export const GRID_GROUP_ORDER = [
   'Draft & recruitment',
 ] as const;
 
+// Phase A ships infrastructure only: the original 31 builders (unchanged
+// behaviour) plus the captaincy fix (2 relabels + 2 new). Phases B/C/D add
+// the remaining ~60 entries category by category, each landing here in the
+// same commit as its compileAxis case so GRID_BUILDER_KEYS never names a
+// builder grid-solver.ts can't yet compile -- tests/integration/grid-solver.test.ts's
+// it.each(GRID_BUILDER_KEYS) loop would otherwise fail between phases.
 export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   // Clubs & journeys -- club-scoped builders resolve at the organization
   // level (lineage-inclusive: "Western Bulldogs" also matches Footscray-
@@ -127,9 +205,16 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   teammate_of: { key: 'teammate_of', label: 'Teammate of…', group: 'Teammates', params: [player()] },
   played_against: { key: 'played_against', label: 'Played against…', group: 'Teammates', params: [player()] },
 
-  // Captaincy
-  club_captain: { key: 'club_captain', label: 'Club captain', group: 'Captaincy', params: [club()] },
-  captain_between_seasons: { key: 'captain_between_seasons', label: 'Captain between seasons', group: 'Captaincy', params: [season('from', 'From season'), season('to', 'To season')] },
+  // Captaincy -- club_captain/captain_between_seasons kept their original
+  // keys and behaviour from V1 but are relabelled here: they were always
+  // "captain of a specific club" and "captain of any club in a season
+  // range" respectively, not the generic questions their old labels
+  // suggested. club_captain_any and captain_of_club_between_seasons fill
+  // the two gaps that mislabelling was hiding.
+  club_captain: { key: 'club_captain', label: 'Captain of club', group: 'Captaincy', params: [club()] },
+  club_captain_any: { key: 'club_captain_any', label: 'Club captain', group: 'Captaincy', params: [] },
+  captain_between_seasons: { key: 'captain_between_seasons', label: 'Club captain between seasons', group: 'Captaincy', params: [season('from', 'From season'), season('to', 'To season')] },
+  captain_of_club_between_seasons: { key: 'captain_of_club_between_seasons', label: 'Captain of club between seasons', group: 'Captaincy', params: [club(), season('from', 'From season'), season('to', 'To season')] },
 
   // Awards & honours
   hall_of_fame_player: { key: 'hall_of_fame_player', label: 'Hall of Fame player', group: 'Awards & honours', params: [] },
