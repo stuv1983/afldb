@@ -57,6 +57,13 @@ export default async function AdminDashboard() {
         </p>
       )}
 
+      {admin.role === 'super_admin' && (
+        <p className="section-note">
+          <Link href="/admin/query-builder">Data QA search →</Link>{' '}
+          — build ad-hoc queries against the underlying tables to check data.
+        </p>
+      )}
+
       <section className="section">
         <div className="split-head">
           <h2>Data submissions</h2>

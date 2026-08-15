@@ -124,7 +124,45 @@ All query state lives in the URL, so any search is a shareable, indexable link:
 
 Career filters read `player_career_stats` (13,361 rows), never the 694,210-row fact table — asserted by an integration test that runs `EXPLAIN` and fails if `player_match_stats` appears in the plan. Measured p50 148 ms at concurrency 20.
 
-## 6. Regression cases
+## 6. Data QA search (internal, super-admin only)
+
+`/admin/query-builder` is a separate tool from everything above: not
+public, not linked from the admin nav, gated by `requireSuperAdmin()`.
+It exists for ad-hoc data QA — checking the underlying tables directly
+— rather than answering a fixed statistical question.
+
+Modelled on `sports_data_lab`'s `query_builder.py` "Table filters" mode:
+pick a table, pick a column, set an operator and value, add it as a
+condition. A **card** holds any number of conditions combined by its own
+ALL (AND) / ANY (OR) rule; each card after the first says how it joins
+the accumulated result of the cards before it. That two-level shape —
+cards of conditions — is deliberately narrower than the reference's
+fully general nested-group AST or its drag-and-drop visual tree: neither
+was what was asked for, and a flatter shape is easier to review.
+
+**Same security model as Advanced Search, extended across tables rather
+than discovered from the catalogue.** `src/search/query-builder-spec.ts`
+holds `QUERYABLE_TABLES`, a curated allowlist of table → column → kind,
+analogous to `FIELDS` above but spanning players, player career stats,
+clubs, matches and player match stats. This is deliberately **not**
+built on live `information_schema` introspection: a discovery-based tool
+would need an explicit denylist to keep `auth_users.password_hash` out
+of reach, and an allowlist cannot leak what was never listed.
+`src/db/queries/query-builder.ts` compiles the card AST to SQL through
+the identical allowlist-then-bind discipline as `advanced-search.ts` —
+`sql.unsafe` only for fragments the catalogue itself supplied, every
+value a bound parameter — and runs it through the same `afldb_app`
+client every public page uses, so even a compiler bug can only read
+statistics (and, since migration 031, cannot read the operational
+tables at all).
+
+Query state lives in one `q` URL parameter (JSON, base64url — no
+compression, unlike the reference's zlib step: a handful of conditions
+does not need it), so a query built once is a shareable, reproducible
+link like every other search on the site. Limits: 6 cards, 8 conditions
+per card, 50 rows per page.
+
+## 7. Regression cases
 
 Compared as **exact player-ID sets** with SHA-256 hashes, not merely counts, in both `tools/validation/validate_migration.py` and the integration tests.
 
