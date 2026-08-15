@@ -18,29 +18,13 @@ import {
   getStatEraStarts,
   getSubmissionBacklog,
   listTableRowCounts,
+  OPERATIONAL_TABLES,
   reconcileCareerTotals,
 } from '@/db/queries/db-health';
 
 afterAll(async () => {
   await sql.end();
 });
-
-// Kept in sync by hand with privileges.test.ts's OPERATIONAL_TABLES: this
-// is a second, independent guard that the health page's table inventory
-// -- built on pg_stat_user_tables, which is NOT privilege-filtered --
-// never surfaces a table the public role cannot even read.
-const OPERATIONAL_TABLES = [
-  'auth_users',
-  'auth_sessions',
-  'auth_audit_log',
-  'beta_access_codes',
-  'beta_allowed_emails',
-  'beta_login_tokens',
-  'beta_join_requests',
-  'data_submissions',
-  'data_submission_rows',
-  'admin_invites',
-];
 
 describe('db-health queries', () => {
   it('finds no drift between player_career_stats and its source fact tables', async () => {

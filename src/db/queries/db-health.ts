@@ -121,19 +121,48 @@ export type TableRowCount = {
 };
 
 /**
+ * Migration 031's own REVOKE list, duplicated here rather than imported --
+ * this file has no server-only-free path to that migration's SQL. Also
+ * re-exported so tests/integration/db-health.test.ts asserts against this
+ * exact list instead of a third hand-copied one.
+ *
+ * pg_stat_user_tables carries no privilege filtering: it reports every
+ * table in a schema to any role that can read the catalogue, which is
+ * exactly what afldb_owner (this file's connection, via the read-only
+ * `sql` client's underlying grants -- see client.ts) can do. Without this
+ * exclusion, a table this super-admin-only page has no business surfacing
+ * row counts for -- auth_users, sessions, the audit log -- would appear
+ * in "what is in the database" right alongside the statistical tables.
+ */
+export const OPERATIONAL_TABLES = [
+  'auth_users',
+  'auth_sessions',
+  'auth_audit_log',
+  'beta_access_codes',
+  'beta_allowed_emails',
+  'beta_login_tokens',
+  'beta_join_requests',
+  'data_submissions',
+  'data_submission_rows',
+  'admin_invites',
+];
+
+/**
  * Every table's row count, largest first -- an ESTIMATE from PostgreSQL's
  * own statistics view, not a per-table `COUNT(*)`. A literal count-every-
  * table loop across ~50 tables, including the 694k-row match-stats table,
  * risks AFLDB_STATEMENT_TIMEOUT_MS on every page load for a number that
  * only needs to be roughly right. `staging`/`staging_aflw` are import
  * pipeline internals (migration 001: staging is "never queried by the
- * application"), so this inventory covers `public` only.
+ * application"), so this inventory covers `public` only, and excludes the
+ * operational tables covered by the submission-backlog panel instead.
  */
 export async function listTableRowCounts(): Promise<TableRowCount[]> {
   const rows = await sql<{ schema: string; table: string; estimatedRows: string }[]>`
     SELECT schemaname AS schema, relname AS table, n_live_tup AS "estimatedRows"
       FROM pg_stat_user_tables
      WHERE schemaname = 'public'
+       AND relname <> ALL(${OPERATIONAL_TABLES})
      ORDER BY n_live_tup DESC
   `;
   return rows.map((r) => ({
