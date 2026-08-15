@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { ReorderableSections } from '@/components/ReorderableSections';
 import {
   getMatch,
   getMatchPeriods,
@@ -97,6 +98,112 @@ export default async function MatchPage({
   const periodLabel = (period: number) =>
     period === lastPeriod ? 'Final' : period <= 4 ? `Q${period}` : `ET${period - 4}`;
 
+  const sections: { id: string; label: string; node: React.ReactNode }[] = [];
+
+  sections.push({
+    id: 'quarter-by-quarter',
+    label: 'Quarter by quarter',
+    node: (
+      <section className="section">
+        <CollapsibleTable title="Quarter by quarter">
+        <div className="table-wrap">
+          <table>
+            <caption>
+              Cumulative score at each break, as published.
+              {lastPeriod > 4 && ' ET periods are extra time.'}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Club</th>
+                {periodNumbers.map((period) => (
+                  <th key={period} scope="col" className="num">{periodLabel(period)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sides.map((side) => {
+                const own = periods.filter((p) => p.clubId === side.clubId);
+                return (
+                  <tr key={side.clubId}>
+                    <td className="wide">
+                      <Link href={clubPath(side.slug)}>{side.name}</Link>
+                    </td>
+                    {periodNumbers.map((q) => {
+                      const period = own.find((p) => p.period === q);
+                      return (
+                        <td key={q} className="num nowrap">
+                          {period && period.points !== null
+                            ? formatScore(period.goals, period.behinds, period.points)
+                            : <span className="not-recorded">—</span>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        </CollapsibleTable>
+      </section>
+    ),
+  });
+
+  for (const side of sides) {
+    const squad = players.filter((p) => p.clubId === side.clubId);
+    if (squad.length === 0) continue;
+    sections.push({
+      id: `squad-${side.slug}`,
+      label: side.name,
+      node: (
+        <section className="section">
+          <p className="section-note">
+            <Link href={clubPath(side.slug)}>{side.name}</Link>
+          </p>
+          <CollapsibleTable title={side.name}>
+          <div className="table-wrap">
+            <table>
+              <caption>{squad.length} players</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Player</th>
+                  <th scope="col" className="num">G</th>
+                  <th scope="col" className="num">B</th>
+                  <th scope="col" className="num">K</th>
+                  <th scope="col" className="num">HB</th>
+                  <th scope="col" className="num">D</th>
+                  <th scope="col" className="num">M</th>
+                  <th scope="col" className="num">T</th>
+                  <th scope="col" className="num">HO</th>
+                  {hasBrownlow && <th scope="col" className="num">BV</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {squad.map((p) => (
+                  <tr key={p.playerId}>
+                    <td className="wide">
+                      <Link href={playerPath(p.slug, p.playerId)}>{p.displayName}</Link>
+                    </td>
+                    <td className="num">{formatStat(p.goals)}</td>
+                    <td className="num">{formatStat(p.behinds)}</td>
+                    <td className="num">{formatStat(p.kicks)}</td>
+                    <td className="num">{formatStat(p.handballs)}</td>
+                    <td className="num">{formatStat(p.disposals)}</td>
+                    <td className="num">{formatStat(p.marks)}</td>
+                    <td className="num">{formatStat(p.tackles)}</td>
+                    <td className="num">{formatStat(p.hitouts)}</td>
+                    {hasBrownlow && <td className="num">{formatStat(p.brownlowVotes)}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          </CollapsibleTable>
+        </section>
+      ),
+    });
+  }
+
   return (
     <>
       <nav className="breadcrumbs" aria-label="Breadcrumb">
@@ -142,99 +249,7 @@ export default async function MatchPage({
         </div>
       </div>
 
-      <section className="section">
-        <CollapsibleTable title="Quarter by quarter">
-        <div className="table-wrap">
-          <table>
-            <caption>
-              Cumulative score at each break, as published.
-              {lastPeriod > 4 && ' ET periods are extra time.'}
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">Club</th>
-                {periodNumbers.map((period) => (
-                  <th key={period} scope="col" className="num">{periodLabel(period)}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sides.map((side) => {
-                const own = periods.filter((p) => p.clubId === side.clubId);
-                return (
-                  <tr key={side.clubId}>
-                    <td className="wide">
-                      <Link href={clubPath(side.slug)}>{side.name}</Link>
-                    </td>
-                    {periodNumbers.map((q) => {
-                      const period = own.find((p) => p.period === q);
-                      return (
-                        <td key={q} className="num nowrap">
-                          {period && period.points !== null
-                            ? formatScore(period.goals, period.behinds, period.points)
-                            : <span className="not-recorded">—</span>}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        </CollapsibleTable>
-      </section>
-
-      {sides.map((side) => {
-        const squad = players.filter((p) => p.clubId === side.clubId);
-        if (squad.length === 0) return null;
-        return (
-          <section className="section" key={side.clubId}>
-            <p className="section-note">
-              <Link href={clubPath(side.slug)}>{side.name}</Link>
-            </p>
-            <CollapsibleTable title={side.name}>
-            <div className="table-wrap">
-              <table>
-                <caption>{squad.length} players</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Player</th>
-                    <th scope="col" className="num">G</th>
-                    <th scope="col" className="num">B</th>
-                    <th scope="col" className="num">K</th>
-                    <th scope="col" className="num">HB</th>
-                    <th scope="col" className="num">D</th>
-                    <th scope="col" className="num">M</th>
-                    <th scope="col" className="num">T</th>
-                    <th scope="col" className="num">HO</th>
-                    {hasBrownlow && <th scope="col" className="num">BV</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {squad.map((p) => (
-                    <tr key={p.playerId}>
-                      <td className="wide">
-                        <Link href={playerPath(p.slug, p.playerId)}>{p.displayName}</Link>
-                      </td>
-                      <td className="num">{formatStat(p.goals)}</td>
-                      <td className="num">{formatStat(p.behinds)}</td>
-                      <td className="num">{formatStat(p.kicks)}</td>
-                      <td className="num">{formatStat(p.handballs)}</td>
-                      <td className="num">{formatStat(p.disposals)}</td>
-                      <td className="num">{formatStat(p.marks)}</td>
-                      <td className="num">{formatStat(p.tackles)}</td>
-                      <td className="num">{formatStat(p.hitouts)}</td>
-                      {hasBrownlow && <td className="num">{formatStat(p.brownlowVotes)}</td>}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            </CollapsibleTable>
-          </section>
-        );
-      })}
+      <ReorderableSections storageKey={`/matches/${match.id}`} sections={sections} />
     </>
   );
 }

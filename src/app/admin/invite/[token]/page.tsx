@@ -43,7 +43,11 @@ export default async function AcceptInvitePage({
       <div className="page-header">
         <h1>Set up your admin account</h1>
         <p className="subtitle">
-          {invite.email} · {invite.role === 'super_admin' ? 'Super admin' : 'Admin'}
+          {invite.email} · {
+            invite.role === 'super_admin' ? 'Super admin'
+              : invite.role === 'contributor' ? 'Contributor'
+              : 'Admin'
+          }
         </p>
       </div>
       <AcceptInviteForm token={token} />

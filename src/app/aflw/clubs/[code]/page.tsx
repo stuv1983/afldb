@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
+import { ReorderableSections } from '@/components/ReorderableSections';
 import { TableFilters } from '@/components/TableFilters';
 import {
   getAflwClub,
@@ -85,50 +86,12 @@ export default async function AflwClubPage({
     ranges: values,
   });
 
-  return (
-    <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/aflw">AFLW</Link>
-        <span aria-hidden="true">/</span>
-        <Link href="/aflw/clubs">Clubs</Link>
-        <span aria-hidden="true">/</span>
-        <span>{club.name}</span>
-      </nav>
+  const sections: { id: string; label: string; node: React.ReactNode }[] = [];
 
-      <div className="page-header">
-        <h1>{club.name}</h1>
-        <p className="subtitle">
-          AFLW · {club.seasonsContested} seasons · {formatNumber(club.matches)} matches
-        </p>
-      </div>
-
-      <FilterErrors errors={values.errors} />
-
-      <div className="stat-strip">
-        <div className="stat">
-          <div className="value">{formatNumber(club.matches)}</div>
-          <div className="label">Matches</div>
-        </div>
-        <div className="stat">
-          <div className="value">{formatNumber(club.wins)}</div>
-          <div className="label">Wins</div>
-        </div>
-        <div className="stat">
-          <div className="value">
-            {club.matches > 0 ? formatPercentage((club.wins / club.matches) * 100) : '—'}
-          </div>
-          <div className="label">Win %</div>
-        </div>
-        <div className="stat">
-          <div className="value">{formatNumber(club.finals)}</div>
-          <div className="label">Finals</div>
-        </div>
-        <div className="stat">
-          <div className="value">{formatNumber(club.premierships)}</div>
-          <div className="label">Premierships</div>
-        </div>
-      </div>
-
+  sections.push({
+    id: 'season-by-season',
+    label: 'Season by season',
+    node: (
       <section className="section">
         <CollapsibleTable title="Season by season" note={`${seasons.length} seasons`}>
           <div className="table-wrap">
@@ -169,9 +132,16 @@ export default async function AflwClubPage({
           </div>
         </CollapsibleTable>
       </section>
+    ),
+  });
 
+  sections.push({
+    id: 'players',
+    label: 'Players',
+    node: (
       <section className="section">
         <CollapsibleTable
+          id="players"
           title="Players"
           note={
             players.total > PLAYER_LIMIT
@@ -181,6 +151,7 @@ export default async function AflwClubPage({
           filters={
             <TableFilters
               action={aflwClubPath(code)}
+              anchor="players"
               fields={playerFields}
               values={values}
               title="Filter players"
@@ -231,6 +202,54 @@ export default async function AflwClubPage({
           )}
         </CollapsibleTable>
       </section>
+    ),
+  });
+
+  return (
+    <>
+      <nav className="breadcrumbs" aria-label="Breadcrumb">
+        <Link href="/aflw">AFLW</Link>
+        <span aria-hidden="true">/</span>
+        <Link href="/aflw/clubs">Clubs</Link>
+        <span aria-hidden="true">/</span>
+        <span>{club.name}</span>
+      </nav>
+
+      <div className="page-header">
+        <h1>{club.name}</h1>
+        <p className="subtitle">
+          AFLW · {club.seasonsContested} seasons · {formatNumber(club.matches)} matches
+        </p>
+      </div>
+
+      <FilterErrors errors={values.errors} />
+
+      <div className="stat-strip">
+        <div className="stat">
+          <div className="value">{formatNumber(club.matches)}</div>
+          <div className="label">Matches</div>
+        </div>
+        <div className="stat">
+          <div className="value">{formatNumber(club.wins)}</div>
+          <div className="label">Wins</div>
+        </div>
+        <div className="stat">
+          <div className="value">
+            {club.matches > 0 ? formatPercentage((club.wins / club.matches) * 100) : '—'}
+          </div>
+          <div className="label">Win %</div>
+        </div>
+        <div className="stat">
+          <div className="value">{formatNumber(club.finals)}</div>
+          <div className="label">Finals</div>
+        </div>
+        <div className="stat">
+          <div className="value">{formatNumber(club.premierships)}</div>
+          <div className="label">Premierships</div>
+        </div>
+      </div>
+
+      <ReorderableSections storageKey={aflwClubPath(code)} sections={sections} />
     </>
   );
 }

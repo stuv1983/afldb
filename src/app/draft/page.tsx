@@ -60,7 +60,9 @@ export default async function DraftPage({
   const linkParams = filterQueryParams(fields, values);
   const described = describeFilters(fields, values);
 
-  const filters = <TableFilters action="/draft" fields={fields} values={values} />;
+  const filters = (
+    <TableFilters action="/draft" anchor="draft-picks" fields={fields} values={values} />
+  );
 
   return (
     <>
@@ -75,6 +77,7 @@ export default async function DraftPage({
       <FilterErrors errors={values.errors} />
 
       <CollapsibleTable
+        id="draft-picks"
         title="Draft picks"
         note={`${formatNumber(total)} matching`}
         filters={filters}

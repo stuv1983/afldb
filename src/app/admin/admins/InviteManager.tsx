@@ -46,20 +46,19 @@ export function InviteManager({
           Email
           <input name="email" type="email" required placeholder="them@example.com" />
         </label>
+        <label>
+          Role
+          <select name="role" defaultValue="admin">
+            <option value="admin">Admin</option>
+            <option value="contributor">Contributor (upload only)</option>
+            {canGrantSuperAdmin && <option value="super_admin">Super admin</option>}
+          </select>
+        </label>
         {canGrantSuperAdmin && (
-          <>
-            <label>
-              Role
-              <select name="role" defaultValue="admin">
-                <option value="admin">Admin</option>
-                <option value="super_admin">Super admin</option>
-              </select>
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <input name="canManageAdmins" type="checkbox" />
-              Can also invite/manage admins
-            </label>
-          </>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <input name="canManageAdmins" type="checkbox" />
+            Can also invite/manage admins
+          </label>
         )}
         <button className="btn" type="submit" disabled={creating}>
           {creating ? 'Creating…' : 'Create invite'}
@@ -106,8 +105,10 @@ export function InviteManager({
                   <tr key={invite.id}>
                     <td className="wide">{invite.email}</td>
                     <td>
-                      {invite.role === 'super_admin' ? 'Super admin' : 'Admin'}
-                      {invite.canManageAdmins && invite.role !== 'super_admin' ? ' (+ manage admins)' : ''}
+                      {invite.role === 'super_admin' ? 'Super admin'
+                        : invite.role === 'contributor' ? 'Contributor'
+                        : 'Admin'}
+                      {invite.canManageAdmins && invite.role === 'admin' ? ' (+ manage admins)' : ''}
                     </td>
                     <td className="muted">{invite.invitedByEmail}</td>
                     <td className="nowrap muted">{invite.expiresAt.slice(0, 10)}</td>

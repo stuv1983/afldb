@@ -48,9 +48,17 @@ export default async function AflwVenuesPage({
       <FilterErrors errors={values.errors} />
 
       <CollapsibleTable
+        id="venues"
         title="Venues"
         note={`${venues.length} matching`}
-        filters={<TableFilters action="/aflw/venues" fields={fields} values={values} />}
+        filters={(
+          <TableFilters
+            action="/aflw/venues"
+            anchor="venues"
+            fields={fields}
+            values={values}
+          />
+        )}
       >
         {venues.length === 0 ? (
           <div className="empty">

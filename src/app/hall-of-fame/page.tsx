@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
+import { ReorderableSections } from '@/components/ReorderableSections';
 import { TableFilters } from '@/components/TableFilters';
 import { getHallOfFameCategories, listHallOfFame } from '@/db/queries/awards';
 import { formatNumber, isLinked, playerPath } from '@/lib/format';
@@ -58,6 +59,99 @@ export default async function HallOfFamePage({
     return a.name.localeCompare(b.name);
   });
 
+  const sections: { id: string; label: string; node: React.ReactNode }[] = [];
+
+  sections.push({
+    id: 'legends',
+    label: 'Legends',
+    node: (
+      <section className="section">
+        <p className="section-note">
+          Elevated to Legend status, the Hall of Fame’s highest honour.
+        </p>
+        <CollapsibleTable title="Legends">
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col" className="num">Elevated</th>
+                <th scope="col">Club</th>
+                <th scope="col">Career</th>
+              </tr>
+            </thead>
+            <tbody>
+              {legends
+                .sort((a, b) => (a.legendYear ?? 0) - (b.legendYear ?? 0))
+                .map((i) => (
+                  <tr key={i.id}>
+                    <td className="wide">
+                      {i.playerId && isLinked(i.linkStatus) ? (
+                        <Link href={playerPath(i.playerSlug!, i.playerId)}>{i.name}</Link>
+                      ) : (
+                        i.name
+                      )}
+                    </td>
+                    <td className="num">{i.legendYear ?? i.inductedYear ?? '—'}</td>
+                    <td>{i.clubNameRaw ?? <span className="muted">—</span>}</td>
+                    <td className="nowrap muted">{i.playingCareer ?? '—'}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+        </CollapsibleTable>
+      </section>
+    ),
+  });
+
+  sections.push({
+    id: 'all-inductees',
+    label: 'All inductees',
+    node: (
+      <section className="section">
+        <CollapsibleTable title="All inductees">
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col" className="num">Inducted</th>
+                <th scope="col">Name</th>
+                <th scope="col">Category</th>
+                <th scope="col">Club</th>
+                <th scope="col">Career</th>
+              </tr>
+            </thead>
+            <tbody>
+              {byYear.map((i) => (
+                <tr key={i.id}>
+                  <td className="num">{i.inductedYear ?? '—'}</td>
+                  <td className="wide">
+                    {i.playerId && isLinked(i.linkStatus) ? (
+                      <Link href={playerPath(i.playerSlug!, i.playerId)}>{i.name}</Link>
+                    ) : (
+                      <span title="No VFL/AFL playing record in AFLDB">{i.name}</span>
+                    )}
+                    {i.isLegend && <strong> · Legend</strong>}
+                    {i.removedYear && (
+                      <span className="badge badge-warn" title={`Removed in ${i.removedYear}`}>
+                        Removed
+                      </span>
+                    )}
+                  </td>
+                  <td>{CATEGORY_LABELS[i.category ?? ''] ?? i.category ?? '—'}</td>
+                  <td>{i.clubNameRaw ?? <span className="muted">—</span>}</td>
+                  <td className="nowrap muted">{i.playingCareer ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        </CollapsibleTable>
+      </section>
+    ),
+  });
+
   return (
     <>
       <nav className="breadcrumbs" aria-label="Breadcrumb">
@@ -103,84 +197,7 @@ export default async function HallOfFamePage({
         </div>
       </div>
 
-      <section className="section">
-        <p className="section-note">
-          Elevated to Legend status, the Hall of Fame’s highest honour.
-        </p>
-        <CollapsibleTable title="Legends">
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col" className="num">Elevated</th>
-                <th scope="col">Club</th>
-                <th scope="col">Career</th>
-              </tr>
-            </thead>
-            <tbody>
-              {legends
-                .sort((a, b) => (a.legendYear ?? 0) - (b.legendYear ?? 0))
-                .map((i) => (
-                  <tr key={i.id}>
-                    <td className="wide">
-                      {i.playerId && isLinked(i.linkStatus) ? (
-                        <Link href={playerPath(i.playerSlug!, i.playerId)}>{i.name}</Link>
-                      ) : (
-                        i.name
-                      )}
-                    </td>
-                    <td className="num">{i.legendYear ?? i.inductedYear ?? '—'}</td>
-                    <td>{i.clubNameRaw ?? <span className="muted">—</span>}</td>
-                    <td className="nowrap muted">{i.playingCareer ?? '—'}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
-        </CollapsibleTable>
-      </section>
-
-      <section className="section">
-        <CollapsibleTable title="All inductees">
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col" className="num">Inducted</th>
-                <th scope="col">Name</th>
-                <th scope="col">Category</th>
-                <th scope="col">Club</th>
-                <th scope="col">Career</th>
-              </tr>
-            </thead>
-            <tbody>
-              {byYear.map((i) => (
-                <tr key={i.id}>
-                  <td className="num">{i.inductedYear ?? '—'}</td>
-                  <td className="wide">
-                    {i.playerId && isLinked(i.linkStatus) ? (
-                      <Link href={playerPath(i.playerSlug!, i.playerId)}>{i.name}</Link>
-                    ) : (
-                      <span title="No VFL/AFL playing record in AFLDB">{i.name}</span>
-                    )}
-                    {i.isLegend && <strong> · Legend</strong>}
-                    {i.removedYear && (
-                      <span className="badge badge-warn" title={`Removed in ${i.removedYear}`}>
-                        Removed
-                      </span>
-                    )}
-                  </td>
-                  <td>{CATEGORY_LABELS[i.category ?? ''] ?? i.category ?? '—'}</td>
-                  <td>{i.clubNameRaw ?? <span className="muted">—</span>}</td>
-                  <td className="nowrap muted">{i.playingCareer ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        </CollapsibleTable>
-      </section>
+      <ReorderableSections storageKey="/hall-of-fame" sections={sections} />
     </>
   );
 }

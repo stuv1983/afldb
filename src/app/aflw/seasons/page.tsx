@@ -41,7 +41,9 @@ export default async function AflwSeasonsPage({
   });
   const described = describeFilters(fields, values);
 
-  const filters = <TableFilters action="/aflw/seasons" fields={fields} values={values} />;
+  const filters = (
+    <TableFilters action="/aflw/seasons" anchor="seasons" fields={fields} values={values} />
+  );
 
   return (
     <>
@@ -62,6 +64,7 @@ export default async function AflwSeasonsPage({
       <FilterErrors errors={values.errors} />
 
       <CollapsibleTable
+        id="seasons"
         title="Seasons"
         note={`${seasons.length} matching`}
         filters={filters}

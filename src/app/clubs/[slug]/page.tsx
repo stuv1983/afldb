@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { ReorderableSections } from '@/components/ReorderableSections';
 import { getClubBestAndFairest, getClubCaptains } from '@/db/queries/awards';
 import {
   getClub,
@@ -96,6 +97,263 @@ export default async function ClubPage({
   // The whole club is named for its present identity, whichever era the
   // reader arrived at.
   const clubRecordName = club.currentIdentityName;
+
+  const sections: { id: string; label: string; node: React.ReactNode }[] = [];
+
+  sections.push({
+    id: 'games-leaders',
+    label: 'Games leaders',
+    node: (
+      <section className="section">
+        <CollapsibleTable title="Games leaders">
+        <div className="table-wrap">
+          <table>
+            <caption>
+              Most games for {clubRecordName}
+              {hasLineage && ', counting every era of the club'}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" className="num">#</th>
+                <th scope="col">Player</th>
+                <th scope="col" className="num">Seasons</th>
+                <th scope="col" className="num">Games</th>
+                <th scope="col" className="num">Goals</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leaders.map((p, i) => (
+                <tr key={p.id}>
+                  <td className="num">{i + 1}</td>
+                  <td className="wide"><Link href={playerPath(p.slug, p.id)}>{p.displayName}</Link></td>
+                  <td className="num nowrap">{formatSpan(p.firstSeason, p.lastSeason)}</td>
+                  <td className="num">{formatNumber(p.games)}</td>
+                  <td className="num">{formatNumber(p.goals)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        </CollapsibleTable>
+      </section>
+    ),
+  });
+
+  sections.push({
+    id: 'goalkicking-leaders',
+    label: 'Goalkicking leaders',
+    node: (
+      <section className="section">
+        <CollapsibleTable title="Goalkicking leaders">
+        <div className="table-wrap">
+          <table>
+            <caption>
+              Most goals for {clubRecordName}
+              {hasLineage && ', counting every era of the club'}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" className="num">#</th>
+                <th scope="col">Player</th>
+                <th scope="col" className="num">Seasons</th>
+                <th scope="col" className="num">Goals</th>
+                <th scope="col" className="num">Games</th>
+              </tr>
+            </thead>
+            <tbody>
+              {goalkickers.map((p, i) => (
+                <tr key={p.id}>
+                  <td className="num">{i + 1}</td>
+                  <td className="wide"><Link href={playerPath(p.slug, p.id)}>{p.displayName}</Link></td>
+                  <td className="num nowrap">{formatSpan(p.firstSeason, p.lastSeason)}</td>
+                  <td className="num">{formatNumber(p.goals)}</td>
+                  <td className="num">{formatNumber(p.games)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        </CollapsibleTable>
+      </section>
+    ),
+  });
+
+  if (bestAndFairest.length > 0) {
+    sections.push({
+      id: 'best-and-fairest',
+      label: 'Best and fairest',
+      node: (
+        <section className="section">
+          <p className="section-note">
+            {bestAndFairest[0].awardName}
+            {hasLineage && ', across every era of the club'}. The source record begins in
+            1980.{' '}
+            <Link href={awardPath(bestAndFairest[0].awardSlug)}>Full history →</Link>
+          </p>
+          <CollapsibleTable title="Best and fairest">
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Season</th>
+                  <th scope="col">Player</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bestAndFairest.map((b) => (
+                  <tr key={`${b.season}-${b.playerName}`}>
+                    <td>{b.season ?? '—'}</td>
+                    <td className="wide">
+                      {b.playerId && isLinked(b.linkStatus) ? (
+                        <Link href={playerPath(b.playerSlug!, b.playerId)}>{b.playerName}</Link>
+                      ) : (
+                        b.playerName
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          </CollapsibleTable>
+        </section>
+      ),
+    });
+  }
+
+  if (captains.length > 0) {
+    sections.push({
+      id: 'captains',
+      label: 'Captains',
+      node: (
+        <section className="section">
+          <p className="section-note">
+            {formatNumber(captains.length)} recorded captaincy seasons
+            {hasLineage && ', across every era of the club'}.
+          </p>
+          <CollapsibleTable title="Captains">
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Season</th>
+                  <th scope="col">Captain</th>
+                  {hasLineage && <th scope="col">Played as</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {captains.map((c) => (
+                  <tr key={`${c.season}-${c.playerName}`}>
+                    <td>{c.season}</td>
+                    <td className="wide">
+                      {c.playerId && isLinked(c.linkStatus) ? (
+                        <Link href={playerPath(c.playerSlug!, c.playerId)}>{c.playerName}</Link>
+                      ) : (
+                        c.playerName
+                      )}
+                    </td>
+                    {hasLineage && <td className="muted nowrap">{c.identityName}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          </CollapsibleTable>
+        </section>
+      ),
+    });
+  }
+
+  sections.push({
+    id: 'season-history',
+    label: 'Season history',
+    node: (
+      <section className="section">
+        {hasLineage && (
+          <p className="section-note">
+            {isContinuing ? (
+              <>
+                All {formatNumber(seasons.length)} seasons of the club, under every
+                name it has played as.
+              </>
+            ) : (
+              <>
+                The {club.name} era only, {formatSpan(club.firstSeason, club.lastSeason, false)}.
+                {' '}
+                <Link href={clubPath(club.currentIdentitySlug)}>
+                  All {formatNumber(totals.seasons)} seasons of the club →
+                </Link>
+              </>
+            )}
+          </p>
+        )}
+        <CollapsibleTable title="Season history">
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Season</th>
+                {hasLineage && isContinuing && <th scope="col">Played as</th>}
+                <th scope="col" className="num">P</th>
+                <th scope="col" className="num">W</th>
+                <th scope="col" className="num">L</th>
+                <th scope="col" className="num">D</th>
+                <th scope="col" className="num">For</th>
+                <th scope="col" className="num">Agst</th>
+                <th scope="col" className="num">%</th>
+                <th scope="col" className="num">Pos</th>
+                <th scope="col">Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              {seasons.map((s) => (
+                <tr key={s.season}>
+                  <td><Link href={seasonPath(s.season)}>{s.season}</Link></td>
+                  {hasLineage && isContinuing && (
+                    <td className="nowrap">
+                      {s.identitySlug === club.slug ? (
+                        <span className="muted">{s.identityName}</span>
+                      ) : (
+                        <Link href={clubPath(s.identitySlug)}>{s.identityName}</Link>
+                      )}
+                    </td>
+                  )}
+                  <td className="num">{s.played}</td>
+                  <td className="num">{s.wins}</td>
+                  <td className="num">{s.losses}</td>
+                  <td className="num">{s.draws}</td>
+                  <td className="num">{formatNumber(s.pointsFor)}</td>
+                  <td className="num">{formatNumber(s.pointsAgainst)}</td>
+                  <td className="num">{formatPercentage(s.percentage)}</td>
+                  <td className="num">{s.ladderRank ?? '—'}</td>
+                  <td>
+                    {/* Honours are only shown once the season has been
+                        decided. A club leading, or last, in an unfinished
+                        season has a standing, not an honour. */}
+                    {s.seasonStatus === 'in_progress' ? (
+                      <span className="badge badge-warn" title={
+                        s.dataThroughDate
+                          ? `Provisional, as at ${formatDate(s.dataThroughDate)}`
+                          : undefined
+                      }>
+                        In progress
+                      </span>
+                    ) : (
+                      <>
+                        {s.isPremier && <strong>Premiers</strong>}
+                        {s.woodenSpoon && <span className="badge badge-warn">Wooden spoon</span>}
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        </CollapsibleTable>
+      </section>
+    ),
+  });
 
   return (
     <>
@@ -201,230 +459,7 @@ export default async function ClubPage({
         </div>
       </div>
 
-      <section className="section">
-        <CollapsibleTable title="Games leaders">
-        <div className="table-wrap">
-          <table>
-            <caption>
-              Most games for {clubRecordName}
-              {hasLineage && ', counting every era of the club'}
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col" className="num">#</th>
-                <th scope="col">Player</th>
-                <th scope="col" className="num">Seasons</th>
-                <th scope="col" className="num">Games</th>
-                <th scope="col" className="num">Goals</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leaders.map((p, i) => (
-                <tr key={p.id}>
-                  <td className="num">{i + 1}</td>
-                  <td className="wide"><Link href={playerPath(p.slug, p.id)}>{p.displayName}</Link></td>
-                  <td className="num nowrap">{formatSpan(p.firstSeason, p.lastSeason)}</td>
-                  <td className="num">{formatNumber(p.games)}</td>
-                  <td className="num">{formatNumber(p.goals)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        </CollapsibleTable>
-      </section>
-
-      <section className="section">
-        <CollapsibleTable title="Goalkicking leaders">
-        <div className="table-wrap">
-          <table>
-            <caption>
-              Most goals for {clubRecordName}
-              {hasLineage && ', counting every era of the club'}
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col" className="num">#</th>
-                <th scope="col">Player</th>
-                <th scope="col" className="num">Seasons</th>
-                <th scope="col" className="num">Goals</th>
-                <th scope="col" className="num">Games</th>
-              </tr>
-            </thead>
-            <tbody>
-              {goalkickers.map((p, i) => (
-                <tr key={p.id}>
-                  <td className="num">{i + 1}</td>
-                  <td className="wide"><Link href={playerPath(p.slug, p.id)}>{p.displayName}</Link></td>
-                  <td className="num nowrap">{formatSpan(p.firstSeason, p.lastSeason)}</td>
-                  <td className="num">{formatNumber(p.goals)}</td>
-                  <td className="num">{formatNumber(p.games)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        </CollapsibleTable>
-      </section>
-
-      {bestAndFairest.length > 0 && (
-        <section className="section">
-          <p className="section-note">
-            {bestAndFairest[0].awardName}
-            {hasLineage && ', across every era of the club'}. The source record begins in
-            1980.{' '}
-            <Link href={awardPath(bestAndFairest[0].awardSlug)}>Full history →</Link>
-          </p>
-          <CollapsibleTable title="Best and fairest">
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Season</th>
-                  <th scope="col">Player</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bestAndFairest.map((b) => (
-                  <tr key={`${b.season}-${b.playerName}`}>
-                    <td>{b.season ?? '—'}</td>
-                    <td className="wide">
-                      {b.playerId && isLinked(b.linkStatus) ? (
-                        <Link href={playerPath(b.playerSlug!, b.playerId)}>{b.playerName}</Link>
-                      ) : (
-                        b.playerName
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          </CollapsibleTable>
-        </section>
-      )}
-
-      {captains.length > 0 && (
-        <section className="section">
-          <p className="section-note">
-            {formatNumber(captains.length)} recorded captaincy seasons
-            {hasLineage && ', across every era of the club'}.
-          </p>
-          <CollapsibleTable title="Captains">
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Season</th>
-                  <th scope="col">Captain</th>
-                  {hasLineage && <th scope="col">Played as</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {captains.map((c) => (
-                  <tr key={`${c.season}-${c.playerName}`}>
-                    <td>{c.season}</td>
-                    <td className="wide">
-                      {c.playerId && isLinked(c.linkStatus) ? (
-                        <Link href={playerPath(c.playerSlug!, c.playerId)}>{c.playerName}</Link>
-                      ) : (
-                        c.playerName
-                      )}
-                    </td>
-                    {hasLineage && <td className="muted nowrap">{c.identityName}</td>}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          </CollapsibleTable>
-        </section>
-      )}
-
-      <section className="section">
-        {hasLineage && (
-          <p className="section-note">
-            {isContinuing ? (
-              <>
-                All {formatNumber(seasons.length)} seasons of the club, under every
-                name it has played as.
-              </>
-            ) : (
-              <>
-                The {club.name} era only, {formatSpan(club.firstSeason, club.lastSeason, false)}.
-                {' '}
-                <Link href={clubPath(club.currentIdentitySlug)}>
-                  All {formatNumber(totals.seasons)} seasons of the club →
-                </Link>
-              </>
-            )}
-          </p>
-        )}
-        <CollapsibleTable title="Season history">
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Season</th>
-                {hasLineage && isContinuing && <th scope="col">Played as</th>}
-                <th scope="col" className="num">P</th>
-                <th scope="col" className="num">W</th>
-                <th scope="col" className="num">L</th>
-                <th scope="col" className="num">D</th>
-                <th scope="col" className="num">For</th>
-                <th scope="col" className="num">Agst</th>
-                <th scope="col" className="num">%</th>
-                <th scope="col" className="num">Pos</th>
-                <th scope="col">Result</th>
-              </tr>
-            </thead>
-            <tbody>
-              {seasons.map((s) => (
-                <tr key={s.season}>
-                  <td><Link href={seasonPath(s.season)}>{s.season}</Link></td>
-                  {hasLineage && isContinuing && (
-                    <td className="nowrap">
-                      {s.identitySlug === club.slug ? (
-                        <span className="muted">{s.identityName}</span>
-                      ) : (
-                        <Link href={clubPath(s.identitySlug)}>{s.identityName}</Link>
-                      )}
-                    </td>
-                  )}
-                  <td className="num">{s.played}</td>
-                  <td className="num">{s.wins}</td>
-                  <td className="num">{s.losses}</td>
-                  <td className="num">{s.draws}</td>
-                  <td className="num">{formatNumber(s.pointsFor)}</td>
-                  <td className="num">{formatNumber(s.pointsAgainst)}</td>
-                  <td className="num">{formatPercentage(s.percentage)}</td>
-                  <td className="num">{s.ladderRank ?? '—'}</td>
-                  <td>
-                    {/* Honours are only shown once the season has been
-                        decided. A club leading, or last, in an unfinished
-                        season has a standing, not an honour. */}
-                    {s.seasonStatus === 'in_progress' ? (
-                      <span className="badge badge-warn" title={
-                        s.dataThroughDate
-                          ? `Provisional, as at ${formatDate(s.dataThroughDate)}`
-                          : undefined
-                      }>
-                        In progress
-                      </span>
-                    ) : (
-                      <>
-                        {s.isPremier && <strong>Premiers</strong>}
-                        {s.woodenSpoon && <span className="badge badge-warn">Wooden spoon</span>}
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        </CollapsibleTable>
-      </section>
+      <ReorderableSections storageKey={`/clubs/${club.slug}`} sections={sections} />
     </>
   );
 }

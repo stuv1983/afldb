@@ -98,6 +98,7 @@ export default async function AflwMatchSearchPage({
   const filters = (
     <TableFilters
       action="/aflw/match-search"
+      anchor="matches"
       fields={fields}
       values={values}
       groups={AFLW_MATCH_GROUPS}
@@ -129,6 +130,7 @@ export default async function AflwMatchSearchPage({
       <FilterErrors errors={values.errors} />
 
       <CollapsibleTable
+        id="matches"
         title="Matches"
         note={`${formatNumber(total)} matching`}
         filters={filters}

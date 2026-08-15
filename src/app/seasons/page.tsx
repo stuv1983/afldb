@@ -65,7 +65,9 @@ export default async function SeasonsPage({
   });
   const described = describeFilters(fields, values);
 
-  const filters = <TableFilters action="/seasons" fields={fields} values={values} />;
+  const filters = (
+    <TableFilters action="/seasons" anchor="seasons" fields={fields} values={values} />
+  );
 
   return (
     <>
@@ -80,6 +82,7 @@ export default async function SeasonsPage({
       <FilterErrors errors={values.errors} />
 
       <CollapsibleTable
+        id="seasons"
         title="Seasons"
         note={`${formatNumber(seasons.length)} matching`}
         filters={filters}

@@ -158,7 +158,7 @@ export async function hasBetaAccess(): Promise<boolean> {
 export type AdminUser = {
   id: number;
   email: string;
-  role: 'admin' | 'super_admin';
+  role: 'admin' | 'super_admin' | 'contributor';
   canManageAdmins: boolean;
 };
 
@@ -215,7 +215,8 @@ export async function getAdminUser(): Promise<AdminUser | null> {
   const token = claim.sub.slice(colon + 1);
 
   const [row] = await authSql<{
-    id: number; email: string; role: 'admin' | 'super_admin'; canManageAdmins: boolean;
+    id: number; email: string; role: 'admin' | 'super_admin' | 'contributor';
+    canManageAdmins: boolean;
   }[]>`
     SELECT u.id, u.email, u.role, u.can_manage_admins AS "canManageAdmins"
       FROM auth_sessions s
@@ -224,13 +225,27 @@ export async function getAdminUser(): Promise<AdminUser | null> {
        AND s.expires_at > now()
        AND s.revoked_at IS NULL
        AND u.disabled_at IS NULL
-       AND u.role IN ('admin', 'super_admin')
+       AND u.role IN ('admin', 'super_admin', 'contributor')
   `;
   return row ?? null;
 }
 
 /**
- * Require an admin session, or redirect to the login form.
+ * Require a signed-in staff session of any role, or redirect to the login
+ * form -- no role check beyond that. This is deliberately narrower than
+ * requireAdmin(): it exists only for the handful of routes a contributor
+ * is meant to reach (the upload form and the status page of a submission
+ * they made). Reach for requireAdmin() unless you specifically mean to
+ * admit a contributor too.
+ */
+export async function requireUploader(): Promise<AdminUser> {
+  const admin = await getAdminUser();
+  if (!admin) redirect('/admin/login');
+  return admin;
+}
+
+/**
+ * Require an admin (or super admin) session, or redirect.
  *
  * This is the ONE guard every admin page and server action must call. The
  * middleware cookie check is not enough: it verifies only the signed cookie,
@@ -238,10 +253,15 @@ export async function getAdminUser(): Promise<AdminUser | null> {
  * honours revocation and disablement. It was hand-copied into seven files;
  * centralising it means a new admin route cannot quietly ship with a weaker
  * (or missing) check.
+ *
+ * A contributor session passes getAdminUser() (it needs to, for
+ * requireUploader() above) but is bounced to /admin/upload here rather
+ * than admitted: this is what keeps a contributor out of every other
+ * admin route without a matching check having to be added to each one.
  */
 export async function requireAdmin(): Promise<AdminUser> {
-  const admin = await getAdminUser();
-  if (!admin) redirect('/admin/login');
+  const admin = await requireUploader();
+  if (admin.role === 'contributor') redirect('/admin/upload');
   return admin;
 }
 

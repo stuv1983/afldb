@@ -43,6 +43,7 @@ export function AdminSessionsClient({ admins }: { admins: Admin[] }) {
     <>
       {admins.map((admin) => {
         const roleLabel = admin.role === 'super_admin' ? 'Super admin'
+          : admin.role === 'contributor' ? 'Contributor'
           : admin.canManageAdmins ? 'Admin · can manage admins' : 'Admin';
         return (
           <CollapsibleTable

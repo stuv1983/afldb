@@ -28,7 +28,7 @@ const CONFIRM_LIMIT = new RateLimiter(10, 15 * 60 * 1000);
 type InviteRow = {
   id: number;
   email: string;
-  role: 'admin' | 'super_admin';
+  role: 'admin' | 'super_admin' | 'contributor';
   canManageAdmins: boolean;
   pendingTotpSecret: string | null;
 };

@@ -30,12 +30,14 @@ export async function createInvite(
 
   // Only an actual super admin may hand out super_admin or the delegated
   // manage-admins power — a plain admin holding can_manage_admins may
-  // invite ordinary admins, never a peer or better. Silently downgrading
-  // rather than erroring keeps a delegated manager's form usable without
-  // ever needing to explain a permission they don't have.
+  // invite an ordinary admin or a contributor, never a peer or better.
+  // Silently downgrading rather than erroring keeps a delegated manager's
+  // form usable without ever needing to explain a permission they don't
+  // have.
   const role = admin.role === 'super_admin' && requestedRole === 'super_admin'
-    ? 'super_admin' : 'admin';
-  const canManageAdmins = admin.role === 'super_admin' && requestedManage;
+    ? 'super_admin'
+    : requestedRole === 'contributor' ? 'contributor' : 'admin';
+  const canManageAdmins = admin.role === 'super_admin' && role !== 'contributor' && requestedManage;
 
   const token = generateToken();
   await authSql`

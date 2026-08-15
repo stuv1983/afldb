@@ -8,7 +8,7 @@ import { getClubOrganizationOptions, getVenueOptions } from '@/db/queries/advanc
 import { getAwardOptions } from '@/db/queries/awards';
 import { solveCellRows, solveCellSummary, type GridCellSummary } from '@/db/queries/grid-solver';
 import { getPlayerNames } from '@/db/queries/players';
-import { requireSuperAdmin } from '@/lib/auth/session';
+import { requireAdmin } from '@/lib/auth/session';
 import { formatNumber, formatSpan, playerPath } from '@/lib/format';
 import { firstValue, parsePage } from '@/lib/params';
 import {
@@ -32,18 +32,16 @@ export const metadata: Metadata = {
 };
 
 /**
- * Hidden, super-admin-only sibling to /admin/query-builder: a 3x3 board
- * of named questions instead of raw column/operator/value conditions.
- * Unlinked from the shared admin nav for the same reason query-builder
- * is -- see that page's own comment -- and enforces requireSuperAdmin()
- * itself regardless of how it was reached.
+ * Sibling to /admin/query-builder, but open to any admin (not just super
+ * admins): a 3x3 board of named questions instead of raw column/operator/
+ * value conditions. Linked from the admin dashboard for both roles.
  */
 export default async function GridSolverPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireSuperAdmin();
+  await requireAdmin();
 
   const params = await searchParams;
   const token = firstValue(params.g);

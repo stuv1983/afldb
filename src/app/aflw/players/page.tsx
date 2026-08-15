@@ -88,6 +88,7 @@ export default async function AflwPlayersPage({
   const filters = (
     <TableFilters
       action="/aflw/players"
+      anchor="players"
       fields={fields}
       values={values}
       groups={AFLW_PLAYER_GROUPS}
@@ -135,6 +136,7 @@ export default async function AflwPlayersPage({
       </nav>
 
       <CollapsibleTable
+        id="players"
         title="Players"
         note={`${formatNumber(total)} matching`}
         filters={filters}

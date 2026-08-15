@@ -41,10 +41,21 @@ The script APPENDS to `.env` (`AFLDB_AUTH_DATABASE_URL`,
 
 ## 2. Administrators
 
-Two roles: `admin` and `super_admin`. A super admin may always invite and
-manage other admins; a plain admin may only if a super admin has ticked
-`can_manage_admins` for their account — a delegated power, independent of
-role, granted per account rather than by promoting someone outright.
+Three roles: `admin`, `super_admin` and `contributor`. A super admin may
+always invite and manage other admins; a plain admin may only if a super
+admin has ticked `can_manage_admins` for their account — a delegated
+power, independent of role, granted per account rather than by promoting
+someone outright.
+
+A `contributor` is upload-only: they sign in the same way (password +
+TOTP) but `requireAdmin()` (`src/lib/auth/session.ts`) redirects that
+role to `/admin/upload` rather than admitting it, so every existing
+admin page and action is closed to a contributor without needing its
+own check. `requireUploader()` is the narrower guard, used only by the
+upload page/action and by the submission-status page (which additionally
+checks the submission belongs to that contributor) — reach for
+`requireAdmin()` everywhere else, and it will keep a contributor out
+correctly on its own.
 
 ### The first super admin
 
@@ -75,8 +86,8 @@ available for break-glass account recovery.
 `/admin/admins` shows an "Invite an admin" form to anyone with admin-
 management access. Only an actual `super_admin` may set the invited
 role to `super_admin` or tick "can also invite/manage admins" — a
-delegated admin manager can only invite plain admins, so delegation can
-never compound into a peer or better.
+delegated admin manager can invite a plain admin or a contributor, never
+a peer or better, so delegation can never compound.
 
 Creating an invite writes a row to `admin_invites` (only the token's
 sha256, exactly like `beta_login_tokens`) with a 7-day expiry, and

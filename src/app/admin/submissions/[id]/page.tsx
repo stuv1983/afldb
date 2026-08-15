@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { ReviewControls } from '@/app/admin/submissions/[id]/ReviewControls';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { authSql } from '@/db/authClient';
-import { requireAdmin } from '@/lib/auth/session';
+import { requireUploader } from '@/lib/auth/session';
 import { formatNumber } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +19,7 @@ export default async function SubmissionPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAdmin();
+  const admin = await requireUploader();
 
   const { id: idText } = await params;
   const id = Number(idText);
@@ -27,14 +27,15 @@ export default async function SubmissionPage({
 
   const [submission] = await authSql<{
     id: number; dataset: string; filename: string; status: string;
-    rowCount: number | null; uploadedAt: Date; uploaderEmail: string;
+    rowCount: number | null; uploadedAt: Date; uploadedBy: number; uploaderEmail: string;
     reviewerEmail: string | null; promotedAt: Date | null;
     importBatchId: number | null; error: string | null;
     report: { ok: number; warnings: number; errors: number; duplicates: number } | null;
   }[]>`
     SELECT s.id, s.dataset, s.filename, s.status::text,
            s.row_count AS "rowCount", s.uploaded_at AS "uploadedAt",
-           up.email AS "uploaderEmail", rev.email AS "reviewerEmail",
+           s.uploaded_by AS "uploadedBy", up.email AS "uploaderEmail",
+           rev.email AS "reviewerEmail",
            s.promoted_at AS "promotedAt", s.import_batch_id AS "importBatchId",
            s.error, s.validation_report AS report
       FROM data_submissions s
@@ -43,6 +44,11 @@ export default async function SubmissionPage({
      WHERE s.id = ${id}
   `;
   if (!submission) notFound();
+
+  // A contributor may only ever see the status of a submission they made
+  // themselves -- everyone else's review queue is out of scope for them,
+  // same as the rest of /admin.
+  if (admin.role === 'contributor' && submission.uploadedBy !== admin.id) notFound();
 
   // Problem rows first, then a sample of clean ones: the reviewer's job
   // is to look at what is wrong, not to scroll past what is right.
@@ -110,7 +116,14 @@ export default async function SubmissionPage({
         </div>
       )}
 
-      <ReviewControls id={submission.id} status={submission.status} />
+      {admin.role === 'contributor' ? (
+        <p className="section-note">
+          Review and promotion are handled by an admin — this page will update once
+          they act on it.
+        </p>
+      ) : (
+        <ReviewControls id={submission.id} status={submission.status} />
+      )}
 
       {submission.status === 'promoted' && (
         <p className="notice">

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
+import { ReorderableSections } from '@/components/ReorderableSections';
 import { TableFilters } from '@/components/TableFilters';
 import {
   getAflwClubOptions,
@@ -112,42 +113,17 @@ export default async function AflwSeasonPage({
 
   const conferences = [...new Set(ladder.map((row) => row.conference))];
 
-  return (
-    <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/aflw">AFLW</Link>
-        <span aria-hidden="true">/</span>
-        <Link href="/aflw/seasons">Seasons</Link>
-        <span aria-hidden="true">/</span>
-        <span>{season.displayLabel}</span>
-      </nav>
+  const sections: { id: string; label: string; node: React.ReactNode }[] = [];
 
-      <div className="page-header">
-        <h1>{season.displayLabel} AFLW season</h1>
-        <p className="subtitle">
-          {formatDate(season.firstFixtureDate)} – {formatDate(season.lastFixtureDate)}
-          {' · '}{formatNumber(season.playedCount)} matches
-          {' · '}{formatNumber(season.clubCount)} clubs
-        </p>
-      </div>
-
-      <FilterErrors errors={matchValues.errors} />
-
-      {!season.hasGrandFinal && (
-        <p className="notice">
-          {season.status === 'in_progress'
-            ? `This season is still being played: ${season.playedCount} of `
-              + `${season.fixtureCount} fixtures have been completed and no premiership `
-              + 'has been awarded.'
-            : 'This season was abandoned before a Grand Final was played and awarded no '
-              + 'premiership. A ladder leader is not a premier.'}
-        </p>
-      )}
-
-      {conferences.map((conference) => (
-        <section className="section" key={conference || 'single'}>
+  for (const conference of conferences) {
+    const label = conference ? `Ladder — Conference ${conference}` : 'Ladder';
+    sections.push({
+      id: conference ? `ladder-${conference}` : 'ladder',
+      label,
+      node: (
+        <section className="section">
           <CollapsibleTable
-            title={conference ? `Ladder — Conference ${conference}` : 'Ladder'}
+            title={label}
             note={`${ladder.filter((row) => row.conference === conference).length} clubs`}
           >
             <div className="table-wrap">
@@ -192,15 +168,23 @@ export default async function AflwSeasonPage({
             </div>
           </CollapsibleTable>
         </section>
-      ))}
+      ),
+    });
+  }
 
+  sections.push({
+    id: 'results',
+    label: 'Results',
+    node: (
       <section className="section">
         <CollapsibleTable
+          id="results"
           title="Results"
           note={`${matches.length} of ${allMatches.length} matches`}
           filters={
             <TableFilters
               action={aflwSeasonPath(seasonKey)}
+              anchor="results"
               fields={matchFields}
               values={matchValues}
               title="Filter results"
@@ -264,7 +248,13 @@ export default async function AflwSeasonPage({
           )}
         </CollapsibleTable>
       </section>
+    ),
+  });
 
+  sections.push({
+    id: 'leading-goalkickers',
+    label: 'Leading goalkickers',
+    node: (
       <section className="section">
         <CollapsibleTable
           title="Leading goalkickers"
@@ -301,6 +291,42 @@ export default async function AflwSeasonPage({
           </div>
         </CollapsibleTable>
       </section>
+    ),
+  });
+
+  return (
+    <>
+      <nav className="breadcrumbs" aria-label="Breadcrumb">
+        <Link href="/aflw">AFLW</Link>
+        <span aria-hidden="true">/</span>
+        <Link href="/aflw/seasons">Seasons</Link>
+        <span aria-hidden="true">/</span>
+        <span>{season.displayLabel}</span>
+      </nav>
+
+      <div className="page-header">
+        <h1>{season.displayLabel} AFLW season</h1>
+        <p className="subtitle">
+          {formatDate(season.firstFixtureDate)} – {formatDate(season.lastFixtureDate)}
+          {' · '}{formatNumber(season.playedCount)} matches
+          {' · '}{formatNumber(season.clubCount)} clubs
+        </p>
+      </div>
+
+      <FilterErrors errors={matchValues.errors} />
+
+      {!season.hasGrandFinal && (
+        <p className="notice">
+          {season.status === 'in_progress'
+            ? `This season is still being played: ${season.playedCount} of `
+              + `${season.fixtureCount} fixtures have been completed and no premiership `
+              + 'has been awarded.'
+            : 'This season was abandoned before a Grand Final was played and awarded no '
+              + 'premiership. A ladder leader is not a premier.'}
+        </p>
+      )}
+
+      <ReorderableSections storageKey={aflwSeasonPath(seasonKey)} sections={sections} />
     </>
   );
 }

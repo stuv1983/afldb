@@ -35,7 +35,7 @@ export default async function VenuesPage({
   const described = describeFilters(fields, values);
 
   const filters = (
-    <TableFilters action="/venues" fields={fields} values={values} />
+    <TableFilters action="/venues" anchor="venues" fields={fields} values={values} />
   );
 
   return (
@@ -51,6 +51,7 @@ export default async function VenuesPage({
       <FilterErrors errors={values.errors} />
 
       <CollapsibleTable
+        id="venues"
         title="Venues"
         note={`${formatNumber(venues.length)} matching`}
         filters={filters}

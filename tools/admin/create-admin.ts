@@ -5,8 +5,10 @@
  *   npx tsx tools/admin/create-admin.ts admin@example.com
  *   npx tsx tools/admin/create-admin.ts you@example.com super_admin
  *
- * The second argument is the role: 'admin' (default) or 'super_admin'.
- * It can also be set via AFLDB_ADMIN_ROLE for an unattended run. This is
+ * The second argument is the role: 'admin' (default), 'super_admin' or
+ * 'contributor' (upload-only -- see requireUploader() in
+ * src/lib/auth/session.ts). It can also be set via AFLDB_ADMIN_ROLE for
+ * an unattended run. This is
  * the only way to mint the *first* super admin — every subsequent one
  * can instead be invited from /admin/admins by an existing super admin
  * (or a plain admin granted can_manage_admins), which walks the invitee
@@ -120,8 +122,8 @@ async function main(): Promise<number> {
   }
 
   const role = (process.argv[3] ?? process.env.AFLDB_ADMIN_ROLE ?? 'admin').trim();
-  if (role !== 'admin' && role !== 'super_admin') {
-    console.error(`Role must be 'admin' or 'super_admin', got '${role}'.`);
+  if (role !== 'admin' && role !== 'super_admin' && role !== 'contributor') {
+    console.error(`Role must be 'admin', 'super_admin' or 'contributor', got '${role}'.`);
     return 1;
   }
 
@@ -177,7 +179,10 @@ async function main(): Promise<number> {
          AND revoked_at IS NULL
     `;
 
-    console.log(`\n${role === 'super_admin' ? 'Super admin' : 'Administrator'} ${email} is ready.\n`);
+    const roleLabel = role === 'super_admin' ? 'Super admin'
+      : role === 'contributor' ? 'Contributor'
+      : 'Administrator';
+    console.log(`\n${roleLabel} ${email} is ready.\n`);
     console.log('Add this to your authenticator app NOW (shown only once):\n');
     // Grouped for typing, unbroken for pasting. Authy, Google
     // Authenticator and 1Password all strip the spaces; a few older apps

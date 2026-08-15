@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 
-import { audit, requireAdmin } from '@/lib/auth/session';
+import { audit, requireUploader } from '@/lib/auth/session';
 import { MAX_UPLOAD_BYTES, stageSubmission } from '@/lib/ingest/pipeline';
 
 export type UploadState = { error?: string };
@@ -11,7 +11,7 @@ export async function uploadSubmission(
   _previous: UploadState,
   formData: FormData,
 ): Promise<UploadState> {
-  const admin = await requireAdmin();
+  const admin = await requireUploader();
 
   const dataset = String(formData.get('dataset') ?? '');
   const file = formData.get('file');

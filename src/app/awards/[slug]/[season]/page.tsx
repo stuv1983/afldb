@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { ReorderableSections } from '@/components/ReorderableSections';
 import {
   getAward,
   getAwardSeason,
@@ -92,36 +93,16 @@ export default async function AwardSeasonPage({
   const shownStats = STAT_ORDER.filter((s) =>
     nominations.some((n) => n.statLine?.[s.key] !== undefined));
 
-  return (
-    <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/awards">Awards</Link>
-        <span aria-hidden="true">/</span>
-        <Link href={awardPath(award.slug)}>{award.name}</Link>
-        <span aria-hidden="true">/</span>
-        <span>{year}</span>
-      </nav>
+  const sections: { id: string; label: string; node: React.ReactNode }[] = [];
 
-      <div className="page-header">
-        <h1>{year} {award.name}</h1>
-        <p className="subtitle">
-          <Link href={seasonPath(year)}>The {year} season</Link>
-        </p>
-      </div>
-
-      <nav className="pagination" aria-label="Seasons">
-        {older
-          ? <Link href={awardSeasonPath(award.slug, older)}>← {older}</Link>
-          : <span className="muted">←</span>}
-        <Link href={awardPath(award.slug)}>All seasons</Link>
-        {newer
-          ? <Link href={awardSeasonPath(award.slug, newer)}>{newer} →</Link>
-          : <span className="muted">→</span>}
-      </nav>
-
-      {members.length > 0 && (
+  if (members.length > 0) {
+    const memberLabel = award.category === 'honour_team' ? 'The team' : 'Winner';
+    sections.push({
+      id: 'members',
+      label: memberLabel,
+      node: (
         <section className="section">
-          <CollapsibleTable title={award.category === 'honour_team' ? 'The team' : 'Winner'}>
+          <CollapsibleTable title={memberLabel}>
           <div className="table-wrap">
             <table>
               <thead>
@@ -162,9 +143,15 @@ export default async function AwardSeasonPage({
           </div>
           </CollapsibleTable>
         </section>
-      )}
+      ),
+    });
+  }
 
-      {nominations.length > 0 && (
+  if (nominations.length > 0) {
+    sections.push({
+      id: 'round-by-round-nominations',
+      label: 'Round-by-round nominations',
+      node: (
         <section className="section">
           <p className="section-note">
             The nominee’s figures are from the match that earned the nomination. A dash
@@ -226,7 +213,41 @@ export default async function AwardSeasonPage({
           </div>
           </CollapsibleTable>
         </section>
-      )}
+      ),
+    });
+  }
+
+  return (
+    <>
+      <nav className="breadcrumbs" aria-label="Breadcrumb">
+        <Link href="/awards">Awards</Link>
+        <span aria-hidden="true">/</span>
+        <Link href={awardPath(award.slug)}>{award.name}</Link>
+        <span aria-hidden="true">/</span>
+        <span>{year}</span>
+      </nav>
+
+      <div className="page-header">
+        <h1>{year} {award.name}</h1>
+        <p className="subtitle">
+          <Link href={seasonPath(year)}>The {year} season</Link>
+        </p>
+      </div>
+
+      <nav className="pagination" aria-label="Seasons">
+        {older
+          ? <Link href={awardSeasonPath(award.slug, older)}>← {older}</Link>
+          : <span className="muted">←</span>}
+        <Link href={awardPath(award.slug)}>All seasons</Link>
+        {newer
+          ? <Link href={awardSeasonPath(award.slug, newer)}>{newer} →</Link>
+          : <span className="muted">→</span>}
+      </nav>
+
+      <ReorderableSections
+        storageKey={awardSeasonPath(award.slug, year)}
+        sections={sections}
+      />
     </>
   );
 }

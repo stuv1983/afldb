@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { ReorderableSections } from '@/components/ReorderableSections';
 import {
   getAflwMatch,
   getAflwMatchPlayers,
@@ -67,62 +68,14 @@ export default async function AflwMatchPage({
   // rendering a column of blanks.
   const namesScorers = scoring.some((event) => event.playerName !== '');
 
-  return (
-    <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/aflw">AFLW</Link>
-        <span aria-hidden="true">/</span>
-        <Link href={aflwSeasonPath(match.seasonKey)}>{match.seasonLabel}</Link>
-        <span aria-hidden="true">/</span>
-        <span>{match.homeClubName} v {match.awayClubName}</span>
-      </nav>
+  const sections: { id: string; label: string; node: React.ReactNode }[] = [];
 
-      <div className="page-header">
-        <h1>{match.homeClubName} v {match.awayClubName}</h1>
-        <p className="subtitle">
-          {formatDateLong(match.matchDate)}
-          {match.matchTime ? ` · ${match.matchTime}` : ''}
-          {' · '}
-          {formatRound(match.roundType, match.roundNumber, match.roundCode)}
-          {' · '}{match.venueName}
-          {match.weatherRaw ? ` · ${match.weatherRaw}` : ''}
-        </p>
-      </div>
-
-      <div className="stat-strip">
-        <div className="stat">
-          <div className="value">
-            {formatScore(match.homeGoals, match.homeBehinds, match.homeScore)}
-          </div>
-          <div className="label">
-            <Link href={aflwClubPath(match.homeTeamCode)}>{match.homeClubName}</Link>
-          </div>
-        </div>
-        <div className="stat">
-          <div className="value">
-            {formatScore(match.awayGoals, match.awayBehinds, match.awayScore)}
-          </div>
-          <div className="label">
-            <Link href={aflwClubPath(match.awayTeamCode)}>{match.awayClubName}</Link>
-          </div>
-        </div>
-        <div className="stat">
-          <div className="value">
-            {match.result === 'draw' ? 'Draw' : `${match.margin}`}
-          </div>
-          <div className="label">
-            {match.result === 'draw' ? 'Result' : 'Margin (points)'}
-          </div>
-        </div>
-      </div>
-
-      <p className="notice">
-        Attendance and umpires are not published by this source, so they are absent
-        rather than recorded as zero.
-      </p>
-
-      {teams.map((team) => (
-        <section className="section" key={team.code}>
+  for (const team of teams) {
+    sections.push({
+      id: `team-sheet-${team.code}`,
+      label: `${team.name} — team sheet`,
+      node: (
+        <section className="section">
           <CollapsibleTable
             title={`${team.name} — team sheet`}
             note={`${players.filter((p) => p.teamCode === team.code).length} players`}
@@ -177,8 +130,14 @@ export default async function AflwMatchPage({
             </div>
           </CollapsibleTable>
         </section>
-      ))}
+      ),
+    });
+  }
 
+  sections.push({
+    id: 'scoring-progression',
+    label: 'Scoring progression',
+    node: (
       <section className="section">
         <CollapsibleTable
           title="Scoring progression"
@@ -231,6 +190,64 @@ export default async function AflwMatchPage({
           </div>
         </CollapsibleTable>
       </section>
+    ),
+  });
+
+  return (
+    <>
+      <nav className="breadcrumbs" aria-label="Breadcrumb">
+        <Link href="/aflw">AFLW</Link>
+        <span aria-hidden="true">/</span>
+        <Link href={aflwSeasonPath(match.seasonKey)}>{match.seasonLabel}</Link>
+        <span aria-hidden="true">/</span>
+        <span>{match.homeClubName} v {match.awayClubName}</span>
+      </nav>
+
+      <div className="page-header">
+        <h1>{match.homeClubName} v {match.awayClubName}</h1>
+        <p className="subtitle">
+          {formatDateLong(match.matchDate)}
+          {match.matchTime ? ` · ${match.matchTime}` : ''}
+          {' · '}
+          {formatRound(match.roundType, match.roundNumber, match.roundCode)}
+          {' · '}{match.venueName}
+          {match.weatherRaw ? ` · ${match.weatherRaw}` : ''}
+        </p>
+      </div>
+
+      <div className="stat-strip">
+        <div className="stat">
+          <div className="value">
+            {formatScore(match.homeGoals, match.homeBehinds, match.homeScore)}
+          </div>
+          <div className="label">
+            <Link href={aflwClubPath(match.homeTeamCode)}>{match.homeClubName}</Link>
+          </div>
+        </div>
+        <div className="stat">
+          <div className="value">
+            {formatScore(match.awayGoals, match.awayBehinds, match.awayScore)}
+          </div>
+          <div className="label">
+            <Link href={aflwClubPath(match.awayTeamCode)}>{match.awayClubName}</Link>
+          </div>
+        </div>
+        <div className="stat">
+          <div className="value">
+            {match.result === 'draw' ? 'Draw' : `${match.margin}`}
+          </div>
+          <div className="label">
+            {match.result === 'draw' ? 'Result' : 'Margin (points)'}
+          </div>
+        </div>
+      </div>
+
+      <p className="notice">
+        Attendance and umpires are not published by this source, so they are absent
+        rather than recorded as zero.
+      </p>
+
+      <ReorderableSections storageKey={aflwMatchPath(match.matchKey)} sections={sections} />
     </>
   );
 }

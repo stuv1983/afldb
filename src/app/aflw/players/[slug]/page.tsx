@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { Pagination } from '@/components/Pagination';
+import { ReorderableSections } from '@/components/ReorderableSections';
 import { TableFilters } from '@/components/TableFilters';
 import {
   getAflwPlayer,
@@ -97,50 +98,12 @@ export default async function AflwPlayerPage({
     total: matches.total,
   });
 
-  return (
-    <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/aflw">AFLW</Link>
-        <span aria-hidden="true">/</span>
-        <Link href="/aflw/players">Players</Link>
-        <span aria-hidden="true">/</span>
-        <span>{player.displayName}</span>
-      </nav>
+  const sections: { id: string; label: string; node: React.ReactNode }[] = [];
 
-      <div className="page-header">
-        <h1>{player.displayName}</h1>
-        <p className="subtitle">
-          {player.clubNames ?? 'AFLW'}
-          {' · '}
-          {formatSpanLabel(player.debutSeasonLabel, player.finalSeasonLabel)}
-          {' · '}
-          {formatNumber(player.games)} games
-        </p>
-      </div>
-
-      <div className="stat-strip">
-        <div className="stat">
-          <div className="value">{formatNumber(player.games)}</div>
-          <div className="label">Games</div>
-        </div>
-        <div className="stat">
-          <div className="value">{formatNumber(player.goals)}</div>
-          <div className="label">Goals</div>
-        </div>
-        <div className="stat">
-          <div className="value">{formatNumber(player.disposals)}</div>
-          <div className="label">Disposals</div>
-        </div>
-        <div className="stat">
-          <div className="value">{formatAverage(player.disposals, player.games)}</div>
-          <div className="label">Disposals per game</div>
-        </div>
-        <div className="stat">
-          <div className="value">{formatNumber(player.premierships)}</div>
-          <div className="label">Premierships</div>
-        </div>
-      </div>
-
+  sections.push({
+    id: 'career-totals',
+    label: 'Career totals',
+    node: (
       <section className="section">
         <CollapsibleTable title="Career totals">
           <div className="table-wrap">
@@ -183,7 +146,13 @@ export default async function AflwPlayerPage({
           </div>
         </CollapsibleTable>
       </section>
+    ),
+  });
 
+  sections.push({
+    id: 'playing-record',
+    label: 'Playing record',
+    node: (
       <section className="section">
         <CollapsibleTable
           title="Playing record"
@@ -227,7 +196,13 @@ export default async function AflwPlayerPage({
           </div>
         </CollapsibleTable>
       </section>
+    ),
+  });
 
+  sections.push({
+    id: 'season-by-season',
+    label: 'Season by season',
+    node: (
       <section className="section">
         <CollapsibleTable title="Season by season" note={`${seasons.length} seasons`}>
           <div className="table-wrap">
@@ -270,14 +245,22 @@ export default async function AflwPlayerPage({
           </div>
         </CollapsibleTable>
       </section>
+    ),
+  });
 
+  sections.push({
+    id: 'match-log',
+    label: 'Match log',
+    node: (
       <section className="section">
         <CollapsibleTable
+          id="match-log"
           title="Match log"
           note={`${formatNumber(matches.total)} matches`}
           filters={
             <TableFilters
               action={aflwPlayerPath(slug)}
+              anchor="match-log"
               fields={matchFields}
               values={values}
               title="Filter matches"
@@ -360,6 +343,54 @@ export default async function AflwPlayerPage({
           )}
         </CollapsibleTable>
       </section>
+    ),
+  });
+
+  return (
+    <>
+      <nav className="breadcrumbs" aria-label="Breadcrumb">
+        <Link href="/aflw">AFLW</Link>
+        <span aria-hidden="true">/</span>
+        <Link href="/aflw/players">Players</Link>
+        <span aria-hidden="true">/</span>
+        <span>{player.displayName}</span>
+      </nav>
+
+      <div className="page-header">
+        <h1>{player.displayName}</h1>
+        <p className="subtitle">
+          {player.clubNames ?? 'AFLW'}
+          {' · '}
+          {formatSpanLabel(player.debutSeasonLabel, player.finalSeasonLabel)}
+          {' · '}
+          {formatNumber(player.games)} games
+        </p>
+      </div>
+
+      <div className="stat-strip">
+        <div className="stat">
+          <div className="value">{formatNumber(player.games)}</div>
+          <div className="label">Games</div>
+        </div>
+        <div className="stat">
+          <div className="value">{formatNumber(player.goals)}</div>
+          <div className="label">Goals</div>
+        </div>
+        <div className="stat">
+          <div className="value">{formatNumber(player.disposals)}</div>
+          <div className="label">Disposals</div>
+        </div>
+        <div className="stat">
+          <div className="value">{formatAverage(player.disposals, player.games)}</div>
+          <div className="label">Disposals per game</div>
+        </div>
+        <div className="stat">
+          <div className="value">{formatNumber(player.premierships)}</div>
+          <div className="label">Premierships</div>
+        </div>
+      </div>
+
+      <ReorderableSections storageKey={aflwPlayerPath(slug)} sections={sections} />
 
       <p className="notice">
         The AFLW source identifies a player by a name-derived slug rather than a

@@ -22,6 +22,7 @@ import {
  */
 export function TableFilters({
   action,
+  anchor,
   fields,
   values,
   title = 'Advanced search',
@@ -32,6 +33,13 @@ export function TableFilters({
   defaultOpen,
 }: {
   action: string;
+  /**
+   * The id of this panel's `CollapsibleTable`. A GET form's navigation
+   * keeps a fragment identifier on its action, so appending `#anchor`
+   * here is what returns the browser to this table instead of the top
+   * of the page once the results reload — see `CollapsibleTable`'s `id`.
+   */
+  anchor?: string;
   fields: readonly FilterField[];
   values: FilterValues;
   title?: string;
@@ -58,6 +66,7 @@ export function TableFilters({
   const note = values.active === 0
     ? 'All rows'
     : `${values.active} filter${values.active === 1 ? '' : 's'} applied`;
+  const target = anchor ? `${action}#${anchor}` : action;
 
   return (
     <details className="filter-details" open={open}>
@@ -66,7 +75,7 @@ export function TableFilters({
         <span className="filter-details-note">{note}</span>
       </summary>
 
-      <form method="get" action={action}>
+      <form method="get" action={target}>
         {Object.entries(hidden ?? {}).flatMap(([name, value]) => {
           if (value === undefined) return [];
           const items = Array.isArray(value) ? value : [value];
@@ -107,7 +116,7 @@ export function TableFilters({
 
         <div className="filter-actions">
           <button className="btn" type="submit">{submitLabel}</button>
-          <Link className="btn btn-secondary" href={action}>Reset</Link>
+          <Link className="btn btn-secondary" href={target}>Reset</Link>
         </div>
       </form>
     </details>

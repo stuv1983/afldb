@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { ReorderableSections } from '@/components/ReorderableSections';
 import { getSeasonMatches } from '@/db/queries/matches';
 import {
   getSeason,
@@ -87,44 +88,12 @@ export default async function SeasonPage({
     rounds.get(key)!.push(match);
   }
 
-  return (
-    <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/seasons">Seasons</Link>
-        <span aria-hidden="true">/</span>
-        <span>{season.year}</span>
-      </nav>
+  const sections: { id: string; label: string; node: React.ReactNode }[] = [];
 
-      <div className="page-header">
-        <h1>{season.year} {season.league} Season</h1>
-        <p className="subtitle">
-          {formatNumber(season.matchCount)} matches · {season.clubCount} clubs
-          {season.premierName && (
-            <> · Premiers: <Link href={clubPath(season.premierSlug!)}>{season.premierName}</Link></>
-          )}
-        </p>
-      </div>
-
-      {season.status === 'in_progress' && (
-        <p className="notice">
-          <strong>Season in progress.</strong>{' '}
-          Every figure on this page is provisional and current only as at{' '}
-          {formatDate(season.dataThroughDate)}
-          {season.lastLoadedRound && <> (round {season.lastLoadedRound})</>}.
-          No premier, wooden spoon or Brownlow Medal has been decided.
-        </p>
-      )}
-
-      <nav className="pagination" aria-label="Season navigation">
-        {prev
-          ? <Link className="btn btn-secondary" href={seasonPath(prev)} rel="prev">← {prev}</Link>
-          : <span />}
-        <span className="spacer" />
-        {next
-          ? <Link className="btn btn-secondary" href={seasonPath(next)} rel="next">{next} →</Link>
-          : <span />}
-      </nav>
-
+  sections.push({
+    id: 'ladder',
+    label: 'Ladder',
+    node: (
       <section className="section">
         <CollapsibleTable title="Ladder">
         <div className="table-wrap">
@@ -166,7 +135,13 @@ export default async function SeasonPage({
         </div>
         </CollapsibleTable>
       </section>
+    ),
+  });
 
+  sections.push({
+    id: 'goalkickers-and-brownlow',
+    label: 'Leading goalkickers and Brownlow Medal',
+    node: (
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
         <section className="section">
           <CollapsibleTable title="Leading goalkickers">
@@ -231,7 +206,13 @@ export default async function SeasonPage({
           )}
         </section>
       </div>
+    ),
+  });
 
+  sections.push({
+    id: 'matches',
+    label: 'Matches',
+    node: (
       <section className="section">
         <h2>Matches</h2>
         {[...rounds.entries()].map(([roundName, roundMatches]) => (
@@ -276,6 +257,48 @@ export default async function SeasonPage({
           </div>
         ))}
       </section>
+    ),
+  });
+
+  return (
+    <>
+      <nav className="breadcrumbs" aria-label="Breadcrumb">
+        <Link href="/seasons">Seasons</Link>
+        <span aria-hidden="true">/</span>
+        <span>{season.year}</span>
+      </nav>
+
+      <div className="page-header">
+        <h1>{season.year} {season.league} Season</h1>
+        <p className="subtitle">
+          {formatNumber(season.matchCount)} matches · {season.clubCount} clubs
+          {season.premierName && (
+            <> · Premiers: <Link href={clubPath(season.premierSlug!)}>{season.premierName}</Link></>
+          )}
+        </p>
+      </div>
+
+      {season.status === 'in_progress' && (
+        <p className="notice">
+          <strong>Season in progress.</strong>{' '}
+          Every figure on this page is provisional and current only as at{' '}
+          {formatDate(season.dataThroughDate)}
+          {season.lastLoadedRound && <> (round {season.lastLoadedRound})</>}.
+          No premier, wooden spoon or Brownlow Medal has been decided.
+        </p>
+      )}
+
+      <nav className="pagination" aria-label="Season navigation">
+        {prev
+          ? <Link className="btn btn-secondary" href={seasonPath(prev)} rel="prev">← {prev}</Link>
+          : <span />}
+        <span className="spacer" />
+        {next
+          ? <Link className="btn btn-secondary" href={seasonPath(next)} rel="next">{next} →</Link>
+          : <span />}
+      </nav>
+
+      <ReorderableSections storageKey={`/seasons/${season.year}`} sections={sections} />
     </>
   );
 }

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { ReorderableSections } from '@/components/ReorderableSections';
 import { getPlayerHonours } from '@/db/queries/awards';
 import {
   getPlayer,
@@ -132,73 +133,12 @@ export default async function PlayerPage({
   const partialDisposals =
     player.disposals !== null && player.disposalsRecordedGames < player.games;
 
-  return (
-    <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/players">Players</Link>
-        <span aria-hidden="true">/</span>
-        <span>{player.displayName}</span>
-      </nav>
+  const sections: { id: string; label: string; node: React.ReactNode }[] = [];
 
-      <div className="page-header">
-        <h1>{player.displayName}</h1>
-        <p className="subtitle">
-          {clubs.map((c, i) => (
-            <span key={c.clubId}>
-              {i > 0 && ' · '}
-              <Link href={clubPath(c.clubSlug)}>{c.clubName}</Link>
-            </span>
-          ))}
-          {' · '}
-          {formatSpan(player.debutSeason, player.finalSeason, stillPlaying)}
-        </p>
-        <p className="section-note">
-          <Link href={`/players/compare?a=${player.id}`}>Compare with another player →</Link>
-        </p>
-      </div>
-
-      <div className="stat-strip">
-        <div className="stat">
-          <div className="value">{formatNumber(player.games)}</div>
-          <div className="label">Games</div>
-        </div>
-        <div className="stat">
-          <div className="value">{formatNumber(player.goals)}</div>
-          <div className="label">Goals</div>
-        </div>
-        <div className="stat">
-          <div className="value">{formatNumber(player.brownlowVotes)}</div>
-          <div className="label">Brownlow votes</div>
-          {player.brownlowMedals > 0 && (
-            <div className="note">{player.brownlowMedals}× medallist</div>
-          )}
-        </div>
-        <div className="stat">
-          <div className="value">{formatNumber(player.finals)}</div>
-          <div className="label">Finals</div>
-        </div>
-        <div className="stat">
-          <div className="value">{formatNumber(player.premierships)}</div>
-          <div className="label">Premierships</div>
-        </div>
-        <div className="stat">
-          <div className="value">{formatStat(player.disposals)}</div>
-          <div className="label">Disposals</div>
-          {partialDisposals && (
-            <div className="note">in {formatNumber(player.disposalsRecordedGames)} recorded games</div>
-          )}
-        </div>
-      </div>
-
-      {partialDisposals && (
-        <p className="notice">
-          Detailed statistics such as disposals were not recorded for the whole of this
-          player’s career. Totals cover only the games in which each statistic was
-          collected; “—” means the statistic was not recorded, not zero.
-        </p>
-      )}
-
-      {/* Career summary --------------------------------------------------- */}
+  sections.push({
+    id: 'career',
+    label: 'Career',
+    node: (
       <section className="section">
         <CollapsibleTable title="Career">
         <div className="table-wrap">
@@ -249,12 +189,14 @@ export default async function PlayerPage({
         </div>
         </CollapsibleTable>
       </section>
+    ),
+  });
 
-      {/* Honours ----------------------------------------------------------
-          Only honours AFLDB could tie to this player with confidence are
-          shown. An award whose source name was ambiguous is held against
-          the award, not asserted against a player who may not be him. */}
-      {honours.total > 0 && (
+  if (honours.total > 0) {
+    sections.push({
+      id: 'honours',
+      label: 'Honours',
+      node: (
         <section className="section">
           <h2>Honours</h2>
           <ul className="honours">
@@ -340,10 +282,15 @@ export default async function PlayerPage({
             ))}
           </ul>
         </section>
-      )}
+      ),
+    });
+  }
 
-      {/* Clubs ------------------------------------------------------------ */}
-      {clubs.length > 1 && (
+  if (clubs.length > 1) {
+    sections.push({
+      id: 'clubs',
+      label: 'Clubs',
+      node: (
         <section className="section">
           <CollapsibleTable title="Clubs">
           <div className="table-wrap">
@@ -370,9 +317,14 @@ export default async function PlayerPage({
           </div>
           </CollapsibleTable>
         </section>
-      )}
+      ),
+    });
+  }
 
-      {/* Season by season -------------------------------------------------- */}
+  sections.push({
+    id: 'season-by-season',
+    label: 'Season by season',
+    node: (
       <section className="section">
         <CollapsibleTable title="Season by season">
         <div className="table-wrap">
@@ -433,9 +385,14 @@ export default async function PlayerPage({
         </div>
         </CollapsibleTable>
       </section>
+    ),
+  });
 
-      {/* Brownlow --------------------------------------------------------- */}
-      {brownlow.length > 0 && (
+  if (brownlow.length > 0) {
+    sections.push({
+      id: 'brownlow-medal',
+      label: 'Brownlow Medal',
+      node: (
         <section className="section">
           <p className="section-note">
             Season vote totals from the official count, available from 1924.
@@ -468,9 +425,14 @@ export default async function PlayerPage({
           </div>
           </CollapsibleTable>
         </section>
-      )}
+      ),
+    });
+  }
 
-      {/* Match log -------------------------------------------------------- */}
+  sections.push({
+    id: 'match-log',
+    label: 'Match log',
+    node: (
       <section className="section">
         <CollapsibleTable title="Match log">
         <div className="table-wrap">
@@ -535,6 +497,79 @@ export default async function PlayerPage({
           </p>
         )}
       </section>
+    ),
+  });
+
+  return (
+    <>
+      <nav className="breadcrumbs" aria-label="Breadcrumb">
+        <Link href="/players">Players</Link>
+        <span aria-hidden="true">/</span>
+        <span>{player.displayName}</span>
+      </nav>
+
+      <div className="page-header">
+        <h1>{player.displayName}</h1>
+        <p className="subtitle">
+          {clubs.map((c, i) => (
+            <span key={c.clubId}>
+              {i > 0 && ' · '}
+              <Link href={clubPath(c.clubSlug)}>{c.clubName}</Link>
+            </span>
+          ))}
+          {' · '}
+          {formatSpan(player.debutSeason, player.finalSeason, stillPlaying)}
+        </p>
+        <p className="section-note">
+          <Link href={`/players/compare?a=${player.id}`}>Compare with another player →</Link>
+        </p>
+      </div>
+
+      <div className="stat-strip">
+        <div className="stat">
+          <div className="value">{formatNumber(player.games)}</div>
+          <div className="label">Games</div>
+        </div>
+        <div className="stat">
+          <div className="value">{formatNumber(player.goals)}</div>
+          <div className="label">Goals</div>
+        </div>
+        <div className="stat">
+          <div className="value">{formatNumber(player.brownlowVotes)}</div>
+          <div className="label">Brownlow votes</div>
+          {player.brownlowMedals > 0 && (
+            <div className="note">{player.brownlowMedals}× medallist</div>
+          )}
+        </div>
+        <div className="stat">
+          <div className="value">{formatNumber(player.finals)}</div>
+          <div className="label">Finals</div>
+        </div>
+        <div className="stat">
+          <div className="value">{formatNumber(player.premierships)}</div>
+          <div className="label">Premierships</div>
+        </div>
+        <div className="stat">
+          <div className="value">{formatStat(player.disposals)}</div>
+          <div className="label">Disposals</div>
+          {partialDisposals && (
+            <div className="note">in {formatNumber(player.disposalsRecordedGames)} recorded games</div>
+          )}
+        </div>
+      </div>
+
+      {partialDisposals && (
+        <p className="notice">
+          Detailed statistics such as disposals were not recorded for the whole of this
+          player’s career. Totals cover only the games in which each statistic was
+          collected; “—” means the statistic was not recorded, not zero.
+        </p>
+      )}
+
+      <ReorderableSections
+        storageKey={playerPath(player.slug, player.id)}
+        sections={sections}
+      />
     </>
   );
 }

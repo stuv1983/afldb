@@ -39,7 +39,8 @@ export async function adminLogin(
   }[]>`
     SELECT id, email, password_hash AS "passwordHash", totp_secret AS "totpSecret"
       FROM auth_users
-     WHERE email = ${email} AND role IN ('admin', 'super_admin') AND disabled_at IS NULL
+     WHERE email = ${email} AND role IN ('admin', 'super_admin', 'contributor')
+       AND disabled_at IS NULL
   `;
 
   // Password AND TOTP are both always evaluated on the failure path too,

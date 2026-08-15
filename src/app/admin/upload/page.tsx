@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { UploadForm } from '@/app/admin/upload/UploadForm';
-import { requireAdmin } from '@/lib/auth/session';
+import { requireUploader } from '@/lib/auth/session';
 import { DATASETS } from '@/lib/ingest/datasets';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default async function UploadPage() {
-  await requireAdmin();
+  await requireUploader();
 
   const datasets = Object.values(DATASETS).map((d) => ({
     key: d.key,

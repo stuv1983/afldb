@@ -125,6 +125,7 @@ export default async function RecordCategoryPage({
   const filters = (
     <TableFilters
       action={`/records/${definition.slug}`}
+      anchor="records"
       fields={fields}
       values={values}
       title="Filter this record"
@@ -167,6 +168,7 @@ export default async function RecordCategoryPage({
 
       {careerRows.length > 0 && (
         <CollapsibleTable
+          id="records"
           title="Career leaders"
           note={`${careerRows.length} shown`}
           filters={filters}
@@ -207,6 +209,7 @@ export default async function RecordCategoryPage({
 
       {matchRows.length > 0 && (
         <CollapsibleTable
+          id="records"
           title="Match performances"
           note={`${matchRows.length} shown`}
           filters={filters}
@@ -251,6 +254,7 @@ export default async function RecordCategoryPage({
 
       {seasonRows.length > 0 && (
         <CollapsibleTable
+          id="records"
           title="Season leaders"
           note={`${seasonRows.length} shown`}
           filters={filters}

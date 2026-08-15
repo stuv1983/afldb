@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
+import { ReorderableSections } from '@/components/ReorderableSections';
 import { TableFilters } from '@/components/TableFilters';
 import {
   getAward,
@@ -122,65 +123,13 @@ export default async function AwardPage({
   });
   const showVotes = winners.some((w) => w.votes !== null);
 
-  return (
-    <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/awards">Awards</Link>
-        <span aria-hidden="true">/</span>
-        <span>{award.name}</span>
-      </nav>
+  const sections: { id: string; label: string; node: React.ReactNode }[] = [];
 
-      <div className="page-header">
-        <h1>{award.name}</h1>
-        <p className="subtitle">
-          {award.clubSlug && (
-            <>
-              <Link href={clubPath(award.clubSlug)}>{award.clubName}</Link>
-              {' · '}
-            </>
-          )}
-          {award.competition ? `${award.competition} · ` : ''}
-          {formatSpan(award.firstSeason, award.lastSeason)}
-        </p>
-      </div>
-
-      {award.description && <p className="notice">{award.description}</p>}
-
-      <div className="stat-strip">
-        <div className="stat">
-          <div className="value">{formatNumber(award.seasonCount)}</div>
-          <div className="label">Seasons</div>
-        </div>
-        <div className="stat">
-          <div className="value">{formatNumber(award.winnerCount)}</div>
-          <div className="label">{isTeam ? 'Selections' : 'Winners'}</div>
-        </div>
-        {isRisingStar && (
-          <div className="stat">
-            <div className="value">
-              {formatNumber(nominationSeasons.reduce((n, s) => n + s.nominations, 0))}
-            </div>
-            <div className="label">Nominations</div>
-          </div>
-        )}
-        {unlinked > 0 && (
-          <div className="stat">
-            <div className="value">{formatNumber(unlinked)}</div>
-            <div className="label">Unlinked names</div>
-          </div>
-        )}
-      </div>
-
-      {unlinked > 0 && (
-        <p className="notice">
-          {formatNumber(unlinked)} of these {formatNumber(award.winnerCount)} entries name
-          a player AFLDB could not identify with confidence — most often a state-league
-          footballer with no VFL/AFL record. They are listed as the source spelled them,
-          without a link.
-        </p>
-      )}
-
-      {isRisingStar && (
+  if (isRisingStar) {
+    sections.push({
+      id: 'nominations-by-season',
+      label: 'Nominations by season',
+      node: (
         <section className="section">
           <p className="section-note">
             One player is nominated each round. Every nomination since 1993 is recorded,
@@ -211,9 +160,15 @@ export default async function AwardPage({
           </div>
           </CollapsibleTable>
         </section>
-      )}
+      ),
+    });
+  }
 
-      {isTeam && (
+  if (isTeam) {
+    sections.push({
+      id: 'teams-by-season',
+      label: 'Teams by season',
+      node: (
         <section className="section">
           <CollapsibleTable title="Teams by season">
           <div className="table-wrap">
@@ -254,9 +209,15 @@ export default async function AwardPage({
           </div>
           </CollapsibleTable>
         </section>
-      )}
+      ),
+    });
+  }
 
-      {leaders.length > 0 && (
+  if (leaders.length > 0) {
+    sections.push({
+      id: 'multiple-winners',
+      label: 'Multiple winners',
+      node: (
         <section className="section">
           <CollapsibleTable title="Multiple winners">
           <div className="table-wrap">
@@ -283,9 +244,15 @@ export default async function AwardPage({
           </div>
           </CollapsibleTable>
         </section>
-      )}
+      ),
+    });
+  }
 
-      {isRisingStar && nominationClubs.length > 0 && (
+  if (isRisingStar && nominationClubs.length > 0) {
+    sections.push({
+      id: 'nominations-by-club',
+      label: 'Nominations by club',
+      node: (
         <section className="section">
           <p className="section-note">
             Counted by club as a continuing entity, so Footscray and Western Bulldogs
@@ -314,11 +281,18 @@ export default async function AwardPage({
           </div>
           </CollapsibleTable>
         </section>
-      )}
+      ),
+    });
+  }
 
-      {!isTeam && (
+  if (!isTeam) {
+    sections.push({
+      id: 'every-winner',
+      label: 'Every winner',
+      node: (
         <section className="section">
           <CollapsibleTable
+            id="winners"
             title="Every winner"
             note={
               filteredWinners.length === winners.length
@@ -328,6 +302,7 @@ export default async function AwardPage({
             filters={
               <TableFilters
                 action={awardPath(award.slug)}
+                anchor="winners"
                 fields={winnerFields}
                 values={winnerValues}
                 title="Filter winners"
@@ -387,7 +362,69 @@ export default async function AwardPage({
           )}
           </CollapsibleTable>
         </section>
+      ),
+    });
+  }
+
+  return (
+    <>
+      <nav className="breadcrumbs" aria-label="Breadcrumb">
+        <Link href="/awards">Awards</Link>
+        <span aria-hidden="true">/</span>
+        <span>{award.name}</span>
+      </nav>
+
+      <div className="page-header">
+        <h1>{award.name}</h1>
+        <p className="subtitle">
+          {award.clubSlug && (
+            <>
+              <Link href={clubPath(award.clubSlug)}>{award.clubName}</Link>
+              {' · '}
+            </>
+          )}
+          {award.competition ? `${award.competition} · ` : ''}
+          {formatSpan(award.firstSeason, award.lastSeason)}
+        </p>
+      </div>
+
+      {award.description && <p className="notice">{award.description}</p>}
+
+      <div className="stat-strip">
+        <div className="stat">
+          <div className="value">{formatNumber(award.seasonCount)}</div>
+          <div className="label">Seasons</div>
+        </div>
+        <div className="stat">
+          <div className="value">{formatNumber(award.winnerCount)}</div>
+          <div className="label">{isTeam ? 'Selections' : 'Winners'}</div>
+        </div>
+        {isRisingStar && (
+          <div className="stat">
+            <div className="value">
+              {formatNumber(nominationSeasons.reduce((n, s) => n + s.nominations, 0))}
+            </div>
+            <div className="label">Nominations</div>
+          </div>
+        )}
+        {unlinked > 0 && (
+          <div className="stat">
+            <div className="value">{formatNumber(unlinked)}</div>
+            <div className="label">Unlinked names</div>
+          </div>
+        )}
+      </div>
+
+      {unlinked > 0 && (
+        <p className="notice">
+          {formatNumber(unlinked)} of these {formatNumber(award.winnerCount)} entries name
+          a player AFLDB could not identify with confidence — most often a state-league
+          footballer with no VFL/AFL record. They are listed as the source spelled them,
+          without a link.
+        </p>
       )}
+
+      <ReorderableSections storageKey={`/awards/${award.slug}`} sections={sections} />
     </>
   );
 }

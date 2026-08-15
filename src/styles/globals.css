@@ -397,6 +397,10 @@ td.wide { white-space: normal; min-width: 12rem; }
 /* Collapsible table sections ------------------------------------------ */
 details.table-details {
   margin: 1.5rem 0;
+  /* So jumping to a #id (a filtered table's form submits back to its own
+     anchor, see TableFilters) doesn't land the heading under the sticky
+     site header. */
+  scroll-margin-top: 5rem;
 }
 details.table-details > summary {
   display: flex;
@@ -419,6 +423,71 @@ details.table-details > summary::before {
 details.table-details[open] > summary::before { transform: rotate(90deg); }
 .table-details-title { font-size: 1rem; }
 .table-details-note { font-size: 0.78rem; font-weight: 400; color: var(--text-muted); }
+
+/* Reorderable table sections -------------------------------------------
+   A drag handle plus an up/down button pair sit to the left of a section;
+   the buttons are the accessible path (keyboard, touch, screen reader),
+   the handle is the pointer-drag shortcut. See ReorderableSections. */
+.reorderable-section {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 0.5rem;
+}
+.reorderable-section.is-drag-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: 4px;
+  border-radius: var(--radius-lg);
+}
+.reorderable-section .reorder-handle {
+  display: none;
+}
+.reorder-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  margin-top: 1.6rem;
+}
+.reorder-btn {
+  width: 1.6rem;
+  height: 1.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+.reorder-btn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.reorder-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.reorderable-section-content {
+  min-width: 0;
+}
+@media (min-width: 640px) {
+  .reorderable-section .reorder-handle {
+    display: block;
+    order: -1;
+    color: var(--text-faint);
+    letter-spacing: -0.2em;
+    font-size: 0.85rem;
+    cursor: grab;
+    margin-bottom: 0.15rem;
+  }
+  .reorderable-section .reorder-handle:active {
+    cursor: grabbing;
+  }
+}
 
 /* Per-table filter panel ---------------------------------------------- */
 /* Nested inside a .table-details, so it is deliberately quieter than the

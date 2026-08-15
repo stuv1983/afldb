@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { ReorderableSections } from '@/components/ReorderableSections';
 import { SearchBox } from '@/components/SearchBox';
 import {
   getAflwOverview,
@@ -50,6 +51,112 @@ export default async function AflwPage() {
   // awarded one yet either, and next year there is one more of each.
   const decided = seasons.filter((season) => season.premierCode !== null).length;
   const undecided = seasons.length - decided;
+
+  const sections: { id: string; label: string; node: React.ReactNode }[] = [];
+
+  sections.push({
+    id: 'most-recent-matches',
+    label: 'Most recent matches',
+    node: (
+      <section className="section">
+        <CollapsibleTable title="Most recent matches" note={`${recent.length} shown`}>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Date</th>
+                  <th scope="col">Season</th>
+                  <th scope="col">Home</th>
+                  <th scope="col" className="num">Score</th>
+                  <th scope="col">Away</th>
+                  <th scope="col">Venue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recent.map((match) => (
+                  <tr key={match.matchKey}>
+                    <td className="nowrap">
+                      <Link href={aflwMatchPath(match.matchKey)}>
+                        {formatDate(match.matchDate)}
+                      </Link>
+                    </td>
+                    <td>
+                      <Link href={aflwSeasonPath(match.seasonKey)}>{match.seasonLabel}</Link>
+                    </td>
+                    <td className="wide">
+                      <Link href={aflwClubPath(match.homeTeamCode)}>{match.homeClubName}</Link>
+                    </td>
+                    <td className="num nowrap">
+                      {formatScore(match.homeGoals, match.homeBehinds, match.homeScore)}–
+                      {formatScore(match.awayGoals, match.awayBehinds, match.awayScore)}
+                    </td>
+                    <td className="wide">
+                      <Link href={aflwClubPath(match.awayTeamCode)}>{match.awayClubName}</Link>
+                    </td>
+                    <td>{match.venueName}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CollapsibleTable>
+      </section>
+    ),
+  });
+
+  sections.push({
+    id: 'premierships',
+    label: 'Premierships',
+    node: (
+      <section className="section">
+        <CollapsibleTable
+          title="Premierships"
+          note={`${clubs.length} clubs`}
+          defaultOpen={false}
+        >
+          <div className="table-wrap">
+            <table>
+              <caption>
+                {decided} of {seasons.length} seasons have produced a premier
+                {undecided > 0 && (
+                  <>
+                    {' '}— 2020 was abandoned at the semi-finals and awarded no
+                    premiership, and a season still being played has yet to award one
+                  </>
+                )}.
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Club</th>
+                  <th scope="col" className="num">Seasons</th>
+                  <th scope="col" className="num">Matches</th>
+                  <th scope="col" className="num">Won</th>
+                  <th scope="col" className="num">Finals</th>
+                  <th scope="col" className="num">Premierships</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clubs.map((club) => (
+                  <tr key={club.code}>
+                    <td className="wide">
+                      <Link href={aflwClubPath(club.code)}>{club.name}</Link>
+                    </td>
+                    <td className="num">{club.seasonsContested}</td>
+                    <td className="num">{formatNumber(club.matches)}</td>
+                    <td className="num">{formatNumber(club.wins)}</td>
+                    <td className="num">{formatNumber(club.finals)}</td>
+                    <td className="num">
+                      {club.premierships > 0 ? <strong>{club.premierships}</strong> : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CollapsibleTable>
+      </section>
+    ),
+  });
 
   return (
     <>
@@ -117,97 +224,7 @@ export default async function AflwPage() {
         </div>
       </section>
 
-      <section className="section">
-        <CollapsibleTable title="Most recent matches" note={`${recent.length} shown`}>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Date</th>
-                  <th scope="col">Season</th>
-                  <th scope="col">Home</th>
-                  <th scope="col" className="num">Score</th>
-                  <th scope="col">Away</th>
-                  <th scope="col">Venue</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recent.map((match) => (
-                  <tr key={match.matchKey}>
-                    <td className="nowrap">
-                      <Link href={aflwMatchPath(match.matchKey)}>
-                        {formatDate(match.matchDate)}
-                      </Link>
-                    </td>
-                    <td>
-                      <Link href={aflwSeasonPath(match.seasonKey)}>{match.seasonLabel}</Link>
-                    </td>
-                    <td className="wide">
-                      <Link href={aflwClubPath(match.homeTeamCode)}>{match.homeClubName}</Link>
-                    </td>
-                    <td className="num nowrap">
-                      {formatScore(match.homeGoals, match.homeBehinds, match.homeScore)}–
-                      {formatScore(match.awayGoals, match.awayBehinds, match.awayScore)}
-                    </td>
-                    <td className="wide">
-                      <Link href={aflwClubPath(match.awayTeamCode)}>{match.awayClubName}</Link>
-                    </td>
-                    <td>{match.venueName}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CollapsibleTable>
-      </section>
-
-      <section className="section">
-        <CollapsibleTable
-          title="Premierships"
-          note={`${clubs.length} clubs`}
-          defaultOpen={false}
-        >
-          <div className="table-wrap">
-            <table>
-              <caption>
-                {decided} of {seasons.length} seasons have produced a premier
-                {undecided > 0 && (
-                  <>
-                    {' '}— 2020 was abandoned at the semi-finals and awarded no
-                    premiership, and a season still being played has yet to award one
-                  </>
-                )}.
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">Club</th>
-                  <th scope="col" className="num">Seasons</th>
-                  <th scope="col" className="num">Matches</th>
-                  <th scope="col" className="num">Won</th>
-                  <th scope="col" className="num">Finals</th>
-                  <th scope="col" className="num">Premierships</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clubs.map((club) => (
-                  <tr key={club.code}>
-                    <td className="wide">
-                      <Link href={aflwClubPath(club.code)}>{club.name}</Link>
-                    </td>
-                    <td className="num">{club.seasonsContested}</td>
-                    <td className="num">{formatNumber(club.matches)}</td>
-                    <td className="num">{formatNumber(club.wins)}</td>
-                    <td className="num">{formatNumber(club.finals)}</td>
-                    <td className="num">
-                      {club.premierships > 0 ? <strong>{club.premierships}</strong> : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CollapsibleTable>
-      </section>
+      <ReorderableSections storageKey="/aflw" sections={sections} />
     </>
   );
 }

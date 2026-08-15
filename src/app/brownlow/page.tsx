@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
+import { ReorderableSections } from '@/components/ReorderableSections';
 import { TableFilters } from '@/components/TableFilters';
 import { getClubOptions } from '@/db/queries/advanced-search';
 import { getBrownlowCareerLeaders, getBrownlowWinners } from '@/db/queries/brownlow';
@@ -64,28 +65,17 @@ export default async function BrownlowPage({
   const leadersDescribed = describeFilters(leaderFields, leaderValues);
   const seasonCount = new Set(winners.map((w) => w.season)).size;
 
-  return (
-    <>
-      <div className="page-header">
-        <h1>Brownlow Medal</h1>
-        <p className="subtitle">
-          Awarded to the fairest and best player of the season, first presented in 1924.
-        </p>
-      </div>
+  const sections: { id: string; label: string; node: React.ReactNode }[] = [];
 
-      <p className="notice">
-        Vote totals come from the official season counts. Round-by-round votes are
-        available from 1984; per-game votes were also published for 1931–1934. For
-        the seasons in between, only the season total is on record — an absent
-        per-game vote means it was not published, not that no vote was polled.
-      </p>
-
-      <FilterErrors errors={errors} />
-
+  sections.push({
+    id: 'career-vote-leaders',
+    label: 'Career vote leaders',
+    node: (
       <section className="section">
         {/* Anchor target for /brownlow#brownlow-leaders links from search. */}
         <div id="brownlow-leaders" style={{ scrollMarginTop: '4rem' }}>
         <CollapsibleTable
+          id="leaders"
           title="Career vote leaders"
           note={
             leaders.total > LEADER_LIMIT
@@ -95,6 +85,7 @@ export default async function BrownlowPage({
           filters={
             <TableFilters
               action="/brownlow"
+              anchor="leaders"
               fields={leaderFields}
               values={leaderValues}
               title="Filter career leaders"
@@ -142,16 +133,24 @@ export default async function BrownlowPage({
         </CollapsibleTable>
         </div>
       </section>
+    ),
+  });
 
+  sections.push({
+    id: 'winners-by-season',
+    label: 'Winners by season',
+    node: (
       <section className="section">
         {/* Anchor target for /brownlow#brownlow-winners links from search. */}
         <div id="brownlow-winners" style={{ scrollMarginTop: '4rem' }}>
         <CollapsibleTable
+          id="winners"
           title="Winners by season"
           note={`${winners.length} winners`}
           filters={
             <TableFilters
               action="/brownlow"
+              anchor="winners"
               fields={winnerFields}
               values={winnerValues}
               title="Filter winners"
@@ -207,6 +206,28 @@ export default async function BrownlowPage({
         </CollapsibleTable>
         </div>
       </section>
+    ),
+  });
+
+  return (
+    <>
+      <div className="page-header">
+        <h1>Brownlow Medal</h1>
+        <p className="subtitle">
+          Awarded to the fairest and best player of the season, first presented in 1924.
+        </p>
+      </div>
+
+      <p className="notice">
+        Vote totals come from the official season counts. Round-by-round votes are
+        available from 1984; per-game votes were also published for 1931–1934. For
+        the seasons in between, only the season total is on record — an absent
+        per-game vote means it was not published, not that no vote was polled.
+      </p>
+
+      <FilterErrors errors={errors} />
+
+      <ReorderableSections storageKey="/brownlow" sections={sections} />
     </>
   );
 }

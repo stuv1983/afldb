@@ -88,6 +88,7 @@ export default async function PlayersPage({
   const filters = (
     <TableFilters
       action="/players"
+      anchor="players"
       fields={fields}
       values={values}
       groups={CAREER_GROUPS}
@@ -133,6 +134,7 @@ export default async function PlayersPage({
       </nav>
 
       <CollapsibleTable
+        id="players"
         title="Players"
         note={`${formatNumber(total)} matching`}
         filters={filters}

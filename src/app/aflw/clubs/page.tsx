@@ -35,7 +35,9 @@ export default async function AflwClubsPage({
   const byOrdinal = new Map(seasons.map((season) => [season.ordinal, season.displayLabel]));
   const described = describeFilters(fields, values);
 
-  const filters = <TableFilters action="/aflw/clubs" fields={fields} values={values} />;
+  const filters = (
+    <TableFilters action="/aflw/clubs" anchor="club-records" fields={fields} values={values} />
+  );
 
   return (
     <>
@@ -56,6 +58,7 @@ export default async function AflwClubsPage({
       <FilterErrors errors={values.errors} />
 
       <CollapsibleTable
+        id="club-records"
         title="Club records"
         note={`${clubs.length} matching`}
         filters={filters}
