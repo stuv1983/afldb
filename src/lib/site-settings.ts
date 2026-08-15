@@ -269,11 +269,36 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   gridAudience: DEFAULT_GRID_AUDIENCE,
 };
 
+/**
+ * Normalise one stored value, whichever way the driver hands jsonb back.
+ *
+ * The postgres.js client this project uses returns a jsonb column as its raw
+ * TEXT — the five characters `"public"`, not the string `public`, and an
+ * object as its serialisation rather than an object. A client configured (or
+ * upgraded) to parse jsonb itself returns the decoded value instead. Both
+ * have to land in the same place, or the settings read as their defaults on
+ * one of them and nothing looks broken except that saving changes nothing.
+ *
+ * So: a string that parses as JSON is taken as encoded, and anything else is
+ * taken as already decoded. The one case that could confuse the two is a
+ * setting whose legitimate value is a string of digits or the word `null`;
+ * none of the keys here has one, and every value is allowlisted downstream
+ * regardless.
+ */
+function fromStore(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
 /** Parse whole `site_settings` rows into the typed settings object. */
 export function parseSiteSettings(
   rows: readonly { key: string; value: unknown }[],
 ): SiteSettings {
-  const byKey = new Map(rows.map((row) => [row.key, row.value]));
+  const byKey = new Map(rows.map((row) => [row.key, fromStore(row.value)]));
   return {
     homeLayout: byKey.has(SETTING_KEYS.homeLayout)
       ? parseHomeLayout(byKey.get(SETTING_KEYS.homeLayout))

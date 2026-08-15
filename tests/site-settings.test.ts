@@ -114,6 +114,34 @@ describe('parseSiteSettings', () => {
     });
   });
 
+  it('reads a jsonb column handed back as raw text', () => {
+    // The shape the postgres.js client this project uses actually returns:
+    // the five characters `"admin"`, and an object as its serialisation.
+    // Reading these as opaque strings is what made every saved setting
+    // silently fall back to its default — caught on the dev server, because
+    // falling back is also the correct behaviour for a value we do not
+    // recognise, so nothing looked broken except that saving did nothing.
+    const settings = parseSiteSettings([
+      { key: SETTING_KEYS.gridAudience, value: '"admin"' },
+      { key: SETTING_KEYS.homeLayout, value: '{"order":["browse","stats"],"hidden":["stats"]}' },
+    ]);
+    expect(settings.gridAudience).toBe('admin');
+    expect(settings.homeLayout.order.slice(0, 2)).toEqual(['browse', 'stats']);
+    expect(settings.homeLayout.hidden).toEqual(['stats']);
+  });
+
+  it('reads the same values from a client that decodes jsonb itself', () => {
+    // The other half of that fix: a driver upgrade must not flip the
+    // behaviour back, so an already-decoded value has to work too.
+    const settings = parseSiteSettings([
+      { key: SETTING_KEYS.gridAudience, value: 'admin' },
+      { key: SETTING_KEYS.homeLayout, value: { order: ['browse', 'stats'], hidden: ['stats'] } },
+    ]);
+    expect(settings.gridAudience).toBe('admin');
+    expect(settings.homeLayout.order.slice(0, 2)).toEqual(['browse', 'stats']);
+    expect(settings.homeLayout.hidden).toEqual(['stats']);
+  });
+
   it('reads each key independently', () => {
     const settings = parseSiteSettings([
       { key: SETTING_KEYS.gridAudience, value: 'admin' },
