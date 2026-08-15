@@ -145,9 +145,14 @@ async function main(): Promise<number> {
       INSERT INTO auth_users (email, role, password_hash, totp_secret)
       VALUES (${email}, 'admin', ${passwordHash}, ${secret})
       ON CONFLICT (email) DO UPDATE
-        SET password_hash = EXCLUDED.password_hash,
-            totp_secret   = EXCLUDED.totp_secret,
-            disabled_at   = NULL
+        SET password_hash  = EXCLUDED.password_hash,
+            totp_secret    = EXCLUDED.totp_secret,
+            -- A new secret starts a new counter. Carrying the old step
+            -- over would reject every code from the fresh authenticator
+            -- until the clock passed it, which for a reset performed
+            -- minutes after the last sign-in is a locked-out admin.
+            totp_last_step = NULL,
+            disabled_at    = NULL
     `;
     // A reset invalidates every live session for the account.
     await sql`

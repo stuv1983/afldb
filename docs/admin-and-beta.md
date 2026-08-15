@@ -44,10 +44,16 @@ session for that account.
 
 Passwords are scrypt-hashed (N=2¹⁵, r=8, p=1); TOTP is RFC 6238 with ±1
 step of drift; both are implemented on Node's own crypto with no
-third-party auth dependency. Admin sessions are database rows (sha256 of
-the cookie token), individually revocable, 12-hour TTL. Everything an
-administrator does lands in `auth_audit_log`, which the app role can
-only INSERT into.
+third-party auth dependency. Each code is accepted **once**: the step it
+matched is recorded in `auth_users.totp_last_step` by the same statement
+that tests it, so the next sign-in needs a code from a later step and a
+code read over your shoulder is dead as soon as you have used it. A
+consequence worth knowing at the terminal: signing in twice inside the
+same 30-second window means waiting for the authenticator to roll.
+
+Admin sessions are database rows (sha256 of the cookie token),
+individually revocable, 12-hour TTL. Everything an administrator does
+lands in `auth_audit_log`, which the app role can only INSERT into.
 
 ## 3. Beta gate
 

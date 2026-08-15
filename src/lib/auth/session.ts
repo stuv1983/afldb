@@ -50,7 +50,7 @@ function secureCookies(): boolean {
 }
 
 /**
- * The client's IP, for the audit trail.
+ * The client's IP, for the audit trail and for keying the rate limiters.
  *
  * Behind our single reverse proxy (deploy/Caddyfile) the trustworthy value is
  * the LAST entry of X-Forwarded-For — the address Caddy itself observed —
@@ -61,6 +61,17 @@ function secureCookies(): boolean {
  * overwrite the header, so in production only its own value is present; the
  * rightmost read is defence in depth for that. Assumes exactly one trusted
  * proxy hop.
+ *
+ * X-Real-IP is deliberately NOT consulted. The proxy sets X-Forwarded-For on
+ * every request it passes, so the fallback could only ever fire for a request
+ * that did not come through the proxy — exactly the case where the header is
+ * client-supplied and forging it would let an attacker spread rate-limit
+ * buckets and write a chosen address into the audit log. Caddy strips the
+ * header inbound as well, so neither layer can be the one that fails.
+ *
+ * Returning null when there is no trustworthy value is the safe direction:
+ * callers key their limiters on 'unknown', which shares one bucket rather
+ * than minting a fresh one per forged header.
  */
 export async function requestIp(): Promise<string | null> {
   const h = await headers();
@@ -70,7 +81,7 @@ export async function requestIp(): Promise<string | null> {
     const last = hops[hops.length - 1]?.trim();
     if (last) return last;
   }
-  return h.get('x-real-ip');
+  return null;
 }
 
 // ---------------------------------------------------------------------------

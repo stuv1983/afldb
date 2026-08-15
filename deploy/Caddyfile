@@ -22,6 +22,13 @@
 		# (requestIp) reads the rightmost hop; the two together keep the audit
 		# trail honest. The production reverse proxy MUST do the same.
 		header_up X-Forwarded-For {remote_host}
+
+		# Drop the other address headers a client might send. The app does not
+		# read these, and removing them here means it never can by accident:
+		# a future reader of X-Real-IP would otherwise be trusting whatever the
+		# client typed. The production reverse proxy MUST do the same.
+		header_up -X-Real-IP
+		header_up -Forwarded
 	}
 
 	encode gzip zstd

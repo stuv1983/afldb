@@ -3,6 +3,7 @@ import 'server-only';
 import { searchAflwClubs, searchAflwPlayers } from '@/db/queries/aflw';
 import { sql } from '@/db/client';
 import { RECORD_CATEGORIES } from '@/db/queries/records';
+import { normalisedSearchTerm } from '@/lib/like';
 
 /**
  * Global search across players, clubs, venues, seasons, rounds, awards
@@ -15,6 +16,17 @@ import { RECORD_CATEGORIES } from '@/db/queries/records';
  */
 
 export const MIN_QUERY_LENGTH = 2;
+
+/**
+ * Neutralise the LIKE metacharacters that survive normalisation.
+ *
+ * Every match below is a bound parameter, so this is not an injection
+ * guard — it is a correctness and cost one. A search for "%" reached the
+ * database as `LIKE '%' || '%' || '%'`, which matches every player, club,
+ * venue and award and asks PostgreSQL to rank the entire corpus by
+ * trigram similarity. See lib/like.ts for why `_` is left alone.
+ */
+const likeSafe = normalisedSearchTerm;
 
 export type { SearchResultType } from '@/search/constants';
 import type { SearchResultType } from '@/search/constants';
@@ -30,7 +42,7 @@ export type SearchResult = {
 
 export async function searchPlayers(query: string, limit = 20): Promise<SearchResult[]> {
   return sql<SearchResult[]>`
-    WITH q AS (SELECT afldb_normalise_name(${query}) AS term)
+    WITH q AS (SELECT afldb_normalise_name(${likeSafe(query)}) AS term)
     SELECT 'player'::text AS type,
            p.id,
            p.slug,
@@ -67,7 +79,7 @@ export async function searchPlayers(query: string, limit = 20): Promise<SearchRe
  */
 export async function searchClubs(query: string, limit = 6): Promise<SearchResult[]> {
   return sql<SearchResult[]>`
-    WITH q AS (SELECT afldb_normalise_name(${query}) AS term),
+    WITH q AS (SELECT afldb_normalise_name(${likeSafe(query)}) AS term),
     matched AS (
       SELECT DISTINCT ON (c.id)
              'club'::text AS type,
@@ -97,7 +109,7 @@ export async function searchClubs(query: string, limit = 6): Promise<SearchResul
 
 export async function searchVenues(query: string, limit = 6): Promise<SearchResult[]> {
   return sql<SearchResult[]>`
-    WITH q AS (SELECT afldb_normalise_name(${query}) AS term),
+    WITH q AS (SELECT afldb_normalise_name(${likeSafe(query)}) AS term),
     matched AS (
       SELECT DISTINCT ON (v.id)
              'venue'::text AS type,
@@ -209,7 +221,7 @@ export async function searchRounds(query: string): Promise<SearchResult[]> {
  */
 export async function searchAwards(query: string, limit = 6): Promise<SearchResult[]> {
   const results = await sql<SearchResult[]>`
-    WITH q AS (SELECT afldb_normalise_name(${query}) AS term)
+    WITH q AS (SELECT afldb_normalise_name(${likeSafe(query)}) AS term)
     SELECT 'award'::text AS type,
            a.id, a.slug,
            a.name AS title,

@@ -119,18 +119,35 @@ function totpAt(secret: string, counter: number): string {
 }
 
 /**
+ * Verify a code and return the step it matched, or null.
+ *
  * Accepts the current step and one either side: clock skew between the
  * server and a phone is normal; a wider window is not.
+ *
+ * The step is returned rather than a bare boolean because RFC 6238 §5.2
+ * requires a code to be accepted only once, and enforcing that needs the
+ * caller to know WHICH step it was so it can record it. Every candidate
+ * is evaluated even after a match, so the time taken does not reveal how
+ * far the client's clock has drifted.
  */
-export function verifyTotp(secret: string, code: string, now = Date.now()): boolean {
+export function verifyTotpStep(
+  secret: string, code: string, now = Date.now(),
+): number | null {
   const cleaned = code.replace(/\s+/g, '');
-  if (!/^\d{6}$/.test(cleaned)) return false;
-  const step = Math.floor(now / 1000 / 30);
+  if (!/^\d{6}$/.test(cleaned)) return null;
+  const current = Math.floor(now / 1000 / 30);
+  let matched: number | null = null;
   for (const drift of [0, -1, 1]) {
-    const expected = totpAt(secret, step + drift);
-    if (timingSafeEqual(Buffer.from(expected), Buffer.from(cleaned))) return true;
+    const step = current + drift;
+    const expected = totpAt(secret, step);
+    if (timingSafeEqual(Buffer.from(expected), Buffer.from(cleaned))) matched = step;
   }
-  return false;
+  return matched;
+}
+
+/** Whether a code is currently valid, ignoring which step it matched. */
+export function verifyTotp(secret: string, code: string, now = Date.now()): boolean {
+  return verifyTotpStep(secret, code, now) !== null;
 }
 
 /** otpauth:// URI for authenticator apps (manual entry or QR elsewhere). */

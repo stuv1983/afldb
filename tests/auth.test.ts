@@ -6,6 +6,7 @@ import {
   sha256Hex,
   verifyPassword,
   verifyTotp,
+  verifyTotpStep,
 } from '@/lib/auth/crypto';
 import { BACKSPACE, DELETE, applyEditing, takeLine } from '@/lib/auth/line-input';
 import { signClaim, verifyClaim, type AccessClaim } from '@/lib/auth/tokens';
@@ -46,6 +47,18 @@ describe('TOTP (RFC 6238 SHA-1 test vectors, truncated to 6 digits)', () => {
   it('rejects junk', () => {
     expect(verifyTotp(SECRET, 'abcdef', 59_000)).toBe(false);
     expect(verifyTotp(SECRET, '28708', 59_000)).toBe(false);
+  });
+
+  it('reports which step a code matched, so a code can be spent once', () => {
+    // The login path stores this and requires the next code to come from
+    // a strictly later step (RFC 6238 §5.2). Without the step number
+    // there is nothing to compare against and a captured code stays
+    // valid for the whole ±1 window.
+    expect(verifyTotpStep(SECRET, '287082', 59_000)).toBe(1);
+    // The same code one step later is still accepted as drift — and
+    // still reports step 1, so the replay check sees it is not newer.
+    expect(verifyTotpStep(SECRET, '287082', 89_000)).toBe(1);
+    expect(verifyTotpStep(SECRET, 'abcdef', 59_000)).toBeNull();
   });
 
   it('generates 32-character base32 secrets', () => {

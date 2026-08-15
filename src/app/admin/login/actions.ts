@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation';
 
 import { authSql } from '@/db/authClient';
-import { verifyPassword, verifyTotp } from '@/lib/auth/crypto';
+import { verifyPassword, verifyTotpStep } from '@/lib/auth/crypto';
 import { RateLimiter } from '@/lib/auth/rate-limit';
 import { audit, createAdminSession, requestIp } from '@/lib/auth/session';
 
@@ -47,10 +47,28 @@ export async function adminLogin(
   const passwordOk = user?.passwordHash
     ? await verifyPassword(password, user.passwordHash)
     : await verifyPassword(password, 'scrypt$32768$8$1$AAAA$AAAA').then(() => false);
-  const totpOk = user?.totpSecret ? verifyTotp(user.totpSecret, code) : false;
+  const totpStep = user?.totpSecret ? verifyTotpStep(user.totpSecret, code) : null;
 
-  if (!user || !passwordOk || !totpOk) {
+  if (!user || !passwordOk || totpStep === null) {
     await audit('admin.login_failed', { email }, { label: email });
+    return { error: FAILURE };
+  }
+
+  // A one-time password must be usable exactly once (RFC 6238 §5.2). The
+  // step is claimed in the same statement that tests it, so two requests
+  // racing with the same code cannot both succeed, and a code observed
+  // over a shoulder or in transit is dead the moment the owner uses it.
+  // Claimed only after the password has already passed, so knowing a code
+  // alone cannot burn a step the legitimate owner is about to need.
+  const [claimed] = await authSql<{ id: number }[]>`
+    UPDATE auth_users
+       SET totp_last_step = ${totpStep}
+     WHERE id = ${user.id}
+       AND (totp_last_step IS NULL OR totp_last_step < ${totpStep})
+    RETURNING id
+  `;
+  if (!claimed) {
+    await audit('admin.login_totp_replay', { email }, { label: email });
     return { error: FAILURE };
   }
 

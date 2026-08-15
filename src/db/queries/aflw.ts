@@ -3,7 +3,7 @@ import 'server-only';
 import { cache } from 'react';
 
 import { sql } from '@/db/client';
-import { allOf, containsPattern, rangeConditions } from '@/db/queries/filters';
+import { allOf, containsPattern, prefixPattern, rangeConditions } from '@/db/queries/filters';
 import {
   AFLW_MATCH_OUTCOME_FILTERS,
   AFLW_MATCH_SORTS,
@@ -809,7 +809,7 @@ export async function searchAflwPlayers(query: string, limit = 6): Promise<AflwS
            p.display_name AS title,
            COALESCE(c.club_names, '') || ' · ' || c.games || ' games' AS subtitle,
            (CASE WHEN lower(p.display_name) = lower(${query}) THEN 1000
-                 WHEN lower(p.display_name) LIKE lower(${query}) || '%' THEN 500
+                 WHEN lower(p.display_name) LIKE lower(${prefixPattern(query)}) THEN 500
                  ELSE 250 END + LEAST(c.games, 100) / 10.0)::float AS rank
       FROM aflw.players p
       JOIN aflw.player_careers c ON c.player_slug = p.slug
@@ -825,7 +825,7 @@ export async function searchAflwClubs(query: string, limit = 3): Promise<AflwSea
            c.name AS title,
            'AFLW club · ' || t.matches || ' matches' AS subtitle,
            (CASE WHEN lower(c.name) = lower(${query}) THEN 1000
-                 WHEN lower(c.name) LIKE lower(${query}) || '%' THEN 500
+                 WHEN lower(c.name) LIKE lower(${prefixPattern(query)}) THEN 500
                  ELSE 250 END)::float AS rank
       FROM aflw.clubs c
       JOIN aflw.club_totals t ON t.code = c.code

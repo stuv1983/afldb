@@ -54,11 +54,9 @@ export function allOf(conditions: SqlFragment[]): SqlFragment {
 }
 
 /**
- * A case-insensitive contains match.
- *
- * `%` and `_` are escaped so a name containing them is searched for
- * literally rather than silently becoming a wildcard.
+ * Pattern builders live in lib/like.ts — they are string functions with
+ * no database dependency, which is what lets them be unit tested — and
+ * are re-exported here because this is where the query modules already
+ * look for them.
  */
-export function containsPattern(term: string): string {
-  return `%${term.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
-}
+export { containsPattern, prefixPattern } from '@/lib/like';
