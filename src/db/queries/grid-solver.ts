@@ -230,13 +230,32 @@ function compileAxis(axis: GridAxisState): SqlFragment {
       // "Teammate" means same club, same season -- player_club_season_stats
       // (migration 015's club-grained table), not player_season_stats
       // (player-season grain, no club dimension at all).
+      //
+      // A direct self-join here (pcs1 JOIN pcs2 ON season/club) blows the
+      // 5s statement timeout: EXPLAIN ANALYZE showed Postgres choosing a
+      // Nested Loop + Memoize plan with a 0% cache hit rate (every
+      // (player, season, club) key is visited once), so the "cache" adds
+      // pure overhead over ~2.1M intermediate join rows. Pre-aggregating
+      // each (season, club) roster into an array first and hash-joining
+      // against that gets the same 2.1M-row result through a Hash Join
+      // instead, in ~2s against the real test data -- comfortably inside
+      // budget where the self-join version measured over 5s.
       const n = requireInt(axis, 'x', 'At least');
-      return sql`p.id IN (SELECT pcs1.player_id FROM player_club_season_stats pcs1
-                            JOIN player_club_season_stats pcs2
-                              ON pcs2.season = pcs1.season AND pcs2.club_id = pcs1.club_id
-                             AND pcs2.player_id <> pcs1.player_id
-                           GROUP BY pcs1.player_id
-                          HAVING count(DISTINCT pcs2.player_id) >= ${n})`;
+      return sql`p.id IN (
+        WITH rosters AS (
+          SELECT season, club_id, array_agg(player_id) AS players
+            FROM player_club_season_stats
+           GROUP BY season, club_id
+        )
+        SELECT t.player_id FROM (
+          SELECT pcs.player_id, unnest(r.players) AS other
+            FROM player_club_season_stats pcs
+            JOIN rosters r ON r.season = pcs.season AND r.club_id = pcs.club_id
+        ) t
+        WHERE t.other <> t.player_id
+        GROUP BY t.player_id
+        HAVING count(DISTINCT t.other) >= ${n}
+      )`;
     }
 
     // -- Single-game feats -- the per-game sibling of the career/season
