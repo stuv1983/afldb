@@ -3,6 +3,15 @@
  * Create or reset an administrator account.
  *
  *   npx tsx tools/admin/create-admin.ts admin@example.com
+ *   npx tsx tools/admin/create-admin.ts you@example.com super_admin
+ *
+ * The second argument is the role: 'admin' (default) or 'super_admin'.
+ * It can also be set via AFLDB_ADMIN_ROLE for an unattended run. This is
+ * the only way to mint the *first* super admin — every subsequent one
+ * can instead be invited from /admin/admins by an existing super admin
+ * (or a plain admin granted can_manage_admins), which walks the invitee
+ * through their own password and QR-code MFA enrolment. Re-running this
+ * CLI for an existing email also resets their role if given.
  *
  * Prompts for the password without echoing it, so nothing sensitive
  * reaches shell history or `ps` output. For an unattended run, set
@@ -106,7 +115,13 @@ async function main(): Promise<number> {
 
   const email = (process.argv[2] ?? '').trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-    console.error('Usage: npx tsx tools/admin/create-admin.ts admin@example.com');
+    console.error('Usage: npx tsx tools/admin/create-admin.ts admin@example.com [admin|super_admin]');
+    return 1;
+  }
+
+  const role = (process.argv[3] ?? process.env.AFLDB_ADMIN_ROLE ?? 'admin').trim();
+  if (role !== 'admin' && role !== 'super_admin') {
+    console.error(`Role must be 'admin' or 'super_admin', got '${role}'.`);
     return 1;
   }
 
@@ -143,9 +158,10 @@ async function main(): Promise<number> {
 
     await sql`
       INSERT INTO auth_users (email, role, password_hash, totp_secret)
-      VALUES (${email}, 'admin', ${passwordHash}, ${secret})
+      VALUES (${email}, ${role}, ${passwordHash}, ${secret})
       ON CONFLICT (email) DO UPDATE
-        SET password_hash  = EXCLUDED.password_hash,
+        SET role           = EXCLUDED.role,
+            password_hash  = EXCLUDED.password_hash,
             totp_secret    = EXCLUDED.totp_secret,
             -- A new secret starts a new counter. Carrying the old step
             -- over would reject every code from the fresh authenticator
@@ -161,7 +177,7 @@ async function main(): Promise<number> {
          AND revoked_at IS NULL
     `;
 
-    console.log(`\nAdministrator ${email} is ready.\n`);
+    console.log(`\n${role === 'super_admin' ? 'Super admin' : 'Administrator'} ${email} is ready.\n`);
     console.log('Add this to your authenticator app NOW (shown only once):\n');
     // Grouped for typing, unbroken for pasting. Authy, Google
     // Authenticator and 1Password all strip the spaces; a few older apps

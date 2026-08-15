@@ -30,17 +30,34 @@ The script APPENDS to `.env` (`AFLDB_AUTH_DATABASE_URL`,
 
 ## 2. Administrators
 
-Created from the server shell, never from the web:
+Two roles: `admin` and `super_admin`. A super admin may always invite and
+manage other admins; a plain admin may only if a super admin has ticked
+`can_manage_admins` for their account — a delegated power, independent of
+role, granted per account rather than by promoting someone outright.
+
+### The first super admin
+
+There is no invitation without an existing super admin to send one, so the
+very first account is always minted from the server shell:
 
 ```bash
-AFLDB_ADMIN_PASSWORD='a-long-password' npx tsx tools/admin/create-admin.ts you@example.com
+AFLDB_ADMIN_PASSWORD='a-long-password' npx tsx tools/admin/create-admin.ts you@example.com super_admin
 ```
 
 The tool prints a TOTP secret and `otpauth://` URI **once**. Enter it
 into an authenticator app immediately: sign-in at `/admin/login` always
 requires the password **and** a current 6-digit code. Re-running the tool
-for the same email resets the password and secret and revokes every live
-session for that account.
+for the same email resets the password, role and secret, and revokes every
+live session for that account. Omit the role (or pass `admin`) for a plain
+admin created the same way.
+
+### Every subsequent admin: invited from the web
+
+A super admin (or a delegated admin manager) creates an invite at
+`/admin/admins` — see "Inviting a new admin" below. The invitee sets their
+own password and scans a QR code to enrol MFA; nobody but them ever sees
+their TOTP secret, which the CLI path above cannot say. The CLI remains
+available for break-glass account recovery.
 
 Passwords are scrypt-hashed (N=2¹⁵, r=8, p=1); TOTP is RFC 6238 with ±1
 step of drift; both are implemented on Node's own crypto with no

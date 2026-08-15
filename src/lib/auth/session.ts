@@ -137,6 +137,8 @@ export async function hasBetaAccess(): Promise<boolean> {
 export type AdminUser = {
   id: number;
   email: string;
+  role: 'admin' | 'super_admin';
+  canManageAdmins: boolean;
 };
 
 /** Create a database session and set the admin cookie. */
@@ -191,15 +193,17 @@ export async function getAdminUser(): Promise<AdminUser | null> {
   if (colon <= 0) return null;
   const token = claim.sub.slice(colon + 1);
 
-  const [row] = await authSql<AdminUser[]>`
-    SELECT u.id, u.email
+  const [row] = await authSql<{
+    id: number; email: string; role: 'admin' | 'super_admin'; canManageAdmins: boolean;
+  }[]>`
+    SELECT u.id, u.email, u.role, u.can_manage_admins AS "canManageAdmins"
       FROM auth_sessions s
       JOIN auth_users u ON u.id = s.user_id
      WHERE s.token_hash = ${sha256Hex(token)}
        AND s.expires_at > now()
        AND s.revoked_at IS NULL
        AND u.disabled_at IS NULL
-       AND u.role = 'admin'
+       AND u.role IN ('admin', 'super_admin')
   `;
   return row ?? null;
 }
@@ -217,6 +221,33 @@ export async function getAdminUser(): Promise<AdminUser | null> {
 export async function requireAdmin(): Promise<AdminUser> {
   const admin = await getAdminUser();
   if (!admin) redirect('/admin/login');
+  return admin;
+}
+
+/**
+ * Require a super admin session, or redirect.
+ *
+ * Used by routes that must stay out of reach of a plain admin regardless
+ * of any delegated power: promoting/creating other admins at the role
+ * level, and the hidden data-QA query builder. Delegated
+ * `can_manage_admins` grants the *invite* power to a plain admin (see
+ * `hasAdminManagementAccess`) but never this.
+ */
+export async function requireSuperAdmin(): Promise<AdminUser> {
+  const admin = await requireAdmin();
+  if (admin.role !== 'super_admin') redirect('/admin');
+  return admin;
+}
+
+/** Whether an admin may invite/manage other admins: super admins always can; a plain admin only when delegated. */
+export function hasAdminManagementAccess(admin: AdminUser): boolean {
+  return admin.role === 'super_admin' || admin.canManageAdmins;
+}
+
+/** Require either a super admin or a delegated admin manager, or redirect. */
+export async function requireAdminManager(): Promise<AdminUser> {
+  const admin = await requireAdmin();
+  if (!hasAdminManagementAccess(admin)) redirect('/admin');
   return admin;
 }
 
