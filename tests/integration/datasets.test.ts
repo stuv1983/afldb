@@ -34,8 +34,11 @@ describe('match_results dataset', () => {
   });
 
   it('rejects a home_and_away round with no round_number and a non-finals code', async () => {
+    // A blank CSV cell reaches validateRow as null, never '' -- toObjects()
+    // (src/lib/ingest/csv.ts) normalises every empty field before validation
+    // ever runs, so that is what this simulates.
     const result = await matchResults.validateRow(
-      { season: '1989', round_code: '1', round_number: '', match_date: '1989-04-01', venue: 'x', home_club: 'Carlton', away_club: 'Footscray', home_score: '80', away_score: '70' },
+      { season: '1989', round_code: '1', round_number: null, match_date: '1989-04-01', venue: 'x', home_club: 'Carlton', away_club: 'Footscray', home_score: '80', away_score: '70' },
       { sql: authSql },
     );
     expect(result.verdict).toBe('error');
