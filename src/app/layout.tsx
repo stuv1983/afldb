@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { PrimaryNav, TabBar } from '@/components/SiteNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { getSiteFooter } from '@/db/queries/site-settings';
+import { indexingEnabled } from '@/lib/indexing';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
 import '@/styles/globals.css';
 
@@ -50,9 +51,10 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_AU',
   },
-  // Development pages must never be indexed. This is relaxed only at the
-  // deliberate production cutover.
-  robots: process.env.AFLDB_ENV === 'production'
+  // Development pages must never be indexed, and neither must a gated beta.
+  // Relaxed only by an explicit AFLDB_INDEXING=on at the deliberate cutover:
+  // the same predicate robots.txt uses, so the two can no longer disagree.
+  robots: indexingEnabled()
     ? { index: true, follow: true }
     : { index: false, follow: false },
 };

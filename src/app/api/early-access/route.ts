@@ -33,6 +33,65 @@ export const dynamic = 'force-dynamic';
 const SUBMIT_LIMIT = new RateLimiter(5, 15 * 60 * 1000);
 const READ_LIMIT = new RateLimiter(120, 15 * 60 * 1000);
 
+/**
+ * The largest submission worth reading.
+ *
+ * A Route Handler has no body limit of its own — the 1 MB cap that applies to
+ * Server Actions is not in play here — so without this an unauthenticated
+ * caller can make a 4 GB droplet buffer whatever it cares to send. The rate
+ * limiter above blunts that but does not answer it: it admits five bodies per
+ * IP per window before it says no, and it says no only AFTER this handler has
+ * been entered.
+ *
+ * 32 KB is far above any real submission (24 questions capped at 2000
+ * characters each, plus an email and a name) and far below anything that
+ * threatens the host. deploy/Caddyfile.production sets the same ceiling at
+ * the proxy so the bytes are refused before they reach Node at all; this is
+ * the check that still holds on a host with no proxy in front of it.
+ */
+const MAX_BODY_BYTES = 32 * 1024;
+
+/**
+ * Read the body, refusing anything oversized. Null means "too large".
+ *
+ * Read off the STREAM rather than through `request.text()`, which is the
+ * part that actually matters: Content-Length is a claim an attacker writes,
+ * and a chunked request declares no length at all, so `.text()` would buffer
+ * the whole of whatever is sent and only then hand it over to be measured —
+ * by which point the memory has already been spent. Reading chunk by chunk
+ * stops at the cap, so the bound holds against a body that lies about its
+ * size or never states one.
+ */
+async function readBounded(request: Request): Promise<string | null> {
+  // The cheap no first, for the honest client that simply sent too much.
+  const declared = Number(request.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return null;
+
+  if (!request.body) return '';
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_BODY_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } catch {
+    // A connection that dies mid-body is not a submission.
+    return null;
+  }
+
+  return Buffer.concat(chunks).toString('utf8');
+}
+
 /** Never say more than "we took it" — see the generic-failure note in beta/actions.ts. */
 const ACCEPTED = { ok: true } as const;
 
@@ -127,9 +186,14 @@ export async function POST(request: Request) {
     );
   }
 
+  const raw = await readBounded(request);
+  if (raw === null) {
+    return NextResponse.json({ error: 'That request is too large.' }, { status: 413 });
+  }
+
   let body: SubmitBody;
   try {
-    body = await request.json() as SubmitBody;
+    body = JSON.parse(raw) as SubmitBody;
   } catch {
     return NextResponse.json({ error: 'Malformed request.' }, { status: 400 });
   }

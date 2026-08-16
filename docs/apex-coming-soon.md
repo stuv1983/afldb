@@ -209,8 +209,9 @@ When the application takes over the apex:
    `beta.afldb.com` has.
 2. Delete `/var/www/afldb-soon`.
 3. The app's own `robots.ts` and `sitemap.ts` take over — set
-   `AFLDB_ENV=production` and turn the beta gate off, or they will keep
-   serving `Disallow: /`.
+   `AFLDB_INDEXING=on` and turn the beta gate off, or they will keep
+   serving `Disallow: /`. (`AFLDB_ENV` is already `production` on that host
+   and is transport security, not indexing — see `src/lib/indexing.ts`.)
 4. Decide what `beta.afldb.com` becomes. Leaving it serving the same app on a
    noindex header is fine; pointing it at the apex is tidier.
 

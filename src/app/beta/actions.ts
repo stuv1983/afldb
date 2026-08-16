@@ -6,6 +6,7 @@ import { authSql } from '@/db/authClient';
 import { generateToken, sha256Hex } from '@/lib/auth/crypto';
 import { RateLimiter } from '@/lib/auth/rate-limit';
 import { audit, grantBetaAccess, requestIp } from '@/lib/auth/session';
+import { sendEmail } from '@/lib/email/send';
 
 /**
  * The two ways into the beta: an access code, or a magic link to an
@@ -126,17 +127,39 @@ export async function requestMagicLink(
     const base = process.env.AFLDB_BASE_URL ?? 'http://localhost:3100';
     const link = `${base}/beta/verify?token=${token}`;
 
+    const delivery = await sendEmail({
+      to: email,
+      subject: 'Your AFLDB sign-in link',
+      text: [
+        'Here is your sign-in link for the AFLDB beta:',
+        '',
+        link,
+        '',
+        'It expires in 30 minutes and can be used once.',
+        '',
+        'If you did not ask for this, nothing has happened and you can ignore',
+        'this message — the link is useless without this mailbox.',
+      ].join('\n'),
+    });
+
     // The link carries a live 30-minute credential, so it must never reach a
-    // production log. In development there is no SMTP and the operator reads
-    // the link from the log to pass it on; in production the token stays out
-    // of the journal and the SMTP hook (still one function) must deliver it.
-    if (process.env.AFLDB_ENV === 'production') {
-      // TODO: deliver `link` by email. Deliberately NOT logged.
-      console.info(`[beta] magic link issued for ${email}`);
-    } else {
-      console.info(`[beta] magic link for ${email}: ${link}`);
+    // production log. With no relay configured there is nowhere to send it,
+    // which is the normal state in development: the operator reads it from
+    // the journal and passes it on. In production that fallback would write a
+    // working credential into the log, so it is withheld and the failure is
+    // reported without it.
+    if (!delivery.ok) {
+      if (process.env.AFLDB_ENV === 'production') {
+        console.warn(`[beta] magic link for ${email} could not be sent (${delivery.reason})`);
+      } else {
+        console.info(`[beta] magic link for ${email}: ${link}`);
+      }
     }
-    await audit('beta.magic_link_issued', { email }, { label: email });
+
+    // `delivered` is worth auditing: a request that was accepted but never
+    // reached anybody looks identical from the outside, and this is the only
+    // record that separates the two.
+    await audit('beta.magic_link_issued', { email, delivered: delivery.ok }, { label: email });
   } else {
     await audit('beta.magic_link_refused', { email }, { label: email });
   }

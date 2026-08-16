@@ -1,5 +1,15 @@
 import type { NextConfig } from 'next';
 
+/**
+ * AFLDB_ENV is the TRANSPORT SECURITY flag: HSTS and the stricter CSP here,
+ * and Secure session cookies in src/lib/auth/session.ts. It does NOT decide
+ * indexing — that is AFLDB_INDEXING, and src/lib/indexing.ts explains why the
+ * two had to come apart. Every host reachable over public HTTPS sets this to
+ * `production`, whether or not it is ready to be indexed.
+ *
+ * Read at BUILD time: `headers()` is evaluated when the routes manifest is
+ * generated, so changing this on a server requires a rebuild, not a restart.
+ */
 const isProduction = process.env.AFLDB_ENV === 'production';
 
 /**

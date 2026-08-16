@@ -1,15 +1,16 @@
 import type { MetadataRoute } from 'next';
 
+import { indexingEnabled } from '@/lib/indexing';
+
 const baseUrl = process.env.AFLDB_BASE_URL ?? 'http://localhost:3100';
-const isProduction = process.env.AFLDB_ENV === 'production';
 
 export default function robots(): MetadataRoute.Robots {
-  // Development and staging deployments must never be indexed. Indexing
-  // is enabled only by setting AFLDB_ENV=production at the deliberate
-  // cutover, so an exposed dev server cannot leak into search results.
-  // A gated beta is likewise not indexable: crawlers would only index
-  // the door.
-  if (!isProduction || process.env.AFLDB_BETA_GATE === 'on') {
+  // Development and staging deployments must never be indexed, and neither
+  // must a gated beta. Both questions are answered by `indexingEnabled()`,
+  // which fails closed and is keyed on AFLDB_INDEXING rather than on the
+  // AFLDB_ENV flag that also decides cookie and transport security — see the
+  // header of src/lib/indexing.ts for why those had to come apart.
+  if (!indexingEnabled()) {
     return { rules: [{ userAgent: '*', disallow: '/' }] };
   }
 

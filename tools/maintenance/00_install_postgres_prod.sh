@@ -11,7 +11,7 @@
 #                     development script        this script
 #   Databases         afldb_dev, afldb_test     afldb_prod only
 #   Roles             same five, same grants    same five, same grants
-#   .env AFLDB_ENV    development               development (see below)
+#   .env AFLDB_ENV    development               production (see below)
 #   .env base URL     http://10.0.40.100:3100   https://afldb.com
 #
 # Role names carry no _prod suffix. The cutover plan proposed afldb_prod_*
@@ -19,11 +19,16 @@
 # dedicated host there is nothing to collide with, and matching names keep
 # every DSN variable, grant and privileges test working unchanged.
 #
-# AFLDB_ENV IS WRITTEN AS development, DELIBERATELY. It gates indexing:
-# robots.txt returns Disallow: / and every page emits noindex until it says
-# production. Flipping it is the LAST step of cutover, after the site is
-# publicly correct on its real domain — not something this script should
-# decide. See docs/production-cutover.md §10.
+# AFLDB_ENV IS WRITTEN AS production, because this host answers on public
+# HTTPS and that flag is what puts Secure on the session cookie, sends HSTS
+# and drops 'unsafe-eval' from the CSP.
+#
+# It used to be written as `development` here, to hold indexing off until
+# cutover — which also shipped admin session cookies with no Secure attribute
+# on a live HTTPS host. Indexing is now its own flag, AFLDB_INDEXING, left
+# unset below and fail-closed: robots.txt returns Disallow: / and every page
+# emits noindex until it is explicitly turned on. Flipping THAT is the last
+# step of cutover. See src/lib/indexing.ts and docs/production-cutover.md §10.
 #
 # What it deliberately does NOT do:
 #   - It does not change listen_addresses. PostgreSQL stays bound to localhost.
@@ -190,11 +195,17 @@ cat > "${ENV_FILE}" <<ENV
 
 NODE_ENV=production
 
-# INDEXING GATE. While this says development, robots.txt returns
-# Disallow: / and every page emits noindex. Set it to production only as
-# the final step of cutover, once the site is publicly correct on its real
-# domain — see docs/production-cutover.md. Restart afldb afterwards.
-AFLDB_ENV=development
+# TRANSPORT SECURITY. This host answers on public HTTPS, so this must say
+# production: it is what puts Secure on the session cookie, sends HSTS and
+# drops 'unsafe-eval' from the CSP. It does NOT enable indexing.
+AFLDB_ENV=production
+
+# INDEXING GATE, deliberately left unset. Fails closed: robots.txt returns
+# Disallow: / and every page emits noindex until this says exactly `on`.
+# Setting it is the FINAL step of cutover, once the site is publicly correct
+# on its real domain — see docs/production-cutover.md §10. It is read at build
+# time, so `npm run build` and a restart are both needed afterwards.
+# AFLDB_INDEXING=on
 
 AFLDB_BASE_URL=https://afldb.com
 PORT=3100
@@ -265,8 +276,9 @@ echo
 echo "   Listening  : $(sudo -u postgres psql -tAc 'SHOW listen_addresses') (localhost only)"
 echo "   Port 5432 is NOT exposed beyond this host."
 echo
-echo "   AFLDB_ENV  : development — the site is noindex until you change"
-echo "                this. That is the final cutover step, not this one."
+echo "   AFLDB_ENV  : production — Secure cookies, HSTS and the strict CSP."
+echo "   AFLDB_INDEXING: unset — the site is noindex until you set it to"
+echo "                'on'. That is the final cutover step, not this one."
 echo
 echo " Next: load the schema and data, either"
 echo "   AFLDB_MIGRATE_TARGET=prod npm run db:migrate   (schema only), or"

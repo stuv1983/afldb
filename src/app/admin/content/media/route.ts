@@ -42,8 +42,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Choose an image file.' }, { status: 400 });
   }
 
-  // Checked before reading, so an oversized upload is refused rather than
-  // buffered into memory first.
+  // Refused before the bytes are copied out of the parsed form and before
+  // anything is stored. It does NOT save the buffering — request.formData()
+  // above has already read the body — so this bounds what reaches the
+  // database, not what reaches memory. The route is super-admin-only and
+  // behind middleware, which is what makes that acceptable here; the public
+  // endpoint in src/app/api/early-access/route.ts bounds the read itself.
   if (file.size > CONTENT_LIMITS.mediaBytes) {
     const limit = Math.round(CONTENT_LIMITS.mediaBytes / 1024 / 1024);
     return NextResponse.json(

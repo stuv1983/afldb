@@ -261,7 +261,8 @@ All configuration is in `/home/arm/projects/afldb/.env` (mode 600, owner `arm`),
 | `AFLDB_PROD_DATABASE_URL` | migrations, target `prod` — unset here |
 | `AFLDB_TEST_DATABASE_URL` | integration tests (must name a `_test` database) |
 | `AFLDB_BACKUP_DATABASE_URL` | `pg_dump` (`afldb_backup`, read-only) |
-| `AFLDB_ENV` | `development` \| `production` — **gates indexing** |
+| `AFLDB_ENV` | `development` \| `production` — **transport security**: Secure cookies, HSTS, strict CSP |
+| `AFLDB_INDEXING` | `on` enables indexing; anything else = `noindex`. Separate from `AFLDB_ENV` |
 | `AFLDB_WORKERS` | cluster worker count |
 | `AFLDB_POOL_MAX` | app pool size **per worker** (default 10) |
 | `AFLDB_BUILD_WORKERS` | caps `next build` static-generation workers; unset = Next's default |
@@ -279,7 +280,9 @@ back to development.
 
 ## 10. Indexing safety
 
-`robots.txt` returns `Disallow: /` and every page emits `noindex` unless `AFLDB_ENV=production`. The development server therefore cannot leak into search results. This flag is flipped only at cutover.
+`robots.txt` returns `Disallow: /` and every page emits `noindex` unless `AFLDB_INDEXING=on`. It fails closed, so the development server cannot leak into search results, and the beta gate overrides it regardless — a crawler behind a gate can only index the door. This flag is turned on only at cutover, and is read at build time, so it needs a rebuild rather than a restart.
+
+**It is deliberately not the same flag as `AFLDB_ENV`.** That one is transport security — `Secure` on the session cookie, HSTS, and the CSP that drops `'unsafe-eval'` — and every host reachable over public HTTPS sets it to `production` whether or not it is ready to be indexed. The two were one flag until 2026-08-16, which meant holding a pre-cutover HTTPS host out of search results also stripped `Secure` from its admin cookies. See `src/lib/indexing.ts`.
 
 ## 11. Rollback
 

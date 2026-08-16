@@ -50,10 +50,17 @@ beta.afldb.com {
 		# The beta host runs AFLDB_ENV=production, because three security
 		# behaviours key off it: Secure session cookies
 		# (src/lib/auth/session.ts), the CSP that drops 'unsafe-eval', and
-		# HSTS. That same flag also enables indexing, which is wrong here —
-		# a beta must never enter search results, and duplicate content on
-		# a subdomain would compete with the eventual apex. Overriding at
-		# the proxy separates the two: production posture, no indexing.
+		# HSTS. It must, being a public HTTPS host — without it the admin
+		# session cookie goes out with no Secure attribute.
+		#
+		# Indexing is a SEPARATE flag (AFLDB_INDEXING, see
+		# src/lib/indexing.ts) and stays off here: a beta must never enter
+		# search results, and duplicate content on a subdomain would compete
+		# with the eventual apex. The app therefore already serves noindex
+		# on every page and Disallow:/ from robots.txt. This header is the
+		# belt to that braces, and covers responses the proxy itself
+		# generates — errors, health-check failures — which never reach the
+		# application's own metadata.
 		#
 		# REMOVE THIS when this file is switched to serve the apex.
 		X-Robots-Tag "noindex, nofollow"
@@ -115,6 +122,15 @@ afldb.com {
 	# Must come first: `handle` blocks are evaluated in order and the bare
 	# one below matches everything.
 	handle /api/early-access* {
+		# The one unauthenticated write path on this host, so the body is
+		# capped before a byte of it reaches Node. The handler applies the
+		# same 32 KB ceiling itself — a host with no proxy in front still
+		# needs it — while this refuses the request at the edge, which is
+		# where an oversized body costs least.
+		request_body {
+			max_size 32KB
+		}
+
 		reverse_proxy 127.0.0.1:3100 {
 			health_uri /api/health
 			health_interval 30s

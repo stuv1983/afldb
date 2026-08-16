@@ -48,7 +48,7 @@
 - [x] Canonical URLs
 - [x] Metadata
 - [x] Segmented sitemap, with a published index at `/sitemap.xml`
-- [x] robots.txt gated on `AFLDB_ENV`, and smoke-tested per environment
+- [x] robots.txt gated on `AFLDB_INDEXING`, and smoke-tested per environment
 
 ### Reload safety
 - [x] A partial `--groups` import cannot `CASCADE` into tables it will not
@@ -127,9 +127,11 @@ Each step is reversible until step 8.
 > On the droplet, run **[`tools/maintenance/00_install_postgres_prod.sh`](../tools/maintenance/00_install_postgres_prod.sh)**
 > instead. It installs PostgreSQL, creates `afldb_prod` and the same five
 > role names as development, enables `pg_trgm`/`unaccent`, and writes a
-> production `.env` — with `AFLDB_ENV=development` so indexing stays off
-> until §10. It refuses to run on a host that has an `afldb_dev` database,
-> and refuses to overwrite an existing `.env` without `--force`.
+> production `.env` — with `AFLDB_ENV=production` (the host is on public
+> HTTPS, so it needs Secure cookies and HSTS from the first request) and
+> `AFLDB_INDEXING` left unset, so indexing stays off until §10. It refuses
+> to run on a host that has an `afldb_dev` database, and refuses to
+> overwrite an existing `.env` without `--force`.
 >
 > Steps 4 onward (reverse proxy, firewall, DNS, indexing) still apply as
 > written.
@@ -178,7 +180,7 @@ Grants belong in a migration, not a manual `GRANT`. Then write
 Set `AFLDB_ENV=production`, `AFLDB_BASE_URL=https://afldb.com` and a `PORT`
 that is **not** 3100 — see step 3.
 
-> Setting `AFLDB_ENV=production` **enables search-engine indexing**. Do not set it until the site is publicly correct.
+> `AFLDB_ENV=production` is **transport security**, not indexing: Secure session cookies, HSTS, and the CSP that drops `'unsafe-eval'`. Set it on any host reachable over public HTTPS, immediately. Indexing is `AFLDB_INDEXING`, which fails closed and is turned on separately at §10 — do not set that one until the site is publicly correct.
 
 ### Step 3 — Production service
 
@@ -285,7 +287,17 @@ Plus manual checks: home, search, a player, a club, a season, a match, records, 
 
 ### Step 10 — Search engines
 
-Only after smoke tests pass: submit the sitemap to Google Search Console and Bing Webmaster Tools.
+Only after smoke tests pass. Set `AFLDB_INDEXING=on` in `.env`, then rebuild
+and restart — it is read at build time, so a restart alone will not take:
+
+```bash
+npm run build && sudo systemctl restart afldb
+curl -s https://afldb.com/robots.txt   # must no longer say Disallow: /
+```
+
+The beta gate overrides this flag, so turn the gate off first or the site
+stays `noindex` with no other symptom. Then submit the sitemap to Google
+Search Console and Bing Webmaster Tools.
 
 ## 5. Rollback
 

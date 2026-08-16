@@ -103,7 +103,8 @@ Copy [.env.example](.env.example) and provide the values appropriate to the envi
 
 | Variable | Purpose |
 |---|---|
-| `AFLDB_ENV` | `development`, `staging`, or `production`; gates indexing, HSTS, and `Secure` session cookies |
+| `AFLDB_ENV` | `development`, `staging`, or `production`; transport security — HSTS, strict CSP, `Secure` session cookies |
+| `AFLDB_INDEXING` | `on` allows search indexing; fails closed. Separate from `AFLDB_ENV` by design |
 | `AFLDB_BASE_URL` | Canonical public base URL (metadata and magic-link links) |
 | `AFLDB_BETA_GATE` | `on` enables the closed-beta gate |
 | `AFLDB_BETA_EPOCH` | Beta revocation epoch; must be an integer (a bad value fails closed) |
@@ -156,7 +157,7 @@ A security review of the auth, beta-gate, and deployment surfaces produced the f
 **Authentication and sessions**
 
 - Admin authorization is now a single `requireAdmin()` exported from `src/lib/auth/session.ts`, replacing a guard that was hand-copied into seven routes. This DB-session check is the only layer that honours session revocation, so centralising it prevents a new admin route from silently shipping without it.
-- Admin and beta cookies derive their `Secure` attribute from `AFLDB_ENV === 'production'` (the single source of truth for production posture) rather than from `AFLDB_BASE_URL`, which could ship non-`Secure` cookies if that URL was misconfigured at cutover.
+- Admin and beta cookies derive their `Secure` attribute from `AFLDB_ENV === 'production'` (the transport-security flag) rather than from `AFLDB_BASE_URL`, which could ship non-`Secure` cookies if that URL was misconfigured at cutover. Indexing is a **separate** flag, `AFLDB_INDEXING`: when the two were one, holding a live HTTPS host out of search results also stripped `Secure` from its admin cookies.
 - The beta revocation epoch (`AFLDB_BETA_EPOCH`) is parsed and validated once in the edge-safe token module. A non-integer value now fails **closed** (a 503 at the gate) instead of becoming `NaN` and silently disabling the kill switch.
 
 **Denial-of-service and abuse**
