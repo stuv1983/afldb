@@ -115,6 +115,8 @@ Copy [.env.example](.env.example) and provide the values appropriate to the envi
 | `AFLDB_BACKUP_DATABASE_URL` | Read-only backup connection |
 | `AFLDB_LEGACY_SQLITE` | Path to the read-only legacy source |
 | `AFLDB_WORKERS` | Production cluster worker count |
+| `AFLDB_POOL_MAX` | Application pool size per worker (default 10) |
+| `AFLDB_BUILD_WORKERS` | Caps `next build` static-generation workers |
 | `AFLDB_MAX_PAGE_SIZE` | Maximum results per page |
 | `AFLDB_MAX_FILTERS` | Maximum advanced-search filters |
 | `AFLDB_STATEMENT_TIMEOUT_MS` | PostgreSQL statement timeout |

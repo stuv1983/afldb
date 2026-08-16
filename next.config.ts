@@ -50,10 +50,30 @@ const securityHeaders = [
     : []),
 ];
 
+/**
+ * Static-generation worker cap.
+ *
+ * Prerendering forks a worker per core and each one builds its own
+ * PostgreSQL pool (src/db/client.ts drops that pool to 2 during a build).
+ * Against a local cluster with max_connections=100 that is fine, but a
+ * managed database on a small plan allows far fewer — 22 on the entry
+ * tier — and a 24-core build box would ask for 48. The build then dies
+ * partway through with "too many clients", after doing most of the work.
+ *
+ * Unset means Next's default, which is what local and dev-server builds
+ * want. Production builds against the managed database set it.
+ */
+const buildWorkers = Number(process.env.AFLDB_BUILD_WORKERS);
+const cpus = Number.isSafeInteger(buildWorkers) && buildWorkers > 0
+  ? buildWorkers
+  : undefined;
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
+
+  ...(cpus === undefined ? {} : { experimental: { cpus } }),
 
   // Standalone output keeps the systemd deployment self-contained.
   output: 'standalone',

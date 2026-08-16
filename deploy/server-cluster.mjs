@@ -13,6 +13,11 @@
  * Worker count comes from AFLDB_WORKERS, defaulting to 4. It is
  * deliberately not "one per core": each worker holds its own PostgreSQL
  * pool, and 24 workers x 10 connections would exhaust max_connections.
+ *
+ * That default suits a local cluster (max_connections=100). Against a
+ * managed database the connection limit is much lower and the ceiling is
+ * workers x (AFLDB_POOL_MAX + 3) — the +3 being each worker's auth pool.
+ * deploy/afldb.service sets both explicitly; see docs/deployment.md §5.
  */
 import cluster from 'node:cluster';
 import { availableParallelism } from 'node:os';

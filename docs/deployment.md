@@ -93,6 +93,29 @@ Measured, concurrency 20 for 20 s against the full dataset:
 
 Worker count is **not** one per core: each worker holds its own PostgreSQL pool, and 24 × 10 would exhaust `max_connections` (100).
 
+### Sizing the connection budget
+
+Every worker holds **two** pools, not one, so the service's peak is `AFLDB_WORKERS × (AFLDB_POOL_MAX + 3)` — the `+3` being the separate auth pool in [`src/db/authClient.ts`](../src/db/authClient.ts). Miss the auth pool and the arithmetic understates the real figure by a third.
+
+**Production droplet** (2 vCPU / 4 GB, PostgreSQL co-located): `AFLDB_WORKERS=2`, `AFLDB_POOL_MAX=10`.
+
+| Consumer | Connections |
+|---|---:|
+| App pools (2 × 10) | 20 |
+| Auth pools (2 × 3) | 6 |
+| **Service peak** | **26** |
+| Headroom against `max_connections` (100) | 74 |
+
+One worker per vCPU. This box is not the 24-core development host, and CPU is not the first ceiling it hits: with 4 GB shared between Node and PostgreSQL, memory usually is, and each extra worker costs both. Raise `AFLDB_WORKERS` only once `journalctl -u afldb` shows CPU saturation arriving *before* memory pressure.
+
+**If the database ever moves to a managed plan**, the connection limit replaces `max_connections` as the ceiling, and it is a hard one — exceeding it does not degrade, it fails with `too many clients`. Entry tiers are tight: 22 connections at 1 GB, 47 at 2 GB. At 22 the same formula caps you at two workers with a pool of 5.
+
+Builds need their own budget. Prerendering forks a worker per core, each with a 2-connection pool, so a 24-core build box asks for 48 — over a managed limit before the build finishes. `AFLDB_BUILD_WORKERS` caps Next's static-generation workers; leave it **unset** against a local cluster, where Next's default is correct.
+
+```bash
+AFLDB_BUILD_WORKERS=4 npm run build     # 4 × 2 = 8 connections
+```
+
 ## 6. Health
 
 ```bash
@@ -233,6 +256,8 @@ All configuration is in `/home/arm/projects/afldb/.env` (mode 600, owner `arm`),
 | `AFLDB_BACKUP_DATABASE_URL` | `pg_dump` (`afldb_backup`, read-only) |
 | `AFLDB_ENV` | `development` \| `production` — **gates indexing** |
 | `AFLDB_WORKERS` | cluster worker count |
+| `AFLDB_POOL_MAX` | app pool size **per worker** (default 10) |
+| `AFLDB_BUILD_WORKERS` | caps `next build` static-generation workers; unset = Next's default |
 | `AFLDB_STATEMENT_TIMEOUT_MS` | per-connection statement timeout |
 
 **The web service does not receive them all.** `.env` is the whole project's
@@ -267,7 +292,8 @@ Migrations are forward-only: the runner refuses to run if an applied migration h
 |---|---|---|
 | Site loads unstyled | `.next/static` missing from standalone | `npm run build` (runs `prepare-standalone`) |
 | `EADDRINUSE :3100` | an old server still running | `fuser -k 3100/tcp` |
-| Build fails, "too many clients" | prerender workers × pool size | already handled: pool drops to 2 during build |
-| Pages slow under load | worker count | raise `AFLDB_WORKERS`, watch `max_connections` |
+| Build fails, "too many clients" | prerender workers × pool size | pool already drops to 2 during build; against a managed database also set `AFLDB_BUILD_WORKERS` (§5) |
+| Serving fails, "too many clients" | `AFLDB_WORKERS × (AFLDB_POOL_MAX + 3)` over the plan limit | lower either, or raise the plan (§5) |
+| Pages slow under load | worker count | raise `AFLDB_WORKERS` **and** the connection limit together (§5) |
 | `permission denied for table` | role lacks a grant | grants belong in a migration, not a manual `GRANT` |
 | Chromium won't launch | `libasound2` | set `LD_LIBRARY_PATH` (§8) |

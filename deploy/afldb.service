@@ -35,9 +35,22 @@ UnsetEnvironment=AFLDB_IMPORT_DATABASE_URL AFLDB_OWNER_DATABASE_URL AFLDB_TEST_D
 
 Environment=NODE_ENV=production
 Environment=HOSTNAME=127.0.0.1
-# Each worker holds its own PostgreSQL pool, so this is deliberately not
-# one worker per core: 24 x 10 connections would exhaust max_connections.
-Environment=AFLDB_WORKERS=4
+# Worker count and pool size are one decision, not two: every worker holds
+# its own app pool AND its own auth pool, so this service can hold
+# workers x (AFLDB_POOL_MAX + 3) connections.
+#
+# Sized for the production droplet: 2 vCPU, 4 GB, PostgreSQL co-located on
+# the same box (max_connections 100). One worker per vCPU, and the pool
+# back at its default:
+#
+#   2 workers x (10 + 3) = 26 connections against a limit of 100
+#
+# The 24-core development host runs 4 workers; this is not that box. Raise
+# AFLDB_WORKERS only after journalctl shows CPU saturation arriving before
+# memory pressure — on 4 GB shared with PostgreSQL, memory is the more
+# likely ceiling, and each extra worker costs both.
+Environment=AFLDB_WORKERS=2
+Environment=AFLDB_POOL_MAX=10
 
 KillMode=mixed
 Restart=always
