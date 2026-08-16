@@ -57,6 +57,11 @@ const OPERATIONAL_TABLES = [
   'data_submissions',
   'data_submission_rows',
   'admin_invites',
+  // Uploaded page images (037). Its own header wrongly claimed the absence
+  // of a GRANT was enough; the schema-wide default privilege had already
+  // granted SELECT, and 038 revokes it. Listed here so the assertion below
+  // is what keeps it revoked rather than the comment in either migration.
+  'site_media',
 ];
 
 beforeAll(async () => {
