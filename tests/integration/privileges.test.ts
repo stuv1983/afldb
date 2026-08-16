@@ -368,15 +368,26 @@ describe('afldb_import is confined to the statistical tables', () => {
     const offLimits = OPERATIONAL_TABLES
       .filter((t) => t !== 'data_submissions' && t !== 'data_submission_rows');
 
+    // Split the same way the afldb_app write test above is: SELECT,
+    // INSERT and UPDATE can be granted per column, so the column-aware
+    // check is the one that sees them; DELETE and TRUNCATE exist only at
+    // table level and has_any_column_privilege rejects them outright.
     const rows = await sql<{ name: string; privilege: string }[]>`
       SELECT c.relname AS name, p.privilege
         FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
-       CROSS JOIN LATERAL (VALUES ('SELECT'), ('INSERT'), ('UPDATE'),
-                                  ('DELETE'), ('TRUNCATE')) AS p(privilege)
+       CROSS JOIN LATERAL (VALUES ('SELECT'), ('INSERT'), ('UPDATE')) AS p(privilege)
        WHERE n.nspname = 'public'
          AND c.relname::text = ANY(${offLimits})
          AND has_any_column_privilege(${IMPORT_ROLE}, c.oid, p.privilege)
+      UNION ALL
+      SELECT c.relname, p.privilege
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+       CROSS JOIN LATERAL (VALUES ('DELETE'), ('TRUNCATE')) AS p(privilege)
+       WHERE n.nspname = 'public'
+         AND c.relname::text = ANY(${offLimits})
+         AND has_table_privilege(${IMPORT_ROLE}, c.oid, p.privilege)
        ORDER BY 1, 2
     `;
     expect(rows).toEqual([]);
