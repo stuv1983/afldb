@@ -1,0 +1,18 @@
+# AFLDB — apex (afldb.com), coming-soon page.
+#
+# This host is INDEXABLE. That is the point of it: the apex is the domain that
+# accumulates search history, and a real page here is worth more than the
+# parked ad page it replaced.
+#
+# beta.afldb.com serves its own robots.txt from the application
+# (src/app/robots.ts) and is separately marked noindex at the proxy, so the
+# beta cannot compete with this page for the same content.
+#
+# /api/ is the early-access form's endpoint. It is proxied to the application
+# and has nothing to index.
+
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://afldb.com/sitemap.xml

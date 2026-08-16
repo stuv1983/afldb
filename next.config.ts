@@ -78,8 +78,10 @@ const nextConfig: NextConfig = {
   // Standalone output keeps the systemd deployment self-contained.
   output: 'standalone',
 
-  // The database driver must never be bundled for the browser.
-  serverExternalPackages: ['postgres'],
+  // The database driver and the SMTP client must never be bundled for the
+  // browser. nodemailer additionally resolves transports by dynamic require,
+  // which the bundler cannot follow.
+  serverExternalPackages: ['postgres', 'nodemailer'],
 
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];

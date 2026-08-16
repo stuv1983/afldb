@@ -190,11 +190,27 @@ serves disallow-all. Two ways in, both managed at `/admin/access`:
   a use limit and an expiry. The clear text is shown once at creation;
   only its sha256 is stored. Redemption is atomic, so a code cannot be
   double-spent. Revoking a code stops new admissions.
+
+  Ticking **Unlimited** stores a NULL `max_uses` (migration 036), which
+  the redeem query reads the same way it already reads a NULL
+  `expires_at`: no cap. That is the right shape for a standing code held
+  by a small group of trusted testers, where an arbitrary number would
+  only run out at an inconvenient moment. It still expires, `use_count`
+  still counts, and revoking still stops it — unlimited means uncapped,
+  not unrevocable. Everything else stays single-use by default, and the
+  uncapped case cannot be reached by fumbling the form: the checkbox has
+  to be ticked deliberately.
 * **Allowlisted emails** — the visitor requests a single-use, 30-minute
   magic link on `/beta`. The response never reveals whether the address
-  was on the list. Until SMTP exists the link is written to the service
-  log: `journalctl -u afldb | grep magic`. Revoking the email wins even
+  was on the list. Configure an SMTP relay (`AFLDB_SMTP_*`, see
+  [apex-coming-soon.md](apex-coming-soon.md) §6) and the link is
+  delivered; without one it is written to the service log instead:
+  `journalctl -u afldb | grep magic`. Revoking the email wins even
   against an already-issued, unclicked link.
+* **Early access requests** — a visitor with neither can ask, either on
+  `/beta` or through the form on `afldb.com`. Both queue a pending row
+  for review here; neither admits anybody. The apex form's questions are
+  configured at `/admin/settings`.
 
 Admission sets a signed 90-day cookie carrying a **revocation epoch**.
 Bumping `AFLDB_BETA_EPOCH` invalidates every outstanding admission at

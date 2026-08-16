@@ -24,7 +24,14 @@ export async function createAccessCode(
   // Math.min(Math.max(Number(...))) let a non-numeric field become NaN and
   // flow straight into the INSERT's integer column (a 500), and passed
   // fractional values through.
-  const maxUses = parseIntInRange(String(formData.get('maxUses') ?? ''), 1, 500) ?? 1;
+  //
+  // Unlimited is NULL (migration 036), and must be asked for explicitly: a
+  // blank or unparseable field still falls back to a single use, so the
+  // uncapped case can never be reached by fumbling the form.
+  const unlimited = formData.get('unlimited') === 'on';
+  const maxUses = unlimited
+    ? null
+    : parseIntInRange(String(formData.get('maxUses') ?? ''), 1, 500) ?? 1;
   const days = parseIntInRange(String(formData.get('days') ?? ''), 1, 365) ?? 90;
 
   if (label.length < 2 || label.length > 100) {
@@ -39,13 +46,16 @@ export async function createAccessCode(
     VALUES (${sha256Hex(code)}, ${label}, ${maxUses}, ${admin.id},
             now() + ${days} * interval '1 day')
   `;
-  await audit('access.code_created', { label, maxUses, days },
+  await audit('access.code_created', { label, maxUses, days, unlimited: maxUses === null },
     { userId: admin.id, label: admin.email });
   revalidatePath('/admin/access');
 
   return {
     newCode: code,
-    message: `Code for “${label}” created. Copy it now — it is not stored and cannot be shown again.`,
+    message: maxUses === null
+      ? `Unlimited code for “${label}” created, valid ${days} days. Copy it now — it is `
+        + 'not stored and cannot be shown again. Revoke it to stop it.'
+      : `Code for “${label}” created. Copy it now — it is not stored and cannot be shown again.`,
   };
 }
 

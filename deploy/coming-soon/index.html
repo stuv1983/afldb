@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<!--
+  AFLDB — apex coming-soon page.
+
+  Served as STATIC FILES by Caddy from /var/www/afldb-soon, not by the Next.js
+  app. deploy/Caddyfile.production explains why in full; the short version is
+  that this page is the SEO asset for afldb.com and must not go down with the
+  application or the database behind it.
+
+  The only dynamic part is the early-access form, whose questions a super
+  admin configures at /admin/settings. app.js fetches them from
+  /api/early-access, which Caddy proxies to the app on the SAME origin.
+
+  The statistics in the hero are a SNAPSHOT taken when this page was written.
+  They only move when a season is loaded; refresh them at the same time as the
+  screenshots. See docs/apex-coming-soon.md.
+-->
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>AFLDB — Australian Football Statistics, 1897 to Present</title>
+<meta name="description" content="A complete statistical record of Australian Football: every VFL/AFL player, match and season from 1897 to the present, with career records, Brownlow Medal votes, ladders and AFLW. Currently in closed beta.">
+<link rel="canonical" href="https://afldb.com/">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AFLDB">
+<meta property="og:locale" content="en_AU">
+<meta property="og:url" content="https://afldb.com/">
+<meta property="og:title" content="AFLDB — Australian Football Statistics, 1897 to Present">
+<meta property="og:description" content="Every VFL/AFL player, match and season since 1897. Career records, Brownlow votes, ladders and AFLW — currently in closed beta.">
+<meta property="og:image" content="https://afldb.com/img/home-dark.webp">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "AFLDB",
+  "alternateName": "Australian Football Database",
+  "url": "https://afldb.com/",
+  "description": "A complete statistical record of Australian Football (VFL/AFL) from 1897 to the present: players, clubs, seasons, matches, venues, records, awards and Brownlow Medal history.",
+  "inLanguage": "en-AU"
+}
+</script>
+</head>
+
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="container masthead">
+    <span class="brand">AFLDB</span>
+    <span class="span">1897 &mdash; Present</span>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero container">
+    <p class="eyebrow">Coming soon</p>
+    <h1>Every player. Every game. Since 1897.</h1>
+    <p class="lede">
+      AFLDB is a complete statistical record of Australian Football &mdash; every
+      VFL/AFL player, every match, every season from the first bounce in 1897 to
+      the present round. It is being built as an independent, non-commercial
+      reference, and is currently in closed beta while the record is verified.
+    </p>
+
+    <div class="cta-row">
+      <!--
+        Replaced by app.js once the form definition loads. Kept as a mailto so
+        the page is still useful with JavaScript disabled or the app down.
+      -->
+      <div id="early-access">
+        <noscript>
+          <a class="btn" href="mailto:requests@afldb.com?subject=AFLDB%20early%20access">
+            Request early access
+          </a>
+        </noscript>
+      </div>
+    </div>
+
+    <ul class="stats" aria-label="The record, at a glance">
+      <li><strong>13,361</strong><span>Players</span></li>
+      <li><strong>17,027</strong><span>Matches</span></li>
+      <li><strong>130</strong><span>Seasons</span></li>
+      <li><strong>694,209</strong><span>Player games</span></li>
+    </ul>
+  </section>
+
+  <section class="container shot-wide">
+    <img
+      src="/img/home-dark.webp"
+      width="1600" height="1000"
+      alt="The AFLDB home page: a single search box above counts of players, matches and seasons, with panels showing recent club meetings and career Brownlow vote leaders."
+      loading="eager" decoding="async">
+  </section>
+
+  <section class="container">
+    <h2>What it does</h2>
+
+    <div class="features">
+
+      <article class="feature">
+        <h3>Every player, in full</h3>
+        <p>
+          Career totals, season-by-season splits, honours and every match a player
+          appeared in &mdash; from the 1890s to last weekend. Two players can be put
+          side by side.
+        </p>
+        <img
+          src="/img/player-dark.webp"
+          width="1400" height="875"
+          alt="A player page showing career games, goals, Brownlow votes, finals and premierships, above a career detail table and a list of honours."
+          loading="lazy" decoding="async">
+      </article>
+
+      <article class="feature">
+        <h3>Seasons and ladders</h3>
+        <p>
+          Every season from 1897, with the final ladder, every round and every
+          result. Premiers, wooden spoons and finals series are marked where the
+          record supports it.
+        </p>
+        <img
+          src="/img/season-dark.webp"
+          width="1400" height="875"
+          alt="A season page showing the 2025 AFL ladder with played, won, lost, points for and against, percentage and premiership points."
+          loading="lazy" decoding="async">
+      </article>
+
+      <article class="feature">
+        <h3>Search that answers questions</h3>
+        <p>
+          One line of enquiry finds a name, a club, a ground, a season or a round.
+          Career criteria can be combined and filtered, and every search is a URL
+          you can share or keep.
+        </p>
+        <img
+          src="/img/players-dark.webp"
+          width="1400" height="875"
+          alt="The players leaderboard, sortable by games, goals, Brownlow votes, finals, premierships, debut or name, with an advanced search panel above it."
+          loading="lazy" decoding="async">
+      </article>
+
+      <article class="feature">
+        <h3>Brownlow Medal history</h3>
+        <p>
+          Every vote on record since 1924, by season and by career, with
+          round-by-round detail where it was published &mdash; and an explicit note
+          where it was not.
+        </p>
+        <img
+          src="/img/brownlow-dark.webp"
+          width="1400" height="875"
+          alt="The Brownlow Medal page listing career vote leaders with vote totals, medals won and games played."
+          loading="lazy" decoding="async">
+      </article>
+
+    </div>
+  </section>
+
+  <section class="container band">
+    <h2>Built like a record book</h2>
+    <div class="notes">
+      <div class="note">
+        <h3>Gaps are shown as gaps</h3>
+        <p>
+          Statistics that were never collected in a given era are shown as
+          &ldquo;&mdash;&rdquo;, never as zero. A missing figure and a figure of nil
+          are different facts, and conflating them quietly corrupts every total
+          built on top of them.
+        </p>
+      </div>
+      <div class="note">
+        <h3>Sources are stated</h3>
+        <p>
+          Data is derived from publicly available sources including AFL Tables and
+          Wikipedia. Where a value is disputed or unrecorded, the page says so
+          rather than picking one and looking confident.
+        </p>
+      </div>
+      <div class="note">
+        <h3>AFLW included</h3>
+        <p>
+          The AFLW record has its own section, with its own leaders and season
+          pages, rather than being folded into the men&rsquo;s competition.
+        </p>
+      </div>
+      <div class="note">
+        <h3>Reads well anywhere</h3>
+        <p>
+          Light and dark, desktop and phone. Numbers are set in a monospace face so
+          columns line up down the page.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="container pair">
+    <figure>
+      <img
+        src="/img/home-light.webp"
+        width="1600" height="1000"
+        alt="The same AFLDB home page in its light theme, on cream paper with dark ink."
+        loading="lazy" decoding="async">
+      <figcaption>Light</figcaption>
+    </figure>
+    <figure class="phone">
+      <img
+        src="/img/home-mobile-dark.webp"
+        width="420" height="910"
+        alt="The AFLDB home page on a phone, with the search box and statistics stacked in a single column."
+        loading="lazy" decoding="async">
+      <figcaption>Mobile</figcaption>
+    </figure>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>
+      AFLDB &mdash; Australian Football statistics, 1897 to present.
+      Data derived from publicly available sources including AFL Tables and Wikipedia.
+    </p>
+    <p>AFLDB is an independent hobby project, and is not affiliated with the AFL.</p>
+    <p>Contact: <a href="mailto:admin@afldb.com">admin@afldb.com</a></p>
+  </div>
+</footer>
+
+<script src="/app.js" defer></script>
+</body>
+</html>

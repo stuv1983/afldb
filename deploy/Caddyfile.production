@@ -7,11 +7,20 @@
 # Caddy obtains and renews certificates automatically once the hostname
 # resolves to this droplet. Nothing here requests one explicitly.
 #
-# BETA FIRST, APEX LATER. beta.afldb.com is served now; the afldb.com and
-# www.afldb.com blocks at the bottom stay commented out until the beta is
-# proven. That ordering is deliberate — it is the staging-hostname step
-# docs/production-cutover.md §3 recommended, and it means a mistake here
-# cannot affect the real domain.
+# TWO HOSTNAMES, TWO JOBS.
+#
+#   beta.afldb.com   the application, gated, noindex — the staging-hostname
+#                    step docs/production-cutover.md §3 recommended.
+#   afldb.com        a static coming-soon page, indexable, served from disk.
+#   www.afldb.com    a permanent redirect to the apex, nothing else.
+#
+# The apex does NOT proxy to the application, with one exception (the
+# early-access form endpoint). See the comment on that block for why. This
+# keeps the original property of the beta-first ordering — a mistake in the
+# application cannot take down the domain that matters for search — while
+# still putting a real page at the apex instead of a parked one.
+#
+# See docs/apex-coming-soon.md for the deployment steps.
 #
 # THE header_up LINES ARE NOT OPTIONAL. Without them a client can send
 # its own X-Forwarded-For and forge the IP recorded in auth_sessions and
@@ -75,47 +84,105 @@ beta.afldb.com {
 	}
 }
 
-# --- Apex, for the real launch -----------------------------------------
-# Uncomment both blocks together, and drop the X-Robots-Tag above.
+# --- Apex: the coming-soon page ----------------------------------------
 #
 # The apex and www MUST be separate blocks. Naming both on one block and
 # redirecting to the apex makes the apex redirect to itself — an infinite
 # loop that takes the site down the moment DNS resolves. `caddy validate`
 # does not catch it; only the separation does.
+
+www.afldb.com {
+	redir https://afldb.com{uri} permanent
+}
+
+# afldb.com serves STATIC FILES, not the application.
 #
-# www.afldb.com {
-# 	redir https://afldb.com{uri} permanent
-# }
+# The apex is the hostname that accumulates search history, so it is the one
+# that must always answer. A static file server cannot 502 because the app is
+# restarting, cannot time out because a query got slow, and does not care
+# whether PostgreSQL is up. Until the beta is proven, that reliability is
+# worth more at the apex than the application is — and when the application
+# does launch here, the SEO history is already attached to this hostname.
 #
-# afldb.com {
-# 	reverse_proxy 127.0.0.1:3100 {
-# 		health_uri /api/health
-# 		health_interval 30s
-# 		health_timeout 5s
-# 		header_up X-Forwarded-For {remote_host}
-# 		header_up -X-Real-IP
-# 		header_up -Forwarded
-# 	}
+# The ONE dynamic path is the early-access form's endpoint, proxied to the app
+# below. Same origin, so the form posts without CORS and the page's own
+# form-action/connect-src 'self' policy covers it.
 #
-# 	encode gzip zstd
-#
-# 	header {
-# 		X-Content-Type-Options nosniff
-# 		X-Frame-Options DENY
-# 		Referrer-Policy strict-origin-when-cross-origin
-# 		-Server
-# 		-X-Powered-By
-# 	}
-#
-# 	@health path /api/health
-# 	header @health Cache-Control "no-store"
-#
-# 	log {
-# 		output file /var/log/caddy/afldb-access.log {
-# 			roll_size 20MiB
-# 			roll_keep 5
-# 		}
-# 		format json
-# 		level INFO
-# 	}
-# }
+# AT LAUNCH: delete the `handle` blocks and give this site the same
+# `reverse_proxy` body the beta.afldb.com block above has. Nothing else here
+# changes — same hostname, same certificate, same logs.
+afldb.com {
+	# Must come first: `handle` blocks are evaluated in order and the bare
+	# one below matches everything.
+	handle /api/early-access* {
+		reverse_proxy 127.0.0.1:3100 {
+			health_uri /api/health
+			health_interval 30s
+			health_timeout 5s
+
+			# Identical to the beta block, and for the same reason: the app
+			# records the RIGHTMOST X-Forwarded-For entry, which is only
+			# trustworthy because Caddy overwrites rather than appends. The
+			# early-access endpoint rate-limits on that value.
+			header_up X-Forwarded-For {remote_host}
+			header_up -X-Real-IP
+			header_up -Forwarded
+		}
+	}
+
+	handle {
+		root * /var/www/afldb-soon
+		file_server
+	}
+
+	encode gzip zstd
+
+	header {
+		# NO X-Robots-Tag here. This host is meant to be indexed — that is
+		# the entire point of serving a real page at the apex instead of
+		# leaving it parked. /var/www/afldb-soon/robots.txt allows crawling
+		# and points at the one-URL sitemap beside it.
+
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+
+		# The page loads no third-party anything, and its CSS and JS are
+		# separate files rather than inline, so this needs no 'unsafe-inline'
+		# — unlike the application's own CSP, which does.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+
+		# Never advertise the stack.
+		-Server
+		-X-Powered-By
+
+		# HSTS IS DELIBERATELY ABSENT until HTTPS here is confirmed working.
+		# `includeSubDomains` on the apex also binds beta.afldb.com, and
+		# max-age=31536000 means browsers refuse plain HTTP for a year — close
+		# to irreversible on a first deployment. Once the certificate has
+		# issued and the site has served cleanly for a day or two, add it
+		# ramped: 300, then 86400, then 31536000. `preload` is a separate,
+		# later decision and is not on that ramp.
+		# Strict-Transport-Security "max-age=300"
+	}
+
+	# The HTML must not be cached hard: switching the early-access form on or
+	# off changes what the page offers, and a week-old copy in a CDN or a
+	# browser would not know. The fingerprint-free assets beside it are
+	# cheap enough to revalidate.
+	@html path / /index.html
+	header @html Cache-Control "public, max-age=300, must-revalidate"
+
+	@assets path /img/* /favicon.svg
+	header @assets Cache-Control "public, max-age=86400"
+
+	log {
+		output file /var/log/caddy/afldb-apex.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+		format json
+		level INFO
+	}
+}

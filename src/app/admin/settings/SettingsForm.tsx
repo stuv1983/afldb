@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react';
 
+import { EarlyAccessSettings } from '@/app/admin/settings/EarlyAccessSettings';
 import { saveSiteSettings, type SettingsState } from '@/app/admin/settings/actions';
 import {
   AFLW_LEADER_CATEGORIES,
@@ -25,10 +26,13 @@ import {
 export function SettingsForm({
   settings,
   recordOptions,
+  smtpConfigured,
 }: {
   settings: SiteSettings;
   /** Career record categories, labelled server-side from RECORD_CATEGORIES. */
   recordOptions: { value: string; label: string }[];
+  /** Whether AFLDB_SMTP_* is set, so the form can say why sending is off. */
+  smtpConfigured: boolean;
 }) {
   const [state, action, saving] = useActionState<SettingsState, FormData>(saveSiteSettings, {});
   const [layout, setLayout] = useState<HomeLayout>(settings.homeLayout);
@@ -191,6 +195,15 @@ export function SettingsForm({
           </label>
         ))}
       </section>
+
+      <EarlyAccessSettings
+        open={settings.earlyAccessOpen}
+        intro={settings.earlyAccessIntro}
+        questions={settings.earlyAccessQuestions}
+        notify={settings.earlyAccessNotify}
+        notifyTo={settings.earlyAccessNotifyTo}
+        smtpConfigured={smtpConfigured}
+      />
 
       <button className="btn" type="submit" disabled={saving}>
         {saving ? 'Saving…' : 'Save settings'}

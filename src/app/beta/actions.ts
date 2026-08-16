@@ -70,13 +70,19 @@ export async function redeemAccessCode(
 
   // Atomic redeem: the use is counted in the same statement that checks
   // the limits, so a code cannot be double-spent by two racing requests.
+  //
+  // A NULL max_uses means unlimited (migration 036), matching the NULL
+  // expires_at convention on the line above. Without the explicit IS NULL
+  // test this comparison would be NULL rather than true, and an unlimited
+  // code would be refused every time — the failure mode is silent, because
+  // "not accepted" is the same message a wrong code gets.
   const [row] = await authSql<{ id: number; label: string }[]>`
     UPDATE beta_access_codes
        SET use_count = use_count + 1
      WHERE code_hash = ${sha256Hex(code)}
        AND revoked_at IS NULL
        AND (expires_at IS NULL OR expires_at > now())
-       AND use_count < max_uses
+       AND (max_uses IS NULL OR use_count < max_uses)
     RETURNING id, label
   `;
 

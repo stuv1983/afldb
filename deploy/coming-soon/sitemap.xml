@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  One URL, deliberately.
+
+  The apex currently serves exactly one page. The application's own segmented
+  sitemap (src/app/sitemap.ts, thousands of URLs) belongs to whichever host
+  serves the application, and must not be published here: every one of those
+  paths 404s on the apex while the coming-soon page is what it serves.
+
+  Replace this file with a proxy to the app's sitemap at the real launch, at
+  the same time as the Caddy block switches from file_server to reverse_proxy.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://afldb.com/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>

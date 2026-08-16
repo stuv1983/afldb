@@ -8,13 +8,19 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DEFAULT_EARLY_ACCESS_INTRO,
+  DEFAULT_EARLY_ACCESS_NOTIFY_TO,
+  DEFAULT_EARLY_ACCESS_QUESTIONS,
   DEFAULT_GRID_AUDIENCE,
   DEFAULT_HOME_LAYOUT,
   DEFAULT_HOME_RECORD,
+  EARLY_ACCESS_LIMITS,
   HOME_SECTIONS,
   SETTING_KEYS,
   homeSectionRows,
   parseAflwLeaders,
+  parseEarlyAccessNotifyTo,
+  parseEarlyAccessQuestions,
   parseGridAudience,
   parseHomeLayout,
   parseHomeRecord,
@@ -111,6 +117,11 @@ describe('parseSiteSettings', () => {
       homeRecord: DEFAULT_HOME_RECORD,
       aflwLeaders: 'goals',
       gridAudience: DEFAULT_GRID_AUDIENCE,
+      earlyAccessOpen: false,
+      earlyAccessIntro: DEFAULT_EARLY_ACCESS_INTRO,
+      earlyAccessQuestions: DEFAULT_EARLY_ACCESS_QUESTIONS,
+      earlyAccessNotify: false,
+      earlyAccessNotifyTo: DEFAULT_EARLY_ACCESS_NOTIFY_TO,
     });
   });
 
@@ -151,5 +162,144 @@ describe('parseSiteSettings', () => {
     expect(settings.gridAudience).toBe('admin');
     expect(settings.homeRecord).toBe('most-premierships');
     expect(settings.homeLayout).toEqual(DEFAULT_HOME_LAYOUT);
+  });
+});
+
+/**
+ * The early-access question list is the one setting whose value is written by
+ * a person rather than chosen from a fixed list, and it is rendered on a
+ * public page and used to validate what strangers submit. Every case here is
+ * "what the apex form does when the stored questions are not what this build
+ * expects".
+ */
+describe('parseEarlyAccessQuestions', () => {
+  it('falls back to the defaults for a value that is not a list', () => {
+    expect(parseEarlyAccessQuestions(undefined)).toEqual(DEFAULT_EARLY_ACCESS_QUESTIONS);
+    expect(parseEarlyAccessQuestions(null)).toEqual(DEFAULT_EARLY_ACCESS_QUESTIONS);
+    expect(parseEarlyAccessQuestions('interest')).toEqual(DEFAULT_EARLY_ACCESS_QUESTIONS);
+  });
+
+  it('keeps a deliberately empty list rather than restoring the defaults', () => {
+    // "Email and name only" is a coherent form, and a super admin who removed
+    // every question must not have them reappear on the next read.
+    expect(parseEarlyAccessQuestions([])).toEqual([]);
+  });
+
+  it('drops a question with no usable id or label', () => {
+    expect(parseEarlyAccessQuestions([
+      { id: 'ok', label: 'Fine', type: 'short', required: false },
+      { id: 'NO CAPS OR SPACES', label: 'Bad id', type: 'short' },
+      { id: 'blank', label: '   ', type: 'short' },
+      { label: 'No id at all', type: 'short' },
+    ])).toEqual([
+      { id: 'ok', label: 'Fine', type: 'short', required: false },
+    ]);
+  });
+
+  it('drops a duplicate id, keeping the first', () => {
+    // Answers are keyed by id, so two questions sharing one would overwrite
+    // each other in the stored object.
+    const questions = parseEarlyAccessQuestions([
+      { id: 'why', label: 'First', type: 'short' },
+      { id: 'why', label: 'Second', type: 'long' },
+    ]);
+    expect(questions).toHaveLength(1);
+    expect(questions[0].label).toBe('First');
+  });
+
+  it('drops a choice with no options, which could not be answered', () => {
+    expect(parseEarlyAccessQuestions([
+      { id: 'how', label: 'How?', type: 'select', options: [] },
+    ])).toEqual([]);
+    expect(parseEarlyAccessQuestions([
+      { id: 'how', label: 'How?', type: 'select' },
+    ])).toEqual([]);
+  });
+
+  it('cleans up a choice’s options', () => {
+    const [question] = parseEarlyAccessQuestions([
+      { id: 'how', label: 'How?', type: 'select', options: ['  Search  ', '', 'Search', 'Word of mouth'] },
+    ]);
+    expect(question.options).toEqual(['Search', 'Word of mouth']);
+  });
+
+  it('falls back to short text for an unknown answer type', () => {
+    const [question] = parseEarlyAccessQuestions([
+      { id: 'q', label: 'Q', type: 'signature' },
+    ]);
+    expect(question.type).toBe('short');
+  });
+
+  it('treats required as strictly boolean true', () => {
+    const [a, b] = parseEarlyAccessQuestions([
+      { id: 'a', label: 'A', type: 'short', required: 'yes' },
+      { id: 'b', label: 'B', type: 'short', required: true },
+    ]);
+    expect(a.required).toBe(false);
+    expect(b.required).toBe(true);
+  });
+
+  it('caps the list and the field lengths', () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({
+      id: `q${i}`, label: 'x'.repeat(500), type: 'short' as const,
+    }));
+    const questions = parseEarlyAccessQuestions(many);
+    expect(questions).toHaveLength(EARLY_ACCESS_LIMITS.maxQuestions);
+    expect(questions[0].label).toHaveLength(EARLY_ACCESS_LIMITS.labelChars);
+  });
+});
+
+describe('early access, the other settings', () => {
+  it('only accepts an email-shaped notification address', () => {
+    expect(parseEarlyAccessNotifyTo('someone@example.com')).toBe('someone@example.com');
+    expect(parseEarlyAccessNotifyTo('not-an-email')).toBe(DEFAULT_EARLY_ACCESS_NOTIFY_TO);
+    expect(parseEarlyAccessNotifyTo(null)).toBe(DEFAULT_EARLY_ACCESS_NOTIFY_TO);
+  });
+
+  it('keeps the form shut and quiet unless the stored value is exactly true', () => {
+    // A malformed row must never be the thing that opens a public form or
+    // starts sending mail. Note 1 and 'on' are the near-misses that matter:
+    // both read as "yes" to a human and neither is a jsonb boolean.
+    for (const stored of [1, 'on', 'yes', null, undefined, {}, '']) {
+      const settings = parseSiteSettings([
+        { key: SETTING_KEYS.earlyAccessOpen, value: stored },
+        { key: SETTING_KEYS.earlyAccessNotify, value: stored },
+      ]);
+      expect(settings.earlyAccessOpen).toBe(false);
+      expect(settings.earlyAccessNotify).toBe(false);
+    }
+  });
+
+  it('reads a stored boolean through both jsonb paths', () => {
+    // 'true' is not a near-miss: it is what a jsonb boolean looks like coming
+    // back as raw text from this project's client, and is the normal path.
+    for (const stored of ['true', true]) {
+      const settings = parseSiteSettings([
+        { key: SETTING_KEYS.earlyAccessOpen, value: stored },
+      ]);
+      expect(settings.earlyAccessOpen).toBe(true);
+    }
+    expect(parseSiteSettings([
+      { key: SETTING_KEYS.earlyAccessOpen, value: 'false' },
+    ]).earlyAccessOpen).toBe(false);
+  });
+
+  it('reads the questions through the jsonb-as-text path too', () => {
+    const settings = parseSiteSettings([
+      {
+        key: SETTING_KEYS.earlyAccessQuestions,
+        value: '[{"id":"why","label":"Why?","type":"long","required":true}]',
+      },
+    ]);
+    expect(settings.earlyAccessQuestions).toEqual([
+      { id: 'why', label: 'Why?', type: 'long', required: true },
+    ]);
+  });
+
+  it('falls back to the built-in intro for an empty one', () => {
+    const settings = parseSiteSettings([
+      { key: SETTING_KEYS.earlyAccessIntro, value: '   ' },
+    ]);
+    expect(settings.earlyAccessIntro).toBe(DEFAULT_EARLY_ACCESS_INTRO);
   });
 });

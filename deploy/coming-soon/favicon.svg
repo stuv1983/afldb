@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="AFLDB">
+  <!-- Squared, ruled, gold on ink: the same almanac palette as the site. -->
+  <rect width="32" height="32" fill="#090a0b"/>
+  <rect x="2.5" y="2.5" width="27" height="27" fill="none" stroke="#d1ad55" stroke-width="1"/>
+  <text x="16" y="22" text-anchor="middle"
+        font-family="Georgia, 'Times New Roman', serif" font-size="16" fill="#d1ad55">A</text>
+</svg>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 
@@ -15,7 +15,10 @@ import {
 } from '@/app/admin/access/actions';
 
 type CodeRow = {
-  id: number; label: string; maxUses: number; useCount: number;
+  id: number; label: string;
+  /** Null means unlimited (migration 036), as a null expiresAt means never. */
+  maxUses: number | null;
+  useCount: number;
   createdAt: string; expiresAt: string | null; revokedAt: string | null;
 };
 type EmailRow = {
@@ -25,6 +28,12 @@ type EmailRow = {
 type JoinRequestRow = {
   id: number; email: string; name: string | null; message: string | null;
   requestedAt: string;
+  /**
+   * Answers to the configured early-access questions, already paired with
+   * their current labels server-side. Empty for requests made through the
+   * /beta gate form, which collects `message` instead.
+   */
+  answers: { label: string; value: string; orphaned: boolean }[];
 };
 
 export function AccessManager({
@@ -45,12 +54,19 @@ export function AccessManager({
   const [denyState, denyAction] =
     useActionState<AccessState, FormData>(denyJoinRequest, {});
 
+  // Only so the Uses field can be greyed out while Unlimited is ticked. The
+  // action reads the checkbox itself and ignores maxUses when it is set, so
+  // this is presentation, not the decision.
+  const [unlimited, setUnlimited] = useState(false);
+
   return (
     <>
       <section className="section">
         <p className="section-note">
-          Visitors who asked for access on the beta page rather than using a code or an
-          allowlisted email. Approving allowlists the email immediately.
+          Visitors who asked for access — from the beta page, or from the early-access
+          form on afldb.com — rather than using a code or an allowlisted email.
+          Approving allowlists the email immediately. The questions that form asks are
+          set in <a href="/admin/settings">Site settings</a>.
         </p>
 
         {approveState.message && <p className="notice">{approveState.message}</p>}
@@ -68,7 +84,7 @@ export function AccessManager({
                 <tr>
                   <th scope="col">Email</th>
                   <th scope="col">Name</th>
-                  <th scope="col">Message</th>
+                  <th scope="col">What they said</th>
                   <th scope="col">Requested</th>
                   <th scope="col" />
                 </tr>
@@ -78,7 +94,27 @@ export function AccessManager({
                   <tr key={request.id}>
                     <td className="wide">{request.email}</td>
                     <td className="muted">{request.name ?? ''}</td>
-                    <td className="wide muted">{request.message ?? ''}</td>
+                    <td className="wide muted">
+                      {/* A request carries either the old gate form's single
+                          message or the configured questions' answers, never
+                          both — but both are rendered so neither form's
+                          history becomes unreadable. */}
+                      {request.message && <p style={{ margin: 0 }}>{request.message}</p>}
+                      {request.answers.map((answer) => (
+                        <p key={answer.label} style={{ margin: '0 0 0.35rem' }}>
+                          <span
+                            style={{ display: 'block', fontSize: '0.72rem' }}
+                            title={answer.orphaned
+                              ? 'This question has since been removed; the id is shown instead of a label.'
+                              : undefined}
+                          >
+                            {answer.label}{answer.orphaned ? ' (removed)' : ''}
+                          </span>
+                          {answer.value}
+                        </p>
+                      ))}
+                      {!request.message && request.answers.length === 0 && '—'}
+                    </td>
                     <td className="nowrap muted">{request.requestedAt.slice(0, 10)}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.35rem' }}>
@@ -113,7 +149,17 @@ export function AccessManager({
           <label>
             Uses
             <input name="maxUses" type="number" defaultValue={1} min={1} max={500}
-              style={{ width: '5rem' }} />
+              disabled={unlimited} style={{ width: '5rem' }} />
+          </label>
+          <label style={{ cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              name="unlimited"
+              checked={unlimited}
+              onChange={(e) => setUnlimited(e.target.checked)}
+              style={{ marginRight: '0.35rem' }}
+            />
+            Unlimited
           </label>
           <label>
             Valid (days)
@@ -152,13 +198,17 @@ export function AccessManager({
             </thead>
             <tbody>
               {codes.map((code) => {
-                const spent = code.useCount >= code.maxUses;
+                // A null maxUses is unlimited (migration 036) and can never be
+                // spent — only revoked or expired.
+                const spent = code.maxUses !== null && code.useCount >= code.maxUses;
                 const expired = code.expiresAt !== null && code.expiresAt < new Date().toISOString();
                 const state = code.revokedAt ? 'revoked' : spent ? 'spent' : expired ? 'expired' : 'live';
                 return (
                   <tr key={code.id}>
                     <td className="wide">{code.label}</td>
-                    <td className="num">{code.useCount}/{code.maxUses}</td>
+                    <td className="num">
+                      {code.useCount}/{code.maxUses ?? '∞'}
+                    </td>
                     <td className="nowrap muted">{code.expiresAt?.slice(0, 10) ?? 'never'}</td>
                     <td>
                       <span className={state === 'live' ? 'badge' : 'badge badge-warn'}>

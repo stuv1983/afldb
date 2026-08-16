@@ -1,0 +1,317 @@
+'use client';
+
+import { useState } from 'react';
+
+import {
+  EARLY_ACCESS_LIMITS,
+  slugifyQuestionId,
+  type EarlyAccessQuestion,
+  type EarlyAccessQuestionType,
+} from '@/lib/site-settings';
+
+/**
+ * The early-access question builder, and the notification settings beside it.
+ *
+ * Rendered inside the one `<form>` of /admin/settings, so it submits with
+ * everything else. The question list is edited in React state and carried as
+ * one hidden JSON field: the server re-parses it through
+ * `parseEarlyAccessQuestions` regardless, so this editor is a convenience and
+ * never the validation — the same contract the layout editor above it has.
+ *
+ * Ids are the thing to be careful with. An answer is stored under its
+ * question's id, so editing a LABEL keeps every past answer readable while
+ * changing an id orphans them. The id is therefore generated once, from the
+ * first label typed, and then shown read-only rather than tracking the label.
+ */
+
+const TYPE_LABELS: { value: EarlyAccessQuestionType; label: string; help: string }[] = [
+  { value: 'short', label: 'Short text', help: 'One line.' },
+  { value: 'long', label: 'Long text', help: 'A few sentences.' },
+  { value: 'select', label: 'Choice', help: 'One of the options below.' },
+];
+
+export function EarlyAccessSettings({
+  open,
+  intro,
+  questions: initialQuestions,
+  notify,
+  notifyTo,
+  smtpConfigured,
+}: {
+  open: boolean;
+  intro: string;
+  questions: EarlyAccessQuestion[];
+  notify: boolean;
+  notifyTo: string;
+  smtpConfigured: boolean;
+}) {
+  const [questions, setQuestions] = useState<EarlyAccessQuestion[]>(initialQuestions);
+
+  function update(index: number, patch: Partial<EarlyAccessQuestion>) {
+    setQuestions((previous) => previous.map(
+      (question, i) => (i === index ? { ...question, ...patch } : question),
+    ));
+  }
+
+  function add() {
+    setQuestions((previous) => {
+      if (previous.length >= EARLY_ACCESS_LIMITS.maxQuestions) return previous;
+      // A placeholder id, replaced by one derived from the label the first
+      // time the label is edited while it is still untouched.
+      return [...previous, {
+        id: '',
+        label: '',
+        type: 'short' as const,
+        required: false,
+      }];
+    });
+  }
+
+  function remove(index: number) {
+    setQuestions((previous) => previous.filter((_, i) => i !== index));
+  }
+
+  function move(index: number, direction: -1 | 1) {
+    setQuestions((previous) => {
+      const next = [...previous];
+      const target = index + direction;
+      if (target < 0 || target >= next.length) return previous;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
+  const full = questions.length >= EARLY_ACCESS_LIMITS.maxQuestions;
+
+  return (
+    <section className="section">
+      <h2>Early access requests</h2>
+      <p className="section-note">
+        The form behind the “Request early access” button on{' '}
+        <code>afldb.com</code>. A request never admits anybody by itself — it queues a
+        row for review at <a href="/admin/access">Access</a>, where approving it
+        allowlists the email through the normal path.
+      </p>
+
+      <label style={{ display: 'block', margin: '0 0 1rem', cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          name="earlyAccessOpen"
+          value="on"
+          defaultChecked={open}
+          style={{ marginRight: '0.45rem' }}
+        />
+        Accept requests
+        <span className="muted" style={{ marginLeft: '0.4rem', fontSize: '0.78rem' }}>
+          Unticked, the button disappears from the page and the endpoint refuses
+          submissions.
+        </span>
+      </label>
+
+      <div style={{ marginBottom: '1.25rem' }}>
+        <label htmlFor="earlyAccessIntro">Intro text</label>
+        <textarea
+          id="earlyAccessIntro"
+          name="earlyAccessIntro"
+          rows={3}
+          maxLength={EARLY_ACCESS_LIMITS.introChars}
+          defaultValue={intro}
+        />
+        <span className="muted" style={{ fontSize: '0.78rem' }}>
+          Shown above the form. Left empty, the built-in wording is used.
+        </span>
+      </div>
+
+      <h3 style={{ fontSize: '0.95rem', marginBottom: '0.35rem' }}>Questions</h3>
+      <p className="section-note" style={{ marginTop: 0 }}>
+        Email address is always asked and is not listed here: approving a request
+        allowlists that address, so the flow has no meaning without it. Name is always
+        asked and always optional. Editing a question’s wording keeps its previous
+        answers; removing it hides the question but never deletes what people wrote.
+      </p>
+
+      <input
+        type="hidden"
+        name="earlyAccessQuestions"
+        value={JSON.stringify(questions)}
+      />
+
+      <ul style={{ listStyle: 'none', margin: '0 0 0.75rem', padding: 0 }}>
+        {questions.map((question, index) => (
+          <li
+            key={index}
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              background: 'var(--bg-subtle)',
+              padding: '0.7rem',
+              marginBottom: '0.5rem',
+            }}
+          >
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline' }}>
+              <span
+                className="muted"
+                style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem' }}
+                title="The key answers are stored under. Fixed once set."
+              >
+                {question.id || '(new)'}
+              </span>
+              <span style={{ marginLeft: 'auto', display: 'flex', gap: '0.3rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => move(index, -1)}
+                  disabled={index === 0}
+                  aria-label={`Move “${question.label || 'question'}” up`}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => move(index, 1)}
+                  disabled={index === questions.length - 1}
+                  aria-label={`Move “${question.label || 'question'}” down`}
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => remove(index)}
+                  aria-label={`Remove “${question.label || 'question'}”`}
+                >
+                  Remove
+                </button>
+              </span>
+            </div>
+
+            <div style={{ marginTop: '0.5rem' }}>
+              <label htmlFor={`ea-label-${index}`}>Question</label>
+              <input
+                id={`ea-label-${index}`}
+                value={question.label}
+                maxLength={EARLY_ACCESS_LIMITS.labelChars}
+                placeholder="What would you use AFLDB for?"
+                onChange={(e) => {
+                  const label = e.target.value;
+                  // Only ever assign an id while the question is new. Once it
+                  // has one, answers may already be keyed by it.
+                  update(index, question.id
+                    ? { label }
+                    : { label, id: label.trim() ? slugifyQuestionId(label) : '' });
+                }}
+              />
+            </div>
+
+            <div style={{ marginTop: '0.5rem' }}>
+              <label htmlFor={`ea-help-${index}`}>Hint (optional)</label>
+              <input
+                id={`ea-help-${index}`}
+                value={question.help ?? ''}
+                maxLength={EARLY_ACCESS_LIMITS.helpChars}
+                onChange={(e) => update(index, { help: e.target.value })}
+              />
+            </div>
+
+            <div
+              className="grid"
+              style={{
+                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                marginTop: '0.5rem',
+              }}
+            >
+              <div>
+                <label htmlFor={`ea-type-${index}`}>Answer type</label>
+                <select
+                  id={`ea-type-${index}`}
+                  value={question.type}
+                  onChange={(e) => update(index, {
+                    type: e.target.value as EarlyAccessQuestionType,
+                  })}
+                >
+                  {TYPE_LABELS.map((type) => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ alignSelf: 'end' }}>
+                <label style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={question.required}
+                    onChange={(e) => update(index, { required: e.target.checked })}
+                    style={{ marginRight: '0.45rem' }}
+                  />
+                  Required
+                </label>
+              </div>
+            </div>
+
+            {question.type === 'select' && (
+              <div style={{ marginTop: '0.5rem' }}>
+                <label htmlFor={`ea-options-${index}`}>Options, one per line</label>
+                <textarea
+                  id={`ea-options-${index}`}
+                  rows={3}
+                  value={(question.options ?? []).join('\n')}
+                  onChange={(e) => update(index, {
+                    options: e.target.value.split('\n'),
+                  })}
+                />
+                <span className="muted" style={{ fontSize: '0.78rem' }}>
+                  A choice with no options is dropped on save — it could not be answered.
+                </span>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      <button
+        type="button"
+        className="btn btn-secondary"
+        onClick={add}
+        disabled={full}
+      >
+        Add question
+      </button>
+      {full && (
+        <span className="muted" style={{ marginLeft: '0.5rem', fontSize: '0.78rem' }}>
+          {EARLY_ACCESS_LIMITS.maxQuestions} is the maximum.
+        </span>
+      )}
+
+      <h3 style={{ fontSize: '0.95rem', margin: '1.5rem 0 0.35rem' }}>Notification</h3>
+      <p className="section-note" style={{ marginTop: 0 }}>
+        {smtpConfigured
+          ? 'An SMTP relay is configured on this server.'
+          : 'No SMTP relay is configured on this server, so nothing can be sent yet. '
+            + 'Set AFLDB_SMTP_* in .env. Requests are still saved and reviewable either way.'}
+      </p>
+
+      <label style={{ display: 'block', margin: '0 0 0.6rem', cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          name="earlyAccessNotify"
+          value="on"
+          defaultChecked={notify}
+          disabled={!smtpConfigured}
+          style={{ marginRight: '0.45rem' }}
+        />
+        Email me each new request
+      </label>
+
+      <div style={{ maxWidth: '24rem' }}>
+        <label htmlFor="earlyAccessNotifyTo">Send to</label>
+        <input
+          id="earlyAccessNotifyTo"
+          name="earlyAccessNotifyTo"
+          type="email"
+          defaultValue={notifyTo}
+          maxLength={200}
+        />
+      </div>
+    </section>
+  );
+}

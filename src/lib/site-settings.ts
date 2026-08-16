@@ -24,6 +24,11 @@ export const SETTING_KEYS = {
   homeRecord: 'home.record_of_the_week',
   aflwLeaders: 'home.aflw_leaders',
   gridAudience: 'grid_solver.audience',
+  earlyAccessOpen: 'early_access.open',
+  earlyAccessIntro: 'early_access.intro',
+  earlyAccessQuestions: 'early_access.questions',
+  earlyAccessNotify: 'early_access.notify',
+  earlyAccessNotifyTo: 'early_access.notify_to',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -254,12 +259,211 @@ export function parseGridAudience(value: unknown): GridAudience {
 }
 
 // ---------------------------------------------------------------------------
+// Early access requests
+// ---------------------------------------------------------------------------
+
+/**
+ * The public "request early access" form, as a super admin configures it.
+ *
+ * The email address is NOT a question here and never can be: approving a
+ * request allowlists that address in `beta_allowed_emails`, so the flow has
+ * no meaning without it. Name is likewise a fixed column. Everything else is
+ * the super admin's to define, and lands in `beta_join_requests.answers`
+ * (migration 035) keyed by question id.
+ *
+ * Ids are stable and are what stored answers are keyed by, so renaming a
+ * question's LABEL keeps its history readable while changing its ID orphans
+ * the old answers. `parseEarlyAccessQuestions` therefore keeps ids as given
+ * rather than deriving them from the label.
+ */
+export type EarlyAccessQuestionType = 'short' | 'long' | 'select';
+
+export type EarlyAccessQuestion = {
+  id: string;
+  label: string;
+  help?: string;
+  type: EarlyAccessQuestionType;
+  required: boolean;
+  /** `select` only; ignored for the free-text types. */
+  options?: string[];
+};
+
+/**
+ * Caps, so a hand-posted or fumbled settings row cannot produce a form that
+ * is hostile to render or to store. These bound the ADMIN side; the public
+ * submit path applies its own answer-length limit independently.
+ */
+export const EARLY_ACCESS_LIMITS = {
+  maxQuestions: 12,
+  maxOptions: 20,
+  labelChars: 200,
+  helpChars: 300,
+  optionChars: 100,
+  /** Longest answer the public form will store, per question. */
+  answerChars: 2000,
+  introChars: 600,
+} as const;
+
+const QUESTION_TYPES: EarlyAccessQuestionType[] = ['short', 'long', 'select'];
+
+export const DEFAULT_EARLY_ACCESS_QUESTIONS: EarlyAccessQuestion[] = [
+  {
+    id: 'interest',
+    label: 'What would you use AFLDB for?',
+    help: 'A sentence is plenty — it helps us prioritise what to build next.',
+    type: 'long',
+    required: false,
+  },
+];
+
+export const DEFAULT_EARLY_ACCESS_INTRO =
+  'AFLDB is in closed beta while the record is verified. Leave your email and '
+  + 'we will be in touch as places open up.';
+
+/** The address new requests are emailed to when notification is on. */
+export const DEFAULT_EARLY_ACCESS_NOTIFY_TO = 'requests@afldb.com';
+
+/**
+ * Ids the form already uses for its fixed fields, and so cannot be reused.
+ *
+ * The public form submits questions as sibling fields of `email`, `name` and
+ * the `website` honeypot, and reads each answer back by name. A question id of
+ * `name` would therefore collide: `form.elements.name` returns a list rather
+ * than an input once two fields share it, and the answer would be read as the
+ * wrong value or lost. Rejecting the id is the fix; there is no ambiguity to
+ * resolve afterwards.
+ */
+export const RESERVED_QUESTION_IDS = ['email', 'name', 'website'] as const;
+
+/** A question id is a slug: stable, safe as a jsonb key and as a form field name. */
+export function isQuestionId(value: unknown): value is string {
+  return typeof value === 'string'
+    && /^[a-z0-9][a-z0-9_-]{0,39}$/.test(value)
+    && !(RESERVED_QUESTION_IDS as readonly string[]).includes(value);
+}
+
+/** Derive a legal id from a label, for the admin form's convenience. */
+export function slugifyQuestionId(label: string): string {
+  let slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+    .replace(/-+$/, '');
+  // "Name" is a plausible thing to type as a question, and would otherwise
+  // produce a reserved id. Suffixing keeps it legal and still readable.
+  if ((RESERVED_QUESTION_IDS as readonly string[]).includes(slug)) slug = `${slug}-q`;
+  return isQuestionId(slug) ? slug : `q${Date.now().toString(36).slice(-6)}`;
+}
+
+function clamp(value: unknown, chars: number): string {
+  return typeof value === 'string' ? value.trim().slice(0, chars) : '';
+}
+
+/**
+ * Normalise a stored (or submitted) question list against this build's rules.
+ *
+ * Anything unusable is DROPPED rather than defaulted: a question with no
+ * label, a duplicate id or a `select` with no options is not a question, and
+ * silently substituting one would put words in the super admin's mouth on a
+ * public page. An empty result is legal and means "email and name only",
+ * which is a coherent form — so, unlike the other settings here, this does
+ * not fall back to the defaults once a super admin has saved anything.
+ */
+export function parseEarlyAccessQuestions(value: unknown): EarlyAccessQuestion[] {
+  if (!Array.isArray(value)) return DEFAULT_EARLY_ACCESS_QUESTIONS;
+
+  const seen = new Set<string>();
+  const questions: EarlyAccessQuestion[] = [];
+
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') continue;
+    const item = raw as Record<string, unknown>;
+
+    if (!isQuestionId(item.id) || seen.has(item.id)) continue;
+    const label = clamp(item.label, EARLY_ACCESS_LIMITS.labelChars);
+    if (!label) continue;
+
+    const type = QUESTION_TYPES.includes(item.type as EarlyAccessQuestionType)
+      ? item.type as EarlyAccessQuestionType
+      : 'short';
+
+    let options: string[] | undefined;
+    if (type === 'select') {
+      options = Array.isArray(item.options)
+        ? [...new Set(
+          item.options
+            .map((option) => clamp(option, EARLY_ACCESS_LIMITS.optionChars))
+            .filter(Boolean),
+        )].slice(0, EARLY_ACCESS_LIMITS.maxOptions)
+        : [];
+      // A choice with nothing to choose from cannot be answered, and marking
+      // it required would make the form unsubmittable.
+      if (options.length === 0) continue;
+    }
+
+    const help = clamp(item.help, EARLY_ACCESS_LIMITS.helpChars);
+
+    seen.add(item.id);
+    questions.push({
+      id: item.id,
+      label,
+      ...(help ? { help } : {}),
+      type,
+      required: item.required === true,
+      ...(options ? { options } : {}),
+    });
+
+    if (questions.length >= EARLY_ACCESS_LIMITS.maxQuestions) break;
+  }
+
+  return questions;
+}
+
+export function parseEarlyAccessIntro(value: unknown): string {
+  const intro = clamp(value, EARLY_ACCESS_LIMITS.introChars);
+  return intro || DEFAULT_EARLY_ACCESS_INTRO;
+}
+
+/**
+ * A plain email check, matching the one the public form and the existing beta
+ * actions already apply. Deliberately permissive about the local part and
+ * strict only about the shape, since the address is verified by being written
+ * to rather than by a regex.
+ */
+export function isEmailish(value: unknown): value is string {
+  return typeof value === 'string'
+    && value.length <= 200
+    && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value);
+}
+
+export function parseEarlyAccessNotifyTo(value: unknown): string {
+  return isEmailish(value) ? value : DEFAULT_EARLY_ACCESS_NOTIFY_TO;
+}
+
+/**
+ * Whether the form is open, and whether a new request raises an email.
+ *
+ * Both default to the CLOSED/quiet direction on a malformed row. A settings
+ * row that fails to parse must not be the thing that opens a public form or
+ * starts sending mail — the same reasoning as `parseGridAudience` above.
+ */
+export function parseBooleanSetting(value: unknown): boolean {
+  return value === true;
+}
+
+// ---------------------------------------------------------------------------
 
 export type SiteSettings = {
   homeLayout: HomeLayout;
   homeRecord: HomeRecordCategory;
   aflwLeaders: AflwLeaderCategory;
   gridAudience: GridAudience;
+  earlyAccessOpen: boolean;
+  earlyAccessIntro: string;
+  earlyAccessQuestions: EarlyAccessQuestion[];
+  earlyAccessNotify: boolean;
+  earlyAccessNotifyTo: string;
 };
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
@@ -267,6 +471,11 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   homeRecord: DEFAULT_HOME_RECORD,
   aflwLeaders: DEFAULT_AFLW_LEADERS,
   gridAudience: DEFAULT_GRID_AUDIENCE,
+  earlyAccessOpen: false,
+  earlyAccessIntro: DEFAULT_EARLY_ACCESS_INTRO,
+  earlyAccessQuestions: DEFAULT_EARLY_ACCESS_QUESTIONS,
+  earlyAccessNotify: false,
+  earlyAccessNotifyTo: DEFAULT_EARLY_ACCESS_NOTIFY_TO,
 };
 
 /**
@@ -306,5 +515,14 @@ export function parseSiteSettings(
     homeRecord: parseHomeRecord(byKey.get(SETTING_KEYS.homeRecord)),
     aflwLeaders: parseAflwLeaders(byKey.get(SETTING_KEYS.aflwLeaders)),
     gridAudience: parseGridAudience(byKey.get(SETTING_KEYS.gridAudience)),
+    earlyAccessOpen: parseBooleanSetting(byKey.get(SETTING_KEYS.earlyAccessOpen)),
+    earlyAccessIntro: parseEarlyAccessIntro(byKey.get(SETTING_KEYS.earlyAccessIntro)),
+    // Absent means "never configured", which takes the defaults; a stored
+    // empty list is a deliberate choice and is kept.
+    earlyAccessQuestions: byKey.has(SETTING_KEYS.earlyAccessQuestions)
+      ? parseEarlyAccessQuestions(byKey.get(SETTING_KEYS.earlyAccessQuestions))
+      : DEFAULT_EARLY_ACCESS_QUESTIONS,
+    earlyAccessNotify: parseBooleanSetting(byKey.get(SETTING_KEYS.earlyAccessNotify)),
+    earlyAccessNotifyTo: parseEarlyAccessNotifyTo(byKey.get(SETTING_KEYS.earlyAccessNotifyTo)),
   };
 }
