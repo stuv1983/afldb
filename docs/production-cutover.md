@@ -116,6 +116,24 @@ Each step is reversible until step 8.
 
 ### Step 1 — Production database
 
+> **Superseded for the droplet deployment.** Steps 1–3 below were written on
+> the assumption that production would run *alongside* development on
+> streamanator, which is why they create `afldb_prod_*` roles, a separate
+> `.env.production`, a second `afldb-prod.service` and `PORT=3200`. None of
+> that applies now: production is its own DigitalOcean droplet
+> (`afldb-prod`, 2 vCPU / 4 GB, SYD1), where nothing competes for the port
+> and no development roles exist to collide with.
+>
+> On the droplet, run **[`tools/maintenance/00_install_postgres_prod.sh`](../tools/maintenance/00_install_postgres_prod.sh)**
+> instead. It installs PostgreSQL, creates `afldb_prod` and the same five
+> role names as development, enables `pg_trgm`/`unaccent`, and writes a
+> production `.env` — with `AFLDB_ENV=development` so indexing stays off
+> until §10. It refuses to run on a host that has an `afldb_dev` database,
+> and refuses to overwrite an existing `.env` without `--force`.
+>
+> Steps 4 onward (reverse proxy, firewall, DNS, indexing) still apply as
+> written.
+
 Production roles are **separate roles**, not the development ones with new
 passwords — see step 2. Create them first, then the database.
 
