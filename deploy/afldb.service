@@ -90,7 +90,13 @@ ReadWritePaths=/home/arm/projects/afldb/.next
 # Caddy reads it through the group; nothing else needs access. Remove this
 # line if AFLDB_APEX_DIR is ever unset, since a writable path granted to a
 # web-facing service and then not used is a liability rather than a leftover.
-ReadWritePaths=/var/www/afldb-soon
+#
+# The leading `-` means "ignore if absent". Without it systemd refuses to
+# START the service on any host that has no /var/www/afldb-soon — which is
+# every host except the one serving the apex, the development server
+# included. One unit file serves both, so it has to tolerate the directory
+# not being there.
+ReadWritePaths=-/var/www/afldb-soon
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
