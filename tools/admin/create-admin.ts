@@ -170,6 +170,13 @@ async function main(): Promise<number> {
             -- until the clock passed it, which for a reset performed
             -- minutes after the last sign-in is a locked-out admin.
             totp_last_step = NULL,
+            -- The operator typed this password at the console for the account
+            -- holder, so it is theirs, not a temporary one to be replaced.
+            -- Clearing the flag matters on the recovery path this tool exists
+            -- for: an account locked behind an unreplaced temporary password
+            -- would otherwise stay locked behind it after being reset here.
+            must_change_password = false,
+            password_changed_at  = now(),
             disabled_at    = NULL
     `;
     // A reset invalidates every live session for the account.

@@ -6,7 +6,7 @@ import { MediaLibrary } from '@/app/admin/content/MediaLibrary';
 import { PublishPanel } from '@/app/admin/content/PublishPanel';
 import { getApexContent, listMedia } from '@/db/queries/site-content';
 import { getSiteSettingsForAdmin } from '@/db/queries/site-settings';
-import { apexPublishStatus, listTemplateImages } from '@/lib/apex-publish';
+import { apexPublishStatus, describeWritability, listTemplateImages } from '@/lib/apex-publish';
 import { requireSuperAdmin } from '@/lib/auth/session';
 import { uploadedSrc } from '@/lib/site-content';
 
@@ -73,6 +73,8 @@ export default async function ContentPage() {
         lastPublishedAt={status.lastPublishedAt
           ? status.lastPublishedAt.toLocaleString('en-AU', { timeZone: 'Australia/Melbourne' })
           : null}
+        writable={describeWritability(status.writable)}
+        remedy={status.remedy}
       />
 
       <ContentEditor

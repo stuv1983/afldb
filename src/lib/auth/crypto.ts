@@ -169,6 +169,48 @@ export function generateToken(): string {
   return randomBytes(32).toString('base64url');
 }
 
+/**
+ * The alphabet a temporary password is drawn from.
+ *
+ * `I l 1` and `O o 0` are absent. This string is read off one screen and
+ * typed into another — often dictated over a phone in between — and the
+ * cost of a character pair nobody can tell apart is a support conversation,
+ * not a security property. 57 characters still gives ~70 bits over the
+ * twelve drawn below, which is far beyond what an online login rate-limited
+ * to eight attempts a quarter-hour can be walked through.
+ */
+const TEMPORARY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+
+/**
+ * A temporary password for an administrator whose own one has to be replaced.
+ *
+ * Generated HERE rather than typed by the admin issuing it: a human-chosen
+ * "temporary" password is reliably one of a dozen, and the person choosing it
+ * is not the person it belongs to. Shown once to the issuer, hashed like any
+ * other password, and carries `must_change_password` so it can do nothing but
+ * replace itself (migration 040).
+ *
+ * Grouped with hyphens purely so it can be read aloud and checked; the
+ * hyphens are part of the password.
+ */
+export function generateTemporaryPassword(): string {
+  const size = TEMPORARY_ALPHABET.length;
+  // Rejection sampling. `byte % size` would make the first
+  // 256 % 57 = 28 characters of the alphabet fractionally likelier than the
+  // rest — a small bias, but a free one to not have.
+  const limit = 256 - (256 % size);
+  const characters: string[] = [];
+  while (characters.length < 12) {
+    for (const byte of randomBytes(24)) {
+      if (byte >= limit) continue;
+      characters.push(TEMPORARY_ALPHABET[byte % size]);
+      if (characters.length === 12) break;
+    }
+  }
+  const word = characters.join('');
+  return `${word.slice(0, 4)}-${word.slice(4, 8)}-${word.slice(8)}`;
+}
+
 export function sha256Hex(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }

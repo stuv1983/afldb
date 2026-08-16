@@ -148,6 +148,11 @@ export async function confirmEnrolment(
               can_manage_admins = EXCLUDED.can_manage_admins,
               -- A new secret starts a new counter; see create-admin.ts for why.
               totp_last_step    = ${totpStep},
+              -- The invitee chose this password themselves, so any temporary
+              -- one issued in the meantime is discharged rather than carried
+              -- over into an account whose password is already theirs.
+              must_change_password = false,
+              password_changed_at  = now(),
               disabled_at       = NULL
         RETURNING id
       `;

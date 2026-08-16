@@ -22,6 +22,7 @@ import { formatNumber } from '@/lib/format';
 import {
   type ApexContent,
   type ApexImage,
+  type ApexSectionId,
   type ApexTotals,
   type SiteFooter,
 } from '@/lib/site-content';
@@ -159,6 +160,91 @@ export function renderApexPage({
       + `${escapeHtml(footer.contactEmail)}</a></p>`
     : '';
 
+  // ---------------------------------------------------------------------
+  // The bands of the page, one function each.
+  //
+  // Which of these are emitted, and in what order, comes from
+  // `content.sections` rather than from the order they are written here.
+  // That is the whole of the "show, hide and reorder" control at
+  // /admin/content: the renderer holds the markup for each band and the
+  // stored document holds the running order, so neither has to know the
+  // other's business. A band whose own content is empty renders nothing
+  // even when visible — hiding it is a decision, having nothing to say is
+  // a fact, and both should produce the same silence.
+  // ---------------------------------------------------------------------
+  const bands: Record<ApexSectionId, () => string> = {
+    hero: () => `
+  <section class="hero container">
+${hero.eyebrow ? `    <p class="eyebrow">${escapeHtml(hero.eyebrow)}</p>\n` : ''}    <h1>${escapeHtml(hero.heading)}</h1>
+${hero.lede ? `    ${paragraphs(hero.lede, 'lede')}\n` : ''}
+    <div class="cta-row">
+      <!--
+        Replaced by app.js once the form definition loads. Kept as a mailto so
+        the page is still useful with JavaScript disabled or the app down.
+        data-label is the button's wording, edited at /admin/content: the
+        endpoint serves the QUESTIONS, so the copy around them stays here in
+        the static file where the rest of the page's words are.
+      -->
+      <div id="early-access" data-label="${escapeHtml(hero.ctaLabel)}">
+        <noscript>
+          <a class="btn" href="mailto:${escapeHtml(hero.requestEmail)}?subject=AFLDB%20early%20access">
+            ${escapeHtml(hero.ctaLabel)}
+          </a>
+        </noscript>
+      </div>
+    </div>
+${stats ? `
+    <ul class="stats" aria-label="${escapeHtml(hero.statsLabel)}">
+      ${stats}
+    </ul>
+` : ''}  </section>
+`,
+
+    wideShot: () => (content.wideShot ? `
+  <section class="container shot-wide">
+    ${image(content.wideShot, assetBase, 'loading="eager" decoding="async"')}
+  </section>
+` : ''),
+
+    features: () => (features.items.length > 0 ? `
+  <section class="container">
+${features.heading ? `    <h2>${escapeHtml(features.heading)}</h2>\n` : ''}
+    <div class="features">
+
+      ${featureCards}
+
+    </div>
+  </section>
+` : ''),
+
+    notes: () => (notes.items.length > 0 ? `
+  <section class="container band">
+${notes.heading ? `    <h2>${escapeHtml(notes.heading)}</h2>\n` : ''}    <div class="notes">
+      ${noteCards}
+    </div>
+  </section>
+` : ''),
+
+    // Either half may be empty; the section appears while one survives, so
+    // "just the phone shot" is a layout the editor can actually produce.
+    pair: () => (pair.light || pair.mobile ? `
+  <section class="container pair">
+${pair.light ? `    <figure>
+      ${image(pair.light, assetBase, 'loading="lazy" decoding="async"')}
+${pair.lightCaption ? `      <figcaption>${escapeHtml(pair.lightCaption)}</figcaption>\n` : ''}    </figure>
+` : ''}${pair.mobile ? `    <figure class="phone">
+      ${image(pair.mobile, assetBase, 'loading="lazy" decoding="async"')}
+${pair.mobileCaption ? `      <figcaption>${escapeHtml(pair.mobileCaption)}</figcaption>\n` : ''}    </figure>
+` : ''}  </section>
+` : ''),
+  };
+
+  const body = content.sections
+    .filter((section) => section.visible)
+    .map((section) => bands[section.id]())
+    .filter(Boolean)
+    .join('');
+
   const schema = escapeJsonLd({
     '@context': 'https://schema.org',
     '@type': 'WebSite',
@@ -205,9 +291,10 @@ export function renderApexPage({
 <meta property="og:locale" content="en_AU">
 <meta property="og:url" content="${APEX_ORIGIN}/">
 <meta property="og:title" content="${escapeHtml(meta.ogTitle)}">
-<meta property="og:description" content="${escapeHtml(meta.ogDescription)}">
+<meta property="og:description" content="${escapeHtml(meta.ogDescription)}">${meta.ogImage ? `
 <meta property="og:image" content="${escapeHtml(APEX_ORIGIN + meta.ogImage.src)}">
-<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:card" content="summary_large_image">` : `
+<meta name="twitter:card" content="summary">`}
 
 <link rel="icon" href="${assetBase}/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="${assetBase}/style.css">
@@ -228,57 +315,7 @@ ${schema}
 </header>
 
 <main id="main">
-
-  <section class="hero container">
-${hero.eyebrow ? `    <p class="eyebrow">${escapeHtml(hero.eyebrow)}</p>\n` : ''}    <h1>${escapeHtml(hero.heading)}</h1>
-${hero.lede ? `    ${paragraphs(hero.lede, 'lede')}\n` : ''}
-    <div class="cta-row">
-      <!--
-        Replaced by app.js once the form definition loads. Kept as a mailto so
-        the page is still useful with JavaScript disabled or the app down.
-      -->
-      <div id="early-access">
-        <noscript>
-          <a class="btn" href="mailto:${escapeHtml(hero.requestEmail)}?subject=AFLDB%20early%20access">
-            Request early access
-          </a>
-        </noscript>
-      </div>
-    </div>
-${stats ? `
-    <ul class="stats" aria-label="The record, at a glance">
-      ${stats}
-    </ul>
-` : ''}  </section>
-
-  <section class="container shot-wide">
-    ${image(content.wideShot, assetBase, 'loading="eager" decoding="async"')}
-  </section>
-${features.items.length > 0 ? `
-  <section class="container">
-${features.heading ? `    <h2>${escapeHtml(features.heading)}</h2>\n` : ''}
-    <div class="features">
-
-      ${featureCards}
-
-    </div>
-  </section>
-` : ''}${notes.items.length > 0 ? `
-  <section class="container band">
-${notes.heading ? `    <h2>${escapeHtml(notes.heading)}</h2>\n` : ''}    <div class="notes">
-      ${noteCards}
-    </div>
-  </section>
-` : ''}
-  <section class="container pair">
-    <figure>
-      ${image(pair.light, assetBase, 'loading="lazy" decoding="async"')}
-${pair.lightCaption ? `      <figcaption>${escapeHtml(pair.lightCaption)}</figcaption>\n` : ''}    </figure>
-    <figure class="phone">
-      ${image(pair.mobile, assetBase, 'loading="lazy" decoding="async"')}
-${pair.mobileCaption ? `      <figcaption>${escapeHtml(pair.mobileCaption)}</figcaption>\n` : ''}    </figure>
-  </section>
-
+${body}
 </main>
 
 <footer class="site-footer">

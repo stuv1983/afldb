@@ -3,6 +3,10 @@
 import { useActionState } from 'react';
 
 import { revokeSession, type AdminSessionState } from '@/app/admin/admins/actions';
+import {
+  issueTemporaryPassword,
+  type PasswordResetState,
+} from '@/app/admin/admins/password-actions';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 
 type Session = {
@@ -13,7 +17,15 @@ type Session = {
   userAgent: string | null;
 };
 
-type Admin = { email: string; role: string; canManageAdmins: boolean; sessions: Session[] };
+type Admin = {
+  userId: number;
+  email: string;
+  role: string;
+  canManageAdmins: boolean;
+  mustChangePassword: boolean;
+  passwordChangedAt: string | null;
+  sessions: Session[];
+};
 
 function SessionRow({ session }: { session: Session }) {
   const [state, action, pending] = useActionState<AdminSessionState, FormData>(revokeSession, {});
@@ -38,7 +50,66 @@ function SessionRow({ session }: { session: Session }) {
   );
 }
 
-export function AdminSessionsClient({ admins }: { admins: Admin[] }) {
+/**
+ * The reset control, and the one place the generated password is ever shown.
+ *
+ * Its own component with its own action state, so the result belongs to the
+ * account it was issued for rather than to a banner at the top of a page
+ * listing eight of them. The password is not stored, so this is the only
+ * chance to copy it — which is why it is rendered large, in the monospace
+ * face, and says so.
+ */
+function PasswordReset({ admin, isSelf }: { admin: Admin; isSelf: boolean }) {
+  const [state, action, pending] = useActionState<PasswordResetState, FormData>(
+    issueTemporaryPassword, {},
+  );
+
+  if (isSelf) {
+    return (
+      <p className="muted" style={{ fontSize: '0.8125rem', margin: '0.5rem 0 0' }}>
+        This is your own account. <a href="/admin/password">Change your password →</a>
+      </p>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: '0.6rem' }}>
+      <form action={action}>
+        <input type="hidden" name="userId" value={admin.userId} />
+        <button className="btn btn-secondary" type="submit" disabled={pending}>
+          {pending ? 'Resetting…' : 'Reset password'}
+        </button>
+      </form>
+
+      {state.error && (
+        <p className="notice" role="alert" style={{ marginTop: '0.5rem' }}>{state.error}</p>
+      )}
+
+      {state.temporaryPassword && (
+        <div className="notice" style={{ marginTop: '0.5rem' }}>
+          <p style={{ margin: '0 0 0.5rem' }}>{state.message}</p>
+          <p
+            className="mono"
+            style={{ margin: 0, fontSize: '1.125rem', color: 'var(--text)', userSelect: 'all' }}
+          >
+            {state.temporaryPassword}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function AdminSessionsClient({
+  admins,
+  canManage,
+  viewerId,
+}: {
+  admins: Admin[];
+  /** Whether the viewer may reset other people's passwords. */
+  canManage: boolean;
+  viewerId: number;
+}) {
   return (
     <>
       {admins.map((admin) => {
@@ -49,7 +120,10 @@ export function AdminSessionsClient({ admins }: { admins: Admin[] }) {
           <CollapsibleTable
             key={admin.email}
             title={`${admin.email} · ${roleLabel}`}
-            note={`${admin.sessions.length} live session${admin.sessions.length === 1 ? '' : 's'}`}
+            note={[
+              `${admin.sessions.length} live session${admin.sessions.length === 1 ? '' : 's'}`,
+              admin.mustChangePassword ? 'temporary password outstanding' : '',
+            ].filter(Boolean).join(' · ')}
           >
             {admin.sessions.length === 0 ? (
               <p className="muted">No live sessions.</p>
@@ -71,6 +145,17 @@ export function AdminSessionsClient({ admins }: { admins: Admin[] }) {
                 </table>
               </div>
             )}
+
+            <p className="muted" style={{ fontSize: '0.78rem', marginTop: '0.75rem' }}>
+              Password last changed{' '}
+              {admin.passwordChangedAt
+                ? admin.passwordChangedAt.slice(0, 16).replace('T', ' ')
+                : 'before this was recorded'}
+              {admin.mustChangePassword
+                && ' — a temporary password has been issued and not yet replaced.'}
+            </p>
+
+            {canManage && <PasswordReset admin={admin} isSelf={admin.userId === viewerId} />}
           </CollapsibleTable>
         );
       })}

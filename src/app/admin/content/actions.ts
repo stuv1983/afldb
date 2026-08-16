@@ -66,6 +66,12 @@ export async function saveSiteContent(
     notes: content.notes.items.length,
     stats: content.hero.stats.length,
     footerLines: footer.lines.length,
+    // The running order and what is switched off, so the audit log answers
+    // "when did the wide shot disappear from the front door" without anyone
+    // having to diff two settings rows by hand.
+    sections: content.sections
+      .map((section) => (section.visible ? section.id : `${section.id}:hidden`))
+      .join(','),
     published: result.ok,
     ...(result.ok ? { written: result.written, pruned: result.pruned } : { reason: result.reason }),
   }, { userId: admin.id, label: admin.email });

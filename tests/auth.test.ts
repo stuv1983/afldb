@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  MIN_PASSWORD_LENGTH,
+  generateTemporaryPassword,
   generateTotpSecret,
   hashPassword,
   sha256Hex,
@@ -23,6 +25,29 @@ describe('password hashing', () => {
   it('rejects malformed stored hashes rather than throwing', async () => {
     expect(await verifyPassword('x', 'not-a-hash')).toBe(false);
     expect(await verifyPassword('x', 'scrypt$bad')).toBe(false);
+  });
+});
+
+describe('temporary passwords', () => {
+  it('is long enough to be accepted by the form it will be typed into', () => {
+    // The change-password form applies MIN_PASSWORD_LENGTH, and so does the
+    // invite flow. A generated password shorter than that would be a
+    // credential the application refuses to let anyone re-enter.
+    const password = generateTemporaryPassword();
+    expect(password.length).toBeGreaterThanOrEqual(MIN_PASSWORD_LENGTH);
+    expect(password).toMatch(/^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/);
+  });
+
+  it('omits the characters nobody can tell apart when reading one out', () => {
+    // These are dictated over a phone as often as they are copied, and
+    // `I/l/1` or `O/0` costs a support conversation rather than security.
+    const sample = Array.from({ length: 200 }, generateTemporaryPassword).join('');
+    expect(sample).not.toMatch(/[IlO01o]/);
+  });
+
+  it('does not repeat itself', () => {
+    const issued = new Set(Array.from({ length: 200 }, generateTemporaryPassword));
+    expect(issued.size).toBe(200);
   });
 });
 

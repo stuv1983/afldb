@@ -4,7 +4,7 @@ import { constants } from 'node:fs';
 import {
   access, copyFile, mkdir, readFile, readdir, rename, rm, stat, writeFile,
 } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 import { getSiteTotals } from '@/db/queries/overview';
 import { getAllMediaBytes, getApexContent } from '@/db/queries/site-content';
@@ -43,7 +43,7 @@ const UPLOAD_DIR = join('img', 'u');
 export type PublishFailure =
   | { ok: false; reason: 'not-configured' }
   | { ok: false; reason: 'template-missing'; detail: string }
-  | { ok: false; reason: 'write-failed'; detail: string };
+  | { ok: false; reason: 'write-failed'; detail: string; remedy: string | null };
 
 export type PublishSuccess = {
   ok: true;
@@ -125,6 +125,76 @@ export async function listTemplateImages(): Promise<
   return images.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/**
+ * Whether the published directory can actually be written, and if not, why.
+ *
+ * `ok` is the only state a publish succeeds from. The other three are the
+ * three ways the directory goes wrong on a real host, kept apart because the
+ * repair for each is different and a super admin reading the admin screen is
+ * the person who has to run it:
+ *
+ *   missing      nothing at AFLDB_APEX_DIR — the publisher creates the tree
+ *                itself, so this is only a problem if the PARENT is not
+ *                writable either, which `denied` then reports
+ *   denied       the directory exists but this process cannot write to it.
+ *                Almost always ownership: docs/apex-coming-soon.md §4 used to
+ *                say `chown -R caddy:caddy`, which leaves the service user
+ *                (`arm`) unable to write the very tree it publishes
+ *   read-only    the mount, or systemd's ProtectSystem=strict without the
+ *                ReadWritePaths= line in deploy/afldb.service
+ */
+export type ApexWritability = 'ok' | 'missing' | 'denied' | 'read-only';
+
+/**
+ * The commands that repair a directory this service cannot publish into.
+ *
+ * One string, shown by the admin screen ahead of a failure and by the error
+ * message after one. Both need the same words, and the words are the whole
+ * value of the diagnosis — "EACCES" on its own has sent more than one person
+ * to the wrong file.
+ */
+export function apexRemedy(target: string): string {
+  const user = process.env.USER || process.env.LOGNAME || 'arm';
+  return [
+    `sudo mkdir -p ${target}`,
+    `sudo chown -R ${user}:caddy ${target}`,
+    `sudo chmod 750 ${target}`,
+    '',
+    '# and, if this host runs the systemd unit, confirm it grants the path:',
+    `#   ReadWritePaths=-${target}    (deploy/afldb.service)`,
+    '#   sudo systemctl daemon-reload && sudo systemctl restart afldb',
+  ].join('\n');
+}
+
+/**
+ * Can this process write to `directory`? Distinguishes the three failures
+ * above rather than collapsing them into "no".
+ */
+async function writability(directory: string): Promise<ApexWritability> {
+  try {
+    await access(directory, constants.W_OK | constants.X_OK);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') return 'missing';
+    if (code === 'EROFS') return 'read-only';
+    return 'denied';
+  }
+
+  // The root being writable is not enough: img/u is where uploads land and
+  // where the reported EACCES actually came from, so an existing one owned by
+  // somebody else has to be caught here rather than half way through a
+  // publish that has already rewritten index.html.
+  const uploads = join(directory, UPLOAD_DIR);
+  if (await exists(uploads)) {
+    try {
+      await access(uploads, constants.W_OK | constants.X_OK);
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === 'EROFS' ? 'read-only' : 'denied';
+    }
+  }
+  return 'ok';
+}
+
 export type PublishStatus = {
   configured: boolean;
   target: string | null;
@@ -132,6 +202,10 @@ export type PublishStatus = {
   templateFound: boolean;
   /** mtime of the published page, which is the honest "last published". */
   lastPublishedAt: Date | null;
+  /** Checked BEFORE the button is pressed; 'ok' on a host that does not publish. */
+  writable: ApexWritability;
+  /** The shell to fix it, or null when there is nothing to fix. */
+  remedy: string | null;
 };
 
 /**
@@ -141,6 +215,12 @@ export type PublishStatus = {
  * written at publish time on purpose: the question being asked is "what is on
  * disk right now", and a database row can be right about a file that was
  * subsequently deleted.
+ *
+ * The writability probe is here rather than only in `publishApex` so the
+ * screen can say "this will fail, and here is the fix" before an author has
+ * typed a page of copy and pressed Save. A failed publish costs only the
+ * publish — the text is saved either way — but being told afterwards is a
+ * poor substitute for being told first.
  */
 export async function apexPublishStatus(): Promise<PublishStatus> {
   const target = apexTargetDir();
@@ -155,12 +235,25 @@ export async function apexPublishStatus(): Promise<PublishStatus> {
     }
   }
 
+  // 'missing' is not a fault on its own — publishApex creates the tree — so
+  // it is reported only when the parent cannot be written into either.
+  let writable: ApexWritability = 'ok';
+  if (target) {
+    writable = await writability(target);
+    if (writable === 'missing') {
+      const parent = dirname(target);
+      writable = (await writability(parent)) === 'ok' ? 'ok' : 'missing';
+    }
+  }
+
   return {
     configured: target !== null,
     target,
     templateDir,
     templateFound: await exists(join(templateDir, 'style.css')),
     lastPublishedAt,
+    writable,
+    remedy: target && writable !== 'ok' ? apexRemedy(target) : null,
   };
 }
 
@@ -271,11 +364,16 @@ export async function publishApex(): Promise<PublishResult> {
   } catch (error) {
     // The settings are already saved at this point, so a failed write costs
     // the publish and nothing else. The message is shown to a super admin,
-    // who is the only person who can act on an EACCES.
+    // who is the only person who can act on an EACCES — so it carries the
+    // commands that act on it rather than the bare errno, which says where
+    // the write stopped but nothing about why or what to do.
+    const code = (error as NodeJS.ErrnoException).code;
+    const permission = code === 'EACCES' || code === 'EPERM' || code === 'EROFS';
     return {
       ok: false,
       reason: 'write-failed',
       detail: error instanceof Error ? error.message : String(error),
+      remedy: permission ? apexRemedy(target) : null,
     };
   }
 
@@ -295,6 +393,30 @@ export function describePublishResult(result: PublishResult): string {
     case 'template-missing':
       return `Saved, but not published. ${result.detail}`;
     case 'write-failed':
-      return `Saved, but the page could not be written: ${result.detail}`;
+      return `Saved, but the page could not be written: ${result.detail}`
+        + (result.remedy
+          ? ' The published directory is not writable by this service. Run:\n\n'
+            + `${result.remedy}\n\nthen press Republish.`
+          : '');
+  }
+}
+
+/** A sentence for the pre-flight warning on the admin screen. */
+export function describeWritability(writable: ApexWritability): string {
+  switch (writable) {
+    case 'ok':
+      return '';
+    case 'missing':
+      return 'The published directory does not exist and its parent cannot be created '
+        + 'by this service, so publishing will fail.';
+    case 'denied':
+      return 'The published directory exists but this service cannot write to it, so '
+        + 'publishing will fail with EACCES. This is almost always ownership: the '
+        + 'directory must belong to the user the service runs as, with Caddy reading '
+        + 'it through the group.';
+    case 'read-only':
+      return 'The published directory is on a read-only path, so publishing will fail. '
+        + 'On the production droplet that means systemd: ProtectSystem=strict makes '
+        + 'the whole of /var read-only unless deploy/afldb.service grants the path.';
   }
 }

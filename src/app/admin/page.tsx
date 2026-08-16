@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { adminLogout } from '@/app/admin/logout-action';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { authSql } from '@/db/authClient';
 import { getSiteSettingsForAdmin } from '@/db/queries/site-settings';
@@ -49,9 +48,6 @@ export default async function AdminDashboard() {
         <p className="subtitle">
           Signed in as {admin.email}.
         </p>
-        <form action={adminLogout}>
-          <button className="btn btn-secondary" type="submit">Sign out</button>
-        </form>
       </div>
 
       {pending.length > 0 && (
@@ -60,23 +56,10 @@ export default async function AdminDashboard() {
         </p>
       )}
 
-      {admin.role === 'super_admin' && (
-        <>
-          <p className="section-note">
-            <Link href="/admin/settings">Site settings →</Link>{' '}
-            — what the home pages show, and who may reach the grid solver.
-          </p>
-          <p className="section-note">
-            <Link href="/admin/query-builder">Data QA search →</Link>{' '}
-            — build ad-hoc queries against the underlying tables to check data.
-          </p>
-          <p className="section-note">
-            <Link href="/admin/db-health">Database health →</Link>{' '}
-            — table inventory, derived-data reconciliation and link quality.
-          </p>
-        </>
-      )}
-
+      {/* The list of destinations that used to live here is the sidebar's job
+          now — repeating it was most of what made this page hard to read.
+          What stays is the one line that carries information the nav cannot:
+          who the grid solver is currently open to. */}
       <p className="section-note">
         <Link href="/grid-solver">Grid solver →</Link>{' '}
         — a 3×3 board of named questions, for spot-checking data by intersection.

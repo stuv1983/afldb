@@ -17,6 +17,8 @@ type SessionRow = {
   email: string;
   role: string;
   canManageAdmins: boolean;
+  mustChangePassword: boolean;
+  passwordChangedAt: Date | null;
   sessionId: number | null;
   createdAt: Date | null;
   expiresAt: Date | null;
@@ -43,6 +45,8 @@ export default async function AdminsPage() {
   const [rows, invites] = await Promise.all([
     authSql<SessionRow[]>`
       SELECT u.id AS "userId", u.email, u.role, u.can_manage_admins AS "canManageAdmins",
+             u.must_change_password AS "mustChangePassword",
+             u.password_changed_at  AS "passwordChangedAt",
              s.id AS "sessionId", s.created_at AS "createdAt", s.expires_at AS "expiresAt",
              s.ip::text AS ip, s.user_agent AS "userAgent"
         FROM auth_users u
@@ -75,16 +79,22 @@ export default async function AdminsPage() {
         <h1>Administrators</h1>
         <p className="subtitle">
           {canManage
-            ? 'Invite new admins below, or sign a live session out.'
+            ? 'Invite new admins below, reset a forgotten password, or sign a live '
+              + 'session out.'
             : 'This page can sign a live session out. Ask a super admin for an invite link.'}
         </p>
       </div>
 
       <AdminSessionsClient
+        canManage={canManage}
+        viewerId={admin.id}
         admins={[...admins.entries()].map(([email, sessions]) => ({
+          userId: sessions[0].userId,
           email,
           role: sessions[0].role,
           canManageAdmins: sessions[0].canManageAdmins,
+          mustChangePassword: sessions[0].mustChangePassword,
+          passwordChangedAt: sessions[0].passwordChangedAt?.toISOString() ?? null,
           sessions: sessions
             .filter((s) => s.sessionId !== null)
             .map((s) => ({

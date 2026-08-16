@@ -2,16 +2,19 @@
 
 import { useActionState, useState } from 'react';
 
+import { AdminSection } from '@/app/admin/AdminSection';
 import { ImageField, type ImageOption } from '@/app/admin/content/ImageField';
 import { saveSiteContent, type ContentState } from '@/app/admin/content/actions';
 import {
   APEX_METRICS,
+  APEX_SECTIONS,
   CONTENT_LIMITS,
+  isSectionVisible,
   newBlockId,
   type ApexContent,
   type ApexFeature,
-  type ApexImage,
   type ApexNote,
+  type ApexSectionId,
   type ApexStat,
   type SiteFooter,
 } from '@/lib/site-content';
@@ -27,7 +30,11 @@ import {
  *
  * The ordering of the sections below follows the page itself, top to bottom,
  * with the footer first because it is the part that appears on every page of
- * the application rather than only on the apex.
+ * the application rather than only on the apex. Each is an `AdminSection`, so
+ * it folds and stays folded: this screen is the longest form in the
+ * application and finding the hero used to mean scrolling past the footer.
+ * The fields inside a folded section are still in the DOM and still submit —
+ * see the note on `<details>` in AdminSection.
  */
 
 const cardStyle = {
@@ -98,6 +105,10 @@ function BlockControls({
   );
 }
 
+const SECTION_LABELS = new Map<ApexSectionId, string>(
+  APEX_SECTIONS.map((section) => [section.id, section.label]),
+);
+
 export function ContentEditor({
   content: initialContent,
   footer: initialFooter,
@@ -142,6 +153,20 @@ export function ContentEditor({
   const updateStat = (index: number, patch: Partial<ApexStat>) =>
     setStats(content.hero.stats.map((item, i) => (i === index ? { ...item, ...patch } : item)));
 
+  const moveSection = (index: number, direction: -1 | 1) =>
+    setContent((previous) => ({ ...previous, sections: move(previous.sections, index, direction) }));
+  const toggleSection = (id: ApexSectionId) =>
+    setContent((previous) => ({
+      ...previous,
+      sections: previous.sections.map((section) => (
+        section.id === id ? { ...section, visible: !section.visible } : section
+      )),
+    }));
+
+  /** "Hidden" beside a section heading, so a folded editor still says so. */
+  const hiddenNote = (id: ApexSectionId) =>
+    (isSectionVisible(content, id) ? undefined : 'hidden on the published page');
+
   return (
     <form action={action}>
       {/* Both documents ride along as JSON; the server owns their shape. */}
@@ -149,11 +174,64 @@ export function ContentEditor({
       <input type="hidden" name="footer" value={JSON.stringify(footer)} />
 
       {state.message && <p className="notice">{state.message}</p>}
-      {state.error && <p className="notice" role="alert">{state.error}</p>}
+      {/* pre-wrap: a failed publish's message carries the shell that repairs
+          it, over several lines. */}
+      {state.error && <p className="notice notice-pre" role="alert">{state.error}</p>}
 
       {/* ---------------------------------------------------------------- */}
-      <section className="section">
-        <h2>Footer — every page</h2>
+      <AdminSection id="apex-sections" title="Sections — what the page shows, and in what order">
+        <p className="section-note">
+          Each band of <code>afldb.com</code>, in the order it is published. Hide one and it
+          is left out of the page entirely — the words and pictures stay here, so switching
+          it back on restores what was written rather than a blank. A band with nothing in
+          it publishes nothing whether or not it is ticked.
+        </p>
+
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          {content.sections.map((section, index) => (
+            <li key={section.id} style={cardStyle}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <label style={{ cursor: 'pointer', display: 'flex', gap: '0.45rem', alignItems: 'baseline' }}>
+                  <input
+                    type="checkbox"
+                    checked={section.visible}
+                    onChange={() => toggleSection(section.id)}
+                  />
+                  {' '}{SECTION_LABELS.get(section.id) ?? section.id}
+                </label>
+                <span style={rowStyle}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => moveSection(index, -1)}
+                    disabled={index === 0}
+                    aria-label={`Move ${SECTION_LABELS.get(section.id) ?? section.id} up`}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => moveSection(index, 1)}
+                    disabled={index === content.sections.length - 1}
+                    aria-label={`Move ${SECTION_LABELS.get(section.id) ?? section.id} down`}
+                  >
+                    ↓
+                  </button>
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <p className="muted" style={{ fontSize: '0.78rem', marginTop: '0.5rem' }}>
+          The masthead and the footer are not in this list: they are the frame the page sits
+          in rather than bands of it, and both are edited below.
+        </p>
+      </AdminSection>
+
+      {/* ---------------------------------------------------------------- */}
+      <AdminSection id="footer" title="Footer — every page">
         <p className="section-note">
           The colophon at the bottom of every page of the site <em>and</em> of the
           coming-soon page at <code>afldb.com</code>. There is one of them, so the two
@@ -238,15 +316,19 @@ export function ContentEditor({
             </span>
           </div>
         </div>
-      </section>
+      </AdminSection>
 
       {/* ---------------------------------------------------------------- */}
-      <section className="section">
-        <h2>Coming soon — masthead and hero</h2>
+      <AdminSection
+        id="apex-hero"
+        title="Coming soon — masthead and hero"
+        note={hiddenNote('hero')}
+      >
         <p className="section-note">
-          The top of <code>afldb.com</code>. The “Request early access” button is not
-          configured here: its questions and its on/off switch live on{' '}
-          <a href="/admin/settings">Settings</a>.
+          The top of <code>afldb.com</code>. The button’s wording is set here; whether it
+          appears at all, and what it asks, live on{' '}
+          <a href="/admin/settings">Settings</a> — the button is drawn only while the
+          early-access form is open.
         </p>
 
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(14rem, 1fr))' }}>
@@ -309,30 +391,48 @@ export function ContentEditor({
           </span>
         </div>
 
-        <div style={{ marginTop: '0.75rem', maxWidth: '24rem' }}>
-          <label htmlFor="requestEmail">Fallback request address</label>
-          <input
-            id="requestEmail"
-            type="email"
-            value={content.hero.requestEmail}
-            maxLength={CONTENT_LIMITS.emailChars}
-            onChange={(event) => setHero({ requestEmail: event.target.value })}
-          />
-          <span className="muted" style={{ fontSize: '0.78rem' }}>
-            Only used by visitors with JavaScript disabled, who get a mailto link
-            instead of the form.
-          </span>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(16rem, 1fr))', marginTop: '0.75rem' }}>
+          <div>
+            <label htmlFor="ctaLabel">Button wording</label>
+            <input
+              id="ctaLabel"
+              value={content.hero.ctaLabel}
+              maxLength={CONTENT_LIMITS.labelChars}
+              onChange={(event) => setHero({ ctaLabel: event.target.value })}
+            />
+            <span className="muted" style={{ fontSize: '0.78rem' }}>
+              On the button that opens the request form, and on the mailto fallback below
+              it. Cannot be empty — a button with no words is not a button.
+            </span>
+          </div>
+          <div>
+            <label htmlFor="requestEmail">Fallback request address</label>
+            <input
+              id="requestEmail"
+              type="email"
+              value={content.hero.requestEmail}
+              maxLength={CONTENT_LIMITS.emailChars}
+              onChange={(event) => setHero({ requestEmail: event.target.value })}
+            />
+            <span className="muted" style={{ fontSize: '0.78rem' }}>
+              Only used by visitors with JavaScript disabled, who get a mailto link
+              instead of the form.
+            </span>
+          </div>
         </div>
-      </section>
+      </AdminSection>
 
       {/* ---------------------------------------------------------------- */}
-      <section className="section">
-        <h2>Hero statistics</h2>
+      <AdminSection
+        id="apex-stats"
+        title="Hero statistics"
+        note={hiddenNote('hero')}
+      >
         <p className="section-note">
           Each figure is read from the database when the page is published, so it can
           never drift out of date the way the hand-typed snapshot used to. Type
           something into “Fixed value” to override one; clear the box to hand it back
-          to the database.
+          to the database. Remove every figure to drop the strip.
         </p>
 
         <ul style={{ listStyle: 'none', margin: '0 0 0.75rem', padding: 0 }}>
@@ -408,17 +508,38 @@ export function ContentEditor({
         >
           Add figure
         </button>
-      </section>
+
+        <div style={{ marginTop: '1rem', maxWidth: '24rem' }}>
+          <label htmlFor="statsLabel">Description of the strip</label>
+          <input
+            id="statsLabel"
+            value={content.hero.statsLabel}
+            maxLength={CONTENT_LIMITS.labelChars}
+            onChange={(event) => setHero({ statsLabel: event.target.value })}
+          />
+          <span className="muted" style={{ fontSize: '0.78rem' }}>
+            Read aloud by a screen reader to introduce the figures; never shown.
+          </span>
+        </div>
+      </AdminSection>
 
       {/* ---------------------------------------------------------------- */}
-      <section className="section">
-        <h2>Screenshots</h2>
+      <AdminSection id="apex-screenshots" title="Screenshots">
+        <p className="section-note">
+          Every slot may be left empty. An empty wide shot publishes no wide shot; empty
+          both halves of the pair and that band disappears too — which is the same thing
+          as unticking it above, reached from whichever end you happen to be at.
+        </p>
 
         <ImageField
           label="Wide shot, under the hero"
+          optional
+          help={isSectionVisible(content, 'wideShot')
+            ? undefined
+            : 'This band is switched off in Sections, so it will not be published.'}
           value={content.wideShot}
           options={options}
-          onChange={(image) => image && setContent((previous) => ({ ...previous, wideShot: image }))}
+          onChange={(image) => setContent((previous) => ({ ...previous, wideShot: image }))}
           onUploaded={registerUpload}
         />
 
@@ -426,9 +547,10 @@ export function ContentEditor({
           <div>
             <ImageField
               label="Pair, left"
+              optional
               value={content.pair.light}
               options={options}
-              onChange={(image) => image && setPair({ light: image })}
+              onChange={(image) => setPair({ light: image })}
               onUploaded={registerUpload}
             />
             <label htmlFor="lightCaption">Caption</label>
@@ -442,9 +564,10 @@ export function ContentEditor({
           <div>
             <ImageField
               label="Pair, right (phone)"
+              optional
               value={content.pair.mobile}
               options={options}
-              onChange={(image) => image && setPair({ mobile: image })}
+              onChange={(image) => setPair({ mobile: image })}
               onUploaded={registerUpload}
             />
             <label htmlFor="mobileCaption">Caption</label>
@@ -456,12 +579,14 @@ export function ContentEditor({
             />
           </div>
         </div>
-      </section>
+      </AdminSection>
 
       {/* ---------------------------------------------------------------- */}
-      <section className="section">
-        <h2>“What it does” cards</h2>
-
+      <AdminSection
+        id="apex-features"
+        title="“What it does” cards"
+        note={hiddenNote('features')}
+      >
         <div style={{ marginBottom: '0.75rem', maxWidth: '24rem' }}>
           <label htmlFor="features-heading">Section heading</label>
           <input
@@ -540,12 +665,14 @@ export function ContentEditor({
             {CONTENT_LIMITS.maxFeatures} is the maximum.
           </span>
         )}
-      </section>
+      </AdminSection>
 
       {/* ---------------------------------------------------------------- */}
-      <section className="section">
-        <h2>“Built like a record book” notes</h2>
-
+      <AdminSection
+        id="apex-notes"
+        title="“Built like a record book” notes"
+        note={hiddenNote('notes')}
+      >
         <div style={{ marginBottom: '0.75rem', maxWidth: '24rem' }}>
           <label htmlFor="notes-heading">Section heading</label>
           <input
@@ -606,11 +733,10 @@ export function ContentEditor({
         >
           Add note
         </button>
-      </section>
+      </AdminSection>
 
       {/* ---------------------------------------------------------------- */}
-      <section className="section">
-        <h2>Search and sharing</h2>
+      <AdminSection id="apex-meta" title="Search and sharing">
         <p className="section-note">
           What search engines list and what a shared link looks like. The canonical
           URL is <code>https://afldb.com/</code> and is set in code, not here: a typo
@@ -665,10 +791,12 @@ export function ContentEditor({
         <div style={{ marginTop: '0.75rem' }}>
           <ImageField
             label="Shared-link image"
-            help="What appears when the link is posted to a chat or a social network."
+            optional
+            help="What appears when the link is posted to a chat or a social network.
+              Leave it empty and the link shares as plain text instead of a card."
             value={content.meta.ogImage}
             options={options}
-            onChange={(image) => image && setMeta({ ogImage: image })}
+            onChange={(image) => setMeta({ ogImage: image })}
             onUploaded={registerUpload}
           />
         </div>
@@ -687,7 +815,7 @@ export function ContentEditor({
             plainer version of the search description.
           </span>
         </div>
-      </section>
+      </AdminSection>
 
       <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', margin: '1.25rem 0' }}>
         <button className="btn" type="submit" disabled={saving}>

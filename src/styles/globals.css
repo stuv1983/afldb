@@ -932,6 +932,151 @@ label {
   text-wrap: pretty;
 }
 
+/* Admin shell -------------------------------------------------------- */
+/* The admin area navigates from a sidebar rather than the one-line
+   breadcrumb row it used to: ten destinations across four unrelated
+   concerns do not read as a list of peers. The rail collapses, and the
+   choice is remembered — see AdminNav. */
+.admin-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+}
+.admin-shell:has(.admin-nav.collapsed) { grid-template-columns: auto minmax(0, 1fr); }
+
+.admin-nav {
+  position: sticky;
+  /* Clear of the sticky site header. */
+  top: 4.5rem;
+  border-right: 1px solid var(--border);
+  padding-right: 1rem;
+  font-family: var(--font-sans);
+}
+.admin-nav.collapsed { border-right: 0; padding-right: 0; }
+/* No animation until the stored preference has been applied, so the first
+   paint does not slide a rail nobody asked to move. */
+.admin-nav[data-ready='no'] { transition: none; }
+
+.admin-nav-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+.admin-nav-brand {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-faint);
+  font-weight: 600;
+}
+.admin-nav-toggle {
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+.admin-nav-toggle:hover { color: var(--text); background: var(--bg-hover); }
+
+.admin-nav-group { margin-bottom: 1.1rem; }
+.admin-nav-group-label {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+  font-weight: 600;
+  margin: 0 0 0.35rem;
+  padding: 0;
+  border: 0;
+}
+.admin-nav-group ul { list-style: none; margin: 0; padding: 0; }
+.admin-nav-group li { margin: 0; }
+.admin-nav-group a {
+  display: block;
+  padding: 0.3rem 0.5rem;
+  margin-left: -0.5rem;
+  border-radius: var(--radius);
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.admin-nav-group a:hover { background: var(--bg-hover); color: var(--text); }
+.admin-nav-group a[aria-current='page'] {
+  color: var(--text);
+  font-weight: 600;
+  background: var(--bg-subtle);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.admin-nav-foot { border-top: 1px solid var(--border); padding-top: 0.8rem; }
+.admin-nav-who {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0 0 0.5rem;
+  word-break: break-all;
+}
+.admin-nav-who span { color: var(--text-faint); font-size: 0.6875rem; }
+.admin-nav-foot .btn { margin-top: 0.5rem; width: 100%; }
+
+.admin-main { min-width: 0; }
+
+/* Collapsible sections of a long admin form -------------------------- */
+/* Built on <details>, so the fields inside stay in the DOM — and therefore
+   keep submitting — while the section is shut. See AdminSection. */
+details.admin-section > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  list-style: none;
+  cursor: pointer;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-strong);
+}
+details.admin-section > summary::-webkit-details-marker { display: none; }
+details.admin-section > summary::before {
+  content: '▸';
+  color: var(--text-faint);
+  transition: transform 0.15s ease;
+}
+details.admin-section[open] > summary::before { transform: rotate(90deg); }
+details.admin-section > summary h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1rem;
+}
+.admin-section-note { font-size: 0.78rem; color: var(--text-muted); }
+
+/* Shell commands quoted back at an admin, e.g. the repair for a publish
+   that failed on permissions. */
+.code-block {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre;
+  color: var(--text);
+}
+/* A message that arrived with its own line breaks in it. */
+.notice-pre { white-space: pre-wrap; }
+
 /* Utilities ---------------------------------------------------------- */
 .visually-hidden {
   position: absolute;
@@ -957,6 +1102,30 @@ label {
   }
   .split > *:last-child { padding-left: 0; }
   .aflw-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* The sidebar becomes a disclosure above the page rather than a column
+     beside it. AdminNav defaults to collapsed at this width, so what is
+     normally here is a single toggle button. */
+  .admin-shell,
+  .admin-shell:has(.admin-nav.collapsed) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+  .admin-nav {
+    position: static;
+    border-right: 0;
+    padding-right: 0;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.75rem;
+  }
+  .admin-nav.collapsed { border-bottom: 0; padding-bottom: 0; }
+  .admin-nav-body {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 0.75rem 1.5rem;
+    align-items: start;
+  }
+  .admin-nav-foot { grid-column: 1 / -1; }
 }
 
 @media (max-width: 1080px) and (min-width: 641px) {

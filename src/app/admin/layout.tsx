@@ -1,5 +1,5 @@
-import Link from 'next/link';
-
+import { AdminNav } from '@/app/admin/AdminNav';
+import { adminNavFor } from '@/app/admin/nav-model';
 import { getAdminUser } from '@/lib/auth/session';
 
 /**
@@ -10,38 +10,33 @@ import { getAdminUser } from '@/lib/auth/session';
  */
 export const dynamic = 'force-dynamic';
 
+function roleLabel(role: string, canManageAdmins: boolean): string {
+  if (role === 'super_admin') return 'Super admin';
+  if (role === 'contributor') return 'Contributor';
+  return canManageAdmins ? 'Admin · can manage admins' : 'Admin';
+}
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const admin = await getAdminUser();
-  const isContributor = admin?.role === 'contributor';
+
+  // Signed out, or on the login/invite pages the middleware lets through
+  // unauthenticated: there is no menu to draw, and drawing an empty rail
+  // beside a login form would be worse than drawing nothing.
+  //
+  // An outstanding temporary password gets the same treatment for a
+  // different reason: every route in that menu redirects straight back to
+  // the change-password page (see `requireUploader`), so a full sidebar
+  // would be eight links to nowhere.
+  if (!admin || admin.mustChangePassword) return <>{children}</>;
 
   return (
-    <>
-      <nav className="breadcrumbs" aria-label="Admin">
-        {isContributor ? (
-          <Link href="/admin/upload">Upload</Link>
-        ) : (
-          <>
-            <Link href="/admin">Admin</Link>
-            <span aria-hidden="true">·</span>
-            <Link href="/admin/upload">Upload</Link>
-            <span aria-hidden="true">·</span>
-            <Link href="/admin/access">Beta access</Link>
-            <span aria-hidden="true">·</span>
-            <Link href="/admin/admins">Administrators</Link>
-            {admin?.role === 'super_admin' && (
-              <>
-                <span aria-hidden="true">·</span>
-                <Link href="/admin/content">Page content</Link>
-                <span aria-hidden="true">·</span>
-                <Link href="/admin/settings">Settings</Link>
-              </>
-            )}
-          </>
-        )}
-        <span aria-hidden="true">·</span>
-        <Link href="/">View site</Link>
-      </nav>
-      {children}
-    </>
+    <div className="admin-shell">
+      <AdminNav
+        groups={adminNavFor({ role: admin.role, canManageAdmins: admin.canManageAdmins })}
+        email={admin.email}
+        roleLabel={roleLabel(admin.role, admin.canManageAdmins)}
+      />
+      <div className="admin-main">{children}</div>
+    </div>
   );
 }

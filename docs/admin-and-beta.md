@@ -173,6 +173,71 @@ Admin sessions are database rows (sha256 of the cookie token),
 individually revocable, 12-hour TTL. Everything an administrator does
 lands in `auth_audit_log`, which the app role can only INSERT into.
 
+### Resetting a forgotten password
+
+Until migration 040 the only mechanism was to re-issue an invite, and
+because acceptance re-enrols **both** factors that made a forgotten
+password cost the authenticator too — delete the entry from your phone,
+scan a new QR code, for a factor that never went wrong.
+
+`/admin/admins` now has **Reset password** beside each account, open to
+anyone with admin-management access under the same rank rules as invites:
+a super admin may reset anyone, a delegated manager may reset a
+contributor and no one better (`admin.password_reset_refused`). Nobody
+may reset their own account through it — that is what "Change password"
+in the sidebar is for.
+
+The server generates the temporary password; it is never typed by the
+admin issuing it. It is shown **once**, stored only as an scrypt hash,
+and **cannot be read back** — a lost one is re-issued, not looked up. It
+is drawn from an alphabet with `I l 1` and `O 0 o` removed, because it is
+dictated over a phone as often as it is copied.
+
+What a temporary password can do is deliberately almost nothing:
+
+- **It signs the account out everywhere.** Issuing one revokes every live
+  session, which is the point when the reason for the reset is that
+  somebody else got in.
+- **It grants exactly one ability: replacing itself.** `auth_users
+  .must_change_password` is honoured by `requireUploader()` — the guard
+  every admin route already funnels through — so every page redirects to
+  `/admin/password` until a new password is chosen. This is not a prompt
+  on the login form; a prompt is skipped by typing another URL.
+- **It does not touch the authenticator.** Signing in with it still needs
+  the account's existing TOTP code. An admin who could reset a password
+  *and* disarm the second factor would be the weakest door in the
+  building. A lost authenticator is still the invite flow's job, which
+  re-enrols both factors together and proves the new one with a live code.
+
+Changing a password — by either route — revokes every session including
+the caller's own and immediately mints a fresh one, so a session opened
+while the old password was live never outlives it.
+`auth_users.password_changed_at` is shown per account at `/admin/admins`,
+which is how anyone notices a reset that was issued and never used.
+Audited as `admin.password_reset`, `admin.password_changed` and
+`admin.password_change_failed`.
+
+### Getting around the admin area
+
+Navigation is a sidebar (`src/app/admin/AdminNav.tsx`), grouped Overview /
+Data / People / Site / Account, with the current page marked. It collapses
+to a rail, and the choice is remembered in `localStorage` rather than a
+cookie — it is a display preference that never needs to reach the server,
+and a cookie would make every admin response vary on it. On a narrow
+screen it defaults to collapsed and expands into a grid above the page.
+
+Which links appear is derived from the role in `src/app/admin/nav-model.ts`.
+That file is **furniture, never a gate**: every page still calls its own
+`requireAdmin()` / `requireSuperAdmin()`, and a link omitted there is not a
+link that is protected.
+
+The long forms — `/admin/content` and `/admin/settings` — are built from
+`AdminSection`, a `<details>` block that remembers whether it is open, one
+key per section. `<details>` rather than a conditional render for a reason
+that matters inside a form: the fields stay in the DOM while the section is
+shut, so they still submit. A React-conditional section would silently
+discard everything typed into it.
+
 ### Site settings (`/admin/settings`, super admin only)
 
 The handful of choices that used to be hard-coded, stored one jsonb row

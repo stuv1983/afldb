@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { AdminSection } from '@/app/admin/AdminSection';
 import { EARLY_ACCESS_PRESETS } from '@/lib/early-access-presets';
 import {
   EARLY_ACCESS_LIMITS,
@@ -122,8 +123,7 @@ export function EarlyAccessSettings({
   }
 
   return (
-    <section className="section">
-      <h2>Early access requests</h2>
+    <AdminSection id="settings-early-access" title="Early access requests">
       <p className="section-note">
         The form behind the “Request early access” button on{' '}
         <code>afldb.com</code>. A request never admits anybody by itself — it queues a
@@ -429,6 +429,6 @@ export function EarlyAccessSettings({
           maxLength={200}
         />
       </div>
-    </section>
+    </AdminSection>
   );
 }

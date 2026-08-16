@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react';
 
+import { AdminSection } from '@/app/admin/AdminSection';
 import { EarlyAccessSettings } from '@/app/admin/settings/EarlyAccessSettings';
 import { saveSiteSettings, type SettingsState } from '@/app/admin/settings/actions';
 import {
@@ -77,8 +78,7 @@ export function SettingsForm({
 
       <input type="hidden" name="order" value={layout.order.join(',')} />
 
-      <section className="section">
-        <h2>Home page</h2>
+      <AdminSection id="settings-home" title="Home page">
         <p className="section-note">
           Applies to both the AFL front page and the AFLW one, which carry the same
           layout. Untick to hide a section; drag the handle — or focus it and press
@@ -170,10 +170,9 @@ export function SettingsForm({
             </select>
           </div>
         </div>
-      </section>
+      </AdminSection>
 
-      <section className="section">
-        <h2>Grid solver</h2>
+      <AdminSection id="settings-grid" title="Grid solver">
         <p className="section-note">
           Who may reach <code>/grid-solver</code>. Everything above super admin is a
           publication decision: the page runs real queries against the whole record,
@@ -194,7 +193,7 @@ export function SettingsForm({
             </span>
           </label>
         ))}
-      </section>
+      </AdminSection>
 
       <EarlyAccessSettings
         open={settings.earlyAccessOpen}

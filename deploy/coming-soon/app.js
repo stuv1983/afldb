@@ -213,7 +213,15 @@
 
       // The button, not the form: a form sitting open under the hero competes
       // with the page's actual job, which is to explain what AFLDB is.
-      var button = el('button', { type: 'button', class: 'btn' }, 'Request early access');
+      //
+      // Its wording comes from the page rather than from the endpoint, via a
+      // data attribute the publisher writes (see apex-html.ts). The endpoint
+      // serves the QUESTIONS; the copy around them is part of the page and is
+      // edited with the rest of it at /admin/content. The literal below is
+      // the fallback for the hand-written index.html in this directory, which
+      // carries no attribute.
+      var label = mount.getAttribute('data-label') || 'Request early access';
+      var button = el('button', { type: 'button', class: 'btn' }, label);
       button.addEventListener('click', function () {
         mount.textContent = '';
         var form = buildForm(definition);

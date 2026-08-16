@@ -20,18 +20,39 @@ export function PublishPanel({
   templateFound,
   templateDir,
   lastPublishedAt,
+  writable,
+  remedy,
 }: {
   configured: boolean;
   target: string | null;
   templateFound: boolean;
   templateDir: string;
   lastPublishedAt: string | null;
+  /** Empty when the directory is fine; otherwise why it is not. */
+  writable: string;
+  /** The shell that repairs it, or null. */
+  remedy: string | null;
 }) {
   const [state, action, publishing] = useActionState<ContentState, FormData>(republishApex, {});
 
   return (
     <form action={action} className="section">
       <h2>Publishing</h2>
+
+      {/* Ahead of the button, not after it. A publish that is going to fail on
+          permissions fails the same way every time, and the author should not
+          have to write a page of copy to discover it. */}
+      {configured && writable && (
+        <div className="notice" role="alert">
+          <p style={{ margin: 0 }}><strong>The page cannot be published.</strong> {writable}</p>
+          {remedy && (
+            <>
+              <p style={{ margin: '0.6rem 0 0.3rem' }}>On the server, as a user with sudo:</p>
+              <pre className="code-block"><code>{remedy}</code></pre>
+            </>
+          )}
+        </div>
+      )}
 
       {configured ? (
         <p className="section-note">
@@ -66,7 +87,7 @@ export function PublishPanel({
       </p>
 
       {state.message && <p className="notice">{state.message}</p>}
-      {state.error && <p className="notice" role="alert">{state.error}</p>}
+      {state.error && <p className="notice notice-pre" role="alert">{state.error}</p>}
 
       <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
         <button className="btn btn-secondary" type="submit" disabled={publishing || !configured}>

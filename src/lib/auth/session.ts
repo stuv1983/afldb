@@ -170,7 +170,12 @@ export type AdminUser = {
   email: string;
   role: 'admin' | 'super_admin' | 'contributor';
   canManageAdmins: boolean;
+  /** An admin-issued temporary password is outstanding; see migration 040. */
+  mustChangePassword: boolean;
 };
+
+/** The one page an account carrying a temporary password may reach. */
+export const CHANGE_PASSWORD_PATH = '/admin/password';
 
 /**
  * The roles in privilege order, for the one comparison the invite flow
@@ -244,9 +249,10 @@ export const getAdminUser = cache(async function getAdminUser(): Promise<AdminUs
 
   const [row] = await authSql<{
     id: number; email: string; role: 'admin' | 'super_admin' | 'contributor';
-    canManageAdmins: boolean;
+    canManageAdmins: boolean; mustChangePassword: boolean;
   }[]>`
-    SELECT u.id, u.email, u.role, u.can_manage_admins AS "canManageAdmins"
+    SELECT u.id, u.email, u.role, u.can_manage_admins AS "canManageAdmins",
+           u.must_change_password AS "mustChangePassword"
       FROM auth_sessions s
       JOIN auth_users u ON u.id = s.user_id
      WHERE s.token_hash = ${sha256Hex(token)}
@@ -259,16 +265,38 @@ export const getAdminUser = cache(async function getAdminUser(): Promise<AdminUs
 });
 
 /**
+ * Require a signed-in staff session and nothing more -- no role check, and
+ * no check on an outstanding temporary password.
+ *
+ * There is exactly one legitimate caller: the change-password page itself,
+ * which an account holding a temporary password must be able to reach. Every
+ * other route wants `requireUploader` or one of the guards above it, all of
+ * which funnel through this one and then add the checks it omits.
+ */
+export async function requireSignedIn(): Promise<AdminUser> {
+  const admin = await getAdminUser();
+  if (!admin) redirect('/admin/login');
+  return admin;
+}
+
+/**
  * Require a signed-in staff session of any role, or redirect to the login
  * form -- no role check beyond that. This is deliberately narrower than
  * requireAdmin(): it exists only for the handful of routes a contributor
  * is meant to reach (the upload form and the status page of a submission
  * they made). Reach for requireAdmin() unless you specifically mean to
  * admit a contributor too.
+ *
+ * An outstanding temporary password is enforced HERE rather than on the
+ * login form, and the difference is the whole point of the flag. A prompt
+ * after signing in is skipped by typing another URL; a redirect from the
+ * guard that every admin route already calls is not. So a temporary
+ * password buys exactly one ability -- replacing itself -- and the account
+ * is otherwise as good as locked until it does. See migration 040.
  */
 export async function requireUploader(): Promise<AdminUser> {
-  const admin = await getAdminUser();
-  if (!admin) redirect('/admin/login');
+  const admin = await requireSignedIn();
+  if (admin.mustChangePassword) redirect(CHANGE_PASSWORD_PATH);
   return admin;
 }
 

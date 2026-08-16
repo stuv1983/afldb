@@ -237,13 +237,89 @@ export type ApexNote = {
   body: string;
 };
 
+// ---------------------------------------------------------------------------
+// Sections
+// ---------------------------------------------------------------------------
+
+/**
+ * The bands of the page, in the order they were hand-written.
+ *
+ * Every one of these is a CONTENT decision — whether the page shows a wide
+ * screenshot, whether the notes come before the feature cards — and content
+ * decisions belong to whoever writes the page, not to whoever last deployed
+ * it. Before this list existed the renderer emitted all five, always, in this
+ * order, and changing either meant editing `apex-html.ts`.
+ *
+ * The ids are stable and are the only thing a stored document keys order and
+ * visibility by, so a section may be renamed here freely but never re-slugged.
+ */
+export const APEX_SECTIONS = [
+  { id: 'hero', label: 'Hero — eyebrow, headline, request button, figures' },
+  { id: 'wideShot', label: 'Wide screenshot' },
+  { id: 'features', label: '“What it does” cards' },
+  { id: 'notes', label: '“Built like a record book” notes' },
+  { id: 'pair', label: 'Light and mobile pair' },
+] as const;
+
+export type ApexSectionId = typeof APEX_SECTIONS[number]['id'];
+
+export type ApexSection = {
+  id: ApexSectionId;
+  visible: boolean;
+};
+
+export const DEFAULT_APEX_SECTIONS: ApexSection[] = APEX_SECTIONS.map(
+  (section) => ({ id: section.id, visible: true }),
+);
+
+function isSectionId(value: unknown): value is ApexSectionId {
+  return APEX_SECTIONS.some((section) => section.id === value);
+}
+
+/**
+ * Normalise the section list: known ids only, no duplicates, and anything
+ * missing appended in its shipped position.
+ *
+ * The append is what makes this survive a deploy in either direction. A
+ * document written before a new section existed does not know about it and
+ * must not lose it; a document naming a section this build has dropped must
+ * not carry a dangling id into the renderer. Both are the ordinary state of
+ * affairs for a settings row read either side of a release.
+ *
+ * A section absent from a stored list arrives VISIBLE, because the
+ * alternative — defaulting to hidden — would silently blank part of the page
+ * on the first publish after a release.
+ */
+export function parseApexSections(value: unknown): ApexSection[] {
+  const sections: ApexSection[] = [];
+  const seen = new Set<ApexSectionId>();
+
+  if (Array.isArray(value)) {
+    for (const raw of value) {
+      if (!raw || typeof raw !== 'object') continue;
+      const item = raw as Record<string, unknown>;
+      if (!isSectionId(item.id) || seen.has(item.id)) continue;
+      seen.add(item.id);
+      sections.push({ id: item.id, visible: item.visible !== false });
+    }
+  }
+
+  for (const section of APEX_SECTIONS) {
+    if (!seen.has(section.id)) sections.push({ id: section.id, visible: true });
+  }
+  return sections;
+}
+
 export type ApexContent = {
+  /** Which bands the page shows, and in what order. */
+  sections: ApexSection[];
   meta: {
     title: string;
     description: string;
     ogTitle: string;
     ogDescription: string;
-    ogImage: ApexImage;
+    /** Null drops the og:image and twitter:card tags rather than guessing one. */
+    ogImage: ApexImage | null;
     /** The `description` of the WebSite JSON-LD block. */
     schemaDescription: string;
   };
@@ -256,14 +332,25 @@ export type ApexContent = {
     heading: string;
     lede: string;
     /**
+     * The words on the button that opens the early-access form.
+     *
+     * Rendered into the page as a data attribute that `app.js` reads, so the
+     * static file stays the authority on its own wording — the endpoint
+     * serves the QUESTIONS, not the copy around them.
+     */
+    ctaLabel: string;
+    /**
      * The address the no-JavaScript fallback button mails. Distinct from the
      * footer's contact address on purpose: one is where requests go, the other
      * is where a reader writes about the data.
      */
     requestEmail: string;
     stats: ApexStat[];
+    /** The `aria-label` on the figures list; read aloud, never seen. */
+    statsLabel: string;
   };
-  wideShot: ApexImage;
+  /** Null renders no wide screenshot band at all. */
+  wideShot: ApexImage | null;
   features: {
     heading: string;
     items: ApexFeature[];
@@ -273,9 +360,9 @@ export type ApexContent = {
     items: ApexNote[];
   };
   pair: {
-    light: ApexImage;
+    light: ApexImage | null;
     lightCaption: string;
-    mobile: ApexImage;
+    mobile: ApexImage | null;
     mobileCaption: string;
   };
 };
@@ -289,6 +376,7 @@ export type ApexContent = {
  * the numbers that were typed into the original file.
  */
 export const DEFAULT_APEX_CONTENT: ApexContent = {
+  sections: DEFAULT_APEX_SECTIONS,
   meta: {
     title: 'AFLDB — Australian Football Statistics, 1897 to Present',
     description:
@@ -322,6 +410,7 @@ export const DEFAULT_APEX_CONTENT: ApexContent = {
       + 'player, every match, every season from the first bounce in 1897 to the '
       + 'present round. It is being built as an independent, non-commercial '
       + 'reference, and is currently in closed beta while the record is verified.',
+    ctaLabel: 'Request early access',
     requestEmail: 'requests@afldb.com',
     stats: [
       { id: 'players', label: 'Players', metric: 'players', value: '' },
@@ -329,6 +418,7 @@ export const DEFAULT_APEX_CONTENT: ApexContent = {
       { id: 'seasons', label: 'Seasons', metric: 'seasons', value: '' },
       { id: 'playergames', label: 'Player games', metric: 'playerGames', value: '' },
     ],
+    statsLabel: 'The record, at a glance',
   },
   wideShot: {
     src: '/img/home-dark.webp',
@@ -530,6 +620,7 @@ export function parseApexContent(value: unknown): ApexContent {
   const pair = section('pair');
 
   return {
+    sections: parseApexSections(raw.sections),
     meta: {
       title: textOr(meta.title, CONTENT_LIMITS.metaTitleChars, fallback.meta.title),
       description: textOr(
@@ -550,7 +641,10 @@ export function parseApexContent(value: unknown): ApexContent {
           meta.description, CONTENT_LIMITS.metaDescriptionChars, fallback.meta.ogDescription,
         ),
       ),
-      ogImage: parseImage(meta.ogImage, fallback.meta.ogImage),
+      // Optional, like every other image slot now: a page that would rather
+      // share as a plain link than as a card is a legitimate choice, and
+      // reinstating a picture the author removed is not a repair.
+      ogImage: parseOptionalImage(meta.ogImage),
       schemaDescription: textOr(
         meta.schemaDescription,
         CONTENT_LIMITS.metaDescriptionChars,
@@ -567,12 +661,17 @@ export function parseApexContent(value: unknown): ApexContent {
       // cannot be emptied.
       heading: textOr(hero.heading, CONTENT_LIMITS.headingChars, fallback.hero.heading),
       lede: text(hero.lede, CONTENT_LIMITS.ledeChars),
+      // A button with no words on it is not a button, so this one field of
+      // the call to action cannot be emptied. Removing the button entirely is
+      // done at /admin/settings, by closing the form.
+      ctaLabel: textOr(hero.ctaLabel, CONTENT_LIMITS.labelChars, fallback.hero.ctaLabel),
       requestEmail: isEmailAddress(hero.requestEmail)
         ? hero.requestEmail
         : fallback.hero.requestEmail,
       stats: parseStats(hero.stats),
+      statsLabel: textOr(hero.statsLabel, CONTENT_LIMITS.labelChars, fallback.hero.statsLabel),
     },
-    wideShot: parseImage(raw.wideShot, fallback.wideShot),
+    wideShot: parseOptionalImage(raw.wideShot),
     features: {
       heading: text(features.heading, CONTENT_LIMITS.headingChars),
       items: parseBlocks<ApexFeature>(
@@ -602,9 +701,9 @@ export function parseApexContent(value: unknown): ApexContent {
       ),
     },
     pair: {
-      light: parseImage(pair.light, fallback.pair.light),
+      light: parseOptionalImage(pair.light),
       lightCaption: text(pair.lightCaption, CONTENT_LIMITS.labelChars),
-      mobile: parseImage(pair.mobile, fallback.pair.mobile),
+      mobile: parseOptionalImage(pair.mobile),
       mobileCaption: text(pair.mobileCaption, CONTENT_LIMITS.labelChars),
     },
   };
@@ -617,10 +716,13 @@ export function apexImages(content: ApexContent): ApexImage[] {
     content.wideShot,
     content.pair.light,
     content.pair.mobile,
-    ...content.features.items
-      .map((feature) => feature.image)
-      .filter((image): image is ApexImage => image !== null),
-  ];
+    ...content.features.items.map((feature) => feature.image),
+  ].filter((image): image is ApexImage => image !== null);
+}
+
+/** Whether a section is switched on, for the renderer and the editor alike. */
+export function isSectionVisible(content: ApexContent, id: ApexSectionId): boolean {
+  return content.sections.some((section) => section.id === id && section.visible);
 }
 
 // ---------------------------------------------------------------------------

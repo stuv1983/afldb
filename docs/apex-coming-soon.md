@@ -82,11 +82,7 @@ curl -s http://127.0.0.1:3100/api/early-access
 ## 4. Deploy the page
 
 ```bash
-sudo mkdir -p /var/www/afldb-soon
-sudo cp -r ~/projects/afldb/deploy/coming-soon/. /var/www/afldb-soon/
-sudo chown -R caddy:caddy /var/www/afldb-soon
-sudo find /var/www/afldb-soon -type f -exec chmod 644 {} +
-sudo find /var/www/afldb-soon -type d -exec chmod 755 {} +
+sudo bash ~/projects/afldb/tools/maintenance/03_apex_dir.sh
 
 sudo cp ~/projects/afldb/deploy/Caddyfile.production /etc/caddy/Caddyfile
 sudo caddy validate --config /etc/caddy/Caddyfile
@@ -96,6 +92,26 @@ sudo systemctl reload caddy
 `caddy validate` **must** pass before the reload. It catches a malformed block;
 it does not catch an apex-redirects-to-itself loop, which is why `afldb.com`
 and `www.afldb.com` are separate blocks and must stay that way.
+
+Nothing is copied into `/var/www/afldb-soon` here. The directory is derived
+and disposable (§8) — the application fills it, and the way to fill it is to
+press **Republish** at `/admin/content` once the app is running.
+
+`03_apex_dir.sh` replaces what this section used to say, which was
+`chown -R caddy:caddy`. That is wrong and it is worth knowing why, because the
+symptom points at the wrong file: the directory is **written by the service
+user and read by Caddy**, so giving it to Caddy outright locks out the only
+process that publishes into it and every Save reports
+
+```text
+Saved, but the page could not be written:
+EACCES: permission denied, mkdir '/var/www/afldb-soon/img/u'
+```
+
+Owner `arm`, group `caddy`, mode 750. The script sets that, checks the systemd
+unit grants the path (§8 — `ProtectSystem=strict` is the *other* cause of the
+identical error), and is safe to re-run. `/admin/content` also checks the
+directory on load now and says so before anything is saved.
 
 ## 5. Verify before DNS, then move DNS
 
@@ -248,17 +264,47 @@ deleting the directory and pressing **Republish** is a complete recovery.
 
 ### What is editable
 
-Every text field, the images, and the two repeating card lists — the "What it
-does" features and the "Built like a record book" notes can be added to,
-removed and reordered. Images are uploaded from any slot, stored in
-`site_media` (migration 037, revoked from the public role by 038) and written
-to `img/u/` on publish. An upload is
-identified by its **magic bytes**, not its name or declared type: PNG, JPEG
-and WebP only, 2 MB each.
+Effectively all of it. Every text field, every image, the two repeating card
+lists — and, since the **Sections** panel at the top of the editor, the shape
+of the page itself:
+
+- **Which bands appear.** Hero, wide screenshot, "What it does" cards,
+  "Built like a record book" notes, and the light/mobile pair. Untick one and
+  it is left out of the published page entirely. Its words and pictures stay
+  in the database, so ticking it back on restores what was written rather
+  than a blank — hiding a band is not deleting it.
+- **The order they appear in.** The stored list drives the renderer;
+  `apex-html.ts` holds the markup for each band and no longer decides the
+  running order.
+- **Whether an image is there at all.** Every slot is optional now, the wide
+  shot and both halves of the pair included. An empty slot publishes no
+  image, and a band whose only content was an image publishes nothing — so
+  "remove the wide shot" and "untick Wide screenshot" reach the same place
+  from either end. Removing the share image drops `og:image` and downgrades
+  the Twitter card to `summary`, rather than substituting a picture nobody
+  chose.
+- **The button's wording.** The label on the "Request early access" button is
+  published into the page as a `data-label` attribute that `app.js` reads.
+  The endpoint serves the *questions*; the copy around them is part of the
+  page and is edited with the rest of it. Whether the button appears at all
+  is still the early-access switch at `/admin/settings`.
+
+Images are uploaded from any slot, stored in `site_media` (migration 037,
+revoked from the public role by 038) and written to `img/u/` on publish. An
+upload is identified by its **magic bytes**, not its name or declared type:
+PNG, JPEG and WebP only, 2 MB each.
+
+A stored document that names a section this build does not have loses it, and
+one that is missing a section this build does have gains it, **visible**. Both
+are the ordinary state of a settings row read either side of a deploy, and the
+second defaults to visible on purpose: the alternative silently blanks part of
+the page on the first publish after a release.
 
 The canonical URL, `og:url` and the origin of `og:image` are **not** editable.
 They are deployment facts, and a typo in one is invisible on the page and
-expensive in the index.
+expensive in the index. Nor is the markup: everything published is escaped and
+the page's CSP has no `'unsafe-inline'`, so the editor writes text and
+choices, never HTML.
 
 ### The hero statistics are now live
 
@@ -282,16 +328,25 @@ is already stored, without saving anything, and is the answer to all three of:
 
 `AFLDB_APEX_DIR` must be set **only on the host that serves the apex**. Unset
 means "save to the database, publish nothing", which is the correct state in
-development, and the admin screen says so rather than failing. The production
-droplet additionally needs the `ReadWritePaths=/var/www/afldb-soon` line in
-`deploy/afldb.service` — the service is `ProtectSystem=strict`, so without it
-every publish fails with `EACCES` — and the directory must be owned by the
-service user:
+development, and the admin screen says so rather than failing.
+
+Two other things must be true on the host that does publish, and **both fail
+with the same `EACCES`**, which is why one script checks for both:
+
+1. the directory is owned by the service user, group `caddy`, mode 750 — it is
+   written by the app and read by the web server;
+2. `deploy/afldb.service` carries `ReadWritePaths=-/var/www/afldb-soon`. The
+   service is `ProtectSystem=strict`, which makes the whole of `/var`
+   read-only, so correct ownership on its own still fails.
 
 ```bash
-sudo chown -R arm:caddy /var/www/afldb-soon
-sudo chmod 750 /var/www/afldb-soon
+sudo bash ~/projects/afldb/tools/maintenance/03_apex_dir.sh
 ```
+
+`/admin/content` probes the directory when the page loads and refuses to
+pretend: if publishing would fail, the Publishing panel says which of the two
+causes it is and prints the commands, rather than waiting for a Save to find
+out.
 
 ### Screenshots
 
