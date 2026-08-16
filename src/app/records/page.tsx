@@ -2,16 +2,17 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { RECORD_CATEGORIES } from '@/db/queries/records';
+import { pageMetadata } from '@/lib/seo';
 
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
-  title: 'Records',
+export const metadata: Metadata = pageMetadata({
+  title: 'AFL & VFL Records — Career, Season and Single-Match Leaders',
   description:
     'AFL/VFL records: most games, most goals, most finals, most premierships, '
     + 'most Brownlow votes, and single-game and single-season records.',
-  alternates: { canonical: '/records' },
-};
+  path: '/records',
+});
 
 export default function RecordsPage() {
   const categories = Object.values(RECORD_CATEGORIES);

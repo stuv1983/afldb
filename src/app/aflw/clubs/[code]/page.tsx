@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
 import { ReorderableSections } from '@/components/ReorderableSections';
@@ -19,6 +20,7 @@ import {
   formatNumber,
   formatPercentage,
 } from '@/lib/format';
+import { isFilteredView, notFoundMetadata, pageMetadata } from '@/lib/seo';
 import { type FilterField, parseFilterValues } from '@/search/table-filters';
 
 export const dynamic = 'force-dynamic';
@@ -27,19 +29,22 @@ const PLAYER_LIMIT = 50;
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ code: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
-  const { code } = await params;
+  const [{ code }, query] = await Promise.all([params, searchParams]);
   const club = await getAflwClub(decodeURIComponent(code));
-  if (!club) return { title: 'Club not found' };
-  return {
-    title: `${club.name} — AFLW`,
+  if (!club) return notFoundMetadata('AFLW club');
+  return pageMetadata({
+    title: `${club.name} AFLW — Players, Seasons & Record`,
     description:
       `${club.name} in the AFLW: ${club.matches} matches, ${club.wins} wins and `
-      + `${club.premierships} premierships since 2017.`,
-    alternates: { canonical: aflwClubPath(club.code) },
-  };
+      + `${club.premierships} premierships since 2017, with the full player list.`,
+    path: aflwClubPath(club.code),
+    noindex: isFilteredView(query),
+  });
 }
 
 export default async function AflwClubPage({
@@ -207,13 +212,11 @@ export default async function AflwClubPage({
 
   return (
     <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/aflw">AFLW</Link>
-        <span aria-hidden="true">/</span>
-        <Link href="/aflw/clubs">Clubs</Link>
-        <span aria-hidden="true">/</span>
-        <span>{club.name}</span>
-      </nav>
+      <Breadcrumbs items={[
+        { label: 'AFLW', href: '/aflw' },
+        { label: 'Clubs', href: '/aflw/clubs' },
+        { label: club.name },
+      ]} />
 
       <div className="page-header">
         <h1>{club.name}</h1>

@@ -23,15 +23,18 @@ import {
   playerPath,
 } from '@/lib/format';
 import { firstValue, parseIntInRange } from '@/lib/params';
+import { pageMetadata } from '@/lib/seo';
 import { comparableStats, eraGaps, ERA_LIMITED_STATS, type EraLimitedStat } from '@/lib/player-compare';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Compare players',
-  description: 'Compare two VFL/AFL players’ careers side by side, from any club or era, and see every match they shared.',
-  alternates: { canonical: '/players/compare' },
-};
+export const metadata: Metadata = pageMetadata({
+  title: 'Compare AFL Players — Career Statistics Side by Side',
+  description:
+    'Compare two VFL/AFL players’ careers side by side, from any club or era, '
+    + 'and see every match they shared.',
+  path: '/players/compare',
+});
 
 type Basis = 'total' | 'per_game' | 'best';
 

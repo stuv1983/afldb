@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { Pagination } from '@/components/Pagination';
 import { ReorderableSections } from '@/components/ReorderableSections';
@@ -25,27 +26,41 @@ import {
 } from '@/lib/format';
 import { redirectPastEnd } from '@/lib/pagination';
 import { firstValue, parsePage } from '@/lib/params';
+import { isFilteredView, notFoundMetadata, pageMetadata } from '@/lib/seo';
 import { filterQueryParams, parseFilterValues, type FilterField } from '@/search/table-filters';
 
 export const dynamic = 'force-dynamic';
 
 const MATCHES_PER_PAGE = 25;
 
+/**
+ * AFLW pages carry AFLW in the title and canonicalise only to themselves.
+ *
+ * Several players share a name with a VFL/AFL player and a few have played
+ * in both competitions; the competitions share no record, so an AFLW page
+ * must never canonicalise to an AFL one and must be distinguishable from it
+ * in a result list without opening either.
+ */
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
-  const { slug } = await params;
+  const [{ slug }, query] = await Promise.all([params, searchParams]);
   const player = await getAflwPlayer(decodeURIComponent(slug));
-  if (!player) return { title: 'Player not found' };
-  return {
-    title: `${player.displayName} — AFLW`,
+  if (!player) return notFoundMetadata('AFLW player');
+  return pageMetadata({
+    title: `${player.displayName} — AFLW Stats, Games & Career Record`,
     description:
       `${player.displayName}: ${player.games} AFLW games, ${player.goals} goals `
-      + `and ${player.disposals} disposals for ${player.clubNames ?? 'the AFLW'}.`,
-    alternates: { canonical: aflwPlayerPath(player.slug) },
-  };
+      + `and ${player.disposals} disposals for ${player.clubNames ?? 'the AFLW'}. `
+      + 'Season-by-season statistics and full match log.',
+    path: aflwPlayerPath(player.slug),
+    ogType: 'profile',
+    noindex: isFilteredView(query),
+  });
 }
 
 export default async function AflwPlayerPage({
@@ -348,13 +363,11 @@ export default async function AflwPlayerPage({
 
   return (
     <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/aflw">AFLW</Link>
-        <span aria-hidden="true">/</span>
-        <Link href="/aflw/players">Players</Link>
-        <span aria-hidden="true">/</span>
-        <span>{player.displayName}</span>
-      </nav>
+      <Breadcrumbs items={[
+        { label: 'AFLW', href: '/aflw' },
+        { label: 'Players', href: '/aflw/players' },
+        { label: player.displayName },
+      ]} />
 
       <div className="page-header">
         <h1>{player.displayName}</h1>

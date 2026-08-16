@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { cache } from 'react';
+
 import { sql } from '@/db/client';
 
 export type MatchListRow = {
@@ -66,7 +68,7 @@ export type MatchDetail = {
   matchEvent: string | null;
 };
 
-export async function getMatch(id: number): Promise<MatchDetail | null> {
+async function fetchMatch(id: number): Promise<MatchDetail | null> {
   const [row] = await sql<MatchDetail[]>`
     SELECT m.id, m.season, m.round_type AS "roundType",
            m.round_number AS "roundNumber", m.round_code AS "roundCode",
@@ -243,3 +245,15 @@ export async function listNotableMatchIds(limit: number) {
     (SELECT id FROM matches ORDER BY match_date DESC LIMIT ${limit})
   `;
 }
+
+/**
+ * Deduplicated per request.
+ *
+ * generateMetadata and the page body both need this row, and neither can
+ * hand it to the other — Next calls them separately. Without React's
+ * cache() that is two identical queries for every render of an entity
+ * page, doubling the cost of the pages a crawler spends most of its time
+ * on. Outside a request scope cache() calls straight through, so the
+ * import tools and the test suite are unaffected.
+ */
+export const getMatch = cache(fetchMatch);

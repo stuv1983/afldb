@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { JsonLd } from '@/components/JsonLd';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import { getPlayerHonours } from '@/db/queries/awards';
 import {
@@ -31,7 +33,9 @@ import {
   playerPath,
   seasonPath,
 } from '@/lib/format';
+import { notFoundMetadata, pageMetadata } from '@/lib/seo';
 import { honourTeamSlug } from '@/lib/slugs';
+import { playerSchema } from '@/lib/structured-data';
 
 // Player careers are historical and change only when an import runs.
 // This page deliberately reads no searchParams: doing so would force
@@ -64,23 +68,72 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const parsed = parseEntitySlug(slug);
-  if (!parsed) return { title: 'Player not found' };
+  if (!parsed) return notFoundMetadata('Player');
 
   const player = await getPlayer(parsed.id);
-  if (!player) return { title: 'Player not found' };
+  if (!player) return notFoundMetadata('Player');
 
   const span = formatSpan(player.debutSeason, player.finalSeason);
-  return {
-    title: `${player.displayName} AFL Statistics`,
-    description:
-      `${player.displayName} played ${player.games} VFL/AFL games (${span}), `
-      + `kicking ${player.goals} goals with ${player.brownlowVotes} Brownlow votes.`,
-    alternates: { canonical: playerPath(player.slug, player.id) },
-    openGraph: {
-      title: `${player.displayName} — AFL Statistics | AFLDB`,
-      type: 'profile',
-    },
-  };
+  return pageMetadata({
+    title: `${player.displayName} — ${leagueOf(player.finalSeason)} Stats, Games & Career Record`,
+    description: careerSentence(player),
+    path: playerPath(player.slug, player.id),
+    ogType: 'profile',
+  });
+}
+
+/**
+ * Which competition to name for a career, by the season it ended.
+ *
+ * "AFL stats" is what people search for, but calling Roy Cazaly's record an
+ * AFL one would be false — the competition was the VFL until 1990. The title
+ * follows the career rather than the search volume, which is the same rule
+ * the season pages already apply through `season.league`.
+ */
+function leagueOf(finalSeason: number | null): 'VFL' | 'AFL' {
+  return finalSeason !== null && finalSeason < 1990 ? 'VFL' : 'AFL';
+}
+
+/**
+ * One factual sentence about a career, from the career totals.
+ *
+ * Used for the meta description and, verbatim, as the page's opening line —
+ * a table of numbers on its own gives a crawler nothing in prose to match a
+ * query against, and gives a reader arriving cold no orientation either.
+ *
+ * Every clause is conditional on the datum existing. A player who finished
+ * in 1910 has a `brownlowVotes` of 0 because the medal did not yet exist,
+ * and writing "with 0 Brownlow votes" would state that as a fact about the
+ * player rather than about the era.
+ */
+function careerSentence(player: {
+  displayName: string;
+  games: number;
+  goals: number;
+  brownlowVotes: number;
+  premierships: number;
+  debutSeason: number | null;
+  finalSeason: number | null;
+}): string {
+  const span = formatSpan(player.debutSeason, player.finalSeason);
+  const league = leagueOf(player.finalSeason);
+
+  const clauses = [`kicking ${formatNumber(player.goals)} goals`];
+  if (player.premierships > 0) {
+    clauses.push(
+      `winning ${player.premierships} `
+      + `${player.premierships === 1 ? 'premiership' : 'premierships'}`,
+    );
+  }
+  if (player.brownlowVotes > 0) {
+    clauses.push(`polling ${formatNumber(player.brownlowVotes)} Brownlow votes`);
+  }
+
+  return (
+    `${player.displayName} played ${formatNumber(player.games)} ${league} games `
+    + `(${span}), ${clauses.join(', ')}. Full season-by-season statistics, `
+    + 'match log, honours and Brownlow record.'
+  );
 }
 
 export default async function PlayerPage({
@@ -502,11 +555,21 @@ export default async function PlayerPage({
 
   return (
     <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/players">Players</Link>
-        <span aria-hidden="true">/</span>
-        <span>{player.displayName}</span>
-      </nav>
+      <Breadcrumbs items={[
+        { label: 'Players', href: '/players' },
+        { label: player.displayName },
+      ]} />
+
+      <JsonLd data={playerSchema({
+        name: player.displayName,
+        path: playerPath(player.slug, player.id),
+        dob: player.dob,
+        dobDisputed: player.dobDisputed,
+        debutSeason: player.debutSeason,
+        finalSeason: player.finalSeason,
+        clubs: clubs.map((c) => ({ name: c.clubName, slug: c.clubSlug })),
+        description: careerSentence(player),
+      })} />
 
       <div className="page-header">
         <h1>{player.displayName}</h1>
@@ -520,6 +583,10 @@ export default async function PlayerPage({
           {' · '}
           {formatSpan(player.debutSeason, player.finalSeason, stillPlaying)}
         </p>
+        {/* The same sentence the meta description carries. A page whose
+            entire body is figures gives a query nothing in prose to match,
+            and gives a reader arriving from one nothing to read first. */}
+        <p className="lede">{careerSentence(player)}</p>
         <p className="section-note">
           <Link href={`/players/compare?a=${player.id}`}>Compare with another player →</Link>
         </p>

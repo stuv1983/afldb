@@ -6,18 +6,19 @@ import { FilterErrors } from '@/components/FilterErrors';
 import { TableFilters } from '@/components/TableFilters';
 import { getClubStates, listClubs } from '@/db/queries/clubs';
 import { clubPath, formatSpan } from '@/lib/format';
+import { pageMetadata } from '@/lib/seo';
 import { clubFilterFields } from '@/search/list-filters';
 import { describeFilters, optionsFrom, parseFilterValues } from '@/search/table-filters';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Clubs',
+export const metadata: Metadata = pageMetadata({
+  title: 'AFL & VFL Clubs — Every Club, Current and Historical',
   description:
     'Every VFL/AFL club, current and historical, including Fitzroy, South Melbourne, '
     + 'Footscray, University and the Brisbane Bears.',
-  alternates: { canonical: '/clubs' },
-};
+  path: '/clubs',
+});
 
 export default async function ClubsPage({
   searchParams,

@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { JsonLd } from '@/components/JsonLd';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import { getClubBestAndFairest, getClubCaptains } from '@/db/queries/awards';
 import {
@@ -28,6 +30,8 @@ import {
   seasonPath,
 } from '@/lib/format';
 import { parseSlug } from '@/lib/params';
+import { notFoundMetadata, pageMetadata } from '@/lib/seo';
+import { clubSchema } from '@/lib/structured-data';
 
 export const revalidate = 86400;
 
@@ -45,15 +49,23 @@ export async function generateMetadata({
   const { slug } = await params;
   const parsed = parseSlug(slug);
   const club = parsed ? await getClub(parsed) : null;
-  if (!club) return { title: 'Club not found' };
+  if (!club) return notFoundMetadata('Club');
 
-  return {
-    title: `${club.name} — History and Statistics`,
+  // A historical identity is described in its own terms — "Footscray, 1925 to
+  // 1996" — rather than as the modern club under an old name. Collapsing the
+  // two would be the keyword-consistency mistake §20 of the brief warns about,
+  // and would also make two pages compete for one query.
+  const era = club.firstSeason === null
+    ? ''
+    : ` (${formatSpan(club.firstSeason, club.lastSeason)})`;
+  return pageMetadata({
+    title: `${club.name} — Players, Seasons, Records & History`,
     description:
-      `${club.name} VFL/AFL history: season-by-season results, ladder positions, `
-      + `premierships, games and goalkicking leaders.`,
-    alternates: { canonical: clubPath(club.slug) },
-  };
+      `${club.name} in the VFL/AFL${era}: season-by-season results and ladder `
+      + 'positions, premierships, games and goalkicking leaders, best-and-fairest '
+      + 'winners and captains.',
+    path: clubPath(club.slug),
+  });
 }
 
 export default async function ClubPage({
@@ -67,6 +79,12 @@ export default async function ClubPage({
 
   const club = await getClub(parsed);
   if (!club) notFound();
+
+  // `parseSlug` lower-cases, so /clubs/Carlton found the club and then
+  // rendered it at an address that is not the canonical one — a second live
+  // URL for the same page, saved only by the canonical tag. One URL per
+  // club instead, the same way a stale player slug is corrected.
+  if (slug !== club.slug) permanentRedirect(clubPath(club.slug));
 
   // The club's record spans every name it has traded under; the season
   // table is scoped to the era on a historical identity's page, because
@@ -357,11 +375,24 @@ export default async function ClubPage({
 
   return (
     <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/clubs">Clubs</Link>
-        <span aria-hidden="true">/</span>
-        <span>{club.name}</span>
-      </nav>
+      <Breadcrumbs items={[
+        { label: 'Clubs', href: '/clubs' },
+        { label: club.name },
+      ]} />
+
+      {/* The lineage becomes `alternateName`, which is the one point where
+          AFLDB's identity model and Schema.org line up exactly: one team,
+          several names, none of them rewritten into the others. */}
+      <JsonLd data={clubSchema({
+        name: club.name,
+        path: clubPath(club.slug),
+        description:
+          `${club.name} VFL/AFL record: seasons, premierships, games and `
+          + 'goalkicking leaders.',
+        foundedSeason: club.firstSeason,
+        dissolvedSeason: club.isCurrent ? null : club.lastSeason,
+        alternateNames: otherEras.map((era) => era.name),
+      })} />
 
       <div className="page-header">
         <h1>{club.name}</h1>

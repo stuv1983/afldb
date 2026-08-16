@@ -2,10 +2,14 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { JsonLd } from '@/components/JsonLd';
 import { sql } from '@/db/client';
 import { formatNumber, playerPath, seasonPath } from '@/lib/format';
 import { parseSeason } from '@/lib/params';
+import { notFoundMetadata, pageMetadata } from '@/lib/seo';
+import { itemListSchema } from '@/lib/structured-data';
 
 export const revalidate = 3600;
 
@@ -40,12 +44,27 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { year } = await params;
   const parsed = parseSeason(year);
-  if (!parsed) return { title: 'Brownlow count not found' };
-  return {
-    title: `${parsed} Brownlow Medal`,
-    description: `Full ${parsed} Brownlow Medal vote count.`,
-    alternates: { canonical: `/brownlow/${parsed}` },
-  };
+  if (!parsed) return notFoundMetadata('Brownlow count');
+
+  // The winner is named in the description because it is what the query
+  // "2024 Brownlow Medal" is asking for, and it is read from the same
+  // official season count the page renders — not derived from per-game
+  // votes, which exist only for 1931–1934 and 1984 onwards and would give a
+  // different, wrong answer for most seasons.
+  const rows = await getCount(parsed);
+  const winners = rows.filter((r) => r.isWinner);
+  const won = winners.length === 0
+    ? ''
+    : ` Won by ${winners.map((w) => w.displayName).join(' and ')}`
+      + ` with ${winners[0].votes} votes.`;
+
+  return pageMetadata({
+    title: `${parsed} Brownlow Medal — Winner, Votes & Leaderboard`,
+    description:
+      `The full ${parsed} Brownlow Medal vote count: every player to poll, `
+      + `their vote total and finishing position.${won}`,
+    path: `/brownlow/${parsed}`,
+  });
 }
 
 export default async function BrownlowYearPage({
@@ -66,11 +85,25 @@ export default async function BrownlowYearPage({
 
   return (
     <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/brownlow">Brownlow</Link>
-        <span aria-hidden="true">/</span>
-        <span>{parsed}</span>
-      </nav>
+      <Breadcrumbs items={[
+        { label: 'Awards', href: '/awards' },
+        { label: 'Brownlow Medal', href: '/brownlow' },
+        { label: String(parsed) },
+      ]} />
+
+      {/* The count IS the ranking, so it is described as one. Taken from
+          `brownlow_season_votes` — the official season count — which is the
+          same authority the career totals use. Per-game votes exist for only
+          part of the record and are never summed into a season here. */}
+      <JsonLd data={itemListSchema({
+        name: `${parsed} Brownlow Medal vote count`,
+        path: `/brownlow/${parsed}`,
+        description: `Every player to poll a Brownlow Medal vote in ${parsed}, by vote total.`,
+        items: rows.map((r) => ({
+          name: r.displayName,
+          path: playerPath(r.slug, r.playerId),
+        })),
+      })} />
 
       <div className="page-header">
         <h1>{parsed} Brownlow Medal</h1>

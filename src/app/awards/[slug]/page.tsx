@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
 import { ReorderableSections } from '@/components/ReorderableSections';
@@ -24,6 +25,7 @@ import {
   playerPath,
   seasonPath,
 } from '@/lib/format';
+import { notFoundMetadata, pageMetadata } from '@/lib/seo';
 import { SEASON_MAX, SEASON_MIN } from '@/search/list-filters';
 import { type FilterField, parseFilterValues } from '@/search/table-filters';
 
@@ -46,15 +48,15 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const award = await getAward(slug);
-  if (!award) return { title: 'Award not found' };
+  if (!award) return notFoundMetadata('Award');
 
-  return {
-    title: `${award.name} — Winners and History`,
+  return pageMetadata({
+    title: `${award.name} — Every Winner and Full History`,
     description:
       award.description
       ?? `Every ${award.name} winner, ${formatSpan(award.firstSeason, award.lastSeason)}.`,
-    alternates: { canonical: awardPath(award.slug) },
-  };
+    path: awardPath(award.slug),
+  });
 }
 
 export default async function AwardPage({
@@ -368,11 +370,10 @@ export default async function AwardPage({
 
   return (
     <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/awards">Awards</Link>
-        <span aria-hidden="true">/</span>
-        <span>{award.name}</span>
-      </nav>
+      <Breadcrumbs items={[
+        { label: 'Awards', href: '/awards' },
+        { label: award.name },
+      ]} />
 
       <div className="page-header">
         <h1>{award.name}</h1>

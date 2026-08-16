@@ -6,18 +6,19 @@ import { FilterErrors } from '@/components/FilterErrors';
 import { TableFilters } from '@/components/TableFilters';
 import { listAflwClubs, listAflwSeasons } from '@/db/queries/aflw';
 import { aflwClubPath, formatNumber, formatPercentage } from '@/lib/format';
+import { pageMetadata } from '@/lib/seo';
 import { aflwClubFilterFields } from '@/search/aflw-filters';
 import { describeFilters, parseFilterValues } from '@/search/table-filters';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'AFLW Clubs',
+export const metadata: Metadata = pageMetadata({
+  title: 'AFLW Clubs — Records, Finals & Premierships',
   description:
     'Every AFLW club with its full record: matches, wins, finals and premierships '
     + 'since the competition began in 2017.',
-  alternates: { canonical: '/aflw/clubs' },
-};
+  path: '/aflw/clubs',
+});
 
 export default async function AflwClubsPage({
   searchParams,

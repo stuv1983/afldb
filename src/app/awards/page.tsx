@@ -3,18 +3,19 @@ import Link from 'next/link';
 
 import { listAwards, listHonourTeams } from '@/db/queries/awards';
 import { awardPath, formatNumber, formatSpan, honourTeamPath } from '@/lib/format';
+import { pageMetadata } from '@/lib/seo';
 import { honourTeamSlug } from '@/lib/slugs';
 
 export const revalidate = 86400;
 
-export const metadata: Metadata = {
-  title: 'Awards and Honours',
+export const metadata: Metadata = pageMetadata({
+  title: 'AFL & VFL Awards and Honours — Every Winner',
   description:
     'AFL/VFL awards and honours: the All-Australian team, the Rising Star, the Coleman '
     + 'and Norm Smith Medals, every club best-and-fairest, the Hall of Fame and the '
     + 'teams of the century.',
-  alternates: { canonical: '/awards' },
-};
+  path: '/awards',
+});
 
 const CATEGORY_HEADINGS: Record<string, { title: string; note: string }> = {
   honour_team: {

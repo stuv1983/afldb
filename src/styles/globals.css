@@ -421,7 +421,15 @@ details.table-details > summary::before {
   transition: transform 0.15s ease;
 }
 details.table-details[open] > summary::before { transform: rotate(90deg); }
-.table-details-title { font-size: 1rem; }
+/* An <h2> since the section headings joined the document outline (see
+   CollapsiblePanel). `font: inherit` takes the summary's own type back off
+   the heading defaults, so the change is structural and not visual. */
+.table-details-title {
+  font: inherit;
+  font-size: 1rem;
+  letter-spacing: inherit;
+  margin: 0;
+}
 .table-details-note { font-size: 0.78rem; font-weight: 400; color: var(--text-muted); }
 
 /* Reorderable table sections -------------------------------------------
@@ -751,7 +759,11 @@ label {
   padding: 3.5rem 1rem;
   color: var(--text-muted);
 }
-.empty h2 { margin-bottom: 0.5rem; color: var(--text); }
+/* The 404 page's heading is an h1 — it is that page's subject, not a
+   subsection of one — while an empty table's is still an h2 under the page
+   it belongs to. Both look the same. */
+.empty h1,
+.empty h2 { margin-bottom: 0.5rem; color: var(--text); font-size: 1.25rem; }
 
 /* ==========================================================================
    Homepage — the almanac front page

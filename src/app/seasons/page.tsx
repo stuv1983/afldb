@@ -9,6 +9,7 @@ import { getClubOptions } from '@/db/queries/advanced-search';
 import { getSeasonLeagues, listSeasons } from '@/db/queries/seasons';
 import { clubPath, formatNumber, seasonPath } from '@/lib/format';
 import { firstValue, parseSeason } from '@/lib/params';
+import { pageMetadata } from '@/lib/seo';
 import { clubOptions, seasonFilterFields } from '@/search/list-filters';
 import {
   describeFilters,
@@ -19,11 +20,11 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Seasons',
+export const metadata: Metadata = pageMetadata({
+  title: 'AFL & VFL Seasons — Ladders, Premiers & Results Since 1897',
   description: 'Every VFL/AFL season from 1897, with premiers, match counts and ladders.',
-  alternates: { canonical: '/seasons' },
-};
+  path: '/seasons',
+});
 
 export default async function SeasonsPage({
   searchParams,

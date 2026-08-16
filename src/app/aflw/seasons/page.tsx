@@ -11,18 +11,19 @@ import {
   formatDate,
   formatNumber,
 } from '@/lib/format';
+import { pageMetadata } from '@/lib/seo';
 import { aflwSeasonFilterFields } from '@/search/aflw-filters';
 import { describeFilters, parseFilterValues } from '@/search/table-filters';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'AFLW Seasons',
+export const metadata: Metadata = pageMetadata({
+  title: 'AFLW Seasons — Ladders, Premiers & Results',
   description:
     'Every AFLW season from 2017, with premiers, ladders, match counts and the two '
     + 'seasons played in calendar 2022.',
-  alternates: { canonical: '/aflw/seasons' },
-};
+  path: '/aflw/seasons',
+});
 
 export default async function AflwSeasonsPage({
   searchParams,

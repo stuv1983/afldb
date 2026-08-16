@@ -2,8 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
+import { JsonLd } from '@/components/JsonLd';
 import { TableFilters } from '@/components/TableFilters';
 import { getClubOptions } from '@/db/queries/advanced-search';
 import {
@@ -23,6 +25,8 @@ import {
   playerPath,
   seasonPath,
 } from '@/lib/format';
+import { isFilteredView, notFoundMetadata, pageMetadata } from '@/lib/seo';
+import { itemListSchema } from '@/lib/structured-data';
 import { SEASON_MAX, SEASON_MIN, clubOptions } from '@/search/list-filters';
 import {
   type FilterField,
@@ -40,18 +44,34 @@ export function generateStaticParams() {
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ category: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
-  const { category } = await params;
+  const [{ category }, query] = await Promise.all([params, searchParams]);
   const definition = getRecordCategory(category);
-  if (!definition) return { title: 'Record not found' };
+  if (!definition) return notFoundMetadata('Record');
 
-  return {
-    title: `${definition.title} — AFLDB Records`,
-    description: definition.definition,
-    alternates: { canonical: `/records/${definition.slug}` },
-  };
+  // A record board filtered to one club is a genuinely useful VIEW and a
+  // poor search RESULT: it is the same ranking, cut down, under a title
+  // that no longer describes it. It stays crawlable so the players on it are
+  // still reached, and stops competing with the board it came from.
+  return pageMetadata({
+    title: `${definition.title} — ${scopeLabel(category)} VFL/AFL Record`,
+    description: `${definition.definition} ${
+      definition.coverage ?? 'Ranked from AFLDB’s complete match record since 1897.'
+    }`,
+    path: `/records/${definition.slug}`,
+    noindex: isFilteredView(query),
+  });
+}
+
+/** What the board ranks, so a single-match board is not titled a career one. */
+function scopeLabel(category: string): string {
+  if (MATCH.has(category)) return 'Single-Match';
+  if (category === 'most-goals-in-a-season') return 'Single-Season';
+  return 'Career';
 }
 
 const CAREER = new Set([
@@ -136,11 +156,26 @@ export default async function RecordCategoryPage({
 
   return (
     <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/records">Records</Link>
-        <span aria-hidden="true">/</span>
-        <span>{definition.title}</span>
-      </nav>
+      <Breadcrumbs items={[
+        { label: 'Records', href: '/records' },
+        { label: definition.title },
+      ]} />
+
+      {/* The board's ORDER is the fact this page exists to state, so it is
+          described as an ItemList — but only when it is the whole board.
+          A filtered cut is a different, shorter list under the same URL,
+          and marking that up as the record would misstate it. */}
+      {described.length === 0 && careerRows.length > 0 && (
+        <JsonLd data={itemListSchema({
+          name: definition.title,
+          path: `/records/${definition.slug}`,
+          description: definition.definition,
+          items: careerRows.map((row) => ({
+            name: row.displayName,
+            path: playerPath(row.slug, row.playerId),
+          })),
+        })} />
+      )}
 
       <div className="page-header">
         <h1>{definition.title}</h1>

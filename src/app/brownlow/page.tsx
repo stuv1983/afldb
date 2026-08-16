@@ -8,6 +8,7 @@ import { TableFilters } from '@/components/TableFilters';
 import { getClubOptions } from '@/db/queries/advanced-search';
 import { getBrownlowCareerLeaders, getBrownlowWinners } from '@/db/queries/brownlow';
 import { clubPath, formatNumber, playerPath } from '@/lib/format';
+import { pageMetadata } from '@/lib/seo';
 import {
   brownlowLeaderFilterFields,
   brownlowWinnerFilterFields,
@@ -17,12 +18,13 @@ import { describeFilters, filterQueryParams, parseFilterValues } from '@/search/
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Brownlow Medal',
+export const metadata: Metadata = pageMetadata({
+  title: 'Brownlow Medal — Winners, Votes & Career Leaders',
   description:
-    'Brownlow Medal winners and vote counts from 1924, with career vote leaders.',
-  alternates: { canonical: '/brownlow' },
-};
+    'Every Brownlow Medal winner since 1924, the full vote count for each season, '
+    + 'and the career vote leaders — totalled from the official season counts.',
+  path: '/brownlow',
+});
 
 /** Career leaders are a leaderboard, so the list stays bounded. */
 const LEADER_LIMIT = 50;

@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 
-export const metadata: Metadata = {
-  title: 'About',
+import { pageMetadata } from '@/lib/seo';
+
+export const metadata: Metadata = pageMetadata({
+  title: 'About AFLDB',
   description: 'What AFLDB is, and where its data comes from.',
-  alternates: { canonical: '/about' },
-};
+  path: '/about',
+});
 
 export default function AboutPage() {
   return (

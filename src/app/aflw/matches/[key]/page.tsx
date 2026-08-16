@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import {
@@ -19,6 +20,7 @@ import {
   formatRound,
   formatScore,
 } from '@/lib/format';
+import { notFoundMetadata, pageMetadata } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,14 +31,16 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { key } = await params;
   const match = await getAflwMatch(decodeURIComponent(key));
-  if (!match) return { title: 'Match not found' };
-  return {
-    title: `${match.homeClubName} v ${match.awayClubName}, ${match.seasonLabel} — AFLW`,
+  if (!match) return notFoundMetadata('AFLW match');
+  return pageMetadata({
+    title:
+      `${match.homeClubName} v ${match.awayClubName} — ${match.seasonLabel} AFLW Match`,
     description:
       `AFLW: ${match.homeClubName} ${match.homeScore} v ${match.awayClubName} `
       + `${match.awayScore} at ${match.venueName}.`,
-    alternates: { canonical: aflwMatchPath(match.matchKey) },
-  };
+    path: aflwMatchPath(match.matchKey),
+    ogType: 'article',
+  });
 }
 
 const PERIOD_LABELS = ['First quarter', 'Second quarter', 'Third quarter', 'Fourth quarter'];
@@ -195,13 +199,11 @@ export default async function AflwMatchPage({
 
   return (
     <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/aflw">AFLW</Link>
-        <span aria-hidden="true">/</span>
-        <Link href={aflwSeasonPath(match.seasonKey)}>{match.seasonLabel}</Link>
-        <span aria-hidden="true">/</span>
-        <span>{match.homeClubName} v {match.awayClubName}</span>
-      </nav>
+      <Breadcrumbs items={[
+        { label: 'AFLW', href: '/aflw' },
+        { label: match.seasonLabel, href: aflwSeasonPath(match.seasonKey) },
+        { label: `${match.homeClubName} v ${match.awayClubName}` },
+      ]} />
 
       <div className="page-header">
         <h1>{match.homeClubName} v {match.awayClubName}</h1>

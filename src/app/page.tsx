@@ -1,6 +1,8 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Fragment } from 'react';
 
+import { JsonLd } from '@/components/JsonLd';
 import { SearchBox } from '@/components/SearchBox';
 import { sql } from '@/db/client';
 import { getVaultMeetings } from '@/db/queries/matches';
@@ -9,14 +11,33 @@ import { getSiteSettings } from '@/db/queries/site-settings';
 import {
   formatDate, formatNumber, formatRoundShort, matchPath, playerPath, seasonPath,
 } from '@/lib/format';
+import { pageMetadata } from '@/lib/seo';
 import {
   homeSection, homeSectionRows, visibleHomeSections, type HomeSectionId,
 } from '@/lib/site-settings';
+import { websiteSchema } from '@/lib/structured-data';
 
 // Historical data changes only when an import runs. The one exception is
 // "From the vault", which is deliberately random: this window is also how
 // often it deals a different set of old meetings.
 export const revalidate = 3600;
+
+const HOME_DESCRIPTION =
+  'Every VFL/AFL player, club, season, match and record since 1897. '
+  + 'Career statistics, ladders, finals, Brownlow Medal counts, awards, the draft '
+  + 'and venue history — with AFLW covered separately.';
+
+/**
+ * The home page had no metadata of its own and fell through to the root
+ * layout's defaults, which meant the site's most linked-to URL was the only
+ * page with no canonical at all. Everything else here is what the layout
+ * already said; the canonical and the og:url are the additions.
+ */
+export const metadata: Metadata = pageMetadata({
+  title: 'AFL & VFL Statistics, Records and Match History',
+  description: HOME_DESCRIPTION,
+  path: '/',
+});
 
 async function getOverview() {
   const [row] = await sql<{
@@ -166,6 +187,11 @@ export default async function HomePage() {
 
   return (
     <>
+      {/* Site-level identity, declared once on the one page that is
+          unambiguously the site rather than a page within it. The
+          SearchAction describes /search?q=, which is a real public GET. */}
+      <JsonLd data={websiteSchema(HOME_DESCRIPTION)} />
+
       <div className="almanac-hero">
         <h1>Every player. Every game. Since {overview.firstSeason}.</h1>
         <p className="tagline">

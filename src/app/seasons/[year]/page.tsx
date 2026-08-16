@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import { getSeasonMatches } from '@/db/queries/matches';
@@ -24,6 +25,7 @@ import {
   seasonPath,
 } from '@/lib/format';
 import { parseSeason } from '@/lib/params';
+import { notFoundMetadata, pageMetadata } from '@/lib/seo';
 
 export const revalidate = 3600;
 
@@ -46,15 +48,19 @@ export async function generateMetadata({
   const { year } = await params;
   const parsed = parseSeason(year);
   const season = parsed ? await getSeason(parsed) : null;
-  if (!season) return { title: 'Season not found' };
+  if (!season) return notFoundMetadata('Season');
 
-  return {
-    title: `${season.year} ${season.league} Season`,
+  // `season.league` is the competition's name IN THAT YEAR — VFL through
+  // 1989, AFL after — so a season title never anachronises itself.
+  const premier = season.premierName ? ` Premiers: ${season.premierName}.` : '';
+  return pageMetadata({
+    title: `${season.year} ${season.league} Season — Ladder, Results & Finals`,
     description:
-      `${season.year} ${season.league} season: final ladder, all ${season.matchCount ?? ''} `
-      + `matches, leading goalkickers and Brownlow Medal votes.`,
-    alternates: { canonical: seasonPath(season.year) },
-  };
+      `The ${season.year} ${season.league} season in full: final ladder, `
+      + `${season.matchCount === null ? 'every match' : `all ${season.matchCount} matches`}, `
+      + `finals series, leading goalkickers and Brownlow Medal votes.${premier}`,
+    path: seasonPath(season.year),
+  });
 }
 
 export default async function SeasonPage({
@@ -262,11 +268,10 @@ export default async function SeasonPage({
 
   return (
     <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/seasons">Seasons</Link>
-        <span aria-hidden="true">/</span>
-        <span>{season.year}</span>
-      </nav>
+      <Breadcrumbs items={[
+        { label: 'Seasons', href: '/seasons' },
+        { label: `${season.year} ${season.league}` },
+      ]} />
 
       <div className="page-header">
         <h1>{season.year} {season.league} Season</h1>

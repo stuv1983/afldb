@@ -6,16 +6,17 @@ import { FilterErrors } from '@/components/FilterErrors';
 import { TableFilters } from '@/components/TableFilters';
 import { listAflwVenues } from '@/db/queries/aflw';
 import { formatNumber, formatSpanLabel } from '@/lib/format';
+import { pageMetadata } from '@/lib/seo';
 import { aflwVenueFilterFields } from '@/search/aflw-filters';
 import { describeFilters, parseFilterValues } from '@/search/table-filters';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'AFLW Venues',
+export const metadata: Metadata = pageMetadata({
+  title: 'AFLW Venues — Every Ground Since 2017',
   description: 'Every ground to host an AFLW match since 2017.',
-  alternates: { canonical: '/aflw/venues' },
-};
+  path: '/aflw/venues',
+});
 
 export default async function AflwVenuesPage({
   searchParams,

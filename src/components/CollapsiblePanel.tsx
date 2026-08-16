@@ -9,6 +9,14 @@
  * `CollapsibleTable` is this with a filter slot, and is what a table should
  * use. Reach for this one directly when the thing being collapsed is not a
  * table: the grid solver's board controls, for instance.
+ *
+ * The title is an `<h2>` and not the styled `<span>` it used to be. Every
+ * major section of a player, club, season or match page is one of these —
+ * "Career", "Season by season", "Match log", "Ladder" — so with a span they
+ * were the page's real structure while its heading outline was an `<h1>` and
+ * almost nothing else. A heading inside `<summary>` is explicitly allowed by
+ * the content model, and it is what puts those sections into the document
+ * outline a screen reader and a crawler both navigate by.
  */
 export function CollapsiblePanel({
   id,
@@ -26,7 +34,7 @@ export function CollapsiblePanel({
   return (
     <details id={id} className="table-details" open={defaultOpen}>
       <summary>
-        <span className="table-details-title">{title}</span>
+        <h2 className="table-details-title">{title}</h2>
         {note && <span className="table-details-note">{note}</span>}
       </summary>
       {children}

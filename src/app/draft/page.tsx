@@ -9,6 +9,7 @@ import { getClubOptions } from '@/db/queries/advanced-search';
 import { getDraftTypes, getDraftYears, listDraftPicks } from '@/db/queries/draft';
 import { clubPath, formatNumber, isLinked, playerPath } from '@/lib/format';
 import { firstValue, parsePage } from '@/lib/params';
+import { pageMetadata } from '@/lib/seo';
 import { DEFAULT_PAGE_SIZE } from '@/search/constants';
 import { clubOptions, draftFilterFields } from '@/search/list-filters';
 import {
@@ -20,11 +21,12 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Draft',
-  description: 'AFL national and rookie draft history from 1981, with every pick, club and player.',
-  alternates: { canonical: '/draft' },
-};
+export const metadata: Metadata = pageMetadata({
+  title: 'AFL Draft History — Every Pick by Year and Club',
+  description:
+    'AFL national and rookie draft history from 1981, with every pick, club and player.',
+  path: '/draft',
+});
 
 export default async function DraftPage({
   searchParams,

@@ -17,6 +17,7 @@ import {
   formatDate,
   formatNumber,
 } from '@/lib/format';
+import { pageMetadata } from '@/lib/seo';
 import {
   aflwLeaderCategory,
   homeSection,
@@ -27,13 +28,19 @@ import {
 
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
-  title: 'AFLW',
+/**
+ * A separate competition, titled as one. AFLW pages never borrow an AFL
+ * title, never canonicalise to an AFL equivalent, and say "AFLW" in the
+ * first two words so a result for a player who appears in both competitions
+ * is unambiguous at a glance.
+ */
+export const metadata: Metadata = pageMetadata({
+  title: 'AFLW Statistics — Players, Clubs, Seasons & Matches',
   description:
     'AFLW statistics from the competition’s first season in 2017: every match, '
     + 'player, club and season, with ladders, scoring progressions and search.',
-  alternates: { canonical: '/aflw' },
-};
+  path: '/aflw',
+});
 
 /**
  * The AFLW front page, laid out exactly as the AFL one: same hero, same

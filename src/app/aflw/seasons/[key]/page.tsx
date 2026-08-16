@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
 import { ReorderableSections } from '@/components/ReorderableSections';
@@ -24,6 +25,7 @@ import {
   formatRoundShort,
   formatScore,
 } from '@/lib/format';
+import { isFilteredView, notFoundMetadata, pageMetadata } from '@/lib/seo';
 import { AFLW_MATCH_TYPES } from '@/search/aflw-filters';
 import { type FilterField, parseFilterValues } from '@/search/table-filters';
 
@@ -33,19 +35,25 @@ const LEADER_LIMIT = 25;
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ key: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
-  const { key } = await params;
+  const [{ key }, query] = await Promise.all([params, searchParams]);
   const season = await getAflwSeason(decodeURIComponent(key));
-  if (!season) return { title: 'Season not found' };
-  return {
-    title: `${season.displayLabel} AFLW season`,
+  if (!season) return notFoundMetadata('AFLW season');
+  return pageMetadata({
+    // AFLW seasons are NAMED, not numbered — two of them fall in calendar
+    // 2022 — so the label is the season's own and is never rewritten to a
+    // year, which would make those two seasons indistinguishable.
+    title: `${season.displayLabel} AFLW Season — Ladder, Results & Stats`,
     description:
       `The ${season.displayLabel} AFLW season: ladder, results and leading players `
       + `across ${season.playedCount} matches.`,
-    alternates: { canonical: aflwSeasonPath(season.seasonKey) },
-  };
+    path: aflwSeasonPath(season.seasonKey),
+    noindex: isFilteredView(query),
+  });
 }
 
 export default async function AflwSeasonPage({
@@ -296,13 +304,11 @@ export default async function AflwSeasonPage({
 
   return (
     <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/aflw">AFLW</Link>
-        <span aria-hidden="true">/</span>
-        <Link href="/aflw/seasons">Seasons</Link>
-        <span aria-hidden="true">/</span>
-        <span>{season.displayLabel}</span>
-      </nav>
+      <Breadcrumbs items={[
+        { label: 'AFLW', href: '/aflw' },
+        { label: 'Seasons', href: '/aflw/seasons' },
+        { label: season.displayLabel },
+      ]} />
 
       <div className="page-header">
         <h1>{season.displayLabel} AFLW season</h1>

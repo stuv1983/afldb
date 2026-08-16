@@ -13,6 +13,7 @@ import {
 import { aflwPlayerPath, formatNumber, formatSpanLabel } from '@/lib/format';
 import { redirectPastEnd } from '@/lib/pagination';
 import { firstValue, parsePage } from '@/lib/params';
+import { isFilteredView, pageMetadata } from '@/lib/seo';
 import {
   AFLW_PLAYER_GROUPS,
   AFLW_PLAYER_SORT_OPTIONS,
@@ -30,13 +31,22 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'AFLW Players',
-  description:
-    'Every player to appear in an AFLW match since 2017, searchable by games, '
-    + 'goals, disposals, tackles, marks, premierships and club.',
-  alternates: { canonical: '/aflw/players' },
-};
+/** Filtered states are views of this page, not pages. See /players. */
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<Metadata> {
+  const params = await searchParams;
+  return pageMetadata({
+    title: 'AFLW Players — Every Player Since 2017',
+    description:
+      'Every player to appear in an AFLW match since 2017, searchable by games, '
+      + 'goals, disposals, tackles, marks, premierships and club.',
+    path: '/aflw/players',
+    noindex: isFilteredView(params),
+  });
+}
 
 export default async function AflwPlayersPage({
   searchParams,

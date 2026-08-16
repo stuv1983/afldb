@@ -1,8 +1,9 @@
 import type { MetadataRoute } from 'next';
 
 import { indexingEnabled } from '@/lib/indexing';
+import { siteUrl } from '@/lib/seo';
 
-const baseUrl = process.env.AFLDB_BASE_URL ?? 'http://localhost:3100';
+const baseUrl = siteUrl();
 
 export default function robots(): MetadataRoute.Robots {
   // Development and staging deployments must never be indexed, and neither
@@ -19,8 +20,22 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        // Search result pages are infinite and low-value to index.
-        disallow: ['/api/', '/search'],
+        disallow: [
+          // Not content. `/api/` is machine endpoints (health, autocomplete,
+          // the early-access form); `/admin` and `/beta` are behind
+          // authentication and a gate and would only ever crawl to a login
+          // form. These carry `noindex` in their own metadata as well — the
+          // disallow saves the crawl rather than being the control.
+          '/api/',
+          '/admin',
+          '/beta',
+          // Every query is a page, so this is an unbounded space with no
+          // stable content behind any single URL. The page itself is
+          // `noindex, follow`; this stops the crawl reaching it at all.
+          '/search',
+          // A solver whose answers depend entirely on a board posted to it.
+          '/grid-solver',
+        ],
       },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,

@@ -22,6 +22,7 @@ import {
 } from '@/lib/format';
 import { redirectPastEnd } from '@/lib/pagination';
 import { firstValue, parsePage } from '@/lib/params';
+import { isFilteredView, pageMetadata } from '@/lib/seo';
 import {
   AFLW_MATCH_GROUPS,
   AFLW_MATCH_SORT_OPTIONS,
@@ -38,13 +39,22 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'AFLW Match Search',
-  description:
-    'Search every AFLW match by margin, combined score, club, season, venue, '
-    + 'result and match type. Every search is a shareable link.',
-  alternates: { canonical: '/aflw/match-search' },
-};
+/** Filtered states are views of this page, not pages. See /players. */
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<Metadata> {
+  const params = await searchParams;
+  return pageMetadata({
+    title: 'AFLW Match Search — Scores, Margins & Results',
+    description:
+      'Search every AFLW match by margin, combined score, club, season, venue, '
+      + 'result and match type. Every search is a shareable link.',
+    path: '/aflw/match-search',
+    noindex: isFilteredView(params),
+  });
+}
 
 export default async function AflwMatchSearchPage({
   searchParams,

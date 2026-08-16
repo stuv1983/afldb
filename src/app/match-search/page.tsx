@@ -15,6 +15,7 @@ import {
   matchPath,
   seasonPath,
 } from '@/lib/format';
+import { isFilteredView, pageMetadata } from '@/lib/seo';
 import {
   MATCH_FIELDS,
   MATCH_OUTCOMES,
@@ -28,13 +29,22 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Match Search',
-  description:
-    'Search every AFL/VFL match by season, margin, both teams’ scores, '
-    + 'combined score, result, finals status and club.',
-  alternates: { canonical: '/match-search' },
-};
+/** Filtered states are views of this page, not pages. See /players. */
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<Metadata> {
+  const params = await searchParams;
+  return pageMetadata({
+    title: 'AFL & VFL Match Search — Scores, Margins & Results',
+    description:
+      'Search every AFL/VFL match by season, margin, both teams’ scores, '
+      + 'combined score, result, finals status and club.',
+    path: '/match-search',
+    noindex: isFilteredView(params),
+  });
+}
 
 const GROUP_LABELS = {
   scoreline: 'Scoreline',

@@ -2,9 +2,11 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { getHonourTeam, listHonourTeams } from '@/db/queries/awards';
 import { honourTeamPath, isLinked, playerPath } from '@/lib/format';
+import { notFoundMetadata, pageMetadata } from '@/lib/seo';
 import { honourTeamSlug, matchHonourTeam } from '@/lib/slugs';
 
 export const revalidate = 86400;
@@ -27,13 +29,13 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const teamName = await resolveTeam(slug);
-  if (!teamName) return { title: 'Team not found' };
+  if (!teamName) return notFoundMetadata('Team');
 
-  return {
-    title: teamName,
-    description: `Every player selected in the ${teamName}.`,
-    alternates: { canonical: honourTeamPath(slug) },
-  };
+  return pageMetadata({
+    title: `${teamName} — Full Team and Every Selection`,
+    description: `Every player selected in the ${teamName}, with the position each filled.`,
+    path: honourTeamPath(slug),
+  });
 }
 
 export default async function HonourTeamPage({
@@ -52,11 +54,10 @@ export default async function HonourTeamPage({
 
   return (
     <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/awards">Awards</Link>
-        <span aria-hidden="true">/</span>
-        <span>{teamName}</span>
-      </nav>
+      <Breadcrumbs items={[
+        { label: 'Awards', href: '/awards' },
+        { label: teamName },
+      ]} />
 
       <div className="page-header">
         <h1>{teamName}</h1>

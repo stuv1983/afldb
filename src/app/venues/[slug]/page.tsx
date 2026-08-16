@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { sql } from '@/db/client';
 import {
@@ -14,6 +15,7 @@ import {
   venuePath,
 } from '@/lib/format';
 import { parseSlug } from '@/lib/params';
+import { notFoundMetadata, pageMetadata } from '@/lib/seo';
 
 export const revalidate = 86400;
 
@@ -43,12 +45,17 @@ export async function generateMetadata({
   const { slug } = await params;
   const parsed = parseSlug(slug);
   const venue = parsed ? await getVenue(parsed) : null;
-  if (!venue) return { title: 'Venue not found' };
-  return {
-    title: `${venue.canonicalName} — AFL Matches`,
-    description: `VFL/AFL matches played at ${venue.canonicalName}.`,
-    alternates: { canonical: venuePath(venue.slug) },
-  };
+  if (!venue) return notFoundMetadata('Venue');
+  return pageMetadata({
+    title: `${venue.canonicalName} — AFL/VFL Matches & Venue Record`,
+    description:
+      `Every VFL/AFL match played at ${venue.canonicalName}`
+      + (venue.legacyName && venue.legacyName !== venue.canonicalName
+        ? ` (also known as ${venue.legacyName})`
+        : '')
+      + ', with the clubs that played there and the seasons it was used.',
+    path: venuePath(venue.slug),
+  });
 }
 
 export default async function VenuePage({
@@ -62,6 +69,10 @@ export default async function VenuePage({
 
   const venue = await getVenue(parsed);
   if (!venue) notFound();
+
+  // See the club route: `parseSlug` lower-cases, so a mixed-case address
+  // resolved and then rendered at a second, non-canonical URL.
+  if (slug !== venue.slug) permanentRedirect(venuePath(venue.slug));
 
   const [[totals], recent] = await Promise.all([
     sql<{ matches: number; avgAttendance: number | null; maxAttendance: number | null }[]>`
@@ -91,11 +102,10 @@ export default async function VenuePage({
 
   return (
     <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/venues">Venues</Link>
-        <span aria-hidden="true">/</span>
-        <span>{venue.canonicalName}</span>
-      </nav>
+      <Breadcrumbs items={[
+        { label: 'Venues', href: '/venues' },
+        { label: venue.canonicalName },
+      ]} />
 
       <div className="page-header">
         <h1>{venue.canonicalName}</h1>

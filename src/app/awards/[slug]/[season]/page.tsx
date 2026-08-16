@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import {
@@ -19,6 +20,7 @@ import {
   playerPath,
   seasonPath,
 } from '@/lib/format';
+import { notFoundMetadata, pageMetadata } from '@/lib/seo';
 
 export const revalidate = 86400;
 
@@ -50,13 +52,13 @@ export async function generateMetadata({
   const { slug, season } = await params;
   const award = await getAward(slug);
   const year = parseSeason(season);
-  if (!award || year === null) return { title: 'Not found' };
+  if (!award || year === null) return notFoundMetadata('Award season');
 
-  return {
-    title: `${year} ${award.name}`,
-    description: `The ${year} ${award.name} in full.`,
-    alternates: { canonical: awardSeasonPath(award.slug, year) },
-  };
+  return pageMetadata({
+    title: `${year} ${award.name} — Winner and Full Result`,
+    description: `The ${year} ${award.name} in full: winner, club and season statistics.`,
+    path: awardSeasonPath(award.slug, year),
+  });
 }
 
 export default async function AwardSeasonPage({
@@ -219,13 +221,11 @@ export default async function AwardSeasonPage({
 
   return (
     <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/awards">Awards</Link>
-        <span aria-hidden="true">/</span>
-        <Link href={awardPath(award.slug)}>{award.name}</Link>
-        <span aria-hidden="true">/</span>
-        <span>{year}</span>
-      </nav>
+      <Breadcrumbs items={[
+        { label: 'Awards', href: '/awards' },
+        { label: award.name, href: awardPath(award.slug) },
+        { label: String(year) },
+      ]} />
 
       <div className="page-header">
         <h1>{year} {award.name}</h1>

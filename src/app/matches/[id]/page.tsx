@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { JsonLd } from '@/components/JsonLd';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import {
   getMatch,
@@ -22,6 +24,8 @@ import {
   seasonPath,
   venuePath,
 } from '@/lib/format';
+import { notFoundMetadata, pageMetadata } from '@/lib/seo';
+import { matchSchema } from '@/lib/structured-data';
 
 export const revalidate = 3600;
 
@@ -42,10 +46,10 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   const matchId = Number(id);
-  if (!Number.isSafeInteger(matchId)) return { title: 'Match not found' };
+  if (!Number.isSafeInteger(matchId)) return notFoundMetadata('Match');
 
   const match = await getMatch(matchId);
-  if (!match) return { title: 'Match not found' };
+  if (!match) return notFoundMetadata('Match');
 
   const round = formatRound(match.roundType, match.roundNumber);
   // Home team first, so the verb has to follow the result rather than
@@ -55,11 +59,16 @@ export async function generateMetadata({
     : match.result === 'home_win'
       ? `${match.homeName} ${match.homeScore} defeated ${match.awayName} ${match.awayScore}`
       : `${match.homeName} ${match.homeScore} defeated by ${match.awayName} ${match.awayScore}`;
-  return {
-    title: `${match.homeName} v ${match.awayName}, ${round} ${match.season}`,
+  // "AFL"/"VFL" by the season played, not by the competition's present name:
+  // a 1954 preliminary final was a VFL match and calling it an AFL one in the
+  // title would be wrong on the one page that exists to record it.
+  const league = match.season < 1990 ? 'VFL' : 'AFL';
+  return pageMetadata({
+    title: `${match.homeName} v ${match.awayName} — ${round}, ${match.season} ${league}`,
     description: `${outcome} — ${round}, ${match.season} at ${match.venueName}.`,
-    alternates: { canonical: matchPath(match.id) },
-  };
+    path: matchPath(match.id),
+    ogType: 'article',
+  });
 }
 
 export default async function MatchPage({
@@ -206,13 +215,27 @@ export default async function MatchPage({
 
   return (
     <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/seasons">Seasons</Link>
-        <span aria-hidden="true">/</span>
-        <Link href={seasonPath(match.season)}>{match.season}</Link>
-        <span aria-hidden="true">/</span>
-        <span>{round}</span>
-      </nav>
+      <Breadcrumbs items={[
+        { label: 'Seasons', href: '/seasons' },
+        { label: String(match.season), href: seasonPath(match.season) },
+        { label: `${match.homeName} v ${match.awayName}, ${round}` },
+      ]} />
+
+      <JsonLd data={matchSchema({
+        path: matchPath(match.id),
+        name: `${match.homeName} v ${match.awayName}, ${round} ${match.season}`,
+        description:
+          `${match.homeName} ${match.homeScore} v ${match.awayName} ${match.awayScore}`
+          + ` — ${round}, ${match.season}`
+          + (match.venueName ? ` at ${match.venueName}` : '')
+          + (match.attendance === null
+            ? '.'
+            : `, attendance ${formatAttendance(match.attendance)}.`),
+        date: match.matchDate,
+        home: { name: match.homeName, slug: match.homeSlug, score: match.homeScore },
+        away: { name: match.awayName, slug: match.awaySlug, score: match.awayScore },
+        venueName: match.venueName,
+      })} />
 
       <div className="page-header">
         <div className="eyebrow">{round} · {match.season}</div>

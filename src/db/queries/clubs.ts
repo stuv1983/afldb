@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { cache } from 'react';
+
 import { sql } from '@/db/client';
 import { allOf, containsPattern, rangeConditions } from '@/db/queries/filters';
 import type { FilterValues } from '@/search/table-filters';
@@ -95,7 +97,7 @@ export async function getClubStates(): Promise<string[]> {
   return rows.map((r) => r.state);
 }
 
-export async function getClub(slug: string): Promise<ClubSummary | null> {
+async function fetchClub(slug: string): Promise<ClubSummary | null> {
   const [row] = await sql<ClubSummary[]>`
     SELECT c.id, c.slug, c.name, c.short_name AS "shortName",
            c.abbreviation, c.is_current_afl_club AS "isCurrent",
@@ -337,3 +339,15 @@ export async function getClubLeaders(clubId: number, limit = 15) {
 export async function getClubGoalkickers(clubId: number, limit = 15) {
   return clubLeaders(clubId, 'goals', limit);
 }
+
+/**
+ * Deduplicated per request.
+ *
+ * generateMetadata and the page body both need this row, and neither can
+ * hand it to the other — Next calls them separately. Without React's
+ * cache() that is two identical queries for every render of an entity
+ * page, doubling the cost of the pages a crawler spends most of its time
+ * on. Outside a request scope cache() calls straight through, so the
+ * import tools and the test suite are unaffected.
+ */
+export const getClub = cache(fetchClub);

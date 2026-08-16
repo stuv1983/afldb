@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { Pagination } from '@/components/Pagination';
 import { getPlayer, getPlayerMatches } from '@/db/queries/players';
@@ -16,6 +17,7 @@ import {
   playerPath,
 } from '@/lib/format';
 import { firstValue, parsePage, parseSeason } from '@/lib/params';
+import { isFilteredView, notFoundMetadata, pageMetadata } from '@/lib/seo';
 
 // Paging lives here rather than on the profile so that the profile
 // itself stays free of searchParams and can be served from the full
@@ -26,19 +28,26 @@ const PAGE_SIZE = 100;
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
   const { slug } = await params;
   const parsed = parseEntitySlug(slug);
   const player = parsed ? await getPlayer(parsed.id) : null;
-  if (!player) return { title: 'Player not found' };
+  if (!player) return notFoundMetadata('Player');
 
-  return {
+  return pageMetadata({
     title: `${player.displayName} — Complete Match Log`,
-    description: `Every VFL/AFL match played by ${player.displayName}.`,
-    alternates: { canonical: `${playerPath(player.slug, player.id)}/matches` },
-  };
+    description:
+      `Every VFL/AFL match played by ${player.displayName}, with the opponent, `
+      + 'result, score and his statistics in each.',
+    path: `${playerPath(player.slug, player.id)}/matches`,
+    // Every page but the first is a slice of the same log, and the canonical
+    // already points all of them at page one. See /players for the reasoning.
+    noindex: isFilteredView(await searchParams),
+  });
 }
 
 export default async function PlayerMatchesPage({
@@ -74,13 +83,11 @@ export default async function PlayerMatchesPage({
 
   return (
     <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/players">Players</Link>
-        <span aria-hidden="true">/</span>
-        <Link href={profilePath}>{player.displayName}</Link>
-        <span aria-hidden="true">/</span>
-        <span>Match log</span>
-      </nav>
+      <Breadcrumbs items={[
+        { label: 'Players', href: '/players' },
+        { label: player.displayName, href: profilePath },
+        { label: 'Match log' },
+      ]} />
 
       <div className="page-header">
         <h1>{player.displayName} — Match Log</h1>

@@ -11,6 +11,7 @@ import { getSeasonBounds } from '@/db/queries/seasons';
 import { formatNumber, playerPath } from '@/lib/format';
 import { redirectPastEnd } from '@/lib/pagination';
 import { firstValue, parsePage } from '@/lib/params';
+import { isFilteredView, pageMetadata } from '@/lib/seo';
 import { DEFAULT_PAGE_SIZE } from '@/search/constants';
 import { CAREER_GROUPS, clubOptions, playerFilterFields } from '@/search/list-filters';
 import {
@@ -23,14 +24,38 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Players',
-  description:
-    'Every player to appear in a VFL/AFL match since 1897. Search by name or '
-    + 'filter by career games, goals, finals, premierships, Brownlow votes, '
-    + 'clubs and debut season. Every search is a shareable link.',
-  alternates: { canonical: '/players' },
-};
+/**
+ * The unfiltered index is the indexable page; every filter, sort and page
+ * beyond the first is a view OF it.
+ *
+ * Those views stay crawlable and `follow`, because the links out of them are
+ * how a crawler reaches players deep in the list. What they must not be is
+ * indexable: the canonical already points every one of them at `/players`,
+ * and canonicalising materially different result sets to one URL is the
+ * mistake that gets a canonical ignored altogether. `noindex, follow` says
+ * the same thing without asking Google to believe something untrue.
+ *
+ * The combinatorial space behind this page is unbounded — any pair of bounds
+ * on any of a dozen career fields — but the DISCOVERABLE space is not: the
+ * filters are a GET form rather than a grid of links, so a crawler only ever
+ * finds the five example searches, the seven sort links and the pager.
+ */
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<Metadata> {
+  const params = await searchParams;
+  return pageMetadata({
+    title: 'AFL & VFL Players — Every Player Since 1897',
+    description:
+      'Every player to appear in a VFL/AFL match since 1897. Search by name or '
+      + 'filter by career games, goals, finals, premierships, Brownlow votes, '
+      + 'clubs and debut season. Every search is a shareable link.',
+    path: '/players',
+    noindex: isFilteredView(params),
+  });
+}
 
 const SORT_OPTIONS: { value: PlayerSort; label: string }[] = [
   { value: 'games', label: 'Games' },

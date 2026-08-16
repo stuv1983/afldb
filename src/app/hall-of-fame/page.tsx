@@ -1,24 +1,26 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import { TableFilters } from '@/components/TableFilters';
 import { getHallOfFameCategories, listHallOfFame } from '@/db/queries/awards';
 import { formatNumber, isLinked, playerPath } from '@/lib/format';
+import { pageMetadata } from '@/lib/seo';
 import { hallOfFameFilterFields } from '@/search/list-filters';
 import { describeFilters, parseFilterValues } from '@/search/table-filters';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Australian Football Hall of Fame',
+export const metadata: Metadata = pageMetadata({
+  title: 'Australian Football Hall of Fame — Every Inductee and Legend',
   description:
     'Every inductee of the Australian Football Hall of Fame, including its Legends — '
     + 'players, coaches, umpires, administrators and media figures.',
-  alternates: { canonical: '/hall-of-fame' },
-};
+  path: '/hall-of-fame',
+});
 
 const CATEGORY_LABELS: Record<string, string> = {
   player: 'Player',
@@ -154,11 +156,10 @@ export default async function HallOfFamePage({
 
   return (
     <>
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link href="/awards">Awards</Link>
-        <span aria-hidden="true">/</span>
-        <span>Hall of Fame</span>
-      </nav>
+      <Breadcrumbs items={[
+        { label: 'Awards', href: '/awards' },
+        { label: 'Hall of Fame' },
+      ]} />
 
       <div className="page-header">
         <h1>Australian Football Hall of Fame</h1>

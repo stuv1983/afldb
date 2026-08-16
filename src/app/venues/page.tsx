@@ -6,16 +6,19 @@ import { FilterErrors } from '@/components/FilterErrors';
 import { TableFilters } from '@/components/TableFilters';
 import { getVenueStates, listVenues } from '@/db/queries/venues';
 import { formatNumber, formatSpan, venuePath } from '@/lib/format';
+import { pageMetadata } from '@/lib/seo';
 import { venueFilterFields } from '@/search/list-filters';
 import { describeFilters, optionsFrom, parseFilterValues } from '@/search/table-filters';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Venues',
-  description: 'Every ground to host a VFL/AFL match since 1897.',
-  alternates: { canonical: '/venues' },
-};
+export const metadata: Metadata = pageMetadata({
+  title: 'AFL & VFL Venues — Every Ground Since 1897',
+  description:
+    'Every ground to host a VFL/AFL match since 1897, with the matches played '
+    + 'at each and the seasons it was used.',
+  path: '/venues',
+});
 
 export default async function VenuesPage({
   searchParams,

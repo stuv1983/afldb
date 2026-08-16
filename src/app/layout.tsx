@@ -6,10 +6,11 @@ import { PrimaryNav, TabBar } from '@/components/SiteNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { getSiteFooter } from '@/db/queries/site-settings';
 import { indexingEnabled } from '@/lib/indexing';
+import { siteUrl } from '@/lib/seo';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
 import '@/styles/globals.css';
 
-const baseUrl = process.env.AFLDB_BASE_URL ?? 'http://localhost:3100';
+const baseUrl = siteUrl();
 
 /**
  * Fonts are self-hosted by `next/font`, which matters twice over: the
@@ -46,6 +47,11 @@ export const metadata: Metadata = {
   description:
     'Historical Australian Football (AFL/VFL) statistics from 1897 to the present: '
     + 'players, clubs, seasons, matches, venues, records, awards and Brownlow history.',
+  // Inherited only by pages that set no `openGraph` of their own, because
+  // Next REPLACES this object between segments rather than merging it. Every
+  // page that matters for search goes through `pageMetadata` in src/lib/seo.ts,
+  // which restates these three and adds the og:url and og:title that a
+  // wholesale replacement would otherwise drop.
   openGraph: {
     siteName: 'AFLDB',
     type: 'website',
