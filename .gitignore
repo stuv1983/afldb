@@ -4,9 +4,13 @@ node_modules/
 .pnp.js
 
 # Next.js
+# Leading slashes matter. An unanchored `build/` matches at ANY depth, so
+# it silently excluded tools/build/prepare-standalone.mjs — a script the
+# build script itself invokes. The clone on a fresh host therefore failed
+# at the last step of `npm run build`, and only there.
 .next/
 out/
-build/
+/build/
 next-env.d.ts
 
 # Environment / secrets — never commit
@@ -18,7 +22,9 @@ next-env.d.ts
 *.key
 
 # Databases, dumps and backups — never commit
-data/
+# Anchored for the same reason as /build/ above: this is the top-level
+# data directory (afl.db, the AFLW parsed CSVs), not any nested one.
+/data/
 *.db
 *.db-journal
 *.db-wal
