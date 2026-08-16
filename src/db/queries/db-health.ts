@@ -121,10 +121,18 @@ export type TableRowCount = {
 };
 
 /**
- * Migration 031's own REVOKE list, duplicated here rather than imported --
- * this file has no server-only-free path to that migration's SQL. Also
- * re-exported so tests/integration/db-health.test.ts asserts against this
- * exact list instead of a third hand-copied one.
+ * The public tables afldb_app must not read -- migration 031's REVOKE
+ * list plus every operational table added since (038's site_media).
+ * Duplicated here rather than imported: this file has no server-only-free
+ * path to a migration's SQL. It is the single TypeScript copy, though --
+ * tests/integration/privileges.test.ts and db-health.test.ts both import
+ * it, so there is one list to keep current rather than three.
+ *
+ * The database's own copy is afldb_meta.app_readable_tables (migration
+ * 039), stated the other way round: what afldb_app MAY read. That is the
+ * authority for grants, and tools/maintenance/privileges.sql reconciles
+ * against it. This list is the display-side complement, and a test
+ * asserts the two agree.
  *
  * pg_stat_user_tables carries no privilege filtering: it reports every
  * table in a schema to any role that can read the catalogue, which is
@@ -145,6 +153,7 @@ export const OPERATIONAL_TABLES = [
   'data_submissions',
   'data_submission_rows',
   'admin_invites',
+  'site_media',
 ];
 
 /**

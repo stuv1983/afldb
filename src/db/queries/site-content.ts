@@ -14,7 +14,15 @@ import { SETTING_KEYS } from '@/lib/site-settings';
  * Everything here runs on the AUTH pool. Unlike the rest of `site_settings`,
  * which the public role reads to render the home page, this document is only
  * ever read by two callers — the editor at /admin/content and the publisher —
- * and `site_media` is not granted to afldb_app at all (migration 037).
+ * and `site_media` is readable by afldb_auth alone.
+ *
+ * The pool choice is load-bearing, and not because 037 declined to grant
+ * anything: 037 created the table believing that was sufficient, and the
+ * schema-wide default privilege granted afldb_app SELECT regardless.
+ * Migration 038 revoked it and 039 removed the default privilege that caused
+ * it, so a new query written against the public `sql` client will now fail
+ * with permission denied rather than quietly stream image bytes to a public
+ * page. Use `authSql` here.
  *
  * That is also why `getSiteSettings()` excludes the `apex.content` row: the
  * public path fetches the settings table on every render, and a marketing

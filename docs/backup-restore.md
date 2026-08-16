@@ -126,13 +126,33 @@ sudo bash tools/maintenance/00_install_postgres.sh
 pg_restore --dbname="$AFLDB_OWNER_DATABASE_URL" --clean --if-exists \
            --no-owner --no-privileges --jobs=4 ~/backups/afldb/<newest>.dump
 
-# 3. Verify
+# 3. Re-apply role privileges — NOT optional, see below
+npm run db:privileges
+
+# 4. Verify
 ./.venv/bin/python tools/validation/validate_migration.py
 
-# 4. Rebuild and restart the application
+# 5. Rebuild and restart the application
 npm ci && npm run build
 sudo bash tools/maintenance/01_setup_service.sh
 ```
+
+**Step 3 is the one that is easy to skip and expensive to skip.** The dump is
+taken with `--no-privileges`, so a restore recreates every table with no ACLs
+at all: `afldb_app` can read nothing and the site serves errors on every page.
+`npm run db:migrate` will not fix it — every migration is already recorded in
+`afldb_meta.schema_migrations`, so the runner correctly reports nothing to
+apply and the grants stay missing.
+
+Before migration 039 the failure was quieter and worse. A schema-wide default
+privilege granted `afldb_app` SELECT on every table `afldb_owner` created, so
+a restore silently handed the public role read access to `auth_users` (password
+hashes, TOTP secrets), the session and beta-code tables and `site_media` —
+undoing migrations 031 and 038 with nothing to notice, because the site came
+back up looking perfectly healthy. That default is now inverted: the public
+role reads exactly what `afldb_meta.app_readable_tables` lists, and that
+registry is an ordinary table, so the dump carries it and step 3 rebuilds the
+grant model from the backup itself.
 
 If no backup is usable, the database can be rebuilt from the legacy source in roughly 2.5 minutes:
 

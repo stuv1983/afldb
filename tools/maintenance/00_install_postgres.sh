@@ -25,6 +25,7 @@ set -euo pipefail
 APP_USER="arm"
 PROJECT_DIR="/home/${APP_USER}/projects/afldb"
 ENV_FILE="${PROJECT_DIR}/.env"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ $EUID -ne 0 ]]; then
   echo "ERROR: must be run as root (use sudo)." >&2
@@ -105,20 +106,27 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT  USAGE  ON SCHEMA public TO afldb_app, afldb_import, afldb_backup, afldb_auth;
 GRANT  CREATE ON SCHEMA public TO afldb_owner;
 
--- Existing objects
-GRANT SELECT                          ON ALL TABLES    IN SCHEMA public TO afldb_app;
-GRANT SELECT, INSERT, UPDATE, DELETE  ON ALL TABLES    IN SCHEMA public TO afldb_import;
-GRANT USAGE, SELECT                   ON ALL SEQUENCES IN SCHEMA public TO afldb_import;
-
--- Future objects created by afldb_owner
-ALTER DEFAULT PRIVILEGES FOR ROLE afldb_owner IN SCHEMA public
-  GRANT SELECT ON TABLES TO afldb_app;
+-- Future objects created by afldb_owner. afldb_import keeps a default
+-- privilege because every new statistical table is a reload target for
+-- it; afldb_app deliberately has none. Migration 039 inverted that: the
+-- public role reads only what afldb_meta.app_readable_tables lists, so
+-- that forgetting to think about a new table denies access instead of
+-- granting it. Re-adding a blanket GRANT here would undo migrations 031,
+-- 038 and 039 on every re-run of this script, which is exactly what it
+-- used to do.
 ALTER DEFAULT PRIVILEGES FOR ROLE afldb_owner IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO afldb_import;
 ALTER DEFAULT PRIVILEGES FOR ROLE afldb_owner IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO afldb_import;
 SQL
-  echo "    ${DB}: pg_trgm + unaccent enabled, privileges set"
+  echo "    ${DB}: pg_trgm + unaccent enabled, default privileges set"
+
+  # Table-level grants come from the reconciler, which reads the registry
+  # rather than granting by the bucket. On a fresh database it finds no
+  # tables and says so; the operator runs `npm run db:migrate` and then
+  # `npm run db:privileges` to finish the job (step [5/5] prints this).
+  sudo -u postgres psql -v ON_ERROR_STOP=1 -d "${DB}" -f "${SCRIPT_DIR}/privileges.sql"
+  echo "    ${DB}: role privileges reconciled"
 done
 
 echo "==> [5/5] Writing ${ENV_FILE}"
@@ -162,4 +170,12 @@ echo "   Credentials: ${ENV_FILE} (mode 600, owner ${APP_USER})"
 echo
 echo "   Listening  : $(sudo -u postgres psql -tAc 'SHOW listen_addresses') (localhost only)"
 echo "   Port 5432 is NOT exposed beyond this host."
+echo
+echo "   NEXT, as ${APP_USER}:"
+echo "     npm run db:migrate     # creates the tables"
+echo "     npm run db:privileges  # grants afldb_app the ones it may read"
+echo
+echo "   The second is not optional on a database that already had tables"
+echo "   when this script ran: table-level grants are reconciled from"
+echo "   afldb_meta.app_readable_tables, which only exists after migrating."
 echo "=========================================================="

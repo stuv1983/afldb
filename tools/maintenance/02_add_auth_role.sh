@@ -9,18 +9,22 @@
 # migration 023 needs:
 #
 #   1. Creates the afldb_auth login role (if missing) with a new password
-#   2. Grants USAGE on the public schema of afldb_dev and afldb_test
+#   2. Reconciles privileges on afldb_dev and afldb_test, which grants
+#      afldb_auth the operational tables it owns
 #   3. APPENDS AFLDB_AUTH_DATABASE_URL and AFLDB_SESSION_SECRET to .env,
 #      touching nothing already there
 #
-# Table-level grants live in migration 023 itself, so the order is:
-# run this, then `npm run db:migrate`. Idempotent; a re-run changes the
-# afldb_auth password and updates .env in place.
+# Either order of this script and `npm run db:migrate` works, because
+# step 2 finishes by running tools/maintenance/privileges.sql, which
+# applies every afldb_auth grant the migrations may have skipped.
+# Idempotent; a re-run changes the afldb_auth password and updates .env
+# in place.
 set -euo pipefail
 
 APP_USER="arm"
 PROJECT_DIR="/home/${APP_USER}/projects/afldb"
 ENV_FILE="${PROJECT_DIR}/.env"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ $EUID -ne 0 ]]; then
   echo "ERROR: must be run as root (use sudo)." >&2
@@ -50,28 +54,19 @@ for DB in afldb_dev afldb_test; do
     -c "GRANT USAGE ON SCHEMA public TO afldb_auth;"
   echo "    ${DB}: schema usage granted"
 
-  # Migration 023 applies these same grants inside a DO block, but only
-  # when the role already exists. If the migration ran first the grants
-  # were skipped, so they are repeated here whenever the tables exist —
-  # either order of "run this script" and "npm run db:migrate" works.
-  sudo -u postgres psql -v ON_ERROR_STOP=1 -d "${DB}" <<'SQL'
-DO $$
-BEGIN
-  IF to_regclass('public.auth_users') IS NOT NULL THEN
-    GRANT SELECT, INSERT, UPDATE ON auth_users, auth_sessions,
-      beta_access_codes, beta_allowed_emails, beta_login_tokens,
-      data_submissions, data_submission_rows TO afldb_auth;
-    GRANT INSERT, SELECT ON auth_audit_log TO afldb_auth;
-    GRANT DELETE ON data_submission_rows TO afldb_auth;
-    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO afldb_auth;
-    GRANT SELECT ON players, player_clubs, clubs, club_aliases, seasons,
-      awards, award_nominations, award_winners, import_batches TO afldb_auth;
-    RAISE NOTICE 'table grants applied';
-  ELSE
-    RAISE NOTICE 'migration 023 not applied yet; table grants will come from it';
-  END IF;
-END $$;
-SQL
+  # Every afldb_auth grant in migrations 023/024/030/032/034/037 sits
+  # inside an `IF EXISTS (afldb_auth)` guard, so all of them were skipped
+  # if the migrations ran before this script. The reconciler applies the
+  # whole set, which is what makes either order genuinely work.
+  #
+  # This used to be a hand-copied catch-up block listing migration 023's
+  # tables only. It went stale three times over — site_settings (034),
+  # beta_join_requests (024) and site_media (037) were all missing — and
+  # after migration 038 revoked afldb_app's accidental read of site_media,
+  # the migrate-first ordering left NO role able to read it, taking
+  # /admin/content and Publish down with a permission error.
+  sudo -u postgres psql -v ON_ERROR_STOP=1 -d "${DB}" -f "${SCRIPT_DIR}/privileges.sql"
+  echo "    ${DB}: role privileges reconciled"
 done
 
 echo "==> Updating ${ENV_FILE}"

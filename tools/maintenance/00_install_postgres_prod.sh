@@ -43,6 +43,7 @@ set -euo pipefail
 APP_USER="arm"
 PROJECT_DIR="/home/${APP_USER}/projects/afldb"
 ENV_FILE="${PROJECT_DIR}/.env"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DB_NAME="afldb_prod"
 FORCE=0
 
@@ -152,20 +153,26 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT  USAGE  ON SCHEMA public TO afldb_app, afldb_import, afldb_backup, afldb_auth;
 GRANT  CREATE ON SCHEMA public TO afldb_owner;
 
--- Existing objects
-GRANT SELECT                          ON ALL TABLES    IN SCHEMA public TO afldb_app;
-GRANT SELECT, INSERT, UPDATE, DELETE  ON ALL TABLES    IN SCHEMA public TO afldb_import;
-GRANT USAGE, SELECT                   ON ALL SEQUENCES IN SCHEMA public TO afldb_import;
-
--- Future objects created by afldb_owner
-ALTER DEFAULT PRIVILEGES FOR ROLE afldb_owner IN SCHEMA public
-  GRANT SELECT ON TABLES TO afldb_app;
+-- Future objects created by afldb_owner. afldb_import keeps a default
+-- privilege because every new statistical table is a reload target for
+-- it; afldb_app deliberately has none. Migration 039 inverted that: the
+-- public role reads only what afldb_meta.app_readable_tables lists, so
+-- that forgetting to think about a new table denies access instead of
+-- granting it. Re-adding a blanket GRANT here would undo migrations 031,
+-- 038 and 039 on a --force re-run, which is exactly what it used to do.
 ALTER DEFAULT PRIVILEGES FOR ROLE afldb_owner IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO afldb_import;
 ALTER DEFAULT PRIVILEGES FOR ROLE afldb_owner IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO afldb_import;
 SQL
-echo "    ${DB_NAME}: pg_trgm + unaccent enabled, privileges set"
+echo "    ${DB_NAME}: pg_trgm + unaccent enabled, default privileges set"
+
+# Table-level grants come from the reconciler, which reads the registry
+# rather than granting by the bucket. On a fresh database it finds no
+# tables and says so; `npm run db:migrate && npm run db:privileges`
+# finishes the job.
+sudo -u postgres psql -v ON_ERROR_STOP=1 -d "${DB_NAME}" -f "${SCRIPT_DIR}/privileges.sql"
+echo "    ${DB_NAME}: role privileges reconciled"
 
 echo "==> [5/5] Writing ${ENV_FILE}"
 mkdir -p "${PROJECT_DIR}"
@@ -264,4 +271,11 @@ echo
 echo " Next: load the schema and data, either"
 echo "   AFLDB_MIGRATE_TARGET=prod npm run db:migrate   (schema only), or"
 echo "   pg_restore a dump taken from the development host."
+echo
+echo " Then, either way:"
+echo "   npm run db:privileges"
+echo
+echo " Table-level grants are reconciled from afldb_meta.app_readable_tables,"
+echo " which does not exist until the schema is loaded. A pg_restore is taken"
+echo " with --no-privileges, so without this step afldb_app can read nothing."
 echo "=========================================================="

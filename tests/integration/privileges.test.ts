@@ -24,6 +24,7 @@ import './guard';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
+import { OPERATIONAL_TABLES } from '@/db/queries/db-health';
 
 afterAll(async () => {
   await sql.end();
@@ -32,37 +33,30 @@ afterAll(async () => {
 /** The role the website runs as. */
 const APP_ROLE = 'afldb_app';
 
+/** The role that owns the auth, beta and admin-content tables. */
+const AUTH_ROLE = 'afldb_auth';
+
+/** The ETL role. Writes the statistical tables; nothing else. */
+const IMPORT_ROLE = 'afldb_import';
+
 /** Schemas holding statistical data the public site reads. */
 const DATA_SCHEMAS = ['public', 'aflw'];
 
-/**
- * Operational tables from migrations 023/024/030. The public role should
- * not even be able to read these: sessions, hashed access/invite codes
- * and the audit log never render on a public page.
+/*
+ * OPERATIONAL_TABLES is imported rather than restated. It used to be a
+ * hand-copy of the list in db-health.ts, and the two silently diverged
+ * the first time one of them was updated on its own.
  *
- * A table landing in this list is not enough on its own to protect it:
- * `public` carries a schema-wide default privilege (see migration 031)
- * that grants afldb_app SELECT on every table afldb_owner creates,
- * statistical or not. Adding a table here without also revoking it in a
- * migration documents the gap; it does not close it.
+ * Listing a table there does not protect it, and this file no longer
+ * relies on the list to notice a leak. Migration 039 inverted the
+ * schema-wide default privilege that granted afldb_app SELECT on
+ * everything afldb_owner created -- the mechanism that leaked the auth
+ * tables in 023 and site_media in 037, both times past a header saying
+ * no grant was intended. The database now carries the positive list
+ * (afldb_meta.app_readable_tables), and "reads exactly what the registry
+ * allows" below is the assertion that catches an unclassified table,
+ * whether or not anyone remembered to add it here.
  */
-const OPERATIONAL_TABLES = [
-  'auth_users',
-  'auth_sessions',
-  'auth_audit_log',
-  'beta_access_codes',
-  'beta_allowed_emails',
-  'beta_login_tokens',
-  'beta_join_requests',
-  'data_submissions',
-  'data_submission_rows',
-  'admin_invites',
-  // Uploaded page images (037). Its own header wrongly claimed the absence
-  // of a GRANT was enough; the schema-wide default privilege had already
-  // granted SELECT, and 038 revokes it. Listed here so the assertion below
-  // is what keeps it revoked rather than the comment in either migration.
-  'site_media',
-];
 
 beforeAll(async () => {
   const [role] = await sql<{ rolname: string }[]>`
@@ -166,6 +160,22 @@ describe(`${APP_ROLE} is read-only`, () => {
     // Not merely "cannot write": a session token hash or a hashed access
     // code has no business being reachable from the public pool, so the
     // absence of SELECT is the assertion.
+    //
+    // The existence check first, because this query joins pg_class: a
+    // table missing from the database under test -- a stale test DB that
+    // stopped at an earlier migration -- matches no row, and the SELECT
+    // assertion would pass green having inspected nothing at all.
+    const missing = await sql<{ name: string }[]>`
+      SELECT t.name
+        FROM unnest(${OPERATIONAL_TABLES}::text[]) AS t(name)
+       WHERE to_regclass('public.' || quote_ident(t.name)) IS NULL
+       ORDER BY 1
+    `;
+    expect(
+      missing.map((r) => r.name),
+      'operational tables absent from this database; run npm run db:migrate:test',
+    ).toEqual([]);
+
     const rows = await sql<{ name: string }[]>`
       SELECT c.relname AS name
         FROM pg_class c
@@ -176,6 +186,63 @@ describe(`${APP_ROLE} is read-only`, () => {
        ORDER BY 1
     `;
     expect(rows.map((r) => r.name)).toEqual([]);
+  });
+
+  it('reads exactly the tables the registry allows, and no others', async () => {
+    // The assertion that does not depend on anyone maintaining a list of
+    // known-bad names. Every table in `public` is compared against
+    // afldb_meta.app_readable_tables (migration 039): registered means it
+    // must be readable, unregistered means it must not be.
+    //
+    // A future migration that creates a table and says nothing about
+    // privileges fails HERE, whichever kind of table it is -- which is
+    // the property the old known-bad-names check could not have, because
+    // a table nobody thought to add to the list was filtered out of the
+    // query and passed by default.
+    const rows = await sql<{ name: string; registered: boolean; readable: boolean }[]>`
+      SELECT c.relname AS name,
+             (r.name IS NOT NULL) AS registered,
+             has_any_column_privilege(${APP_ROLE}, c.oid, 'SELECT') AS readable
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        LEFT JOIN afldb_meta.app_readable_tables r ON r.name = c.relname
+       WHERE n.nspname = 'public'
+         AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+       ORDER BY 1
+    `;
+    expect(rows.length).toBeGreaterThan(0);
+
+    const drift = rows
+      .filter((r) => r.registered !== r.readable)
+      .map((r) => `${r.name}: ${r.registered ? 'registered but unreadable'
+        : 'READABLE BUT NOT REGISTERED'}`);
+    expect(
+      drift,
+      'run npm run db:privileges, or register the table with '
+      + "SELECT afldb_meta.grant_app_read('<table>') in its migration",
+    ).toEqual([]);
+  });
+
+  it('has no default privilege that would grant it a future table', async () => {
+    // The root cause of both leaks, asserted directly. While a default
+    // privilege on `public` grants afldb_app SELECT, every test above is
+    // a snapshot: correct today and silently wrong the moment the next
+    // migration runs. Migration 039 removed it.
+    //
+    // Scoped to `public`: staging, staging_aflw and aflw keep theirs
+    // (migrations 014/025/026) and hold no operational table.
+    const rows = await sql<{ privilege: string }[]>`
+      SELECT a.privilege_type AS privilege
+        FROM pg_default_acl d
+        JOIN pg_namespace n ON n.oid = d.defaclnamespace
+       CROSS JOIN LATERAL aclexplode(d.defaclacl) AS a
+        JOIN pg_roles g ON g.oid = a.grantee
+       WHERE n.nspname = 'public'
+         AND d.defaclobjtype = 'r'
+         AND g.rolname = ${APP_ROLE}
+       ORDER BY 1
+    `;
+    expect(rows.map((r) => r.privilege)).toEqual([]);
   });
 
   it('still reads the statistical tables it serves', async () => {
@@ -199,6 +266,47 @@ describe(`${APP_ROLE} is read-only`, () => {
 });
 
 describe('afldb_auth is confined to the operational tables', () => {
+  it('still holds the grants the admin pages depend on', async () => {
+    // The counterweight to every revoke in this file, and the one that
+    // was missing: nothing asserted that the role which MUST read these
+    // tables still can. An over-broad revoke -- `REVOKE ALL ON site_media
+    // FROM PUBLIC`, or afldb_auth typed where afldb_app was meant --
+    // satisfies all of the negative assertions above and takes
+    // /admin/content and Publish down in production instead of in CI.
+    //
+    // These are the grants migrations 023/024/030/032/034/037 make, each
+    // inside an `IF EXISTS (afldb_auth)` guard that is skipped when the
+    // role is created after the migrations run. That ordering is exactly
+    // how site_media ended up readable by no role at all once 038 landed.
+    const rows = await sql<{ name: string; privilege: string; held: boolean }[]>`
+      SELECT t.name, t.privilege,
+             has_table_privilege(${AUTH_ROLE}, t.name, t.privilege) AS held
+        FROM (VALUES
+                ('auth_users',           'SELECT'),
+                ('auth_users',           'UPDATE'),
+                ('auth_sessions',        'INSERT'),
+                ('auth_audit_log',       'INSERT'),
+                ('beta_access_codes',    'SELECT'),
+                ('beta_login_tokens',    'INSERT'),
+                ('beta_join_requests',   'SELECT'),
+                ('admin_invites',        'INSERT'),
+                ('data_submissions',     'UPDATE'),
+                ('data_submission_rows', 'DELETE'),
+                ('site_settings',        'UPDATE'),
+                ('site_media',           'SELECT'),
+                ('site_media',           'INSERT'),
+                ('site_media',           'DELETE'),
+                ('matches',              'SELECT')
+             ) AS t(name, privilege)
+       ORDER BY 1, 2
+    `;
+    const lost = rows.filter((r) => !r.held).map((r) => `${r.name}.${r.privilege}`);
+    expect(
+      lost,
+      'run tools/maintenance/privileges.sql against this database',
+    ).toEqual([]);
+  });
+
   it('holds no write privilege on the statistical tables', async () => {
     const [role] = await sql<{ rolname: string }[]>`
       SELECT rolname FROM pg_roles WHERE rolname = 'afldb_auth'
@@ -228,5 +336,94 @@ describe('afldb_auth is confined to the operational tables', () => {
        ORDER BY 1, 2
     `;
     expect(rows).toEqual([]);
+  });
+});
+
+describe('afldb_import is confined to the statistical tables', () => {
+  beforeAll(async () => {
+    const [role] = await sql<{ rolname: string }[]>`
+      SELECT rolname FROM pg_roles WHERE rolname = ${IMPORT_ROLE}
+    `;
+    if (!role) {
+      throw new Error(
+        `Role ${IMPORT_ROLE} does not exist in this cluster, so its confinement `
+        + 'cannot be verified. Create it (tools/maintenance/00_install_postgres.sh) '
+        + 'rather than skipping.',
+      );
+    }
+  });
+
+  it('cannot touch the auth, beta, invite or media tables', async () => {
+    // The ETL role was never asserted about at all, and the same default
+    // privilege that leaked SELECT to afldb_app had handed this role
+    // SELECT/INSERT/UPDATE/DELETE -- and TRUNCATE, from migration 010 --
+    // on every operational table the moment each was created. It could
+    // rewrite a password hash in auth_users, delete the auth_audit_log
+    // rows that would show it, or TRUNCATE site_media, the declared
+    // source of truth for the published apex page.
+    //
+    // data_submissions and data_submission_rows are excluded: migration
+    // 023 grants the import role a deliberate, narrow read there for the
+    // promotion path, asserted separately below.
+    const offLimits = OPERATIONAL_TABLES
+      .filter((t) => t !== 'data_submissions' && t !== 'data_submission_rows');
+
+    const rows = await sql<{ name: string; privilege: string }[]>`
+      SELECT c.relname AS name, p.privilege
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+       CROSS JOIN LATERAL (VALUES ('SELECT'), ('INSERT'), ('UPDATE'),
+                                  ('DELETE'), ('TRUNCATE')) AS p(privilege)
+       WHERE n.nspname = 'public'
+         AND c.relname::text = ANY(${offLimits})
+         AND has_any_column_privilege(${IMPORT_ROLE}, c.oid, p.privilege)
+       ORDER BY 1, 2
+    `;
+    expect(rows).toEqual([]);
+  });
+
+  it('reads the submission tables at the width migration 023 asked for', async () => {
+    // 023 granted SELECT on both plus UPDATE on four columns of
+    // data_submissions, and the promotion path in src/lib/ingest does
+    // even less than that -- every submission read and write there runs
+    // on the auth pool. The full-table UPDATE the default privilege had
+    // silently added made 023's column list decorative.
+    const [privileges] = await sql<{
+      selects: boolean; columnUpdate: boolean; tableUpdate: boolean;
+      inserts: boolean; deletes: boolean; truncates: boolean;
+    }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'data_submissions', 'SELECT')     AS selects,
+             has_column_privilege(${IMPORT_ROLE}, 'data_submissions', 'status', 'UPDATE')
+                                                                                   AS "columnUpdate",
+             has_table_privilege(${IMPORT_ROLE}, 'data_submissions', 'UPDATE')     AS "tableUpdate",
+             has_table_privilege(${IMPORT_ROLE}, 'data_submissions', 'INSERT')     AS inserts,
+             has_table_privilege(${IMPORT_ROLE}, 'data_submissions', 'DELETE')     AS deletes,
+             has_table_privilege(${IMPORT_ROLE}, 'data_submissions', 'TRUNCATE')   AS truncates
+    `;
+    expect(privileges).toEqual({
+      selects: true,
+      columnUpdate: true,
+      tableUpdate: false,
+      inserts: false,
+      deletes: false,
+      truncates: false,
+    });
+  });
+
+  it('still writes the statistical tables it reloads', async () => {
+    // The counterweight: the revokes above must not have cost the ETL
+    // role the access the nightly import actually runs on.
+    const rows = await sql<{ name: string; privilege: string; held: boolean }[]>`
+      SELECT t.name, p.privilege,
+             has_table_privilege(${IMPORT_ROLE}, t.name, p.privilege) AS held
+        FROM unnest(ARRAY['players', 'clubs', 'matches', 'seasons',
+                          'player_career_stats', 'player_match_stats',
+                          'import_batches']) AS t(name)
+       CROSS JOIN LATERAL (VALUES ('SELECT'), ('INSERT'), ('UPDATE'),
+                                  ('DELETE'), ('TRUNCATE')) AS p(privilege)
+       ORDER BY 1, 2
+    `;
+    const lost = rows.filter((r) => !r.held).map((r) => `${r.name}.${r.privilege}`);
+    expect(lost).toEqual([]);
   });
 });

@@ -250,7 +250,8 @@ deleting the directory and pressing **Republish** is a complete recovery.
 Every text field, the images, and the two repeating card lists — the "What it
 does" features and the "Built like a record book" notes can be added to,
 removed and reordered. Images are uploaded from any slot, stored in
-`site_media` (migration 037) and written to `img/u/` on publish. An upload is
+`site_media` (migration 037, revoked from the public role by 038) and written
+to `img/u/` on publish. An upload is
 identified by its **magic bytes**, not its name or declared type: PNG, JPEG
 and WebP only, 2 MB each.
 

@@ -17,24 +17,46 @@ statistics; a vetted submission is promoted by the same import role, with
 the same import-batch bookkeeping, as the bulk migration. There is one
 way into the statistical tables.
 
-**`afldb_app` must not be able to *read* the operational tables either**,
-and that takes more than simply never granting it: `public` carries a
-schema-wide default privilege (set during role setup) that hands
-`afldb_app` `SELECT` on every table `afldb_owner` creates, statistical or
-not. Migration 023 assumed omission was enough and was wrong — migration
-031 explicitly revokes it from the auth/beta/submission/invite tables.
-**Every future operational (non-statistical) table's migration must
-include its own `REVOKE ALL ... FROM afldb_app`**, verified by
-`tests/integration/privileges.test.ts`'s `OPERATIONAL_TABLES` list —
-add the table there too, or the test cannot catch a repeat.
+**`afldb_app` must not be able to *read* the operational tables either.**
+That used to take more than never granting it: `public` carried a
+schema-wide default privilege (set during role setup) that handed
+`afldb_app` `SELECT` on every table `afldb_owner` created, statistical or
+not. Migration 023 assumed omission was enough and was wrong (fixed by
+031); migration 037 read 031's warning, reasoned about it, and made the
+same mistake with `site_media` (fixed by 038).
+
+Twice was enough. **Migration 039 inverted the default**, so the rule is
+now the opposite of what it was:
+
+- A new table in `public` is **unreadable** by `afldb_app` until someone
+  says otherwise. Forgetting denies access; it no longer grants it.
+- A statistical table opts in with one line in its own migration:
+  `SELECT afldb_meta.grant_app_read('my_table');`, which registers it in
+  `afldb_meta.app_readable_tables` and grants the `SELECT` together.
+- An operational table does nothing at all and is safe.
+- `tests/integration/privileges.test.ts` asserts that what `afldb_app`
+  can read is exactly what the registry lists, so an unclassified table
+  fails CI whichever kind it is — and separately asserts that no default
+  privilege has crept back.
+
+The registry is a table rather than a list in a script because a
+`pg_restore` runs with `--no-privileges`: the dump carries the registry,
+so `npm run db:privileges` can rebuild the entire grant model from the
+backup. See `docs/backup-restore.md` §6.
+
+`afldb_import` is confined the same way (039): the identical default
+privilege had given the ETL role full write plus `TRUNCATE` on every
+operational table, including `auth_users` and `site_media`. It now holds
+the statistical tables and migration 023's narrow submission read.
 
 `site_settings` (migration 034) is the one deliberate exception: the
 public role is *meant* to read it, because the home page renders the
 layout and record-of-the-week choices stored there. It holds no secret
 and never should; the write grant is still `afldb_auth`'s alone, and the
 "holds no write privilege on any table" assertion covers it like every
-other table. It is listed in the test's positive read check rather than
-in `OPERATIONAL_TABLES`.
+other table. It is registered in
+`afldb_meta.app_readable_tables` and listed in the test's positive read
+check, rather than in `OPERATIONAL_TABLES`.
 
 ### One-time setup on the server
 
@@ -199,7 +221,9 @@ written first and the files second, so a failed publish costs the publish
 alone and **Republish** is the whole retry. Full details in
 `docs/apex-coming-soon.md` §8.
 
-Uploaded images live in `site_media` (migration 037), not on disk: the
+Uploaded images live in `site_media` (migration 037; readable by
+`afldb_auth` only, which 038 had to revoke and 039 made the default), not
+on disk: the
 nightly dump then covers them, the published directory stays derived, and
 the service needs no second writable path. An upload is identified by its
 **magic bytes** — `src/lib/image-probe.ts` — so neither the file name nor
