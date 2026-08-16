@@ -23,17 +23,26 @@
 -- every schema is guarded, so it does the part of the model that the
 -- database is ready for and says what it skipped.
 --
--- SOURCE OF TRUTH for afldb_app is afldb_meta.app_readable_tables
--- (migration 039), not a list in this file. That is the whole point:
--- the registry is data, so a dump carries it, so recovery can rebuild
--- grants from the backup itself rather than from whatever this file
--- happened to say on the day it was written. Public tables absent from
--- the registry are REVOKED here, which is what makes forgetting to
--- register a new operational table safe.
+-- SOURCE OF TRUTH is a pair of registries, not a list in this file:
 --
--- afldb_auth and afldb_import are small, fixed sets that belong to
--- specific migrations, so they are enumerated below with the migration
--- that established each one.
+--   afldb_meta.app_readable_tables      what afldb_app may SELECT  (039)
+--   afldb_meta.import_writable_tables   what afldb_import may write (045)
+--
+-- That is the whole point: the registries are data, so a dump carries
+-- them, so recovery can rebuild grants from the backup itself rather than
+-- from whatever this file happened to say on the day it was written.
+-- Public relations absent from a registry are REVOKED here, which is what
+-- makes forgetting to register a new operational table safe.
+--
+-- Until migration 045 the import role's scope was inferred as "everything
+-- afldb_app cannot read". That inference was wrong in both directions: it
+-- classed site_settings — app-readable by design, since the home page
+-- renders it — as an ETL table and handed the importer TRUNCATE on the
+-- site's runtime configuration. Two registries, no inference.
+--
+-- afldb_auth is a small, fixed set that belongs to specific migrations,
+-- so it is enumerated below with the migration that established each
+-- grant, and everything outside that list is revoked from it.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -68,6 +77,46 @@ BEGIN
       END IF;
     END IF;
   END LOOP;
+END
+$$;
+
+-- ---------------------------------------------------------------------
+-- Registry hygiene — a name outlives the table that claimed it
+-- ---------------------------------------------------------------------
+-- A registry row is only ever created for a table that exists, so a row
+-- with no matching relation means the table was dropped. Left in place it
+-- is a loaded gun: a LATER table that happens to reuse the name is
+-- granted on the next run of this script, with nothing having decided
+-- that afresh.
+DO $$
+DECLARE
+  removed text[];
+BEGIN
+  IF to_regclass('afldb_meta.app_readable_tables') IS NOT NULL THEN
+    WITH gone AS (
+      DELETE FROM afldb_meta.app_readable_tables r
+       WHERE to_regclass('public.' || quote_ident(r.name)) IS NULL
+      RETURNING r.name
+    )
+    SELECT array_agg(name ORDER BY name) INTO removed FROM gone;
+    IF removed IS NOT NULL THEN
+      RAISE NOTICE 'app_readable_tables: dropped % stale entr(y/ies): %',
+        array_length(removed, 1), array_to_string(removed, ', ');
+    END IF;
+  END IF;
+
+  IF to_regclass('afldb_meta.import_writable_tables') IS NOT NULL THEN
+    WITH gone AS (
+      DELETE FROM afldb_meta.import_writable_tables r
+       WHERE to_regclass('public.' || quote_ident(r.name)) IS NULL
+      RETURNING r.name
+    )
+    SELECT array_agg(name ORDER BY name) INTO removed FROM gone;
+    IF removed IS NOT NULL THEN
+      RAISE NOTICE 'import_writable_tables: dropped % stale entr(y/ies): %',
+        array_length(removed, 1), array_to_string(removed, ', ');
+    END IF;
+  END IF;
 END
 $$;
 
@@ -121,6 +170,12 @@ BEGIN
   EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE afldb_owner IN SCHEMA public '
           'REVOKE SELECT ON TABLES FROM afldb_app';
 
+  -- A read-only role has no business advancing a sequence, and nothing in
+  -- the public site inserts anything. Stated rather than assumed, because
+  -- an install script re-run is exactly how a blanket sequence grant
+  -- comes back.
+  EXECUTE 'REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM afldb_app';
+
   -- The staging and AFLW schemas hold no operational table, so they keep
   -- the blanket read the migrations gave them.
   IF to_regnamespace('staging') IS NOT NULL THEN
@@ -133,38 +188,41 @@ BEGIN
     EXECUTE 'GRANT SELECT ON ALL TABLES IN SCHEMA aflw TO afldb_app';
   END IF;
 
-  RAISE NOTICE 'afldb_app: % public tables readable, % revoked', granted, revoked;
+  RAISE NOTICE 'afldb_app: % public relations readable, % revoked', granted, revoked;
 END
 $$;
 
 -- ---------------------------------------------------------------------
--- afldb_import — the statistical tables only (migrations 010, 011, 023, 039)
+-- afldb_import — the registered statistical tables only
+--                (migrations 010, 011, 023, 039, 045)
 -- ---------------------------------------------------------------------
 DO $$
 DECLARE
-  operational text[];
+  writable text[];
+  readable text[];
   t record;
+  seq text;
+  granted int := 0;
+  revoked int := 0;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'afldb_import') THEN
     RAISE NOTICE 'afldb_import: role absent, skipped';
     RETURN;
   END IF;
 
-  -- Operational = public tables the app role may not read. The import
-  -- role has no business in them either (migration 039): it can neither
-  -- rewrite a password hash nor truncate the published page's images.
-  IF to_regclass('afldb_meta.app_readable_tables') IS NULL THEN
-    RAISE NOTICE 'afldb_import: registry absent (pre-039), skipped';
+  IF to_regclass('afldb_meta.import_writable_tables') IS NULL THEN
+    RAISE NOTICE 'afldb_import: registry absent (pre-045), skipped; run npm run db:migrate, then this script';
     RETURN;
   END IF;
 
-  SELECT coalesce(array_agg(c.relname), ARRAY[]::text[])
-    INTO operational
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-   WHERE n.nspname = 'public'
-     AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
-     AND c.relname NOT IN (SELECT name FROM afldb_meta.app_readable_tables);
+  SELECT coalesce(array_agg(name), ARRAY[]::text[])
+    INTO writable FROM afldb_meta.import_writable_tables;
+
+  -- Views are not reload targets, so they are not in the write registry.
+  -- The importer reads them, and the app-readable registry is the list of
+  -- views that are not operational.
+  SELECT coalesce(array_agg(name), ARRAY[]::text[])
+    INTO readable FROM afldb_meta.app_readable_tables;
 
   FOR t IN
     SELECT c.relname, c.relkind
@@ -174,19 +232,42 @@ BEGIN
        AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
      ORDER BY c.relname
   LOOP
-    IF t.relname = ANY (operational) THEN
-      EXECUTE format('REVOKE ALL ON public.%I FROM afldb_import', t.relname);
-    ELSIF t.relkind IN ('v', 'm') THEN
-      -- A view is not a reload target; the importer only reads them.
-      EXECUTE format('GRANT SELECT ON public.%I TO afldb_import', t.relname);
-    ELSE
+    IF t.relkind IN ('v', 'm') THEN
+      IF t.relname = ANY (readable) THEN
+        EXECUTE format('GRANT SELECT ON public.%I TO afldb_import', t.relname);
+      ELSE
+        EXECUTE format('REVOKE ALL ON public.%I FROM afldb_import', t.relname);
+      END IF;
+    ELSIF t.relname = ANY (writable) THEN
       EXECUTE format(
         'GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON public.%I TO afldb_import',
         t.relname);
+      -- setval() after a bulk load with explicit ids needs UPDATE on the
+      -- sequence (migration 011); nothing else here does.
+      FOR seq IN SELECT name FROM afldb_meta.owned_sequences(t.relname::text) LOOP
+        EXECUTE format('GRANT USAGE, SELECT, UPDATE ON SEQUENCE public.%I TO afldb_import', seq);
+      END LOOP;
+      granted := granted + 1;
+    ELSE
+      EXECUTE format('REVOKE ALL ON public.%I FROM afldb_import', t.relname);
+      -- Migration 039 revoked the operational TABLES and left their
+      -- sequences reachable. UPDATE on a sequence is what setval() needs,
+      -- so auth_users_id_seq alone is enough to break every login-adjacent
+      -- insert with a duplicate key.
+      FOR seq IN SELECT name FROM afldb_meta.owned_sequences(t.relname::text) LOOP
+        EXECUTE format('REVOKE ALL ON SEQUENCE public.%I FROM afldb_import', seq);
+      END LOOP;
+      revoked := revoked + 1;
     END IF;
   END LOOP;
 
-  EXECUTE 'GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO afldb_import';
+  -- Migration 045's inversion, reasserted alongside 039's: a table created
+  -- after this point is neither readable by the site nor writable by the
+  -- ETL until something registers it.
+  EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE afldb_owner IN SCHEMA public '
+          'REVOKE SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON TABLES FROM afldb_import';
+  EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE afldb_owner IN SCHEMA public '
+          'REVOKE USAGE, SELECT, UPDATE ON SEQUENCES FROM afldb_import';
 
   -- Migration 023's intended, deliberately narrow submission access. The
   -- pipeline does its submission writes on the auth pool; this is what
@@ -200,13 +281,8 @@ BEGIN
     GRANT SELECT ON data_submission_rows TO afldb_import;
   END IF;
 
-  -- Future statistical tables: the import role's default privilege stays,
-  -- and 039 keeps operational tables out of its reach by revoking above.
-  EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE afldb_owner IN SCHEMA public '
-          'GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON TABLES TO afldb_import';
-  EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE afldb_owner IN SCHEMA public '
-          'GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO afldb_import';
-
+  -- Staging is the importer's own workspace and holds no operational
+  -- table, so it keeps its blanket grants and its default privileges.
   IF to_regnamespace('staging') IS NOT NULL THEN
     EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA staging TO afldb_import';
   END IF;
@@ -218,8 +294,8 @@ BEGIN
     EXECUTE 'GRANT SELECT ON ALL TABLES IN SCHEMA aflw TO afldb_import';
   END IF;
 
-  RAISE NOTICE 'afldb_import: statistical tables writable, % operational tables revoked',
-    coalesce(array_length(operational, 1), 0);
+  RAISE NOTICE 'afldb_import: % registered tables writable, % relations revoked',
+    granted, revoked;
 END
 $$;
 
@@ -231,6 +307,12 @@ $$;
 -- role is created after the migrations run. This is the catch-up, and it
 -- is generated from the same list rather than the partial one that used
 -- to sit in 02_add_auth_role.sh (which stopped at migration 023).
+--
+-- The list is also subtractive: anything in `public` that is not named
+-- here is revoked from afldb_auth. Without that this section could only
+-- ever widen the role, so a hand-typed grant made during an incident, or
+-- one left behind by an abandoned migration, survived every "reconcile"
+-- this script claimed to perform.
 DO $$
 DECLARE
   spec CONSTANT text[][] := ARRAY[
@@ -261,8 +343,20 @@ DECLARE
     ['venues',                 'SELECT'],                           -- 032
     ['venue_aliases',          'SELECT']                            -- 032
   ];
+  -- The tables afldb_auth writes, and so the only sequences it may
+  -- advance. Its grants on the statistical tables are SELECT alone.
+  written CONSTANT text[] := ARRAY[
+    'auth_users', 'auth_sessions', 'auth_audit_log',
+    'beta_access_codes', 'beta_allowed_emails', 'beta_login_tokens',
+    'beta_join_requests', 'data_submissions', 'data_submission_rows',
+    'admin_invites', 'site_settings', 'site_media'
+  ];
+  named text[] := ARRAY[]::text[];
   i int;
+  t record;
+  seq text;
   applied int := 0;
+  revoked int := 0;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'afldb_auth') THEN
     RAISE NOTICE 'afldb_auth: role absent, skipped';
@@ -270,15 +364,50 @@ BEGIN
   END IF;
 
   FOR i IN 1 .. array_length(spec, 1) LOOP
+    named := named || spec[i][1];
     IF to_regclass('public.' || quote_ident(spec[i][1])) IS NOT NULL THEN
       EXECUTE format('GRANT %s ON public.%I TO afldb_auth', spec[i][2], spec[i][1]);
       applied := applied + 1;
     END IF;
   END LOOP;
 
-  EXECUTE 'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO afldb_auth';
+  -- Everything else in `public`, including anything a future migration
+  -- adds without thinking about this role.
+  FOR t IN
+    SELECT c.relname
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'public'
+       AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+       AND c.relname <> ALL (named)
+     ORDER BY c.relname
+  LOOP
+    EXECUTE format('REVOKE ALL ON public.%I FROM afldb_auth', t.relname);
+    revoked := revoked + 1;
+  END LOOP;
 
-  RAISE NOTICE 'afldb_auth: grants applied on % of % tables', applied, array_length(spec, 1);
+  -- Sequences, narrowed to the tables above rather than the whole schema
+  -- (023 and 030 grant `ALL SEQUENCES IN SCHEMA public`, which is nextval
+  -- on every statistical sequence for a role that inserts into none).
+  --
+  -- owned_sequences() arrives with migration 045. Before it exists the
+  -- blanket grant is kept: too wide, but a role that cannot advance the
+  -- sequence behind auth_users cannot log anybody in, and this script has
+  -- to leave a half-migrated database working.
+  IF to_regprocedure('afldb_meta.owned_sequences(text)') IS NOT NULL THEN
+    EXECUTE 'REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM afldb_auth';
+    FOR i IN 1 .. array_length(written, 1) LOOP
+      FOR seq IN SELECT name FROM afldb_meta.owned_sequences(written[i]) LOOP
+        EXECUTE format('GRANT USAGE, SELECT ON SEQUENCE public.%I TO afldb_auth', seq);
+      END LOOP;
+    END LOOP;
+  ELSE
+    EXECUTE 'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO afldb_auth';
+    RAISE NOTICE 'afldb_auth: sequence grants left schema-wide (pre-045)';
+  END IF;
+
+  RAISE NOTICE 'afldb_auth: grants applied on % of % tables, % other relations revoked',
+    applied, array_length(spec, 1), revoked;
 END
 $$;
 

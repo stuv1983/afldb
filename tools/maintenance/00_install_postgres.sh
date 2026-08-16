@@ -106,18 +106,25 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT  USAGE  ON SCHEMA public TO afldb_app, afldb_import, afldb_backup, afldb_auth;
 GRANT  CREATE ON SCHEMA public TO afldb_owner;
 
--- Future objects created by afldb_owner. afldb_import keeps a default
--- privilege because every new statistical table is a reload target for
--- it; afldb_app deliberately has none. Migration 039 inverted that: the
--- public role reads only what afldb_meta.app_readable_tables lists, so
--- that forgetting to think about a new table denies access instead of
--- granting it. Re-adding a blanket GRANT here would undo migrations 031,
--- 038 and 039 on every re-run of this script, which is exactly what it
+-- Future objects created by afldb_owner. NEITHER application role gets a
+-- default privilege here any more. Migration 039 inverted it for afldb_app
+-- and migration 045 for afldb_import, so each now reads or writes only what
+-- its registry lists — afldb_meta.app_readable_tables and
+-- afldb_meta.import_writable_tables — and forgetting to think about a new
+-- table denies access instead of granting it. Re-adding a blanket GRANT
+-- here would undo migrations 031, 038 and 039 (afldb_app) or 045
+-- (afldb_import) on every re-run of this script, which is exactly what it
 -- used to do.
+--
+-- Revoked explicitly rather than merely omitted: this script is also run
+-- against an existing cluster, where an older copy of itself will have
+-- left the defaults behind.
 ALTER DEFAULT PRIVILEGES FOR ROLE afldb_owner IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO afldb_import;
+  REVOKE SELECT ON TABLES FROM afldb_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE afldb_owner IN SCHEMA public
-  GRANT USAGE, SELECT ON SEQUENCES TO afldb_import;
+  REVOKE SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON TABLES FROM afldb_import;
+ALTER DEFAULT PRIVILEGES FOR ROLE afldb_owner IN SCHEMA public
+  REVOKE USAGE, SELECT, UPDATE ON SEQUENCES FROM afldb_import;
 SQL
   echo "    ${DB}: pg_trgm + unaccent enabled, default privileges set"
 

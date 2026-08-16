@@ -15,6 +15,69 @@ commit.
 
 ## [Unreleased]
 
+### Schema and privilege review — 17 August 2026
+
+A design review of the 43 migrations and the privilege reconciler. Nothing here
+was a live defect; every item is a rule that existed only in prose, in a
+comment, or in the habits of the one program that writes a table. Two
+migrations: `044_schema_integrity.sql` and `045_import_write_is_fail_closed.sql`.
+
+#### Fixed
+- **Write privileges fail closed too.** Migration 039 inverted the schema-wide
+  default privilege for `afldb_app` and left the identical mechanism running for
+  `afldb_import`, so each new operational table was fully writable and
+  `TRUNCATE`-able by the ETL role until someone ran the reconciler. Its scope is
+  now `afldb_meta.import_writable_tables`, opted into with
+  `afldb_meta.grant_import_write()` — the mirror of `grant_app_read()`. Both
+  install scripts now revoke the defaults instead of re-granting them on every
+  re-run.
+- **`afldb_import` could reset the auth sequences.** 039 revoked the operational
+  tables and not their identity sequences, and migration 011 had granted
+  `UPDATE` on every sequence in `public` — which is what `setval()` needs. The
+  ETL role could reset `auth_users_id_seq` and break every later insert on a
+  duplicate key without touching the table itself.
+- **`afldb_import` could truncate `site_settings`.** The reconciler inferred
+  "operational" as the complement of what `afldb_app` may read, and
+  `site_settings` is deliberately app-readable, so the ETL role held `DELETE`
+  and `TRUNCATE` on the site's runtime configuration. Two registries, no
+  inference.
+- **The reconciler now reconciles `afldb_auth`.** It re-granted an enumerated
+  spec and never revoked, so any grant added by hand or left behind by an
+  abandoned migration survived every run. Anything outside the spec is now
+  revoked, and its sequence grants are narrowed from the whole schema to the
+  tables it writes.
+- **Stale registry rows are cleared.** A registry entry outlived its dropped
+  table, so a later table reusing the name would have been granted on the next
+  reconcile with nothing deciding that afresh.
+- **Source keys scoped by source.** `player_relationships` and
+  `father_son_selections` keyed `source_record_id` on its own, which forbade a
+  second source and — being a plain `UNIQUE` — exempted null-keyed rows
+  entirely. Both now match migration 042's
+  `UNIQUE NULLS NOT DISTINCT (source_id, source_record_id)`.
+- **Case-insensitive email uniqueness** on `auth_users`, `beta_allowed_emails`
+  and pending `beta_join_requests`. Seven application write paths lowercase
+  before storing; the database knew about none of them.
+- **Foreign-key indexes the integrity check can use.** Four `player_id` indexes
+  were partial on link status, which a `DELETE` from `players` cannot imply, so
+  each of those tables was scanned instead. Re-predicated on
+  `player_id IS NOT NULL`, the shape migration 041 established.
+
+#### Added
+- `CHECK` constraints for `data_submission_rows.verdict` (the only status column
+  with no vocabulary behind it, and it gates approval) and for
+  `site_media.byte_size = octet_length(bytes)`.
+- `afldb_meta.revoke_app_read()` and `revoke_import_write()`, so un-registering
+  a table is not a hand-written `DELETE` plus `REVOKE`.
+- `afldb_meta.owned_sequences()`, which finds a table's identity sequences
+  through the catalogue dependency rather than by guessing at a name.
+
+#### Changed
+- Comments recording three decisions that were previously unstated or wrong: the
+  provenance foreign keys are unindexed deliberately (append-only parents), the
+  awards tables keep both unique indexes because the two keys are not
+  interchangeable, and `clubs_org_span_ck` checks a season span rather than the
+  organization rule the comment above it in migration 017 describes.
+
 ### Housekeeping — 16 August 2026
 
 #### Changed

@@ -154,6 +154,12 @@ role reads exactly what `afldb_meta.app_readable_tables` lists, and that
 registry is an ordinary table, so the dump carries it and step 3 rebuilds the
 grant model from the backup itself.
 
+Migration 045 gave `afldb_import` the same treatment, for the same reason: the
+identical default privilege had been re-granting the ETL role full write plus
+`TRUNCATE` on every operational table on each restore. Its scope is now
+`afldb_meta.import_writable_tables`, a second ordinary table the dump carries,
+and step 3 reconciles both registries at once.
+
 If no backup is usable, the database can be rebuilt from the legacy source in roughly 2.5 minutes:
 
 ```bash

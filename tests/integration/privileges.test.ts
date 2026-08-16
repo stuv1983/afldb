@@ -307,6 +307,59 @@ describe('afldb_auth is confined to the operational tables', () => {
     ).toEqual([]);
   });
 
+  it('advances only the sequences behind the tables it writes', async () => {
+    // Migrations 023 and 030 grant `USAGE, SELECT ON ALL SEQUENCES IN
+    // SCHEMA public`, which is nextval on every statistical sequence for
+    // a role whose table grants are an enumerated two dozen and which
+    // inserts into none of them. Migration 045 narrows it to the
+    // sequences behind its own tables.
+    const rows = await sql<{ sequence: string; privilege: string }[]>`
+      SELECT s.name AS sequence, p.privilege
+        FROM unnest(ARRAY['players', 'matches', 'clubs', 'import_batches',
+                          'player_match_stats']) AS t(name)
+       CROSS JOIN LATERAL afldb_meta.owned_sequences(t.name) AS s(name)
+       CROSS JOIN LATERAL (VALUES ('USAGE'), ('SELECT'), ('UPDATE')) AS p(privilege)
+       WHERE has_sequence_privilege(${AUTH_ROLE}, 'public.' || quote_ident(s.name), p.privilege)
+       ORDER BY 1, 2
+    `;
+    expect(rows).toEqual([]);
+
+    // The counterweight: the sequence it does need, or no admin can be
+    // invited and nobody can log in.
+    const [own] = await sql<{ held: boolean }[]>`
+      SELECT has_sequence_privilege(${AUTH_ROLE}, 'public.' || quote_ident(s.name), 'USAGE') AS held
+        FROM afldb_meta.owned_sequences('auth_users') AS s(name)
+    `;
+    expect(own?.held).toBe(true);
+  });
+
+  it('holds nothing at all on a statistical table outside its list', async () => {
+    // The reconciler used to be additive for this role: it re-granted the
+    // enumerated list and never revoked, so a hand-typed grant made during
+    // an incident, or one left by an abandoned migration, survived every
+    // run of the script that claims to reconcile privileges.
+    //
+    // These five are statistical tables that appear in no afldb_auth grant
+    // in any migration, so the role must hold no privilege on them --
+    // not even SELECT, which the validation reads are scoped away from.
+    const rows = await sql<{ name: string; privilege: string }[]>`
+      SELECT c.relname AS name, p.privilege
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+       CROSS JOIN LATERAL (VALUES ('SELECT'), ('INSERT'), ('UPDATE')) AS p(privilege)
+       WHERE n.nspname = 'public'
+         AND c.relname IN ('player_match_stats', 'brownlow_season_votes',
+                           'draft_picks', 'club_seasons', 'data_issues')
+         AND has_any_column_privilege(${AUTH_ROLE}, c.oid, p.privilege)
+       ORDER BY 1, 2
+    `;
+    expect(
+      rows,
+      'run tools/maintenance/privileges.sql: its afldb_auth section now revokes '
+      + 'everything outside the enumerated spec',
+    ).toEqual([]);
+  });
+
   it('holds no write privilege on the statistical tables', async () => {
     const [role] = await sql<{ rolname: string }[]>`
       SELECT rolname FROM pg_roles WHERE rolname = 'afldb_auth'
@@ -416,6 +469,120 @@ describe('afldb_import is confined to the statistical tables', () => {
       columnUpdate: true,
       tableUpdate: false,
       inserts: false,
+      deletes: false,
+      truncates: false,
+    });
+  });
+
+  it('has no default privilege that would grant it a future table', async () => {
+    // The afldb_app half of this was migration 039; the ETL role kept the
+    // identical mechanism for six more migrations. While a default
+    // privilege on `public` grants afldb_import anything, every other test
+    // in this describe is a snapshot: correct today, and silently wrong
+    // the moment the next migration creates an operational table.
+    // Migration 045 removed it, for TABLES and SEQUENCES both.
+    const rows = await sql<{ kind: string; privilege: string }[]>`
+      SELECT d.defaclobjtype::text AS kind, a.privilege_type AS privilege
+        FROM pg_default_acl d
+        JOIN pg_namespace n ON n.oid = d.defaclnamespace
+       CROSS JOIN LATERAL aclexplode(d.defaclacl) AS a
+        JOIN pg_roles g ON g.oid = a.grantee
+       WHERE n.nspname = 'public'
+         AND d.defaclobjtype IN ('r', 'S')
+         AND g.rolname = ${IMPORT_ROLE}
+       ORDER BY 1, 2
+    `;
+    expect(rows).toEqual([]);
+  });
+
+  it('writes exactly the tables the registry allows, and no others', async () => {
+    // The counterpart of the afldb_app registry assertion, and the reason
+    // migration 045 exists: a future migration that creates a table and
+    // says nothing about privileges fails HERE rather than shipping an
+    // operational table the ETL role can TRUNCATE.
+    //
+    // INSERT is the probe because it is the privilege the narrow
+    // data_submissions grant (SELECT plus four updatable columns)
+    // deliberately withholds -- so that table reads as unregistered here,
+    // which it is.
+    const rows = await sql<{ name: string; registered: boolean; writable: boolean }[]>`
+      SELECT c.relname AS name,
+             (w.name IS NOT NULL) AS registered,
+             has_table_privilege(${IMPORT_ROLE}, c.oid, 'INSERT') AS writable
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        LEFT JOIN afldb_meta.import_writable_tables w ON w.name = c.relname
+       WHERE n.nspname = 'public'
+         AND c.relkind IN ('r', 'p')
+       ORDER BY 1
+    `;
+    expect(rows.length).toBeGreaterThan(0);
+
+    const drift = rows
+      .filter((r) => r.registered !== r.writable)
+      .map((r) => `${r.name}: ${r.registered ? 'registered but not writable'
+        : 'WRITABLE BUT NOT REGISTERED'}`);
+    expect(
+      drift,
+      'run npm run db:privileges, or register the table with '
+      + "SELECT afldb_meta.grant_import_write('<table>') in its migration",
+    ).toEqual([]);
+  });
+
+  it('cannot reset the sequence behind an operational table', async () => {
+    // Migration 039 revoked the operational TABLES from this role and left
+    // their identity sequences reachable, and migration 011 had granted
+    // UPDATE on every sequence in `public`. UPDATE on a sequence is what
+    // setval() needs: setval('auth_users_id_seq', 1) makes every
+    // subsequent insert fail on a duplicate key, which is a way into the
+    // auth path from the ETL role without touching the auth table at all.
+    const rows = await sql<{ sequence: string; privilege: string }[]>`
+      SELECT s.name AS sequence, p.privilege
+        FROM unnest(${OPERATIONAL_TABLES}::text[]) AS t(name)
+       CROSS JOIN LATERAL afldb_meta.owned_sequences(t.name) AS s(name)
+       CROSS JOIN LATERAL (VALUES ('USAGE'), ('SELECT'), ('UPDATE')) AS p(privilege)
+       WHERE has_sequence_privilege(${IMPORT_ROLE}, 'public.' || quote_ident(s.name), p.privilege)
+       ORDER BY 1, 2
+    `;
+    expect(rows).toEqual([]);
+  });
+
+  it('can still fast-forward the sequences it bulk-loads', async () => {
+    // The counterweight. The importer loads players and matches with the
+    // legacy ids so parity checks stay exact, then calls setval() -- which
+    // is why UPDATE on these sequences is granted rather than merely USAGE
+    // (migration 011).
+    const rows = await sql<{ sequence: string; held: boolean }[]>`
+      SELECT s.name AS sequence,
+             has_sequence_privilege(${IMPORT_ROLE}, 'public.' || quote_ident(s.name), 'UPDATE') AS held
+        FROM unnest(ARRAY['players', 'matches', 'import_batches']) AS t(name)
+       CROSS JOIN LATERAL afldb_meta.owned_sequences(t.name) AS s(name)
+       ORDER BY 1
+    `;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.filter((r) => !r.held).map((r) => r.sequence)).toEqual([]);
+  });
+
+  it('cannot write the settings the home page renders', async () => {
+    // site_settings is app-readable by design (034), and the reconciler
+    // used to infer "operational" as the complement of what afldb_app may
+    // read -- so it classed site_settings as a statistical table and
+    // handed the ETL role DELETE and TRUNCATE on the site's runtime
+    // configuration. Two registries instead of one inference (045).
+    const [privileges] = await sql<{
+      selects: boolean; inserts: boolean; updates: boolean;
+      deletes: boolean; truncates: boolean;
+    }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'site_settings', 'SELECT')   AS selects,
+             has_table_privilege(${IMPORT_ROLE}, 'site_settings', 'INSERT')   AS inserts,
+             has_table_privilege(${IMPORT_ROLE}, 'site_settings', 'UPDATE')   AS updates,
+             has_table_privilege(${IMPORT_ROLE}, 'site_settings', 'DELETE')   AS deletes,
+             has_table_privilege(${IMPORT_ROLE}, 'site_settings', 'TRUNCATE') AS truncates
+    `;
+    expect(privileges).toEqual({
+      selects: false,
+      inserts: false,
+      updates: false,
       deletes: false,
       truncates: false,
     });

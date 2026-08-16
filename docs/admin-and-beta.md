@@ -44,19 +44,44 @@ The registry is a table rather than a list in a script because a
 so `npm run db:privileges` can rebuild the entire grant model from the
 backup. See `docs/backup-restore.md` §6.
 
-`afldb_import` is confined the same way (039): the identical default
-privilege had given the ETL role full write plus `TRUNCATE` on every
-operational table, including `auth_users` and `site_media`. It now holds
-the statistical tables and migration 023's narrow submission read.
+**`afldb_import` is confined the same way — but only since migration
+045.** 039 revoked the ETL role's access to the eleven operational tables
+that existed that day and left the mechanism running, so the *next*
+operational table was still fully writable and `TRUNCATE`-able by it from
+the moment its migration ran. 045 finished the job with the same shape:
 
-`site_settings` (migration 034) is the one deliberate exception: the
-public role is *meant* to read it, because the home page renders the
-layout and record-of-the-week choices stored there. It holds no secret
-and never should; the write grant is still `afldb_auth`'s alone, and the
-"holds no write privilege on any table" assertion covers it like every
-other table. It is registered in
-`afldb_meta.app_readable_tables` and listed in the test's positive read
-check, rather than in `OPERATIONAL_TABLES`.
+- A new table in `public` is **unwritable** by `afldb_import` until
+  someone says otherwise.
+- A statistical table opts in with `SELECT
+  afldb_meta.grant_import_write('my_table');`, which registers it in
+  `afldb_meta.import_writable_tables` and grants the DML, `TRUNCATE` and
+  the table's own sequences together.
+- The same test file asserts write access matches that registry exactly,
+  and that no default privilege has crept back for this role either.
+
+So **a new statistical table's migration calls two one-liners** —
+`grant_app_read` if a public page reads it, `grant_import_write` if the
+ETL reloads it — and an operational table calls neither.
+
+045 also closed two narrower gaps. 039 revoked the operational *tables*
+from `afldb_import` and not their identity **sequences**, while migration
+011 had granted `UPDATE` on every sequence in `public`; `UPDATE` on a
+sequence is what `setval()` needs, so the ETL role could reset
+`auth_users_id_seq` and make every subsequent insert fail on a duplicate
+key. And `afldb_auth`'s schema-wide sequence grant (023, 030) is narrowed
+to the sequences behind the tables it actually writes.
+
+`site_settings` (migration 034) is the deliberate exception on both
+sides. The public role is *meant* to read it, because the home page
+renders the layout and record-of-the-week choices stored there; it holds
+no secret and never should. The ETL role, by contrast, has no business in
+it at all — and until 045 it had `DELETE` and `TRUNCATE` there, because
+the reconciler inferred "operational" as the complement of what
+`afldb_app` may read and this table is deliberately readable. Two
+registries instead of one inference. It is registered in
+`afldb_meta.app_readable_tables`, absent from
+`afldb_meta.import_writable_tables`, and listed in the test's positive
+read check rather than in `OPERATIONAL_TABLES`.
 
 ### One-time setup on the server
 
