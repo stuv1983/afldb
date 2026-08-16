@@ -1,33 +1,26 @@
 /**
  * Grid solver specification: a 3x3 board where each cell answers "who
- * satisfies this row's question AND this column's question", modelled on
+ * satisfies this row's question AND this column's question". Modelled on
  * sports_data_lab's Grid Solver (app_pages/11_Grid_Solver.py,
- * afl/constraints.py) -- a sibling to the AND/OR card-based query builder
- * in query-builder-spec.ts, not a replacement of it. Where that tool asks
- * "pick a column, an operator, a value", this one asks "pick one of these
- * named questions and fill in its details" -- the actual "grid squares"
- * shape the original request also named.
+ * afl/constraints.py); a sibling to the query builder in
+ * query-builder-spec.ts, which asks for a column/operator/value instead of a
+ * named question.
  *
- * Not ported from the reference, all deliberately: the daily board fetch
- * from an external trivia site, saved-grids-per-account (AFLDB has no
- * regular-user accounts, only admin auth), practice/auto-grid modes, and
- * the obscurity/star-rating system (a bespoke precomputed score AFLDB has
- * no equivalent of -- see GridOrder below for the honest substitute).
+ * Deliberately not ported: the daily board fetch from an external trivia site,
+ * saved grids per account (AFLDB has no regular-user accounts), practice and
+ * auto-grid modes, and the obscurity star-rating (a precomputed score with no
+ * AFLDB equivalent — see GridOrder for the substitute).
  *
- * Catalogue: 93 builders across 10 categories, checked against the
- * reference's own generated criteria doc (afl_grid_criteria.md) and
- * verified against AFLDB's live data one category at a time -- family
- * relationships, physical attributes, derby definitions and win-streaks
- * are cut because the data genuinely isn't there (see docs/search.md for
- * the full reasoning), not because they were skipped.
+ * The catalogue is 93 builders across 10 categories, checked against the
+ * reference's afl_grid_criteria.md and verified against live data. Family
+ * relationships, physical attributes, derby definitions and win-streaks are
+ * absent because the data is not there, not because they were skipped
+ * (docs/search.md).
  *
- * Every builder is a fixed, named SQL shape with typed parameters (mirrors
- * constraints.py's `(sql, params)` functions); nothing here lets a request
- * choose a column or operator the way the generic query builder does, so
- * identifiers never need to be checked against a value the request
- * supplied in the first place -- except the `stat` family of params
- * (including `statA`/`statB`), checked against GRID_STATS before
- * sql.unsafe ever sees them.
+ * Every builder is a fixed, named SQL shape with typed parameters, so unlike
+ * the generic query builder nothing here lets a request choose a column or
+ * operator. The one exception is the `stat` family (including `statA`/`statB`),
+ * checked against GRID_STATS before `sql.unsafe` sees it.
  */
 
 import { decodeUrlState, encodeUrlState } from '@/lib/urlState';

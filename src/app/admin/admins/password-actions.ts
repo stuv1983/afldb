@@ -9,29 +9,19 @@ import { ROLE_RANK, type AdminUser, audit, requireAdminManager } from '@/lib/aut
 /**
  * Issue a temporary password for somebody else's account.
  *
- * This is the answer to "I have forgotten my password", which until now cost
- * the authenticator as well: the only mechanism was to re-issue an invite,
- * and accepting one re-enrols BOTH factors (see invite-actions.ts and
- * migration 040). Losing a password is not evidence that the second factor is
- * compromised, and making the two share one repair meant every forgotten
- * password also became a QR code to scan.
+ * Exists so that "I forgot my password" no longer costs the authenticator too:
+ * the previous repair was re-issuing an invite, which re-enrols BOTH factors
+ * (invite-actions.ts, migration 040).
  *
- * What the temporary password can do is bounded on purpose:
+ * Its power is bounded on purpose. It is generated here rather than chosen by
+ * the issuing admin, shown once and stored only as an scrypt hash, and carries
+ * `must_change_password`, so it grants exactly one ability: replacing itself.
+ * It leaves the TOTP secret alone — an admin who could both reset a password
+ * and disarm 2FA would be the weakest door in the building.
  *
- *   - it is generated here, never typed by the admin issuing it;
- *   - it is shown once and stored only as an scrypt hash, so it cannot be
- *     read back off this screen tomorrow — a lost one is re-issued;
- *   - it carries `must_change_password`, which every admin route honours, so
- *     it grants exactly one ability: replacing itself;
- *   - it does not touch the TOTP secret, so signing in with it still needs
- *     the account's authenticator. An admin who could reset a password AND
- *     disarm 2FA would be the weakest door in the building.
- *
- * Who may issue one follows the invite rules exactly, because the powers are
- * comparable: both hand somebody a way into an account. A super admin may
- * reset anyone; a delegated `can_manage_admins` holder may reset a
- * contributor and no one better, which is the same line createInvite draws
- * and for the same reason.
+ * Who may issue one follows the `createInvite` rules exactly, since both hand
+ * somebody a way into an account: a super admin may reset anyone, a delegated
+ * `can_manage_admins` holder may reset a contributor and no one better.
  */
 
 export type PasswordResetState = {

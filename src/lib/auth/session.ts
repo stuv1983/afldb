@@ -62,33 +62,16 @@ function secureCookies(): boolean {
 /**
  * The client's IP, for the audit trail and for keying the rate limiters.
  *
- * Behind our single reverse proxy (deploy/Caddyfile) the trustworthy value is
- * the LAST entry of X-Forwarded-For — the address Caddy itself observed —
- * because any earlier entries are whatever the client chose to send. Taking
- * the FIRST (leftmost) entry, as this used to, recorded a fully
- * attacker-controlled value: a request with `X-Forwarded-For: 8.8.8.8` poisoned
- * auth_sessions.ip and auth_audit_log.ip. Caddy is also configured to
- * overwrite the header, so in production only its own value is present; the
- * rightmost read is defence in depth for that. Assumes exactly one trusted
- * proxy hop.
+ * Assumes exactly one trusted proxy hop (deploy/Caddyfile). The trustworthy
+ * value is therefore the LAST X-Forwarded-For entry, the address Caddy itself
+ * observed; earlier entries are whatever the client sent. X-Real-IP is
+ * deliberately not consulted as a fallback, since it could only fire for a
+ * request that bypassed the proxy — precisely when it is forgeable.
  *
- * X-Real-IP is deliberately NOT consulted. The proxy sets X-Forwarded-For on
- * every request it passes, so the fallback could only ever fire for a request
- * that did not come through the proxy — exactly the case where the header is
- * client-supplied and forging it would let an attacker spread rate-limit
- * buckets and write a chosen address into the audit log. Caddy strips the
- * header inbound as well, so neither layer can be the one that fails.
- *
- * Returning null when there is no trustworthy value is the safe direction:
- * callers key their limiters on 'unknown', which shares one bucket rather
- * than minting a fresh one per forged header.
- *
- * next/headers()'s headers() throws outside a real Next.js request scope
- * (a bare script, a test invoking a Route Handler directly). audit() calls
- * this on every write path in the app purely to enrich a log column, so a
- * context it cannot read is exactly the "no trustworthy value" case above,
- * not a reason to fail whatever action was being audited — caught and
- * treated the same as an absent header.
+ * Returning null is the safe direction: callers key on 'unknown' and share one
+ * rate-limit bucket rather than minting a fresh one per forged header. That
+ * also covers `headers()` throwing outside a request scope, which audit() hits
+ * on write paths where a missing log column must not fail the action.
  */
 export async function requestIp(): Promise<string | null> {
   try {
@@ -115,22 +98,18 @@ export function lastForwardedIp(forwardedFor: string | null): string | null {
   return last || null;
 }
 
-// ---------------------------------------------------------------------------
-// Beta epoch and gate
+// --- Beta epoch and gate ---
 //
 // Both read the environment through the edge-safe helpers in tokens.ts so the
 // mint side here and the check side in middleware share one definition.
 // betaEpoch is re-exported at the top of this module; a non-numeric
 // AFLDB_BETA_EPOCH makes it throw, which fails admission closed.
-// ---------------------------------------------------------------------------
 
 export function betaGateEnabled(): boolean {
   return betaGateOn();
 }
 
-// ---------------------------------------------------------------------------
-// Beta admission
-// ---------------------------------------------------------------------------
+// --- Beta admission ---
 
 export async function grantBetaAccess(subject: string): Promise<void> {
   const token = await signClaim({
@@ -161,9 +140,7 @@ export async function hasBetaAccess(): Promise<boolean> {
   return claim !== null;
 }
 
-// ---------------------------------------------------------------------------
-// Admin sessions
-// ---------------------------------------------------------------------------
+// --- Admin sessions ---
 
 export type AdminUser = {
   id: number;
@@ -365,9 +342,7 @@ export async function destroyAdminSession(): Promise<void> {
   jar.delete(ADMIN_COOKIE);
 }
 
-// ---------------------------------------------------------------------------
-// Audit
-// ---------------------------------------------------------------------------
+// --- Audit ---
 
 export async function audit(
   action: string,

@@ -66,9 +66,7 @@ export type DatasetSpec = {
   awardSlug?: string;
 };
 
-// ---------------------------------------------------------------------------
-// Shared resolution helpers
-// ---------------------------------------------------------------------------
+// --- Shared resolution helpers ---
 
 function toIntOrNull(value: string | null): number | null {
   if (value === null) return null;
@@ -218,9 +216,7 @@ async function resolveMatch(
   return { status: 'ambiguous', matchId: null, count: candidates.length };
 }
 
-// ---------------------------------------------------------------------------
-// Dataset: Rising Star nominations
-// ---------------------------------------------------------------------------
+// --- Dataset: Rising Star nominations ---
 
 const risingStar: DatasetSpec = {
   key: 'rising_star',
@@ -324,9 +320,7 @@ const risingStar: DatasetSpec = {
   },
 };
 
-// ---------------------------------------------------------------------------
-// Dataset: All-Australian selections
-// ---------------------------------------------------------------------------
+// --- Dataset: All-Australian selections ---
 
 const allAustralian: DatasetSpec = {
   key: 'all_australian',
@@ -406,9 +400,7 @@ const allAustralian: DatasetSpec = {
   },
 };
 
-// ---------------------------------------------------------------------------
-// Dataset: Match results
-// ---------------------------------------------------------------------------
+// --- Dataset: Match results ---
 
 const FINALS_ROUND_TYPES: Record<string, string> = {
   EF: 'elimination_final',
@@ -587,9 +579,7 @@ const matchResults: DatasetSpec = {
   },
 };
 
-// ---------------------------------------------------------------------------
-// Dataset: Player match stats
-// ---------------------------------------------------------------------------
+// --- Dataset: Player match stats ---
 
 /** Every nullable statistic player_match_stats carries (migration 004). */
 const STAT_COLUMNS = [

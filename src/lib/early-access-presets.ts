@@ -1,25 +1,15 @@
 /**
- * A catalogue of ready-made early-access questions, to be opted into rather
- * than typed out.
+ * Ready-made early-access questions, opted into rather than typed out. The
+ * form at /admin/settings can still build any question from scratch.
  *
- * The form at /admin/settings has always been able to build any question from
- * scratch. That is the right primitive and it is not going away — but writing
- * seventeen good questions from a blank list is a different job from deciding
- * which ones to ask, and this module exists so the second job is the only one
- * that has to be done.
+ * IDS ARE PART OF THE CONTRACT. Answers are stored under a question's id
+ * (migration 035), so toggling a preset off stops asking without erasing, and
+ * re-adding it reunites the question with its earlier answers. Relabelling a
+ * preset is safe; changing its `id` orphans that history and must not be done.
  *
- * IDS ARE PART OF THE CONTRACT. An answer is stored under its question's id
- * (migration 035), and these ids are stable, so opting a question out and back
- * in later reunites it with every answer previously given to it. That is why
- * toggling a preset off is safe: it stops asking, it does not erase. Renaming
- * a preset's LABEL here in a future release keeps its history readable for the
- * same reason; changing its `id` would orphan it, and must not be done.
- *
- * Everything here is a SUGGESTION, normalised through
- * `parseEarlyAccessQuestions` like anything else a super admin submits. A
- * preset carries no privilege — it is a filled-in form, not a special kind of
- * question — and once added it can be reworded, reordered, made required or
- * deleted like any other.
+ * Presets carry no privilege — each is a filled-in form, normalised through
+ * `parseEarlyAccessQuestions` like any other submission, and editable or
+ * deletable once added.
  */
 
 import type { EarlyAccessQuestion } from '@/lib/site-settings';

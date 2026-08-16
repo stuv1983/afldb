@@ -71,9 +71,7 @@ export async function verifyPassword(password: string, stored: string): Promise<
   return key.length === expected.length && timingSafeEqual(key, expected);
 }
 
-// ---------------------------------------------------------------------------
-// TOTP (RFC 6238, SHA-1, 30-second step, 6 digits)
-// ---------------------------------------------------------------------------
+// --- TOTP (RFC 6238, SHA-1, 30-second step, 6 digits) ---
 
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
@@ -160,9 +158,7 @@ export function totpUri(secret: string, email: string): string {
     + `?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
 }
 
-// ---------------------------------------------------------------------------
-// Opaque tokens
-// ---------------------------------------------------------------------------
+// --- Opaque tokens ---
 
 /** 256-bit random token; the database stores only its sha256. */
 export function generateToken(): string {

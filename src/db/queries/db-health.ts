@@ -23,9 +23,7 @@ import { sql } from '@/db/client';
  * guard against in the first place.
  */
 
-// ---------------------------------------------------------------------------
-// Core summary
-// ---------------------------------------------------------------------------
+// --- Core summary ---
 
 export type CoreSummary = {
   seasonMin: number | null;
@@ -62,9 +60,7 @@ export async function getCoreSummary(): Promise<CoreSummary> {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Table inventory
-// ---------------------------------------------------------------------------
+// --- Table inventory ---
 
 /**
  * What each table is for, so the inventory reads as an explanation of the
@@ -182,9 +178,7 @@ export async function listTableRowCounts(): Promise<TableRowCount[]> {
   }));
 }
 
-// ---------------------------------------------------------------------------
-// Derived-data rebuild log
-// ---------------------------------------------------------------------------
+// --- Derived-data rebuild log ---
 
 export type RebuildRow = {
   id: number;
@@ -208,9 +202,7 @@ export async function getLatestRebuilds(limit: number): Promise<RebuildRow[]> {
   `;
 }
 
-// ---------------------------------------------------------------------------
-// Career-total reconciliation
-// ---------------------------------------------------------------------------
+// --- Career-total reconciliation ---
 
 export type ReconciliationCheck = {
   check: string;
@@ -278,9 +270,7 @@ export async function reconcileCareerTotals(): Promise<ReconciliationCheck[]> {
   ];
 }
 
-// ---------------------------------------------------------------------------
-// Statistic era coverage
-// ---------------------------------------------------------------------------
+// --- Statistic era coverage ---
 
 export type StatEraRow = {
   key: string;
@@ -305,9 +295,7 @@ export async function getStatEraStarts(): Promise<StatEraRow[]> {
   return rows.map((r) => ({ ...r, seasonsRecorded: Number(r.seasonsRecorded) }));
 }
 
-// ---------------------------------------------------------------------------
-// Submission pipeline backlog (operational tables -- authSql, not sql)
-// ---------------------------------------------------------------------------
+// --- Submission pipeline backlog (operational tables -- authSql, not sql) ---
 
 export type SubmissionBacklogRow = {
   status: string;
@@ -330,9 +318,7 @@ export async function getSubmissionBacklog(): Promise<SubmissionBacklogRow[]> {
   return rows.map((r) => ({ ...r, count: Number(r.count) }));
 }
 
-// ---------------------------------------------------------------------------
-// Link quality
-// ---------------------------------------------------------------------------
+// --- Link quality ---
 
 type LinkLayer = {
   table: string;
@@ -389,9 +375,7 @@ export async function getLinkQuality(): Promise<LinkQualityRow[]> {
   return results;
 }
 
-// ---------------------------------------------------------------------------
-// Database size
-// ---------------------------------------------------------------------------
+// --- Database size ---
 
 export type DatabaseSize = { bytes: number; pretty: string };
 
@@ -403,9 +387,7 @@ export async function getDatabaseSize(): Promise<DatabaseSize> {
   return { bytes: Number(row.bytes), pretty: row.pretty };
 }
 
-// ---------------------------------------------------------------------------
-// Everything together
-// ---------------------------------------------------------------------------
+// --- Everything together ---
 
 export type HealthReport = {
   core: CoreSummary;

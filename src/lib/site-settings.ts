@@ -42,9 +42,7 @@ export const SETTING_KEYS = {
   apexContent: 'apex.content',
 } as const;
 
-// ---------------------------------------------------------------------------
-// Home page layout
-// ---------------------------------------------------------------------------
+// --- Home page layout ---
 
 export type HomeSectionId = 'stats' | 'vault' | 'record' | 'browse';
 
@@ -157,9 +155,7 @@ export function homeSectionRows(visible: HomeSectionId[]): HomeSectionId[][] {
   return rows;
 }
 
-// ---------------------------------------------------------------------------
-// Record of the week
-// ---------------------------------------------------------------------------
+// --- Record of the week ---
 
 /**
  * Career records the home panel can lead with.
@@ -188,9 +184,7 @@ export function parseHomeRecord(value: unknown): HomeRecordCategory {
     : DEFAULT_HOME_RECORD;
 }
 
-// ---------------------------------------------------------------------------
-// AFLW leaders panel
-// ---------------------------------------------------------------------------
+// --- AFLW leaders panel ---
 
 /**
  * The AFLW half of "Record of the week".
@@ -223,9 +217,7 @@ export function aflwLeaderCategory(value: AflwLeaderCategory) {
     ?? AFLW_LEADER_CATEGORIES[0];
 }
 
-// ---------------------------------------------------------------------------
-// Grid solver audience
-// ---------------------------------------------------------------------------
+// --- Grid solver audience ---
 
 /**
  * Who may reach the grid solver, in widening order.
@@ -269,9 +261,7 @@ export function parseGridAudience(value: unknown): GridAudience {
     : DEFAULT_GRID_AUDIENCE;
 }
 
-// ---------------------------------------------------------------------------
-// Early access requests
-// ---------------------------------------------------------------------------
+// --- Early access requests ---
 
 /**
  * The public "request early access" form, as a super admin configures it.
@@ -482,7 +472,6 @@ export function parseBooleanSetting(value: unknown): boolean {
   return value === true;
 }
 
-// ---------------------------------------------------------------------------
 
 export type SiteSettings = {
   homeLayout: HomeLayout;

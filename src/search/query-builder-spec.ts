@@ -2,32 +2,25 @@
  * Data QA query builder specification.
  *
  * A hidden, super-admin-only tool for ad-hoc statistical QA, modelled on
- * sports_data_lab's query_builder.py "Table filters" mode: pick a table,
- * pick a column, set an operator and value, add it as a condition. A
- * card holds any number of conditions combined by its own ALL (AND) /
- * ANY (OR) rule; each card after the first says how it joins the
- * accumulated result of the cards before it. That two-level shape --
- * cards of conditions, not unbounded nested groups -- is what "chain
- * more with AND/OR, or group them into cards" actually asked for; deeper
- * nesting and the reference's drag-and-drop visual tree were not.
+ * sports_data_lab's query_builder.py "Table filters" mode. A card holds any
+ * number of conditions combined by its own ALL/ANY rule; each card after the
+ * first says how it joins the accumulated result of those before it. Two
+ * levels deliberately — deeper nesting and the reference's drag-and-drop tree
+ * were not wanted.
  *
- * Security model, same three walls as advanced-spec.ts and the
- * reference this is modelled on, deliberately NOT built on live
+ * Security rests on three walls, and deliberately not on live
  * information_schema discovery:
  *
- *   1. Table and column identifiers only ever come from QUERYABLE_TABLES
- *      below -- a curated allowlist, not a catalogue query. A discovery-
- *      based tool would need an explicit denylist to keep
- *      auth_users.password_hash out of reach; an allowlist cannot leak
- *      what was never listed.
- *   2. Every operator comes from the fixed per-kind vocabulary
- *      (OPERATORS_BY_KIND); nothing typed is ever compiled as an
- *      operator.
- *   3. Every value is bound as a query parameter by the compiler in
+ *   1. Identifiers come only from QUERYABLE_TABLES below. A discovery-based
+ *      tool would need a denylist to keep auth_users.password_hash out of
+ *      reach; an allowlist cannot leak what was never listed.
+ *   2. Operators come only from OPERATORS_BY_KIND; nothing typed is compiled
+ *      as an operator.
+ *   3. Values are bound as query parameters by the compiler in
  *      src/db/queries/query-builder.ts, never spliced into SQL text.
  *
- * This module is shared by the server compiler and the Client Component
- * form, so it carries no server-only imports.
+ * Shared by the server compiler and the Client Component form, so it carries
+ * no server-only imports.
  */
 
 import { decodeUrlState, encodeUrlState } from '@/lib/urlState';

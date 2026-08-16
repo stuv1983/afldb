@@ -35,9 +35,7 @@ import type { FilterValues } from '@/search/table-filters';
  * the whole player-match table twice to render one page.
  */
 
-// ---------------------------------------------------------------------------
-// Seasons
-// ---------------------------------------------------------------------------
+// --- Seasons ---
 
 export type AflwSeasonSummary = {
   seasonKey: string;
@@ -148,9 +146,7 @@ export async function getAflwLadder(seasonKey: string): Promise<AflwLadderRow[]>
   `;
 }
 
-// ---------------------------------------------------------------------------
-// Clubs
-// ---------------------------------------------------------------------------
+// --- Clubs ---
 
 export type AflwClubRow = {
   code: string;
@@ -252,9 +248,7 @@ export async function getAflwClubSeasons(code: string): Promise<AflwClubSeasonRo
   `;
 }
 
-// ---------------------------------------------------------------------------
-// Players
-// ---------------------------------------------------------------------------
+// --- Players ---
 
 export type AflwPlayerListRow = {
   slug: string;
@@ -519,9 +513,7 @@ export async function getAflwPlayerMatches(
   return { rows: [], total: Number(counted.total) };
 }
 
-// ---------------------------------------------------------------------------
-// Matches
-// ---------------------------------------------------------------------------
+// --- Matches ---
 
 export type AflwMatchRow = {
   matchKey: string;
@@ -748,9 +740,7 @@ export async function getAflwMatchScoring(matchKey: string): Promise<AflwScoring
   `;
 }
 
-// ---------------------------------------------------------------------------
-// Match search
-// ---------------------------------------------------------------------------
+// --- Match search ---
 
 export const AFLW_MATCH_FILTER_COLUMNS: Record<string, string> = {
   margin: 'm.margin',
@@ -807,9 +797,7 @@ export async function runAflwMatchSearch(options: {
   return { rows: [], total: Number(counted.total) };
 }
 
-// ---------------------------------------------------------------------------
-// Venues and overview
-// ---------------------------------------------------------------------------
+// --- Venues and overview ---
 
 export type AflwVenueRow = {
   slug: string;
@@ -870,9 +858,7 @@ export async function getAflwOverview(): Promise<AflwOverview> {
   return row;
 }
 
-// ---------------------------------------------------------------------------
-// Global search
-// ---------------------------------------------------------------------------
+// --- Global search ---
 
 export type AflwSearchRow = {
   slug: string;

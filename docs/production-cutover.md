@@ -1,10 +1,18 @@
 # AFLDB — Production Cutover Plan
 
-> **STATUS: PREPARED, NOT EXECUTED.**
+> **STATUS: PARTIALLY EXECUTED — closed beta is live.**
 >
-> Nothing in this document has been run. `afldb.com` is untouched: its DNS is unchanged, it points nowhere near the development server, no certificate has been requested, and no production database exists.
+> As of 16 August 2026 the production droplet exists, `afldb_prod` has been
+> created and loaded, `beta.afldb.com` serves the application over Let's Encrypt
+> TLS behind the beta gate, and `afldb.com` resolves to that host and serves the
+> static coming-soon page. Certificates have been issued for both names.
 >
-> Do not begin until every item in §1 passes.
+> What remains is the cutover proper: serving the **application** from
+> `afldb.com` and allowing it to be indexed. That is still gated on §1, and the
+> open items there have not been re-verified against the production host — the
+> checkboxes below were assessed on the development server.
+>
+> Do not complete the cutover until every item in §1 passes **on production**.
 
 ## 1. Readiness gate
 

@@ -160,8 +160,7 @@ export function renderApexPage({
       + `${escapeHtml(footer.contactEmail)}</a></p>`
     : '';
 
-  // ---------------------------------------------------------------------
-  // The bands of the page, one function each.
+  // --- The bands of the page, one function each. ---
   //
   // Which of these are emitted, and in what order, comes from
   // `content.sections` rather than from the order they are written here.
@@ -171,7 +170,6 @@ export function renderApexPage({
   // other's business. A band whose own content is empty renders nothing
   // even when visible — hiding it is a decision, having nothing to say is
   // a fact, and both should produce the same silence.
-  // ---------------------------------------------------------------------
   const bands: Record<ApexSectionId, () => string> = {
     hero: () => `
   <section class="hero container">

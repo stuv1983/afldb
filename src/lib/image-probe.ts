@@ -49,9 +49,7 @@ function plausible(width: number, height: number): boolean {
     && width <= MAX_DIMENSION && height <= MAX_DIMENSION;
 }
 
-// ---------------------------------------------------------------------------
-// PNG
-// ---------------------------------------------------------------------------
+// --- PNG ---
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
@@ -69,9 +67,7 @@ function probePng(bytes: Uint8Array, view: DataView): ProbedImage | null {
     : null;
 }
 
-// ---------------------------------------------------------------------------
-// JPEG
-// ---------------------------------------------------------------------------
+// --- JPEG ---
 
 /**
  * Frame markers that carry the size. Every SOFn except the three markers in
@@ -125,9 +121,7 @@ function probeJpeg(bytes: Uint8Array, view: DataView): ProbedImage | null {
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// WebP
-// ---------------------------------------------------------------------------
+// --- WebP ---
 
 /**
  * Three container variants, all inside the same RIFF wrapper:
@@ -177,7 +171,6 @@ function probeWebp(bytes: Uint8Array, view: DataView): ProbedImage | null {
   return null;
 }
 
-// ---------------------------------------------------------------------------
 
 /**
  * Identify `bytes` as PNG, JPEG or WebP and read its dimensions.

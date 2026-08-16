@@ -51,9 +51,7 @@ export async function getApexContent(): Promise<ApexContent> {
   return parseApexContent(decoded);
 }
 
-// ---------------------------------------------------------------------------
-// Uploaded images
-// ---------------------------------------------------------------------------
+// --- Uploaded images ---
 
 export type MediaRecord = {
   name: string;

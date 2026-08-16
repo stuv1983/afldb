@@ -1,17 +1,13 @@
 /**
  * LIKE/ILIKE pattern building.
  *
- * Every search value reaches PostgreSQL as a bound parameter, so nothing
- * here is an injection guard. What it guards is meaning and cost: inside
- * a LIKE pattern `%` and `_` are wildcards, so a reader searching for a
- * literal percent sign was silently asking for "match anything", which
- * returns the whole table and makes the database rank a corpus it never
- * needed to look at.
+ * Every search value reaches PostgreSQL as a bound parameter, so nothing here
+ * is an injection guard. It guards meaning and cost: unescaped, a literal `%`
+ * typed by a reader becomes "match anything" and makes the database rank the
+ * whole table.
  *
- * Deliberately free of `server-only` and of any database import: these
- * are string functions, and keeping them here means they can be unit
- * tested without a connection. The query layer imports them through
- * db/queries/filters, which is where callers already look for them.
+ * Deliberately free of `server-only` and of any database import so these stay
+ * unit-testable without a connection.
  */
 
 /** Escape the three characters LIKE treats specially. */

@@ -172,9 +172,7 @@ export async function getAwardLeaders(awardId: number, limit = 10) {
   `;
 }
 
-// ---------------------------------------------------------------------------
-// Rising Star nominations
-// ---------------------------------------------------------------------------
+// --- Rising Star nominations ---
 
 export type NominationRow = {
   id: number;
@@ -266,9 +264,7 @@ export async function getNominationsByClub(awardId: number) {
   `;
 }
 
-// ---------------------------------------------------------------------------
-// Hall of Fame and honour teams
-// ---------------------------------------------------------------------------
+// --- Hall of Fame and honour teams ---
 
 export type HallOfFameRow = {
   id: number;
@@ -371,9 +367,7 @@ export async function getHonourTeam(teamName: string): Promise<HonourTeamMemberR
   `;
 }
 
-// ---------------------------------------------------------------------------
-// Per-player and per-club views
-// ---------------------------------------------------------------------------
+// --- Per-player and per-club views ---
 
 /** Every honour AFLDB can attribute to one player. */
 export async function getPlayerHonours(playerId: number) {

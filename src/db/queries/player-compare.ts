@@ -12,9 +12,7 @@ import { sql } from '@/db/client';
  * overlap() and explore.py's _player_connections().
  */
 
-// ---------------------------------------------------------------------------
-// Best single game
-// ---------------------------------------------------------------------------
+// --- Best single game ---
 
 export type BestSingleGame = {
   goals: number | null;
@@ -47,9 +45,7 @@ export async function getBestSingleGame(playerId: number): Promise<BestSingleGam
   return row;
 }
 
-// ---------------------------------------------------------------------------
-// Shared matches: summary
-// ---------------------------------------------------------------------------
+// --- Shared matches: summary ---
 
 export type OverlapSummary = {
   together: number;
@@ -91,9 +87,7 @@ export async function getPlayerOverlapSummary(a: number, b: number): Promise<Ove
   };
 }
 
-// ---------------------------------------------------------------------------
-// Shared matches: full drill-down
-// ---------------------------------------------------------------------------
+// --- Shared matches: full drill-down ---
 
 export type HeadToHeadRelationship = 'all' | 'teammates' | 'opponents';
 

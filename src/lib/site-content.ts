@@ -21,9 +21,7 @@
  * admin's Client Component editor, so no server-only imports.
  */
 
-// ---------------------------------------------------------------------------
-// Limits
-// ---------------------------------------------------------------------------
+// --- Limits ---
 
 /**
  * Caps, so a hand-posted or fumbled document cannot produce a page that is
@@ -70,9 +68,7 @@ function textOr(value: unknown, chars: number, fallback: string): string {
   return text(value, chars) || fallback;
 }
 
-// ---------------------------------------------------------------------------
-// Images
-// ---------------------------------------------------------------------------
+// --- Images ---
 
 /**
  * A reference to an image in the published tree, never to arbitrary bytes.
@@ -154,9 +150,7 @@ function parseOptionalImage(value: unknown): ApexImage | null {
   return parseImage(value, { src: raw.src, alt: '', width: 0, height: 0 });
 }
 
-// ---------------------------------------------------------------------------
-// Identifiers for the repeating blocks
-// ---------------------------------------------------------------------------
+// --- Identifiers for the repeating blocks ---
 
 /**
  * Feature cards and notes carry stable ids for the same reason early-access
@@ -176,9 +170,7 @@ export function newBlockId(prefix = 'b'): string {
   return `${prefix}${Date.now().toString(36).slice(-6)}${blockCounter.toString(36)}`;
 }
 
-// ---------------------------------------------------------------------------
-// Hero statistics
-// ---------------------------------------------------------------------------
+// --- Hero statistics ---
 
 /**
  * The figures the hero strip can quote, and where they come from.
@@ -220,9 +212,7 @@ function isMetric(value: unknown): value is ApexMetric | 'custom' {
     || APEX_METRICS.some((metric) => metric.value === value);
 }
 
-// ---------------------------------------------------------------------------
-// The apex document
-// ---------------------------------------------------------------------------
+// --- The apex document ---
 
 export type ApexFeature = {
   id: string;
@@ -237,9 +227,7 @@ export type ApexNote = {
   body: string;
 };
 
-// ---------------------------------------------------------------------------
-// Sections
-// ---------------------------------------------------------------------------
+// --- Sections ---
 
 /**
  * The bands of the page, in the order they were hand-written.
@@ -725,9 +713,7 @@ export function isSectionVisible(content: ApexContent, id: ApexSectionId): boole
   return content.sections.some((section) => section.id === id && section.visible);
 }
 
-// ---------------------------------------------------------------------------
-// The shared footer
-// ---------------------------------------------------------------------------
+// --- The shared footer ---
 
 /**
  * One footer, two renderers.
