@@ -164,7 +164,13 @@ export default async function SeasonPage({
                 {goalkickers.map((p) => (
                   <tr key={`${p.id}-${p.clubSlug}`}>
                     <td className="wide"><Link href={playerPath(p.slug, p.id)}>{p.displayName}</Link></td>
-                    <td><Link href={clubPath(p.clubSlug)}>{p.clubName}</Link></td>
+                    <td>
+                      {p.clubSlug ? (
+                        <Link href={clubPath(p.clubSlug)}>{p.clubName}</Link>
+                      ) : (
+                        <span className="not-recorded">—</span>
+                      )}
+                    </td>
                     <td className="num">{formatNumber(p.goals)}</td>
                   </tr>
                 ))}

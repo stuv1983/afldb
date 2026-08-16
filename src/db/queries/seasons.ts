@@ -148,7 +148,8 @@ export async function getSeasonLadder(year: number): Promise<LadderRow[]> {
 export async function getSeasonGoalkickers(year: number, limit = 10) {
   return sql<{
     id: number; slug: string; displayName: string;
-    clubName: string; clubSlug: string; goals: number; games: number;
+    // LEFT JOIN on the nullable primary_club_id: null when no club is named.
+    clubName: string | null; clubSlug: string | null; goals: number; games: number;
   }[]>`
     -- The season's leading goalkickers are ranked on each player's whole
     -- season, so a mid-season transfer is one entry, not two part-seasons.
@@ -181,10 +182,16 @@ export async function getSeasonBrownlow(year: number, limit = 10) {
 }
 
 export async function getSeasonBounds(): Promise<{ min: number; max: number }> {
+  // An ungrouped aggregate always returns exactly one row, so the empty case
+  // is an all-NULL row rather than no row at all -- a `row ?? default` never
+  // fired and the nulls reached the caller typed as numbers. COALESCE is what
+  // actually answers it, on the one path that can hit it: an unseeded database.
   const [row] = await sql<{ min: number; max: number }[]>`
-    SELECT min(year)::int AS min, max(year)::int AS max FROM seasons
+    SELECT COALESCE(min(year), 1897)::int AS min,
+           COALESCE(max(year), 1897)::int AS max
+      FROM seasons
   `;
-  return row ?? { min: 1897, max: 1897 };
+  return row;
 }
 
 /**

@@ -121,7 +121,12 @@ export async function listPlayers(options: PlayerListFilters & {
      LIMIT ${limit} OFFSET ${offset}
   `;
 
-  if (rows.length > 0) return { rows, total: Number(rows[0].total) };
+  if (rows.length > 0) {
+    return {
+      rows: rows.map(({ total: _total, ...rest }) => rest),
+      total: Number(rows[0].total),
+    };
+  }
 
   // An offset past the end returns no rows, and a window count carried on
   // those rows would report the collection as empty. Count separately so
@@ -233,8 +238,13 @@ export async function getPlayerClubs(playerId: number): Promise<PlayerClubStint[
 
 export type PlayerSeasonRow = {
   season: number;
-  clubName: string;
-  clubSlug: string;
+  /**
+   * The club of most games that season, from a LEFT JOIN on the nullable
+   * player_season_stats.primary_club_id -- null when the derived row names
+   * no club, which the schema permits (migration 015).
+   */
+  clubName: string | null;
+  clubSlug: string | null;
   /** Clubs represented that season. >1 means a mid-season transfer. */
   clubCount: number;
   games: number;
@@ -367,7 +377,12 @@ export async function getPlayerMatches(
      ORDER BY m.match_date DESC, m.id DESC
      LIMIT ${limit} OFFSET ${offset}
   `;
-  if (rows.length > 0) return { rows, total: Number(rows[0].total) };
+  if (rows.length > 0) {
+    return {
+      rows: rows.map(({ total: _total, ...rest }) => rest),
+      total: Number(rows[0].total),
+    };
+  }
 
   // Same reason as listPlayers: a window count cannot survive an empty page.
   const [counted] = await sql<{ total: string }[]>`

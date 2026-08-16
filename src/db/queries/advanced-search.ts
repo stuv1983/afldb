@@ -80,7 +80,7 @@ export async function runAdvancedSearch(
   `;
 
   return {
-    rows,
+    rows: rows.map(({ total: _total, ...rest }) => rest),
     total: rows.length > 0 ? Number(rows[0].total) : 0,
   };
 }

@@ -72,6 +72,41 @@ describe('query builder compiler', () => {
     expect(result.total).toBe(Number(row.n));
   });
 
+  it('folds three cards left-to-right, so an OR join before an AND join binds first', async () => {
+    // The regression this exists for: the compiler joined each card to the
+    // accumulated result without parenthesising it, so these three cards
+    // emitted `A OR B AND C`. SQL binds AND tighter, making that
+    // `A OR (B AND C)` -- a different question from the left fold the
+    // spec promises, and one that quietly returns different players.
+    //
+    // The two readings are chosen to give genuinely different counts:
+    // every player with 0-5 games has 0 premierships, so the wrong
+    // reading collapses the first card away entirely.
+    const state: QueryBuilderState = {
+      table: 'player_career_stats',
+      cards: [
+        { join: 'AND', card: { match: 'AND', conditions: [{ column: 'games', op: 'between', lo: 0, hi: 5 }] } },
+        { join: 'OR', card: { match: 'AND', conditions: [{ column: 'games', op: '>=', value: 300 }] } },
+        { join: 'AND', card: { match: 'AND', conditions: [{ column: 'premierships', op: '>=', value: 1 }] } },
+      ],
+      page: 1,
+    };
+    const result = await runQueryBuilder(state);
+
+    const [correct] = await sql<{ n: string }[]>`
+      SELECT count(*)::text AS n FROM player_career_stats
+       WHERE ((games BETWEEN 0 AND 5) OR (games >= 300)) AND (premierships >= 1)
+    `;
+    const [wrong] = await sql<{ n: string }[]>`
+      SELECT count(*)::text AS n FROM player_career_stats
+       WHERE (games BETWEEN 0 AND 5) OR ((games >= 300) AND (premierships >= 1))
+    `;
+
+    expect(result.total).toBe(Number(correct.n));
+    // Guards the test itself: if these ever coincide the case proves nothing.
+    expect(Number(correct.n)).not.toBe(Number(wrong.n));
+  });
+
   it('an empty card (no conditions yet) filters nothing rather than erroring', async () => {
     const state: QueryBuilderState = {
       table: 'clubs',

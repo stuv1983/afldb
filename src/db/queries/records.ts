@@ -274,8 +274,9 @@ export type SeasonRecordRow = {
   displayName: string;
   value: number;
   season: number;
-  clubName: string;
-  clubSlug: string;
+  /** LEFT JOIN on the nullable primary_club_id: null when no club is named. */
+  clubName: string | null;
+  clubSlug: string | null;
   games: number;
 };
 

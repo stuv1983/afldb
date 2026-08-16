@@ -316,7 +316,13 @@ export default async function RecordCategoryPage({
                     <Link href={playerPath(row.slug, row.playerId)}>{row.displayName}</Link>
                   </td>
                   <td className="num"><strong>{formatNumber(row.value)}</strong></td>
-                  <td><Link href={clubPath(row.clubSlug)}>{row.clubName}</Link></td>
+                  <td>
+                    {row.clubSlug ? (
+                      <Link href={clubPath(row.clubSlug)}>{row.clubName}</Link>
+                    ) : (
+                      <span className="not-recorded">—</span>
+                    )}
+                  </td>
                   <td className="num"><Link href={seasonPath(row.season)}>{row.season}</Link></td>
                   <td className="num">{formatNumber(row.games)}</td>
                 </tr>

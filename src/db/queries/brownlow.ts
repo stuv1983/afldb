@@ -123,5 +123,8 @@ export async function getBrownlowCareerLeaders(filters: {
      LIMIT ${filters.limit}
   `;
 
-  return { rows, total: rows.length > 0 ? Number(rows[0].total) : 0 };
+  return {
+    rows: rows.map(({ total: _total, ...rest }) => rest),
+    total: rows.length > 0 ? Number(rows[0].total) : 0,
+  };
 }

@@ -18,16 +18,12 @@ import type { EarlyAccessQuestion } from '@/lib/site-settings';
  */
 export type EarlyAccessAnswer = string | string[];
 
-export type EarlyAccessRequestRow = {
-  id: number;
-  email: string;
-  name: string | null;
-  message: string | null;
-  answers: Record<string, EarlyAccessAnswer> | null;
-  status: 'pending' | 'approved' | 'denied';
-  requestedAt: Date;
-  ip: string | null;
-};
+// A row type for the whole table deliberately does NOT live here. The one
+// that existed typed `answers` as a decoded object, which is not what the
+// driver returns -- jsonb arrives as raw TEXT -- so anything that had picked
+// it up would have read every answer set as a string and quietly rendered
+// nothing. Select `answers: unknown` and run it through `parseAnswers` below,
+// as /admin/access does.
 
 /**
  * Insert a request, or do nothing if one is already pending for that email.

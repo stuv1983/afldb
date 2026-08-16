@@ -254,8 +254,9 @@ export type AflwPlayerListRow = {
   slug: string;
   displayName: string;
   clubNames: string | null;
-  debutSeasonLabel: string;
-  finalSeasonLabel: string;
+  /** LEFT JOIN on aflw.seasons by ordinal: null if the season is missing. */
+  debutSeasonLabel: string | null;
+  finalSeasonLabel: string | null;
   games: number;
   goals: number;
   disposals: number;
@@ -336,7 +337,12 @@ export async function listAflwPlayers(options: {
      LIMIT ${limit} OFFSET ${offset}
   `;
 
-  if (rows.length > 0) return { rows, total: Number(rows[0].total) };
+  if (rows.length > 0) {
+    return {
+      rows: rows.map(({ total: _total, ...rest }) => rest),
+      total: Number(rows[0].total),
+    };
+  }
 
   // A window count cannot survive an empty page, and the caller needs the
   // real total to redirect to a page that exists.
@@ -502,7 +508,12 @@ export async function getAflwPlayerMatches(
      ORDER BY pms.match_date DESC, pms.match_key DESC
      LIMIT ${limit} OFFSET ${offset}
   `;
-  if (rows.length > 0) return { rows, total: Number(rows[0].total) };
+  if (rows.length > 0) {
+    return {
+      rows: rows.map(({ total: _total, ...rest }) => rest),
+      total: Number(rows[0].total),
+    };
+  }
 
   const [counted] = await sql<{ total: string }[]>`
     SELECT count(*) AS total
@@ -789,7 +800,12 @@ export async function runAflwMatchSearch(options: {
      ORDER BY ${sql.unsafe(AFLW_MATCH_SORTS[sort].sql)}
      LIMIT ${limit} OFFSET ${offset}
   `;
-  if (rows.length > 0) return { rows, total: Number(rows[0].total) };
+  if (rows.length > 0) {
+    return {
+      rows: rows.map(({ total: _total, ...rest }) => rest),
+      total: Number(rows[0].total),
+    };
+  }
 
   const [counted] = await sql<{ total: string }[]>`
     SELECT count(*) AS total FROM aflw.matches m WHERE ${where}

@@ -4,6 +4,7 @@ import { cache } from 'react';
 
 import { sql } from '@/db/client';
 import { allOf, containsPattern, rangeConditions } from '@/db/queries/filters';
+import { parseStatLine } from '@/lib/jsonb';
 import type { FilterValues } from '@/search/table-filters';
 
 /**
@@ -192,6 +193,15 @@ export type NominationRow = {
   statLine: Record<string, number> | null;
 };
 
+/**
+ * As the driver hands the row back, before `stat_line` is decoded.
+ *
+ * jsonb arrives as raw TEXT on this project's client, so the column is read
+ * as `unknown` and passed through `parseStatLine` (src/lib/jsonb.ts) rather
+ * than being annotated as the object it is not yet.
+ */
+type RawNominationRow = Omit<NominationRow, 'statLine'> & { statLine: unknown };
+
 const NOMINATION_COLUMNS = sql`
   n.id, n.season, n.round_number AS "roundNumber",
   n.player_id AS "playerId", p.slug AS "playerSlug",
@@ -208,7 +218,7 @@ export async function getNominationsBySeason(
   awardId: number,
   season: number,
 ): Promise<NominationRow[]> {
-  return sql<NominationRow[]>`
+  const rows = await sql<RawNominationRow[]>`
     SELECT ${NOMINATION_COLUMNS}
       FROM award_nominations n
       LEFT JOIN players p ON p.id = n.player_id
@@ -217,11 +227,12 @@ export async function getNominationsBySeason(
      WHERE n.award_id = ${awardId} AND n.season = ${season}
      ORDER BY n.round_number NULLS LAST, "playerName"
   `;
+  return rows.map((row) => ({ ...row, statLine: parseStatLine(row.statLine) }));
 }
 
 /** Season winners, for the award's landing page. */
 export async function getNominationWinners(awardId: number): Promise<NominationRow[]> {
-  return sql<NominationRow[]>`
+  const rows = await sql<RawNominationRow[]>`
     SELECT ${NOMINATION_COLUMNS}
       FROM award_nominations n
       LEFT JOIN players p ON p.id = n.player_id
@@ -230,6 +241,7 @@ export async function getNominationWinners(awardId: number): Promise<NominationR
      WHERE n.award_id = ${awardId} AND n.is_winner
      ORDER BY n.season DESC
   `;
+  return rows.map((row) => ({ ...row, statLine: parseStatLine(row.statLine) }));
 }
 
 export async function getNominationSeasons(awardId: number) {

@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { sql } from '@/db/client';
+import { escapeLike } from '@/lib/like';
 import {
   OPERATORS_BY_KIND, QB_LIMITS, QUERYABLE_TABLES,
   type CardGroup, type CardSpec, type ConditionSpec, type QueryBuilderState,
@@ -37,11 +38,6 @@ function coerceNumber(value: string | number, integer: boolean): number {
   if (!Number.isFinite(n)) throw new Error('That value must be a number.');
   if (integer && !Number.isInteger(n)) throw new Error('That value must be a whole number.');
   return n;
-}
-
-/** Escape LIKE wildcards so a search for "100%" cannot become "starts with 100". */
-function escapeLike(text: string): string {
-  return text.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
 
 function parseIsoDate(value: string | number): string {
@@ -132,7 +128,18 @@ function compileCard(tableKey: string, card: CardSpec): SqlFragment | null {
   return sql`(${acc})`;
 }
 
-/** Every card, each joined to the accumulated result by its own AND/OR. */
+/**
+ * Every card, each joined to the accumulated result by its own AND/OR.
+ *
+ * The accumulator is parenthesised at every step, because the spec says a
+ * card joins the ACCUMULATED result of those before it -- a left fold,
+ * ((A op B) op C). Without the parentheses SQL's own precedence applies
+ * instead, and cards "A, OR B, AND C" compile to `A OR B AND C`, which
+ * PostgreSQL reads as `A OR (B AND C)`: a different question, silently
+ * answered with different rows. The card itself needs no wrapping --
+ * compileCard already parenthesises anything with more than one condition,
+ * and a single condition is atomic.
+ */
 function compileCards(tableKey: string, cardGroups: CardGroup[]): SqlFragment {
   let acc: SqlFragment | null = null;
   for (const group of cardGroups) {
@@ -141,7 +148,9 @@ function compileCards(tableKey: string, cardGroups: CardGroup[]): SqlFragment {
     }
     const compiled = compileCard(tableKey, group.card);
     if (!compiled) continue; // an empty/half-built card filters nothing
-    acc = acc === null ? compiled : (group.join === 'OR' ? sql`${acc} OR ${compiled}` : sql`${acc} AND ${compiled}`);
+    acc = acc === null
+      ? compiled
+      : (group.join === 'OR' ? sql`(${acc}) OR ${compiled}` : sql`(${acc}) AND ${compiled}`);
   }
   return acc ?? sql`TRUE`;
 }

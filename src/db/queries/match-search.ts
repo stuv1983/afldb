@@ -31,7 +31,17 @@ export type MatchSearchResultRow = {
   venueName: string;
 };
 
-type RawMatchSearchRow = MatchSearchResultRow & { total: number };
+/**
+ * One row as the `totals LEFT JOIN page` shape below actually returns it.
+ *
+ * Every match column is nullable here because a page beyond the last result
+ * produces exactly one row carrying the total and nothing else. The filter
+ * further down relies on that; typing the columns non-null made the very
+ * check that keeps the empty row out of the results look impossible.
+ */
+type RawMatchSearchRow =
+  { [K in keyof MatchSearchResultRow]: MatchSearchResultRow[K] | null }
+  & { total: number };
 
 /**
  * Execute a validated Match Search specification.
@@ -122,7 +132,7 @@ export async function runMatchSearch(
 
   const total = rawRows[0]?.total ?? 0;
   const rows = rawRows
-    .filter((row) => row.id !== null)
+    .filter((row): row is MatchSearchResultRow & { total: number } => row.id !== null)
     .map(({ total: _total, ...row }) => row);
 
   return { rows, total };
