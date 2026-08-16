@@ -97,7 +97,14 @@ Worker count is **not** one per core: each worker holds its own PostgreSQL pool,
 
 Every worker holds **two** pools, not one, so the service's peak is `AFLDB_WORKERS × (AFLDB_POOL_MAX + 3)` — the `+3` being the separate auth pool in [`src/db/authClient.ts`](../src/db/authClient.ts). Miss the auth pool and the arithmetic understates the real figure by a third.
 
-**Production droplet** (2 vCPU / 4 GB, PostgreSQL co-located): `AFLDB_WORKERS=2`, `AFLDB_POOL_MAX=10`.
+Both values live in each host's **`.env`**, never in `deploy/afldb.service`. systemd applies `Environment=` after `EnvironmentFile=`, so a value in the unit would override `.env` on every machine the unit is installed on — and the two hosts are not comparable:
+
+| Host | Spec | `AFLDB_WORKERS` | Peak connections |
+|---|---|---:|---:|
+| Development (streamanator) | 24 cores, 31 GB | 4 | 52 |
+| Production droplet | 2 vCPU, 4 GB, PostgreSQL co-located | 2 | 26 |
+
+Both against `max_connections` of 100.
 
 | Consumer | Connections |
 |---|---:|

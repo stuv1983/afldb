@@ -35,22 +35,27 @@ UnsetEnvironment=AFLDB_IMPORT_DATABASE_URL AFLDB_OWNER_DATABASE_URL AFLDB_TEST_D
 
 Environment=NODE_ENV=production
 Environment=HOSTNAME=127.0.0.1
-# Worker count and pool size are one decision, not two: every worker holds
-# its own app pool AND its own auth pool, so this service can hold
-# workers x (AFLDB_POOL_MAX + 3) connections.
+# AFLDB_WORKERS and AFLDB_POOL_MAX are deliberately NOT set here. They are
+# the one part of this unit that cannot be the same on every host, and
+# systemd applies Environment= after EnvironmentFile=, so a value here
+# would silently override .env on every machine this unit is installed on.
 #
-# Sized for the production droplet: 2 vCPU, 4 GB, PostgreSQL co-located on
-# the same box (max_connections 100). One worker per vCPU, and the pool
-# back at its default:
+# The two hosts are not comparable: development is 24 cores and 31 GB with
+# PostgreSQL alongside a great deal of headroom, production is a 2 vCPU /
+# 4 GB droplet with PostgreSQL co-located. One worker count cannot be
+# right for both — 4 workers on the droplet oversubscribes 2 vCPUs and
+# competes with PostgreSQL for 4 GB, while 2 workers on the development
+# host leaves 22 cores idle and costs ~78% of measured throughput.
 #
-#   2 workers x (10 + 3) = 26 connections against a limit of 100
+# Each host therefore sets both in its own .env:
 #
-# The 24-core development host runs 4 workers; this is not that box. Raise
-# AFLDB_WORKERS only after journalctl shows CPU saturation arriving before
-# memory pressure — on 4 GB shared with PostgreSQL, memory is the more
-# likely ceiling, and each extra worker costs both.
-Environment=AFLDB_WORKERS=2
-Environment=AFLDB_POOL_MAX=10
+#   development   AFLDB_WORKERS=4  AFLDB_POOL_MAX=10
+#   production    AFLDB_WORKERS=2  AFLDB_POOL_MAX=10
+#
+# Neither appears in UnsetEnvironment= below, so both reach the service.
+# The budget to respect is workers x (AFLDB_POOL_MAX + 3) — the +3 being
+# each worker's separate auth pool from src/db/authClient.ts, which is the
+# term that gets forgotten.
 
 KillMode=mixed
 Restart=always
