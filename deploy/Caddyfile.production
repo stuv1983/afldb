@@ -1,0 +1,121 @@
+# AFLDB reverse proxy — PRODUCTION DROPLET (afldb-prod, SYD1)
+#
+#   sudo cp deploy/Caddyfile.production /etc/caddy/Caddyfile
+#   sudo caddy validate --config /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+#
+# Caddy obtains and renews certificates automatically once the hostname
+# resolves to this droplet. Nothing here requests one explicitly.
+#
+# BETA FIRST, APEX LATER. beta.afldb.com is served now; the afldb.com and
+# www.afldb.com blocks at the bottom stay commented out until the beta is
+# proven. That ordering is deliberate — it is the staging-hostname step
+# docs/production-cutover.md §3 recommended, and it means a mistake here
+# cannot affect the real domain.
+#
+# THE header_up LINES ARE NOT OPTIONAL. Without them a client can send
+# its own X-Forwarded-For and forge the IP recorded in auth_sessions and
+# auth_audit_log. deploy/Caddyfile (development) carries the same three
+# lines and says the production proxy must match. src/lib/auth/session.ts
+# reads the RIGHTMOST entry, which is only trustworthy because Caddy
+# overwrites rather than appends.
+
+beta.afldb.com {
+	reverse_proxy 127.0.0.1:3100 {
+		health_uri /api/health
+		health_interval 30s
+		health_timeout 5s
+
+		# Overwrite, never append: the app must see only Caddy's own value.
+		header_up X-Forwarded-For {remote_host}
+
+		# Drop the other address headers entirely, so no future reader of
+		# them can end up trusting client input.
+		header_up -X-Real-IP
+		header_up -Forwarded
+	}
+
+	encode gzip zstd
+
+	header {
+		# The beta host runs AFLDB_ENV=production, because three security
+		# behaviours key off it: Secure session cookies
+		# (src/lib/auth/session.ts), the CSP that drops 'unsafe-eval', and
+		# HSTS. That same flag also enables indexing, which is wrong here —
+		# a beta must never enter search results, and duplicate content on
+		# a subdomain would compete with the eventual apex. Overriding at
+		# the proxy separates the two: production posture, no indexing.
+		#
+		# REMOVE THIS when this file is switched to serve the apex.
+		X-Robots-Tag "noindex, nofollow"
+
+		# Next.js sets these too; the proxy enforces them for responses it
+		# serves itself, such as errors and health-check failures.
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+
+		# Never advertise the stack.
+		-Server
+		-X-Powered-By
+	}
+
+	# Health checks must not be cached anywhere.
+	@health path /api/health
+	header @health Cache-Control "no-store"
+
+	log {
+		output file /var/log/caddy/afldb-access.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+		format json
+		# Query strings stay out of the logs: Advanced Search URLs are user input.
+		level INFO
+	}
+}
+
+# --- Apex, for the real launch -----------------------------------------
+# Uncomment both blocks together, and drop the X-Robots-Tag above.
+#
+# The apex and www MUST be separate blocks. Naming both on one block and
+# redirecting to the apex makes the apex redirect to itself — an infinite
+# loop that takes the site down the moment DNS resolves. `caddy validate`
+# does not catch it; only the separation does.
+#
+# www.afldb.com {
+# 	redir https://afldb.com{uri} permanent
+# }
+#
+# afldb.com {
+# 	reverse_proxy 127.0.0.1:3100 {
+# 		health_uri /api/health
+# 		health_interval 30s
+# 		health_timeout 5s
+# 		header_up X-Forwarded-For {remote_host}
+# 		header_up -X-Real-IP
+# 		header_up -Forwarded
+# 	}
+#
+# 	encode gzip zstd
+#
+# 	header {
+# 		X-Content-Type-Options nosniff
+# 		X-Frame-Options DENY
+# 		Referrer-Policy strict-origin-when-cross-origin
+# 		-Server
+# 		-X-Powered-By
+# 	}
+#
+# 	@health path /api/health
+# 	header @health Cache-Control "no-store"
+#
+# 	log {
+# 		output file /var/log/caddy/afldb-access.log {
+# 			roll_size 20MiB
+# 			roll_keep 5
+# 		}
+# 		format json
+# 		level INFO
+# 	}
+# }
