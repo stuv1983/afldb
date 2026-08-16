@@ -419,6 +419,26 @@ address against `auth_users` itself and refuses anything that is not a
 known, enabled account. Nothing the poller or the email claims is
 trusted beyond that.
 
+The secret travels over loopback. The poller POSTs to
+`http://127.0.0.1:$PORT` — the app is on the same host by construction
+(the unit is ordered `After=afldb.service`), so the request never
+reaches the network or the proxy. `AFLDB_INTAKE_URL` overrides it for a
+genuinely separate host; it is deliberately not `AFLDB_BASE_URL`, which
+is the site's *public* address and would send the secret out and back.
+
+**A `From` address is a claim, not a credential.** Re-resolving it
+against `auth_users` establishes that the address belongs to someone
+allowed to submit — not that they are the one who sent it, which
+anyone can write. So before forwarding anything, the poller requires
+that the *receiving* mail server verified the sender: the topmost
+`Authentication-Results` header must record `dmarc=pass`, or
+`spf=pass` with `dkim=pass`. Only the topmost is read, because each hop
+prepends its own and a spoofer's is the one underneath. Where the mail
+server does not strip inbound copies, set `AFLDB_INTAKE_AUTHSERV_ID` to
+its authserv-id so the header must also carry that name.
+`AFLDB_INTAKE_REQUIRE_AUTH=false` turns the check off, and should only
+be set where something upstream already guarantees it.
+
 Contributors count as senders here, the same as they do at
 `/admin/upload`: this is that form's email counterpart, submitting data
 is the whole reason the role exists, and an emailed file reaches exactly
@@ -435,10 +455,26 @@ approves/promotes at `/admin/submissions/<id>`. "Processed by a
 script" means *validated*, not auto-applied — nothing about this
 channel is allowed to bypass the human-approval step the web path has.
 
-The script never deletes mail. A processed message — success or
-failure — is copied to a `Processed` or `Errors` IMAP folder (created
-automatically) and marked `\Seen` so it is not picked up again; the
-original always stays in the mailbox as a record.
+The script never deletes mail. A message it has **finished with** — 
+staged, or rejected for a reason that will not change (unrecognised
+subject, unverified sender, no CSV attached, a file the route refused
+with a 4xx) — is copied to a `Processed` or `Errors` IMAP folder
+(created automatically) and marked `\Seen` so it is not picked up
+again; the original always stays in the mailbox as a record.
+
+A message whose outcome is **unknown** is treated differently: left
+unread, on purpose. If the app was restarting, the request timed out,
+or the reply was unreadable, the file may or may not have been staged,
+and the only safe answer is to ask again on the next poll. That is safe
+to do because `stageSubmission` deduplicates on the file's SHA-256 —
+the same bytes resolve to the submission they already made rather than
+a second copy of it (`duplicate: true` in the reply). The same
+protection covers a double-click on `/admin/upload`.
+
+Exit codes: `0` all clear, `1` something was rejected and needs a
+human, `75` (`EX_TEMPFAIL`) nothing was rejected but something is being
+retried. A single 75 during a deploy is expected; a run of them means
+the app is not answering.
 
 ### One-time server setup
 
@@ -452,7 +488,14 @@ sudo systemctl enable --now afldb-email-intake.timer
 Polls every 5 minutes (`OnUnitActiveSec=5min` in the timer unit).
 `journalctl -u afldb-email-intake` shows each run. Dry-run without
 touching the mailbox or the app: `python3 tools/email_intake/
-fetch_and_stage.py --dry-run`.
+fetch_and_stage.py --dry-run` — it reads with `BODY.PEEK[]`, so
+listing what is waiting does not mark anything read, and it needs no
+secret because it contacts nothing.
+
+The poller's own checks — which senders count as verified, which
+attachments count as CSVs, which failures are worth retrying — run
+without pytest or a mailbox: `python3 tools/email_intake/
+test_fetch_and_stage.py`.
 
 ## 6. Bulk award history (Phase 3b)
 

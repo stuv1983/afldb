@@ -21,7 +21,7 @@ import { CsvError, parseCsv, toObjects } from '@/lib/ingest/csv';
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 export type StageResult =
-  | { ok: true; submissionId: number; rowCount: number }
+  | { ok: true; submissionId: number; rowCount: number; duplicate: boolean }
   | { ok: false; error: string };
 
 export async function stageSubmission(
@@ -57,29 +57,73 @@ export async function stageSubmission(
 
   const sha = createHash('sha256').update(content).digest('hex');
 
-  const [submission] = await authSql<{ id: number }[]>`
-    INSERT INTO data_submissions (dataset, filename, content, content_sha256, uploaded_by, row_count)
-    VALUES (${dataset}, ${filename.slice(0, 200)}, ${content}, ${sha}, ${uploadedBy}, ${objects.length})
-    RETURNING id
+  // Idempotency, keyed on the bytes themselves.
+  //
+  // The email poller re-sends any message whose POST it could not
+  // confirm -- a connection dropped after staging, a client timeout
+  // while validation was still running -- so the same file arrives
+  // twice on a path where nobody chose to send it twice. Resolving it
+  // back to the submission it already made keeps the retry harmless
+  // and leaves the reviewer one submission to read instead of two
+  // identical ones to reconcile.
+  //
+  // Scoped to the states a retry can actually be racing: 'staged' and
+  // 'validated' are "nobody has ruled on this yet". Once a human has
+  // approved or rejected it -- or it has been promoted or failed --
+  // they have acted on that file, and sending it again is a deliberate
+  // act that deserves its own submission and its own fresh verdicts
+  // rather than quietly reopening a decision already made.
+  const [existing] = await authSql<{ id: number; rowCount: number | null }[]>`
+    SELECT id, row_count AS "rowCount"
+      FROM data_submissions
+     WHERE dataset = ${dataset}
+       AND content_sha256 = ${sha}
+       AND status IN ('staged', 'validated')
+     ORDER BY id DESC
+     LIMIT 1
   `;
-
-  // Bulk insert rows in chunks; jsonb payload per row. `sql(array)`
-  // negotiates each column's real type from the table (including
-  // `payload`'s jsonb) and serialises accordingly -- pre-stringifying
-  // here double-encodes it: the column ends up holding a JSON STRING
-  // containing the row's JSON text, not the row object itself, so
-  // every `row.payload.<field>` downstream reads back as undefined.
-  const chunkSize = 500;
-  for (let start = 0; start < objects.length; start += chunkSize) {
-    const chunk = objects.slice(start, start + chunkSize).map((payload, offset) => ({
-      submission_id: submission.id,
-      row_no: start + offset + 1,
-      payload,
-    }));
-    await authSql`INSERT INTO data_submission_rows ${authSql(chunk)}`;
+  if (existing) {
+    return {
+      ok: true,
+      submissionId: existing.id,
+      rowCount: existing.rowCount ?? objects.length,
+      duplicate: true,
+    };
   }
 
-  return { ok: true, submissionId: submission.id, rowCount: objects.length };
+  // One transaction for the header row and every chunk of rows. A
+  // failure part-way through would otherwise leave a 'staged'
+  // submission whose row_count promises more rows than
+  // data_submission_rows actually holds -- and both validation and
+  // promotion read those rows, so they would silently work on the
+  // partial file as though it were the whole thing.
+  const submissionId = await authSql.begin(async (tx) => {
+    const [submission] = await tx<{ id: number }[]>`
+      INSERT INTO data_submissions (dataset, filename, content, content_sha256, uploaded_by, row_count)
+      VALUES (${dataset}, ${filename.slice(0, 200)}, ${content}, ${sha}, ${uploadedBy}, ${objects.length})
+      RETURNING id
+    `;
+
+    // Bulk insert rows in chunks; jsonb payload per row. `sql(array)`
+    // negotiates each column's real type from the table (including
+    // `payload`'s jsonb) and serialises accordingly -- pre-stringifying
+    // here double-encodes it: the column ends up holding a JSON STRING
+    // containing the row's JSON text, not the row object itself, so
+    // every `row.payload.<field>` downstream reads back as undefined.
+    const chunkSize = 500;
+    for (let start = 0; start < objects.length; start += chunkSize) {
+      const chunk = objects.slice(start, start + chunkSize).map((payload, offset) => ({
+        submission_id: submission.id,
+        row_no: start + offset + 1,
+        payload,
+      }));
+      await tx`INSERT INTO data_submission_rows ${tx(chunk)}`;
+    }
+
+    return submission.id;
+  });
+
+  return { ok: true, submissionId: Number(submissionId), rowCount: objects.length, duplicate: false };
 }
 
 export type ValidationSummary = {

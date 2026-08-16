@@ -11,11 +11,34 @@ export const dynamic = 'force-dynamic';
  * reachable. No version numbers, hostnames, connection strings or stack
  * traces: this endpoint may be reachable from the proxy.
  */
+
+/**
+ * A health check must answer, not wait.
+ *
+ * The client's statement_timeout bounds a query the database is
+ * actually running, but not the wait for a connection to run it on:
+ * when the pool is exhausted -- the exact situation a health check
+ * exists to reveal -- `sql` queues indefinitely and the probe hangs
+ * instead of failing. A process manager reads a hang as "still
+ * checking" and leaves a wedged worker in the rotation, which is the
+ * worst of both answers.
+ */
+const PROBE_TIMEOUT_MS = 2000;
+
 export async function GET() {
   const startedAt = Date.now();
+  let timer: ReturnType<typeof setTimeout> | undefined;
 
   try {
-    await sql`SELECT 1`;
+    await Promise.race([
+      sql`SELECT 1`,
+      new Promise((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`health probe exceeded ${PROBE_TIMEOUT_MS}ms`)),
+          PROBE_TIMEOUT_MS,
+        );
+      }),
+    ]);
     return NextResponse.json(
       { status: 'ok', database: 'ok', latencyMs: Date.now() - startedAt },
       { headers: { 'Cache-Control': 'no-store' } },
@@ -26,5 +49,7 @@ export async function GET() {
       { status: 'error', database: 'unreachable' },
       { status: 503, headers: { 'Cache-Control': 'no-store' } },
     );
+  } finally {
+    clearTimeout(timer);
   }
 }

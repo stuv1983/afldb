@@ -100,6 +100,59 @@ describe('POST /api/admin/email-intake', () => {
     // rather than reaching for owner-level credentials just to tidy up.
   });
 
+  it('resolves an identical resend to the submission it already made', async () => {
+    const secret = process.env.AFLDB_EMAIL_INTAKE_SECRET;
+    if (!secret) return;
+    const [admin] = await authSql<{ email: string }[]>`
+      SELECT email FROM auth_users WHERE role = 'super_admin' AND disabled_at IS NULL LIMIT 1
+    `;
+    if (!admin) return;
+
+    // The poller re-sends anything whose outcome it could not confirm,
+    // so the same bytes arriving twice is a designed-for event, not a
+    // mistake: it must resolve to one submission, not two identical
+    // ones for a reviewer to reconcile. Unique content per run, so a
+    // previous run's rows cannot make this pass for the wrong reason.
+    const csv = `player,year,club,position,captain\nResend Case ${Date.now()},2024,Carlton,Half Back,\n`;
+    const contentBase64 = Buffer.from(csv, 'utf8').toString('base64');
+    const body = { senderEmail: admin.email, dataset: 'all_australian', filename: 'resend.csv', contentBase64 };
+
+    const first = await POST(request(body, { 'x-intake-secret': secret })).then((r) => r.json());
+    expect(first.ok).toBe(true);
+    expect(first.duplicate).toBe(false);
+
+    const second = await POST(request(body, { 'x-intake-secret': secret })).then((r) => r.json());
+    expect(second.ok).toBe(true);
+    expect(second.duplicate).toBe(true);
+    expect(second.submissionId).toBe(first.submissionId);
+
+    // Staged once, and the rows staged once with it: a re-run that
+    // re-inserted rows would double them under the same submission.
+    const [{ count }] = await authSql<{ count: string }[]>`
+      SELECT count(*) FROM data_submission_rows WHERE submission_id = ${first.submissionId}
+    `;
+    expect(Number(count)).toBe(1);
+  });
+
+  it('rejects base64 that Buffer.from would silently accept', async () => {
+    const secret = process.env.AFLDB_EMAIL_INTAKE_SECRET;
+    if (!secret) return;
+    const [admin] = await authSql<{ email: string }[]>`
+      SELECT email FROM auth_users WHERE role = 'super_admin' AND disabled_at IS NULL LIMIT 1
+    `;
+    if (!admin) return;
+
+    // Buffer.from skips characters it does not recognise rather than
+    // throwing, so a damaged transfer would otherwise decode to
+    // plausible garbage and surface as a confusing CSV parse error.
+    const res = await POST(request(
+      { senderEmail: admin.email, dataset: 'all_australian', contentBase64: 'not!valid!base64!' },
+      { 'x-intake-secret': secret },
+    ));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/base64/i);
+  });
+
   it('rejects an oversized payload', async () => {
     const secret = process.env.AFLDB_EMAIL_INTAKE_SECRET;
     if (!secret) return;

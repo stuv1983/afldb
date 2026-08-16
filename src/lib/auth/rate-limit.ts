@@ -52,6 +52,23 @@ export class RateLimiter {
   }
 
   /**
+   * True if `key` is already over the limit, WITHOUT recording a hit.
+   *
+   * For limiters that should count only failures. `check` conflates
+   * "ask" with "record", so a caller using it as the gate charges
+   * successful requests against the same budget as the attack it is
+   * trying to bound -- fine when every request is equally suspect
+   * (login, redeem), wrong when a legitimate authenticated caller can
+   * arrive in a burst. Those callers `peek` first and `check` only on
+   * the failure path.
+   */
+  peek(key: string): boolean {
+    const hit = this.hits.get(key);
+    if (!hit || hit.resetAt <= Date.now()) return false;
+    return hit.count > this.max;
+  }
+
+  /**
    * Drop expired entries at most once per window, so sweeping is O(1)
    * amortised rather than O(n) on every request.
    */

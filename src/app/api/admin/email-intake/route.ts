@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { authSql } from '@/db/authClient';
 import { RateLimiter } from '@/lib/auth/rate-limit';
 import { audit, lastForwardedIp } from '@/lib/auth/session';
+import type { StageResult, ValidationSummary } from '@/lib/ingest/pipeline';
 import { MAX_UPLOAD_BYTES, stageSubmission, validateSubmission } from '@/lib/ingest/pipeline';
 
 export const dynamic = 'force-dynamic';
@@ -29,7 +30,34 @@ export const dynamic = 'force-dynamic';
  * tables. "Processed by a script" means validated, not auto-applied.
  */
 
-const INTAKE_LIMIT = new RateLimiter(20, 15 * 60 * 1000);
+/**
+ * Two limiters, because two different things are being bounded.
+ *
+ * AUTH_FAILURES bounds guessing at the secret, and counts ONLY failed
+ * attempts -- a single limiter charging every request would let a
+ * legitimate batch of emailed CSVs exhaust the brute-force budget and
+ * lock the poller out of its own route.
+ *
+ * INTAKE_WORK bounds the staging itself, generously: a morning's worth
+ * of forwarded mail is normal, a thousand POSTs is a runaway loop. The
+ * poller treats 429 as retryable, so tripping this delays a message
+ * rather than losing it.
+ */
+const AUTH_FAILURES = new RateLimiter(10, 15 * 60 * 1000);
+const INTAKE_WORK = new RateLimiter(200, 15 * 60 * 1000);
+
+/**
+ * Base64 that Buffer.from would silently accept.
+ *
+ * `Buffer.from(s, 'base64')` never throws -- it skips characters it
+ * does not recognise -- so a truncated or corrupted attachment decodes
+ * to plausible-looking garbage and surfaces as a confusing CSV parse
+ * error rather than "the transfer was damaged".
+ */
+const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
+
+/** 4 base64 characters per 3 bytes, plus room for padding. */
+const MAX_BASE64_LENGTH = Math.ceil(MAX_UPLOAD_BYTES / 3) * 4 + 4;
 
 function timingSafeStringEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
@@ -57,14 +85,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Email intake is not configured on this server.' }, { status: 503 });
   }
 
-  const ip = lastForwardedIp(request.headers.get('x-forwarded-for'));
-  if (INTAKE_LIMIT.check(`ip:${ip ?? 'unknown'}`)) {
-    return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
+  const key = `ip:${lastForwardedIp(request.headers.get('x-forwarded-for')) ?? 'unknown'}`;
+  if (AUTH_FAILURES.peek(key)) {
+    return NextResponse.json({ error: 'Too many failed attempts.' }, { status: 429 });
   }
 
   const providedSecret = request.headers.get('x-intake-secret') ?? '';
   if (!timingSafeStringEqual(providedSecret, configuredSecret)) {
+    AUTH_FAILURES.check(key);
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+  }
+
+  if (INTAKE_WORK.check(key)) {
+    return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
   }
 
   let body: IntakeBody;
@@ -103,12 +136,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Sender is not a known, enabled account.' }, { status: 403 });
   }
 
-  let content: Buffer;
-  try {
-    content = Buffer.from(contentBase64, 'base64');
-  } catch {
+  // Size-check the encoding before decoding it: a 5 MB cap on the file
+  // means anything much past 6.7 MB of base64 is already over, and
+  // rejecting it here avoids allocating the buffer to find that out.
+  const encoded = contentBase64.replace(/\s+/g, '');
+  if (encoded.length > MAX_BASE64_LENGTH) {
+    return NextResponse.json({ error: 'The attachment exceeds the 5 MB limit.' }, { status: 400 });
+  }
+  if (encoded.length % 4 !== 0 || !BASE64_RE.test(encoded)) {
     return NextResponse.json({ error: 'contentBase64 is not valid base64.' }, { status: 400 });
   }
+
+  const content = Buffer.from(encoded, 'base64');
   if (content.length === 0) {
     return NextResponse.json({ error: 'Empty attachment.' }, { status: 400 });
   }
@@ -116,23 +155,62 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'The attachment exceeds the 5 MB limit.' }, { status: 400 });
   }
 
-  const staged = await stageSubmission(dataset, filename, content, admin.id);
+  // Staging and validation both talk to the database and both can
+  // throw -- a CSV that trips a parser bug, a validator query that
+  // times out, the pool exhausted. Unhandled, those become a bare 500
+  // with a stack trace in the body; the poller cannot tell them apart
+  // from "your file was bad" and files the message under Errors
+  // forever. A deliberate 500 with a stable shape says "try again",
+  // which is what the caller should actually do.
+  let staged: StageResult;
+  try {
+    staged = await stageSubmission(dataset, filename, content, admin.id);
+  } catch (error) {
+    console.error('[email-intake] staging failed', error);
+    await audit('email_intake.stage_error', { senderEmail, dataset, filename },
+      { userId: admin.id, label: admin.email }).catch(() => {});
+    return NextResponse.json({ error: 'Staging failed on the server.' }, { status: 500 });
+  }
+
   if (!staged.ok) {
     await audit('email_intake.stage_failed', { senderEmail, dataset, filename, error: staged.error },
       { userId: admin.id, label: admin.email });
     return NextResponse.json({ error: staged.error }, { status: 400 });
   }
-  await audit('email_intake.staged',
+  await audit(staged.duplicate ? 'email_intake.duplicate' : 'email_intake.staged',
     { dataset, filename, submissionId: staged.submissionId, rows: staged.rowCount },
     { userId: admin.id, label: admin.email });
 
-  const report = await validateSubmission(staged.submissionId);
-  await audit('email_intake.validated', { submissionId: staged.submissionId, report },
-    { userId: admin.id, label: admin.email });
+  // Re-validating a duplicate is deliberate: the retry that produced it
+  // may be exactly because validation did not finish the first time.
+  // A duplicate is only ever 'staged' or 'validated' (stageSubmission
+  // will not reopen a submission a human has ruled on), and
+  // validateSubmission rewrites the verdicts for both, so this is
+  // idempotent rather than a second, conflicting report.
+  let report: ValidationSummary;
+  try {
+    report = await validateSubmission(staged.submissionId);
+    await audit('email_intake.validated', { submissionId: staged.submissionId, report },
+      { userId: admin.id, label: admin.email });
+  } catch (error) {
+    console.error('[email-intake] validation failed', error);
+    await audit('email_intake.validate_error',
+      { submissionId: staged.submissionId, dataset, filename },
+      { userId: admin.id, label: admin.email }).catch(() => {});
+    // The file IS staged; only the verdicts are missing. Say so, so a
+    // retry is understood as resuming rather than resubmitting, and
+    // point at the submission a human can re-validate by hand.
+    return NextResponse.json({
+      error: 'The file was staged but validation failed; it can be re-validated from the review page.',
+      submissionId: staged.submissionId,
+      reviewUrl: `/admin/submissions/${staged.submissionId}`,
+    }, { status: 500 });
+  }
 
   return NextResponse.json({
     ok: true,
     submissionId: staged.submissionId,
+    duplicate: staged.duplicate,
     rowCount: staged.rowCount,
     report,
     reviewUrl: `/admin/submissions/${staged.submissionId}`,

@@ -27,7 +27,12 @@ export async function uploadSubmission(
     return { error: result.error };
   }
 
-  await audit('upload.staged',
+  // A duplicate lands on the submission the file already made rather
+  // than a second copy of it — double-submitting the same CSV is far
+  // more often a double-click or a re-upload after losing the tab than
+  // a real intent to stage it twice, and the review page is where the
+  // uploader wanted to end up either way.
+  await audit(result.duplicate ? 'upload.duplicate' : 'upload.staged',
     { dataset, filename: file.name, submissionId: result.submissionId, rows: result.rowCount },
     { userId: admin.id, label: admin.email });
   redirect(`/admin/submissions/${result.submissionId}`);

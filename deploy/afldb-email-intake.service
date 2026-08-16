@@ -16,11 +16,18 @@ WorkingDirectory=/home/arm/projects/afldb
 # the app's own database roles.
 ExecStart=/usr/bin/python3 tools/email_intake/fetch_and_stage.py
 
-# Needs AFLDB_EMAIL_INTAKE_SECRET, AFLDB_BASE_URL and AFLDB_INTAKE_IMAP_*
-# only -- not any database DSN. UnsetEnvironment below drops everything
-# else .env carries, the same "load the file, keep only what this
-# process uses" pattern as afldb.service.
+# Needs AFLDB_EMAIL_INTAKE_SECRET, AFLDB_INTAKE_* and PORT only -- not
+# any database DSN. UnsetEnvironment below drops everything else .env
+# carries, the same "load the file, keep only what this process uses"
+# pattern as afldb.service. The poller POSTs to 127.0.0.1:$PORT unless
+# AFLDB_INTAKE_URL says otherwise, so the shared secret stays on
+# loopback and never reaches the proxy.
 EnvironmentFile=/home/arm/projects/afldb/.env
+
+# Exit 75 is EX_TEMPFAIL: nothing was rejected, but a message could not
+# be delivered to the app this time (a restart, a timeout) and is still
+# unread for the next run to retry. It is reported as a failed run on
+# purpose -- one is noise during a deploy, a run of them is not.
 UnsetEnvironment=AFLDB_IMPORT_DATABASE_URL AFLDB_OWNER_DATABASE_URL AFLDB_AUTH_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL DATABASE_URL
 
 StandardOutput=journal
