@@ -355,6 +355,31 @@ img {
 }
 .request-form textarea { resize: vertical; min-height: 5rem; }
 
+/* "Select all that apply": a group of checkboxes rather than one control.
+   Two columns where there is room, because these lists run long — eighteen
+   clubs, a dozen skills — and a single column pushes the submit button off
+   the screen. */
+.request-form .checkboxes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.15rem 0.9rem;
+  margin-top: 0.15rem;
+}
+.request-form .checkbox {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.15rem 0;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+.request-form .checkbox input {
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--accent, currentColor);
+}
+
 /* The honeypot. Hidden from people and from screen readers, but a bot
    parsing the HTML fills it in and gives itself away. */
 .hp {

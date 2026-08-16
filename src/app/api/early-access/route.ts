@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 
-import { insertEarlyAccessRequest } from '@/db/queries/early-access';
+import {
+  insertEarlyAccessRequest,
+  type EarlyAccessAnswer,
+} from '@/db/queries/early-access';
 import { getSiteSettings } from '@/db/queries/site-settings';
 import { RateLimiter } from '@/lib/auth/rate-limit';
 import { audit, lastForwardedIp } from '@/lib/auth/session';
@@ -74,8 +77,30 @@ type SubmitBody = {
 function answerFor(
   question: EarlyAccessQuestion,
   submitted: Record<string, unknown>,
-): { ok: true; value: string | null } | { ok: false } {
+): { ok: true; value: EarlyAccessAnswer | null } | { ok: false } {
   const raw = submitted[question.id];
+
+  // "Select all that apply" submits an array, and every member has to be one
+  // of the question's own options — the same rule a single choice follows,
+  // applied per tick. Deduplicated and capped at the number of options, so a
+  // hand-posted payload cannot repeat one option ten thousand times.
+  if (question.type === 'multi') {
+    if (!Array.isArray(raw)) {
+      return question.required ? { ok: false } : { ok: true, value: null };
+    }
+    const allowed = question.options ?? [];
+    const chosen = [...new Set(
+      raw
+        .filter((member): member is string => typeof member === 'string')
+        .map((member) => member.trim())
+        .filter(Boolean),
+    )].slice(0, allowed.length);
+
+    if (chosen.some((member) => !allowed.includes(member))) return { ok: false };
+    if (chosen.length === 0) return question.required ? { ok: false } : { ok: true, value: null };
+    return { ok: true, value: chosen };
+  }
+
   const value = typeof raw === 'string'
     ? raw.trim().slice(0, EARLY_ACCESS_LIMITS.answerChars)
     : '';
@@ -139,7 +164,7 @@ export async function POST(request: Request) {
   // Only the configured questions are read, so extra keys are dropped rather
   // than stored — the stored object can never contain a field no admin asked
   // for.
-  const answers: Record<string, string> = {};
+  const answers: Record<string, EarlyAccessAnswer> = {};
   for (const question of settings.earlyAccessQuestions) {
     const result = answerFor(question, submitted);
     if (!result.ok) {
@@ -163,7 +188,8 @@ export async function POST(request: Request) {
       '',
       ...settings.earlyAccessQuestions.map((question) => {
         const value = answers[question.id];
-        return `${question.label}\n  ${value ?? '(not answered)'}`;
+        const shown = Array.isArray(value) ? value.join(', ') : value;
+        return `${question.label}\n  ${shown ?? '(not answered)'}`;
       }),
       '',
       'Review: /admin/access',

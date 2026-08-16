@@ -1,7 +1,14 @@
 # AFLDB — The apex coming-soon page
 
-> **STATUS: BUILT, NOT DEPLOYED.** `afldb.com` still resolves to a parked ad
-> page on another host. Nothing in this document has been run.
+> **STATUS: LIVE.** `afldb.com`, `www.afldb.com` and `beta.afldb.com` all
+> resolve to the droplet, each with its own Let's Encrypt certificate, and the
+> apex serves this page over HTTPS. Verified 16 Aug 2026: `http://` 308s to
+> `https://` on both apex and www, `www` 301s to the apex, and the page reports
+> no mixed content. HSTS on the apex is still deliberately absent — see §7 of
+> `deploy/Caddyfile.production` for the ramp.
+>
+> The page's text and images are edited at **`/admin/content`**, not in this
+> repository. See §8.
 
 `afldb.com` gets a real page — what AFLDB is, what it does, screenshots, and a
 "Request early access" button — while `beta.afldb.com` keeps serving the gated
@@ -38,7 +45,7 @@ beta.afldb.com/*              → 127.0.0.1:3100             (gated, noindex)
 
 | Path | What it is |
 |---|---|
-| `deploy/coming-soon/index.html` | The page. Metadata, JSON-LD, copy. |
+| `deploy/coming-soon/index.html` | The page **as originally hand-written**. Now a reference copy: the published page is rendered from the database (§8). |
 | `deploy/coming-soon/style.css` | The almanac palette, copied from `src/styles/globals.css`. |
 | `deploy/coming-soon/app.js` | Fetches the form definition and posts it back. No dependencies. |
 | `deploy/coming-soon/robots.txt` | Allows indexing. **Different from the app's.** |
@@ -131,8 +138,18 @@ cleanly for a day or two — ramped, per the comment in the Caddyfile.
 - **Accept requests** — the master switch. Off, the button does not appear and
   the endpoint refuses submissions.
 - **Intro text** — shown above the form.
-- **Questions** — add, reorder, remove. Each is short text, long text or a
-  choice, and can be required.
+- **Questions** — add, reorder, remove. Each is short text, long text, a single
+  choice or **select all that apply**, and can be required.
+- **Suggested questions** — a catalogue of ready-made questions (about the
+  visitor and their footy, why they want AFLDB, how much beta testing they will
+  do, and what skills they could contribute) grouped and ticked on or off
+  individually or a section at a time. Their ids are fixed, so unticking one
+  stops it being asked without deleting a single answer already given to it,
+  and ticking it back on reunites the question with its history. Once added,
+  a suggested question is an ordinary question: reword, reorder or delete it.
+
+A "select all that apply" answer is stored as a **list**, not a joined string,
+so each tick stays a separate fact; `/admin/access` shows them on one line.
 - **Notification** — whether each request is emailed, and to where
   (`requests@afldb.com` by default).
 
@@ -200,13 +217,84 @@ When the application takes over the apex:
 The hostname, the certificate and the accumulated search history all carry
 over untouched. That is the point of putting a real page here now.
 
-## 8. Keeping the page current
+## 8. Editing the page — `/admin/content`
 
-The hero statistics (13,361 players, 17,027 matches, 130 seasons, 694,209
-player games) and the screenshots are a **snapshot**. They only move when a
-season is loaded. Refresh both together, then re-copy to `/var/www/afldb-soon`.
+The page's words and pictures are **content, not code**. A super admin edits
+them at `/admin/content` and presses Save; nothing here needs a deploy.
 
-Screenshots were captured at 1440×900, device scale 2, dark theme except the
-one light pairing, cropped to 16:10 and re-encoded as WebP at quality 82. The
-capture drives a real browser through the beta gate with an access code cut at
-`/admin/access`.
+### The application publishes the page, it does not serve it
+
+This is the whole design, and it is what keeps §1 true. Saving writes the two
+documents to PostgreSQL and then **renders the page to disk** at
+`AFLDB_APEX_DIR`. From that moment Caddy serves plain files with the
+application entirely out of the path — so the apex still cannot 502 because
+the app restarted, cannot time out on a slow query, and does not care whether
+PostgreSQL is up. The strict CSP survives too, because nothing published is
+inline.
+
+```text
+/admin/content  ──save──▶  PostgreSQL          (the source of truth)
+                              │
+                              ├─ renders ─▶ /var/www/afldb-soon/index.html
+                              └─ writes  ─▶ /var/www/afldb-soon/img/u/*
+                                                    │
+                              visitor ──▶ Caddy ────┘   (app not involved)
+```
+
+`/var/www/afldb-soon` is therefore **derived and disposable**. Everything in
+it comes either from `deploy/coming-soon/` in git or from the database, so
+deleting the directory and pressing **Republish** is a complete recovery.
+
+### What is editable
+
+Every text field, the images, and the two repeating card lists — the "What it
+does" features and the "Built like a record book" notes can be added to,
+removed and reordered. Images are uploaded from any slot, stored in
+`site_media` (migration 037) and written to `img/u/` on publish. An upload is
+identified by its **magic bytes**, not its name or declared type: PNG, JPEG
+and WebP only, 2 MB each.
+
+The canonical URL, `og:url` and the origin of `og:image` are **not** editable.
+They are deployment facts, and a typo in one is invisible on the page and
+expensive in the index.
+
+### The hero statistics are now live
+
+The four figures are read from the database **at publish time**, using the
+same query the application's own home page uses, so the two can never
+disagree. This retires the standing chore this section used to describe. Any
+figure can still be overridden with fixed text; clearing the box hands it back
+to the database.
+
+### Republish
+
+Save publishes automatically. **Republish** rebuilds the directory from what
+is already stored, without saving anything, and is the answer to all three of:
+
+- the server was rebuilt, or `/var/www/afldb-soon` was deleted
+- a deploy changed `style.css`, `app.js` or a shipped screenshot — those come
+  from git, so they only reach the apex on a publish
+- a publish failed and the cause has been fixed
+
+### Configuration
+
+`AFLDB_APEX_DIR` must be set **only on the host that serves the apex**. Unset
+means "save to the database, publish nothing", which is the correct state in
+development, and the admin screen says so rather than failing. The production
+droplet additionally needs the `ReadWritePaths=/var/www/afldb-soon` line in
+`deploy/afldb.service` — the service is `ProtectSystem=strict`, so without it
+every publish fails with `EACCES` — and the directory must be owned by the
+service user:
+
+```bash
+sudo chown -R arm:caddy /var/www/afldb-soon
+sudo chmod 750 /var/www/afldb-soon
+```
+
+### Screenshots
+
+The originals were captured at 1440×900, device scale 2, dark theme except the
+one light pairing, cropped to 16:10 and re-encoded as WebP at quality 82,
+driving a real browser through the beta gate with an access code cut at
+`/admin/access`. Replacements are uploaded through `/admin/content` and need
+no particular size, but matching that recipe keeps the page looking of a piece.

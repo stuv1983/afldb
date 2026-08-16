@@ -19,6 +19,8 @@
  * Component form, so it stays free of server-only imports.
  */
 
+import { DEFAULT_SITE_FOOTER, parseSiteFooter, type SiteFooter } from '@/lib/site-content';
+
 export const SETTING_KEYS = {
   homeLayout: 'home.sections',
   homeRecord: 'home.record_of_the_week',
@@ -29,6 +31,15 @@ export const SETTING_KEYS = {
   earlyAccessQuestions: 'early_access.questions',
   earlyAccessNotify: 'early_access.notify',
   earlyAccessNotifyTo: 'early_access.notify_to',
+  /** The colophon under every page, and under the apex. See site-content.ts. */
+  siteFooter: 'site.footer',
+  /**
+   * The apex coming-soon page's whole content document. Deliberately NOT part
+   * of the `SiteSettings` object below: it is kilobytes of prose read by the
+   * editor and the publisher only, so `getSiteSettings()` excludes this row
+   * from the query rather than dragging it through every public render.
+   */
+  apexContent: 'apex.content',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -276,7 +287,21 @@ export function parseGridAudience(value: unknown): GridAudience {
  * the old answers. `parseEarlyAccessQuestions` therefore keeps ids as given
  * rather than deriving them from the label.
  */
-export type EarlyAccessQuestionType = 'short' | 'long' | 'select';
+/**
+ * `multi` is the "select all that apply" type: several options, several
+ * answers, stored as an ARRAY rather than a string. Everything downstream —
+ * the public form, the submit validator, the review screen — has to know the
+ * difference, which is why the answer type is widened rather than joined into
+ * a comma-separated string somewhere convenient. A reader who ticks
+ * "Windows PC" and "iPhone" has given two facts, and the review screen should
+ * be able to say so.
+ */
+export type EarlyAccessQuestionType = 'short' | 'long' | 'select' | 'multi';
+
+/** The types whose answers must come from a fixed option list. */
+export function isChoiceType(type: EarlyAccessQuestionType): boolean {
+  return type === 'select' || type === 'multi';
+}
 
 export type EarlyAccessQuestion = {
   id: string;
@@ -294,8 +319,13 @@ export type EarlyAccessQuestion = {
  * submit path applies its own answer-length limit independently.
  */
 export const EARLY_ACCESS_LIMITS = {
-  maxQuestions: 12,
-  maxOptions: 20,
+  // Raised from 12 when the preset library landed: the suggested set alone is
+  // seventeen questions across four sections, and a super admin who opts into
+  // most of it must not hit a cap that silently drops the tail of their form.
+  maxQuestions: 24,
+  // 18 AFL clubs plus "Other" and "No team" is exactly 20, which is precisely
+  // the sort of list that should not sit on the limit.
+  maxOptions: 30,
   labelChars: 200,
   helpChars: 300,
   optionChars: 100,
@@ -304,7 +334,7 @@ export const EARLY_ACCESS_LIMITS = {
   introChars: 600,
 } as const;
 
-const QUESTION_TYPES: EarlyAccessQuestionType[] = ['short', 'long', 'select'];
+const QUESTION_TYPES: EarlyAccessQuestionType[] = ['short', 'long', 'select', 'multi'];
 
 export const DEFAULT_EARLY_ACCESS_QUESTIONS: EarlyAccessQuestion[] = [
   {
@@ -389,7 +419,7 @@ export function parseEarlyAccessQuestions(value: unknown): EarlyAccessQuestion[]
       : 'short';
 
     let options: string[] | undefined;
-    if (type === 'select') {
+    if (isChoiceType(type)) {
       options = Array.isArray(item.options)
         ? [...new Set(
           item.options
@@ -464,6 +494,13 @@ export type SiteSettings = {
   earlyAccessQuestions: EarlyAccessQuestion[];
   earlyAccessNotify: boolean;
   earlyAccessNotifyTo: string;
+  /**
+   * The footer every page renders. Unlike everything above it this is read on
+   * the critical path of EVERY page rather than just the home page, which is
+   * why the root layout falls back to the compiled-in default rather than
+   * failing a page over a colophon.
+   */
+  footer: SiteFooter;
 };
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
@@ -476,6 +513,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   earlyAccessQuestions: DEFAULT_EARLY_ACCESS_QUESTIONS,
   earlyAccessNotify: false,
   earlyAccessNotifyTo: DEFAULT_EARLY_ACCESS_NOTIFY_TO,
+  footer: DEFAULT_SITE_FOOTER,
 };
 
 /**
@@ -524,5 +562,8 @@ export function parseSiteSettings(
       : DEFAULT_EARLY_ACCESS_QUESTIONS,
     earlyAccessNotify: parseBooleanSetting(byKey.get(SETTING_KEYS.earlyAccessNotify)),
     earlyAccessNotifyTo: parseEarlyAccessNotifyTo(byKey.get(SETTING_KEYS.earlyAccessNotifyTo)),
+    footer: byKey.has(SETTING_KEYS.siteFooter)
+      ? parseSiteFooter(byKey.get(SETTING_KEYS.siteFooter))
+      : DEFAULT_SITE_FOOTER,
   };
 }

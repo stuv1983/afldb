@@ -31,6 +31,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             {admin?.role === 'super_admin' && (
               <>
                 <span aria-hidden="true">·</span>
+                <Link href="/admin/content">Page content</Link>
+                <span aria-hidden="true">·</span>
                 <Link href="/admin/settings">Settings</Link>
               </>
             )}

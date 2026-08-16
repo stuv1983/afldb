@@ -11,12 +11,19 @@ import type { EarlyAccessQuestion } from '@/lib/site-settings';
  * grants on at all.
  */
 
+/**
+ * An answer is a string, or an array of them for a "select all that apply"
+ * question. Both shapes are stored in the same jsonb object, keyed by question
+ * id — see migration 035.
+ */
+export type EarlyAccessAnswer = string | string[];
+
 export type EarlyAccessRequestRow = {
   id: number;
   email: string;
   name: string | null;
   message: string | null;
-  answers: Record<string, string> | null;
+  answers: Record<string, EarlyAccessAnswer> | null;
   status: 'pending' | 'approved' | 'denied';
   requestedAt: Date;
   ip: string | null;
@@ -33,7 +40,7 @@ export type EarlyAccessRequestRow = {
 export async function insertEarlyAccessRequest(input: {
   email: string;
   name: string | null;
-  answers: Record<string, string>;
+  answers: Record<string, EarlyAccessAnswer>;
   ip: string | null;
 }): Promise<void> {
   // An empty object is stored as NULL rather than `{}`: "this form had no
@@ -57,11 +64,12 @@ export async function insertEarlyAccessRequest(input: {
  * does: a client later configured to parse jsonb itself must not silently
  * start reading every answer set as null.
  *
- * Values are coerced to strings because that is all the form can submit; a
- * hand-edited row holding a number or an object is rendered as text rather
- * than crashing the review page.
+ * An array is preserved as an array — that is a "select all that apply"
+ * answer and its members are separate facts. Anything else is coerced to a
+ * string, so a hand-edited row holding a number or an object is rendered as
+ * text rather than crashing the review page.
  */
-export function parseAnswers(value: unknown): Record<string, string> | null {
+export function parseAnswers(value: unknown): Record<string, EarlyAccessAnswer> | null {
   let decoded = value;
   if (typeof decoded === 'string') {
     try {
@@ -72,9 +80,19 @@ export function parseAnswers(value: unknown): Record<string, string> | null {
   }
   if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) return null;
 
-  const answers: Record<string, string> = {};
+  const answers: Record<string, EarlyAccessAnswer> = {};
   for (const [key, raw] of Object.entries(decoded as Record<string, unknown>)) {
     if (raw === null || raw === undefined || raw === '') continue;
+
+    if (Array.isArray(raw)) {
+      const members = raw
+        .filter((member) => member !== null && member !== undefined && member !== '')
+        .map((member) => (typeof member === 'string' ? member : JSON.stringify(member)));
+      // An empty array is the same fact as an unanswered question.
+      if (members.length > 0) answers[key] = members;
+      continue;
+    }
+
     answers[key] = typeof raw === 'string' ? raw : JSON.stringify(raw);
   }
   return Object.keys(answers).length > 0 ? answers : null;
@@ -89,19 +107,30 @@ export function parseAnswers(value: unknown): Record<string, string> | null {
  * dropping it would silently hide something a person wrote.
  */
 export function labelAnswers(
-  answers: Record<string, string> | null,
+  answers: Record<string, EarlyAccessAnswer> | null,
   questions: readonly EarlyAccessQuestion[],
 ): { label: string; value: string; orphaned: boolean }[] {
   if (!answers) return [];
   const byId = new Map(questions.map((question) => [question.id, question.label]));
 
+  // Several ticked options read best as a list on one line; the review screen
+  // is scanned, not parsed.
+  const show = (value: EarlyAccessAnswer) => (
+    Array.isArray(value) ? value.join(', ') : value
+  );
+  const present = (value: EarlyAccessAnswer | undefined) => (
+    Array.isArray(value) ? value.length > 0 : Boolean(value)
+  );
+
   const ordered: { label: string; value: string; orphaned: boolean }[] = [];
   for (const question of questions) {
     const value = answers[question.id];
-    if (value) ordered.push({ label: question.label, value, orphaned: false });
+    if (present(value)) {
+      ordered.push({ label: question.label, value: show(value), orphaned: false });
+    }
   }
   for (const [id, value] of Object.entries(answers)) {
-    if (!byId.has(id)) ordered.push({ label: id, value, orphaned: true });
+    if (!byId.has(id)) ordered.push({ label: id, value: show(value), orphaned: true });
   }
   return ordered;
 }

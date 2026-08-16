@@ -42,6 +42,23 @@ if (await exists(join(root, 'public'))) {
   console.log('prepare-standalone: copied public');
 }
 
+// The apex coming-soon page's template: stylesheet, form script, icon,
+// robots, sitemap and the shipped screenshots. src/lib/apex-publish.ts reads
+// these when publishing and copies them to the directory Caddy serves.
+//
+// It has to be copied in because the standalone server chdir()s into
+// .next/standalone on startup, so `process.cwd()/deploy/coming-soon` resolves
+// HERE in production and to the repository root under `next dev`. Both
+// therefore work without the publisher having to guess which layout it is in.
+if (await exists(join(root, 'deploy', 'coming-soon'))) {
+  await cp(
+    join(root, 'deploy', 'coming-soon'),
+    join(standalone, 'deploy', 'coming-soon'),
+    { recursive: true },
+  );
+  console.log('prepare-standalone: copied deploy/coming-soon');
+}
+
 // Incremental static regeneration writes revalidated pages here. The
 // standalone output does not create it, and without it Next cannot
 // persist a revalidated page, so every request past a page's stale time

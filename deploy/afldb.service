@@ -79,6 +79,18 @@ PrivateDevices=true
 ProtectSystem=strict
 ProtectHome=read-only
 ReadWritePaths=/home/arm/projects/afldb/.next
+# The apex coming-soon page is PUBLISHED here by /admin/content: the service
+# renders index.html and writes the uploaded images, and Caddy serves the
+# directory as static files. Without this line ProtectSystem=strict makes the
+# whole of /var read-only and every publish fails with EACCES.
+#
+# The directory must also be owned by this service's user:
+#   sudo chown -R arm:caddy /var/www/afldb-soon
+#   sudo chmod  750 /var/www/afldb-soon
+# Caddy reads it through the group; nothing else needs access. Remove this
+# line if AFLDB_APEX_DIR is ever unset, since a writable path granted to a
+# web-facing service and then not used is a liability rather than a leftover.
+ReadWritePaths=/var/www/afldb-soon
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true

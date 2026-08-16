@@ -48,6 +48,25 @@
     wrap.appendChild(el('label', { for: id }, question.label + (question.required ? ' *' : '')));
     if (question.help) wrap.appendChild(el('span', { class: 'hint' }, question.help));
 
+    // "Select all that apply" is a group of checkboxes rather than one
+    // control, so it gets a fieldset and no single element to hang `required`
+    // or an id on. The label above is turned into the group's caption.
+    if (question.type === 'multi') {
+      var group = el('div', { class: 'checkboxes', role: 'group', 'aria-labelledby': id + '-label' });
+      wrap.firstChild.setAttribute('id', id + '-label');
+      (question.options || []).forEach(function (option, index) {
+        var optionId = id + '-' + index;
+        var line = el('label', { class: 'checkbox', for: optionId });
+        line.appendChild(el('input', {
+          type: 'checkbox', id: optionId, name: question.id, value: option,
+        }));
+        line.appendChild(document.createTextNode(' ' + option));
+        group.appendChild(line);
+      });
+      wrap.appendChild(group);
+      return wrap;
+    }
+
     var input;
     if (question.type === 'long') {
       input = el('textarea', { id: id, name: question.id, rows: '3' });
@@ -118,6 +137,23 @@
 
       var answers = {};
       (definition.questions || []).forEach(function (question) {
+        // A checkbox group shares one name across several inputs, so
+        // namedItem returns a RadioNodeList rather than an element and
+        // reading .value off it would give only the first ticked box.
+        if (question.type === 'multi') {
+          var ticked = [];
+          // Walked rather than selected, so no question id ever has to be
+          // escaped into a CSS attribute selector.
+          Array.prototype.forEach.call(form.elements, function (element) {
+            if (element.type === 'checkbox'
+              && element.name === question.id
+              && element.checked) {
+              ticked.push(element.value);
+            }
+          });
+          if (ticked.length) answers[question.id] = ticked;
+          return;
+        }
         var node = field(question.id);
         if (node && node.value.trim()) answers[question.id] = node.value.trim();
       });

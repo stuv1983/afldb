@@ -163,6 +163,8 @@ per key in `site_settings` (migration 034) and audited as
 | `home.record_of_the_week` | Which career record the AFL front page leads with. Limited to the five categories the career leaderboard can answer. |
 | `home.aflw_leaders` | The AFLW counterpart, ranked off `aflw.player_careers`. |
 | `grid_solver.audience` | Who may reach `/grid-solver`: super admins (default), admins, any signed-in staff account, or everyone. |
+| `site.footer` | The colophon under **every** page of the site and under the apex coming-soon page. Edited at `/admin/content`, not here. |
+| `apex.content` | The whole coming-soon page: copy, images, cards, search metadata. Edited at `/admin/content`. Excluded from the settings read on public pages — it is kilobytes of prose that nothing on the site renders. |
 
 Not open to a plain admin, delegated or not: what the front page shows
 and who may reach the grid solver are publication decisions, the same
@@ -175,6 +177,34 @@ that names a section this build no longer has is dropped and a new one is
 appended, which is what lets a settings row survive a deploy in either
 direction. Saving revalidates both home pages, which are otherwise
 ISR-cached for an hour.
+
+### Page content (`/admin/content`, super admin only)
+
+The text and images of the two pages a super admin writes rather than
+codes: the coming-soon page at `afldb.com`, and the footer every page
+carries. Audited as `content.saved`, `content.published`,
+`content.media_uploaded` and `content.media_deleted`.
+
+The footer is one document shared by both renderers — the root layout
+draws it under every application page, and the publisher writes the same
+lines into the static apex page — so the two colophons cannot drift
+apart. The apex omits the "About this data" link, having no `/about` of
+its own to point at.
+
+Saving also **publishes**: the apex page is rendered and written to
+`AFLDB_APEX_DIR`, where Caddy serves it as static files. The application
+is that page's publisher, never its server, which is what preserves the
+reliability argument in `docs/apex-coming-soon.md` §1. The database is
+written first and the files second, so a failed publish costs the publish
+alone and **Republish** is the whole retry. Full details in
+`docs/apex-coming-soon.md` §8.
+
+Uploaded images live in `site_media` (migration 037), not on disk: the
+nightly dump then covers them, the published directory stays derived, and
+the service needs no second writable path. An upload is identified by its
+**magic bytes** — `src/lib/image-probe.ts` — so neither the file name nor
+the declared `Content-Type` decides what gets written into a directory a
+web server publishes.
 
 ## 3. Beta gate
 

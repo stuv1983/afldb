@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_SITE_FOOTER } from '@/lib/site-content';
 import {
   DEFAULT_EARLY_ACCESS_INTRO,
   DEFAULT_EARLY_ACCESS_NOTIFY_TO,
@@ -122,6 +123,7 @@ describe('parseSiteSettings', () => {
       earlyAccessQuestions: DEFAULT_EARLY_ACCESS_QUESTIONS,
       earlyAccessNotify: false,
       earlyAccessNotifyTo: DEFAULT_EARLY_ACCESS_NOTIFY_TO,
+      footer: DEFAULT_SITE_FOOTER,
     });
   });
 

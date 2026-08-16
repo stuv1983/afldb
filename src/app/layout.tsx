@@ -4,6 +4,7 @@ import Link from 'next/link';
 
 import { PrimaryNav, TabBar } from '@/components/SiteNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { getSiteFooter } from '@/db/queries/site-settings';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
 import '@/styles/globals.css';
 
@@ -56,8 +57,15 @@ export const metadata: Metadata = {
     : { index: false, follow: false },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+/**
+ * Async because of the footer, which a super admin edits at /admin/content and
+ * which therefore has to be read rather than written here. `getSiteFooter`
+ * falls back to the compiled-in colophon on ANY failure — a layout that can
+ * throw is a site that has no error page either.
+ */
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const fonts = `${newsreader.variable} ${plexSans.variable} ${plexMono.variable}`;
+  const footer = await getSiteFooter();
 
   return (
     // The pre-paint script below sets data-theme on this element, so the
@@ -90,18 +98,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="site-footer">
           <div className="container">
             <div className="colophon">
-              <p>
-                AFLDB — Australian Football statistics, 1897 to present.
-                Data derived from publicly available sources including AFL Tables and Wikipedia.
-                {' '}<Link href="/about">About this data →</Link>
-              </p>
-              <p>AFLDB is an independent hobby project.</p>
-              <p>
-                Statistics not collected in a given era are shown as “—”, never as zero.
-              </p>
-              <p>
-                Contact: <a href="mailto:admin@afldb.com">admin@afldb.com</a>
-              </p>
+              {footer.lines.map((line, index) => (
+                <p key={index}>
+                  {line}
+                  {/* The About link rides on the first paragraph, where it has
+                      always been. The apex publishes the same lines WITHOUT it,
+                      having no /about of its own to point at. */}
+                  {index === 0 && footer.aboutLinkText && (
+                    <>{' '}<Link href="/about">{footer.aboutLinkText}</Link></>
+                  )}
+                </p>
+              ))}
+              {footer.contactEmail && (
+                <p>
+                  Contact:{' '}
+                  <a href={`mailto:${footer.contactEmail}`}>{footer.contactEmail}</a>
+                </p>
+              )}
             </div>
           </div>
         </footer>
