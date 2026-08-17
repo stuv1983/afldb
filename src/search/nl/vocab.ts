@@ -68,8 +68,14 @@ export const OVER_CAREER = /\b(?:career|all[ -]time|ever|in (?:his|their|a) care
  * "total"/"combined" alongside a club/venue/season scope has nowhere to
  * live except a scoped player_game sum -- player_career has no
  * opponent/venue scoping at all.
+ *
+ * The lookahead protects the total_score TEAM metric: in "highest
+ * combined score" the word "combined" is half of a metric name, not a
+ * sum cue, and stripping it here left "score" to resolve as team_score
+ * -- a confidently wrong answer, since the highest single-team score and
+ * the highest match aggregate are different records.
  */
-export const AGGREGATE_TOTAL_WORDS = /\b(?:total|combined|overall|cumulative)\b/;
+export const AGGREGATE_TOTAL_WORDS = /\b(?:total|combined|overall|cumulative|aggregate)\b(?!\s+(?:score|points))/;
 
 // -------------------------------------------------------------- aggregation
 
@@ -95,6 +101,14 @@ export const AGG_WORDS: [RegExp, AggWord][] = [
   [/\bhow many\b/, 'count'],
   [/\b(?:players?|teams?|clubs?) with\b/, 'list'],
   [/\bwho (?:has|have|played|kicked|holds?)\b/, 'max'],
+  // Bare "top" -- the leader, i.e. max -- reached only when TOP_N_RE
+  // found no usable count after it ("top goalkicker", "top disposal
+  // games"). Listed last so none of the specific phrases above can be
+  // shadowed by it. The word after a bare "top" stays in the text: if it
+  // was a real metric it is consumed by metric extraction, and if it was
+  // noise ("top banana goals") it is left over, which is exactly what
+  // makes the parser decline rather than invent a Top 10.
+  [/\btop\b/, 'max'],
 ];
 
 /** "top 10", "top ten", "top10" -- captured separately since it also carries a count. */
@@ -149,8 +163,12 @@ export const TEAM_METRIC_WORDS: [RegExp, 'win_margin' | 'loss_margin' | 'team_sc
   [/\b(?:losing margin|loss margin|margin of defeat)\b/, 'loss_margin'],
   [/\b(?:win|victory|victories|thrashing|thumping)\b/, 'win_margin'],
   [/\b(?:loss|defeat|beating)\b/, 'loss_margin'],
+  // total_score BEFORE team_score: extraction returns the first match,
+  // and \bscore\b matches inside "combined score", so the other order
+  // makes total_score unreachable -- "highest combined score" silently
+  // answered the single-team record instead of the match aggregate.
+  [/\b(?:combined|total|aggregate) (?:score|points)\b/, 'total_score'],
   [/\b(?:score|points scored)\b/, 'team_score'],
-  [/\b(?:combined score|total score)\b/, 'total_score'],
   [/\b(?:crowd|attendance)\b/, 'attendance'],
 ];
 
@@ -241,7 +259,15 @@ export const AT_PREPOSITION = /\b(?:at|on)\b/;
 export const SINCE_RE = /\bsince (\d{4})\b/;
 export const BEFORE_RE = /\bbefore (\d{4})\b/;
 export const BETWEEN_RE = /\bbetween (\d{4}) and (\d{4})\b/;
-export const DECADE_RE = /\bin the (\d{4})0?s\b|\bin the (\d{2})0s\b/;
+/**
+ * "in the 1990s" (group 1, the decade's first year) or "in the 90s"
+ * (group 2, a single leading digit). Two-digit decades resolve 30s-90s
+ * to the 1900s and 00s/10s to the 2000s; "the 20s" is DELIBERATELY
+ * excluded from group 2 -- with both a 1920s and a 2020s in the data it
+ * is genuinely ambiguous, and an unparsed token declines safely where a
+ * guessed century answers confidently and wrongly.
+ */
+export const DECADE_RE = /\bin the (\d{3}0)s\b|\bin the ([013-9])0s\b/;
 export const BARE_YEAR_RE = /\b(1[89]\d{2}|20\d{2})\b/;
 
 export const NEGATION_WORDS = /\b(?:without|never|no|didn'?t|hasn'?t|hadn'?t)\b/;
@@ -477,12 +503,18 @@ export const UNANSWERABLE_TOPICS: UnanswerableTopic[] = [
     reason: 'AFLDB has no coaching data at all -- no coach, no coach-per-club-season, nothing.',
   },
   {
-    re: /\b(?:score involvements?|fantasy points?|supercoach)\b/,
+    // Bare \bfantasy\b, not "fantasy points": readers ask for a "fantasy
+    // score" too, and the missed phrasing declined with the baffling
+    // reason "unsupported term: fantasy" instead of this honest one.
+    re: /\b(?:score involvements?|fantasy|supercoach)\b/,
     topic: 'score involvements or fantasy points',
     reason: 'Score involvements and fantasy/SuperCoach points are not recorded in AFLDB.',
   },
   {
-    re: /\bposition(?:s)?\b/,
+    // Named positions as well as the word "position" itself -- "most
+    // games at centre half forward" never says "position" but is exactly
+    // this question.
+    re: /\bposition(?:s)?\b|\b(?:centre half[- ](?:forward|back)|full[- ](?:forward|back)|half[- ](?:forward|back)(?:[- ]flank)?|(?:forward|back) pocket|ruck[- ]?rovers?|ruck(?:m[ae]n)?|rovers?|wing(?:ers?|m[ae]n)?|centrem[ae]n|followers?|interchange)\b/,
     topic: 'playing position',
     reason: 'AFLDB does not record which position a player lined up in.',
   },

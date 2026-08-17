@@ -44,6 +44,7 @@ import {
 import {
   AGAINST_PREPOSITION, AGG_WORDS, AGGREGATE_TOTAL_WORDS, AWARD_WORDS,
   BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_METRIC_WORDS,
+  DECADE_RE,
   CLUB_SUBJECT_LEADING, COMPARE_OP_WORDS,
   IN_A_FINAL, IN_A_GRAND_FINAL, IN_ONE_GAME, IN_ONE_SEASON,
   MATCH_TYPE_WORDS, METRIC_HIGHER_IS_WORSE, METRIC_WORDS, NEGATION_WORDS, NUMBER_PLUS_RE,
@@ -164,6 +165,27 @@ type SeasonExtraction = { text: string; seasonMin?: number; seasonMax?: number; 
 function extractSeasons(text: string): SeasonExtraction {
   const consumed: string[] = [];
   let working = text;
+
+  // "in the 1990s" / "in the 90s" -- a whole decade as the season range.
+  // Checked first: nothing else here can match inside the phrase (the
+  // trailing "s" keeps BARE_YEAR_RE's \b from firing on the digits), but
+  // a decade IS the complete range, so nothing else should run after it.
+  // Two-digit decades resolve 30s-90s to the 1900s and 00s/10s to the
+  // 2000s; DECADE_RE itself refuses "the 20s" (1920s vs 2020s is a coin
+  // flip, and an unparsed token declines safely where a guessed century
+  // answers wrongly). The four-digit bounds check does the same for
+  // nonsense like "in the 3560s".
+  const decade = DECADE_RE.exec(working);
+  if (decade) {
+    const first = decade[1] !== undefined
+      ? Number(decade[1])
+      : Number(decade[2]) >= 3 ? 1900 + Number(decade[2]) * 10 : 2000 + Number(decade[2]) * 10;
+    if (first >= 1890 && first <= 2090) {
+      consumed.push(decade[0]);
+      working = working.replace(DECADE_RE, ' ');
+      return { text: working, seasonMin: first, seasonMax: first + 9, consumed };
+    }
+  }
 
   const between = BETWEEN_RE.exec(working);
   if (between) {
@@ -487,8 +509,19 @@ function extractAggregation(text: string): {
 } {
   const topN = TOP_N_RE.exec(text);
   if (topN) {
-    const n = /^\d+$/.test(topN[1]) ? Number(topN[1]) : readCount(topN[1]) ?? 10;
-    return { text: stripMatch(text, topN[0]), agg: { kind: 'top_n', n }, consumed: [topN[0]], polarity: false };
+    const n = /^\d+$/.test(topN[1]) ? Number(topN[1]) : readCount(topN[1]);
+    // Only a real count makes a Top-N. TOP_N_RE's [a-z]+ arm matches
+    // whatever word follows "top", so "top banana goals" used to land
+    // here with readCount(...) null and a silent `?? 10` turned the
+    // nonsense into a confident Top 10 -- and "top disposal games",
+    // where the next word is the METRIC, got the same invented 10. An
+    // unrecognised count falls through instead: AGG_WORDS reads the bare
+    // "top" as the leader (max) and the following word stays in the
+    // text, to be consumed as a metric if it is one and to block
+    // execution as a leftover if it is not.
+    if (n !== null) {
+      return { text: stripMatch(text, topN[0]), agg: { kind: 'top_n', n }, consumed: [topN[0]], polarity: false };
+    }
   }
   for (const [re, kind] of AGG_WORDS) {
     const match = re.exec(text);
@@ -662,14 +695,23 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const inOneSeason = IN_ONE_SEASON.test(text);
   const overCareer = OVER_CAREER.test(text);
   // "dusty TOTAL goals against Carlton" -- overrides the named-player
-  // single-game default toward a scoped running total. Tracked separately
-  // from overCareer: pushed to consumedTokens (below) so the cue never
-  // silently costs confidence the way OVER_CAREER's own words already do.
-  const aggregateTotalMatch = AGGREGATE_TOTAL_WORDS.exec(text);
-  const aggregateTotal = !!aggregateTotalMatch;
-  if (aggregateTotalMatch) consumedTokens.push(aggregateTotalMatch[0]);
-  text = text.replace(IN_ONE_GAME, ' ').replace(IN_A_FINAL, ' ').replace(IN_A_GRAND_FINAL, ' ')
-    .replace(IN_ONE_SEASON, ' ').replace(OVER_CAREER, ' ').replace(AGGREGATE_TOTAL_WORDS, ' ');
+  // single-game default toward a scoped running total.
+  const aggregateTotal = AGGREGATE_TOTAL_WORDS.test(text);
+  // Every cue phrase the flags above just read is CONSUMED, not merely
+  // stripped. These words were understood -- "career" in "dusty career
+  // goals against Carlton" did exactly its job -- and leaving them out
+  // of consumedTokens depressed tokenRatio to 0.75 on perfectly parsed
+  // questions. That mattered little when the clarify band executed
+  // anyway; now that a leftover meaningful token DECLINES in the band
+  // (see the gate at the end of this function), an understood word that
+  // still looked leftover would turn correct answers into declines.
+  for (const cueRe of [IN_ONE_GAME, IN_A_FINAL, IN_A_GRAND_FINAL, IN_ONE_SEASON, OVER_CAREER, AGGREGATE_TOTAL_WORDS]) {
+    const cueMatch = cueRe.exec(text);
+    if (cueMatch) {
+      consumedTokens.push(cueMatch[0]);
+      text = text.replace(cueRe, ' ');
+    }
+  }
 
   const negated = NEGATION_WORDS.test(text);
 
@@ -709,10 +751,20 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
 
   // Deliberately NOT triggered by clubFor alone: a named club is just as
   // often a player_game/player_season scope ("richmond's most goals
-  // against carlton"), so only an unambiguous club-season signal --
-  // a leading "teams"/"clubs" subject, or one of the boolean conditions
-  // above -- elects this grain.
-  const clubSeasonCuePresent = clubSubjectPresent || clubSeasonConditionResult.conditions.length > 0;
+  // against carlton"), so only an unambiguous club-season signal elects
+  // this grain: a leading "teams"/"clubs" subject, one of the boolean
+  // conditions above, or -- the case a bare clubFor CAN safely cue -- a
+  // named club with one of the club-season-only metric words AND season
+  // wording ("Richmond most wins in a season"). The metric word does the
+  // disambiguating there: "wins"/"percentage" is not a player stat the
+  // way "goals" is, so the player_game/player_season readings the
+  // caution above protects do not exist for it. Probed without
+  // consuming; the guarded extraction below still does the real work.
+  const seasonWorded = inOneSeason || seasons.seasonMin !== undefined || seasons.seasonMax !== undefined;
+  const clubSeasonMetricWordPresent = CLUB_SEASON_METRIC_WORDS.some(([re]) => re.test(text));
+  const clubSeasonCuePresent = clubSubjectPresent
+    || clubSeasonConditionResult.conditions.length > 0
+    || (!!clubFor && !teamMetricResult.metric && clubSeasonMetricWordPresent && seasonWorded);
 
   let clubSeasonMetricResult: { text: string; metric?: string; consumed: string[] } = { text, consumed: [] };
   if (clubSeasonCuePresent && !teamMetricResult.metric) {
@@ -776,20 +828,63 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   let playerCertainty = 1;
   const candidateRaw = candidatePlayerSpan(text);
   let unresolvedPlayerMention: string | null = null;
+  let ambiguousPlayerMention: string | null = null;
   if (candidateRaw && candidateRaw.length >= 3) {
-    const nickname = PLAYER_NICKNAMES[candidateRaw] ?? PLAYER_NICKNAMES[candidateRaw.split(' ')[0]];
-    const lookupName = nickname ?? candidateRaw;
+    const nicknameKey = PLAYER_NICKNAMES[candidateRaw] !== undefined
+      ? candidateRaw
+      : PLAYER_NICKNAMES[candidateRaw.split(' ')[0]] !== undefined ? candidateRaw.split(' ')[0] : null;
+    const lookupName = nicknameKey !== null ? PLAYER_NICKNAMES[nicknameKey] : candidateRaw;
     const candidates = await ctx.resolvePlayer(lookupName);
     const top = candidates[0];
     if (top && top.score >= PLAYER_ACCEPT_SCORE) {
       player = top.ref;
+
+      // Only the tokens the resolution JUSTIFIES are consumed: the
+      // nickname key's own tokens, plus any token that is (a prefix of)
+      // a word of the resolved player's actual name. Consuming the whole
+      // span let arbitrary noise vanish behind a valid name -- "dusty
+      // banana most goals" resolved "dusty", then counted "banana" as
+      // consumed too, and answered at full confidence as though the
+      // nonsense had never been typed. Now "banana" stays in the text as
+      // a leftover, and the gate at the end declines rather than guesses.
+      const nameWords = top.ref.name.toLowerCase().split(/\s+/);
+      const nicknameTokens = new Set(nicknameKey !== null ? nicknameKey.split(' ') : []);
+      const spanTokens = candidateRaw.split(' ');
+      const justified = spanTokens.filter(
+        (t) => nicknameTokens.has(t) || nameWords.some((w) => w.startsWith(t)),
+      );
+      const mention = justified.length > 0 ? justified.join(' ') : candidateRaw;
+
+      // Surname-only ambiguity, independent of the resolver's score gap:
+      // count the candidates whose name contains every mention word (as
+      // a whole-word prefix). "Thomas" is both a surname and a first
+      // name, so prominence ranking can put one Thomas 200+ points clear
+      // and the gap rule alone reads a bare surname as certain -- but
+      // two candidates both genuinely called Thomas means the reader has
+      // not said which one, however lopsided their game counts are.
+      // Nickname-resolved mentions skip this: "dusty" already names one
+      // specific player by construction.
+      const mentionTokens = justified.length > 0 ? justified : spanTokens;
+      const nameMatches = nicknameKey !== null ? 1 : candidates.filter((c) => {
+        const words = c.ref.name.toLowerCase().split(/\s+/);
+        return mentionTokens.every((t) => words.some((w) => w.startsWith(t)));
+      }).length;
+
       const second = candidates[1];
-      playerCertainty = !second || top.score - second.score > 200 ? 1 : 0.7;
-      report.entityResolution.push({ mention: candidateRaw, resolvedTo: top.ref.name, certainty: playerCertainty });
-      consumedTokens.push(candidateRaw);
-      text = stripMatch(text, candidateRaw);
+      const gapCertain = !second || top.score - second.score > 200;
+      playerCertainty = nameMatches >= 2 ? 0.7 : gapCertain ? 1 : 0.7;
+      report.entityResolution.push({ mention, resolvedTo: top.ref.name, certainty: playerCertainty });
+      for (const token of justified.length > 0 ? justified : spanTokens) {
+        consumedTokens.push(token);
+        text = stripMatch(text, token);
+      }
     } else {
       unresolvedPlayerMention = candidateRaw;
+      // The resolver found SOMETHING, just nothing it would commit to --
+      // "ablett" surfaces both Gary Abletts below accept strength. That
+      // is an ambiguity, not an unknown word, and the decline message
+      // and log should say so rather than "unsupported term: ablett".
+      if (candidates.length > 0) ambiguousPlayerMention = candidateRaw;
     }
   }
 
@@ -834,6 +929,29 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       grain = 'player_game';
       mode = (aggregateTotal || overCareer) ? 'sum' : 'single';
       metric = playerMetricResult.metric;
+    } else if (
+      // No player named, a season WAS named, and the only other scope (if
+      // any) is the club whose players are being ranked: that is a
+      // season-leaderboard question -- "Richmond's leading goalkicker in
+      // 2017", "most goals in 2025" -- and player_season is the grain
+      // that says so. Checked BEFORE the scoped-sum branch below, which
+      // previously swallowed every club-scoped one of these: a bare
+      // clubFor made `scoped` true, so the question became a
+      // player_game/sum over a pinned season. That reached the same
+      // answer by summing match rows instead of reading season totals,
+      // but described a different question, and it was the single
+      // largest disagreement in the 12,000-question corpus.
+      //
+      // An opponent, venue or match-type scope still routes to the sum
+      // below -- season aggregates cannot express any of those. So do an
+      // explicit total/career cue and an explicit single-game cue, both
+      // of which name a different reading outright.
+      !inOneGame && !aggregateTotal && !overCareer
+      && !venue && !clubAgainst && !matchTypeResult.matchType
+      && (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined)
+    ) {
+      grain = 'player_season';
+      metric = playerMetricResult.metric;
     } else if (scoped || inOneGame) {
       // No player named: a scoped or single-game-cued stat question
       // ranks every player's performance in that scope.
@@ -841,10 +959,9 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       mode = inOneGame ? 'single' : 'sum';
       metric = playerMetricResult.metric;
     } else if (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined) {
-      // No player, venue, club or match-type cue, but a season WAS named
-      // ("most goals in 2025") -- ranks player_season_stats within that
-      // range. Without this branch the year fell through to the plain
-      // career-total default below with the season silently dropped.
+      // A season with a total/career cue but no other scope ("total
+      // goals since 2000") -- the season must not silently drop, and
+      // player_season is the only grain that keeps it.
       grain = 'player_season';
       metric = playerMetricResult.metric;
     } else if (['games', 'goals'].includes(playerMetricResult.metric) || careerResult.conditions.length > 0) {
@@ -936,13 +1053,31 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const consumedCount = totalTokens.filter((t) => consumedSet.has(t) || t === candidateRaw?.split(' ')[0]).length;
   const ratio = totalTokens.length === 0 ? 0 : consumedCount / totalTokens.length;
 
+  // Meaningful tokens the parser could do nothing with -- excluding the
+  // failed player mention's own tokens, which are reported separately
+  // below rather than double-counted here. These feed both the
+  // clarify-band gate (a leftover word is grounds to decline, not to
+  // guess) and unsupportedTerms, so the log's vocabulary mining and the
+  // reader's decline message name the exact words that stopped the
+  // answer instead of only the failed name lookups.
+  const mentionTokens = new Set(unresolvedPlayerMention ? unresolvedPlayerMention.split(' ') : []);
+  const leftoverTokens = totalTokens.filter(
+    (t) => !consumedSet.has(t) && !mentionTokens.has(t) && t !== candidateRaw?.split(' ')[0],
+  );
+
   const structuralPenalty = structuralOk ? 1 : 0.3;
   const unresolvedPenalty = unresolvedPlayerMention ? 0.35 : 0;
   let confidence = ratio * playerCertainty * structuralPenalty - unresolvedPenalty;
   if (unresolvedPlayerMention) {
-    report.unsupportedTerms.push(unresolvedPlayerMention);
-    notes.push(`Could not find a player matching "${unresolvedPlayerMention}".`);
+    if (ambiguousPlayerMention) {
+      report.ambiguousPlayer = ambiguousPlayerMention;
+      notes.push(`"${ambiguousPlayerMention}" matches more than one player.`);
+    } else {
+      report.unsupportedTerms.push(unresolvedPlayerMention);
+      notes.push(`Could not find a player matching "${unresolvedPlayerMention}".`);
+    }
   }
+  report.unsupportedTerms.push(...leftoverTokens.filter((t) => !report.unsupportedTerms.includes(t)));
   if (playerCertainty < 1) notes.push(`"${candidateRaw}" matched more than one player; using the closest.`);
   confidence = Math.max(0, Math.min(1, confidence));
 
@@ -961,13 +1096,21 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   }
   if (confidence >= NL_CONFIDENCE.clarify) {
     // "Execute only if all entities and metrics resolved unambiguously" --
-    // any sub-1.0 entity certainty, or an unresolved player mention,
-    // means the reader must be asked rather than guessed for. There is
-    // no interactive clarification surface yet (conversational
-    // refinement is deferred), so this degrades to a decline rather than
+    // any sub-1.0 entity certainty, an unresolved player mention, OR a
+    // meaningful word the parser could not consume means the reader must
+    // be asked rather than guessed for. The leftover-token condition is
+    // what stops "top banana goals" and "dusty banana most goals" from
+    // executing: mid-band confidence with words left over is not partial
+    // certainty about one question, it is certainty about part of the
+    // question -- and answering the understood part as though it were
+    // the whole is this engine's worst failure mode. There is no
+    // interactive clarification surface yet (conversational refinement
+    // is deferred), so this degrades to a decline rather than
     // fabricating an answer; the report still records exactly what was
     // ambiguous, for the search log and for a future clarification UI.
-    const allCertain = report.entityResolution.every((e) => e.certainty >= 1) && !unresolvedPlayerMention;
+    const allCertain = report.entityResolution.every((e) => e.certainty >= 1)
+      && !unresolvedPlayerMention
+      && leftoverTokens.length === 0;
     if (allCertain) return { status: 'plan', plan, report };
     const reason: NlDeclineReason = 'ambiguous';
     return { status: 'none', reason, report };

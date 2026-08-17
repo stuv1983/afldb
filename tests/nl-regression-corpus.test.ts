@@ -35,6 +35,25 @@ const VENUES: NlVenueDirectoryEntry[] = [
 
 const PLAYERS: Record<string, NlPlayerCandidate[]> = {
   'dustin martin': [{ ref: { id: 100, slug: 'dustin-martin', name: 'Dustin Martin' }, score: 1000 }],
+  // "thomas" is both a surname and a first name, and prominence ranking
+  // can put one Thomas 200+ points clear of the next -- the exact shape
+  // that made the gap rule read a bare surname as certain (NL-018).
+  thomas: [
+    { ref: { id: 200, slug: 'thomas-hawkins', name: 'Thomas Hawkins' }, score: 900 },
+    { ref: { id: 201, slug: 'dale-thomas', name: 'Dale Thomas' }, score: 600 },
+  ],
+  // Two Gary Abletts, both below PLAYER_ACCEPT_SCORE for a bare
+  // surname: the resolver knows who they might be but will not commit.
+  ablett: [
+    { ref: { id: 300, slug: 'gary-ablett-snr', name: 'Gary Ablett Snr' }, score: 400 },
+    { ref: { id: 301, slug: 'gary-ablett-jnr', name: 'Gary Ablett Jnr' }, score: 380 },
+  ],
+  // A unique surname: one real candidate plus a distant fuzzy match.
+  // Must STAY certain -- surname-only is how readers actually type.
+  pendlebury: [
+    { ref: { id: 400, slug: 'scott-pendlebury', name: 'Scott Pendlebury' }, score: 900 },
+    { ref: { id: 401, slug: 'pendleton-someone', name: 'John Pendleton' }, score: 250 },
+  ],
 };
 
 const ctx: NlParseContext = {
@@ -49,6 +68,12 @@ async function plan(question: string): Promise<NlQueryPlan> {
     result.report.confidence.toFixed(2)}, unsupported: [${result.report.unsupportedTerms.join(', ')}]`)
     .toBe('plan');
   return (result as Extract<NlParse, { status: 'plan' }>).plan;
+}
+
+async function declined(question: string): Promise<Extract<NlParse, { status: 'none' }>> {
+  const result: NlParse = await parseNlQuestion(question, ctx);
+  expect(result.status, `"${question}" -> ${result.status}; expected a decline`).toBe('none');
+  return result as Extract<NlParse, { status: 'none' }>;
 }
 
 // ---------------------------------------------------------------------
@@ -437,5 +462,211 @@ describe('NL-012: two numeric conditions in one question both survive', () => {
     expect(p.careerConditions).toEqual([
       expect.objectContaining({ column: 'games', op: 'gte', value: 145 }),
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------
+// NL-013 -- "combined score"/"total score" answered the single-team record
+// ---------------------------------------------------------------------
+// From the user's code review of the stress-run parser. Two independent
+// faults, either fatal alone: AGGREGATE_TOTAL_WORDS stripped
+// "total"/"combined" before team-metric extraction ever saw the text, and
+// TEAM_METRIC_WORDS listed \bscore\b before "combined score" with
+// first-match-wins iteration -- so "highest combined score" answered
+// team_score, a confidently wrong record.
+describe('NL-013: combined/total score is the match aggregate, not the team score', () => {
+  it.each([
+    'highest combined score',
+    'highest total score',
+    'highest aggregate score',
+    'highest total points',
+  ])('%s', async (question) => {
+    const p = await plan(question);
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('total_score');
+  });
+
+  it('survives a match-type scope', async () => {
+    const p = await plan('highest combined score in a grand final');
+    expect(p.metric).toBe('total_score');
+    expect(p.scope.matchType).toBe('grand_final');
+  });
+
+  it('a bare "score" is still the single-team metric', async () => {
+    const p = await plan('Richmond highest score in a grand final');
+    expect(p.metric).toBe('team_score');
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+  });
+
+  it('"total" away from "score" is still the named-player sum cue', async () => {
+    const p = await plan('dusty total goals against Carlton');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('sum');
+    expect(p.metric).toBe('goals');
+  });
+});
+
+// ---------------------------------------------------------------------
+// NL-014 -- decades were never parsed
+// ---------------------------------------------------------------------
+// DECADE_RE existed in vocab.ts but nothing imported it, and the "1990s"
+// token cost the confidence ratio so little that "most goals in the
+// 1990s" executed as the ALL-TIME career record -- the season constraint
+// silently discarded behind a believable answer.
+describe('NL-014: "in the 1990s" is a season range', () => {
+  it('four-digit decade', async () => {
+    const p = await plan('most goals in the 1990s');
+    expect(p.grain).toBe('player_season');
+    expect(p.scope.seasonMin).toBe(1990);
+    expect(p.scope.seasonMax).toBe(1999);
+  });
+
+  it('two-digit decades resolve a century sensibly', async () => {
+    const nineties = await plan('most goals in the 90s');
+    expect(nineties.scope.seasonMin).toBe(1990);
+    const noughties = await plan('most goals in the 00s');
+    expect(noughties.scope.seasonMin).toBe(2000);
+  });
+
+  it('"the 20s" declines rather than guessing a century', async () => {
+    // 1920s vs 2020s is a coin flip; a decline beats a confident guess.
+    const result = await declined('most goals in the 20s');
+    expect(result.report.confidence).toBeLessThan(0.85);
+  });
+});
+
+// ---------------------------------------------------------------------
+// NL-015 -- "top banana" was a valid Top 10
+// ---------------------------------------------------------------------
+// TOP_N_RE's [a-z]+ arm matched whatever word followed "top", and an
+// unknown count word fell back to `?? 10` -- so "top banana goals" ran a
+// confident Top 10, and "top disposal games" (where the next word is the
+// METRIC) invented the same 10.
+describe('NL-015: an unknown word after "top" is not a count', () => {
+  it('garbage after "top" declines instead of inventing a Top 10', async () => {
+    const result = await declined('top banana goals');
+    expect(result.report.unsupportedTerms).toContain('banana');
+  });
+
+  it('"top 5 disposal games by dusty" still carries its real count', async () => {
+    const p = await plan('top 5 disposal games by dusty');
+    expect(p.agg).toEqual({ kind: 'top_n', n: 5 });
+    expect(p.metric).toBe('disposals');
+  });
+
+  it('"top disposal games by dusty" reads bare "top" as the leader', async () => {
+    const p = await plan('top disposal games by dusty');
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(p.metric).toBe('disposals');
+    expect(p.mode).toBe('single');
+  });
+
+  it('"top ten" still counts', async () => {
+    const p = await plan('top ten goalkickers');
+    expect(p.agg).toEqual({ kind: 'top_n', n: 10 });
+  });
+});
+
+// ---------------------------------------------------------------------
+// NL-016 -- a nickname swallowed whatever followed it
+// ---------------------------------------------------------------------
+// The player span consumed candidateRaw wholesale, so "dusty banana most
+// goals" resolved Dustin Martin via the first-token nickname and counted
+// "banana" as consumed too -- arbitrary noise vanished behind a valid
+// name at full confidence.
+describe('NL-016: only the tokens the resolution justifies are consumed', () => {
+  it('noise after a nickname declines', async () => {
+    const result = await declined('dusty banana most goals');
+    expect(result.report.unsupportedTerms).toContain('banana');
+  });
+
+  it('"dusty martin" still resolves -- the surname is part of the real name', async () => {
+    const p = await plan('dusty martin most goals');
+    expect(p.player?.name).toBe('Dustin Martin');
+  });
+
+  it('a full clean name is untouched', async () => {
+    const p = await plan('dustin martin most goals');
+    expect(p.player?.name).toBe('Dustin Martin');
+  });
+});
+
+// ---------------------------------------------------------------------
+// NL-017 -- named club + club-season metric fell through to unrecognised
+// ---------------------------------------------------------------------
+// clubSeasonCuePresent deliberately excluded clubFor, but for the
+// club-season-ONLY metric words (wins/losses/draws/percentage) plus
+// season wording there is no player reading to protect -- "Richmond most
+// wins in a season" just declined.
+describe('NL-017: a named club with a club-season metric and season wording routes to club_season', () => {
+  it('Richmond most wins in a season', async () => {
+    const p = await plan('Richmond most wins in a season');
+    expect(p.grain).toBe('club_season');
+    expect(p.metric).toBe('wins');
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+    expect(p.agg).toEqual({ kind: 'max' });
+  });
+
+  it('Richmond most wins in 2017 pins the season', async () => {
+    const p = await plan('Richmond most wins in 2017');
+    expect(p.grain).toBe('club_season');
+    expect(p.scope.seasonMin).toBe(2017);
+  });
+
+  it('"Richmond most goals in 2017" is still a player question -- goals is a player stat', async () => {
+    const p = await plan('Richmond most goals in 2017');
+    expect(p.grain).toBe('player_season');
+    expect(p.metric).toBe('goals');
+  });
+});
+
+// ---------------------------------------------------------------------
+// NL-018 -- a bare surname shared by two players answered anyway
+// ---------------------------------------------------------------------
+// Certainty came only from the resolver's score gap, and prominence
+// ranking routinely puts one Thomas 200+ points clear of the next -- so
+// "Thomas most goals" answered for Thomas Hawkins as though the reader
+// had named him. The one hard failure left in the 12,000-question run.
+describe('NL-018: a mention matching two players is ambiguous however lopsided the ranking', () => {
+  it('Thomas most goals declines as ambiguous', async () => {
+    const result = await declined('Thomas most goals');
+    expect(result.reason).toBe('ambiguous');
+  });
+
+  it('Ablett most goals declines with the mention recorded as ambiguous, not unsupported', async () => {
+    const result = await declined('Ablett most goals');
+    expect(result.report.ambiguousPlayer).toBe('ablett');
+    expect(result.report.unsupportedTerms).not.toContain('ablett');
+  });
+
+  it('a unique surname still resolves -- surname-only is how readers type', async () => {
+    const p = await plan('pendlebury most goals');
+    expect(p.player?.name).toBe('Scott Pendlebury');
+  });
+
+  it('a nickname is one specific player by construction', async () => {
+    const p = await plan('dusty most goals');
+    expect(p.player?.name).toBe('Dustin Martin');
+  });
+});
+
+// ---------------------------------------------------------------------
+// NL-019 -- understood cue words depressed confidence
+// ---------------------------------------------------------------------
+// IN_ONE_GAME/IN_A_FINAL/IN_A_GRAND_FINAL/IN_ONE_SEASON/OVER_CAREER were
+// stripped but never counted as consumed, so "dusty career goals against
+// Carlton" sat at 0.750 -- and with the clarify band now declining over
+// leftover words, an understood-but-uncounted cue would have turned
+// correct answers into declines.
+describe('NL-019: grain-cue words count as consumed', () => {
+  it.each([
+    'dusty career goals against Carlton',
+    'most career goals at the mcg',
+    'most disposals in a game',
+    'most goals in a season',
+  ])('%s parses at full token ratio', async (question) => {
+    const result = await parseNlQuestion(question, ctx);
+    expect(result.status).toBe('plan');
+    expect(result.report.components.tokenRatio).toBe(1);
   });
 });

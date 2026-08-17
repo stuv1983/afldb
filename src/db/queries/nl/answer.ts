@@ -46,15 +46,19 @@ const DECLINE_OUTCOME: Record<NlDeclineReason, NlSearchLogOutcome> = {
 };
 
 /**
- * The fine-grained reason under a decline. Both branches collapse to
- * 'ambiguous_player' because entity resolution can only land below
- * certainty 1 for a player today (see log.ts's NlFailureReason comment) --
- * an unresolved mention and a low-certainty fuzzy match are both, in
- * practice, "the parser couldn't pin down which player".
+ * The fine-grained reason under a decline. Ambiguity is checked before
+ * unsupported terms: a mention the resolver returned candidates for but
+ * would not commit to ("ablett") is a word the engine UNDERSTOOD --
+ * calling it an unsupported term told the reader their spelling was the
+ * problem when the actual problem was two Gary Abletts. The 'ambiguous'
+ * decline reason collapses to the same label because entity resolution
+ * can only land below certainty 1 for a player today (see log.ts's
+ * NlFailureReason comment).
  */
 function declineFailureReason(reason: NlDeclineReason, report: NlParseReport): NlFailureReason {
-  if (report.unsupportedTerms.length > 0) return 'unsupported_term';
+  if (report.ambiguousPlayer !== undefined) return 'ambiguous_player';
   if (reason === 'ambiguous') return 'ambiguous_player';
+  if (report.unsupportedTerms.length > 0) return 'unsupported_term';
   return reason;
 }
 

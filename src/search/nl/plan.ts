@@ -40,8 +40,18 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  * way that would make two log rows not directly comparable -- phase F's
  * tuning pass groups by this so a vocabulary addition doesn't get
  * credited (or blamed) for outcomes it couldn't have affected.
+ *
+ * The bump belongs IN the commit that changes the behaviour, not in a
+ * later cleanup: version 1 sat unchanged through several vocabulary and
+ * role-logic fixes, which quietly made "version 1" span two different
+ * parsers in the log.
+ *
+ * 2: stress-run review batch -- total_score reachable, decades parsed,
+ *    strict top-N counts, justified-token player consumption, club-season
+ *    routing for named clubs, player_season for club+season leaderboards,
+ *    surname-ambiguity detection, and the clarify-band leftover gate.
  */
-export const PARSER_VERSION = 1;
+export const PARSER_VERSION = 2;
 
 // ------------------------------------------------------------------ grain
 
@@ -695,6 +705,15 @@ export type NlParseReport = {
   /** Interpretation caveats to surface alongside the answer ("Reading 'won' as premierships"). */
   notes: string[];
   entityResolution: NlEntityResolution[];
+  /**
+   * A player mention the resolver returned candidates for but would not
+   * commit to -- "ablett" surfacing both Gary Abletts. Distinct from
+   * unsupportedTerms because the failure reason differs in kind: the
+   * word IS understood, it just names more than one person, and the log
+   * and decline message should say ambiguous_player, not
+   * "unsupported term".
+   */
+  ambiguousPlayer?: string;
 };
 
 export type NlDeclineReason = 'unrecognised' | 'low_confidence' | 'ambiguous';
