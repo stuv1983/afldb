@@ -22,7 +22,10 @@ function metricValueExpr(metric: string): SqlFragment {
   const def = NL_METRICS.player_season[metric];
   if (def.kind !== 'column') throw new Error(`player_season metric "${metric}" has no column.`);
   if (def.statKey && GRID_STATS[def.statKey].grain === 'live_only') {
-    return sql`(SELECT sum(${sql.unsafe(def.statKey)}) FROM player_match_stats pms
+    // sum() over a smallint column is bigint in Postgres, and postgres.js
+    // hands a bigint back as text -- ::int keeps this a real number, the
+    // same fix player-career.ts's metricValueExpr already needed.
+    return sql`(SELECT sum(${sql.unsafe(def.statKey)})::int FROM player_match_stats pms
                   JOIN matches m2 ON m2.id = pms.match_id
                  WHERE pms.player_id = s.player_id AND m2.season = s.season)`;
   }
