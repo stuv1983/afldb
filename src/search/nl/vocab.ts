@@ -81,7 +81,13 @@ export type AggWord = 'max' | 'min' | 'top_n' | 'list' | 'count';
  * it; everything else is a fixed word -> aggregation mapping.
  */
 export const AGG_WORDS: [RegExp, AggWord][] = [
-  [/\b(?:most|highest|best|biggest|largest|greatest|maximum|record)\b/, 'max'],
+  // "leading"/"led" are aggregation words, not decoration: "Richmond's
+  // LEADING goalkicker" is exactly "most goals", and "who LED the
+  // goalkicking" the same question again. Before they were listed here
+  // the metric ("goalkicker" -> goals) resolved fine and the leftover
+  // "leading" was misread as a failed player-name guess, which cost
+  // enough confidence to decline a question the engine could answer.
+  [/\b(?:most|highest|best|biggest|largest|greatest|maximum|record|leading|led|heaviest)\b/, 'max'],
   // Bare "least" is deliberately excluded: "at least" (an operator
   // phrase, handled by COMPARE_OP_WORDS) is far more common in real
   // questions than "least" meaning minimum, and the two must not compete.
@@ -93,6 +99,28 @@ export const AGG_WORDS: [RegExp, AggWord][] = [
 
 /** "top 10", "top ten", "top10" -- captured separately since it also carries a count. */
 export const TOP_N_RE = /\btop[ -]?(\d{1,3}|[a-z]+)\b/;
+
+/**
+ * "worst" and "best" are the two aggregation words whose direction
+ * depends on the metric rather than on the word.
+ *
+ * For almost every metric here a bigger number is a better outcome, so
+ * worst = min ("worst percentage", "worst season by wins"). For a LOSING
+ * MARGIN the polarity inverts: a team's worst loss is its BIGGEST one.
+ * AGG_WORDS above still maps worst -> min as the default, and the parser
+ * flips it to max only for the metrics named below -- so the special case
+ * is confined to the metrics that genuinely have inverted polarity
+ * instead of leaking into every question containing the word.
+ *
+ * This was a real, dangerous bug rather than a theoretical one: "Richmond
+ * worst loss to Carlton" answered "1 point" (their narrowest defeat)
+ * where the true answer is the 115-point loss of 1984 -- a believable
+ * number, silently the opposite of what was asked.
+ */
+export const POLARITY_AGG_RE = /\b(?:worst|best)\b/;
+
+/** Metrics where a LARGER value is the worse outcome, so "worst" means max. */
+export const METRIC_HIGHER_IS_WORSE = new Set(['loss_margin', 'opponent_score']);
 
 // -------------------------------------------------------------- stat words
 
@@ -112,6 +140,13 @@ export const TOP_N_RE = /\btop[ -]?(\d{1,3}|[a-z]+)\b/;
  * "losses" as its own ranking metric.
  */
 export const TEAM_METRIC_WORDS: [RegExp, 'win_margin' | 'loss_margin' | 'team_score' | 'total_score' | 'attendance'][] = [
+  // Explicit margin phrases first. They cannot collide with the bare
+  // "win"/"loss" patterns below (\bwin\b does not match "winning"), but
+  // stating them first keeps the more specific reading in front of the
+  // more general one, which is the ordering rule the rest of this file
+  // follows.
+  [/\b(?:winning margin|win margin|margin of victory)\b/, 'win_margin'],
+  [/\b(?:losing margin|loss margin|margin of defeat)\b/, 'loss_margin'],
   [/\b(?:win|victory|victories|thrashing|thumping)\b/, 'win_margin'],
   [/\b(?:loss|defeat|beating)\b/, 'loss_margin'],
   [/\b(?:score|points scored)\b/, 'team_score'],
@@ -167,7 +202,7 @@ export const METRIC_WORDS: [RegExp, string][] = [
   [/\brebound-fifties\b/, 'rebounds'],
   [/\bbrownlow votes?\b/, 'brownlow_votes'],
   [/\bbiggest bags?\b/, 'goals'],
-  [/\bgoalkickers?\b/, 'goals'],
+  [/\bgoal ?kick(?:ers?|ing)\b/, 'goals'],
   [/\bgoals?\b/, 'goals'],
   [/\bbehinds?\b/, 'behinds'],
   [/\bkicks?\b/, 'kicks'],
@@ -211,6 +246,14 @@ export const COMPARE_OP_WORDS: [RegExp, NlCompareOp][] = [
   [/\bmore than\b/, 'gt'],
   [/\bless than\b/, 'lt'],
   [/\bfewer than\b/, 'lt'],
+  // "over"/"under" are genuinely two words in one. Immediately before a
+  // NUMBER they are comparison operators ("over 200 games"); immediately
+  // before a CLUB they are a relationship ("Richmond's biggest win over
+  // Carlton"). Requiring the digits here settles it by context rather
+  // than by a global rule, and the club reading is handled separately by
+  // STOPWORDS -- so neither sense has to know about the other.
+  [/\bover(?=\s+\d)/, 'gt'],
+  [/\bunder(?=\s+\d)/, 'lt'],
   [/\bexactly\b/, 'eq'],
 ];
 
@@ -293,6 +336,14 @@ export const STOPWORDS = new Set([
   // ("most goals against carlton ever") left "against" as the only
   // leftover alpha token, misread as a failed player-name candidate.
   'against', 'versus',
+  // "over" in its RELATIONSHIP sense ("biggest win over Carlton"). The
+  // comparison sense ("over 200 games") never reaches here:
+  // COMPARE_OP_WORDS claims and strips "over" when digits follow, so what
+  // survives to this point is only the club-relationship reading. Without
+  // this the word was left over as the sole unmatched alpha token and
+  // read as a failed player-name guess, declining a question whose clubs
+  // had both resolved perfectly.
+  'over',
   'his', 'her', 'their', 'its', 'who', 'whom', 'which', 'what', 'ever',
   // Operator/connective words: never plausible fragments of a player name,
   // and a safety net alongside the explicit stripping each extraction

@@ -46,7 +46,8 @@ import {
   BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_METRIC_WORDS,
   CLUB_SUBJECT_LEADING, COMPARE_OP_WORDS,
   IN_A_FINAL, IN_A_GRAND_FINAL, IN_ONE_GAME, IN_ONE_SEASON,
-  MATCH_TYPE_WORDS, METRIC_WORDS, NEGATION_WORDS, NUMBER_PLUS_RE, NUMBER_WORDS, OVER_CAREER,
+  MATCH_TYPE_WORDS, METRIC_HIGHER_IS_WORSE, METRIC_WORDS, NEGATION_WORDS, NUMBER_PLUS_RE,
+  NUMBER_WORDS, OVER_CAREER, POLARITY_AGG_RE,
   PLAYER_NICKNAMES, SINCE_RE, STAT_GAMES_IDIOM_WORDS, STOPWORDS, TEAM_METRIC_WORDS, TOP_N_RE,
   UNANSWERABLE_TOPICS, canonicalise, readCount,
 } from '@/search/nl/vocab';
@@ -202,15 +203,42 @@ function extractSeasons(text: string): SeasonExtraction {
 // metric instead ("most finals played").
 const SCOPE_GOVERNS_MATCH_TYPE = /\b(?:in|during|was|is|were)\s+(?:an?|any|the)?\s*$/;
 
-function extractMatchType(text: string): { text: string; matchType?: NlMatchType; consumed: string[] } {
+/**
+ * `allowBare` lifts the governing-word requirement, and is passed when the
+ * question also contains a TEAM-metric word ("biggest grand final WIN").
+ *
+ * The requirement exists to stop "most finals played" being read as "rank
+ * single final-game performances", and that ambiguity is real only for
+ * the player_career reading of "finals". A team-scoring word rules that
+ * reading out entirely -- there is no career metric for "grand final
+ * win" -- so with one present, a bare match-type word can only be scope.
+ *
+ * The singular/plural convention does the delicate part for free, and it
+ * is why this stays a rule rather than a list of phrases:
+ *
+ *   "biggest finals WIN"   -> \bwin\b matches   -> scope, team_match
+ *   "most finals WINS"     -> \bwin\b does NOT  -> career metric, unchanged
+ *
+ * exactly the distinction asked for, falling out of the same convention
+ * that already separates one match's margin from a season tally.
+ */
+function extractMatchType(
+  text: string,
+  allowBare = false,
+): { text: string; matchType?: NlMatchType; consumed: string[] } {
   for (const [re, type] of MATCH_TYPE_WORDS) {
     const match = re.exec(text);
     if (!match) continue;
     const before = text.slice(Math.max(0, match.index - 12), match.index);
-    if (!SCOPE_GOVERNS_MATCH_TYPE.test(before)) continue;
+    if (!allowBare && !SCOPE_GOVERNS_MATCH_TYPE.test(before)) continue;
     return { text: stripMatch(text, match[0]), matchType: type as NlMatchType, consumed: [match[0]] };
   }
   return { text, consumed: [] };
+}
+
+/** Does a team-scoring word appear anywhere? Peeked WITHOUT consuming -- extractTeamMetric still does the real extraction later, against the by-then-stripped text. */
+function hasTeamMetricWord(text: string): boolean {
+  return TEAM_METRIC_WORDS.some(([re]) => re.test(text));
 }
 
 // ----------------------------------------------------------------- awards
@@ -413,20 +441,49 @@ function extractBoundary(
 
 // ---------------------------------------------------------------- aggregation
 
-function extractAggregation(text: string): { text: string; agg?: NlAggregation; consumed: string[] } {
+/**
+ * `polarity` is set when the aggregation came from a word whose direction
+ * depends on the metric ("worst", "best") rather than on the word itself.
+ * The caller resolves it once the metric is known -- see POLARITY_AGG_RE.
+ */
+function extractAggregation(text: string): {
+  text: string; agg?: NlAggregation; consumed: string[]; polarity: boolean;
+} {
   const topN = TOP_N_RE.exec(text);
   if (topN) {
     const n = /^\d+$/.test(topN[1]) ? Number(topN[1]) : readCount(topN[1]) ?? 10;
-    return { text: stripMatch(text, topN[0]), agg: { kind: 'top_n', n }, consumed: [topN[0]] };
+    return { text: stripMatch(text, topN[0]), agg: { kind: 'top_n', n }, consumed: [topN[0]], polarity: false };
   }
   for (const [re, kind] of AGG_WORDS) {
     const match = re.exec(text);
     if (match) {
       const agg: NlAggregation = kind === 'top_n' ? { kind: 'top_n', n: 1 } : { kind };
-      return { text: stripMatch(text, match[0]), agg, consumed: [match[0]] };
+      return {
+        text: stripMatch(text, match[0]),
+        agg,
+        consumed: [match[0]],
+        polarity: POLARITY_AGG_RE.test(match[0]),
+      };
     }
   }
-  return { text, consumed: [] };
+  return { text, consumed: [], polarity: false };
+}
+
+/**
+ * Flip a polarity-word aggregation for a metric whose polarity is
+ * inverted: a team's WORST loss is its BIGGEST one, not its narrowest.
+ * Everything else keeps the direction AGG_WORDS gave it.
+ */
+function resolvePolarity(
+  agg: NlAggregation | undefined,
+  metric: string | null,
+  polarity: boolean,
+): NlAggregation | undefined {
+  if (!agg || !polarity || !metric) return agg;
+  if (!METRIC_HIGHER_IS_WORSE.has(metric)) return agg;
+  if (agg.kind === 'min') return { kind: 'max' };
+  if (agg.kind === 'max') return { kind: 'min' };
+  return agg;
 }
 
 // --------------------------------------------------------------- metrics
@@ -531,7 +588,11 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   text = seasons.text;
   consumedTokens.push(...seasons.consumed);
 
-  const matchTypeResult = extractMatchType(text);
+  // A team-scoring word anywhere in the question means a bare "grand
+  // final"/"finals" can only be scope, never the player_career metric --
+  // see extractMatchType. Peeked before extraction so the decision is made
+  // on the whole question rather than on whatever is left by this point.
+  const matchTypeResult = extractMatchType(text, hasTeamMetricWord(text));
   text = matchTypeResult.text;
   consumedTokens.push(...matchTypeResult.consumed);
 
@@ -800,9 +861,13 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // else was said, a plain list when the question named only conditions
   // ("players with 200 games and no premiership", "teams that won the
   // wooden spoon").
-  const agg: NlAggregation = aggResult.agg ?? (careerConditions.length > 0 || clubSeasonConditions.length > 0 || boundary
-    ? { kind: 'list' }
-    : { kind: 'max' });
+  // resolvePolarity runs here, at plan assembly, because it is the first
+  // point where BOTH halves of the decision are known: the aggregation
+  // was extracted at step 8, the metric only settles at step 11.
+  const agg: NlAggregation = resolvePolarity(aggResult.agg, metric, aggResult.polarity)
+    ?? (careerConditions.length > 0 || clubSeasonConditions.length > 0 || boundary
+      ? { kind: 'list' }
+      : { kind: 'max' });
 
   const plan: NlQueryPlan = {
     v: 1,
