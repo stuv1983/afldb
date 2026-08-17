@@ -658,6 +658,45 @@ describe('NL-018: a mention matching two players is ambiguous however lopsided t
 // Carlton" sat at 0.750 -- and with the clarify band now declining over
 // leftover words, an understood-but-uncounted cue would have turned
 // correct answers into declines.
+// ---------------------------------------------------------------------
+// NL-020 -- "in ONE grand final" dropped the scope entirely
+// ---------------------------------------------------------------------
+// Caught by the corpus re-run of the batch above, as a regression the
+// batch itself introduced. SCOPE_GOVERNS_MATCH_TYPE accepted only
+// a/an/any/the, so "in one Grand Final" failed the gate and kept its
+// match type unextracted -- and IN_A_GRAND_FINAL, which DOES accept
+// "one", then deleted the phrase as a grain cue. Once grain cues began
+// counting as consumed, that turned a safe low-confidence decline into a
+// full-confidence all-time career total with the Grand Final scope gone:
+// "most goals in one Grand Final" answered Tony Lockett 1360.
+describe('NL-020: every determiner that names a match type also scopes it', () => {
+  it.each([
+    'most goals in a grand final',
+    'most goals in one grand final',
+    'most goals in any grand final',
+    'most goals in a single grand final',
+  ])('%s', async (question) => {
+    const p = await plan(question);
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('single');
+    expect(p.metric).toBe('goals');
+    expect(p.scope.matchType).toBe('grand_final');
+  });
+
+  it('all four phrasings produce the identical plan', async () => {
+    const a = await plan('most goals in a grand final');
+    const b = await plan('most goals in one grand final');
+    expect(a).toEqual(b);
+  });
+
+  it('bare "finals" with no governing word is still the career metric', async () => {
+    const p = await plan('most finals without a premiership');
+    expect(p.grain).toBe('player_career');
+    expect(p.metric).toBe('finals');
+    expect(p.scope.matchType).toBeUndefined();
+  });
+});
+
 describe('NL-019: grain-cue words count as consumed', () => {
   it.each([
     'dusty career goals against Carlton',

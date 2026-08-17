@@ -250,7 +250,15 @@ function extractSeasons(text: string): SeasonExtraction {
 // purpose -- both name a real match type. Only a governing word from
 // this set counts; bare "finals" with nothing before it is the career
 // metric instead ("most finals played").
-const SCOPE_GOVERNS_MATCH_TYPE = /\b(?:in|during|was|is|were)\s+(?:an?|any|the)?\s*$/;
+//
+// The determiner list must stay in step with IN_ONE_GAME/IN_A_FINAL/
+// IN_A_GRAND_FINAL in vocab.ts, which accept "one"/"any"/"single"/"the
+// same" as well. When it did not, "most goals in one Grand Final" failed
+// this gate and kept its match type -- then IN_A_GRAND_FINAL, which DOES
+// accept "one", deleted the phrase at the grain-cue step. The question
+// answered as an all-time career total with the Grand Final scope
+// silently gone.
+const SCOPE_GOVERNS_MATCH_TYPE = /\b(?:in|during|was|is|were)\s+(?:the same|(?:a )?single|an?|any|one|the)?\s*$/;
 
 /**
  * `allowBare` lifts the governing-word requirement, and is passed when the
@@ -279,8 +287,15 @@ function extractMatchType(
     const match = re.exec(text);
     if (!match) continue;
     const before = text.slice(Math.max(0, match.index - 12), match.index);
-    if (!allowBare && !SCOPE_GOVERNS_MATCH_TYPE.test(before)) continue;
-    return { text: stripMatch(text, match[0]), matchType: type as NlMatchType, consumed: [match[0]] };
+    const governs = SCOPE_GOVERNS_MATCH_TYPE.exec(before);
+    if (!allowBare && !governs) continue;
+    // The governing phrase is consumed WITH the match type, not left
+    // behind. Its determiner is often a meaningful word in its own right
+    // ("one", "any", "single" are not stopwords the way "a" and "the"
+    // are), and stranding it made "most goals in one Grand Final"
+    // decline over a leftover "one" -- the very word that scoped it.
+    const span = governs ? `${governs[0]}${match[0]}` : match[0];
+    return { text: stripMatch(text, span), matchType: type as NlMatchType, consumed: [span] };
   }
   return { text, consumed: [] };
 }
