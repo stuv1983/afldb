@@ -137,6 +137,9 @@ const NUMBER_WORDS: Record<string, number> = {
   once: 1, twice: 2, thrice: 3,
   one: 1, two: 2, three: 3, four: 4, five: 5,
   six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  // "multiple draws" / "several draws" — vaguer than a numeral, but the
+  // question they name is unambiguous: more than one.
+  multiple: 2, several: 2,
 };
 
 const IN_ONE_SEASON = /\bin (?:a|one|any|(?:a )?single|the same) season\b/;
@@ -191,9 +194,18 @@ function question(builder: string, params: Record<string, string>, label: string
 
 /**
  * Parse one player question out of free text, or null when nothing in the
- * vocabulary matches. Checked most-specific first: the outcome words
- * (draws/wins/losses) before the generic "games", so "won 20 games in a
- * season" reads as wins, not games.
+ * vocabulary matches.
+ *
+ * Ordered most-specific first, because the same verb serves several
+ * questions: "won" appears in "won 3 premierships", "won 5 finals" and
+ * "won 20 games in a season", which are three different builders, so the
+ * narrower reading has to be tried before the broader one.
+ *
+ * The season phrase is OPTIONAL for the outcome questions (draws, wins,
+ * losses). The catalogue only offers those at season grain, so "drawn
+ * twice or more" and "two draws in a season" are the same question, and
+ * demanding the literal "in one season" only made the feature look
+ * broken for the shorter phrasing people actually type.
  */
 export function parsePlayerQuestion(raw: string): PlayerQuestion | null {
   const text = canonicalise(raw);
@@ -202,14 +214,48 @@ export function parsePlayerQuestion(raw: string): PlayerQuestion | null {
   const countText = text.replace(IN_ONE_SEASON, ' ').replace(IN_ONE_GAME, ' ');
   const n = readCount(countText);
 
-  if (/\bdraws?\b|\bdrawn\b|\bdrew\b/.test(text) && IN_ONE_SEASON.test(text)) {
+  const won = /\bwins?\b|\bwon\b|\bwinning\b/.test(text);
+  const lost = /\bloss(?:es)?\b|\blost\b|\blosing\b/.test(text);
+  const anyFinal = /\bfinals?\b/.test(text);
+  const grandFinal = /\bgrand finals?\b|\bgrand-finals?\b/.test(text);
+
+  // Premierships/flags, and "won a grand final", which means the same
+  // thing. Ahead of the generic win handling below, which would
+  // otherwise read the "won" and answer a season-wins question.
+  if (/\bpremierships?\b|\bflags?\b/.test(text) || (grandFinal && won)) {
+    const times = n ?? 1;
+    return question('premierships_min', { times: String(times) }, `${times}+ premierships`);
+  }
+  if (grandFinal && lost) {
+    const times = n ?? 1;
+    return question('grand_finals_lost_min', { times: String(times) }, `${times}+ Grand Finals lost`);
+  }
+  if (grandFinal) {
+    const times = n ?? 1;
+    return question('grand_finals_played_min', { times: String(times) }, `${times}+ Grand Finals played`);
+  }
+
+  // Finals, likewise ahead of the generic season-outcome handling.
+  if (anyFinal && won) {
+    const times = n ?? 1;
+    return question('finals_wins_min', { x: String(times) }, `${times}+ finals wins`);
+  }
+  if (anyFinal && n !== null) {
+    return question('finals_games_min', { games: String(n) }, `${n}+ finals games`);
+  }
+
+  // Season outcomes. Draws default to 1 when no count is given ("drew a
+  // game"); wins and losses require an explicit count, since a bare
+  // "won a final" is a finals question and is caught above, and a bare
+  // "winners" is more likely an award query than a season-wins one.
+  if (/\bdraws?\b|\bdrawn\b|\bdrew\b/.test(text)) {
     const times = n ?? 1;
     return question('season_draws_min', { times: String(times) }, `${times}+ draws in one season`);
   }
-  if (n !== null && /\bwins?\b|\bwon\b/.test(text) && IN_ONE_SEASON.test(text)) {
+  if (n !== null && won) {
     return question('season_wins_min', { times: String(n) }, `${n}+ wins in one season`);
   }
-  if (n !== null && /\bloss(?:es)?\b|\blost\b/.test(text) && IN_ONE_SEASON.test(text)) {
+  if (n !== null && lost) {
     return question('season_losses_min', { times: String(n) }, `${n}+ losses in one season`);
   }
 
@@ -221,11 +267,6 @@ export function parsePlayerQuestion(raw: string): PlayerQuestion | null {
       return question('games_in_season_min', { games: String(n) }, `${n}+ games in one season`);
     }
     return question('career_games_min', { games: String(n) }, `${n}+ career games`);
-  }
-
-  if (/\bpremierships?\b|\bflags?\b/.test(text)) {
-    const times = n ?? 1;
-    return question('premierships_min', { times: String(times) }, `${times}+ premierships`);
   }
 
   if (n !== null) {

@@ -144,6 +144,50 @@ describe('parsePlayerQuestion', () => {
     });
   });
 
+  it('does not require the "in one season" phrase for outcome questions', () => {
+    // The regression this guards: both of these returned null on the live
+    // site because the draws branch demanded the literal season phrase,
+    // while the catalogue only offers draws at season grain anyway.
+    const expected = { builder: 'season_draws_min', params: { times: '2' } };
+    expect(parsePlayerQuestion('drawn twice or more')?.axis).toEqual(expected);
+    expect(parsePlayerQuestion('two draws')?.axis).toEqual(expected);
+    expect(parsePlayerQuestion('multiple draws')?.axis).toEqual(expected);
+    expect(parsePlayerQuestion('20 wins')?.axis).toEqual({
+      builder: 'season_wins_min', params: { times: '20' },
+    });
+    expect(parsePlayerQuestion('15 losses')?.axis).toEqual({
+      builder: 'season_losses_min', params: { times: '15' },
+    });
+  });
+
+  it('reads "won" as premierships or finals before season wins', () => {
+    // One verb, three builders — the narrower reading has to win.
+    expect(parsePlayerQuestion('won 3 premierships')?.axis).toEqual({
+      builder: 'premierships_min', params: { times: '3' },
+    });
+    expect(parsePlayerQuestion('won 2 grand finals')?.axis).toEqual({
+      builder: 'premierships_min', params: { times: '2' },
+    });
+    expect(parsePlayerQuestion('won 5 finals')?.axis).toEqual({
+      builder: 'finals_wins_min', params: { x: '5' },
+    });
+    expect(parsePlayerQuestion('won 20 games in a season')?.axis).toEqual({
+      builder: 'season_wins_min', params: { times: '20' },
+    });
+  });
+
+  it('parses grand final questions at the right grain', () => {
+    expect(parsePlayerQuestion('played 4 grand finals')?.axis).toEqual({
+      builder: 'grand_finals_played_min', params: { times: '4' },
+    });
+    expect(parsePlayerQuestion('lost 3 grand finals')?.axis).toEqual({
+      builder: 'grand_finals_lost_min', params: { times: '3' },
+    });
+    expect(parsePlayerQuestion('10 finals games')?.axis).toEqual({
+      builder: 'finals_games_min', params: { games: '10' },
+    });
+  });
+
   it('never reads the "one" of "in one season" as the count', () => {
     // No explicit number: draws default to 1+.
     expect(parsePlayerQuestion('drew a game in one season')?.axis).toEqual({
