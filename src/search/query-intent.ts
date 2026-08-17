@@ -290,16 +290,31 @@ export function parsePlayerQuestion(raw: string): PlayerQuestion | null {
 }
 
 /**
+ * The single "every player" axis a one-question search is solved against:
+ * the parsed question on one side, and a threshold every player clears on
+ * the other. Exported so the search layer can answer the question with the
+ * same pair the shared board below is built from.
+ */
+export const EVERY_PLAYER_AXIS: GridAxisState = {
+  builder: 'career_games_min',
+  params: { games: '1' },
+};
+
+/**
  * A board with the parsed question in one solvable cell: the question as
  * row 1, "1+ career games" (i.e. every player) as column 1, and the
  * remaining axes left incomplete so no other cell solves. Most games
  * first, so the familiar names lead the answer.
+ *
+ * This is now only the "open this in the grid solver to refine it" link,
+ * offered beside results that are already on screen -- never the way the
+ * question gets answered, which must not depend on reaching that page.
  */
-function gridSolverHref(axis: GridAxisState): string {
+export function gridSolverHref(axis: GridAxisState): string {
   const filler = (): GridAxisState => ({ builder: 'career_games_min', params: {} });
   const board: GridBoardState = {
     rows: [axis, filler(), filler()],
-    cols: [{ builder: 'career_games_min', params: { games: '1' } }, filler(), filler()],
+    cols: [EVERY_PLAYER_AXIS, filler(), filler()],
     order: 'games_desc',
   };
   return `/grid-solver?g=${serializeBoardState(board)}`;
@@ -315,12 +330,7 @@ function gridSolverHref(axis: GridAxisState): string {
 export function resolveIntent(
   query: string,
   signals: QuerySignals,
-  ctx: {
-    bestRecord?: IntentCandidate | null;
-    bestAward?: IntentCandidate | null;
-    /** Whether the current visitor may reach /grid-solver (a runtime audience setting) — the player-question intents only fire when they can. */
-    gridSolver?: boolean;
-  },
+  ctx: { bestRecord?: IntentCandidate | null; bestAward?: IntentCandidate | null },
 ): IntentMatch | null {
   const lower = query.trim().toLowerCase();
   if (lower.length === 0) return null;
@@ -412,21 +422,13 @@ export function resolveIntent(
     };
   }
 
-  // 5. A player question in plain words ("drawn twice or more in one
-  // season") — answered by the grid solver with the question prefilled.
-  // Only when this visitor can actually reach /grid-solver, and only
-  // without a club: the parsed question carries no club dimension, so a
-  // club-qualified query would silently drop the club rather than apply it.
-  if (ctx.gridSolver && !club) {
-    const parsed = parsePlayerQuestion(topicWords || lower);
-    if (parsed) {
-      return {
-        href: gridSolverHref(parsed.axis),
-        label: `Players with ${parsed.label}`,
-        detail: 'Every matching player, most games first.',
-      };
-    }
-  }
-
+  // A player question in plain words ("drawn twice or more") is
+  // deliberately NOT handled here. An intent is a "go to this page" link,
+  // and answering a question with a link to the grid solver made the
+  // answer depend on reaching that page: at the default audience a reader
+  // without access got no link and no answer, just "no results". The
+  // search layer parses and answers it directly instead, on the page the
+  // reader is already looking at -- see playerQuestion in
+  // db/queries/search.ts.
   return null;
 }

@@ -4,8 +4,16 @@ import { getClubOptions } from '@/db/queries/advanced-search';
 import { searchAflwClubs, searchAflwPlayers } from '@/db/queries/aflw';
 import { sql } from '@/db/client';
 import { RECORD_CATEGORIES } from '@/db/queries/records';
+import { solveCellRows, type GridCellRow } from '@/db/queries/grid-solver';
 import { normalisedSearchTerm } from '@/lib/like';
-import { type IntentMatch, extractQuerySignals, resolveIntent } from '@/search/query-intent';
+import {
+  EVERY_PLAYER_AXIS,
+  type IntentMatch,
+  extractQuerySignals,
+  gridSolverHref,
+  parsePlayerQuestion,
+  resolveIntent,
+} from '@/search/query-intent';
 
 /**
  * Global search across players, clubs, venues, seasons, rounds, awards
@@ -348,6 +356,23 @@ function aflwUnavailable(error: unknown): [] {
   return [];
 }
 
+/**
+ * A question asked in plain words ("drawn twice or more", "10 goals in a
+ * game"), ANSWERED — not linked to.
+ *
+ * The rows are the answer itself, rendered on the search page, so this
+ * works for every reader regardless of who may reach /grid-solver.
+ * `refineHref` is the optional extra: the same question opened in that
+ * page for someone who can use it, and null for everyone else.
+ */
+export type PlayerQuestionAnswer = {
+  /** Human-readable restatement, e.g. "2+ draws in one season". */
+  label: string;
+  rows: GridCellRow[];
+  total: number;
+  refineHref: string | null;
+};
+
 export type GlobalSearchResults = {
   players: SearchResult[];
   clubs: SearchResult[];
@@ -360,21 +385,66 @@ export type GlobalSearchResults = {
   aflwClubs: SearchResult[];
   /** A recognised intent, e.g. "brownlow winner richmond" -> filtered deep link. */
   intent: IntentMatch | null;
+  /** A plain-words player question, already answered. */
+  playerQuestion: PlayerQuestionAnswer | null;
   total: number;
 };
+
+/** How many answer rows a search page shows before "refine" takes over. */
+const PLAYER_QUESTION_ROWS = 10;
+
+/**
+ * Parse and answer a plain-words player question, or null.
+ *
+ * Runs one grid-solver shape (the question against "every player"), which
+ * is the same bounded, parameterised SQL the grid solver itself compiles
+ * -- no request-chosen column or operator -- under the same statement
+ * timeout as every other query on the site.
+ *
+ * A failure degrades to "no question recognised" rather than failing the
+ * whole search: the reader still gets their player and club results.
+ */
+async function answerPlayerQuestion(
+  query: string,
+  canReachGridSolver: boolean,
+): Promise<PlayerQuestionAnswer | null> {
+  const parsed = parsePlayerQuestion(query);
+  if (!parsed) return null;
+
+  try {
+    const { rows, total } = await solveCellRows(
+      parsed.axis, EVERY_PLAYER_AXIS, 'games_desc',
+      { limit: PLAYER_QUESTION_ROWS, offset: 0 },
+    );
+    if (total === 0) return null;
+    return {
+      label: parsed.label,
+      rows,
+      total,
+      refineHref: canReachGridSolver ? gridSolverHref(parsed.axis) : null,
+    };
+  } catch (error) {
+    console.error('player question could not be answered', error);
+    return null;
+  }
+}
 
 const EMPTY_RESULTS: GlobalSearchResults = {
   players: [], clubs: [], venues: [], seasons: [],
   rounds: [], awards: [], records: [],
-  aflwPlayers: [], aflwClubs: [], intent: null, total: 0,
+  aflwPlayers: [], aflwClubs: [], intent: null, playerQuestion: null, total: 0,
 };
 
 export async function globalSearch(
   query: string,
   playerLimit = 25,
   options: {
-    /** Whether the current visitor may reach /grid-solver — enables the player-question intents. */
-    gridSolverIntents?: boolean;
+    /**
+     * Whether the visitor may reach /grid-solver. Only decides whether the
+     * answer carries a "refine there" link -- the answer itself is
+     * computed and shown either way.
+     */
+    canReachGridSolver?: boolean;
   } = {},
 ): Promise<GlobalSearchResults> {
   const trimmed = query.trim();
@@ -391,7 +461,9 @@ export async function globalSearch(
   const topicText = (signals.club || signals.year !== null) ? signals.topicWords : '';
   const runTopicSearch = topicText.length >= MIN_QUERY_LENGTH && topicText !== trimmed;
 
-  const [players, clubs, venues, seasons, rounds, awards, aflw, topicAwards] = await Promise.all([
+  const [
+    players, clubs, venues, seasons, rounds, awards, aflw, topicAwards, playerQuestion,
+  ] = await Promise.all([
     searchPlayers(trimmed, playerLimit),
     searchClubs(trimmed),
     searchVenues(trimmed),
@@ -400,6 +472,7 @@ export async function globalSearch(
     searchAwards(trimmed),
     aflwResults(trimmed, { players: 10, clubs: 4 }),
     runTopicSearch ? searchAwards(topicText, 3) : Promise.resolve([] as SearchResult[]),
+    answerPlayerQuestion(trimmed, options.canReachGridSolver ?? false),
   ]);
   const records = searchRecords(trimmed);
   const topicRecords = runTopicSearch ? searchRecords(topicText, 3) : [];
@@ -409,7 +482,6 @@ export async function globalSearch(
   const intent = resolveIntent(trimmed, signals, {
     bestRecord: bestRecord && { slug: bestRecord.slug, title: bestRecord.title, score: bestRecord.rank },
     bestAward: bestAward && { slug: bestAward.slug, title: bestAward.title, score: bestAward.rank },
-    gridSolver: options.gridSolverIntents ?? false,
   });
 
   return {
@@ -417,9 +489,14 @@ export async function globalSearch(
     aflwPlayers: aflw.players,
     aflwClubs: aflw.clubs,
     intent,
+    playerQuestion,
+    // An answered question is a result: without this, a phrase that only
+    // the question parser understands still renders the "no results"
+    // empty state despite having an answer on screen.
     total: players.length + clubs.length + venues.length + seasons.length
       + rounds.length + awards.length + records.length
-      + aflw.players.length + aflw.clubs.length,
+      + aflw.players.length + aflw.clubs.length
+      + (playerQuestion ? 1 : 0),
   };
 }
 

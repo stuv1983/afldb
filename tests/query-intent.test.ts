@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type IntentClub,
   extractQuerySignals,
+  gridSolverHref,
   parsePlayerQuestion,
   resolveIntent,
 } from '@/search/query-intent';
@@ -250,28 +251,31 @@ describe('parsePlayerQuestion', () => {
   });
 });
 
-describe('resolveIntent — player questions', () => {
-  it('links the parsed question to a grid solver board with one solvable cell', () => {
-    const match = intentFor('drawn twice or more in one season', { gridSolver: true });
-    expect(match?.label).toBe('Players with 2+ draws in one season');
-    expect(match?.href.startsWith('/grid-solver?g=')).toBe(true);
+describe('player questions are answered, not linked away', () => {
+  it('is not turned into a grid-solver intent link', () => {
+    // The regression this guards: answering via an intent link made the
+    // answer depend on reaching /grid-solver, so a reader without access
+    // to that page got "no results" instead of their answer. The search
+    // layer answers the question inline now (db/queries/search.ts), and
+    // resolveIntent must stay out of it.
+    expect(intentFor('drawn twice or more in one season')).toBeNull();
+    expect(intentFor('drawn twice or more')).toBeNull();
+    expect(intentFor('10 goals in a game')).toBeNull();
+  });
 
-    const state = parseBoardState(match!.href.replace('/grid-solver?g=', ''));
+  it('still builds a refine board with one solvable cell', () => {
+    // Offered beside the answer for a reader who can reach the page, so
+    // the board shape still matters.
+    const href = gridSolverHref(parsePlayerQuestion('drawn twice or more')!.axis);
+    expect(href.startsWith('/grid-solver?g=')).toBe(true);
+
+    const state = parseBoardState(href.replace('/grid-solver?g=', ''));
     expect(state?.rows[0]).toEqual({ builder: 'season_draws_min', params: { times: '2' } });
     expect(state?.cols[0]).toEqual({ builder: 'career_games_min', params: { games: '1' } });
     expect(state?.order).toBe('games_desc');
     // The remaining axes stay incomplete so only the one cell solves.
     expect(state?.rows[1].params).toEqual({});
     expect(state?.cols[2].params).toEqual({});
-  });
-
-  it('stays silent when the visitor cannot reach the grid solver', () => {
-    expect(intentFor('drawn twice or more in one season')).toBeNull();
-    expect(intentFor('drawn twice or more in one season', { gridSolver: false })).toBeNull();
-  });
-
-  it('stays silent when a club is named, rather than dropping it', () => {
-    expect(intentFor('drawn twice in one season richmond', { gridSolver: true })).toBeNull();
   });
 });
 

@@ -6,7 +6,7 @@ import { SearchBox } from '@/components/SearchBox';
 import { aflwOnlySearch, globalSearch } from '@/db/queries/search';
 import { getSiteSettings } from '@/db/queries/site-settings';
 import { getAdminUser, ROLE_RANK } from '@/lib/auth/session';
-import { clubPath, playerPath, seasonPath, venuePath } from '@/lib/format';
+import { clubPath, formatNumber, formatSpan, playerPath, seasonPath, venuePath } from '@/lib/format';
 import { firstValue } from '@/lib/params';
 import { MIN_QUERY_LENGTH, searchResultHref } from '@/search/constants';
 
@@ -35,19 +35,23 @@ export default async function SearchPage({
   // The player-question intents ("drawn twice or more in one season") link
   // to /grid-solver, whose audience is a runtime setting — only offer them
   // to a visitor that gate would actually admit (see requireAudience).
-  let gridSolverIntents = false;
+  // A plain-words question ("drawn twice or more") is answered inline
+  // below for every reader. This only decides whether the answer also
+  // offers "refine in the grid solver", which is a page not everyone may
+  // reach (its audience is a runtime setting — see requireAudience).
+  let canReachGridSolver = false;
   if (scope !== 'aflw' && hasQuery) {
     const { gridAudience } = await getSiteSettings();
     if (gridAudience === 'public') {
-      gridSolverIntents = true;
+      canReachGridSolver = true;
     } else {
       const user = await getAdminUser();
-      gridSolverIntents = user !== null && ROLE_RANK[user.role] >= ROLE_RANK[gridAudience];
+      canReachGridSolver = user !== null && ROLE_RANK[user.role] >= ROLE_RANK[gridAudience];
     }
   }
 
   const results = scope !== 'aflw' && hasQuery
-    ? await globalSearch(query, 25, { gridSolverIntents })
+    ? await globalSearch(query, 25, { canReachGridSolver })
     : null;
 
   const otherScopeHref = scope === 'aflw'
@@ -142,6 +146,60 @@ export default async function SearchPage({
         </div>
       ) : (
         <>
+          {/* A question asked in plain words, answered here rather than
+              linked elsewhere: the reader asked for players, so the
+              players are the result. */}
+          {results.playerQuestion && (
+            <section className="section">
+              <CollapsibleTable
+                title={`Players with ${results.playerQuestion.label}`}
+                note={`${formatNumber(results.playerQuestion.total)} ${
+                  results.playerQuestion.total === 1 ? 'player' : 'players'
+                }`}
+              >
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th scope="col">Player</th>
+                        <th scope="col">Career</th>
+                        <th scope="col" className="num">Games</th>
+                        <th scope="col" className="num">Goals</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {results.playerQuestion.rows.map((p) => (
+                        <tr key={p.id}>
+                          <td className="wide">
+                            <Link href={playerPath(p.slug, p.id)}>{p.displayName}</Link>
+                          </td>
+                          <td className="muted">{formatSpan(p.debutSeason, p.finalSeason)}</td>
+                          <td className="num">{formatNumber(p.games)}</td>
+                          <td className="num">{formatNumber(p.goals)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CollapsibleTable>
+
+              {results.playerQuestion.total > results.playerQuestion.rows.length && (
+                <p className="muted" style={{ marginTop: '0.6rem' }}>
+                  Showing the {results.playerQuestion.rows.length} with the most games
+                  of {formatNumber(results.playerQuestion.total)}.
+                  {results.playerQuestion.refineHref && (
+                    <>
+                      {' '}
+                      <Link href={results.playerQuestion.refineHref}>
+                        Open in the grid solver to refine →
+                      </Link>
+                    </>
+                  )}
+                </p>
+              )}
+            </section>
+          )}
+
           {results.intent && (
             <section className="section search-intent">
               <Link href={results.intent.href} className="search-intent-link">
