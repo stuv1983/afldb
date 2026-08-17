@@ -50,8 +50,12 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    strict top-N counts, justified-token player consumption, club-season
  *    routing for named clubs, player_season for club+season leaderboards,
  *    surname-ambiguity detection, and the clarify-band leftover gate.
+ * 3: conversational filler stripped at canonicalisation ("can you tell me",
+ *    "show me", "afl question", "please"), decorative punctuation including
+ *    the em dash, and "vs"/"v" recognised as the preposition they always
+ *    were -- the largest failure cause in the 250,000-question run.
  */
-export const PARSER_VERSION = 2;
+export const PARSER_VERSION = 3;
 
 // ------------------------------------------------------------------ grain
 

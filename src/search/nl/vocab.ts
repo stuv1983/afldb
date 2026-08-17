@@ -37,17 +37,70 @@ export function readCount(text: string): number | null {
 // ---------------------------------------------------------- canonicalise
 
 /**
+ * Conversational scaffolding: the words a reader wraps a question in, which
+ * carry no part of the question itself. Stripped during canonicalisation,
+ * before any extraction stage sees the text.
+ *
+ * This is not politeness-trimming for its own sake. Filler was the single
+ * largest failure cause in the 250,000-question qualification run, and it
+ * failed in the worst of the two available ways. A leftover meaningful word
+ * makes the clarify-band gate decline (annoying but safe); but filler
+ * adjacent to a name is swallowed by candidatePlayerSpan, so "can you tell
+ * me Nick Dal Santo ..." looked up a player called "can you tell me nick"
+ * and declined as an ambiguous player -- 26,287 rows, the largest single
+ * cluster, all of them questions the engine understood perfectly apart from
+ * the greeting in front. Stripping here rather than in STOPWORDS matters:
+ * these are PHRASES, and declaring their constituent words individually
+ * meaningless would also disarm "in ONE game" and "QUICK" as a surname.
+ *
+ * Ordered longest-first, since a bare "afl" must not claim the "afl
+ * question" prefix before the phrase gets a chance at it. Every entry below
+ * is taken from the run's own unsupported-term frequency table, with the
+ * obvious siblings of an observed phrase included alongside it ("thank you"
+ * beside "thanks") -- a reader who writes one writes the other.
+ */
+export const CONVERSATIONAL_FILLER: RegExp[] = [
+  /\b(?:can|could|would) you (?:please )?tell me\b/g,
+  /\bi(?: would| ?'d)? (?:like|want) to know\b/g,
+  /\bi want know\b/g,          // canonicaliseStatWords drops the "to"
+  /\bjust wondering\b/g,
+  /\b(?:please )?tell me\b/g,
+  /\bshow me\b/g,
+  /\bfor afldb\b/g,
+  /\bafldb\b/g,
+  /\bafl (?:question|stat|trivia)\b/g,
+  /\b(?:quick|dumb|silly|stupid|serious) (?:question|one)\b/g,
+  /\bif you can\b/g,
+  /\bfor me\b/g,
+  /\bg'?day\b/g,
+  /\bthank you\b/g,
+  /\b(?:please|thanks|ta|cheers|mate|hey)\b/g,
+  // "in the year 2015" -- "the year" says nothing BARE_YEAR_RE does not
+  // already read from the digits themselves.
+  /\bthe year\b/g,
+  // Bare "afl" last, once every phrase that starts with it has been tried.
+  // Safe against "aflw" and "afldb", both of which fail the word boundary.
+  /\bafl\b/g,
+];
+
+/**
  * Lowercase, strip possessives and punctuation the vocabulary below isn't
- * written to expect, and apply query-intent.ts's number-word protection
- * ("inside 50s" must never read as the number 50). Run first, always.
+ * written to expect, drop conversational filler, and apply
+ * query-intent.ts's number-word protection ("inside 50s" must never read as
+ * the number 50). Run first, always.
  */
 export function canonicalise(raw: string): string {
-  const text = raw
+  let text = raw
     .toLowerCase()
     .replace(/['’]s\b/g, '')     // "richmond's" -> "richmond", "dusty's" -> "dusty"
-    .replace(/[.,!?]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+    // Sentence punctuation, plus the decorative marks readers paste in.
+    // The em dash earns its place on evidence: 2,036 questions carried one
+    // ("what is most goals in a Grand Final — please") and it survived as a
+    // leftover token. Hyphens and apostrophes are deliberately NOT here --
+    // "inside-fifties", "home-and-away" and "o'brien" all need theirs.
+    .replace(/[.,!?:;—–…"“”()[\]]/g, ' ');
+  for (const filler of CONVERSATIONAL_FILLER) text = text.replace(filler, ' ');
+  text = text.replace(/\s+/g, ' ').trim();
   return canonicaliseStatWords(text);
 }
 
@@ -383,7 +436,13 @@ export const STOPWORDS = new Set([
   // itself -- without this, a scoped question with no player named
   // ("most goals against carlton ever") left "against" as the only
   // leftover alpha token, misread as a failed player-name candidate.
-  'against', 'versus',
+  // "vs"/"v" are the SAME preposition and were the oversight in that list:
+  // AGAINST_PREPOSITION has always accepted them for role assignment, so
+  // "Richmond heaviest win vs Kangas" resolved both clubs correctly and
+  // then declined anyway, because the abbreviation itself was the one
+  // unconsumed alpha token left for the player-name scan to misread. 838
+  // questions in the qualification run failed on nothing else.
+  'against', 'versus', 'vs', 'v',
   // "over" in its RELATIONSHIP sense ("biggest win over Carlton"). The
   // comparison sense ("over 200 games") never reaches here:
   // COMPARE_OP_WORDS claims and strips "over" when digits follow, so what
@@ -406,6 +465,13 @@ export const STOPWORDS = new Set([
   // consumed ("finals played", "goals kicked", "votes recorded") --
   // meaningful as English, redundant once their subject is resolved.
   'played', 'kicked', 'scored', 'recorded', 'achieved', 'won', 'whose',
+  // Conversational pronouns, as a safety net BEHIND CONVERSATIONAL_FILLER
+  // rather than instead of it. The phrase list removes "for me" and "if you
+  // can" outright; these catch the same words when a reader arranges them a
+  // way the list does not anticipate, so a stray pronoun can neither depress
+  // the token ratio nor be swallowed into a player-name span. None is ever a
+  // fragment of an AFL player, club or venue name.
+  'i', 'me', 'my', 'you', 'your', 'us', 'we',
 ]);
 
 /** Only the LEADING word decides a club-season question ("teams that…", "clubs with…") -- a bare "clubs" buried in a count phrase ("exactly two clubs") must not trigger it. */

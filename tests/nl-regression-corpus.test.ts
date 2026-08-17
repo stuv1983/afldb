@@ -709,3 +709,96 @@ describe('NL-019: grain-cue words count as consumed', () => {
     expect(result.report.components.tokenRatio).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------
+// NL-021 -- conversational filler was read as part of the question
+// ---------------------------------------------------------------------
+// From the 250,000-question qualification run, where it was the single
+// largest failure cause: 144,551 rows carried a greeting, a sign-off or
+// both, and the parser had no notion of either.
+//
+// Two distinct failures, one root cause. The mild one is a leftover
+// meaningful token, which the clarify-band gate correctly declines. The
+// severe one is that filler ADJACENT TO A NAME is swallowed by
+// candidatePlayerSpan, so "can you tell me Nick Dal Santo ..." looked up
+// a player called "can you tell me nick", failed, and declined as an
+// ambiguous player -- 26,287 rows whose football content the engine had
+// understood completely.
+//
+// The assertion that matters is metamorphic: a decorated question and
+// its bare form must produce the IDENTICAL plan. Pinning the decorated
+// plan's fields alone would still pass if the filler quietly changed the
+// scope, which is the failure this class is capable of.
+describe('NL-021: conversational filler is not part of the question', () => {
+  const BARE = 'most goals against Carlton in 2017';
+  it.each([
+    'can you tell me most goals against Carlton in 2017',
+    'could you please tell me most goals against Carlton in 2017',
+    'show me most goals against Carlton in 2017',
+    'AFL question most goals against Carlton in 2017',
+    'AFL stat: most goals against Carlton in 2017',
+    'for AFLDB most goals against Carlton in 2017',
+    'quick one most goals against Carlton in 2017',
+    'quick question most goals against Carlton in 2017',
+    'I want to know most goals against Carlton in 2017',
+    'most goals against Carlton in 2017 please',
+    'most goals against Carlton in 2017 thanks',
+    'most goals against Carlton in 2017 if you can',
+    'most goals against Carlton in 2017 for me',
+    'mate, most goals against Carlton in 2017 cheers',
+    'SHOW ME MOST GOALS AGAINST CARLTON IN 2017 PLEASE!!',
+    'most goals against Carlton in the year 2017',
+  ])('%s parses identically to the bare question', async (decorated) => {
+    expect(await plan(decorated)).toEqual(await plan(BARE));
+  });
+
+  // The severe case: filler immediately before and after a player name.
+  it('filler around a player name does not become part of the name', async () => {
+    const decorated = await parseNlQuestion(
+      'can you tell me dusty total goals against Carlton please', ctx,
+    );
+    expect(decorated.status).toBe('plan');
+    expect(decorated.report.ambiguousPlayer).toBeUndefined();
+    expect(decorated.report.unsupportedTerms).toEqual([]);
+    expect((decorated as Extract<NlParse, { status: 'plan' }>).plan.player?.name)
+      .toBe('Dustin Martin');
+  });
+
+  it('a decorated question consumes every meaningful token', async () => {
+    const result = await parseNlQuestion(
+      'show me dusty total goals against Carlton thanks', ctx,
+    );
+    expect(result.report.components.tokenRatio).toBe(1);
+  });
+
+  // "vs"/"v" resolved both clubs and then declined on the abbreviation
+  // itself, the only unconsumed alpha token left over.
+  it.each(['vs', 'v', 'against'])('Richmond biggest win %s Carlton', async (preposition) => {
+    const p = await plan(`Richmond biggest win ${preposition} Carlton`);
+    expect(p.scope.clubFor?.slug).toBe('richmond');
+    expect(p.scope.clubAgainst?.slug).toBe('carlton');
+  });
+
+  it('an em dash is decoration, not a token', async () => {
+    expect(await plan('what is most goals in a grand final — please'))
+      .toEqual(await plan('most goals in a grand final'));
+  });
+
+  // The guard rails. Filler stripping works on PHRASES precisely so that
+  // it cannot disarm the words those phrases happen to contain.
+  it('"one" still scopes a single game', async () => {
+    const p = await plan('most goals in one game');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('single');
+  });
+
+  it('"for <club>" is still a club role, not the "for me" filler', async () => {
+    const p = await plan('most goals for Richmond in 2017');
+    expect(p.scope.clubFor?.slug).toBe('richmond');
+  });
+
+  it('garbage is still garbage -- filler stripping is not a leftover amnesty', async () => {
+    const result = await parseNlQuestion('show me dusty banana most goals please', ctx);
+    expect(result.status).toBe('none');
+  });
+});
