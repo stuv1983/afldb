@@ -95,9 +95,10 @@ export default function PrivacyPage() {
       <section className="section">
         <h2>Changing your mind</h2>
         <p>
-          Declining removes the <code>nl_sid</code> cookie immediately if one was already set. You
-          can also clear cookies for this site in your browser at any time; the banner will then
-          ask again.
+          Declining removes the <code>nl_sid</code> cookie immediately if one was already set, and
+          it stays removed: that cookie is kept only while an acceptance is on record, so any
+          later visit without one clears it again. You can also clear cookies for this site in
+          your browser at any time; the banner will then ask again.
         </p>
         <p>
           <Link href="/">Back to AFLDB</Link>

@@ -296,7 +296,16 @@ describe('afldb_auth is confined to the operational tables', () => {
                 ('site_media',           'SELECT'),
                 ('site_media',           'INSERT'),
                 ('site_media',           'DELETE'),
-                ('matches',              'SELECT')
+                ('matches',              'SELECT'),
+                -- The natural-language surfaces (046, 047, 049). Named here
+                -- because the reconciler's afldb_auth section is SUBTRACTIVE:
+                -- a table the feature ships without adding to that spec keeps
+                -- working until the next restore silently revokes it, and the
+                -- public write path swallows the permission error by design.
+                ('nl_search_log',        'INSERT'),
+                ('nl_search_review',     'UPDATE'),
+                ('nl_search_feedback',   'SELECT'),
+                ('nl_search_feedback',   'INSERT')
              ) AS t(name, privilege)
        ORDER BY 1, 2
     `;
@@ -305,6 +314,22 @@ describe('afldb_auth is confined to the operational tables', () => {
       lost,
       'run tools/maintenance/privileges.sql against this database',
     ).toEqual([]);
+  });
+
+  it('cannot rewrite what a reader said', async () => {
+    // nl_search_feedback and nl_search_log are append-only, and the ABSENT
+    // grant is what enforces that rather than everyone remembering it. A
+    // reader having pressed "no" at 8:04pm is a fact that happened; an
+    // admin who disagrees records that in nl_search_review, which is the
+    // one of the three that is meant to be mutable.
+    const rows = await sql<{ name: string; privilege: string }[]>`
+      SELECT t.name, p.privilege
+        FROM unnest(ARRAY['nl_search_feedback', 'nl_search_log']) AS t(name)
+       CROSS JOIN LATERAL (VALUES ('UPDATE'), ('DELETE'), ('TRUNCATE')) AS p(privilege)
+       WHERE has_table_privilege(${AUTH_ROLE}, t.name, p.privilege)
+       ORDER BY 1, 2
+    `;
+    expect(rows).toEqual([]);
   });
 
   it('advances only the sequences behind the tables it writes', async () => {

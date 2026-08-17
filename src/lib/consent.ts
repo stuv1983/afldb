@@ -47,3 +47,22 @@ export function isConsentChoice(value: string | undefined | null): value is Cons
 export function analyticsAllowed(value: string | undefined | null): boolean {
   return value === 'accepted';
 }
+
+/**
+ * The stored choice as the BROWSER can see it.
+ *
+ * Call sites must be client-side: it reads document.cookie, which is the
+ * whole reason the consent cookie is not httpOnly. Reading it on the
+ * server instead -- `cookies()` in the root layout, as the banner first
+ * did -- opts every route in the site out of static rendering, because a
+ * layout that consults a cookie can no longer be prerendered. So the
+ * decision of whether to show the banner is made in the browser, where a
+ * cookie can be read without making 60-odd prerendered pages dynamic.
+ */
+export function readConsentCookie(): string | undefined {
+  const prefix = `${CONSENT_COOKIE}=`;
+  for (const entry of document.cookie.split('; ')) {
+    if (entry.startsWith(prefix)) return entry.slice(prefix.length);
+  }
+  return undefined;
+}

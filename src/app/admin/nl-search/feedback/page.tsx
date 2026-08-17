@@ -10,6 +10,7 @@ export const metadata: Metadata = { title: 'Reader feedback', robots: { index: f
 export const dynamic = 'force-dynamic';
 
 const DAYS = 30;
+const LIMIT = 200;
 
 /**
  * What readers said about their own search results.
@@ -32,7 +33,7 @@ export default async function NlFeedbackPage(
 
   const [summary, rows] = await Promise.all([
     getNlFeedbackSummary(DAYS),
-    listNlFeedback({ verdict, limit: 200 }),
+    listNlFeedback({ verdict, limit: LIMIT }),
   ]);
 
   const total = summary.correct + summary.incorrect;
@@ -42,11 +43,15 @@ export default async function NlFeedbackPage(
       <div className="page-header">
         <h1>Reader feedback</h1>
         <p className="subtitle">
-          Anonymous replies to “Did AFLDB understand this question?”, last {DAYS} days.
+          Anonymous replies to “Did AFLDB understand this question?”
         </p>
       </div>
 
       <section className="section">
+        {/* The counts are windowed; the table below is not. Said out loud
+            in both places, because a low-volume month otherwise shows
+            "Understood: 0" directly above a table full of replies. */}
+        <h2>Last {DAYS} days</h2>
         <div className="stat-strip">
           <div className="stat">
             <div className="value">{formatNumber(summary.correct)}</div>
@@ -85,6 +90,15 @@ export default async function NlFeedbackPage(
       </nav>
 
       <section className="section">
+        <h2>
+          Every reply
+          {verdict === 'correct' ? ' marked understood' : ''}
+          {verdict === 'incorrect' ? ' marked misread' : ''}
+        </h2>
+        <p className="section-note">
+          Newest first, all time, up to {LIMIT}. Deliberately not the 30-day window above: there
+          are few enough of these that the older ones are still worth reading.
+        </p>
         {rows.length === 0 ? (
           <p className="muted">No feedback yet.</p>
         ) : (

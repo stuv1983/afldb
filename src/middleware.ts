@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { ADMIN_COOKIE, BETA_COOKIE, betaEpoch, betaGateOn, verifyClaim } from '@/lib/auth/tokens';
 import { analyticsAllowed, CONSENT_COOKIE } from '@/lib/consent';
+import { secureCookies } from '@/lib/cookie-security';
 import { NL_SESSION_COOKIE, NL_SESSION_MAX_AGE_SECONDS } from '@/lib/nl-session';
 import { redirectTo } from '@/lib/redirect';
 
@@ -61,12 +62,32 @@ function isPublicPath(pathname: string): boolean {
  * analyticsAllowed fails closed, so a visitor who has not answered yet
  * gets no cookie -- and a reader who later declines stops getting one,
  * since this runs on every request rather than once.
+ *
+ * Not minting is only half of it: an nl_sid that is ALREADY there without
+ * consent is deleted here. Two ways that happens, and both are real --
+ * every visitor holding an nl_sid from before consent existed has no
+ * answer recorded, and a cookie set by a response already in flight when
+ * the reader pressed Decline survives the one-shot delete in setConsent.
+ * Left alone, both keep being sent and keep being written into
+ * nl_search_log for up to 30 minutes, which is storage retained without
+ * consent -- the exact thing the banner claims to gate. Doing it on every
+ * request instead makes the guarantee self-healing rather than a promise
+ * about the moment a button was pressed.
  */
 function withNlSession(request: NextRequest, response: NextResponse): NextResponse {
-  if (!analyticsAllowed(request.cookies.get(CONSENT_COOKIE)?.value)) return response;
-  if (!request.cookies.get(NL_SESSION_COOKIE)) {
+  const existing = request.cookies.get(NL_SESSION_COOKIE);
+
+  if (!analyticsAllowed(request.cookies.get(CONSENT_COOKIE)?.value)) {
+    // Path-qualified: it was set with path '/', and a delete whose path
+    // does not match removes nothing.
+    if (existing) response.cookies.delete({ name: NL_SESSION_COOKIE, path: '/' });
+    return response;
+  }
+
+  if (!existing) {
     response.cookies.set(NL_SESSION_COOKIE, crypto.randomUUID(), {
       httpOnly: true,
+      secure: secureCookies(),
       sameSite: 'lax',
       maxAge: NL_SESSION_MAX_AGE_SECONDS,
       path: '/',

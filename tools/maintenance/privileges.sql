@@ -300,7 +300,8 @@ END
 $$;
 
 -- ---------------------------------------------------------------------
--- afldb_auth — the operational tables (migrations 023, 024, 030, 032, 034, 037)
+-- afldb_auth — the operational tables
+--              (migrations 023, 024, 030, 032, 034, 037, 046, 047, 049)
 -- ---------------------------------------------------------------------
 -- Every one of these grants lives inside an `IF EXISTS (afldb_auth)`
 -- guard in its migration, so all of them are silently skipped when the
@@ -331,6 +332,8 @@ DECLARE
     ['site_media',             'SELECT, INSERT, UPDATE, DELETE'],   -- 037
     ['nl_search_log',          'SELECT, INSERT'],                   -- 046
     ['nl_search_review',       'SELECT, INSERT, UPDATE'],           -- 047
+    -- Append-only by grant: no UPDATE, no DELETE (see migration 049).
+    ['nl_search_feedback',     'SELECT, INSERT'],                   -- 049
     -- Read-only: validation resolves submitted names against these.
     ['players',                'SELECT'],                           -- 023
     ['player_clubs',           'SELECT'],                           -- 023
@@ -351,7 +354,8 @@ DECLARE
     'auth_users', 'auth_sessions', 'auth_audit_log',
     'beta_access_codes', 'beta_allowed_emails', 'beta_login_tokens',
     'beta_join_requests', 'data_submissions', 'data_submission_rows',
-    'admin_invites', 'site_settings', 'site_media', 'nl_search_log', 'nl_search_review'
+    'admin_invites', 'site_settings', 'site_media', 'nl_search_log', 'nl_search_review',
+    'nl_search_feedback'
   ];
   named text[] := ARRAY[]::text[];
   i int;

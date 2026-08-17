@@ -16,6 +16,7 @@ import {
   signClaim,
   verifyClaim,
 } from '@/lib/auth/tokens';
+import { secureCookies } from '@/lib/cookie-security';
 
 // Re-exported so server-side callers keep one import site for these; the
 // definitions themselves live in the edge-safe tokens module so middleware
@@ -39,24 +40,6 @@ export function sessionSecret(): string {
     );
   }
   return secret;
-}
-
-function secureCookies(): boolean {
-  // Keyed on AFLDB_ENV, which is now the TRANSPORT SECURITY flag and nothing
-  // else: this, HSTS and the CSP that drops 'unsafe-eval' (next.config.ts).
-  // The dev server serves plain HTTP on the LAN, where a Secure cookie would
-  // silently fail to set; deriving this from AFLDB_BASE_URL instead let a
-  // production deploy that set AFLDB_ENV but fumbled AFLDB_BASE_URL ship
-  // non-Secure session cookies while looking fine.
-  //
-  // Indexing used to key off this same flag, which was a live bug rather than
-  // an untidiness: holding AFLDB_ENV at `development` to keep a pre-cutover
-  // host out of search results also stripped Secure off its session cookies.
-  // Indexing moved to AFLDB_INDEXING (src/lib/indexing.ts) so that a host on
-  // public HTTPS can have the full security posture while still being
-  // invisible to crawlers. Any host reachable over HTTPS sets AFLDB_ENV
-  // =production, cutover or not.
-  return process.env.AFLDB_ENV === 'production';
 }
 
 /**
