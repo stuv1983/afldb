@@ -401,3 +401,41 @@ describe('NL-011: the club named first is the subject, whatever its name length'
     expect(p.scope.clubAgainst?.name).toBe('Collingwood');
   });
 });
+
+// ---------------------------------------------------------------------
+// NL-012 -- two conditions sharing a number lost one of them
+// ---------------------------------------------------------------------
+// "players with 3 games and exactly 3 clubs": both counts are the string
+// "3", and each clause removed its number by searching for it from the
+// start of the question. The clubs clause therefore deleted the games
+// clause's "3", leaving "games" with no number to bind to and dropping
+// the condition entirely -- a silently narrower answer, not an error.
+describe('NL-012: two numeric conditions in one question both survive', () => {
+  it('keeps both when the numbers are identical', async () => {
+    const p = await plan('players with 3 games and exactly 3 clubs');
+    expect(p.grain).toBe('player_career');
+    expect(p.careerConditions).toContainEqual(
+      expect.objectContaining({ column: 'games', op: 'gte', value: 3 }),
+    );
+    expect(p.careerConditions).toContainEqual(
+      expect.objectContaining({ column: 'clubs_played', op: 'eq', value: 3 }),
+    );
+  });
+
+  it('keeps both when the numbers differ', async () => {
+    const p = await plan('players with 200 games and exactly 2 clubs');
+    expect(p.careerConditions).toContainEqual(
+      expect.objectContaining({ column: 'games', op: 'gte', value: 200 }),
+    );
+    expect(p.careerConditions).toContainEqual(
+      expect.objectContaining({ column: 'clubs_played', op: 'eq', value: 2 }),
+    );
+  });
+
+  it('still reads a single condition the same way', async () => {
+    const p = await plan('players with at least 145 games');
+    expect(p.careerConditions).toEqual([
+      expect.objectContaining({ column: 'games', op: 'gte', value: 145 }),
+    ]);
+  });
+});

@@ -247,6 +247,13 @@ describe('wrong semantics are hard failures', () => {
     expect(classes(expectation({ seasonFrom: 2000 }), observed())).toContain('DROPPED_FILTER');
   });
 
+  it('but "since 1897" and no lower bound select the same matches', () => {
+    // The corpus writes the floor on questions that never mention a
+    // season; 1897 is the first VFL season, so it excludes nothing.
+    expect(scoreRow(expectation({ seasonFrom: 1897 }), observed())).toEqual([]);
+    expect(classes(expectation({ seasonFrom: 1898 }), observed())).toContain('DROPPED_FILTER');
+  });
+
   it('a wrong season scope', () => {
     const a = observed({ plan: plan({ scope: { seasonMin: 1990 } }) });
     expect(classes(expectation({ seasonFrom: 2000 }), a)).toContain('WRONG_SEASON');

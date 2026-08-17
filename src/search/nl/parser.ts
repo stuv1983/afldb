@@ -347,44 +347,53 @@ function extractCareerConditions(text: string): { text: string; conditions: NlCa
 
     const plus = NUMBER_PLUS_RE.exec(window);
     let op: NlCompareOp = 'gte';
-    let opPhrase: string | null = null;
     let value: number | null = null;
-    // The literal text the count came from -- "2" or "two" -- so it can
-    // be stripped exactly. Reconstructing a digit-only pattern from the
-    // resolved numeric value would never match a number WORD.
-    let valueSource: string | null = null;
+    // Spans are recorded as absolute positions in `working` rather than as
+    // text to search for again. "players with 3 games and exactly 3 clubs"
+    // is why: both counts are the string "3", so removing the one this
+    // clause used by first-occurrence deleted the OTHER clause's number
+    // instead, leaving "games" with nothing to bind to and silently
+    // dropping the condition.
+    const spans: { start: number; end: number; text: string }[] = [
+      { start: idx, end: idx + match[0].length, text: match[0] },
+    ];
+    const spanFrom = (m: RegExpExecArray, source = m[0]) => ({
+      start: windowStart + m.index,
+      end: windowStart + m.index + m[0].length,
+      text: source,
+    });
+
     if (plus) {
       value = Number(plus[1]);
       op = 'gte';
-      valueSource = plus[0].replace(/\+$/, '');
+      spans.push(spanFrom(plus, plus[0].replace(/\+$/, '')));
     } else {
       for (const [opRe, opKind] of COMPARE_OP_WORDS) {
         const opMatch = opRe.exec(window);
-        if (opMatch) { op = opKind; opPhrase = opMatch[0]; break; }
+        if (opMatch) { op = opKind; spans.push(spanFrom(opMatch)); break; }
       }
       const digits = /\b(\d{1,4})\b/.exec(window);
       if (digits) {
         value = Number(digits[1]);
-        valueSource = digits[1];
+        spans.push(spanFrom(digits, digits[1]));
       } else {
         for (const [word, n] of Object.entries(NUMBER_WORDS)) {
-          if (new RegExp(`\\b${word}\\b`).test(window)) { value = n; valueSource = word; break; }
+          const wordMatch = new RegExp(`\\b${word}\\b`).exec(window);
+          if (wordMatch) { value = n; spans.push(spanFrom(wordMatch)); break; }
         }
       }
     }
     if (value === null) continue;
 
     conditions.push({ kind: 'column', column, op, value });
-    consumed.push(match[0]);
-    working = stripMatch(working, match[0]);
-    if (valueSource) {
-      working = stripMatch(working, valueSource);
-      consumed.push(valueSource);
-    }
-    if (opPhrase) {
-      working = stripMatch(working, opPhrase);
-      consumed.push(opPhrase);
-    }
+    for (const span of spans) consumed.push(span.text);
+    // Highest offset first, so removing one span cannot shift the
+    // positions of the ones still to be removed.
+    working = spans
+      .sort((a, b) => b.start - a.start)
+      .reduce((text, span) => `${text.slice(0, span.start)} ${text.slice(span.end)}`, working)
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   return { text: working, conditions, consumed };

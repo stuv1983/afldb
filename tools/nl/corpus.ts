@@ -126,6 +126,9 @@ export type StressExpectation = {
   notes: string;
 };
 
+/** The first VFL season. A lower bound of this year excludes nothing, so it is indistinguishable from no lower bound. */
+const FIRST_SEASON = 1897;
+
 const MATCH_TYPES: Record<string, NlMatchType> = {
   final: 'finals',
   finals: 'finals',
@@ -546,7 +549,15 @@ export function scoreRow(
     if (!matched) findings.push(finding(slot.cls, 'hard', slot.want, slot.got));
   }
 
-  if (expected.seasonFrom !== undefined && plan.scope.seasonMin !== expected.seasonFrom) {
+  // 1897 is the first VFL season, so "since 1897" and no lower bound at
+  // all select exactly the same matches. The corpus generator writes the
+  // floor explicitly on questions that never mention a season ("Adelaide
+  // highest score in a Grand Final"), and reporting the absent filter as
+  // a dropped one would be scoring a difference that cannot change an
+  // answer.
+  const seasonFloorIsAllTime = expected.seasonFrom === FIRST_SEASON && plan.scope.seasonMin === undefined;
+
+  if (expected.seasonFrom !== undefined && plan.scope.seasonMin !== expected.seasonFrom && !seasonFloorIsAllTime) {
     findings.push(finding(
       plan.scope.seasonMin === undefined ? 'DROPPED_FILTER' : 'WRONG_SEASON',
       'hard', `seasonMin=${expected.seasonFrom}`, plan.scope.seasonMin,
