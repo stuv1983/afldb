@@ -85,6 +85,23 @@ function hashPlan(plan: unknown): string {
 }
 
 /**
+ * jsonb columns must be bound with `sql.json()`, never `JSON.stringify()`.
+ *
+ * postgres.js JSON-encodes whatever JS value it is given for a jsonb
+ * parameter, so handing it an already-stringified object stores a jsonb
+ * *string scalar* containing JSON text -- `plan->>'grain'` then returns
+ * NULL and the column is effectively opaque to SQL. An explicit `::jsonb`
+ * cast does NOT rescue it (verified empirically: the driver encodes before
+ * the cast applies). Migration 048 repairs the rows written the wrong way
+ * before this was noticed; `auth_audit_log.detail` still carries the same
+ * shape from lib/auth/session.ts's audit(), which is a separate,
+ * pre-existing case and deliberately untouched here.
+ */
+function jsonbOrNull(value: unknown) {
+  return value === undefined || value === null ? null : authSql.json(value as never);
+}
+
+/**
  * Fire-and-forget: scheduled via `after()` so a slow or unreachable log
  * write never adds latency to the answer a reader is waiting on, and a
  * failure here never turns into a failed search. Every /search render
@@ -113,12 +130,12 @@ export function logNlSearch(entry: NlSearchLogEntry): void {
           ${entry.topic ?? null},
           ${entry.grain ?? null},
           ${entry.metric ?? null},
-          ${entry.plan ? JSON.stringify(entry.plan) : null},
+          ${jsonbOrNull(entry.plan)},
           ${entry.plan ? hashPlan(entry.plan) : null},
           ${entry.confidence ?? null},
-          ${entry.confidenceComponents ? JSON.stringify(entry.confidenceComponents) : null},
+          ${jsonbOrNull(entry.confidenceComponents)},
           ${entry.unsupportedTerms && entry.unsupportedTerms.length > 0 ? entry.unsupportedTerms : null},
-          ${entry.entityResolution && entry.entityResolution.length > 0 ? JSON.stringify(entry.entityResolution) : null},
+          ${jsonbOrNull(entry.entityResolution && entry.entityResolution.length > 0 ? entry.entityResolution : null)},
           ${entry.resultCount ?? null},
           ${Math.max(0, Math.round(entry.durationMs))},
           ${entry.parserVersion ?? null},
