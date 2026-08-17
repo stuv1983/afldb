@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { after } from 'next/server';
 
 import { authSql } from '@/db/authClient';
-import { isValidNlSessionId } from '@/lib/nl-session';
+import { isUuid, isValidNlSessionId } from '@/lib/nl-session';
 import type { NlConfidenceComponents, NlEntityResolution, NlGrain } from '@/search/nl/plan';
 
 /**
@@ -63,6 +63,12 @@ export type NlSearchLogEntry = {
   parserVersion?: number | null;
   /** The nl_sid cookie value (lib/nl-session.ts), or null/absent for no session. */
   sessionId?: string | null;
+  /**
+   * Opaque per-search token returned to the browser, so reader feedback
+   * can be attached to this exact search (migration 049). Random and
+   * meaningless -- and NOT the session id, which spans many searches.
+   */
+  clientRef?: string | null;
 };
 
 /** Recursively sorts object keys so semantically identical plans hash identically regardless of construction order. */
@@ -121,7 +127,7 @@ export function logNlSearch(entry: NlSearchLogEntry): void {
         INSERT INTO nl_search_log (
           question, outcome, failure_reason, topic, grain, metric, plan, plan_hash,
           confidence, confidence_components, unsupported_terms, entity_resolution,
-          result_count, duration_ms, parser_version, session_id, parent_search_id
+          result_count, duration_ms, parser_version, session_id, client_ref, parent_search_id
         )
         VALUES (
           ${entry.question.slice(0, 200)},
@@ -140,6 +146,7 @@ export function logNlSearch(entry: NlSearchLogEntry): void {
           ${Math.max(0, Math.round(entry.durationMs))},
           ${entry.parserVersion ?? null},
           ${sessionId}::uuid,
+          ${isUuid(entry.clientRef) ? entry.clientRef : null}::uuid,
           (SELECT id FROM nl_search_log
              WHERE session_id = ${sessionId}::uuid
                AND at > now() - interval '60 seconds'

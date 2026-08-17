@@ -71,6 +71,7 @@ async function loadRun(dir: string): Promise<RunInfo> {
     if (!line.trim()) continue;
     const record = JSON.parse(line) as {
       id?: string; severity?: 'clean' | 'soft' | 'hard';
+      oracleDefect?: string;
       findings?: { class: string; severity?: string }[];
       question?: string;
       expected?: { id?: number | string; question?: string };
@@ -78,6 +79,15 @@ async function loadRun(dir: string): Promise<RunInfo> {
     };
     if (record.id !== undefined && record.severity !== undefined) {
       // V2 record: severity is written at run time, always present.
+      //
+      // A quarantined row still carries a severity in results.jsonl -- the
+      // scorer runs, its verdict is simply not counted -- so comparing on
+      // severity alone silently re-admits every corpus defect that the
+      // report excludes. That put 4,536 phantom hard rows in this table
+      // and, worse, let a defect row whose severity happened to move count
+      // as a REGRESSION, which is the one number here that must never be
+      // wrong.
+      if (record.oracleDefect) continue;
       rows.set(String(record.id), {
         severity: record.severity,
         classes: (record.findings ?? []).map((f) => f.class).join(' '),

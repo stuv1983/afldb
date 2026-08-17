@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { randomUUID } from 'node:crypto';
+
 import { executePlan } from '@/db/queries/nl/execute';
 import { logNlSearch, type NlFailureReason, type NlSearchLogEntry, type NlSearchLogOutcome } from '@/db/queries/nl/log';
 import { buildNlParseContext } from '@/db/queries/nl/resolve';
@@ -75,9 +77,17 @@ export async function answerNlQuestion(question: string, sessionId: string | nul
   const startedAt = Date.now();
   const elapsed = () => Date.now() - startedAt;
 
+  // Minted here rather than read from the log row's id, because logging
+  // is deferred to after() -- the response is already sent by the time
+  // the row exists, so its id can never reach the page that needs it.
+  // This is the token the feedback widget sends back (migration 049).
+  // Random and meaningless: deliberately NOT the session id, which spans
+  // many searches and would let feedback land on the wrong one.
+  const clientRef = randomUUID();
+
   // Fields every log call shares; each call site layers on outcome-specific ones.
   const log = (entry: Omit<NlSearchLogEntry, 'question' | 'durationMs' | 'sessionId'>) => logNlSearch({
-    question, durationMs: elapsed(), sessionId, ...entry,
+    question, durationMs: elapsed(), sessionId, clientRef, ...entry,
   });
 
   try {

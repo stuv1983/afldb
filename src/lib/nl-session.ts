@@ -19,7 +19,12 @@ export const NL_SESSION_MAX_AGE_SECONDS = 30 * 60;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Client-supplied input reaching a `::uuid` cast must be checked first. */
+export function isUuid(value: string | undefined | null): value is string {
+  return !!value && UUID_RE.test(value);
+}
+
 /** A cookie value is client-supplied input; validate before it reaches a `::uuid` cast. */
 export function isValidNlSessionId(value: string | undefined | null): value is string {
-  return !!value && UUID_RE.test(value);
+  return isUuid(value);
 }
