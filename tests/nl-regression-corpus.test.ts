@@ -325,3 +325,79 @@ describe('production successes that must not regress', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------
+// NL-010 -- "<stat>s game" was not the same idiom as "<stat> game"
+// ---------------------------------------------------------------------
+// From the 12,000-question stress run: the largest single cluster of
+// declines, 1,887 rows, all one missing plural. STAT_GAMES_IDIOM_WORDS
+// matched "goal game" but not "goals game", so METRIC_WORDS took "goals"
+// and left "game" in the text, where the player-name scan swallowed it
+// and reported an unsupported term of "dustin martin game".
+describe('NL-010: the stat-games idiom accepts either noun pluralised', () => {
+  it.each([
+    'Dustin Martin highest goal game against Carlton',
+    'Dustin Martin highest goals game against Carlton',
+    'Dustin Martin highest goals games against Carlton',
+  ])('%s', async (question) => {
+    const p = await plan(question);
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('single');
+    expect(p.metric).toBe('goals');
+    expect(p.player?.name).toBe('Dustin Martin');
+    expect(p.scope.clubAgainst?.name).toBe('Carlton');
+  });
+
+  it('the player name comes back clean, with nothing left unsupported', async () => {
+    const result = await parseNlQuestion('Dustin Martin highest goals game against Carlton', ctx);
+    expect(result.report.unsupportedTerms).toEqual([]);
+  });
+
+  it('works for the other stats too', async () => {
+    const p = await plan('top 5 disposals games by Dustin Martin');
+    expect(p.metric).toBe('disposals');
+    expect(p.agg).toEqual({ kind: 'top_n', n: 5 });
+  });
+});
+
+// ---------------------------------------------------------------------
+// NL-011 -- club roles were decided by alias length, not word order
+// ---------------------------------------------------------------------
+// Also from the stress run. "to" and "over" were missing from
+// AGAINST_PREPOSITION, so neither club in "X biggest win over Y" was
+// governed and the roles fell through to first-found-wins -- and findClub
+// returns the LONGEST alias, never the leftmost. The result was a
+// coin-flip decided by club name length: "Richmond biggest win over
+// Carlton" came out right, "Carlton biggest win over Collingwood" came
+// out backwards, and both looked equally confident.
+describe('NL-011: the club named first is the subject, whatever its name length', () => {
+  it.each([
+    ['Carlton biggest win over Collingwood', 'Carlton', 'Collingwood'],
+    ['Collingwood biggest win over Carlton', 'Collingwood', 'Carlton'],
+    ['Carlton worst loss to Collingwood', 'Carlton', 'Collingwood'],
+    ['Collingwood worst loss to Carlton', 'Collingwood', 'Carlton'],
+  ])('%s', async (question, subject, opponent) => {
+    const p = await plan(question);
+    expect(p.grain).toBe('team_match');
+    expect(p.scope.clubFor?.name).toBe(subject);
+    expect(p.scope.clubAgainst?.name).toBe(opponent);
+  });
+
+  it('reversing the clubs reverses the plan -- it is not one fixed answer', async () => {
+    const a = await plan('Carlton biggest win over Collingwood');
+    const b = await plan('Collingwood biggest win over Carlton');
+    expect(a.scope.clubFor?.name).not.toBe(b.scope.clubFor?.name);
+  });
+
+  it('an explicit "for" still beats position', async () => {
+    const p = await plan('biggest win by Richmond over Carlton');
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+    expect(p.scope.clubAgainst?.name).toBe('Carlton');
+  });
+
+  it('word order decides when no preposition governs either club', async () => {
+    const p = await plan('Carlton Collingwood biggest win');
+    expect(p.scope.clubFor?.name).toBe('Carlton');
+    expect(p.scope.clubAgainst?.name).toBe('Collingwood');
+  });
+});

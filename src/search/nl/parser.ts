@@ -96,18 +96,33 @@ type ClubExtraction = {
   consumed: string[];
 };
 
+/** Where a matched phrase sits in the original question, word-boundary anchored so "melbourne" does not report the position of "north melbourne". */
+function phrasePosition(text: string, phrase: string): number {
+  const at = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).exec(text);
+  return at ? at.index : Number.MAX_SAFE_INTEGER;
+}
+
 /**
  * Finds up to two club mentions and assigns each a role by the
- * preposition governing it: "against/versus/vs/v/to" -> the opponent,
- * "for/by/from" or no preposition at all -> the subject side. "richmond
- * biggest loss to carlton" and "biggest win for richmond against
- * carlton" both resolve the same way from this one rule.
+ * preposition governing it: "against/versus/vs/v/to/over" -> the
+ * opponent, "for/by/from" or no preposition at all -> the subject side.
+ * "richmond biggest loss to carlton" and "biggest win for richmond
+ * against carlton" both resolve the same way from this one rule.
+ *
+ * When neither mention is governed -- "richmond carlton mcg biggest win"
+ * -- the roles go by WORD ORDER, subject first. findClub returns the
+ * longest alias rather than the leftmost one, so the previous
+ * first-found-wins fallback handed the subject slot to whichever club
+ * happened to have the longer name: "Adelaide biggest win over Brisbane
+ * Lions" became Brisbane's win, while the same question about Carlton
+ * came out right purely because "richmond" is longer than "carlton". A
+ * coin-flip that reads as a confident answer is the worst failure this
+ * engine has, so position decides it now.
  */
 function extractClubs(text: string, clubs: readonly NlClubDirectoryEntry[]): ClubExtraction {
   let working = text;
   const consumed: string[] = [];
-  let clubFor: NlEntityMatch<NlClubDirectoryEntry> | undefined;
-  let clubAgainst: NlEntityMatch<NlClubDirectoryEntry> | undefined;
+  const found: { match: NlEntityMatch<NlClubDirectoryEntry>; governedAgainst: boolean; at: number }[] = [];
 
   for (let i = 0; i < 2; i++) {
     const match = findClub(working, clubs);
@@ -117,14 +132,26 @@ function extractClubs(text: string, clubs: readonly NlClubDirectoryEntry[]): Clu
     // Look at a short window before the match for a governing preposition.
     const idx = working.toLowerCase().indexOf(match.matchedText);
     const before = idx >= 0 ? working.slice(Math.max(0, idx - 20), idx) : '';
-    if (AGAINST_PREPOSITION.test(before)) {
-      if (!clubAgainst) clubAgainst = match;
-    } else if (!clubFor) {
-      clubFor = match;
-    } else if (!clubAgainst) {
-      clubAgainst = match;
-    }
+    found.push({
+      match,
+      governedAgainst: AGAINST_PREPOSITION.test(before),
+      // Measured against the ORIGINAL text: `working` has had earlier
+      // matches spliced out, so its offsets no longer describe the
+      // question the reader typed.
+      at: phrasePosition(text, match.matchedText),
+    });
     working = stripMatch(working, match.matchedText);
+  }
+
+  let clubFor: NlEntityMatch<NlClubDirectoryEntry> | undefined;
+  let clubAgainst: NlEntityMatch<NlClubDirectoryEntry> | undefined;
+
+  for (const entry of found.filter((f) => f.governedAgainst)) {
+    if (!clubAgainst) clubAgainst = entry.match;
+  }
+  for (const entry of found.filter((f) => !f.governedAgainst).sort((a, b) => a.at - b.at)) {
+    if (!clubFor) clubFor = entry.match;
+    else if (!clubAgainst) clubAgainst = entry.match;
   }
 
   return { text: working, clubFor, clubAgainst, consumed };

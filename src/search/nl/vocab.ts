@@ -222,7 +222,20 @@ export const METRIC_WORDS: [RegExp, string][] = [
 
 /** "for/by Richmond" vs "against/versus Carlton" -- the only thing separating the two club roles a question can name. */
 export const FOR_PREPOSITION = /\b(?:for|by|from)\b/;
-export const AGAINST_PREPOSITION = /\b(?:against|versus|vs\.?|v\.?)\b/;
+/**
+ * The opponent side. "to" and "over" are the two forms a result question
+ * reaches for -- "biggest loss TO Carlton", "biggest win OVER Carlton" --
+ * and both were missing, so neither club was governed and the roles fell
+ * through to a tiebreak that never looks at word order. That made
+ * "Adelaide biggest win over Brisbane Lions" report Brisbane's win, while
+ * "Richmond biggest loss to Carlton" happened to come out right only
+ * because "richmond" is the longer alias.
+ *
+ * "over" is safe to include despite also being a comparison operator:
+ * COMPARE_OP_WORDS claims it only when digits follow ("over 200 games"),
+ * a phrasing that never puts a club immediately after it.
+ */
+export const AGAINST_PREPOSITION = /\b(?:against|versus|vs\.?|v\.?|to|over)\b/;
 export const AT_PREPOSITION = /\b(?:at|on)\b/;
 
 export const SINCE_RE = /\bsince (\d{4})\b/;
@@ -267,23 +280,32 @@ export const NUMBER_PLUS_RE = /\b(\d{1,4})\+/;
  * IN_ONE_GAME phrase. Matches the WHOLE "<stat> game(s)" span so both
  * words are consumed together, rather than leaving "games" behind for
  * the player-name scan to trip over.
+ *
+ * BOTH nouns take an optional plural, because readers pluralise either
+ * half independently: "goal games", "goals game", "goals games" and
+ * "highest goals game" are all the same question. Accepting only the
+ * singular stat noun was the single largest source of declines in the
+ * 12,000-question stress run -- "Dustin Martin highest goals game against
+ * Adelaide" left "game" in the text, the player-name scan swallowed it as
+ * part of the mention, and 1,887 answerable questions were refused with
+ * an unsupported term of "dustin martin game".
  */
 export const STAT_GAMES_IDIOM_WORDS: [RegExp, string][] = [
   [/\bgoal assists? games?\b/, 'goal_assists'],
   [/\bcontested marks? games?\b/, 'contested_marks'],
-  [/\bdisposal games?\b/, 'disposals'],
-  [/\btouch games?\b/, 'disposals'],
-  [/\bpossession games?\b/, 'disposals'],
-  [/\bgoal games?\b/, 'goals'],
-  [/\bbehind games?\b/, 'behinds'],
-  [/\bkick games?\b/, 'kicks'],
-  [/\bhandball games?\b/, 'handballs'],
-  [/\bmark games?\b/, 'marks'],
-  [/\btackle games?\b/, 'tackles'],
-  [/\bhit ?out games?\b/, 'hitouts'],
-  [/\bclearance games?\b/, 'clearances'],
-  [/\bclanger games?\b/, 'clangers'],
-  [/\bbounce games?\b/, 'bounces'],
+  [/\bdisposals? games?\b/, 'disposals'],
+  [/\btouch(?:es)? games?\b/, 'disposals'],
+  [/\bpossessions? games?\b/, 'disposals'],
+  [/\bgoals? games?\b/, 'goals'],
+  [/\bbehinds? games?\b/, 'behinds'],
+  [/\bkicks? games?\b/, 'kicks'],
+  [/\bhandballs? games?\b/, 'handballs'],
+  [/\bmarks? games?\b/, 'marks'],
+  [/\btackles? games?\b/, 'tackles'],
+  [/\bhit ?outs? games?\b/, 'hitouts'],
+  [/\bclearances? games?\b/, 'clearances'],
+  [/\bclangers? games?\b/, 'clangers'],
+  [/\bbounces? games?\b/, 'bounces'],
 ];
 
 /** Words that make a question about clubs rather than players -- the same word query-intent.ts's CLUB_SUBJECT uses. */
