@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   canonicaliseExpected, canonicalisePlan, detectSchema, metaAccumulate, newMetaGroupState,
+  oracleDefect,
   recordSeverity, scoreMetaGroup, scoreV2, semanticFindings, semanticHash, streamCsvRows, toV2Case,
   V2Stats,
   type CanonicalSemantics, type EntityLookup, type V2Case, type V2Observation, type V2ResultRecord,
@@ -536,5 +537,113 @@ describe('streamed output honours backpressure', () => {
     await once(stream, 'end');
 
     expect(Buffer.concat(received).toString().split('\n').filter(Boolean)).toHaveLength(20);
+  });
+});
+
+// ---------------------------------------------------------------------
+// Corpus oracle defects
+// ---------------------------------------------------------------------
+// A corpus is only an oracle while it agrees with itself. The 250k
+// generator emitted rows whose surface text says "exactly 300" and whose
+// expectation asserts `gt 300` -- rows a correct parser MUST fail and an
+// incorrect one could pass. Scoring them rewards wrong parsing, so they
+// are quarantined out of every rate and reported on their own.
+//
+// A mis-detecting quarantine is worse than none: a false positive hides
+// a real parser bug behind "corpus defect". These pin both directions.
+describe('oracleDefect', () => {
+  const base = {
+    id: 'T-1', category: 'plan_numeric_conditions', oracle: 'plan' as const,
+    difficulty: 'hard', expectedStatus: 'plan' as const,
+  };
+  const withConditions = (
+    question: string,
+    conditions: { kind: string; column: string; op: string; value: number }[],
+  ) => ({
+    ...base,
+    question,
+    expectedSemantics: { grain: 'player_career', agg: { kind: 'list' }, careerConditions: conditions },
+  });
+
+  it('flags "exactly N" asserted as gt', () => {
+    expect(oracleDefect(withConditions('players with 1+ games and exactly 1 goals', [
+      { kind: 'column', column: 'games', op: 'gte', value: 1 },
+      { kind: 'column', column: 'goals', op: 'gt', value: 1 },
+    ]))).toMatch(/goals gt 1/);
+  });
+
+  it('flags "exactly N" asserted as lte', () => {
+    expect(oracleDefect(withConditions('players with 100+ clubs and exactly 100 games', [
+      { kind: 'column', column: 'clubs_played', op: 'gte', value: 100 },
+      { kind: 'column', column: 'games', op: 'lte', value: 100 },
+    ]))).not.toBeNull();
+  });
+
+  it('accepts an expectation that matches the question', () => {
+    expect(oracleDefect(withConditions('players with at least 3 games and at most 3 goals', [
+      { kind: 'column', column: 'games', op: 'gte', value: 3 },
+      { kind: 'column', column: 'goals', op: 'lte', value: 3 },
+    ]))).toBeNull();
+  });
+
+  it('accepts distinct values with distinct operators', () => {
+    expect(oracleDefect(withConditions('players with over 100 goals and at most 3 premierships', [
+      { kind: 'column', column: 'goals', op: 'gt', value: 100 },
+      { kind: 'column', column: 'premierships', op: 'lte', value: 3 },
+    ]))).toBeNull();
+  });
+
+  // Conservatism rule 1: a value with no stated operator is unjudgeable.
+  it('does not judge a bare number', () => {
+    expect(oracleDefect(withConditions('players with 250 games', [
+      { kind: 'column', column: 'games', op: 'lt', value: 250 },
+    ]))).toBeNull();
+  });
+
+  // Conservatism rule 2: same-valued clauses are invisible to it, which
+  // is why the reported count is documented as a floor, not a total.
+  it('cannot see a swap between two same-valued clauses', () => {
+    expect(oracleDefect(withConditions('players with at least 5 finals and at most 5 goals', [
+      { kind: 'column', column: 'finals', op: 'lte', value: 5 },
+      { kind: 'column', column: 'goals', op: 'gte', value: 5 },
+    ]))).toBeNull();
+  });
+
+  it('ignores rows with no conditions at all', () => {
+    expect(oracleDefect({ ...base, question: 'most goals', expectedSemantics: { grain: 'player_career', agg: { kind: 'max' } } }))
+      .toBeNull();
+  });
+});
+
+describe('V2Stats quarantine', () => {
+  const record = (id: string, severity: 'clean' | 'soft' | 'hard', defect?: string): V2ResultRecord => ({
+    id, category: 'plan_numeric_conditions', oracle: 'plan', question: 'q',
+    expectedStatus: 'plan',
+    actual: { status: 'plan', confidence: 1, unsupportedTerms: [], parseMs: 1 },
+    findings: severity === 'clean' ? [] : [{ class: 'DROPPED_FILTER', severity, field: 'careerConditions', expected: 'a', actual: 'b' }],
+    severity,
+    ...(defect ? { oracleDefect: defect } : {}),
+  });
+
+  it('a quarantined row lands in no rate at all', () => {
+    const stats = new V2Stats();
+    stats.addRow(record('A', 'hard'));
+    stats.addRow(record('B', 'hard', 'question states eq 5, expectation asserts goals gt 5'));
+    expect(stats.total).toBe(1);
+    expect(stats.hard).toBe(1);
+    expect(stats.quarantined).toBe(1);
+  });
+
+  it('quarantine shapes are grouped with the numbers generalised', () => {
+    const stats = new V2Stats();
+    stats.addRow(record('A', 'hard', 'question states eq 5, expectation asserts goals gt 5'));
+    stats.addRow(record('B', 'hard', 'question states eq 300, expectation asserts goals gt 300'));
+    expect([...stats.quarantineShapes.values()]).toEqual([2]);
+  });
+
+  it('keeps the ids, so a generator fix stays auditable', () => {
+    const stats = new V2Stats();
+    stats.addRow(record('NLK-125003', 'hard', 'question states eq 1, expectation asserts goals gt 1'));
+    expect(stats.quarantineSamples[0].id).toBe('NLK-125003');
   });
 });

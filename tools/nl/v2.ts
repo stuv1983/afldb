@@ -156,7 +156,84 @@ export type V2Case = {
   expectedSemantics?: ExpectedSemantics;
   expectedAnswer?: ExpectedAnswer;
   metamorphicGroup?: string;
+  /**
+   * Set when the row's own expectation contradicts the question it ships
+   * with -- see oracleDefect(). Such a row cannot be passed by a correct
+   * parser, so it is quarantined out of every rate rather than counted as
+   * a failure. Nothing is deleted: the id, the question and the
+   * contradiction are all reported, so a generator fix stays auditable.
+   */
+  oracleDefect?: string;
 };
+
+/**
+ * Surface phrase -> comparison operator, for auditing the CORPUS against
+ * itself. Deliberately a separate, dumber reader than src/search/nl: if
+ * this shared the parser's vocabulary, a parser bug would excuse the very
+ * expectations it should be measured against, which is the failure mode
+ * this whole harness exists to prevent.
+ */
+const STATED_OPERATOR_PHRASES: [RegExp, string][] = [
+  [/\bat least\s+(\d+)\b/g, 'gte'],
+  [/\bat most\s+(\d+)\b/g, 'lte'],
+  [/\bno more than\s+(\d+)\b/g, 'lte'],
+  [/\bno fewer than\s+(\d+)\b/g, 'gte'],
+  [/\bmore than\s+(\d+)\b/g, 'gt'],
+  [/\bfewer than\s+(\d+)\b/g, 'lt'],
+  [/\bless than\s+(\d+)\b/g, 'lt'],
+  [/\bover\s+(\d+)\b/g, 'gt'],
+  [/\bunder\s+(\d+)\b/g, 'lt'],
+  [/\bexactly\s+(\d+)\b/g, 'eq'],
+  [/\b(\d+)\+/g, 'gte'],
+];
+
+/** Every (operator, value) pair the question states in plain English. */
+function statedOperators(question: string): { op: string; value: number }[] {
+  const found: { op: string; value: number }[] = [];
+  for (const [re, op] of STATED_OPERATOR_PHRASES) {
+    re.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(question)) !== null) found.push({ op, value: Number(match[1]) });
+  }
+  return found;
+}
+
+/**
+ * Why this row's expectation contradicts its own question text, or null
+ * when it does not.
+ *
+ * A corpus is only an oracle while it agrees with itself. The 250k
+ * generator emitted 4,421 numeric-condition rows whose surface text says
+ * "exactly 300" and whose expectation asserts `gt 300` -- rows a correct
+ * parser must fail and an incorrect one could pass. Scoring them rewards
+ * wrong parsing, so they are quarantined.
+ *
+ * Two deliberate conservatism rules, both erring toward NOT quarantining:
+ *
+ *  - A value the question states no operator for is unjudgeable, and is
+ *    skipped rather than assumed.
+ *  - A value stated with several operators ("at least 5 finals and at
+ *    most 5 goals" both state 5) counts as agreeing with any of them. So
+ *    a corpus that swapped two same-valued clauses is invisible here, and
+ *    the count this produces is a floor, not a total.
+ */
+export function oracleDefect(v2Case: V2Case): string | null {
+  const conditions = v2Case.expectedSemantics?.careerConditions;
+  if (!conditions || conditions.length === 0) return null;
+
+  const stated = statedOperators(v2Case.question.toLowerCase());
+  if (stated.length === 0) return null;
+
+  for (const condition of conditions) {
+    const sameValue = stated.filter((s) => s.value === condition.value);
+    if (sameValue.length === 0) continue;
+    if (sameValue.some((s) => s.op === condition.op)) continue;
+    const says = [...new Set(sameValue.map((s) => s.op))].join('/');
+    return `question states ${says} ${condition.value}, expectation asserts `
+      + `${condition.column ?? condition.awardKey ?? '?'} ${condition.op} ${condition.value}`;
+  }
+  return null;
+}
 
 /** One CSV record -> a case, or the reason it is malformed. */
 export function toV2Case(record: Record<string, string>): { v2Case?: V2Case; error?: string } {
@@ -217,20 +294,23 @@ export function toV2Case(record: Record<string, string>): { v2Case?: V2Case; err
   const metamorphicGroup = record.metamorphic_group?.trim() || undefined;
   if (oracle === 'metamorphic' && !metamorphicGroup) return { error: `${id}: metamorphic oracle with no group` };
 
-  return {
-    v2Case: {
-      id,
-      category: record.category ?? '',
-      oracle,
-      difficulty: record.difficulty ?? '',
-      question,
-      expectedStatus,
-      expectedReason: record.expected_reason?.trim() || undefined,
-      expectedSemantics,
-      expectedAnswer,
-      metamorphicGroup,
-    },
+  const v2Case: V2Case = {
+    id,
+    category: record.category ?? '',
+    oracle,
+    difficulty: record.difficulty ?? '',
+    question,
+    expectedStatus,
+    expectedReason: record.expected_reason?.trim() || undefined,
+    expectedSemantics,
+    expectedAnswer,
+    metamorphicGroup,
   };
+  // A self-contradicting row is NOT a validation error: it is well-formed
+  // and must still run, be recorded and be reported. Only its scoring is
+  // suspended.
+  v2Case.oracleDefect = oracleDefect(v2Case) ?? undefined;
+  return { v2Case };
 }
 
 // -------------------------------------------------------- canonical semantics
@@ -743,6 +823,8 @@ export type V2ResultRecord = {
   };
   findings: V2Finding[];
   severity: 'clean' | 'soft' | 'hard';
+  /** Present when the row's expectation contradicts its own question. */
+  oracleDefect?: string;
 };
 
 export function recordSeverity(findings: V2Finding[]): 'clean' | 'soft' | 'hard' {
@@ -795,7 +877,27 @@ export class V2Stats {
   maxMs = 0;
   private sumMs = 0;
 
+  quarantined = 0;
+  quarantineShapes = new Map<string, number>();
+  quarantineSamples: { id: string; question: string; defect: string }[] = [];
+
   addRow(record: V2ResultRecord): void {
+    // A row whose expectation contradicts its own question is scored by
+    // nothing: not the totals, not the per-category rates, not the
+    // failure classes, not the leverage table. It cannot be passed by a
+    // correct parser, so counting it as a failure would make the suite
+    // reward wrong parsing -- and counting it as a pass would hide the
+    // generator bug. It is recorded and reported on its own instead.
+    if (record.oracleDefect) {
+      this.quarantined++;
+      const shape = record.oracleDefect.replace(/\b\d+\b/g, 'N');
+      this.quarantineShapes.set(shape, (this.quarantineShapes.get(shape) ?? 0) + 1);
+      if (this.quarantineSamples.length < SAMPLES_PER_CLASS) {
+        this.quarantineSamples.push({ id: record.id, question: record.question, defect: record.oracleDefect });
+      }
+      return;
+    }
+
     this.total++;
     if (record.severity === 'clean') this.clean++;
     else if (record.severity === 'soft') this.soft++;

@@ -293,6 +293,32 @@ function buildV2Report(
   );
   out.push('');
 
+  // ---- quarantine
+  if (stats.quarantined > 0) {
+    out.push('## Quarantined — corpus oracle defects');
+    out.push('');
+    out.push(
+      `**${stats.quarantined.toLocaleString('en-AU')} rows** assert an expectation that contradicts the question `
+      + 'they ship with, so no correct parser can pass them. They are excluded from every rate above -- scoring '
+      + 'them would make this suite reward wrong parsing -- and are listed here instead of deleted, so a '
+      + 'generator fix stays auditable against the same ids. `corpus-defects.jsonl` holds all of them.',
+    );
+    out.push('');
+    out.push(
+      'The detection is conservative in both directions it can be: a value the question states no operator for '
+      + 'is skipped as unjudgeable, and a value stated with several operators counts as agreeing with any of '
+      + 'them -- so two same-valued clauses swapped between themselves are invisible here. Treat this count as '
+      + 'a floor.',
+    );
+    out.push('');
+    out.push(table(['Contradiction', 'Rows'],
+      [...stats.quarantineShapes.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20)));
+    out.push('');
+    out.push(table(['Case', 'Question', 'Defect'],
+      stats.quarantineSamples.slice(0, 10).map((s) => [s.id, s.question, s.defect])));
+    out.push('');
+  }
+
   // ---- failure classes
   out.push('## Failure classes');
   out.push('');
@@ -539,6 +565,7 @@ export async function runV2(options: V2RunOptions, engine: StressEngine): Promis
   // ---- pass 2: execute ---------------------------------------------------
   const results = createWriteStream(resultsPath, { flags: options.resume ? 'a' : 'w' });
   const failures = createWriteStream(join(options.outDir, 'failures.jsonl'), { flags: options.resume ? 'a' : 'w' });
+  const defects = createWriteStream(join(options.outDir, 'corpus-defects.jsonl'), { flags: options.resume ? 'a' : 'w' });
 
   const source = (async function* rows(): AsyncGenerator<V2Case> {
     const stream = createReadStream(options.corpusPath);
@@ -599,13 +626,26 @@ export async function runV2(options: V2RunOptions, engine: StressEngine): Promis
         },
         findings,
         severity: recordSeverity(findings),
+        ...(v2Case.oracleDefect ? { oracleDefect: v2Case.oracleDefect } : {}),
       };
 
       await writeLine(results, JSON.stringify(record));
-      if (record.severity !== 'clean') await writeLine(failures, JSON.stringify(record));
+      // A quarantined row is not a failure -- it is a corpus bug, and
+      // putting it in failures.jsonl would send whoever debugs that file
+      // hunting a parser defect that is not there.
+      if (record.oracleDefect) {
+        await writeLine(defects, JSON.stringify({
+          id: record.id, category: record.category, question: record.question,
+          defect: record.oracleDefect, expectedKey: record.expectedKey, actualKey: record.actual.key,
+        }));
+      } else if (record.severity !== 'clean') {
+        await writeLine(failures, JSON.stringify(record));
+      }
 
       stats.addRow(record);
-      if (record.group) {
+      // Metamorphic groups skip them too: a group's majority reading must
+      // not be decided by rows whose expectation is self-contradictory.
+      if (record.group && !record.oracleDefect) {
         const state = metaGroups.get(record.group) ?? newMetaGroupState();
         metaAccumulate(state, {
           status: record.actual.status, hash: record.actual.hash, key: record.actual.key,
@@ -629,7 +669,7 @@ export async function runV2(options: V2RunOptions, engine: StressEngine): Promis
       }
     }, options.concurrency);
   } finally {
-    await Promise.all([closeStream(results), closeStream(failures)]);
+    await Promise.all([closeStream(results), closeStream(failures), closeStream(defects)]);
   }
 
   // ---- metamorphic group scoring ----------------------------------------
@@ -689,6 +729,9 @@ export async function runV2(options: V2RunOptions, engine: StressEngine): Promis
     wallClockSeconds: Math.round((finishedAt - startedAt) / 1000),
     totals: {
       rows: stats.total, clean: stats.clean, soft: stats.soft, hard: stats.hard, errors: stats.errors,
+      // Outside every rate above: rows whose expectation contradicts their
+      // own question, which no correct parser can pass.
+      quarantined: stats.quarantined,
       semantic: { pass: semPass, of: semScored },
       answer: { pass: ansPass, of: ansScored },
       decline: { pass: declinePass, of: declineScored },
