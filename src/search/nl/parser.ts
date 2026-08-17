@@ -845,9 +845,13 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   let unresolvedPlayerMention: string | null = null;
   let ambiguousPlayerMention: string | null = null;
   if (candidateRaw && candidateRaw.length >= 3) {
-    const nicknameKey = PLAYER_NICKNAMES[candidateRaw] !== undefined
+    // `Object.hasOwn`, not a plain index: the key is reader-typed text, so
+    // `constructor` and friends come back off the prototype chain as truthy
+    // non-strings and get passed on as the name to resolve.
+    const firstWord = candidateRaw.split(' ')[0];
+    const nicknameKey = Object.hasOwn(PLAYER_NICKNAMES, candidateRaw)
       ? candidateRaw
-      : PLAYER_NICKNAMES[candidateRaw.split(' ')[0]] !== undefined ? candidateRaw.split(' ')[0] : null;
+      : Object.hasOwn(PLAYER_NICKNAMES, firstWord) ? firstWord : null;
     const lookupName = nicknameKey !== null ? PLAYER_NICKNAMES[nicknameKey] : candidateRaw;
     const candidates = await ctx.resolvePlayer(lookupName);
     const top = candidates[0];

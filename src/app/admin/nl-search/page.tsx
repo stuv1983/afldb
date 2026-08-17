@@ -85,7 +85,7 @@ export default async function NlSearchAdminPage({
   // binds it either way, but an unknown reason should mean "no filter"
   // rather than an empty table with no explanation.
   const requestedReason = firstValue(params.reason);
-  const reason = requestedReason && requestedReason in NL_FAILURE_REASON_LABEL
+  const reason = requestedReason && Object.hasOwn(NL_FAILURE_REASON_LABEL, requestedReason)
     ? requestedReason
     : undefined;
 
