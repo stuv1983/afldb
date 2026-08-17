@@ -8,12 +8,88 @@ returned something.
 ```bash
 # on the dev server, from ~/projects/afldb
 export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+
+# V1 -- the 12,000-question regression corpus
 npm run nl:stress -- --corpus ~/nl-stress-corpus.csv --out ~/nl-stress-out
+
+# V2 -- the 250,000-question qualification suite
+npm run nl:stress -- --corpus ~/nl-killer-250k.csv --out ~/nl-stress-v2 --concurrency 6
+
+# compare two finished runs (no database needed)
+npm run nl:stress:compare -- ~/nl-stress-v2-before ~/nl-stress-v2-after
 ```
 
 Use the npm script rather than calling `tsx` directly: it sets
 `--conditions=react-server`, without which Node resolves the `server-only`
 guard on every query module to the copy that throws.
+
+## Two corpus schemas, detected from the header
+
+The runner reads the CSV header and picks its scoring contract from it —
+there is no `--v1`/`--v2` flag, and an unrecognised header is refused
+rather than guessed at.
+
+| | V1 | V2 |
+| --- | --- | --- |
+| Size | 12,000 rows | 250,000 rows |
+| Expectations | its own column vocabulary, translated in `corpus.ts` | this codebase's own `NlQueryPlan` IR, compared directly |
+| Oracles | one (interpretation, plus 51 verified answers) | five: `plan`, `plan+policy`, `answer`, `decline`, `metamorphic` |
+| Execution | every row, unless `--parse-only` | only `answer` rows — a plan row's correctness is its interpretation |
+| Memory | whole corpus and all results in RAM | streamed both ways; bounded aggregates only |
+| Output | `report.md`, `failures.csv`, `summary.json` | the structured directory below |
+
+V1 behaviour is unchanged, so earlier 12k results stay comparable.
+
+### V2 oracles
+
+| Oracle | Runs SQL | Passes when |
+| --- | --- | --- |
+| `plan` | no | canonical semantics equal the expectation |
+| `plan+policy` | no | as `plan`, but the expected status may be a decline (era coverage) |
+| `answer` | yes | semantics **and** the verified football result both match, scored independently |
+| `decline` | no | the parser refuses; a wrong decline *reason* is soft, answering at all is `UNSAFE_ANSWER` |
+| `metamorphic` | no | every phrasing in a `metamorphic_group` yields the same canonical semantics |
+
+**A `plan` row is never failed because the query would return zero rows.**
+A question can name a real player, club and season that never intersect;
+that makes the result empty, not the interpretation wrong.
+
+### What counts as semantics
+
+Canonical semantics carry grain, metric, mode, aggregation (including
+`top_n`'s `n`), entities, season range, match type, career and
+club-season conditions, boundary and tie policy. They deliberately
+exclude confidence, consumed tokens, unsupported-term diagnostics, parser
+notes, entity-resolution debug, plan tokens, headlines, explanations and
+formatting — none of that is a query.
+
+Entities compare by **stable id** (`player.id`, `club.organizationId`,
+`venue.id`), resolved through the same directories and resolver the
+parser uses. Names differing cosmetically ("GWS Giants" vs "Greater
+Western Sydney") is not a failure; `Sydney` vs `Greater Western Sydney`
+still is. Collections whose order carries no meaning (career conditions,
+club-season conditions) are sorted before comparison.
+
+### V2 output
+
+| File | Use |
+| --- | --- |
+| `run.json` | reproducibility: corpus SHA-256, row count, git commit, `PARSER_VERSION`, database, concurrency, node, host, start/finish, and the headline totals. Written *before* the first query and marked `running` until the run completes, so an interrupted run still says what it was. |
+| `report.md` | read first: the five quality dimensions, safety counts, failure classes with examples, metamorphic divergences, per-category rates, highest-leverage fixes, latency. |
+| `failures.jsonl` | only rows with a finding — the primary debugging file. |
+| `results.jsonl` | every row's full forensic record; the input to `--resume`. |
+| `metamorphic-failures.jsonl` | one record per divergent group, with majority and outlier semantics. |
+| `unsupported-terms.csv` | `term,count,example` frequency table for vocabulary mining. |
+| `latency.json` | throughput and p50/p90/p95/p99/p99.9 for the full path, the parser alone, and database execution. |
+
+The headline is deliberately **not** one blended number. It reports
+semantic correctness, answer correctness, safe declines and metamorphic
+consistency separately, then the absolute count of confidently wrong
+answers — because a rising clean rate must never excuse a rising
+wrong-answer count. Compare the absolute hard number between runs, which
+is what `npm run nl:stress:compare` exists to do: it lists rows that were
+correct in the baseline and wrong in the candidate, regardless of which
+way the percentage moved.
 
 ## Why it scores meaning rather than answers
 
@@ -63,7 +139,7 @@ biggest clusters, run the identical file again, and the movement in
 
 | Option | Effect |
 | --- | --- |
-| `--corpus <path>` | The CSV to run. Required. |
+| `--corpus <path>` | The CSV to run. Required. Schema detected from its header. |
 | `--out <dir>` | Output directory. Default `./nl-stress-out`. |
 | `--concurrency <n>` | Questions in flight at once. Default 6. |
 | `--limit <n>` | First *n* rows only. |

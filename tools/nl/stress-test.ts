@@ -1,12 +1,15 @@
 #!/usr/bin/env tsx
 /**
- * Natural-language search stress-test runner.
+ * Natural-language search stress-test runner, for both corpus schemas.
  *
- *   npx tsx tools/nl/stress-test.ts --corpus /path/to/stressTest.csv
+ *   npm run nl:stress -- --corpus /path/to/corpus.csv
  *
- * Feeds a corpus of natural-language questions through the real parsing
- * and execution pipeline, compares each result against the corpus's
- * expected interpretation, and writes a clustered report saying what
+ * The schema is detected from the CSV header, never from a flag: the V1
+ * 12,000-question corpus runs through the original in-memory scorer so
+ * its results stay comparable with earlier runs, and a V2 corpus (the
+ * 250,000-question qualification suite) runs through the streaming
+ * runner in v2-runner.ts. Feeds each question through the real parsing
+ * and execution pipeline and writes a clustered report saying what
  * failed, how, and how often.
  *
  * WHY THIS DOES NOT GO THROUGH HTTP
@@ -20,13 +23,13 @@
  * WHAT IT DELIBERATELY DOES NOT DO
  *
  *   It never calls logNlSearch. nl_search_log is the record of what real
- *   readers asked, and it drives vocabulary and confidence tuning; twelve
- *   thousand synthetic rows would drown that signal. Nothing here writes
- *   to any table -- the whole run is SELECTs through the read-only app
- *   role.
+ *   readers asked, and it drives vocabulary and confidence tuning;
+ *   hundreds of thousands of synthetic rows would drown that signal.
+ *   Nothing here writes to any table -- the whole run is SELECTs through
+ *   the read-only app role.
  *
  *   It never promotes an observed value into an expected one. Only the
- *   corpus's VERIFIED_RESULT rows carry factual answers, and they were
+ *   corpus's verified-answer rows carry factual answers, and they were
  *   checked by hand; everything else is scored on meaning alone.
  *
  * OPTIONS
@@ -35,33 +38,28 @@
  *   --out <dir>           Output directory. Default ./nl-stress-out.
  *   --concurrency <n>     Questions in flight at once. Default 6.
  *   --limit <n>           Run only the first n rows.
- *   --sample <n>          Run n evenly spaced rows -- what a pilot wants,
- *                         since the corpus is generated template by
- *                         template and its first 400 rows are 330
- *                         variations on one question.
- *   --category <name>     Run only one corpus category. Repeatable.
- *   --parse-only          Skip SQL execution; score interpretation only.
- *                         Minutes instead of hours, and enough to find
- *                         every parser bug. Verified-fact rows are then
- *                         scored on their plan alone.
+ *   --sample <n>          V1 only: run n evenly spaced rows -- what a
+ *                         pilot wants, since the corpus is generated
+ *                         template by template and its first 400 rows
+ *                         are 330 variations on one question.
+ *   --category <name>     V1 only: run one corpus category. Repeatable.
+ *   --parse-only          V1 only: skip SQL execution everywhere. (V2
+ *                         already executes SQL only for answer-oracle
+ *                         rows; its plan rows are parser-only by
+ *                         contract.)
  *   --resume              Skip ids already present in results.jsonl.
- *   --report-only         Re-score and re-report an existing
- *                         results.jsonl without touching the database.
- *   --allow-any-database  Bypass the _dev/_test name guard. Needed only
- *                         to run against a database whose name does not
- *                         say it is safe to hammer.
+ *   --report-only         V1 only: re-score an existing results.jsonl
+ *                         without touching the database.
+ *   --allow-any-database  Bypass the _dev/_test name guard.
  *
- * OUTPUT (in --out)
- *
- *   results.jsonl   one line per question: expectation, observation, findings
- *   report.md       the clustered summary to read first
- *   failures.csv    every failing row, for sorting in a spreadsheet
- *   summary.json    headline numbers, for comparing run to run
+ * OUTPUT (in --out): see tools/nl/README.md -- V1 writes report.md /
+ * failures.csv / summary.json; V2 writes the structured directory
+ * (run.json, report.md, results.jsonl, failures.jsonl,
+ * metamorphic-failures.jsonl, unsupported-terms.csv, latency.json).
  */
 import { createWriteStream } from 'node:fs';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
 import { toCsv } from '@/lib/csv';
 
@@ -70,27 +68,14 @@ import {
   type EntityIndex, type StressExpectation, type StressFinding, type StressFindingClass,
   type StressObservation,
 } from './corpus';
-
-const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+import {
+  flag, guardDatabase, loadEngine, loadEnv, normaliseKey, option, options, runPool,
+  type StressEngine,
+} from './engine';
+import { detectSchema } from './v2';
+import { runV2 } from './v2-runner';
 
 // ------------------------------------------------------------------ options
-
-function flag(name: string): boolean {
-  return process.argv.includes(`--${name}`);
-}
-
-function option(name: string): string | undefined {
-  const index = process.argv.indexOf(`--${name}`);
-  return index >= 0 ? process.argv[index + 1] : undefined;
-}
-
-function options(name: string): string[] {
-  const values: string[] = [];
-  process.argv.forEach((arg, index) => {
-    if (arg === `--${name}` && process.argv[index + 1]) values.push(process.argv[index + 1]);
-  });
-  return values;
-}
 
 const OUT_DIR = option('out') ?? join(process.cwd(), 'nl-stress-out');
 const CONCURRENCY = Math.max(1, Number(option('concurrency') ?? 6));
@@ -101,52 +86,7 @@ const PARSE_ONLY = flag('parse-only');
 const RESUME = flag('resume');
 const REPORT_ONLY = flag('report-only');
 
-// --------------------------------------------------------------------- env
-
-/** Same loader tools/db/migrate.ts uses: an already-exported variable always wins. */
-function loadEnv(): void {
-  let contents: string;
-  try {
-    contents = readFileSync(join(PROJECT_ROOT, '.env'), 'utf8');
-  } catch {
-    return;
-  }
-  for (const line of contents.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue;
-    const [key, ...rest] = trimmed.split('=');
-    const name = key.trim();
-    if (!process.env[name]) process.env[name] = rest.join('=').trim();
-  }
-}
-
 loadEnv();
-
-/**
- * A 12,000-question run is sustained load. It must land on a database
- * whose name says it exists to be hammered, the same allowlist rule
- * tests/setup.ts applies -- refusing only a name that looks like
- * production would leave every other database acceptable by default.
- */
-function guardDatabase(): string {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error('DATABASE_URL is not set. Run this from the project root on a server with a .env, or export it.');
-  }
-  let database: string;
-  try {
-    database = new URL(url).pathname.replace(/^\//, '');
-  } catch {
-    throw new Error('DATABASE_URL is not a valid connection URL.');
-  }
-  if (!/_(dev|test)$/.test(database) && !flag('allow-any-database')) {
-    throw new Error(
-      `DATABASE_URL points at '${database}', which is not a _dev or _test database. `
-      + 'Refusing to run twelve thousand queries against it. Pass --allow-any-database if that is genuinely what you want.',
-    );
-  }
-  return database;
-}
 
 // ------------------------------------------------------------------ running
 
@@ -167,7 +107,7 @@ type RunRecord = {
  */
 async function runQuestion(
   question: string,
-  deps: Awaited<ReturnType<typeof loadEngine>>,
+  deps: StressEngine,
 ): Promise<StressObservation> {
   const startedAt = Date.now();
   const empty = {
@@ -272,85 +212,20 @@ function summarisePayload(payload: AnyPayload): {
   };
 }
 
-/**
- * Imports the engine after the environment is settled.
- *
- * src/db/client.ts builds its pool at module evaluation time, so a static
- * import would run before loadEnv() and throw "DATABASE_URL is not set".
- * Player resolution is memoised on the way through: the corpus asks about
- * a few dozen players across twelve thousand questions, and the same
- * trigram search repeated ten thousand times is the single largest
- * avoidable cost in the run.
- */
-async function loadEngine() {
-  // Every query module is marked `server-only`, whose default export
-  // throws to stop a Client Component importing database code. Node
-  // resolves that package's harmless entry under the react-server
-  // condition, which `npm run nl:stress` sets -- hence the reminder
-  // rather than the package's own message, which would be baffling here.
-  const loaded = await Promise.all([
-    import('@/db/queries/nl/resolve'),
-    import('@/db/queries/nl/execute'),
-    import('@/search/nl/plan'),
-    import('@/search/nl/parser'),
-    import('@/db/client'),
-  ]).catch((error: unknown) => {
-    if (error instanceof Error && /Client Component/.test(error.message)) {
-      throw new Error(
-        'Run this through `npm run nl:stress -- <options>`, or add '
-        + '--conditions=react-server to tsx. Without it Node resolves the '
-        + 'server-only guard to the copy that throws.',
-      );
-    }
-    throw error;
-  });
-  const [{ buildNlParseContext }, { executePlan }, plan, { parseNlQuestion }, { sql }] = loaded;
-
-  const ctx = await buildNlParseContext();
-  const memo = new Map<string, ReturnType<typeof ctx.resolvePlayer>>();
-  const resolvePlayer = (name: string) => {
-    const cached = memo.get(name);
-    if (cached) return cached;
-    const pending = ctx.resolvePlayer(name);
-    memo.set(name, pending);
-    return pending;
-  };
-
-  // The scoring layer compares club and venue identity, not names, and
-  // gets both from the directories the parser itself resolves against --
-  // so "GWS Giants" and "Greater Western Sydney" are one club here for
-  // exactly the reason they are one club to the parser.
-  const clubByName = new Map<string, number>();
-  for (const club of ctx.clubs) {
-    for (const name of [club.name, ...club.names]) clubByName.set(normaliseKey(name), club.organizationId);
-  }
-  const venueByName = new Map<string, number>();
-  for (const venue of ctx.venues) {
-    for (const name of [venue.name, ...venue.names]) venueByName.set(normaliseKey(name), venue.id);
-  }
+/** The shared engine plus the V1 scorer's name->id index, which carries the V1 corpus's own club spellings. */
+async function loadV1Engine(): Promise<StressEngine & { index: EntityIndex; clubKeys: Record<string, number>; venueKeys: Record<string, number> }> {
+  const engine = await loadEngine();
   const index: EntityIndex = {
-    clubOrgId: (name) => clubByName.get(normaliseKey(name))
-      ?? clubByName.get(normaliseKey(CORPUS_CLUB_SPELLINGS[name] ?? '')),
-    venueId: (name) => venueByName.get(normaliseKey(name)),
+    clubOrgId: (name) => engine.clubByName.get(normaliseKey(name))
+      ?? engine.clubByName.get(normaliseKey(CORPUS_CLUB_SPELLINGS[name] ?? '')),
+    venueId: (name) => engine.venueByName.get(normaliseKey(name)),
   };
-
   return {
-    ctx: { ...ctx, resolvePlayer },
+    ...engine,
     index,
-    clubKeys: Object.fromEntries(clubByName),
-    venueKeys: Object.fromEntries(venueByName),
-    parseNlQuestion,
-    executePlan,
-    validatePlan: plan.validatePlan,
-    NL_COVERAGE: plan.NL_COVERAGE,
-    BROWNLOW_GAME_VOTE_NOTE: plan.BROWNLOW_GAME_VOTE_NOTE,
-    PARSER_VERSION: plan.PARSER_VERSION,
-    sql,
+    clubKeys: Object.fromEntries(engine.clubByName),
+    venueKeys: Object.fromEntries(engine.venueByName),
   };
-}
-
-function normaliseKey(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
 /**
@@ -392,23 +267,6 @@ function spread<T>(items: T[], count: number): T[] {
   if (count >= items.length) return items;
   const stride = items.length / count;
   return Array.from({ length: count }, (_, i) => items[Math.floor(i * stride)]);
-}
-
-/** Fixed-size worker pool: `concurrency` questions in flight, next one started as each finishes. */
-async function runPool(
-  rows: StressExpectation[],
-  worker: (row: StressExpectation) => Promise<void>,
-  concurrency: number,
-): Promise<void> {
-  let next = 0;
-  const runners = Array.from({ length: Math.min(concurrency, rows.length) }, async () => {
-    for (;;) {
-      const index = next++;
-      if (index >= rows.length) return;
-      await worker(rows[index]);
-    }
-  });
-  await Promise.all(runners);
 }
 
 // ---------------------------------------------------------------- reporting
@@ -724,6 +582,15 @@ function readResults(path: string): RunRecord[] {
 
 // -------------------------------------------------------------------- main
 
+/** The corpus's header line, read without loading the file -- enough for schema detection. */
+function readHeader(path: string): string[] {
+  const fd = readFileSync(path, { encoding: 'utf8', flag: 'r' });
+  // The header never contains a quoted newline in either schema, so the
+  // first line is the header line.
+  const firstLine = fd.slice(0, fd.indexOf('\n'));
+  return firstLine.replace(/^﻿/, '').split(',').map((h) => h.replace(/^"|"$/g, '').trim());
+}
+
 async function main(): Promise<void> {
   mkdirSync(OUT_DIR, { recursive: true });
   const resultsPath = join(OUT_DIR, 'results.jsonl');
@@ -737,6 +604,33 @@ async function main(): Promise<void> {
 
   const corpusPath = option('corpus');
   if (!corpusPath) throw new Error('--corpus <path to csv> is required.');
+
+  // Detect the corpus schema from its header, never from a flag. An
+  // unknown header is refused with what was seen, because guessing which
+  // contract to score against is the one thing a harness must not do.
+  const schema = detectSchema(readHeader(corpusPath));
+  if (schema === null) {
+    throw new Error(`${corpusPath} matches neither the V1 nor the V2 corpus schema. Header: ${readHeader(corpusPath).join(', ')}`);
+  }
+
+  if (schema === 'v2') {
+    const database = guardDatabase();
+    process.stdout.write(`Schema: V2 (qualification suite)\nDatabase: ${database}  concurrency: ${CONCURRENCY}\n\n`);
+    const engine = await loadEngine();
+    try {
+      await runV2({
+        corpusPath,
+        outDir: OUT_DIR,
+        concurrency: CONCURRENCY,
+        resume: RESUME,
+        database,
+        limit: ROW_LIMIT === Infinity ? 0 : ROW_LIMIT,
+      }, engine);
+    } finally {
+      await engine.sql.end();
+    }
+    return;
+  }
 
   const database = guardDatabase();
   const all = readCorpus(readFileSync(corpusPath, 'utf8'));
@@ -756,7 +650,7 @@ async function main(): Promise<void> {
     + `Database: ${database}  concurrency: ${CONCURRENCY}  ${PARSE_ONLY ? 'parse only' : 'parse + execute'}\n\n`,
   );
 
-  const engine = await loadEngine();
+  const engine = await loadV1Engine();
   reportUnindexedEntities(rows, engine.index);
   saveEntityIndex(engine.clubKeys, engine.venueKeys);
   process.stdout.write('\n');
