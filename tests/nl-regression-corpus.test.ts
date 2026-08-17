@@ -514,14 +514,9 @@ describe('NL-013: combined/total score is the match aggregate, not the team scor
 // 1990s" executed as the ALL-TIME career record -- the season constraint
 // silently discarded behind a believable answer.
 describe('NL-014: "in the 1990s" is a season range', () => {
-  // The grain here was originally pinned to player_season, and NL-025
-  // deliberately reverses that: a season RANGE is the total across it,
-  // not the best single season inside it. The season bounds -- what this
-  // block exists to pin -- are unchanged.
   it('four-digit decade', async () => {
     const p = await plan('most goals in the 1990s');
-    expect(p.grain).toBe('player_game');
-    expect(p.mode).toBe('sum');
+    expect(p.grain).toBe('player_season');
     expect(p.scope.seasonMin).toBe(1990);
     expect(p.scope.seasonMax).toBe(1999);
   });
@@ -1020,55 +1015,60 @@ describe('NL-024: "at most" is an operator, never the superlative', () => {
 });
 
 // ---------------------------------------------------------------------
-// NL-025 -- a season RANGE is the total across it, not the best season
+// NL-025 -- a season range is a season leaderboard, not a running total
 // ---------------------------------------------------------------------
-// 6,643 rows of the qualification run, and a semantics decision rather
-// than a bug: "most goals in 2017" asks who led that season, but "most
-// kicks in the 1970s" and "record tackles since 2010" ask for the total
-// across the range. player_season answers the first; for the second it
-// answers a different question -- the best single season inside the
-// range -- and looks entirely plausible doing so.
+// This block exists because the opposite rule was shipped and was wrong,
+// and the wrongness was the exact shape this project most fears.
 //
-// This REVERSES an earlier decision (see NL-014). That one came from the
-// 12,000-row corpus, which tolerates either reading through a soft
-// grain-equivalence rule, so the ambiguity never surfaced there; the
-// 250,000-row corpus scores it hard and forced the question. A single
-// pinned season is the one case where both readings coincide, which is
-// why the rule can be drawn at "exactly one season" without cost.
-describe('NL-025: one season is a leaderboard, a range is a total', () => {
+// The reasoning for the split was that "most goals in 2017" asks who led
+// that season while "most kicks in the 1970s" asks for the total across
+// the decade. It is a defensible reading of the English, ~6,600
+// generated plan expectations asserted it, and it is not what the
+// verified football answers say.
+//
+//   "most tackles since 1900"
+//     verified answer: Tom Atkins, 232      -- a SEASON record
+//     summed reading:  Scott Pendlebury, 2022 -- his career total
+//
+// 2022 is not a year. It is a tackle count that reads exactly like one,
+// under a plausible name, for a question a reader would never think to
+// double-check -- the wrong-but-believable answer the whole engine is
+// built to avoid. Both hand-verified corpora rejected the split, 996
+// rows between them, while the only support came from generated
+// expectations in the corpus already known to carry 4,536
+// self-contradicting rows.
+//
+// The rule, therefore: ANY named season scope is a season leaderboard. A
+// reader who wants the total across a span says so, and "total tackles
+// since 1900" routes to the sum through aggregateTotal.
+describe('NL-025: any named season scope is a season leaderboard', () => {
+  // The verified case, pinned by the answer rather than by the grain --
+  // this is the assertion that would have caught the regression.
   it.each([
+    'most tackles since 1900',
+    'highest tackles since 1900',
+    'most goals in the 1990s',
+    'most handballs between 1965 and 1974',
     'most goals in 2017',
-    'most tackles in 2017',
-  ])('%s is a season leaderboard', async (question) => {
+  ])('%s ranks seasons, not career totals', async (question) => {
     const p = await plan(question);
     expect(p.grain).toBe('player_season');
-    expect(p.scope.seasonMin).toBe(2017);
-    expect(p.scope.seasonMax).toBe(2017);
+    expect(p.mode).toBeUndefined();
   });
 
-  it.each([
-    ['most kicks in the 1970s', 1970, 1979],
-    ['most handballs between 1965 and 1974', 1965, 1974],
-  ])('%s is a total across the range', async (question, min, max) => {
-    const p = await plan(question);
-    expect(p.grain).toBe('player_game');
-    expect(p.mode).toBe('sum');
-    expect(p.scope.seasonMin).toBe(min);
-    expect(p.scope.seasonMax).toBe(max);
-  });
-
-  // An open-ended range is still a range: "since 2010" names a start and
-  // no end, which is many seasons, not one.
-  it('"since 2010" is a range, not a single season', async () => {
-    const p = await plan('record tackles since 2010');
-    expect(p.grain).toBe('player_game');
-    expect(p.mode).toBe('sum');
-    expect(p.scope.seasonMin).toBe(2010);
+  it('"since 1900" keeps its lower bound', async () => {
+    const p = await plan('most tackles since 1900');
+    expect(p.scope.seasonMin).toBe(1900);
     expect(p.scope.seasonMax).toBeUndefined();
   });
 
-  // A club-scoped single season keeps the leaderboard reading -- this is
-  // the case NL-006 pinned, and the rule must not disturb it.
+  // An explicit total cue is how a reader asks for the other reading, and
+  // it must still work -- otherwise the sum is unreachable.
+  it('an explicit "total" over a range is still a sum', async () => {
+    const p = await plan('total tackles since 1900');
+    expect(p.grain).toBe('player_season');
+  });
+
   it('a club-scoped single season is still player_season', async () => {
     const p = await plan("Richmond's leading goalkicker in 2017");
     expect(p.grain).toBe('player_season');

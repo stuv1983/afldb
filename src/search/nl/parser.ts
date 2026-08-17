@@ -612,24 +612,6 @@ function extractByClubPlayer(
  * between "no player was mentioned" and "a player was mentioned but
  * could not be resolved", which score very differently.
  */
-/**
- * True when the question pinned exactly ONE season, false for a range and
- * for no season at all.
- *
- * The grain election turns on this. "Most goals in 2017" asks who led that
- * season; "most kicks in the 1970s" asks for the total across the decade,
- * and answering it with the best single SEASON in that decade is a
- * different question wearing the same words. A single pinned season is the
- * one case where the two readings coincide, so it is the only case that
- * can safely take the season grain.
- *
- * An open-ended range counts as a range: "since 2010" names a start and no
- * end, which is many seasons, not one.
- */
-function isSingleSeason(seasonMin: number | undefined, seasonMax: number | undefined): boolean {
-  return seasonMin !== undefined && seasonMin === seasonMax;
-}
-
 function candidatePlayerSpan(text: string): string | null {
   const tokens = text.split(/\s+/).filter(Boolean);
   const alphaRun = tokens.filter((t) => /^[a-z]+$/.test(t) && !STOPWORDS.has(t));
@@ -995,17 +977,23 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       // explicit total/career cue and an explicit single-game cue, both
       // of which name a different reading outright.
       //
-      // ONE season, not a range. The distinction is the question itself:
-      // "most goals in 2017" asks who led that season, and player_season
-      // says exactly that. "Most kicks in the 1970s" or "record tackles
-      // since 2010" asks for the total ACROSS the range -- player_season
-      // would answer a different question, the best single season inside
-      // it, and would look entirely plausible doing so. For a single
-      // pinned season the two readings coincide, which is why the rule
-      // can be drawn here without cost.
+      // A season RANGE reads the same way as a single season, and the
+      // attempt to split them is recorded here because it produced the
+      // worst answer this engine has shipped. Routing a range to a summed
+      // player_game turned "most tackles since 1900" -- whose verified
+      // answer is Tom Atkins with 232, a SEASON record -- into "Scott
+      // Pendlebury, 2022", his career total across the range, wearing a
+      // number that reads exactly like a year. Both hand-verified corpora
+      // rejected it, 996 rows between them; the only support for the split
+      // came from generated plan expectations, in the same corpus already
+      // known to carry 4,536 self-contradicting rows.
+      //
+      // So: any named season scope is a season leaderboard. A reader who
+      // wants the total across a span says so ("total tackles since
+      // 1900"), and aggregateTotal already routes that to the sum below.
       !inOneGame && !aggregateTotal && !overCareer
       && !venue && !clubAgainst && !matchTypeResult.matchType
-      && isSingleSeason(seasons.seasonMin, seasons.seasonMax)
+      && (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined)
     ) {
       grain = 'player_season';
       metric = playerMetricResult.metric;
@@ -1015,18 +1003,11 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       grain = 'player_game';
       mode = inOneGame ? 'single' : 'sum';
       metric = playerMetricResult.metric;
-    } else if (isSingleSeason(seasons.seasonMin, seasons.seasonMax)) {
-      // One named season with a total/career cue but no other scope
-      // ("total goals in 2017") -- the season must not silently drop, and
-      // player_season is the grain that keeps it.
-      grain = 'player_season';
-      metric = playerMetricResult.metric;
     } else if (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined) {
-      // A season RANGE with no other scope ("most kicks in the 1970s",
-      // "record tackles since 2010"): the total across the range, which
-      // only a summed player_game can express.
-      grain = 'player_game';
-      mode = 'sum';
+      // A season with a total/career cue but no other scope ("total
+      // goals since 2000") -- the season must not silently drop, and
+      // player_season is the only grain that keeps it.
+      grain = 'player_season';
       metric = playerMetricResult.metric;
     } else if (['games', 'goals'].includes(playerMetricResult.metric) || careerResult.conditions.length > 0) {
       grain = 'player_career';

@@ -65,13 +65,17 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  * 6: "at most" is no longer read as the superlative "most" -- it inverted
  *    the first condition of a multi-clause question to its opposite and
  *    ranked instead of listing.
- * 7: a season RANGE is the total across it (player_game/sum), while ONE
- *    named season stays a season leaderboard -- reversing part of 2. A
- *    boundary question no longer repeats its match type in scope. Slang
+ * 7: a boundary question no longer repeats its match type in scope. Slang
  *    ("possies", "snags", "danger") and the multi-word stat-games idioms
  *    ("uncontested possessions game", "inside-fifties game") resolve.
+ *    ALSO shipped a season-range grain split, reverted in 8 -- see below.
+ * 8: reverts 7's season-range split. Routing a range to a summed
+ *    player_game answered "most tackles since 1900" with a career total
+ *    (Scott Pendlebury, 2022) where the verified answer is a season
+ *    record (Tom Atkins, 232). Any named season scope is a season
+ *    leaderboard again.
  */
-export const PARSER_VERSION = 7;
+export const PARSER_VERSION = 8;
 
 // ------------------------------------------------------------------ grain
 
