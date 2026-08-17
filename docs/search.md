@@ -254,3 +254,40 @@ Compared as **exact player-ID sets** with SHA-256 hashes, not merely counts, in 
 The third case is a deliberate correction. The legacy derivation returned **750** because it summed per-game Brownlow votes, which do not exist for 1935–1983; the 481 extra players did poll votes. AFLDB counts from the authoritative season totals and returns 269.
 
 The "exactly 2 clubs" case exposed a second definitional bug during development: counting distinct *historical* club identities made Brent Harvey a two-club player because North Melbourne was branded "Kangaroos" from 1999 to 2007. `clubs_played` now counts modern identities, and the case returns 110 rather than 109.
+
+## 9. Natural-language search
+
+`/search` answers a question typed in plain English — "players with 200 games and no premiership", "most brownlow votes without winning one" — with a real answer rendered inline, not a link to another tool. Deliberately **no LLM anywhere in the pipeline**:
+
+```
+Question → Deterministic parser → Structured query plan (JSON)
+        → Validation → Grain compiler → PostgreSQL → Answer
+```
+
+Everything is `src/search/nl/` (DB-free, the parser and the plan type) and `src/db/queries/nl/` (server-only, the compilers). A seam is left for an optional future LLM fallback — see the header comment on `plan.ts` — but nothing in this codebase calls one, and no builder here can ever emit raw SQL: a plan reaches the database only through the same allowlist-then-bind discipline the grid solver and query builder already use.
+
+**The plan.** `NlQueryPlan` names a *grain* (`player_career`, `player_game`, `player_season`, `team_match`, `club_season`), a *metric* from that grain's fixed allowlist (`NL_METRICS`), an *aggregation* (`max`/`min`/`top_n`/`list`/`count`), and whatever scope the question named — a player, a club (for and/or against), a venue, a season range, a match type. Career-grain questions additionally carry `careerConditions` (numeric thresholds, including `eq 0` for a negative — "no premiership") and `careerPredicates`: `GridAxisState` entries compiled by the grid solver's own `compileAxis`, reused directly rather than duplicated, so a recognised phrase like "played a grand final" becomes exactly the predicate the grid solver already knows how to run.
+
+**The parser.** `parseNlQuestion(question, ctx)` runs entirely synchronously except for one step — resolving a player name, which delegates to `searchPlayers`' existing trigram/prominence ranking. Stages: canonicalise (lowercase, strip possessives, protect number-like stat names such as "inside 50s" from being read as the digits 50) → an unanswerable-topic gate (coaching, positions, streaks — recognised and declined with a reason, before entity matching can partially misfire on them) → club/venue extraction against a directory merging every historical identity's name and alias with a seed nickname dictionary (`dusty` → Dustin Martin, `pies` → Collingwood, `mcg` → Melbourne Cricket Ground) → slot extraction (aggregation words, stat words, match type, season range, comparison operators, negation) → the async player lookup → grain election.
+
+Grain election resolves the genuine ambiguities in the vocabulary rather than guessing: a team-scoring word ("biggest win/loss") always means `team_match`, checked before any stat word can compete for the same sentence. A player named with a per-game stat and no season/career qualifier defaults to their single-game peak ("dusty most disposals" asks for his record game, not a career total). "Finals" is genuinely two different questions depending on whether a preposition governs it — "in finals" is a scope, "most finals played" is a career metric — and only a governing word (`in`, `during`, or a copula like `was`) resolves it one way; bare "finals" with nothing before it defaults to the career-metric reading.
+
+**Confidence.** Every parse returns a report: consumed tokens, unsupported terms, entity-resolution certainty per mention, and a confidence score. Thresholds (`NL_CONFIDENCE`, kept as named constants for future tuning):
+
+| Confidence | Outcome |
+|---|---|
+| ≥ 0.85 | Execute. |
+| 0.60–0.85 | Execute only if every entity/metric resolved unambiguously (certainty 1.0, no unresolved mention); otherwise decline as `ambiguous`. |
+| < 0.60 | Decline as `low_confidence`. |
+
+A decline is never shown as an error — the question just falls through to ordinary player/club/venue search results, the same graceful degradation `answerPlayerQuestion`/`answerClubQuestion` already established. A recognised-but-unanswerable topic (no coaching data, streaks not yet computed) gets its own honest panel instead: "AFLDB can't answer this because…", not a bare empty state.
+
+**Validation runs twice.** `validatePlan` is called from `answer.ts` regardless of whether the plan came from the parser — defence in depth, and the one gate any future non-deterministic producer would have to pass. It rejects an unknown grain/metric/column/award/builder, clamps `top_n` and row limits to fixed caps, and — the era-coverage check — declines outright when a metric's first-recorded season (`NL_COVERAGE`, checked against the live `stat_availability` registry by an integration test so the two cannot silently drift) is entirely after the requested season range, with the reason stated plainly rather than an empty result that reads as "nobody ever did this."
+
+**Ties are never dropped.** A `max`/`min` answer uses `rank() OVER (...)` and returns every row sharing the extreme value, the same discipline `records.ts`'s `getCareerRecord` already applies; a `top_n` answer includes ties that straddle the cutoff, so "top 10" can return more than ten rows when the tenth place is shared.
+
+**What's compiled so far:** `player_career` only — multi-condition trivia ("300 games, no premiership, played a grand final"), career rankings for any allowlisted metric including the 13 stats with no precomputed total (a live `SUM()` over `player_match_stats`, the same shape `careerStatValueExpr` proves out for the grid catalogue) and award-count metrics like All-Australian selections (counted from linked `award_winners` rows, since there is no precomputed total for that), and career-boundary questions ("first/last game was a grand final", read off `career_game_no = 1` / `match_date = last_match_date` rather than a fragile game-count comparison). `player_game` (single-game and player records), `player_season`, `team_match` and `club_season` are designed and validated by the parser corpus but have no compiler yet — a plan of that grain throws a named "no compiler yet" error that `answer.ts` catches and degrades from, the same shape `query-builder.ts` and `grid-solver.ts` already use for an unrecognised builder.
+
+**Precedence over the older question-answering.** `parsePlayerQuestion`/`parseClubQuestion` (§ above them in this file, unchanged) still run alongside the NL engine in `globalSearch`'s parallel fetch; when the NL engine answers, both are nulled out before rendering, so a question is never shown twice under two different UIs. They remain the fallback for whatever the NL engine's still-growing vocabulary doesn't yet cover.
+
+**Deliberately deferred**, each with its own reason rather than silently unsupported: conversational follow-ups ("only finals" refining a prior answer) — the plan-token encoding (`encodePlanToken`/`decodePlanToken`, the same base64url `urlState.ts` scheme `q`/`g` already use) is the seam a later build hangs a refinement UI on; youngest/oldest questions — `players.dob` is only ~93% populated, and a superlative over an incomplete column is exactly the kind of silently-wrong answer this codebase refuses elsewhere; averages as a ranking metric — the grid solver's average builders are threshold checks, not rankings, and a qualification-minimum ("average with at least 50 games") needs its own design; streaks and quarter-by-quarter comebacks — no precomputation exists yet.
