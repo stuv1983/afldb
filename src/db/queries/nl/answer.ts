@@ -1,14 +1,17 @@
 import 'server-only';
 
 import { executePlan } from '@/db/queries/nl/execute';
-import { logNlSearch, type NlSearchLogOutcome } from '@/db/queries/nl/log';
+import { logNlSearch, type NlFailureReason, type NlSearchLogEntry, type NlSearchLogOutcome } from '@/db/queries/nl/log';
 import { buildNlParseContext } from '@/db/queries/nl/resolve';
 import {
   BROWNLOW_GAME_VOTE_NOTE,
   describePlan,
   encodePlanToken,
   NL_COVERAGE,
+  PARSER_VERSION,
   validatePlan,
+  type NlDeclineReason,
+  type NlParseReport,
   type NlQueryPlan,
 } from '@/search/nl/plan';
 import { parseNlQuestion } from '@/search/nl/parser';
@@ -30,28 +33,60 @@ import type {
  * Every failure mode degrades to null rather than throwing: a reader's
  * ordinary player/club/venue results must never be lost because the
  * question-answering layer hit a bug.
+ *
+ * `sessionId` is the anonymous nl_sid cookie (lib/nl-session.ts), passed
+ * through purely for telemetry -- it never affects parsing or the answer.
  */
 // One row per NlDeclineReason, matching nl_search_log's outcome CHECK
 // (unrecognised gets its own bucket, distinct from the two decline reasons).
-const DECLINE_OUTCOME: Record<'unrecognised' | 'low_confidence' | 'ambiguous', NlSearchLogOutcome> = {
+const DECLINE_OUTCOME: Record<NlDeclineReason, NlSearchLogOutcome> = {
   unrecognised: 'unrecognised',
   low_confidence: 'declined_low_confidence',
   ambiguous: 'declined_ambiguous',
 };
 
-export async function answerNlQuestion(question: string): Promise<NlAnswer | null> {
+/**
+ * The fine-grained reason under a decline. Both branches collapse to
+ * 'ambiguous_player' because entity resolution can only land below
+ * certainty 1 for a player today (see log.ts's NlFailureReason comment) --
+ * an unresolved mention and a low-certainty fuzzy match are both, in
+ * practice, "the parser couldn't pin down which player".
+ */
+function declineFailureReason(reason: NlDeclineReason, report: NlParseReport): NlFailureReason {
+  if (report.unsupportedTerms.length > 0) return 'unsupported_term';
+  if (reason === 'ambiguous') return 'ambiguous_player';
+  return reason;
+}
+
+/** SQLSTATE 57014 is query_canceled -- exactly what a statement_timeout abort raises. Any other 5-character SQLSTATE is a real database error; anything else is a bug in this code, not the database. */
+function classifyError(error: unknown): NlFailureReason {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code?: unknown }).code;
+    if (code === '57014') return 'query_timeout';
+    if (typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code)) return 'database_error';
+  }
+  return 'internal_error';
+}
+
+export async function answerNlQuestion(question: string, sessionId: string | null = null): Promise<NlAnswer | null> {
   const startedAt = Date.now();
   const elapsed = () => Date.now() - startedAt;
+
+  // Fields every log call shares; each call site layers on outcome-specific ones.
+  const log = (entry: Omit<NlSearchLogEntry, 'question' | 'durationMs' | 'sessionId'>) => logNlSearch({
+    question, durationMs: elapsed(), sessionId, ...entry,
+  });
 
   try {
     const ctx = await buildNlParseContext();
     const parsed = await parseNlQuestion(question, ctx);
 
     if (parsed.status === 'unanswerable') {
-      logNlSearch({
-        question, outcome: 'unanswerable',
-        confidence: parsed.report.confidence, unsupportedTerms: parsed.report.unsupportedTerms,
-        durationMs: elapsed(),
+      log({
+        outcome: 'unanswerable', failureReason: 'unsupported_topic', topic: parsed.topic,
+        confidence: parsed.report.confidence, confidenceComponents: parsed.report.components,
+        unsupportedTerms: parsed.report.unsupportedTerms, entityResolution: parsed.report.entityResolution,
+        parserVersion: PARSER_VERSION,
       });
       return {
         headline: 'AFLDB can’t answer this yet',
@@ -65,10 +100,11 @@ export async function answerNlQuestion(question: string): Promise<NlAnswer | nul
     }
 
     if (parsed.status === 'none') {
-      logNlSearch({
-        question, outcome: DECLINE_OUTCOME[parsed.reason],
-        confidence: parsed.report.confidence, unsupportedTerms: parsed.report.unsupportedTerms,
-        durationMs: elapsed(),
+      log({
+        outcome: DECLINE_OUTCOME[parsed.reason], failureReason: declineFailureReason(parsed.reason, parsed.report),
+        confidence: parsed.report.confidence, confidenceComponents: parsed.report.components,
+        unsupportedTerms: parsed.report.unsupportedTerms, entityResolution: parsed.report.entityResolution,
+        parserVersion: PARSER_VERSION,
       });
       return null;
     }
@@ -76,14 +112,16 @@ export async function answerNlQuestion(question: string): Promise<NlAnswer | nul
     const validated = validatePlan(parsed.plan);
     if ('error' in validated) {
       // The parser's own plan failed defence-in-depth validation --
-      // most commonly an era-coverage rejection ("tackles weren't
-      // recorded before 1987"), which is a genuine, useful answer in
-      // its own right, not a bug to hide.
-      logNlSearch({
-        question, outcome: 'unanswerable',
+      // in practice always an era-coverage rejection ("tackles weren't
+      // recorded before 1987"), the only rejection validatePlan can
+      // reach from a plan the parser itself produced -- which is a
+      // genuine, useful answer in its own right, not a bug to hide.
+      log({
+        outcome: 'unanswerable', failureReason: 'coverage_unavailable',
         grain: parsed.plan.grain, metric: parsed.plan.metric, plan: parsed.plan,
-        confidence: parsed.report.confidence, unsupportedTerms: parsed.report.unsupportedTerms,
-        durationMs: elapsed(),
+        confidence: parsed.report.confidence, confidenceComponents: parsed.report.components,
+        unsupportedTerms: parsed.report.unsupportedTerms, entityResolution: parsed.report.entityResolution,
+        parserVersion: PARSER_VERSION,
       });
       return {
         headline: 'AFLDB can’t answer this',
@@ -99,26 +137,28 @@ export async function answerNlQuestion(question: string): Promise<NlAnswer | nul
     const payload = await executePlan(validated);
     const resultCount = payloadTotal(payload);
     if (resultCount === 0) {
-      logNlSearch({
-        question, outcome: 'no_results',
+      log({
+        outcome: 'no_results', failureReason: 'empty_result',
         grain: validated.grain, metric: validated.metric, plan: validated,
-        confidence: parsed.report.confidence, unsupportedTerms: parsed.report.unsupportedTerms,
-        resultCount: 0, durationMs: elapsed(),
+        confidence: parsed.report.confidence, confidenceComponents: parsed.report.components,
+        unsupportedTerms: parsed.report.unsupportedTerms, entityResolution: parsed.report.entityResolution,
+        resultCount: 0, parserVersion: PARSER_VERSION,
       });
       return null;
     }
 
     const answer = buildAnswer(validated, payload, parsed.report.notes);
-    logNlSearch({
-      question, outcome: (answer.caveats.length > 0 || answer.coverageNote) ? 'answered_caveat' : 'answered',
+    log({
+      outcome: (answer.caveats.length > 0 || answer.coverageNote) ? 'answered_caveat' : 'answered',
       grain: validated.grain, metric: validated.metric, plan: validated,
-      confidence: parsed.report.confidence, unsupportedTerms: parsed.report.unsupportedTerms,
-      resultCount, durationMs: elapsed(),
+      confidence: parsed.report.confidence, confidenceComponents: parsed.report.components,
+      unsupportedTerms: parsed.report.unsupportedTerms, entityResolution: parsed.report.entityResolution,
+      resultCount, parserVersion: PARSER_VERSION,
     });
     return answer;
   } catch (error) {
     console.error('natural-language question could not be answered', error);
-    logNlSearch({ question, outcome: 'error', durationMs: elapsed() });
+    log({ outcome: 'error', failureReason: classifyError(error) });
     return null;
   }
 }

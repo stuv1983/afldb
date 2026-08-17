@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { ADMIN_COOKIE, BETA_COOKIE, betaEpoch, betaGateOn, verifyClaim } from '@/lib/auth/tokens';
+import { NL_SESSION_COOKIE, NL_SESSION_MAX_AGE_SECONDS } from '@/lib/nl-session';
 import { redirectTo } from '@/lib/redirect';
 
 /**
@@ -41,6 +42,26 @@ function isPublicPath(pathname: string): boolean {
   );
 }
 
+/**
+ * Ensures every response carries the anonymous NL-search correlation
+ * cookie, minting one on a visitor's first request. Applied uniformly to
+ * every branch below (redirects included) rather than only to
+ * NextResponse.next(), since the search box is reachable from any page,
+ * not only /search itself -- the cookie has to exist before a reader's
+ * first search, not after.
+ */
+function withNlSession(request: NextRequest, response: NextResponse): NextResponse {
+  if (!request.cookies.get(NL_SESSION_COOKIE)) {
+    response.cookies.set(NL_SESSION_COOKIE, crypto.randomUUID(), {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: NL_SESSION_MAX_AGE_SECONDS,
+      path: '/',
+    });
+  }
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const secret = process.env.AFLDB_SESSION_SECRET ?? '';
@@ -52,18 +73,18 @@ export async function middleware(request: NextRequest) {
       ? await verifyClaim(request.cookies.get(ADMIN_COOKIE)?.value, secret, { kind: 'admin' })
       : null;
     if (!claim) {
-      return redirectTo(request, '/admin/login');
+      return withNlSession(request, redirectTo(request, '/admin/login'));
     }
-    return NextResponse.next();
+    return withNlSession(request, NextResponse.next());
   }
 
   // Beta gate, when enabled.
   if (betaGateOn() && !isPublicPath(pathname)) {
     if (!secret) {
       // Misconfiguration must fail closed, but explicably.
-      return new NextResponse('Beta gate is on but AFLDB_SESSION_SECRET is not set.', {
+      return withNlSession(request, new NextResponse('Beta gate is on but AFLDB_SESSION_SECRET is not set.', {
         status: 503,
-      });
+      }));
     }
     // A present-but-invalid epoch throws rather than silently disabling the
     // kill switch (see betaEpoch). Fail closed and explicably, as above.
@@ -71,10 +92,10 @@ export async function middleware(request: NextRequest) {
     try {
       minEpoch = betaEpoch();
     } catch {
-      return new NextResponse(
+      return withNlSession(request, new NextResponse(
         'Beta gate is on but AFLDB_BETA_EPOCH is not a valid integer.',
         { status: 503 },
-      );
+      ));
     }
     const beta = await verifyClaim(
       request.cookies.get(BETA_COOKIE)?.value, secret, { kind: 'beta', minEpoch },
@@ -87,11 +108,11 @@ export async function middleware(request: NextRequest) {
     if (!beta && !admin) {
       // Return the visitor to what they asked for once admitted.
       const search = pathname === '/' ? '' : `?from=${encodeURIComponent(pathname)}`;
-      return redirectTo(request, '/beta', search);
+      return withNlSession(request, redirectTo(request, '/beta', search));
     }
   }
 
-  return NextResponse.next();
+  return withNlSession(request, NextResponse.next());
 }
 
 export const config = {

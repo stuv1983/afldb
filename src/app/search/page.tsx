@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
@@ -8,6 +9,7 @@ import { aflwOnlySearch, globalSearch } from '@/db/queries/search';
 import { getSiteSettings } from '@/db/queries/site-settings';
 import { getAdminUser, ROLE_RANK } from '@/lib/auth/session';
 import { clubPath, formatNumber, formatSpan, playerPath, seasonPath, venuePath } from '@/lib/format';
+import { NL_SESSION_COOKIE } from '@/lib/nl-session';
 import { firstValue } from '@/lib/params';
 import { MIN_QUERY_LENGTH, searchResultHref } from '@/search/constants';
 
@@ -51,8 +53,15 @@ export default async function SearchPage({
     }
   }
 
+  // Anonymous, unsigned, minted by middleware.ts -- purely a correlation
+  // id for nl_search_log's reformulation tracking (docs/search.md's
+  // "Search log" section); it never affects the answer itself.
+  const nlSessionId = scope !== 'aflw' && hasQuery
+    ? (await cookies()).get(NL_SESSION_COOKIE)?.value ?? null
+    : null;
+
   const results = scope !== 'aflw' && hasQuery
-    ? await globalSearch(query, 25, { canReachGridSolver })
+    ? await globalSearch(query, 25, { canReachGridSolver, nlSessionId })
     : null;
 
   const otherScopeHref = scope === 'aflw'
