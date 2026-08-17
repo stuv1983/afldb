@@ -5,15 +5,25 @@
  * shape, so both sides can be developed and tested independently.
  */
 
+/**
+ * A player_game answer row covers two different questions with one shape:
+ * mode 'single' ("dusty's highest disposal game") names one real match, so
+ * every match-context field is populated and `games` is null; mode 'sum'
+ * ("most goals against Carlton") ranks a scoped career total with no
+ * single match to point at, so the match-context fields are null and
+ * `games` says how many games the total was accumulated over instead.
+ */
 export type NlPlayerGameRow = {
   playerId: number; playerSlug: string; playerName: string;
   value: number;
-  matchId: number; season: number;
-  roundType: string; roundNumber: number | null;
-  matchDate: string;
-  clubName: string; opponentName: string;
+  matchId: number | null; season: number | null;
+  roundType: string | null; roundNumber: number | null;
+  matchDate: Date | null;
+  clubName: string | null; opponentName: string | null;
   venueName: string | null;
-  homeScore: number; awayScore: number;
+  homeScore: number | null; awayScore: number | null;
+  /** Sum mode only: how many games the total spans. Null for a single-game row. */
+  games: number | null;
 };
 
 export type NlPlayerCareerRow = {
@@ -49,7 +59,7 @@ export type NlClubSeasonRow = {
 };
 
 export type NlAnswerPayload =
-  | { kind: 'player_game'; lead: NlPlayerGameRow; rows: NlPlayerGameRow[]; total: number }
+  | { kind: 'player_game'; lead: NlPlayerGameRow | null; rows: NlPlayerGameRow[]; total: number }
   | { kind: 'player_career'; lead: NlPlayerCareerRow | null; rows: NlPlayerCareerRow[]; total: number }
   | { kind: 'player_season'; lead: NlPlayerSeasonRow | null; rows: NlPlayerSeasonRow[]; total: number }
   | { kind: 'team_match'; lead: NlTeamMatchRow; rows: NlTeamMatchRow[]; total: number }

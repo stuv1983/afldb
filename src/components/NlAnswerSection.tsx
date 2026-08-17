@@ -1,8 +1,12 @@
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
-import { formatNumber, formatSpan, playerPath } from '@/lib/format';
-import type { NlAnswer, NlPlayerCareerRow } from '@/search/nl/answer-types';
+import {
+  clubPath, formatDate, formatNumber, formatRoundShort, formatSpan, matchPath, playerPath, seasonPath,
+} from '@/lib/format';
+import type {
+  NlAnswer, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
+} from '@/search/nl/answer-types';
 
 /**
  * Renders a natural-language answer at the top of /search: a lead-result
@@ -61,11 +65,15 @@ function renderPayload(answer: NlAnswer) {
   switch (payload.kind) {
     case 'player_career':
       return <PlayerCareerTable rows={payload.rows} total={payload.total} />;
+    case 'player_game':
+      return <PlayerGameTable rows={payload.rows} total={payload.total} />;
+    case 'player_season':
+      return <PlayerSeasonTable rows={payload.rows} total={payload.total} />;
     case 'count':
       return <p>{formatNumber(payload.value)}</p>;
-    // player_game / player_season / team_match / club_season land in
-    // later phases -- execute.ts does not produce these yet.
-    case 'player_game': case 'player_season': case 'team_match': case 'club_season':
+    // team_match / club_season land in a later phase -- execute.ts does
+    // not produce these yet.
+    case 'team_match': case 'club_season':
       return null;
     case 'unanswerable':
       return null;
@@ -96,6 +104,119 @@ function PlayerCareerTable({ rows, total }: { rows: NlPlayerCareerRow[]; total: 
                   <td className="muted">{formatSpan(r.debutSeason, r.finalSeason)}</td>
                   <td className="num">{formatNumber(r.games)}</td>
                   {r.value !== null && <td className="num">{formatNumber(r.value)}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CollapsibleTable>
+      {total > rows.length && (
+        <p className="muted" style={{ marginTop: '0.6rem' }}>
+          Showing {rows.length} of {formatNumber(total)}.
+        </p>
+      )}
+    </>
+  );
+}
+
+/**
+ * Two row shapes share one table, distinguished by `games`: a single-game
+ * row (games null) names a real match, a sum-mode row (games not null)
+ * names a scoped career total with no single match to point at -- see
+ * NlPlayerGameRow's own header comment in answer-types.ts.
+ */
+function PlayerGameTable({ rows, total }: { rows: NlPlayerGameRow[]; total: number }) {
+  if (rows.length <= 1) return null;
+  const isSum = rows[0]?.games !== null;
+  return (
+    <>
+      <CollapsibleTable title={isSum ? 'Every matching player' : 'Every matching performance'} note={`${formatNumber(total)} total`}>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Player</th>
+                <th scope="col" className="num">Value</th>
+                {isSum
+                  ? <th scope="col" className="num">Games</th>
+                  : <>
+                      <th scope="col">Club</th>
+                      <th scope="col">Opponent</th>
+                      <th scope="col">Match</th>
+                    </>}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.matchId ?? r.playerId}>
+                  <td className="wide">
+                    <Link href={playerPath(r.playerSlug, r.playerId)}>{r.playerName}</Link>
+                  </td>
+                  <td className="num">{formatNumber(r.value)}</td>
+                  {isSum ? (
+                    <td className="num">{formatNumber(r.games)}</td>
+                  ) : (
+                    <>
+                      <td>{r.clubName}</td>
+                      <td>{r.opponentName}</td>
+                      <td className="nowrap">
+                        {r.matchId !== null && r.roundType !== null && (
+                          <Link href={matchPath(r.matchId)}>
+                            {r.season} {formatRoundShort(r.roundType, r.roundNumber)}
+                          </Link>
+                        )}
+                        {' '}
+                        <span className="muted">{formatDate(r.matchDate)}</span>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CollapsibleTable>
+      {total > rows.length && (
+        <p className="muted" style={{ marginTop: '0.6rem' }}>
+          Showing {rows.length} of {formatNumber(total)}.
+        </p>
+      )}
+    </>
+  );
+}
+
+function PlayerSeasonTable({ rows, total }: { rows: NlPlayerSeasonRow[]; total: number }) {
+  if (rows.length <= 1) return null;
+  return (
+    <>
+      <CollapsibleTable title="Every matching season" note={`${formatNumber(total)} total`}>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Player</th>
+                <th scope="col" className="num">Value</th>
+                <th scope="col">Club</th>
+                <th scope="col" className="num">Season</th>
+                <th scope="col" className="num">Games</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={`${r.playerId}-${r.season}`}>
+                  <td className="wide">
+                    <Link href={playerPath(r.slug, r.playerId)}>{r.displayName}</Link>
+                  </td>
+                  <td className="num">{formatNumber(r.value)}</td>
+                  <td>
+                    {r.clubSlug ? (
+                      <Link href={clubPath(r.clubSlug)}>{r.clubName}</Link>
+                    ) : (
+                      <span className="not-recorded">—</span>
+                    )}
+                  </td>
+                  <td className="num"><Link href={seasonPath(r.season)}>{r.season}</Link></td>
+                  <td className="num">{formatNumber(r.games)}</td>
                 </tr>
               ))}
             </tbody>

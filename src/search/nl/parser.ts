@@ -42,7 +42,7 @@ import {
 } from '@/search/nl/entities';
 import {
   AGAINST_PREPOSITION, AGG_WORDS, AWARD_WORDS,
-  BEFORE_RE, BETWEEN_RE, CLUB_SUBJECT_LEADING, COMPARE_OP_WORDS,
+  BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SUBJECT_LEADING, COMPARE_OP_WORDS,
   IN_A_FINAL, IN_A_GRAND_FINAL, IN_ONE_GAME, IN_ONE_SEASON,
   MATCH_TYPE_WORDS, METRIC_WORDS, NEGATION_WORDS, NUMBER_PLUS_RE, NUMBER_WORDS, OVER_CAREER,
   PLAYER_NICKNAMES, SINCE_RE, STAT_GAMES_IDIOM_WORDS, STOPWORDS, TEAM_METRIC_WORDS, TOP_N_RE,
@@ -66,7 +66,11 @@ function emptyScope(): NlMatchScope {
 }
 
 function emptyReport(normalisedQuery: string): NlParseReport {
-  return { confidence: 0, normalisedQuery, consumed: [], unsupportedTerms: [], notes: [], entityResolution: [] };
+  return {
+    confidence: 0,
+    components: { tokenRatio: 0, playerCertainty: 1, structuralPenalty: 1, unresolvedPenalty: 0 },
+    normalisedQuery, consumed: [], unsupportedTerms: [], notes: [], entityResolution: [],
+  };
 }
 
 function meaningfulTokens(text: string): string[] {
@@ -154,6 +158,25 @@ function extractSeasons(text: string): SeasonExtraction {
     seasonMax = Number(before[1]) - 1;
     consumed.push(before[0]);
     working = working.replace(BEFORE_RE, ' ');
+  }
+
+  // A bare year ("most goals in 2025") names one exact season -- checked
+  // only once since/before found nothing, so "since 1980" never has its
+  // own year re-read here. Without this, "in 2025" left both seasonMin
+  // and seasonMax undefined (BARE_YEAR_RE existed in vocab.ts but nothing
+  // ever called it), and because meaningfulTokens() excludes pure-digit
+  // tokens from the confidence ratio, the dropped year cost the parse
+  // NOTHING in confidence -- "most goals in 2025" silently answered the
+  // career-wide record at high confidence with the year discarded.
+  if (seasonMin === undefined && seasonMax === undefined) {
+    const bareYear = BARE_YEAR_RE.exec(working);
+    if (bareYear) {
+      const year = Number(bareYear[1]);
+      seasonMin = year;
+      seasonMax = year;
+      consumed.push(bareYear[0]);
+      working = working.replace(BARE_YEAR_RE, ' ');
+    }
   }
 
   return { text: working, seasonMin, seasonMax, consumed };
@@ -634,6 +657,13 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       grain = 'player_game';
       mode = inOneGame ? 'single' : 'sum';
       metric = playerMetricResult.metric;
+    } else if (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined) {
+      // No player, venue, club or match-type cue, but a season WAS named
+      // ("most goals in 2025") -- ranks player_season_stats within that
+      // range. Without this branch the year fell through to the plain
+      // career-total default below with the season silently dropped.
+      grain = 'player_season';
+      metric = playerMetricResult.metric;
     } else if (['games', 'goals'].includes(playerMetricResult.metric) || careerResult.conditions.length > 0) {
       grain = 'player_career';
       metric = playerMetricResult.metric;
@@ -716,10 +746,10 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const consumedCount = totalTokens.filter((t) => consumedSet.has(t) || t === candidateRaw?.split(' ')[0]).length;
   const ratio = totalTokens.length === 0 ? 0 : consumedCount / totalTokens.length;
 
-  let confidence = ratio * playerCertainty;
-  if (!structuralOk) confidence *= 0.3;
+  const structuralPenalty = structuralOk ? 1 : 0.3;
+  const unresolvedPenalty = unresolvedPlayerMention ? 0.35 : 0;
+  let confidence = ratio * playerCertainty * structuralPenalty - unresolvedPenalty;
   if (unresolvedPlayerMention) {
-    confidence -= 0.35;
     report.unsupportedTerms.push(unresolvedPlayerMention);
     notes.push(`Could not find a player matching "${unresolvedPlayerMention}".`);
   }
@@ -727,6 +757,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   confidence = Math.max(0, Math.min(1, confidence));
 
   report.confidence = confidence;
+  report.components = { tokenRatio: ratio, playerCertainty, structuralPenalty, unresolvedPenalty };
   report.consumed = [...consumedSet];
   report.notes = notes;
   void PARSER_VERSION;

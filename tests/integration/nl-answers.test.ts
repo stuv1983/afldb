@@ -1,9 +1,10 @@
 /**
- * player_career grain (the only grain execute.ts compiles so far --
- * player_game/player_season/team_match/club_season land in later
- * phases): every answer checked against an independently hand-written
- * SQL query, never just "returns rows". Also ties NL_COVERAGE to the
- * live stat_availability registry so the two cannot silently drift.
+ * player_career grain. player_game/player_season land in
+ * tests/integration/nl-answers-game-season.test.ts; team_match/club_season
+ * still have no compiler. Every answer here is checked against an
+ * independently hand-written SQL query, never just "returns rows". Also
+ * ties NL_COVERAGE to the live stat_availability registry so the two
+ * cannot silently drift.
  */
 import './guard';
 

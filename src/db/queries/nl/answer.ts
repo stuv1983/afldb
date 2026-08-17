@@ -3,6 +3,7 @@ import 'server-only';
 import { executePlan } from '@/db/queries/nl/execute';
 import { buildNlParseContext } from '@/db/queries/nl/resolve';
 import {
+  BROWNLOW_GAME_VOTE_NOTE,
   describePlan,
   encodePlanToken,
   NL_COVERAGE,
@@ -10,7 +11,9 @@ import {
   type NlQueryPlan,
 } from '@/search/nl/plan';
 import { parseNlQuestion } from '@/search/nl/parser';
-import type { NlAnswer, NlAnswerPayload, NlPlayerCareerRow } from '@/search/nl/answer-types';
+import type {
+  NlAnswer, NlAnswerPayload, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
+} from '@/search/nl/answer-types';
 
 /**
  * Parse and answer a natural-language question end to end: question ->
@@ -85,7 +88,14 @@ function payloadTotal(payload: NlAnswerPayload): number {
 }
 
 function buildAnswer(plan: NlQueryPlan, payload: NlAnswerPayload, notes: string[]): NlAnswer {
-  const coverageNote = plan.metric ? (NL_COVERAGE[plan.metric]?.note ?? null) : null;
+  // Per-game Brownlow votes have their own coverage gap (1935-1983 missing
+  // entirely, and never recorded for finals at all) that NL_COVERAGE's
+  // single-firstSeason shape can't express -- a fixed note, the same one
+  // grid-solver-adjacent code already carries, rather than a misleading
+  // "recorded since 1931".
+  const coverageNote = plan.grain === 'player_game' && plan.metric === 'brownlow_votes'
+    ? BROWNLOW_GAME_VOTE_NOTE
+    : plan.metric ? (NL_COVERAGE[plan.metric]?.note ?? null) : null;
   const { headline, interpretation } = describeAnswer(plan, payload);
 
   return {
@@ -103,7 +113,48 @@ function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { headline
   if (payload.kind === 'player_career') {
     return describePlayerCareerAnswer(plan, payload.lead, payload.total);
   }
+  if (payload.kind === 'player_game') {
+    return describePlayerGameAnswer(plan, payload.lead);
+  }
+  if (payload.kind === 'player_season') {
+    return describePlayerSeasonAnswer(plan, payload.lead);
+  }
   return { headline: 'Results', interpretation: '' };
+}
+
+function describePlayerGameAnswer(
+  plan: NlQueryPlan,
+  lead: NlPlayerGameRow | null,
+): { headline: string; interpretation: string } {
+  if (!lead) return { headline: 'No matching performance found', interpretation: '' };
+  const metricLabel = (plan.metric ?? '').replace(/_/g, ' ');
+  if (lead.games !== null) {
+    // Sum mode: a scoped career total, no single match to name.
+    return {
+      headline: `${lead.playerName} — ${lead.value.toLocaleString('en-AU')} ${metricLabel}`,
+      interpretation: `Total across ${lead.games.toLocaleString('en-AU')} ${lead.games === 1 ? 'game' : 'games'} in scope.`,
+    };
+  }
+  return {
+    headline: `${lead.playerName} — ${lead.value.toLocaleString('en-AU')} ${metricLabel}`,
+    interpretation: plan.agg.kind === 'top_n'
+      ? `Top ${plan.agg.n} single-game performances.`
+      : 'Highest single-game performance.',
+  };
+}
+
+function describePlayerSeasonAnswer(
+  plan: NlQueryPlan,
+  lead: NlPlayerSeasonRow | null,
+): { headline: string; interpretation: string } {
+  if (!lead) return { headline: 'No matching season found', interpretation: '' };
+  const metricLabel = (plan.metric ?? '').replace(/_/g, ' ');
+  return {
+    headline: `${lead.displayName} — ${lead.value.toLocaleString('en-AU')} ${metricLabel} (${lead.season})`,
+    interpretation: plan.agg.kind === 'top_n'
+      ? `Top ${plan.agg.n} player-seasons by ${metricLabel}.`
+      : `Highest single season by ${metricLabel}.`,
+  };
 }
 
 function describePlayerCareerAnswer(

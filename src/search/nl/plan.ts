@@ -418,6 +418,13 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   if (raw.metric !== null && !isNlMetric(raw.grain, raw.metric)) {
     return { error: `"${raw.metric}" is not a recognised statistic for this kind of question.` };
   }
+  // Only player_career and club_season can be answered as a plain list
+  // with no ranked metric ("players with 300 games and no premiership").
+  // Every other grain's compiler ranks by a metric and has no other
+  // question shape to fall back to.
+  if (raw.metric === null && (raw.grain === 'player_game' || raw.grain === 'player_season' || raw.grain === 'team_match')) {
+    return { error: 'This kind of question needs a statistic to rank by.' };
+  }
 
   if (raw.grain === 'player_game' && raw.mode === undefined) {
     return { error: 'A player-game question must say whether it means one game or a total across games.' };
@@ -602,9 +609,28 @@ export function decodePlanToken(token: string): NlQueryPlan | null {
 
 export type NlEntityResolution = { mention: string; resolvedTo: string; certainty: number };
 
+/**
+ * The factors `confidence` was multiplied/penalised by, kept alongside the
+ * final number rather than only the number itself -- a lone 0.62 doesn't
+ * say whether that came from a fuzzy player match, an unresolved mention,
+ * or a plan with no metric/condition to anchor it, and a tuning pass needs
+ * to tell those apart. Not shown to readers; a debugging/log aid only.
+ */
+export type NlConfidenceComponents = {
+  /** Fraction of meaningful input tokens the parser recognised and used. */
+  tokenRatio: number;
+  /** Player-name resolution certainty (1 = exact/unambiguous, <1 = a fuzzy match was accepted). */
+  playerCertainty: number;
+  /** Multiplier applied when the plan has no metric/condition/boundary to anchor it (1 = no penalty). */
+  structuralPenalty: number;
+  /** Flat subtraction when a player-like mention in the text could not be resolved to anyone. */
+  unresolvedPenalty: number;
+};
+
 export type NlParseReport = {
   /** 0..1. See NL_CONFIDENCE for the thresholds this drives. */
   confidence: number;
+  components: NlConfidenceComponents;
   normalisedQuery: string;
   consumed: string[];
   /**

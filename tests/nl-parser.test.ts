@@ -309,6 +309,33 @@ describe('10. operator parsing', () => {
   });
 });
 
+describe('11. player-season queries', () => {
+  it('most goals in 2017 -> player_season, a bare year is captured as an exact season', async () => {
+    const p = await plan('most goals in 2017');
+    expect(p.grain).toBe('player_season');
+    expect(p.metric).toBe('goals');
+    expect(p.scope.seasonMin).toBe(2017);
+    expect(p.scope.seasonMax).toBe(2017);
+    expect(p.player).toBeUndefined();
+  });
+
+  it('most goals by a richmond player in 2017 -> stays player_game/sum, not player_season (club scoping is more precise at match grain for a transfer season)', async () => {
+    const p = await plan('most goals by a richmond player in 2017');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('sum');
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+    expect(p.scope.seasonMin).toBe(2017);
+  });
+
+  it('dusty most goals in 2017 -> a named player still defaults to single-game peak, now filtered to that season', async () => {
+    const p = await plan('dusty most goals in 2017');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('single');
+    expect(p.scope.seasonMin).toBe(2017);
+    expect(p.scope.seasonMax).toBe(2017);
+  });
+});
+
 describe('unanswerable topics decline with a reason rather than a wrong answer', () => {
   it('coaching questions are declined', async () => {
     const result = await parse('who coached richmond to the 2017 premiership');
