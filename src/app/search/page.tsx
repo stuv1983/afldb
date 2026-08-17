@@ -36,19 +36,29 @@ export default async function SearchPage({
   // to /grid-solver, whose audience is a runtime setting — only offer them
   // to a visitor that gate would actually admit (see requireAudience).
   let gridSolverIntents = false;
+  let diagUser: string | null = null;
   if (scope !== 'aflw' && hasQuery) {
     const { gridAudience } = await getSiteSettings();
     if (gridAudience === 'public') {
       gridSolverIntents = true;
     } else {
       const user = await getAdminUser();
+      diagUser = user ? user.role : 'null';
       gridSolverIntents = user !== null && ROLE_RANK[user.role] >= ROLE_RANK[gridAudience];
     }
+    // TEMP DIAGNOSTIC — remove after confirming the natural-language search
+    // intent path. Logs nothing sensitive: query text, the audience gate's
+    // inputs/output, and the resolved intent (or its absence).
+    console.error('[nl-search-diag]', JSON.stringify({ query, gridAudience, diagUser, gridSolverIntents }));
   }
 
   const results = scope !== 'aflw' && hasQuery
     ? await globalSearch(query, 25, { gridSolverIntents })
     : null;
+
+  if (results) {
+    console.error('[nl-search-diag] intent:', JSON.stringify(results.intent));
+  }
 
   const otherScopeHref = scope === 'aflw'
     ? `/search?q=${encodeURIComponent(query)}`
