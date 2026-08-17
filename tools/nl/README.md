@@ -66,7 +66,8 @@ biggest clusters, run the identical file again, and the movement in
 | `--corpus <path>` | The CSV to run. Required. |
 | `--out <dir>` | Output directory. Default `./nl-stress-out`. |
 | `--concurrency <n>` | Questions in flight at once. Default 6. |
-| `--limit <n>` | First *n* rows only — for a pilot. |
+| `--limit <n>` | First *n* rows only. |
+| `--sample <n>` | *n* evenly spaced rows — what a pilot wants. The corpus is generated template by template, so its first 400 rows are 330 variations on one question; every *n*th row covers each category in proportion. Deterministic, so two pilots of the same size are comparable. |
 | `--category <name>` | One corpus category only. Repeatable. |
 | `--parse-only` | Skip SQL execution and score interpretation alone. Minutes instead of an hour, and enough to find every parser bug. |
 | `--resume` | Skip ids already in `results.jsonl`. |

@@ -267,6 +267,8 @@ export function readCorpus(text: string): StressExpectation[] {
 export type StressObservation = {
   /** 'no_results' is a plan that executed and matched nothing; 'error' is a thrown exception. */
   status: 'success' | 'decline' | 'no_results' | 'error';
+  /** False in --parse-only runs, where no SQL ran and there is therefore no answer to check a verified fact against. */
+  executed: boolean;
   /** For a decline: the NlFailureReason the engine would have logged. */
   failureReason?: string;
   confidence: number | null;
@@ -550,20 +552,25 @@ export function scoreRow(
 
   // ---- verified facts ----------------------------------------------------
 
-  if (expected.answerPrimary && expected.answerPrimary.length > 0) {
-    const matched = expected.answerPrimary.some((name) => samePersonName(name, actual.leadName));
-    if (!matched) {
-      findings.push(finding('WRONG_VERIFIED_ANSWER', 'hard', expected.answerPrimary.join(' | '), actual.leadName));
+  // Only checkable when SQL actually ran: a --parse-only run has a plan
+  // and no answer, and scoring a missing answer as a wrong one would
+  // fail all 51 hand-verified rows for the wrong reason.
+  if (actual.executed) {
+    if (expected.answerPrimary && expected.answerPrimary.length > 0) {
+      const matched = expected.answerPrimary.some((name) => samePersonName(name, actual.leadName));
+      if (!matched) {
+        findings.push(finding('WRONG_VERIFIED_ANSWER', 'hard', expected.answerPrimary.join(' | '), actual.leadName));
+      }
     }
-  }
-  if (expected.answerValue !== undefined && actual.leadValue !== null && actual.leadValue !== expected.answerValue) {
-    findings.push(finding('WRONG_VERIFIED_VALUE', 'hard', expected.answerValue, actual.leadValue));
-  }
-  if (expected.tieCount !== undefined && actual.tieCount !== null && actual.tieCount !== expected.tieCount) {
-    findings.push(finding('WRONG_TIE_COUNT', 'hard', expected.tieCount, actual.tieCount));
-  }
-  if (expected.resultCount !== undefined && actual.total !== null && actual.total !== expected.resultCount) {
-    findings.push(finding('WRONG_VERIFIED_VALUE', 'hard', `${expected.resultCount} results`, `${actual.total} results`));
+    if (expected.answerValue !== undefined && actual.leadValue !== expected.answerValue) {
+      findings.push(finding('WRONG_VERIFIED_VALUE', 'hard', expected.answerValue, actual.leadValue));
+    }
+    if (expected.tieCount !== undefined && actual.tieCount !== expected.tieCount) {
+      findings.push(finding('WRONG_TIE_COUNT', 'hard', expected.tieCount, actual.tieCount));
+    }
+    if (expected.resultCount !== undefined && actual.total !== expected.resultCount) {
+      findings.push(finding('WRONG_VERIFIED_VALUE', 'hard', `${expected.resultCount} results`, `${actual.total} results`));
+    }
   }
 
   // ---- confidence and emptiness -----------------------------------------

@@ -39,6 +39,7 @@ function plan(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
 function observed(overrides: Partial<StressObservation> = {}): StressObservation {
   return {
     status: 'success',
+    executed: true,
     confidence: 0.9,
     plan: plan(),
     unsupportedTerms: [],
@@ -379,6 +380,15 @@ describe('verified facts, coverage, confidence and empty results', () => {
     const findings = scoreRow(expectation({ minConfidence: 0.8 }), observed({ confidence: 0.7 }));
     expect(findings).toEqual([expect.objectContaining({ class: 'LOW_CONFIDENCE', severity: 'soft' })]);
     expect(verdict(findings)).toBe('soft_fail');
+  });
+
+  it('a parse-only run does not score a verified fact it never fetched', () => {
+    const e = expectation({
+      verificationLevel: 'VERIFIED_RESULT',
+      answerPrimary: ['Dustin Martin'], answerValue: 24, tieCount: 1,
+    });
+    const parseOnly = observed({ executed: false, leadName: null, leadValue: null, total: null, tieCount: null });
+    expect(scoreRow(e, parseOnly)).toEqual([]);
   });
 
   it('a correct plan that matched no rows is reported but not scored', () => {

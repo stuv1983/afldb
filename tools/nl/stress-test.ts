@@ -34,7 +34,11 @@
  *   --corpus <path>       CSV to run. Required (unless --report-only).
  *   --out <dir>           Output directory. Default ./nl-stress-out.
  *   --concurrency <n>     Questions in flight at once. Default 6.
- *   --limit <n>           Run only the first n rows -- use for a pilot.
+ *   --limit <n>           Run only the first n rows.
+ *   --sample <n>          Run n evenly spaced rows -- what a pilot wants,
+ *                         since the corpus is generated template by
+ *                         template and its first 400 rows are 330
+ *                         variations on one question.
  *   --category <name>     Run only one corpus category. Repeatable.
  *   --parse-only          Skip SQL execution; score interpretation only.
  *                         Minutes instead of hours, and enough to find
@@ -91,6 +95,7 @@ function options(name: string): string[] {
 const OUT_DIR = option('out') ?? join(process.cwd(), 'nl-stress-out');
 const CONCURRENCY = Math.max(1, Number(option('concurrency') ?? 6));
 const ROW_LIMIT = Number(option('limit') ?? 0) || Infinity;
+const SAMPLE_SIZE = Number(option('sample') ?? 0) || 0;
 const CATEGORIES = new Set(options('category'));
 const PARSE_ONLY = flag('parse-only');
 const RESUME = flag('resume');
@@ -166,7 +171,7 @@ async function runQuestion(
 ): Promise<StressObservation> {
   const startedAt = Date.now();
   const empty = {
-    confidence: null, plan: null, unsupportedTerms: [], coverageNote: null,
+    executed: false, confidence: null, plan: null, unsupportedTerms: [], coverageNote: null,
     leadName: null, leadValue: null, total: null, tieCount: null,
   };
 
@@ -174,6 +179,7 @@ async function runQuestion(
     const parsed = await deps.parseNlQuestion(question, deps.ctx);
     const report = parsed.report;
     const base = {
+      executed: false,
       confidence: report.confidence,
       unsupportedTerms: report.unsupportedTerms,
       coverageNote: null as string | null,
@@ -210,12 +216,7 @@ async function runQuestion(
       : validated.metric ? (deps.NL_COVERAGE[validated.metric]?.note ?? null) : null;
 
     if (PARSE_ONLY) {
-      return {
-        status: 'success', plan: validated, coverageNote,
-        confidence: report.confidence, unsupportedTerms: report.unsupportedTerms,
-        leadName: null, leadValue: null, total: null, tieCount: null,
-        durationMs: Date.now() - startedAt,
-      };
+      return { ...base, status: 'success', plan: validated, coverageNote, durationMs: Date.now() - startedAt };
     }
 
     const payload = await deps.executePlan(validated);
@@ -223,6 +224,7 @@ async function runQuestion(
 
     return {
       status: total === 0 ? 'no_results' : 'success',
+      executed: true,
       plan: validated, coverageNote,
       confidence: report.confidence, unsupportedTerms: report.unsupportedTerms,
       leadName, leadValue, total, tieCount,
@@ -374,6 +376,21 @@ function reportUnindexedEntities(rows: StressExpectation[], index: EntityIndex):
     `WARNING: ${missing.size} corpus entity names are unknown to the club/venue directories, `
     + `so those rows fall back to exact name matching:\n  ${[...missing].join('\n  ')}\n`,
   );
+}
+
+/**
+ * An evenly spaced subset, for a pilot that is worth reading.
+ *
+ * The corpus is generated template by template, so its first 400 rows are
+ * 330 variations on one question. Taking every nth row instead covers
+ * every category and template in proportion, which is what makes a small
+ * run predictive of the full one. Deterministic, so two pilots of the same
+ * size are comparable.
+ */
+function spread<T>(items: T[], count: number): T[] {
+  if (count >= items.length) return items;
+  const stride = items.length / count;
+  return Array.from({ length: count }, (_, i) => items[Math.floor(i * stride)]);
 }
 
 /** Fixed-size worker pool: `concurrency` questions in flight, next one started as each finishes. */
@@ -530,13 +547,13 @@ function buildReport(scored: Scored[], meta: Record<string, string | number>): s
   out.push('');
   const categories = [...new Set(scored.map((s) => s.expected.category))].sort();
   out.push(table(
-    ['Category', 'Rows', 'Pass', 'Soft', 'Fail', 'Pass rate'],
+    ['Category', 'Rows', 'Clean', 'Soft', 'Fail', 'Clean rate', 'Nothing wrong reached the reader'],
     categories.map((category) => {
       const rows = scored.filter((s) => s.expected.category === category);
       const p = rows.filter((s) => s.verdict === 'pass').length;
       const sf = rows.filter((s) => s.verdict === 'soft_fail').length;
       const f = rows.filter((s) => s.verdict === 'fail').length;
-      return [category, rows.length, p, sf, f, pct(p + sf, rows.length)];
+      return [category, rows.length, p, sf, f, pct(p, rows.length), pct(p + sf, rows.length)];
     }),
   ));
   out.push('');
@@ -724,10 +741,12 @@ async function main(): Promise<void> {
   if (all.length === 0) throw new Error(`No rows read from ${corpusPath}.`);
 
   const done = new Set(RESUME ? readResults(resultsPath).map((r) => r.expected.id) : []);
-  const rows = all
+  const selected = all
     .filter((row) => CATEGORIES.size === 0 || CATEGORIES.has(row.category))
-    .filter((row) => !done.has(row.id))
-    .slice(0, ROW_LIMIT === Infinity ? undefined : ROW_LIMIT);
+    .filter((row) => !done.has(row.id));
+  const rows = SAMPLE_SIZE > 0
+    ? spread(selected, SAMPLE_SIZE)
+    : selected.slice(0, ROW_LIMIT === Infinity ? undefined : ROW_LIMIT);
 
   process.stdout.write(
     `Corpus: ${all.length} rows from ${corpusPath}\n`
