@@ -122,6 +122,34 @@ describe('player_game mode "single" matches hand-written SQL', () => {
 });
 
 describe('player_game mode "sum" matches hand-written SQL', () => {
+  it('a player + opponent scoped sum ("dusty total goals against Carlton") matches a hand-written SUM for that one player', async () => {
+    const [anchor] = await sql<{ playerId: number }[]>`
+      SELECT player_id AS "playerId" FROM player_career_stats WHERE goals > 0 ORDER BY goals DESC LIMIT 1
+    `;
+    const [org] = await sql<{ id: number }[]>`SELECT id FROM club_organizations ORDER BY id LIMIT 1`;
+    const { lead } = await game({
+      metric: 'goals', agg: { kind: 'max' }, mode: 'sum',
+      player: { id: anchor.playerId, slug: 'x', name: 'x' },
+      scope: { clubAgainst: { organizationId: org.id, slug: 'x', name: 'x' } },
+    });
+
+    const [expected] = await sql<{ total: string | null }[]>`
+      SELECT sum(s.goals) AS total
+        FROM player_match_stats s JOIN matches m ON m.id = s.match_id
+       WHERE s.player_id = ${anchor.playerId}
+         AND (CASE WHEN m.home_club_id = s.club_id THEN m.away_club_id ELSE m.home_club_id END)
+               IN (SELECT id FROM clubs WHERE organization_id = ${org.id})
+         AND s.goals IS NOT NULL
+    `;
+    if (expected.total === null) {
+      expect(lead).toBeNull(); // this player never played that opponent -- a real, legitimate empty answer
+    } else {
+      expect(lead).not.toBeNull();
+      expect(lead!.value).toBe(Number(expected.total));
+      expect(lead!.games).not.toBeNull();
+    }
+  });
+
   it('"most goals against <club>" matches a hand-written grouped SUM', async () => {
     const [org] = await sql<{ id: number }[]>`SELECT id FROM club_organizations ORDER BY id LIMIT 1`;
     const { lead } = await game({

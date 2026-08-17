@@ -41,7 +41,7 @@ import {
   type NlClubDirectoryEntry, type NlEntityMatch, type NlVenueDirectoryEntry,
 } from '@/search/nl/entities';
 import {
-  AGAINST_PREPOSITION, AGG_WORDS, AWARD_WORDS,
+  AGAINST_PREPOSITION, AGG_WORDS, AGGREGATE_TOTAL_WORDS, AWARD_WORDS,
   BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SUBJECT_LEADING, COMPARE_OP_WORDS,
   IN_A_FINAL, IN_A_GRAND_FINAL, IN_ONE_GAME, IN_ONE_SEASON,
   MATCH_TYPE_WORDS, METRIC_WORDS, NEGATION_WORDS, NUMBER_PLUS_RE, NUMBER_WORDS, OVER_CAREER,
@@ -526,8 +526,15 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const inOneGame = !!idiomMetric || IN_ONE_GAME.test(text) || !!matchTypeResult.matchType;
   const inOneSeason = IN_ONE_SEASON.test(text);
   const overCareer = OVER_CAREER.test(text);
+  // "dusty TOTAL goals against Carlton" -- overrides the named-player
+  // single-game default toward a scoped running total. Tracked separately
+  // from overCareer: pushed to consumedTokens (below) so the cue never
+  // silently costs confidence the way OVER_CAREER's own words already do.
+  const aggregateTotalMatch = AGGREGATE_TOTAL_WORDS.exec(text);
+  const aggregateTotal = !!aggregateTotalMatch;
+  if (aggregateTotalMatch) consumedTokens.push(aggregateTotalMatch[0]);
   text = text.replace(IN_ONE_GAME, ' ').replace(IN_A_FINAL, ' ').replace(IN_A_GRAND_FINAL, ' ')
-    .replace(IN_ONE_SEASON, ' ').replace(OVER_CAREER, ' ');
+    .replace(IN_ONE_SEASON, ' ').replace(OVER_CAREER, ' ').replace(AGGREGATE_TOTAL_WORDS, ' ');
 
   const negated = NEGATION_WORDS.test(text);
 
@@ -637,21 +644,30 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     grain = 'player_career';
     metric = 'all_australian_selections';
   } else if (playerMetricResult.metric) {
+    // Whether ANY match-level scope was named -- player_career has no
+    // opponent/venue/match-type scoping at all, so "career"/"ever"
+    // alongside one of these must not route there (it used to: "dusty's
+    // career goals against Carlton" silently dropped "against Carlton"
+    // and answered his whole career total instead).
+    const scoped = !!(venue || clubFor || clubAgainst || matchTypeResult.matchType);
     if (inOneSeason) {
       grain = 'player_season';
       metric = playerMetricResult.metric;
-    } else if (overCareer) {
+    } else if (overCareer && !scoped) {
       grain = 'player_career';
       metric = playerMetricResult.metric;
     } else if (player) {
       // A named player's per-game stat defaults to their single-game
-      // peak, not a career running total -- "dusty most disposals" asks
-      // for his record game, the natural reading of "most" applied to
-      // one person's individual performances.
+      // peak, not a running total -- "dusty most disposals" asks for his
+      // record game. An explicit aggregate cue ("total", "combined"), or
+      // "career"/"ever" made scoped by a club/venue/match-type also
+      // present, overrides that default toward a scoped running total --
+      // "dusty total goals against Carlton" is a sum, not his one best
+      // game against them.
       grain = 'player_game';
-      mode = 'single';
+      mode = (aggregateTotal || overCareer) ? 'sum' : 'single';
       metric = playerMetricResult.metric;
-    } else if (venue || clubFor || clubAgainst || matchTypeResult.matchType || inOneGame) {
+    } else if (scoped || inOneGame) {
       // No player named: a scoped or single-game-cued stat question
       // ranks every player's performance in that scope.
       grain = 'player_game';

@@ -336,6 +336,45 @@ describe('11. player-season queries', () => {
   });
 });
 
+describe('12. aggregate-vs-single scope for a named player', () => {
+  it('dusty total goals against carlton -> "total" overrides the single-game default to a scoped sum', async () => {
+    const p = await plan('dusty total goals against carlton');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('sum');
+    expect(p.metric).toBe('goals');
+    expect(p.player?.name).toBe('Dustin Martin');
+    expect(p.scope.clubAgainst?.name).toBe('Carlton');
+  });
+
+  it('dusty combined disposals -> "combined" also reads as a sum cue', async () => {
+    const p = await plan('dusty combined disposals');
+    expect(p.mode).toBe('sum');
+  });
+
+  it('dusty career goals against carlton -> a scoped "career" reads as a sum, not a dropped scope', async () => {
+    // Regression: player_career has no opponent scoping at all, so this
+    // used to silently drop "against carlton" and answer his whole
+    // career total instead of erroring or scoping correctly.
+    const p = await plan('dusty career goals against carlton');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('sum');
+    expect(p.scope.clubAgainst?.name).toBe('Carlton');
+  });
+
+  it('dusty career goals (no scope) -> stays the true unscoped player_career reading', async () => {
+    const p = await plan('dusty career goals');
+    expect(p.grain).toBe('player_career');
+    expect(p.player?.name).toBe('Dustin Martin');
+  });
+
+  it('most goals against carlton ever (no player) -> scoped sum, not a dropped opponent', async () => {
+    const p = await plan('most goals against carlton ever');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('sum');
+    expect(p.scope.clubAgainst?.name).toBe('Carlton');
+  });
+});
+
 describe('unanswerable topics decline with a reason rather than a wrong answer', () => {
   it('coaching questions are declined', async () => {
     const result = await parse('who coached richmond to the 2017 premiership');
@@ -379,5 +418,41 @@ describe('confidence gating', () => {
     if (result.status === 'plan') {
       expect(result.report.confidence).toBeGreaterThanOrEqual(NL_CONFIDENCE.clarify);
     }
+  });
+});
+
+/**
+ * Generalises the exact bug class the bare-year gap was: a meaningful,
+ * recognisable token (here, a season year) present in the question but
+ * with no effect at all on the executed plan -- silently ignored rather
+ * than acted on. (Digit tokens are deliberately excluded from
+ * `report.consumed`'s own token-ratio accounting -- meaningfulTokens()
+ * filters them from both the numerator and denominator alike, so a
+ * dropped year costs nothing in confidence either; the plan's `scope` is
+ * the only place that actually proves the year was used.) A future
+ * regression of this shape -- a year dropped from a new compound
+ * phrasing -- fails here rather than shipping a silently-wrong answer.
+ */
+describe('regression: every year in an executed question reaches the plan scope', () => {
+  const YEAR_RE = /\b(1[89]\d{2}|20\d{2})\b/;
+  const questionsWithAYear = [
+    'most goals in 2017',
+    'richmond biggest win since 2000',
+    'most disposals since 1990',
+    'players with at least 300 games since 1980',
+    'most goals by a Richmond player in a final at the MCG since 1980',
+    'dusty most goals in 2017',
+    'dusty total goals against carlton since 2015',
+  ];
+
+  it.each(questionsWithAYear)('%s', async (question) => {
+    const result = await parse(question);
+    if (result.status !== 'plan') return; // A decline can't silently drop anything -- nothing was acted on.
+    const year = Number(YEAR_RE.exec(question)![0]);
+    const { seasonMin, seasonMax } = result.plan.scope;
+    expect(
+      seasonMin === year || seasonMax === year,
+      `"${question}": year ${year} reached neither seasonMin (${seasonMin}) nor seasonMax (${seasonMax})`,
+    ).toBe(true);
   });
 });

@@ -59,6 +59,18 @@ export const IN_A_FINAL = /\bin (?:a|one|any) final\b/;
 export const IN_A_GRAND_FINAL = /\bin (?:a|one|any) grand final\b/;
 export const OVER_CAREER = /\b(?:career|all[ -]time|ever|in (?:his|their|a) career)\b/;
 
+/**
+ * "dusty TOTAL goals against Carlton" -- an explicit cue that a named
+ * player's stat should be a scoped running total (player_game mode
+ * 'sum'), overriding the single-game-peak default a bare "dusty most
+ * goals against Carlton" reads as. Kept distinct from OVER_CAREER: an
+ * unscoped "career"/"ever" still means the true player_career grain, but
+ * "total"/"combined" alongside a club/venue/season scope has nowhere to
+ * live except a scoped player_game sum -- player_career has no
+ * opponent/venue scoping at all.
+ */
+export const AGGREGATE_TOTAL_WORDS = /\b(?:total|combined|overall|cumulative)\b/;
+
 // -------------------------------------------------------------- aggregation
 
 export type AggWord = 'max' | 'min' | 'top_n' | 'list' | 'count';
@@ -233,6 +245,13 @@ export const AWARD_WORDS: [RegExp, 'all_australian'][] = [
 export const STOPWORDS = new Set([
   'a', 'an', 'the', 'is', 'was', 'were', 'has', 'have', 'had', 'did', 'does', 'do',
   'in', 'on', 'at', 'of', 'to', 'by', 'for', 'with', 'and', 'or', 'that', 'this',
+  // "against"/"versus" are consumed as a club-role preposition the same
+  // way "for"/"by" already are above, but only the club NAME they govern
+  // is stripped from `text` (extractClubs), never the preposition word
+  // itself -- without this, a scoped question with no player named
+  // ("most goals against carlton ever") left "against" as the only
+  // leftover alpha token, misread as a failed player-name candidate.
+  'against', 'versus',
   'his', 'her', 'their', 'its', 'who', 'whom', 'which', 'what', 'ever',
   // Operator/connective words: never plausible fragments of a player name,
   // and a safety net alongside the explicit stripping each extraction
