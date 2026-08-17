@@ -5,7 +5,9 @@ import { searchAflwClubs, searchAflwPlayers } from '@/db/queries/aflw';
 import { sql } from '@/db/client';
 import { RECORD_CATEGORIES } from '@/db/queries/records';
 import { solveCellRows, type GridCellRow } from '@/db/queries/grid-solver';
+import { answerNlQuestion } from '@/db/queries/nl/answer';
 import { normalisedSearchTerm } from '@/lib/like';
+import type { NlAnswer } from '@/search/nl/answer-types';
 import {
   EVERY_PLAYER_AXIS,
   type ClubQuestionKind,
@@ -391,6 +393,15 @@ export type GlobalSearchResults = {
   playerQuestion: PlayerQuestionAnswer | null;
   /** A plain-words club question ("teams to draw twice"), already answered. */
   clubQuestion: ClubQuestionAnswer | null;
+  /**
+   * A question answered by the deterministic natural-language engine
+   * (db/queries/nl). Takes precedence over playerQuestion/clubQuestion
+   * when present -- both stay null in that case, so the page never
+   * renders two answer panels for the same question. The older two
+   * remain the fallback for phrasings the NL engine's grain compilers
+   * don't cover yet (only player_career is built so far).
+   */
+  nlAnswer: NlAnswer | null;
   total: number;
 };
 
@@ -533,7 +544,7 @@ const EMPTY_RESULTS: GlobalSearchResults = {
   players: [], clubs: [], venues: [], seasons: [],
   rounds: [], awards: [], records: [],
   aflwPlayers: [], aflwClubs: [], intent: null,
-  playerQuestion: null, clubQuestion: null, total: 0,
+  playerQuestion: null, clubQuestion: null, nlAnswer: null, total: 0,
 };
 
 export async function globalSearch(
@@ -564,7 +575,7 @@ export async function globalSearch(
 
   const [
     players, clubs, venues, seasons, rounds, awards, aflw, topicAwards,
-    playerQuestion, clubQuestion,
+    playerQuestionRaw, clubQuestionRaw, nlAnswer,
   ] = await Promise.all([
     searchPlayers(trimmed, playerLimit),
     searchClubs(trimmed),
@@ -576,7 +587,15 @@ export async function globalSearch(
     runTopicSearch ? searchAwards(topicText, 3) : Promise.resolve([] as SearchResult[]),
     answerPlayerQuestion(trimmed, options.canReachGridSolver ?? false),
     answerClubQuestion(trimmed),
+    answerNlQuestion(trimmed),
   ]);
+  // The NL engine takes precedence when it answers: showing its answer
+  // AND the older grid-solver-backed one for the same question would be
+  // a confusing double panel. Both run in parallel above regardless (the
+  // legacy queries are cheap, and waiting on them sequentially would
+  // only add latency for no benefit).
+  const playerQuestion = nlAnswer ? null : playerQuestionRaw;
+  const clubQuestion = nlAnswer ? null : clubQuestionRaw;
   const records = searchRecords(trimmed);
   const topicRecords = runTopicSearch ? searchRecords(topicText, 3) : [];
 
@@ -594,13 +613,14 @@ export async function globalSearch(
     intent,
     playerQuestion,
     clubQuestion,
+    nlAnswer,
     // An answered question is a result: without this, a phrase that only
     // the question parser understands still renders the "no results"
     // empty state despite having an answer on screen.
     total: players.length + clubs.length + venues.length + seasons.length
       + rounds.length + awards.length + records.length
       + aflw.players.length + aflw.clubs.length
-      + (playerQuestion ? 1 : 0) + (clubQuestion ? 1 : 0),
+      + (playerQuestion ? 1 : 0) + (clubQuestion ? 1 : 0) + (nlAnswer ? 1 : 0),
   };
 }
 

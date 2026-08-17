@@ -133,7 +133,10 @@ function buildHref(
 // stays in-process and DB-free: the builders themselves validate and
 // solve, this only names one.
 
-const NUMBER_WORDS: Record<string, number> = {
+// Exported for src/search/nl/vocab.ts, which extends this vocabulary
+// rather than duplicating it -- the "twice"/"multiple" reading of a count
+// must stay one definition shared by both parsers.
+export const NUMBER_WORDS: Record<string, number> = {
   once: 1, twice: 2, thrice: 3,
   one: 1, two: 2, three: 3, four: 4, five: 5,
   six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
@@ -170,7 +173,9 @@ const STAT_WORDS: [RegExp, GridStatKey][] = [
   [/\bbounces?\b/, 'bounces'],
 ];
 
-function canonicalise(text: string): string {
+// Exported for src/search/nl/vocab.ts -- the "inside 50s must never read
+// as the number 50" protection has to run before either parser reads a count.
+export function canonicalise(text: string): string {
   return text
     .replace(/\binside (?:fifty|50)s?\b/g, 'inside-fifties')
     .replace(/\brebound (?:fifty|50)s?\b/g, 'rebound-fifties');

@@ -160,7 +160,14 @@ function ledSeasonRows(statKey: GridStatKey): SqlFragment {
 
 // One dispatch per builder is the clearest shape here; splitting it up
 // would scatter the catalogue across files for no real benefit.
-function compileAxis(axis: GridAxisState): SqlFragment {
+//
+// Exported for src/db/queries/nl/player-career.ts: the natural-language
+// engine's career-grain compiler reuses this catalogue of 93 tuned,
+// allowlist-safe predicates directly rather than duplicating any of
+// them -- a career-predicate phrase in a parsed question ("played a
+// grand final", "premierships >= 3") becomes exactly the GridAxisState
+// this function already knows how to compile.
+export function compileAxis(axis: GridAxisState): SqlFragment {
   const def = GRID_BUILDERS[axis.builder];
   if (!def) throw new Error(`Unknown builder: ${axis.builder}`);
 
@@ -781,6 +788,12 @@ const GRID_ORDER_SQL: Record<GridOrder, string> = {
   debut_desc: 'c.debut_season DESC NULLS LAST, p.sort_name',
 };
 
+/** AND-folds any number of axes into one WHERE fragment. `TRUE` for zero axes, same convention as filters.ts's allOf. */
+function andAxes(axes: readonly GridAxisState[]): SqlFragment {
+  if (axes.length === 0) return sql`TRUE`;
+  return axes.map((axis) => compileAxis(axis)).reduce((acc, fragment) => sql`${acc} AND ${fragment}`);
+}
+
 export type GridCellSummary = {
   eligible: number;
   top: {
@@ -799,8 +812,7 @@ export async function solveCellSummary(
   col: GridAxisState,
   order: GridOrder,
 ): Promise<GridCellSummary> {
-  const rowWhere = compileAxis(row);
-  const colWhere = compileAxis(col);
+  const where = andAxes([row, col]);
 
   const rows = await sql<{
     id: number; slug: string; displayName: string;
@@ -810,7 +822,7 @@ export async function solveCellSummary(
            c.debut_season AS "debutSeason", c.final_season AS "finalSeason", c.games,
            count(*) OVER () AS total
       FROM players p JOIN player_career_stats c ON c.player_id = p.id
-     WHERE ${rowWhere} AND ${colWhere}
+     WHERE ${where}
      ORDER BY ${sql.unsafe(GRID_ORDER_SQL[order])}
      LIMIT 1
   `;
@@ -835,15 +847,20 @@ export type GridCellRow = {
   goals: number;
 };
 
-/** The ranked list for one cell, paged -- for the drill-down section. */
-export async function solveCellRows(
-  row: GridAxisState,
-  col: GridAxisState,
+/**
+ * The ranked list for any number of AND-folded axes, paged. The grid
+ * solver itself always calls this with exactly two (a row and a column);
+ * the natural-language engine's player_career compiler (db/queries/nl/
+ * player-career.ts) is the reason this takes an array rather than a
+ * fixed pair -- "300 games, no premiership, played a grand final" is
+ * three predicates ANDed the same way two are.
+ */
+export async function solvePredicates(
+  axes: readonly GridAxisState[],
   order: GridOrder,
   options: { limit: number; offset: number },
 ): Promise<{ rows: GridCellRow[]; total: number }> {
-  const rowWhere = compileAxis(row);
-  const colWhere = compileAxis(col);
+  const where = andAxes(axes);
   const limit = Math.min(Math.max(1, options.limit), GRID_LIMITS.maxRowsPerCell);
   const offset = Math.max(0, options.offset);
 
@@ -853,7 +870,7 @@ export async function solveCellRows(
            c.games, c.goals,
            count(*) OVER () AS total
       FROM players p JOIN player_career_stats c ON c.player_id = p.id
-     WHERE ${rowWhere} AND ${colWhere}
+     WHERE ${where}
      ORDER BY ${sql.unsafe(GRID_ORDER_SQL[order])}
      LIMIT ${limit} OFFSET ${offset}
   `;
@@ -866,7 +883,17 @@ export async function solveCellRows(
   const [counted] = await sql<{ total: string }[]>`
     SELECT count(*) AS total
       FROM players p JOIN player_career_stats c ON c.player_id = p.id
-     WHERE ${rowWhere} AND ${colWhere}
+     WHERE ${where}
   `;
   return { rows: [], total: Number(counted.total) };
+}
+
+/** The ranked list for one grid-solver cell (a row axis and a column axis), paged -- for the drill-down section. */
+export async function solveCellRows(
+  row: GridAxisState,
+  col: GridAxisState,
+  order: GridOrder,
+  options: { limit: number; offset: number },
+): Promise<{ rows: GridCellRow[]; total: number }> {
+  return solvePredicates([row, col], order, options);
 }

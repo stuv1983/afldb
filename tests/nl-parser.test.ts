@@ -1,0 +1,356 @@
+/**
+ * Parser corpus: every phrasing required by the feature's acceptance
+ * criteria, asserting the exact semantic plan produced -- not just that
+ * a plan exists. DB-free: a small fake directory and a fake
+ * resolvePlayer stand in for the database (see db/queries/nl/resolve.ts
+ * for the real one). DB-result validation for the same fixtures lands in
+ * tests/integration/nl-answers.test.ts once the grain compilers exist.
+ */
+import { describe, expect, it } from 'vitest';
+
+import { parseNlQuestion, type NlParseContext, type NlPlayerCandidate } from '@/search/nl/parser';
+import { NL_CONFIDENCE, type NlParse, type NlQueryPlan } from '@/search/nl/plan';
+import type { NlClubDirectoryEntry, NlVenueDirectoryEntry } from '@/search/nl/entities';
+
+const CLUBS: NlClubDirectoryEntry[] = [
+  { organizationId: 1, slug: 'richmond', name: 'Richmond', names: ['richmond', 'tigers'] },
+  { organizationId: 2, slug: 'carlton', name: 'Carlton', names: ['carlton', 'blues'] },
+  { organizationId: 3, slug: 'collingwood', name: 'Collingwood', names: ['collingwood', 'pies', 'magpies'] },
+  { organizationId: 4, slug: 'geelong', name: 'Geelong', names: ['geelong', 'cats'] },
+];
+
+const VENUES: NlVenueDirectoryEntry[] = [
+  { id: 1, slug: 'mcg', name: 'Melbourne Cricket Ground', names: ['mcg', 'melbourne cricket ground', 'the g'] },
+  { id: 2, slug: 'docklands', name: 'Docklands Stadium', names: ['docklands', 'marvel', 'etihad'] },
+];
+
+const PLAYERS: Record<string, NlPlayerCandidate[]> = {
+  'dustin martin': [{ ref: { id: 100, slug: 'dustin-martin', name: 'Dustin Martin' }, score: 1000 }],
+  'gary ablett': [{ ref: { id: 101, slug: 'gary-ablett', name: 'Gary Ablett' }, score: 1000 }],
+};
+
+function fakeResolvePlayer(name: string): Promise<NlPlayerCandidate[]> {
+  return Promise.resolve(PLAYERS[name.toLowerCase()] ?? []);
+}
+
+const ctx: NlParseContext = { clubs: CLUBS, venues: VENUES, resolvePlayer: fakeResolvePlayer };
+
+async function parse(question: string): Promise<NlParse> {
+  return parseNlQuestion(question, ctx);
+}
+
+async function plan(question: string): Promise<NlQueryPlan> {
+  const result = await parse(question);
+  expect(result.status, `"${question}" -> ${result.status}${
+    result.status !== 'plan' ? ` (${result.status === 'none' ? result.reason : result.reason})` : ''
+  }, confidence ${result.report.confidence.toFixed(2)}, unsupported: ${result.report.unsupportedTerms.join(',')}`)
+    .toBe('plan');
+  return (result as Extract<NlParse, { status: 'plan' }>).plan;
+}
+
+describe('1. player-specific queries', () => {
+  it('dusty most disposals -> single-game peak', async () => {
+    const p = await plan('dusty most disposals');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('single');
+    expect(p.metric).toBe('disposals');
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(p.player?.name).toBe('Dustin Martin');
+  });
+
+  it('dustin martin most goals -> single-game peak', async () => {
+    const p = await plan('dustin martin most goals');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('single');
+    expect(p.metric).toBe('goals');
+    expect(p.player?.name).toBe('Dustin Martin');
+  });
+
+  it('top 5 disposal games by dusty', async () => {
+    const p = await plan('top 5 disposal games by dusty');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('single');
+    expect(p.metric).toBe('disposals');
+    expect(p.agg).toEqual({ kind: 'top_n', n: 5 });
+    expect(p.player?.name).toBe('Dustin Martin');
+  });
+});
+
+describe('2. team queries', () => {
+  it('richmond biggest loss', async () => {
+    const p = await plan('richmond biggest loss');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('loss_margin');
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+    expect(p.scope.clubAgainst).toBeUndefined();
+  });
+
+  it('richmond biggest win since 2000', async () => {
+    const p = await plan('richmond biggest win since 2000');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('win_margin');
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+    expect(p.scope.seasonMin).toBe(2000);
+  });
+
+  it('biggest loss at the mcg', async () => {
+    const p = await plan('biggest loss at the mcg');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('loss_margin');
+    expect(p.scope.venue?.name).toBe('Melbourne Cricket Ground');
+    expect(p.scope.clubFor).toBeUndefined();
+  });
+});
+
+describe('3. venue queries', () => {
+  it('most goals at the mcg -> ranks every player, summed at that venue', async () => {
+    const p = await plan('most goals at the mcg');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('sum');
+    expect(p.metric).toBe('goals');
+    expect(p.scope.venue?.name).toBe('Melbourne Cricket Ground');
+    expect(p.player).toBeUndefined();
+  });
+
+  it('most disposals in a grand final at the mcg -> single-game, matchType + venue scoped', async () => {
+    const p = await plan('most disposals in a grand final at the mcg');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('single');
+    expect(p.metric).toBe('disposals');
+    expect(p.scope.venue?.name).toBe('Melbourne Cricket Ground');
+    expect(p.scope.matchType).toBe('grand_final');
+  });
+});
+
+describe('4. career filters', () => {
+  it('players with 200 games and no premiership', async () => {
+    const p = await plan('players with 200 games and no premiership');
+    expect(p.grain).toBe('player_career');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 200 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'premierships', op: 'eq', value: 0 });
+  });
+
+  it('players with 250 games and exactly two clubs', async () => {
+    const p = await plan('players with 250 games and exactly two clubs');
+    expect(p.grain).toBe('player_career');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 250 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'eq', value: 2 });
+  });
+
+  it('most games without kicking a goal', async () => {
+    const p = await plan('most games without kicking a goal');
+    expect(p.grain).toBe('player_career');
+    expect(p.metric).toBe('games');
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'eq', value: 0 });
+  });
+});
+
+describe('5. awards', () => {
+  it('most brownlow votes', async () => {
+    const p = await plan('most brownlow votes');
+    expect(p.grain).toBe('player_career');
+    expect(p.metric).toBe('brownlow_votes');
+    expect(p.agg).toEqual({ kind: 'max' });
+  });
+
+  it('most brownlow votes without winning a brownlow', async () => {
+    const p = await plan('most brownlow votes without winning a brownlow');
+    expect(p.grain).toBe('player_career');
+    expect(p.metric).toBe('brownlow_votes');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'brownlow_medals', op: 'eq', value: 0 });
+  });
+
+  it('most all-australian selections without a premiership', async () => {
+    const p = await plan('most all-australian selections without a premiership');
+    expect(p.grain).toBe('player_career');
+    expect(p.metric).toBe('all_australian_selections');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'premierships', op: 'eq', value: 0 });
+  });
+});
+
+describe('6. finals', () => {
+  it('most disposals in a grand final', async () => {
+    const p = await plan('most disposals in a grand final');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('single');
+    expect(p.metric).toBe('disposals');
+    expect(p.scope.matchType).toBe('grand_final');
+  });
+
+  it('dusty top 5 disposal games in finals', async () => {
+    const p = await plan('dusty top 5 disposal games in finals');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('single');
+    expect(p.metric).toBe('disposals');
+    expect(p.agg).toEqual({ kind: 'top_n', n: 5 });
+    expect(p.scope.matchType).toBe('finals');
+    expect(p.player?.name).toBe('Dustin Martin');
+  });
+
+  it('most finals played without winning a premiership', async () => {
+    const p = await plan('most finals played without winning a premiership');
+    expect(p.grain).toBe('player_career');
+    expect(p.metric).toBe('finals');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'premierships', op: 'eq', value: 0 });
+  });
+});
+
+describe('7. career-boundary queries', () => {
+  it('players whose first game was a grand final', async () => {
+    const p = await plan('players whose first game was a grand final');
+    expect(p.grain).toBe('player_career');
+    expect(p.boundary).toEqual({ event: 'debut', where: 'grand_final' });
+  });
+
+  it('players whose last game was a grand final', async () => {
+    const p = await plan('players whose last game was a grand final');
+    expect(p.grain).toBe('player_career');
+    expect(p.boundary).toEqual({ event: 'last_game', where: 'grand_final' });
+  });
+});
+
+describe('8. compound queries', () => {
+  it('most goals by a Richmond player in a final at the MCG since 1980', async () => {
+    const p = await plan('most goals by a Richmond player in a final at the MCG since 1980');
+    expect(p.grain).toBe('player_game');
+    expect(p.metric).toBe('goals');
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+    expect(p.scope.matchType).toBe('finals');
+    expect(p.scope.venue?.name).toBe('Melbourne Cricket Ground');
+    expect(p.scope.seasonMin).toBe(1980);
+    expect(p.player).toBeUndefined(); // "a Richmond player" names no one specific
+  });
+
+  it('top 10 players by brownlow votes with no medal', async () => {
+    const p = await plan('top 10 players by brownlow votes with no medal');
+    expect(p.grain).toBe('player_career');
+    expect(p.metric).toBe('brownlow_votes');
+    expect(p.agg).toEqual({ kind: 'top_n', n: 10 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'brownlow_medals', op: 'eq', value: 0 });
+  });
+});
+
+describe('9. aliases', () => {
+  it('dusty resolves to Dustin Martin', async () => {
+    const p = await plan('dusty most disposals');
+    expect(p.player?.name).toBe('Dustin Martin');
+  });
+
+  it('tigers resolves to Richmond', async () => {
+    const p = await plan('tigers biggest win');
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+  });
+
+  it('pies resolves to Collingwood', async () => {
+    const p = await plan('pies biggest win');
+    expect(p.scope.clubFor?.name).toBe('Collingwood');
+  });
+
+  it('touches resolves to disposals', async () => {
+    const p = await plan('dusty most touches');
+    expect(p.metric).toBe('disposals');
+  });
+
+  it('AA resolves to All-Australian', async () => {
+    const p = await plan('most AA selections');
+    expect(p.metric).toBe('all_australian_selections');
+  });
+
+  it('GF resolves to Grand Final', async () => {
+    const p = await plan('most disposals in a gf');
+    expect(p.scope.matchType).toBe('grand_final');
+  });
+
+  it('MCG resolves to Melbourne Cricket Ground', async () => {
+    const p = await plan('biggest win at the mcg');
+    expect(p.scope.venue?.name).toBe('Melbourne Cricket Ground');
+  });
+});
+
+describe('10. operator parsing', () => {
+  it('top 10', async () => {
+    const p = await plan('top 10 career goalkickers');
+    expect(p.agg).toEqual({ kind: 'top_n', n: 10 });
+  });
+
+  it('most / least / highest / lowest all resolve to max/min', async () => {
+    expect((await plan('most goals')).agg).toEqual({ kind: 'max' });
+    expect((await plan('highest disposal game by dustin martin')).agg).toEqual({ kind: 'max' });
+    expect((await plan('lowest score at the mcg')).agg).toEqual({ kind: 'min' });
+  });
+
+  it('since / before as season bounds', async () => {
+    expect((await plan('richmond biggest win since 2000')).scope.seasonMin).toBe(2000);
+    expect((await plan('richmond biggest win before 1990')).scope.seasonMax).toBe(1989);
+  });
+
+  it('at least / more than / less than / exactly as comparison operators', async () => {
+    const atLeast = await plan('players with at least 300 games');
+    expect(atLeast.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 300 });
+
+    const moreThan = await plan('players with more than 300 games');
+    expect(moreThan.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gt', value: 300 });
+
+    const lessThan = await plan('players with less than 50 games');
+    expect(lessThan.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'lt', value: 50 });
+
+    const exactly = await plan('players with exactly 250 games');
+    expect(exactly.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'eq', value: 250 });
+  });
+
+  it('without / never as negation', async () => {
+    const without = await plan('most games without kicking a goal');
+    expect(without.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'eq', value: 0 });
+
+    const never = await plan('players with 300 games and never a premiership');
+    expect(never.careerConditions).toContainEqual({ kind: 'column', column: 'premierships', op: 'eq', value: 0 });
+  });
+});
+
+describe('unanswerable topics decline with a reason rather than a wrong answer', () => {
+  it('coaching questions are declined', async () => {
+    const result = await parse('who coached richmond to the 2017 premiership');
+    expect(result.status).toBe('unanswerable');
+    if (result.status === 'unanswerable') {
+      expect(result.topic).toBe('coaching');
+      expect(result.reason).toMatch(/coaching data/i);
+    }
+  });
+
+  it('streak questions are declined', async () => {
+    const result = await parse("richmond's longest winning streak");
+    expect(result.status).toBe('unanswerable');
+  });
+
+  it('youngest/oldest questions are declined pending dob completeness', async () => {
+    const result = await parse('youngest player ever');
+    expect(result.status).toBe('unanswerable');
+  });
+});
+
+describe('confidence gating', () => {
+  it('gibberish declines rather than fabricating a plan', async () => {
+    const result = await parse('purple elephant sandwich');
+    expect(result.status).toBe('none');
+    if (result.status === 'none') expect(result.reason).toBe('unrecognised');
+  });
+
+  it('an unresolvable player mention declines rather than dropping the reference', async () => {
+    const result = await parse('zzznotaplayer most disposals');
+    expect(result.status).toBe('none');
+  });
+
+  it('a plain entity search ("michael tuck") is not forced into a plan', async () => {
+    const result = await parse('michael tuck');
+    expect(result.status).not.toBe('plan');
+  });
+
+  it('an executed plan always clears the configured execute threshold', async () => {
+    const result = await parse('dusty most disposals');
+    if (result.status === 'plan') {
+      expect(result.report.confidence).toBeGreaterThanOrEqual(NL_CONFIDENCE.clarify);
+    }
+  });
+});

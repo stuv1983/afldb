@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { NlAnswerSection } from '@/components/NlAnswerSection';
 import { SearchBox } from '@/components/SearchBox';
 import { aflwOnlySearch, globalSearch } from '@/db/queries/search';
 import { getSiteSettings } from '@/db/queries/site-settings';
@@ -146,6 +147,12 @@ export default async function SearchPage({
         </div>
       ) : (
         <>
+          {/* The deterministic natural-language engine's answer, when it
+              has one -- takes precedence over playerQuestion/clubQuestion
+              below (globalSearch nulls those out when this is present),
+              so the reader never sees two answer panels for one question. */}
+          {results.nlAnswer && <NlAnswerSection answer={results.nlAnswer} />}
+
           {/* A question asked in plain words, answered here rather than
               linked elsewhere: the reader asked for players, so the
               players are the result. */}
