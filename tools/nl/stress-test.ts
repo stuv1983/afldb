@@ -281,13 +281,28 @@ function summarisePayload(payload: AnyPayload): {
  * avoidable cost in the run.
  */
 async function loadEngine() {
-  const [{ buildNlParseContext }, { executePlan }, plan, { parseNlQuestion }] = await Promise.all([
+  // Every query module is marked `server-only`, whose default export
+  // throws to stop a Client Component importing database code. Node
+  // resolves that package's harmless entry under the react-server
+  // condition, which `npm run nl:stress` sets -- hence the reminder
+  // rather than the package's own message, which would be baffling here.
+  const loaded = await Promise.all([
     import('@/db/queries/nl/resolve'),
     import('@/db/queries/nl/execute'),
     import('@/search/nl/plan'),
     import('@/search/nl/parser'),
-  ]);
-  const { sql } = await import('@/db/client');
+    import('@/db/client'),
+  ]).catch((error: unknown) => {
+    if (error instanceof Error && /Client Component/.test(error.message)) {
+      throw new Error(
+        'Run this through `npm run nl:stress -- <options>`, or add '
+        + '--conditions=react-server to tsx. Without it Node resolves the '
+        + 'server-only guard to the copy that throws.',
+      );
+    }
+    throw error;
+  });
+  const [{ buildNlParseContext }, { executePlan }, plan, { parseNlQuestion }, { sql }] = loaded;
 
   const ctx = await buildNlParseContext();
   const memo = new Map<string, ReturnType<typeof ctx.resolvePlayer>>();

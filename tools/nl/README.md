@@ -8,8 +8,12 @@ returned something.
 ```bash
 # on the dev server, from ~/projects/afldb
 export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
-npx tsx tools/nl/stress-test.ts --corpus /path/to/corpus.csv --out ~/nl-stress-out
+npm run nl:stress -- --corpus ~/nl-stress-corpus.csv --out ~/nl-stress-out
 ```
+
+Use the npm script rather than calling `tsx` directly: it sets
+`--conditions=react-server`, without which Node resolves the `server-only`
+guard on every query module to the copy that throws.
 
 ## Why it scores meaning rather than answers
 
