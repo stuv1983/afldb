@@ -66,7 +66,7 @@ import { fileURLToPath } from 'node:url';
 import { toCsv } from '@/lib/csv';
 
 import {
-  readCorpus, scoreRow, verdict,
+  CORPUS_CLUB_SPELLINGS, readCorpus, scoreRow, verdict,
   type EntityIndex, type StressExpectation, type StressFinding, type StressFindingClass,
   type StressObservation,
 } from './corpus';
@@ -329,7 +329,8 @@ async function loadEngine() {
     for (const name of [venue.name, ...venue.names]) venueByName.set(normaliseKey(name), venue.id);
   }
   const index: EntityIndex = {
-    clubOrgId: (name) => clubByName.get(normaliseKey(name)),
+    clubOrgId: (name) => clubByName.get(normaliseKey(name))
+      ?? clubByName.get(normaliseKey(CORPUS_CLUB_SPELLINGS[name] ?? '')),
     venueId: (name) => venueByName.get(normaliseKey(name)),
   };
 
@@ -438,7 +439,8 @@ function loadEntityIndex(): EntityIndex | undefined {
     clubs: Record<string, number>; venues: Record<string, number>;
   };
   return {
-    clubOrgId: (name) => clubs[normaliseKey(name)],
+    clubOrgId: (name) => clubs[normaliseKey(name)]
+      ?? clubs[normaliseKey(CORPUS_CLUB_SPELLINGS[name] ?? '')],
     venueId: (name) => venues[normaliseKey(name)],
   };
 }

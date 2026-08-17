@@ -314,6 +314,79 @@ describe('wrong semantics are hard failures', () => {
   });
 });
 
+describe('two plans that ask the database the same question', () => {
+  const leadingGoalkicker = expectation({
+    category: 'player_season', equivalenceGroup: 'ps|goals|1897|Sydney|max',
+    question: "Sydney's leading goalkicker in 1897",
+    grain: 'player_season', mode: undefined, metric: 'goals', aggregation: 'max',
+    club: 'Sydney', seasonFrom: 1897, seasonTo: 1897,
+  });
+
+  it('summing one pinned season is reported as equivalent, not as a wrong grain', () => {
+    const a = observed({
+      plan: plan({
+        grain: 'player_game', mode: 'sum', metric: 'goals', agg: { kind: 'max' },
+        scope: {
+          clubFor: { organizationId: 17, slug: 'sydney', name: 'Sydney' },
+          seasonMin: 1897, seasonMax: 1897,
+        },
+      }),
+    });
+    const findings = scoreRow(leadingGoalkicker, a, index);
+    expect(findings).toEqual([expect.objectContaining({ class: 'GRAIN_EQUIVALENT', severity: 'soft' })]);
+    expect(verdict(findings)).toBe('soft_fail');
+  });
+
+  it('but an open season range is a genuinely different question and stays a hard failure', () => {
+    // "most tackles since 1900": ranking best seasons, versus summing a
+    // career from 1900 onward. Same words, different answers.
+    const e = expectation({
+      grain: 'player_season', mode: undefined, metric: 'tackles', aggregation: 'max', seasonFrom: 1900,
+    });
+    const a = observed({
+      plan: plan({
+        grain: 'player_game', mode: 'sum', metric: 'tackles', agg: { kind: 'max' },
+        scope: { seasonMin: 1900 },
+      }),
+    });
+    expect(classes(e, a, index)).toContain('WRONG_GRAIN');
+  });
+});
+
+describe('a list question carries its column as a condition, not as a metric', () => {
+  const listQuestion = expectation({
+    question: 'players with at least 24 games',
+    grain: 'player_career', mode: undefined, metric: 'games', aggregation: 'list',
+    conditions: [{ column: 'games', op: 'gte', value: 24 }],
+  });
+
+  it('accepts a null metric when the column it names is among the conditions', () => {
+    const a = observed({
+      plan: plan({
+        grain: 'player_career', mode: undefined, metric: null, agg: { kind: 'list' },
+        careerConditions: [{ kind: 'column', column: 'games', op: 'gte', value: 24 }],
+      }),
+    });
+    expect(scoreRow(listQuestion, a, index)).toEqual([]);
+  });
+
+  it('still reports a null metric when the column is nowhere in the plan', () => {
+    const a = observed({
+      plan: plan({
+        grain: 'player_career', mode: undefined, metric: null, agg: { kind: 'list' },
+        careerConditions: [{ kind: 'column', column: 'goals', op: 'gte', value: 24 }],
+      }),
+    });
+    expect(classes(listQuestion, a, index)).toContain('WRONG_METRIC');
+  });
+
+  it('and a ranked question still needs its metric', () => {
+    const ranked = expectation({ grain: 'player_career', mode: undefined, metric: 'games', aggregation: 'max' });
+    const a = observed({ plan: plan({ grain: 'player_career', mode: undefined, metric: null, agg: { kind: 'max' } }) });
+    expect(classes(ranked, a, index)).toContain('WRONG_METRIC');
+  });
+});
+
 describe('declines', () => {
   it('answering something the corpus says is ambiguous is a hard failure', () => {
     const e = expectation({ status: 'decline', grain: undefined, metric: undefined, mode: undefined, aggregation: undefined, failureReason: 'ambiguous_player' });

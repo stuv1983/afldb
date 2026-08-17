@@ -152,6 +152,19 @@ const METRIC_ALIASES: Record<string, string> = {
   finals_played: 'finals',
 };
 
+/**
+ * Club names the corpus spells in a way the club directory does not carry
+ * as one alias. The directory knows "gws", "giants" and "greater western
+ * sydney" separately -- and the parser resolves "GWS Giants" from them
+ * perfectly well -- but the exact string is not a key, so the identity
+ * lookup would miss and fall back to comparing names, which then reports
+ * 21 phantom failures. Keep this list as short as the startup warning
+ * allows: an entry here is a translation, not a fix.
+ */
+export const CORPUS_CLUB_SPELLINGS: Record<string, string> = {
+  'GWS Giants': 'Greater Western Sydney',
+};
+
 function num(value: string | undefined): number | undefined {
   if (!value) return undefined;
   const parsed = Number(value);
@@ -294,7 +307,7 @@ export type StressObservation = {
  * and get fixed separately, so WRONG_ENTITY is broken out per slot).
  */
 export type StressFindingClass =
-  | 'WRONG_GRAIN' | 'WRONG_MODE' | 'WRONG_METRIC' | 'WRONG_RESULT_SIDE'
+  | 'WRONG_GRAIN' | 'GRAIN_EQUIVALENT' | 'WRONG_MODE' | 'WRONG_METRIC' | 'WRONG_RESULT_SIDE'
   | 'WRONG_AGGREGATION' | 'WRONG_TOP_N'
   | 'WRONG_PLAYER' | 'WRONG_CLUB' | 'WRONG_OPPONENT' | 'WRONG_VENUE'
   | 'WRONG_SEASON' | 'WRONG_MATCH_TYPE' | 'WRONG_BOUNDARY' | 'WRONG_PREDICATES'
@@ -429,15 +442,49 @@ export function scoreRow(
 
   // ---- semantics ---------------------------------------------------------
 
+  /**
+   * "Sydney's leading goalkicker in 1897" can be planned two ways that ask
+   * the database the same question: rank player-seasons, or sum a player's
+   * match rows inside one pinned season and rank that. The corpus names
+   * the first; this engine builds the second, and both return Dinny McKay
+   * on 14.
+   *
+   * Reported, because the two read different tables and could diverge
+   * where season aggregates exist and match rows do not -- but soft,
+   * because calling it a wrong interpretation would put thousands of rows
+   * that produce the right answer ahead of the handful that produce the
+   * wrong one. The pinned-season test is load-bearing: with an open range
+   * ("most tackles since 1900") the two are genuinely different questions,
+   * one asking for a best season and the other for a career total, and
+   * that difference stays a hard failure.
+   */
+  const pinnedSeason = plan.scope.seasonMin !== undefined && plan.scope.seasonMin === plan.scope.seasonMax;
+  const seasonSumForSeasonRank = expected.grain === 'player_season'
+    && plan.grain === 'player_game' && plan.mode === 'sum' && pinnedSeason;
+
   if (expected.grain && plan.grain !== expected.grain) {
-    findings.push(finding('WRONG_GRAIN', 'hard', expected.grain, plan.grain));
+    findings.push(seasonSumForSeasonRank
+      ? finding('GRAIN_EQUIVALENT', 'soft', expected.grain, `${plan.grain}/sum over one season`)
+      : finding('WRONG_GRAIN', 'hard', expected.grain, plan.grain));
   }
 
   if (expected.mode && plan.mode !== expected.mode) {
     findings.push(finding('WRONG_MODE', 'hard', expected.mode, plan.mode));
   }
 
-  if (expected.metric && plan.metric !== expected.metric) {
+  // A pure list question ("players with at least 24 games") has no ranked
+  // metric in this IR -- the column lives in the condition instead, which
+  // is where the check below finds it. The corpus names a metric for these
+  // rows anyway, so a null here is only a finding when the column it names
+  // is not among the conditions.
+  const metricIsACondition = expected.aggregation === 'list'
+    && plan.metric === null
+    && expected.metric !== undefined
+    && plan.careerConditions.some((c) => c.kind === 'column' && c.column === expected.metric);
+
+  if (metricIsACondition) {
+    // Nothing to report: the plan carries the column as a filter.
+  } else if (expected.metric && plan.metric !== expected.metric) {
     // win_margin vs loss_margin is the polarity bug class, not a metric
     // lookup failure, and clusters separately because one parser rule
     // fixes every instance of it at once.
