@@ -75,5 +75,13 @@ export type NlAnswer = {
   explain: string[];
   /** Present only when the answer resolved to a real plan (absent for the unanswerable payload). */
   planToken: string | null;
+  /**
+   * Opaque per-search token, matching nl_search_log.client_ref, so a
+   * reader's "was this correct?" reply can be attached to this exact
+   * search (migration 049). Random and meaningless -- it is NOT the
+   * nl_sid session cookie, which spans many searches, and it identifies
+   * nobody.
+   */
+  clientRef: string;
   payload: NlAnswerPayload;
 };

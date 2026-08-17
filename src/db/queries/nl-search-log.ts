@@ -525,3 +525,85 @@ export async function saveNlSearchReview(input: {
            reviewed_at      = now()
   `;
 }
+
+// --------------------------------------------------------------- feedback
+
+export type NlFeedbackRow = {
+  id: number;
+  verdict: 'correct' | 'incorrect';
+  expectedAnswer: string | null;
+  createdAt: Date;
+  /** Null when the log row has not landed yet, or has since been pruned. */
+  searchId: number | null;
+  question: string | null;
+  outcome: string | null;
+  failureReason: string | null;
+  grain: string | null;
+  metric: string | null;
+  parserVersion: number | null;
+};
+
+/**
+ * What readers said, newest first.
+ *
+ * A LEFT JOIN rather than an inner one, and on client_ref rather than a
+ * foreign key: the log row is written from `after()`, so a reader who
+ * answers the prompt quickly can genuinely arrive first. Their report is
+ * still worth reading with the question attached a moment later, and is
+ * still worth reading even if it never is.
+ */
+export async function listNlFeedback(
+  options: { verdict?: 'correct' | 'incorrect'; limit?: number } = {},
+): Promise<NlFeedbackRow[]> {
+  const limit = Math.min(Math.max(options.limit ?? 100, 1), 500);
+  const rows = await authSql<{
+    id: string; verdict: 'correct' | 'incorrect'; expectedAnswer: string | null; createdAt: Date;
+    searchId: string | null; question: string | null; outcome: string | null;
+    failureReason: string | null; grain: string | null; metric: string | null;
+    parserVersion: number | null;
+  }[]>`
+    SELECT f.id,
+           f.verdict,
+           f.expected_answer AS "expectedAnswer",
+           f.created_at      AS "createdAt",
+           l.id              AS "searchId",
+           l.question,
+           l.outcome,
+           l.failure_reason  AS "failureReason",
+           l.grain,
+           l.metric,
+           l.parser_version  AS "parserVersion"
+      FROM nl_search_feedback f
+      LEFT JOIN nl_search_log l ON l.client_ref = f.client_ref
+     WHERE ${options.verdict ? authSql`f.verdict = ${options.verdict}` : authSql`TRUE`}
+     ORDER BY f.created_at DESC
+     LIMIT ${limit}
+  `;
+  return rows.map((row) => ({
+    ...row,
+    id: Number(row.id),
+    searchId: row.searchId === null ? null : Number(row.searchId),
+  }));
+}
+
+export type NlFeedbackSummary = {
+  correct: number;
+  incorrect: number;
+  withText: number;
+};
+
+/** Headline counts over the recent window the rest of the dashboard uses. */
+export async function getNlFeedbackSummary(days: number): Promise<NlFeedbackSummary> {
+  const [row] = await authSql<{ correct: string; incorrect: string; withText: string }[]>`
+    SELECT count(*) FILTER (WHERE verdict = 'correct')                    AS correct,
+           count(*) FILTER (WHERE verdict = 'incorrect')                  AS incorrect,
+           count(*) FILTER (WHERE expected_answer IS NOT NULL)            AS "withText"
+      FROM nl_search_feedback
+     WHERE created_at > now() - make_interval(days => ${days})
+  `;
+  return {
+    correct: Number(row?.correct ?? 0),
+    incorrect: Number(row?.incorrect ?? 0),
+    withText: Number(row?.withText ?? 0),
+  };
+}

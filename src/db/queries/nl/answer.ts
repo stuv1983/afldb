@@ -108,6 +108,7 @@ export async function answerNlQuestion(question: string, sessionId: string | nul
         coverageNote: null,
         explain: [parsed.reason],
         planToken: null,
+        clientRef,
         payload: { kind: 'unanswerable', topic: parsed.topic, reason: parsed.reason },
       };
     }
@@ -143,6 +144,7 @@ export async function answerNlQuestion(question: string, sessionId: string | nul
         coverageNote: null,
         explain: [validated.error],
         planToken: null,
+        clientRef,
         payload: { kind: 'unanswerable', topic: question, reason: validated.error },
       };
     }
@@ -160,7 +162,7 @@ export async function answerNlQuestion(question: string, sessionId: string | nul
       return null;
     }
 
-    const answer = buildAnswer(validated, payload, parsed.report.notes);
+    const answer = buildAnswer(validated, payload, parsed.report.notes, clientRef);
     log({
       outcome: (answer.caveats.length > 0 || answer.coverageNote) ? 'answered_caveat' : 'answered',
       grain: validated.grain, metric: validated.metric, plan: validated,
@@ -188,7 +190,12 @@ function payloadTotal(payload: NlAnswerPayload): number {
   }
 }
 
-function buildAnswer(plan: NlQueryPlan, payload: NlAnswerPayload, notes: string[]): NlAnswer {
+function buildAnswer(
+  plan: NlQueryPlan,
+  payload: NlAnswerPayload,
+  notes: string[],
+  clientRef: string,
+): NlAnswer {
   // One source of truth for what is recorded and when. nlCoverageFor
   // applies the rule's own grain scope, so a career or season Brownlow
   // TOTAL -- which exists for every year the medal has been awarded --
@@ -208,6 +215,7 @@ function buildAnswer(plan: NlQueryPlan, payload: NlAnswerPayload, notes: string[
     coverageNote,
     explain: describePlan(plan),
     planToken: encodePlanToken(plan),
+    clientRef,
     payload,
   };
 }

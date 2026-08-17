@@ -1348,3 +1348,57 @@ details.admin-section > summary h2 {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------------------------------------------------------------------
+   Consent banner
+   ---------------------------------------------------------------------
+   Fixed to the bottom rather than overlaying the page: the reader can
+   still use the site while it is up, which matters because declining is
+   a legitimate answer and must not be extracted by making the content
+   unreadable until they choose.
+
+   It sits above the mobile TabBar, whose height it clears, so the two
+   never overlap on a phone. */
+.consent-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  background: var(--surface, #fff);
+  border-top: 1px solid var(--rule, rgba(128, 128, 128, 0.3));
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.12);
+  padding: 0.75rem 0;
+}
+
+.consent-banner-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.consent-banner p {
+  margin: 0;
+  font-size: 0.85rem;
+  max-width: 62ch;
+}
+
+/* Both actions are the same size and weight on purpose: a decline that
+   is harder to press than an accept is not a choice. */
+.consent-banner-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.consent-banner-actions button {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .consent-banner {
+    bottom: var(--tabbar-height, 3.5rem);
+  }
+}

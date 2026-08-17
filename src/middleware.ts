@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { ADMIN_COOKIE, BETA_COOKIE, betaEpoch, betaGateOn, verifyClaim } from '@/lib/auth/tokens';
+import { analyticsAllowed, CONSENT_COOKIE } from '@/lib/consent';
 import { NL_SESSION_COOKIE, NL_SESSION_MAX_AGE_SECONDS } from '@/lib/nl-session';
 import { redirectTo } from '@/lib/redirect';
 
@@ -49,8 +50,20 @@ function isPublicPath(pathname: string): boolean {
  * NextResponse.next(), since the search box is reachable from any page,
  * not only /search itself -- the cookie has to exist before a reader's
  * first search, not after.
+ *
+ * GATED ON CONSENT, and gated HERE rather than in a client script,
+ * because this is the only place the cookie is ever created -- a banner
+ * that merely hides itself while middleware keeps minting would be
+ * decoration, not consent. nl_sid is analytics: the site works exactly
+ * the same without it and only the telemetry is poorer, which is what
+ * makes it the kind of storage that has to be asked for.
+ *
+ * analyticsAllowed fails closed, so a visitor who has not answered yet
+ * gets no cookie -- and a reader who later declines stops getting one,
+ * since this runs on every request rather than once.
  */
 function withNlSession(request: NextRequest, response: NextResponse): NextResponse {
+  if (!analyticsAllowed(request.cookies.get(CONSENT_COOKIE)?.value)) return response;
   if (!request.cookies.get(NL_SESSION_COOKIE)) {
     response.cookies.set(NL_SESSION_COOKIE, crypto.randomUUID(), {
       httpOnly: true,

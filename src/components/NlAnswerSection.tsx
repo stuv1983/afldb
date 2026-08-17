@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { NlAnswerFeedback } from '@/components/NlAnswerFeedback';
 import {
   clubPath, formatDate, formatNumber, formatPercentage, formatRoundShort, formatSpan,
   matchPath, playerPath, seasonPath,
@@ -28,6 +29,7 @@ export function NlAnswerSection({ answer }: { answer: NlAnswer }) {
         <div className="empty">
           <h2>{answer.headline}</h2>
           <p>{answer.payload.reason}</p>
+          <NlAnswerFeedback clientRef={answer.clientRef} />
         </div>
       </section>
     );
@@ -55,6 +57,11 @@ export function NlAnswerSection({ answer }: { answer: NlAnswer }) {
           {answer.explain.map((line) => <li key={line}>{line}</li>)}
         </ul>
       </details>
+
+      {/* Below the explanation, deliberately: a reader is best placed to
+          say whether the question was understood once they have seen how
+          it was read. */}
+      <NlAnswerFeedback clientRef={answer.clientRef} />
     </section>
   );
 }
