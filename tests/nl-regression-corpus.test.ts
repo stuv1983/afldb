@@ -939,3 +939,77 @@ describe('NL-023: a scope with no recorded data is refused, not footnoted', () =
     expect('error' in result).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------
+// NL-024 -- "at most" was read as the superlative "most"
+// ---------------------------------------------------------------------
+// The largest structural cluster in the qualification run, 6,428 rows,
+// and a single missing lookbehind.
+//
+// Aggregation is extracted BEFORE career conditions and STRIPS what it
+// matched. So "players with at most 20 clubs and at most 20 goals" read
+// the "most" of the first "at most" as a superlative, set the
+// aggregation to `max`, and handed extractCareerConditions "at 20
+// clubs" -- a count with no operator phrase, which falls back to its
+// `gte` default. The question inverted to "at LEAST 20 clubs" and was
+// ranked rather than listed.
+//
+// Only the FIRST clause was damaged, because the strip is first-match
+// only. That is what made a one-word bug look like an exotic two-clause
+// interaction: the second "at most" always parsed correctly, so every
+// example had one right operator and one wrong one.
+//
+// vocab.ts already excluded bare "least" for precisely this reason. The
+// same hazard on "most" was simply never applied.
+describe('NL-024: "at most" is an operator, never the superlative', () => {
+  it('both clauses keep their operator, and the question is a list', async () => {
+    const p = await plan('players with at most 20 clubs and at most 20 goals');
+    expect(p.agg).toEqual({ kind: 'list' });
+    expect(p.careerConditions).toEqual([
+      { kind: 'column', column: 'clubs_played', op: 'lte', value: 20 },
+      { kind: 'column', column: 'goals', op: 'lte', value: 20 },
+    ]);
+  });
+
+  it('a leading "at most" clause is not inverted', async () => {
+    const p = await plan('players with at most 5 premierships and less than 5 brownlow votes');
+    expect(p.agg).toEqual({ kind: 'list' });
+    expect(p.careerConditions).toContainEqual(
+      { kind: 'column', column: 'premierships', op: 'lte', value: 5 },
+    );
+    expect(p.careerConditions).toContainEqual(
+      { kind: 'column', column: 'brownlow_votes', op: 'lt', value: 5 },
+    );
+  });
+
+  it('mixed operators across clauses both survive', async () => {
+    const p = await plan('players with at least 3 games and at most 3 goals');
+    expect(p.agg).toEqual({ kind: 'list' });
+    expect(p.careerConditions).toContainEqual(
+      { kind: 'column', column: 'games', op: 'gte', value: 3 },
+    );
+    expect(p.careerConditions).toContainEqual(
+      { kind: 'column', column: 'goals', op: 'lte', value: 3 },
+    );
+  });
+
+  // The superlative reading must be untouched -- this is the common case
+  // and the whole reason bare "most" is in AGG_WORDS at all.
+  it.each([
+    'most goals',
+    'most career goals at the mcg',
+    'who has the most goals',
+    'dusty most goals against Carlton',
+  ])('%s is still a superlative', async (question) => {
+    const p = await plan(question);
+    expect(p.agg).toEqual({ kind: 'max' });
+  });
+
+  it('"at most" and a superlative in one question keep their own senses', async () => {
+    const p = await plan('most goals by players with at most 3 clubs');
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(p.careerConditions).toContainEqual(
+      { kind: 'column', column: 'clubs_played', op: 'lte', value: 3 },
+    );
+  });
+});

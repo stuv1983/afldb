@@ -146,7 +146,20 @@ export const AGG_WORDS: [RegExp, AggWord][] = [
   // the metric ("goalkicker" -> goals) resolved fine and the leftover
   // "leading" was misread as a failed player-name guess, which cost
   // enough confidence to decline a question the engine could answer.
-  [/\b(?:most|highest|best|biggest|largest|greatest|maximum|record|leading|led|heaviest)\b/, 'max'],
+  // "most" is excluded after "at", for exactly the reason bare "least" is
+  // excluded outright below -- and the omission was expensive. Aggregation
+  // is extracted BEFORE career conditions and STRIPS what it matched, so
+  // "players with at most 20 clubs and at most 20 goals" read the "most"
+  // of the first "at most" as a superlative, took the aggregation to be
+  // `max`, and handed extractCareerConditions "at 20 clubs" -- a count
+  // with no operator phrase, which falls back to its `gte` default. The
+  // question inverted to "at LEAST 20 clubs", ranked instead of listed.
+  //
+  // Only the FIRST clause was damaged, because the strip is first-match
+  // only, which is what made the failure look like an exotic two-clause
+  // interaction rather than one missing lookbehind: the second "at most"
+  // was always read correctly. 6,428 questions in the qualification run.
+  [/\b(?:highest|best|biggest|largest|greatest|maximum|record|leading|led|heaviest)\b|(?<!\bat )\bmost\b/, 'max'],
   // Bare "least" is deliberately excluded: "at least" (an operator
   // phrase, handled by COMPARE_OP_WORDS) is far more common in real
   // questions than "least" meaning minimum, and the two must not compete.

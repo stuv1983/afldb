@@ -62,8 +62,11 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    discontinuous range and a match-type exclusion, so per-game Brownlow
  *    votes decline for 1935-1983 and for finals rather than answering with
  *    a note that contradicts the number above it.
+ * 6: "at most" is no longer read as the superlative "most" -- it inverted
+ *    the first condition of a multi-clause question to its opposite and
+ *    ranked instead of listing.
  */
-export const PARSER_VERSION = 5;
+export const PARSER_VERSION = 6;
 
 // ------------------------------------------------------------------ grain
 
