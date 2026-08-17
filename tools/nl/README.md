@@ -79,6 +79,7 @@ club-season conditions) are sorted before comparison.
 | `failures.jsonl` | only rows with a finding — the primary debugging file. |
 | `results.jsonl` | every row's full forensic record; the input to `--resume`. |
 | `metamorphic-failures.jsonl` | one record per divergent group, with majority and outlier semantics. |
+| `corpus-defects.jsonl` | rows quarantined because their expectation contradicts their own question — see below. |
 | `unsupported-terms.csv` | `term,count,example` frequency table for vocabulary mining. |
 | `latency.json` | throughput and p50/p90/p95/p99/p99.9 for the full path, the parser alone, and database execution. |
 
@@ -90,6 +91,33 @@ wrong-answer count. Compare the absolute hard number between runs, which
 is what `npm run nl:stress:compare` exists to do: it lists rows that were
 correct in the baseline and wrong in the candidate, regardless of which
 way the percentage moved.
+
+### When the corpus is wrong
+
+A corpus is only an oracle while it agrees with itself. The 250k
+generator emitted 4,536 numeric-condition rows whose surface text says
+"exactly 300" and whose expectation asserts `gt 300` — rows a correct
+parser **must** fail and an incorrect one could pass. Left in, they do
+worse than add noise: they make the suite reward wrong parsing.
+
+`oracleDefect()` reads the operator each clause states in plain English
+and compares it with what the expectation asserts. It is deliberately a
+**separate, dumber reader** than `src/search/nl` — sharing the parser's
+own vocabulary would let a parser bug excuse the very expectations it is
+being measured against.
+
+Quarantined rows are excluded from every rate (totals, per-category,
+failure classes, leverage, metamorphic majorities, and `failures.jsonl`,
+where a corpus bug would send whoever debugs that file hunting a parser
+defect that is not there). They are **reported, not deleted**: the ids
+live in `corpus-defects.jsonl` so a generator fix can be audited against
+the same cases, and `run.json` carries the count.
+
+The detection is conservative in both directions it can be, and the
+report says so: a value the question states no operator for is skipped as
+unjudgeable, and a value stated with several operators counts as agreeing
+with any of them — so two same-valued clauses swapped between themselves
+are invisible. Treat the count as a floor.
 
 ## Why it scores meaning rather than answers
 
