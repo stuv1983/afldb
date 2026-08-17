@@ -329,6 +329,7 @@ DECLARE
     ['admin_invites',          'SELECT, INSERT, UPDATE'],           -- 030
     ['site_settings',          'SELECT, INSERT, UPDATE'],           -- 034
     ['site_media',             'SELECT, INSERT, UPDATE, DELETE'],   -- 037
+    ['nl_search_log',          'SELECT, INSERT'],                   -- 046
     -- Read-only: validation resolves submitted names against these.
     ['players',                'SELECT'],                           -- 023
     ['player_clubs',           'SELECT'],                           -- 023
@@ -349,7 +350,7 @@ DECLARE
     'auth_users', 'auth_sessions', 'auth_audit_log',
     'beta_access_codes', 'beta_allowed_emails', 'beta_login_tokens',
     'beta_join_requests', 'data_submissions', 'data_submission_rows',
-    'admin_invites', 'site_settings', 'site_media'
+    'admin_invites', 'site_settings', 'site_media', 'nl_search_log'
   ];
   named text[] := ARRAY[]::text[];
   i int;

@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { executePlan } from '@/db/queries/nl/execute';
+import { logNlSearch, type NlSearchLogOutcome } from '@/db/queries/nl/log';
 import { buildNlParseContext } from '@/db/queries/nl/resolve';
 import {
   BROWNLOW_GAME_VOTE_NOTE,
@@ -30,12 +31,28 @@ import type {
  * ordinary player/club/venue results must never be lost because the
  * question-answering layer hit a bug.
  */
+// One row per NlDeclineReason, matching nl_search_log's outcome CHECK
+// (unrecognised gets its own bucket, distinct from the two decline reasons).
+const DECLINE_OUTCOME: Record<'unrecognised' | 'low_confidence' | 'ambiguous', NlSearchLogOutcome> = {
+  unrecognised: 'unrecognised',
+  low_confidence: 'declined_low_confidence',
+  ambiguous: 'declined_ambiguous',
+};
+
 export async function answerNlQuestion(question: string): Promise<NlAnswer | null> {
+  const startedAt = Date.now();
+  const elapsed = () => Date.now() - startedAt;
+
   try {
     const ctx = await buildNlParseContext();
     const parsed = await parseNlQuestion(question, ctx);
 
     if (parsed.status === 'unanswerable') {
+      logNlSearch({
+        question, outcome: 'unanswerable',
+        confidence: parsed.report.confidence, unsupportedTerms: parsed.report.unsupportedTerms,
+        durationMs: elapsed(),
+      });
       return {
         headline: 'AFLDB can’t answer this yet',
         interpretation: parsed.topic,
@@ -47,7 +64,14 @@ export async function answerNlQuestion(question: string): Promise<NlAnswer | nul
       };
     }
 
-    if (parsed.status === 'none') return null;
+    if (parsed.status === 'none') {
+      logNlSearch({
+        question, outcome: DECLINE_OUTCOME[parsed.reason],
+        confidence: parsed.report.confidence, unsupportedTerms: parsed.report.unsupportedTerms,
+        durationMs: elapsed(),
+      });
+      return null;
+    }
 
     const validated = validatePlan(parsed.plan);
     if ('error' in validated) {
@@ -55,6 +79,12 @@ export async function answerNlQuestion(question: string): Promise<NlAnswer | nul
       // most commonly an era-coverage rejection ("tackles weren't
       // recorded before 1987"), which is a genuine, useful answer in
       // its own right, not a bug to hide.
+      logNlSearch({
+        question, outcome: 'unanswerable',
+        grain: parsed.plan.grain, metric: parsed.plan.metric, plan: parsed.plan,
+        confidence: parsed.report.confidence, unsupportedTerms: parsed.report.unsupportedTerms,
+        durationMs: elapsed(),
+      });
       return {
         headline: 'AFLDB can’t answer this',
         interpretation: validated.error,
@@ -67,11 +97,28 @@ export async function answerNlQuestion(question: string): Promise<NlAnswer | nul
     }
 
     const payload = await executePlan(validated);
-    if (payloadTotal(payload) === 0) return null;
+    const resultCount = payloadTotal(payload);
+    if (resultCount === 0) {
+      logNlSearch({
+        question, outcome: 'no_results',
+        grain: validated.grain, metric: validated.metric, plan: validated,
+        confidence: parsed.report.confidence, unsupportedTerms: parsed.report.unsupportedTerms,
+        resultCount: 0, durationMs: elapsed(),
+      });
+      return null;
+    }
 
-    return buildAnswer(validated, payload, parsed.report.notes);
+    const answer = buildAnswer(validated, payload, parsed.report.notes);
+    logNlSearch({
+      question, outcome: (answer.caveats.length > 0 || answer.coverageNote) ? 'answered_caveat' : 'answered',
+      grain: validated.grain, metric: validated.metric, plan: validated,
+      confidence: parsed.report.confidence, unsupportedTerms: parsed.report.unsupportedTerms,
+      resultCount, durationMs: elapsed(),
+    });
+    return answer;
   } catch (error) {
     console.error('natural-language question could not be answered', error);
+    logNlSearch({ question, outcome: 'error', durationMs: elapsed() });
     return null;
   }
 }
