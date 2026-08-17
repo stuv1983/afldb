@@ -54,8 +54,12 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    "show me", "afl question", "please"), decorative punctuation including
  *    the em dash, and "vs"/"v" recognised as the preposition they always
  *    were -- the largest failure cause in the 250,000-question run.
+ * 4: "ambiguous player" now requires two candidates that plausibly spell
+ *    the mention, not merely a non-empty candidate list. Changes only the
+ *    decline REASON, never the plan -- but failure_reason is exactly what
+ *    the tuning pass groups by, so the rows must not be pooled with v3's.
  */
-export const PARSER_VERSION = 3;
+export const PARSER_VERSION = 4;
 
 // ------------------------------------------------------------------ grain
 

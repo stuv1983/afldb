@@ -802,3 +802,53 @@ describe('NL-021: conversational filler is not part of the question', () => {
     expect(result.status).toBe('none');
   });
 });
+
+// ---------------------------------------------------------------------
+// NL-022 -- a single weak fuzzy match was reported as "ambiguous"
+// ---------------------------------------------------------------------
+// From review of the v3 batch. The unresolved branch classified a
+// mention as ambiguous on `candidates.length > 0`, which is the test for
+// "the resolver found something", not for "the reader has not said which
+// player". A misspelling that surfaces ONE weak fuzzy candidate was
+// declined with "matches more than one player" -- a statement that is
+// simply false, and one a reader cannot act on: the useful reply to
+// "smoth" is that the name is not recognised.
+//
+// A failure-reason bug rather than a wrong-answer one, so it costs
+// accuracy in the search log and in the decline message rather than
+// correctness. Both still matter: WRONG_FAILURE_REASON is what the
+// vocabulary-mining pass reads to decide what to teach the parser next.
+describe('NL-022: "ambiguous" means two plausible players, not one weak match', () => {
+  it('a misspelling with one distant candidate is unsupported, not ambiguous', async () => {
+    const result = await parseNlQuestion('smoth most goals', {
+      ...ctx,
+      resolvePlayer: () => Promise.resolve([
+        { ref: { id: 500, slug: 'john-smith', name: 'John Smith' }, score: 410 },
+      ]),
+    });
+    expect(result.status).toBe('none');
+    expect(result.report.ambiguousPlayer).toBeUndefined();
+    expect(result.report.unsupportedTerms).toContain('smoth');
+  });
+
+  // The case the original condition existed for must keep working: both
+  // Abletts genuinely spell the mention, and neither reaches accept
+  // strength, so the reader really has not said which one.
+  it('two players who both spell the mention are still ambiguous', async () => {
+    const result = await parseNlQuestion('ablett most goals', ctx);
+    expect(result.status).toBe('none');
+    expect(result.report.ambiguousPlayer).toBe('ablett');
+    expect(result.report.unsupportedTerms).not.toContain('ablett');
+  });
+
+  it('one plausible candidate below accept strength is not ambiguous either', async () => {
+    const result = await parseNlQuestion('mcintyre most goals', {
+      ...ctx,
+      resolvePlayer: () => Promise.resolve([
+        { ref: { id: 600, slug: 'peter-mcintyre', name: 'Peter McIntyre' }, score: 420 },
+        { ref: { id: 601, slug: 'a-nother', name: 'Angus Nother' }, score: 200 },
+      ]),
+    });
+    expect(result.report.ambiguousPlayer).toBeUndefined();
+  });
+});

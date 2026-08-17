@@ -899,7 +899,22 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       // "ablett" surfaces both Gary Abletts below accept strength. That
       // is an ambiguity, not an unknown word, and the decline message
       // and log should say so rather than "unsupported term: ablett".
-      if (candidates.length > 0) ambiguousPlayerMention = candidateRaw;
+      //
+      // "Found something" is NOT the same test as "ambiguous", though,
+      // and a bare `candidates.length > 0` conflated them: a misspelling
+      // that surfaces ONE weak fuzzy match ("smoth" -> John Smith, 410)
+      // is an unknown spelling, not a choice between players, and saying
+      // it "matches more than one player" is simply false. Apply the same
+      // whole-word-prefix equivalence the accepted branch uses for
+      // nameMatches above, and require TWO genuine matches -- candidates
+      // that do not even plausibly spell the mention are the resolver
+      // casting a wide net, not competing readings of the question.
+      const lookupTokens = lookupName.split(' ');
+      const plausible = candidates.filter((c) => {
+        const words = c.ref.name.toLowerCase().split(/\s+/);
+        return lookupTokens.every((t) => words.some((w) => w.startsWith(t)));
+      });
+      if (plausible.length >= 2) ambiguousPlayerMention = candidateRaw;
     }
   }
 
