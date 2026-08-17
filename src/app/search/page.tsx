@@ -200,6 +200,58 @@ export default async function SearchPage({
             </section>
           )}
 
+          {/* The club-season sibling of the player answer above:
+              "teams to draw twice in one season" is answered by a season,
+              not just a club, so each row carries that season's record. */}
+          {results.clubQuestion && (
+            <section className="section">
+              <CollapsibleTable
+                title={`Teams with ${results.clubQuestion.label}`}
+                note={`${formatNumber(results.clubQuestion.total)} ${
+                  results.clubQuestion.total === 1 ? 'season' : 'seasons'
+                }`}
+              >
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th scope="col">Club</th>
+                        <th scope="col">Season</th>
+                        <th scope="col" className="num">P</th>
+                        <th scope="col" className="num">W</th>
+                        <th scope="col" className="num">D</th>
+                        <th scope="col" className="num">L</th>
+                        <th scope="col" className="num">Ladder</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {results.clubQuestion.rows.map((r) => (
+                        <tr key={`${r.clubId}-${r.season}`}>
+                          <td className="wide">
+                            <Link href={clubPath(r.clubSlug)}>{r.clubName}</Link>
+                          </td>
+                          <td><Link href={seasonPath(r.season)}>{r.season}</Link></td>
+                          <td className="num">{r.played}</td>
+                          <td className="num">{r.wins}</td>
+                          <td className="num">{r.draws}</td>
+                          <td className="num">{r.losses}</td>
+                          <td className="num">{r.ladderRank ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CollapsibleTable>
+
+              {results.clubQuestion.total > results.clubQuestion.rows.length && (
+                <p className="muted" style={{ marginTop: '0.6rem' }}>
+                  Showing {results.clubQuestion.rows.length} of{' '}
+                  {formatNumber(results.clubQuestion.total)} seasons.
+                </p>
+              )}
+            </section>
+          )}
+
           {results.intent && (
             <section className="section search-intent">
               <Link href={results.intent.href} className="search-intent-link">

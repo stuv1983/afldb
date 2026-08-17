@@ -8,9 +8,11 @@ import { solveCellRows, type GridCellRow } from '@/db/queries/grid-solver';
 import { normalisedSearchTerm } from '@/lib/like';
 import {
   EVERY_PLAYER_AXIS,
+  type ClubQuestionKind,
   type IntentMatch,
   extractQuerySignals,
   gridSolverHref,
+  parseClubQuestion,
   parsePlayerQuestion,
   resolveIntent,
 } from '@/search/query-intent';
@@ -387,11 +389,109 @@ export type GlobalSearchResults = {
   intent: IntentMatch | null;
   /** A plain-words player question, already answered. */
   playerQuestion: PlayerQuestionAnswer | null;
+  /** A plain-words club question ("teams to draw twice"), already answered. */
+  clubQuestion: ClubQuestionAnswer | null;
+  total: number;
+};
+
+/**
+ * One answered club question: the club-SEASONS that satisfy it.
+ *
+ * A club-season is the right grain -- "teams to draw twice in one season"
+ * is answered by "Collingwood, 2011", not by "Collingwood" -- so each row
+ * carries the season and that season's record.
+ */
+export type ClubSeasonRow = {
+  clubId: number;
+  clubSlug: string;
+  clubName: string;
+  season: number;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  ladderRank: number | null;
+};
+
+export type ClubQuestionAnswer = {
+  label: string;
+  rows: ClubSeasonRow[];
   total: number;
 };
 
 /** How many answer rows a search page shows before "refine" takes over. */
 const PLAYER_QUESTION_ROWS = 10;
+
+/**
+ * The WHERE and ORDER BY for each club question kind.
+ *
+ * Both are fixed SQL written here, chosen by a closed union -- never a
+ * request-supplied column or direction, the same discipline the grid
+ * solver's builders follow. Only the threshold is a bound parameter.
+ */
+function clubQuestionSql(kind: ClubQuestionKind, n: number): {
+  where: ReturnType<typeof sql>;
+  orderBy: ReturnType<typeof sql>;
+} {
+  // Ordering puts the most extreme season first (five draws before two),
+  // then the most recent, so the head of the list is the interesting end
+  // rather than an arbitrary slice.
+  switch (kind) {
+    case 'season_draws_min':
+      return { where: sql`cs.draws >= ${n}`, orderBy: sql`cs.draws DESC, cs.season DESC` };
+    case 'season_wins_min':
+      return { where: sql`cs.wins >= ${n}`, orderBy: sql`cs.wins DESC, cs.season DESC` };
+    case 'season_losses_min':
+      return { where: sql`cs.losses >= ${n}`, orderBy: sql`cs.losses DESC, cs.season DESC` };
+    case 'wooden_spoon':
+      return { where: sql`cs.wooden_spoon`, orderBy: sql`cs.season DESC` };
+    case 'premiers':
+      return { where: sql`cs.is_premier`, orderBy: sql`cs.season DESC` };
+    case 'minor_premiers':
+      return { where: sql`cs.ladder_rank = 1`, orderBy: sql`cs.season DESC` };
+    // `played > 0` keeps a season with no recorded matches out of both:
+    // "won none of nothing" is not a winless season.
+    case 'winless':
+      return { where: sql`cs.wins = 0 AND cs.played > 0`, orderBy: sql`cs.played DESC, cs.season DESC` };
+    case 'undefeated':
+      return { where: sql`cs.losses = 0 AND cs.played > 0`, orderBy: sql`cs.played DESC, cs.season DESC` };
+  }
+}
+
+/**
+ * Parse and answer a club question, or null.
+ *
+ * Degrades to "no question recognised" on error, like its player
+ * counterpart: the reader still gets their ordinary search results.
+ */
+async function answerClubQuestion(query: string): Promise<ClubQuestionAnswer | null> {
+  const parsed = parseClubQuestion(query);
+  if (!parsed) return null;
+
+  try {
+    const { where, orderBy } = clubQuestionSql(parsed.kind, parsed.n);
+    const rows = await sql<(ClubSeasonRow & { total: string })[]>`
+      SELECT cs.club_id AS "clubId", c.slug AS "clubSlug", c.name AS "clubName",
+             cs.season, cs.played, cs.wins, cs.draws, cs.losses,
+             cs.ladder_rank AS "ladderRank",
+             count(*) OVER () AS total
+        FROM club_seasons cs
+        JOIN clubs c ON c.id = cs.club_id
+       WHERE ${where}
+       ORDER BY ${orderBy}
+       LIMIT ${PLAYER_QUESTION_ROWS}
+    `;
+    if (rows.length === 0) return null;
+    return {
+      label: parsed.label,
+      rows: rows.map(({ total: _total, ...rest }) => rest),
+      total: Number(rows[0].total),
+    };
+  } catch (error) {
+    console.error('club question could not be answered', error);
+    return null;
+  }
+}
 
 /**
  * Parse and answer a plain-words player question, or null.
@@ -432,7 +532,8 @@ async function answerPlayerQuestion(
 const EMPTY_RESULTS: GlobalSearchResults = {
   players: [], clubs: [], venues: [], seasons: [],
   rounds: [], awards: [], records: [],
-  aflwPlayers: [], aflwClubs: [], intent: null, playerQuestion: null, total: 0,
+  aflwPlayers: [], aflwClubs: [], intent: null,
+  playerQuestion: null, clubQuestion: null, total: 0,
 };
 
 export async function globalSearch(
@@ -462,7 +563,8 @@ export async function globalSearch(
   const runTopicSearch = topicText.length >= MIN_QUERY_LENGTH && topicText !== trimmed;
 
   const [
-    players, clubs, venues, seasons, rounds, awards, aflw, topicAwards, playerQuestion,
+    players, clubs, venues, seasons, rounds, awards, aflw, topicAwards,
+    playerQuestion, clubQuestion,
   ] = await Promise.all([
     searchPlayers(trimmed, playerLimit),
     searchClubs(trimmed),
@@ -473,6 +575,7 @@ export async function globalSearch(
     aflwResults(trimmed, { players: 10, clubs: 4 }),
     runTopicSearch ? searchAwards(topicText, 3) : Promise.resolve([] as SearchResult[]),
     answerPlayerQuestion(trimmed, options.canReachGridSolver ?? false),
+    answerClubQuestion(trimmed),
   ]);
   const records = searchRecords(trimmed);
   const topicRecords = runTopicSearch ? searchRecords(topicText, 3) : [];
@@ -490,13 +593,14 @@ export async function globalSearch(
     aflwClubs: aflw.clubs,
     intent,
     playerQuestion,
+    clubQuestion,
     // An answered question is a result: without this, a phrase that only
     // the question parser understands still renders the "no results"
     // empty state despite having an answer on screen.
     total: players.length + clubs.length + venues.length + seasons.length
       + rounds.length + awards.length + records.length
       + aflw.players.length + aflw.clubs.length
-      + (playerQuestion ? 1 : 0),
+      + (playerQuestion ? 1 : 0) + (clubQuestion ? 1 : 0),
   };
 }
 

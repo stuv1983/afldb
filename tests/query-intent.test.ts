@@ -4,6 +4,7 @@ import {
   type IntentClub,
   extractQuerySignals,
   gridSolverHref,
+  parseClubQuestion,
   parsePlayerQuestion,
   resolveIntent,
 } from '@/search/query-intent';
@@ -248,6 +249,55 @@ describe('parsePlayerQuestion', () => {
   it('returns null for text naming no question', () => {
     expect(parsePlayerQuestion('michael tuck')).toBeNull();
     expect(parsePlayerQuestion('most goals')).toBeNull();
+  });
+});
+
+describe('parseClubQuestion', () => {
+  it('parses the teams example', () => {
+    expect(parseClubQuestion('teams to draw twice in one season')).toEqual({
+      kind: 'season_draws_min', n: 2, label: '2+ draws in a season',
+    });
+  });
+
+  it('needs an explicit club subject, which is all that separates it from the player question', () => {
+    // One word apart, two different questions and two different answers.
+    expect(parseClubQuestion('drawn twice or more')).toBeNull();
+    expect(parsePlayerQuestion('drawn twice or more')?.axis.builder).toBe('season_draws_min');
+
+    expect(parseClubQuestion('clubs drawn twice or more')?.kind).toBe('season_draws_min');
+    expect(parsePlayerQuestion('clubs drawn twice or more')).toBeNull();
+  });
+
+  it('accepts team, club and side as the subject', () => {
+    for (const subject of ['teams', 'team', 'clubs', 'club', 'sides', 'side']) {
+      expect(parseClubQuestion(`${subject} to draw twice`)?.n, subject).toBe(2);
+    }
+  });
+
+  it('reads the standalone season achievements', () => {
+    expect(parseClubQuestion('teams that won the wooden spoon')?.kind).toBe('wooden_spoon');
+    expect(parseClubQuestion('teams that won the premiership')?.kind).toBe('premiers');
+    expect(parseClubQuestion('teams that finished first')?.kind).toBe('minor_premiers');
+    expect(parseClubQuestion('undefeated teams')?.kind).toBe('undefeated');
+    expect(parseClubQuestion('winless teams')?.kind).toBe('winless');
+  });
+
+  it('reads minor premiership before the premiership inside it', () => {
+    expect(parseClubQuestion('teams that were minor premiers')?.kind).toBe('minor_premiers');
+  });
+
+  it('reads season win and loss counts', () => {
+    expect(parseClubQuestion('teams with 20 wins in a season')).toEqual({
+      kind: 'season_wins_min', n: 20, label: '20+ wins in a season',
+    });
+    expect(parseClubQuestion('teams that lost 18 games in a season')).toEqual({
+      kind: 'season_losses_min', n: 18, label: '18+ losses in a season',
+    });
+  });
+
+  it('returns null for club text naming no question', () => {
+    expect(parseClubQuestion('richmond football club')).toBeNull();
+    expect(parseClubQuestion('teams')).toBeNull();
   });
 });
 

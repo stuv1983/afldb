@@ -186,6 +186,84 @@ function readCount(text: string): number | null {
   return null;
 }
 
+/** Words that make a question about clubs rather than players. */
+const CLUB_SUBJECT = /\b(?:teams?|clubs?|sides?)\b/;
+
+/**
+ * A club question, as a fixed kind plus a threshold.
+ *
+ * Unlike the player side, this does NOT go through the grid solver: that
+ * catalogue is entirely player-grained, and the answer to "teams to draw
+ * twice in one season" is a club-SEASON (Collingwood, 2011), not a club.
+ * The kinds are a closed set the answering layer switches on, so nothing
+ * a reader types ever reaches SQL as an identifier.
+ */
+export type ClubQuestionKind =
+  | 'season_draws_min'
+  | 'season_wins_min'
+  | 'season_losses_min'
+  | 'wooden_spoon'
+  | 'premiers'
+  | 'minor_premiers'
+  | 'winless'
+  | 'undefeated';
+
+export type ClubQuestion = {
+  kind: ClubQuestionKind;
+  /** Threshold for the `_min` kinds; ignored by the others. */
+  n: number;
+  label: string;
+};
+
+/**
+ * Parse a club question ("teams to draw twice in one season"), or null.
+ *
+ * Requires an explicit club subject — "teams", "clubs", "sides" — which is
+ * what separates this from the player questions below: "drawn twice or
+ * more" asks about players, "teams to draw twice" asks about clubs, and
+ * the only difference in the text is that word.
+ */
+export function parseClubQuestion(raw: string): ClubQuestion | null {
+  const text = canonicalise(raw);
+  if (!CLUB_SUBJECT.test(text)) return null;
+
+  const countText = text.replace(IN_ONE_SEASON, ' ').replace(IN_ONE_GAME, ' ');
+  const n = readCount(countText);
+
+  // Most specific first, as on the player side: "minor premiership" has
+  // to be read before the "premiership" inside it, and both before the
+  // bare "won" that a wins question would otherwise claim.
+  if (/\bwooden spoons?\b/.test(text)) {
+    return { kind: 'wooden_spoon', n: 0, label: 'a wooden spoon' };
+  }
+  if (/\bminor premier/.test(text) || /\bfinished (?:first|top)\b/.test(text)
+    || /\btop of the ladder\b/.test(text) || /\bladder leaders?\b/.test(text)) {
+    return { kind: 'minor_premiers', n: 0, label: 'a minor premiership (finished first)' };
+  }
+  if (/\bpremiers?\b|\bpremierships?\b|\bflags?\b/.test(text)) {
+    return { kind: 'premiers', n: 0, label: 'a premiership' };
+  }
+  if (/\bundefeated\b|\bunbeaten\b|\bperfect seasons?\b/.test(text)) {
+    return { kind: 'undefeated', n: 0, label: 'an undefeated season' };
+  }
+  if (/\bwinless\b|\bno wins\b|\bwithout a win\b/.test(text)) {
+    return { kind: 'winless', n: 0, label: 'a winless season' };
+  }
+
+  if (/\bdraws?\b|\bdrawn\b|\bdrew\b/.test(text)) {
+    const times = n ?? 1;
+    return { kind: 'season_draws_min', n: times, label: `${times}+ draws in a season` };
+  }
+  if (n !== null && /\bwins?\b|\bwon\b|\bwinning\b/.test(text)) {
+    return { kind: 'season_wins_min', n, label: `${n}+ wins in a season` };
+  }
+  if (n !== null && /\bloss(?:es)?\b|\blost\b|\blosing\b/.test(text)) {
+    return { kind: 'season_losses_min', n, label: `${n}+ losses in a season` };
+  }
+
+  return null;
+}
+
 export type PlayerQuestion = { axis: GridAxisState; label: string };
 
 function question(builder: string, params: Record<string, string>, label: string): PlayerQuestion {
@@ -209,6 +287,10 @@ function question(builder: string, params: Record<string, string>, label: string
  */
 export function parsePlayerQuestion(raw: string): PlayerQuestion | null {
   const text = canonicalise(raw);
+  // "teams to draw twice in one season" is a club question and is
+  // answered as one; declining it here rather than relying on the caller
+  // trying parseClubQuestion first keeps each parser correct alone.
+  if (CLUB_SUBJECT.test(text)) return null;
   // The season/game phrase is removed before reading the count so the
   // "one" in "in one season" can never be taken as the number.
   const countText = text.replace(IN_ONE_SEASON, ' ').replace(IN_ONE_GAME, ' ');
