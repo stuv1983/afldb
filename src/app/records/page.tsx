@@ -27,7 +27,7 @@ export default function RecordsPage() {
         </p>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+      <div className="grid grid-wide">
         {categories.map((category) => (
           <Link key={category.slug} href={`/records/${category.slug}`} className="card">
             <h3>{category.title}</h3>

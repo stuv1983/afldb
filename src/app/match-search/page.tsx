@@ -104,28 +104,15 @@ export default async function MatchSearchPage({
         <input type="hidden" name="search" value="1" />
 
         {groups.map((group) => (
-          <fieldset
-            key={group}
-            style={{
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '0.75rem 1rem 1rem',
-              marginBottom: '0.85rem',
-            }}
-          >
-            <legend style={{ fontWeight: 650, fontSize: '0.85rem', padding: '0 0.35rem' }}>
-              {GROUP_LABELS[group]}
-            </legend>
-            <div
-              className="grid"
-              style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))' }}
-            >
+          <fieldset key={group} className="filter-group">
+            <legend>{GROUP_LABELS[group]}</legend>
+            <div className="grid grid-fields">
               {Object.values(MATCH_FIELDS)
                 .filter((field) => field.group === group)
                 .map((field) => (
                   <div key={field.key}>
                     <label htmlFor={`${field.key}_min`}>{field.label}</label>
-                    <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.15rem' }}>
+                    <div className="filter-range">
                       <input
                         id={`${field.key}_min`}
                         name={`${field.key}_min`}
@@ -151,34 +138,16 @@ export default async function MatchSearchPage({
                         aria-label={`${field.label} maximum`}
                       />
                     </div>
-                    {field.help && (
-                      <div
-                        style={{
-                          fontSize: '0.72rem',
-                          color: 'var(--text-faint)',
-                          marginTop: '0.2rem',
-                        }}
-                      >
-                        {field.help}
-                      </div>
-                    )}
+                    {field.help && <div className="filter-help">{field.help}</div>}
                   </div>
                 ))}
             </div>
           </fieldset>
         ))}
 
-        <fieldset
-          style={{
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '0.75rem 1rem 1rem',
-          }}
-        >
-          <legend style={{ fontWeight: 650, fontSize: '0.85rem', padding: '0 0.35rem' }}>
-            Match details
-          </legend>
-          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))' }}>
+        <fieldset className="filter-group">
+          <legend>Match details</legend>
+          <div className="grid grid-fields">
             <div>
               <label htmlFor="club">Club</label>
               {/* Two clubs can be combined, and the parser has always
@@ -336,7 +305,7 @@ export default async function MatchSearchPage({
       {!hasSearch && (
         <section className="section">
           <h2>Example searches</h2>
-          <ul>
+          <ul className="ruled-list">
             <li>
               <Link href="/match-search?search=1&margin_min=1&margin_max=5&low_score_min=100&outcome=decided&sort=margin_asc">
                 Decided by under a goal with both teams scoring 100+

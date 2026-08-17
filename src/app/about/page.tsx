@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { pageMetadata } from '@/lib/seo';
 
 export const metadata: Metadata = pageMetadata({
@@ -11,6 +12,8 @@ export const metadata: Metadata = pageMetadata({
 export default function AboutPage() {
   return (
     <>
+      <Breadcrumbs items={[{ label: 'About' }]} />
+
       <div className="page-header">
         <h1>About AFLDB</h1>
         <p className="subtitle">
@@ -50,7 +53,7 @@ export default function AboutPage() {
           </a>.
         </p>
         <p>Additional source material fills in what fitzRoy does not cover:</p>
-        <ul>
+        <ul className="ruled-list">
           <li><strong>Wikipedia</strong> — biographical detail, including birth dates.</li>
           <li>
             <strong>DraftGuru</strong> — national and rookie draft history from 1981,

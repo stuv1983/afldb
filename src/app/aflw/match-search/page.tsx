@@ -221,7 +221,7 @@ export default async function AflwMatchSearchPage({
 
       <section className="section">
         <h2>Example searches</h2>
-        <ul>
+        <ul className="ruled-list">
           <li>
             <Link href="/aflw/match-search?margin_max=6&sort=margin_asc">
               Decided by a goal or less, closest first

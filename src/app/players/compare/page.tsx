@@ -217,18 +217,14 @@ export default async function ComparePlayersPage({
           <div className="split-head">
             <h2>Statistics</h2>
           </div>
-          <nav aria-label="Comparison basis" style={{ marginBottom: '0.75rem' }}>
+          <nav className="sort-nav" aria-label="Comparison basis">
+            <span className="sort-label">Compare by</span>
             {([['total', 'Career total'], ['per_game', 'Per game'], ['best', 'Best single game']] as const).map(
               ([value, label]) => (
                 <Link
                   key={value}
                   href={compareHref(aPlayer.id, bPlayer.id, rel, value)}
-                  className="badge"
-                  style={{
-                    marginRight: '0.3rem',
-                    background: basis === value ? 'var(--accent)' : undefined,
-                    color: basis === value ? 'var(--text-invert)' : undefined,
-                  }}
+                  className="sort-link"
                   aria-current={basis === value ? 'true' : undefined}
                 >
                   {label}
@@ -267,7 +263,7 @@ export default async function ComparePlayersPage({
       {gaps.length > 0 && (
         <details style={{ marginBottom: '1.5rem' }}>
           <summary>{gaps.length} statistic{gaps.length === 1 ? '' : 's'} not comparable across these eras</summary>
-          <ul>
+          <ul className="ruled-list">
             {gaps.map((g) => {
               const have = g.have === 'a' ? aPlayer : bPlayer;
               const lack = g.have === 'a' ? bPlayer : aPlayer;
@@ -284,14 +280,14 @@ export default async function ComparePlayersPage({
 
       <section className="section">
         <h2>Honours</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+        <div className="grid grid-panels">
           {[{ player: aPlayer, honours: honoursA }, { player: bPlayer, honours: honoursB }].map(({ player, honours }) => (
             <div key={player.id}>
               <strong>{player.displayName}</strong>
               {honours.total === 0 ? (
                 <p className="muted">No linked award or selection rows.</p>
               ) : (
-                <ul>
+                <ul className="ruled-list">
                   {honours.hallOfFame && (
                     <li>Australian Football Hall of Fame{honours.hallOfFame.inductedYear ? ` (${honours.hallOfFame.inductedYear})` : ''}</li>
                   )}
@@ -339,17 +335,13 @@ export default async function ComparePlayersPage({
               </div>
             </div>
 
-            <nav aria-label="Relationship" style={{ margin: '0.75rem 0' }}>
+            <nav className="sort-nav" aria-label="Relationship">
+              <span className="sort-label">Show</span>
               {([['all', 'All'], ['teammates', 'Teammates'], ['opponents', 'Opponents']] as const).map(([value, label]) => (
                 <Link
                   key={value}
                   href={compareHref(aPlayer.id, bPlayer.id, value, basis)}
-                  className="badge"
-                  style={{
-                    marginRight: '0.3rem',
-                    background: rel === value ? 'var(--accent)' : undefined,
-                    color: rel === value ? 'var(--text-invert)' : undefined,
-                  }}
+                  className="sort-link"
                   aria-current={rel === value ? 'true' : undefined}
                 >
                   {label}

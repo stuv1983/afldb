@@ -60,7 +60,10 @@ export default async function ClubsPage({
       <section className="section">
         <h2>Current clubs</h2>
         {current.length === 0 ? (
-          <p className="muted">No current clubs match those filters.</p>
+          <div className="empty">
+            <h3>No current clubs match those filters</h3>
+            <p>Try clearing the state or widening the season range.</p>
+          </div>
         ) : (
           <div className="grid">
             {current.map((club) => (
@@ -76,16 +79,23 @@ export default async function ClubsPage({
       </section>
 
       <section className="section">
-        <p className="section-note">
-          Historical identities are preserved rather than folded away, so a player’s
-          record shows the club as it was at the time. A rename or relocation carries
-          the club’s record forward; a merger does not, so the two sit in different
-          columns.
-        </p>
         {historical.length === 0 ? (
-          <p className="muted">No historical identities match those filters.</p>
+          // An h2: with no table there is no CollapsibleTable summary to
+          // head this section, so the empty state is the section's heading.
+          <div className="empty">
+            <h2>No historical identities match those filters</h2>
+            <p>Try clearing the state or widening the season range.</p>
+          </div>
         ) : (
           <CollapsibleTable title="Historical identities">
+          {/* Inside the panel, so the heading introduces the note rather
+              than the note floating above an unheaded table. */}
+          <p className="section-note">
+            Historical identities are preserved rather than folded away, so a player’s
+            record shows the club as it was at the time. A rename or relocation carries
+            the club’s record forward; a merger does not, so the two sit in different
+            columns.
+          </p>
           <div className="table-wrap">
             <table>
               <caption>

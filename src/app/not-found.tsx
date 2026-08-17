@@ -22,8 +22,8 @@ export default function NotFound() {
         That player, club, season or match isn’t in AFLDB — the address may be
         mistyped or out of date.
       </p>
-      <p style={{ marginTop: '1rem' }}>
-        <Link className="btn" href="/">Search AFL history</Link>
+      <p className="empty-actions">
+        <Link className="btn" href="/">Search AFLDB</Link>
       </p>
     </div>
   );

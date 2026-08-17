@@ -124,7 +124,7 @@ export default async function SeasonPage({
                   <td className="num">{row.ladderRank ?? '—'}</td>
                   <td className="wide">
                     <Link href={clubPath(row.clubSlug)}>{row.clubName}</Link>
-                    {row.isPremier && <span className="badge" style={{ marginLeft: '0.35rem' }}>Premiers</span>}
+                    {row.isPremier && <span className="badge">Premiers</span>}
                   </td>
                   <td className="num">{row.played}</td>
                   <td className="num">{row.wins}</td>
@@ -148,7 +148,7 @@ export default async function SeasonPage({
     id: 'goalkickers-and-brownlow',
     label: 'Leading goalkickers and Brownlow Medal',
     node: (
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+      <div className="grid grid-panels">
         <section className="section">
           <CollapsibleTable title="Leading goalkickers">
           <div className="table-wrap">
@@ -184,10 +184,14 @@ export default async function SeasonPage({
           {brownlow.length === 0 ? (
             <>
               <h2>Brownlow Medal</h2>
-              <p className="muted">
-                No Brownlow votes recorded for {season.year}
-                {season.year < 1924 ? ' — the medal was first awarded in 1924.' : '.'}
-              </p>
+              <div className="empty">
+                <h3>No votes recorded for {season.year}</h3>
+                <p>
+                  {season.year < 1924
+                    ? 'The medal was first awarded in 1924.'
+                    : 'The season count for this year is not in AFLDB.'}
+                </p>
+              </div>
             </>
           ) : (
             <CollapsibleTable title="Brownlow Medal">
@@ -232,7 +236,8 @@ export default async function SeasonPage({
             key={roundName}
             // Anchor target for /seasons/1989#round-5 links from search.
             id={roundName.toLowerCase().replace(/\s+/g, '-')}
-            style={{ marginBottom: '1.25rem', scrollMarginTop: '4rem' }}
+            className="anchor"
+            style={{ marginBottom: '1.25rem' }}
           >
             <CollapsibleTable title={roundName}>
             <div className="table-wrap">
@@ -299,14 +304,19 @@ export default async function SeasonPage({
         </p>
       )}
 
-      <nav className="pagination" aria-label="Season navigation">
-        {prev
-          ? <Link className="btn btn-secondary" href={seasonPath(prev)} rel="prev">← {prev}</Link>
-          : <span />}
-        <span className="spacer" />
-        {next
-          ? <Link className="btn btn-secondary" href={seasonPath(next)} rel="next">{next} →</Link>
-          : <span />}
+      {/* Adjacent seasons, not pages of one list — so it states the end of
+          the record rather than leaving a gap where a control would be. */}
+      <nav className="season-nav" aria-label="Adjacent seasons">
+        {prev ? (
+          <Link className="btn btn-secondary" href={seasonPath(prev)} rel="prev">← {prev}</Link>
+        ) : (
+          <span className="btn btn-secondary" aria-disabled="true">Earliest season</span>
+        )}
+        {next ? (
+          <Link className="btn btn-secondary" href={seasonPath(next)} rel="next">{next} →</Link>
+        ) : (
+          <span className="btn btn-secondary" aria-disabled="true">Latest season</span>
+        )}
       </nav>
 
       <ReorderableSections storageKey={`/seasons/${season.year}`} sections={sections} />

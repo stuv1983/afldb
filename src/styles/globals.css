@@ -47,6 +47,10 @@
   --measure: 1180px;
   --gutter: clamp(1rem, 3vw, 2rem);
 
+  /* Clear of the sticky header when a #id is jumped to. One value, so a
+     heading lands in the same place whichever anchor was followed. */
+  --anchor-offset: 5rem;
+
   color-scheme: light;
 }
 
@@ -299,6 +303,18 @@ main { min-height: 72vh; padding: clamp(1.5rem, 3vw, 2.25rem) 0 3.5rem; }
   font-size: 0.9375rem;
 }
 
+/* Opening line of a page: the sentence a reader arriving cold reads first,
+   and the prose a search result has to match against. Set to a measure so
+   it reads as a sentence rather than running the full width of a table. */
+.lede {
+  margin: 0.55rem 0 0;
+  max-width: 68ch;
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
 .breadcrumbs {
   font-size: 0.75rem;
   color: var(--text-faint);
@@ -342,6 +358,19 @@ main { min-height: 72vh; padding: clamp(1.5rem, 3vw, 2.25rem) 0 3.5rem; }
   margin-top: 0.4rem;
 }
 .stat .note { font-size: 0.7rem; color: var(--text-faint); }
+
+/* Names the figures below it — used where a stat strip needs saying what
+   it counts. A label for a row of numbers, so it is set like the strip's
+   own labels rather than like a section heading. */
+.strip-heading {
+  margin: 1.5rem 0 -0.75rem;
+  font-family: var(--font-sans);
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
 
 /* Tables ------------------------------------------------------------- */
 /* Wide statistical tables scroll inside their own container; the page
@@ -400,8 +429,12 @@ details.table-details {
   /* So jumping to a #id (a filtered table's form submits back to its own
      anchor, see TableFilters) doesn't land the heading under the sticky
      site header. */
-  scroll-margin-top: 5rem;
+  scroll-margin-top: var(--anchor-offset);
 }
+
+/* Anything else a #id points at — a round on a season page, a named table
+   on a page that carries two — clears the header by the same amount. */
+.anchor { scroll-margin-top: var(--anchor-offset); }
 details.table-details > summary {
   display: flex;
   align-items: baseline;
@@ -554,6 +587,14 @@ details.filter-details > form { padding: 0.85rem; }
   gap: 0.875rem;
   grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
 }
+/* Three modifiers cover every case the pages were setting by hand. They
+   differ by what the cell HOLDS, not by a few pixels: a form field, a card
+   carrying a sentence of description, or a whole table.
+   `auto-fill` on the card grids so a lone card keeps its width instead of
+   stretching across the row. */
+.grid-fields { grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr)); }
+.grid-wide   { grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }
+.grid-panels { grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); }
 .card {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -572,52 +613,6 @@ details.filter-details > form { padding: 0.85rem; }
   color: var(--text-muted);
   font-size: 0.8125rem;
 }
-
-/* AFLW placeholder -------------------------------------------------- */
-.aflw-header {
-  max-width: 720px;
-  padding: clamp(1.5rem, 4vw, 3rem) 0 clamp(1.25rem, 3vw, 2rem);
-}
-.aflw-header .subtitle {
-  max-width: 64ch;
-  font-size: 1rem;
-  line-height: 1.65;
-}
-.aflw-status,
-.aflw-card > span {
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-.aflw-status {
-  margin-top: 0.65rem;
-  padding: 0.35rem 0.55rem;
-  border: 1px solid var(--accent);
-  background: var(--accent-subtle);
-}
-.aflw-grid {
-  grid-template-columns: repeat(4, 1fr);
-}
-.aflw-card {
-  min-height: 150px;
-  display: flex;
-  flex-direction: column;
-  padding: 1rem;
-  border: 1px solid var(--border);
-  border-top-color: var(--border-strong);
-  background: var(--bg-raised);
-}
-.aflw-card h3 { margin-bottom: 0.35rem; }
-.aflw-card p {
-  margin: 0 0 1.25rem;
-  color: var(--text-muted);
-  font-size: 0.8125rem;
-}
-.aflw-card > span { margin-top: auto; }
 
 /* Forms -------------------------------------------------------------- */
 input[type='text'], input[type='search'], input[type='number'], select {
@@ -672,6 +667,47 @@ label {
   color: var(--text);
   border-color: var(--accent);
 }
+/* A pager end-stop. The control already says so with aria-disabled; this
+   is the same fact in the stylesheet rather than in a style attribute. */
+.btn[aria-disabled='true'] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Sort links --------------------------------------------------------- */
+/* A row of views of the same list. Marked like the primary nav, not like a
+   badge: the current sort is a place the reader is standing, where a badge
+   states something about the row it sits on. */
+.sort-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.9rem;
+  margin-bottom: 0.9rem;
+}
+.sort-nav .sort-label {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+}
+.sort-link {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0.15rem 0;
+  border-bottom: 1px solid transparent;
+}
+.sort-link:hover {
+  color: var(--text);
+  text-decoration: none;
+  border-bottom-color: var(--accent);
+}
+.sort-link[aria-current] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
 
 /* Search ------------------------------------------------------------- */
 .search-form { display: flex; gap: 0.5rem; }
@@ -695,6 +731,15 @@ label {
 .pagination .spacer { flex: 1; }
 .pagination .count { color: var(--text-muted); font-family: var(--font-mono); }
 
+/* Step between adjacent seasons. Not the pager: there is no list being
+   paged and no count to state, only the record's two ends. */
+.season-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
 /* Badges ------------------------------------------------------------- */
 .badge {
   display: inline-block;
@@ -710,6 +755,9 @@ label {
   vertical-align: middle;
 }
 .badge-warn { background: transparent; color: var(--draw); }
+/* A badge that follows something in the same cell needs air before it; one
+   standing alone in a cell does not. */
+* + .badge { margin-left: 0.35rem; }
 
 /* Coverage notice ---------------------------------------------------- */
 .notice {
@@ -737,21 +785,50 @@ label {
 .search-intent-link:hover { border-color: var(--accent); }
 .search-intent-link strong { color: var(--accent); }
 
-/* Honours roll ------------------------------------------------------- */
-.honours {
+/* Ruled lists -------------------------------------------------------- */
+/* The list form of a ledger row: one fact per line, ruled off rather than
+   bulleted. This is what a short list looks like in the almanac — an
+   honours roll, a set of search results, a page of example queries — and
+   it is the alternative to leaving a <ul> to the browser's discs. */
+.ruled-list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.honours li {
+.ruled-list li {
   padding: 0.5rem 0;
   border-bottom: 1px solid var(--border);
   font-size: 0.875rem;
   text-wrap: pretty;
 }
 
-.honours li:last-child { border-bottom: 0; }
+.ruled-list li:last-child { border-bottom: 0; }
+
+/* Beta gate ---------------------------------------------------------- */
+/* A door, not a page: one column, centred, nothing else on screen. The
+   masthead above already says AFLDB, so the heading here is free to say
+   what the door is for. */
+.gate {
+  max-width: 30rem;
+  margin: clamp(2rem, 8vh, 4rem) auto;
+  text-align: center;
+}
+.gate .page-header { margin-bottom: 1.75rem; }
+.gate .rule {
+  width: 3rem;
+  height: 1px;
+  margin: 1.25rem auto 0;
+  background: var(--accent);
+}
+.gate .footnote {
+  margin: 2rem 0 0;
+  padding-top: 1.15rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.8125rem;
+  color: var(--text-faint);
+  text-wrap: pretty;
+}
 
 /* Empty / error states ----------------------------------------------- */
 .empty {
@@ -759,11 +836,18 @@ label {
   padding: 3.5rem 1rem;
   color: var(--text-muted);
 }
-/* The 404 page's heading is an h1 — it is that page's subject, not a
-   subsection of one — while an empty table's is still an h2 under the page
-   it belongs to. Both look the same. */
+/* A full-page message (404, error) heads itself with an h1 — it is that
+   page's subject, not a subsection of one — while an empty table keeps the
+   level of the section it sits in. All three look the same. */
 .empty h1,
-.empty h2 { margin-bottom: 0.5rem; color: var(--text); font-size: 1.25rem; }
+.empty h2,
+.empty h3 { margin-bottom: 0.5rem; color: var(--text); font-size: 1.25rem; }
+.empty-actions { margin-top: 1rem; }
+.empty-reference {
+  margin-top: 1.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
 
 /* ==========================================================================
    Homepage — the almanac front page
@@ -846,10 +930,12 @@ label {
   text-transform: uppercase;
   white-space: nowrap;
 }
+/* Inside a ruled panel the lede explains the panel rather than opening a
+   page, so it tightens up under the heading. */
 .split .lede {
   margin: -0.5rem 0 1.5rem;
+  max-width: none;
   font-size: 0.8125rem;
-  color: var(--text-muted);
 }
 
 /* Ruled result rows. */
@@ -913,14 +999,28 @@ label {
   font-variant-numeric: tabular-nums;
   color: var(--accent);
 }
-.meter .meter-track {
+/* Track and fill are deliberately NOT scoped to `.meter`: the same bar is
+   what a record board draws in its leading column. See `.meter-inline`. */
+.meter-track {
   height: 5px;
   background: var(--bg-hover);
 }
-.meter .meter-fill {
+.meter-fill {
   height: 5px;
   background: var(--accent);
 }
+
+/* The bar inside a record board's value cell.
+   A board exists to state an order, and a column of figures states it only
+   to a reader who does the arithmetic. Drawn to the top row shown, so the
+   gap between first and second is visible at a glance — the same device
+   the front page leads with, on the pages it was made for. */
+.meter-inline {
+  display: block;
+  margin-top: 0.3rem;
+  min-width: 4.5rem;
+}
+.meter-inline > .meter-fill { min-width: 1px; }
 
 .split .footnote {
   margin: 1.75rem 0 0;
@@ -1101,7 +1201,6 @@ details.admin-section > summary h2 {
     padding-right: 0;
   }
   .split > *:last-child { padding-left: 0; }
-  .aflw-grid { grid-template-columns: repeat(2, 1fr); }
 
   /* The sidebar becomes a disclosure above the page rather than a column
      beside it. AdminNav defaults to collapsed at this width, so what is
@@ -1186,8 +1285,6 @@ details.admin-section > summary h2 {
   .section { margin: 1.75rem 0; }
 
   .grid { grid-template-columns: 1fr; }
-  .aflw-grid { grid-template-columns: 1fr; }
-  .aflw-card { min-height: 128px; }
 
   .search-form { gap: 0.4rem; }
   .search-form .btn { padding-inline: 0.85rem; }

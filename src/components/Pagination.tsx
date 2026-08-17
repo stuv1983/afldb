@@ -49,8 +49,7 @@ export function Pagination({
           ← Previous
         </Link>
       ) : (
-        <span className="btn btn-secondary" aria-disabled="true"
-              style={{ opacity: 0.45, pointerEvents: 'none' }}>← Previous</span>
+        <span className="btn btn-secondary" aria-disabled="true">← Previous</span>
       )}
       <span className="count">Page {page} of {lastPage.toLocaleString('en-AU')}</span>
       {page < lastPage ? (
@@ -58,8 +57,7 @@ export function Pagination({
           Next →
         </Link>
       ) : (
-        <span className="btn btn-secondary" aria-disabled="true"
-              style={{ opacity: 0.45, pointerEvents: 'none' }}>Next →</span>
+        <span className="btn btn-secondary" aria-disabled="true">Next →</span>
       )}
     </nav>
   );

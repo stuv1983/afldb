@@ -23,16 +23,16 @@ export default function Error({
 
   return (
     <div className="empty">
-      <h2>Something went wrong</h2>
+      {/* An h1: this page's subject IS the message, the same way the 404's
+          is. An empty table inside a larger page keeps its section's level. */}
+      <h1>Something went wrong</h1>
       <p>This page could not be loaded. The problem has been logged.</p>
-      <p style={{ marginTop: '1rem' }}>
+      <p className="empty-actions">
         <button className="btn" type="button" onClick={reset}>Try again</button>{' '}
-        <Link className="btn btn-secondary" href="/">Go to search</Link>
+        <Link className="btn btn-secondary" href="/">Search AFLDB</Link>
       </p>
       {error.digest && (
-        <p className="muted mono" style={{ marginTop: '1.5rem', fontSize: '0.75rem' }}>
-          Reference: {error.digest}
-        </p>
+        <p className="empty-reference mono">Reference: {error.digest}</p>
       )}
     </div>
   );

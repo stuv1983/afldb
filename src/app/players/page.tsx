@@ -171,20 +171,13 @@ export default async function PlayersPage({
 
       <FilterErrors errors={values.errors} />
 
-      <nav aria-label="Sort players" style={{ marginBottom: '0.75rem' }}>
-        <span className="muted" style={{ fontSize: '0.8125rem', marginRight: '0.5rem' }}>
-          Sort by:
-        </span>
+      <nav className="sort-nav" aria-label="Sort players">
+        <span className="sort-label">Sort by</span>
         {SORT_OPTIONS.map((option) => (
           <Link
             key={option.value}
             href={sortHref(option.value)}
-            className="badge"
-            style={{
-              marginRight: '0.3rem',
-              background: option.value === sort ? 'var(--accent)' : undefined,
-              color: option.value === sort ? 'var(--text-invert)' : undefined,
-            }}
+            className="sort-link"
             aria-current={option.value === sort ? 'true' : undefined}
           >
             {option.label}
@@ -255,7 +248,7 @@ export default async function PlayersPage({
       {values.active === 0 && (
         <section className="section">
           <h2>Example searches</h2>
-          <ul>
+          <ul className="ruled-list">
             {EXAMPLE_SEARCHES.map((example) => (
               <li key={example.href}>
                 <Link href={example.href}>{example.label}</Link>

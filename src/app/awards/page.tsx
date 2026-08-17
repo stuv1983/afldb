@@ -77,7 +77,7 @@ export default async function AwardsPage() {
           <section className="section" key={category}>
             <h2>{heading?.title ?? category}</h2>
             {heading?.note && <p className="section-note">{heading.note}</p>}
-            <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+            <div className="grid grid-wide">
               {list.map((award) => (
                 <Link key={award.id} href={awardPath(award.slug)} className="card">
                   <h3>{award.name}</h3>
@@ -116,7 +116,7 @@ export default async function AwardsPage() {
             Retrospective sides. Several were selected across leagues, so not every member
             has a VFL/AFL record.
           </p>
-          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+          <div className="grid grid-wide">
             {honourTeams.map((team) => (
               <Link
                 key={team.teamName}

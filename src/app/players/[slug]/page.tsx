@@ -219,7 +219,7 @@ export default async function PlayerPage({
                 <th scope="row">Date of birth</th>
                 <td>
                   {player.dob
-                    ? formatDate(player.dob)
+                    ? <span>{formatDate(player.dob)}</span>
                     : <span className="not-recorded">Not recorded</span>}
                   {/* Sources disagree. The date shown is the one AFLDB
                       already held; the conflict is recorded rather than
@@ -227,7 +227,6 @@ export default async function PlayerPage({
                   {player.dobDisputed && (
                     <span
                       className="badge badge-warn"
-                      style={{ marginLeft: '0.4rem' }}
                       title="Sources disagree on this date. The existing value is shown pending review."
                     >
                       Disputed
@@ -252,7 +251,7 @@ export default async function PlayerPage({
       node: (
         <section className="section">
           <h2>Honours</h2>
-          <ul className="honours">
+          <ul className="ruled-list">
             {honours.hallOfFame && (
               <li>
                 <strong>Australian Football Hall of Fame</strong>
@@ -403,11 +402,9 @@ export default async function PlayerPage({
                 <tr key={s.season}>
                   <td>
                     <Link href={seasonPath(s.season)}>{s.season}</Link>
-                    {s.isPremier && <span className="badge" style={{ marginLeft: '0.3rem' }}>P</span>}
+                    {s.isPremier && <span className="badge">P</span>}
                     {s.seasonStatus === 'in_progress' && (
-                      <span className="badge badge-warn" style={{ marginLeft: '0.3rem' }}>
-                        In progress
-                      </span>
+                      <span className="badge badge-warn">In progress</span>
                     )}
                   </td>
                   <td>

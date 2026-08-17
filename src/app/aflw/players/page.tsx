@@ -124,20 +124,13 @@ export default async function AflwPlayersPage({
 
       <FilterErrors errors={values.errors} />
 
-      <nav aria-label="Sort players" style={{ marginBottom: '0.75rem' }}>
-        <span className="muted" style={{ fontSize: '0.8125rem', marginRight: '0.5rem' }}>
-          Sort by:
-        </span>
+      <nav className="sort-nav" aria-label="Sort players">
+        <span className="sort-label">Sort by</span>
         {AFLW_PLAYER_SORT_OPTIONS.map((option) => (
           <Link
             key={option.value}
             href={sortHref(option.value)}
-            className="badge"
-            style={{
-              marginRight: '0.3rem',
-              background: option.value === sort ? 'var(--accent)' : undefined,
-              color: option.value === sort ? 'var(--text-invert)' : undefined,
-            }}
+            className="sort-link"
             aria-current={option.value === sort ? 'true' : undefined}
           >
             {option.label}

@@ -143,6 +143,28 @@ export default async function RecordCategoryPage({
   ]);
 
   const described = describeFilters(fields, values);
+
+  // Bars are drawn against the largest value ON SCREEN, not against rank 1:
+  // a filtered board legitimately starts at rank 17, and scaling to an
+  // absent leader would draw every visible row as a stub.
+  const scaleTo = Math.max(
+    0,
+    ...careerRows.map((r) => r.value),
+    ...matchRows.map((r) => r.value),
+    ...seasonRows.map((r) => r.value),
+  );
+  const barWidth = (value: number) =>
+    scaleTo > 0 ? `${Math.max(0, (value / scaleTo) * 100)}%` : '0%';
+
+  /** The figure the board ranks on, with the bar that draws it to scale. */
+  const valueCell = (value: number) => (
+    <td className="num">
+      <strong>{formatNumber(value)}</strong>
+      <span className="meter-track meter-inline" aria-hidden="true">
+        <span className="meter-fill" style={{ width: barWidth(value) }} />
+      </span>
+    </td>
+  );
   const filters = (
     <TableFilters
       action={`/records/${definition.slug}`}
@@ -233,7 +255,7 @@ export default async function RecordCategoryPage({
                   <td className="num nowrap">
                     {formatSpan(row.debutSeason, row.finalSeason)}
                   </td>
-                  <td className="num"><strong>{formatNumber(row.value)}</strong></td>
+                  {valueCell(row.value)}
                   <td className="num">{formatNumber(row.games)}</td>
                 </tr>
               ))}
@@ -270,7 +292,7 @@ export default async function RecordCategoryPage({
                   <td className="wide">
                     <Link href={playerPath(row.slug, row.playerId)}>{row.displayName}</Link>
                   </td>
-                  <td className="num"><strong>{formatNumber(row.value)}</strong></td>
+                  {valueCell(row.value)}
                   <td>{row.clubName}</td>
                   <td>{row.opponentName}</td>
                   <td className="nowrap">
@@ -315,7 +337,7 @@ export default async function RecordCategoryPage({
                   <td className="wide">
                     <Link href={playerPath(row.slug, row.playerId)}>{row.displayName}</Link>
                   </td>
-                  <td className="num"><strong>{formatNumber(row.value)}</strong></td>
+                  {valueCell(row.value)}
                   <td>
                     {row.clubSlug ? (
                       <Link href={clubPath(row.clubSlug)}>{row.clubName}</Link>

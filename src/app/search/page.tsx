@@ -100,7 +100,7 @@ export default async function SearchPage({
             {aflwResults!.clubs.length > 0 && (
               <section className="section">
                 <h2>AFLW clubs</h2>
-                <ul>
+                <ul className="ruled-list">
                   {aflwResults!.clubs.map((r) => (
                     <li key={r.slug}>
                       <Link href={searchResultHref(r)}>{r.title}</Link>{' '}
@@ -140,7 +140,7 @@ export default async function SearchPage({
             || results.records.length > 0) && (
             <section className="section">
               <h2>Go to</h2>
-              <ul>
+              <ul className="ruled-list">
                 {[...results.rounds, ...results.awards, ...results.records].map((r) => (
                   <li key={`${r.type}-${r.slug}-${r.id}`}>
                     <Link href={searchResultHref(r)}>{r.title}</Link>{' '}
@@ -181,7 +181,7 @@ export default async function SearchPage({
           {results.clubs.length > 0 && (
             <section className="section">
               <h2>Clubs</h2>
-              <ul>
+              <ul className="ruled-list">
                 {results.clubs.map((r) => (
                   <li key={r.id}>
                     <Link href={clubPath(r.slug)}>{r.title}</Link>{' '}
@@ -195,7 +195,7 @@ export default async function SearchPage({
           {results.venues.length > 0 && (
             <section className="section">
               <h2>Venues</h2>
-              <ul>
+              <ul className="ruled-list">
                 {results.venues.map((r) => (
                   <li key={r.id}>
                     <Link href={venuePath(r.slug)}>{r.title}</Link>{' '}
@@ -209,7 +209,7 @@ export default async function SearchPage({
           {results.seasons.length > 0 && (
             <section className="section">
               <h2>Seasons</h2>
-              <ul>
+              <ul className="ruled-list">
                 {results.seasons.map((r) => (
                   <li key={r.id}>
                     <Link href={seasonPath(r.id)}>{r.title}</Link>{' '}
@@ -256,7 +256,7 @@ export default async function SearchPage({
           {results.aflwClubs.length > 0 && (
             <section className="section">
               <h2>AFLW clubs</h2>
-              <ul>
+              <ul className="ruled-list">
                 {results.aflwClubs.map((r) => (
                   <li key={r.slug}>
                     <Link href={searchResultHref(r)}>{r.title}</Link>{' '}

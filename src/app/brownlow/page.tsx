@@ -75,7 +75,7 @@ export default async function BrownlowPage({
     node: (
       <section className="section">
         {/* Anchor target for /brownlow#brownlow-leaders links from search. */}
-        <div id="brownlow-leaders" style={{ scrollMarginTop: '4rem' }}>
+        <div id="brownlow-leaders" className="anchor">
         <CollapsibleTable
           id="leaders"
           title="Career vote leaders"
@@ -95,9 +95,6 @@ export default async function BrownlowPage({
             />
           }
         >
-          {leadersDescribed.length > 0 && (
-            <p className="section-note">{leadersDescribed.join(' · ')}</p>
-          )}
           {leaders.rows.length === 0 ? (
             <div className="empty">
               <h2>No players match those filters</h2>
@@ -144,7 +141,7 @@ export default async function BrownlowPage({
     node: (
       <section className="section">
         {/* Anchor target for /brownlow#brownlow-winners links from search. */}
-        <div id="brownlow-winners" style={{ scrollMarginTop: '4rem' }}>
+        <div id="brownlow-winners" className="anchor">
         <CollapsibleTable
           id="winners"
           title="Winners by season"
@@ -160,9 +157,6 @@ export default async function BrownlowPage({
             />
           }
         >
-          {winnersDescribed.length > 0 && (
-            <p className="section-note">{winnersDescribed.join(' · ')}</p>
-          )}
           {winners.length === 0 ? (
             <div className="empty">
               <h2>No winners match those filters</h2>
@@ -217,6 +211,11 @@ export default async function BrownlowPage({
         <h1>Brownlow Medal</h1>
         <p className="subtitle">
           Awarded to the fairest and best player of the season, first presented in 1924.
+          {/* Both tables' active filters surface here, the way every other
+              index page states what the reader is looking at. The two are
+              named because this page carries two independent lists. */}
+          {leadersDescribed.length > 0 && ` · Leaders: ${leadersDescribed.join(' · ')}`}
+          {winnersDescribed.length > 0 && ` · Winners: ${winnersDescribed.join(' · ')}`}
         </p>
       </div>
 

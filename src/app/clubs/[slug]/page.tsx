@@ -458,9 +458,7 @@ export default async function ClubPage({
       ))}
 
       {hasLineage && (
-        <h2 className="section-note" style={{ marginBottom: '0.25rem' }}>
-          {clubRecordName} — whole club record
-        </h2>
+        <h2 className="strip-heading">{clubRecordName} — whole club record</h2>
       )}
 
       <div className="stat-strip">

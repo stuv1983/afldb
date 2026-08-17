@@ -26,17 +26,21 @@ export default async function BetaGatePage({
   const from = firstValue(params.from) ?? '/';
 
   return (
-    <div style={{ maxWidth: '30rem', margin: '4rem auto', textAlign: 'center' }}>
+    <div className="gate">
       <div className="page-header">
-        <h1>AFLDB</h1>
+        {/* The masthead directly above already says AFLDB, so this heading
+            is free to say what the door is for instead of repeating it. */}
+        <h1>Closed beta</h1>
         <p className="subtitle">
-          Every player, every game, since 1897 — currently in closed beta.
+          Every player, every game, since 1897. Enter the email your invitation
+          was sent to and we’ll send you a sign-in link.
         </p>
+        <div className="rule" />
       </div>
 
       <BetaGateForm from={from} />
 
-      <p className="section-note" style={{ marginTop: '2rem' }}>
+      <p className="footnote">
         No invitation? AFLDB opens publicly once the record is verified.
       </p>
     </div>

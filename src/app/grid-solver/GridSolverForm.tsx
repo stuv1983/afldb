@@ -114,7 +114,7 @@ function AxisGroup({
   return (
     <div>
       <h3 style={{ margin: '0 0 0.4rem', fontSize: '0.9rem' }}>{title}</h3>
-      <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(17rem, 1fr))' }}>
+      <div className="grid grid-panels">
         {axes.map((axis, i) => (
           <AxisEditor
             key={i}
