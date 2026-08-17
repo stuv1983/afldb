@@ -514,9 +514,14 @@ describe('NL-013: combined/total score is the match aggregate, not the team scor
 // 1990s" executed as the ALL-TIME career record -- the season constraint
 // silently discarded behind a believable answer.
 describe('NL-014: "in the 1990s" is a season range', () => {
+  // The grain here was originally pinned to player_season, and NL-025
+  // deliberately reverses that: a season RANGE is the total across it,
+  // not the best single season inside it. The season bounds -- what this
+  // block exists to pin -- are unchanged.
   it('four-digit decade', async () => {
     const p = await plan('most goals in the 1990s');
-    expect(p.grain).toBe('player_season');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('sum');
     expect(p.scope.seasonMin).toBe(1990);
     expect(p.scope.seasonMax).toBe(1999);
   });
@@ -1011,5 +1016,146 @@ describe('NL-024: "at most" is an operator, never the superlative', () => {
     expect(p.careerConditions).toContainEqual(
       { kind: 'column', column: 'clubs_played', op: 'lte', value: 3 },
     );
+  });
+});
+
+// ---------------------------------------------------------------------
+// NL-025 -- a season RANGE is the total across it, not the best season
+// ---------------------------------------------------------------------
+// 6,643 rows of the qualification run, and a semantics decision rather
+// than a bug: "most goals in 2017" asks who led that season, but "most
+// kicks in the 1970s" and "record tackles since 2010" ask for the total
+// across the range. player_season answers the first; for the second it
+// answers a different question -- the best single season inside the
+// range -- and looks entirely plausible doing so.
+//
+// This REVERSES an earlier decision (see NL-014). That one came from the
+// 12,000-row corpus, which tolerates either reading through a soft
+// grain-equivalence rule, so the ambiguity never surfaced there; the
+// 250,000-row corpus scores it hard and forced the question. A single
+// pinned season is the one case where both readings coincide, which is
+// why the rule can be drawn at "exactly one season" without cost.
+describe('NL-025: one season is a leaderboard, a range is a total', () => {
+  it.each([
+    'most goals in 2017',
+    'most tackles in 2017',
+  ])('%s is a season leaderboard', async (question) => {
+    const p = await plan(question);
+    expect(p.grain).toBe('player_season');
+    expect(p.scope.seasonMin).toBe(2017);
+    expect(p.scope.seasonMax).toBe(2017);
+  });
+
+  it.each([
+    ['most kicks in the 1970s', 1970, 1979],
+    ['most handballs between 1965 and 1974', 1965, 1974],
+  ])('%s is a total across the range', async (question, min, max) => {
+    const p = await plan(question);
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('sum');
+    expect(p.scope.seasonMin).toBe(min);
+    expect(p.scope.seasonMax).toBe(max);
+  });
+
+  // An open-ended range is still a range: "since 2010" names a start and
+  // no end, which is many seasons, not one.
+  it('"since 2010" is a range, not a single season', async () => {
+    const p = await plan('record tackles since 2010');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('sum');
+    expect(p.scope.seasonMin).toBe(2010);
+    expect(p.scope.seasonMax).toBeUndefined();
+  });
+
+  // A club-scoped single season keeps the leaderboard reading -- this is
+  // the case NL-006 pinned, and the rule must not disturb it.
+  it('a club-scoped single season is still player_season', async () => {
+    const p = await plan("Richmond's leading goalkicker in 2017");
+    expect(p.grain).toBe('player_season');
+    expect(p.scope.clubFor?.slug).toBe('richmond');
+  });
+});
+
+// ---------------------------------------------------------------------
+// NL-026 -- a boundary question double-encoded its match type
+// ---------------------------------------------------------------------
+// 3,364 rows. extractBoundary reads its target from the match type
+// extractMatchType already found and stores it as boundary.where -- and
+// the match type was then ALSO written into scope, stating the same fact
+// twice in two places that can disagree.
+//
+// "Players whose debut was a grand final" is a career question about
+// which players' FIRST game was a Grand Final. It is not a question
+// filtered to Grand Finals, and the compilers, handed a scope match type
+// they are never given for this shape, cannot express it.
+describe('NL-026: a boundary absorbs the match type it was built from', () => {
+  it.each([
+    ['players whose debut was a grand final', 'debut', 'grand_final'],
+    ['players whose first game was a grand final', 'debut', 'grand_final'],
+    ['players whose last game was a final', 'last_game', 'final'],
+  ])('%s', async (question, event, where) => {
+    const p = await plan(question);
+    expect(p.boundary).toEqual({ event, where });
+    expect(p.scope.matchType).toBeUndefined();
+  });
+
+  // A non-boundary question must keep its match type in scope.
+  it('a plain match-type question still scopes it', async () => {
+    const p = await plan('most goals in a grand final');
+    expect(p.scope.matchType).toBe('grand_final');
+    expect(p.boundary).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------
+// NL-027 -- slang and the multi-word stat-games idiom
+// ---------------------------------------------------------------------
+// ~6,900 soft rows, all declines rather than wrong answers. The
+// multi-word metrics were in METRIC_WORDS but missing from
+// STAT_GAMES_IDIOM_WORDS, so "Tony Lockett most uncontested possessions
+// game at SCG" resolved the metric, left "game" in the text, and the
+// player-name scan swallowed it -- declining with the baffling
+// unsupported term "tony lockett uncontested".
+describe('NL-027: slang and multi-word stat-game idioms resolve', () => {
+  it.each([
+    ['most possies against Carlton in 2015', 'disposals'],
+    ['most snags against Carlton in 2015', 'goals'],
+  ])('%s -> %s', async (question, metric) => {
+    const p = await plan(question);
+    expect(p.metric).toBe(metric);
+  });
+
+  it.each([
+    ['dusty most uncontested possessions game against Carlton', 'uncontested'],
+    ['dusty most contested possessions game against Carlton', 'contested'],
+    ['dusty record inside-fifties game against Carlton', 'inside_50s'],
+    ['dusty record rebound-fifties game against Carlton', 'rebounds'],
+  ])('%s -> %s, with no leftover "game"', async (question, metric) => {
+    const result = await parseNlQuestion(question, ctx);
+    expect(result.status).toBe('plan');
+    expect(result.report.unsupportedTerms).toEqual([]);
+    const p = (result as Extract<NlParse, { status: 'plan' }>).plan;
+    expect(p.metric).toBe(metric);
+    expect(p.mode).toBe('single');
+  });
+
+  // "contested possessions" must not be shadowed by the bare
+  // "possessions games" entry and read as plain disposals.
+  it('contested possessions is not disposals', async () => {
+    const p = await plan('dusty most contested possessions game against Carlton');
+    expect(p.metric).not.toBe('disposals');
+  });
+
+  it('"danger" resolves to Patrick Dangerfield', async () => {
+    const result = await parseNlQuestion('danger most goals against Carlton', {
+      ...ctx,
+      resolvePlayer: (name) => Promise.resolve(
+        name === 'patrick dangerfield'
+          ? [{ ref: { id: 700, slug: 'patrick-dangerfield', name: 'Patrick Dangerfield' }, score: 1000 }]
+          : [],
+      ),
+    });
+    expect(result.status).toBe('plan');
+    expect((result as Extract<NlParse, { status: 'plan' }>).plan.player?.name).toBe('Patrick Dangerfield');
   });
 });

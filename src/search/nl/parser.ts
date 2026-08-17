@@ -612,6 +612,24 @@ function extractByClubPlayer(
  * between "no player was mentioned" and "a player was mentioned but
  * could not be resolved", which score very differently.
  */
+/**
+ * True when the question pinned exactly ONE season, false for a range and
+ * for no season at all.
+ *
+ * The grain election turns on this. "Most goals in 2017" asks who led that
+ * season; "most kicks in the 1970s" asks for the total across the decade,
+ * and answering it with the best single SEASON in that decade is a
+ * different question wearing the same words. A single pinned season is the
+ * one case where the two readings coincide, so it is the only case that
+ * can safely take the season grain.
+ *
+ * An open-ended range counts as a range: "since 2010" names a start and no
+ * end, which is many seasons, not one.
+ */
+function isSingleSeason(seasonMin: number | undefined, seasonMax: number | undefined): boolean {
+  return seasonMin !== undefined && seasonMin === seasonMax;
+}
+
 function candidatePlayerSpan(text: string): string | null {
   const tokens = text.split(/\s+/).filter(Boolean);
   const alphaRun = tokens.filter((t) => /^[a-z]+$/.test(t) && !STOPWORDS.has(t));
@@ -976,9 +994,18 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       // below -- season aggregates cannot express any of those. So do an
       // explicit total/career cue and an explicit single-game cue, both
       // of which name a different reading outright.
+      //
+      // ONE season, not a range. The distinction is the question itself:
+      // "most goals in 2017" asks who led that season, and player_season
+      // says exactly that. "Most kicks in the 1970s" or "record tackles
+      // since 2010" asks for the total ACROSS the range -- player_season
+      // would answer a different question, the best single season inside
+      // it, and would look entirely plausible doing so. For a single
+      // pinned season the two readings coincide, which is why the rule
+      // can be drawn here without cost.
       !inOneGame && !aggregateTotal && !overCareer
       && !venue && !clubAgainst && !matchTypeResult.matchType
-      && (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined)
+      && isSingleSeason(seasons.seasonMin, seasons.seasonMax)
     ) {
       grain = 'player_season';
       metric = playerMetricResult.metric;
@@ -988,11 +1015,18 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       grain = 'player_game';
       mode = inOneGame ? 'single' : 'sum';
       metric = playerMetricResult.metric;
-    } else if (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined) {
-      // A season with a total/career cue but no other scope ("total
-      // goals since 2000") -- the season must not silently drop, and
-      // player_season is the only grain that keeps it.
+    } else if (isSingleSeason(seasons.seasonMin, seasons.seasonMax)) {
+      // One named season with a total/career cue but no other scope
+      // ("total goals in 2017") -- the season must not silently drop, and
+      // player_season is the grain that keeps it.
       grain = 'player_season';
+      metric = playerMetricResult.metric;
+    } else if (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined) {
+      // A season RANGE with no other scope ("most kicks in the 1970s",
+      // "record tackles since 2010"): the total across the range, which
+      // only a summed player_game can express.
+      grain = 'player_game';
+      mode = 'sum';
       metric = playerMetricResult.metric;
     } else if (['games', 'goals'].includes(playerMetricResult.metric) || careerResult.conditions.length > 0) {
       grain = 'player_career';
@@ -1027,7 +1061,17 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   if (venue) scope.venue = { id: venue.entity.id, slug: venue.entity.slug, name: venue.entity.name };
   if (seasons.seasonMin !== undefined) scope.seasonMin = seasons.seasonMin;
   if (seasons.seasonMax !== undefined) scope.seasonMax = seasons.seasonMax;
-  if (matchTypeResult.matchType) scope.matchType = matchTypeResult.matchType as NlMatchType;
+  // A boundary question has ALREADY absorbed the match type: extractBoundary
+  // reads its target from exactly this value and stores it as
+  // boundary.where, so repeating it in scope states the same fact twice in
+  // two places that can disagree. "Players whose debut was a grand final"
+  // is a career question about which players' FIRST game was a Grand Final,
+  // not a question filtered to Grand Finals -- and the compilers, reading a
+  // scope match type they were never given for this shape, cannot express
+  // it. 3,364 questions in the qualification run.
+  if (matchTypeResult.matchType && !boundary) {
+    scope.matchType = matchTypeResult.matchType as NlMatchType;
+  }
 
   const careerConditions = grain === 'player_career' ? careerResult.conditions : [];
   const careerPredicates: GridAxisState[] = [];

@@ -287,11 +287,20 @@ export const METRIC_WORDS: [RegExp, string][] = [
   [/\bbrownlow votes?\b/, 'brownlow_votes'],
   [/\bbiggest bags?\b/, 'goals'],
   [/\bgoal ?kick(?:ers?|ing)\b/, 'goals'],
+  [/\bsnags?\b/, 'goals'],
   [/\bgoals?\b/, 'goals'],
   [/\bbehinds?\b/, 'behinds'],
   [/\bkicks?\b/, 'kicks'],
   [/\bhandballs?\b/, 'handballs'],
   [/\btouches?\b/, 'disposals'],
+  // Terrace slang, from the qualification run's own frequency table:
+  // "possies" 1,695 questions and "snags" 1,642, each declining as an
+  // unsupported term. Listed beside the formal word each abbreviates
+  // rather than in a table of their own, so the two can never disagree
+  // about which column they mean. "possies" sits AFTER the contested/
+  // uncontested phrases above for the same first-match-wins reason
+  // "possessions" does.
+  [/\bpossies\b/, 'disposals'],
   [/\bpossessions?\b/, 'disposals'],
   [/\bdisposals?\b/, 'disposals'],
   [/\bmarks?\b/, 'marks'],
@@ -385,6 +394,20 @@ export const NUMBER_PLUS_RE = /\b(\d{1,4})\+/;
 export const STAT_GAMES_IDIOM_WORDS: [RegExp, string][] = [
   [/\bgoal assists? games?\b/, 'goal_assists'],
   [/\bcontested marks? games?\b/, 'contested_marks'],
+  // The multi-word metrics were absent from this list even though they
+  // are all in METRIC_WORDS, so "Tony Lockett most uncontested
+  // possessions game at SCG" resolved the metric, left "game" behind, and
+  // the player-name scan swallowed it -- declining with the baffling
+  // unsupported term "tony lockett uncontested". These MUST precede the
+  // bare "possessions games" entry below, which would otherwise claim the
+  // tail of the phrase and read contested possessions as plain disposals.
+  [/\bcontested possessions? games?\b/, 'contested'],
+  [/\buncontested possessions? games?\b/, 'uncontested'],
+  [/\binside-fifties games?\b/, 'inside_50s'],
+  [/\brebound-fifties games?\b/, 'rebounds'],
+  [/\bbrownlow votes? games?\b/, 'brownlow_votes'],
+  [/\bpossies games?\b/, 'disposals'],
+  [/\bsnags? games?\b/, 'goals'],
   [/\bdisposals? games?\b/, 'disposals'],
   [/\btouch(?:es)? games?\b/, 'disposals'],
   [/\bpossessions? games?\b/, 'disposals'],
@@ -501,6 +524,10 @@ export const PLAYER_NICKNAMES: Record<string, string> = {
   pendles: 'scott pendlebury',
   hodgey: 'shaun hodge',
   roo: 'kevin bartlett',
+  // "danger" -- 1,669 questions in the qualification run, every one
+  // declining, because the bare word reaches the resolver and matches
+  // nothing it will commit to.
+  danger: 'patrick dangerfield',
   dangerfield: 'patrick dangerfield',
   dangerwood: 'patrick dangerfield',
   chappy: 'matthew richardson',
