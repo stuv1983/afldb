@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { SearchBox } from '@/components/SearchBox';
 import { aflwOnlySearch, globalSearch } from '@/db/queries/search';
+import { getSiteSettings } from '@/db/queries/site-settings';
+import { getAdminUser, ROLE_RANK } from '@/lib/auth/session';
 import { clubPath, playerPath, seasonPath, venuePath } from '@/lib/format';
 import { firstValue } from '@/lib/params';
 import { MIN_QUERY_LENGTH, searchResultHref } from '@/search/constants';
@@ -29,7 +31,24 @@ export default async function SearchPage({
   const hasQuery = query.trim().length >= MIN_QUERY_LENGTH;
 
   const aflwResults = scope === 'aflw' && hasQuery ? await aflwOnlySearch(query) : null;
-  const results = scope !== 'aflw' && hasQuery ? await globalSearch(query) : null;
+
+  // The player-question intents ("drawn twice or more in one season") link
+  // to /grid-solver, whose audience is a runtime setting — only offer them
+  // to a visitor that gate would actually admit (see requireAudience).
+  let gridSolverIntents = false;
+  if (scope !== 'aflw' && hasQuery) {
+    const { gridAudience } = await getSiteSettings();
+    if (gridAudience === 'public') {
+      gridSolverIntents = true;
+    } else {
+      const user = await getAdminUser();
+      gridSolverIntents = user !== null && ROLE_RANK[user.role] >= ROLE_RANK[gridAudience];
+    }
+  }
+
+  const results = scope !== 'aflw' && hasQuery
+    ? await globalSearch(query, 25, { gridSolverIntents })
+    : null;
 
   const otherScopeHref = scope === 'aflw'
     ? `/search?q=${encodeURIComponent(query)}`

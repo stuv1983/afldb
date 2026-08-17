@@ -372,6 +372,10 @@ const EMPTY_RESULTS: GlobalSearchResults = {
 export async function globalSearch(
   query: string,
   playerLimit = 25,
+  options: {
+    /** Whether the current visitor may reach /grid-solver — enables the player-question intents. */
+    gridSolverIntents?: boolean;
+  } = {},
 ): Promise<GlobalSearchResults> {
   const trimmed = query.trim();
   if (trimmed.length < MIN_QUERY_LENGTH) return EMPTY_RESULTS;
@@ -405,6 +409,7 @@ export async function globalSearch(
   const intent = resolveIntent(trimmed, signals, {
     bestRecord: bestRecord && { slug: bestRecord.slug, title: bestRecord.title, score: bestRecord.rank },
     bestAward: bestAward && { slug: bestAward.slug, title: bestAward.title, score: bestAward.rank },
+    gridSolver: options.gridSolverIntents ?? false,
   });
 
   return {

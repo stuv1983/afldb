@@ -18,6 +18,14 @@
  * connection.
  */
 
+import {
+  GRID_STATS,
+  serializeBoardState,
+  type GridAxisState,
+  type GridBoardState,
+  type GridStatKey,
+} from '@/search/grid-solver-spec';
+
 export type IntentClub = { slug: string; name: string };
 
 export type IntentCandidate = { slug: string; title: string; score: number };
@@ -117,6 +125,145 @@ function buildHref(
   return `${path}${qs ? `?${qs}` : ''}${hash ? `#${hash}` : ''}`;
 }
 
+// ------------------------------------------------------- player questions
+// Free text like "drawn twice or more in one season" or "10 goals in a
+// game" describes a QUESTION about players, not an entity. These parse a
+// small vocabulary of such phrasings into a grid-solver builder and link
+// to /grid-solver with that question prefilled in one cell. Everything
+// stays in-process and DB-free: the builders themselves validate and
+// solve, this only names one.
+
+const NUMBER_WORDS: Record<string, number> = {
+  once: 1, twice: 2, thrice: 3,
+  one: 1, two: 2, three: 3, four: 4, five: 5,
+  six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+};
+
+const IN_ONE_SEASON = /\bin (?:a|one|any|(?:a )?single|the same) season\b/;
+const IN_ONE_GAME = /\bin (?:a|one|any|(?:a )?single|the same) (?:game|match)\b/;
+
+/**
+ * Stat vocabulary, checked in order. Multi-word stats come before any
+ * single word they contain ("goal assists" before "goals"), and the
+ * numeric-named stats are canonicalised first (see canonicalise) so
+ * "inside 50s" can never be read as the number 50.
+ */
+const STAT_WORDS: [RegExp, GridStatKey][] = [
+  [/\bgoal assists?\b/, 'goal_assists'],
+  [/\bcontested marks?\b/, 'contested_marks'],
+  [/\binside-fifties\b/, 'inside_50s'],
+  [/\brebound-fifties\b/, 'rebounds'],
+  [/\bgoals?\b/, 'goals'],
+  [/\bbehinds?\b/, 'behinds'],
+  [/\bkicks?\b/, 'kicks'],
+  [/\bhandballs?\b/, 'handballs'],
+  [/\bdisposals?\b/, 'disposals'],
+  [/\bpossessions?\b/, 'disposals'],
+  [/\bmarks?\b/, 'marks'],
+  [/\btackles?\b/, 'tackles'],
+  [/\bhit ?outs?\b/, 'hitouts'],
+  [/\bclearances?\b/, 'clearances'],
+  [/\bclangers?\b/, 'clangers'],
+  [/\bbounces?\b/, 'bounces'],
+];
+
+function canonicalise(text: string): string {
+  return text
+    .replace(/\binside (?:fifty|50)s?\b/g, 'inside-fifties')
+    .replace(/\brebound (?:fifty|50)s?\b/g, 'rebound-fifties');
+}
+
+/** The first number in the text, as digits ("300", "2+") or as a word ("twice"). */
+function readCount(text: string): number | null {
+  const digits = /\b(\d{1,4})\b/.exec(text);
+  if (digits) return Number(digits[1]);
+  for (const [word, value] of Object.entries(NUMBER_WORDS)) {
+    if (new RegExp(`\\b${word}\\b`).test(text)) return value;
+  }
+  return null;
+}
+
+export type PlayerQuestion = { axis: GridAxisState; label: string };
+
+function question(builder: string, params: Record<string, string>, label: string): PlayerQuestion {
+  return { axis: { builder, params }, label };
+}
+
+/**
+ * Parse one player question out of free text, or null when nothing in the
+ * vocabulary matches. Checked most-specific first: the outcome words
+ * (draws/wins/losses) before the generic "games", so "won 20 games in a
+ * season" reads as wins, not games.
+ */
+export function parsePlayerQuestion(raw: string): PlayerQuestion | null {
+  const text = canonicalise(raw);
+  // The season/game phrase is removed before reading the count so the
+  // "one" in "in one season" can never be taken as the number.
+  const countText = text.replace(IN_ONE_SEASON, ' ').replace(IN_ONE_GAME, ' ');
+  const n = readCount(countText);
+
+  if (/\bdraws?\b|\bdrawn\b|\bdrew\b/.test(text) && IN_ONE_SEASON.test(text)) {
+    const times = n ?? 1;
+    return question('season_draws_min', { times: String(times) }, `${times}+ draws in one season`);
+  }
+  if (n !== null && /\bwins?\b|\bwon\b/.test(text) && IN_ONE_SEASON.test(text)) {
+    return question('season_wins_min', { times: String(n) }, `${n}+ wins in one season`);
+  }
+  if (n !== null && /\bloss(?:es)?\b|\blost\b/.test(text) && IN_ONE_SEASON.test(text)) {
+    return question('season_losses_min', { times: String(n) }, `${n}+ losses in one season`);
+  }
+
+  // Tested against countText, where the "in a game/season" phrases are
+  // already blanked out — the "game" of "10 goals in a game" is part of
+  // that phrase, not a games count.
+  if (n !== null && /\bgames?\b/.test(countText)) {
+    if (IN_ONE_SEASON.test(text)) {
+      return question('games_in_season_min', { games: String(n) }, `${n}+ games in one season`);
+    }
+    return question('career_games_min', { games: String(n) }, `${n}+ career games`);
+  }
+
+  if (/\bpremierships?\b|\bflags?\b/.test(text)) {
+    const times = n ?? 1;
+    return question('premierships_min', { times: String(times) }, `${times}+ premierships`);
+  }
+
+  if (n !== null) {
+    for (const [re, key] of STAT_WORDS) {
+      if (!re.test(text)) continue;
+      const statLabel = GRID_STATS[key].label.toLowerCase();
+      if (IN_ONE_GAME.test(text)) {
+        return question('single_game_stat_min', { stat: key, x: String(n) }, `${n}+ ${statLabel} in one game`);
+      }
+      if (IN_ONE_SEASON.test(text)) {
+        return question('season_stat_total_min', { stat: key, x: String(n) }, `${n}+ ${statLabel} in one season`);
+      }
+      if (key === 'goals') {
+        return question('career_goals_min', { goals: String(n) }, `${n}+ career goals`);
+      }
+      return question('career_stat_total_min', { stat: key, x: String(n) }, `${n}+ career ${statLabel}`);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * A board with the parsed question in one solvable cell: the question as
+ * row 1, "1+ career games" (i.e. every player) as column 1, and the
+ * remaining axes left incomplete so no other cell solves. Most games
+ * first, so the familiar names lead the answer.
+ */
+function gridSolverHref(axis: GridAxisState): string {
+  const filler = (): GridAxisState => ({ builder: 'career_games_min', params: {} });
+  const board: GridBoardState = {
+    rows: [axis, filler(), filler()],
+    cols: [{ builder: 'career_games_min', params: { games: '1' } }, filler(), filler()],
+    order: 'games_desc',
+  };
+  return `/grid-solver?g=${serializeBoardState(board)}`;
+}
+
 /**
  * Resolve a query and its extracted signals to a single best deep link.
  *
@@ -127,7 +274,12 @@ function buildHref(
 export function resolveIntent(
   query: string,
   signals: QuerySignals,
-  ctx: { bestRecord?: IntentCandidate | null; bestAward?: IntentCandidate | null },
+  ctx: {
+    bestRecord?: IntentCandidate | null;
+    bestAward?: IntentCandidate | null;
+    /** Whether the current visitor may reach /grid-solver (a runtime audience setting) — the player-question intents only fire when they can. */
+    gridSolver?: boolean;
+  },
 ): IntentMatch | null {
   const lower = query.trim().toLowerCase();
   if (lower.length === 0) return null;
@@ -217,6 +369,22 @@ export function resolveIntent(
       label: `${ctx.bestAward.title} — ${club.name}`,
       detail: `Every winner, filtered to ${club.name}.`,
     };
+  }
+
+  // 5. A player question in plain words ("drawn twice or more in one
+  // season") — answered by the grid solver with the question prefilled.
+  // Only when this visitor can actually reach /grid-solver, and only
+  // without a club: the parsed question carries no club dimension, so a
+  // club-qualified query would silently drop the club rather than apply it.
+  if (ctx.gridSolver && !club) {
+    const parsed = parsePlayerQuestion(topicWords || lower);
+    if (parsed) {
+      return {
+        href: gridSolverHref(parsed.axis),
+        label: `Players with ${parsed.label}`,
+        detail: 'Every matching player, most games first.',
+      };
+    }
   }
 
   return null;

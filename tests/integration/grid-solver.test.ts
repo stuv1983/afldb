@@ -214,6 +214,66 @@ describe('grid solver correctness', () => {
     expect(summary.eligible).toBe(Number(expected.count));
   });
 
+  it('games_at_multiple_clubs_min never matches a one-organization career', async () => {
+    // The regression this guards: player_clubs is one row per HISTORICAL
+    // identity, so counted per identity a rename (North Melbourne <->
+    // Kangaroos) made 27 one-club careers look like multi-club ones.
+    // clubs_played counts organizations, so the intersection must be empty.
+    const summary = await solveCellSummary(
+      { builder: 'games_at_multiple_clubs_min', params: { games: '1', clubs: '2' } },
+      { builder: 'one_club_player', params: {} },
+      'games_asc',
+    );
+    expect(summary.eligible).toBe(0);
+  });
+
+  it('goals_at_multiple_clubs_min never matches a one-organization career', async () => {
+    const summary = await solveCellSummary(
+      { builder: 'goals_at_multiple_clubs_min', params: { goals: '1', clubs: '2' } },
+      { builder: 'one_club_player', params: {} },
+      'games_asc',
+    );
+    expect(summary.eligible).toBe(0);
+  });
+
+  it('finals_clubs_min(2) never matches a one-organization career', async () => {
+    const summary = await solveCellSummary(
+      { builder: 'finals_clubs_min', params: { clubs: '2' } },
+      { builder: 'one_club_player', params: {} },
+      'games_asc',
+    );
+    expect(summary.eligible).toBe(0);
+  });
+
+  it('games_at_one_club_min counts a whole organization stint across a rename', async () => {
+    const summary = await solveCellSummary(
+      { builder: 'games_at_one_club_min', params: { games: '250' } },
+      { builder: 'career_games_min', params: { games: '0' } },
+      'games_asc',
+    );
+    const [expected] = await sql<{ count: string }[]>`
+      SELECT count(DISTINCT player_id) FROM (
+        SELECT pc.player_id
+          FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id
+         GROUP BY pc.player_id, cl.organization_id
+        HAVING sum(pc.games) >= 250
+      ) t
+    `;
+    expect(summary.eligible).toBe(Number(expected.count));
+  });
+
+  it('season_draws_min(2) matches a hand-written equivalent count', async () => {
+    const summary = await solveCellSummary(
+      { builder: 'season_draws_min', params: { times: '2' } },
+      { builder: 'career_games_min', params: { games: '0' } },
+      'games_asc',
+    );
+    const [expected] = await sql<{ count: string }[]>`
+      SELECT count(DISTINCT player_id) FROM player_season_stats WHERE draws >= 2
+    `;
+    expect(summary.eligible).toBe(Number(expected.count));
+  });
+
   it('club_season_stat_leader(goals) rows really did lead a club-season in goals', async () => {
     const { rows } = await solveCellRows(
       { builder: 'club_season_stat_leader', params: { stat: 'goals' } },

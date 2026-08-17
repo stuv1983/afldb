@@ -11,7 +11,7 @@
  * auto-grid modes, and the obscurity star-rating (a precomputed score with no
  * AFLDB equivalent — see GridOrder for the substitute).
  *
- * The catalogue is 93 builders across 10 categories, checked against the
+ * The catalogue is 94 builders across 10 categories, checked against the
  * reference's afl_grid_criteria.md and verified against live data. Family
  * relationships, physical attributes, derby definitions and win-streaks are
  * absent because the data is not there, not because they were skipped
@@ -195,6 +195,7 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   season_stat_avg_min: { key: 'season_stat_avg_min', label: 'Season average of a stat', group: 'Season & era', params: [stat(), decimal('avg', 'At least (average)')] },
   season_wins_min: { key: 'season_wins_min', label: 'X+ wins in one season', group: 'Season & era', params: [int('times', 'Wins')] },
   season_losses_min: { key: 'season_losses_min', label: 'X+ losses in one season', group: 'Season & era', params: [int('times', 'Losses')] },
+  season_draws_min: { key: 'season_draws_min', label: 'X+ draws in one season', group: 'Season & era', params: [int('times', 'Draws')] },
   club_season_stat_leader: { key: 'club_season_stat_leader', label: 'Led club in a stat (season)', group: 'Season & era', params: [stat()] },
   club_season_stat_leader_min_times: { key: 'club_season_stat_leader_min_times', label: 'Led club in a stat, X+ times', group: 'Season & era', params: [stat(), int('times', 'Times')] },
   wooden_spoon_season: { key: 'wooden_spoon_season', label: 'Wooden spoon season', group: 'Season & era', params: [] },

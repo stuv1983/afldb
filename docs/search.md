@@ -176,7 +176,7 @@ set, showing an eligible-player count and a top-ranked answer, with a
 drill-down to the full ranked list.
 
 **Named builders, not user-chosen columns.** `src/search/grid-solver-spec.ts`
-holds `GRID_BUILDERS`: 93 fixed, parameterised questions across ten
+holds `GRID_BUILDERS`: 94 fixed, parameterised questions across ten
 categories (clubs & journeys, career milestones, single-game feats,
 season & era, finals & premierships, grounds & venues, teammates,
 captaincy, awards & honours, draft & recruitment) — checked one category

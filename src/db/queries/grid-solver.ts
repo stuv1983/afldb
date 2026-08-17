@@ -181,23 +181,55 @@ function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`c.clubs_played = 1`;
     case 'multi_club_player':
       return sql`c.clubs_played > 1`;
+    // "Club" in the per-club aggregate builders means the organization
+    // (lineage), the same resolution played_for_club uses and the same
+    // definition clubs_played precomputes. player_clubs is one row per
+    // HISTORICAL identity, so summing per organization here is what stops
+    // a rename (North Melbourne <-> Kangaroos, Footscray -> Western
+    // Bulldogs) splitting one stint into two "clubs": counted per
+    // identity, Brent Harvey and 26 other one-organization players
+    // satisfied "X+ games at 2+ clubs", and 12 genuine 250-games-at-one-
+    // club careers went missing because no single identity row reached
+    // the threshold.
     case 'games_at_one_club_min': {
       const n = requireInt(axis, 'games', 'Games');
-      return sql`p.id IN (SELECT player_id FROM player_clubs WHERE games >= ${n})`;
+      return sql`EXISTS (SELECT 1 FROM player_clubs pc
+                           JOIN clubs cl ON cl.id = pc.club_id
+                          WHERE pc.player_id = p.id
+                          GROUP BY cl.organization_id
+                         HAVING sum(pc.games) >= ${n})`;
     }
     case 'clubs_played_min':
       return sql`c.clubs_played >= ${requireInt(axis, 'clubs', 'Clubs')}`;
+    // Correlated rather than a set-wide IN: Postgres cannot estimate rows
+    // through the per-org HAVING (it guessed 67 where ~13k came back) and
+    // answered the IN form with a nested loop over a materialised
+    // aggregate -- past the 5s statement timeout. Correlated, each
+    // candidate costs one player_clubs_pkey seek over a handful of rows
+    // (281ms worst-case across every player on real data), and the
+    // clubs_played gate -- implied by the org count, and indexed -- prunes
+    // most candidates before the subquery runs at all.
     case 'goals_at_multiple_clubs_min': {
       const goals = requireInt(axis, 'goals', 'Goals');
       const clubs = requireInt(axis, 'clubs', 'Clubs');
-      return sql`p.id IN (SELECT player_id FROM player_clubs WHERE goals >= ${goals}
-                           GROUP BY player_id HAVING count(*) >= ${clubs})`;
+      return sql`(c.clubs_played >= ${clubs} AND (
+                    SELECT count(*) FROM (
+                      SELECT 1 FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id
+                       WHERE pc.player_id = p.id
+                       GROUP BY cl.organization_id
+                      HAVING sum(pc.goals) >= ${goals}
+                    ) org) >= ${clubs})`;
     }
     case 'games_at_multiple_clubs_min': {
       const games = requireInt(axis, 'games', 'Games');
       const clubs = requireInt(axis, 'clubs', 'Clubs');
-      return sql`p.id IN (SELECT player_id FROM player_clubs WHERE games >= ${games}
-                           GROUP BY player_id HAVING count(*) >= ${clubs})`;
+      return sql`(c.clubs_played >= ${clubs} AND (
+                    SELECT count(*) FROM (
+                      SELECT 1 FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id
+                       WHERE pc.player_id = p.id
+                       GROUP BY cl.organization_id
+                      HAVING sum(pc.games) >= ${games}
+                    ) org) >= ${clubs})`;
     }
 
     // -- Career milestones ----------------------------------------------
@@ -314,6 +346,8 @@ function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`p.id IN (SELECT player_id FROM player_season_stats WHERE wins >= ${requireInt(axis, 'times', 'Wins')})`;
     case 'season_losses_min':
       return sql`p.id IN (SELECT player_id FROM player_season_stats WHERE losses >= ${requireInt(axis, 'times', 'Losses')})`;
+    case 'season_draws_min':
+      return sql`p.id IN (SELECT player_id FROM player_season_stats WHERE draws >= ${requireInt(axis, 'times', 'Draws')})`;
     case 'club_season_stat_leader': {
       const statKey = requireStatKey(axis);
       return sql`p.id IN (SELECT DISTINCT player_id FROM (${ledSeasonRows(statKey)}) led)`;
@@ -373,11 +407,15 @@ function compileAxis(axis: GridAxisState): SqlFragment {
                     SELECT 1 FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
                      WHERE pms.player_id = p.id AND m.is_final AND m.winner_club_id = pms.club_id)`;
     case 'finals_clubs_min': {
+      // Distinct organizations, not distinct historical identities --
+      // finals played either side of a club rename are one club here,
+      // the same rule as the per-club aggregate builders above.
       const n = requireInt(axis, 'clubs', 'Clubs');
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                             JOIN matches m ON m.id = pms.match_id
+                            JOIN clubs cl ON cl.id = pms.club_id
                            WHERE m.is_final
-                           GROUP BY pms.player_id HAVING count(DISTINCT pms.club_id) >= ${n})`;
+                           GROUP BY pms.player_id HAVING count(DISTINCT cl.organization_id) >= ${n})`;
     }
     case 'final_game_stat_min': {
       const statKey = requireStatKey(axis);
@@ -432,11 +470,13 @@ function compileAxis(axis: GridAxisState): SqlFragment {
                            GROUP BY pms.player_id HAVING count(*) >= ${n})`;
     }
     case 'grand_final_clubs_min': {
+      // Distinct organizations, same as finals_clubs_min.
       const n = requireInt(axis, 'clubs', 'Clubs');
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                             JOIN matches m ON m.id = pms.match_id
+                            JOIN clubs cl ON cl.id = pms.club_id
                            WHERE m.round_type = 'grand_final'
-                           GROUP BY pms.player_id HAVING count(DISTINCT pms.club_id) >= ${n})`;
+                           GROUP BY pms.player_id HAVING count(DISTINCT cl.organization_id) >= ${n})`;
     }
     case 'grand_final_between_seasons': {
       const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
