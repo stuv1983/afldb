@@ -2,10 +2,11 @@ import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import {
-  clubPath, formatDate, formatNumber, formatRoundShort, formatSpan, matchPath, playerPath, seasonPath,
+  clubPath, formatDate, formatNumber, formatPercentage, formatRoundShort, formatSpan,
+  matchPath, playerPath, seasonPath,
 } from '@/lib/format';
 import type {
-  NlAnswer, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
+  NlAnswer, NlClubSeasonRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow, NlTeamMatchRow,
 } from '@/search/nl/answer-types';
 
 /**
@@ -16,11 +17,9 @@ import type {
  * question (no coaching data, streaks not yet supported, …) gets its own
  * honest panel rather than the ordinary "no results" empty state.
  *
- * Only the player_career payload has a real renderer so far -- the other
- * grains land in later phases and execute.ts does not produce them yet,
- * so this component will not see them in production; the switch still
- * covers every case so a future grain landing here is a type error, not
- * a silent blank panel, until its renderer is written.
+ * Every grain now has a real renderer; the switch below still covers
+ * every case explicitly so a future sixth grain lands here as a type
+ * error, not a silent blank panel.
  */
 export function NlAnswerSection({ answer }: { answer: NlAnswer }) {
   if (answer.payload.kind === 'unanswerable') {
@@ -69,12 +68,12 @@ function renderPayload(answer: NlAnswer) {
       return <PlayerGameTable rows={payload.rows} total={payload.total} />;
     case 'player_season':
       return <PlayerSeasonTable rows={payload.rows} total={payload.total} />;
+    case 'team_match':
+      return <TeamMatchTable rows={payload.rows} total={payload.total} />;
+    case 'club_season':
+      return <ClubSeasonTable rows={payload.rows} total={payload.total} />;
     case 'count':
       return <p>{formatNumber(payload.value)}</p>;
-    // team_match / club_season land in a later phase -- execute.ts does
-    // not produce these yet.
-    case 'team_match': case 'club_season':
-      return null;
     case 'unanswerable':
       return null;
   }
@@ -217,6 +216,97 @@ function PlayerSeasonTable({ rows, total }: { rows: NlPlayerSeasonRow[]; total: 
                   </td>
                   <td className="num"><Link href={seasonPath(r.season)}>{r.season}</Link></td>
                   <td className="num">{formatNumber(r.games)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CollapsibleTable>
+      {total > rows.length && (
+        <p className="muted" style={{ marginTop: '0.6rem' }}>
+          Showing {rows.length} of {formatNumber(total)}.
+        </p>
+      )}
+    </>
+  );
+}
+
+function TeamMatchTable({ rows, total }: { rows: NlTeamMatchRow[]; total: number }) {
+  if (rows.length <= 1) return null;
+  return (
+    <>
+      <CollapsibleTable title="Every matching game" note={`${formatNumber(total)} total`}>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Club</th>
+                <th scope="col">Opponent</th>
+                <th scope="col" className="num">Value</th>
+                <th scope="col" className="num">Score</th>
+                <th scope="col">Match</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={`${r.matchId}-${r.clubSlug}`}>
+                  <td className="wide"><Link href={clubPath(r.clubSlug)}>{r.clubName}</Link></td>
+                  <td><Link href={clubPath(r.opponentSlug)}>{r.opponentName}</Link></td>
+                  <td className="num">{formatNumber(r.value)}</td>
+                  <td className="num nowrap">{r.clubScore}–{r.opponentScore}</td>
+                  <td className="nowrap">
+                    <Link href={matchPath(r.matchId)}>
+                      {r.season} {formatRoundShort(r.roundType, r.roundNumber)}
+                    </Link>
+                    {' '}
+                    <span className="muted">{formatDate(r.matchDate)}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CollapsibleTable>
+      {total > rows.length && (
+        <p className="muted" style={{ marginTop: '0.6rem' }}>
+          Showing {rows.length} of {formatNumber(total)}.
+        </p>
+      )}
+    </>
+  );
+}
+
+function ClubSeasonTable({ rows, total }: { rows: NlClubSeasonRow[]; total: number }) {
+  if (rows.length <= 1) return null;
+  return (
+    <>
+      <CollapsibleTable title="Every matching club season" note={`${formatNumber(total)} total`}>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Club</th>
+                <th scope="col" className="num">Season</th>
+                {rows[0]?.value !== null && <th scope="col" className="num">Value</th>}
+                <th scope="col" className="num">Played</th>
+                <th scope="col" className="num">W–D–L</th>
+                <th scope="col" className="num">Ladder</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={`${r.clubId}-${r.season}`}>
+                  <td className="wide"><Link href={clubPath(r.clubSlug)}>{r.clubName}</Link></td>
+                  <td className="num"><Link href={seasonPath(r.season)}>{r.season}</Link></td>
+                  {r.value !== null && (
+                    <td className="num">
+                      {/* percentage carries decimals; every other club_season metric is a whole game count */}
+                      {Number.isInteger(r.value) ? formatNumber(r.value) : formatPercentage(r.value)}
+                    </td>
+                  )}
+                  <td className="num">{formatNumber(r.played)}</td>
+                  <td className="num nowrap">{r.wins}–{r.draws}–{r.losses}</td>
+                  <td className="num">{r.ladderRank ?? '—'}</td>
                 </tr>
               ))}
             </tbody>

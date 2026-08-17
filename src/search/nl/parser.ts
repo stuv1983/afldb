@@ -26,6 +26,7 @@ import {
   type NlBoundary,
   type NlCareerColumn,
   type NlCareerCondition,
+  type NlClubSeasonCondition,
   type NlCompareOp,
   type NlDeclineReason,
   type NlMatchScope,
@@ -42,7 +43,8 @@ import {
 } from '@/search/nl/entities';
 import {
   AGAINST_PREPOSITION, AGG_WORDS, AGGREGATE_TOTAL_WORDS, AWARD_WORDS,
-  BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SUBJECT_LEADING, COMPARE_OP_WORDS,
+  BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_METRIC_WORDS,
+  CLUB_SUBJECT_LEADING, COMPARE_OP_WORDS,
   IN_A_FINAL, IN_A_GRAND_FINAL, IN_ONE_GAME, IN_ONE_SEASON,
   MATCH_TYPE_WORDS, METRIC_WORDS, NEGATION_WORDS, NUMBER_PLUS_RE, NUMBER_WORDS, OVER_CAREER,
   PLAYER_NICKNAMES, SINCE_RE, STAT_GAMES_IDIOM_WORDS, STOPWORDS, TEAM_METRIC_WORDS, TOP_N_RE,
@@ -333,6 +335,42 @@ function extractCareerConditions(text: string): { text: string; conditions: NlCa
   return { text: working, conditions, consumed };
 }
 
+// ---------------------------------------------------------- club-season
+
+/**
+ * Boolean club-season conditions: "fewest wins by a PREMIER", "worst team
+ * to MAKE FINALS". Presence-only (no threshold/negation logic like
+ * extractCareerConditions needs) -- each phrase already names exactly one
+ * true/false club_seasons column, so a match is the condition.
+ */
+function extractClubSeasonConditions(text: string): { text: string; conditions: NlClubSeasonCondition[]; consumed: string[] } {
+  const conditions: NlClubSeasonCondition[] = [];
+  const consumed: string[] = [];
+  let working = text;
+  for (const [re, kind] of CLUB_SEASON_CONDITION_WORDS) {
+    const match = re.exec(working);
+    if (!match) continue;
+    conditions.push({ kind });
+    consumed.push(match[0]);
+    working = stripMatch(working, match[0]);
+  }
+  return { text: working, conditions, consumed };
+}
+
+/**
+ * club_season ranking metric ("most wins", "highest percentage"). Callers
+ * only invoke this once a club-season cue already makes the grain
+ * unambiguous -- see CLUB_SEASON_METRIC_WORDS's header comment on the
+ * "wins"/player-career collision this gate avoids.
+ */
+function extractClubSeasonMetric(text: string): { text: string; metric?: string; consumed: string[] } {
+  for (const [re, metric] of CLUB_SEASON_METRIC_WORDS) {
+    const match = re.exec(text);
+    if (match) return { text: stripMatch(text, match[0]), metric, consumed: [match[0]] };
+  }
+  return { text, consumed: [] };
+}
+
 // -------------------------------------------------------------- boundary
 
 const DEBUT_RE = /\b(?:first|debut(?:ed)?)\b/;
@@ -562,13 +600,45 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   text = careerResult.text;
   consumedTokens.push(...careerResult.consumed);
 
+  // 10.5. Club-season conditions/metric. Conditions run first and are
+  // themselves one of the cues that makes a question club-season in the
+  // first place ("fewest wins BY A PREMIER" has no leading "teams" word
+  // at all); the metric word ("wins"/"losses"/"draws") is only tried once
+  // a cue already exists, since those words also name a player career
+  // column -- see CLUB_SEASON_METRIC_WORDS's header comment.
+  const clubSeasonConditionResult = extractClubSeasonConditions(text);
+  text = clubSeasonConditionResult.text;
+  consumedTokens.push(...clubSeasonConditionResult.consumed);
+
+  // Deliberately NOT triggered by clubFor alone: a named club is just as
+  // often a player_game/player_season scope ("richmond's most goals
+  // against carlton"), so only an unambiguous club-season signal --
+  // a leading "teams"/"clubs" subject, or one of the boolean conditions
+  // above -- elects this grain.
+  const clubSeasonCuePresent = clubSubjectPresent || clubSeasonConditionResult.conditions.length > 0;
+
+  let clubSeasonMetricResult: { text: string; metric?: string; consumed: string[] } = { text, consumed: [] };
+  if (clubSeasonCuePresent && !teamMetricResult.metric) {
+    clubSeasonMetricResult = extractClubSeasonMetric(text);
+    text = clubSeasonMetricResult.text;
+    consumedTokens.push(...clubSeasonMetricResult.consumed);
+  }
+
   // 11. Player stat metric (only tried once team-metric words have had
   // first refusal, and only consumed from `text` if a team metric did
   // NOT already fire, so "goals" in "biggest win" scope never
   // double-reads as a player stat too).
   let playerMetricResult: { text: string; metric?: string; consumed: string[] };
   if (teamMetricResult.metric) {
-    text = teamMetricResult.text;
+    // Strip the matched word from the CURRENT text, not
+    // teamMetricResult.text -- that snapshot was computed back at step 9,
+    // before extractCareerConditions/extractClubSeasonConditions (steps
+    // 10/10.5) had a chance to strip anything, so assigning it wholesale
+    // would silently resurrect whatever those steps already removed
+    // ("most losses by a premiership team" stripped "premiership team"
+    // correctly, then had it reappear here, misread as a failed
+    // player-name guess).
+    text = stripMatch(text, teamMetricResult.consumed[0]);
     consumedTokens.push(...teamMetricResult.consumed);
     playerMetricResult = { text, consumed: [] };
   } else if (idiomMetric) {
@@ -635,9 +705,9 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   if (teamMetricResult.metric) {
     grain = 'team_match';
     metric = teamMetricResult.metric;
-  } else if (clubSubjectPresent && !player) {
+  } else if (clubSeasonCuePresent && !player) {
     grain = 'club_season';
-    metric = careerResult.conditions.length > 0 ? null : (playerMetricResult.metric ?? null);
+    metric = clubSeasonMetricResult.metric ?? null;
   } else if (boundary) {
     grain = 'player_career';
   } else if (awardResult.awardKey) {
@@ -717,6 +787,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
 
   const careerConditions = grain === 'player_career' ? careerResult.conditions : [];
   const careerPredicates: GridAxisState[] = [];
+  const clubSeasonConditions = grain === 'club_season' ? clubSeasonConditionResult.conditions : [];
 
   if (grain === 'player_career' && metric === 'all_australian_selections' && negated && isNlAwardKey('all_australian')) {
     // "without" scoped to the award itself would double-count; the
@@ -727,8 +798,9 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
 
   // Aggregation default: a superlative reading ("most X") when nothing
   // else was said, a plain list when the question named only conditions
-  // ("players with 200 games and no premiership").
-  const agg: NlAggregation = aggResult.agg ?? (careerConditions.length > 0 || boundary
+  // ("players with 200 games and no premiership", "teams that won the
+  // wooden spoon").
+  const agg: NlAggregation = aggResult.agg ?? (careerConditions.length > 0 || clubSeasonConditions.length > 0 || boundary
     ? { kind: 'list' }
     : { kind: 'max' });
 
@@ -742,6 +814,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     scope,
     careerConditions,
     careerPredicates,
+    clubSeasonConditions,
     ...(boundary ? { boundary } : {}),
     tiePolicy: 'all',
     limit: agg.kind === 'top_n' || agg.kind === 'list' ? 100 : 25,
@@ -755,7 +828,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   ].join(' ');
   const consumedSet = new Set(meaningfulTokens(allConsumed));
   const structuralOk = grain === 'team_match' ? !!metric
-    : grain === 'club_season' ? clubSubjectPresent || !!clubFor
+    : grain === 'club_season' ? clubSeasonCuePresent
     : grain === 'player_career' ? (metric !== null || careerConditions.length > 0 || boundary !== undefined)
     : metric !== null;
 

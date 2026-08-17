@@ -12,7 +12,8 @@ import {
 } from '@/search/nl/plan';
 import { parseNlQuestion } from '@/search/nl/parser';
 import type {
-  NlAnswer, NlAnswerPayload, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
+  NlAnswer, NlAnswerPayload, NlClubSeasonRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
+  NlTeamMatchRow,
 } from '@/search/nl/answer-types';
 
 /**
@@ -119,7 +120,50 @@ function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { headline
   if (payload.kind === 'player_season') {
     return describePlayerSeasonAnswer(plan, payload.lead);
   }
+  if (payload.kind === 'team_match') {
+    return describeTeamMatchAnswer(plan, payload.lead);
+  }
+  if (payload.kind === 'club_season') {
+    return describeClubSeasonAnswer(plan, payload.lead, payload.total);
+  }
   return { headline: 'Results', interpretation: '' };
+}
+
+function describeTeamMatchAnswer(
+  plan: NlQueryPlan,
+  lead: NlTeamMatchRow | null,
+): { headline: string; interpretation: string } {
+  if (!lead) return { headline: 'No matching match found', interpretation: '' };
+  const metricLabel = (plan.metric ?? '').replace(/_/g, ' ');
+  return {
+    headline: `${lead.clubName} vs ${lead.opponentName} (${lead.season}) — ${lead.value.toLocaleString('en-AU')} ${metricLabel}`,
+    interpretation: plan.agg.kind === 'top_n'
+      ? `Top ${plan.agg.n} matches by ${metricLabel}.`
+      : `Highest ${metricLabel}.`,
+  };
+}
+
+function describeClubSeasonAnswer(
+  plan: NlQueryPlan,
+  lead: NlClubSeasonRow | null,
+  total: number,
+): { headline: string; interpretation: string } {
+  if (!plan.metric || lead === null || lead.value === null) {
+    return {
+      headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'club season matches' : 'club seasons match'}`,
+      interpretation: 'Club seasons meeting every condition asked for.',
+    };
+  }
+  const metricLabel = plan.metric.replace(/_/g, ' ');
+  // AFL percentage is conventionally shown to one decimal; every other
+  // club_season metric (wins/losses/draws) is a whole number of games.
+  const formattedValue = plan.metric === 'percentage' ? lead.value.toFixed(1) : lead.value.toLocaleString('en-AU');
+  return {
+    headline: `${lead.clubName} (${lead.season}) — ${formattedValue} ${metricLabel}`,
+    interpretation: plan.agg.kind === 'top_n'
+      ? `Top ${plan.agg.n} club seasons by ${metricLabel}.`
+      : `Highest ${metricLabel}.`,
+  };
 }
 
 function describePlayerGameAnswer(

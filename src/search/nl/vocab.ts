@@ -103,12 +103,53 @@ export const TOP_N_RE = /\btop[ -]?(\d{1,3}|[a-z]+)\b/;
  * separate from METRIC_WORDS (player stats) because the two vocabularies
  * name different grains and must never be tried in the same pass.
  */
+/**
+ * "loss" is deliberately SINGULAR-only here, matching "win" (which never
+ * included plural "wins" at all) -- the plural "losses"/"wins" reads as a
+ * SEASON TALLY (club_season), not one match's margin. Without this, "clubs
+ * with the most losses in a season" matched loss_margin here first and
+ * was read as team_match before club_season ever got a chance to claim
+ * "losses" as its own ranking metric.
+ */
 export const TEAM_METRIC_WORDS: [RegExp, 'win_margin' | 'loss_margin' | 'team_score' | 'total_score' | 'attendance'][] = [
   [/\b(?:win|victory|victories|thrashing|thumping)\b/, 'win_margin'],
-  [/\b(?:loss|losses|defeat|beating)\b/, 'loss_margin'],
+  [/\b(?:loss|defeat|beating)\b/, 'loss_margin'],
   [/\b(?:score|points scored)\b/, 'team_score'],
   [/\b(?:combined score|total score)\b/, 'total_score'],
   [/\b(?:crowd|attendance)\b/, 'attendance'],
+];
+
+/**
+ * club_season ranking words -- "most wins in a season", "highest
+ * percentage". "wins"/"losses"/"draws" also name a PLAYER career column
+ * (NL_CAREER_COLUMNS), so the parser only tries this vocabulary once a
+ * club-season cue (a leading "teams"/"clubs" word, a named club, or one
+ * of CLUB_SEASON_CONDITION_WORDS below) has already made the grain
+ * unambiguous -- see parser.ts's clubSeasonCuePresent. "percentage" has
+ * no such collision (it is not a player statistic in this vocabulary at
+ * all) but is kept in the same gated list for one consistent code path
+ * rather than a special case.
+ */
+export const CLUB_SEASON_METRIC_WORDS: [RegExp, 'wins' | 'losses' | 'draws' | 'percentage'][] = [
+  [/\bpercentage\b/, 'percentage'],
+  [/\bwins?\b/, 'wins'],
+  [/\blosses?\b/, 'losses'],
+  [/\bdraws?\b/, 'draws'],
+];
+
+/**
+ * club_season boolean conditions -- "fewest wins BY A PREMIER", "worst
+ * team to MAKE FINALS". Each reads one already-computed club_seasons
+ * column (is_premier / wooden_spoon / finals_played); unlike the metric
+ * words above, these never collide with player vocabulary, so they are
+ * always tried and are themselves one of the cues that makes a question
+ * a club-season question in the first place.
+ */
+export const CLUB_SEASON_CONDITION_WORDS: [RegExp, 'premier' | 'wooden_spoon' | 'made_finals' | 'missed_finals'][] = [
+  [/\bwooden spoon\b/, 'wooden_spoon'],
+  [/\bpremiers?\b|\bpremiership (?:team|side)\b|\bwon the flag\b/, 'premier'],
+  [/\b(?:missed|missing|miss(?:es)?) (?:the )?finals\b/, 'missed_finals'],
+  [/\b(?:made|make|makes|making|qualified for|reached) (?:the )?finals\b/, 'made_finals'],
 ];
 
 /**

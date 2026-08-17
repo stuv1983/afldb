@@ -336,6 +336,60 @@ describe('11. player-season queries', () => {
   });
 });
 
+describe('13. club_season queries', () => {
+  it('teams with the most wins in a season', async () => {
+    const p = await plan('teams with the most wins in a season');
+    expect(p.grain).toBe('club_season');
+    expect(p.metric).toBe('wins');
+    expect(p.agg).toEqual({ kind: 'max' });
+  });
+
+  it('clubs with the most losses in a season', async () => {
+    const p = await plan('clubs with the most losses in a season');
+    expect(p.grain).toBe('club_season');
+    expect(p.metric).toBe('losses');
+  });
+
+  it('fewest wins by a premier -> "premier" alone is enough of a club-season cue, no leading "teams" needed', async () => {
+    const p = await plan('fewest wins by a premier');
+    expect(p.grain).toBe('club_season');
+    expect(p.metric).toBe('wins');
+    expect(p.agg).toEqual({ kind: 'min' });
+    expect(p.clubSeasonConditions).toContainEqual({ kind: 'premier' });
+  });
+
+  it('most losses by a premiership team', async () => {
+    const p = await plan('most losses by a premiership team');
+    expect(p.grain).toBe('club_season');
+    expect(p.metric).toBe('losses');
+    expect(p.clubSeasonConditions).toContainEqual({ kind: 'premier' });
+  });
+
+  it('teams that won the wooden spoon -> a conditions-only list, no ranked metric', async () => {
+    const p = await plan('teams that won the wooden spoon');
+    expect(p.grain).toBe('club_season');
+    expect(p.metric).toBeNull();
+    expect(p.clubSeasonConditions).toContainEqual({ kind: 'wooden_spoon' });
+  });
+
+  it('clubs that made finals', async () => {
+    const p = await plan('clubs that made finals');
+    expect(p.grain).toBe('club_season');
+    expect(p.clubSeasonConditions).toContainEqual({ kind: 'made_finals' });
+  });
+
+  it('clubs that missed finals', async () => {
+    const p = await plan('clubs that missed finals');
+    expect(p.grain).toBe('club_season');
+    expect(p.clubSeasonConditions).toContainEqual({ kind: 'missed_finals' });
+  });
+
+  it('a club-scoped player question is NOT misread as club_season ("richmond" alone is too weak a cue)', async () => {
+    const p = await plan('most goals against carlton by a richmond player');
+    expect(p.grain).not.toBe('club_season');
+  });
+});
+
 describe('12. aggregate-vs-single scope for a named player', () => {
   it('dusty total goals against carlton -> "total" overrides the single-game default to a scoped sum', async () => {
     const p = await plan('dusty total goals against carlton');

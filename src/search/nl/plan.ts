@@ -303,6 +303,26 @@ export type NlBoundary = {
   where: 'grand_final' | 'final';
 };
 
+// -------------------------------------------------------- club-season conditions
+
+/**
+ * Boolean club_season-grain filters -- "fewest wins by a premier",
+ * "worst team to make finals". A closed, named set rather than a generic
+ * predicate, the same reasoning NL_AWARDS and GRID_BUILDERS are closed:
+ * each reads one already-computed club_seasons column
+ * (is_premier/wooden_spoon/finals_played), never a request-typed
+ * condition.
+ */
+export type NlClubSeasonCondition = { kind: 'premier' | 'wooden_spoon' | 'made_finals' | 'missed_finals' };
+
+const NL_CLUB_SEASON_CONDITION_KINDS: readonly NlClubSeasonCondition['kind'][] = [
+  'premier', 'wooden_spoon', 'made_finals', 'missed_finals',
+];
+
+export function isNlClubSeasonConditionKind(value: string): value is NlClubSeasonCondition['kind'] {
+  return (NL_CLUB_SEASON_CONDITION_KINDS as readonly string[]).includes(value);
+}
+
 // -------------------------------------------------------------- aggregation
 
 export type NlAggregation =
@@ -329,6 +349,8 @@ export type NlQueryPlan = {
   careerConditions: NlCareerCondition[];
   /** player_career only; each compiled by grid-solver's compileAxis. */
   careerPredicates: GridAxisState[];
+  /** club_season only. */
+  clubSeasonConditions: NlClubSeasonCondition[];
   boundary?: NlBoundary;
   /** Whether a value tied for the extreme all come back, or only the first found. Default 'all'. */
   tiePolicy: 'all' | 'first';
@@ -344,6 +366,7 @@ export const NL_LIMITS = {
   maxTopN: 50,
   maxCareerConditions: 8,
   maxCareerPredicates: 8,
+  maxClubSeasonConditions: 4,
   minSeason: 1897,
   maxSeason: 2100,
 } as const;
@@ -452,6 +475,16 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
     }
   }
 
+  if (raw.grain !== 'club_season' && raw.clubSeasonConditions.length > 0) {
+    return { error: 'Club-season conditions only apply to a club-season question.' };
+  }
+  if (raw.clubSeasonConditions.length > NL_LIMITS.maxClubSeasonConditions) {
+    return { error: `A question can combine at most ${NL_LIMITS.maxClubSeasonConditions} club-season conditions.` };
+  }
+  for (const cond of raw.clubSeasonConditions) {
+    if (!isNlClubSeasonConditionKind(cond.kind)) return { error: `Unknown club-season condition "${cond.kind}".` };
+  }
+
   if (raw.boundary) {
     if (!['debut', 'last_game'].includes(raw.boundary.event)) return { error: 'Unknown boundary event.' };
     if (!['grand_final', 'final'].includes(raw.boundary.where)) return { error: 'Unknown boundary target.' };
@@ -533,8 +566,24 @@ const GRAIN_LABEL: Record<NlGrain, string> = {
   club_season: 'club season',
 };
 
+/** The subject noun for a grain with no ranked metric ("every matching <noun>"). */
+const GRAIN_SUBJECT: Record<NlGrain, string> = {
+  player_career: 'player',
+  player_game: 'player',
+  player_season: 'player',
+  team_match: 'club',
+  club_season: 'club season',
+};
+
 const OP_WORDS: Record<NlCompareOp, string> = {
   gte: 'at least', lte: 'at most', gt: 'more than', lt: 'less than', eq: 'exactly',
+};
+
+const CLUB_SEASON_CONDITION_LABEL: Record<NlClubSeasonCondition['kind'], string> = {
+  premier: 'Premiers that season',
+  wooden_spoon: 'Wooden spoon that season',
+  made_finals: 'Played finals that season',
+  missed_finals: 'Missed finals that season',
 };
 
 function metricLabelOf(grain: NlGrain, metric: string | null): string | null {
@@ -557,7 +606,7 @@ export function describePlan(plan: NlQueryPlan): string[] {
       ? `Ranked ${GRAIN_LABEL[plan.grain]} ${metricLabel.toLowerCase()}, ${aggWord} ${(plan.agg as { n: number }).n}.`
       : `Searched for ${aggWord} ${GRAIN_LABEL[plan.grain]} ${metricLabel.toLowerCase()}.`);
   } else {
-    lines.push(`Searched ${GRAIN_LABEL[plan.grain]} records for ${aggWord} matching player.`);
+    lines.push(`Searched ${GRAIN_LABEL[plan.grain]} records for ${aggWord} matching ${GRAIN_SUBJECT[plan.grain]}.`);
   }
 
   if (plan.player) lines.push(`Player: ${plan.player.name}.`);
@@ -578,6 +627,9 @@ export function describePlan(plan: NlQueryPlan): string[] {
   }
   for (const axis of plan.careerPredicates) {
     lines.push(`Condition: ${GRID_BUILDERS[axis.builder]?.label ?? axis.builder}.`);
+  }
+  for (const cond of plan.clubSeasonConditions) {
+    lines.push(`Condition: ${CLUB_SEASON_CONDITION_LABEL[cond.kind]}.`);
   }
   if (plan.boundary) {
     lines.push(`Boundary: ${plan.boundary.event === 'debut' ? 'debut' : 'final'} game was a ${

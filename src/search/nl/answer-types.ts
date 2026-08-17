@@ -43,7 +43,7 @@ export type NlPlayerSeasonRow = {
 export type NlTeamMatchRow = {
   matchId: number; season: number;
   roundType: string; roundNumber: number | null;
-  matchDate: string;
+  matchDate: Date | null;
   clubName: string; clubSlug: string; opponentName: string; opponentSlug: string;
   value: number;
   clubScore: number; opponentScore: number;
@@ -62,7 +62,7 @@ export type NlAnswerPayload =
   | { kind: 'player_game'; lead: NlPlayerGameRow | null; rows: NlPlayerGameRow[]; total: number }
   | { kind: 'player_career'; lead: NlPlayerCareerRow | null; rows: NlPlayerCareerRow[]; total: number }
   | { kind: 'player_season'; lead: NlPlayerSeasonRow | null; rows: NlPlayerSeasonRow[]; total: number }
-  | { kind: 'team_match'; lead: NlTeamMatchRow; rows: NlTeamMatchRow[]; total: number }
+  | { kind: 'team_match'; lead: NlTeamMatchRow | null; rows: NlTeamMatchRow[]; total: number }
   | { kind: 'club_season'; lead: NlClubSeasonRow | null; rows: NlClubSeasonRow[]; total: number }
   | { kind: 'count'; value: number }
   | { kind: 'unanswerable'; topic: string; reason: string };

@@ -33,6 +33,7 @@ function basePlan(overrides: Partial<NlQueryPlan>): NlQueryPlan {
     scope: {},
     careerConditions: [],
     careerPredicates: [],
+    clubSeasonConditions: [],
     tiePolicy: 'all',
     limit: 25,
     ...overrides,
