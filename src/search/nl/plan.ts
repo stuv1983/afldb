@@ -58,8 +58,12 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    the mention, not merely a non-empty candidate list. Changes only the
  *    decline REASON, never the plan -- but failure_reason is exactly what
  *    the tuning pass groups by, so the rows must not be pooled with v3's.
+ * 5: coverage is a refusal, not a footnote. NlCoverage can now express a
+ *    discontinuous range and a match-type exclusion, so per-game Brownlow
+ *    votes decline for 1935-1983 and for finals rather than answering with
+ *    a note that contradicts the number above it.
  */
-export const PARSER_VERSION = 4;
+export const PARSER_VERSION = 5;
 
 // ------------------------------------------------------------------ grain
 
@@ -287,7 +291,23 @@ export function isNlMetric(grain: NlGrain, metric: string): boolean {
  * hand" discipline the grid solver's GRID_STATS grain tags already rely
  * on being right.
  */
-export type NlCoverage = { firstSeason: number; note: string };
+export type NlCoverage = {
+  /** Earliest recorded season. The common case is a plain floor. */
+  firstSeason: number;
+  note: string;
+  /**
+   * The seasons actually recorded, when coverage is NOT one unbroken run
+   * from `firstSeason` to the present. Omitted means [firstSeason, ∞).
+   * Per-game Brownlow votes are the reason this exists: a floor of 1931
+   * describes their coverage exactly as badly as no floor at all, since
+   * the fifty seasons after 1934 hold nothing.
+   */
+  seasons?: readonly (readonly [number, number])[];
+  /** Match types for which the stat was never recorded at all. */
+  neverForMatchTypes?: readonly NlMatchType[];
+  /** Grains the rule applies at. Omitted means all of them. */
+  grains?: readonly NlGrain[];
+};
 
 export const NL_COVERAGE: Partial<Record<string, NlCoverage>> = {
   behinds: { firstSeason: 1965, note: 'Behinds were not recorded before 1965.' },
@@ -305,14 +325,73 @@ export const NL_COVERAGE: Partial<Record<string, NlCoverage>> = {
   uncontested: { firstSeason: 1999, note: 'Uncontested possessions were not recorded before 1999.' },
   bounces: { firstSeason: 1999, note: 'Bounces were not recorded before 1999.' },
   goal_assists: { firstSeason: 2003, note: 'Goal assists were not recorded before 2003.' },
-  // Per-game Brownlow votes exist only for 1931-1934 and 1984-2025, and
-  // never for finals -- a range, not a floor, so it's a fixed note a
-  // compiler attaches whenever brownlow_votes is used at player_game
-  // grain, rather than a firstSeason entry here.
+  // Per-game Brownlow votes are the one stat whose coverage is neither a
+  // floor nor continuous: 1931-1934, then a fifty-season hole, then 1984
+  // onward -- and never for a final in any of those years, because the
+  // medal is polled on home-and-away matches only.
+  //
+  // This used to be a note the answer CARRIED rather than a rule that
+  // could refuse. That reads well for "most Brownlow votes in a game",
+  // which the 1984+ data answers properly, and badly for "most Brownlow
+  // votes in one game in 1935" or "in a Grand Final", which have no
+  // answer at all: those returned a confident record from whatever rows
+  // the query happened to touch, with a footnote that quietly
+  // contradicted the number above it. The qualification corpus counts
+  // 2,855 such questions, every one of them interpreted correctly and
+  // answered wrongly.
+  brownlow_votes: {
+    firstSeason: 1931,
+    note: 'Per-game Brownlow votes are recorded only for 1931-1934 and 1984 onward, and never for finals.',
+    // Open-ended rather than pinned to NL_LIMITS.maxSeason: "1984 onward"
+    // is the actual fact, and it needs no editing each time a season is
+    // played. (NL_LIMITS is declared below this, so referencing it here
+    // would also be a temporal-dead-zone error.)
+    seasons: [[1931, 1934], [1984, Number.POSITIVE_INFINITY]],
+    neverForMatchTypes: ['finals', 'grand_final', 'preliminary_final', 'semi_final', 'qualifying_final', 'elimination_final'],
+    // player_career/player_season brownlow_votes are season and career
+    // TOTALS, which exist for every year the medal has been awarded.
+    // Only the per-match figure has the gap.
+    grains: ['player_game'],
+  },
 };
 
-export const BROWNLOW_GAME_VOTE_NOTE =
-  'Per-game Brownlow votes are recorded only for 1931-1934 and 1984 onward, and never for finals.';
+export const BROWNLOW_GAME_VOTE_NOTE = NL_COVERAGE.brownlow_votes!.note;
+
+/** The coverage rule for a metric, but only where it actually applies. */
+export function nlCoverageFor(grain: NlGrain, metric: string | null): NlCoverage | null {
+  if (!metric) return null;
+  const coverage = NL_COVERAGE[metric];
+  if (!coverage) return null;
+  if (coverage.grains && !coverage.grains.includes(grain)) return null;
+  return coverage;
+}
+
+/**
+ * Why the requested scope holds no data at all, or null when some part of
+ * it is covered. "At all" is the bar deliberately: a range that overlaps
+ * coverage even partly is answerable, and the answer carries the note.
+ */
+export function nlCoverageGap(
+  coverage: NlCoverage,
+  scope: { seasonMin?: number; seasonMax?: number; matchType?: NlMatchType },
+): string | null {
+  if (scope.matchType && coverage.neverForMatchTypes?.includes(scope.matchType)) {
+    return `${coverage.note} There is nothing recorded for finals to rank.`;
+  }
+
+  // An unbounded end of the requested range cannot exclude anything, so
+  // an unscoped question always survives this and is answered from the
+  // seasons that do exist.
+  const from = scope.seasonMin ?? Number.NEGATIVE_INFINITY;
+  const to = scope.seasonMax ?? Number.POSITIVE_INFINITY;
+  const recorded = coverage.seasons ?? [[coverage.firstSeason, Number.POSITIVE_INFINITY]] as const;
+  if (recorded.some(([start, end]) => from <= end && to >= start)) return null;
+
+  const asked = scope.seasonMin === scope.seasonMax && scope.seasonMin !== undefined
+    ? String(scope.seasonMin)
+    : `${scope.seasonMin ?? 'the earliest season'}-${scope.seasonMax ?? 'the latest season'}`;
+  return `${coverage.note} Nothing in ${asked} can be recorded.`;
+}
 
 // ---------------------------------------------------------------- boundary
 
@@ -533,17 +612,16 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
     return { error: 'The season range is backwards.' };
   }
 
-  // Era coverage: a metric whose earliest recorded season is entirely
-  // after the requested range cannot be answered, and must say so rather
-  // than silently return nothing (the same principle records.ts states
-  // on every era-limited category and search.md enforces for filters).
-  if (raw.metric) {
-    const coverage = NL_COVERAGE[raw.metric];
-    if (coverage && seasonMax !== undefined && seasonMax < coverage.firstSeason) {
-      return {
-        error: `${coverage.note} Nothing in ${seasonMin ?? 'the requested range'}-${seasonMax} can be recorded.`,
-      };
-    }
+  // Era coverage: a scope that holds no recorded data at all cannot be
+  // answered, and must say so rather than silently return nothing (the
+  // same principle records.ts states on every era-limited category and
+  // search.md enforces for filters). nlCoverageGap covers both shapes --
+  // a metric that starts after the range, and per-game Brownlow votes,
+  // whose coverage has a hole in the middle and excludes finals outright.
+  const coverage = nlCoverageFor(raw.grain, raw.metric);
+  if (coverage) {
+    const gap = nlCoverageGap(coverage, { seasonMin, seasonMax, matchType: raw.scope.matchType });
+    if (gap) return { error: gap };
   }
 
   if (raw.agg.kind === 'top_n') {

@@ -20,7 +20,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseNlQuestion, type NlParseContext, type NlPlayerCandidate } from '@/search/nl/parser';
-import type { NlParse, NlQueryPlan } from '@/search/nl/plan';
+import { validatePlan, type NlParse, type NlQueryPlan } from '@/search/nl/plan';
 import type { NlClubDirectoryEntry, NlVenueDirectoryEntry } from '@/search/nl/entities';
 
 const CLUBS: NlClubDirectoryEntry[] = [
@@ -850,5 +850,92 @@ describe('NL-022: "ambiguous" means two plausible players, not one weak match', 
       ]),
     });
     expect(result.report.ambiguousPlayer).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------
+// NL-023 -- coverage gaps were a footnote, not a refusal
+// ---------------------------------------------------------------------
+// The largest UNSAFE_ANSWER cluster in the qualification run: 2,855 rows
+// interpreted PERFECTLY (the corpus records the expected plan hash and
+// the parser's hash as identical) and answered anyway, when the honest
+// reply is that the data does not exist.
+//
+// Per-game Brownlow votes are the one stat whose coverage is neither a
+// floor nor continuous -- 1931-34, a fifty-season hole, then 1984 on,
+// and never a final in any of those years, because the medal is polled
+// on home-and-away matches only. NL_COVERAGE could express "not before
+// N" and nothing else, so this was a note the answer CARRIED. For "most
+// Brownlow votes in a game" that reads fine. For "in 1935" or "in a
+// Grand Final" it produced a confident record from whatever rows the
+// query touched, with a footnote quietly contradicting the number above
+// it -- the wrong-but-believable failure this engine exists to avoid.
+//
+// The rule is deliberately "no overlap at all": a range that touches
+// coverage even partly is still answered, with the note attached.
+describe('NL-023: a scope with no recorded data is refused, not footnoted', () => {
+  const brownlowGame = (scope: Partial<NlQueryPlan['scope']>): NlQueryPlan => ({
+    v: 1,
+    grain: 'player_game',
+    metric: 'brownlow_votes',
+    mode: 'single',
+    agg: { kind: 'max' },
+    scope,
+    careerConditions: [],
+    careerPredicates: [],
+    clubSeasonConditions: [],
+    tiePolicy: 'all',
+    limit: 25,
+  });
+
+  it.each([
+    ['the 1935-1983 hole', { seasonMin: 1935, seasonMax: 1935 }],
+    ['a range inside the hole', { seasonMin: 1940, seasonMax: 1950 }],
+    ['a Grand Final', { matchType: 'grand_final' as const }],
+    ['any final', { matchType: 'finals' as const }],
+    ['a final in a covered year', { seasonMin: 1990, seasonMax: 1990, matchType: 'grand_final' as const }],
+  ])('refuses %s', (_label, scope) => {
+    const result = validatePlan(brownlowGame(scope));
+    expect('error' in result, JSON.stringify(scope)).toBe(true);
+  });
+
+  it.each([
+    ['no season at all', {}],
+    ['a covered year', { seasonMin: 1990, seasonMax: 1990 }],
+    ['the early window', { seasonMin: 1931, seasonMax: 1934 }],
+    ['a range straddling the hole', { seasonMin: 1930, seasonMax: 2000 }],
+    ['an open-ended range reaching coverage', { seasonMin: 1970 }],
+    ['home-and-away in a covered year', { seasonMin: 2000, matchType: 'home_and_away' as const }],
+  ])('still answers %s', (_label, scope) => {
+    expect('error' in validatePlan(brownlowGame(scope))).toBe(false);
+  });
+
+  // The gap belongs to the PER-GAME figure. Career and season totals
+  // exist for every year the medal has been awarded, and a bare
+  // NL_COVERAGE[metric] lookup would wrongly give them the same hole.
+  it('a career Brownlow-vote total is unaffected by the per-game gap', () => {
+    const result = validatePlan({
+      ...brownlowGame({ seasonMin: 1950, seasonMax: 1950 }),
+      grain: 'player_career',
+      mode: undefined,
+    });
+    expect('error' in result).toBe(false);
+  });
+
+  // The pre-existing floor behaviour must be untouched by the generalisation.
+  it('still refuses tackles before 1987', () => {
+    const result = validatePlan({
+      ...brownlowGame({ seasonMax: 1970 }),
+      metric: 'tackles',
+    });
+    expect('error' in result).toBe(true);
+  });
+
+  it('still answers tackles after 1987', () => {
+    const result = validatePlan({
+      ...brownlowGame({ seasonMin: 2000, seasonMax: 2000 }),
+      metric: 'tackles',
+    });
+    expect('error' in result).toBe(false);
   });
 });

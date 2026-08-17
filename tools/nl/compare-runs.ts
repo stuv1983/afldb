@@ -30,6 +30,17 @@ type RunInfo = {
   dir: string;
   label: Record<string, unknown>;
   rows: Map<string, RowState>;
+  /**
+   * True when every row's severity was actually read from the file rather
+   * than assumed. A V1 results.jsonl written by a normal run holds raw
+   * observations and no findings, so severity cannot be recovered from it
+   * -- and the old fallback of scoring those rows `clean` made a 12,000-row
+   * V1 run whose own summary.json said "11,212 clean, 788 soft" compare as
+   * "100.00% clean, +0" against itself. A comparison that cannot see soft
+   * findings must say so; printing a confident +0 invents a green signal,
+   * which is worse than printing nothing at all.
+   */
+  scored: boolean;
 };
 
 /** V2 rows carry `id`; V1 rows carry `expected.id` and verdict names instead of severities. */
@@ -39,7 +50,11 @@ async function loadRun(dir: string): Promise<RunInfo> {
     const path = join(dir, name);
     if (existsSync(path)) {
       const parsed = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
-      for (const key of ['corpus', 'corpusSha256', 'database', 'parserVersion', 'gitCommit', 'mode', 'status', 'totals']) {
+      for (const key of [
+        'corpus', 'corpusSha256', 'database', 'parserVersion', 'gitCommit', 'mode', 'status', 'totals',
+        // V1's summary.json spells its totals as flat fields.
+        'total', 'pass', 'softFail', 'fail',
+      ]) {
         if (parsed[key] !== undefined) label[key] = parsed[key];
       }
       break;
@@ -50,6 +65,7 @@ async function loadRun(dir: string): Promise<RunInfo> {
   if (!existsSync(resultsPath)) throw new Error(`${dir} has no results.jsonl.`);
 
   const rows = new Map<string, RowState>();
+  let unscoredRows = 0;
   const lines = createInterface({ input: createReadStream(resultsPath) });
   for await (const line of lines) {
     if (!line.trim()) continue;
@@ -61,28 +77,29 @@ async function loadRun(dir: string): Promise<RunInfo> {
       actual?: unknown;
     };
     if (record.id !== undefined && record.severity !== undefined) {
-      // V2 record.
+      // V2 record: severity is written at run time, always present.
       rows.set(String(record.id), {
         severity: record.severity,
         classes: (record.findings ?? []).map((f) => f.class).join(' '),
         question: record.question ?? '',
       });
     } else if (record.expected?.id !== undefined) {
-      // V1 record: results.jsonl holds raw observations; severity is
-      // derived from findings only when the line carries them (report-only
-      // reruns) -- otherwise fall back to unknown-as-clean, which keeps
-      // V1-to-V1 comparisons possible without re-scoring here.
-      const findings = (record as { findings?: { class: string; severity: string }[] }).findings ?? [];
-      const severity = findings.some((f) => f.severity === 'hard') ? 'hard'
-        : findings.some((f) => f.severity === 'soft') ? 'soft' : 'clean';
+      // V1 record. results.jsonl holds raw observations, and carries
+      // findings only on a --report-only rerun. A line without them has an
+      // UNKNOWN severity, which is counted here and reported rather than
+      // quietly rounded down to clean.
+      const findings = (record as { findings?: { class: string; severity: string }[] }).findings;
+      if (findings === undefined) unscoredRows += 1;
+      const severity = (findings ?? []).some((f) => f.severity === 'hard') ? 'hard'
+        : (findings ?? []).some((f) => f.severity === 'soft') ? 'soft' : 'clean';
       rows.set(String(record.expected.id), {
         severity,
-        classes: findings.map((f) => f.class).join(' '),
+        classes: (findings ?? []).map((f) => f.class).join(' '),
         question: record.expected.question ?? '',
       });
     }
   }
-  return { dir, label, rows };
+  return { dir, label, rows, scored: unscoredRows === 0 };
 }
 
 function pct(part: number, whole: number): string {
@@ -102,6 +119,34 @@ async function main(): Promise<void> {
   out.push(`- **Candidate (B)**: ${dirB} — ${JSON.stringify(b.label.gitCommit ?? b.label.mode ?? '')} parser v${String(b.label.parserVersion ?? '?')}, ${b.rows.size.toLocaleString('en-AU')} rows`);
   out.push('');
 
+  // Refuse to draw the severity table from severities that were never in
+  // the file. summary.json's own totals are authoritative and are shown
+  // instead, with the one command that makes a real comparison possible.
+  const unscored = [a, b].filter((run) => !run.scored);
+  if (unscored.length > 0) {
+    out.push('## Comparison unavailable');
+    out.push('');
+    out.push(`${unscored.map((r) => r.dir).join(' and ')} ${unscored.length === 1 ? 'has' : 'have'} a \`results.jsonl\` without findings, so row severities cannot be recovered from it. That is what a normal V1 run writes; only \`--report-only\` adds findings.`);
+    out.push('');
+    out.push('Re-score first, then compare:');
+    out.push('');
+    out.push('```bash');
+    for (const run of unscored) out.push(`npm run nl:stress -- --corpus <corpus> --out ${run.dir} --report-only`);
+    out.push('```');
+    out.push('');
+    out.push('Each run\'s own authoritative totals, from `summary.json`/`run.json`:');
+    out.push('');
+    out.push('| | A | B |');
+    out.push('| --- | --- | --- |');
+    const totals = (run: RunInfo) => JSON.stringify(run.label.totals ?? {
+      total: run.label.total, pass: run.label.pass, softFail: run.label.softFail, fail: run.label.fail,
+    });
+    out.push(`| totals | ${totals(a)} | ${totals(b)} |`);
+    out.push('');
+    process.stdout.write(`${out.join('\n')}\n`);
+    return;
+  }
+
   const count = (run: RunInfo, severity: RowState['severity']) =>
     [...run.rows.values()].filter((r) => r.severity === severity).length;
   out.push('| | A | B | Movement |');
@@ -115,38 +160,67 @@ async function main(): Promise<void> {
 
   // Row-level movement over the ids both runs contain.
   const shared = [...a.rows.keys()].filter((id) => b.rows.has(id));
-  const movement = { fixedHard: [] as string[], newHard: [] as string[], fixedSoft: 0, newSoft: 0 };
+  const movement = {
+    fixedHard: [] as string[],
+    cleanToHard: [] as string[],
+    softToHard: [] as string[],
+    fixedSoft: 0,
+    newSoft: 0,
+  };
   for (const id of shared) {
-    const wasHard = a.rows.get(id)!.severity === 'hard';
-    const isHard = b.rows.get(id)!.severity === 'hard';
-    const wasSoft = a.rows.get(id)!.severity === 'soft';
-    const isSoft = b.rows.get(id)!.severity === 'soft';
-    if (wasHard && !isHard) movement.fixedHard.push(id);
-    if (!wasHard && isHard) movement.newHard.push(id);
-    if (wasSoft && !isSoft && !isHard) movement.fixedSoft++;
-    if (!wasSoft && !wasHard && isSoft) movement.newSoft++;
+    const was = a.rows.get(id)!.severity;
+    const is = b.rows.get(id)!.severity;
+    if (was === 'hard' && is !== 'hard') movement.fixedHard.push(id);
+    if (was === 'clean' && is === 'hard') movement.cleanToHard.push(id);
+    if (was === 'soft' && is === 'hard') movement.softToHard.push(id);
+    if (was === 'soft' && is === 'clean') movement.fixedSoft++;
+    if (was === 'clean' && is === 'soft') movement.newSoft++;
   }
 
   out.push(`## Movement across ${shared.length.toLocaleString('en-AU')} shared rows`);
   out.push('');
   out.push(`- Hard failures fixed: **${movement.fixedHard.length}**`);
-  out.push(`- Hard failures introduced: **${movement.newHard.length}**`);
+  out.push(`- **Regressions (clean -> hard): ${movement.cleanToHard.length}**`);
+  out.push(`- Declines that became wrong answers (soft -> hard): ${movement.softToHard.length}`);
   out.push(`- Soft findings cleared: ${movement.fixedSoft}`);
   out.push(`- Soft findings introduced: ${movement.newSoft}`);
   out.push('');
 
-  if (movement.newHard.length > 0) {
-    out.push('## REGRESSIONS — correct in A, wrong in B');
+  // These two were one table headed "correct in A, wrong in B", which was
+  // false of half its rows: a soft finding is a DECLINE, not a correct
+  // answer, so pooling the two hid the distinction that matters most when
+  // a fix unblocks questions in bulk. clean -> hard means the change broke
+  // something that worked. soft -> hard means it unmasked a bug that was
+  // already there, behind a refusal -- bad for a reader either way, but a
+  // completely different thing to have caused.
+  const table = (ids: string[], heading: string, gloss: string, limit: number) => {
+    if (ids.length === 0) return;
+    out.push(`## ${heading}`);
+    out.push('');
+    out.push(gloss);
     out.push('');
     out.push('| Id | Question | B findings |');
     out.push('| --- | --- | --- |');
-    for (const id of movement.newHard.slice(0, 40)) {
+    for (const id of ids.slice(0, limit)) {
       const row = b.rows.get(id)!;
       out.push(`| ${id} | ${row.question.replace(/\|/g, '\\|')} | ${row.classes} |`);
     }
-    if (movement.newHard.length > 40) out.push(`| ... | +${movement.newHard.length - 40} more | |`);
+    if (ids.length > limit) out.push(`| ... | +${ids.length - limit} more | |`);
     out.push('');
-  }
+  };
+
+  table(
+    movement.cleanToHard,
+    'REGRESSIONS — correct in A, wrong in B',
+    'Rows the candidate broke. Nothing else in this report outranks these.',
+    40,
+  );
+  table(
+    movement.softToHard,
+    'UNMASKED — declined in A, wrong in B',
+    'Previously refused, now answered wrongly. Not caused by the candidate, but newly reaching readers, so they count against the absolute hard total just the same.',
+    20,
+  );
 
   if (movement.fixedHard.length > 0) {
     out.push('## Fixed since A');

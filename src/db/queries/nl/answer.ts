@@ -4,10 +4,9 @@ import { executePlan } from '@/db/queries/nl/execute';
 import { logNlSearch, type NlFailureReason, type NlSearchLogEntry, type NlSearchLogOutcome } from '@/db/queries/nl/log';
 import { buildNlParseContext } from '@/db/queries/nl/resolve';
 import {
-  BROWNLOW_GAME_VOTE_NOTE,
   describePlan,
   encodePlanToken,
-  NL_COVERAGE,
+  nlCoverageFor,
   PARSER_VERSION,
   validatePlan,
   type NlDeclineReason,
@@ -180,14 +179,16 @@ function payloadTotal(payload: NlAnswerPayload): number {
 }
 
 function buildAnswer(plan: NlQueryPlan, payload: NlAnswerPayload, notes: string[]): NlAnswer {
-  // Per-game Brownlow votes have their own coverage gap (1935-1983 missing
-  // entirely, and never recorded for finals at all) that NL_COVERAGE's
-  // single-firstSeason shape can't express -- a fixed note, the same one
-  // grid-solver-adjacent code already carries, rather than a misleading
-  // "recorded since 1931".
-  const coverageNote = plan.grain === 'player_game' && plan.metric === 'brownlow_votes'
-    ? BROWNLOW_GAME_VOTE_NOTE
-    : plan.metric ? (NL_COVERAGE[plan.metric]?.note ?? null) : null;
+  // One source of truth for what is recorded and when. nlCoverageFor
+  // applies the rule's own grain scope, so a career or season Brownlow
+  // TOTAL -- which exists for every year the medal has been awarded --
+  // does not inherit the per-game figure's gap the way a bare
+  // NL_COVERAGE[metric] lookup would.
+  //
+  // A plan that reaches here has already passed validatePlan, so its
+  // scope overlaps coverage somewhere; the note explains the part of the
+  // range that does not, rather than contradicting the answer above it.
+  const coverageNote = nlCoverageFor(plan.grain, plan.metric)?.note ?? null;
   const { headline, interpretation } = describeAnswer(plan, payload);
 
   return {
