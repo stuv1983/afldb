@@ -29,6 +29,7 @@
  */
 import { readFileSync } from 'node:fs';
 
+import { isHydrationErrorMessage } from '../../src/lib/hydration-error';
 import { parseCsv } from './corpus';
 
 // ------------------------------------------------------------------- corpus
@@ -214,6 +215,33 @@ export type UiObservation = {
   };
   /** Distinct `x-afldb-worker` values seen on non-document responses for this navigation. */
   subresourceWorkers?: string[];
+  /**
+   * Full per-response detail behind `subresourceWorkers`, in arrival order:
+   * every traced response (not just the distinct workers), each with its
+   * timing relative to navigation start and Playwright's resource-type
+   * classification. Exists to test the more specific cross-worker-timing
+   * hypothesis -- e.g. "the data-bearing request lands on a different
+   * worker within N ms of the document" -- which a deduplicated worker set
+   * cannot distinguish from an unrelated image or font request.
+   */
+  subresourceTrace?: { worker: string; atMs: number; resourceType: string }[];
+  /**
+   * The document's worker plus every RSC prefetch (`fetch`-typed
+   * response with a traced worker header -- this app's nav-link
+   * hover/viewport prefetching, `?_rsc=` in the URL) this navigation
+   * triggered, on EVERY row, not just ones that hydration-error. Exists
+   * to give a same-run, same-conditions baseline: whether same-worker
+   * overlap between the document and a prefetch is more common on
+   * failing loads than ordinary ones is only answerable by comparing
+   * against ordinary loads captured under identical conditions in the
+   * same sweep, not a separately-run sample with a different traffic
+   * shape.
+   */
+  networkSummary?: {
+    docWorker: string | null;
+    docAtMs: number | null;
+    prefetches: { worker: string; atMs: number }[];
+  };
 };
 
 export type UiVerdict = 'pass' | 'fail' | 'unscored';
@@ -329,13 +357,13 @@ export type HydrationByWorker = {
   totalHydrationErrors: number;
 };
 
-/** React's hydration-mismatch errors, minified (#418/#423/#425) or not. */
-function isHydrationError(message: string): boolean {
-  const lower = message.toLowerCase();
-  return lower.includes('hydration')
-    || lower.includes('did not match')
-    || /minified react error #(418|419|420|421|422|423|424|425)\b/.test(lower);
-}
+/**
+ * React's hydration-mismatch errors, minified (#418/#423/#425) or not.
+ * Re-exported under this tool's existing name from the shared classifier
+ * in src/lib/hydration-error.ts, which the production client-side health
+ * reporter now also uses -- one definition, not two that can drift apart.
+ */
+export const isHydrationError = isHydrationErrorMessage;
 
 export function hydrationByWorker(observations: Iterable<UiObservation>): HydrationByWorker {
   const byWorker: Record<string, { loads: number; hydrationErrors: number; ratePercent: number }> = {};
