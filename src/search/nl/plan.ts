@@ -127,8 +127,17 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    cases. Fix: the lookbehind window is now clipped at the nearest
  *    preceding clause boundary (comma or "and"), so one clause's number
  *    search can never see a token belonging to the clause before it.
+ * 11: "most wins" / "most losses" / "most draws" / "most brownlow medals" /
+ *    "most clubs" answer instead of declining. Version 9 taught the parser
+ *    to rank these columns, but NL_METRICS.player_career had no entry for
+ *    any of them, so validatePlan rejected every one as "not a recognised
+ *    statistic" -- which a reader can only read as "AFLDB does not track
+ *    wins". Not a change to parsing (the plan was always right), but it
+ *    moves these questions from outcome=unanswerable/coverage_unavailable
+ *    to outcome=answered, which is exactly the shift that must not be
+ *    pooled with version 10's rows when the log is read.
  */
-export const PARSER_VERSION = 10;
+export const PARSER_VERSION = 11;
 
 // ------------------------------------------------------------------ grain
 
