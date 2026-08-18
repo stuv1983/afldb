@@ -518,3 +518,139 @@ describe('regression: every year in an executed question reaches the plan scope'
     ).toBe(true);
   });
 });
+
+/**
+ * A bare "most <career column>" with no player named. Found broken for
+ * everything except games/goals/brownlow_votes/finals: the fallback that
+ * reads a leftover career-subject word only ever hand-listed those three,
+ * so "most premierships" matched none of them, fell through to the
+ * player-name scan, and declined as "no player named premierships".
+ * Reuses CAREER_STAT_WORDS (the same list extractCareerConditions already
+ * uses for thresholds) instead of a second, narrower copy.
+ */
+describe('regression: bare "most <career column>" ranks every career column, not just games/goals', () => {
+  const cases: [string, string][] = [
+    ['most premierships', 'premierships'],
+    ['most wins', 'wins'],
+    ['most losses', 'losses'],
+    ['most draws', 'draws'],
+    ['most brownlow medals', 'brownlow_medals'],
+    ['most clubs', 'clubs_played'],
+  ];
+
+  it.each(cases)('%s -> player_career %s, ranked, not a condition', async (question, metric) => {
+    const p = await plan(question);
+    expect(p.grain).toBe('player_career');
+    expect(p.metric).toBe(metric);
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(p.careerConditions).toEqual([]);
+  });
+
+  it('"most flags" ranks by premierships rather than filtering to zero premierships', async () => {
+    // The regression this guards: CAREER_STAT_WORDS' premierships entry
+    // is /\bpremierships?\b|\bflags?\b/ -- a top-level alternation.
+    // negativeTargets spliced its .source into a larger pattern
+    // unparenthesised, so the "no/never/without" prefix bound only to
+    // the FIRST alternative; "flags" stood alone as its own complete
+    // alternative and matched unconditionally. Every bare "flags"
+    // anywhere in a question, not just "no flags", pushed a false
+    // premierships = 0 condition -- "most flags" silently became "most
+    // <nothing> among players with no premierships".
+    const p = await plan('most flags');
+    expect(p.metric).toBe('premierships');
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(p.careerConditions).toEqual([]);
+  });
+
+  it('"no flags" still reads as the negative condition it always meant', async () => {
+    const p = await plan('players with no flags');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'premierships', op: 'eq', value: 0 });
+  });
+});
+
+/**
+ * A NAMED player asking for a career-only column ("games", "premierships",
+ * "wins", "losses", "draws", "brownlow medals", "clubs") must go to
+ * player_career, never the player_game single-game-peak default that a
+ * genuine per-game stat like "goals" or "disposals" gets. There is no
+ * "his best 1-game haul of premierships" -- Nick Dal Santo most games
+ * was routing to player_game with metric 'games', which validatePlan
+ * correctly rejects (player_game has no games column), surfacing as
+ * "'games' is not a recognised statistic for this kind of question" for
+ * a total (322) that was one grain over.
+ */
+describe('regression: a named player + a career-only column goes to player_career', () => {
+  it('dusty most games -> career total, not a single-game reading', async () => {
+    const p = await plan('dusty most games');
+    expect(p.grain).toBe('player_career');
+    expect(p.metric).toBe('games');
+    expect(p.mode).toBeUndefined();
+    expect(p.player?.name).toBe('Dustin Martin');
+  });
+
+  it('dusty most premierships -> career total', async () => {
+    const p = await plan('dusty most premierships');
+    expect(p.grain).toBe('player_career');
+    expect(p.metric).toBe('premierships');
+  });
+
+  it('genuine per-game stats are unaffected: dusty most goals still asks for his record game', async () => {
+    const p = await plan('dusty most goals');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('single');
+    expect(p.metric).toBe('goals');
+  });
+});
+
+/**
+ * New vocabulary: AFL commentary/slang terms with no existing mapping,
+ * checked against a real question shape rather than the bare regex, so a
+ * future edit to surrounding extraction logic (aggregation, stripping)
+ * that broke one would fail here too.
+ */
+describe('vocabulary: commentary and slang terms map to their real stat', () => {
+  it.each([
+    ['dusty most sausages', 'goals'],
+    ['dusty most sausage rolls', 'goals'],
+    ['dusty find the sticks the most', 'goals'],
+    ['dusty most grabs', 'marks'],
+    ['dusty most clunks', 'marks'],
+    ['dusty most handpasses', 'handballs'],
+    ['dusty most assists', 'goal_assists'],
+  ] as const)('%s -> metric %s', async (question, metric) => {
+    const p = await plan(question);
+    expect(p.metric).toBe(metric);
+  });
+
+  it.each([
+    'dusty most inside 50s',
+    'dusty most inside-50s',
+    'dusty most forward entries',
+  ])('%s -> inside_50s', async (question) => {
+    const p = await plan(question);
+    expect(p.metric).toBe('inside_50s');
+  });
+
+  it.each([
+    'dusty most rebound 50s',
+    'dusty most rebound-50s',
+  ])('%s -> rebounds', async (question) => {
+    const p = await plan(question);
+    expect(p.metric).toBe('rebounds');
+  });
+
+  it('"most goals in the big dance" reads as a grand_final match type', async () => {
+    const p = await plan('most goals in the big dance');
+    expect(p.scope.matchType).toBe('grand_final');
+  });
+
+  it('"most goals in September" reads as the finals series', async () => {
+    const p = await plan('most goals in September');
+    expect(p.scope.matchType).toBe('finals');
+  });
+
+  it('bare "spoon" reads as the wooden-spoon condition', async () => {
+    const p = await plan('teams that won the spoon');
+    expect(p.clubSeasonConditions).toContainEqual({ kind: 'wooden_spoon' });
+  });
+});

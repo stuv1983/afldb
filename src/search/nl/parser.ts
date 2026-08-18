@@ -338,6 +338,28 @@ const CAREER_STAT_WORDS: [RegExp, NlCareerColumn][] = [
   [/\bbrownlow votes?\b/, 'brownlow_votes'],
 ];
 
+/**
+ * The CAREER_STAT_WORDS columns with no meaningful single-game reading --
+ * there is no "his best 1-game haul of premierships", and a player can't
+ * win 'games' or 'wins' or 'brownlow_medals' inside one match. `goals`
+ * and `brownlow_votes` are deliberately excluded: both are ALSO real
+ * player_match_stats columns (METRIC_WORDS carries them too), so "dusty
+ * most goals" asking for his best single-game haul is a real, intended
+ * reading, not a bug.
+ *
+ * Used below to keep a named player's bare "most <career-only stat>"
+ * out of the player_game default that everything else in this branch
+ * gets: "Nick Dal Santo most games" was routing to player_game grain
+ * with metric 'games', mode 'single' -- "his highest-games game", which
+ * validatePlan correctly rejects (player_game has no `games` column at
+ * all) with a message ("'games' is not a recognised statistic") that
+ * reads like the site doesn't track games played, when the real total
+ * (322) was sitting one grain over.
+ */
+const CAREER_ONLY_METRICS: ReadonlySet<string> = new Set(
+  CAREER_STAT_WORDS.map(([, column]) => column).filter((column) => column !== 'goals' && column !== 'brownlow_votes'),
+);
+
 function extractCareerConditions(text: string): { text: string; conditions: NlCareerCondition[]; consumed: string[] } {
   const conditions: NlCareerCondition[] = [];
   const consumed: string[] = [];
@@ -363,8 +385,21 @@ function extractCareerConditions(text: string): { text: string; conditions: NlCa
   // "no X" / "never <verb> X" / "without <verb-ing>? X" -- the trigger
   // word, then a short gap that absorbs whatever verb sits between it
   // and the stat ("kicking a", "winning a"), then the stat itself.
+  //
+  // re.source is wrapped in (?:...) here, NOT inlined bare. premierships'
+  // own entry is /\bpremierships?\b|\bflags?\b/ -- a top-level alternation
+  // -- and regex `|` has the lowest precedence there is, so splicing its
+  // .source in unparenthesised turned this into two independent
+  // alternatives: "(no|never|without) ... premierships" OR, completely
+  // unconditionally, "flags" on its own. Every bare "flags" anywhere in a
+  // question (not just "no flags") matched, pushing a false
+  // premierships-equals-0 condition -- "most flags" produced a plan
+  // asking for players with ZERO premierships. Silent, because the
+  // resulting plan still validated; it just answered a different
+  // question than it was asked. The group makes the prefix bind to
+  // every alternative, the way it was always meant to.
   for (const [re, column] of negativeTargets) {
-    const negRe = new RegExp(`\\b(?:no|never|without)\\b[^.]{0,20}?${re.source}`);
+    const negRe = new RegExp(`\\b(?:no|never|without)\\b[^.]{0,20}?(?:${re.source})`);
     const match = negRe.exec(working);
     if (match) {
       conditions.push({ kind: 'column', column, op: 'eq', value: 0 });
@@ -829,19 +864,26 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     consumedTokens.push(...playerMetricResult.consumed);
 
     // "most games without kicking a goal", "most finals played without a
-    // premiership" -- games/finals are ranked career subjects, not in
-    // METRIC_WORDS (that vocabulary is player_match_stats-grain stats).
-    // Only read as a metric when NOT already claimed by
-    // extractCareerConditions as a threshold ("300 games", already
-    // stripped from `text` by this point) -- a bare, still-present word
-    // is the leftover subject noun of the superlative itself. Must run
-    // here, before the player-mention scan, or the word is misread as an
-    // unresolved player name.
+    // premiership" -- games/finals/premierships/... are ranked career
+    // subjects, not in METRIC_WORDS (that vocabulary is
+    // player_match_stats-grain stats). Only read as a metric when NOT
+    // already claimed by extractCareerConditions as a threshold ("300
+    // games", already stripped from `text` by this point) -- a bare,
+    // still-present word is the leftover subject noun of the
+    // superlative itself. Must run here, before the player-mention scan,
+    // or the word is misread as an unresolved player name.
+    //
+    // Reuses CAREER_STAT_WORDS rather than a separate list: this used to
+    // hand-list only games/goals/finals, so every OTHER career column it
+    // already knows how to read as a THRESHOLD -- premierships, wins,
+    // losses, draws, brownlow medals, clubs_played -- had no path to
+    // being read as a bare RANKING subject at all. "most premierships"
+    // matched none of the three and fell all the way through to the
+    // player-name guess, declining as "no player named premierships".
+    // The same list already carries the right NlCareerColumn for each
+    // word; there was never a reason to keep a second, narrower copy.
     if (!playerMetricResult.metric && !teamMetricResult.metric) {
-      const bareMetricWords: [RegExp, 'games' | 'goals' | 'finals'][] = [
-        [/\bgames?\b/, 'games'], [/\bgoals?\b/, 'goals'], [/\bfinals?\b/, 'finals'],
-      ];
-      for (const [re, key] of bareMetricWords) {
+      for (const [re, key] of CAREER_STAT_WORDS) {
         const bare = re.exec(text);
         if (!bare) continue;
         playerMetricResult = { text: stripMatch(text, bare[0]), metric: key, consumed: [bare[0]] };
@@ -966,6 +1008,13 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       grain = 'player_season';
       metric = playerMetricResult.metric;
     } else if (overCareer && !scoped) {
+      grain = 'player_career';
+      metric = playerMetricResult.metric;
+    } else if (player && CAREER_ONLY_METRICS.has(playerMetricResult.metric)) {
+      // "Nick Dal Santo most games", "Ablett most premierships" -- see
+      // CAREER_ONLY_METRICS. Checked before the general named-player
+      // branch below, which would otherwise send these to player_game
+      // and metric-validate them straight into a decline.
       grain = 'player_career';
       metric = playerMetricResult.metric;
     } else if (player) {

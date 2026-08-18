@@ -266,6 +266,10 @@ export const CLUB_SEASON_METRIC_WORDS: [RegExp, 'wins' | 'losses' | 'draws' | 'p
  */
 export const CLUB_SEASON_CONDITION_WORDS: [RegExp, 'premier' | 'wooden_spoon' | 'made_finals' | 'missed_finals'][] = [
   [/\bwooden spoon\b/, 'wooden_spoon'],
+  // Bare "spoon" -- always read this way in AFL commentary and otherwise
+  // meaningless in this vocabulary, so there is nothing for it to collide
+  // with here.
+  [/\bspoons?\b/, 'wooden_spoon'],
   [/\bpremiers?\b|\bpremiership (?:team|side)\b|\bwon the flag\b/, 'premier'],
   [/\b(?:missed|missing|miss(?:es)?) (?:the )?finals\b/, 'missed_finals'],
   [/\b(?:made|make|makes|making|qualified for|reached) (?:the )?finals\b/, 'made_finals'],
@@ -282,8 +286,16 @@ export const METRIC_WORDS: [RegExp, string][] = [
   [/\bcontested marks?\b/, 'contested_marks'],
   [/\bcontested possessions?\b/, 'contested'],
   [/\buncontested possessions?\b/, 'uncontested'],
-  [/\binside-fifties\b/, 'inside_50s'],
-  [/\brebound-fifties\b/, 'rebounds'],
+  // The numeral form ("inside 50", "inside-50") is how most readers
+  // actually type this, not the spelled-out "fifties" the original entry
+  // required -- "50" reads as a bare year everywhere else in this parser,
+  // which is presumably why the metric word was spelled out instead, but
+  // that made the common phrasing unreachable. "forward entry/entries" is
+  // commentary-speak for the same stat, textually unrelated enough to
+  // need its own entry rather than another spacing variant.
+  [/\binside[- ]?(?:fifties|50s?)\b/, 'inside_50s'],
+  [/\bforward entr(?:y|ies)\b/, 'inside_50s'],
+  [/\brebound[- ]?(?:fifties|50s?)\b/, 'rebounds'],
   [/\bbrownlow votes?\b/, 'brownlow_votes'],
   [/\bbiggest bags?\b/, 'goals'],
   // "bag of goals" / "bags of goals" as one phrase, BEFORE the bare
@@ -309,10 +321,20 @@ export const METRIC_WORDS: [RegExp, string][] = [
   // "majors" -- the formal-commentary word for goals, the counterpart of
   // "behinds" as minor scores.
   [/\bmajors?\b/, 'goals'],
+  // "sausage"/"sausage roll" -- rhyming slang, roll -> goal. "find the
+  // (big) sticks" -- the goalposts themselves standing in for scoring
+  // between them, a commentary idiom rather than a literal stat word.
+  [/\bsausages?(?: rolls?)?\b/, 'goals'],
+  [/\bfind the (?:big )?sticks\b/, 'goals'],
   [/\bgoals?\b/, 'goals'],
   [/\bbehinds?\b/, 'behinds'],
   [/\bkicks?\b/, 'kicks'],
   [/\bhandballs?\b/, 'handballs'],
+  // "handpass" is the OTHER name for the same disposal, used about as
+  // often as "handball" in commentary and coaching -- not a synonym in
+  // METRIC_WORDS anywhere else, so without this it was a plain
+  // unsupported term.
+  [/\bhandpass(?:es)?\b/, 'handballs'],
   [/\btouches?\b/, 'disposals'],
   // Terrace slang, from the qualification run's own frequency table:
   // "possies" 1,695 questions and "snags" 1,642, each declining as an
@@ -325,11 +347,23 @@ export const METRIC_WORDS: [RegExp, string][] = [
   [/\bpossessions?\b/, 'disposals'],
   [/\bdisposals?\b/, 'disposals'],
   [/\bmarks?\b/, 'marks'],
+  // "grab"/"clunk" -- both plain commentary synonyms for a mark in this
+  // engine's vocabulary. A clunk is really a STRONG mark specifically,
+  // but there is no separate "contested/strong mark" column to route it
+  // to (contested_marks is a different, narrower stat already reachable
+  // via its own phrase above), so it maps to the same 'marks' bare
+  // "biggest bag" already maps to plain goals for the same reason.
+  [/\bgrabs?\b/, 'marks'],
+  [/\bclunks?\b/, 'marks'],
   [/\btackles?\b/, 'tackles'],
   [/\bhit ?outs?\b/, 'hitouts'],
   [/\bclearances?\b/, 'clearances'],
   [/\bclangers?\b/, 'clangers'],
   [/\bbounces?\b/, 'bounces'],
+  // Bare "assist(s)", after the "goal assist(s)" phrase above so the
+  // fuller, more specific phrase still wins when it is the one typed --
+  // this only catches a reader who dropped "goal" ("most assists").
+  [/\bassists?\b/, 'goal_assists'],
 ];
 
 // -------------------------------------------------------------- scoping
@@ -424,8 +458,8 @@ export const STAT_GAMES_IDIOM_WORDS: [RegExp, string][] = [
   // tail of the phrase and read contested possessions as plain disposals.
   [/\bcontested possessions? games?\b/, 'contested'],
   [/\buncontested possessions? games?\b/, 'uncontested'],
-  [/\binside-fifties games?\b/, 'inside_50s'],
-  [/\brebound-fifties games?\b/, 'rebounds'],
+  [/\binside[- ]?(?:fifties|50s?) games?\b/, 'inside_50s'],
+  [/\brebound[- ]?(?:fifties|50s?) games?\b/, 'rebounds'],
   [/\bbrownlow votes? games?\b/, 'brownlow_votes'],
   [/\bpossies games?\b/, 'disposals'],
   [/\bsnags? games?\b/, 'goals'],
@@ -454,10 +488,17 @@ export const MATCH_TYPE_WORDS: [RegExp, string][] = [
   // "GF" only as its own token -- not inside a longer word -- since a
   // two-letter abbreviation is otherwise an easy false match.
   [/\bgf\b/, 'grand_final'],
-  // "the granny" -- Australian slang for the Grand Final, no formal
-  // plural in this usage. Must precede the bare "finals?" entry below,
-  // or nothing here would ever be reached for it.
+  // "the granny"/"the big dance" -- Australian slang for the Grand
+  // Final, neither with a real plural in this usage. Must precede the
+  // bare "finals?" entry below, or nothing here would ever be reached
+  // for them.
   [/\bgrann(?:y|ies)\b/, 'grand_final'],
+  [/\bbig dance\b/, 'grand_final'],
+  // "September" -- the finals series, by the month it's played in. No
+  // month-name vocabulary exists anywhere else in this parser (dates are
+  // read by year only), so there is nothing else this word could mean
+  // here to collide with.
+  [/\bseptember\b/, 'finals'],
   [/\bpreliminary finals?\b/, 'preliminary_final'],
   [/\bsemi finals?\b/, 'semi_final'],
   [/\bqualifying finals?\b/, 'qualifying_final'],
@@ -535,8 +576,24 @@ export const STOPWORDS = new Set([
   'i', 'me', 'my', 'you', 'your', 'us', 'we',
 ]);
 
-/** Only the LEADING word decides a club-season question ("teams that…", "clubs with…") -- a bare "clubs" buried in a count phrase ("exactly two clubs") must not trigger it. */
-export const CLUB_SUBJECT_LEADING = /^(?:teams?|clubs?|sides?)\b/;
+/**
+ * Only the LEADING word decides a club-season question ("teams that…",
+ * "clubs with…") -- a bare "clubs" buried in a count phrase ("exactly
+ * two clubs") must not trigger it.
+ *
+ * The trailing `\s+\S` requires something to follow the subject word,
+ * matching what every real use of this actually looks like ("teams
+ * THAT…", "clubs WITH…") and what the comment above always said the
+ * rule was -- the regex itself just didn't enforce it. Without it, "most
+ * clubs" left nothing behind after "most" was stripped except the bare
+ * word "clubs", which still matched: a leading-subject cue with no
+ * condition and no metric to rank by, so it elected club_season with
+ * metric null and answered with an unranked list of every club-season on
+ * file -- for a question that meant the player_career clubs_played
+ * column ("how many different clubs has a player represented"), not a
+ * club-season listing at all.
+ */
+export const CLUB_SUBJECT_LEADING = /^(?:teams?|clubs?|sides?)\b\s+\S/;
 
 // ------------------------------------------------------------------ nicknames
 
