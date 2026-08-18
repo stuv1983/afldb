@@ -15,7 +15,7 @@ import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
-  groupByCore, metamorphicViolations, readUiCorpus, scoreObservation, summarise,
+  groupByCore, hydrationByWorker, metamorphicViolations, readUiCorpus, scoreObservation, summarise,
   type UiObservation,
 } from './ui-corpus';
 
@@ -69,14 +69,15 @@ export function buildReport(corpusPath: string, dir = OUT_DIR) {
 
   return {
     summary, failures, violations, clientErrors,
+    hydration: hydrationByWorker(observations.values()),
     observed: observations.size,
     total: cases.length,
   };
 }
 
 export function formatSummary(report: ReturnType<typeof buildReport>): string {
-  const { summary } = report;
-  return [
+  const { summary, hydration } = report;
+  const lines = [
     '',
     `NL UI sweep — ${report.observed} of ${report.total} questions observed`,
     `  pass ${summary.pass}   fail ${summary.fail}   unscored ${summary.unscored}`,
@@ -86,8 +87,29 @@ export function formatSummary(report: ReturnType<typeof buildReport>): string {
     summary.failuresByCategory.length > 0
       ? `  failures by category: ${summary.failuresByCategory.map(([c, n]) => `${c} ${n}`).join(', ')}`
       : '  no scored failures',
-    '',
-  ].join('\n');
+  ];
+
+  // Only when the deployment was traced; otherwise this is all zeroes and
+  // says nothing (see deploy/server-cluster.mjs, AFLDB_TRACE_REQUESTS).
+  const workers = Object.entries(hydration.byWorker).sort(([a], [b]) => a.localeCompare(b));
+  if (workers.length > 0) {
+    lines.push('', `  hydration errors: ${hydration.totalHydrationErrors}`);
+    for (const [worker, stats] of workers) {
+      lines.push(`    worker ${worker}: ${stats.hydrationErrors} of ${stats.loads} loads (${stats.ratePercent}%)`);
+    }
+    const { sameWorker, differentWorker } = hydration.crossWorker;
+    if (sameWorker.loads > 0 || differentWorker.loads > 0) {
+      lines.push(
+        '  by worker agreement (document vs its subrequests):',
+        `    same worker:      ${sameWorker.hydrationErrors} of ${sameWorker.loads} (${sameWorker.ratePercent}%)`,
+        `    different worker: ${differentWorker.hydrationErrors} of ${differentWorker.loads} (${differentWorker.ratePercent}%)`,
+      );
+    }
+    if (hydration.untraced > 0) lines.push(`    (${hydration.untraced} loads carried no trace headers)`);
+  }
+
+  lines.push('');
+  return lines.join('\n');
 }
 
 // tsx runs this file directly; the spec imports the functions instead.

@@ -559,6 +559,8 @@ export async function globalSearch(
     canReachGridSolver?: boolean;
     /** The anonymous nl_sid cookie (lib/nl-session.ts), for reformulation telemetry only -- never affects results. */
     nlSessionId?: string | null;
+    /** The x-afldb-run-tag header (migration 051), set only by a synthetic qualification run -- telemetry only, never affects results. */
+    nlRunTag?: string | null;
   } = {},
 ): Promise<GlobalSearchResults> {
   const trimmed = query.trim();
@@ -589,7 +591,7 @@ export async function globalSearch(
     runTopicSearch ? searchAwards(topicText, 3) : Promise.resolve([] as SearchResult[]),
     answerPlayerQuestion(trimmed, options.canReachGridSolver ?? false),
     answerClubQuestion(trimmed),
-    answerNlQuestion(trimmed, options.nlSessionId ?? null),
+    answerNlQuestion(trimmed, options.nlSessionId ?? null, options.nlRunTag ?? null),
   ]);
   // The NL engine takes precedence when it answers: showing its answer
   // AND the older grid-solver-backed one for the same question would be

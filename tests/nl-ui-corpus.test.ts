@@ -14,7 +14,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
-  groupByCore, metamorphicViolations, questionCore, readUiCorpus, scoreObservation, summarise,
+  groupByCore, hydrationByWorker, metamorphicViolations, questionCore, readUiCorpus,
+  scoreObservation, summarise,
   type UiCase, type UiObservation, type UiOutcome,
 } from '../tools/nl/ui-corpus';
 
@@ -262,5 +263,78 @@ describe('summarise', () => {
     // for the questions it never asked.
     const summary = summarise([testCase('a', 'q1'), testCase('b', 'q2')], new Map([['a', observed('a')]]), []);
     expect(summary).toMatchObject({ total: 1, pass: 1, fail: 0 });
+  });
+});
+
+describe('hydration errors correlated by cluster worker', () => {
+  const hydrationError = ['pageerror: Minified React error #418; visit https://react.dev/errors/418'];
+
+  function traced(id: string, worker: string, overrides: Partial<UiObservation> = {}): UiObservation {
+    return observed(id, {
+      trace: { worker, pid: `100${worker}`, requestId: `rid-${id}`, build: 'abc123' },
+      ...overrides,
+    });
+  }
+
+  it('reports a rate per worker, not just a count', () => {
+    // The whole point: a worker serving more traffic shows more errors
+    // while being no more faulty. Only the rate separates the two, so a
+    // lopsided load distribution must not read as a lopsided fault.
+    const seen = [
+      traced('a', '1'), traced('b', '1'), traced('c', '1'), traced('d', '1', { errors: hydrationError }),
+      traced('e', '2', { errors: hydrationError }),
+    ];
+    const report = hydrationByWorker(seen);
+    expect(report.totalHydrationErrors).toBe(2);
+    expect(report.byWorker['1']).toEqual({ loads: 4, hydrationErrors: 1, ratePercent: 25 });
+    expect(report.byWorker['2']).toEqual({ loads: 1, hydrationErrors: 1, ratePercent: 100 });
+  });
+
+  it('separates same-worker from cross-worker navigations', () => {
+    // The cluster-cache hypothesis stands or falls here: a document served
+    // by one worker whose RSC payload came from another.
+    const seen = [
+      traced('a', '1', { subresourceWorkers: ['1'] }),
+      traced('b', '1', { subresourceWorkers: ['2'], errors: hydrationError }),
+      traced('c', '2', { subresourceWorkers: ['3'], errors: hydrationError }),
+      traced('d', '2', { subresourceWorkers: ['2'] }),
+    ];
+    const report = hydrationByWorker(seen);
+    expect(report.crossWorker.sameWorker).toEqual({ loads: 2, hydrationErrors: 0, ratePercent: 0 });
+    expect(report.crossWorker.differentWorker).toEqual({ loads: 2, hydrationErrors: 2, ratePercent: 100 });
+  });
+
+  it('does not count a navigation with no subrequests as same-worker agreement', () => {
+    // Silence is not agreement. A document that pulled nothing traced says
+    // nothing about cross-worker divergence, and counting it as "same"
+    // would dilute the very rate the comparison exists to measure.
+    const report = hydrationByWorker([traced('a', '1'), traced('b', '1', { subresourceWorkers: [] })]);
+    expect(report.crossWorker.sameWorker.loads).toBe(0);
+    expect(report.crossWorker.differentWorker.loads).toBe(0);
+  });
+
+  it('counts untraced loads separately rather than attributing them to a worker', () => {
+    const report = hydrationByWorker([observed('a', { errors: hydrationError }), traced('b', '1')]);
+    expect(report.untraced).toBe(1);
+    expect(report.totalHydrationErrors).toBe(1);
+    expect(Object.keys(report.byWorker)).toEqual(['1']);
+  });
+
+  it('recognises a hydration error whether minified or not', () => {
+    const minified = hydrationByWorker([traced('a', '1', { errors: ['pageerror: Minified React error #423'] })]);
+    expect(minified.totalHydrationErrors).toBe(1);
+    const plain = hydrationByWorker([traced('b', '1', {
+      errors: ["pageerror: Hydration failed because the server rendered HTML didn't match the client."],
+    })]);
+    expect(plain.totalHydrationErrors).toBe(1);
+  });
+
+  it('does not count an unrelated console error as a hydration failure', () => {
+    // The sweep also records autocomplete 429s and RSC fetch fallbacks;
+    // folding those in would inflate the very number being investigated.
+    const report = hydrationByWorker([traced('a', '1', {
+      errors: ['console: Failed to fetch RSC payload for /players/x. Falling back to browser navigation.'],
+    })]);
+    expect(report.totalHydrationErrors).toBe(0);
   });
 });

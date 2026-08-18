@@ -30,7 +30,23 @@ const workers = Number.isSafeInteger(configured) && configured > 0
 if (cluster.isPrimary) {
   console.log(`[afldb] primary ${process.pid} starting ${workers} worker(s)`);
 
-  for (let i = 0; i < workers; i += 1) cluster.fork();
+  // AFLDB_WORKER_ID is a small stable ordinal (1..N), NOT cluster's own
+  // worker.id, which counts up forever: a worker that dies and is replaced
+  // gets a fresh cluster id, so an investigation correlating failures with
+  // "worker 3" would silently be looking at two different processes across
+  // a restart. The ordinal is reused by the replacement, which is what
+  // makes it a meaningful axis to group by. PID is exported alongside it
+  // (by the worker itself) to tell those apart when it matters.
+  // cluster.id -> ordinal, so a replacement fork below can inherit the
+  // ordinal of the worker it replaces rather than being handed a new one.
+  const ordinals = new Map();
+  const fork = (ordinal) => {
+    const worker = cluster.fork({ AFLDB_WORKER_ID: String(ordinal) });
+    ordinals.set(worker.id, ordinal);
+    return worker;
+  };
+
+  for (let i = 0; i < workers; i += 1) fork(i + 1);
 
   // Restart crashed workers, but never in a tight loop. A worker that dies
   // immediately on startup (database down at boot, EADDRINUSE, a throw during
@@ -44,6 +60,9 @@ if (cluster.isPrimary) {
   const restarts = [];
 
   cluster.on('exit', (worker, code, signal) => {
+    const ordinal = ordinals.get(worker.id);
+    ordinals.delete(worker.id);
+
     // A worker that exits on SIGTERM/SIGINT is a deliberate shutdown.
     if (signal === 'SIGTERM' || signal === 'SIGINT') return;
 
@@ -61,11 +80,12 @@ if (cluster.isPrimary) {
 
     const delay = Math.min(1000 * 2 ** (restarts.length - 1), 30_000);
     console.error(
-      `[afldb] worker ${worker.process.pid} exited (${signal ?? code}); restarting in ${delay}ms`,
+      `[afldb] worker ${worker.process.pid} (id ${ordinal ?? '?'}) exited (${signal ?? code}); `
+      + `restarting in ${delay}ms`,
     );
     // Deliberately not unref()'d: this timer must keep the primary alive long
     // enough to fork the replacement.
-    setTimeout(() => cluster.fork(), delay);
+    setTimeout(() => fork(ordinal ?? ordinals.size + 1), delay);
   });
 
   const shutdown = (signal) => {
@@ -77,6 +97,77 @@ if (cluster.isPrimary) {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
 } else {
+  // ------------------------------------------------------ request tracing
+  //
+  // OPT-IN, via AFLDB_TRACE_REQUESTS=on. Off, this branch is a no-op and
+  // the worker behaves exactly as it did before.
+  //
+  // Why here and not in middleware.ts: middleware runs in Next's edge
+  // sandbox, where process.env is resolved at BUILD time. AFLDB_WORKER_ID
+  // is set at FORK time, so middleware cannot see it -- the one fact this
+  // instrumentation exists to report. This wrapper is plain Node in the
+  // worker process itself, which can.
+  //
+  // Added to diagnose a production-only React hydration mismatch (error
+  // #418, ~2.2% of loads in the 12k UI sweep, absent from 480 attempts
+  // against single-process `next dev`). The leading hypothesis is that
+  // this very cluster is the cause: four processes round-robin behind one
+  // socket, each with its own in-memory Next.js cache, so a page's SSR and
+  // its follow-up RSC request can be served by processes holding different
+  // state. Confirming or killing that needs the worker identity attached
+  // to individual responses, which is what these headers are for.
+  if (process.env.AFLDB_TRACE_REQUESTS === 'on') {
+    const http = await import('node:http');
+    const { randomUUID } = await import('node:crypto');
+    const { readFileSync } = await import('node:fs');
+
+    const workerId = process.env.AFLDB_WORKER_ID ?? '?';
+    // The build the response was rendered by. A sweep spanning a redeploy
+    // would otherwise mix two builds' behaviour under one set of numbers.
+    let buildId = 'unknown';
+    try {
+      buildId = readFileSync(new URL('../.next/standalone/.next/BUILD_ID', import.meta.url), 'utf8').trim();
+    } catch {
+      try {
+        buildId = readFileSync(new URL('../.next/BUILD_ID', import.meta.url), 'utf8').trim();
+      } catch { /* headers still carry worker and pid, which is the point */ }
+    }
+
+    const createServer = http.createServer.bind(http);
+    http.createServer = (...args) => {
+      const handler = args.find((arg) => typeof arg === 'function');
+      if (!handler) return createServer(...args);
+      const options = args.find((arg) => arg && typeof arg === 'object');
+
+      const traced = (req, res) => {
+        const requestId = randomUUID();
+        const startedAt = Date.now();
+
+        // Set before the handler runs: Next streams, so headers are flushed
+        // as soon as the first chunk is written and anything set afterwards
+        // would be too late for exactly the responses being measured.
+        res.setHeader('x-afldb-worker', workerId);
+        res.setHeader('x-afldb-pid', String(process.pid));
+        res.setHeader('x-afldb-request-id', requestId);
+        res.setHeader('x-afldb-build', buildId);
+
+        res.on('finish', () => {
+          // One line per request, journald-visible. Fields are ordered so
+          // `journalctl -u afldb | grep '\[trace\]'` is directly parseable.
+          console.log(
+            `[trace] ts=${new Date(startedAt).toISOString()} worker=${workerId} pid=${process.pid} `
+            + `rid=${requestId} build=${buildId} status=${res.statusCode} `
+            + `ms=${Date.now() - startedAt} method=${req.method} url=${req.url}`,
+          );
+        });
+
+        return handler(req, res);
+      };
+
+      return options ? createServer(options, traced) : createServer(traced);
+    };
+  }
+
   // Each worker runs the standard Next.js standalone server.
   await import('../.next/standalone/server.js');
 }

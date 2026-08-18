@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
@@ -9,6 +9,7 @@ import { aflwOnlySearch, globalSearch } from '@/db/queries/search';
 import { getSiteSettings } from '@/db/queries/site-settings';
 import { getAdminUser, ROLE_RANK } from '@/lib/auth/session';
 import { clubPath, formatNumber, formatSpan, playerPath, seasonPath, venuePath } from '@/lib/format';
+import { NL_RUN_TAG_HEADER, nlRunTagAccepted, parseNlRunTag } from '@/lib/nl-run-tag';
 import { NL_SESSION_COOKIE } from '@/lib/nl-session';
 import { firstValue } from '@/lib/params';
 import { MIN_QUERY_LENGTH, searchResultHref } from '@/search/constants';
@@ -60,8 +61,15 @@ export default async function SearchPage({
     ? (await cookies()).get(NL_SESSION_COOKIE)?.value ?? null
     : null;
 
+  // Provenance for a synthetic qualification run (migration 051). Only
+  // read when the deployment has opted in, so a visitor cannot mislabel
+  // their own searches as test traffic -- see lib/nl-run-tag.ts.
+  const nlRunTag = scope !== 'aflw' && hasQuery && nlRunTagAccepted()
+    ? parseNlRunTag((await headers()).get(NL_RUN_TAG_HEADER))
+    : null;
+
   const results = scope !== 'aflw' && hasQuery
-    ? await globalSearch(query, 25, { canReachGridSolver, nlSessionId })
+    ? await globalSearch(query, 25, { canReachGridSolver, nlSessionId, nlRunTag })
     : null;
 
   const otherScopeHref = scope === 'aflw'

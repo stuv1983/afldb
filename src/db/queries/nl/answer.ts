@@ -35,6 +35,9 @@ import type { NlAnswer, NlAnswerPayload } from '@/search/nl/answer-types';
  *
  * `sessionId` is the anonymous nl_sid cookie (lib/nl-session.ts), passed
  * through purely for telemetry -- it never affects parsing or the answer.
+ * `runTag` is the `x-afldb-run-tag` header (migration 051), present only on
+ * a synthetic qualification run; like sessionId, it never affects parsing
+ * or the answer, only what gets written to nl_search_log.
  */
 // One row per NlDeclineReason, matching nl_search_log's outcome CHECK
 // (unrecognised gets its own bucket, distinct from the two decline reasons).
@@ -71,7 +74,11 @@ function classifyError(error: unknown): NlFailureReason {
   return 'internal_error';
 }
 
-export async function answerNlQuestion(question: string, sessionId: string | null = null): Promise<NlAnswer | null> {
+export async function answerNlQuestion(
+  question: string,
+  sessionId: string | null = null,
+  runTag: string | null = null,
+): Promise<NlAnswer | null> {
   const startedAt = Date.now();
   const elapsed = () => Date.now() - startedAt;
 
@@ -84,8 +91,8 @@ export async function answerNlQuestion(question: string, sessionId: string | nul
   const clientRef = randomUUID();
 
   // Fields every log call shares; each call site layers on outcome-specific ones.
-  const log = (entry: Omit<NlSearchLogEntry, 'question' | 'durationMs' | 'sessionId'>) => logNlSearch({
-    question, durationMs: elapsed(), sessionId, clientRef, ...entry,
+  const log = (entry: Omit<NlSearchLogEntry, 'question' | 'durationMs' | 'sessionId' | 'runTag'>) => logNlSearch({
+    question, durationMs: elapsed(), sessionId, clientRef, runTag, ...entry,
   });
 
   try {

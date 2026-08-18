@@ -18,6 +18,10 @@ import { buildReport, formatSummary } from '../../tools/nl/ui-summary';
  *   NL_UI_TIMEOUT_MS     per-navigation budget (default 15000)
  *   NL_UI_WORKERS        parallel browsers (default 4)
  *   NL_UI_FAST=1         JavaScript off; server-rendered panel only
+ *   NL_UI_RUN_TAG        provenance label written to nl_search_log.run_tag
+ *                        (migration 051), e.g. ui-12k-20260818. Needs the
+ *                        deployment to have AFLDB_NL_RUN_TAG=accept, or the
+ *                        header is ignored and rows log as real traffic.
  */
 
 const CORPUS_PATH = resolve(
@@ -26,6 +30,7 @@ const CORPUS_PATH = resolve(
 const OUT_DIR = resolve('nl-ui-out');
 const BATCH_SIZE = Number(process.env.NL_UI_BATCH ?? 100);
 const NAV_TIMEOUT_MS = Number(process.env.NL_UI_TIMEOUT_MS ?? 15_000);
+const RUN_TAG = process.env.NL_UI_RUN_TAG ?? '';
 
 const all = readUiCorpus(CORPUS_PATH);
 const limit = Number(process.env.NL_UI_LIMIT ?? 0);
@@ -103,11 +108,24 @@ async function observe(page: Page, test_: UiCase): Promise<UiObservation> {
   page.on('pageerror', onPageError);
   page.on('console', onConsole);
 
+  // Every OTHER traced response this navigation pulls -- RSC payloads
+  // above all. The hydration hypothesis under investigation is that the
+  // document and its follow-up data can come from different cluster
+  // workers holding different cache state, so the document's own worker
+  // (below) is only half the evidence.
+  const subresourceWorkers = new Set<string>();
+  const onResponse = (response: { headers(): Record<string, string>; url(): string }) => {
+    const worker = response.headers()['x-afldb-worker'];
+    if (worker) subresourceWorkers.add(worker);
+  };
+  page.on('response', onResponse);
+
   const started = Date.now();
   let outcome: UiOutcome;
   let httpStatus: number | null = null;
   let headline: string | null = null;
   let interpretation: string | null = null;
+  let trace: UiObservation['trace'];
 
   try {
     const response = await page.goto(
@@ -115,6 +133,13 @@ async function observe(page: Page, test_: UiCase): Promise<UiObservation> {
       { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS },
     );
     httpStatus = response?.status() ?? null;
+    const headers = response?.headers() ?? {};
+    trace = {
+      worker: headers['x-afldb-worker'] ?? null,
+      pid: headers['x-afldb-pid'] ?? null,
+      requestId: headers['x-afldb-request-id'] ?? null,
+      build: headers['x-afldb-build'] ?? null,
+    };
 
     if (httpStatus !== null && httpStatus >= 400) {
       outcome = 'http_error';
@@ -148,6 +173,7 @@ async function observe(page: Page, test_: UiCase): Promise<UiObservation> {
   } finally {
     page.off('pageerror', onPageError);
     page.off('console', onConsole);
+    page.off('response', onResponse);
   }
 
   // Deliberately NOT folded into `outcome`; see UiOutcome in
@@ -162,6 +188,8 @@ async function observe(page: Page, test_: UiCase): Promise<UiObservation> {
     interpretation,
     errors,
     elapsedMs: Date.now() - started,
+    ...(trace ? { trace } : {}),
+    ...(subresourceWorkers.size > 0 ? { subresourceWorkers: [...subresourceWorkers] } : {}),
   };
 }
 
@@ -170,6 +198,11 @@ for (const [index, batch] of batches.entries()) {
 
   test(`nl ui batch ${label} (${batch[0].id}–${batch[batch.length - 1].id})`, async ({ page }, info) => {
     await stubAutocomplete(page);
+    // Provenance for every row this run writes to nl_search_log
+    // (migration 051). Ignored unless the deployment sets
+    // AFLDB_NL_RUN_TAG=accept, so a stray header cannot mislabel real
+    // traffic -- see src/lib/nl-run-tag.ts.
+    if (RUN_TAG) await page.setExtraHTTPHeaders({ 'x-afldb-run-tag': RUN_TAG });
 
     const observations: UiObservation[] = [];
     for (const test_ of batch) observations.push(await observe(page, test_));

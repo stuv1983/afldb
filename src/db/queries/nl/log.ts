@@ -69,6 +69,12 @@ export type NlSearchLogEntry = {
    * meaningless -- and NOT the session id, which spans many searches.
    */
   clientRef?: string | null;
+  /**
+   * Set only by a synthetic qualification run (migration 051), via the
+   * `x-afldb-run-tag` request header -- never by a genuine reader, so a
+   * NULL here means real traffic. See that migration's header comment.
+   */
+  runTag?: string | null;
 };
 
 /** Recursively sorts object keys so semantically identical plans hash identically regardless of construction order. */
@@ -127,7 +133,7 @@ export function logNlSearch(entry: NlSearchLogEntry): void {
         INSERT INTO nl_search_log (
           question, outcome, failure_reason, topic, grain, metric, plan, plan_hash,
           confidence, confidence_components, unsupported_terms, entity_resolution,
-          result_count, duration_ms, parser_version, session_id, client_ref, parent_search_id
+          result_count, duration_ms, parser_version, session_id, client_ref, run_tag, parent_search_id
         )
         VALUES (
           ${entry.question.slice(0, 200)},
@@ -147,6 +153,7 @@ export function logNlSearch(entry: NlSearchLogEntry): void {
           ${entry.parserVersion ?? null},
           ${sessionId}::uuid,
           ${isUuid(entry.clientRef) ? entry.clientRef : null}::uuid,
+          ${entry.runTag ?? null},
           (SELECT id FROM nl_search_log
              WHERE session_id = ${sessionId}::uuid
                AND at > now() - interval '60 seconds'

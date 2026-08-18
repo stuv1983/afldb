@@ -194,6 +194,26 @@ export type UiObservation = {
   interpretation: string | null;
   errors: string[];
   elapsedMs: number;
+  /**
+   * Which cluster worker served this navigation, from deploy/server-cluster.mjs's
+   * tracing headers (AFLDB_TRACE_REQUESTS=on). Absent when tracing is off,
+   * so every field here is optional and nothing depends on it.
+   *
+   * `trace` is the SSR document request; `subresourceWorkers` is every
+   * OTHER traced response the page pulled (RSC payloads especially). The
+   * pair is the point: the hydration-mismatch hypothesis is that a
+   * document rendered by one worker gets its follow-up data from another
+   * holding different cache state, which only a comparison between the
+   * two can show.
+   */
+  trace?: {
+    worker: string | null;
+    pid: string | null;
+    requestId: string | null;
+    build: string | null;
+  };
+  /** Distinct `x-afldb-worker` values seen on non-document responses for this navigation. */
+  subresourceWorkers?: string[];
 };
 
 export type UiVerdict = 'pass' | 'fail' | 'unscored';
@@ -283,6 +303,80 @@ export type UiSummary = {
    */
   clientErrors: number;
 };
+
+/**
+ * Hydration errors broken down by which cluster worker served the page.
+ *
+ * The question this exists to answer, and the reason it reports rates
+ * rather than raw counts: a worker that served twice as many requests
+ * will show twice as many errors while being no more faulty. Only the
+ * per-worker RATE distinguishes "one bad process" from "evenly spread".
+ *
+ * `crossWorker` is the second hypothesis: a document served by one worker
+ * whose follow-up RSC request came from another. If hydration errors
+ * concentrate there rather than on any single worker, the cause is the
+ * cluster's per-process cache divergence rather than any one process.
+ */
+export type HydrationByWorker = {
+  /** worker id -> { loads, hydrationErrors, ratePercent } */
+  byWorker: Record<string, { loads: number; hydrationErrors: number; ratePercent: number }>;
+  crossWorker: {
+    sameWorker: { loads: number; hydrationErrors: number; ratePercent: number };
+    differentWorker: { loads: number; hydrationErrors: number; ratePercent: number };
+  };
+  /** Loads carrying no trace headers at all -- tracing off, or an untraced deployment. */
+  untraced: number;
+  totalHydrationErrors: number;
+};
+
+/** React's hydration-mismatch errors, minified (#418/#423/#425) or not. */
+function isHydrationError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return lower.includes('hydration')
+    || lower.includes('did not match')
+    || /minified react error #(418|419|420|421|422|423|424|425)\b/.test(lower);
+}
+
+export function hydrationByWorker(observations: Iterable<UiObservation>): HydrationByWorker {
+  const byWorker: Record<string, { loads: number; hydrationErrors: number; ratePercent: number }> = {};
+  const same = { loads: 0, hydrationErrors: 0, ratePercent: 0 };
+  const different = { loads: 0, hydrationErrors: 0, ratePercent: 0 };
+  let untraced = 0;
+  let totalHydrationErrors = 0;
+
+  for (const observation of observations) {
+    const hydrated = observation.errors.some(isHydrationError);
+    if (hydrated) totalHydrationErrors++;
+
+    const worker = observation.trace?.worker;
+    if (!worker) { untraced++; continue; }
+
+    byWorker[worker] ??= { loads: 0, hydrationErrors: 0, ratePercent: 0 };
+    byWorker[worker].loads++;
+    if (hydrated) byWorker[worker].hydrationErrors++;
+
+    // Only meaningful when the page actually made a traced subrequest;
+    // a document with none says nothing either way about cross-worker
+    // divergence and must not be counted as evidence of agreement.
+    const others = observation.subresourceWorkers ?? [];
+    if (others.length > 0) {
+      const bucket = others.every((w) => w === worker) ? same : different;
+      bucket.loads++;
+      if (hydrated) bucket.hydrationErrors++;
+    }
+  }
+
+  const rate = (bucket: { loads: number; hydrationErrors: number; ratePercent: number }) => {
+    bucket.ratePercent = bucket.loads === 0
+      ? 0
+      : Number(((bucket.hydrationErrors / bucket.loads) * 100).toFixed(3));
+  };
+  for (const bucket of Object.values(byWorker)) rate(bucket);
+  rate(same);
+  rate(different);
+
+  return { byWorker, crossWorker: { sameWorker: same, differentWorker: different }, untraced, totalHydrationErrors };
+}
 
 export function summarise(
   cases: UiCase[],
