@@ -388,7 +388,21 @@ const CAREER_STAT_WORDS: [RegExp, NlCareerColumn][] = [
   [/\bgames?\b/, 'games'],
   [/\bwins?\b/, 'wins'],
   [/\blosses?\b/, 'losses'],
-  [/\bdraws?\b/, 'draws'],
+  // "drawn"/"drew" as well as "draw(s)": "played in at least 1 drawn
+  // match" and "drew a game" name the same c.draws career total as "2
+  // draws" does, but neither participle/past-tense form was recognised,
+  // so the word was left for the entity scan to misread as a player
+  // name. The trailing "match(es)" noun is folded into the SAME match
+  // (not left for some other step to consume): an unconsumed "match" left
+  // sitting in the text after "drawn" is claimed still reads as a
+  // leftover, undeclined word and the whole question still declines even
+  // though a real condition was found. "game(s)" is deliberately NOT
+  // folded in here: the 'games' entry above already claims any "game(s)"
+  // word (and, greedily, whatever count precedes it) before this entry
+  // is even tried, so "drawn games" always reads as a games-count
+  // condition regardless -- a pre-existing ambiguity this isn't trying
+  // to resolve, not a new gap.
+  [/\bdraws?\b|\bdrawn\b(?:\s+match(?:es)?)?|\bdrew\b(?:\s+an?\s+match)?/, 'draws'],
   [/\bbrownlow medals?\b/, 'brownlow_medals'],
   [/\bbrownlow votes?\b/, 'brownlow_votes'],
 ];
@@ -415,8 +429,11 @@ const CAREER_ONLY_METRICS: ReadonlySet<string> = new Set(
   CAREER_STAT_WORDS.map(([, column]) => column).filter((column) => column !== 'goals' && column !== 'brownlow_votes'),
 );
 
-function extractCareerConditions(text: string): { text: string; conditions: NlCareerCondition[]; consumed: string[] } {
+function extractCareerConditions(text: string): {
+  text: string; conditions: NlCareerCondition[]; predicates: GridAxisState[]; consumed: string[];
+} {
   const conditions: NlCareerCondition[] = [];
+  const predicates: GridAxisState[] = [];
   const consumed: string[] = [];
   let working = text;
 
@@ -469,7 +486,36 @@ function extractCareerConditions(text: string): { text: string; conditions: NlCa
     if (!match) continue;
     // A window before the stat word carries the count and its operator.
     const idx = working.indexOf(match[0]);
-    const outerStart = Math.max(0, idx - 20);
+
+    // "3 grand finals", "played in at least 1 preliminary final" -- the
+    // bare /\bfinals?\b/ entry above reads ANY qualified final phrase as
+    // the generic any-type career total (c.finals), leaving "grand" or
+    // "preliminary"/"prelim" as an unconsumed word the entity scan then
+    // misreads as an unresolved player name and declines on. GRID_BUILDERS
+    // has a dedicated min-count builder for exactly these two final round
+    // types (semi/qualifying/elimination finals have none), so a
+    // qualifier immediately before "final(s)" answers through that
+    // instead. Detected AHEAD of the 20-char lookback below, not after,
+    // because that lookback is sized for a short stat word: "preliminary
+    // " alone is 12 characters, which for "3 or more preliminary finals"
+    // pushed the leading digit outside the window entirely -- the
+    // condition silently vanished (`value` stayed null) rather than
+    // falling back to the generic reading. Extending the lookback by the
+    // qualifier's own length keeps the number search's effective budget
+    // the same regardless of which qualifier, if any, preceded the word.
+    let qualifierBuilder: 'grand_finals_played_min' | 'prelim_finals_played_min' | null = null;
+    let qualifierSpan: { start: number; end: number; text: string } | null = null;
+    if (column === 'finals') {
+      const qualifierProbe = working.slice(Math.max(0, idx - 15), idx);
+      const qualifierMatch = /\b(grand|preliminary|prelim)\b\s*$/i.exec(qualifierProbe);
+      if (qualifierMatch) {
+        qualifierBuilder = qualifierMatch[1].toLowerCase() === 'grand'
+          ? 'grand_finals_played_min' : 'prelim_finals_played_min';
+        const qualifierStart = Math.max(0, idx - 15) + qualifierMatch.index;
+        qualifierSpan = { start: qualifierStart, end: qualifierStart + qualifierMatch[1].length, text: qualifierMatch[1] };
+      }
+    }
+    const outerStart = Math.max(0, idx - 20 - (qualifierSpan ? idx - qualifierSpan.start : 0));
     // Clipped at the nearest preceding clause boundary (a comma, or "and")
     // so the window can never reach into a NEIGHBOURING numeric clause --
     // "players with more than 300 clubs and over 10 premierships" found
@@ -533,7 +579,16 @@ function extractCareerConditions(text: string): { text: string; conditions: NlCa
     }
     if (value === null) continue;
 
-    conditions.push({ kind: 'column', column, op, value });
+    // The `_min` builders only express a floor ("X+"/"at least"/a bare
+    // number, which all default to 'gte' above); "fewer than 2 grand
+    // finals" has nowhere to go there and falls back to the generic
+    // any-type reading instead of declining outright.
+    if (qualifierBuilder && op === 'gte') {
+      predicates.push({ builder: qualifierBuilder, params: { times: String(value) } });
+      if (qualifierSpan) spans.push(qualifierSpan);
+    } else {
+      conditions.push({ kind: 'column', column, op, value });
+    }
     for (const span of spans) consumed.push(span.text);
     // Highest offset first, so removing one span cannot shift the
     // positions of the ones still to be removed.
@@ -544,7 +599,7 @@ function extractCareerConditions(text: string): { text: string; conditions: NlCa
       .trim();
   }
 
-  return { text: working, conditions, consumed };
+  return { text: working, conditions, predicates, consumed };
 }
 
 // ---------------------------------------------------------- club-season
@@ -1283,7 +1338,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // means players who did it FOR Carlton, not players who did it anywhere
   // and later happened to play there, and "in the 1940s" means the feat
   // happened then, which is not always the season they debuted.
-  const careerPredicates: GridAxisState[] = [];
+  const careerPredicates: GridAxisState[] = grain === 'player_career' ? [...careerResult.predicates] : [];
   if (grain === 'player_career' && achievementResult.achievementKey) {
     if (clubFor) {
       careerPredicates.push({ builder: 'first_kick_goal_for_club', params: { club: String(clubFor.entity.organizationId) } });

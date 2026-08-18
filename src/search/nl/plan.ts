@@ -159,8 +159,28 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    longer elects the by_decade histogram ("this decade" declines); and
  *    the by_decade headline names the decade with the most, not the
  *    earliest row.
+ * 14: two CAREER_STAT_WORDS gaps. "3 grand finals" / "played in 3 or more
+ *    preliminary finals" read the qualifier ("grand"/"preliminary") as an
+ *    unresolved player name and declined outright, because the generic
+ *    /\bfinals?\b/ entry matched "final(s)" alone and left the qualifier
+ *    behind unconsumed; a qualified match now becomes a careerPredicates
+ *    entry against GRID_BUILDERS' grand_finals_played_min/
+ *    prelim_finals_played_min instead of the generic any-type c.finals
+ *    condition (only when the count reads as a floor -- the one
+ *    comparison those builders express). Fixing it surfaced a second,
+ *    independent bug in the same code path: the fixed 20-character number
+ *    lookback (see version 10) is sized for a short stat word, and
+ *    "preliminary " alone is 12 characters, long enough that "3 or more
+ *    preliminary finals" pushed the leading digit out of the window
+ *    entirely -- the qualifier fix widens the lookback by the qualifier's
+ *    own length so the number search keeps its usual effective range.
+ *    Separately, "drawn"/"drew" now answer the same as "draw(s)" for
+ *    "played in at least 1 drawn match" (c.draws is a lifetime total, so
+ *    this is exactly the right column) -- neither past-tense form was in
+ *    the vocabulary before, and the trailing "match(es)" noun is folded
+ *    into the same match so it is not left over as an undeclined word.
  */
-export const PARSER_VERSION = 13;
+export const PARSER_VERSION = 14;
 
 // ------------------------------------------------------------------ grain
 

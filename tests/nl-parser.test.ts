@@ -145,6 +145,20 @@ describe('4. career filters', () => {
     expect(p.agg).toEqual({ kind: 'max' });
     expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'eq', value: 0 });
   });
+
+  it('reads "drawn"/"drew" as the same career draws total as "draws"', async () => {
+    // Regression: only the bare "draw(s)" spelling was recognised, so the
+    // participle and past-tense forms were left for the entity scan to
+    // misread as an unresolved player name and the question declined
+    // outright, even though c.draws (a lifetime total, not per-season) is
+    // exactly the right column for "played in at least 1 drawn match".
+    let p = await plan('played in at least 1 drawn match');
+    expect(p.grain).toBe('player_career');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'draws', op: 'gte', value: 1 });
+
+    p = await plan('2 drawn matches');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'draws', op: 'gte', value: 2 });
+  });
 });
 
 describe('5. awards', () => {
@@ -194,6 +208,24 @@ describe('6. finals', () => {
     expect(p.grain).toBe('player_career');
     expect(p.metric).toBe('finals');
     expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'premierships', op: 'eq', value: 0 });
+  });
+
+  it('reads a qualified finals count as its own builder, not the generic any-type total', async () => {
+    // Regression: the generic /\bfinals?\b/ entry matched "final(s)" on its
+    // own and read the qualifier ("grand"/"preliminary") as an unresolved
+    // player name, declining the whole question. Also covers the window-
+    // size edge case: "preliminary " is long enough that a naive fixed
+    // lookback pushed the leading digit of "3 or more" out of range.
+    let p = await plan('played 3 grand finals');
+    expect(p.grain).toBe('player_career');
+    expect(p.careerConditions).toEqual([]);
+    expect(p.careerPredicates).toContainEqual({ builder: 'grand_finals_played_min', params: { times: '3' } });
+
+    p = await plan('played in 3 or more preliminary finals');
+    expect(p.careerPredicates).toContainEqual({ builder: 'prelim_finals_played_min', params: { times: '3' } });
+
+    p = await plan('at least 1 preliminary final');
+    expect(p.careerPredicates).toContainEqual({ builder: 'prelim_finals_played_min', params: { times: '1' } });
   });
 });
 
