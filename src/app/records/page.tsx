@@ -34,6 +34,18 @@ export default function RecordsPage() {
             <div className="meta">{category.definition}</div>
           </Link>
         ))}
+
+        {/* Listed by hand rather than from RECORD_CATEGORIES: that
+            catalogue drives the computed /records/[category] leaderboards,
+            and this is a curated list from a cited source, with no
+            underlying column to rank. */}
+        <Link href="/records/first-kick-goal" className="card">
+          <h3>Goal with first VFL/AFL kick</h3>
+          <div className="meta">
+            Players recognised as having kicked a goal with their first kick in a senior
+            VFL/AFL match.
+          </div>
+        </Link>
       </div>
     </>
   );

@@ -80,7 +80,54 @@ export function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { h
   if (payload.kind === 'club_season') {
     return describeClubSeasonAnswer(plan, payload.lead, payload.rows, payload.total);
   }
+  if (payload.kind === 'achievement_summary') {
+    return describeAchievementSummaryAnswer(payload);
+  }
   return { headline: 'Results', interpretation: '' };
+}
+
+function describeAchievementSummaryAnswer(
+  payload: Extract<NlAnswerPayload, { kind: 'achievement_summary' }>,
+): { headline: string; interpretation: string } {
+  const { rows, groupBy, achievementLabel, total } = payload;
+  const held = `${total.toLocaleString('en-AU')} recorded ${total === 1 ? 'player' : 'players'}`;
+
+  if (rows.length === 0) {
+    return { headline: 'No matching records found', interpretation: `${achievementLabel}: ${held}.` };
+  }
+
+  // "Which clubs have never..." is a list, not a ranking: every row is
+  // equally an answer, so naming a leader would be meaningless.
+  if (groupBy === 'club' && rows.every((r) => r.value === 0)) {
+    const names = rows.map((r) => r.label);
+    const shown = names.length <= 4 ? names.join(', ') : `${names.slice(0, 4).join(', ')} and ${names.length - 4} more`;
+    return {
+      headline: `${rows.length} ${rows.length === 1 ? 'club has' : 'clubs have'} never had one — ${shown}`,
+      interpretation: `${achievementLabel}. Measured across ${held}.`,
+    };
+  }
+
+  if (groupBy === 'occurrence') {
+    const names = rows.map((r) => r.label);
+    return {
+      headline: names.length === 1 ? names[0] : `${names.join(', ')} (tied)`,
+      interpretation: `${achievementLabel}. Measured across ${held}.`,
+    };
+  }
+
+  // A distribution's headline names the leader, and says so when the top
+  // count is shared rather than presenting one of several as the answer.
+  const top = rows[0];
+  const tiedWith = rows.filter((r) => r.value === top.value);
+  const leader = tiedWith.length > 1
+    ? `${tiedWith.map((r) => r.label).join(', ')} — ${top.value.toLocaleString('en-AU')} each (tied)`
+    : `${top.label} — ${top.value.toLocaleString('en-AU')}`;
+  const noun = groupBy === 'club' ? 'club' : groupBy === 'decade' ? 'decade' : 'season';
+
+  return {
+    headline: leader,
+    interpretation: `${achievementLabel}, by ${noun}. Measured across ${held}.`,
+  };
 }
 
 function describeTeamMatchAnswer(

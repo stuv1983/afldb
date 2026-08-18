@@ -20,9 +20,12 @@
 
 import {
   isNlAwardKey,
+  NL_ACHIEVEMENTS,
   NL_CONFIDENCE,
   NL_LIMITS,
   PARSER_VERSION,
+  type NlAchievementKey,
+  type NlAchievementSummaryKind,
   type NlAggregation,
   type NlBoundary,
   type NlCareerColumn,
@@ -43,8 +46,10 @@ import {
   type NlClubDirectoryEntry, type NlEntityMatch, type NlVenueDirectoryEntry,
 } from '@/search/nl/entities';
 import {
+  ACHIEVEMENT_SUMMARY_CUES,
   AGAINST_PREPOSITION, AGG_WORDS, AGGREGATE_TOTAL_WORDS, AWARD_WORDS,
   BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_METRIC_WORDS,
+  FIRST_KICK_GOAL_RE,
   DECADE_RE,
   CLUB_SUBJECT_LEADING, COMPARE_OP_WORDS,
   IN_A_FINAL, IN_A_GRAND_FINAL, IN_ONE_GAME, IN_ONE_SEASON,
@@ -314,6 +319,40 @@ function extractAward(text: string): { text: string; awardKey?: 'all_australian'
     if (match) return { text: stripMatch(text, match[0]), awardKey: key, consumed: [match[0]] };
   }
   return { text, consumed: [] };
+}
+
+/**
+ * The first-kick-goal achievement, and whether the question asks for the
+ * players who hold it or for a summary of them.
+ *
+ * `summaryKind` is only ever set when the achievement phrase itself
+ * matched, so the deliberately broad cue phrases ("which club", "by
+ * decade") cannot elect the summary grain on their own.
+ */
+function extractFirstKickGoal(text: string): {
+  text: string;
+  achievementKey?: NlAchievementKey;
+  summaryKind?: NlAchievementSummaryKind;
+  consumed: string[];
+} {
+  const match = FIRST_KICK_GOAL_RE.exec(text);
+  if (!match) return { text, consumed: [] };
+
+  const consumed = [match[0]];
+  let remaining = stripMatch(text, match[0]);
+
+  let summaryKind: NlAchievementSummaryKind | undefined;
+  for (const [re, kind] of ACHIEVEMENT_SUMMARY_CUES) {
+    const cueMatch = re.exec(remaining);
+    if (cueMatch) {
+      summaryKind = kind as NlAchievementSummaryKind;
+      consumed.push(cueMatch[0]);
+      remaining = stripMatch(remaining, cueMatch[0]);
+      break;
+    }
+  }
+
+  return { text: remaining, achievementKey: 'first_kick_goal', summaryKind, consumed };
 }
 
 // ---------------------------------------------------------- career phrases
@@ -757,6 +796,17 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   text = awardResult.text;
   consumedTokens.push(...awardResult.consumed);
 
+  // 5a. The first-kick goal achievement. Runs here, ahead of every metric
+  // and grain cue, because the phrase contains both "goal" and "kick" --
+  // two METRIC_WORDS entries that would otherwise be read as the question's
+  // ranking subject the moment this phrase was left in the text. Consuming
+  // the whole span first is also what keeps "first" away from the boundary
+  // logic further down. See FIRST_KICK_GOAL_RE for the phrases this
+  // deliberately does NOT match ("first goal", "debut goal", ...).
+  const achievementResult = extractFirstKickGoal(text);
+  text = achievementResult.text;
+  consumedTokens.push(...achievementResult.consumed);
+
   // 5b. "N disposal games" idiom -- resolves the metric AND acts as a
   // single-game grain cue in one step, so "games" never lingers in the
   // text for the player-name scan to misread.
@@ -1048,7 +1098,15 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   let metric: string | null = null;
   let mode: 'single' | 'sum' | undefined;
 
-  if (teamMetricResult.metric) {
+  if (achievementResult.achievementKey && achievementResult.summaryKind) {
+    // "which club has had the most players kick a goal with their first
+    // kick" -- a group-and-count over the achievement, not a player list.
+    // Checked first: the summary cue only exists because the achievement
+    // phrase matched, so nothing else can be competing for this question.
+    grain = 'achievement_summary';
+  } else if (achievementResult.achievementKey) {
+    grain = 'player_career';
+  } else if (teamMetricResult.metric) {
     grain = 'team_match';
     metric = teamMetricResult.metric;
   } else if (clubSeasonCuePresent && !player) {
@@ -1187,7 +1245,43 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   }
 
   const careerConditions = grain === 'player_career' ? careerResult.conditions : [];
+
+  // A career predicate reuses the grid solver's builder catalogue, which
+  // is where every boolean/categorical career question already lives --
+  // the compiler, the validator and the answer path all existed; until
+  // now nothing in the parser had ever produced one.
+  //
+  // A club or season filter has to be expressed as a predicate too, not
+  // left in scope: answerWithPredicates compiles the predicate list and
+  // ignores scope entirely, so "Carlton players who kicked a goal with
+  // their first kick" would otherwise silently answer for every club.
+  //
+  // Both use the achievement's OWN club and season rather than the
+  // player's -- "Carlton players who kicked a goal with their first kick"
+  // means players who did it FOR Carlton, not players who did it anywhere
+  // and later happened to play there, and "in the 1940s" means the feat
+  // happened then, which is not always the season they debuted.
   const careerPredicates: GridAxisState[] = [];
+  if (grain === 'player_career' && achievementResult.achievementKey) {
+    if (clubFor) {
+      careerPredicates.push({ builder: 'first_kick_goal_for_club', params: { club: String(clubFor.entity.organizationId) } });
+    }
+    if (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined) {
+      careerPredicates.push({
+        builder: 'first_kick_goal_between',
+        params: {
+          from: String(seasons.seasonMin ?? NL_LIMITS.minSeason),
+          to: String(seasons.seasonMax ?? NL_LIMITS.maxSeason),
+        },
+      });
+    }
+    // The bare achievement predicate is only needed when nothing scoped
+    // it: each scoped builder already implies it.
+    if (careerPredicates.length === 0) {
+      careerPredicates.push({ builder: NL_ACHIEVEMENTS[achievementResult.achievementKey].builder, params: {} });
+    }
+  }
+
   const clubSeasonConditions = grain === 'club_season' ? clubSeasonConditionResult.conditions : [];
 
   if (grain === 'player_career' && metric === 'all_australian_selections' && negated && isNlAwardKey('all_australian')) {
@@ -1204,8 +1298,14 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // resolvePolarity runs here, at plan assembly, because it is the first
   // point where BOTH halves of the decision are known: the aggregation
   // was extracted at step 8, the metric only settles at step 11.
+  // careerPredicates counts as "the question named only conditions" for
+  // this default, the same as careerConditions: without it a predicate-only
+  // question ("players who kicked a goal with their first kick") fell
+  // through to {kind:'max'}, which has no metric to maximise and is capped
+  // at maxTiedRows(25) rather than maxListRows(100) -- a silently truncated
+  // list where the reader asked for all of them.
   const agg: NlAggregation = resolvePolarity(aggResult.agg, metric, aggResult.polarity)
-    ?? (careerConditions.length > 0 || clubSeasonConditions.length > 0 || boundary
+    ?? (careerConditions.length > 0 || careerPredicates.length > 0 || clubSeasonConditions.length > 0 || boundary
       ? { kind: 'list' }
       : { kind: 'max' });
 
@@ -1220,6 +1320,9 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     careerConditions,
     careerPredicates,
     clubSeasonConditions,
+    ...(grain === 'achievement_summary' && achievementResult.achievementKey && achievementResult.summaryKind
+      ? { achievementSummary: { achievementKey: achievementResult.achievementKey, kind: achievementResult.summaryKind } }
+      : {}),
     ...(boundary ? { boundary } : {}),
     tiePolicy: 'all',
     limit: agg.kind === 'top_n' || agg.kind === 'list' ? 100 : 25,
@@ -1232,9 +1335,16 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     ...(clubExtraction.consumed), ...(venue ? [venue.matchedText] : []),
   ].join(' ');
   const consumedSet = new Set(meaningfulTokens(allConsumed));
+  // careerPredicates is structure in exactly the way careerConditions is:
+  // "players who kicked a goal with their first kick" names no metric, no
+  // numeric condition and no boundary, and without this clause the plan --
+  // correct in every other respect -- was declined as unrecognised.
+  // An achievement_summary always carries its own descriptor, which
+  // validatePlan requires, so reaching this point is itself the structure.
   const structuralOk = grain === 'team_match' ? !!metric
     : grain === 'club_season' ? clubSeasonCuePresent
-    : grain === 'player_career' ? (metric !== null || careerConditions.length > 0 || boundary !== undefined)
+    : grain === 'achievement_summary' ? true
+    : grain === 'player_career' ? (metric !== null || careerConditions.length > 0 || careerPredicates.length > 0 || boundary !== undefined)
     : metric !== null;
 
   const consumedCount = totalTokens.filter((t) => consumedSet.has(t) || t === candidateRaw?.split(' ')[0]).length;

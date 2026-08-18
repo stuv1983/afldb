@@ -595,6 +595,66 @@ export const STOPWORDS = new Set([
  */
 export const CLUB_SUBJECT_LEADING = /^(?:teams?|clubs?|sides?)\b\s+\S/;
 
+// ------------------------------------------------------- first-kick goal
+
+/**
+ * "Kicked a goal with their first kick" -- the curated achievement in
+ * player_achievements, not anything derivable from a stat line.
+ *
+ * Every alternative below requires the word "kick" adjacent to "first",
+ * which is the whole safeguard. These are all DIFFERENT achievements and
+ * none of them can match:
+ *
+ *   "first goal"          a player's first career goal, whenever it came
+ *   "debut goal"          any goal in the debut game
+ *   "goal in first game"  same -- "first" is followed by "game", not "kick"
+ *   "scored on debut"     same again
+ *   "one career goal"     a career total; nothing to do with first kicks
+ *
+ * The distinction is real and the acceptance criteria call it out: a
+ * player can kick a goal in their debut game without it being their first
+ * kick, so mapping any of the above here would answer a question the
+ * reader did not ask.
+ *
+ * Extracted BEFORE the metric vocabulary gets a turn, because "goal" and
+ * "kick" are both METRIC_WORDS entries: left in the text, "goals" would be
+ * read as the ranking subject. Same "specific claims run before generic
+ * ones" ordering the venue-before-club pass follows.
+ */
+export const FIRST_KICK_GOAL_RE = new RegExp([
+  // "kicked/scored/booted a goal with his first kick", "goal from their first kick"
+  /(?:kick(?:ed|s)?|scor(?:ed|es)?|boot(?:ed|s)?|slott(?:ed|s)?|got|goaled)?\s*(?:a\s+)?goals?\s+(?:with|from|off|on)\s+(?:their|his|her|the|a)?\s*(?:very\s+)?first\s+(?:ever\s+)?(?:afl|vfl|career|senior)?\s*kick/,
+  // "first-kick goal", "first kick goals"
+  /first[-\s]kick\s+goals?/,
+  // "their first kick was a goal"
+  /(?:their|his|her|the)?\s*(?:very\s+)?first\s+(?:afl|vfl|career|senior)?\s*kick\s+(?:was|being)\s+(?:a\s+)?goal/,
+  // "goaled with their first kick" -- verb form, no article
+  /goal(?:ed|ing)\s+(?:with|from|off)\s+(?:their|his|her|the)?\s*(?:very\s+)?first\s+(?:afl|vfl|career|senior)?\s*kick/,
+  // "scored with their first kick" -- no "goal" word at all. Safe for the
+  // same reason as every branch above: "kick" still has to follow
+  // "first", so none of the debut/first-goal phrasings can reach it.
+  /scor(?:ed|es|ing)\s+(?:with|from|off)\s+(?:their|his|her|the)?\s*(?:very\s+)?first\s+(?:afl|vfl|career|senior)?\s*kick/,
+].map((r) => `(?:${r.source})`).join('|'));
+
+/**
+ * A summary question ABOUT the achievement rather than a list of the
+ * players who hold it. Only consulted once FIRST_KICK_GOAL_RE has already
+ * matched, so these deliberately loose phrases ("by decade", "which club")
+ * can never elect this grain on their own.
+ *
+ * Order matters: 'clubs_without' is tested before 'by_club' because
+ * "which clubs have NEVER had..." contains the same club wording as
+ * "which club has had the most...".
+ */
+export const ACHIEVEMENT_SUMMARY_CUES: [RegExp, string][] = [
+  [/\b(?:never|no|not)\b[^.?]*\bclubs?\b|\bclubs?\b[^.?]*\bnever\b/, 'clubs_without'],
+  [/\bby\s+decade\b|\beach\s+decade\b|\bper\s+decade\b|\bdecades?\b/, 'by_decade'],
+  [/\bby\s+(?:club|team)\b|\bwhich\s+(?:club|team)\b|\bwhat\s+(?:club|team)\b|\beach\s+(?:club|team)\b|\bclub\s+has\s+(?:had\s+)?the\s+most\b/, 'by_club'],
+  [/\bby\s+(?:year|season)\b|\bwhich\s+(?:year|season)\b|\bwhat\s+(?:year|season)\b|\beach\s+(?:year|season)\b/, 'by_season'],
+  [/\bfirst\s+(?:ever\s+)?player\b|\bearliest\b|\bwho\s+was\s+the\s+first\b/, 'earliest'],
+  [/\bmost\s+recent\b|\blatest\b|\bmost\s+recently\b|\blast\s+player\b/, 'latest'],
+];
+
 // ------------------------------------------------------------------ nicknames
 
 /** Seed vocabulary; grown from real search-log usage (db/queries/nl/log.ts, phase F). */

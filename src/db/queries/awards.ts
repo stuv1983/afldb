@@ -383,7 +383,7 @@ export async function getHonourTeam(teamName: string): Promise<HonourTeamMemberR
 
 /** Every honour AFLDB can attribute to one player. */
 export async function getPlayerHonours(playerId: number) {
-  const [awards, nominations, allAustralian, captaincies, hof, teams] = await Promise.all([
+  const [awards, nominations, allAustralian, captaincies, hof, teams, firstKickGoal] = await Promise.all([
     sql<{
       slug: string; name: string; category: string; competition: string | null;
       seasons: string; wins: number;
@@ -441,6 +441,35 @@ export async function getPlayerHonours(playerId: number) {
          AND link_status_value IN ('unique','resolved')
        ORDER BY team_name
     `,
+    // A curated achievement (player_achievements, migration 053) rather
+    // than an award: no ceremony, no votes, just a recorded feat.
+    sql<{
+      season: number; roundRaw: string; clubName: string | null; clubSlug: string | null;
+      consecutiveGoalKicks: number; noFurtherCareerGoals: boolean; noFurtherCareerKicks: boolean;
+      kicklessMatchesBeforeFirstKick: number;
+      opponentName: string | null; opponentSlug: string | null;
+    }[]>`
+      SELECT a.season, a.round_raw AS "roundRaw",
+             c.name AS "clubName", c.slug AS "clubSlug",
+             a.consecutive_goal_kicks AS "consecutiveGoalKicks",
+             a.no_further_career_goals AS "noFurtherCareerGoals",
+             a.no_further_career_kicks AS "noFurtherCareerKicks",
+             a.kickless_matches_before_first_kick AS "kicklessMatchesBeforeFirstKick",
+             opp.name AS "opponentName", opp.slug AS "opponentSlug"
+        FROM player_achievements a
+        LEFT JOIN clubs c ON c.id = a.club_id
+        LEFT JOIN matches m ON m.id = a.match_id
+        -- The opponent is whichever side of the match the player's club
+        -- was not; null when the match or the club never resolved.
+        LEFT JOIN clubs opp ON opp.id = CASE
+          WHEN m.home_club_id = a.club_id THEN m.away_club_id
+          WHEN m.away_club_id = a.club_id THEN m.home_club_id
+        END
+       WHERE a.player_id = ${playerId}
+         AND a.achievement_type = 'first_kick_goal'
+         AND a.link_status_value IN ('unique','resolved')
+       LIMIT 1
+    `,
   ]);
 
   return {
@@ -450,8 +479,10 @@ export async function getPlayerHonours(playerId: number) {
     captaincies,
     hallOfFame: hof[0] ?? null,
     honourTeams: teams,
+    firstKickGoal: firstKickGoal[0] ?? null,
     total: awards.length + allAustralian.length + captaincies.length
-      + teams.length + (hof.length ? 1 : 0) + nominations.length,
+      + teams.length + (hof.length ? 1 : 0) + nominations.length
+      + firstKickGoal.length,
   };
 }
 

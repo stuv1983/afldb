@@ -252,6 +252,16 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
 
   // Awards & honours
   hall_of_fame_player: { key: 'hall_of_fame_player', label: 'Hall of Fame player', group: 'Awards & honours', params: [] },
+  // Curated source-only facts from player_achievements -- linked rows
+  // only, the same rule the draft and Hall of Fame builders follow.
+  first_kick_goal_player: { key: 'first_kick_goal_player', label: 'Goal with their first VFL/AFL kick', group: 'Awards & honours', params: [] },
+  first_kick_goal_only_career_goal: { key: 'first_kick_goal_only_career_goal', label: 'First-kick goal was their only career goal', group: 'Awards & honours', params: [] },
+  first_kick_goal_consecutive_min: { key: 'first_kick_goal_consecutive_min', label: 'Goal with each of their first X kicks', group: 'Awards & honours', params: [int('kicks', 'Kicks')] },
+  // Scoped to where and when the feat happened, which is not the same as
+  // "has the feat and also played for this club": a player can do it on
+  // debut for one club and be traded to another years later.
+  first_kick_goal_for_club: { key: 'first_kick_goal_for_club', label: 'Goal with their first kick, for club', group: 'Awards & honours', params: [club()] },
+  first_kick_goal_between: { key: 'first_kick_goal_between', label: 'Goal with their first kick, between seasons', group: 'Awards & honours', params: [season('from', 'From season'), season('to', 'To season')] },
   brownlow_medallist: { key: 'brownlow_medallist', label: 'Brownlow medallist', group: 'Awards & honours', params: [] },
   brownlow_votes_career_min: { key: 'brownlow_votes_career_min', label: 'X+ career Brownlow votes', group: 'Awards & honours', params: [int('votes', 'Votes')] },
   award_winner: { key: 'award_winner', label: 'Won an award…', group: 'Awards & honours', params: [award()] },

@@ -74,7 +74,7 @@ function toIntOrNull(value: string | null): number | null {
   return Number.isInteger(n) ? n : null;
 }
 
-async function resolveSeason(sql: Sql, value: string | null): Promise<number | null> {
+export async function resolveSeason(sql: Sql, value: string | null): Promise<number | null> {
   const year = toIntOrNull(value);
   if (year === null) return null;
   const [row] = await sql<{ year: number }[]>`
@@ -84,7 +84,7 @@ async function resolveSeason(sql: Sql, value: string | null): Promise<number | n
 }
 
 /** Club by any recorded alias, resolved to the identity of the season. */
-async function resolveClub(
+export async function resolveClub(
   sql: Sql,
   name: string | null,
   season: number | null,
@@ -121,7 +121,7 @@ async function resolveClub(
  *
  * The caller records the verdict; nothing here guesses.
  */
-async function resolvePlayer(
+export async function resolvePlayer(
   sql: Sql,
   name: string | null,
   season: number | null,

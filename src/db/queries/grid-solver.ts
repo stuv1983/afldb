@@ -604,6 +604,43 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                             WHERE player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved'))`;
     case 'brownlow_medallist':
       return sql`p.id IN (SELECT player_id FROM brownlow_season_votes WHERE is_winner)`;
+
+    // player_achievements: curated facts AFLDB cannot recompute from its
+    // own match data (there is no play-by-play table), so these read the
+    // stored claim rather than deriving anything. Linked rows only.
+    case 'first_kick_goal_player':
+      return sql`p.id IN (SELECT player_id FROM player_achievements
+                            WHERE achievement_type = 'first_kick_goal'
+                              AND player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved'))`;
+    case 'first_kick_goal_only_career_goal':
+      return sql`p.id IN (SELECT player_id FROM player_achievements
+                            WHERE achievement_type = 'first_kick_goal'
+                              AND player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
+                              AND no_further_career_goals)`;
+    case 'first_kick_goal_consecutive_min':
+      return sql`p.id IN (SELECT player_id FROM player_achievements
+                            WHERE achievement_type = 'first_kick_goal'
+                              AND player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
+                              AND consecutive_goal_kicks >= ${requireInt(axis, 'kicks', 'Kicks')})`;
+    case 'first_kick_goal_for_club': {
+      // By lineage, like every other club-scoped builder, so a Western
+      // Bulldogs filter includes the Footscray era.
+      const orgId = requireInt(axis, 'club', 'Club');
+      return sql`p.id IN (SELECT a.player_id FROM player_achievements a
+                            JOIN clubs cl ON cl.id = a.club_id
+                           WHERE a.achievement_type = 'first_kick_goal'
+                             AND a.player_id IS NOT NULL AND a.link_status_value IN ('unique', 'resolved')
+                             AND cl.organization_id = ${orgId})`;
+    }
+    case 'first_kick_goal_between': {
+      // The season the feat happened in, not the player's debut season:
+      // the two differ whenever the first kick came after the first game.
+      const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
+      return sql`p.id IN (SELECT player_id FROM player_achievements
+                            WHERE achievement_type = 'first_kick_goal'
+                              AND player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
+                              AND season BETWEEN ${lo} AND ${hi})`;
+    }
     case 'brownlow_votes_career_min':
       return sql`c.brownlow_votes >= ${requireInt(axis, 'votes', 'Votes')}`;
 

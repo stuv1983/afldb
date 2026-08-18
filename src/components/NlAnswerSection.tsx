@@ -81,9 +81,57 @@ function renderPayload(answer: NlAnswer) {
       return <ClubSeasonTable rows={payload.rows} total={payload.total} />;
     case 'count':
       return <p>{formatNumber(payload.value)}</p>;
+    case 'achievement_summary':
+      return <AchievementSummaryTable payload={payload} />;
     case 'unanswerable':
       return null;
   }
+}
+
+function AchievementSummaryTable({
+  payload,
+}: {
+  payload: Extract<NlAnswer['payload'], { kind: 'achievement_summary' }>;
+}) {
+  const { rows, groupBy } = payload;
+  if (rows.length === 0) return null;
+
+  // "Which clubs have never had one" and "who was first" are lists of
+  // names; a count column on either would be noise (every value is 0, or
+  // is the season already shown in the label).
+  const isNameList = groupBy === 'occurrence' || rows.every((r) => r.value === 0);
+  const heading = groupBy === 'club' ? 'Club'
+    : groupBy === 'decade' ? 'Decade'
+    : groupBy === 'season' ? 'Season'
+    : 'Player';
+
+  return (
+    <CollapsibleTable
+      title={isNameList ? `Every matching ${heading.toLowerCase()}` : `By ${heading.toLowerCase()}`}
+      note={`${formatNumber(payload.total)} recorded ${payload.total === 1 ? 'player' : 'players'}`}
+    >
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">{heading}</th>
+              {!isNameList && <th scope="col" className="num">Players</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.label}>
+                <td className="wide">
+                  {r.href ? <Link href={r.href}>{r.label}</Link> : r.label}
+                </td>
+                {!isNameList && <td className="num">{formatNumber(r.value)}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </CollapsibleTable>
+  );
 }
 
 function PlayerCareerTable({ rows, total }: { rows: NlPlayerCareerRow[]; total: number }) {

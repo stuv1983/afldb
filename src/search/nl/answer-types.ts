@@ -58,6 +58,22 @@ export type NlClubSeasonRow = {
   value: number | null;
 };
 
+/**
+ * One group of an achievement summary: a club, a decade, a season, or a
+ * single named occurrence. `label` is display text and `value` the count
+ * (or the season, for earliest/latest); `href` links the group's own page
+ * where one exists, so a club row can be clicked through.
+ */
+export type NlAchievementGroupRow = {
+  label: string;
+  value: number;
+  href: string | null;
+  /** Present for earliest/latest: the player the occurrence belongs to. */
+  playerName?: string | null;
+  playerSlug?: string | null;
+  playerId?: number | null;
+};
+
 export type NlAnswerPayload =
   | { kind: 'player_game'; lead: NlPlayerGameRow | null; rows: NlPlayerGameRow[]; total: number }
   | { kind: 'player_career'; lead: NlPlayerCareerRow | null; rows: NlPlayerCareerRow[]; total: number }
@@ -65,6 +81,16 @@ export type NlAnswerPayload =
   | { kind: 'team_match'; lead: NlTeamMatchRow | null; rows: NlTeamMatchRow[]; total: number }
   | { kind: 'club_season'; lead: NlClubSeasonRow | null; rows: NlClubSeasonRow[]; total: number }
   | { kind: 'count'; value: number }
+  | {
+      kind: 'achievement_summary';
+      /** What the groups are: 'club' | 'decade' | 'season' | 'occurrence'. */
+      groupBy: string;
+      /** The achievement's display label, e.g. "Scored a goal with their first kick". */
+      achievementLabel: string;
+      rows: NlAchievementGroupRow[];
+      /** Linked rows the summary covers, so a caveat can say what it excludes. */
+      total: number;
+    }
   | { kind: 'unanswerable'; topic: string; reason: string };
 
 export type NlAnswer = {

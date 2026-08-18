@@ -136,12 +136,75 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    moves these questions from outcome=unanswerable/coverage_unavailable
  *    to outcome=answered, which is exactly the shift that must not be
  *    pooled with version 10's rows when the log is read.
+ * 12: "goal with their first kick" answers, as a career predicate and as a
+ *    new achievement_summary grain ("which club has had the most", "by
+ *    decade", "which clubs never have", "who was first/most recent").
+ *    Two fixes ship with it, both in the plan-assembly step of parser.ts:
+ *    careerPredicates was excluded from `structuralOk` and from the
+ *    aggregation default, so the first parser-produced predicate plan
+ *    would have declined as unrecognised, and -- once accepted -- would
+ *    have defaulted to {kind:'max'} and been capped at 25 rows instead of
+ *    listing all 100. Neither could fire before now: nothing in the
+ *    parser had ever populated careerPredicates, so the array was always
+ *    empty and both bugs were unreachable.
  */
-export const PARSER_VERSION = 11;
+export const PARSER_VERSION = 12;
 
 // ------------------------------------------------------------------ grain
 
-export type NlGrain = 'player_career' | 'player_game' | 'player_season' | 'team_match' | 'club_season';
+export type NlGrain =
+  | 'player_career' | 'player_game' | 'player_season' | 'team_match' | 'club_season'
+  /**
+   * Summaries OF an achievement rather than a list of players who hold it
+   * ("which club has had the most players kick a goal with their first
+   * kick"). The player_career grain answers "who", filtered by the same
+   * achievement as a career predicate; this one answers "how are they
+   * distributed", which is a group-and-count no player-row grain can
+   * express.
+   */
+  | 'achievement_summary';
+
+// ----------------------------------------------------------- achievements
+
+/**
+ * Achievements that can be summarised, as a closed catalogue -- the same
+ * shape and the same reason as NL_AWARDS: the value reaches SQL as a bound
+ * parameter chosen from this map, never as text from the question.
+ *
+ * Adding a second player_achievement_type is one entry here plus one
+ * GRID_BUILDERS entry; nothing else in this file changes.
+ */
+export const NL_ACHIEVEMENTS = {
+  first_kick_goal: {
+    value: 'first_kick_goal',
+    label: 'Scored a goal with their first kick',
+    /** The career predicate answering "who", for the player_career grain. */
+    builder: 'first_kick_goal_player',
+  },
+} as const;
+
+export type NlAchievementKey = keyof typeof NL_ACHIEVEMENTS;
+
+export function isNlAchievementKey(value: string): value is NlAchievementKey {
+  return Object.prototype.hasOwnProperty.call(NL_ACHIEVEMENTS, value);
+}
+
+/**
+ * by_club/by_decade/by_season are distributions; clubs_without is the
+ * inverse ("which clubs have never had one"); earliest/latest name the
+ * first and most recent occurrence.
+ */
+export type NlAchievementSummaryKind =
+  | 'by_club' | 'by_decade' | 'by_season' | 'clubs_without' | 'earliest' | 'latest';
+
+const NL_ACHIEVEMENT_SUMMARY_KINDS: readonly NlAchievementSummaryKind[] = [
+  'by_club', 'by_decade', 'by_season', 'clubs_without', 'earliest', 'latest',
+];
+
+export type NlAchievementSummary = {
+  achievementKey: NlAchievementKey;
+  kind: NlAchievementSummaryKind;
+};
 
 // ---------------------------------------------------------------- entities
 
@@ -310,6 +373,10 @@ const PLAYER_STAT_METRICS: Record<string, NlMetricDef> = Object.fromEntries(
 );
 
 export const NL_METRICS: Record<NlGrain, Record<string, NlMetricDef>> = {
+  // An achievement summary counts rows rather than ranking a statistic,
+  // so it has no metric vocabulary at all -- validatePlan requires its
+  // metric to be null.
+  achievement_summary: {},
   player_game: {
     ...PLAYER_STAT_METRICS,
     brownlow_votes: columnMetric('brownlow_votes', 'Brownlow votes', 'brownlow_votes'),
@@ -553,6 +620,8 @@ export type NlQueryPlan = {
   careerPredicates: GridAxisState[];
   /** club_season only. */
   clubSeasonConditions: NlClubSeasonCondition[];
+  /** achievement_summary only: which achievement, summarised which way. */
+  achievementSummary?: NlAchievementSummary;
   boundary?: NlBoundary;
   /** Whether a value tied for the extreme all come back, or only the first found. Default 'all'. */
   tiePolicy: 'all' | 'first';
@@ -644,8 +713,23 @@ function validateCondition(cond: NlCareerCondition): NlValidationError | null {
 export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError {
   if (raw.v !== 1) return { error: 'Unrecognised plan version.' };
 
-  const grains: NlGrain[] = ['player_career', 'player_game', 'player_season', 'team_match', 'club_season'];
+  const grains: NlGrain[] = ['player_career', 'player_game', 'player_season', 'team_match', 'club_season', 'achievement_summary'];
   if (!grains.includes(raw.grain)) return { error: `Unknown grain "${raw.grain}".` };
+
+  // An achievement summary counts rows; it never ranks by a statistic, so
+  // it carries its own descriptor instead of a metric.
+  if (raw.grain === 'achievement_summary') {
+    if (!raw.achievementSummary) return { error: 'An achievement summary must say which achievement it summarises.' };
+    if (!isNlAchievementKey(raw.achievementSummary.achievementKey)) {
+      return { error: `Unknown achievement "${raw.achievementSummary.achievementKey}".` };
+    }
+    if (!NL_ACHIEVEMENT_SUMMARY_KINDS.includes(raw.achievementSummary.kind)) {
+      return { error: `Unknown achievement summary "${raw.achievementSummary.kind}".` };
+    }
+    if (raw.metric !== null) return { error: 'An achievement summary does not rank by a statistic.' };
+  } else if (raw.achievementSummary) {
+    return { error: 'An achievement summary only applies to an achievement-summary question.' };
+  }
 
   if (raw.metric !== null && !isNlMetric(raw.grain, raw.metric)) {
     return { error: `"${raw.metric}" is not a recognised statistic for this kind of question.` };
@@ -788,6 +872,7 @@ const GRAIN_LABEL: Record<NlGrain, string> = {
   player_season: 'season',
   team_match: 'match',
   club_season: 'club season',
+  achievement_summary: 'achievement',
 };
 
 /** The subject noun for a grain with no ranked metric ("every matching <noun>"). */
@@ -797,6 +882,7 @@ const GRAIN_SUBJECT: Record<NlGrain, string> = {
   player_season: 'player',
   team_match: 'club',
   club_season: 'club season',
+  achievement_summary: 'group',
 };
 
 const OP_WORDS: Record<NlCompareOp, string> = {

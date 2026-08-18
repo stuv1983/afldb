@@ -190,6 +190,11 @@ function payloadTotal(payload: NlAnswerPayload): number {
       return payload.total;
     case 'count':
       return 1;
+    case 'achievement_summary':
+      // How many groups came back, matching every other branch's "rows the
+      // reader is shown" reading -- payload.total counts the achievement's
+      // holders, which is a different number and belongs in the answer text.
+      return payload.rows.length;
     case 'unanswerable':
       return 0;
   }

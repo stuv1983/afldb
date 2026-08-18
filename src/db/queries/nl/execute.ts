@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { answerAchievementSummary } from '@/db/queries/nl/achievement-summary';
 import { answerClubSeason } from '@/db/queries/nl/club-season';
 import { answerPlayerCareer } from '@/db/queries/nl/player-career';
 import { answerPlayerGame } from '@/db/queries/nl/player-game';
@@ -13,7 +14,7 @@ import type { NlAnswerPayload } from '@/search/nl/answer-types';
  * function a future LLM fallback (see plan.ts's header comment) would
  * call: anything that produces a plan passing validatePlan reaches SQL
  * only through here, and only through one of the grain compilers below,
- * never directly. All five grains now have a compiler.
+ * never directly. Every grain has a compiler.
  */
 export async function executePlan(plan: NlQueryPlan): Promise<NlAnswerPayload> {
   const limit = plan.agg.kind === 'top_n' || plan.agg.kind === 'list' ? NL_LIMITS.maxListRows : NL_LIMITS.maxTiedRows;
@@ -30,5 +31,10 @@ export async function executePlan(plan: NlQueryPlan): Promise<NlAnswerPayload> {
       return answerTeamMatch(plan, cappedLimit);
     case 'club_season':
       return answerClubSeason(plan, cappedLimit);
+    case 'achievement_summary':
+      // Groups, not rows: the limit above caps a player list and has no
+      // meaning for a per-club or per-decade count, which is bounded by
+      // how many clubs and decades exist.
+      return answerAchievementSummary(plan);
   }
 }

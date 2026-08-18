@@ -728,3 +728,184 @@ describe('regression: two career conditions in one sentence do not cross-contami
     expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'finals', op: 'gt', value: 5 });
   });
 });
+
+/**
+ * The first-kick-goal achievement (player_achievements, migration 053).
+ *
+ * The claim is curated and source-only -- AFLDB has no play-by-play data,
+ * so nothing here is derivable from a stat line. The parser's job is to
+ * recognise the phrase, keep it apart from the several achievements that
+ * sound like it, and route a summary question to its own grain.
+ */
+describe('14. goal with first kick', () => {
+  const ACHIEVEMENT = 'first_kick_goal_player';
+
+  function builders(p: NlQueryPlan): string[] {
+    return p.careerPredicates.map((axis) => axis.builder);
+  }
+
+  describe('the base question', () => {
+    it('lists players, with no metric to rank by', async () => {
+      const p = await plan('players who kicked a goal with their first kick');
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual([ACHIEVEMENT]);
+      expect(p.metric).toBeNull();
+      // Not {kind:'max'}: a list is capped at 100 rows and a tie list at
+      // 25, and this question asks for all of them.
+      expect(p.agg).toEqual({ kind: 'list' });
+      expect(p.limit).toBe(100);
+    });
+
+    it('validates, so the plan actually reaches a compiler', async () => {
+      const p = await plan('players who kicked a goal with their first kick');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  // Every phrasing in the acceptance criteria has to produce the SAME
+  // plan, not merely a similar one: a reader rewording a question must
+  // not silently get a different query.
+  describe('equivalent phrasings produce one canonical plan', () => {
+    const phrasings = [
+      'players who kicked a goal with their first kick',
+      'players to goal with their first kick',
+      'players who goaled with their first kick',
+      'first kick goal players',
+      'players who scored with their first kick',
+      'players to score a goal with their first AFL kick',
+      'who kicked a goal with their first VFL kick',
+      'who kicked a goal with their first career kick',
+    ];
+
+    it.each(phrasings)('%s', async (question) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual([ACHIEVEMENT]);
+    });
+
+    it('every phrasing produces the identical plan, not merely a similar one', async () => {
+      const plans = await Promise.all(phrasings.map(plan));
+      for (const p of plans.slice(1)) {
+        expect({ ...p }).toEqual({ ...plans[0] });
+      }
+    });
+  });
+
+  describe('filters', () => {
+    // A club or season filter has to become a PREDICATE, not scope:
+    // answerWithPredicates ignores scope entirely, so a scope-only club
+    // filter would silently answer for every club.
+    //
+    // And it must scope the ACHIEVEMENT, not the player: "Carlton players
+    // who kicked a goal with their first kick" means players who did it
+    // FOR Carlton. Scoping by played_for_club instead would also count a
+    // player who did it on debut elsewhere and was traded to Carlton
+    // later -- 33 players rather than the 23 who actually did it there.
+    it('a club filter scopes the achievement, not the player', async () => {
+      const p = await plan('Carlton players who kicked a goal with their first kick');
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['first_kick_goal_for_club']);
+      expect(p.careerPredicates[0].params.club).toBe('2');
+    });
+
+    it('a decade filter uses the season the feat happened in', async () => {
+      const p = await plan('players who kicked a goal with their first kick in the 1940s');
+      expect(builders(p)).toEqual(['first_kick_goal_between']);
+      expect(p.careerPredicates[0].params).toEqual({ from: '1940', to: '1949' });
+    });
+
+    it('a "before" filter bounds the upper end', async () => {
+      const p = await plan('players who kicked a goal with their first kick before 1950');
+      expect(builders(p)).toEqual(['first_kick_goal_between']);
+      expect(p.careerPredicates[0].params.to).toBe('1949');
+    });
+
+    it('a "since" filter bounds the lower end', async () => {
+      const p = await plan('players who kicked a goal with their first kick since 2000');
+      expect(builders(p)).toEqual(['first_kick_goal_between']);
+      expect(p.careerPredicates[0].params.from).toBe('2000');
+    });
+
+    it('"how many" is still a list; the count comes from its total', async () => {
+      const p = await plan('how many players have kicked a goal with their first kick');
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual([ACHIEVEMENT]);
+      expect(p.metric).toBeNull();
+    });
+  });
+
+  describe('summary questions', () => {
+    it('which club has had the most', async () => {
+      const p = await plan('which club has had the most players kick a goal with their first kick');
+      expect(p.grain).toBe('achievement_summary');
+      expect(p.achievementSummary).toEqual({ achievementKey: 'first_kick_goal', kind: 'by_club' });
+      expect(p.metric).toBeNull();
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('by club', async () => {
+      const p = await plan('first kick goal players by club');
+      expect(p.achievementSummary?.kind).toBe('by_club');
+    });
+
+    it('by decade', async () => {
+      const p = await plan('first kick goal players by decade');
+      expect(p.achievementSummary?.kind).toBe('by_decade');
+    });
+
+    it('which clubs have never had one', async () => {
+      const p = await plan('which clubs have never had a player kick a goal with their first kick');
+      expect(p.achievementSummary?.kind).toBe('clubs_without');
+    });
+
+    it('who was the first', async () => {
+      const p = await plan('who was the first player to kick a goal with their first kick');
+      expect(p.achievementSummary?.kind).toBe('earliest');
+    });
+
+    it('who was the most recent', async () => {
+      const p = await plan('who was the most recent player to kick a goal with their first kick');
+      expect(p.achievementSummary?.kind).toBe('latest');
+    });
+
+    it('a summary cue alone never elects the grain', async () => {
+      // "by decade" names no achievement, so there is nothing to
+      // summarise; this must not become an achievement_summary plan.
+      const result = await parse('players by decade');
+      if (result.status === 'plan') {
+        expect(result.plan.grain).not.toBe('achievement_summary');
+      }
+    });
+  });
+
+  /**
+   * These are DIFFERENT achievements. A player can kick a goal in their
+   * debut game without it being their first kick, and a "first goal" is
+   * whenever it came -- mapping any of them here would answer a question
+   * the reader did not ask.
+   */
+  describe('semantically different questions are not this achievement', () => {
+    const negatives = [
+      'players who kicked a goal in their first game',
+      'players who kicked their first goal',
+      'players with one career goal',
+      'players who scored on debut',
+      'players who kicked a goal on debut',
+    ];
+
+    it.each(negatives)('%s does not resolve to the achievement', async (question) => {
+      const result = await parse(question);
+      if (result.status === 'plan') {
+        expect(builders(result.plan)).not.toContain(ACHIEVEMENT);
+        expect(result.plan.grain).not.toBe('achievement_summary');
+      }
+    });
+
+    it('"one career goal" still parses as an ordinary career condition', async () => {
+      const p = await plan('players with one career goal');
+      expect(p.grain).toBe('player_career');
+      expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'gte', value: 1 });
+      expect(builders(p)).not.toContain(ACHIEVEMENT);
+    });
+  });
+});

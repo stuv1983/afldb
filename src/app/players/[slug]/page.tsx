@@ -268,6 +268,42 @@ export default async function PlayerPage({
               </li>
             )}
 
+            {honours.firstKickGoal && (
+              <li>
+                <strong>
+                  <Link href="/records/first-kick-goal">
+                    {honours.firstKickGoal.consecutiveGoalKicks > 1
+                      ? `Goal with each of their first ${honours.firstKickGoal.consecutiveGoalKicks} VFL/AFL kicks`
+                      : 'Goal with their first VFL/AFL kick'}
+                  </Link>
+                </strong>
+                {' — '}
+                {honours.firstKickGoal.roundRaw ? `Round ${honours.firstKickGoal.roundRaw}, ` : ''}
+                {honours.firstKickGoal.season}
+                {honours.firstKickGoal.clubSlug && honours.firstKickGoal.clubName && (
+                  <>
+                    {' · '}
+                    <Link href={clubPath(honours.firstKickGoal.clubSlug)}>{honours.firstKickGoal.clubName}</Link>
+                  </>
+                )}
+                {honours.firstKickGoal.opponentSlug && honours.firstKickGoal.opponentName && (
+                  <>
+                    {' v '}
+                    <Link href={clubPath(honours.firstKickGoal.opponentSlug)}>{honours.firstKickGoal.opponentName}</Link>
+                  </>
+                )}
+                {/* Both are striking enough to be the point of the entry
+                    rather than a footnote, and both are checked against
+                    player_career_stats at import rather than taken on the
+                    source's word. */}
+                {honours.firstKickGoal.noFurtherCareerKicks
+                  ? '. The only kick of their career.'
+                  : honours.firstKickGoal.noFurtherCareerGoals
+                    ? '. The only goal of their career.'
+                    : ''}
+              </li>
+            )}
+
             {honours.allAustralian.length > 0 && (
               <li>
                 <strong>
