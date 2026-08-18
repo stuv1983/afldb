@@ -18,7 +18,8 @@
     "nl:stress:compare": "tsx tools/nl/compare-runs.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "nl:ui": "playwright test --config playwright.nl-stress.config.ts"
   },
   "dependencies": {
     "next": "^15.5.0",

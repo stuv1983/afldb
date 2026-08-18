@@ -575,17 +575,49 @@ export const CLUB_NICKNAMES: Record<string, string> = {
   lions: 'brisbane lions',
 };
 
-/** Merged server-side with venue_aliases the same way club nicknames are. */
+/**
+ * Merged server-side with venue_aliases the same way club nicknames are.
+ *
+ * THE VALUE IS A LOOKUP KEY, NOT A LABEL. buildVenueDirectory attaches a
+ * nickname to a venue only when the venue's own name-set -- canonical
+ * name, legacy name, venue_aliases -- contains the value verbatim. A
+ * value that matches nothing attaches to nothing, in silence: the
+ * nickname is simply never a known name, and the question comes back as
+ * an unsupported term with no hint that a dictionary entry was meant to
+ * cover it.
+ *
+ * That is not hypothetical. `marvel` and `etihad` both pointed at
+ * "docklands stadium" while the venues table calls it "Docklands", so
+ * both were dead for as long as they had existed -- 100 unsupported-term
+ * hits for "marvel" in a single 12,000-question run against dev. `gabba`
+ * pointed at "the gabba" against a row named "Gabba" and was dead the
+ * same way. Both are corrected below.
+ *
+ * tests/integration/nl-vocab.test.ts now asserts every value here
+ * resolves against the real directory, so the next drift fails a test
+ * instead of quietly deleting a nickname.
+ */
 export const VENUE_NICKNAMES: Record<string, string> = {
   'the g': 'melbourne cricket ground',
   mcg: 'melbourne cricket ground',
   kardinia: 'kardinia park',
   gmhba: 'kardinia park',
-  docklands: 'docklands stadium',
-  marvel: 'docklands stadium',
-  etihad: 'docklands stadium',
-  'the gabba': 'the gabba',
-  gabba: 'the gabba',
+  docklands: 'docklands',
+  marvel: 'docklands',
+  etihad: 'docklands',
+  /**
+   * The whole-phrase forms are not redundant. findLongestMatch takes the
+   * longest name that appears, and stripMatch then removes only what
+   * matched -- so a bare `marvel` entry consumes "marvel" out of "marvel
+   * stadium" and leaves "stadium" behind in the text to be re-parsed as
+   * a stray token. Listing the full name lets the longest-wins rule take
+   * the whole phrase, which is also how readers actually write it.
+   */
+  'marvel stadium': 'docklands',
+  'etihad stadium': 'docklands',
+  'docklands stadium': 'docklands',
+  'the gabba': 'gabba',
+  gabba: 'gabba',
   scg: 'sydney cricket ground',
   waverley: 'waverley park',
   'vfl park': 'waverley park',
