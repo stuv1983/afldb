@@ -355,6 +355,13 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`p.id IN (SELECT player_id FROM player_season_stats WHERE losses >= ${requireInt(axis, 'times', 'Losses')})`;
     case 'season_draws_min':
       return sql`p.id IN (SELECT player_id FROM player_season_stats WHERE draws >= ${requireInt(axis, 'times', 'Draws')})`;
+    case 'drawn_matches_min': {
+      const n = requireInt(axis, 'times', 'Drawn matches');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.result = 'draw'
+                           GROUP BY pms.player_id HAVING count(*) >= ${n})`;
+    }
     case 'club_season_stat_leader': {
       const statKey = requireStatKey(axis);
       return sql`p.id IN (SELECT DISTINCT player_id FROM (${ledSeasonRows(statKey)}) led)`;

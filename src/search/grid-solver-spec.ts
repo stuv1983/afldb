@@ -196,6 +196,7 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   season_wins_min: { key: 'season_wins_min', label: 'X+ wins in one season', group: 'Season & era', params: [int('times', 'Wins')] },
   season_losses_min: { key: 'season_losses_min', label: 'X+ losses in one season', group: 'Season & era', params: [int('times', 'Losses')] },
   season_draws_min: { key: 'season_draws_min', label: 'X+ draws in one season', group: 'Season & era', params: [int('times', 'Draws')] },
+  drawn_matches_min: { key: 'drawn_matches_min', label: 'Played in X+ drawn matches', group: 'Season & era', params: [int('times', 'Drawn matches')] },
   club_season_stat_leader: { key: 'club_season_stat_leader', label: 'Led club in a stat (season)', group: 'Season & era', params: [stat()] },
   club_season_stat_leader_min_times: { key: 'club_season_stat_leader_min_times', label: 'Led club in a stat, X+ times', group: 'Season & era', params: [stat(), int('times', 'Times')] },
   wooden_spoon_season: { key: 'wooden_spoon_season', label: 'Wooden spoon season', group: 'Season & era', params: [] },

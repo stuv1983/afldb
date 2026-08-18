@@ -250,6 +250,34 @@ describe('parsePlayerQuestion', () => {
     expect(parsePlayerQuestion('michael tuck')).toBeNull();
     expect(parsePlayerQuestion('most goals')).toBeNull();
   });
+
+  it('reads preliminary finals as their own question, not a generic finals count', () => {
+    // The regression this guards: "preliminary final" contains "final", so
+    // without a dedicated check this fell through to the generic anyFinal
+    // branch and answered finals_games_min instead.
+    expect(parsePlayerQuestion('played 3 preliminary finals')?.axis).toEqual({
+      builder: 'prelim_finals_played_min', params: { times: '3' },
+    });
+    expect(parsePlayerQuestion('played in a preliminary final')?.axis).toEqual({
+      builder: 'prelim_finals_played_min', params: { times: '1' },
+    });
+    expect(parsePlayerQuestion('2 prelim finals')?.axis).toEqual({
+      builder: 'prelim_finals_played_min', params: { times: '2' },
+    });
+  });
+
+  it('reads a bare "drawn match/game" as career-wide, distinct from season draws', () => {
+    expect(parsePlayerQuestion('played in at least 1 drawn match')?.axis).toEqual({
+      builder: 'drawn_matches_min', params: { times: '1' },
+    });
+    expect(parsePlayerQuestion('2 drawn games')?.axis).toEqual({
+      builder: 'drawn_matches_min', params: { times: '2' },
+    });
+    // "season" still present alongside "game" -- the season reading wins.
+    expect(parsePlayerQuestion('drew a game in one season')?.axis).toEqual({
+      builder: 'season_draws_min', params: { times: '1' },
+    });
+  });
 });
 
 describe('parseClubQuestion', () => {

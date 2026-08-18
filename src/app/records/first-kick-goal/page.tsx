@@ -11,11 +11,13 @@ import {
   getClubsWithoutFirstKickGoal,
   getFirstKickGoalByClub,
   getFirstKickGoalByDecade,
+  getFirstKickGoalHighlights,
   getFirstKickGoalList,
   getFirstKickGoalProvenance,
   getFirstKickGoalSummary,
+  type FirstKickGoalHighlight,
 } from '@/db/queries/player-achievements';
-import { clubPath, formatNumber, isLinked, playerPath, seasonPath } from '@/lib/format';
+import { clubPath, formatNumber, isLinked, matchPath, playerPath, seasonPath } from '@/lib/format';
 import { pageMetadata } from '@/lib/seo';
 import { clubOptions } from '@/search/list-filters';
 import { type FilterField, parseFilterValues } from '@/search/table-filters';
@@ -36,6 +38,21 @@ function decadeOptions(rows: { decade: number }[]) {
   return rows.map((r) => ({ value: String(r.decade), label: `${r.decade}s` }));
 }
 
+/** Player name (linked when matched) plus round (linked when the match resolved), for a highlight stat tile. */
+function HighlightNote({ highlight }: { highlight: FirstKickGoalHighlight }) {
+  return (
+    <div className="note">
+      {highlight.playerId !== null && highlight.playerSlug
+        ? <Link href={playerPath(highlight.playerSlug, highlight.playerId)}>{highlight.playerName}</Link>
+        : highlight.playerName}
+      {' · '}
+      {highlight.matchId !== null
+        ? <Link href={matchPath(highlight.matchId)}>{highlight.roundRaw}</Link>
+        : highlight.roundRaw}
+    </div>
+  );
+}
+
 export default async function FirstKickGoalPage({
   searchParams,
 }: {
@@ -43,8 +60,9 @@ export default async function FirstKickGoalPage({
 }) {
   const query = await searchParams;
 
-  const [summary, byClub, byDecade, without, provenance, clubs] = await Promise.all([
+  const [summary, highlights, byClub, byDecade, without, provenance, clubs] = await Promise.all([
     getFirstKickGoalSummary(),
+    getFirstKickGoalHighlights(),
     getFirstKickGoalByClub(),
     getFirstKickGoalByDecade(),
     getClubsWithoutFirstKickGoal(),
@@ -52,18 +70,26 @@ export default async function FirstKickGoalPage({
     listClubs(),
   ]);
 
+  const FEATURE_OPTIONS = [
+    { value: 'multi-kick', label: 'Multiple kicks (goal with each of first 2+ kicks)' },
+    { value: 'only-career-goal', label: 'Only career goal' },
+  ];
+
   const fields: FilterField[] = [
     { kind: 'text', key: 'q', label: 'Player', placeholder: 'Name contains…' },
     { kind: 'select', key: 'club', label: 'Club', options: clubOptions(clubs), anyLabel: 'Any club' },
     { kind: 'select', key: 'decade', label: 'Decade', options: decadeOptions(byDecade), anyLabel: 'Any decade' },
+    { kind: 'select', key: 'feature', label: 'Feature', options: FEATURE_OPTIONS, anyLabel: 'Any' },
   ];
   const values = parseFilterValues(fields, query);
   const decadeValue = values.select.decade ? Number(values.select.decade) : undefined;
+  const feature = values.select.feature as 'multi-kick' | 'only-career-goal' | undefined;
 
   const rows = await getFirstKickGoalList({
     q: values.text.q || undefined,
     club: values.select.club || undefined,
     decade: Number.isFinite(decadeValue) ? decadeValue : undefined,
+    feature,
   });
 
   const sections: { id: string; label: string; node: React.ReactNode }[] = [];
@@ -123,7 +149,11 @@ export default async function FirstKickGoalPage({
                         : <span className="muted">—</span>}
                     </td>
                     <td className="num"><Link href={seasonPath(r.season)}>{r.season}</Link></td>
-                    <td>{r.roundRaw}</td>
+                    <td>
+                      {r.matchId !== null
+                        ? <Link href={matchPath(r.matchId)}>{r.roundRaw}</Link>
+                        : r.roundRaw}
+                    </td>
                     <td>
                       {r.opponentSlug && r.opponentName
                         ? <Link href={clubPath(r.opponentSlug)}>{r.opponentName}</Link>
@@ -245,20 +275,34 @@ export default async function FirstKickGoalPage({
           )}
         </div>
         <div className="stat">
-          <div className="value">{summary.earliestSeason ?? '—'}</div>
+          <div className="value">
+            {highlights.earliest
+              ? <Link href={seasonPath(highlights.earliest.season)}>{highlights.earliest.season}</Link>
+              : summary.earliestSeason ?? '—'}
+          </div>
           <div className="label">Earliest</div>
+          {highlights.earliest && <HighlightNote highlight={highlights.earliest} />}
         </div>
         <div className="stat">
-          <div className="value">{summary.latestSeason ?? '—'}</div>
+          <div className="value">
+            {highlights.latest
+              ? <Link href={seasonPath(highlights.latest.season)}>{highlights.latest.season}</Link>
+              : summary.latestSeason ?? '—'}
+          </div>
           <div className="label">Most recent</div>
+          {highlights.latest && <HighlightNote highlight={highlights.latest} />}
         </div>
         <div className="stat">
-          <div className="value">{formatNumber(summary.multiKick)}</div>
+          <div className="value">
+            <Link href="/records/first-kick-goal?feature=multi-kick#players">{formatNumber(summary.multiKick)}</Link>
+          </div>
           <div className="label">Multiple kicks</div>
           <div className="note">a goal with each of their first 2+ kicks</div>
         </div>
         <div className="stat">
-          <div className="value">{formatNumber(summary.onlyCareerGoal)}</div>
+          <div className="value">
+            <Link href="/records/first-kick-goal?feature=only-career-goal#players">{formatNumber(summary.onlyCareerGoal)}</Link>
+          </div>
           <div className="label">Only career goal</div>
         </div>
       </div>

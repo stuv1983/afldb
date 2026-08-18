@@ -274,6 +274,20 @@ describe('grid solver correctness', () => {
     expect(summary.eligible).toBe(Number(expected.count));
   });
 
+  it('drawn_matches_min(1) matches a hand-written equivalent count', async () => {
+    const summary = await solveCellSummary(
+      { builder: 'drawn_matches_min', params: { times: '1' } },
+      { builder: 'career_games_min', params: { games: '0' } },
+      'games_asc',
+    );
+    const [expected] = await sql<{ count: string }[]>`
+      SELECT count(DISTINCT pms.player_id) FROM player_match_stats pms
+        JOIN matches m ON m.id = pms.match_id
+       WHERE m.result = 'draw'
+    `;
+    expect(summary.eligible).toBe(Number(expected.count));
+  });
+
   it('club_season_stat_leader(goals) rows really did lead a club-season in goals', async () => {
     const { rows } = await solveCellRows(
       { builder: 'club_season_stat_leader', params: { stat: 'goals' } },

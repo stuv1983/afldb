@@ -70,11 +70,11 @@ export function ConsentBanner() {
         <div className="consent-banner-actions">
           <form action={record}>
             <input type="hidden" name="choice" value="accepted" />
-            <button type="submit">Accept</button>
+            <button type="submit" className="btn">Accept</button>
           </form>
           <form action={record}>
             <input type="hidden" name="choice" value="declined" />
-            <button type="submit">Decline</button>
+            <button type="submit" className="btn">Decline</button>
           </form>
         </div>
       </div>

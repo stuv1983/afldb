@@ -1365,8 +1365,9 @@ details.admin-section > summary h2 {
   right: 0;
   bottom: 0;
   z-index: 60;
-  background: var(--surface, #fff);
-  border-top: 1px solid var(--rule, rgba(128, 128, 128, 0.3));
+  background: var(--bg);
+  color: var(--text);
+  border-top: 1px solid var(--border-strong);
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.12);
   padding: 0.75rem 0;
 }

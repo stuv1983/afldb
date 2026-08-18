@@ -305,6 +305,7 @@ export function parsePlayerQuestion(raw: string): PlayerQuestion | null {
   const lost = /\bloss(?:es)?\b|\blost\b|\blosing\b/.test(text);
   const anyFinal = /\bfinals?\b/.test(text);
   const grandFinal = /\bgrand finals?\b|\bgrand-finals?\b/.test(text);
+  const prelimFinal = /\bpreliminary finals?\b|\bprelim finals?\b|\bpreliminary-finals?\b/.test(text);
 
   // Premierships/flags, and "won a grand final", which means the same
   // thing. Ahead of the generic win handling below, which would
@@ -322,6 +323,15 @@ export function parsePlayerQuestion(raw: string): PlayerQuestion | null {
     return question('grand_finals_played_min', { times: String(times) }, `${times}+ Grand Finals played`);
   }
 
+  // Preliminary finals, ahead of the generic "finals" reading below for
+  // the same reason grand finals are: "preliminary final" contains the
+  // word "final", so the narrower question has to be tried first or it
+  // is silently answered as a generic finals-games count instead.
+  if (prelimFinal) {
+    const times = n ?? 1;
+    return question('prelim_finals_played_min', { times: String(times) }, `${times}+ Preliminary Finals played`);
+  }
+
   // Finals, likewise ahead of the generic season-outcome handling.
   if (anyFinal && won) {
     const times = n ?? 1;
@@ -335,8 +345,22 @@ export function parsePlayerQuestion(raw: string): PlayerQuestion | null {
   // game"); wins and losses require an explicit count, since a bare
   // "won a final" is a finals question and is caught above, and a bare
   // "winners" is more likely an award query than a season-wins one.
+  //
+  // Draws split on grain: the catalogue's only long-standing draws
+  // question is season-scoped ("X+ draws in one season"), which is what a
+  // bare "drawn twice" or "two draws" has always meant here. But "played
+  // in at least 1 drawn match" names a game, not a season, so once the
+  // text says "match"/"game" without also saying "season" it means the
+  // career-wide count instead -- these disagree for X > 1 (two draws
+  // spread across two seasons is 2 career draws but 0 for either season's
+  // X=2 count), so which one is meant is not just a wording preference.
   if (/\bdraws?\b|\bdrawn\b|\bdrew\b/.test(text)) {
     const times = n ?? 1;
+    const namesAMatch = /\bmatch(?:es)?\b|\bgames?\b/.test(text);
+    const namesASeason = /\bseasons?\b/.test(text);
+    if (namesAMatch && !namesASeason) {
+      return question('drawn_matches_min', { times: String(times) }, `${times}+ drawn matches`);
+    }
     return question('season_draws_min', { times: String(times) }, `${times}+ draws in one season`);
   }
   if (n !== null && won) {

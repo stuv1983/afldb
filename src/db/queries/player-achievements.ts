@@ -41,10 +41,13 @@ export type FirstKickGoalRow = {
   kicklessMatchesBeforeFirstKick: number;
 };
 
+export type FirstKickGoalFeature = 'multi-kick' | 'only-career-goal';
+
 export type FirstKickGoalFilters = {
   q?: string;
   club?: string;
   decade?: number;
+  feature?: FirstKickGoalFeature;
 };
 
 export async function getFirstKickGoalList(filters: FirstKickGoalFilters = {}): Promise<FirstKickGoalRow[]> {
@@ -60,6 +63,11 @@ export async function getFirstKickGoalList(filters: FirstKickGoalFilters = {}): 
   }
   if (filters.decade !== undefined) {
     conditions.push(sql`a.season BETWEEN ${filters.decade} AND ${filters.decade + 9}`);
+  }
+  if (filters.feature === 'multi-kick') {
+    conditions.push(sql`a.consecutive_goal_kicks > 1`);
+  } else if (filters.feature === 'only-career-goal') {
+    conditions.push(sql`a.no_further_career_goals`);
   }
   const where = allOf(conditions);
 
@@ -116,6 +124,51 @@ export async function getFirstKickGoalSummary(): Promise<{
      WHERE ${FIRST_KICK_GOAL}
   `;
   return row;
+}
+
+export type FirstKickGoalHighlight = {
+  playerId: number | null;
+  playerSlug: string | null;
+  playerName: string;
+  season: number;
+  roundRaw: string;
+  matchId: number | null;
+};
+
+/**
+ * The earliest- and most-recent-dated rows, each with enough detail (player,
+ * round, match) to link to rather than just the bare year the stat strip
+ * showed before. Ties (more than one row in the extreme season) resolve to
+ * the lowest `id`, i.e. import order -- an arbitrary but stable pick rather
+ * than an undefined one.
+ */
+export async function getFirstKickGoalHighlights(): Promise<{
+  earliest: FirstKickGoalHighlight | null;
+  latest: FirstKickGoalHighlight | null;
+}> {
+  const rows = await sql<(FirstKickGoalHighlight & { which: 'earliest' | 'latest' })[]>`
+    (SELECT 'earliest' AS which, a.player_id AS "playerId", p.slug AS "playerSlug",
+            COALESCE(p.display_name, a.player_name_clean) AS "playerName",
+            a.season, a.round_raw AS "roundRaw", a.match_id AS "matchId"
+       FROM player_achievements a
+       LEFT JOIN players p ON p.id = a.player_id
+      WHERE a.${FIRST_KICK_GOAL}
+      ORDER BY a.season ASC, a.id ASC
+      LIMIT 1)
+    UNION ALL
+    (SELECT 'latest' AS which, a.player_id AS "playerId", p.slug AS "playerSlug",
+            COALESCE(p.display_name, a.player_name_clean) AS "playerName",
+            a.season, a.round_raw AS "roundRaw", a.match_id AS "matchId"
+       FROM player_achievements a
+       LEFT JOIN players p ON p.id = a.player_id
+      WHERE a.${FIRST_KICK_GOAL}
+      ORDER BY a.season DESC, a.id DESC
+      LIMIT 1)
+  `;
+  return {
+    earliest: rows.find((r) => r.which === 'earliest') ?? null,
+    latest: rows.find((r) => r.which === 'latest') ?? null,
+  };
 }
 
 /** Linked rows by club lineage, the same shape as getNominationsByClub. */
