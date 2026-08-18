@@ -641,23 +641,23 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     }
   }
 
-  // 2. "by a <club> player" -- must run before general club extraction,
-  // since it also contains a club name that would otherwise be treated
-  // as an ordinary clubFor/clubAgainst mention with no special meaning.
-  const byClubPlayer = extractByClubPlayer(text, ctx.clubs);
-  text = byClubPlayer.text;
-  consumedTokens.push(...byClubPlayer.consumed);
-
-  // 3. Club extraction (roles resolved by governing preposition).
-  const clubExtraction = extractClubs(text, ctx.clubs);
-  text = clubExtraction.text;
-  consumedTokens.push(...clubExtraction.consumed);
-  const clubFor = byClubPlayer.clubFor ?? clubExtraction.clubFor;
-  const clubAgainst = clubExtraction.clubAgainst;
-  if (clubFor) report.entityResolution.push({ mention: clubFor.matchedText, resolvedTo: clubFor.entity.name, certainty: 1 });
-  if (clubAgainst) report.entityResolution.push({ mention: clubAgainst.matchedText, resolvedTo: clubAgainst.entity.name, certainty: 1 });
-
-  // 4. Venue extraction.
+  // 2. Venue extraction, BEFORE any club extraction.
+  //
+  // Five venue names contain a club name as a whole word -- "melbourne
+  // cricket ground", "sydney cricket ground", "sydney showground",
+  // "adelaide oval", "east melbourne" -- and no club name contains a
+  // venue name, so the containment only runs one way. With clubs first,
+  // "most goals at Melbourne Cricket Ground" had "melbourne" consumed as
+  // a club, leaving "cricket ground", which matches no venue: the
+  // question then resolved to neither the club nor the ground and
+  // returned nothing at all. "the MCG" worked, so the full name of the
+  // most-used ground in the sport was the broken spelling.
+  //
+  // Extracting venues first makes the longer, more specific phrase win,
+  // which is the same rule findLongestMatch already applies WITHIN a
+  // directory -- this just applies it across the two. Safe in the other
+  // direction precisely because the containment is one-way: no club
+  // mention can be swallowed by a venue name.
   const venueMatch = findVenue(text, ctx.venues);
   let venue: NlEntityMatch<NlVenueDirectoryEntry> | undefined;
   if (venueMatch) {
@@ -666,6 +666,22 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     consumedTokens.push(venueMatch.matchedText);
     report.entityResolution.push({ mention: venueMatch.matchedText, resolvedTo: venueMatch.entity.name, certainty: 1 });
   }
+
+  // 3. "by a <club> player" -- must run before general club extraction,
+  // since it also contains a club name that would otherwise be treated
+  // as an ordinary clubFor/clubAgainst mention with no special meaning.
+  const byClubPlayer = extractByClubPlayer(text, ctx.clubs);
+  text = byClubPlayer.text;
+  consumedTokens.push(...byClubPlayer.consumed);
+
+  // 4. Club extraction (roles resolved by governing preposition).
+  const clubExtraction = extractClubs(text, ctx.clubs);
+  text = clubExtraction.text;
+  consumedTokens.push(...clubExtraction.consumed);
+  const clubFor = byClubPlayer.clubFor ?? clubExtraction.clubFor;
+  const clubAgainst = clubExtraction.clubAgainst;
+  if (clubFor) report.entityResolution.push({ mention: clubFor.matchedText, resolvedTo: clubFor.entity.name, certainty: 1 });
+  if (clubAgainst) report.entityResolution.push({ mention: clubAgainst.matchedText, resolvedTo: clubAgainst.entity.name, certainty: 1 });
 
   // 5. Seasons, match type, award.
   const seasons = extractSeasons(text);
@@ -1110,7 +1126,23 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     : metric !== null;
 
   const consumedCount = totalTokens.filter((t) => consumedSet.has(t) || t === candidateRaw?.split(' ')[0]).length;
-  const ratio = totalTokens.length === 0 ? 0 : consumedCount / totalTokens.length;
+  // An empty totalTokens means every word in the question was a stopword,
+  // digit or operator -- there is no meaningful content left for the
+  // parser to have failed on, so the fraction it explained is vacuously
+  // complete (1), not zero. "0" was backwards: it read "nothing left to
+  // explain" as "explained nothing", which is the opposite of what
+  // happened. "players with at least 2 clubs" is exactly this shape --
+  // every token is a STOPWORDS entry or a bare digit -- and
+  // extractCareerConditions had already built a correct clubs_played
+  // condition several steps earlier; the old 0 dragged confidence to 0
+  // regardless and declined a plan that was already right.
+  //
+  // Safe against garbage: a query with real content still needs
+  // `structuralOk` below (a real metric/condition/boundary) to pass at
+  // all, so ratio 1 on an empty totalTokens can only ever help a
+  // question where something upstream had already extracted something
+  // real -- it cannot by itself accept "the a is of".
+  const ratio = totalTokens.length === 0 ? 1 : consumedCount / totalTokens.length;
 
   // Meaningful tokens the parser could do nothing with -- excluding the
   // failed player mention's own tokens, which are reported separately

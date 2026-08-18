@@ -286,8 +286,21 @@ export const METRIC_WORDS: [RegExp, string][] = [
   [/\brebound-fifties\b/, 'rebounds'],
   [/\bbrownlow votes?\b/, 'brownlow_votes'],
   [/\bbiggest bags?\b/, 'goals'],
+  /**
+   * A bare "bag" as well as "biggest bag", because by the time metric
+   * extraction runs the phrase has usually already been split:
+   * AGGREGATION_PATTERNS claims "biggest" as `max` several steps
+   * earlier, leaving "bag" alone in the text. With only the two-word
+   * entry above, "biggest bag" resolved to no metric at all and declined
+   * -- which is what the v2 sweep found. It is honest vocabulary in its
+   * own right, too: a bag IS a haul of goals in football usage.
+   */
+  [/\bbags?\b/, 'goals'],
   [/\bgoal ?kick(?:ers?|ing)\b/, 'goals'],
   [/\bsnags?\b/, 'goals'],
+  // "majors" -- the formal-commentary word for goals, the counterpart of
+  // "behinds" as minor scores.
+  [/\bmajors?\b/, 'goals'],
   [/\bgoals?\b/, 'goals'],
   [/\bbehinds?\b/, 'behinds'],
   [/\bkicks?\b/, 'kicks'],
@@ -433,6 +446,10 @@ export const MATCH_TYPE_WORDS: [RegExp, string][] = [
   // "GF" only as its own token -- not inside a longer word -- since a
   // two-letter abbreviation is otherwise an easy false match.
   [/\bgf\b/, 'grand_final'],
+  // "the granny" -- Australian slang for the Grand Final, no formal
+  // plural in this usage. Must precede the bare "finals?" entry below,
+  // or nothing here would ever be reached for it.
+  [/\bgrann(?:y|ies)\b/, 'grand_final'],
   [/\bpreliminary finals?\b/, 'preliminary_final'],
   [/\bsemi finals?\b/, 'semi_final'],
   [/\bqualifying finals?\b/, 'qualifying_final'],
@@ -675,5 +692,31 @@ export const UNANSWERABLE_TOPICS: UnanswerableTopic[] = [
     re: /\baverage\b/,
     topic: 'averages',
     reason: 'Average-based questions are not yet supported.',
+  },
+  {
+    /**
+     * Subjective superlatives -- "best team of all time", "greatest
+     * player ever".
+     *
+     * These cannot be a bare `best|greatest` ban: both are legitimate
+     * aggregation words meaning `max` (see AGGREGATION_PATTERNS and
+     * POLARITY_AGG_RE above), so "best goal tally" and "worst losing
+     * margin" are real, answerable questions and must stay that way.
+     * What makes THIS class unanswerable is the shape: a subjective
+     * superlative over a bare entity noun with an explicit all-time
+     * qualifier and no metric anywhere.
+     *
+     * Requiring that qualifier is what keeps the rule narrow. Without
+     * it, "best team score" would be caught by "best team" and a real
+     * question would start declining.
+     *
+     * Found by the v2 UI sweep: "best team of all time" parsed as a
+     * club_season query with no conditions and confidently returned all
+     * 1,640 club seasons -- a meaningless answer presented as a real
+     * one, which is worse than declining.
+     */
+    re: /\b(?:best|greatest|finest|worst)\s+(?:team|side|player|club|footballer)s?\s+(?:of\s+all\s+time|ever|in\s+history)\b/,
+    topic: 'subjective ranking',
+    reason: 'Who was "best" or "greatest" is a matter of opinion, not something the data can settle.',
   },
 ];
