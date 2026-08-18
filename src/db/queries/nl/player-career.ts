@@ -88,6 +88,22 @@ function boundarySql(boundary: NlBoundary): SqlFragment {
 function conditionsWhere(plan: NlQueryPlan): SqlFragment[] {
   const clauses: SqlFragment[] = plan.careerConditions.map(conditionSql);
   if (plan.boundary) clauses.push(boundarySql(plan.boundary));
+  // A single named player ("Nick Dal Santo most games", "Dusty's debut
+  // was a grand final"). Pre-existing gap, not new: player_career had no
+  // player filter at all before CAREER_ONLY_METRICS started routing
+  // named-player questions here (games/premierships/wins/losses/draws/
+  // brownlow_medals/clubs_played have no player_game equivalent), but the
+  // boundary and all_australian_selections branches could already reach
+  // this grain with a player named, and would have silently ranked
+  // everyone instead of answering about the one player asked about. Found
+  // by executing "Nick Dal Santo most games" end to end against real
+  // data, not just checking the plan shape -- it returned Scott
+  // Pendlebury's 440 games, the outright leader, rather than Dal Santo's
+  // own 322.
+  if (plan.player) clauses.push(sql`p.id = ${plan.player.id}`);
+  // An ambiguous surname ("Ablett most goals") -- ranks across every
+  // plausible candidate instead of declining. See NlMatchScope.playerIdIn.
+  if (plan.scope.playerIdIn) clauses.push(sql`p.id = ANY(${plan.scope.playerIdIn})`);
   return clauses;
 }
 

@@ -120,6 +120,21 @@ export type NlMatchScope = {
   seasonMin?: number;
   seasonMax?: number;
   matchType?: NlMatchType;
+  /**
+   * "Ablett most goals" -- a surname that names several real players
+   * (Jnr, Snr, Geoff, Luke, Len), none confident enough on its own to
+   * accept outright. Rather than decline, the ranking runs across every
+   * plausible candidate's id and lets the SAME rank()-with-ties SQL every
+   * grain already uses for a genuine tie pick the actual answer: whoever
+   * of the Abletts scores highest wins outright, or a real tie between
+   * two of them is named as one (see describe.ts's tiedSubject/
+   * dedupeByIdentity, unchanged by this -- it already handles "more than
+   * one row at the lead value" regardless of why there is more than one).
+   *
+   * Mutually exclusive with `player` on the plan itself: a plan carries
+   * ONE OR THE OTHER, never both -- see validatePlan.
+   */
+  playerIdIn?: number[];
 };
 
 // -------------------------------------------------------- comparison ops
@@ -487,6 +502,13 @@ export const NL_LIMITS = {
   maxClubSeasonConditions: 4,
   minSeason: 1897,
   maxSeason: 2100,
+  /**
+   * scope.playerIdIn's cap. The real cases are small -- five Abletts is
+   * the widest genuine one seen -- so a plan naming more than this is
+   * treated as a bug in whatever built it (a stray "found everything"
+   * candidate list, not a real ambiguous surname) rather than answered.
+   */
+  maxPlayerCandidates: 12,
 } as const;
 
 /**
@@ -611,6 +633,22 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
 
   const playerErr = validateRef(raw.player, 'id', 'Player');
   if (playerErr) return playerErr;
+
+  if (raw.player && raw.scope.playerIdIn) {
+    return { error: 'A plan cannot name one player and a candidate set at the same time.' };
+  }
+  if (raw.scope.playerIdIn) {
+    if (raw.scope.playerIdIn.length < 2 || raw.scope.playerIdIn.length > NL_LIMITS.maxPlayerCandidates) {
+      return { error: 'A player-candidate set must have between 2 and the documented maximum ids.' };
+    }
+    if (!raw.scope.playerIdIn.every((id) => Number.isInteger(id) && id > 0)) {
+      return { error: 'A player-candidate id must be a positive integer.' };
+    }
+    if (raw.grain !== 'player_career' && raw.grain !== 'player_game' && raw.grain !== 'player_season') {
+      return { error: 'A player-candidate set only applies to a player question.' };
+    }
+  }
+
   const forErr = validateRef(raw.scope.clubFor, 'organizationId', 'Club');
   if (forErr) return forErr;
   const againstErr = validateRef(raw.scope.clubAgainst, 'organizationId', 'Opponent club');

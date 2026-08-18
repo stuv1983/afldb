@@ -29,6 +29,11 @@ function matchTypeSql(matchType: NlMatchType | undefined): SqlFragment {
 function scopeClauses(scope: NlMatchScope, playerId: number | undefined): SqlFragment[] {
   const clauses: SqlFragment[] = [];
   if (playerId) clauses.push(sql`s.player_id = ${playerId}`);
+  // An ambiguous surname ranking across every plausible candidate rather
+  // than declining -- see NlMatchScope.playerIdIn. validatePlan keeps
+  // this and `playerId` mutually exclusive, so only one of the two ever
+  // fires for a given plan.
+  if (scope.playerIdIn) clauses.push(sql`s.player_id = ANY(${scope.playerIdIn})`);
   if (scope.clubFor) {
     clauses.push(sql`s.club_id IN (SELECT id FROM clubs WHERE organization_id = ${scope.clubFor.organizationId})`);
   }

@@ -52,6 +52,10 @@ export async function answerPlayerSeason(plan: NlQueryPlan, limit: number): Prom
 
   const clauses: SqlFragment[] = [];
   if (plan.player) clauses.push(sql`s.player_id = ${plan.player.id}`);
+  // An ambiguous surname ranking across every plausible candidate rather
+  // than declining -- see NlMatchScope.playerIdIn. validatePlan keeps
+  // this and `plan.player` mutually exclusive.
+  if (plan.scope.playerIdIn) clauses.push(sql`s.player_id = ANY(${plan.scope.playerIdIn})`);
   if (plan.scope.seasonMin !== undefined) clauses.push(sql`s.season >= ${plan.scope.seasonMin}`);
   if (plan.scope.seasonMax !== undefined) clauses.push(sql`s.season <= ${plan.scope.seasonMax}`);
   if (plan.scope.clubFor) {

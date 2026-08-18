@@ -106,6 +106,50 @@ describe('player_career: multi-condition trivia matches hand-written SQL', () =>
   });
 });
 
+/**
+ * A named player asking for a career-only column ("Nick Dal Santo most
+ * games") has to reach THIS grain -- player_game has no games column at
+ * all (there is no "his highest-games game") -- but until this was
+ * added, conditionsWhere never read `plan.player`. The query silently
+ * ranked every player in the database and returned the outright leader
+ * instead: caught by executing "Nick Dal Santo most games" against real
+ * data, where it answered with Scott Pendlebury's 440 games rather than
+ * Dal Santo's own 322. A fixture-based plan-shape test could not have
+ * caught this -- the plan itself was already correct, `player` set and
+ * all; only the executed row was wrong. Real ids from afldb_test:
+ * Nick Dal Santo 1132, Scott Pendlebury 4182.
+ */
+describe('player_career: a named player is filtered to that player, not ranked against everyone', () => {
+  it('"Nick Dal Santo most games" answers about Dal Santo, not the outright leader', async () => {
+    const { lead } = await career(plan({
+      player: { id: 1132, slug: 'nick-dal-santo', name: 'Nick Dal Santo' },
+      metric: 'games', agg: { kind: 'max' },
+    }), 25);
+    expect(lead).not.toBeNull();
+    expect(lead!.playerId).toBe(1132);
+
+    const [expected] = await sql<{ games: number }[]>`
+      SELECT games FROM player_career_stats WHERE player_id = 1132
+    `;
+    expect(lead!.value).toBe(expected.games);
+    // The regression this pins: the pre-fix query ignored `plan.player`
+    // and would have returned the database-wide leader here instead.
+    expect(lead!.playerId).not.toBe(4182);
+  });
+
+  it('a named player with a career condition is still filtered to just them', async () => {
+    // Combines plan.player with plan.careerConditions -- conditionsWhere
+    // folds both into the same AND chain, so this also guards against a
+    // future edit that overwrites rather than appends the player clause.
+    const { rows } = await career(plan({
+      player: { id: 1132, slug: 'nick-dal-santo', name: 'Nick Dal Santo' },
+      careerConditions: [{ kind: 'column', column: 'games', op: 'gte', value: 1 }],
+    }), 25);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.playerId).toBe(1132);
+  });
+});
+
 describe('player_career: awards match hand-written SQL', () => {
   it('"most brownlow votes without winning a brownlow"', async () => {
     const { lead } = await career(plan({

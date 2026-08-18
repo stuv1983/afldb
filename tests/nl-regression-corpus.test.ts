@@ -627,16 +627,59 @@ describe('NL-017: a named club with a club-season metric and season wording rout
 // ranking routinely puts one Thomas 200+ points clear of the next -- so
 // "Thomas most goals" answered for Thomas Hawkins as though the reader
 // had named him. The one hard failure left in the 12,000-question run.
+//
+// "Ablett most goals" below is a DIFFERENT shape -- neither Ablett clears
+// PLAYER_ACCEPT_SCORE at all, so the resolver never picks a favourite in
+// the first place (Thomas's problem, a false favourite, cannot happen
+// here). Originally declined outright for that reason. It now ranks
+// across every plausible candidate instead: the real question is not
+// "which Ablett did the reader mean" so much as "of the Abletts, who
+// kicked the most goals", which has one true answer regardless of which
+// Ablett the reader had in mind -- and naming that answer, in full, is
+// strictly more useful than asking the reader to type a first name too.
 describe('NL-018: a mention matching two players is ambiguous however lopsided the ranking', () => {
   it('Thomas most goals declines as ambiguous', async () => {
     const result = await declined('Thomas most goals');
     expect(result.reason).toBe('ambiguous');
   });
 
-  it('Ablett most goals declines with the mention recorded as ambiguous, not unsupported', async () => {
-    const result = await declined('Ablett most goals');
-    expect(result.report.ambiguousPlayer).toBe('ablett');
-    expect(result.report.unsupportedTerms).not.toContain('ablett');
+  it('Ablett most goals ranks across both Abletts rather than declining', async () => {
+    const p = await plan('Ablett most goals');
+    expect(p.grain).toBe('player_career');
+    expect(p.metric).toBe('goals');
+    expect(p.player).toBeUndefined();
+    // Order follows the resolver's own candidate order (Snr id 300 then
+    // Jnr id 301 in this fixture), not score or name -- nothing downstream
+    // depends on the order, but pinning it catches an accidental reshuffle.
+    expect(p.scope.playerIdIn).toEqual([300, 301]);
+  });
+
+  it('a scoped ambiguous question still resolves, at the grain a named player would use', async () => {
+    // "against Carlton" makes this `scoped`, which for a genuinely named
+    // player would route to player_game/sum -- the candidate-set case
+    // must fall through the exact same grain election, not a special path
+    // of its own, or the two would silently drift apart over time.
+    const p = await plan('Ablett most goals against Carlton');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('sum');
+    expect(p.scope.clubAgainst?.name).toBe('Carlton');
+    expect(p.scope.playerIdIn).toEqual([300, 301]);
+  });
+
+  it('more plausible candidates than the documented cap still declines', async () => {
+    // The Abletts are the real, small case. A surname matching a dozen-plus
+    // players is a generic clash, not a family of same-named footballers,
+    // and ranking across that many was never the point -- asking the
+    // reader to narrow it down still is.
+    const many = Array.from({ length: 13 }, (_, i) => ({
+      ref: { id: 700 + i, slug: `smith-${i}`, name: `Smith Player${i}` },
+      score: 400,
+    }));
+    const result = await parseNlQuestion('smith most goals', {
+      ...ctx,
+      resolvePlayer: () => Promise.resolve(many),
+    });
+    expect(result.status).toBe('none');
   });
 
   it('a unique surname still resolves -- surname-only is how readers type', async () => {
@@ -831,14 +874,20 @@ describe('NL-022: "ambiguous" means two plausible players, not one weak match', 
     expect(result.report.unsupportedTerms).toContain('smoth');
   });
 
-  // The case the original condition existed for must keep working: both
-  // Abletts genuinely spell the mention, and neither reaches accept
-  // strength, so the reader really has not said which one.
-  it('two players who both spell the mention are still ambiguous', async () => {
+  // The case the original condition existed for: both Abletts genuinely
+  // spell the mention, and neither reaches accept strength, so the
+  // resolver really has not picked one. Kept distinguishable from the
+  // "smoth" case above by the SAME plausible-candidate-count test this
+  // block is named for -- it just resolves that genuine multi-candidate
+  // case by ranking now (NL-018) rather than declining.
+  it('two players who both spell the mention resolve via ranking, not a decline', async () => {
     const result = await parseNlQuestion('ablett most goals', ctx);
-    expect(result.status).toBe('none');
-    expect(result.report.ambiguousPlayer).toBe('ablett');
+    expect(result.status).toBe('plan');
+    expect(result.report.ambiguousPlayer).toBeUndefined();
     expect(result.report.unsupportedTerms).not.toContain('ablett');
+    expect(result.report.entityResolution).toContainEqual({
+      mention: 'ablett', resolvedTo: 'Gary Ablett Snr, Gary Ablett Jnr', certainty: 1,
+    });
   });
 
   it('one plausible candidate below accept strength is not ambiguous either', async () => {

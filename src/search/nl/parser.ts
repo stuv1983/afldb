@@ -21,6 +21,7 @@
 import {
   isNlAwardKey,
   NL_CONFIDENCE,
+  NL_LIMITS,
   PARSER_VERSION,
   type NlAggregation,
   type NlBoundary,
@@ -902,6 +903,10 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const candidateRaw = candidatePlayerSpan(text);
   let unresolvedPlayerMention: string | null = null;
   let ambiguousPlayerMention: string | null = null;
+  // "Ablett most goals" -- set instead of ambiguousPlayerMention when the
+  // resolver couldn't confidently pick ONE candidate but the mention
+  // plausibly spells a small, real set of them. See NlMatchScope.playerIdIn.
+  let ambiguousCandidateIds: number[] | undefined;
   if (candidateRaw && candidateRaw.length >= 3) {
     // `Object.hasOwn`, not a plain index: the key is reader-typed text, so
     // `constructor` and friends come back off the prototype chain as truthy
@@ -976,7 +981,43 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
         const words = c.ref.name.toLowerCase().split(/\s+/);
         return lookupTokens.every((t) => words.some((w) => w.startsWith(t)));
       });
-      if (plausible.length >= 2) ambiguousPlayerMention = candidateRaw;
+      if (plausible.length >= 2 && plausible.length <= NL_LIMITS.maxPlayerCandidates) {
+        // Rank across every plausible candidate instead of declining --
+        // "of everyone this mention could plausibly mean, here is the
+        // actual answer" is a complete, correct response to a superlative
+        // question even though the SURNAME alone was ambiguous, and it is
+        // what the tie machinery every grain already has (rank() with no
+        // PARTITION BY, describe.ts's tiedSubject/dedupeByIdentity) is
+        // built to do: name the true winner outright, or name a genuine
+        // tie between two of them as one, exactly as it already does for
+        // an ordinary tied record.
+        //
+        // A bare surname justifies EVERY plausible candidate's own name
+        // by construction -- `plausible` above already required the whole
+        // mention to be a prefix-match against each of them -- so unlike
+        // the accepted branch's per-name justification, the whole mention
+        // span is always the right thing to consume here.
+        ambiguousCandidateIds = plausible.map((c) => c.ref.id);
+        // Set unconditionally at the top of this else-branch; this path
+        // IS a resolution, not a failure to find one, so it must not
+        // still carry the unresolved-mention confidence penalty below.
+        unresolvedPlayerMention = null;
+        const spanTokens = candidateRaw.split(' ');
+        const mention = spanTokens.join(' ');
+        report.entityResolution.push({
+          mention, resolvedTo: plausible.map((c) => c.ref.name).join(', '), certainty: 1,
+        });
+        for (const token of spanTokens) {
+          consumedTokens.push(token);
+          text = stripMatch(text, token);
+        }
+      } else if (plausible.length >= 2) {
+        // More plausible candidates than the documented cap -- a generic
+        // surname clash rather than a small, real family of same-named
+        // footballers, so this stays a decline rather than a 12-way
+        // ranking nobody asked for.
+        ambiguousPlayerMention = candidateRaw;
+      }
     }
   }
 
@@ -1111,6 +1152,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   if (venue) scope.venue = { id: venue.entity.id, slug: venue.entity.slug, name: venue.entity.name };
   if (seasons.seasonMin !== undefined) scope.seasonMin = seasons.seasonMin;
   if (seasons.seasonMax !== undefined) scope.seasonMax = seasons.seasonMax;
+  if (ambiguousCandidateIds) scope.playerIdIn = ambiguousCandidateIds;
   // A boundary question has ALREADY absorbed the match type: extractBoundary
   // reads its target from exactly this value and stores it as
   // boundary.where, so repeating it in scope states the same fact twice in
