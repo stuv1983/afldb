@@ -3,10 +3,10 @@ import { IBM_Plex_Mono, IBM_Plex_Sans, Newsreader } from 'next/font/google';
 import Link from 'next/link';
 
 import { ConsentBanner } from '@/components/ConsentBanner';
-import { HealthReporter } from '@/components/HealthReporter';
 import { PrimaryNav, TabBar } from '@/components/SiteNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { getSiteFooter } from '@/db/queries/site-settings';
+import { HEALTH_INIT_SCRIPT } from '@/lib/health-init-script';
 import { indexingEnabled } from '@/lib/indexing';
 import { siteUrl } from '@/lib/seo';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
@@ -86,6 +86,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             before any styled markup paints, or a reader who chose dark
             gets a frame of cream paper on every navigation. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        {/* Also blocking, also ahead of the app bundle: a hydration
+            mismatch is detected during React's commit phase, before any
+            component's useEffect (including a reporter mounted from this
+            layout) has run -- see health-init-script.ts's own comment. */}
+        <script dangerouslySetInnerHTML={{ __html: HEALTH_INIT_SCRIPT }} />
       </head>
       <body>
         <a className="skip-link" href="#main">Skip to content</a>
@@ -131,7 +136,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
         <TabBar />
         <ConsentBanner />
-        <HealthReporter />
       </body>
     </html>
   );

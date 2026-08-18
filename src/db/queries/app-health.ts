@@ -10,7 +10,7 @@ import { isUuid } from '@/lib/nl-session';
  * (src/db/migrations/052_app_health_events.sql) exactly.
  *
  * RECOVERABLE_HYDRATION_ERROR is the one the client-side reporter
- * (src/components/HealthReporter.tsx) currently detects and classifies
+ * (src/lib/health-init-script.ts) currently detects and classifies
  * automatically, alongside UNHANDLED_CLIENT_ERROR for anything else
  * uncaught, and PAGE_CRASH from the root error boundary
  * (src/app/error.tsx). The rest of the taxonomy exists in the schema for
