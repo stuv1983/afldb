@@ -336,6 +336,11 @@ DECLARE
     ['nl_search_feedback',     'SELECT, INSERT'],                   -- 049
     -- Append-only by grant: no UPDATE, no DELETE (see migration 052).
     ['app_health_events',      'SELECT, INSERT'],                   -- 052
+    -- Content immutable; the workflow columns get a column-scoped UPDATE
+    -- granted after this loop (see migration 056).
+    ['player_link_suggestions', 'SELECT, INSERT'],                  -- 056
+    -- Append-only by grant: no UPDATE, no DELETE (see migration 056).
+    ['player_link_resolutions', 'SELECT, INSERT'],                  -- 056
     -- Read-only: validation resolves submitted names against these.
     ['players',                'SELECT'],                           -- 023
     ['player_clubs',           'SELECT'],                           -- 023
@@ -357,7 +362,8 @@ DECLARE
     'beta_access_codes', 'beta_allowed_emails', 'beta_login_tokens',
     'beta_join_requests', 'data_submissions', 'data_submission_rows',
     'admin_invites', 'site_settings', 'site_media', 'nl_search_log', 'nl_search_review',
-    'nl_search_feedback', 'app_health_events'
+    'nl_search_feedback', 'app_health_events',
+    'player_link_suggestions', 'player_link_resolutions'
   ];
   named text[] := ARRAY[]::text[];
   i int;
@@ -378,6 +384,14 @@ BEGIN
       applied := applied + 1;
     END IF;
   END LOOP;
+
+  -- Migration 056's column-scoped UPDATE: the workflow columns only, so
+  -- the reader's own words stay immutable. Whole-table privileges live in
+  -- the spec array; this is the one grant that cannot be expressed there.
+  IF to_regclass('public.player_link_suggestions') IS NOT NULL THEN
+    GRANT UPDATE (status, resolved_by, resolved_at)
+      ON player_link_suggestions TO afldb_auth;
+  END IF;
 
   -- Everything else in `public`, including anything a future migration
   -- adds without thinking about this role.

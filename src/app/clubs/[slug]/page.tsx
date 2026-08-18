@@ -6,6 +6,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { JsonLd } from '@/components/JsonLd';
 import { ReorderableSections } from '@/components/ReorderableSections';
+import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import { getClubBestAndFairest, getClubCaptains } from '@/db/queries/awards';
 import {
   getClub,
@@ -227,6 +228,9 @@ export default async function ClubPage({
                       ) : (
                         b.playerName
                       )}
+                      {!isLinked(b.linkStatus) && (
+                        <UnmatchedPlayer targetTable="award_winners" targetId={b.id} />
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -268,6 +272,9 @@ export default async function ClubPage({
                         <Link href={playerPath(c.playerSlug!, c.playerId)}>{c.playerName}</Link>
                       ) : (
                         c.playerName
+                      )}
+                      {!isLinked(c.linkStatus) && (
+                        <UnmatchedPlayer targetTable="captaincies" targetId={c.id} />
                       )}
                     </td>
                     {hasLineage && <td className="muted nowrap">{c.identityName}</td>}

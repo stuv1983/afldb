@@ -7,6 +7,7 @@ import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import { TableFilters } from '@/components/TableFilters';
+import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import {
   getAward,
   getAwardLeaders,
@@ -346,6 +347,9 @@ export default async function AwardPage({
                         </Link>
                       ) : (
                         <span title="Not linked to an AFLDB player">{w.playerName}</span>
+                      )}
+                      {!isLinked(w.linkStatus) && (
+                        <UnmatchedPlayer targetTable="award_winners" targetId={w.id} />
                       )}
                     </td>
                     <td>

@@ -305,7 +305,13 @@ describe('afldb_auth is confined to the operational tables', () => {
                 ('nl_search_log',        'INSERT'),
                 ('nl_search_review',     'UPDATE'),
                 ('nl_search_feedback',   'SELECT'),
-                ('nl_search_feedback',   'INSERT')
+                ('nl_search_feedback',   'INSERT'),
+                -- Player-link review (056): the public suggestion form and
+                -- the admin queue both run as afldb_auth.
+                ('player_link_suggestions', 'SELECT'),
+                ('player_link_suggestions', 'INSERT'),
+                ('player_link_resolutions', 'SELECT'),
+                ('player_link_resolutions', 'INSERT')
              ) AS t(name, privilege)
        ORDER BY 1, 2
     `;
@@ -322,14 +328,47 @@ describe('afldb_auth is confined to the operational tables', () => {
     // reader having pressed "no" at 8:04pm is a fact that happened; an
     // admin who disagrees records that in nl_search_review, which is the
     // one of the three that is meant to be mutable.
+    // player_link_resolutions (056) is append-only the same way: a wrong
+    // decision gets a new row, never an edit.
     const rows = await sql<{ name: string; privilege: string }[]>`
       SELECT t.name, p.privilege
-        FROM unnest(ARRAY['nl_search_feedback', 'nl_search_log']) AS t(name)
+        FROM unnest(ARRAY['nl_search_feedback', 'nl_search_log',
+                          'player_link_resolutions']) AS t(name)
        CROSS JOIN LATERAL (VALUES ('UPDATE'), ('DELETE'), ('TRUNCATE')) AS p(privilege)
        WHERE has_table_privilege(${AUTH_ROLE}, t.name, p.privilege)
        ORDER BY 1, 2
     `;
     expect(rows).toEqual([]);
+  });
+
+  it('can move a link suggestion through the workflow but never edit its words', async () => {
+    // Migration 056's column-scoped UPDATE: the workflow fields are
+    // mutable, the reader's own text is not, and the grant is what
+    // enforces the split. has_table_privilege stays false because no
+    // table-wide UPDATE exists -- the same shape as afldb_import's
+    // data_submissions grant asserted below.
+    const [privileges] = await sql<{
+      tableUpdate: boolean; statusUpdate: boolean; nameUpdate: boolean;
+      noteUpdate: boolean; deletes: boolean;
+    }[]>`
+      SELECT has_table_privilege(${AUTH_ROLE}, 'player_link_suggestions', 'UPDATE')
+               AS "tableUpdate",
+             has_column_privilege(${AUTH_ROLE}, 'player_link_suggestions', 'status', 'UPDATE')
+               AS "statusUpdate",
+             has_column_privilege(${AUTH_ROLE}, 'player_link_suggestions', 'suggested_name', 'UPDATE')
+               AS "nameUpdate",
+             has_column_privilege(${AUTH_ROLE}, 'player_link_suggestions', 'note', 'UPDATE')
+               AS "noteUpdate",
+             has_table_privilege(${AUTH_ROLE}, 'player_link_suggestions', 'DELETE')
+               AS deletes
+    `;
+    expect(privileges).toEqual({
+      tableUpdate: false,
+      statusUpdate: true,
+      nameUpdate: false,
+      noteUpdate: false,
+      deletes: false,
+    });
   });
 
   it('advances only the sequences behind the tables it writes', async () => {

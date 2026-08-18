@@ -6,6 +6,7 @@ import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import { TableFilters } from '@/components/TableFilters';
+import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import { getHallOfFameCategories, listHallOfFame } from '@/db/queries/awards';
 import { formatNumber, isLinked, playerPath } from '@/lib/format';
 import { pageMetadata } from '@/lib/seo';
@@ -133,6 +134,9 @@ export default async function HallOfFamePage({
                       <Link href={playerPath(i.playerSlug!, i.playerId)}>{i.name}</Link>
                     ) : (
                       <span title="No VFL/AFL playing record in AFLDB">{i.name}</span>
+                    )}
+                    {!isLinked(i.linkStatus) && (
+                      <UnmatchedPlayer targetTable="hall_of_fame" targetId={i.id} />
                     )}
                     {i.isLegend && <strong> · Legend</strong>}
                     {i.removedYear && (

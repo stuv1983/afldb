@@ -536,10 +536,11 @@ export async function getClubAwards(clubId: number) {
 /** Best-and-fairest winners for a club, newest first. */
 export async function getClubBestAndFairest(clubId: number, limit = 20) {
   return sql<{
+    id: number;
     season: number | null; playerId: number | null; playerSlug: string | null;
     playerName: string; linkStatus: string; awardName: string; awardSlug: string;
   }[]>`
-    SELECT w.season, w.player_id AS "playerId", p.slug AS "playerSlug",
+    SELECT w.id, w.season, w.player_id AS "playerId", p.slug AS "playerSlug",
            COALESCE(p.display_name, w.player_name_raw) AS "playerName",
            w.link_status_value::text AS "linkStatus",
            a.name AS "awardName", a.slug AS "awardSlug"
@@ -559,12 +560,12 @@ export async function getClubBestAndFairest(clubId: number, limit = 20) {
 /** Every club's Best & Fairest winner for one season, for the season page. */
 export async function getSeasonBestAndFairest(year: number) {
   return sql<{
-    awardName: string; awardSlug: string;
+    id: number; awardName: string; awardSlug: string;
     clubName: string | null; clubSlug: string | null;
     playerId: number | null; playerSlug: string | null;
     playerName: string; linkStatus: string; votes: string | null;
   }[]>`
-    SELECT a.name AS "awardName", a.slug AS "awardSlug",
+    SELECT w.id, a.name AS "awardName", a.slug AS "awardSlug",
            c.name AS "clubName", c.slug AS "clubSlug",
            w.player_id AS "playerId", p.slug AS "playerSlug",
            COALESCE(p.display_name, w.player_name_raw) AS "playerName",
@@ -580,11 +581,12 @@ export async function getSeasonBestAndFairest(year: number) {
 
 export async function getClubCaptains(clubId: number) {
   return sql<{
+    id: number;
     season: number; playerId: number | null; playerSlug: string | null;
     playerName: string; linkStatus: string; role: string; period: string | null;
     identityName: string;
   }[]>`
-    SELECT cp.season, cp.player_id AS "playerId", p.slug AS "playerSlug",
+    SELECT cp.id, cp.season, cp.player_id AS "playerId", p.slug AS "playerSlug",
            COALESCE(p.display_name, cp.player_name_raw) AS "playerName",
            cp.link_status_value::text AS "linkStatus",
            cp.role, cp.period, c.name AS "identityName"

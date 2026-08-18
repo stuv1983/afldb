@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { ReorderableSections } from '@/components/ReorderableSections';
+import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import {
   getAward,
   getAwardSeason,
@@ -129,6 +130,9 @@ export default async function AwardSeasonPage({
                       )}
                       {m.isCaptain && <strong> (c)</strong>}
                       {m.isViceCaptain && <span> (vc)</span>}
+                      {!isLinked(m.linkStatus) && (
+                        <UnmatchedPlayer targetTable="award_winners" targetId={m.id} />
+                      )}
                     </td>
                     <td>
                       {m.clubSlug
@@ -182,6 +186,9 @@ export default async function AwardSeasonPage({
                         <Link href={playerPath(n.playerSlug!, n.playerId)}>{n.playerName}</Link>
                       ) : (
                         n.playerName
+                      )}
+                      {!isLinked(n.linkStatus) && (
+                        <UnmatchedPlayer targetTable="award_nominations" targetId={n.id} />
                       )}
                       {n.isWinner && <strong> — winner</strong>}
                       {n.isIneligible && (

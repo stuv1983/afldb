@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { ReorderableSections } from '@/components/ReorderableSections';
+import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import {
   getAward,
   getAwardSeason,
@@ -299,9 +300,7 @@ export default async function SeasonPage({
                           {m.isCaptain && <strong> (c)</strong>}
                           {m.isViceCaptain && <span> (vc)</span>}
                           {!isLinked(m.linkStatus) && (
-                            <span className="badge badge-warn" title="Not matched to an AFLDB player">
-                              Unmatched
-                            </span>
+                            <UnmatchedPlayer targetTable="award_winners" targetId={m.id} />
                           )}
                         </td>
                         <td>
@@ -346,9 +345,7 @@ export default async function SeasonPage({
                             w.playerName
                           )}
                           {!isLinked(w.linkStatus) && (
-                            <span className="badge badge-warn" title="Not matched to an AFLDB player">
-                              Unmatched
-                            </span>
+                            <UnmatchedPlayer targetTable="award_winners" targetId={w.id} />
                           )}
                         </td>
                       </tr>
@@ -382,9 +379,7 @@ export default async function SeasonPage({
                           risingStarWinner.playerName
                         )}
                         {!isLinked(risingStarWinner.linkStatus) && (
-                          <span className="badge badge-warn" title="Not matched to an AFLDB player">
-                            Unmatched
-                          </span>
+                          <UnmatchedPlayer targetTable="award_nominations" targetId={risingStarWinner.id} />
                         )}
                       </td>
                       <td>
@@ -422,9 +417,7 @@ export default async function SeasonPage({
                           )}
                           {h.isLegend && <strong> (Legend)</strong>}
                           {!isLinked(h.linkStatus) && (
-                            <span className="badge badge-warn" title="Not matched to an AFLDB player">
-                              Unmatched
-                            </span>
+                            <UnmatchedPlayer targetTable="hall_of_fame" targetId={h.id} />
                           )}
                         </td>
                         <td>{h.category ?? <span className="muted">—</span>}</td>

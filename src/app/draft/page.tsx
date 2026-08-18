@@ -5,6 +5,7 @@ import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
 import { Pagination } from '@/components/Pagination';
 import { TableFilters } from '@/components/TableFilters';
+import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import { getClubOptions } from '@/db/queries/advanced-search';
 import { getDraftTypes, getDraftYears, listDraftPicks } from '@/db/queries/draft';
 import { clubPath, formatNumber, isLinked, playerPath } from '@/lib/format';
@@ -122,6 +123,9 @@ export default async function DraftPage({
                           </Link>
                         ) : (
                           pick.playerNameRaw
+                        )}
+                        {!isLinked(pick.linkStatus) && (
+                          <UnmatchedPlayer targetTable="draft_picks" targetId={pick.id} />
                         )}
                       </td>
                       <td>

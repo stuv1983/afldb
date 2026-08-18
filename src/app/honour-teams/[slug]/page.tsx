@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import { getHonourTeam, listHonourTeams } from '@/db/queries/awards';
 import { honourTeamPath, isLinked, playerPath } from '@/lib/format';
 import { notFoundMetadata, pageMetadata } from '@/lib/seo';
@@ -94,6 +95,9 @@ export default async function HonourTeamPage({
                     <Link href={playerPath(m.playerSlug!, m.playerId)}>{m.playerName}</Link>
                   ) : (
                     <span title="No VFL/AFL record in AFLDB">{m.playerName}</span>
+                  )}
+                  {!isLinked(m.linkStatus) && (
+                    <UnmatchedPlayer targetTable="honour_team_members" targetId={m.id} />
                   )}
                 </td>
                 <td>{m.clubNameRaw ?? <span className="muted">—</span>}</td>

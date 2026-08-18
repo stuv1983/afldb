@@ -6,6 +6,7 @@ import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import { TableFilters } from '@/components/TableFilters';
+import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import { listClubs } from '@/db/queries/clubs';
 import {
   getClubsWithoutFirstKickGoal,
@@ -138,9 +139,7 @@ export default async function FirstKickGoalPage({
                       {/* An unlinked row is still evidence; saying so is
                           more honest than hiding it or implying a link. */}
                       {!isLinked(r.linkStatus) && (
-                        <span className="badge badge-warn" title="Not matched to an AFLDB player">
-                          Unmatched
-                        </span>
+                        <UnmatchedPlayer targetTable="player_achievements" targetId={r.id} />
                       )}
                     </td>
                     <td>
