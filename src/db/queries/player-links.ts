@@ -105,7 +105,7 @@ export async function listUnresolvedLinks(
       UNION ALL
       SELECT 'player_achievements', pa.id, pa.player_name_raw,
              pa.link_status_value::text,
-             concat_ws(' · ', replace(pa.achievement_type, '_', ' '),
+             concat_ws(' · ', replace(pa.achievement_type::text, '_', ' '),
                        pa.season::text)
         FROM player_achievements pa
        WHERE pa.link_status_value IN ${statuses}
