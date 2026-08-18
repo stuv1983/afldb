@@ -415,7 +415,28 @@ function extractCareerConditions(text: string): { text: string; conditions: NlCa
     if (!match) continue;
     // A window before the stat word carries the count and its operator.
     const idx = working.indexOf(match[0]);
-    const windowStart = Math.max(0, idx - 20);
+    const outerStart = Math.max(0, idx - 20);
+    // Clipped at the nearest preceding clause boundary (a comma, or "and")
+    // so the window can never reach into a NEIGHBOURING numeric clause --
+    // "players with more than 300 clubs and over 10 premierships" found
+    // 250k-corpus rows where premierships (checked first: CAREER_STAT_WORDS
+    // is in a fixed order, not the order the words appear in the
+    // sentence) opened a 20-char window that reached back across "and"
+    // into "300 clubs", read digit-boundary \b(\d{1,4})\b against the
+    // slice "0 clubs and over 10" and matched the leftmost token -- the
+    // truncated tail "0" left behind when the slice cut "300" in half, a
+    // false number \b treats as complete because it evaluates against the
+    // window substring, not the original text. That produced
+    // premierships=0 (should be 10) AND, since the matched span included
+    // that stray "0", deleted it from the middle of "300" for every
+    // later clause too, leaving clubs_played to read "30". Clipping the
+    // window at the clause boundary means a clause's number search can
+    // never see a token that belongs to the clause before it.
+    const priorText = working.slice(outerStart, idx);
+    const lastAnd = priorText.toLowerCase().lastIndexOf(' and ');
+    const lastComma = priorText.lastIndexOf(',');
+    const boundaryEnd = Math.max(lastAnd >= 0 ? lastAnd + 5 : -1, lastComma >= 0 ? lastComma + 1 : -1);
+    const windowStart = boundaryEnd >= 0 ? outerStart + boundaryEnd : outerStart;
     const window = working.slice(windowStart, idx + match[0].length);
 
     const plus = NUMBER_PLUS_RE.exec(window);

@@ -654,3 +654,47 @@ describe('vocabulary: commentary and slang terms map to their real stat', () => 
     expect(p.clubSeasonConditions).toContainEqual({ kind: 'wooden_spoon' });
   });
 });
+
+describe('regression: two career conditions in one sentence do not cross-contaminate', () => {
+  // Found by the 250k-row V2 stress corpus (category plan_numeric_conditions),
+  // not by hand-written cases: extractCareerConditions's 20-char lookbehind
+  // window used to be measured in raw characters, so when the FIRST stat
+  // processed (CAREER_STAT_WORDS' fixed array order, not the order the
+  // words appear in the sentence) sat close enough to a second clause's
+  // multi-digit number, the window could slice into it -- either stealing
+  // its number outright, or slicing THROUGH it and reading the truncated
+  // remainder as if it were a complete one (\b evaluates against the
+  // window substring, not the original text). See parser.ts's comment at
+  // the windowStart computation for the full trace.
+  it('a 3-digit number does not bleed into an adjacent clause', async () => {
+    const p = await plan('players with more than 300 clubs and over 10 premierships');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gt', value: 300 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'premierships', op: 'gt', value: 10 });
+  });
+
+  it('two clauses with the same number both survive', async () => {
+    const p = await plan('players with more than 4 clubs and over 4 premierships');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gt', value: 4 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'premierships', op: 'gt', value: 4 });
+  });
+
+  it('neither clause is misread as a bare ranking metric', async () => {
+    const p = await plan('players with at least 1 games and over 1 goals');
+    expect(p.metric).toBeNull();
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 1 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'gt', value: 1 });
+  });
+
+  it('a later-processed stat keeps its own number, not an earlier clause\'s', async () => {
+    const p = await plan('players with over 2 games and over 5 premierships');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gt', value: 2 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'premierships', op: 'gt', value: 5 });
+  });
+
+  it('goals keeps its own condition rather than becoming the ranking subject', async () => {
+    const p = await plan('players with more than 5 goals and over 5 finals');
+    expect(p.metric).toBeNull();
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'gt', value: 5 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'finals', op: 'gt', value: 5 });
+  });
+});
