@@ -16,10 +16,8 @@ import {
   type NlQueryPlan,
 } from '@/search/nl/plan';
 import { parseNlQuestion } from '@/search/nl/parser';
-import type {
-  NlAnswer, NlAnswerPayload, NlClubSeasonRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
-  NlTeamMatchRow,
-} from '@/search/nl/answer-types';
+import { describeAnswer } from '@/search/nl/describe';
+import type { NlAnswer, NlAnswerPayload } from '@/search/nl/answer-types';
 
 /**
  * Parse and answer a natural-language question end to end: question ->
@@ -217,116 +215,5 @@ function buildAnswer(
     planToken: encodePlanToken(plan),
     clientRef,
     payload,
-  };
-}
-
-function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { headline: string; interpretation: string } {
-  if (payload.kind === 'player_career') {
-    return describePlayerCareerAnswer(plan, payload.lead, payload.total);
-  }
-  if (payload.kind === 'player_game') {
-    return describePlayerGameAnswer(plan, payload.lead);
-  }
-  if (payload.kind === 'player_season') {
-    return describePlayerSeasonAnswer(plan, payload.lead);
-  }
-  if (payload.kind === 'team_match') {
-    return describeTeamMatchAnswer(plan, payload.lead);
-  }
-  if (payload.kind === 'club_season') {
-    return describeClubSeasonAnswer(plan, payload.lead, payload.total);
-  }
-  return { headline: 'Results', interpretation: '' };
-}
-
-function describeTeamMatchAnswer(
-  plan: NlQueryPlan,
-  lead: NlTeamMatchRow | null,
-): { headline: string; interpretation: string } {
-  if (!lead) return { headline: 'No matching match found', interpretation: '' };
-  const metricLabel = (plan.metric ?? '').replace(/_/g, ' ');
-  return {
-    headline: `${lead.clubName} vs ${lead.opponentName} (${lead.season}) — ${lead.value.toLocaleString('en-AU')} ${metricLabel}`,
-    interpretation: plan.agg.kind === 'top_n'
-      ? `Top ${plan.agg.n} matches by ${metricLabel}.`
-      : `Highest ${metricLabel}.`,
-  };
-}
-
-function describeClubSeasonAnswer(
-  plan: NlQueryPlan,
-  lead: NlClubSeasonRow | null,
-  total: number,
-): { headline: string; interpretation: string } {
-  if (!plan.metric || lead === null || lead.value === null) {
-    return {
-      headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'club season matches' : 'club seasons match'}`,
-      interpretation: 'Club seasons meeting every condition asked for.',
-    };
-  }
-  const metricLabel = plan.metric.replace(/_/g, ' ');
-  // AFL percentage is conventionally shown to one decimal; every other
-  // club_season metric (wins/losses/draws) is a whole number of games.
-  const formattedValue = plan.metric === 'percentage' ? lead.value.toFixed(1) : lead.value.toLocaleString('en-AU');
-  return {
-    headline: `${lead.clubName} (${lead.season}) — ${formattedValue} ${metricLabel}`,
-    interpretation: plan.agg.kind === 'top_n'
-      ? `Top ${plan.agg.n} club seasons by ${metricLabel}.`
-      : `Highest ${metricLabel}.`,
-  };
-}
-
-function describePlayerGameAnswer(
-  plan: NlQueryPlan,
-  lead: NlPlayerGameRow | null,
-): { headline: string; interpretation: string } {
-  if (!lead) return { headline: 'No matching performance found', interpretation: '' };
-  const metricLabel = (plan.metric ?? '').replace(/_/g, ' ');
-  if (lead.games !== null) {
-    // Sum mode: a scoped career total, no single match to name.
-    return {
-      headline: `${lead.playerName} — ${lead.value.toLocaleString('en-AU')} ${metricLabel}`,
-      interpretation: `Total across ${lead.games.toLocaleString('en-AU')} ${lead.games === 1 ? 'game' : 'games'} in scope.`,
-    };
-  }
-  return {
-    headline: `${lead.playerName} — ${lead.value.toLocaleString('en-AU')} ${metricLabel}`,
-    interpretation: plan.agg.kind === 'top_n'
-      ? `Top ${plan.agg.n} single-game performances.`
-      : 'Highest single-game performance.',
-  };
-}
-
-function describePlayerSeasonAnswer(
-  plan: NlQueryPlan,
-  lead: NlPlayerSeasonRow | null,
-): { headline: string; interpretation: string } {
-  if (!lead) return { headline: 'No matching season found', interpretation: '' };
-  const metricLabel = (plan.metric ?? '').replace(/_/g, ' ');
-  return {
-    headline: `${lead.displayName} — ${lead.value.toLocaleString('en-AU')} ${metricLabel} (${lead.season})`,
-    interpretation: plan.agg.kind === 'top_n'
-      ? `Top ${plan.agg.n} player-seasons by ${metricLabel}.`
-      : `Highest single season by ${metricLabel}.`,
-  };
-}
-
-function describePlayerCareerAnswer(
-  plan: NlQueryPlan,
-  lead: NlPlayerCareerRow | null,
-  total: number,
-): { headline: string; interpretation: string } {
-  if (!plan.metric || lead === null || lead.value === null) {
-    return {
-      headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'player matches' : 'players match'}`,
-      interpretation: 'Players meeting every condition asked for.',
-    };
-  }
-  const metricLabel = plan.metric.replace(/_/g, ' ');
-  return {
-    headline: `${lead.displayName} — ${lead.value.toLocaleString('en-AU')} ${metricLabel}`,
-    interpretation: plan.agg.kind === 'top_n'
-      ? `Top ${plan.agg.n} by career ${metricLabel}.`
-      : `Highest career ${metricLabel}.`,
   };
 }

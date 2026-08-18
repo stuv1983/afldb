@@ -74,8 +74,17 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    (Scott Pendlebury, 2022) where the verified answer is a season
  *    record (Tom Atkins, 232). Any named season scope is a season
  *    leaderboard again.
+ * 9: grounded UI qualification fixes -- venue-before-club extraction (a
+ *    club name that is a whole word inside a venue name, e.g. "Melbourne"
+ *    inside "Melbourne Cricket Ground", no longer wins the match), the
+ *    empty-token confidence bug ("players with at least 2 clubs" scored
+ *    tokenRatio 0 -- and so declined outright -- purely because every
+ *    word in it was a stopword or a digit), new slang/vocabulary ("bag"
+ *    and "bag of goals", "majors", "granny" for grand_final), and a
+ *    subjective all-time-ranking refusal ("best team of all time" was
+ *    confidently answering with all 1,640 club seasons on file).
  */
-export const PARSER_VERSION = 8;
+export const PARSER_VERSION = 9;
 
 // ------------------------------------------------------------------ grain
 
