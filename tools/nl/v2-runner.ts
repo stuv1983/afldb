@@ -189,8 +189,16 @@ async function observe(
     const leadValue = typeof lead?.value === 'number' ? lead.value : null;
     const nameOf = (row: Record<string, unknown>) => [row.playerName, row.displayName, row.clubName]
       .find((n): n is string => typeof n === 'string') ?? '';
-    const tieNames = leadValue === null
-      ? rows.slice(0, 1).map(nameOf).filter(Boolean)
+    // A plan with no ranking metric at all (agg.kind 'list': "players
+    // whose debut was a Grand Final") has no lead/tie concept -- every
+    // returned row IS the answer, not just the first. Slicing to one row
+    // here scored the real app wrong on every metric-less list question
+    // with more than one match: the app's own describePlayerCareerAnswer
+    // already reports the true count via `total` and returns every row up
+    // to NL_LIMITS.maxListRows, so this was a scoring bug in the harness,
+    // not a missing-row bug in answerPlayerCareer/etc.
+    const tieNames = canonical.metric == null
+      ? rows.map(nameOf).filter(Boolean)
       : rows.filter((row) => row.value === leadValue).map(nameOf).filter(Boolean);
 
     return {
