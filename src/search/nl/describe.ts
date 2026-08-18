@@ -117,7 +117,10 @@ function describeAchievementSummaryAnswer(
 
   // A distribution's headline names the leader, and says so when the top
   // count is shared rather than presenting one of several as the answer.
-  const top = rows[0];
+  // Found by max value, not position: by_club and by_season arrive
+  // count-descending but by_decade is chronological, and rows[0] of a
+  // chronological table is the 1890s, not the leader.
+  const top = rows.reduce((best, r) => (r.value > best.value ? r : best), rows[0]);
   const tiedWith = rows.filter((r) => r.value === top.value);
   const leader = tiedWith.length > 1
     ? `${tiedWith.map((r) => r.label).join(', ')} — ${top.value.toLocaleString('en-AU')} each (tied)`

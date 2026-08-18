@@ -251,3 +251,37 @@ describe('describeAnswer — ties across the remaining grains', () => {
     expect(headline).toBe('320 players match');
   });
 });
+
+// ----------------------------------------------- achievement_summary
+
+describe('describeAnswer — achievement summary distributions', () => {
+  const summaryPlan = plan({ grain: 'achievement_summary', metric: null, mode: undefined, agg: { kind: 'list' } });
+
+  it('a by-decade headline names the decade with the most, not the earliest row', () => {
+    // by_decade rows arrive in CHRONOLOGICAL order, unlike by_club and
+    // by_season (count-descending) -- the leader must be found by value.
+    const rows = [
+      { label: '1890s', value: 3, href: null },
+      { label: '1920s', value: 41, href: null },
+      { label: '2020s', value: 12, href: null },
+    ];
+    const { headline } = describeAnswer(
+      summaryPlan,
+      { kind: 'achievement_summary', groupBy: 'decade', achievementLabel: 'Scored a goal with their first kick', rows, total: 56 },
+    );
+    expect(headline).toBe('1920s — 41');
+  });
+
+  it('a tied by-decade lead names every decade sharing the true maximum', () => {
+    const rows = [
+      { label: '1890s', value: 3, href: null },
+      { label: '1920s', value: 41, href: null },
+      { label: '1960s', value: 41, href: null },
+    ];
+    const { headline } = describeAnswer(
+      summaryPlan,
+      { kind: 'achievement_summary', groupBy: 'decade', achievementLabel: 'Scored a goal with their first kick', rows, total: 85 },
+    );
+    expect(headline).toBe('1920s, 1960s — 41 each (tied)');
+  });
+});

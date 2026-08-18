@@ -147,8 +147,20 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    listing all 100. Neither could fire before now: nothing in the
  *    parser had ever populated careerPredicates, so the array was always
  *    empty and both bugs were unreachable.
+ * 13: version 12's achievement paths stop dropping what the parser
+ *    consumed. The predicate answer path now honours the named player and
+ *    plain career conditions (it discarded both: "did Dustin Martin kick
+ *    a goal with his first kick" listed all ~330 holders); an
+ *    achievement_summary honours a season range and a club, and any scope
+ *    neither path can express (venue/opponent/match type, or any scope on
+ *    the old paths) is rejected by validatePlan instead of silently
+ *    ignored. Negated achievement questions ("players who never...")
+ *    decline instead of returning the inverted list; a bare "decade" no
+ *    longer elects the by_decade histogram ("this decade" declines); and
+ *    the by_decade headline names the decade with the most, not the
+ *    earliest row.
  */
-export const PARSER_VERSION = 12;
+export const PARSER_VERSION = 13;
 
 // ------------------------------------------------------------------ grain
 
@@ -727,6 +739,19 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
       return { error: `Unknown achievement summary "${raw.achievementSummary.kind}".` };
     }
     if (raw.metric !== null) return { error: 'An achievement summary does not rank by a statistic.' };
+    // The summary executor honours a season range and a club -- and ONLY
+    // those. Any other scope the parser consumed would be silently
+    // dropped, answering a different question than the one asked, so it
+    // is rejected here instead.
+    if (raw.scope.venue || raw.scope.clubAgainst || raw.scope.matchType !== undefined) {
+      return { error: 'An achievement summary cannot be scoped to a venue, opponent, or match type.' };
+    }
+    if (raw.scope.clubFor && raw.achievementSummary.kind === 'clubs_without') {
+      return { error: 'Asking which clubs never had one cannot be scoped to a single club.' };
+    }
+    if (raw.player) {
+      return { error: 'An achievement summary is about the achievement, not one player.' };
+    }
   } else if (raw.achievementSummary) {
     return { error: 'An achievement summary only applies to an achievement-summary question.' };
   }
@@ -766,6 +791,15 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
     if (!Object.hasOwn(GRID_BUILDERS, axis.builder)) {
       return { error: `Unknown question shape "${axis.builder}".` };
     }
+  }
+  // The predicate path expresses club and season scope as predicates of
+  // their own (the parser converts them), and the shared career query
+  // honours a named player and plain conditions -- but no career predicate
+  // can see a venue, opponent, or match type. Rejecting the combination
+  // here is what keeps "kicked a goal with their first kick at the MCG"
+  // a decline instead of a confident answer that ignored the venue.
+  if (raw.careerPredicates.length > 0 && (raw.scope.venue || raw.scope.clubAgainst || raw.scope.matchType !== undefined)) {
+    return { error: 'This kind of question cannot be scoped to a venue, opponent, or match type.' };
   }
 
   if (raw.grain !== 'club_season' && raw.clubSeasonConditions.length > 0) {

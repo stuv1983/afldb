@@ -648,7 +648,12 @@ export const FIRST_KICK_GOAL_RE = new RegExp([
  */
 export const ACHIEVEMENT_SUMMARY_CUES: [RegExp, string][] = [
   [/\b(?:never|no|not)\b[^.?]*\bclubs?\b|\bclubs?\b[^.?]*\bnever\b/, 'clubs_without'],
-  [/\bby\s+decade\b|\beach\s+decade\b|\bper\s+decade\b|\bdecades?\b/, 'by_decade'],
+  // Distributive phrasings only -- a bare "decade(s)" must NOT elect the
+  // histogram, because it also appears in time-filter phrasings the
+  // engine does not support ("in the last decade", "this decade"), which
+  // must decline via their leftover token rather than silently answer
+  // all-time.
+  [/\bby\s+decades?\b|\beach\s+decade\b|\bper\s+decade\b|\bacross\s+(?:the\s+)?decades\b|\bdecade\s+by\s+decade\b|\bwhich\s+decade\b|\bwhat\s+decade\b/, 'by_decade'],
   [/\bby\s+(?:club|team)\b|\bwhich\s+(?:club|team)\b|\bwhat\s+(?:club|team)\b|\beach\s+(?:club|team)\b|\bclub\s+has\s+(?:had\s+)?the\s+most\b/, 'by_club'],
   [/\bby\s+(?:year|season)\b|\bwhich\s+(?:year|season)\b|\bwhat\s+(?:year|season)\b|\beach\s+(?:year|season)\b/, 'by_season'],
   [/\bfirst\s+(?:ever\s+)?player\b|\bearliest\b|\bwho\s+was\s+the\s+first\b/, 'earliest'],

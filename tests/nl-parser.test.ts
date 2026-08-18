@@ -909,3 +909,91 @@ describe('14. goal with first kick', () => {
     });
   });
 });
+
+/**
+ * Parser version 13: the achievement paths stop dropping what the parser
+ * consumed. A named player and a plain career condition survive to the
+ * career answer path; a summary keeps its season range and club; every
+ * scope no compiler can express is rejected by validatePlan rather than
+ * silently ignored; and a negated phrasing declines instead of returning
+ * the polarity-inverted list.
+ */
+describe('15. achievement questions honour everything consumed', () => {
+  const ACHIEVEMENT = 'first_kick_goal_player';
+
+  function builders(p: NlQueryPlan): string[] {
+    return p.careerPredicates.map((axis) => axis.builder);
+  }
+
+  it('a named player stays pinned to the plan', async () => {
+    const p = await plan('did dustin martin kick a goal with his first kick');
+    expect(p.grain).toBe('player_career');
+    expect(builders(p)).toEqual([ACHIEVEMENT]);
+    expect(p.player?.name).toBe('Dustin Martin');
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('a career condition combines with the achievement', async () => {
+    const p = await plan('players with 300 games who kicked a goal with their first kick');
+    expect(builders(p)).toEqual([ACHIEVEMENT]);
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 300 });
+  });
+
+  // The career predicate path expresses a club and a season range as
+  // predicates of their own, and nothing else: a venue, opponent or
+  // match type that reached execution would be silently ignored, so
+  // validatePlan turns each into a decline. (A parse-stage decline is
+  // equally safe -- what must never happen is a confident answer that
+  // dropped the qualifier.)
+  it.each([
+    'players who kicked a goal with their first kick at the mcg',
+    'players who kicked a goal with their first kick against collingwood',
+    'players who kicked a goal with their first kick in a grand final',
+  ])('%s is rejected rather than silently unscoped', async (question) => {
+    const result = await parse(question);
+    if (result.status !== 'plan') return;
+    expect(validatePlan(result.plan)).toHaveProperty('error');
+  });
+
+  it.each([
+    'players who never kicked a goal with their first kick',
+    'players who did not kick a goal with their first kick',
+  ])('%s declines instead of answering inverted', async (question) => {
+    const result = await parse(question);
+    expect(result.status).toBe('none');
+  });
+
+  it('"this decade" declines instead of answering all-time', async () => {
+    const result = await parse('players who kicked a goal with their first kick this decade');
+    expect(result.status).toBe('none');
+  });
+
+  it('a summary keeps its season scope', async () => {
+    const p = await plan('which club has had the most players kick a goal with their first kick since 2000');
+    expect(p.grain).toBe('achievement_summary');
+    expect(p.achievementSummary?.kind).toBe('by_club');
+    expect(p.scope.seasonMin).toBe(2000);
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('a summary keeps its club scope', async () => {
+    const p = await plan('carlton first kick goal players by decade');
+    expect(p.grain).toBe('achievement_summary');
+    expect(p.achievementSummary?.kind).toBe('by_decade');
+    expect(p.scope.clubFor?.name).toBe('Carlton');
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('clubs_without scoped to one club is rejected', async () => {
+    const p = await plan('which clubs have never had a player kick a goal with their first kick');
+    expect(p.achievementSummary?.kind).toBe('clubs_without');
+    const scoped = { ...p, scope: { ...p.scope, clubFor: { organizationId: 2, slug: 'carlton', name: 'Carlton' } } };
+    expect(validatePlan(scoped)).toHaveProperty('error');
+  });
+
+  it('a summary with a named player is rejected', async () => {
+    const p = await plan('who was the most recent player to kick a goal with their first kick');
+    const withPlayer = { ...p, player: { id: 100, slug: 'dustin-martin', name: 'Dustin Martin' } };
+    expect(validatePlan(withPlayer)).toHaveProperty('error');
+  });
+});

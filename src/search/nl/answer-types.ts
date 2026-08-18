@@ -68,10 +68,6 @@ export type NlAchievementGroupRow = {
   label: string;
   value: number;
   href: string | null;
-  /** Present for earliest/latest: the player the occurrence belongs to. */
-  playerName?: string | null;
-  playerSlug?: string | null;
-  playerId?: number | null;
 };
 
 export type NlAnswerPayload =

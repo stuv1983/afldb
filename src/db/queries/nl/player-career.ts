@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { sql } from '@/db/client';
-import { solvePredicates } from '@/db/queries/grid-solver';
+import { compileAxis } from '@/db/queries/grid-solver';
 import { GRID_STATS } from '@/search/grid-solver-spec';
 import {
   NL_AWARDS,
@@ -128,24 +128,22 @@ const CAREER_ROW_SELECT = sql`
  * getCareerRecord uses, generalised to any allowlisted metric and any
  * number of extra conditions.
  *
- * Career predicates (GridAxisState entries) are folded in via
- * solvePredicates, reusing the grid solver's own 93-builder catalogue
- * rather than recompiling any of it.
+ * Career predicates (GridAxisState entries) are compiled through the grid
+ * solver's own 93-builder catalogue (compileAxis) rather than recompiling
+ * any of it. Each compiled predicate is a bare boolean fragment over the
+ * same `p`/`c` aliases this file's queries already use, so predicates AND
+ * plain conditions AND the named-player pin all fold into one WHERE --
+ * the earlier split path through solvePredicates dropped everything
+ * except the predicates ("did Dustin Martin kick a goal with his first
+ * kick" listed every holder instead of answering about him).
  */
 export async function answerPlayerCareer(
   plan: NlQueryPlan,
   limit: number,
 ): Promise<NlAnswerPayload> {
-  const extraWhere = foldAnd(conditionsWhere(plan));
-
-  if (plan.careerPredicates.length > 0) {
-    // A predicate came from the grid catalogue (compileAxis), which
-    // knows only `p`/`c` and a bare boolean fragment -- solvePredicates
-    // owns the FROM/JOIN and can't also accept an extra WHERE clause, so
-    // a plan mixing predicates with plain conditions needs its own query
-    // shape below rather than solvePredicates.
-    return answerWithPredicates(plan, extraWhere, limit);
-  }
+  const clauses = conditionsWhere(plan);
+  for (const axis of plan.careerPredicates) clauses.push(compileAxis(axis));
+  const extraWhere = foldAnd(clauses);
 
   if (!plan.metric) {
     return answerList(extraWhere, limit);
@@ -192,37 +190,6 @@ async function answerRanked(
   const total = rows[0] ? Number(rows[0].total) : 0;
   const clean = rows.map(({ total: _t, rnk: _r, ...rest }) => rest);
   return { kind: 'player_career', lead: clean[0] ?? null, rows: clean, total };
-}
-
-/**
- * Predicates (from the grid catalogue) plus, possibly, plain conditions
- * and/or a ranking metric -- solvePredicates gives the WHERE, this adds
- * ranking on top when the plan asks for one.
- */
-async function answerWithPredicates(
-  plan: NlQueryPlan,
-  extraWhere: SqlFragment,
-  limit: number,
-): Promise<NlAnswerPayload> {
-  if (!plan.metric) {
-    const { rows, total } = await solvePredicates(plan.careerPredicates, 'games_desc', { limit, offset: 0 });
-    // extraWhere (plain conditions/boundary) has no home in solvePredicates'
-    // fixed query shape; a plan combining grid predicates with plain
-    // conditions is rare enough in the current vocabulary that this is a
-    // documented limitation rather than a second query engine. Re-filter
-    // in process if extraWhere carries anything -- acceptable at these
-    // row counts (at most `limit`).
-    void extraWhere;
-    const mapped: NlPlayerCareerRow[] = rows.map((r) => ({
-      playerId: r.id, slug: r.slug, displayName: r.displayName, value: null,
-      games: r.games, debutSeason: r.debutSeason, finalSeason: r.finalSeason, clubNames: null,
-    }));
-    return { kind: 'player_career', lead: mapped[0] ?? null, rows: mapped, total };
-  }
-  // Ranked-with-predicates is not yet needed by the supported vocabulary
-  // (no parsed question currently combines a grid predicate with a
-  // ranking metric); documented rather than silently wrong.
-  throw new Error('Ranking combined with a grid predicate is not yet supported.');
 }
 
 function rankCutoff(agg: NlAggregation): number {

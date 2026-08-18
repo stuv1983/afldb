@@ -169,7 +169,8 @@ function parseCsv(text: string): SourceRow[] {
 /**
  * Rows whose source text is corrupted beyond automatic matching. Each entry
  * is a human decision recorded in git, not a fuzzy guess made at runtime --
- * the key is the raw source string, so a corrected upstream file simply
+ * the key is the marker-stripped CLEAN name (playerNameClean: "Billy
+ * Picken", not "Billy Picken (2)"), so a corrected upstream file simply
  * stops matching here and resolves normally.
  */
 const MANUAL_NAME_OVERRIDES: Record<string, string> = {
@@ -301,7 +302,7 @@ async function main(): Promise<void> {
   if (corrupted.length > 0) {
     console.log(`  names with corrupt text:   ${corrupted.length}`);
     for (const r of corrupted) {
-      const override = MANUAL_NAME_OVERRIDES[r.playerNameRaw];
+      const override = MANUAL_NAME_OVERRIDES[r.playerNameClean];
       console.log(`    line ${r.lineNo}: ${JSON.stringify(r.playerNameClean)}${override ? ` -> override ${JSON.stringify(override)}` : ' (NO OVERRIDE)'}`);
     }
   }
@@ -339,12 +340,15 @@ async function main(): Promise<void> {
       // the shared resolver already called ambiguous, and kept local so
       // the datasets that share resolvePlayer are unaffected.
       if (result.status === 'ambiguous') {
-        const debutBound = row.markers.kicklessMatchesBeforeFirstKick > 0 ? row.season : row.season;
+        // `<=`, not `=`: the debut season can genuinely precede the feat
+        // (Brent Harvey debuted 1996, first kick 1997), and the "#" marker
+        // that would flag those rows is known-incomplete, so the bound
+        // cannot be tightened for unmarked rows.
         const narrowed = await sql<{ id: number }[]>`
           SELECT p.id
             FROM players p
            WHERE p.search_name = afldb_normalise_name(${lookupName})
-             AND p.debut_season <= ${debutBound}
+             AND p.debut_season <= ${row.season}
              AND EXISTS (
                SELECT 1 FROM player_match_stats pms
                 WHERE pms.player_id = p.id
@@ -393,26 +397,33 @@ async function main(): Promise<void> {
         }
 
         // The two legend markers phrased as career totals are the only
-        // part of this dataset AFLDB can independently check.
-        const [career] = await sql<{ goals: number | null; kicks: number | null }[]>`
-          SELECT goals, kicks FROM player_career_stats WHERE player_id = ${playerId}
-        `;
-        if (career) {
-          if (row.markers.noFurtherCareerGoals && career.goals !== null && career.goals !== 1) {
-            issues.push({
-              issueType: 'career_goals_contradicts_source',
-              severity: 'warning',
-              description: `Source marks "no further career goals" (implying 1 career goal); AFLDB has ${career.goals}.`,
-              details: { claim: 'no_further_career_goals', sourceImplies: 1, afldbHas: career.goals },
-            });
-          }
-          if (row.markers.noFurtherCareerKicks && career.kicks !== null && career.kicks !== 1) {
-            issues.push({
-              issueType: 'career_kicks_contradicts_source',
-              severity: 'warning',
-              description: `Source marks "no further career kicks" (implying 1 career kick); AFLDB has ${career.kicks}.`,
-              details: { claim: 'no_further_career_kicks', sourceImplies: 1, afldbHas: career.kicks },
-            });
+        // part of this dataset AFLDB can independently check. A row can
+        // combine "(n)" with either marker ("goal with each of their
+        // first 2 kicks, no further career goals"), in which case the
+        // implied total is n, not 1. Only marked rows are worth the
+        // lookup -- there is nothing to check for the other ~300.
+        if (row.markers.noFurtherCareerGoals || row.markers.noFurtherCareerKicks) {
+          const implied = row.markers.consecutiveGoalKicks;
+          const [career] = await sql<{ goals: number | null; kicks: number | null }[]>`
+            SELECT goals, kicks FROM player_career_stats WHERE player_id = ${playerId}
+          `;
+          if (career) {
+            if (row.markers.noFurtherCareerGoals && career.goals !== null && career.goals !== implied) {
+              issues.push({
+                issueType: 'career_goals_contradicts_source',
+                severity: 'warning',
+                description: `Source marks "no further career goals" (implying ${implied} career goal${implied === 1 ? '' : 's'}); AFLDB has ${career.goals}.`,
+                details: { claim: 'no_further_career_goals', sourceImplies: implied, afldbHas: career.goals },
+              });
+            }
+            if (row.markers.noFurtherCareerKicks && career.kicks !== null && career.kicks !== implied) {
+              issues.push({
+                issueType: 'career_kicks_contradicts_source',
+                severity: 'warning',
+                description: `Source marks "no further career kicks" (implying ${implied} career kick${implied === 1 ? '' : 's'}); AFLDB has ${career.kicks}.`,
+                details: { claim: 'no_further_career_kicks', sourceImplies: implied, afldbHas: career.kicks },
+              });
+            }
           }
         }
       }
@@ -467,6 +478,20 @@ async function main(): Promise<void> {
       // rather than upsert, because a corrected source file may REMOVE a
       // row and an upsert could never notice.
       await tx`DELETE FROM player_achievements WHERE achievement_type = 'first_kick_goal'`;
+
+      // The issues this importer wrote last run point at the rows just
+      // deleted (data_issues.entity_id has no FK) and would be re-filed
+      // below, so a re-run without this stacks duplicates against dead
+      // ids -- the same clear-what-this-pass-owns rule import_draft.py
+      // follows. Only unresolved ones: a human resolution is a recorded
+      // judgement, not this importer's to discard.
+      await tx`
+        DELETE FROM data_issues
+         WHERE entity_type = 'player_achievements'
+           AND issue_type IN ('first_kick_match_unresolved', 'career_goals_contradicts_source',
+                              'career_kicks_contradicts_source', 'source_count_discrepancy')
+           AND resolved_at IS NULL
+      `;
 
       for (const r of resolutions) {
         const [inserted] = await tx<{ id: number }[]>`

@@ -333,6 +333,7 @@ function extractFirstKickGoal(text: string): {
   text: string;
   achievementKey?: NlAchievementKey;
   summaryKind?: NlAchievementSummaryKind;
+  negatedAchievement?: boolean;
   consumed: string[];
 } {
   const match = FIRST_KICK_GOAL_RE.exec(text);
@@ -350,6 +351,20 @@ function extractFirstKickGoal(text: string): {
       remaining = stripMatch(remaining, cueMatch[0]);
       break;
     }
+  }
+
+  // A negation governing the phrase itself ("players who NEVER kicked a
+  // goal with their first kick") inverts the question into one this
+  // engine cannot answer -- the achievement table records who DID it, and
+  // "never" is a stopword, so without this check the polarity-inverted
+  // list would have executed at full confidence. The one negated shape
+  // that IS supported is "which clubs have never had one", where the
+  // clubs_without cue owns the negation. Anything else declines.
+  const before = text.slice(0, match.index);
+  const negatedAchievement = /\b(?:never|not|didn'?t|hasn'?t|hadn'?t|haven'?t|without)\b[^.,;?]*$/.test(before)
+    && summaryKind !== 'clubs_without';
+  if (negatedAchievement) {
+    return { text: remaining, negatedAchievement, consumed };
   }
 
   return { text: remaining, achievementKey: 'first_kick_goal', summaryKind, consumed };
@@ -806,6 +821,13 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const achievementResult = extractFirstKickGoal(text);
   text = achievementResult.text;
   consumedTokens.push(...achievementResult.consumed);
+  if (achievementResult.negatedAchievement) {
+    // The phrase was understood but the question asks for the players who
+    // did NOT do it -- see extractFirstKickGoal. No achievementKey means
+    // no structure downstream, so this declines as unrecognised; the note
+    // tells the reader (and the search log) why.
+    notes.push('Questions about players who did not achieve this are not supported.');
+  }
 
   // 5b. "N disposal games" idiom -- resolves the metric AND acts as a
   // single-game grain cue in one step, so "games" never lingers in the

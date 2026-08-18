@@ -84,10 +84,13 @@ COMMENT ON TABLE player_achievements IS
 COMMENT ON COLUMN player_achievements.source_annotation IS
   'The trailing marker substring exactly as the source wrote it, e.g. "(6)", "## *". '
   'Kept as the audit trail for the typed columns decoded from it.';
+-- (Comment wording corrected by migration 054 -- kept identical here so a
+-- from-scratch database reads the same as a migrated one.)
 COMMENT ON COLUMN player_achievements.round_raw IS
   'Verbatim source round code, including non-numeric codes such as SF. For first_kick_goal '
   'this is the round of the FIRST KICK, which is the debut match only when '
-  'kickless_matches_before_first_kick = 0. Never used to locate match_id.';
+  'kickless_matches_before_first_kick = 0. Together with season, this is what locates '
+  'match_id: the player''s recorded game in the stated season and round.';
 COMMENT ON COLUMN player_achievements.consecutive_goal_kicks IS
   'first_kick_goal legend "(n)": the player scored a goal with EACH of their first n kicks. '
   '1 (the default) means the plain achievement: the first kick only.';
@@ -101,8 +104,11 @@ COMMENT ON COLUMN player_achievements.kickless_matches_before_first_kick IS
   'first_kick_goal legend "#" / "##": the player played 1 or 2 earlier matches without '
   'recording a kick, so the achievement occurred after their senior debut, not in it.';
 COMMENT ON COLUMN player_achievements.match_id IS
-  'The match in which the achievement occurred, resolved by career game position '
-  '(1 + kickless_matches_before_first_kick), never by season/round/club lookup.';
+  'The match in which the achievement occurred: the player''s game in the source-stated '
+  'season and round (the importer absorbs the Opening Round off-by-one for seasons that '
+  'have one). NEVER inferred from career game position -- the "#" markers that would make '
+  'position reliable are incomplete (Brent Harvey: debut 1996 R22 with no recorded kick, '
+  'first kick 1997 R5). NULL when the player has no recorded game in that round.';
 
 SELECT add_provenance_columns('player_achievements');
 

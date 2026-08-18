@@ -97,13 +97,12 @@ export async function getFirstKickGoalSummary(): Promise<{
   latestSeason: number | null;
   multiKick: number;
   onlyCareerGoal: number;
-  onlyCareerKick: number;
   matchesResolved: number;
 }> {
   const [row] = await sql<{
     total: number; linked: number; unlinked: number;
     earliestSeason: number | null; latestSeason: number | null;
-    multiKick: number; onlyCareerGoal: number; onlyCareerKick: number; matchesResolved: number;
+    multiKick: number; onlyCareerGoal: number; matchesResolved: number;
   }[]>`
     SELECT count(*)::int AS total,
            count(*) FILTER (WHERE ${LINKED})::int AS linked,
@@ -112,7 +111,6 @@ export async function getFirstKickGoalSummary(): Promise<{
            max(season)::int AS "latestSeason",
            count(*) FILTER (WHERE consecutive_goal_kicks > 1)::int AS "multiKick",
            count(*) FILTER (WHERE no_further_career_goals)::int AS "onlyCareerGoal",
-           count(*) FILTER (WHERE no_further_career_kicks)::int AS "onlyCareerKick",
            count(*) FILTER (WHERE match_id IS NOT NULL)::int AS "matchesResolved"
       FROM player_achievements
      WHERE ${FIRST_KICK_GOAL}

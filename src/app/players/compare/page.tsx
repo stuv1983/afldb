@@ -291,9 +291,26 @@ export default async function ComparePlayersPage({
                   {honours.hallOfFame && (
                     <li>Australian Football Hall of Fame{honours.hallOfFame.inductedYear ? ` (${honours.hallOfFame.inductedYear})` : ''}</li>
                   )}
+                  {/* Every list total counts must also render here, or a
+                      player whose only honour is one of them shows an
+                      empty list instead of the no-rows message below. */}
+                  {honours.firstKickGoal && (
+                    <li>
+                      {honours.firstKickGoal.consecutiveGoalKicks > 1
+                        ? `Goal with each of their first ${honours.firstKickGoal.consecutiveGoalKicks} VFL/AFL kicks`
+                        : 'Goal with their first VFL/AFL kick'} — {honours.firstKickGoal.season}
+                    </li>
+                  )}
                   {honours.awards.map((a) => (
                     <li key={a.slug}>{a.name}{a.wins > 1 ? ` ×${a.wins}` : ''} — {a.seasons}</li>
                   ))}
+                  {honours.nominations.length > 0 && (
+                    <li>
+                      Rising Star nomination{honours.nominations.length > 1 ? `s ×${honours.nominations.length}` : ''}
+                      {' — '}
+                      {[...new Set(honours.nominations.map((n) => n.season))].join(', ')}
+                    </li>
+                  )}
                   {honours.allAustralian.length > 0 && (
                     <li>All-Australian ×{honours.allAustralian.length}</li>
                   )}
