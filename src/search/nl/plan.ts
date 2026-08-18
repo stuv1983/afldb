@@ -317,6 +317,22 @@ export const NL_METRICS: Record<NlGrain, Record<string, NlMetricDef>> = {
     finals: columnMetric('finals', 'Finals', 'c.finals'),
     premierships: columnMetric('premierships', 'Premierships', 'c.premierships'),
     brownlow_votes: columnMetric('brownlow_votes', 'Brownlow votes', 'c.brownlow_votes'),
+    // The rest of NL_CAREER_COLUMNS' countable columns. These were
+    // thresholdable ("players with 3+ clubs") long before they were
+    // rankable, and parser.ts's CAREER_STAT_WORDS reuse made "most wins" /
+    // "most clubs" / "most brownlow medals" parse -- but with no entry
+    // here validatePlan then rejected every one of them as "not a
+    // recognised statistic", which reads to a reader as though the site
+    // does not track the thing at all. The parser-level regression tests
+    // asserted plan SHAPE and so passed throughout; this is the same
+    // check-the-plan-not-the-answer gap that hid the player_career
+    // missing-player-filter bug, found the same way (executing the
+    // question end to end against real data rather than inspecting a plan).
+    wins: columnMetric('wins', 'Wins', 'c.wins'),
+    losses: columnMetric('losses', 'Losses', 'c.losses'),
+    draws: columnMetric('draws', 'Draws', 'c.draws'),
+    brownlow_medals: columnMetric('brownlow_medals', 'Brownlow medals', 'c.brownlow_medals'),
+    clubs_played: columnMetric('clubs_played', 'Clubs', 'c.clubs_played'),
     behinds: columnMetric('behinds', 'Behinds', 'c.behinds', 'behinds'),
     kicks: columnMetric('kicks', 'Kicks', 'c.kicks', 'kicks'),
     handballs: columnMetric('handballs', 'Handballs', 'c.handballs', 'handballs'),

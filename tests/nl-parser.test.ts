@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseNlQuestion, type NlParseContext, type NlPlayerCandidate } from '@/search/nl/parser';
-import { NL_CONFIDENCE, type NlParse, type NlQueryPlan } from '@/search/nl/plan';
+import { NL_CONFIDENCE, NL_METRICS, validatePlan, type NlParse, type NlQueryPlan } from '@/search/nl/plan';
 import type { NlClubDirectoryEntry, NlVenueDirectoryEntry } from '@/search/nl/entities';
 
 const CLUBS: NlClubDirectoryEntry[] = [
@@ -544,6 +544,36 @@ describe('regression: bare "most <career column>" ranks every career column, not
     expect(p.metric).toBe(metric);
     expect(p.agg).toEqual({ kind: 'max' });
     expect(p.careerConditions).toEqual([]);
+  });
+
+  // Asserting the plan SHAPE above is not enough, and this pair of tests
+  // exists because relying on it alone already shipped a defect: the
+  // parser produced exactly the plan asserted above for "most wins" /
+  // "most losses" / "most draws" / "most brownlow medals" / "most clubs",
+  // and validatePlan then rejected all five -- NL_METRICS.player_career
+  // had no entry for those columns, so a reader was told "'wins' is not a
+  // recognised statistic", which reads as though the site does not track
+  // wins at all. Every test here passed throughout.
+  //
+  // A plan that cannot be validated is not an answer, so the parser test
+  // must carry the plan all the way through validation. Same lesson as
+  // the player_career missing-player-filter bug: check the answer, not
+  // the shape of the thing that was going to produce it.
+  it.each(cases)('%s survives validatePlan, not just the parser', async (question) => {
+    const validated = validatePlan(await plan(question));
+    expect(validated).not.toHaveProperty('error');
+  });
+
+  it('every bare career metric the parser can emit is a real player_career metric', async () => {
+    // The structural form of the same check: whatever CAREER_STAT_WORDS
+    // grows to cover next, the metric it yields must exist in
+    // NL_METRICS.player_career or this fails at the point the vocabulary
+    // is added rather than in production.
+    for (const [question] of cases) {
+      const p = await plan(question);
+      expect(NL_METRICS.player_career, `metric "${p.metric}" from "${question}"`)
+        .toHaveProperty(p.metric!);
+    }
   });
 
   it('"most flags" ranks by premierships rather than filtering to zero premierships', async () => {
