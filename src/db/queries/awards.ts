@@ -331,6 +331,24 @@ export async function listHallOfFame(
   `;
 }
 
+/** Inductees for one year, for the season page. */
+export async function getHallOfFameInductees(year: number): Promise<HallOfFameRow[]> {
+  return sql<HallOfFameRow[]>`
+    SELECT h.id, h.name,
+           h.player_id AS "playerId", p.slug AS "playerSlug",
+           h.link_status_value::text AS "linkStatus",
+           h.category, h.inducted_year AS "inductedYear",
+           h.is_legend AS "isLegend", h.legend_year AS "legendYear",
+           h.club_name_raw AS "clubNameRaw", h.state,
+           h.playing_career AS "playingCareer",
+           h.removed_year AS "removedYear"
+      FROM hall_of_fame h
+      LEFT JOIN players p ON p.id = h.player_id
+     WHERE h.inducted_year = ${year}
+     ORDER BY h.name
+  `;
+}
+
 export async function getHallOfFameCategories(): Promise<string[]> {
   const rows = await sql<{ category: string }[]>`
     SELECT DISTINCT category FROM hall_of_fame
@@ -535,6 +553,28 @@ export async function getClubBestAndFairest(clubId: number, limit = 20) {
            )
      ORDER BY w.season DESC
      LIMIT ${limit}
+  `;
+}
+
+/** Every club's Best & Fairest winner for one season, for the season page. */
+export async function getSeasonBestAndFairest(year: number) {
+  return sql<{
+    awardName: string; awardSlug: string;
+    clubName: string | null; clubSlug: string | null;
+    playerId: number | null; playerSlug: string | null;
+    playerName: string; linkStatus: string; votes: string | null;
+  }[]>`
+    SELECT a.name AS "awardName", a.slug AS "awardSlug",
+           c.name AS "clubName", c.slug AS "clubSlug",
+           w.player_id AS "playerId", p.slug AS "playerSlug",
+           COALESCE(p.display_name, w.player_name_raw) AS "playerName",
+           w.link_status_value::text AS "linkStatus", w.votes
+      FROM award_winners w
+      JOIN awards a ON a.id = w.award_id
+      LEFT JOIN players p ON p.id = w.player_id
+      LEFT JOIN clubs c   ON c.id = w.club_id
+     WHERE a.category = 'club_best_and_fairest' AND w.season = ${year}
+     ORDER BY c.name
   `;
 }
 
