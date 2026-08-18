@@ -74,17 +74,61 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    (Scott Pendlebury, 2022) where the verified answer is a season
  *    record (Tom Atkins, 232). Any named season scope is a season
  *    leaderboard again.
- * 9: grounded UI qualification fixes -- venue-before-club extraction (a
- *    club name that is a whole word inside a venue name, e.g. "Melbourne"
- *    inside "Melbourne Cricket Ground", no longer wins the match), the
- *    empty-token confidence bug ("players with at least 2 clubs" scored
- *    tokenRatio 0 -- and so declined outright -- purely because every
- *    word in it was a stopword or a digit), new slang/vocabulary ("bag"
- *    and "bag of goals", "majors", "granny" for grand_final), and a
- *    subjective all-time-ranking refusal ("best team of all time" was
- *    confidently answering with all 1,640 club seasons on file).
+ * 9: grounded UI qualification fixes, deployed as three commits in quick
+ *    succession without a re-bump between them -- the discipline this
+ *    header asks for lapsed for two of the three, so version 9 spans more
+ *    ground than a version normally should. Recorded in full rather than
+ *    split after the fact, because nl_search_log rows already logged
+ *    under "9" cannot retroactively be told apart: a tuning pass reading
+ *    version 9 must treat it as the union of all of the below, not a
+ *    single coherent behaviour.
+ *    - venue-before-club extraction (a club name that is a whole word
+ *      inside a venue name, e.g. "Melbourne" inside "Melbourne Cricket
+ *      Ground", no longer wins the match), the empty-token confidence bug
+ *      ("players with at least 2 clubs" scored tokenRatio 0 -- and so
+ *      declined outright -- purely because every word in it was a
+ *      stopword or a digit), new slang/vocabulary ("bag" and "bag of
+ *      goals", "majors", "granny" for grand_final), and a subjective
+ *      all-time-ranking refusal ("best team of all time" was confidently
+ *      answering with all 1,640 club seasons on file).
+ *    - every CAREER_STAT_WORDS column except games/goals/finals reachable
+ *      as a bare ranking subject, not just a numbered threshold ("most
+ *      premierships" used to decline outright); a named player asking for
+ *      one of those columns ("Nick Dal Santo most games") now routes to
+ *      player_career instead of a player_game grain with no matching
+ *      column; the negativeTargets alternation-precedence bug ("most
+ *      flags" was silently answering players-with-zero-premierships);
+ *      CLUB_SUBJECT_LEADING requiring something to follow "clubs"/"teams"
+ *      (bare "most clubs" no longer elects an unranked club_season dump);
+ *      and a second vocabulary batch (sausage(s), "find the sticks",
+ *      grab(s)/clunk(s), handpass(es), bare assist(s), numeral inside/
+ *      rebound-50 forms, "forward entry", "the big dance", September,
+ *      bare "spoon").
+ *    - ambiguous-surname ranking: a mention with 2-12 plausible candidates
+ *      ("Ablett most goals") now ranks across all of them via
+ *      scope.playerIdIn instead of declining outright. This is a genuine
+ *      plan-shape change (a new scope field, a status that used to be
+ *      'decline' now 'plan') and the clearest case of the three that
+ *      should have carried its own version number.
+ * 10: extractCareerConditions' operator/number lookup used a fixed
+ *    20-character lookbehind window. Two numeric career conditions close
+ *    together in one sentence ("more than 300 clubs and over 10
+ *    premierships") could have the first-processed clause (CAREER_STAT_WORDS
+ *    is a fixed array order, not sentence order) open a window reaching
+ *    across "and" into the other clause's number -- stealing it outright,
+ *    or slicing through a multi-digit number and reading the severed
+ *    remainder as if it were complete. The stolen span was then removed
+ *    from the source text too, corrupting the clause it belonged to for
+ *    the rest of the pass. A clause that lost its number this way was
+ *    silently dropped, and the orphaned stat word could then be misread by
+ *    bare-metric detection as a ranking subject instead of a condition
+ *    ("at least 1 games and over 1 goals" turned "games" into the plan's
+ *    metric). Found by the 250k-row V2 stress corpus, not hand-written
+ *    cases. Fix: the lookbehind window is now clipped at the nearest
+ *    preceding clause boundary (comma or "and"), so one clause's number
+ *    search can never see a token belonging to the clause before it.
  */
-export const PARSER_VERSION = 9;
+export const PARSER_VERSION = 10;
 
 // ------------------------------------------------------------------ grain
 
