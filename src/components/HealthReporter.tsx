@@ -10,6 +10,29 @@ function truncate(value: string, max: number): string {
   return value.length > max ? value.slice(0, max) : value;
 }
 
+/**
+ * `crypto.randomUUID()` throws outside a secure context (HTTPS or
+ * localhost) -- dev is served over plain HTTP on a LAN IP, which is
+ * neither, so this must not be the only path. navigationId is a
+ * low-stakes correlation key for the admin view, not a security value,
+ * so a Math.random()-based fallback is an acceptable substitute here
+ * even though it would not be for anything the server trusts.
+ */
+function safeRandomId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      // fall through to the Math.random() generator below
+    }
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 function extractReactErrorCode(message: string): string | null {
   return message.match(/react error #(\d+)/i)?.[1] ?? null;
 }
@@ -49,7 +72,7 @@ function report(body: Record<string, unknown>): void {
  */
 export function HealthReporter() {
   useEffect(() => {
-    const navigationId = crypto.randomUUID();
+    const navigationId = safeRandomId();
     const startedAt = performance.now();
 
     function commonFields() {
