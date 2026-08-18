@@ -286,6 +286,14 @@ export const METRIC_WORDS: [RegExp, string][] = [
   [/\brebound-fifties\b/, 'rebounds'],
   [/\bbrownlow votes?\b/, 'brownlow_votes'],
   [/\bbiggest bags?\b/, 'goals'],
+  // "bag of goals" / "bags of goals" as one phrase, BEFORE the bare
+  // "bag(s)" entry below: extraction returns on its first match, so
+  // without this, "biggest bag of goals" (after "biggest" is claimed by
+  // aggregation extraction) matched bare "bag", consumed only that word,
+  // and left "of goals" behind -- "goals" is not itself a stopword, so
+  // it stood as an unaccounted-for leftover token and declined the
+  // question. Matching the full phrase up front consumes it atomically.
+  [/\bbags? of goals\b/, 'goals'],
   /**
    * A bare "bag" as well as "biggest bag", because by the time metric
    * extraction runs the phrase has usually already been split:
