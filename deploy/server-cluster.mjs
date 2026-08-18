@@ -117,7 +117,15 @@ if (cluster.isPrimary) {
   // state. Confirming or killing that needs the worker identity attached
   // to individual responses, which is what these headers are for.
   if (process.env.AFLDB_TRACE_REQUESTS === 'on') {
-    const http = await import('node:http');
+    // createRequire, NOT `await import('node:http')`: an ESM module
+    // namespace object is frozen, so assigning to its createServer throws
+    // "Cannot assign to read only property 'createServer' of object
+    // '[object Module]'" and takes the worker down with it. The CJS view of
+    // the same builtin is an ordinary mutable object, and it is the same
+    // underlying module instance the standalone server will require.
+    const { createRequire } = await import('node:module');
+    const require = createRequire(import.meta.url);
+    const http = require('node:http');
     const { randomUUID } = await import('node:crypto');
     const { readFileSync } = await import('node:fs');
 
