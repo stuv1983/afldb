@@ -19,6 +19,28 @@ export default function Error({
   useEffect(() => {
     // The digest correlates this page with the server log entry.
     console.error('[render] page failed', error.digest);
+
+    // Best-effort: this boundary firing means something genuinely broke a
+    // reader's page, which is exactly the category app_health_events
+    // exists to separate from a recoverable hydration mismatch (see
+    // src/db/queries/app-health.ts). A failed report must not compound
+    // the render failure already in front of the reader.
+    const payload = JSON.stringify({
+      eventType: 'PAGE_CRASH',
+      route: window.location.pathname,
+      detail: error.digest ? `digest: ${error.digest}` : (error.message || 'unknown error').slice(0, 500),
+    });
+    try {
+      if (typeof navigator.sendBeacon === 'function') {
+        navigator.sendBeacon('/api/health-event', new Blob([payload], { type: 'application/json' }));
+      } else {
+        fetch('/api/health-event', {
+          method: 'POST', body: payload, keepalive: true, headers: { 'Content-Type': 'application/json' },
+        }).catch(() => {});
+      }
+    } catch {
+      // Never let telemetry be the reason an already-broken page throws again.
+    }
   }, [error]);
 
   return (

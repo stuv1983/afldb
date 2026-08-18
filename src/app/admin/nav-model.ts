@@ -81,6 +81,7 @@ export function adminNavFor(viewer: AdminNavViewer): AdminNavGroup[] {
           ? [
             { href: '/admin/query-builder', label: 'Data QA search' },
             { href: '/admin/db-health', label: 'Database health' },
+            { href: '/admin/app-health', label: 'Application health' },
             { href: '/admin/nl-search', label: 'Search telemetry' },
             { href: '/admin/nl-search/feedback', label: 'Reader feedback' },
           ]

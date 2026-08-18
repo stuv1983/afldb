@@ -301,7 +301,7 @@ $$;
 
 -- ---------------------------------------------------------------------
 -- afldb_auth — the operational tables
---              (migrations 023, 024, 030, 032, 034, 037, 046, 047, 049)
+--              (migrations 023, 024, 030, 032, 034, 037, 046, 047, 049, 052)
 -- ---------------------------------------------------------------------
 -- Every one of these grants lives inside an `IF EXISTS (afldb_auth)`
 -- guard in its migration, so all of them are silently skipped when the
@@ -334,6 +334,8 @@ DECLARE
     ['nl_search_review',       'SELECT, INSERT, UPDATE'],           -- 047
     -- Append-only by grant: no UPDATE, no DELETE (see migration 049).
     ['nl_search_feedback',     'SELECT, INSERT'],                   -- 049
+    -- Append-only by grant: no UPDATE, no DELETE (see migration 052).
+    ['app_health_events',      'SELECT, INSERT'],                   -- 052
     -- Read-only: validation resolves submitted names against these.
     ['players',                'SELECT'],                           -- 023
     ['player_clubs',           'SELECT'],                           -- 023
@@ -355,7 +357,7 @@ DECLARE
     'beta_access_codes', 'beta_allowed_emails', 'beta_login_tokens',
     'beta_join_requests', 'data_submissions', 'data_submission_rows',
     'admin_invites', 'site_settings', 'site_media', 'nl_search_log', 'nl_search_review',
-    'nl_search_feedback'
+    'nl_search_feedback', 'app_health_events'
   ];
   named text[] := ARRAY[]::text[];
   i int;

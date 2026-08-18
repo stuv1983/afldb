@@ -29,6 +29,7 @@ const PUBLIC_PREFIXES = [
   '/admin/login',    // admins must be able to reach the login form
   '/admin/invite',   // invite acceptance: gated by the unguessable token in the path, not a session
   '/api/health',     // uptime checks predate any visitor
+  '/api/health-event', // client-side failure reports; a broken page must still be able to report itself
   '/api/admin/email-intake', // machine-to-machine, gated by its own shared secret, not a session
   '/api/early-access', // the apex coming-soon page's form; queues a request, admits nobody
   '/robots.txt',     // crawlers must read the disallow, not a redirect

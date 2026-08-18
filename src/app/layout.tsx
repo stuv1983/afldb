@@ -3,6 +3,7 @@ import { IBM_Plex_Mono, IBM_Plex_Sans, Newsreader } from 'next/font/google';
 import Link from 'next/link';
 
 import { ConsentBanner } from '@/components/ConsentBanner';
+import { HealthReporter } from '@/components/HealthReporter';
 import { PrimaryNav, TabBar } from '@/components/SiteNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { getSiteFooter } from '@/db/queries/site-settings';
@@ -130,6 +131,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
         <TabBar />
         <ConsentBanner />
+        <HealthReporter />
       </body>
     </html>
   );
