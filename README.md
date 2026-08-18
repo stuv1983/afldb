@@ -45,6 +45,7 @@ Recent changes are recorded in the [changelog](CHANGELOG.md).
 
 **Search**
 - Global search and autocomplete across players, clubs, venues, seasons, rounds, awards, and record categories
+- Natural-language questions answered inline on `/search` — "most goals against Carlton", "players with 200 games and no premiership", "most premierships" — a deterministic parser and a fixed, allowlisted set of SQL compilers, deliberately no LLM anywhere in the pipeline. A tied record names every holder, not just the first; an ambiguous surname ("Ablett most goals") ranks across every plausible candidate rather than declining. See [Search](docs/search.md)
 - Intent-aware routing — a query naming a club or season alongside a record, award, or draft class ("brownlow winner richmond", "most goals essendon") lands on that filtered view rather than a bare page
 - Typed, shareable player and match searches with allowlisted filters and sorting
 - Player comparison with played-with and played-against drill-down
@@ -70,7 +71,7 @@ The latest clean migration recorded in [the migration report](docs/migration-rep
 | Historical club identities | 24 |
 | Players | 13,361 |
 | Matches | 17,027 |
-| Player-match rows | 694,210 |
+| Player-match rows | 694,209 |
 | Venues | 52 |
 | Brownlow season rows | 16,120 |
 | Draft picks | 6,810 |
@@ -122,11 +123,12 @@ src/components/      Shared UI components
 src/db/queries/      Parameterized application queries
 src/db/migrations/   Ordered PostgreSQL migrations
 src/lib/             Auth, settings, email, SEO, and ingest helpers
-src/search/          Typed search, query-builder, and grid-solver specifications
+src/search/          Typed search, query-builder, grid-solver, and NL search specs
 tools/db/            Migration runner
 tools/migration/     Repeatable import, enrichment, and derived-data jobs
 tools/aflw/          AFLW parse and staging load
 tools/validation/    Migration parity checks
+tools/nl/            NL search stress-test corpora, runners, and comparisons
 tools/maintenance/   Host setup, privileges, backup, restore, and load testing
 tools/email_intake/  IMAP fetch and staging for the email upload channel
 deploy/              systemd units, Caddyfiles, cluster supervisor, apex page
@@ -171,6 +173,9 @@ first-time setup.
 | `npm run typecheck` | TypeScript checks | None |
 | `npm test` | Unit, integration, and release-gate tests | Integration uses only `AFLDB_TEST_DATABASE_URL` |
 | `npm run test:e2e` | Desktop and mobile browser journeys | Configured test deployment |
+| `npm run nl:stress` | Run an NL search corpus through the real parser and compilers, no HTTP | `DATABASE_URL` |
+| `npm run nl:ui` | Drive the NL corpus through the rendered `/search` page in a real browser | Configured test deployment |
+| `npm run nl:stress:compare` | Diff two `nl:stress` runs | None |
 | `npm run db:status` | Show migration state | Owner connection |
 | `npm run db:migrate` | Apply pending development migrations | Development database |
 | `npm run db:migrate:test` | Apply pending test migrations | `_test` database only |
@@ -246,7 +251,7 @@ never be committed.
 | [Data dictionary](docs/data-dictionary.md) | Audit of the legacy source tables and known gaps |
 | [Migration inventory](docs/migration-inventory.md) | Source-to-target mapping and validation baselines |
 | [Migration report](docs/migration-report.md) | Migrated volumes, corrections, and validation results |
-| [Search](docs/search.md) | Normalization, ranking, filters, limits, and performance |
+| [Search](docs/search.md) | Normalization, ranking, filters, limits, performance, and the natural-language engine — parser, confidence scoring, era coverage, and the search log |
 | [AFLW](docs/aflw.md) | The AFLW read model, its identity rules, and source limits |
 | [Admin and beta](docs/admin-and-beta.md) | Admin accounts and MFA, the beta gate, and the CSV pipeline |
 | [Apex coming-soon](docs/apex-coming-soon.md) | The `afldb.com` holding page and its editor |
