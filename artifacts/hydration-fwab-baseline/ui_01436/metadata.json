@@ -1,0 +1,130 @@
+{
+  "id": "ui_01436",
+  "question": "Brendan Fevola total clearances against Adelaide",
+  "capturedAt": "2026-08-19T10:04:10.090Z",
+  "parserVersion": 15,
+  "trace": {
+    "worker": "4",
+    "pid": "909222",
+    "requestId": "bc8ed40f-9684-4b1f-8a72-dd8e9613a570",
+    "build": "-eNMdYva6jS0ztyAXEiyd"
+  },
+  "httpStatus": 200,
+  "elapsedMs": 659,
+  "outcome": "answered",
+  "headline": "Brendan Fevola — 1 clearances",
+  "consoleErrors": [
+    "pageerror: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+  ],
+  "network": [
+    {
+      "url": "http://10.0.40.100:8090/search?q=Brendan%20Fevola%20total%20clearances%20against%20Adelaide",
+      "status": 200,
+      "resourceType": "document",
+      "worker": "4",
+      "atMs": 267
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/d3ebbfd689654d3a-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "4",
+      "atMs": 328
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/css/a8da1fec6492730f.css",
+      "status": 200,
+      "resourceType": "stylesheet",
+      "worker": "1",
+      "atMs": 356
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/26d4368bf94c0ec4-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "1",
+      "atMs": 488
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/5611c55482296524-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "2",
+      "atMs": 488
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/98e207f02528a563-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "3",
+      "atMs": 499
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/webpack-29079d1cd0ad75b6.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 500
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/main-app-95880b0700494805.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 501
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/search/page-a7aecb72d6710b96.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 501
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/2619-3c9e02e22d10480a.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 517
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/1255-a20f6c5e797a687b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 519
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/4bd1b696-f785427dddbba9fb.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 519
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/layout-a6cdbdfa3ad5299f.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 536
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-498be0ede4afac35.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 635
+    }
+  ],
+  "cleanControl": {
+    "attempts": 1,
+    "cleanCaptureSucceeded": true,
+    "trace": {
+      "worker": "2",
+      "pid": "909219",
+      "requestId": "c85fcb07-5211-42c0-80f1-bc9ca2ddc670",
+      "build": "-eNMdYva6jS0ztyAXEiyd"
+    },
+    "errors": []
+  }
+}

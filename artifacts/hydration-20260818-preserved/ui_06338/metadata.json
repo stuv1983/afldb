@@ -1,0 +1,263 @@
+{
+  "id": "ui_06338",
+  "question": "players with at least 10 finals and less than 200 clubs!!!",
+  "capturedAt": "2026-08-18T13:21:23.667Z",
+  "parserVersion": 13,
+  "trace": {
+    "worker": "3",
+    "pid": "2520411",
+    "requestId": "7f5b802b-303b-41d3-8473-4ca4573b5620",
+    "build": "8BKren5fRWzJ4jRofFFS3"
+  },
+  "httpStatus": 200,
+  "elapsedMs": 401,
+  "outcome": "answered",
+  "headline": "1,049 players match",
+  "consoleErrors": [
+    "pageerror: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+  ],
+  "network": [
+    {
+      "url": "http://10.0.40.100:8090/api/health-event",
+      "status": 204,
+      "resourceType": "ping",
+      "worker": "4",
+      "atMs": 60
+    },
+    {
+      "url": "http://10.0.40.100:8090/?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 66
+    },
+    {
+      "url": "http://10.0.40.100:8090/records?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 73
+    },
+    {
+      "url": "http://10.0.40.100:8090/players?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 73
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 75
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 80
+    },
+    {
+      "url": "http://10.0.40.100:8090/draft?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 98
+    },
+    {
+      "url": "http://10.0.40.100:8090/awards?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 114
+    },
+    {
+      "url": "http://10.0.40.100:8090/brownlow?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 114
+    },
+    {
+      "url": "http://10.0.40.100:8090/match-search?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 121
+    },
+    {
+      "url": "http://10.0.40.100:8090/aflw?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 124
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/page-4744a03891e83c2c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 126
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/records/page-4f1c4fe0dc2b1fc0.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 127
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/scott-pendlebury-4182?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 136
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/shaun-burgoyne-1126?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 172
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/brent-harvey-788?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 172
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/michael-tuck-1319?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 172
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/awards/page-4f1c4fe0dc2b1fc0.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 173
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/aflw/page-4744a03891e83c2c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 173
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/kevin-bartlett-1509?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 194
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/travis-boak-11583?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 212
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/robert-harvey-930?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 212
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/dustin-fletcher-304?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 219
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/simon-madden-1302?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 240
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/david-mundy-4088?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 240
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/players/%5Bslug%5D/page-e9d18d1756414d23.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 240
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/search/autocomplete?q=players%20with%20at%20least%2010%20finals%20and%20less%20than%20200%20clubs",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": null,
+      "atMs": 241
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/craig-bradley-151?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 246
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/patrick-dangerfield-11700?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 255
+    },
+    {
+      "url": "http://10.0.40.100:8090/search?q=players%20with%20at%20least%2010%20finals%20and%20less%20than%20200%20clubs!!!",
+      "status": 200,
+      "resourceType": "document",
+      "worker": "3",
+      "atMs": 276
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/d3ebbfd689654d3a-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "1",
+      "atMs": 313
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/98e207f02528a563-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "4",
+      "atMs": 314
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/css/046c53b3249f799d.css",
+      "status": 200,
+      "resourceType": "stylesheet",
+      "worker": "4",
+      "atMs": 322
+    }
+  ],
+  "cleanControl": {
+    "attempts": 1,
+    "cleanCaptureSucceeded": true,
+    "trace": {
+      "worker": "3",
+      "pid": "2520411",
+      "requestId": "48c1f4ef-2146-45fa-a9d8-c4f08724c51f",
+      "build": "8BKren5fRWzJ4jRofFFS3"
+    },
+    "errors": []
+  }
+}

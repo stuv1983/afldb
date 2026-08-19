@@ -1,0 +1,235 @@
+{
+  "id": "ui_01742",
+  "question": "Nick Dal Santo total hitouts against Fremantle",
+  "capturedAt": "2026-08-18T07:48:25.681Z",
+  "parserVersion": 11,
+  "trace": {
+    "worker": "1",
+    "pid": "1944043",
+    "requestId": "8c50267a-0c11-4468-aab3-a1ecafae7f55",
+    "build": "8HXwuDHUf3RJsyB_ZGJXc"
+  },
+  "httpStatus": 200,
+  "elapsedMs": 583,
+  "outcome": "answered",
+  "headline": "Nick Dal Santo — 10 hitouts",
+  "consoleErrors": [
+    "pageerror: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+  ],
+  "network": [
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/layout-d7e1f0fba8a9941c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 2
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-b00f854729942a59.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 2
+    },
+    {
+      "url": "http://10.0.40.100:8090/?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 121
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 141
+    },
+    {
+      "url": "http://10.0.40.100:8090/players?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 141
+    },
+    {
+      "url": "http://10.0.40.100:8090/records?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 160
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 160
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/page-4744a03891e83c2c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 170
+    },
+    {
+      "url": "http://10.0.40.100:8090/brownlow?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 170
+    },
+    {
+      "url": "http://10.0.40.100:8090/match-search?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 192
+    },
+    {
+      "url": "http://10.0.40.100:8090/awards?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 198
+    },
+    {
+      "url": "http://10.0.40.100:8090/draft?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 202
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/search/autocomplete?q=Nick%20Dal%20Santo%20most%20hitouts%20against%20Fremantle",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": null,
+      "atMs": 204
+    },
+    {
+      "url": "http://10.0.40.100:8090/aflw?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 227
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/nick-dal-santo-1132?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 230
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/records/page-8f063a6f2c1d0b29.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 230
+    },
+    {
+      "url": "http://10.0.40.100:8090/matches/13420?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 241
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/players/%5Bslug%5D/page-eb614dba11568a7b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 276
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/awards/page-8f063a6f2c1d0b29.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 276
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/matches/%5Bid%5D/page-eb614dba11568a7b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 276
+    },
+    {
+      "url": "http://10.0.40.100:8090/matches/14420?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 279
+    },
+    {
+      "url": "http://10.0.40.100:8090/search?q=Nick%20Dal%20Santo%20total%20hitouts%20against%20Fremantle",
+      "status": 200,
+      "resourceType": "document",
+      "worker": "1",
+      "atMs": 319
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/d3ebbfd689654d3a-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "2",
+      "atMs": 389
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/css/046c53b3249f799d.css",
+      "status": 200,
+      "resourceType": "stylesheet",
+      "worker": "1",
+      "atMs": 394
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/98e207f02528a563-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "4",
+      "atMs": 398
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/26d4368bf94c0ec4-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "4",
+      "atMs": 473
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/5611c55482296524-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "1",
+      "atMs": 475
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/webpack-29079d1cd0ad75b6.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 517
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/main-app-95880b0700494805.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 530
+    }
+  ],
+  "cleanControl": {
+    "attempts": 1,
+    "cleanCaptureSucceeded": true,
+    "trace": {
+      "worker": "4",
+      "pid": "1944046",
+      "requestId": "2bdd30e7-4196-4f8e-92b1-c26a67c3a165",
+      "build": "8HXwuDHUf3RJsyB_ZGJXc"
+    },
+    "errors": []
+  }
+}

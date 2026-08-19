@@ -1,0 +1,200 @@
+{
+  "id": "ui_11311",
+  "question": "Joel Selwood most disposals against Collingwood in 1999 please",
+  "capturedAt": "2026-08-18T13:36:42.667Z",
+  "parserVersion": 13,
+  "trace": {
+    "worker": "4",
+    "pid": "2520412",
+    "requestId": "51ba173a-4124-4dbb-8ca9-bbfeeb30fcf4",
+    "build": "8BKren5fRWzJ4jRofFFS3"
+  },
+  "httpStatus": 200,
+  "elapsedMs": 279,
+  "outcome": "absent",
+  "headline": null,
+  "consoleErrors": [
+    "pageerror: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+  ],
+  "network": [
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-498be0ede4afac35.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 6
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/health-event",
+      "status": 204,
+      "resourceType": "ping",
+      "worker": "2",
+      "atMs": 26
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 33
+    },
+    {
+      "url": "http://10.0.40.100:8090/?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 33
+    },
+    {
+      "url": "http://10.0.40.100:8090/records?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 40
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/page-4744a03891e83c2c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 43
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 48
+    },
+    {
+      "url": "http://10.0.40.100:8090/players?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 49
+    },
+    {
+      "url": "http://10.0.40.100:8090/awards?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 56
+    },
+    {
+      "url": "http://10.0.40.100:8090/brownlow?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 58
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/records/page-4f1c4fe0dc2b1fc0.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 59
+    },
+    {
+      "url": "http://10.0.40.100:8090/match-search?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 61
+    },
+    {
+      "url": "http://10.0.40.100:8090/aflw?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 68
+    },
+    {
+      "url": "http://10.0.40.100:8090/draft?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 69
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/awards/page-4f1c4fe0dc2b1fc0.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 69
+    },
+    {
+      "url": "http://10.0.40.100:8090/about?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 78
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/james-hird-312?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 83
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/players/%5Bslug%5D/page-e9d18d1756414d23.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 90
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/damian-cupido-1096?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 156
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/search/autocomplete?q=most%20clangers%20for%20Essendon%20against%20Western%20Bulldogs%20in%202003",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": null,
+      "atMs": 214
+    },
+    {
+      "url": "http://10.0.40.100:8090/search?q=Joel%20Selwood%20most%20disposals%20against%20Collingwood%20in%201999%20please",
+      "status": 200,
+      "resourceType": "document",
+      "worker": "4",
+      "atMs": 251
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/css/046c53b3249f799d.css",
+      "status": 200,
+      "resourceType": "stylesheet",
+      "worker": "2",
+      "atMs": 266
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/d3ebbfd689654d3a-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "2",
+      "atMs": 267
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/webpack-29079d1cd0ad75b6.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 277
+    }
+  ],
+  "cleanControl": {
+    "attempts": 1,
+    "cleanCaptureSucceeded": true,
+    "trace": {
+      "worker": "3",
+      "pid": "2520411",
+      "requestId": "c20f2d6d-3c86-4170-aab6-b8c793ced584",
+      "build": "8BKren5fRWzJ4jRofFFS3"
+    },
+    "errors": []
+  }
+}

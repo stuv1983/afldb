@@ -1,0 +1,270 @@
+{
+  "id": "ui_05286",
+  "question": "players with exactly 20 clubs and at least 100 premierships",
+  "capturedAt": "2026-08-19T10:11:26.640Z",
+  "parserVersion": 15,
+  "trace": {
+    "worker": "3",
+    "pid": "909220",
+    "requestId": "73437ee1-d7bb-46f6-84c4-e3dfe53340fa",
+    "build": "-eNMdYva6jS0ztyAXEiyd"
+  },
+  "httpStatus": 200,
+  "elapsedMs": 324,
+  "outcome": "absent",
+  "headline": null,
+  "consoleErrors": [
+    "pageerror: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+  ],
+  "network": [
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/1255-a20f6c5e797a687b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 12
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/main-app-95880b0700494805.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 13
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/webpack-29079d1cd0ad75b6.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 13
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/2619-3c9e02e22d10480a.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 13
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/4bd1b696-f785427dddbba9fb.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 13
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/layout-a6cdbdfa3ad5299f.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 18
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-498be0ede4afac35.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 52
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/health-event",
+      "status": 204,
+      "resourceType": "ping",
+      "worker": "3",
+      "atMs": 72
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 74
+    },
+    {
+      "url": "http://10.0.40.100:8090/?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 88
+    },
+    {
+      "url": "http://10.0.40.100:8090/players?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 89
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 93
+    },
+    {
+      "url": "http://10.0.40.100:8090/brownlow?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 95
+    },
+    {
+      "url": "http://10.0.40.100:8090/records?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 123
+    },
+    {
+      "url": "http://10.0.40.100:8090/awards?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 124
+    },
+    {
+      "url": "http://10.0.40.100:8090/draft?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 124
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/page-4744a03891e83c2c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 125
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/records/page-4f1c4fe0dc2b1fc0.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 130
+    },
+    {
+      "url": "http://10.0.40.100:8090/match-search?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 134
+    },
+    {
+      "url": "http://10.0.40.100:8090/aflw?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 136
+    },
+    {
+      "url": "http://10.0.40.100:8090/about?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 140
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/awards/page-4f1c4fe0dc2b1fc0.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 141
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/search/autocomplete?q=players%20with%20more%20than%20150%20finals%20and%20at%20least%201%20games%20please",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": null,
+      "atMs": 257
+    },
+    {
+      "url": "http://10.0.40.100:8090/search?q=players%20with%20exactly%2020%20clubs%20and%20at%20least%20100%20premierships",
+      "status": 200,
+      "resourceType": "document",
+      "worker": "3",
+      "atMs": 269
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/26d4368bf94c0ec4-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "3",
+      "atMs": 293
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/d3ebbfd689654d3a-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "3",
+      "atMs": 293
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/98e207f02528a563-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "3",
+      "atMs": 294
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/css/a8da1fec6492730f.css",
+      "status": 200,
+      "resourceType": "stylesheet",
+      "worker": "3",
+      "atMs": 295
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/5611c55482296524-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "3",
+      "atMs": 301
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/2619-3c9e02e22d10480a.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 317
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/search/page-a7aecb72d6710b96.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 317
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/1255-a20f6c5e797a687b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 318
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/webpack-29079d1cd0ad75b6.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 320
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/main-app-95880b0700494805.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 320
+    }
+  ],
+  "cleanControl": {
+    "attempts": 1,
+    "cleanCaptureSucceeded": true,
+    "trace": {
+      "worker": "3",
+      "pid": "909220",
+      "requestId": "939e829a-445b-47ac-a2ce-9ccab20c8ac7",
+      "build": "-eNMdYva6jS0ztyAXEiyd"
+    },
+    "errors": []
+  }
+}

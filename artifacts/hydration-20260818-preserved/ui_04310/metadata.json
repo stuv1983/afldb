@@ -1,0 +1,249 @@
+{
+  "id": "ui_04310",
+  "question": "Port Adelaide highest total score v Fremantle",
+  "capturedAt": "2026-08-18T13:28:54.723Z",
+  "parserVersion": 13,
+  "trace": {
+    "worker": "4",
+    "pid": "2520412",
+    "requestId": "47edf839-48b9-4115-97c9-bc6895e960fd",
+    "build": "8BKren5fRWzJ4jRofFFS3"
+  },
+  "httpStatus": 200,
+  "elapsedMs": 252,
+  "outcome": "answered",
+  "headline": "Port Adelaide vs Fremantle (2001) — 234 total score",
+  "consoleErrors": [
+    "pageerror: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+  ],
+  "network": [
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-498be0ede4afac35.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 3
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/health-event",
+      "status": 204,
+      "resourceType": "ping",
+      "worker": "3",
+      "atMs": 23
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 31
+    },
+    {
+      "url": "http://10.0.40.100:8090/players?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 35
+    },
+    {
+      "url": "http://10.0.40.100:8090/?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 35
+    },
+    {
+      "url": "http://10.0.40.100:8090/records?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 37
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 40
+    },
+    {
+      "url": "http://10.0.40.100:8090/brownlow?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 43
+    },
+    {
+      "url": "http://10.0.40.100:8090/awards?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 48
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/records/page-4f1c4fe0dc2b1fc0.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 49
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/page-4744a03891e83c2c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 49
+    },
+    {
+      "url": "http://10.0.40.100:8090/draft?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 50
+    },
+    {
+      "url": "http://10.0.40.100:8090/match-search?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 52
+    },
+    {
+      "url": "http://10.0.40.100:8090/aflw?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 54
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/awards/page-4f1c4fe0dc2b1fc0.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 55
+    },
+    {
+      "url": "http://10.0.40.100:8090/about?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 55
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/search/autocomplete?q=quick%20one%20Port%20Adelaide%20highest%20combined%20score%20vs%20Pies%20please",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": null,
+      "atMs": 199
+    },
+    {
+      "url": "http://10.0.40.100:8090/search?q=Port%20Adelaide%20highest%20total%20score%20v%20Fremantle",
+      "status": 200,
+      "resourceType": "document",
+      "worker": "4",
+      "atMs": 201
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/d3ebbfd689654d3a-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "4",
+      "atMs": 216
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/css/046c53b3249f799d.css",
+      "status": 200,
+      "resourceType": "stylesheet",
+      "worker": "4",
+      "atMs": 222
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/26d4368bf94c0ec4-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "2",
+      "atMs": 223
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/5611c55482296524-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "2",
+      "atMs": 226
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/98e207f02528a563-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "2",
+      "atMs": 226
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/2619-3c9e02e22d10480a.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 237
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/webpack-29079d1cd0ad75b6.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 237
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/search/page-a7aecb72d6710b96.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 237
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/main-app-95880b0700494805.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 237
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/1255-a20f6c5e797a687b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 240
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-498be0ede4afac35.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 240
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/4bd1b696-f785427dddbba9fb.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 240
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/layout-d7e1f0fba8a9941c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 246
+    }
+  ],
+  "cleanControl": {
+    "attempts": 1,
+    "cleanCaptureSucceeded": true,
+    "trace": {
+      "worker": "3",
+      "pid": "2520411",
+      "requestId": "2868de27-c3ca-4673-b5f1-fafcac55843f",
+      "build": "8BKren5fRWzJ4jRofFFS3"
+    },
+    "errors": []
+  }
+}

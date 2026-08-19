@@ -1,0 +1,291 @@
+{
+  "id": "ui_00628",
+  "question": "Scott Pendlebury most clearances against Melbourne",
+  "capturedAt": "2026-08-18T07:52:55.328Z",
+  "parserVersion": 11,
+  "trace": {
+    "worker": "4",
+    "pid": "1944046",
+    "requestId": "0d3afdd2-997f-4509-9c1e-1d6ec645bfad",
+    "build": "8HXwuDHUf3RJsyB_ZGJXc"
+  },
+  "httpStatus": 200,
+  "elapsedMs": 430,
+  "outcome": "answered",
+  "headline": "Scott Pendlebury — 9 clearances",
+  "consoleErrors": [
+    "pageerror: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+  ],
+  "network": [
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/webpack-29079d1cd0ad75b6.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 2
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-b00f854729942a59.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 13
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/layout-d7e1f0fba8a9941c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 13
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/search/page-a7aecb72d6710b96.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 13
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/4bd1b696-f785427dddbba9fb.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 16
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/1255-a20f6c5e797a687b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 18
+    },
+    {
+      "url": "http://10.0.40.100:8090/records?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 63
+    },
+    {
+      "url": "http://10.0.40.100:8090/?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 75
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 79
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 79
+    },
+    {
+      "url": "http://10.0.40.100:8090/players?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 80
+    },
+    {
+      "url": "http://10.0.40.100:8090/brownlow?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 93
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/records/page-8f063a6f2c1d0b29.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 102
+    },
+    {
+      "url": "http://10.0.40.100:8090/draft?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 106
+    },
+    {
+      "url": "http://10.0.40.100:8090/awards?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 123
+    },
+    {
+      "url": "http://10.0.40.100:8090/match-search?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 131
+    },
+    {
+      "url": "http://10.0.40.100:8090/aflw?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 131
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/page-4744a03891e83c2c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 131
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/scott-pendlebury-4182?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 133
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/aflw/page-4744a03891e83c2c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 143
+    },
+    {
+      "url": "http://10.0.40.100:8090/about?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 161
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/players/%5Bslug%5D/page-eb614dba11568a7b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 182
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/search/autocomplete?q=Scott%20Pendlebury%20highest%20clearances%20game%20against%20West%20Coast",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": null,
+      "atMs": 220
+    },
+    {
+      "url": "http://10.0.40.100:8090/search?q=Scott%20Pendlebury%20most%20clearances%20against%20Melbourne",
+      "status": 200,
+      "resourceType": "document",
+      "worker": "4",
+      "atMs": 242
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/98e207f02528a563-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "4",
+      "atMs": 284
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/css/046c53b3249f799d.css",
+      "status": 200,
+      "resourceType": "stylesheet",
+      "worker": "4",
+      "atMs": 296
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/d3ebbfd689654d3a-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "1",
+      "atMs": 325
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/26d4368bf94c0ec4-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "3",
+      "atMs": 351
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/5611c55482296524-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "2",
+      "atMs": 352
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/search/page-a7aecb72d6710b96.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 365
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/webpack-29079d1cd0ad75b6.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 365
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/main-app-95880b0700494805.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 375
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/2619-3c9e02e22d10480a.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 393
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/layout-d7e1f0fba8a9941c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 398
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/1255-a20f6c5e797a687b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 398
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/4bd1b696-f785427dddbba9fb.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 398
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-b00f854729942a59.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 413
+    }
+  ],
+  "cleanControl": {
+    "attempts": 1,
+    "cleanCaptureSucceeded": true,
+    "trace": {
+      "worker": "3",
+      "pid": "1944045",
+      "requestId": "d6d7f0ad-092d-492a-a15f-f14c6858046b",
+      "build": "8HXwuDHUf3RJsyB_ZGJXc"
+    },
+    "errors": []
+  }
+}

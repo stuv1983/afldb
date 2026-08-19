@@ -1,0 +1,193 @@
+{
+  "id": "ui_01123",
+  "question": "Chris Judd most clangers against Western Bulldogs",
+  "capturedAt": "2026-08-18T13:26:40.131Z",
+  "parserVersion": 13,
+  "trace": {
+    "worker": "3",
+    "pid": "2520411",
+    "requestId": "cbeb7027-3edf-466e-9b78-39f9733c13da",
+    "build": "8BKren5fRWzJ4jRofFFS3"
+  },
+  "httpStatus": 200,
+  "elapsedMs": 286,
+  "outcome": "answered",
+  "headline": "Chris Judd — 6 clangers",
+  "consoleErrors": [
+    "pageerror: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+  ],
+  "network": [
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-498be0ede4afac35.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 4
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/health-event",
+      "status": 204,
+      "resourceType": "ping",
+      "worker": "1",
+      "atMs": 26
+    },
+    {
+      "url": "http://10.0.40.100:8090/records?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 33
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 36
+    },
+    {
+      "url": "http://10.0.40.100:8090/?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 39
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 39
+    },
+    {
+      "url": "http://10.0.40.100:8090/players?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 39
+    },
+    {
+      "url": "http://10.0.40.100:8090/brownlow?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 47
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/records/page-4f1c4fe0dc2b1fc0.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 48
+    },
+    {
+      "url": "http://10.0.40.100:8090/awards?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 53
+    },
+    {
+      "url": "http://10.0.40.100:8090/draft?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 57
+    },
+    {
+      "url": "http://10.0.40.100:8090/match-search?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 57
+    },
+    {
+      "url": "http://10.0.40.100:8090/aflw?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 59
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/page-4744a03891e83c2c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 66
+    },
+    {
+      "url": "http://10.0.40.100:8090/about?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 67
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/aflw/page-4744a03891e83c2c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 69
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/search/autocomplete?q=Chris%20Judd%20highest%20clangers%20game%20against%20Hawthorn",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": null,
+      "atMs": 196
+    },
+    {
+      "url": "http://10.0.40.100:8090/search?q=Chris%20Judd%20most%20clangers%20against%20Western%20Bulldogs",
+      "status": 200,
+      "resourceType": "document",
+      "worker": "3",
+      "atMs": 244
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/98e207f02528a563-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "1",
+      "atMs": 257
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/css/046c53b3249f799d.css",
+      "status": 200,
+      "resourceType": "stylesheet",
+      "worker": "3",
+      "atMs": 259
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/26d4368bf94c0ec4-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "3",
+      "atMs": 261
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/d3ebbfd689654d3a-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "3",
+      "atMs": 263
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/5611c55482296524-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "4",
+      "atMs": 265
+    }
+  ],
+  "cleanControl": {
+    "attempts": 1,
+    "cleanCaptureSucceeded": true,
+    "trace": {
+      "worker": "1",
+      "pid": "2520409",
+      "requestId": "80cf08a9-4c65-44b0-8f2e-382685c79041",
+      "build": "8BKren5fRWzJ4jRofFFS3"
+    },
+    "errors": []
+  }
+}

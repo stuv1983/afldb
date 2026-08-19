@@ -1,0 +1,277 @@
+{
+  "id": "ui_03883",
+  "question": "St Kilda biggest win v Hawthorn",
+  "capturedAt": "2026-08-18T13:26:38.564Z",
+  "parserVersion": 13,
+  "trace": {
+    "worker": "1",
+    "pid": "2520409",
+    "requestId": "c03720f2-1ad2-4667-8765-8ea7bb600f84",
+    "build": "8BKren5fRWzJ4jRofFFS3"
+  },
+  "httpStatus": 200,
+  "elapsedMs": 334,
+  "outcome": "answered",
+  "headline": "St Kilda vs Hawthorn (1950) — 109 win margin",
+  "consoleErrors": [
+    "pageerror: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+  ],
+  "network": [
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/search/page-a7aecb72d6710b96.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 37
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/1255-a20f6c5e797a687b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 37
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/4bd1b696-f785427dddbba9fb.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 42
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/layout-d7e1f0fba8a9941c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 61
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-498be0ede4afac35.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 61
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/health-event",
+      "status": 204,
+      "resourceType": "ping",
+      "worker": "3",
+      "atMs": 77
+    },
+    {
+      "url": "http://10.0.40.100:8090/players?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 80
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 80
+    },
+    {
+      "url": "http://10.0.40.100:8090/records?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 84
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 87
+    },
+    {
+      "url": "http://10.0.40.100:8090/?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 88
+    },
+    {
+      "url": "http://10.0.40.100:8090/awards?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 138
+    },
+    {
+      "url": "http://10.0.40.100:8090/brownlow?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 141
+    },
+    {
+      "url": "http://10.0.40.100:8090/draft?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 141
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/records/page-4f1c4fe0dc2b1fc0.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 141
+    },
+    {
+      "url": "http://10.0.40.100:8090/match-search?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 143
+    },
+    {
+      "url": "http://10.0.40.100:8090/aflw?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 147
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/page-4744a03891e83c2c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 147
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/awards/page-4f1c4fe0dc2b1fc0.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 149
+    },
+    {
+      "url": "http://10.0.40.100:8090/about?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 150
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/search/autocomplete?q=quick%20one%20St%20Kilda%20highest%20total%20score%20vs%20Cats%20please",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": null,
+      "atMs": 263
+    },
+    {
+      "url": "http://10.0.40.100:8090/search?q=St%20Kilda%20biggest%20win%20v%20Hawthorn",
+      "status": 200,
+      "resourceType": "document",
+      "worker": "1",
+      "atMs": 273
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/5611c55482296524-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "4",
+      "atMs": 292
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/css/046c53b3249f799d.css",
+      "status": 200,
+      "resourceType": "stylesheet",
+      "worker": "2",
+      "atMs": 293
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/26d4368bf94c0ec4-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "1",
+      "atMs": 293
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/98e207f02528a563-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "2",
+      "atMs": 295
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/d3ebbfd689654d3a-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "1",
+      "atMs": 297
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/2619-3c9e02e22d10480a.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 315
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/search/page-a7aecb72d6710b96.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 316
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/main-app-95880b0700494805.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 316
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/webpack-29079d1cd0ad75b6.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 316
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/layout-d7e1f0fba8a9941c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 316
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/4bd1b696-f785427dddbba9fb.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 316
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/1255-a20f6c5e797a687b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 316
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-498be0ede4afac35.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 326
+    }
+  ],
+  "cleanControl": {
+    "attempts": 1,
+    "cleanCaptureSucceeded": true,
+    "trace": {
+      "worker": "2",
+      "pid": "2520410",
+      "requestId": "101e3289-0e1e-4a34-8a76-4937dcbfb943",
+      "build": "8BKren5fRWzJ4jRofFFS3"
+    },
+    "errors": []
+  }
+}

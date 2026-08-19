@@ -1,0 +1,221 @@
+{
+  "id": "ui_01098",
+  "question": "Chris Judd highest hitouts game against Brisbane Lions",
+  "capturedAt": "2026-08-18T07:49:51.424Z",
+  "parserVersion": 11,
+  "trace": {
+    "worker": "2",
+    "pid": "1944044",
+    "requestId": "1b7638ea-4030-401a-8fb8-fa814c28b049",
+    "build": "8HXwuDHUf3RJsyB_ZGJXc"
+  },
+  "httpStatus": 200,
+  "elapsedMs": 292,
+  "outcome": "answered",
+  "headline": "Chris Judd — 0 hitouts",
+  "consoleErrors": [
+    "pageerror: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+  ],
+  "network": [
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-b00f854729942a59.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 1
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/98e207f02528a563-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "4",
+      "atMs": 26
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 40
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 44
+    },
+    {
+      "url": "http://10.0.40.100:8090/records?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 46
+    },
+    {
+      "url": "http://10.0.40.100:8090/brownlow?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 50
+    },
+    {
+      "url": "http://10.0.40.100:8090/players?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 50
+    },
+    {
+      "url": "http://10.0.40.100:8090/?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 55
+    },
+    {
+      "url": "http://10.0.40.100:8090/awards?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 58
+    },
+    {
+      "url": "http://10.0.40.100:8090/draft?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 58
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/records/page-8f063a6f2c1d0b29.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 59
+    },
+    {
+      "url": "http://10.0.40.100:8090/match-search?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 61
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/page-4744a03891e83c2c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 63
+    },
+    {
+      "url": "http://10.0.40.100:8090/aflw?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 65
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/awards/page-8f063a6f2c1d0b29.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 66
+    },
+    {
+      "url": "http://10.0.40.100:8090/about?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 66
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/search/autocomplete?q=Chris%20Judd%20total%20hitouts%20against%20Brisbane%20Lions",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": null,
+      "atMs": 199
+    },
+    {
+      "url": "http://10.0.40.100:8090/search?q=Chris%20Judd%20highest%20hitouts%20game%20against%20Brisbane%20Lions",
+      "status": 200,
+      "resourceType": "document",
+      "worker": "2",
+      "atMs": 226
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/26d4368bf94c0ec4-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "4",
+      "atMs": 243
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/98e207f02528a563-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "3",
+      "atMs": 243
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/css/046c53b3249f799d.css",
+      "status": 200,
+      "resourceType": "stylesheet",
+      "worker": "2",
+      "atMs": 247
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/5611c55482296524-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "2",
+      "atMs": 247
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/d3ebbfd689654d3a-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "2",
+      "atMs": 249
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/webpack-29079d1cd0ad75b6.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 264
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/2619-3c9e02e22d10480a.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 264
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/main-app-95880b0700494805.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 264
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/search/page-a7aecb72d6710b96.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 264
+    }
+  ],
+  "cleanControl": {
+    "attempts": 1,
+    "cleanCaptureSucceeded": true,
+    "trace": {
+      "worker": "2",
+      "pid": "1944044",
+      "requestId": "c19cbf49-140a-49a7-85a8-b1d963b497a1",
+      "build": "8HXwuDHUf3RJsyB_ZGJXc"
+    },
+    "errors": []
+  }
+}

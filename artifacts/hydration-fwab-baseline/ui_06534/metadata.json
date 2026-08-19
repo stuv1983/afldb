@@ -1,0 +1,334 @@
+{
+  "id": "ui_06534",
+  "question": "AFL question — players with at most 150 brownlow votes and at most 50 goals",
+  "capturedAt": "2026-08-19T09:56:28.301Z",
+  "parserVersion": 15,
+  "trace": {
+    "worker": "3",
+    "pid": "909220",
+    "requestId": "514998a0-db63-4a32-bf55-b46b4d8d3d30",
+    "build": "-eNMdYva6jS0ztyAXEiyd"
+  },
+  "httpStatus": 200,
+  "elapsedMs": 537,
+  "outcome": "answered",
+  "headline": "11,246 players match",
+  "consoleErrors": [
+    "pageerror: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings.",
+    "pageerror: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+  ],
+  "network": [
+    {
+      "url": "http://10.0.40.100:8090/api/health-event",
+      "status": 204,
+      "resourceType": "ping",
+      "worker": "4",
+      "atMs": 91
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 91
+    },
+    {
+      "url": "http://10.0.40.100:8090/?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 91
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 95
+    },
+    {
+      "url": "http://10.0.40.100:8090/records?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 113
+    },
+    {
+      "url": "http://10.0.40.100:8090/players?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 126
+    },
+    {
+      "url": "http://10.0.40.100:8090/brownlow?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 127
+    },
+    {
+      "url": "http://10.0.40.100:8090/awards?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 143
+    },
+    {
+      "url": "http://10.0.40.100:8090/draft?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 143
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/records/page-4f1c4fe0dc2b1fc0.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 161
+    },
+    {
+      "url": "http://10.0.40.100:8090/aflw?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 174
+    },
+    {
+      "url": "http://10.0.40.100:8090/match-search?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 189
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/bruce-doull-1680?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 189
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/awards/page-4f1c4fe0dc2b1fc0.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 189
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/john-rantall-2095?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 201
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/page-4744a03891e83c2c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 202
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/shannon-hurn-4162?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 223
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/search/autocomplete?q=players%20with%20at%20most%20150%20brownlow%20votes%20and%20at%20most%2050%20goals",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": null,
+      "atMs": 242
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/players/%5Bslug%5D/page-e5f034f063b449f0.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 242
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/aflw/page-4744a03891e83c2c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 243
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/ben-hart-22?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 243
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/heath-shaw-4132?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 243
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/chris-langford-639?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 249
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/mick-martyn-757?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 277
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/grant-birchall-4149?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 284
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/rod-carter-1585?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 285
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/kelvin-moore-1999?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 296
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/rory-laird-12165?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 304
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/dane-rampe-12140?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 304
+    },
+    {
+      "url": "http://10.0.40.100:8090/search?q=AFL%20question%20%E2%80%94%20players%20with%20at%20most%20150%20brownlow%20votes%20and%20at%20most%2050%20goals",
+      "status": 200,
+      "resourceType": "document",
+      "worker": "3",
+      "atMs": 367
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/css/a8da1fec6492730f.css",
+      "status": 200,
+      "resourceType": "stylesheet",
+      "worker": "3",
+      "atMs": 401
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/98e207f02528a563-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "4",
+      "atMs": 401
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/d3ebbfd689654d3a-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "1",
+      "atMs": 402
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/5611c55482296524-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "3",
+      "atMs": 415
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/26d4368bf94c0ec4-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "1",
+      "atMs": 427
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/webpack-29079d1cd0ad75b6.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 427
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/search/page-a7aecb72d6710b96.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 462
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/2619-3c9e02e22d10480a.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 462
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/main-app-95880b0700494805.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 462
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/layout-a6cdbdfa3ad5299f.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 462
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/4bd1b696-f785427dddbba9fb.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 462
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/1255-a20f6c5e797a687b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 463
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-498be0ede4afac35.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 477
+    }
+  ],
+  "cleanControl": {
+    "attempts": 1,
+    "cleanCaptureSucceeded": true,
+    "trace": {
+      "worker": "1",
+      "pid": "909218",
+      "requestId": "09b78f34-0d81-4dfe-9f0e-a2eeee14e3dd",
+      "build": "-eNMdYva6jS0ztyAXEiyd"
+    },
+    "errors": []
+  }
+}
