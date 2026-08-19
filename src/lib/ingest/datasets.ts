@@ -721,11 +721,126 @@ const playerMatchStats: DatasetSpec = {
   },
 };
 
+// --- Player biography updates (dob, height, weight) ---
+// Keyed by AFLDB player id, because these files are produced FROM the
+// gap-audit worklists, which carry the id — no name matching, no
+// ambiguity. Only the provided fields change; a blank cell leaves the
+// current value alone rather than clearing it.
+const playerBio: DatasetSpec = {
+  key: 'player_bio',
+  title: 'Player biography updates',
+  description:
+    'dob / height_cm / weight_kg keyed by AFLDB player_id. Blank cells leave the '
+    + 'current value untouched; at least one of the three must be present per row. '
+    + 'A dob set here is recorded as sourced.',
+  requiredColumns: ['player_id'],
+  fileKey: (row) => row.player_id ?? '',
+  async validateRow(row, { sql }) {
+    const reasons: string[] = [];
+    const playerId = Number(row.player_id);
+    if (!Number.isInteger(playerId) || playerId <= 0) {
+      return { verdict: 'error', reasons: ['player_id must be a positive integer'] };
+    }
+    const [player] = await sql<{ id: number; name: string }[]>`
+      SELECT id, display_name AS name FROM players WHERE id = ${playerId}
+    `;
+    if (!player) return { verdict: 'error', reasons: [`no player with id ${playerId}`] };
+
+    const dob = (row.dob ?? '').trim();
+    if (dob && !/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+      reasons.push('dob must be YYYY-MM-DD');
+    }
+    const height = (row.height_cm ?? '').trim();
+    if (height && !(Number.isInteger(Number(height)) && Number(height) >= 120 && Number(height) <= 230)) {
+      reasons.push('height_cm must be a whole number between 120 and 230');
+    }
+    const weight = (row.weight_kg ?? '').trim();
+    if (weight && !(Number.isInteger(Number(weight)) && Number(weight) >= 40 && Number(weight) <= 160)) {
+      reasons.push('weight_kg must be a whole number between 40 and 160');
+    }
+    if (!dob && !height && !weight) {
+      reasons.push('row provides none of dob, height_cm, weight_kg');
+    }
+    if (reasons.length > 0) return { verdict: 'error', reasons };
+    return {
+      verdict: 'ok',
+      reasons: [`updates ${player.name}`],
+      resolved: { player_id: playerId },
+    };
+  },
+  async promoteRow(row, resolved, { sql }) {
+    const dob = (row.dob ?? '').trim() || null;
+    const height = (row.height_cm ?? '').trim() || null;
+    const weight = (row.weight_kg ?? '').trim() || null;
+    // COALESCE keeps the current value wherever the file is silent, so a
+    // partial file can never blank a figure it did not mention.
+    await sql`
+      UPDATE players
+         SET dob = COALESCE(${dob}::date, dob),
+             dob_confidence = CASE WHEN ${dob}::date IS NOT NULL
+                                   THEN 'sourced'::value_confidence
+                                   ELSE dob_confidence END,
+             height_cm = COALESCE(${height}::smallint, height_cm),
+             weight_kg = COALESCE(${weight}::smallint, weight_kg)
+       WHERE id = ${resolved.player_id}
+    `;
+  },
+};
+
+// --- Match attendance updates ---
+// Keyed by AFLDB match id (from the match URL or an exported worklist).
+// Honours migration 020's contract: the figure and its status agree,
+// and a genuine zero cites the manual-edit source.
+const matchAttendance: DatasetSpec = {
+  key: 'match_attendance',
+  title: 'Match attendance updates',
+  description:
+    'attendance keyed by AFLDB match_id. A 0 is accepted as a confirmed zero-crowd '
+    + 'figure and cited to the manual-edit source; use it only when a source supports it.',
+  requiredColumns: ['match_id', 'attendance'],
+  fileKey: (row) => row.match_id ?? '',
+  async validateRow(row, { sql }) {
+    const matchId = Number(row.match_id);
+    if (!Number.isInteger(matchId) || matchId <= 0) {
+      return { verdict: 'error', reasons: ['match_id must be a positive integer'] };
+    }
+    const [match] = await sql<{ id: number; label: string }[]>`
+      SELECT m.id,
+             hc.name || ' v ' || ac.name || ' · ' || m.season || ' ' || m.round_code AS label
+        FROM matches m
+        JOIN clubs hc ON hc.id = m.home_club_id
+        JOIN clubs ac ON ac.id = m.away_club_id
+       WHERE m.id = ${matchId}
+    `;
+    if (!match) return { verdict: 'error', reasons: [`no match with id ${matchId}`] };
+    const attendance = Number((row.attendance ?? '').trim());
+    if (!Number.isInteger(attendance) || attendance < 0 || attendance > 200000) {
+      return { verdict: 'error', reasons: ['attendance must be a whole number from 0 to 200000'] };
+    }
+    return {
+      verdict: 'ok',
+      reasons: [`sets ${match.label} to ${attendance}`],
+      resolved: { match_id: matchId, attendance },
+    };
+  },
+  async promoteRow(_row, resolved, { sql }) {
+    await sql`
+      UPDATE matches
+         SET attendance = ${resolved.attendance},
+             attendance_status = 'complete'::coverage_status,
+             attendance_source_id = (SELECT id FROM sources WHERE key = 'manual_admin_edit')
+       WHERE id = ${resolved.match_id}
+    `;
+  },
+};
+
 export const DATASETS: Record<string, DatasetSpec> = {
   [risingStar.key]: risingStar,
   [allAustralian.key]: allAustralian,
   [matchResults.key]: matchResults,
   [playerMatchStats.key]: playerMatchStats,
+  [playerBio.key]: playerBio,
+  [matchAttendance.key]: matchAttendance,
 };
 
 /**

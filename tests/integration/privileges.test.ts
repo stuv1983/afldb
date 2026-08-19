@@ -311,7 +311,10 @@ describe('afldb_auth is confined to the operational tables', () => {
                 ('player_link_suggestions', 'SELECT'),
                 ('player_link_suggestions', 'INSERT'),
                 ('player_link_resolutions', 'SELECT'),
-                ('player_link_resolutions', 'INSERT')
+                ('player_link_resolutions', 'INSERT'),
+                -- Manual-edit audit (057).
+                ('data_edits',              'SELECT'),
+                ('data_edits',              'INSERT')
              ) AS t(name, privilege)
        ORDER BY 1, 2
     `;
@@ -328,12 +331,12 @@ describe('afldb_auth is confined to the operational tables', () => {
     // reader having pressed "no" at 8:04pm is a fact that happened; an
     // admin who disagrees records that in nl_search_review, which is the
     // one of the three that is meant to be mutable.
-    // player_link_resolutions (056) is append-only the same way: a wrong
-    // decision gets a new row, never an edit.
+    // player_link_resolutions (056) and data_edits (057) are append-only
+    // the same way: a wrong decision gets a new row, never an edit.
     const rows = await sql<{ name: string; privilege: string }[]>`
       SELECT t.name, p.privilege
         FROM unnest(ARRAY['nl_search_feedback', 'nl_search_log',
-                          'player_link_resolutions']) AS t(name)
+                          'player_link_resolutions', 'data_edits']) AS t(name)
        CROSS JOIN LATERAL (VALUES ('UPDATE'), ('DELETE'), ('TRUNCATE')) AS p(privilege)
        WHERE has_table_privilege(${AUTH_ROLE}, t.name, p.privilege)
        ORDER BY 1, 2
