@@ -10,6 +10,7 @@ import {
   GRID_BUILDERS,
   GRID_DRAFT_TYPES,
   GRID_GROUP_ORDER,
+  GRID_MATCH_EVENTS,
   GRID_ORDER_LABELS,
   GRID_SIGNING_KINDS,
   GRID_STAT_KEYS,
@@ -254,8 +255,10 @@ function ParamInput({
     );
   }
 
-  if (param.kind === 'draftType' || param.kind === 'signingKind') {
-    const options = param.kind === 'draftType' ? GRID_DRAFT_TYPES : GRID_SIGNING_KINDS;
+  if (param.kind === 'draftType' || param.kind === 'signingKind' || param.kind === 'matchEvent') {
+    const options = param.kind === 'draftType' ? GRID_DRAFT_TYPES
+      : param.kind === 'signingKind' ? GRID_SIGNING_KINDS
+        : GRID_MATCH_EVENTS;
     return (
       <label>
         {param.label}

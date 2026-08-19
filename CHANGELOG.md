@@ -15,6 +15,45 @@ commit.
 
 ## [Unreleased]
 
+### Grid solver: rivalries, marquee matches and more — 19 August 2026
+
+Seven new builders (the catalogue is now 107 across 11 categories),
+widening what a board can ask based on data already in the schema.
+
+#### Added
+- **Rivalries & marquee matches**, a new category. `match_event_played` /
+  `match_event_min` read `matches.match_event`, whose complete tagged
+  vocabulary is Anzac Day, Dreamtime at the 'G and King's Birthday.
+  `matchup_played_min` ("X+ matches between two clubs") takes the two
+  organizations as parameters, so any derby — Showdown, Western Derby,
+  QClash — is expressible without a derby definition existing in the
+  schema. Good Friday and Easter Monday fixtures are not tagged in the
+  source data and are reachable only as a matchup.
+- **`never_played_in_draw`** — the negation sibling of
+  `drawn_matches_min`, following the `never_played_finals` pattern.
+- **`debuted_in_decade`** — one-parameter convenience over
+  `debuted_between`, matching `played_in_decade`'s shape.
+- **`venue_stat_total_min`** ("X+ of a stat at venue, career") — the
+  aggregated sibling of `venue_game_stat_min`, so "100+ goals at the MCG"
+  is now askable.
+- **`venue_goals_max`** ("X or fewer goals at venue, having played
+  there") — goals only, because it is the one statistic recorded for
+  every player-game; a career max over an era-limited stat would silently
+  count unrecorded games as zero.
+- **Natural-language wiring (parser v15).** "played on anzac day" /
+  "3+ anzac day games", "played in 3 showdowns" (also western derby,
+  qclash, sydney derby — organizations resolved through the club
+  directory at parse time), and "debuted in the 1990s" / "debuted
+  between 2000 and 2009" all compile to the new builders as
+  `careerPredicates`. Guard rails: a superlative governing the phrase
+  ("most anzac day games") declines rather than misreading as a 1+
+  list; a marquee/rivalry predicate alongside a season range declines
+  rather than silently dropping the seasons; and a max/min aggregation
+  with no metric over structure-only content now normalises to a list,
+  so "players WHO PLAYED on anzac day" (whose "who played" reads as the
+  "who played the most…" idiom) returns the full list instead of a
+  25-row truncation. `DECADE_RE` also accepts "during the 1990s".
+
 ### Schema and privilege review — 17 August 2026
 
 A design review of the 43 migrations and the privilege reconciler. Nothing here

@@ -397,10 +397,42 @@ export const BETWEEN_RE = /\bbetween (\d{4}) and (\d{4})\b/;
  * is genuinely ambiguous, and an unparsed token declines safely where a
  * guessed century answers confidently and wrongly.
  */
-export const DECADE_RE = /\bin the (\d{3}0)s\b|\bin the ([013-9])0s\b/;
+export const DECADE_RE = /\b(?:in|during) the (\d{3}0)s\b|\b(?:in|during) the ([013-9])0s\b/;
 export const BARE_YEAR_RE = /\b(1[89]\d{2}|20\d{2})\b/;
 
 export const NEGATION_WORDS = /\b(?:without|never|no|didn'?t|hasn'?t|hadn'?t)\b/;
+
+// ----------------------------------------- marquee matches & rivalries
+
+/**
+ * Named marquee fixtures -> the exact matches.match_event value (the
+ * complete tagged vocabulary; Good Friday and Easter Monday are not
+ * tagged in the source data -- see GRID_MATCH_EVENTS). Each regex runs
+ * against canonicalised text, so "king's birthday" has already become
+ * "king birthday" by the time it is tested. A trailing game-noun is
+ * folded into the same match so "anzac day games" never strands "games"
+ * for a later stage to misread.
+ */
+export const MATCH_EVENT_WORDS: [RegExp, string][] = [
+  [/\banzac day\b(?:\s+(?:games?|matches?|clash(?:es)?))?/, 'Anzac Day'],
+  [/\bdreamtime(?: at the '?g)?\b(?:\s+(?:games?|matches?))?/, "Dreamtime at the 'G"],
+  [/\bkings? birthday\b(?:\s+(?:games?|matches?|clash(?:es)?))?/, "King's Birthday"],
+];
+
+/**
+ * Club-pair rivalries -> the two organizations' canonical query names.
+ * No derby definition exists in the schema, so a rivalry word compiles to
+ * the grid solver's matchup_played_min with both clubs as parameters; the
+ * names here are resolved against the live club directory at parse time
+ * (findClub), and an unresolvable side means the phrase is left alone to
+ * decline rather than guessed at.
+ */
+export const RIVALRY_WORDS: [RegExp, [string, string]][] = [
+  [/\bshowdowns?\b/, ['adelaide', 'port adelaide']],
+  [/\bwestern derb(?:y|ies)\b/, ['west coast', 'fremantle']],
+  [/\bq[- ]?clash(?:es)?\b/, ['gold coast', 'brisbane lions']],
+  [/\bsydney derb(?:y|ies)\b/, ['sydney', 'greater western sydney']],
+];
 
 /**
  * Comparison-operator phrases, checked in order (longest/most specific

@@ -17,6 +17,8 @@ const CLUBS: NlClubDirectoryEntry[] = [
   { organizationId: 2, slug: 'carlton', name: 'Carlton', names: ['carlton', 'blues'] },
   { organizationId: 3, slug: 'collingwood', name: 'Collingwood', names: ['collingwood', 'pies', 'magpies'] },
   { organizationId: 4, slug: 'geelong', name: 'Geelong', names: ['geelong', 'cats'] },
+  { organizationId: 5, slug: 'adelaide', name: 'Adelaide', names: ['adelaide', 'crows'] },
+  { organizationId: 6, slug: 'port-adelaide', name: 'Port Adelaide', names: ['port adelaide', 'power'] },
 ];
 
 const VENUES: NlVenueDirectoryEntry[] = [
@@ -1027,5 +1029,95 @@ describe('15. achievement questions honour everything consumed', () => {
     const p = await plan('who was the most recent player to kick a goal with their first kick');
     const withPlayer = { ...p, player: { id: 100, slug: 'dustin-martin', name: 'Dustin Martin' } };
     expect(validatePlan(withPlayer)).toHaveProperty('error');
+  });
+});
+
+describe('16. marquee matches, rivalries and debut windows (parser v15)', () => {
+  it('played on anzac day -> match_event_min with the exact tagged value', async () => {
+    const p = await plan('players who played on anzac day');
+    expect(p.grain).toBe('player_career');
+    expect(p.careerPredicates).toContainEqual({ builder: 'match_event_min', params: { event: 'Anzac Day', times: '1' } });
+    expect(p.agg).toEqual({ kind: 'list' });
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('3+ anzac day games reads the count', async () => {
+    const p = await plan('players who played in 3+ anzac day games');
+    expect(p.careerPredicates).toContainEqual({ builder: 'match_event_min', params: { event: 'Anzac Day', times: '3' } });
+  });
+
+  it("king's birthday survives canonicalisation to the exact match_event value", async () => {
+    const p = await plan("players who played in a king's birthday game");
+    expect(p.careerPredicates).toContainEqual({ builder: 'match_event_min', params: { event: "King's Birthday", times: '1' } });
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('dreamtime at the g is the fixture, not the MCG venue', async () => {
+    const p = await plan('players who have played dreamtime at the g');
+    expect(p.scope.venue).toBeUndefined();
+    expect(p.careerPredicates).toContainEqual({ builder: 'match_event_min', params: { event: "Dreamtime at the 'G", times: '1' } });
+  });
+
+  it('played in 3 showdowns -> matchup_played_min with both organizations resolved', async () => {
+    const p = await plan('players who played in 3 showdowns');
+    expect(p.grain).toBe('player_career');
+    expect(p.careerPredicates).toContainEqual({
+      builder: 'matchup_played_min',
+      params: { clubA: '5', clubB: '6', times: '3' },
+    });
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('a number word counts too: two showdowns', async () => {
+    const p = await plan('players who played in two showdowns');
+    expect(p.careerPredicates[0]?.params.times).toBe('2');
+  });
+
+  it('a rivalry whose clubs are not in the directory declines instead of guessing', async () => {
+    // The fixture directory has no Sydney or GWS, so the phrase cannot
+    // resolve; its words stay leftover and the question declines.
+    const result = await parse('players who played in a sydney derby');
+    expect(result.status).toBe('none');
+  });
+
+  it('most anzac day games declines -- the count is the ranked subject', async () => {
+    const result = await parse('most anzac day games');
+    expect(result.status).toBe('none');
+  });
+
+  it('a marquee predicate alongside a season range declines rather than dropping the seasons', async () => {
+    const result = await parse('players who played on anzac day since 2000');
+    expect(result.status).toBe('none');
+  });
+
+  it('debuted in the 1990s -> debuted_between with the decade as the parameter', async () => {
+    const p = await plan('players who debuted in the 1990s');
+    expect(p.grain).toBe('player_career');
+    expect(p.careerPredicates).toContainEqual({ builder: 'debuted_between', params: { from: '1990', to: '1999' } });
+    expect(p.agg).toEqual({ kind: 'list' });
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('debuted between 2000 and 2009 -> the explicit range', async () => {
+    const p = await plan('players who debuted between 2000 and 2009');
+    expect(p.careerPredicates).toContainEqual({ builder: 'debuted_between', params: { from: '2000', to: '2009' } });
+  });
+
+  it('played their first career game during the 1990s -> the same predicate', async () => {
+    const p = await plan('players who played their first career game during the 1990s');
+    expect(p.careerPredicates).toContainEqual({ builder: 'debuted_between', params: { from: '1990', to: '1999' } });
+  });
+
+  it('a debut window composes with a career condition', async () => {
+    const p = await plan('players who debuted in the 1990s with 300 games');
+    expect(p.careerPredicates).toContainEqual({ builder: 'debuted_between', params: { from: '1990', to: '1999' } });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 300 });
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('debuted in a grand final still reads as a boundary, not a debut window', async () => {
+    const p = await plan('players who debuted in a grand final');
+    expect(p.boundary).toEqual({ event: 'debut', where: 'grand_final' });
+    expect(p.careerPredicates).toEqual([]);
   });
 });

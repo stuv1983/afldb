@@ -51,6 +51,7 @@ import {
   BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_METRIC_WORDS,
   FIRST_KICK_GOAL_RE,
   DECADE_RE,
+  MATCH_EVENT_WORDS, RIVALRY_WORDS,
   CLUB_SUBJECT_LEADING, COMPARE_OP_WORDS,
   IN_A_FINAL, IN_A_GRAND_FINAL, IN_ONE_GAME, IN_ONE_SEASON,
   MATCH_TYPE_WORDS, METRIC_HIGHER_IS_WORSE, METRIC_WORDS, NEGATION_WORDS, NUMBER_PLUS_RE,
@@ -368,6 +369,108 @@ function extractFirstKickGoal(text: string): {
   }
 
   return { text: remaining, achievementKey: 'first_kick_goal', summaryKind, consumed };
+}
+
+// ------------------------------------------- marquee matches & rivalries
+
+type MarqueeExtraction = {
+  text: string;
+  predicates: GridAxisState[];
+  consumed: string[];
+};
+
+/**
+ * A superlative immediately governing the phrase means the EVENT COUNT is
+ * the ranked subject ("most anzac day games", "fewest showdowns") -- a
+ * ranking no career predicate can express. Skipping extraction leaves the
+ * phrase as leftover tokens, so the question declines instead of
+ * answering "players with 1+ such games" as though it were the ranking.
+ */
+const SUPERLATIVE_GOVERNS = /\b(?:most|fewest|top|highest|lowest|best|worst)\s+$/;
+
+/**
+ * "played on anzac day", "3+ showdowns", "two western derbies" -- each
+ * becomes a grid-solver careerPredicate (match_event_min /
+ * matchup_played_min) with the count read from a short window before the
+ * phrase, defaulting to 1. Rivalry club names resolve through the live
+ * directory; a side that fails to resolve leaves the phrase alone.
+ *
+ * The consumed list is NOT merged into consumedTokens here: the plan can
+ * only honour these predicates at career grain with no season range (the
+ * predicate answer path ignores scope, and neither builder has a season
+ * parameter), so plan assembly decides whether the words count as
+ * understood or as leftovers that decline the question.
+ */
+function extractMarqueeMatches(
+  text: string,
+  clubs: readonly NlClubDirectoryEntry[],
+): MarqueeExtraction {
+  const predicates: GridAxisState[] = [];
+  const consumed: string[] = [];
+  let working = text;
+
+  const entries: [RegExp, (times: number) => GridAxisState | null][] = [
+    ...MATCH_EVENT_WORDS.map(([re, event]): [RegExp, (times: number) => GridAxisState | null] => [
+      re,
+      (times) => ({ builder: 'match_event_min', params: { event, times: String(times) } }),
+    ]),
+    ...RIVALRY_WORDS.map(([re, [nameA, nameB]]): [RegExp, (times: number) => GridAxisState | null] => [
+      re,
+      (times) => {
+        const a = findClub(nameA, clubs);
+        const b = findClub(nameB, clubs);
+        if (!a || !b) return null;
+        return {
+          builder: 'matchup_played_min',
+          params: {
+            clubA: String(a.entity.organizationId),
+            clubB: String(b.entity.organizationId),
+            times: String(times),
+          },
+        };
+      },
+    ]),
+  ];
+
+  for (const [re, build] of entries) {
+    const match = re.exec(working);
+    if (!match) continue;
+    const before = working.slice(Math.max(0, match.index - 12), match.index);
+    if (SUPERLATIVE_GOVERNS.test(before)) continue;
+
+    // Count lookback: "3 showdowns", "3+ anzac day games", "two western
+    // derbies". Digit counts are read but not stripped -- pure digits are
+    // invisible to both the confidence ratio and the player-name scan --
+    // while an alpha number word is stripped like any other understood
+    // token.
+    const countWindow = working.slice(Math.max(0, match.index - 18), match.index);
+    let times = 1;
+    let countWord: string | null = null;
+    const digits = /(\d{1,4})\+?\s*(?:or more\s*)?$/.exec(countWindow);
+    if (digits) {
+      times = Number(digits[1]);
+    } else {
+      for (const [word, n] of Object.entries(NUMBER_WORDS)) {
+        if (new RegExp(`\\b${word}\\s*$`).test(countWindow)) {
+          times = n;
+          countWord = word;
+          break;
+        }
+      }
+    }
+
+    const predicate = build(times);
+    if (!predicate) continue;
+    predicates.push(predicate);
+    consumed.push(match[0]);
+    working = stripMatch(working, match[0]);
+    if (countWord) {
+      consumed.push(countWord);
+      working = stripMatch(working, countWord);
+    }
+  }
+
+  return { text: working, predicates, consumed };
 }
 
 // ---------------------------------------------------------- career phrases
@@ -807,6 +910,14 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     }
   }
 
+  // 1b. Marquee fixtures and named rivalries -- BEFORE venue extraction,
+  // because "dreamtime at the 'g" contains the MCG alias "the g", and
+  // BEFORE club extraction, because "sydney derby" and "western derby"
+  // contain club-name words. Consumption into the token ledger is
+  // deferred to plan assembly -- see extractMarqueeMatches.
+  const marqueeResult = extractMarqueeMatches(text, ctx.clubs);
+  text = marqueeResult.text;
+
   // 2. Venue extraction, BEFORE any club extraction.
   //
   // Five venue names contain a club name as a whole word -- "melbourne
@@ -953,6 +1064,35 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const careerResult = extractCareerConditions(text);
   text = careerResult.text;
   consumedTokens.push(...careerResult.consumed);
+
+  // 10.2. "debuted in the 1990s" / "debuted between 2000 and 2009" -- the
+  // season range extracted at step 5 IS the debut window when a debut
+  // word governs it, so both become one grid-solver debuted_between
+  // predicate (the career answer path ignores season scope, so leaving
+  // the range in scope alone would silently answer for every era).
+  // Boundary questions ("debuted in a grand final") have already claimed
+  // their debut word, and extractFirstKickGoal has already consumed
+  // "first kick" spans, so this reads only what is genuinely left. Runs
+  // after extractCareerConditions so a threshold's "games" ("debuted in
+  // the 1990s with 300 games") has been claimed before "first ... game"
+  // is tried. Attachment is deferred to plan assembly, like the marquee
+  // predicates.
+  let debutPredicate: GridAxisState | null = null;
+  let debutConsumed: string | null = null;
+  if (!boundary && (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined)) {
+    const debutWord = /\bdebut(?:ed)?\b|\bfirst (?:career )?game\b/.exec(text);
+    if (debutWord) {
+      debutPredicate = {
+        builder: 'debuted_between',
+        params: {
+          from: String(seasons.seasonMin ?? NL_LIMITS.minSeason),
+          to: String(seasons.seasonMax ?? NL_LIMITS.maxSeason),
+        },
+      };
+      debutConsumed = debutWord[0];
+      text = stripMatch(text, debutWord[0]);
+    }
+  }
 
   // 10.5. Club-season conditions/metric. Conditions run first and are
   // themselves one of the cues that makes a question club-season in the
@@ -1359,6 +1499,27 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     }
   }
 
+  // Marquee/rivalry predicates attach only when the plan can honour them:
+  // career grain, and no season range named (neither builder has a season
+  // parameter, and the predicate answer path ignores scope -- attaching
+  // anyway would silently drop "since 2000"). When they cannot attach,
+  // their words were stripped from `text` at step 1b but are deliberately
+  // NOT counted as consumed here, so they surface as leftover tokens and
+  // the question declines instead of answering something narrower.
+  if (
+    grain === 'player_career' && marqueeResult.predicates.length > 0
+    && seasons.seasonMin === undefined && seasons.seasonMax === undefined
+  ) {
+    careerPredicates.push(...marqueeResult.predicates);
+    consumedTokens.push(...marqueeResult.consumed);
+  }
+  // The debut-window predicate is the opposite case: the season range is
+  // its parameter, so it is exactly the plan honouring the seasons.
+  if (grain === 'player_career' && debutPredicate) {
+    careerPredicates.push(debutPredicate);
+    if (debutConsumed) consumedTokens.push(debutConsumed);
+  }
+
   const clubSeasonConditions = grain === 'club_season' ? clubSeasonConditionResult.conditions : [];
 
   if (grain === 'player_career' && metric === 'all_australian_selections' && negated && isNlAwardKey('all_australian')) {
@@ -1381,10 +1542,19 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // through to {kind:'max'}, which has no metric to maximise and is capped
   // at maxTiedRows(25) rather than maxListRows(100) -- a silently truncated
   // list where the reader asked for all of them.
-  const agg: NlAggregation = resolvePolarity(aggResult.agg, metric, aggResult.polarity)
-    ?? (careerConditions.length > 0 || careerPredicates.length > 0 || clubSeasonConditions.length > 0 || boundary
-      ? { kind: 'list' }
-      : { kind: 'max' });
+  const resolvedAgg = resolvePolarity(aggResult.agg, metric, aggResult.polarity);
+  const structureOnly = careerConditions.length > 0 || careerPredicates.length > 0
+    || clubSeasonConditions.length > 0 || !!boundary;
+  // A max/min with NO metric and structure present is not a ranking at
+  // all -- there is nothing to rank by, and the answer path already
+  // degrades it to a list, only capped at maxTiedRows(25) instead of
+  // maxListRows(100). "players WHO PLAYED on anzac day" is the shape:
+  // AGG_WORDS reads "who played" as the "who played the most..." idiom,
+  // but with no stat named the honest reading is the full list.
+  const agg: NlAggregation = resolvedAgg && (resolvedAgg.kind === 'max' || resolvedAgg.kind === 'min')
+      && metric === null && structureOnly
+    ? { kind: 'list' }
+    : resolvedAgg ?? (structureOnly ? { kind: 'list' } : { kind: 'max' });
 
   const plan: NlQueryPlan = {
     v: 1,

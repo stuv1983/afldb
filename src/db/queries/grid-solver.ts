@@ -162,7 +162,7 @@ function ledSeasonRows(statKey: GridStatKey): SqlFragment {
 // would scatter the catalogue across files for no real benefit.
 //
 // Exported for src/db/queries/nl/player-career.ts: the natural-language
-// engine's career-grain compiler reuses this catalogue of 93 tuned,
+// engine's career-grain compiler reuses this catalogue of 107 tuned,
 // allowlist-safe predicates directly rather than duplicating any of
 // them -- a career-predicate phrase in a parsed question ("played a
 // grand final", "premierships >= 3") becomes exactly the GridAxisState
@@ -326,6 +326,10 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
       return sql`c.debut_season BETWEEN ${lo} AND ${hi}`;
     }
+    case 'debuted_in_decade': {
+      const start = requireInt(axis, 'decade', 'Decade start');
+      return sql`c.debut_season BETWEEN ${start} AND ${start + 9}`;
+    }
     case 'played_in_decade': {
       const start = requireInt(axis, 'decade', 'Decade start');
       return sql`p.id IN (SELECT player_id FROM player_season_stats
@@ -362,6 +366,10 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                            WHERE m.result = 'draw'
                            GROUP BY pms.player_id HAVING count(*) >= ${n})`;
     }
+    case 'never_played_in_draw':
+      return sql`NOT EXISTS (SELECT 1 FROM player_match_stats pms
+                               JOIN matches m ON m.id = pms.match_id
+                              WHERE pms.player_id = p.id AND m.result = 'draw')`;
     case 'club_season_stat_leader': {
       const statKey = requireStatKey(axis);
       return sql`p.id IN (SELECT DISTINCT player_id FROM (${ledSeasonRows(statKey)}) led)`;
@@ -556,6 +564,62 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                             JOIN matches m ON m.id = pms.match_id
                            WHERE m.venue_id = ${venueId} AND ${sql.unsafe(`pms.${statKey}`)} >= ${n})`;
+    }
+    case 'venue_stat_total_min': {
+      const venueId = requireInt(axis, 'venue', 'Venue');
+      const statKey = requireStatKey(axis);
+      const n = requireInt(axis, 'x', 'At least');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.venue_id = ${venueId}
+                           GROUP BY pms.player_id HAVING sum(${sql.unsafe(`pms.${statKey}`)}) >= ${n})`;
+    }
+    case 'venue_goals_max': {
+      // "Played there" is the gate: the subquery only produces players
+      // with at least one game at the venue, so a player who never set
+      // foot there does not satisfy "X or fewer goals" vacuously. Goals
+      // are recorded for every player-game (never NULL-for-era), so the
+      // coalesce only covers the empty-sum edge, not missing data.
+      const venueId = requireInt(axis, 'venue', 'Venue');
+      const n = requireInt(axis, 'goals', 'Goals');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.venue_id = ${venueId}
+                           GROUP BY pms.player_id HAVING coalesce(sum(pms.goals), 0) <= ${n})`;
+    }
+
+    // -- Rivalries & marquee matches --------------------------------------
+    // match_event is a bound value from GRID_MATCH_EVENTS; like club and
+    // venue ids, an unrecognised value is safe SQL that matches nothing.
+    case 'match_event_played': {
+      const event = requireParam(axis, 'event', 'Marquee match');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.match_event = ${event})`;
+    }
+    case 'match_event_min': {
+      const event = requireParam(axis, 'event', 'Marquee match');
+      const n = requireInt(axis, 'times', 'Matches');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.match_event = ${event}
+                           GROUP BY pms.player_id HAVING count(*) >= ${n})`;
+    }
+    case 'matchup_played_min': {
+      // Both clubs resolve at the organization level, like every other
+      // club-scoped builder, so a Showdown filter spans any rename on
+      // either side. The player only has to have played IN the match,
+      // for either organization.
+      const orgA = requireInt(axis, 'clubA', 'Club A');
+      const orgB = requireInt(axis, 'clubB', 'Club B');
+      const n = requireInt(axis, 'times', 'Matches');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                            JOIN clubs home ON home.id = m.home_club_id
+                            JOIN clubs away ON away.id = m.away_club_id
+                           WHERE (home.organization_id = ${orgA} AND away.organization_id = ${orgB})
+                              OR (home.organization_id = ${orgB} AND away.organization_id = ${orgA})
+                           GROUP BY pms.player_id HAVING count(*) >= ${n})`;
     }
 
     // -- Teammates -- the same self-join as getPlayerOverlapSummary

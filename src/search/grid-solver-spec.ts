@@ -11,11 +11,12 @@
  * auto-grid modes, and the obscurity star-rating (a precomputed score with no
  * AFLDB equivalent — see GridOrder for the substitute).
  *
- * The catalogue is 94 builders across 10 categories, checked against the
+ * The catalogue is 107 builders across 11 categories, checked against the
  * reference's afl_grid_criteria.md and verified against live data. Family
- * relationships, physical attributes, derby definitions and win-streaks are
- * absent because the data is not there, not because they were skipped
- * (docs/search.md).
+ * relationships, physical attributes and win-streaks are absent because the
+ * data is not there, not because they were skipped (docs/search.md). Derbies
+ * have no schema definition either, but matchup_played_min sidesteps that by
+ * taking the two clubs as parameters.
  *
  * Every builder is a fixed, named SQL shape with typed parameters, so unlike
  * the generic query builder nothing here lets a request choose a column or
@@ -29,7 +30,7 @@ import { decodeUrlState, encodeUrlState } from '@/lib/urlState';
 
 export type GridParamKind =
   | 'integer' | 'decimal' | 'season' | 'club' | 'venue' | 'player' | 'stat'
-  | 'award' | 'draftType' | 'signingKind' | 'aaPosition';
+  | 'award' | 'draftType' | 'signingKind' | 'aaPosition' | 'matchEvent';
 
 export type GridParamDef = {
   key: string;
@@ -100,6 +101,15 @@ export const GRID_SIGNING_KINDS = [
   'Concessional', 'Concession', 'Top-Up', 'Supplementary', 'Compensation', 'Special Cat B',
 ] as const;
 
+// The complete set of tagged marquee fixtures in matches.match_event
+// (every other row is NULL -- see docs/data-dictionary.md). Club-pair
+// rivalries with no tag of their own (Showdown, Western Derby, QClash)
+// are covered by the matchup_played_min builder instead, which needs no
+// tagging at all.
+export const GRID_MATCH_EVENTS = [
+  'Anzac Day', "Dreamtime at the 'G", "King's Birthday",
+] as const;
+
 export const GRID_AA_POSITIONS: { value: string; label: string }[] = [
   { value: 'FB', label: 'FB — Full Back' },
   { value: 'BP', label: 'BP — Back Pocket' },
@@ -137,6 +147,7 @@ const award = (label = 'Award'): GridParamDef => ({ key: 'award', label, kind: '
 const draftType = (label = 'Draft type'): GridParamDef => ({ key: 'draftType', label, kind: 'draftType' });
 const signingKind = (label = 'Recruited from'): GridParamDef => ({ key: 'signingKind', label, kind: 'signingKind' });
 const aaPosition = (label = 'Position'): GridParamDef => ({ key: 'position', label, kind: 'aaPosition' });
+const matchEvent = (label = 'Marquee match'): GridParamDef => ({ key: 'event', label, kind: 'matchEvent' });
 
 export const GRID_GROUP_ORDER = [
   'Clubs & journeys',
@@ -145,6 +156,7 @@ export const GRID_GROUP_ORDER = [
   'Season & era',
   'Finals & premierships',
   'Grounds & venues',
+  'Rivalries & marquee matches',
   'Teammates',
   'Captaincy',
   'Awards & honours',
@@ -188,6 +200,7 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
 
   // Season & era
   debuted_between: { key: 'debuted_between', label: 'Debuted between seasons', group: 'Season & era', params: [season('from', 'From season'), season('to', 'To season')] },
+  debuted_in_decade: { key: 'debuted_in_decade', label: 'Debuted in a decade', group: 'Season & era', params: [season('decade', 'Decade start (e.g. 1990)')] },
   played_in_decade: { key: 'played_in_decade', label: 'Played in a decade', group: 'Season & era', params: [season('decade', 'Decade start (e.g. 1990)')] },
   played_between_seasons: { key: 'played_between_seasons', label: 'Played between seasons', group: 'Season & era', params: [season('from', 'From season'), season('to', 'To season')] },
   season_stat_total_min: { key: 'season_stat_total_min', label: 'X+ of a stat in one season', group: 'Season & era', params: [stat(), int('x', 'At least')] },
@@ -197,6 +210,7 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   season_losses_min: { key: 'season_losses_min', label: 'X+ losses in one season', group: 'Season & era', params: [int('times', 'Losses')] },
   season_draws_min: { key: 'season_draws_min', label: 'X+ draws in one season', group: 'Season & era', params: [int('times', 'Draws')] },
   drawn_matches_min: { key: 'drawn_matches_min', label: 'Played in X+ drawn matches', group: 'Season & era', params: [int('times', 'Drawn matches')] },
+  never_played_in_draw: { key: 'never_played_in_draw', label: 'Never played in a draw', group: 'Season & era', params: [] },
   club_season_stat_leader: { key: 'club_season_stat_leader', label: 'Led club in a stat (season)', group: 'Season & era', params: [stat()] },
   club_season_stat_leader_min_times: { key: 'club_season_stat_leader_min_times', label: 'Led club in a stat, X+ times', group: 'Season & era', params: [stat(), int('times', 'Times')] },
   wooden_spoon_season: { key: 'wooden_spoon_season', label: 'Wooden spoon season', group: 'Season & era', params: [] },
@@ -234,6 +248,22 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   games_at_venue_min: { key: 'games_at_venue_min', label: 'X+ games at venue', group: 'Grounds & venues', params: [venue(), int('games', 'Games')] },
   won_final_at_venue: { key: 'won_final_at_venue', label: 'Won a final at venue', group: 'Grounds & venues', params: [venue()] },
   venue_game_stat_min: { key: 'venue_game_stat_min', label: 'X+ of a stat in a game at venue', group: 'Grounds & venues', params: [venue(), stat(), int('x', 'At least')] },
+  venue_stat_total_min: { key: 'venue_stat_total_min', label: 'X+ of a stat at venue (career)', group: 'Grounds & venues', params: [venue(), stat(), int('x', 'At least')] },
+  // Goals only, not the full stat family: a career max over an
+  // era_limited stat would silently count "not recorded" games as 0
+  // (docs/data-dictionary.md's NULL semantics); goals is the one stat
+  // recorded for every player-game, so only it can honestly answer
+  // "no more than X".
+  venue_goals_max: { key: 'venue_goals_max', label: 'X or fewer goals at venue (played there)', group: 'Grounds & venues', params: [venue(), int('goals', 'Goals')] },
+
+  // Rivalries & marquee matches -- match_event covers the tagged
+  // marquee fixtures (Anzac Day, Dreamtime, King's Birthday);
+  // matchup_played_min covers any club-pair rivalry (Showdown, Western
+  // Derby, QClash, ...) by naming the two organizations directly, since
+  // no derby definition exists in the schema.
+  match_event_played: { key: 'match_event_played', label: 'Played in a marquee match', group: 'Rivalries & marquee matches', params: [matchEvent()] },
+  match_event_min: { key: 'match_event_min', label: 'X+ marquee matches', group: 'Rivalries & marquee matches', params: [matchEvent(), int('times', 'Matches')] },
+  matchup_played_min: { key: 'matchup_played_min', label: 'X+ matches between two clubs', group: 'Rivalries & marquee matches', params: [{ key: 'clubA', label: 'Club A', kind: 'club' }, { key: 'clubB', label: 'Club B', kind: 'club' }, int('times', 'Matches')] },
 
   // Teammates -- the same player_match_stats self-join as
   // getPlayerOverlapSummary in db/queries/player-compare.ts.

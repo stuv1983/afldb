@@ -176,10 +176,11 @@ set, showing an eligible-player count and a top-ranked answer, with a
 drill-down to the full ranked list.
 
 **Named builders, not user-chosen columns.** `src/search/grid-solver-spec.ts`
-holds `GRID_BUILDERS`: 94 fixed, parameterised questions across ten
+holds `GRID_BUILDERS`: 107 fixed, parameterised questions across eleven
 categories (clubs & journeys, career milestones, single-game feats,
-season & era, finals & premierships, grounds & venues, teammates,
-captaincy, awards & honours, draft & recruitment) — checked one category
+season & era, finals & premierships, grounds & venues, rivalries &
+marquee matches, teammates, captaincy, awards & honours, draft &
+recruitment) — checked one category
 at a time against the reference's own generated criteria doc
 (`afl_grid_criteria.md`, ~133 questions across 13 categories) and against
 AFLDB's live data, not ported wholesale. Each compiles in
@@ -231,10 +232,16 @@ star-rating system — AFLDB has no precomputed rarity score, so ranking
 falls back to the honest, simple "fewest career games first." Also cut,
 for lack of underlying data verified live rather than assumed: player
 family relationships and physical attributes (both genuinely unpopulated
-on the live database, not merely unexposed), any derby/rivalry pairing
-(no such definition exists in the schema), and win-streak questions
+on the live database, not merely unexposed), and win-streak questions
 (the only builder shape that would need a full per-player chronological
 scan rather than a bound predicate on indexed or precomputed columns).
+Derbies still have no schema definition, but the rivalries & marquee
+matches category works around that: `matchup_played_min` takes the two
+organizations as parameters (so a Showdown is just Adelaide × Port
+Adelaide), and the `match_event` builders read `matches.match_event`,
+whose complete tagged vocabulary is Anzac Day, Dreamtime at the 'G and
+King's Birthday — Good Friday and Easter Monday fixtures are not tagged
+in the source data, so they are reachable only as a matchup.
 
 Board state lives in one `g` URL parameter (same JSON/base64url encoding
 as `q` above, now shared via `src/lib/urlState.ts`), so a built board is
@@ -266,7 +273,7 @@ Question → Deterministic parser → Structured query plan (JSON)
 
 Everything is `src/search/nl/` (DB-free, the parser and the plan type) and `src/db/queries/nl/` (server-only, the compilers). A seam is left for an optional future LLM fallback — see the header comment on `plan.ts` — but nothing in this codebase calls one, and no builder here can ever emit raw SQL: a plan reaches the database only through the same allowlist-then-bind discipline the grid solver and query builder already use.
 
-**The plan.** `NlQueryPlan` names a *grain* (`player_career`, `player_game`, `player_season`, `team_match`, `club_season`), a *metric* from that grain's fixed allowlist (`NL_METRICS`), an *aggregation* (`max`/`min`/`top_n`/`list`/`count`), and whatever scope the question named — a player, a club (for and/or against), a venue, a season range, a match type. Career-grain questions additionally carry `careerConditions` (numeric thresholds, including `eq 0` for a negative — "no premiership") and `careerPredicates`: `GridAxisState` entries compiled by the grid solver's own `compileAxis`, reused directly rather than duplicated, so a recognised phrase like "played a grand final" becomes exactly the predicate the grid solver already knows how to run.
+**The plan.** `NlQueryPlan` names a *grain* (`player_career`, `player_game`, `player_season`, `team_match`, `club_season`), a *metric* from that grain's fixed allowlist (`NL_METRICS`), an *aggregation* (`max`/`min`/`top_n`/`list`/`count`), and whatever scope the question named — a player, a club (for and/or against), a venue, a season range, a match type. Career-grain questions additionally carry `careerConditions` (numeric thresholds, including `eq 0` for a negative — "no premiership") and `careerPredicates`: `GridAxisState` entries compiled by the grid solver's own `compileAxis`, reused directly rather than duplicated, so a recognised phrase like "played a grand final" becomes exactly the predicate the grid solver already knows how to run. Since parser v15 that reuse extends to the rivalries & marquee matches category: "played on anzac day" / "3+ anzac day games" compile to `match_event_min`, "played in 3 showdowns" (and western derby / qclash / sydney derby) to `matchup_played_min` with the pair's organizations resolved through the club directory at parse time, and "debuted in the 1990s" / "debuted between 2000 and 2009" to `debuted_between` with the season range as the predicate's own parameter. Two guard rails keep these honest: a superlative governing the phrase ("most anzac day games" — a ranking no predicate expresses) declines rather than misreading as a 1+ list, and a marquee/rivalry predicate alongside a season range declines rather than silently dropping the seasons, since the predicate answer path ignores scope and neither builder takes a season parameter.
 
 **The parser.** `parseNlQuestion(question, ctx)` runs entirely synchronously except for one step — resolving a player name, which delegates to `searchPlayers`' existing trigram/prominence ranking. Stages: canonicalise (lowercase, strip possessives, protect number-like stat names such as "inside 50s" from being read as the digits 50) → an unanswerable-topic gate (coaching, positions, streaks — recognised and declined with a reason, before entity matching can partially misfire on them) → club/venue extraction against a directory merging every historical identity's name and alias with a seed nickname dictionary (`dusty` → Dustin Martin, `pies` → Collingwood, `mcg` → Melbourne Cricket Ground) → slot extraction (aggregation words, stat words, match type, season range, comparison operators, negation) → the async player lookup → grain election.
 

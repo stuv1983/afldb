@@ -179,8 +179,23 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    this is exactly the right column) -- neither past-tense form was in
  *    the vocabulary before, and the trailing "match(es)" noun is folded
  *    into the same match so it is not left over as an undeclined word.
+ * 15: marquee matches, rivalries, and debut windows, all as
+ *    careerPredicates against the seven new grid builders. "played on
+ *    anzac day" / "3+ anzac day games" -> match_event_min (Anzac Day,
+ *    Dreamtime, King's Birthday -- the complete tagged vocabulary);
+ *    "played in 3 showdowns" / "western derby" / "qclash" / "sydney
+ *    derby" -> matchup_played_min with the pair's organizations resolved
+ *    through the club directory at parse time; "debuted in the 1990s" /
+ *    "debuted between 2000 and 2009" -> debuted_between, with the season
+ *    range as the predicate's own parameter. Guard rails: a superlative
+ *    governing the phrase ("most anzac day games") declines rather than
+ *    misreads as a 1+ list, and a marquee/rivalry predicate alongside a
+ *    season range declines rather than silently dropping the seasons
+ *    (the predicate path ignores scope and neither builder takes a
+ *    season). DECADE_RE also accepts "during the 1990s" now, not just
+ *    "in the 1990s".
  */
-export const PARSER_VERSION = 14;
+export const PARSER_VERSION = 15;
 
 // ------------------------------------------------------------------ grain
 

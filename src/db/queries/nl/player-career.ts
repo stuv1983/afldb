@@ -129,7 +129,7 @@ const CAREER_ROW_SELECT = sql`
  * number of extra conditions.
  *
  * Career predicates (GridAxisState entries) are compiled through the grid
- * solver's own 93-builder catalogue (compileAxis) rather than recompiling
+ * solver's own 107-builder catalogue (compileAxis) rather than recompiling
  * any of it. Each compiled predicate is a bare boolean fragment over the
  * same `p`/`c` aliases this file's queries already use, so predicates AND
  * plain conditions AND the named-player pin all fold into one WHERE --
