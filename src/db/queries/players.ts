@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { cache } from 'react';
+import postgres from 'postgres';
 
 import { sql } from '@/db/client';
 import { allOf, containsPattern, rangeConditions } from '@/db/queries/filters';
@@ -269,41 +270,55 @@ export async function createPlayer(input: CreatePlayerInput): Promise<{ id: numb
   const dobConfidence = dob ? (input.dobConfidence || 'sourced') : 'unknown';
   const birthYear = dob && /^\d{4}/.test(dob) ? Number(dob.slice(0, 4)) : null;
 
-  const [created] = await sql<{ id: number; slug: string; displayName: string }[]>`
-    INSERT INTO players (
-      display_name, given_name, surname, sort_name, search_name, slug,
-      dob, dob_confidence, birth_year, birth_year_confidence,
-      height_cm, weight_kg, notes,
-      debut_season, final_season
-    ) VALUES (
-      ${displayName}, ${givenName}, ${surname}, ${sortName},
-      afldb_normalise_name(${displayName}), ${slug},
-      ${dob}::date, ${dobConfidence}::value_confidence,
-      ${birthYear}, ${dobConfidence}::value_confidence,
-      ${input.heightCm ?? null}, ${input.weightKg ?? null}, ${input.notes?.trim() || null},
-      ${input.debutSeason ?? null}, ${input.finalSeason ?? null}
-    )
-    RETURNING id, slug, display_name AS "displayName"
-  `;
+  const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL || process.env.DATABASE_URL;
+  if (!importUrl) {
+    throw new Error('AFLDB_IMPORT_DATABASE_URL is not configured.');
+  }
 
-  // Seed zero career stats
-  await sql`
-    INSERT INTO player_career_stats (
-      player_id, games, goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts,
-      finals, premierships, wins, draws, losses, brownlow_votes, brownlow_medals,
-      clubs_played, seasons_played, behinds_recorded_games, kicks_recorded_games,
-      handballs_recorded_games, disposals_recorded_games, marks_recorded_games,
-      tackles_recorded_games, hitouts_recorded_games
-    ) VALUES (
-      ${created.id}, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      0, 0, 0, 0, 0, 0, 0,
-      0, 0, 0, 0,
-      0, 0, 0,
-      0, 0
-    ) ON CONFLICT (player_id) DO NOTHING
-  `;
+  const importSql = postgres(importUrl, { max: 1, onnotice: () => {} });
+  try {
+    const created = await importSql.begin(async (tx) => {
+      const [row] = await tx<{ id: number; slug: string; displayName: string }[]>`
+        INSERT INTO players (
+          display_name, given_name, surname, sort_name, search_name, slug,
+          dob, dob_confidence, birth_year, birth_year_confidence,
+          height_cm, weight_kg, notes,
+          debut_season, final_season
+        ) VALUES (
+          ${displayName}, ${givenName}, ${surname}, ${sortName},
+          afldb_normalise_name(${displayName}), ${slug},
+          ${dob}::date, ${dobConfidence}::value_confidence,
+          ${birthYear}, ${dobConfidence}::value_confidence,
+          ${input.heightCm ?? null}, ${input.weightKg ?? null}, ${input.notes?.trim() || null},
+          ${input.debutSeason ?? null}, ${input.finalSeason ?? null}
+        )
+        RETURNING id, slug, display_name AS "displayName"
+      `;
 
-  return created;
+      // Seed zero career stats
+      await tx`
+        INSERT INTO player_career_stats (
+          player_id, games, goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts,
+          finals, premierships, wins, draws, losses, brownlow_votes, brownlow_medals,
+          clubs_played, seasons_played, behinds_recorded_games, kicks_recorded_games,
+          handballs_recorded_games, disposals_recorded_games, marks_recorded_games,
+          tackles_recorded_games, hitouts_recorded_games
+        ) VALUES (
+          ${row.id}, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 0, 0, 0,
+          0, 0, 0, 0,
+          0, 0, 0,
+          0, 0
+        ) ON CONFLICT (player_id) DO NOTHING
+      `;
+
+      return row;
+    });
+
+    return created;
+  } finally {
+    await importSql.end({ timeout: 5 });
+  }
 }
 
 export type PlayerClubStint = {

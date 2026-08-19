@@ -18,7 +18,7 @@ commit.
 ### Super Admin Player Creation, Bio Editing & Draft Pick Management — 20 August 2026
 
 - **Super Admin Player Creation & Bio Information Management**:
-  - `src/db/queries/players.ts`: Added `createPlayer` helper supporting creation of player profiles with display name, auto-split given/surname, canonical slug, search name normalisation (`afldb_normalise_name`), sort name, date of birth, DOB confidence, height (cm), weight (kg), and biographical notes. Initialised empty zero-statistic record in `player_career_stats`.
+  - `src/db/queries/players.ts`: Added `createPlayer` helper supporting creation of player profiles with display name, auto-split given/surname, canonical slug, search name normalisation (`afldb_normalise_name`), sort name, date of birth, DOB confidence, height (cm), weight (kg), and biographical notes. Executes via `AFLDB_IMPORT_DATABASE_URL` (`afldb_import` role) to strictly comply with PostgreSQL least-privilege write grants on statistical tables. Initialised empty zero-statistic record in `player_career_stats`.
   - `src/db/queries/players.ts`: Updated `fetchPlayer` to `LEFT JOIN` `player_career_stats` and `COALESCE` all career statistics to `0`, ensuring newly created or listed players who have yet to make their senior match debut load cleanly on `/players/[slug]`. Expanded `PlayerProfile` to include `heightCm`, `weightKg`, `givenName`, `surname`, and `notes`.
   - `src/app/admin/data-editor/CreatePlayerForm.tsx`: Created a new super admin component allowing administrators to create player profiles directly from the Data Editor GUI (`/admin/data-editor`).
   - `src/app/admin/data-editor/actions.ts`: Added `createPlayerAction` with full field validation, audit logging to `data_edits`, and path revalidations.
@@ -26,6 +26,7 @@ commit.
   - `src/app/admin/player-links/ResolveControls.tsx`: Added a dedicated "Create & link new" tab in the resolve drawer. Pre-fills player name from the raw source name and enables administrators to enter DOB, height, weight, and bio notes to create a player profile and link the unlinked record (e.g. rookie draft pick, honours entry) in a single action.
   - `src/app/admin/player-links/ResolvePanel.tsx`: Passed `playerName` and `context` attributes to `ResolveControls`.
   - `src/app/admin/player-links/actions.ts`: Added `createAndLinkPlayer` action linking created players to `draft_picks` (and corresponding `draft_persons` records) or honours records with audit logging.
+  - `src/db/queries/player-links.ts`: Updated `resolveLink` to synchronize `draft_persons` when resolving `draft_picks` selections.
 - **Draft Picks Management & Search in Data Editor**:
   - `src/lib/edit/spec.ts`: Added `draft_picks` to `EDITABLE_ENTITIES` allowing editing of `player_name_raw`, `original_club_raw`, `height_cm`, `weight_kg`, `draft_age`, `pick_note`, and `detail`.
   - `src/db/queries/data-edits.ts`: Added `draft_picks` row reader in `getEditableRow` and `applyDraftPickEdit` in `applyEdit`.

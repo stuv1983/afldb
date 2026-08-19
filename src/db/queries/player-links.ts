@@ -239,6 +239,15 @@ export async function resolveLink(input: {
                link_status_value = 'resolved'
          WHERE id = ${input.targetId}
       `;
+      if (input.targetTable === 'draft_picks') {
+        await tx`
+          UPDATE draft_persons
+             SET player_id = ${input.playerId},
+                 link_status = 'resolved',
+                 is_matching_backlog = false
+           WHERE id = (SELECT draft_person_id FROM draft_picks WHERE id = ${input.targetId} AND draft_person_id IS NOT NULL)
+        `;
+      }
       return row.status;
     }) as string | null;
     if (previousStatus === null) {
