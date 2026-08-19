@@ -15,6 +15,22 @@ commit.
 
 ## [Unreleased]
 
+### Birth-date enrichment from all-time club lists — 19 August 2026
+
+DOB coverage rose from 12,472 to 13,356 of 13,361 players (100.0%) on the
+dev database. The five clubs missing from the legacy club register —
+Fitzroy (759 gaps), University (82), Brisbane Bears (44), Sydney/South
+Melbourne (3) and North Melbourne (1) — had their AFL Tables all-time
+player list pages captured as CSVs; a new pass
+(`tools/migration/enrich_birth_dates_from_club_lists.py`) matches them by
+name within each club's roster, corroborated by games/goals/seasons, and
+fills only missing dates. 3,944 rows agreed with existing data, one
+conflict (a 2-day discrepancy on an 1868 date) was flagged as a
+data_issue rather than overwritten, and the 5 players still without a
+date are blank in the source as well. Same-name pairs (two Fitzroy Tom
+Meehans, two Sydney John Fogartys) disambiguate on exact games-at-club
+with goals and span as non-blocking vetoes. Not yet run against prod.
+
 ### Grid solver: rivalries, marquee matches and more — 19 August 2026
 
 Seven new builders (the catalogue is now 107 across 11 categories),
