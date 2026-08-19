@@ -3,8 +3,9 @@ import Link from 'next/link';
 
 import { CreatePlayerForm } from '@/app/admin/data-editor/CreatePlayerForm';
 import { EditorForm } from '@/app/admin/data-editor/EditorForm';
+import { MatchSheetEditor } from '@/app/admin/data-editor/MatchSheetEditor';
 import { PlayerFinder } from '@/app/admin/data-editor/PlayerFinder';
-import { getSeasonMatches } from '@/db/queries/matches';
+import { getMatch, getMatchPlayers, getSeasonMatches } from '@/db/queries/matches';
 import { getEditableRow } from '@/db/queries/data-edits';
 import { listDraftPicks } from '@/db/queries/draft';
 import { requireSuperAdmin } from '@/lib/auth/session';
@@ -16,11 +17,10 @@ export const metadata: Metadata = { title: 'Data editor', robots: { index: false
 export const dynamic = 'force-dynamic';
 
 /**
- * Manual corrections and player bio creation (see changeLog.md).
+ * Manual corrections, player bio creation, and match sheet editing (see changeLog.md).
  *
- * Find or create a player, find a match, or edit draft pick details.
- * Every save is audited in data_edits; the CSV pipeline remains the
- * path for bulk jobs.
+ * Find or create a player, find a match, edit draft pick details, or edit match player statistics.
+ * Every save is audited in data_edits; the CSV pipeline remains the path for bulk jobs.
  */
 export default async function DataEditorPage(
   { searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> },
@@ -28,6 +28,7 @@ export default async function DataEditorPage(
   await requireSuperAdmin();
   const params = await searchParams;
 
+  const mode = firstValue(params.mode) ?? '';
   const entityParam = firstValue(params.entity) ?? '';
   const entity = isEditableEntity(entityParam) ? entityParam : null;
   const id = Number(firstValue(params.id));
@@ -35,7 +36,12 @@ export default async function DataEditorPage(
   const draftQueryParam = firstValue(params.draft_q)?.trim() ?? '';
   const draftYearParam = parseSeason(firstValue(params.draft_year) ?? '');
 
-  const row = entity && Number.isInteger(id) && id > 0
+  const matchForSheet = (mode === 'match-sheet' && Number.isInteger(id) && id > 0)
+    ? await getMatch(id)
+    : null;
+  const matchSheetPlayers = matchForSheet ? await getMatchPlayers(id) : [];
+
+  const row = (mode !== 'match-sheet' && entity && Number.isInteger(id) && id > 0)
     ? await getEditableRow(entity, id)
     : null;
   const seasonMatches = seasonParam ? await getSeasonMatches(seasonParam) : [];
@@ -74,10 +80,18 @@ export default async function DataEditorPage(
             <form method="get" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end' }}>
               <input type="hidden" name="entity" value="matches" />
               <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
-                Match id (from its /matches/… URL)
-                <input type="number" name="id" min={1} defaultValue={entity === 'matches' && id > 0 ? id : undefined} />
+                Match details (scores/venue)
+                <input type="number" name="id" min={1} defaultValue={mode !== 'match-sheet' && entity === 'matches' && id > 0 ? id : undefined} />
               </label>
-              <button type="submit">Open</button>
+              <button type="submit">Open details</button>
+            </form>
+            <form method="get" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end' }}>
+              <input type="hidden" name="mode" value="match-sheet" />
+              <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
+                Match sheet editor (lineup & player stats)
+                <input type="number" name="id" min={1} defaultValue={mode === 'match-sheet' && id > 0 ? id : undefined} />
+              </label>
+              <button type="submit" className="btn btn-primary">Open match sheet</button>
             </form>
             <form method="get" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end' }}>
               <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
@@ -192,8 +206,12 @@ export default async function DataEditorPage(
                     <td className="nowrap">{formatDate(m.matchDate)}</td>
                     <td className="wide">{m.homeName} v {m.awayName}</td>
                     <td className="num nowrap">{m.homeScore}–{m.awayScore}</td>
-                    <td>
-                      <Link href={`/admin/data-editor?entity=matches&id=${m.id}`}>Edit</Link>
+                    <td style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                      <Link href={`/admin/data-editor?entity=matches&id=${m.id}`}>Edit details</Link>
+                      <span className="muted">·</span>
+                      <Link href={`/admin/data-editor?mode=match-sheet&id=${m.id}`} style={{ fontWeight: 600 }}>
+                        Match sheet
+                      </Link>
                     </td>
                   </tr>
                 ))}
@@ -203,7 +221,17 @@ export default async function DataEditorPage(
         </section>
       )}
 
-      {entity && id > 0 && !row && (
+      {matchForSheet && (
+        <MatchSheetEditor match={matchForSheet} initialPlayers={matchSheetPlayers} />
+      )}
+
+      {mode === 'match-sheet' && id > 0 && !matchForSheet && (
+        <section className="section">
+          <div className="empty"><h3>No match with id #{id} found</h3></div>
+        </section>
+      )}
+
+      {mode !== 'match-sheet' && entity && id > 0 && !row && (
         <section className="section">
           <div className="empty"><h3>No {entity === 'players' ? 'player' : entity === 'draft_picks' ? 'draft pick' : 'match'} with id {id}</h3></div>
         </section>

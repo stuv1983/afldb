@@ -15,6 +15,18 @@ commit.
 
 ## [Unreleased]
 
+### Super Admin Match Sheet Editor & Live In-Game Player Stats Management — 20 August 2026
+
+- **Interactive Super Admin Match Sheet & Lineup Editor**:
+  - `src/db/queries/match-sheet.ts`: Created `saveMatchSheet` to perform transactional upserts of `player_match_stats` for all players in a match using `afldb_import` pool credentials. Supports player additions, deletions, jumper numbers, goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts, frees for/against, and Brownlow votes.
+  - `src/db/queries/match-sheet.ts`: Added automated real-time recomputation of derived `player_career_stats` (games, goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts, best game records, debut/last match dates) and `player_season_stats` for all affected players directly in SQL upon saving.
+  - `src/db/queries/match-sheet.ts`: Added optional automated synchronization of match final scores, result, winner club, and margin on `matches` derived from player goals and behinds.
+  - `src/app/admin/data-editor/MatchSheetEditor.tsx`: Created a full-featured client editor with team-by-team rosters (Home & Away), live team aggregate totals (score, disposals, marks, tackles), player removal, "+ Add player to lineup" search with `PlayerPicker`, and score synchronization toggle.
+  - `src/app/admin/data-editor/actions.ts`: Added `saveMatchSheetAction` with payload validation, `data_edits` audit recording, and path revalidations across `/matches/[id]`, `/players/[slug]`, and `/admin/data-editor`.
+  - `src/app/admin/data-editor/page.tsx`: Embedded Match Sheet Editor direct ID lookup, "Open match sheet" action buttons on season match lists, and direct launch from Match Details editor.
+  - `src/app/admin/data-editor/EditorForm.tsx`: Added an "Open Match Sheet Editor →" action button on match detail edit forms.
+  - `src/db/queries/matches.ts`: Expanded `MatchPlayerRow` and `getMatchPlayers` to query `jumper_number`, `frees_for`, and `frees_against`.
+
 ### Super Admin Player Creation, Bio Editing & Draft Pick Management — 20 August 2026
 
 - **Super Admin Player Creation & Bio Information Management**:

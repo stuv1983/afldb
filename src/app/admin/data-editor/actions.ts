@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { saveEdit } from '@/db/queries/data-edits';
+import { saveMatchSheet, type PlayerMatchStatInput } from '@/db/queries/match-sheet';
 import { createPlayer } from '@/db/queries/players';
 import { EDITABLE_ENTITIES } from '@/lib/edit/spec';
 import { audit, requireSuperAdmin } from '@/lib/auth/session';
@@ -12,6 +13,12 @@ export type DataEditState = {
   message?: string;
   /** rebuild_derived targets left stale by the saved edit, if any. */
   staleDerived?: string[];
+};
+
+export type MatchSheetActionState = {
+  error?: string;
+  message?: string;
+  playerCount?: number;
 };
 
 export type CreatePlayerActionState = {
@@ -129,5 +136,55 @@ export async function saveDataEdit(
   return {
     message: `Saved. ${summary}.`,
     staleDerived: group.affectsDerived,
+  };
+}
+
+/**
+ * Save complete match sheet (lineups and stats) from GUI (see changeLog.md).
+ */
+export async function saveMatchSheetAction(
+  _prev: MatchSheetActionState,
+  formData: FormData,
+): Promise<MatchSheetActionState> {
+  const admin = await requireSuperAdmin();
+
+  const matchId = Number(formData.get('matchId'));
+  if (!Number.isInteger(matchId) || matchId <= 0) {
+    return { error: 'Invalid match ID.' };
+  }
+
+  const syncMatchScores = formData.get('syncMatchScores') === 'true' || formData.get('syncMatchScores') === 'on';
+  const payloadRaw = String(formData.get('payload') ?? '');
+  const note = String(formData.get('note') ?? '').trim();
+
+  let payload: { players: PlayerMatchStatInput[]; removedPlayerIds?: number[] };
+  try {
+    payload = JSON.parse(payloadRaw);
+  } catch {
+    return { error: 'Invalid match sheet payload data.' };
+  }
+
+  const result = await saveMatchSheet({
+    matchId,
+    syncMatchScores,
+    players: payload.players || [],
+    removedPlayerIds: payload.removedPlayerIds || [],
+    adminUserId: admin.id,
+    note,
+  });
+
+  if (!result.ok) {
+    return { error: result.error };
+  }
+
+  revalidatePath(`/matches/${matchId}`);
+  revalidatePath('/matches');
+  revalidatePath('/players');
+  revalidatePath('/seasons');
+  revalidatePath('/admin/data-editor');
+
+  return {
+    message: `Match sheet saved successfully (${result.playerCount} players). ${result.scoreUpdated ? 'Match scores synchronized.' : ''} Career and season stats updated.`,
+    playerCount: result.playerCount,
   };
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useActionState } from 'react';
 
 import { saveDataEdit, type DataEditState } from '@/app/admin/data-editor/actions';
@@ -113,7 +114,18 @@ export function EditorForm({
   const entity = EDITABLE_ENTITIES[entityKey];
   return (
     <section className="section" style={{ display: 'grid', gap: '0.9rem' }}>
-      <h2>{title}</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <h2 style={{ margin: 0 }}>{title}</h2>
+        {entityKey === 'matches' && (
+          <Link
+            href={`/admin/data-editor?mode=match-sheet&id=${rowId}`}
+            className="btn btn-primary"
+            style={{ fontSize: '0.9rem' }}
+          >
+            Open Match Sheet Editor (Lineup & Stats) →
+          </Link>
+        )}
+      </div>
       {Object.values(entity.groups).map((group) => (
         <GroupForm
           key={group.key}

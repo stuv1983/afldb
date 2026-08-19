@@ -111,6 +111,7 @@ export type MatchPlayerRow = {
   slug: string;
   displayName: string;
   clubId: number;
+  jumperNumber?: string | null;
   goals: number | null;
   behinds: number | null;
   kicks: number | null;
@@ -119,15 +120,18 @@ export type MatchPlayerRow = {
   marks: number | null;
   tackles: number | null;
   hitouts: number | null;
+  freesFor?: number | null;
+  freesAgainst?: number | null;
   brownlowVotes: number | null;
 };
 
 export async function getMatchPlayers(matchId: number): Promise<MatchPlayerRow[]> {
   return sql<MatchPlayerRow[]>`
     SELECT s.player_id AS "playerId", p.slug, p.display_name AS "displayName",
-           s.club_id AS "clubId",
+           s.club_id AS "clubId", s.jumper_number AS "jumperNumber",
            s.goals, s.behinds, s.kicks, s.handballs, s.disposals,
            s.marks, s.tackles, s.hitouts,
+           s.frees_for AS "freesFor", s.frees_against AS "freesAgainst",
            s.brownlow_votes AS "brownlowVotes"
       FROM player_match_stats s
       JOIN players p ON p.id = s.player_id
