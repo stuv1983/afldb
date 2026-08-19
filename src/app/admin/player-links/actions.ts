@@ -72,7 +72,14 @@ export async function linkPlayer(
   await audit('player_link.linked', { targetTable, targetId, playerId },
     { userId: admin.id, label: admin.email });
 
-  revalidatePath('/admin/player-links');
+  // Deliberately NOT revalidatePath('/admin/player-links'): on this Next
+  // 15.5 line, revalidating the route the action was submitted from leaves
+  // the client transition pending forever and the queue never visibly
+  // updates (verified on dev 2026-08-19 — the POST returns a complete
+  // flight payload including this success message, and the browser never
+  // applies it; matches vercel/next.js discussion #82289). The client
+  // component refreshes the route itself after the action settles, which
+  // takes the ordinary navigation path that provably works.
   revalidatePublicLinkPages();
   return { message: 'Player linked.' };
 }
@@ -105,9 +112,9 @@ export async function confirmUnlinked(
   await audit('player_link.confirmed_unlinked', { targetTable, targetId },
     { userId: admin.id, label: admin.email });
 
-  revalidatePath('/admin/player-links');
-  // A vetted-unlinked row renders differently on the public pages too
-  // (no more reader suggestion prompt), so they revalidate as well.
+  // No self-revalidation — see the comment in linkPlayer. The vetted-unlinked
+  // row renders differently on the public pages too (no more reader
+  // suggestion prompt), so those revalidate here as before.
   revalidatePublicLinkPages();
   return { message: 'Recorded as vetted — genuinely unlinked.' };
 }
@@ -131,6 +138,6 @@ export async function reviewSuggestion(
   await audit('player_link.suggestion_reviewed', { suggestionId: id, status },
     { userId: admin.id, label: admin.email });
 
-  revalidatePath('/admin/player-links');
+  // No self-revalidation — see the comment in linkPlayer.
   return { message: `Suggestion ${status}.` };
 }
