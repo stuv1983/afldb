@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useActionState, useEffect, useState } from 'react';
 
 import {
   confirmUnlinked,
@@ -32,11 +33,21 @@ export function ResolveControls({
   linkStatus: string;
   suggestions: { id: number; suggestedName: string; note: string | null }[];
 }) {
+  const router = useRouter();
   const [linkState, linkAction, linkPending] = useActionState(linkPlayer, INITIAL);
   const [confirmState, confirmAction, confirmPending] = useActionState(confirmUnlinked, INITIAL);
   const [picked, setPicked] = useState<{ id: number; label: string } | null>(null);
 
   const done = linkState.message ?? confirmState.message;
+
+  // The actions no longer revalidate this route themselves (doing so from
+  // inside the action hangs the pending transition on this Next 15.5 line —
+  // see actions.ts). Refreshing here, after the action state has settled,
+  // takes the ordinary router path: the resolved row leaves the queue and
+  // no in-flight form gets unmounted mid-action.
+  useEffect(() => {
+    if (done) router.refresh();
+  }, [done, router]);
   if (done) return <p className="muted" style={{ fontSize: '0.85rem' }}>{done}</p>;
 
   return (

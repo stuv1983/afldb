@@ -1,0 +1,375 @@
+{
+  "id": "ui_06142",
+  "question": "players with at most 50 brownlow votes and at most 1 goals",
+  "capturedAt": "2026-08-19T09:53:09.699Z",
+  "parserVersion": 15,
+  "trace": {
+    "worker": "3",
+    "pid": "909220",
+    "requestId": "6079c3cd-5e92-45f9-bca2-e063fec7a387",
+    "build": "-eNMdYva6jS0ztyAXEiyd"
+  },
+  "httpStatus": 200,
+  "elapsedMs": 521,
+  "outcome": "answered",
+  "headline": "4,786 players match",
+  "consoleErrors": [
+    "pageerror: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+  ],
+  "network": [
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-498be0ede4afac35.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 4
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/health-event",
+      "status": 204,
+      "resourceType": "ping",
+      "worker": "2",
+      "atMs": 38
+    },
+    {
+      "url": "http://10.0.40.100:8090/players?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 47
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 48
+    },
+    {
+      "url": "http://10.0.40.100:8090/records?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 52
+    },
+    {
+      "url": "http://10.0.40.100:8090/?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 54
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 54
+    },
+    {
+      "url": "http://10.0.40.100:8090/brownlow?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 69
+    },
+    {
+      "url": "http://10.0.40.100:8090/awards?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 69
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/records/page-4f1c4fe0dc2b1fc0.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 72
+    },
+    {
+      "url": "http://10.0.40.100:8090/draft?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 72
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/page-4744a03891e83c2c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 74
+    },
+    {
+      "url": "http://10.0.40.100:8090/aflw?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 82
+    },
+    {
+      "url": "http://10.0.40.100:8090/match-search?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 83
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/awards/page-4f1c4fe0dc2b1fc0.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 89
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs/brisbane-lions?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 131
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons/2025?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 138
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs/collingwood?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 141
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons/2023?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 142
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons/2024?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 152
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/clubs/%5Bslug%5D/page-85a8579511935d31.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 153
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/seasons/%5Byear%5D/page-85a8579511935d31.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 156
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs/geelong?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 157
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs/melbourne?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 169
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons/2021?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 170
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs/richmond?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 171
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons/2020?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 176
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs/west-coast?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 190
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/search/autocomplete?q=can%20you%20tell%20me%20players%20with%20exactly%2050%20premierships%20and%20at%20most%202%20clubs",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": null,
+      "atMs": 202
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs/western-bulldogs?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 220
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons/2022?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 222
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons/2018?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 224
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons/2019?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 283
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons/2016?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 283
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons/2017?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 293
+    },
+    {
+      "url": "http://10.0.40.100:8090/search?q=players%20with%20at%20most%2050%20brownlow%20votes%20and%20at%20most%201%20goals",
+      "status": 200,
+      "resourceType": "document",
+      "worker": "3",
+      "atMs": 454
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/css/a8da1fec6492730f.css",
+      "status": 200,
+      "resourceType": "stylesheet",
+      "worker": "1",
+      "atMs": 472
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/26d4368bf94c0ec4-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "3",
+      "atMs": 472
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/98e207f02528a563-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "3",
+      "atMs": 473
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/d3ebbfd689654d3a-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "2",
+      "atMs": 476
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/5611c55482296524-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "2",
+      "atMs": 478
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/webpack-29079d1cd0ad75b6.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 497
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/main-app-95880b0700494805.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 497
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/2619-3c9e02e22d10480a.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 498
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/search/page-a7aecb72d6710b96.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 498
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/1255-a20f6c5e797a687b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 498
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/layout-a6cdbdfa3ad5299f.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 498
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-498be0ede4afac35.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 498
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/4bd1b696-f785427dddbba9fb.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 498
+    }
+  ],
+  "cleanControl": {
+    "attempts": 1,
+    "cleanCaptureSucceeded": true,
+    "trace": {
+      "worker": "1",
+      "pid": "909218",
+      "requestId": "eb7c5724-4043-4d42-b4ce-89657413d76f",
+      "build": "-eNMdYva6jS0ztyAXEiyd"
+    },
+    "errors": []
+  }
+}

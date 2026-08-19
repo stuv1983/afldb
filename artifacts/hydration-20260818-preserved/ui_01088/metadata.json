@@ -1,0 +1,340 @@
+{
+  "id": "ui_01088",
+  "question": "Chris Judd total hitouts against Gold Coast",
+  "capturedAt": "2026-08-18T07:33:34.121Z",
+  "parserVersion": 11,
+  "trace": {
+    "worker": "1",
+    "pid": "1944043",
+    "requestId": "a8cd2d0d-9f65-49d7-84af-3f028a0b9363",
+    "build": "8HXwuDHUf3RJsyB_ZGJXc"
+  },
+  "httpStatus": 200,
+  "elapsedMs": 285,
+  "outcome": "answered",
+  "headline": "Chris Judd — 0 hitouts",
+  "consoleErrors": [
+    "pageerror: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+  ],
+  "network": [
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/4bd1b696-f785427dddbba9fb.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 2
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/1255-a20f6c5e797a687b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 2
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/main-app-95880b0700494805.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 4
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/d3ebbfd689654d3a-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "1",
+      "atMs": 7
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/layout-d7e1f0fba8a9941c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 9
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/2619-3c9e02e22d10480a.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 9
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/search/page-a7aecb72d6710b96.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 10
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/5611c55482296524-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "3",
+      "atMs": 11
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-b00f854729942a59.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 20
+    },
+    {
+      "url": "http://10.0.40.100:8090/seasons?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 40
+    },
+    {
+      "url": "http://10.0.40.100:8090/clubs?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 43
+    },
+    {
+      "url": "http://10.0.40.100:8090/players?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 51
+    },
+    {
+      "url": "http://10.0.40.100:8090/?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 51
+    },
+    {
+      "url": "http://10.0.40.100:8090/records?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 51
+    },
+    {
+      "url": "http://10.0.40.100:8090/brownlow?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 53
+    },
+    {
+      "url": "http://10.0.40.100:8090/awards?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 55
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/page-4744a03891e83c2c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 59
+    },
+    {
+      "url": "http://10.0.40.100:8090/aflw?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 63
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/chris-judd-1122?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 67
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/awards/page-8f063a6f2c1d0b29.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 67
+    },
+    {
+      "url": "http://10.0.40.100:8090/draft?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 68
+    },
+    {
+      "url": "http://10.0.40.100:8090/match-search?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 70
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/records/page-8f063a6f2c1d0b29.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 71
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/players/%5Bslug%5D/page-eb614dba11568a7b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 74
+    },
+    {
+      "url": "http://10.0.40.100:8090/about?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 81
+    },
+    {
+      "url": "http://10.0.40.100:8090/matches/14315?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 83
+    },
+    {
+      "url": "http://10.0.40.100:8090/matches/14537?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 92
+    },
+    {
+      "url": "http://10.0.40.100:8090/matches/13774?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 103
+    },
+    {
+      "url": "http://10.0.40.100:8090/matches/14141?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 103
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/search/autocomplete?q=Chris%20Judd%20most%20hitouts%20against%20Gold%20Coast",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": null,
+      "atMs": 213
+    },
+    {
+      "url": "http://10.0.40.100:8090/search?q=Chris%20Judd%20total%20hitouts%20against%20Gold%20Coast",
+      "status": 200,
+      "resourceType": "document",
+      "worker": "1",
+      "atMs": 230
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/98e207f02528a563-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "2",
+      "atMs": 249
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/css/046c53b3249f799d.css",
+      "status": 200,
+      "resourceType": "stylesheet",
+      "worker": "3",
+      "atMs": 250
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/26d4368bf94c0ec4-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "2",
+      "atMs": 254
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/d3ebbfd689654d3a-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "3",
+      "atMs": 254
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/5611c55482296524-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "2",
+      "atMs": 254
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/main-app-95880b0700494805.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 268
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/webpack-29079d1cd0ad75b6.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 268
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/2619-3c9e02e22d10480a.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 269
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/search/page-a7aecb72d6710b96.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 269
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/layout-d7e1f0fba8a9941c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 269
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/1255-a20f6c5e797a687b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 269
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-b00f854729942a59.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 269
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/4bd1b696-f785427dddbba9fb.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 269
+    }
+  ],
+  "cleanControl": {
+    "attempts": 1,
+    "cleanCaptureSucceeded": true,
+    "trace": {
+      "worker": "4",
+      "pid": "1944046",
+      "requestId": "81f262d9-aee4-4a4b-874f-561a6c87b4d7",
+      "build": "8HXwuDHUf3RJsyB_ZGJXc"
+    },
+    "errors": []
+  }
+}

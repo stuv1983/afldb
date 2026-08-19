@@ -1,0 +1,249 @@
+{
+  "id": "ui_00475",
+  "question": "Tony Lockett most clangers against Essendon",
+  "capturedAt": "2026-08-18T07:51:36.165Z",
+  "parserVersion": 11,
+  "trace": {
+    "worker": "2",
+    "pid": "1944044",
+    "requestId": "79d3207b-b09e-4794-aad8-ef4daa80c5fd",
+    "build": "8HXwuDHUf3RJsyB_ZGJXc"
+  },
+  "httpStatus": 200,
+  "elapsedMs": 496,
+  "outcome": "answered",
+  "headline": "Tony Lockett — 0 clangers",
+  "consoleErrors": [
+    "pageerror: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+  ],
+  "network": [
+    {
+      "url": "http://10.0.40.100:8090/awards?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 132
+    },
+    {
+      "url": "http://10.0.40.100:8090/brownlow?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 143
+    },
+    {
+      "url": "http://10.0.40.100:8090/draft?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 144
+    },
+    {
+      "url": "http://10.0.40.100:8090/match-search?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "2",
+      "atMs": 144
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/records/page-8f063a6f2c1d0b29.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 144
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/page-4744a03891e83c2c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 144
+    },
+    {
+      "url": "http://10.0.40.100:8090/api/search/autocomplete?q=Tony%20Lockett%20highest%20clangers%20game%20against%20Brisbane%20Lions",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": null,
+      "atMs": 159
+    },
+    {
+      "url": "http://10.0.40.100:8090/aflw?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 166
+    },
+    {
+      "url": "http://10.0.40.100:8090/players/tony-lockett-990?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 174
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/awards/page-8f063a6f2c1d0b29.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 178
+    },
+    {
+      "url": "http://10.0.40.100:8090/matches/11491?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 197
+    },
+    {
+      "url": "http://10.0.40.100:8090/matches/11370?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "4",
+      "atMs": 206
+    },
+    {
+      "url": "http://10.0.40.100:8090/matches/12102?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "3",
+      "atMs": 207
+    },
+    {
+      "url": "http://10.0.40.100:8090/matches/11646?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 208
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/players/%5Bslug%5D/page-eb614dba11568a7b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 208
+    },
+    {
+      "url": "http://10.0.40.100:8090/about?_rsc=unnn1",
+      "status": 200,
+      "resourceType": "fetch",
+      "worker": "1",
+      "atMs": 245
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/matches/%5Bid%5D/page-eb614dba11568a7b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 245
+    },
+    {
+      "url": "http://10.0.40.100:8090/search?q=Tony%20Lockett%20most%20clangers%20against%20Essendon",
+      "status": 200,
+      "resourceType": "document",
+      "worker": "2",
+      "atMs": 319
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/d3ebbfd689654d3a-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "3",
+      "atMs": 374
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/98e207f02528a563-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "2",
+      "atMs": 374
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/css/046c53b3249f799d.css",
+      "status": 200,
+      "resourceType": "stylesheet",
+      "worker": "4",
+      "atMs": 380
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/26d4368bf94c0ec4-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "1",
+      "atMs": 410
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/media/5611c55482296524-s.p.woff2",
+      "status": 200,
+      "resourceType": "font",
+      "worker": "4",
+      "atMs": 410
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/webpack-29079d1cd0ad75b6.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 441
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/main-app-95880b0700494805.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 445
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/2619-3c9e02e22d10480a.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 447
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/search/page-a7aecb72d6710b96.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "1",
+      "atMs": 447
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/1255-a20f6c5e797a687b.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 447
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/4bd1b696-f785427dddbba9fb.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "3",
+      "atMs": 454
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/layout-d7e1f0fba8a9941c.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "2",
+      "atMs": 468
+    },
+    {
+      "url": "http://10.0.40.100:8090/_next/static/chunks/app/error-b00f854729942a59.js",
+      "status": 200,
+      "resourceType": "script",
+      "worker": "4",
+      "atMs": 468
+    }
+  ],
+  "cleanControl": {
+    "attempts": 1,
+    "cleanCaptureSucceeded": true,
+    "trace": {
+      "worker": "3",
+      "pid": "1944045",
+      "requestId": "e13e44df-c6e9-4767-8920-9c644d968f4e",
+      "build": "8HXwuDHUf3RJsyB_ZGJXc"
+    },
+    "errors": []
+  }
+}

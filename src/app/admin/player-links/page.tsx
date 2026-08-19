@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { ResolveControls } from '@/app/admin/player-links/ResolveControls';
+import { ResolvePanel } from '@/app/admin/player-links/ResolvePanel';
 import { SuggestionControls } from '@/app/admin/player-links/SuggestionControls';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import {
@@ -30,6 +30,14 @@ const TABLE_LABELS: Record<LinkTargetTable, string> = {
 };
 
 /**
+ * Fixed page size, never user-controlled. 50 rows keeps the served HTML
+ * around the size of an ordinary admin table; the full 2,000+-row queue
+ * used to ship ~1.1 MB of RSC and take multiple seconds of client render
+ * per navigation.
+ */
+const PAGE_SIZE = 50;
+
+/**
  * The manual half of player linking.
  *
  * Import-time linking classifies every source name as unique, resolved,
@@ -38,6 +46,17 @@ const TABLE_LABELS: Record<LinkTargetTable, string> = {
  * against external sources. Reader suggestions from the public
  * "Unmatched" badges arrive in their own section and inline against the
  * rows they point at.
+ *
+ * Queue rows are deliberately plain server HTML: the interactive resolve
+ * UI lives in the single shared ResolvePanel, mounted once per page and
+ * fed by data-* attributes on each row's trigger button — see
+ * ResolvePanel.tsx for why (the per-row <details><ResolveControls/>
+ * design cost seconds of client render on every navigation).
+ *
+ * Pagination happens here on the server after the vetted filter — the
+ * client never receives more than one page. The queue query itself stays
+ * unpaginated: it costs ~11 ms for the full seven-table scan, and the
+ * vetted exclusion needs the flat list anyway for correct totals.
  */
 export default async function PlayerLinksPage(
   { searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> },
@@ -57,6 +76,14 @@ export default async function PlayerLinksPage(
   // the honours tables but leave the queue.
   const queue = unresolved.filter((r) => !vetted.has(`${r.targetTable}:${r.targetId}`));
 
+  const totalPages = Math.max(1, Math.ceil(queue.length / PAGE_SIZE));
+  const rawPage = Number(firstValue(params.page) ?? '1');
+  const page = Number.isInteger(rawPage) ? Math.min(Math.max(1, rawPage), totalPages) : 1;
+  const pageRows = queue.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const pageHref = (p: number) =>
+    `/admin/player-links?${table ? `table=${table}&` : ''}page=${p}`;
+
   const suggestionsByTarget = new Map<string, typeof suggestions>();
   for (const s of suggestions) {
     const key = `${s.targetTable}:${s.targetId}`;
@@ -64,11 +91,26 @@ export default async function PlayerLinksPage(
     suggestionsByTarget.get(key)!.push(s);
   }
 
-  const byTable = new Map<LinkTargetTable, typeof queue>();
-  for (const row of queue) {
+  const byTable = new Map<LinkTargetTable, typeof pageRows>();
+  for (const row of pageRows) {
     if (!byTable.has(row.targetTable)) byTable.set(row.targetTable, []);
     byTable.get(row.targetTable)!.push(row);
   }
+
+  const pager = totalPages > 1 && (
+    <nav className="section" aria-label="Queue pages" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+      {page > 1
+        ? <Link href={pageHref(page - 1)}>← Previous</Link>
+        : <span className="muted">← Previous</span>}
+      <span className="muted">
+        Page {formatNumber(page)} of {formatNumber(totalPages)}
+        {' · '}{formatNumber(queue.length)} unresolved{table ? ` in ${TABLE_LABELS[table]}` : ''}
+      </span>
+      {page < totalPages
+        ? <Link href={pageHref(page + 1)}>Next →</Link>
+        : <span className="muted">Next →</span>}
+    </nav>
+  );
 
   return (
     <>
@@ -81,12 +123,17 @@ export default async function PlayerLinksPage(
         </p>
       </div>
 
+      {/* Filter links carry no page param, so changing table resets to page 1. */}
       <nav className="section" aria-label="Filter">
-        <Link href="/admin/player-links">All tables</Link>
+        {table === undefined
+          ? <strong aria-current="true">All tables</strong>
+          : <Link href="/admin/player-links">All tables</Link>}
         {LINK_TARGET_TABLES.map((t) => (
           <span key={t}>
             {' · '}
-            <Link href={`/admin/player-links?table=${t}`}>{TABLE_LABELS[t]}</Link>
+            {table === t
+              ? <strong aria-current="true">{TABLE_LABELS[t]}</strong>
+              : <Link href={`/admin/player-links?table=${t}`}>{TABLE_LABELS[t]}</Link>}
           </span>
         ))}
       </nav>
@@ -129,6 +176,8 @@ export default async function PlayerLinksPage(
         </section>
       )}
 
+      {pager}
+
       {queue.length === 0 ? (
         <section className="section">
           <div className="empty">
@@ -141,8 +190,8 @@ export default async function PlayerLinksPage(
           <section className="section" key={t}>
             <CollapsibleTable
               title={TABLE_LABELS[t]}
-              note={`${formatNumber(rows.length)} unresolved`}
-              defaultOpen={table !== undefined || byTable.size === 1}
+              note={`${formatNumber(rows.length)} on this page`}
+              defaultOpen
             >
               <div className="table-wrap">
                 <table>
@@ -151,7 +200,7 @@ export default async function PlayerLinksPage(
                       <th scope="col">Source name</th>
                       <th scope="col">Context</th>
                       <th scope="col">Status</th>
-                      <th scope="col">Resolve</th>
+                      <th scope="col" />
                     </tr>
                   </thead>
                   <tbody>
@@ -168,18 +217,24 @@ export default async function PlayerLinksPage(
                           </td>
                           <td className="wide muted">{row.context}</td>
                           <td className="nowrap">{row.linkStatus}</td>
-                          <td style={{ minWidth: '22rem' }}>
-                            <details>
-                              <summary>Resolve…</summary>
-                              <ResolveControls
-                                targetTable={row.targetTable}
-                                targetId={row.targetId}
-                                linkStatus={row.linkStatus}
-                                suggestions={rowSuggestions.map((s) => ({
+                          <td className="nowrap">
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              data-resolve-trigger
+                              data-target-table={row.targetTable}
+                              data-target-id={row.targetId}
+                              data-player-name={row.playerName}
+                              data-context={row.context}
+                              data-link-status={row.linkStatus}
+                              data-suggestions={rowSuggestions.length > 0
+                                ? JSON.stringify(rowSuggestions.map((s) => ({
                                   id: s.id, suggestedName: s.suggestedName, note: s.note,
-                                }))}
-                              />
-                            </details>
+                                })))
+                                : undefined}
+                            >
+                              Resolve…
+                            </button>
                           </td>
                         </tr>
                       );
@@ -191,6 +246,10 @@ export default async function PlayerLinksPage(
           </section>
         ))
       )}
+
+      {pager}
+
+      <ResolvePanel />
     </>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useActionState, useEffect } from 'react';
 
 import {
   reviewSuggestion,
@@ -11,7 +12,13 @@ const INITIAL: PlayerLinkActionState = {};
 
 /** Accept/dismiss for one reader suggestion. Both buttons are real submits. */
 export function SuggestionControls({ suggestionId }: { suggestionId: number }) {
+  const router = useRouter();
   const [state, formAction, pending] = useActionState(reviewSuggestion, INITIAL);
+
+  // Post-settle refresh instead of in-action revalidation — see actions.ts.
+  useEffect(() => {
+    if (state.message) router.refresh();
+  }, [state.message, router]);
 
   if (state.message) return <span className="muted" style={{ fontSize: '0.85rem' }}>{state.message}</span>;
 
