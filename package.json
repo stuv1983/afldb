@@ -5,7 +5,7 @@
   "description": "Public historical Australian Football (AFL/VFL) statistics database",
   "scripts": {
     "dev": "next dev -p 3100",
-    "build": "next build && node tools/build/prepare-standalone.mjs",
+    "build": "next build --webpack && node tools/build/prepare-standalone.mjs",
     "start": "next start -p ${PORT:-3100}",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
@@ -23,7 +23,7 @@
     "nl:ui": "playwright test --config playwright.nl-stress.config.ts"
   },
   "dependencies": {
-    "next": "^15.5.0",
+    "next": "16.3.1",
     "nodemailer": "^9.0.5",
     "postgres": "^3.4.9",
     "qrcode": "^1.5.4",
