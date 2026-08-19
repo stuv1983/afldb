@@ -246,6 +246,7 @@ export async function resolveLink(input: {
                  link_status = 'resolved',
                  is_matching_backlog = false
            WHERE id = (SELECT draft_person_id FROM draft_picks WHERE id = ${input.targetId} AND draft_person_id IS NOT NULL)
+              OR (display_name_raw = (SELECT player_name_raw FROM draft_picks WHERE id = ${input.targetId}) AND player_id IS NULL)
         `;
       }
       return row.status;

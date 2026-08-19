@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### Player Search & Listing Improvements for Listed / Un-debuted Players — 20 August 2026
+
+- **Search & Listing Visibility for Listed / Un-debuted Players**:
+  - `src/db/queries/search.ts`: Switched `searchPlayers` from `JOIN` to `LEFT JOIN player_career_stats` and set subtitle to `'Listed player (yet to debut)'` (or club name + `'Listed player'`) when `debut_season` is null. Enables newly created players or un-debuted draftees (e.g. Fred Rodriguez, Riley Onley) to be immediately discoverable in sitewide search, autocomplete, and `PlayerPicker`.
+  - `src/db/queries/players.ts`: Switched `listPlayers` to `LEFT JOIN player_career_stats` with `COALESCE` on numeric totals to ensure players with 0 career games render properly in player directories and filter queries.
+  - `src/db/queries/player-links.ts`: Updated `resolveLink` to ensure dual resolution across `draft_picks` and `draft_persons` matching by person ID or raw name.
+
 ### Draft & Recruitment Info on Player Creation, and Awards & Representative Teams Admin — 20 August 2026
 
 - **Draft & Recruitment Selection during Player Profile Creation**:

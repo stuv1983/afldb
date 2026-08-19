@@ -108,15 +108,18 @@ export async function listPlayers(options: PlayerListFilters & {
            p.display_name       AS "displayName",
            c.debut_season       AS "debutSeason",
            c.final_season       AS "finalSeason",
-           c.games, c.goals, c.finals, c.premierships,
-           c.brownlow_votes     AS "brownlowVotes",
-           c.clubs_played       AS "clubsPlayed",
+           COALESCE(c.games, 0) AS games,
+           COALESCE(c.goals, 0) AS goals,
+           COALESCE(c.finals, 0) AS finals,
+           COALESCE(c.premierships, 0) AS premierships,
+           COALESCE(c.brownlow_votes, 0) AS "brownlowVotes",
+           COALESCE(c.clubs_played, 0) AS "clubsPlayed",
            (SELECT string_agg(DISTINCT cl.short_name, ', ' ORDER BY cl.short_name)
               FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id
              WHERE pc.player_id = p.id) AS "clubNames",
            count(*) OVER ()     AS total
       FROM players p
-      JOIN player_career_stats c ON c.player_id = p.id
+      LEFT JOIN player_career_stats c ON c.player_id = p.id
      WHERE ${where}
      ORDER BY ${sql.unsafe(orderBy)}
      LIMIT ${limit} OFFSET ${offset}
@@ -136,7 +139,7 @@ export async function listPlayers(options: PlayerListFilters & {
   const [counted] = await sql<{ total: string }[]>`
     SELECT count(*) AS total
       FROM players p
-      JOIN player_career_stats c ON c.player_id = p.id
+      LEFT JOIN player_career_stats c ON c.player_id = p.id
      WHERE ${where}
   `;
   return { rows: [], total: Number(counted.total) };

@@ -62,7 +62,13 @@ export async function searchPlayers(query: string, limit = 20): Promise<SearchRe
            p.slug,
            p.display_name AS title,
            CASE
-             WHEN c.debut_season IS NULL THEN NULL
+             WHEN c.debut_season IS NULL THEN
+               COALESCE(
+                 (SELECT string_agg(DISTINCT cl.short_name, ', ')
+                    FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id
+                   WHERE pc.player_id = p.id) || ' · Listed player',
+                 'Listed player (yet to debut)'
+               )
              ELSE (SELECT string_agg(DISTINCT cl.short_name, ', ')
                      FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id
                     WHERE pc.player_id = p.id)
@@ -76,11 +82,11 @@ export async function searchPlayers(query: string, limit = 20): Promise<SearchRe
             + similarity(p.search_name, q.term) * 100
             + LEAST(COALESCE(p.search_rank, 0), 400) / 10.0)::float AS rank
       FROM players p
-      JOIN player_career_stats c ON c.player_id = p.id
+      LEFT JOIN player_career_stats c ON c.player_id = p.id
      CROSS JOIN q
      WHERE p.search_name LIKE '%' || q.term || '%'
         OR p.search_name % q.term
-     ORDER BY rank DESC, c.games DESC, p.sort_name
+     ORDER BY rank DESC, COALESCE(c.games, 0) DESC, p.sort_name
      LIMIT ${limit}
   `;
 }
