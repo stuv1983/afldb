@@ -15,6 +15,18 @@ commit.
 
 ## [Unreleased]
 
+### Super Admin Match Creation, Grounds & Live Stats Workflow — 20 August 2026
+
+- **Super Admin Match Creation GUI (`/admin/data-editor` → "+ Add new match")**:
+  - `src/db/queries/match-admin.ts`: Created `createMatch` query layer to transactionally insert new match records and quarter scores (`match_period_scores`) into PostgreSQL using the `afldb_import` pool credentials. Automatically derives match result (`home_win`, `away_win`, `draw`), winner club, margin, is_final status, round codes, and stable natural match keys. Logs audit records to `data_edits`.
+  - `src/app/admin/data-editor/CreateMatchForm.tsx`: Built interactive super admin GUI component for creating matches:
+    - **Match Information**: Season, Round Type (Regular Season, Qualifying Final, Elimination Final, Semi Final, Preliminary Final, Grand Final), Round Number, Match Date, Start Time, Grounds/Venue dropdown selection (`listVenues`), Attendance (crowd), and Notes.
+    - **Clubs & Scores**: Home & Away club selectors, real-time score calculation (`Goals * 6 + Behinds`).
+    - **Quarter Breakdown**: Collapsible Q1, Q2, Q3, Q4 goals, behinds, and points inputs for both clubs.
+    - **Seamless Workflow**: Direct submission transitions immediately into the **Match Sheet Editor** (`/admin/data-editor?mode=match-sheet&id=${id}`) to populate Home & Away 23-player lineups, in-game stats (goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts, frees for/against, jumper numbers), and allocate 3-2-1 Brownlow votes.
+  - `src/app/admin/data-editor/actions.ts`: Added `createMatchAction` with input validation, `data_edits` audit logging, and cache revalidations across `/matches`, `/matches/[id]`, `/seasons/[year]`, and `/admin/data-editor`.
+  - `src/app/admin/data-editor/page.tsx`: Embedded `CreateMatchForm` into the Matches management section.
+
 ### Player Search & Listing Improvements for Listed / Un-debuted Players — 20 August 2026
 
 - **Search & Listing Visibility for Listed / Un-debuted Players**:

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 
 import { createAwardWinner, createHallOfFameInductee, createHonourTeamMember } from '@/db/queries/awards-admin';
 import { saveEdit } from '@/db/queries/data-edits';
+import { createMatch } from '@/db/queries/match-admin';
 import { saveMatchSheet, type PlayerMatchStatInput } from '@/db/queries/match-sheet';
 import { createPlayer, type DraftPickInput } from '@/db/queries/players';
 import { EDITABLE_ENTITIES } from '@/lib/edit/spec';
@@ -437,3 +438,125 @@ export async function saveMatchSheetAction(
     playerCount: result.playerCount,
   };
 }
+
+/**
+ * Super Admin: Create a new match record (see changeLog.md).
+ * Enables creating in-progress or completed matches, then proceeding to lineup/player stats entry.
+ */
+export async function createMatchAction(
+  _prev: SimpleAdminActionState,
+  formData: FormData,
+): Promise<SimpleAdminActionState> {
+  const admin = await requireSuperAdmin();
+
+  const season = Number(formData.get('season'));
+  if (!Number.isInteger(season) || season < 1897 || season > 2100) {
+    return { error: 'Valid season year is required (1897–2100).' };
+  }
+
+  const roundType = (String(formData.get('roundType') ?? 'home_and_away') || 'home_and_away') as any;
+  const rawRoundNumber = formData.get('roundNumber');
+  const roundNumber = rawRoundNumber && Number.isInteger(Number(rawRoundNumber)) ? Number(rawRoundNumber) : null;
+  const roundCode = String(formData.get('roundCode') ?? '').trim() || null;
+
+  const matchDate = String(formData.get('matchDate') ?? '').trim();
+  if (!matchDate || !/^\d{4}-\d{2}-\d{2}$/.test(matchDate)) {
+    return { error: 'Valid match date (YYYY-MM-DD) is required.' };
+  }
+  const matchTime = String(formData.get('matchTime') ?? '').trim() || null;
+
+  const rawVenueId = formData.get('venueId');
+  const venueId = rawVenueId && Number.isInteger(Number(rawVenueId)) && Number(rawVenueId) > 0 ? Number(rawVenueId) : null;
+  const venueRaw = String(formData.get('venueRaw') ?? '').trim() || null;
+
+  const homeClubId = Number(formData.get('homeClubId'));
+  const awayClubId = Number(formData.get('awayClubId'));
+  if (!Number.isInteger(homeClubId) || homeClubId <= 0 || !Number.isInteger(awayClubId) || awayClubId <= 0) {
+    return { error: 'Both Home club and Away club are required.' };
+  }
+  if (homeClubId === awayClubId) {
+    return { error: 'Home club and Away club must be different.' };
+  }
+
+  const parseScoreNum = (key: string) => {
+    const v = formData.get(key);
+    return v !== null && v !== '' && !isNaN(Number(v)) ? Number(v) : null;
+  };
+
+  const homeGoals = parseScoreNum('homeGoals');
+  const homeBehinds = parseScoreNum('homeBehinds');
+  const homeScore = parseScoreNum('homeScore');
+
+  const awayGoals = parseScoreNum('awayGoals');
+  const awayBehinds = parseScoreNum('awayBehinds');
+  const awayScore = parseScoreNum('awayScore');
+
+  const attendance = parseScoreNum('attendance');
+  const matchEvent = String(formData.get('matchEvent') ?? '').trim() || null;
+  const notes = String(formData.get('notes') ?? '').trim() || null;
+
+  // Optional quarter scores
+  const homeQuarters: Record<number, { goals?: number | null; behinds?: number | null; points?: number | null }> = {};
+  const awayQuarters: Record<number, { goals?: number | null; behinds?: number | null; points?: number | null }> = {};
+  for (let p = 1; p <= 4; p++) {
+    homeQuarters[p] = {
+      goals: parseScoreNum(`homeQ${p}Goals`),
+      behinds: parseScoreNum(`homeQ${p}Behinds`),
+      points: parseScoreNum(`homeQ${p}Points`),
+    };
+    awayQuarters[p] = {
+      goals: parseScoreNum(`awayQ${p}Goals`),
+      behinds: parseScoreNum(`awayQ${p}Behinds`),
+      points: parseScoreNum(`awayQ${p}Points`),
+    };
+  }
+
+  try {
+    const result = await createMatch({
+      season,
+      roundType,
+      roundNumber,
+      roundCode,
+      matchDate,
+      matchTime,
+      venueId,
+      venueRaw,
+      homeClubId,
+      awayClubId,
+      homeGoals,
+      homeBehinds,
+      homeScore,
+      awayGoals,
+      awayBehinds,
+      awayScore,
+      attendance,
+      matchEvent,
+      notes,
+      homeQuarters,
+      awayQuarters,
+      adminUserId: admin.id,
+    });
+
+    await audit('match.created', {
+      matchId: result.id,
+      season: result.season,
+      homeClubId,
+      awayClubId,
+      matchDate,
+    }, { userId: admin.id, label: admin.email });
+
+    revalidatePath('/matches');
+    revalidatePath(`/matches/${result.id}`);
+    revalidatePath(`/seasons/${result.season}`);
+    revalidatePath('/admin/data-editor');
+
+    return {
+      message: `Created match #${result.id} (${matchDate}).`,
+      createdId: result.id,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { error: `Could not create match: ${msg}` };
+  }
+}
+
