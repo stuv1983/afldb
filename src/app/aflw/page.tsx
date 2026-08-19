@@ -193,7 +193,12 @@ export default async function AflwPage() {
         </p>
 
         <div className="hero-search">
-          <SearchBox scope="aflw" placeholder="Search AFLW players and clubs…" />
+          <SearchBox
+            scope="aflw"
+            placeholders={settings.searchPlaceholdersAflw}
+            intervalSeconds={settings.searchPlaceholderInterval}
+            animation={settings.searchPlaceholderAnimation}
+          />
 
           <div className="try-chips">
             <span className="try-label">Try</span>

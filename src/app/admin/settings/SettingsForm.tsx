@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react';
 
 import { AdminSection } from '@/app/admin/AdminSection';
 import { EarlyAccessSettings } from '@/app/admin/settings/EarlyAccessSettings';
+import { SearchPlaceholderSettings } from '@/app/admin/settings/SearchPlaceholderSettings';
 import { saveSiteSettings, type SettingsState } from '@/app/admin/settings/actions';
 import {
   AFLW_LEADER_CATEGORIES,
@@ -194,6 +195,13 @@ export function SettingsForm({
           </label>
         ))}
       </AdminSection>
+
+      <SearchPlaceholderSettings
+        placeholdersAfl={settings.searchPlaceholdersAfl}
+        placeholdersAflw={settings.searchPlaceholdersAflw}
+        intervalSeconds={settings.searchPlaceholderInterval}
+        animation={settings.searchPlaceholderAnimation}
+      />
 
       <EarlyAccessSettings
         open={settings.earlyAccessOpen}

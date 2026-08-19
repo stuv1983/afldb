@@ -34,6 +34,7 @@ export default async function SearchPage({
   const scope = firstValue(params.scope) === 'aflw' ? 'aflw' as const : undefined;
   const hasQuery = query.trim().length >= MIN_QUERY_LENGTH;
 
+  const settings = await getSiteSettings();
   const aflwResults = scope === 'aflw' && hasQuery ? await aflwOnlySearch(query) : null;
 
   // The player-question intents ("drawn twice or more in one season") link
@@ -45,12 +46,11 @@ export default async function SearchPage({
   // reach (its audience is a runtime setting — see requireAudience).
   let canReachGridSolver = false;
   if (scope !== 'aflw' && hasQuery) {
-    const { gridAudience } = await getSiteSettings();
-    if (gridAudience === 'public') {
+    if (settings.gridAudience === 'public') {
       canReachGridSolver = true;
     } else {
       const user = await getAdminUser();
-      canReachGridSolver = user !== null && ROLE_RANK[user.role] >= ROLE_RANK[gridAudience];
+      canReachGridSolver = user !== null && ROLE_RANK[user.role] >= ROLE_RANK[settings.gridAudience];
     }
   }
 
@@ -83,7 +83,14 @@ export default async function SearchPage({
       </div>
 
       <div style={{ maxWidth: '640px', marginBottom: '1.5rem' }}>
-        <SearchBox initialQuery={query} autoFocus={!query} scope={scope} />
+        <SearchBox
+          initialQuery={query}
+          autoFocus={!query}
+          scope={scope}
+          placeholders={scope === 'aflw' ? settings.searchPlaceholdersAflw : settings.searchPlaceholdersAfl}
+          intervalSeconds={settings.searchPlaceholderInterval}
+          animation={settings.searchPlaceholderAnimation}
+        />
       </div>
 
       {hasQuery && (

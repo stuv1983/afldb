@@ -40,6 +40,11 @@ export const SETTING_KEYS = {
    * from the query rather than dragging it through every public render.
    */
   apexContent: 'apex.content',
+  /** Dynamic search box placeholders and animation settings (see changeLog.md). */
+  searchPlaceholdersAfl: 'search.placeholders_afl',
+  searchPlaceholdersAflw: 'search.placeholders_aflw',
+  searchPlaceholderInterval: 'search.placeholder_interval',
+  searchPlaceholderAnimation: 'search.placeholder_animation',
 } as const;
 
 // --- Home page layout ---
@@ -473,6 +478,63 @@ export function parseBooleanSetting(value: unknown): boolean {
 }
 
 
+export type SearchAnimationType = 'typewriter' | 'fade' | 'slide' | 'none';
+
+export const SEARCH_ANIMATIONS: { value: SearchAnimationType; label: string; help: string }[] = [
+  { value: 'typewriter', label: 'Typewriter', help: 'Types out and backspaces sample queries letter by letter.' },
+  { value: 'fade', label: 'Fade transition', help: 'Gently fades between sample queries.' },
+  { value: 'slide', label: 'Slide transition', help: 'Slides the placeholder text in and out.' },
+  { value: 'none', label: 'Instant', help: 'Switches directly to the next query with no animation.' },
+];
+
+export const DEFAULT_AFL_PLACEHOLDERS: string[] = [
+  'Search players, clubs, venues, seasons…',
+  'Try “Scott Pendlebury”, “Dustin Martin”, “Lance Franklin”…',
+  'Try “Carlton vs Collingwood 1970”, “Round 5 1989”…',
+  'Try “Most career goals”, “Brownlow Medal leaders”…',
+  'Try “Hall of Fame legends”, “1995 Grand Final”…',
+  'Ask “Who won the Brownlow in 2004?”…',
+];
+
+export const DEFAULT_AFLW_PLACEHOLDERS: string[] = [
+  'Search AFLW players and clubs…',
+  'Try “Daisy Pearce”, “Erin Phillips”, “Monique Conti”…',
+  'Try “Adelaide Crows AFLW”, “Brisbane Lions AFLW”…',
+  'Try “Leading goalkickers”, “2024 AFLW Season”…',
+  'Try “Most disposals in AFLW”…',
+];
+
+export const DEFAULT_PLACEHOLDER_INTERVAL = 5;
+export const DEFAULT_SEARCH_ANIMATION: SearchAnimationType = 'typewriter';
+
+export function parsePlaceholders(value: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(value)) {
+    if (typeof value === 'string') {
+      const lines = value.split('\n').map((l) => l.trim()).filter(Boolean);
+      return lines.length > 0 ? lines.slice(0, 25) : fallback;
+    }
+    return fallback;
+  }
+  const filtered = value
+    .filter((v): v is string => typeof v === 'string')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return filtered.length > 0 ? filtered.slice(0, 25) : fallback;
+}
+
+export function parsePlaceholderInterval(value: unknown): number {
+  const num = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(num)) return DEFAULT_PLACEHOLDER_INTERVAL;
+  return Math.min(60, Math.max(2, Math.round(num)));
+}
+
+export function parseSearchAnimation(value: unknown): SearchAnimationType {
+  if (value === 'fade' || value === 'slide' || value === 'none' || value === 'typewriter') {
+    return value;
+  }
+  return DEFAULT_SEARCH_ANIMATION;
+}
+
 export type SiteSettings = {
   homeLayout: HomeLayout;
   homeRecord: HomeRecordCategory;
@@ -490,6 +552,10 @@ export type SiteSettings = {
    * failing a page over a colophon.
    */
   footer: SiteFooter;
+  searchPlaceholdersAfl: string[];
+  searchPlaceholdersAflw: string[];
+  searchPlaceholderInterval: number;
+  searchPlaceholderAnimation: SearchAnimationType;
 };
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
@@ -503,6 +569,10 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   earlyAccessNotify: false,
   earlyAccessNotifyTo: DEFAULT_EARLY_ACCESS_NOTIFY_TO,
   footer: DEFAULT_SITE_FOOTER,
+  searchPlaceholdersAfl: DEFAULT_AFL_PLACEHOLDERS,
+  searchPlaceholdersAflw: DEFAULT_AFLW_PLACEHOLDERS,
+  searchPlaceholderInterval: DEFAULT_PLACEHOLDER_INTERVAL,
+  searchPlaceholderAnimation: DEFAULT_SEARCH_ANIMATION,
 };
 
 /**
@@ -554,5 +624,17 @@ export function parseSiteSettings(
     footer: byKey.has(SETTING_KEYS.siteFooter)
       ? parseSiteFooter(byKey.get(SETTING_KEYS.siteFooter))
       : DEFAULT_SITE_FOOTER,
+    searchPlaceholdersAfl: byKey.has(SETTING_KEYS.searchPlaceholdersAfl)
+      ? parsePlaceholders(byKey.get(SETTING_KEYS.searchPlaceholdersAfl), DEFAULT_AFL_PLACEHOLDERS)
+      : DEFAULT_AFL_PLACEHOLDERS,
+    searchPlaceholdersAflw: byKey.has(SETTING_KEYS.searchPlaceholdersAflw)
+      ? parsePlaceholders(byKey.get(SETTING_KEYS.searchPlaceholdersAflw), DEFAULT_AFLW_PLACEHOLDERS)
+      : DEFAULT_AFLW_PLACEHOLDERS,
+    searchPlaceholderInterval: byKey.has(SETTING_KEYS.searchPlaceholderInterval)
+      ? parsePlaceholderInterval(byKey.get(SETTING_KEYS.searchPlaceholderInterval))
+      : DEFAULT_PLACEHOLDER_INTERVAL,
+    searchPlaceholderAnimation: byKey.has(SETTING_KEYS.searchPlaceholderAnimation)
+      ? parseSearchAnimation(byKey.get(SETTING_KEYS.searchPlaceholderAnimation))
+      : DEFAULT_SEARCH_ANIMATION,
   };
 }

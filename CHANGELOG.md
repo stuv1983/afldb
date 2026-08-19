@@ -15,6 +15,22 @@ commit.
 
 ## [Unreleased]
 
+### Dynamic Search Box Placeholders, Fillout Animations & Coming-Soon Polish — 20 August 2026
+
+- **Dynamic Rotating Search Placeholders & Animations for AFL & AFLW**:
+  - `src/lib/site-settings.ts`: Added setting keys `searchPlaceholdersAfl`, `searchPlaceholdersAflw`, `searchPlaceholderInterval`, and `searchPlaceholderAnimation`. Added default sample queries for AFL and AFLW, interval parser (2–60s), and animation type parser (`typewriter` | `fade` | `slide` | `none`).
+  - `src/components/SearchBox.tsx`: Added dynamic placeholder rotator supporting configurable placeholder lists, rotation intervals, and four animation fillout modes (`typewriter` typing/backspacing, `fade`, `slide`, `none`). Pauses animation cleanly on input focus and user entry.
+  - `src/app/page.tsx`, `src/app/aflw/page.tsx`, `src/app/search/page.tsx`: Integrated dynamic search placeholders and animation settings across AFL home, AFLW home, and global search pages.
+- **Super Admin Search Box Settings & Interactive Live Preview**:
+  - `src/app/admin/settings/SearchPlaceholderSettings.tsx`: Created dedicated admin settings component allowing super administrators to configure AFL sample queries, AFLW sample queries, rotation interval (seconds), and placeholder animation styles. Included an interactive live animation preview box simulating AFL and AFLW placeholder cycling in real time.
+  - `src/app/admin/settings/SettingsForm.tsx`: Embedded `SearchPlaceholderSettings` into the main settings form.
+  - `src/app/admin/settings/actions.ts`: Added atomic saving of search placeholder settings with audit logging and page revalidations (`/`, `/aflw`, `/search`, `/admin/settings`).
+  - `tests/site-settings.test.ts`: Added unit tests for search placeholder parsing, interval clamping, and animation mode validation.
+- **Coming Soon Page Text & Media Polish**:
+  - `deploy/coming-soon/index.html`: Refreshed feature texts, descriptions, and image alt captions for players, seasons/ladders, search, and honours/Brownlow medal history.
+  - `src/lib/site-content.ts`: Updated `DEFAULT_APEX_CONTENT` to mirror the refined copy and alt text descriptions for the apex coming-soon page.
+  - `deploy/coming-soon/style.css`: Added smooth image hover elevation transitions (`transform`, `box-shadow`, `border-color`) and subtle card polish.
+
 ### Non-AFL Club Unmatched Filtering & Admin Player Links Search — 20 August 2026
 
 - **Non-AFL Club Unmatched Badge Filtering on Public UI**:

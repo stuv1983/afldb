@@ -422,13 +422,12 @@ export const DEFAULT_APEX_CONTENT: ApexContent = {
       {
         id: 'players',
         heading: 'Every player, in full',
-        body: 'Career totals, season-by-season splits, honours and every match a '
-          + 'player appeared in — from the 1890s to last weekend. Two players can be '
-          + 'put side by side.',
+        body: 'Complete career records, season-by-season splits, match-by-match performances, '
+          + 'and head-to-head comparisons — spanning 1897 to the current round.',
         image: {
           src: '/img/player-dark.webp',
-          alt: 'A player page showing career games, goals, Brownlow votes, finals and '
-            + 'premierships, above a career detail table and a list of honours.',
+          alt: 'A player profile showing career games, goals, Brownlow votes, finals, '
+            + 'premierships, honours and comprehensive season statistics.',
           width: 1400,
           height: 875,
         },
@@ -436,13 +435,12 @@ export const DEFAULT_APEX_CONTENT: ApexContent = {
       {
         id: 'seasons',
         heading: 'Seasons and ladders',
-        body: 'Every season from 1897, with the final ladder, every round and every '
-          + 'result. Premiers, wooden spoons and finals series are marked where the '
-          + 'record supports it.',
+        body: 'Every season from 1897 to 2026, with official ladders, round results, finals '
+          + 'progressions, premier flags, and historical club lineages.',
         image: {
           src: '/img/season-dark.webp',
-          alt: 'A season page showing the 2025 AFL ladder with played, won, lost, '
-            + 'points for and against, percentage and premiership points.',
+          alt: 'A season page showing the full AFL ladder with played, won, lost, '
+            + 'points for, points against, percentage and premiership points.',
           width: 1400,
           height: 875,
         },
@@ -450,28 +448,23 @@ export const DEFAULT_APEX_CONTENT: ApexContent = {
       {
         id: 'search',
         heading: 'Search that answers questions',
-        body: 'One line of enquiry finds a name, a club, a ground, a season or a '
-          + 'round. Career criteria can be combined and filtered, and every search is '
-          + 'a URL you can share or keep.',
+        body: 'Natural language enquiry instantly resolves players, clubs, venues, seasons, '
+          + 'and historical records. Filter complex career criteria with shareable permalinks.',
         image: {
           src: '/img/players-dark.webp',
-          alt: 'The players leaderboard, sortable by games, goals, Brownlow votes, '
-            + 'finals, premierships, debut or name, with an advanced search panel '
-            + 'above it.',
+          alt: 'The players leaderboard with sortable career categories and advanced filter controls.',
           width: 1400,
           height: 875,
         },
       },
       {
         id: 'brownlow',
-        heading: 'Brownlow Medal history',
-        body: 'Every vote on record since 1924, by season and by career, with '
-          + 'round-by-round detail where it was published — and an explicit note '
-          + 'where it was not.',
+        heading: 'Honours and Brownlow history',
+        body: 'Every Brownlow Medal vote on record since 1924, career vote totals, round-by-round '
+          + 'breakdowns, Coleman medals, and Australian Football Hall of Fame Legends.',
         image: {
           src: '/img/brownlow-dark.webp',
-          alt: 'The Brownlow Medal page listing career vote leaders with vote totals, '
-            + 'medals won and games played.',
+          alt: 'The Brownlow Medal leaderboard listing career vote tallies, medal counts, and historical season outcomes.',
           width: 1400,
           height: 875,
         },

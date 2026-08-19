@@ -9,12 +9,16 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_SITE_FOOTER } from '@/lib/site-content';
 import {
+  DEFAULT_AFL_PLACEHOLDERS,
+  DEFAULT_AFLW_PLACEHOLDERS,
   DEFAULT_EARLY_ACCESS_INTRO,
   DEFAULT_EARLY_ACCESS_NOTIFY_TO,
   DEFAULT_EARLY_ACCESS_QUESTIONS,
   DEFAULT_GRID_AUDIENCE,
   DEFAULT_HOME_LAYOUT,
   DEFAULT_HOME_RECORD,
+  DEFAULT_PLACEHOLDER_INTERVAL,
+  DEFAULT_SEARCH_ANIMATION,
   EARLY_ACCESS_LIMITS,
   HOME_SECTIONS,
   SETTING_KEYS,
@@ -25,6 +29,9 @@ import {
   parseGridAudience,
   parseHomeLayout,
   parseHomeRecord,
+  parsePlaceholderInterval,
+  parsePlaceholders,
+  parseSearchAnimation,
   parseSiteSettings,
   visibleHomeSections,
   type HomeSectionId,
@@ -124,6 +131,10 @@ describe('parseSiteSettings', () => {
       earlyAccessNotify: false,
       earlyAccessNotifyTo: DEFAULT_EARLY_ACCESS_NOTIFY_TO,
       footer: DEFAULT_SITE_FOOTER,
+      searchPlaceholdersAfl: DEFAULT_AFL_PLACEHOLDERS,
+      searchPlaceholdersAflw: DEFAULT_AFLW_PLACEHOLDERS,
+      searchPlaceholderInterval: DEFAULT_PLACEHOLDER_INTERVAL,
+      searchPlaceholderAnimation: DEFAULT_SEARCH_ANIMATION,
     });
   });
 
@@ -303,5 +314,22 @@ describe('early access, the other settings', () => {
       { key: SETTING_KEYS.earlyAccessIntro, value: '   ' },
     ]);
     expect(settings.earlyAccessIntro).toBe(DEFAULT_EARLY_ACCESS_INTRO);
+  });
+
+  it('parses and clamps search placeholder settings', () => {
+    expect(parsePlaceholders(' pendles \n dusty \n\n ', DEFAULT_AFL_PLACEHOLDERS)).toEqual(['pendles', 'dusty']);
+    expect(parsePlaceholders([], DEFAULT_AFL_PLACEHOLDERS)).toEqual(DEFAULT_AFL_PLACEHOLDERS);
+    expect(parsePlaceholders(['daisy', ' '], DEFAULT_AFLW_PLACEHOLDERS)).toEqual(['daisy']);
+
+    expect(parsePlaceholderInterval(10)).toBe(10);
+    expect(parsePlaceholderInterval(1)).toBe(2); // Min clamp 2s
+    expect(parsePlaceholderInterval(100)).toBe(60); // Max clamp 60s
+    expect(parsePlaceholderInterval('invalid')).toBe(DEFAULT_PLACEHOLDER_INTERVAL);
+
+    expect(parseSearchAnimation('typewriter')).toBe('typewriter');
+    expect(parseSearchAnimation('fade')).toBe('fade');
+    expect(parseSearchAnimation('slide')).toBe('slide');
+    expect(parseSearchAnimation('none')).toBe('none');
+    expect(parseSearchAnimation('unknown')).toBe(DEFAULT_SEARCH_ANIMATION);
   });
 });

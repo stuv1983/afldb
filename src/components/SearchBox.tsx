@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 
+import type { SearchAnimationType } from '@/lib/site-settings';
 import {
   MIN_QUERY_LENGTH,
   SEARCH_TYPE_LABELS,
@@ -19,7 +20,7 @@ type Suggestion = {
 };
 
 /**
- * Global search with keyboard-accessible autocomplete.
+ * Global search with keyboard-accessible autocomplete and dynamic animated placeholders (see changeLog.md).
  *
  * Requests are debounced and require a minimum query length, so typing
  * does not issue a query per keystroke. In-flight requests are aborted
@@ -27,12 +28,18 @@ type Suggestion = {
  */
 export function SearchBox({
   autoFocus = false,
-  placeholder = 'Search players, clubs, venues…',
+  placeholder,
+  placeholders,
+  intervalSeconds = 5,
+  animation = 'typewriter',
   initialQuery = '',
   scope,
 }: {
   autoFocus?: boolean;
   placeholder?: string;
+  placeholders?: string[];
+  intervalSeconds?: number;
+  animation?: SearchAnimationType;
   initialQuery?: string;
   /** Restrict search to AFLW players and clubs, on `/aflw` and `/search?scope=aflw`. */
   scope?: 'aflw';
@@ -43,8 +50,67 @@ export function SearchBox({
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
+  const [isFocused, setIsFocused] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
+
+  // Dynamic placeholder animation
+  const candidateList = (placeholders && placeholders.length > 0)
+    ? placeholders
+    : [placeholder || (scope === 'aflw' ? 'Search AFLW players and clubs…' : 'Search players, clubs, venues, seasons…')];
+
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [displayedPlaceholder, setDisplayedPlaceholder] = useState(candidateList[0] || '');
+
+  useEffect(() => {
+    if (candidateList.length <= 1) {
+      setDisplayedPlaceholder(candidateList[0] || '');
+      return;
+    }
+
+    if (isFocused || query.length > 0) {
+      return;
+    }
+
+    const currentTarget = candidateList[placeholderIndex % candidateList.length] || '';
+
+    if (animation === 'typewriter') {
+      let charIdx = 0;
+      let isDeleting = false;
+      let timeoutId: NodeJS.Timeout;
+
+      function step() {
+        if (!isDeleting) {
+          charIdx++;
+          setDisplayedPlaceholder(currentTarget.slice(0, charIdx));
+          if (charIdx >= currentTarget.length) {
+            isDeleting = true;
+            timeoutId = setTimeout(step, Math.max(1200, intervalSeconds * 1000));
+          } else {
+            timeoutId = setTimeout(step, 40);
+          }
+        } else {
+          charIdx--;
+          setDisplayedPlaceholder(currentTarget.slice(0, charIdx));
+          if (charIdx <= 0) {
+            isDeleting = false;
+            setPlaceholderIndex((prev) => (prev + 1) % candidateList.length);
+          } else {
+            timeoutId = setTimeout(step, 25);
+          }
+        }
+      }
+
+      timeoutId = setTimeout(step, 100);
+      return () => clearTimeout(timeoutId);
+    } else {
+      setDisplayedPlaceholder(currentTarget);
+      const timer = setTimeout(() => {
+        setPlaceholderIndex((prev) => (prev + 1) % candidateList.length);
+      }, Math.max(1200, intervalSeconds * 1000));
+      return () => clearTimeout(timer);
+    }
+  }, [candidateList, placeholderIndex, intervalSeconds, animation, isFocused, query]);
 
   useEffect(() => {
     const term = query.trim();
@@ -86,8 +152,6 @@ export function SearchBox({
 
   function go(suggestion: Suggestion) {
     setOpen(false);
-    // Route by type: a season suggestion goes to /seasons, an award to
-    // /awards. Everything previously went to /players regardless.
     router.push(searchResultHref(suggestion));
   }
 
@@ -119,7 +183,7 @@ export function SearchBox({
           name="q"
           type="search"
           value={query}
-          placeholder={placeholder}
+          placeholder={displayedPlaceholder || placeholder || 'Search…'}
           autoComplete="off"
           // eslint-disable-next-line jsx-a11y/no-autofocus
           autoFocus={autoFocus}
@@ -128,6 +192,8 @@ export function SearchBox({
           aria-controls={listId}
           aria-autocomplete="list"
           aria-activedescendant={active >= 0 ? `${listId}-opt-${active}` : undefined}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
         />
@@ -161,38 +227,27 @@ export function SearchBox({
               key={`${s.type}-${s.id}`}
               id={`${listId}-opt-${i}`}
               role="option"
-              aria-selected={i === active}
-              onMouseDown={(e) => { e.preventDefault(); go(s); }}
-              onMouseEnter={() => setActive(i)}
+              aria-selected={active === i}
               style={{
-                padding: '0.4rem 0.6rem',
+                padding: '0.6rem 0.9rem',
                 cursor: 'pointer',
-                background: i === active ? 'var(--bg-hover)' : 'transparent',
-                borderBottom: '1px solid var(--border)',
+                background: active === i ? 'var(--bg-hover)' : 'transparent',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                borderBottom: '1px solid var(--border-subtle)',
+              }}
+              onMouseEnter={() => setActive(i)}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                go(s);
               }}
             >
-              <div style={{
-                display: 'flex', justifyContent: 'space-between',
-                alignItems: 'baseline', gap: '0.5rem',
-              }}>
-                <span style={{ fontWeight: 550 }}>{s.title}</span>
-                {s.type !== 'player' && (
-                  <span style={{
-                    fontSize: '0.68rem',
-                    color: 'var(--text-muted)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    flexShrink: 0,
-                  }}>
-                    {SEARCH_TYPE_LABELS[s.type] ?? s.type}
-                  </span>
-                )}
-              </div>
-              {s.subtitle && (
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                  {s.subtitle}
-                </div>
-              )}
+              <span>
+                <strong>{s.title}</strong>
+                {s.subtitle && <span className="muted" style={{ marginLeft: '0.5rem', fontSize: '0.85rem' }}>{s.subtitle}</span>}
+              </span>
+              <span className="badge" style={{ fontSize: '0.75rem' }}>{SEARCH_TYPE_LABELS[s.type]}</span>
             </li>
           ))}
         </ul>

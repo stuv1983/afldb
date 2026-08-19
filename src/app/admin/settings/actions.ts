@@ -7,6 +7,8 @@ import { audit, requireSuperAdmin } from '@/lib/auth/session';
 import { sendEmail } from '@/lib/email/send';
 import {
   SETTING_KEYS,
+  DEFAULT_AFL_PLACEHOLDERS,
+  DEFAULT_AFLW_PLACEHOLDERS,
   parseAflwLeaders,
   parseEarlyAccessIntro,
   parseEarlyAccessNotifyTo,
@@ -14,6 +16,9 @@ import {
   parseGridAudience,
   parseHomeLayout,
   parseHomeRecord,
+  parsePlaceholderInterval,
+  parsePlaceholders,
+  parseSearchAnimation,
   type HomeSectionId,
 } from '@/lib/site-settings';
 
@@ -28,10 +33,8 @@ export type SettingsState = { error?: string; message?: string };
  * than in the database, which matters because that one value decides who can
  * reach a page.
  *
- * The four rows are written in one transaction so a half-applied layout is
- * never observable, and the two home pages are revalidated because both are
- * ISR-cached for an hour — without this an admin would change a setting and
- * see no difference until the window rolled over.
+ * The rows are written in one transaction so a half-applied layout is
+ * never observable, and the home and search pages are revalidated.
  */
 export async function saveSiteSettings(
   _previous: SettingsState,
@@ -55,11 +58,7 @@ export async function saveSiteSettings(
   const aflwLeaders = parseAflwLeaders(formData.get('aflwLeaders'));
   const gridAudience = parseGridAudience(formData.get('gridAudience'));
 
-  // The question list arrives as one JSON field from the client editor. A
-  // payload that is not JSON at all is treated as an empty list rather than
-  // as an error: the parser below drops anything unusable regardless, and
-  // this keeps one hand-mangled field from blocking every other setting on
-  // the form.
+  // The question list arrives as one JSON field from the client editor.
   let submittedQuestions: unknown = [];
   try {
     submittedQuestions = JSON.parse(String(formData.get('earlyAccessQuestions') ?? '[]'));
@@ -72,6 +71,22 @@ export async function saveSiteSettings(
   const earlyAccessNotify = formData.get('earlyAccessNotify') === 'on';
   const earlyAccessNotifyTo = parseEarlyAccessNotifyTo(formData.get('earlyAccessNotifyTo'));
 
+  // Search placeholder settings (see changeLog.md)
+  const searchPlaceholdersAfl = parsePlaceholders(
+    formData.get('searchPlaceholdersAfl'),
+    DEFAULT_AFL_PLACEHOLDERS,
+  );
+  const searchPlaceholdersAflw = parsePlaceholders(
+    formData.get('searchPlaceholdersAflw'),
+    DEFAULT_AFLW_PLACEHOLDERS,
+  );
+  const searchPlaceholderInterval = parsePlaceholderInterval(
+    formData.get('searchPlaceholderInterval'),
+  );
+  const searchPlaceholderAnimation = parseSearchAnimation(
+    formData.get('searchPlaceholderAnimation'),
+  );
+
   await authSql.begin(async (tx) => {
     for (const [key, value] of [
       [SETTING_KEYS.homeLayout, layout],
@@ -83,6 +98,10 @@ export async function saveSiteSettings(
       [SETTING_KEYS.earlyAccessQuestions, earlyAccessQuestions],
       [SETTING_KEYS.earlyAccessNotify, earlyAccessNotify],
       [SETTING_KEYS.earlyAccessNotifyTo, earlyAccessNotifyTo],
+      [SETTING_KEYS.searchPlaceholdersAfl, searchPlaceholdersAfl],
+      [SETTING_KEYS.searchPlaceholdersAflw, searchPlaceholdersAflw],
+      [SETTING_KEYS.searchPlaceholderInterval, searchPlaceholderInterval],
+      [SETTING_KEYS.searchPlaceholderAnimation, searchPlaceholderAnimation],
     ] as const) {
       await tx`
         INSERT INTO site_settings (key, value, updated_by)
@@ -102,16 +121,17 @@ export async function saveSiteSettings(
     earlyAccessOpen,
     earlyAccessNotify,
     earlyAccessNotifyTo,
-    // The question TEXT is not audited, only how many there are: the log is
-    // for who changed what and when, not a second copy of the content.
     earlyAccessQuestionCount: earlyAccessQuestions.length,
+    searchPlaceholderInterval,
+    searchPlaceholderAnimation,
   }, { userId: admin.id, label: admin.email });
 
   revalidatePath('/');
   revalidatePath('/aflw');
+  revalidatePath('/search');
   revalidatePath('/admin/settings');
 
-  return { message: 'Saved. The home pages have been rebuilt with the new layout.' };
+  return { message: 'Saved. Settings have been updated.' };
 }
 
 /**

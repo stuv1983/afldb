@@ -202,7 +202,9 @@ export default async function HomePage() {
         <div className="hero-search">
           <SearchBox
             autoFocus
-            placeholder="Try “Ablett”, “round 5 1989”, “rising star” or “most goals”…"
+            placeholders={settings.searchPlaceholdersAfl}
+            intervalSeconds={settings.searchPlaceholderInterval}
+            animation={settings.searchPlaceholderAnimation}
           />
 
           <div className="try-chips">
