@@ -20,6 +20,7 @@ import {
   isLinked,
   playerPath,
   seasonPath,
+  shouldShowUnmatched,
 } from '@/lib/format';
 import { notFoundMetadata, pageMetadata } from '@/lib/seo';
 
@@ -130,9 +131,11 @@ export default async function AwardSeasonPage({
                       )}
                       {m.isCaptain && <strong> (c)</strong>}
                       {m.isViceCaptain && <span> (vc)</span>}
-                      {!isLinked(m.linkStatus) && (
-                        <UnmatchedPlayer targetTable="award_winners" targetId={m.id} />
-                      )}
+                      {shouldShowUnmatched({
+                        linkStatus: m.linkStatus,
+                        clubName: m.clubNameRaw ?? m.clubName,
+                        clubId: m.clubId,
+                      }) && <UnmatchedPlayer targetTable="award_winners" targetId={m.id} />}
                     </td>
                     <td>
                       {m.clubSlug
@@ -187,9 +190,10 @@ export default async function AwardSeasonPage({
                       ) : (
                         n.playerName
                       )}
-                      {!isLinked(n.linkStatus) && (
-                        <UnmatchedPlayer targetTable="award_nominations" targetId={n.id} />
-                      )}
+                      {shouldShowUnmatched({
+                        linkStatus: n.linkStatus,
+                        clubName: n.clubName,
+                      }) && <UnmatchedPlayer targetTable="award_nominations" targetId={n.id} />}
                       {n.isWinner && <strong> — winner</strong>}
                       {n.isIneligible && (
                         <span

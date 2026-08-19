@@ -15,6 +15,7 @@ import {
   isLinked,
   isNonPlayerHallOfFameCategory,
   playerPath,
+  shouldShowUnmatched,
 } from '@/lib/format';
 import { pageMetadata } from '@/lib/seo';
 import { hallOfFameFilterFields } from '@/search/list-filters';
@@ -156,9 +157,12 @@ export default async function HallOfFamePage({
                           {i.name}
                         </span>
                       )}
-                      {!nonPlayer && !i.aflwPlayerSlug && !isLinked(i.linkStatus) && (
-                        <UnmatchedPlayer targetTable="hall_of_fame" targetId={i.id} />
-                      )}
+                      {shouldShowUnmatched({
+                        linkStatus: i.linkStatus,
+                        clubName: i.clubNameRaw,
+                        category: i.category,
+                        aflwPlayerSlug: i.aflwPlayerSlug,
+                      }) && <UnmatchedPlayer targetTable="hall_of_fame" targetId={i.id} />}
                       {i.isLegend && <strong> · Legend</strong>}
                       {i.removedYear && (
                         <span className="badge badge-warn" title={`Removed in ${i.removedYear}`}>

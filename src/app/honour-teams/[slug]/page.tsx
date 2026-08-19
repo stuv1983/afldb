@@ -6,7 +6,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import { getHonourTeam, listHonourTeams } from '@/db/queries/awards';
-import { honourTeamPath, isLinked, playerPath } from '@/lib/format';
+import { honourTeamPath, isLinked, playerPath, shouldShowUnmatched } from '@/lib/format';
 import { notFoundMetadata, pageMetadata } from '@/lib/seo';
 import { honourTeamSlug, matchHonourTeam } from '@/lib/slugs';
 
@@ -96,9 +96,10 @@ export default async function HonourTeamPage({
                   ) : (
                     <span title="No VFL/AFL record in AFLDB">{m.playerName}</span>
                   )}
-                  {!isLinked(m.linkStatus) && (
-                    <UnmatchedPlayer targetTable="honour_team_members" targetId={m.id} />
-                  )}
+                  {shouldShowUnmatched({
+                    linkStatus: m.linkStatus,
+                    clubName: m.clubNameRaw,
+                  }) && <UnmatchedPlayer targetTable="honour_team_members" targetId={m.id} />}
                 </td>
                 <td>{m.clubNameRaw ?? <span className="muted">—</span>}</td>
                 {members.some((x) => x.role) && (

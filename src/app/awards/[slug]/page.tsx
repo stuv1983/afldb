@@ -25,6 +25,7 @@ import {
   isLinked,
   playerPath,
   seasonPath,
+  shouldShowUnmatched,
 } from '@/lib/format';
 import { notFoundMetadata, pageMetadata } from '@/lib/seo';
 import { SEASON_MAX, SEASON_MIN } from '@/search/list-filters';
@@ -367,9 +368,11 @@ export default async function AwardPage({
                       ) : (
                         <span title="Not linked to an AFLDB player">{w.playerName}</span>
                       )}
-                      {!isLinked(w.linkStatus) && (
-                        <UnmatchedPlayer targetTable="award_winners" targetId={w.id} />
-                      )}
+                      {shouldShowUnmatched({
+                        linkStatus: w.linkStatus,
+                        clubName: w.clubNameRaw ?? w.clubName,
+                        clubId: w.clubId,
+                      }) && <UnmatchedPlayer targetTable="award_winners" targetId={w.id} />}
                     </td>
                     <td>
                       {w.clubSlug

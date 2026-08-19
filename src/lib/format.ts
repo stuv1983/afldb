@@ -274,6 +274,220 @@ export function formatHallOfFameClub(
   return clubNameRaw;
 }
 
+const AFL_CLUBS = [
+  'adelaide',
+  'crows',
+  'brisbane',
+  'bears',
+  'lions',
+  'carlton',
+  'blues',
+  'collingwood',
+  'magpies',
+  'essendon',
+  'bombers',
+  'fitzroy',
+  'roys',
+  'gorillas',
+  'footscray',
+  'western bulldogs',
+  'bulldogs',
+  'fremantle',
+  'dockers',
+  'geelong',
+  'cats',
+  'gold coast',
+  'suns',
+  'greater western sydney',
+  'gws',
+  'giants',
+  'hawthorn',
+  'hawks',
+  'melbourne',
+  'demons',
+  'north melbourne',
+  'kangaroos',
+  'shinboners',
+  'port adelaide',
+  'power',
+  'richmond',
+  'tigers',
+  'st kilda',
+  'saints',
+  'south melbourne',
+  'sydney',
+  'swans',
+  'bloods',
+  'university',
+  'west coast',
+  'eagles',
+];
+
+const NON_AFL_LEAGUE_TAGS = [
+  '(sanfl)',
+  '(wafl)',
+  '(vfa)',
+  '(vwfl)',
+  '(tfl)',
+  '(ntfl)',
+  '(qafl)',
+  '(actafl)',
+  '(sfl)',
+  '(neafl)',
+  '(vflw)',
+];
+
+const EXPLICIT_NON_AFL_CLUBS = [
+  'west perth',
+  'east perth',
+  'perth',
+  'subiaco',
+  'claremont',
+  'swan districts',
+  'south fremantle',
+  'east fremantle',
+  'west adelaide',
+  'north adelaide',
+  'south adelaide',
+  'norwood',
+  'sturt',
+  'glenelg',
+  'central district',
+  'woodville',
+  'west torrens',
+  'woodville-west torrens',
+  'port adelaide (sanfl)',
+  'port adelaide magpies',
+  'port melbourne',
+  'williamstown',
+  'sandringham',
+  'coburg',
+  'frankston',
+  'prahran',
+  'dandenong',
+  'preston',
+  'oakleigh',
+  'camberwell',
+  'box hill',
+  'springvale',
+  'brunswick',
+  'yarraville',
+  'sunshine',
+  'werribee',
+  'east brunswick scorpions',
+  'st albans spurs',
+  'darebin falcons',
+  'melbourne university mugars',
+  'vu western spurs',
+  'diamond creek',
+  'eastern devils',
+  'cranbourne',
+  'north hobart',
+  'hobart',
+  'city-south',
+  'sandy bay',
+  'glenorchy',
+  'clarence',
+  'new norfolk',
+  'burnie',
+  'devonport',
+  'launceston',
+  'st marys',
+  "st mary's",
+  'darwin',
+  'nightcliff',
+  'wanderers',
+  'southern districts',
+  'waratahs',
+  'tiwi bombers',
+  'palmerston',
+  'southport',
+  'coorparoo',
+  'mayne',
+  'broadbeach',
+  'morningside',
+  'ainslie',
+  'eastlake',
+  'belconnen',
+  'tuggeranong',
+  'queanbeyan',
+  'western suburbs',
+];
+
+function isAflClubPart(part: string): boolean {
+  const p = part.trim().toLowerCase();
+  if (!p) return false;
+  if (
+    p.startsWith('west perth') ||
+    p.startsWith('east perth') ||
+    p.startsWith('south fremantle') ||
+    p.startsWith('east fremantle') ||
+    p.startsWith('west adelaide') ||
+    p.startsWith('north adelaide') ||
+    p.startsWith('south adelaide') ||
+    p.startsWith('port melbourne') ||
+    p.startsWith('east brunswick') ||
+    p.startsWith('st albans') ||
+    p.includes('(sanfl)') ||
+    p.includes('(wafl)') ||
+    p.includes('(vfa)') ||
+    p.includes('(vwfl)') ||
+    p.includes('(tfl)') ||
+    p.includes('(ntfl)') ||
+    p.includes('(qafl)')
+  ) {
+    return false;
+  }
+  return AFL_CLUBS.some((c) => p.includes(c));
+}
+
+/**
+ * Whether a club name belongs exclusively to a non-VFL/AFL competition (see changeLog.md).
+ * Used to suppress the UnmatchedPlayer badge for state league and regional footballers.
+ */
+export function isNonAflClub(
+  clubName: string | null | undefined,
+  clubId?: number | null,
+): boolean {
+  if (typeof clubId === 'number' && clubId > 0) return false;
+  if (!clubName) return false;
+  const trimmed = clubName.trim();
+  if (!trimmed) return false;
+
+  const lower = trimmed.toLowerCase();
+
+  // Explicit league suffix check
+  if (NON_AFL_LEAGUE_TAGS.some((tag) => lower.includes(tag))) {
+    const parts = lower.split(/[,/·&]/).map((s) => s.trim());
+    return !parts.some((part) => isAflClubPart(part));
+  }
+
+  // Explicit non-AFL club check
+  if (EXPLICIT_NON_AFL_CLUBS.some((c) => lower.includes(c))) {
+    const parts = lower.split(/[,/·&]/).map((s) => s.trim());
+    return !parts.some((part) => isAflClubPart(part));
+  }
+
+  return false;
+}
+
+/**
+ * Whether the public front-end UI should display the UnmatchedPlayer badge (see changeLog.md).
+ */
+export function shouldShowUnmatched(options: {
+  linkStatus: string;
+  clubName?: string | null;
+  clubId?: number | null;
+  category?: string | null;
+  aflwPlayerSlug?: string | null;
+}): boolean {
+  if (isLinked(options.linkStatus)) return false;
+  if (options.aflwPlayerSlug) return false;
+  if (isNonPlayerHallOfFameCategory(options.category)) return false;
+  if (isNonAflClub(options.clubName, options.clubId)) return false;
+  return true;
+}
+
 /**
  * A source name is only a link when the link is trusted.
  *

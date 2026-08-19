@@ -36,6 +36,7 @@ import {
   matchPath,
   playerPath,
   seasonPath,
+  shouldShowUnmatched,
 } from '@/lib/format';
 import { parseSeason } from '@/lib/params';
 import { notFoundMetadata, pageMetadata } from '@/lib/seo';
@@ -380,7 +381,10 @@ export default async function SeasonPage({
                         ) : (
                           risingStarWinner.playerName
                         )}
-                        {!isLinked(risingStarWinner.linkStatus) && (
+                        {!isLinked(risingStarWinner.linkStatus) && shouldShowUnmatched({
+                          linkStatus: risingStarWinner.linkStatus,
+                          clubName: risingStarWinner.clubName,
+                        }) && (
                           <UnmatchedPlayer targetTable="award_nominations" targetId={risingStarWinner.id} />
                         )}
                       </td>
@@ -410,7 +414,6 @@ export default async function SeasonPage({
                   </thead>
                   <tbody>
                     {hallOfFame.map((h) => {
-                      const nonPlayer = isNonPlayerHallOfFameCategory(h.category);
                       return (
                         <tr key={h.id}>
                           <td className="wide">
@@ -422,9 +425,12 @@ export default async function SeasonPage({
                               h.name
                             )}
                             {h.isLegend && <strong> (Legend)</strong>}
-                            {!nonPlayer && !h.aflwPlayerSlug && !isLinked(h.linkStatus) && (
-                              <UnmatchedPlayer targetTable="hall_of_fame" targetId={h.id} />
-                            )}
+                            {shouldShowUnmatched({
+                              linkStatus: h.linkStatus,
+                              clubName: h.clubNameRaw,
+                              category: h.category,
+                              aflwPlayerSlug: h.aflwPlayerSlug,
+                            }) && <UnmatchedPlayer targetTable="hall_of_fame" targetId={h.id} />}
                           </td>
                           <td>{h.category ?? <span className="muted">—</span>}</td>
                         </tr>

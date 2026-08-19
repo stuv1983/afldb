@@ -15,6 +15,15 @@ commit.
 
 ## [Unreleased]
 
+### Non-AFL Club Unmatched Filtering & Admin Player Links Search — 20 August 2026
+
+- **Non-AFL Club Unmatched Badge Filtering on Public UI**:
+  - `src/lib/format.ts`: Added `isNonAflClub` and `shouldShowUnmatched` helpers recognizing state-league, regional, and non-VFL/AFL clubs (such as West Perth, West Adelaide, North Adelaide, Norwood, Sturt, East Brunswick Scorpions (VWFL), St Albans Spurs (VWFL), TFL, NTFL, etc.).
+  - `src/app/hall-of-fame/page.tsx`, `src/app/honour-teams/[slug]/page.tsx`, `src/app/awards/[slug]/page.tsx`, `src/app/awards/[slug]/[season]/page.tsx`, `src/app/seasons/[year]/page.tsx`: Suppressed `<UnmatchedPlayer>` reader suggestion badges across all public frontend tables for footballers who played exclusively for non-VFL/AFL clubs, as AFLDB contains complete historical VFL/AFL/AFLW player records and these players will not have AFLDB player profiles.
+- **Super Admin Name and Context Search in Player Links**:
+  - `src/app/admin/player-links/page.tsx`: Added search input form and server-side filtering on `q` allowing super administrators to search unresolved records by player name or context across any table or across all tables. Maintained pagination, table filters, clear action, and empty query state.
+  - Retained all unresolved non-AFL records in `/admin/player-links` so super administrators retain full review and resolution capabilities.
+
 ### AFLW Players in Hall of Fame & Non-Player Categories — 20 August 2026
 
 - **AFLW player linking and club labeling**:

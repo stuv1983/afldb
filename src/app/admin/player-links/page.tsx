@@ -65,6 +65,8 @@ export default async function PlayerLinksPage(
   const params = await searchParams;
   const rawTable = firstValue(params.table) ?? '';
   const table = isLinkTargetTable(rawTable) ? rawTable : undefined;
+  const query = (firstValue(params.q) ?? '').trim();
+  const queryLower = query.toLowerCase();
 
   const [unresolved, vetted, suggestions] = await Promise.all([
     listUnresolvedLinks(table),
@@ -76,13 +78,27 @@ export default async function PlayerLinksPage(
   // the honours tables but leave the queue.
   const queue = unresolved.filter((r) => !vetted.has(`${r.targetTable}:${r.targetId}`));
 
-  const totalPages = Math.max(1, Math.ceil(queue.length / PAGE_SIZE));
+  // Search by player name or record context (see changeLog.md).
+  const filteredQueue = queryLower
+    ? queue.filter(
+        (r) =>
+          r.playerName.toLowerCase().includes(queryLower) ||
+          (r.context && r.context.toLowerCase().includes(queryLower)),
+      )
+    : queue;
+
+  const totalPages = Math.max(1, Math.ceil(filteredQueue.length / PAGE_SIZE));
   const rawPage = Number(firstValue(params.page) ?? '1');
   const page = Number.isInteger(rawPage) ? Math.min(Math.max(1, rawPage), totalPages) : 1;
-  const pageRows = queue.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageRows = filteredQueue.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const pageHref = (p: number) =>
-    `/admin/player-links?${table ? `table=${table}&` : ''}page=${p}`;
+  const pageHref = (p: number) => {
+    const qParams = new URLSearchParams();
+    if (table) qParams.set('table', table);
+    if (query) qParams.set('q', query);
+    qParams.set('page', String(p));
+    return `/admin/player-links?${qParams.toString()}`;
+  };
 
   const suggestionsByTarget = new Map<string, typeof suggestions>();
   for (const s of suggestions) {
@@ -104,7 +120,9 @@ export default async function PlayerLinksPage(
         : <span className="muted">← Previous</span>}
       <span className="muted">
         Page {formatNumber(page)} of {formatNumber(totalPages)}
-        {' · '}{formatNumber(queue.length)} unresolved{table ? ` in ${TABLE_LABELS[table]}` : ''}
+        {' · '}{formatNumber(filteredQueue.length)} unresolved
+        {query ? ` matching "${query}"` : ''}
+        {table ? ` in ${TABLE_LABELS[table]}` : ''}
       </span>
       {page < totalPages
         ? <Link href={pageHref(page + 1)}>Next →</Link>
@@ -123,17 +141,55 @@ export default async function PlayerLinksPage(
         </p>
       </div>
 
+      {/* Search box for player name / context */}
+      <form
+        method="GET"
+        action="/admin/player-links"
+        style={{
+          display: 'flex',
+          gap: '0.5rem',
+          alignItems: 'center',
+          marginBottom: '1rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        {table && <input type="hidden" name="table" value={table} />}
+        <input
+          type="search"
+          name="q"
+          defaultValue={query}
+          placeholder="Search by player name or context…"
+          style={{
+            padding: '0.4rem 0.75rem',
+            borderRadius: '4px',
+            border: '1px solid var(--border, #ccc)',
+            minWidth: '280px',
+          }}
+        />
+        <button type="submit" className="button" style={{ padding: '0.4rem 0.85rem' }}>
+          Search
+        </button>
+        {query && (
+          <Link
+            href={table ? `/admin/player-links?table=${table}` : '/admin/player-links'}
+            style={{ fontSize: '0.9rem', color: 'var(--muted, #666)', marginLeft: '0.25rem' }}
+          >
+            Clear
+          </Link>
+        )}
+      </form>
+
       {/* Filter links carry no page param, so changing table resets to page 1. */}
       <nav className="section" aria-label="Filter">
         {table === undefined
           ? <strong aria-current="true">All tables</strong>
-          : <Link href="/admin/player-links">All tables</Link>}
+          : <Link href={query ? `/admin/player-links?q=${encodeURIComponent(query)}` : '/admin/player-links'}>All tables</Link>}
         {LINK_TARGET_TABLES.map((t) => (
           <span key={t}>
             {' · '}
             {table === t
               ? <strong aria-current="true">{TABLE_LABELS[t]}</strong>
-              : <Link href={`/admin/player-links?table=${t}`}>{TABLE_LABELS[t]}</Link>}
+              : <Link href={`/admin/player-links?table=${t}${query ? `&q=${encodeURIComponent(query)}` : ''}`}>{TABLE_LABELS[t]}</Link>}
           </span>
         ))}
       </nav>
@@ -178,11 +234,15 @@ export default async function PlayerLinksPage(
 
       {pager}
 
-      {queue.length === 0 ? (
+      {filteredQueue.length === 0 ? (
         <section className="section">
           <div className="empty">
             <h3>Nothing to review</h3>
-            <p>Every source name in scope is linked, or vetted as genuinely unlinked.</p>
+            <p>
+              {query
+                ? `No unresolved records found matching "${query}"${table ? ` in ${TABLE_LABELS[table]}` : ''}.`
+                : 'Every source name in scope is linked, or vetted as genuinely unlinked.'}
+            </p>
           </div>
         </section>
       ) : (

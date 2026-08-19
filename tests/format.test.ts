@@ -9,9 +9,11 @@ import {
   formatSpan,
   formatSpanLabel,
   formatStat,
+  isNonAflClub,
   isNonPlayerHallOfFameCategory,
   parseEntitySlug,
   playerPath,
+  shouldShowUnmatched,
 } from '@/lib/format';
 
 describe('formatStat', () => {
@@ -180,5 +182,122 @@ describe('formatHallOfFameClub', () => {
   it('returns null when clubNameRaw is empty or null', () => {
     expect(formatHallOfFameClub(null, 'player', 'daisy-pearce')).toBeNull();
     expect(formatHallOfFameClub('', 'player', null)).toBeNull();
+  });
+});
+
+describe('isNonAflClub', () => {
+  it('identifies state-league and regional non-AFL clubs', () => {
+    expect(isNonAflClub('West Perth')).toBe(true);
+    expect(isNonAflClub('West Adelaide')).toBe(true);
+    expect(isNonAflClub('North Adelaide')).toBe(true);
+    expect(isNonAflClub('South Adelaide')).toBe(true);
+    expect(isNonAflClub('Norwood')).toBe(true);
+    expect(isNonAflClub('East Brunswick Scorpions (VWFL)')).toBe(true);
+    expect(isNonAflClub('St Albans Spurs (VWFL)')).toBe(true);
+    expect(isNonAflClub('Port Melbourne')).toBe(true);
+    expect(isNonAflClub('Claremont')).toBe(true);
+  });
+
+  it('returns false for recognized AFL clubs', () => {
+    expect(isNonAflClub('Carlton')).toBe(false);
+    expect(isNonAflClub('Collingwood')).toBe(false);
+    expect(isNonAflClub('Essendon')).toBe(false);
+    expect(isNonAflClub('Hawthorn')).toBe(false);
+    expect(isNonAflClub('Richmond')).toBe(false);
+    expect(isNonAflClub('Melbourne')).toBe(false);
+    expect(isNonAflClub('North Melbourne')).toBe(false);
+    expect(isNonAflClub('South Melbourne')).toBe(false);
+    expect(isNonAflClub('Sydney')).toBe(false);
+    expect(isNonAflClub('West Coast')).toBe(false);
+    expect(isNonAflClub('Adelaide')).toBe(false);
+    expect(isNonAflClub('Brisbane Lions')).toBe(false);
+    expect(isNonAflClub('Western Bulldogs')).toBe(false);
+  });
+
+  it('returns false if club has a valid clubId integer', () => {
+    expect(isNonAflClub('West Perth', 1)).toBe(false);
+  });
+
+  it('returns false for compound entries containing an AFL club', () => {
+    expect(isNonAflClub('West Perth, Richmond')).toBe(false);
+    expect(isNonAflClub('East Perth, West Coast')).toBe(false);
+  });
+
+  it('returns false for null or empty strings', () => {
+    expect(isNonAflClub(null)).toBe(false);
+    expect(isNonAflClub(undefined)).toBe(false);
+    expect(isNonAflClub('')).toBe(false);
+  });
+});
+
+describe('shouldShowUnmatched', () => {
+  it('hides unmatched badge for linked players', () => {
+    expect(
+      shouldShowUnmatched({ linkStatus: 'unique', clubName: 'Carlton' }),
+    ).toBe(false);
+    expect(
+      shouldShowUnmatched({ linkStatus: 'resolved', clubName: 'Collingwood' }),
+    ).toBe(false);
+  });
+
+  it('hides unmatched badge for AFLW matched players', () => {
+    expect(
+      shouldShowUnmatched({
+        linkStatus: 'unmatched',
+        clubName: 'Melbourne',
+        aflwPlayerSlug: 'daisy-pearce',
+      }),
+    ).toBe(false);
+  });
+
+  it('hides unmatched badge for non-player categories', () => {
+    expect(
+      shouldShowUnmatched({
+        linkStatus: 'unmatched',
+        category: 'media',
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowUnmatched({
+        linkStatus: 'unmatched',
+        category: 'umpire',
+      }),
+    ).toBe(false);
+  });
+
+  it('hides unmatched badge for non-AFL clubs', () => {
+    expect(
+      shouldShowUnmatched({
+        linkStatus: 'unmatched',
+        clubName: 'West Perth',
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowUnmatched({
+        linkStatus: 'unmatched',
+        clubName: 'West Adelaide',
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowUnmatched({
+        linkStatus: 'unmatched',
+        clubName: 'East Brunswick Scorpions (VWFL)',
+      }),
+    ).toBe(false);
+  });
+
+  it('shows unmatched badge for unlinked players with AFL clubs or unknown clubs', () => {
+    expect(
+      shouldShowUnmatched({
+        linkStatus: 'unmatched',
+        clubName: 'Carlton',
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowUnmatched({
+        linkStatus: 'unmatched',
+        clubName: null,
+      }),
+    ).toBe(true);
   });
 });
