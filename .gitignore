@@ -67,11 +67,21 @@ blob-report/
 nl-stress-out/
 nl-ui-out/
 
-# Forensic capture from a hydration-error incident during the UI sweep
-# (tests/nl-ui/nl-stress.spec.ts): raw server HTML, post-hydration DOM,
-# and a screenshot per incident. Large, binary-ish, and reproducible by
-# re-running the sweep -- not something to commit.
-artifacts/hydration/
+# Diagnostic/forensic output directory -- e.g. tests/nl-ui/nl-stress.spec.ts's
+# per-incident hydration capture (raw server HTML, post-hydration DOM,
+# screenshot) and tests/admin-nav's timing/screenshot dumps. Large,
+# binary-ish, and reproducible by re-running the relevant harness -- not
+# something to commit. Anchored: this is the top-level scratch directory,
+# not any nested one. A whole 391 MB of exactly this (including manually
+# renamed/archived copies like artifacts/hydration-20260818-preserved)
+# was accidentally committed directly to a shared branch on 2026-08-19
+# because the old narrower `artifacts/hydration/` pattern didn't cover a
+# renamed sibling directory -- this one covers the whole class instead.
+/artifacts/
+
+# Same reasoning, for ad-hoc renamed/archived copies of the NL UI sweep's
+# nl-ui-out/ output (e.g. nl-ui-out-fwab-baseline/, nl-ui-out-*-archive/).
+nl-ui-out-*/
 
 # Playwright's saved storageState for the NL UI sweep (tests/nl-ui/auth.setup.ts).
 # This is not sample data -- it is a live, HMAC-signed afldb_beta session
