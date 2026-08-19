@@ -8,6 +8,7 @@ import {
   resolveLink,
   setSuggestionStatus,
 } from '@/db/queries/player-links';
+import { createPlayer } from '@/db/queries/players';
 import { audit, requireSuperAdmin } from '@/lib/auth/session';
 
 export type PlayerLinkActionState = { error?: string; message?: string };
@@ -140,4 +141,80 @@ export async function reviewSuggestion(
 
   // No self-revalidation — see the comment in linkPlayer.
   return { message: `Suggestion ${status}.` };
+}
+
+/**
+ * Create a new player record and link an unresolved item to it in one step (see changeLog.md).
+ * Ideal for drafted players who have yet to debut (e.g., Riley Onley, Fred Rodriguez).
+ */
+export async function createAndLinkPlayer(
+  _prev: PlayerLinkActionState,
+  formData: FormData,
+): Promise<PlayerLinkActionState> {
+  const admin = await requireSuperAdmin();
+
+  const targetTable = String(formData.get('targetTable') ?? '');
+  if (!isLinkTargetTable(targetTable)) return { error: 'Unknown table.' };
+
+  const targetId = Number(formData.get('targetId'));
+  if (!Number.isInteger(targetId) || targetId <= 0) return { error: 'Bad row id.' };
+
+  const displayName = String(formData.get('displayName') ?? '').trim();
+  if (!displayName || displayName.length > 100) {
+    return { error: 'Player display name is required (max 100 characters).' };
+  }
+
+  const givenName = String(formData.get('givenName') ?? '').trim() || null;
+  const surname = String(formData.get('surname') ?? '').trim() || null;
+  const dob = String(formData.get('dob') ?? '').trim() || null;
+  const dobConfidence = (String(formData.get('dobConfidence') ?? 'sourced') || 'sourced') as 'sourced' | 'estimated' | 'derived' | 'unknown';
+
+  const rawHeight = formData.get('heightCm');
+  const heightCm = rawHeight && Number.isInteger(Number(rawHeight)) ? Number(rawHeight) : null;
+
+  const rawWeight = formData.get('weightKg');
+  const weightKg = rawWeight && Number.isInteger(Number(rawWeight)) ? Number(rawWeight) : null;
+
+  const notes = String(formData.get('notes') ?? '').trim() || null;
+  const note = String(formData.get('note') ?? '').trim();
+
+  // Create the player
+  let player: { id: number; slug: string; displayName: string };
+  try {
+    player = await createPlayer({
+      displayName,
+      givenName,
+      surname,
+      dob,
+      dobConfidence,
+      heightCm,
+      weightKg,
+      notes,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { error: `Could not create player: ${msg}` };
+  }
+
+  // Link the target row
+  const result = await resolveLink({
+    targetTable,
+    targetId,
+    playerId: player.id,
+    adminUserId: admin.id,
+    note: note || `Created player ${player.displayName} and linked to ${targetTable} #${targetId}`,
+  });
+  if (!result.ok) return { error: result.error };
+
+  await audit('player_link.created_and_linked', {
+    targetTable,
+    targetId,
+    playerId: player.id,
+    playerName: player.displayName,
+  }, { userId: admin.id, label: admin.email });
+
+  revalidatePublicLinkPages();
+  revalidatePath('/players');
+  revalidatePath('/admin/data-editor');
+  return { message: `Created player ${player.displayName} (ID #${player.id}) and linked successfully.` };
 }

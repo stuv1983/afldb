@@ -123,3 +123,37 @@ export async function getDraftTypes(): Promise<string[]> {
   `;
   return rows.map((r) => r.type);
 }
+
+export type PlayerDraftHistoryRow = {
+  id: number;
+  draftYear: number;
+  draftType: string;
+  draftKind: string | null;
+  pickNumber: number | null;
+  clubName: string | null;
+  clubSlug: string | null;
+  originClub: string | null;
+  heightCm: number | null;
+  weightKg: number | null;
+  draftAge: number | null;
+  detail: string | null;
+  pickNote: string | null;
+};
+
+/**
+ * All draft selections recorded for one player (see changeLog.md).
+ */
+export async function getPlayerDraftHistory(playerId: number): Promise<PlayerDraftHistoryRow[]> {
+  return sql<PlayerDraftHistoryRow[]>`
+    SELECT dp.id, dp.draft_year AS "draftYear", dp.draft_type AS "draftType",
+           dp.draft_kind AS "draftKind", dp.pick_number AS "pickNumber",
+           c.name AS "clubName", c.slug AS "clubSlug",
+           dp.original_club_raw AS "originClub",
+           dp.height_cm AS "heightCm", dp.weight_kg AS "weightKg",
+           dp.draft_age AS "draftAge", dp.detail, dp.pick_note AS "pickNote"
+      FROM draft_picks dp
+      LEFT JOIN clubs c ON c.id = dp.club_id
+     WHERE dp.player_id = ${playerId}
+     ORDER BY dp.draft_year DESC, dp.pick_number ASC NULLS LAST
+  `;
+}

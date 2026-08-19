@@ -56,6 +56,26 @@ export async function getEditableRow(
     };
   }
 
+  if (entity.key === 'draft_picks') {
+    const [row] = await sql<Record<string, unknown>[]>`
+      SELECT dp.player_name_raw, dp.original_club_raw,
+             dp.height_cm, dp.weight_kg, dp.draft_age,
+             dp.pick_note, dp.detail,
+             dp.draft_year, dp.draft_type, dp.pick_number,
+             c.name AS club_name
+        FROM draft_picks dp
+        LEFT JOIN clubs c ON c.id = dp.club_id
+       WHERE dp.id = ${rowId}
+    `;
+    if (!row) return null;
+    return {
+      entity: entity.key,
+      rowId,
+      title: `${row.player_name_raw} · ${row.draft_year} ${row.draft_type} Draft (Pick ${row.pick_number ?? '—'}) · ${row.club_name ?? '—'}`,
+      values: stringify(entity, row),
+    };
+  }
+
   const [row] = await sql<Record<string, unknown>[]>`
     SELECT m.attendance, m.home_goals, m.home_behinds, m.away_goals, m.away_behinds,
            m.home_score, m.away_score,
@@ -140,6 +160,8 @@ export async function saveEdit(input: {
       if (!before) return null;
       if (input.entityKey === 'players') {
         await applyPlayerEdit(tx, input.rowId, input.groupKey, values);
+      } else if (input.entityKey === 'draft_picks') {
+        await applyDraftPickEdit(tx, input.rowId, input.groupKey, values);
       } else {
         await applyMatchEdit(tx, input.rowId, input.groupKey, values);
       }
@@ -316,5 +338,42 @@ async function applyMatchEdit(
       return;
     default:
       throw new Error(`unhandled matches group ${groupKey}`);
+  }
+}
+
+async function applyDraftPickEdit(
+  tx: Tx,
+  rowId: number,
+  groupKey: string,
+  v: Record<string, FieldValue>,
+): Promise<void> {
+  switch (groupKey) {
+    case 'player_info':
+      await tx`
+        UPDATE draft_picks
+           SET player_name_raw = ${v.player_name_raw},
+               original_club_raw = ${v.original_club_raw},
+               draft_age = ${v.draft_age}
+         WHERE id = ${rowId}
+      `;
+      return;
+    case 'measurements':
+      await tx`
+        UPDATE draft_picks
+           SET height_cm = ${v.height_cm},
+               weight_kg = ${v.weight_kg}
+         WHERE id = ${rowId}
+      `;
+      return;
+    case 'notes':
+      await tx`
+        UPDATE draft_picks
+           SET pick_note = ${v.pick_note},
+               detail = ${v.detail}
+         WHERE id = ${rowId}
+      `;
+      return;
+    default:
+      throw new Error(`unhandled draft_picks group ${groupKey}`);
   }
 }

@@ -143,6 +143,43 @@ export const EDITABLE_ENTITIES: Record<string, EditEntity> = {
       notes: { key: 'notes', label: 'Notes', fields: ['notes'], help: '' },
     },
   },
+
+  draft_picks: {
+    key: 'draft_picks',
+    label: 'Draft picks',
+    table: 'draft_picks',
+    fields: {
+      player_name_raw: {
+        key: 'player_name_raw', label: 'Player name', kind: 'text', nullable: false, maxLength: 120,
+        help: 'The name as recorded for the draft selection.',
+      },
+      original_club_raw: {
+        key: 'original_club_raw', label: 'Recruited from (original club)', kind: 'text', nullable: true, maxLength: 160,
+      },
+      height_cm: { key: 'height_cm', label: 'Height (cm)', kind: 'integer', nullable: true, min: 120, max: 230 },
+      weight_kg: { key: 'weight_kg', label: 'Weight (kg)', kind: 'integer', nullable: true, min: 40, max: 160 },
+      draft_age: { key: 'draft_age', label: 'Draft age', kind: 'integer', nullable: true, min: 14, max: 50 },
+      pick_note: { key: 'pick_note', label: 'Pick note', kind: 'text', nullable: true, maxLength: 500 },
+      detail: { key: 'detail', label: 'Detail / biography', kind: 'text', nullable: true, maxLength: 2000 },
+    },
+    groups: {
+      player_info: {
+        key: 'player_info', label: 'Player details',
+        fields: ['player_name_raw', 'original_club_raw', 'draft_age'],
+        help: 'Basic player recruitment and junior club information.',
+      },
+      measurements: {
+        key: 'measurements', label: 'Height and weight',
+        fields: ['height_cm', 'weight_kg'],
+        help: 'Physical statistics at time of drafting.',
+      },
+      notes: {
+        key: 'notes', label: 'Notes and details',
+        fields: ['pick_note', 'detail'],
+        help: 'Biographical notes and selection conditions.',
+      },
+    },
+  },
 };
 
 export function isEditableEntity(value: string): boolean {

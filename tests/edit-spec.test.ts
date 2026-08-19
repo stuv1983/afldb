@@ -37,6 +37,17 @@ describe('validateFieldValue', () => {
   it('accepts a zero attendance — a confirmed zero is a real figure', () => {
     expect(validateFieldValue(matches.fields.attendance, '0')).toEqual({ ok: true, value: 0 });
   });
+
+  it('validates draft_picks fields properly', () => {
+    const draft = EDITABLE_ENTITIES.draft_picks;
+    expect(draft).toBeDefined();
+    expect(validateFieldValue(draft.fields.player_name_raw, 'Riley Onley')).toEqual({ ok: true, value: 'Riley Onley' });
+    expect(validateFieldValue(draft.fields.player_name_raw, '')).toEqual({ ok: false, error: 'Player name cannot be empty.' });
+    expect(validateFieldValue(draft.fields.height_cm, '195')).toEqual({ ok: true, value: 195 });
+    expect(validateFieldValue(draft.fields.weight_kg, '88')).toEqual({ ok: true, value: 88 });
+    expect(validateFieldValue(draft.fields.draft_age, '18')).toEqual({ ok: true, value: 18 });
+    expect(validateFieldValue(draft.fields.draft_age, '12').ok).toBe(false);
+  });
 });
 
 describe('EDITABLE_ENTITIES integrity', () => {

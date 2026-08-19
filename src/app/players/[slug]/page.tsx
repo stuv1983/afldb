@@ -7,6 +7,7 @@ import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { JsonLd } from '@/components/JsonLd';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import { getPlayerHonours } from '@/db/queries/awards';
+import { getPlayerDraftHistory } from '@/db/queries/draft';
 import {
   getPlayer,
   getPlayerBrownlow,
@@ -100,11 +101,6 @@ function leagueOf(finalSeason: number | null): 'VFL' | 'AFL' {
  * Used for the meta description and, verbatim, as the page's opening line —
  * a table of numbers on its own gives a crawler nothing in prose to match a
  * query against, and gives a reader arriving cold no orientation either.
- *
- * Every clause is conditional on the datum existing. A player who finished
- * in 1910 has a `brownlowVotes` of 0 because the medal did not yet exist,
- * and writing "with 0 Brownlow votes" would state that as a fact about the
- * player rather than about the era.
  */
 function careerSentence(player: {
   displayName: string;
@@ -115,6 +111,9 @@ function careerSentence(player: {
   debutSeason: number | null;
   finalSeason: number | null;
 }): string {
+  if (player.games === 0) {
+    return `${player.displayName} has not yet appeared in a senior VFL/AFL match. Biography and draft history.`;
+  }
   const span = formatSpan(player.debutSeason, player.finalSeason);
   const league = leagueOf(player.finalSeason);
 
@@ -154,7 +153,7 @@ export default async function PlayerPage({
     permanentRedirect(playerPath(player.slug, player.id));
   }
 
-  const [clubs, seasons, brownlow, matches, honours] = await Promise.all([
+  const [clubs, seasons, brownlow, matches, honours, draftHistory] = await Promise.all([
     getPlayerClubs(player.id),
     getPlayerSeasons(player.id),
     getPlayerBrownlow(player.id),
@@ -163,6 +162,7 @@ export default async function PlayerPage({
     // searchParams and therefore cacheable.
     getPlayerMatches(player.id, { limit: MATCH_PAGE_SIZE, offset: 0 }),
     getPlayerHonours(player.id),
+    getPlayerDraftHistory(player.id),
   ]);
 
   const risingStarNominations = honours.nominations;
@@ -193,7 +193,12 @@ export default async function PlayerPage({
     label: 'Career',
     node: (
       <section className="section">
-        <CollapsibleTable title="Career">
+        {player.games === 0 && (
+          <p className="muted" style={{ margin: '0 0 1rem', padding: '0.6rem 0.75rem', background: 'var(--bg-subtle)', borderRadius: '6px' }}>
+            This player is currently listed or drafted and has yet to make their senior VFL/AFL match debut.
+          </p>
+        )}
+        <CollapsibleTable title="Career & Biography">
         <div className="table-wrap">
           <table>
             <tbody>
@@ -236,6 +241,20 @@ export default async function PlayerPage({
                 <th scope="row">Best game (disposals)</th>
                 <td>{formatStat(player.bestDisposalsGame)}</td>
               </tr>
+              {(player.heightCm || player.weightKg) && (
+                <tr>
+                  <th scope="row">Height</th>
+                  <td>{player.heightCm ? `${player.heightCm} cm` : <span className="not-recorded">Not recorded</span>}</td>
+                  <th scope="row">Weight</th>
+                  <td>{player.weightKg ? `${player.weightKg} kg` : <span className="not-recorded">Not recorded</span>}</td>
+                </tr>
+              )}
+              {player.notes && (
+                <tr>
+                  <th scope="row">Notes</th>
+                  <td colSpan={3} className="wide">{player.notes}</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -243,6 +262,53 @@ export default async function PlayerPage({
       </section>
     ),
   });
+
+  if (draftHistory.length > 0) {
+    sections.push({
+      id: 'draft',
+      label: 'Draft & recruitment',
+      node: (
+        <section className="section">
+          <CollapsibleTable title="Draft & recruitment">
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col" className="num">Year</th>
+                    <th scope="col" className="num">Pick</th>
+                    <th scope="col">Draft type</th>
+                    <th scope="col">Drafted to</th>
+                    <th scope="col">Recruited from</th>
+                    <th scope="col" className="num">Draft age</th>
+                    <th scope="col">Notes / Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {draftHistory.map((d) => (
+                    <tr key={d.id}>
+                      <td className="num">{d.draftYear}</td>
+                      <td className="num">{d.pickNumber ?? '—'}</td>
+                      <td className="nowrap">{d.draftType}</td>
+                      <td>
+                        {d.clubSlug ? (
+                          <Link href={clubPath(d.clubSlug)}>{d.clubName}</Link>
+                        ) : (
+                          d.clubName ?? '—'
+                        )}
+                      </td>
+                      <td className="muted">{d.originClub ?? '—'}</td>
+                      <td className="num">{d.draftAge ?? '—'}</td>
+                      <td className="wide muted">{d.detail || d.pickNote || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CollapsibleTable>
+        </section>
+      ),
+    });
+  }
 
   if (honours.total > 0) {
     sections.push({

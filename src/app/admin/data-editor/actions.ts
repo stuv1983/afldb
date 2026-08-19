@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { saveEdit } from '@/db/queries/data-edits';
+import { createPlayer } from '@/db/queries/players';
 import { EDITABLE_ENTITIES } from '@/lib/edit/spec';
 import { audit, requireSuperAdmin } from '@/lib/auth/session';
 
@@ -12,6 +13,70 @@ export type DataEditState = {
   /** rebuild_derived targets left stale by the saved edit, if any. */
   staleDerived?: string[];
 };
+
+export type CreatePlayerActionState = {
+  error?: string;
+  message?: string;
+  createdId?: number;
+};
+
+/**
+ * Create a new player by hand (see changeLog.md).
+ * Allows super admins to add bio info for draftees or historical players.
+ */
+export async function createPlayerAction(
+  _prev: CreatePlayerActionState,
+  formData: FormData,
+): Promise<CreatePlayerActionState> {
+  const admin = await requireSuperAdmin();
+
+  const displayName = String(formData.get('displayName') ?? '').trim();
+  if (!displayName || displayName.length > 100) {
+    return { error: 'Display name is required (up to 100 characters).' };
+  }
+
+  const givenName = String(formData.get('givenName') ?? '').trim() || null;
+  const surname = String(formData.get('surname') ?? '').trim() || null;
+  const dob = String(formData.get('dob') ?? '').trim() || null;
+  const dobConfidence = (String(formData.get('dobConfidence') ?? 'sourced') || 'sourced') as 'sourced' | 'estimated' | 'derived' | 'unknown';
+
+  const rawHeight = formData.get('heightCm');
+  const heightCm = rawHeight && Number.isInteger(Number(rawHeight)) ? Number(rawHeight) : null;
+
+  const rawWeight = formData.get('weightKg');
+  const weightKg = rawWeight && Number.isInteger(Number(rawWeight)) ? Number(rawWeight) : null;
+
+  const notes = String(formData.get('notes') ?? '').trim() || null;
+
+  try {
+    const player = await createPlayer({
+      displayName,
+      givenName,
+      surname,
+      dob,
+      dobConfidence,
+      heightCm,
+      weightKg,
+      notes,
+    });
+
+    await audit('player.created', {
+      playerId: player.id,
+      displayName: player.displayName,
+    }, { userId: admin.id, label: admin.email });
+
+    revalidatePath('/admin/data-editor');
+    revalidatePath('/players');
+
+    return {
+      message: `Created player "${player.displayName}" (ID #${player.id}).`,
+      createdId: player.id,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { error: `Could not create player: ${msg}` };
+  }
+}
 
 /**
  * Save one field group of one row. Guarded by requireSuperAdmin like

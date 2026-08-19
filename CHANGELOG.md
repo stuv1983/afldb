@@ -15,6 +15,26 @@ commit.
 
 ## [Unreleased]
 
+### Super Admin Player Creation, Bio Editing & Draft Pick Management — 20 August 2026
+
+- **Super Admin Player Creation & Bio Information Management**:
+  - `src/db/queries/players.ts`: Added `createPlayer` helper supporting creation of player profiles with display name, auto-split given/surname, canonical slug, search name normalisation (`afldb_normalise_name`), sort name, date of birth, DOB confidence, height (cm), weight (kg), and biographical notes. Initialised empty zero-statistic record in `player_career_stats`.
+  - `src/db/queries/players.ts`: Updated `fetchPlayer` to `LEFT JOIN` `player_career_stats` and `COALESCE` all career statistics to `0`, ensuring newly created or listed players who have yet to make their senior match debut load cleanly on `/players/[slug]`. Expanded `PlayerProfile` to include `heightCm`, `weightKg`, `givenName`, `surname`, and `notes`.
+  - `src/app/admin/data-editor/CreatePlayerForm.tsx`: Created a new super admin component allowing administrators to create player profiles directly from the Data Editor GUI (`/admin/data-editor`).
+  - `src/app/admin/data-editor/actions.ts`: Added `createPlayerAction` with full field validation, audit logging to `data_edits`, and path revalidations.
+- **One-Click "Create & Link Player" in Player Links Queue**:
+  - `src/app/admin/player-links/ResolveControls.tsx`: Added a dedicated "Create & link new" tab in the resolve drawer. Pre-fills player name from the raw source name and enables administrators to enter DOB, height, weight, and bio notes to create a player profile and link the unlinked record (e.g. rookie draft pick, honours entry) in a single action.
+  - `src/app/admin/player-links/ResolvePanel.tsx`: Passed `playerName` and `context` attributes to `ResolveControls`.
+  - `src/app/admin/player-links/actions.ts`: Added `createAndLinkPlayer` action linking created players to `draft_picks` (and corresponding `draft_persons` records) or honours records with audit logging.
+- **Draft Picks Management & Search in Data Editor**:
+  - `src/lib/edit/spec.ts`: Added `draft_picks` to `EDITABLE_ENTITIES` allowing editing of `player_name_raw`, `original_club_raw`, `height_cm`, `weight_kg`, `draft_age`, `pick_note`, and `detail`.
+  - `src/db/queries/data-edits.ts`: Added `draft_picks` row reader in `getEditableRow` and `applyDraftPickEdit` in `applyEdit`.
+  - `src/app/admin/data-editor/page.tsx`: Added draft pick ID direct lookup and draft search by player name / year with inline edit links.
+  - `tests/edit-spec.test.ts`: Added validation unit test coverage for `draft_picks` fields and integrity checks.
+- **Player Profile Display for Listed & Drafted Players**:
+  - `src/db/queries/draft.ts`: Added `getPlayerDraftHistory` query fetching all recorded draft selections for a player.
+  - `src/app/players/[slug]/page.tsx`: Added height, weight, and bio notes to the Career & Biography table. Added a dedicated "Draft & recruitment" table section displaying draft year, pick, type, drafted club, recruited origin, and draft age. Handled 0-game draftees gracefully with an informative listing banner and refined metadata description sentence.
+
 ### Dynamic Search Box Placeholders, Fillout Animations & Coming-Soon Polish — 20 August 2026
 
 - **Dynamic Rotating Search Placeholders & Animations for AFL & AFLW**:

@@ -104,6 +104,8 @@ export function ResolvePanel() {
           key={`${row.targetTable}:${row.targetId}`}
           targetTable={row.targetTable}
           targetId={row.targetId}
+          playerName={row.playerName}
+          context={row.context}
           linkStatus={row.linkStatus}
           suggestions={row.suggestions}
         />

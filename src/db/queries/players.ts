@@ -145,6 +145,11 @@ export type PlayerProfile = {
   id: number;
   slug: string;
   displayName: string;
+  givenName?: string | null;
+  surname?: string | null;
+  heightCm?: number | null;
+  weightKg?: number | null;
+  notes?: string | null;
   dob: Date | null;
   dobConfidence: string;
   dobDisputed: boolean;
@@ -186,32 +191,119 @@ export type PlayerProfile = {
 async function fetchPlayer(id: number): Promise<PlayerProfile | null> {
   const [row] = await sql<PlayerProfile[]>`
     SELECT p.id, p.slug, p.display_name AS "displayName",
+           p.given_name AS "givenName", p.surname AS "surname",
+           p.height_cm AS "heightCm", p.weight_kg AS "weightKg",
+           p.notes AS "notes",
            p.dob, p.dob_confidence AS "dobConfidence",
            p.dob_disputed AS "dobDisputed",
            p.birth_year AS "birthYear",
            p.birth_year_confidence AS "birthYearConfidence",
-           c.games, c.goals,
-           c.behinds, c.behinds_recorded_games AS "behindsRecordedGames",
-           c.kicks, c.kicks_recorded_games AS "kicksRecordedGames",
-           c.handballs, c.handballs_recorded_games AS "handballsRecordedGames",
-           c.disposals, c.disposals_recorded_games AS "disposalsRecordedGames",
-           c.marks, c.marks_recorded_games AS "marksRecordedGames",
-           c.tackles, c.tackles_recorded_games AS "tacklesRecordedGames",
-           c.hitouts, c.hitouts_recorded_games AS "hitoutsRecordedGames",
-           c.finals, c.premierships, c.wins, c.draws, c.losses,
-           c.brownlow_votes AS "brownlowVotes",
-           c.brownlow_medals AS "brownlowMedals",
-           c.clubs_played AS "clubsPlayed",
-           c.seasons_played AS "seasonsPlayed",
+           COALESCE(c.games, 0) AS "games",
+           COALESCE(c.goals, 0) AS "goals",
+           c.behinds, COALESCE(c.behinds_recorded_games, 0) AS "behindsRecordedGames",
+           c.kicks, COALESCE(c.kicks_recorded_games, 0) AS "kicksRecordedGames",
+           c.handballs, COALESCE(c.handballs_recorded_games, 0) AS "handballsRecordedGames",
+           c.disposals, COALESCE(c.disposals_recorded_games, 0) AS "disposalsRecordedGames",
+           c.marks, COALESCE(c.marks_recorded_games, 0) AS "marksRecordedGames",
+           c.tackles, COALESCE(c.tackles_recorded_games, 0) AS "tacklesRecordedGames",
+           c.hitouts, COALESCE(c.hitouts_recorded_games, 0) AS "hitoutsRecordedGames",
+           COALESCE(c.finals, 0) AS "finals",
+           COALESCE(c.premierships, 0) AS "premierships",
+           COALESCE(c.wins, 0) AS "wins",
+           COALESCE(c.draws, 0) AS "draws",
+           COALESCE(c.losses, 0) AS "losses",
+           COALESCE(c.brownlow_votes, 0) AS "brownlowVotes",
+           COALESCE(c.brownlow_medals, 0) AS "brownlowMedals",
+           COALESCE(c.clubs_played, 0) AS "clubsPlayed",
+           COALESCE(c.seasons_played, 0) AS "seasonsPlayed",
            c.debut_season AS "debutSeason", c.final_season AS "finalSeason",
            c.debut_date AS "debutDate", c.last_match_date AS "lastMatchDate",
            c.best_goals_game AS "bestGoalsGame",
            c.best_disposals_game AS "bestDisposalsGame"
       FROM players p
-      JOIN player_career_stats c ON c.player_id = p.id
+      LEFT JOIN player_career_stats c ON c.player_id = p.id
      WHERE p.id = ${id}
   `;
   return row ?? null;
+}
+
+export type CreatePlayerInput = {
+  displayName: string;
+  givenName?: string | null;
+  surname?: string | null;
+  dob?: string | null;
+  dobConfidence?: 'sourced' | 'estimated' | 'derived' | 'unknown';
+  heightCm?: number | null;
+  weightKg?: number | null;
+  notes?: string | null;
+  debutSeason?: number | null;
+  finalSeason?: number | null;
+};
+
+/**
+ * Create a new player in the database (see changeLog.md).
+ * Used for drafted players who have yet to play a match or historical players.
+ */
+export async function createPlayer(input: CreatePlayerInput): Promise<{ id: number; slug: string; displayName: string }> {
+  const displayName = input.displayName.trim();
+  let givenName = input.givenName?.trim() || null;
+  let surname = input.surname?.trim() || null;
+
+  if (!givenName && !surname) {
+    const parts = displayName.split(/\s+/);
+    if (parts.length === 1) {
+      surname = parts[0];
+    } else {
+      givenName = parts.slice(0, -1).join(' ');
+      surname = parts[parts.length - 1];
+    }
+  }
+
+  const sortName = surname ? (givenName ? `${surname}, ${givenName}` : surname) : displayName;
+  const slug = displayName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'player';
+
+  const dob = input.dob ? input.dob.trim() : null;
+  const dobConfidence = dob ? (input.dobConfidence || 'sourced') : 'unknown';
+  const birthYear = dob && /^\d{4}/.test(dob) ? Number(dob.slice(0, 4)) : null;
+
+  const [created] = await sql<{ id: number; slug: string; displayName: string }[]>`
+    INSERT INTO players (
+      display_name, given_name, surname, sort_name, search_name, slug,
+      dob, dob_confidence, birth_year, birth_year_confidence,
+      height_cm, weight_kg, notes,
+      debut_season, final_season
+    ) VALUES (
+      ${displayName}, ${givenName}, ${surname}, ${sortName},
+      afldb_normalise_name(${displayName}), ${slug},
+      ${dob}::date, ${dobConfidence}::value_confidence,
+      ${birthYear}, ${dobConfidence}::value_confidence,
+      ${input.heightCm ?? null}, ${input.weightKg ?? null}, ${input.notes?.trim() || null},
+      ${input.debutSeason ?? null}, ${input.finalSeason ?? null}
+    )
+    RETURNING id, slug, display_name AS "displayName"
+  `;
+
+  // Seed zero career stats
+  await sql`
+    INSERT INTO player_career_stats (
+      player_id, games, goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts,
+      finals, premierships, wins, draws, losses, brownlow_votes, brownlow_medals,
+      clubs_played, seasons_played, behinds_recorded_games, kicks_recorded_games,
+      handballs_recorded_games, disposals_recorded_games, marks_recorded_games,
+      tackles_recorded_games, hitouts_recorded_games
+    ) VALUES (
+      ${created.id}, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0,
+      0, 0, 0,
+      0, 0
+    ) ON CONFLICT (player_id) DO NOTHING
+  `;
+
+  return created;
 }
 
 export type PlayerClubStint = {
