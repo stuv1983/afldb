@@ -2,11 +2,18 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { createAwardWinner, createHallOfFameInductee, createHonourTeamMember } from '@/db/queries/awards-admin';
 import { saveEdit } from '@/db/queries/data-edits';
 import { saveMatchSheet, type PlayerMatchStatInput } from '@/db/queries/match-sheet';
-import { createPlayer } from '@/db/queries/players';
+import { createPlayer, type DraftPickInput } from '@/db/queries/players';
 import { EDITABLE_ENTITIES } from '@/lib/edit/spec';
 import { audit, requireSuperAdmin } from '@/lib/auth/session';
+
+export type SimpleAdminActionState = {
+  error?: string;
+  message?: string;
+  createdId?: number;
+};
 
 export type DataEditState = {
   error?: string;
@@ -55,6 +62,31 @@ export async function createPlayerAction(
 
   const notes = String(formData.get('notes') ?? '').trim() || null;
 
+  // Draft information (optional)
+  const recruitedFrom = String(formData.get('recruitedFrom') ?? '').trim() || null;
+  const rawDraftYear = formData.get('draftYear');
+  const draftYear = rawDraftYear && Number.isInteger(Number(rawDraftYear)) ? Number(rawDraftYear) : null;
+  const draftType = String(formData.get('draftType') ?? '').trim() || null;
+  const rawPickNumber = formData.get('pickNumber');
+  const pickNumber = rawPickNumber && Number.isInteger(Number(rawPickNumber)) ? Number(rawPickNumber) : null;
+  const rawDraftClubId = formData.get('draftClubId');
+  const draftClubId = rawDraftClubId && Number.isInteger(Number(rawDraftClubId)) ? Number(rawDraftClubId) : null;
+  const rawDraftAge = formData.get('draftAge');
+  const draftAge = rawDraftAge && Number.isInteger(Number(rawDraftAge)) ? Number(rawDraftAge) : null;
+  const pickNote = String(formData.get('pickNote') ?? '').trim() || null;
+
+  const draftInfo: DraftPickInput | null = (recruitedFrom || draftYear || pickNumber || draftClubId)
+    ? {
+        recruitedFrom,
+        draftYear,
+        draftType,
+        pickNumber,
+        clubId: draftClubId,
+        draftAge,
+        pickNote,
+      }
+    : null;
+
   try {
     const player = await createPlayer({
       displayName,
@@ -65,23 +97,240 @@ export async function createPlayerAction(
       heightCm,
       weightKg,
       notes,
+      draftInfo,
     });
 
     await audit('player.created', {
       playerId: player.id,
       displayName: player.displayName,
+      hasDraftInfo: Boolean(draftInfo),
     }, { userId: admin.id, label: admin.email });
 
     revalidatePath('/admin/data-editor');
     revalidatePath('/players');
+    revalidatePath('/draft');
 
     return {
-      message: `Created player "${player.displayName}" (ID #${player.id}).`,
+      message: `Created player "${player.displayName}" (ID #${player.id})${draftInfo ? ' with draft selection record' : ''}.`,
       createdId: player.id,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { error: `Could not create player: ${msg}` };
+  }
+}
+
+/**
+ * Super Admin Action: Add an Award Winner (see changeLog.md).
+ */
+export async function createAwardWinnerAction(
+  _prev: SimpleAdminActionState,
+  formData: FormData,
+): Promise<SimpleAdminActionState> {
+  const admin = await requireSuperAdmin();
+
+  const awardId = Number(formData.get('awardId'));
+  if (!Number.isInteger(awardId) || awardId <= 0) {
+    return { error: 'Please select an award.' };
+  }
+
+  const season = Number(formData.get('season'));
+  if (!Number.isInteger(season) || season < 1897 || season > 2100) {
+    return { error: 'Valid season year is required (1897–2100).' };
+  }
+
+  const rawPlayerId = formData.get('playerId');
+  const playerId = rawPlayerId && Number.isInteger(Number(rawPlayerId)) && Number(rawPlayerId) > 0
+    ? Number(rawPlayerId)
+    : null;
+  const playerNameRaw = String(formData.get('playerNameRaw') ?? '').trim() || null;
+
+  if (!playerId && !playerNameRaw) {
+    return { error: 'Either select a player or enter a recipient name.' };
+  }
+
+  const rawClubId = formData.get('clubId');
+  const clubId = rawClubId && Number.isInteger(Number(rawClubId)) && Number(rawClubId) > 0
+    ? Number(rawClubId)
+    : null;
+
+  const rawVotes = formData.get('votes');
+  const votes = rawVotes && !isNaN(Number(rawVotes)) ? Number(rawVotes) : null;
+  const position = String(formData.get('position') ?? '').trim() || null;
+  const isCaptain = formData.get('isCaptain') === 'true' || formData.get('isCaptain') === 'on';
+  const isViceCaptain = formData.get('isViceCaptain') === 'true' || formData.get('isViceCaptain') === 'on';
+  const note = String(formData.get('note') ?? '').trim() || null;
+
+  try {
+    const result = await createAwardWinner({
+      awardId,
+      season,
+      playerId,
+      playerNameRaw,
+      clubId,
+      votes,
+      position,
+      isCaptain,
+      isViceCaptain,
+      note,
+      adminUserId: admin.id,
+    });
+
+    await audit('award_winner.created', {
+      awardId,
+      season,
+      playerId,
+      winnerId: result.id,
+    }, { userId: admin.id, label: admin.email });
+
+    revalidatePath('/awards');
+    revalidatePath('/admin/data-editor');
+    if (playerId) revalidatePath('/players');
+
+    return {
+      message: `Added award recipient for season ${season} (Record #${result.id}).`,
+      createdId: result.id,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { error: `Failed to add award winner: ${msg}` };
+  }
+}
+
+/**
+ * Super Admin Action: Add a Hall of Fame Inductee (see changeLog.md).
+ */
+export async function createHallOfFameAction(
+  _prev: SimpleAdminActionState,
+  formData: FormData,
+): Promise<SimpleAdminActionState> {
+  const admin = await requireSuperAdmin();
+
+  const name = String(formData.get('name') ?? '').trim();
+  const rawPlayerId = formData.get('playerId');
+  const playerId = rawPlayerId && Number.isInteger(Number(rawPlayerId)) && Number(rawPlayerId) > 0
+    ? Number(rawPlayerId)
+    : null;
+
+  if (!name && !playerId) {
+    return { error: 'Inductee name is required.' };
+  }
+
+  const category = String(formData.get('category') ?? 'Player').trim();
+  const rawInductedYear = formData.get('inductedYear');
+  const inductedYear = rawInductedYear && Number.isInteger(Number(rawInductedYear))
+    ? Number(rawInductedYear)
+    : new Date().getFullYear();
+
+  const isLegend = formData.get('isLegend') === 'true' || formData.get('isLegend') === 'on';
+  const rawLegendYear = formData.get('legendYear');
+  const legendYear = isLegend && rawLegendYear && Number.isInteger(Number(rawLegendYear))
+    ? Number(rawLegendYear)
+    : (isLegend ? inductedYear : null);
+
+  const clubNameRaw = String(formData.get('clubNameRaw') ?? '').trim() || null;
+  const state = String(formData.get('state') ?? '').trim() || null;
+  const playingCareer = String(formData.get('playingCareer') ?? '').trim() || null;
+  const notes = String(formData.get('notes') ?? '').trim() || null;
+
+  try {
+    const result = await createHallOfFameInductee({
+      name,
+      playerId,
+      category,
+      inductedYear,
+      isLegend,
+      legendYear,
+      clubNameRaw,
+      state,
+      playingCareer,
+      notes,
+      adminUserId: admin.id,
+    });
+
+    await audit('hall_of_fame.created', {
+      name,
+      year: inductedYear,
+      isLegend,
+      id: result.id,
+    }, { userId: admin.id, label: admin.email });
+
+    revalidatePath('/hall-of-fame');
+    revalidatePath('/admin/data-editor');
+    if (playerId) revalidatePath('/players');
+
+    return {
+      message: `Added Hall of Fame inductee "${name}" in ${inductedYear} (Record #${result.id}).`,
+      createdId: result.id,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { error: `Failed to add Hall of Fame inductee: ${msg}` };
+  }
+}
+
+/**
+ * Super Admin Action: Add a Representative / Honour Team Member (see changeLog.md).
+ */
+export async function createHonourTeamMemberAction(
+  _prev: SimpleAdminActionState,
+  formData: FormData,
+): Promise<SimpleAdminActionState> {
+  const admin = await requireSuperAdmin();
+
+  const teamName = String(formData.get('teamName') ?? '').trim();
+  if (!teamName) {
+    return { error: 'Team name is required.' };
+  }
+
+  const rawPlayerId = formData.get('playerId');
+  const playerId = rawPlayerId && Number.isInteger(Number(rawPlayerId)) && Number(rawPlayerId) > 0
+    ? Number(rawPlayerId)
+    : null;
+  const playerNameRaw = String(formData.get('playerNameRaw') ?? '').trim() || null;
+
+  if (!playerId && !playerNameRaw) {
+    return { error: 'Either select a player or enter a player name.' };
+  }
+
+  const position = String(formData.get('position') ?? '').trim() || null;
+  const role = String(formData.get('role') ?? '').trim() || null;
+  const clubNameRaw = String(formData.get('clubNameRaw') ?? '').trim() || null;
+  const rawSortOrder = formData.get('sortOrder');
+  const sortOrder = rawSortOrder && Number.isInteger(Number(rawSortOrder)) ? Number(rawSortOrder) : 0;
+  const note = String(formData.get('note') ?? '').trim() || null;
+
+  try {
+    const result = await createHonourTeamMember({
+      teamName,
+      playerId,
+      playerNameRaw,
+      position,
+      role,
+      clubNameRaw,
+      sortOrder,
+      note,
+      adminUserId: admin.id,
+    });
+
+    await audit('honour_team_member.created', {
+      teamName,
+      playerName: playerNameRaw,
+      playerId,
+      id: result.id,
+    }, { userId: admin.id, label: admin.email });
+
+    revalidatePath('/honour-teams');
+    revalidatePath('/admin/data-editor');
+    if (playerId) revalidatePath('/players');
+
+    return {
+      message: `Added member to "${teamName}" (Record #${result.id}).`,
+      createdId: result.id,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { error: `Failed to add honour team member: ${msg}` };
   }
 }
 

@@ -228,6 +228,17 @@ async function fetchPlayer(id: number): Promise<PlayerProfile | null> {
   return row ?? null;
 }
 
+export type DraftPickInput = {
+  recruitedFrom?: string | null;
+  draftYear?: number | null;
+  draftType?: string | null;
+  pickNumber?: number | null;
+  clubId?: number | null;
+  draftAge?: number | null;
+  pickNote?: string | null;
+  detail?: string | null;
+};
+
 export type CreatePlayerInput = {
   displayName: string;
   givenName?: string | null;
@@ -239,6 +250,7 @@ export type CreatePlayerInput = {
   notes?: string | null;
   debutSeason?: number | null;
   finalSeason?: number | null;
+  draftInfo?: DraftPickInput | null;
 };
 
 /**
@@ -311,6 +323,42 @@ export async function createPlayer(input: CreatePlayerInput): Promise<{ id: numb
           0, 0
         ) ON CONFLICT (player_id) DO NOTHING
       `;
+
+      // Optional draft & recruitment record
+      if (input.draftInfo && (input.draftInfo.draftYear || input.draftInfo.recruitedFrom || input.draftInfo.pickNumber || input.draftInfo.clubId)) {
+        const d = input.draftInfo;
+        const draftYear = d.draftYear || (birthYear ? birthYear + 18 : new Date().getFullYear());
+        const draftType = d.draftType?.trim() || 'National Draft';
+
+        let clubNameRaw: string | null = null;
+        if (d.clubId) {
+          const [cl] = await tx<{ name: string }[]>`SELECT name FROM clubs WHERE id = ${d.clubId}`;
+          clubNameRaw = cl?.name ?? null;
+        }
+
+        await tx`
+          INSERT INTO draft_picks (
+            draft_year, draft_type, pick_number, player_name_raw, player_id,
+            link_status_value, club_id, club_name_raw, original_club_raw,
+            height_cm, weight_kg, draft_age, pick_note, detail
+          ) VALUES (
+            ${draftYear},
+            ${draftType},
+            ${d.pickNumber ?? null},
+            ${displayName},
+            ${row.id},
+            'resolved',
+            ${d.clubId ?? null},
+            ${clubNameRaw},
+            ${d.recruitedFrom?.trim() || null},
+            ${input.heightCm ?? null},
+            ${input.weightKg ?? null},
+            ${d.draftAge ?? null},
+            ${d.pickNote?.trim() || null},
+            ${d.detail?.trim() || null}
+          )
+        `;
+      }
 
       return row;
     });

@@ -15,6 +15,20 @@ commit.
 
 ## [Unreleased]
 
+### Draft & Recruitment Info on Player Creation, and Awards & Representative Teams Admin — 20 August 2026
+
+- **Draft & Recruitment Selection during Player Profile Creation**:
+  - `src/db/queries/players.ts`: Extended `CreatePlayerInput` and `createPlayer` to accept `draftInfo` (`recruitedFrom`, `draftYear`, `draftType`, `pickNumber`, `clubId`, `draftAge`, `pickNote`, `detail`). Automatically creates a linked `draft_picks` record with status `resolved` and associated `draft_persons` entry inside the creation transaction.
+  - `src/app/admin/data-editor/CreatePlayerForm.tsx`: Added collapsible "Draft & recruitment details" section to the player creation form with inputs for junior/origin club, draft year, draft type (National, Rookie, Pre-Season, Mid-Season, Father-Son, Category B Rookie), pick number, drafted club selector, draft age, and pick note.
+  - `src/app/admin/data-editor/actions.ts`: Updated `createPlayerAction` to parse and validate draft & recruitment fields and trigger path revalidations for `/draft`.
+- **Super Admin Awards, Hall of Fame & Representative Teams Management**:
+  - `src/db/queries/awards-admin.ts`: Created admin mutation layer with `createAwardWinner`, `createHallOfFameInductee`, and `createHonourTeamMember` running with `afldb_import` pool credentials and logging audit snapshots to `data_edits`.
+  - `src/app/admin/data-editor/AwardWinnerForm.tsx`: Created GUI component allowing super admins to record award winners (Brownlow, Coleman, Rising Star, Norm Smith, All-Australian, Club Best & Fairest, AFLCA/AFLPA) with player lookup via `PlayerPicker`, season, club, votes/stats, position, captaincy, and citations.
+  - `src/app/admin/data-editor/HallOfFameForm.tsx`: Created GUI component allowing super admins to record Australian Football Hall of Fame inductees with player links, categories (Player, Coach, Umpire, Media, Admin, Pioneer), induction year, Legend elevation status, state, and career summary.
+  - `src/app/admin/data-editor/HonourTeamForm.tsx`: Created GUI component allowing super admins to add members to representative and honour teams (Teams of the Century, State of Origin, Indigenous / Multicultural teams) with player links, positions, roles (Captain, Coach), and lineup sort order.
+  - `src/app/admin/data-editor/actions.ts`: Added `createAwardWinnerAction`, `createHallOfFameAction`, and `createHonourTeamMemberAction` with validation and revalidations across public awards, Hall of Fame, honour teams, and player profiles.
+  - `src/app/admin/data-editor/page.tsx`: Embedded the new Awards & Honour Teams management section directly in the Data Editor GUI.
+
 ### Super Admin Match Sheet Editor & Live In-Game Player Stats Management — 20 August 2026
 
 - **Interactive Super Admin Match Sheet & Lineup Editor**:

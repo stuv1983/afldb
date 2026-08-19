@@ -1,10 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { AwardWinnerForm } from '@/app/admin/data-editor/AwardWinnerForm';
 import { CreatePlayerForm } from '@/app/admin/data-editor/CreatePlayerForm';
 import { EditorForm } from '@/app/admin/data-editor/EditorForm';
+import { HallOfFameForm } from '@/app/admin/data-editor/HallOfFameForm';
+import { HonourTeamForm } from '@/app/admin/data-editor/HonourTeamForm';
 import { MatchSheetEditor } from '@/app/admin/data-editor/MatchSheetEditor';
 import { PlayerFinder } from '@/app/admin/data-editor/PlayerFinder';
+import { listAwards, listHonourTeams } from '@/db/queries/awards';
+import { listClubs } from '@/db/queries/clubs';
 import { getMatch, getMatchPlayers, getSeasonMatches } from '@/db/queries/matches';
 import { getEditableRow } from '@/db/queries/data-edits';
 import { listDraftPicks } from '@/db/queries/draft';
@@ -17,9 +22,10 @@ export const metadata: Metadata = { title: 'Data editor', robots: { index: false
 export const dynamic = 'force-dynamic';
 
 /**
- * Manual corrections, player bio creation, and match sheet editing (see changeLog.md).
+ * Manual corrections, player bio creation, match sheet editing, and awards/honours management (see changeLog.md).
  *
- * Find or create a player, find a match, edit draft pick details, or edit match player statistics.
+ * Find or create a player, find a match, edit draft pick details, edit match player statistics,
+ * or record award winners and representative team selections.
  * Every save is audited in data_edits; the CSV pipeline remains the path for bulk jobs.
  */
 export default async function DataEditorPage(
@@ -35,6 +41,13 @@ export default async function DataEditorPage(
   const seasonParam = parseSeason(firstValue(params.season) ?? '');
   const draftQueryParam = firstValue(params.draft_q)?.trim() ?? '';
   const draftYearParam = parseSeason(firstValue(params.draft_year) ?? '');
+
+  const [clubs, awards, honourTeams] = await Promise.all([
+    listClubs(),
+    listAwards(),
+    listHonourTeams(),
+  ]);
+  const existingTeamNames = honourTeams.map((t) => t.teamName);
 
   const matchForSheet = (mode === 'match-sheet' && Number.isInteger(id) && id > 0)
     ? await getMatch(id)
@@ -60,17 +73,25 @@ export default async function DataEditorPage(
       <div className="page-header">
         <h1>Data editor</h1>
         <p className="subtitle">
-          One-off corrections and player bio creation, saved with a note and audited. Bulk changes still go through
-          the CSV upload.
+          One-off corrections, player creation, match sheets, and awards management, saved with a note and audited.
         </p>
       </div>
 
-      <section className="section" style={{ display: 'grid', gap: '1.25rem' }}>
+      <section className="section" style={{ display: 'grid', gap: '1.5rem' }}>
         <div>
-          <h2>Players</h2>
+          <h2>Players & recruitment</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
             <PlayerFinder />
-            <CreatePlayerForm />
+            <CreatePlayerForm clubs={clubs} />
+          </div>
+        </div>
+
+        <div>
+          <h2>Awards, Hall of Fame & Representative Teams</h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+            <AwardWinnerForm awards={awards} clubs={clubs} />
+            <HallOfFameForm clubs={clubs} />
+            <HonourTeamForm existingTeams={existingTeamNames} clubs={clubs} />
           </div>
         </div>
 

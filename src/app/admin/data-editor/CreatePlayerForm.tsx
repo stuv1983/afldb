@@ -13,9 +13,14 @@ const INITIAL: CreatePlayerActionState = {};
  * Enables creating bio profiles for drafted players who have yet to play,
  * or historical players.
  */
-export function CreatePlayerForm() {
+export function CreatePlayerForm({
+  clubs = [],
+}: {
+  clubs?: { id: number; name: string }[];
+}) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [showDraftFields, setShowDraftFields] = useState(false);
   const [state, formAction, isPending] = useActionState(createPlayerAction, INITIAL);
 
   useEffect(() => {
@@ -61,7 +66,7 @@ export function CreatePlayerForm() {
       </div>
 
       <p className="muted" style={{ fontSize: '0.85rem', margin: '0 0 1rem' }}>
-        Creates a new player identity and biography. Ideal for newly drafted players (e.g. rookie/national draftees) who have yet to play a senior match.
+        Creates a new player identity and biography with optional draft selection & recruitment details.
       </p>
 
       {state.message && (
@@ -178,7 +183,116 @@ export function CreatePlayerForm() {
           />
         </label>
 
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+        {/* Draft & Recruitment Section */}
+        <div style={{
+          borderTop: '1px dashed var(--border-subtle)',
+          paddingTop: '0.75rem',
+          display: 'grid',
+          gap: '0.5rem',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <strong style={{ fontSize: '0.9rem' }}>Draft & recruitment details</strong>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setShowDraftFields((prev) => !prev)}
+              style={{ fontSize: '0.75rem', padding: '0.2rem 0.4rem' }}
+            >
+              {showDraftFields ? 'Hide draft fields' : '+ Add draft / recruitment record'}
+            </button>
+          </div>
+
+          {showDraftFields && (
+            <div style={{ display: 'grid', gap: '0.75rem', marginTop: '0.25rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(13rem, 1fr))', gap: '0.75rem' }}>
+                <label style={{ display: 'grid', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  Recruited from (junior / origin club)
+                  <input
+                    type="text"
+                    name="recruitedFrom"
+                    placeholder="e.g. Shepparton United / Murray U18"
+                    style={{ fontSize: '0.9rem' }}
+                  />
+                </label>
+
+                <label style={{ display: 'grid', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  Drafted by club
+                  <select name="draftClubId" defaultValue="" style={{ fontSize: '0.9rem' }}>
+                    <option value="">— Select club —</option>
+                    {clubs.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(9rem, 1fr))', gap: '0.75rem' }}>
+                <label style={{ display: 'grid', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  Draft year
+                  <input
+                    type="number"
+                    name="draftYear"
+                    min={1981}
+                    max={2100}
+                    placeholder="e.g. 2025"
+                    style={{ fontSize: '0.9rem' }}
+                  />
+                </label>
+
+                <label style={{ display: 'grid', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  Draft type
+                  <select name="draftType" defaultValue="National Draft" style={{ fontSize: '0.9rem' }}>
+                    <option value="National Draft">National Draft</option>
+                    <option value="Rookie Draft">Rookie Draft</option>
+                    <option value="Pre-Season Draft">Pre-Season Draft</option>
+                    <option value="Mid-Season Draft">Mid-Season Draft</option>
+                    <option value="Father-Son Selection">Father-Son Selection</option>
+                    <option value="Category B Rookie">Category B Rookie</option>
+                    <option value="Zone Selection">Zone Selection</option>
+                    <option value="Uncontracted Selection">Uncontracted Selection</option>
+                  </select>
+                </label>
+
+                <label style={{ display: 'grid', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  Pick number
+                  <input
+                    type="number"
+                    name="pickNumber"
+                    min={1}
+                    max={200}
+                    placeholder="e.g. 3"
+                    style={{ fontSize: '0.9rem' }}
+                  />
+                </label>
+
+                <label style={{ display: 'grid', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  Draft age
+                  <input
+                    type="number"
+                    name="draftAge"
+                    min={15}
+                    max={40}
+                    placeholder="e.g. 18"
+                    style={{ fontSize: '0.9rem' }}
+                  />
+                </label>
+              </div>
+
+              <label style={{ display: 'grid', gap: '0.25rem', fontSize: '0.85rem' }}>
+                Pick note / details
+                <input
+                  type="text"
+                  name="pickNote"
+                  maxLength={500}
+                  placeholder="e.g. 2025 Rookie Draft Selection"
+                  style={{ fontSize: '0.9rem' }}
+                />
+              </label>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
           <button type="submit" disabled={isPending}>
             {isPending ? 'Creating player…' : 'Create player profile'}
           </button>
