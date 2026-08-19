@@ -54,6 +54,7 @@ Recent changes are recorded in the [changelog](CHANGELOG.md).
 **Administration**
 - Role-based admin (`super_admin`, `admin`, `contributor`), all requiring TOTP MFA, with QR-code enrolment and delegable admin management
 - CSV upload and an email-in intake channel for match results and player statistics
+- A player-link review queue for names the importer could not identify with confidence, fed by reader suggestions from the public "Unmatched" badges — see [Player identity review](#player-identity-review)
 - Runtime site settings: home-page layout, record of the week, and the coming-soon page and footer, editable without a deploy
 - Grid Solver and a hidden query builder for data QA
 - Database health reporting
@@ -94,6 +95,57 @@ passing. The legacy SQLite source is opened read-only; AFLDB never writes to it.
 
 Derived career, season, and club-season summaries are reproducible from
 authoritative tables and are rebuilt rather than hand-edited.
+
+### Player identity review
+
+Every honours row — award winners, award nominations, Hall of Fame, honour
+teams, captaincies, achievements, and draft picks — records how confidently its
+source name was tied to an AFLDB player:
+
+| Status | Meaning | Trusted link? |
+|---|---|---|
+| `unique` | Exactly one candidate matched | Yes |
+| `resolved` | Several candidates; settled deliberately | Yes |
+| `ambiguous` | Several candidates; none chosen | No |
+| `unmatched` | No candidate found | No |
+| `implausible` | A candidate existed but was rejected on evidence | No |
+
+An untrusted row is never hidden and never guessed at: it renders with the
+source's own spelling, no player link, and an **Unmatched** badge. Most such
+names are state-league footballers with no VFL/AFL record, and for those the
+absence of a link is correct — but some are real AFLDB players the importer
+rightly refused to guess, and those are what the review exists for.
+
+**How a row gets fixed.** Clicking an Unmatched badge on the public site opens
+a small anonymous form ("Know who this is?") whose tips land in a review queue.
+A super admin works that queue at `/admin/player-links`: every untrusted row
+across all seven tables, with any reader tips shown inline. Each row has two
+outcomes — **link** it to a player found via the site's own search, after
+verifying against external sources, or **confirm** it is genuinely not a
+VFL/AFL player, which leaves the row honestly `unmatched` but retires it from
+the queue. Both decisions are recorded in an append-only audit table; a tip's
+own words can never be edited, and a wrong decision gets a new row rather than
+a rewrite. The statistical write itself runs as the import role, the same
+single path every other statistical write takes.
+
+**Why a human is required** — two real rows from the queue:
+
+- *The automation was right to refuse.* The 2014 Sandover Medal row for
+  **Aaron Black** is `implausible`. AFLDB has two Aaron Blacks: one at Geelong
+  and North Melbourne, 2011–2018 (57 games), and one at West Coast, 2022
+  (1 game). The winner is the West Coast player — he won the WAFL's Sandover
+  eight years **before** his single AFL game, so the award year sits outside
+  any career the importer could see, and rejecting the match was the correct
+  automated call. Only a human with external sources can know the link is real.
+- *The lookalike.* Ten Carlton rows for **Craig Bradley** — three John
+  Nicholls Medals and seven All-Australian selections — are `implausible`.
+  Searching the picker for the name surfaces two candidates: **Craig Bradley
+  (Carlton · 1986–2002)** and the near-spelling **Craig Braddy (Fitzroy,
+  Sydney · 1980–1985)**. The club-and-era subtitle on each candidate is the
+  disambiguator: every one of these honours belongs to Carlton's Bradley.
+
+Neither judgement can be automated safely, which is why the queue exists and
+why the resolution is always a person's, recorded as such.
 
 **AFLW sits outside the normalised model.** It is served from a read-only `aflw`
 schema of views over the staged scrape, because AFLW played two seasons in
