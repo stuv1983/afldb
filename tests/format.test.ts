@@ -8,6 +8,7 @@ import {
   formatSpan,
   formatSpanLabel,
   formatStat,
+  isNonPlayerHallOfFameCategory,
   parseEntitySlug,
   playerPath,
 } from '@/lib/format';
@@ -121,5 +122,28 @@ describe('parseEntitySlug', () => {
       slug: 'gary-ablett',
       id: 1105,
     });
+  });
+});
+
+describe('isNonPlayerHallOfFameCategory', () => {
+  it('identifies non-player categories', () => {
+    expect(isNonPlayerHallOfFameCategory('media')).toBe(true);
+    expect(isNonPlayerHallOfFameCategory('Media')).toBe(true);
+    expect(isNonPlayerHallOfFameCategory('umpire')).toBe(true);
+    expect(isNonPlayerHallOfFameCategory('Umpire')).toBe(true);
+    expect(isNonPlayerHallOfFameCategory('administrator')).toBe(true);
+    expect(isNonPlayerHallOfFameCategory('Administrator')).toBe(true);
+    expect(isNonPlayerHallOfFameCategory('pioneer')).toBe(true);
+    expect(isNonPlayerHallOfFameCategory('Pioneer')).toBe(true);
+  });
+
+  it('returns false for player, coach, legend, or null', () => {
+    expect(isNonPlayerHallOfFameCategory('player')).toBe(false);
+    expect(isNonPlayerHallOfFameCategory('Player')).toBe(false);
+    expect(isNonPlayerHallOfFameCategory('coach')).toBe(false);
+    expect(isNonPlayerHallOfFameCategory('legend')).toBe(false);
+    expect(isNonPlayerHallOfFameCategory(null)).toBe(false);
+    expect(isNonPlayerHallOfFameCategory(undefined)).toBe(false);
+    expect(isNonPlayerHallOfFameCategory('')).toBe(false);
   });
 });

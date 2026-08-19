@@ -8,7 +8,7 @@ import { ReorderableSections } from '@/components/ReorderableSections';
 import { TableFilters } from '@/components/TableFilters';
 import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import { getHallOfFameCategories, listHallOfFame } from '@/db/queries/awards';
-import { formatNumber, isLinked, playerPath } from '@/lib/format';
+import { formatNumber, isLinked, isNonPlayerHallOfFameCategory, playerPath } from '@/lib/format';
 import { pageMetadata } from '@/lib/seo';
 import { hallOfFameFilterFields } from '@/search/list-filters';
 import { describeFilters, parseFilterValues } from '@/search/table-filters';
@@ -126,30 +126,41 @@ export default async function HallOfFamePage({
               </tr>
             </thead>
             <tbody>
-              {byYear.map((i) => (
-                <tr key={i.id}>
-                  <td className="num">{i.inductedYear ?? '—'}</td>
-                  <td className="wide">
-                    {i.playerId && isLinked(i.linkStatus) ? (
-                      <Link href={playerPath(i.playerSlug!, i.playerId)}>{i.name}</Link>
-                    ) : (
-                      <span title="No VFL/AFL playing record in AFLDB">{i.name}</span>
-                    )}
-                    {!isLinked(i.linkStatus) && (
-                      <UnmatchedPlayer targetTable="hall_of_fame" targetId={i.id} />
-                    )}
-                    {i.isLegend && <strong> · Legend</strong>}
-                    {i.removedYear && (
-                      <span className="badge badge-warn" title={`Removed in ${i.removedYear}`}>
-                        Removed
-                      </span>
-                    )}
-                  </td>
-                  <td>{CATEGORY_LABELS[i.category ?? ''] ?? i.category ?? '—'}</td>
-                  <td>{i.clubNameRaw ?? <span className="muted">—</span>}</td>
-                  <td className="nowrap muted">{i.playingCareer ?? '—'}</td>
-                </tr>
-              ))}
+              {byYear.map((i) => {
+                const nonPlayer = isNonPlayerHallOfFameCategory(i.category);
+                return (
+                  <tr key={i.id}>
+                    <td className="num">{i.inductedYear ?? '—'}</td>
+                    <td className="wide">
+                      {i.playerId && isLinked(i.linkStatus) ? (
+                        <Link href={playerPath(i.playerSlug!, i.playerId)}>{i.name}</Link>
+                      ) : (
+                        <span title={nonPlayer ? undefined : 'No VFL/AFL playing record in AFLDB'}>
+                          {i.name}
+                        </span>
+                      )}
+                      {!nonPlayer && !isLinked(i.linkStatus) && (
+                        <UnmatchedPlayer targetTable="hall_of_fame" targetId={i.id} />
+                      )}
+                      {i.isLegend && <strong> · Legend</strong>}
+                      {i.removedYear && (
+                        <span className="badge badge-warn" title={`Removed in ${i.removedYear}`}>
+                          Removed
+                        </span>
+                      )}
+                    </td>
+                    <td>{CATEGORY_LABELS[i.category ?? ''] ?? i.category ?? '—'}</td>
+                    <td>
+                      {nonPlayer ? (
+                        <span className="muted">—</span>
+                      ) : (
+                        i.clubNameRaw ?? <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td className="nowrap muted">{i.playingCareer ?? '—'}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

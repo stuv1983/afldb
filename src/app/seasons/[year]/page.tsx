@@ -31,6 +31,7 @@ import {
   formatPercentage,
   formatRound,
   isLinked,
+  isNonPlayerHallOfFameCategory,
   matchPath,
   playerPath,
   seasonPath,
@@ -407,22 +408,25 @@ export default async function SeasonPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {hallOfFame.map((h) => (
-                      <tr key={h.id}>
-                        <td className="wide">
-                          {h.playerId && isLinked(h.linkStatus) ? (
-                            <Link href={playerPath(h.playerSlug!, h.playerId)}>{h.name}</Link>
-                          ) : (
-                            h.name
-                          )}
-                          {h.isLegend && <strong> (Legend)</strong>}
-                          {!isLinked(h.linkStatus) && (
-                            <UnmatchedPlayer targetTable="hall_of_fame" targetId={h.id} />
-                          )}
-                        </td>
-                        <td>{h.category ?? <span className="muted">—</span>}</td>
-                      </tr>
-                    ))}
+                    {hallOfFame.map((h) => {
+                      const nonPlayer = isNonPlayerHallOfFameCategory(h.category);
+                      return (
+                        <tr key={h.id}>
+                          <td className="wide">
+                            {h.playerId && isLinked(h.linkStatus) ? (
+                              <Link href={playerPath(h.playerSlug!, h.playerId)}>{h.name}</Link>
+                            ) : (
+                              h.name
+                            )}
+                            {h.isLegend && <strong> (Legend)</strong>}
+                            {!nonPlayer && !isLinked(h.linkStatus) && (
+                              <UnmatchedPlayer targetTable="hall_of_fame" targetId={h.id} />
+                            )}
+                          </td>
+                          <td>{h.category ?? <span className="muted">—</span>}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

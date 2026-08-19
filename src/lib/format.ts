@@ -247,6 +247,17 @@ export function aflwSlugToName(slug: string): string {
 }
 
 /**
+ * Non-player Hall of Fame categories (see changeLog.md).
+ * Media, Umpire, Administrator and Pioneer inductees are not players in the database
+ * and will not have player records.
+ */
+export const NON_PLAYER_HOF_CATEGORIES = new Set(['media', 'umpire', 'administrator', 'pioneer']);
+
+export function isNonPlayerHallOfFameCategory(category: string | null | undefined): boolean {
+  return category ? NON_PLAYER_HOF_CATEGORIES.has(category.trim().toLowerCase()) : false;
+}
+
+/**
  * A source name is only a link when the link is trusted.
  *
  * `ambiguous`, `unmatched` and `implausible` all mean AFLDB does not know

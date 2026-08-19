@@ -15,6 +15,14 @@ commit.
 
 ## [Unreleased]
 
+### Hall of Fame Non-Player Categories — 20 August 2026
+
+- **Hall of Fame non-player category presentation**:
+  - `src/lib/format.ts`: Added `NON_PLAYER_HOF_CATEGORIES` and `isNonPlayerHallOfFameCategory` helper recognizing Media, Umpire, Administrator, and Pioneer categories.
+  - `src/app/hall-of-fame/page.tsx`: For inductees in non-player categories, removed the `<UnmatchedPlayer>` tag and misleading "no playing record" tooltip since these inductees are not players and will not have player pages. Displayed `—` (dash) for their Club column.
+  - `src/app/seasons/[year]/page.tsx`: Suppressed `<UnmatchedPlayer>` tags for Hall of Fame inductees in non-player categories.
+  - `src/db/queries/player-links.ts`: Filtered out non-player categories (Media, Umpire, Administrator, Pioneer) from the unresolved player links queue in `listUnresolvedLinks`.
+
 ### Security & Architecture Audit Remediation — 20 August 2026
 
 Detailed remediation of findings identified during the full-stack architecture and security code review:

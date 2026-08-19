@@ -90,6 +90,7 @@ export async function listUnresolvedLinks(
                        h.club_name_raw)
         FROM hall_of_fame h
        WHERE h.link_status_value::text = ANY(${statusValues})
+         AND lower(COALESCE(h.category, '')) NOT IN ('media', 'umpire', 'administrator', 'pioneer')
       UNION ALL
       SELECT 'honour_team_members', m.id, m.player_name_raw,
              m.link_status_value::text,
