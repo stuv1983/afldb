@@ -258,6 +258,23 @@ export function isNonPlayerHallOfFameCategory(category: string | null | undefine
 }
 
 /**
+ * Format the club column for a Hall of Fame inductee (see changeLog.md).
+ * Non-players show '—' (null), while AFLW players append '(AFLW)' to their club name.
+ */
+export function formatHallOfFameClub(
+  clubNameRaw: string | null | undefined,
+  category: string | null | undefined,
+  aflwPlayerSlug: string | null | undefined,
+): string | null {
+  if (isNonPlayerHallOfFameCategory(category)) return null;
+  if (!clubNameRaw) return null;
+  if (aflwPlayerSlug) {
+    return clubNameRaw.includes('(AFLW)') ? clubNameRaw : `${clubNameRaw} (AFLW)`;
+  }
+  return clubNameRaw;
+}
+
+/**
  * A source name is only a link when the link is trusted.
  *
  * `ambiguous`, `unmatched` and `implausible` all mean AFLDB does not know

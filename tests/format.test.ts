@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   NOT_RECORDED,
+  formatHallOfFameClub,
   formatRound,
   formatRoundShort,
   formatScore,
@@ -145,5 +146,39 @@ describe('isNonPlayerHallOfFameCategory', () => {
     expect(isNonPlayerHallOfFameCategory(null)).toBe(false);
     expect(isNonPlayerHallOfFameCategory(undefined)).toBe(false);
     expect(isNonPlayerHallOfFameCategory('')).toBe(false);
+  });
+});
+
+describe('formatHallOfFameClub', () => {
+  it('returns null for non-player categories', () => {
+    expect(formatHallOfFameClub('Melbourne', 'media', null)).toBeNull();
+    expect(formatHallOfFameClub('Collingwood', 'Umpire', null)).toBeNull();
+    expect(formatHallOfFameClub('Carlton', 'administrator', null)).toBeNull();
+    expect(formatHallOfFameClub('Essendon', 'pioneer', null)).toBeNull();
+  });
+
+  it('appends (AFLW) for AFLW player inductees', () => {
+    expect(formatHallOfFameClub('Melbourne', 'player', 'daisy-pearce')).toBe('Melbourne (AFLW)');
+    expect(formatHallOfFameClub('Adelaide, Port Adelaide', 'player', 'erin-phillips')).toBe(
+      'Adelaide, Port Adelaide (AFLW)',
+    );
+  });
+
+  it('avoids duplicating (AFLW) if already present', () => {
+    expect(formatHallOfFameClub('Melbourne (AFLW)', 'player', 'daisy-pearce')).toBe(
+      'Melbourne (AFLW)',
+    );
+  });
+
+  it('returns raw club name for regular AFL players', () => {
+    expect(formatHallOfFameClub('Hawthorn', 'player', null)).toBe('Hawthorn');
+    expect(formatHallOfFameClub('Fitzroy, Brisbane Lions', 'player', null)).toBe(
+      'Fitzroy, Brisbane Lions',
+    );
+  });
+
+  it('returns null when clubNameRaw is empty or null', () => {
+    expect(formatHallOfFameClub(null, 'player', 'daisy-pearce')).toBeNull();
+    expect(formatHallOfFameClub('', 'player', null)).toBeNull();
   });
 });

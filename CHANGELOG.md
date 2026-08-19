@@ -15,13 +15,19 @@ commit.
 
 ## [Unreleased]
 
-### Hall of Fame Non-Player Categories — 20 August 2026
+### AFLW Players in Hall of Fame & Non-Player Categories — 20 August 2026
 
+- **AFLW player linking and club labeling**:
+  - `src/db/queries/awards.ts`: Updated `HallOfFameRow`, `listHallOfFame`, and `getHallOfFameInductees` to left-join `aflw.players` and expose `aflwPlayerSlug` for AFLW inductees (e.g. Daisy Pearce, Erin Phillips).
+  - `src/lib/format.ts`: Added `formatHallOfFameClub` to automatically append `(AFLW)` to the club column for AFLW inductees (e.g. `Melbourne (AFLW)`, `Adelaide, Port Adelaide (AFLW)`), while formatting non-player categories cleanly as `—`.
+  - `src/app/hall-of-fame/page.tsx`: Linked AFLW inductees directly to their AFLW player profiles (`/aflw/players/[slug]`) across Legends and All Inductees tables, updated the stats strip to include AFLW players in "With an AFLDB record", and formatted club names with `(AFLW)`.
+  - `src/app/seasons/[year]/page.tsx`: Linked AFLW inductees to their AFLW player pages in season Hall of Fame overviews and suppressed `<UnmatchedPlayer>` tags.
+  - `src/db/queries/player-links.ts`: Excluded AFLW-matched Hall of Fame inductees from the unresolved men's player linking queue.
 - **Hall of Fame non-player category presentation**:
   - `src/lib/format.ts`: Added `NON_PLAYER_HOF_CATEGORIES` and `isNonPlayerHallOfFameCategory` helper recognizing Media, Umpire, Administrator, and Pioneer categories.
-  - `src/app/hall-of-fame/page.tsx`: For inductees in non-player categories, removed the `<UnmatchedPlayer>` tag and misleading "no playing record" tooltip since these inductees are not players and will not have player pages. Displayed `—` (dash) for their Club column.
+  - `src/app/hall-of-fame/page.tsx`: For inductees in non-player categories, removed the `<UnmatchedPlayer>` tag and misleading "no playing record" tooltip. Displayed `—` (dash) for their Club column.
   - `src/app/seasons/[year]/page.tsx`: Suppressed `<UnmatchedPlayer>` tags for Hall of Fame inductees in non-player categories.
-  - `src/db/queries/player-links.ts`: Filtered out non-player categories (Media, Umpire, Administrator, Pioneer) from the unresolved player links queue in `listUnresolvedLinks`.
+  - `src/db/queries/player-links.ts`: Filtered out non-player categories from the unresolved player links queue in `listUnresolvedLinks`.
 
 ### Security & Architecture Audit Remediation — 20 August 2026
 

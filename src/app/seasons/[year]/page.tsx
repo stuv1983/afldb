@@ -25,6 +25,7 @@ import {
   listSeasons,
 } from '@/db/queries/seasons';
 import {
+  aflwPlayerPath,
   clubPath,
   formatDate,
   formatNumber,
@@ -415,11 +416,13 @@ export default async function SeasonPage({
                           <td className="wide">
                             {h.playerId && isLinked(h.linkStatus) ? (
                               <Link href={playerPath(h.playerSlug!, h.playerId)}>{h.name}</Link>
+                            ) : h.aflwPlayerSlug ? (
+                              <Link href={aflwPlayerPath(h.aflwPlayerSlug)}>{h.name}</Link>
                             ) : (
                               h.name
                             )}
                             {h.isLegend && <strong> (Legend)</strong>}
-                            {!nonPlayer && !isLinked(h.linkStatus) && (
+                            {!nonPlayer && !h.aflwPlayerSlug && !isLinked(h.linkStatus) && (
                               <UnmatchedPlayer targetTable="hall_of_fame" targetId={h.id} />
                             )}
                           </td>

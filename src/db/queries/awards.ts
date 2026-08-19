@@ -297,6 +297,7 @@ export type HallOfFameRow = {
   name: string;
   playerId: number | null;
   playerSlug: string | null;
+  aflwPlayerSlug: string | null;
   linkStatus: string;
   category: string | null;
   inductedYear: number | null;
@@ -332,6 +333,7 @@ export async function listHallOfFame(
   return sql<HallOfFameRow[]>`
     SELECT h.id, h.name,
            h.player_id AS "playerId", p.slug AS "playerSlug",
+           CASE WHEN h.player_id IS NULL THEN ap.slug ELSE NULL END AS "aflwPlayerSlug",
            h.link_status_value::text AS "linkStatus",
            h.category, h.inducted_year AS "inductedYear",
            h.is_legend AS "isLegend", h.legend_year AS "legendYear",
@@ -340,6 +342,11 @@ export async function listHallOfFame(
            h.removed_year AS "removedYear"
       FROM hall_of_fame h
       LEFT JOIN players p ON p.id = h.player_id
+      LEFT JOIN (
+        SELECT DISTINCT ON (lower(trim(display_name))) slug, display_name
+          FROM aflw.players
+         ORDER BY lower(trim(display_name)), slug
+      ) ap ON lower(trim(ap.display_name)) = lower(trim(h.name))
      WHERE ${where}
      ORDER BY h.inducted_year NULLS LAST, h.name
   `;
@@ -350,6 +357,7 @@ export async function getHallOfFameInductees(year: number): Promise<HallOfFameRo
   return sql<HallOfFameRow[]>`
     SELECT h.id, h.name,
            h.player_id AS "playerId", p.slug AS "playerSlug",
+           CASE WHEN h.player_id IS NULL THEN ap.slug ELSE NULL END AS "aflwPlayerSlug",
            h.link_status_value::text AS "linkStatus",
            h.category, h.inducted_year AS "inductedYear",
            h.is_legend AS "isLegend", h.legend_year AS "legendYear",
@@ -358,6 +366,11 @@ export async function getHallOfFameInductees(year: number): Promise<HallOfFameRo
            h.removed_year AS "removedYear"
       FROM hall_of_fame h
       LEFT JOIN players p ON p.id = h.player_id
+      LEFT JOIN (
+        SELECT DISTINCT ON (lower(trim(display_name))) slug, display_name
+          FROM aflw.players
+         ORDER BY lower(trim(display_name)), slug
+      ) ap ON lower(trim(ap.display_name)) = lower(trim(h.name))
      WHERE h.inducted_year = ${year}
      ORDER BY h.name
   `;

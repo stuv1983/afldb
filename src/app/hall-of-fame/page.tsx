@@ -8,7 +8,14 @@ import { ReorderableSections } from '@/components/ReorderableSections';
 import { TableFilters } from '@/components/TableFilters';
 import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import { getHallOfFameCategories, listHallOfFame } from '@/db/queries/awards';
-import { formatNumber, isLinked, isNonPlayerHallOfFameCategory, playerPath } from '@/lib/format';
+import {
+  aflwPlayerPath,
+  formatHallOfFameClub,
+  formatNumber,
+  isLinked,
+  isNonPlayerHallOfFameCategory,
+  playerPath,
+} from '@/lib/format';
 import { pageMetadata } from '@/lib/seo';
 import { hallOfFameFilterFields } from '@/search/list-filters';
 import { describeFilters, parseFilterValues } from '@/search/table-filters';
@@ -54,7 +61,9 @@ export default async function HallOfFamePage({
   const described = describeFilters(fields, values);
 
   const legends = inductees.filter((i) => i.isLegend);
-  const linked = inductees.filter((i) => i.playerId !== null && isLinked(i.linkStatus));
+  const linked = inductees.filter(
+    (i) => (i.playerId !== null && isLinked(i.linkStatus)) || i.aflwPlayerSlug !== null,
+  );
   const byYear = [...inductees].sort((a, b) => {
     const ay = a.inductedYear ?? 9999;
     const by = b.inductedYear ?? 9999;
@@ -91,12 +100,18 @@ export default async function HallOfFamePage({
                     <td className="wide">
                       {i.playerId && isLinked(i.linkStatus) ? (
                         <Link href={playerPath(i.playerSlug!, i.playerId)}>{i.name}</Link>
+                      ) : i.aflwPlayerSlug ? (
+                        <Link href={aflwPlayerPath(i.aflwPlayerSlug)}>{i.name}</Link>
                       ) : (
                         i.name
                       )}
                     </td>
                     <td className="num">{i.legendYear ?? i.inductedYear ?? '—'}</td>
-                    <td>{i.clubNameRaw ?? <span className="muted">—</span>}</td>
+                    <td>
+                      {formatHallOfFameClub(i.clubNameRaw, i.category, i.aflwPlayerSlug) ?? (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
                     <td className="nowrap muted">{i.playingCareer ?? '—'}</td>
                   </tr>
                 ))}
@@ -134,12 +149,14 @@ export default async function HallOfFamePage({
                     <td className="wide">
                       {i.playerId && isLinked(i.linkStatus) ? (
                         <Link href={playerPath(i.playerSlug!, i.playerId)}>{i.name}</Link>
+                      ) : i.aflwPlayerSlug ? (
+                        <Link href={aflwPlayerPath(i.aflwPlayerSlug)}>{i.name}</Link>
                       ) : (
                         <span title={nonPlayer ? undefined : 'No VFL/AFL playing record in AFLDB'}>
                           {i.name}
                         </span>
                       )}
-                      {!nonPlayer && !isLinked(i.linkStatus) && (
+                      {!nonPlayer && !i.aflwPlayerSlug && !isLinked(i.linkStatus) && (
                         <UnmatchedPlayer targetTable="hall_of_fame" targetId={i.id} />
                       )}
                       {i.isLegend && <strong> · Legend</strong>}
@@ -151,10 +168,8 @@ export default async function HallOfFamePage({
                     </td>
                     <td>{CATEGORY_LABELS[i.category ?? ''] ?? i.category ?? '—'}</td>
                     <td>
-                      {nonPlayer ? (
+                      {formatHallOfFameClub(i.clubNameRaw, i.category, i.aflwPlayerSlug) ?? (
                         <span className="muted">—</span>
-                      ) : (
-                        i.clubNameRaw ?? <span className="muted">—</span>
                       )}
                     </td>
                     <td className="nowrap muted">{i.playingCareer ?? '—'}</td>

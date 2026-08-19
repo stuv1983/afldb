@@ -89,7 +89,9 @@ export async function listUnresolvedLinks(
                             THEN 'inducted ' || h.inducted_year END,
                        h.club_name_raw)
         FROM hall_of_fame h
+        LEFT JOIN aflw.players ap ON lower(trim(ap.display_name)) = lower(trim(h.name))
        WHERE h.link_status_value::text = ANY(${statusValues})
+         AND ap.slug IS NULL
          AND lower(COALESCE(h.category, '')) NOT IN ('media', 'umpire', 'administrator', 'pioneer')
       UNION ALL
       SELECT 'honour_team_members', m.id, m.player_name_raw,
