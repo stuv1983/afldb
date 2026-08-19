@@ -150,23 +150,37 @@ export async function getAwardSeasons(awardId: number): Promise<number[]> {
 /**
  * Players with the most wins of one award.
  *
- * Counted over linked players only: an unlinked row names a person AFLDB
- * cannot identify, so counting it would either invent a multiple winner
- * or split one across two spellings.
+ * Linked rows are counted by player identity. Unlinked rows — a Sandover
+ * or Magarey winner is usually a state-league footballer with no AFLDB
+ * player at all — are counted by the source's own spelling WITHIN this
+ * one award, where a single consistent source makes name-grouping safe;
+ * they return with a null playerId and render unlinked. Dropping them
+ * entirely (as this query once did) showed Ian Dargie as the Sandover's
+ * only multiple winner while Stephen Michael, Allistair Pickett and Jye
+ * Bolton sat unlinked in the same table.
+ *
+ * A person whose rows are split between linked and unlinked appears
+ * twice, undercounted in both halves — honest, visible, and fixed by
+ * resolving the unlinked rows in /admin/player-links rather than by
+ * guessing a join here.
  */
-export async function getAwardLeaders(awardId: number, limit = 10) {
+export async function getAwardLeaders(awardId: number, limit = 50) {
   return sql<{
-    playerId: number; slug: string; displayName: string;
+    playerId: number | null; slug: string | null; displayName: string;
     wins: number; seasons: string;
   }[]>`
-    SELECT p.id AS "playerId", p.slug, p.display_name AS "displayName",
+    SELECT max(p.id)::int AS "playerId", max(p.slug) AS "slug",
+           COALESCE(max(p.display_name), min(w.player_name_raw)) AS "displayName",
            count(*)::int AS wins,
            string_agg(w.season::text, ', ' ORDER BY w.season) AS seasons
       FROM award_winners w
-      JOIN players p ON p.id = w.player_id
-     WHERE w.award_id = ${awardId}
+      LEFT JOIN players p
+        ON p.id = w.player_id
        AND w.link_status_value IN ('unique','resolved')
-     GROUP BY p.id, p.slug, p.display_name
+     WHERE w.award_id = ${awardId}
+     GROUP BY CASE WHEN p.id IS NOT NULL
+                   THEN 'player:' || p.id
+                   ELSE 'name:' || lower(w.player_name_raw) END
     HAVING count(*) > 1
      ORDER BY count(*) DESC, min(w.season)
      LIMIT ${limit}

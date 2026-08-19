@@ -217,11 +217,26 @@ export default async function AwardPage({
   }
 
   if (leaders.length > 0) {
+    // The span AFLDB actually holds, from the winner rows themselves —
+    // a state-league award loaded from 1980 must not imply its 1920s
+    // winners were counted.
+    const winnerSeasons = winners
+      .map((w) => w.season)
+      .filter((s): s is number => s !== null);
+    const coverage = winnerSeasons.length > 0
+      ? `${Math.min(...winnerSeasons)}–${Math.max(...winnerSeasons)}`
+      : null;
+
     sections.push({
       id: 'multiple-winners',
       label: 'Multiple winners',
       node: (
         <section className="section">
+          {coverage && (
+            <p className="section-note">
+              Counted across the seasons AFLDB holds for this award ({coverage}).
+            </p>
+          )}
           <CollapsibleTable title="Multiple winners">
           <div className="table-wrap">
             <table>
@@ -234,9 +249,13 @@ export default async function AwardPage({
               </thead>
               <tbody>
                 {leaders.map((l) => (
-                  <tr key={l.playerId}>
+                  <tr key={l.playerId ?? l.displayName}>
                     <td className="wide">
-                      <Link href={playerPath(l.slug, l.playerId)}>{l.displayName}</Link>
+                      {l.playerId !== null && l.slug !== null ? (
+                        <Link href={playerPath(l.slug, l.playerId)}>{l.displayName}</Link>
+                      ) : (
+                        <span title="Not linked to an AFLDB player">{l.displayName}</span>
+                      )}
                     </td>
                     <td className="num">{l.wins}</td>
                     <td className="wide muted">{l.seasons}</td>
