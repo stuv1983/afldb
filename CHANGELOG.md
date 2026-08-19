@@ -15,6 +15,16 @@ commit.
 
 ## [Unreleased]
 
+### Fixed — 19 August 2026
+- **Player links now appear on public pages immediately.** Linking a
+  player in `/admin/player-links` (or vetting a row as genuinely
+  unlinked) only revalidated the admin queue; the public pages that
+  render those names — awards, clubs, honour teams, seasons — are
+  statically generated with up to a 24-hour window, so a freshly linked
+  Team of the Century member (Ted Whitten, Ron Barassi) vanished from
+  the queue but kept showing as unmatched on the honour-team page for up
+  to a day. Both actions now revalidate the whole public family.
+
 ### Birth-date enrichment from all-time club lists — 19 August 2026
 
 DOB coverage rose from 12,472 to 13,356 of 13,361 players (100.0%) on the

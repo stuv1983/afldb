@@ -13,6 +13,30 @@ import { audit, requireSuperAdmin } from '@/lib/auth/session';
 export type PlayerLinkActionState = { error?: string; message?: string };
 
 /**
+ * Every public page that renders linked-or-unmatched names from the
+ * review tables. Four of these are statically generated with a 24-hour
+ * revalidate window, so without an explicit revalidation a link applied
+ * here kept rendering as "unmatched" for up to a day — the row left the
+ * admin queue immediately while the public page showed the stale state
+ * (found with the Team of the Century honour-team rows for Ted Whitten
+ * and Ron Barassi). Link actions are rare, super-admin-only events, so
+ * blanket revalidation of the whole family is cheaper than maintaining
+ * a per-table map that would silently go stale as pages change.
+ */
+function revalidatePublicLinkPages(): void {
+  revalidatePath('/awards/[slug]', 'page');
+  revalidatePath('/awards/[slug]/[season]', 'page');
+  revalidatePath('/clubs/[slug]', 'page');
+  revalidatePath('/honour-teams/[slug]', 'page');
+  revalidatePath('/seasons/[year]', 'page');
+  // Dynamic today, listed so a future caching change cannot reintroduce
+  // the staleness silently.
+  revalidatePath('/hall-of-fame');
+  revalidatePath('/draft');
+  revalidatePath('/records/first-kick-goal');
+}
+
+/**
  * The manual half of player linking (migration 056). Every action here
  * is guarded by requireSuperAdmin — the same gate the queue page uses —
  * and every enum-shaped input is checked against its closed set before
@@ -49,6 +73,7 @@ export async function linkPlayer(
     { userId: admin.id, label: admin.email });
 
   revalidatePath('/admin/player-links');
+  revalidatePublicLinkPages();
   return { message: 'Player linked.' };
 }
 
@@ -81,6 +106,9 @@ export async function confirmUnlinked(
     { userId: admin.id, label: admin.email });
 
   revalidatePath('/admin/player-links');
+  // A vetted-unlinked row renders differently on the public pages too
+  // (no more reader suggestion prompt), so they revalidate as well.
+  revalidatePublicLinkPages();
   return { message: 'Recorded as vetted — genuinely unlinked.' };
 }
 
