@@ -101,10 +101,18 @@ export const SORTS: Record<string, { label: string; sql: string }> = {
 
 export const DEFAULT_SORT = 'games';
 
-/** Abuse limits. Generous enough for research, bounded enough to be safe. */
+import { MAX_PAGE_SIZE } from '@/search/constants';
+
+/**
+ * Abuse limits. Generous enough for research, bounded enough to be safe.
+ * Evaluates AFLDB_MAX_FILTERS from the environment if configured (see changeLog.md).
+ */
+const envMaxFilters = typeof process !== 'undefined' && process.env?.AFLDB_MAX_FILTERS
+  ? Number(process.env.AFLDB_MAX_FILTERS)
+  : NaN;
 export const LIMITS = {
-  maxFilters: 20,
-  maxPageSize: 100,
+  maxFilters: Number.isSafeInteger(envMaxFilters) && envMaxFilters > 0 ? envMaxFilters : 20,
+  maxPageSize: MAX_PAGE_SIZE,
   defaultPageSize: 50,
   maxPage: 200,
   maxClubFilters: 5,

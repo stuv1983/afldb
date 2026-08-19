@@ -11,8 +11,16 @@ export const MIN_QUERY_LENGTH = 2;
 /** Autocomplete never returns more than this many suggestions. */
 export const AUTOCOMPLETE_LIMIT = 8;
 
-/** Hard ceiling on any page size, regardless of what the URL requests. */
-export const MAX_PAGE_SIZE = 100;
+/**
+ * Hard ceiling on any page size, regardless of what the URL requests.
+ * Evaluates AFLDB_MAX_PAGE_SIZE from the environment if configured (see changeLog.md).
+ */
+const envMaxPageSize = typeof process !== 'undefined' && process.env?.AFLDB_MAX_PAGE_SIZE
+  ? Number(process.env.AFLDB_MAX_PAGE_SIZE)
+  : NaN;
+export const MAX_PAGE_SIZE = Number.isSafeInteger(envMaxPageSize) && envMaxPageSize > 0
+  ? envMaxPageSize
+  : 100;
 
 export const DEFAULT_PAGE_SIZE = 50;
 

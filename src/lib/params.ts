@@ -13,6 +13,9 @@ export function parsePage(value: string | undefined): number {
   return Math.min(page, 10_000);
 }
 
+/**
+ * Parse page size bounded by MAX_PAGE_SIZE (configurable via AFLDB_MAX_PAGE_SIZE; see changeLog.md).
+ */
 export function parsePageSize(value: string | undefined): number {
   const size = Number(value);
   if (!Number.isSafeInteger(size) || size < 1) return DEFAULT_PAGE_SIZE;

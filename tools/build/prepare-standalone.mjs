@@ -30,6 +30,14 @@ if (!(await exists(standalone))) {
   process.exit(1);
 }
 
+// Check build-time AFLDB_ENV security flag (see changeLog.md).
+const isProductionBuild = process.env.AFLDB_ENV === 'production';
+if (isProductionBuild) {
+  console.log('prepare-standalone: AFLDB_ENV=production detected (HSTS and production CSP enabled)');
+} else {
+  console.log('prepare-standalone: info: AFLDB_ENV is not production; building with development headers');
+}
+
 // Client chunks, CSS and build assets.
 await cp(join(root, '.next', 'static'), join(standalone, '.next', 'static'), {
   recursive: true,

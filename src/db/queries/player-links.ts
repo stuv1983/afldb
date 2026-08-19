@@ -59,7 +59,8 @@ export type UnresolvedLinkRow = {
 export async function listUnresolvedLinks(
   table?: LinkTargetTable,
 ): Promise<UnresolvedLinkRow[]> {
-  const statuses = sql.unsafe(`('${UNRESOLVED.join("','")}')`);
+  // Parameterised array membership — avoids sql.unsafe (see changeLog.md).
+  const statusValues = [...UNRESOLVED];
   const rows = await sql<UnresolvedLinkRow[]>`
     SELECT * FROM (
       SELECT 'award_winners' AS "targetTable", w.id AS "targetId",
@@ -70,7 +71,7 @@ export async function listUnresolvedLinks(
         FROM award_winners w
         JOIN awards a ON a.id = w.award_id
         LEFT JOIN clubs c ON c.id = w.club_id
-       WHERE w.link_status_value IN ${statuses}
+       WHERE w.link_status_value::text = ANY(${statusValues})
       UNION ALL
       SELECT 'award_nominations', n.id, n.player_name_raw,
              n.link_status_value::text,
@@ -79,7 +80,7 @@ export async function listUnresolvedLinks(
                             THEN 'Round ' || n.round_number END)
         FROM award_nominations n
         JOIN awards a ON a.id = n.award_id
-       WHERE n.link_status_value IN ${statuses}
+       WHERE n.link_status_value::text = ANY(${statusValues})
       UNION ALL
       SELECT 'hall_of_fame', h.id, h.name,
              h.link_status_value::text,
@@ -88,33 +89,33 @@ export async function listUnresolvedLinks(
                             THEN 'inducted ' || h.inducted_year END,
                        h.club_name_raw)
         FROM hall_of_fame h
-       WHERE h.link_status_value IN ${statuses}
+       WHERE h.link_status_value::text = ANY(${statusValues})
       UNION ALL
       SELECT 'honour_team_members', m.id, m.player_name_raw,
              m.link_status_value::text,
              concat_ws(' · ', m.team_name, m.position, m.club_name_raw)
         FROM honour_team_members m
-       WHERE m.link_status_value IN ${statuses}
+       WHERE m.link_status_value::text = ANY(${statusValues})
       UNION ALL
       SELECT 'captaincies', cp.id, cp.player_name_raw,
              cp.link_status_value::text,
              concat_ws(' · ', c.name, cp.season::text, cp.role)
         FROM captaincies cp
         JOIN clubs c ON c.id = cp.club_id
-       WHERE cp.link_status_value IN ${statuses}
+       WHERE cp.link_status_value::text = ANY(${statusValues})
       UNION ALL
       SELECT 'player_achievements', pa.id, pa.player_name_raw,
              pa.link_status_value::text,
              concat_ws(' · ', replace(pa.achievement_type::text, '_', ' '),
                        pa.season::text)
         FROM player_achievements pa
-       WHERE pa.link_status_value IN ${statuses}
+       WHERE pa.link_status_value::text = ANY(${statusValues})
       UNION ALL
       SELECT 'draft_picks', dp.id, dp.player_name_raw,
              dp.link_status_value::text,
              concat_ws(' · ', dp.draft_type, dp.draft_year::text)
         FROM draft_picks dp
-       WHERE dp.link_status_value IN ${statuses}
+       WHERE dp.link_status_value::text = ANY(${statusValues})
     ) q
     WHERE ${table ? sql`q."targetTable" = ${table}` : sql`TRUE`}
     ORDER BY q."targetTable", q."playerName"

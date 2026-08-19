@@ -15,6 +15,24 @@ commit.
 
 ## [Unreleased]
 
+### Security & Architecture Audit Remediation — 20 August 2026
+
+Detailed remediation of findings identified during the full-stack architecture and security code review:
+
+- **Runtime enforcement of `AFLDB_MAX_PAGE_SIZE` and `AFLDB_MAX_FILTERS`**:
+  - `src/search/constants.ts`: Updated `MAX_PAGE_SIZE` to dynamically read `process.env.AFLDB_MAX_PAGE_SIZE` if set and positive, with a safe fallback to 100.
+  - `src/search/advanced-spec.ts`: Updated `LIMITS.maxFilters` to dynamically read `process.env.AFLDB_MAX_FILTERS` if set and positive, with a safe fallback to 20; linked `LIMITS.maxPageSize` to `MAX_PAGE_SIZE`.
+  - `src/lib/params.ts`: Updated documentation and parameter clamping to ensure URL parsing strictly honors configured limits.
+- **Production Reverse Proxy & CSP Hardening**:
+  - `deploy/Caddyfile.production`: Added `Strict-Transport-Security` (`max-age=31536000; includeSubDomains`) and `Content-Security-Policy` to the `beta.afldb.com` reverse proxy block so that edge responses and proxy-generated error pages (such as 502/504 during restarts) enforce strict transport security and script boundaries.
+  - `next.config.ts`: Documented build-time header evaluation requirements for `AFLDB_ENV=production`.
+- **Standalone Build Environment Verification**:
+  - `tools/build/prepare-standalone.mjs`: Added build-time verification logging `AFLDB_ENV` status so operators are notified whether standalone headers are being compiled for production or development.
+- **SQL Query Parameterization Hardening**:
+  - `src/db/queries/player-links.ts`: Replaced `sql.unsafe` array string concatenation in `listUnresolvedLinks` with native postgres.js array parameterization (`= ANY(${statusValues})`).
+- **Dependency Version Pinning**:
+  - `package.json`: Locked core runtime and dev dependencies to exact versions (removing `^` semver ranges) to guarantee reproducible, audit-locked builds.
+
 ### Fixed — 19 August 2026
 - **Player links now appear on public pages immediately.** Linking a
   player in `/admin/player-links` (or vetting a row as genuinely

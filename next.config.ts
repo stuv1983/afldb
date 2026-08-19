@@ -8,7 +8,8 @@ import type { NextConfig } from 'next';
  * `production`, whether or not it is ready to be indexed.
  *
  * Read at BUILD time: `headers()` is evaluated when the routes manifest is
- * generated, so changing this on a server requires a rebuild, not a restart.
+ * generated, so changing this on a server requires a rebuild, not a restart
+ * (see changeLog.md).
  */
 const isProduction = process.env.AFLDB_ENV === 'production';
 
