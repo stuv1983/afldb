@@ -23,11 +23,8 @@ import type { NlAnswer, NlAnswerPayload } from '@/search/nl/answer-types';
  * Parse and answer a natural-language question end to end: question ->
  * parseNlQuestion -> validatePlan (defence in depth, even though the
  * parser just built this plan) -> executePlan -> a rendered NlAnswer, or
- * null when there is nothing to show (the question wasn't recognised,
- * confidence was too low, or the recognised plan matched no rows -- the
- * same "fall through to ordinary search, no empty-state panel" rule
- * db/queries/search.ts's answerPlayerQuestion/answerClubQuestion
- * already follow).
+ * null when there is nothing to show because the question wasn't
+ * recognised or confidence was too low.
  *
  * Every failure mode degrades to null rather than throwing: a reader's
  * ordinary player/club/venue results must never be lost because the
@@ -157,6 +154,7 @@ export async function answerNlQuestion(
     const payload = await executePlan(validated);
     const resultCount = payloadTotal(payload);
     if (resultCount === 0) {
+      const answer = buildAnswer(validated, payload, parsed.report.notes, clientRef);
       log({
         outcome: 'no_results', failureReason: 'empty_result',
         grain: validated.grain, metric: validated.metric, plan: validated,
@@ -164,7 +162,7 @@ export async function answerNlQuestion(
         unsupportedTerms: parsed.report.unsupportedTerms, entityResolution: parsed.report.entityResolution,
         resultCount: 0, parserVersion: PARSER_VERSION,
       });
-      return null;
+      return answer;
     }
 
     const answer = buildAnswer(validated, payload, parsed.report.notes, clientRef);

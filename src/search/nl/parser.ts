@@ -285,6 +285,7 @@ function extractSeasons(text: string): SeasonExtraction {
 // answered as an all-time career total with the Grand Final scope
 // silently gone.
 const SCOPE_GOVERNS_MATCH_TYPE = /\b(?:in|during|was|is|were)\s+(?:the same|(?:a )?single|an?|any|one|the)?\s*$/;
+const BARE_MATCH_TYPE_RECORD_RE = /\b(?:record|leader|leaders?)\b/;
 
 /**
  * `allowBare` lifts the governing-word requirement, and is passed when the
@@ -329,6 +330,10 @@ function extractMatchType(
 /** Does a team-scoring word appear anywhere? Peeked WITHOUT consuming -- extractTeamMetric still does the real extraction later, against the by-then-stripped text. */
 function hasTeamMetricWord(text: string): boolean {
   return TEAM_METRIC_WORDS.some(([re]) => re.test(text));
+}
+
+function hasBareMatchTypeRecordCue(text: string): boolean {
+  return BARE_MATCH_TYPE_RECORD_RE.test(text) && METRIC_WORDS.some(([re]) => re.test(text));
 }
 
 // ----------------------------------------------------------------- awards
@@ -1118,7 +1123,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // final"/"finals" can only be scope, never the player_career metric --
   // see extractMatchType. Peeked before extraction so the decision is made
   // on the whole question rather than on whatever is left by this point.
-  const matchTypeResult = extractMatchType(text, hasTeamMetricWord(text));
+  const matchTypeResult = extractMatchType(text, hasTeamMetricWord(text) || hasBareMatchTypeRecordCue(text));
   text = matchTypeResult.text;
   consumedTokens.push(...matchTypeResult.consumed);
 

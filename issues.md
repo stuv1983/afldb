@@ -2195,3 +2195,83 @@ Extracted the import/report transaction into `src/lib/external-afl/current-seaso
 
 ### Follow-up
 Deploy to the development host and restart the service so the new admin route is served.
+
+## AFLDB-ISSUE-062 - Record/leader NL phrasing drops finals scope
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Area:** NL Search
+- **Found:** 2026-08-21
+- **Resolved:** 2026-08-21
+- **Queries:** `Grand Final record for goals`, `please Grand Final record for goals thanks`, `career goal leader against Collingwood`
+- **Files:** `src/search/nl/parser.ts`, `src/search/nl/plan.ts`, `src/search/nl/vocab.ts`, `tests/nl-parser.test.ts`
+
+### Symptom
+Clear record-style questions declined even though equivalent superlative phrasing, such as `most goals in a Grand Final` or `most goals against Collingwood`, was supported.
+
+### Reproduction
+Run the full NL stress corpora and inspect verified-answer declines for `Grand Final record for goals` and `career goal leader against Collingwood` variants.
+
+### Expected
+Record/leader wording should parse to the same deterministic player-game or scoped career plans as equivalent `most` phrasing, while `most finals played` remains a career-finals total.
+
+### Actual
+Bare `Grand Final` was not consumed as match scope without an `in a`-style governor, and `leader` was not an aggregation word.
+
+### Evidence
+V1 reported soft failures for `Grand Final record for goals` and `career goal leader against Collingwood`; V2 reported 344 `grand final` record declines and 395 `leader` declines in verified-answer rows.
+
+### First wrong layer
+Slot extraction
+
+### Root cause
+The match-type gate protected career-finals questions by requiring a governing preposition for bare finals words, but had no narrow exception for record/leader phrasings that also name a player metric. Separately, aggregation vocabulary covered `leading` and `led` but not the noun `leader`.
+
+### Fix
+Added `leader`/`leaders` to aggregation vocabulary, allowed bare finals match-type words only when a record/leader cue and a player metric are both present, and bumped `PARSER_VERSION` to 23.
+
+### Validation
+`npm.cmd test -- tests/nl-parser.test.ts tests/nl-audit-acceptance.test.ts tests/nl-plan.test.ts tests/nl-describe.test.ts` passed with 211 assertions, including positive coverage for Grand Final record/leader phrasing and negative coverage that `most finals played` remains a career metric. Independent `afldb_dev` truth verified Richmond v Essendon Round 5 1984 hitouts as Mark Lee, 29. Full V2 rerun at `/tmp/afldb-nl-full-v2-v23-20260821/report.md` scored 20,000/20,000 verified football answers correct, 6,788/6,788 metamorphic groups consistent, and cleared all 739 v22 hard verified-answer declines without any clean-to-hard regression.
+
+### Follow-up
+After development service restart, verify parser version 23 is live through `/search` and replay the record/leader browser questions.
+
+## AFLDB-ISSUE-063 - Valid no-result NL plans render no explanation
+
+- **Status:** Resolved
+- **Severity:** Low
+- **Area:** UI
+- **Found:** 2026-08-21
+- **Resolved:** 2026-08-21
+- **Queries:** `Dustin Martin most handballs against Richmond`, `Dustin Martin total handballs against Richmond`, `Dustin Martin highest handballs game against Richmond`
+- **Files:** `src/db/queries/nl/answer.ts`, `tests/integration/nl-answer-boundary.test.ts`
+
+### Symptom
+The rendered `/search` experience showed no NL answer panel for valid questions whose parsed plan matched zero rows.
+
+### Reproduction
+Run the 60-query NL UI smoke. Rows `ui_00055`-`ui_00057` expected an NL plan for Dustin Martin handball questions against Richmond, but the page rendered no NL panel.
+
+### Expected
+A valid parsed question with no matching rows should explain that no matching performance was found rather than disappearing into ordinary global search.
+
+### Actual
+`answerNlQuestion` logged `no_results` and returned `null`, so the UI had no NL panel.
+
+### Evidence
+A direct parser/execute diagnostic on `afldb_dev` showed all three Dustin Martin-v-Richmond queries parsed as `player_game` handball plans with `clubAgainst: Richmond`, validated successfully, and returned `player_game` payloads with `total: 0`. A neighbouring control, `Dustin Martin most handballs against Carlton`, returned one result.
+
+### First wrong layer
+UI/runtime
+
+### Root cause
+The answer layer treated recognised-but-empty NL plans the same as unrecognised low-confidence questions, even though `describeAnswer` already has grain-specific empty-result text.
+
+### Fix
+`answerNlQuestion` now still logs `no_results` but returns the normal described answer for zero-row payloads. A focused integration regression covers the boundary between a supported zero-row plan, a neighbouring supported non-empty answer, an unsupported metric decline, and a historical coverage-unavailable answer.
+
+### Validation
+`npm.cmd test -- tests/nl-describe.test.ts tests/nl-parser.test.ts tests/nl-audit-acceptance.test.ts tests/nl-plan.test.ts` passed with 211 assertions. `npm.cmd run typecheck` passed. Remote guard confirmed `test_database=afldb_test`, then `PATH=/home/arm/.nvm/versions/node/v22.23.2/bin:$PATH npm test -- tests/integration/nl-answer-boundary.test.ts tests/integration/nl-answers.test.ts tests/integration/nl-answers-game-season.test.ts tests/integration/nl-answers-team-club.test.ts tests/integration/nl-vocab.test.ts` passed with 67 assertions. The new boundary test proves supported zero rows return an `NlAnswer` and log `no_results`, supported non-empty controls remain answered, unsupported metrics still decline, and coverage-unavailable eras stay explicit coverage answers. Local `npm.cmd test -- tests/integration/nl-answer-boundary.test.ts` is blocked on Windows because `AFLDB_TEST_DATABASE_URL` is intentionally absent there. Live UI verification is blocked until the development `afldb` service can be restarted with the rebuilt parser-v23 bundle.
+
+### Follow-up
+After development service restart, replay the three Dustin Martin-v-Richmond UI cases and confirm the rendered panel says no matching performance was found.

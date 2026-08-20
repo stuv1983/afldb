@@ -1,6 +1,6 @@
 ---
 name: afldb-nl-search-audit
-description: Review, debug, expand, regression-test, document, and verify AFLDB's deterministic natural-language search against the real PostgreSQL development data and the real /search UI. Use for parser, plan, SQL compiler, alias, coverage, answer-rendering, NL-search regression, audit, and repair work. Maintain issues.md and CHANGELOG.md when defects or codebase changes are found.
+description: Review, debug, expand, regression-test, document, and verify AFLDB's deterministic natural-language search against the real PostgreSQL development data and the real /search UI. Use for parser, plan, SQL compiler, alias, coverage, answer-rendering, NL-search regression, audit, and repair work. Maintain issuesFound.md and CHANGELOG.md when defects or codebase changes are found.
 disable-model-invocation: true
 ---
 
@@ -58,25 +58,53 @@ Documentation files required by this skill are not considered application-source
 - Do not write to production data.
 - Do not use production as a test target.
 
-## Leave Git untouched
+## Limited Git access for audit tooling
 
-Unless the user explicitly asks for Git work:
+Git is permitted only for **read-only repository metadata required to execute existing NL audit/stress tooling**.
 
-- do not run `git`;
-- do not run `gh`;
-- do not inspect or mutate `.git`;
-- do not commit;
-- do not stage;
-- do not stash;
-- do not branch;
-- do not merge/rebase;
-- do not checkout/restore/reset;
-- do not pull/fetch/push;
-- do not use Git history as an investigative shortcut.
+The V2 stress runner is explicitly allowed to execute:
 
-The user reviews the working-tree changes first.
+```text
+git rev-parse HEAD
+```
 
-Track the files changed during the session yourself so the final report does not depend on Git.
+If an existing repository-owned NL test/stress script requires another Git command, allow it only when the command is demonstrably read-only and used solely to obtain repository metadata needed by that script.
+
+Examples of acceptable read-only metadata commands when genuinely required by existing tooling:
+
+```text
+git rev-parse HEAD
+git rev-parse --short HEAD
+git rev-parse --show-toplevel
+```
+
+Do **not** broaden this permission into general Git investigation.
+
+Unless the user explicitly asks for Git work, still do not:
+
+- run `gh`;
+- commit;
+- stage/add;
+- stash;
+- branch/switch;
+- merge/rebase;
+- checkout/restore/reset;
+- cherry-pick/revert;
+- pull/fetch/push;
+- tag;
+- clean;
+- modify Git configuration;
+- modify files under `.git`;
+- use Git history/log/blame as an investigative shortcut;
+- use Git to transfer or reconcile source changes.
+
+The audit must not change repository history, index state, branch state, remotes, tags, or working-tree content through Git.
+
+The user reviews working-tree changes first.
+
+Track files changed during the session yourself; do not depend on Git status/diff for the final changed-file report.
+
+A V2 stress run must **not** be classified as blocked merely because `tools/nl/v2-runner.ts` invokes the permitted read-only `git rev-parse HEAD`.
 
 ## Search-system invariants
 
@@ -301,6 +329,21 @@ for the beta gate.
 
 Do not print cookie contents.
 
+If the saved beta state is missing, expired, or rejected, and the user has supplied a beta access code in the current session or through a protected environment variable, use that code through the real beta-access UI to establish a temporary browser session.
+
+Beta-code rules:
+
+- do not hardcode a beta code in `SKILL.md`;
+- do not write a beta code into source, tests, `issuesFound`, `CHANGELOG.md`, logs, screenshots, traces, or generated corpus files;
+- do not print the code;
+- do not include it in command-line arguments that are likely to be persisted in shell history when an existing protected input mechanism is available;
+- do not commit browser storage state containing beta/session cookies;
+- prefer an ephemeral Playwright browser context or temporary storage-state file outside the repository;
+- delete temporary auth state at the end of the run when practical;
+- if multiple valid codes were supplied, use only one unless authentication fails.
+
+Do not treat an expired saved storage state as an NL-search defect.
+
 For every user-visible NL fix, verify the exact failing question against the development application after the changed source is actually running there.
 
 If the development application requires a rebuild/restart to pick up changes:
@@ -326,8 +369,11 @@ Windows/source inspection
 -> Windows typecheck
 -> SSH afldb_dev independent truth queries
 -> SSH _test database integration tests
--> development /search UI
--> broader NL regression/stress/UI suite
+-> Playwright targeted UI smoke (>=60)
+-> Playwright expanded stratified UI corpus (>=500)
+-> full existing 12,000-question UI corpus when present
+-> full V2 stress
+-> failure replay / DB truth controls
 ```
 
 Only report the database portion as blocked if the remote development server itself cannot provide the required environment after SSH access has been attempted.
@@ -839,6 +885,132 @@ For each target query:
 Prefer semantic locators.
 
 Do not use arbitrary `waitForTimeout()` as a correctness mechanism.
+
+## Aggressive Playwright audit in `full` mode
+
+In `full` mode, Playwright is a first-class correctness oracle for the rendered `/search` experience, not merely a final smoke check.
+
+Use the existing NL UI harness where possible. Extend its input corpus when necessary rather than writing a separate one-off browser script that bypasses existing instrumentation.
+
+Run the browser audit in escalating phases:
+
+### Phase 1 — targeted high-risk smoke
+
+Run at least 60 deliberately chosen questions spanning every supported/high-risk semantic class.
+
+The smoke set must include:
+
+- min and max direction pairs;
+- exact season + round;
+- two-club match scope;
+- finals and Grand Finals;
+- venues and venue aliases;
+- historical club identities;
+- player game/season/career;
+- team-match records;
+- grouped/HAVING counts;
+- per-match margin thresholds before grouping;
+- streaks;
+- quarter/half splits;
+- Brownlow season totals;
+- advanced stat acronyms;
+- slang/nicknames;
+- ties;
+- declines for unavailable data;
+- ambiguous or collision-prone wording;
+- malformed-input resilience;
+- at least one query from every acceptance category in this skill.
+
+### Phase 2 — expanded stratified UI corpus
+
+Generate or assemble at least **500 unique browser queries** by crossing semantic dimensions rather than by random word noise.
+
+Use combinations of:
+
+- aggregation: highest, lowest, most, fewest, top N, list/count;
+- operator: `>`, `>=`, `<`, `<=`, exact;
+- grain: player game, player season, player career, team match, club season, streak;
+- club role: for, against, both clubs;
+- era: exact season, since, before, range, all-time;
+- round: exact round, finals, Grand Final;
+- venue: canonical name and alias;
+- period: Q1, Q2, Q3, Q4, H1, H2, full match;
+- metric: common and advanced allowlisted stats;
+- phrasing: formal, slang, abbreviations, punctuation variation, singular/plural;
+- alias: club nickname, historical identity, venue alias;
+- tie likelihood;
+- supported versus intentionally unsupported combinations.
+
+The expanded set must contain both:
+
+- metamorphic equivalents that should converge on the same plan/answer; and
+- near-neighbour non-equivalents that must remain semantically distinct.
+
+Do not generate meaningless strings only to inflate the count.
+
+### Phase 3 — full existing UI corpus
+
+If the repository contains a 12,000-question NL UI corpus/harness, run the **full corpus** in `full` mode after the targeted and expanded phases are stable.
+
+Do not stop at observing 44 of 12,000 questions and call that the full UI corpus.
+
+Use the repository's existing safe concurrency defaults. If the harness exposes concurrency, keep it at or below the project's known-safe level unless the task is explicitly a load test.
+
+Capture:
+
+- total attempted;
+- passed;
+- failed;
+- declined;
+- page errors;
+- console errors;
+- hydration errors;
+- timeouts;
+- malformed answer text;
+- query/result mismatches;
+- report/output paths.
+
+### Phase 4 — failure replay and controls
+
+For every Playwright failure:
+
+1. save the exact query;
+2. classify whether failure is parser, compiler, data, description, UI, hydration, timeout, or auth/environment;
+3. preserve raw server HTML when hydration is implicated;
+4. preserve a screenshot/trace when useful;
+5. rerun the same query individually;
+6. rerun a semantically equivalent phrasing;
+7. run a clean neighbouring control;
+8. independently verify PostgreSQL truth when the answer is database-backed.
+
+Intermittent failures must not be dismissed because one replay passes.
+
+### Browser assertions
+
+For every successful answer that is sampled deeply, assert as applicable:
+
+- headline is non-empty and semantically correct;
+- interpretation matches the plan;
+- min/max wording direction is correct;
+- entity noun matches the result grain;
+- result values match expected payload shape;
+- ties are complete;
+- grouped results display counts/groups rather than one match;
+- period labels and values agree;
+- no `Highest .`, `Lowest .`, `Top N by .`, `undefined`, or `[object Object]`;
+- no player-specific wording on team/grouped answers;
+- no stale previous-query result after navigation;
+- no page/console/hydration error.
+
+### Search-term expansion ledger
+
+When new high-value queries are generated during the audit:
+
+- add durable regression-worthy cases to the appropriate existing corpus/test fixture;
+- do not add thousands of redundant permutations to source control;
+- keep large generated runs in existing generated-output/corpus locations;
+- record newly discovered semantic families in `issuesFound` when they expose a defect;
+- document meaningful permanent corpus/test expansion in `CHANGELOG.md`.
 
 ---
 
@@ -1366,9 +1538,39 @@ At minimum for a semantic fix:
 
 For a pure description-direction fix, explicitly include both min and max cases.
 
-## 7. Broader NL suites
+## 7. Broader NL suites and full V2 stress
 
 Run relevant parser/regression/stress/UI corpus suites.
+
+In `full` mode:
+
+1. run the targeted Playwright UI smoke;
+2. run the expanded >=500-query stratified browser corpus;
+3. run the repository's full 12,000-question UI corpus when present;
+4. run the full V2 stress suite when the repository contains the runner and its required development database/runtime is available.
+
+Do not substitute the smaller browser smoke for the full UI corpus.
+
+The runner may use the narrowly permitted read-only Git metadata command:
+
+```text
+git rev-parse HEAD
+```
+
+Do not skip V2 solely because of that command.
+
+Capture and report at least:
+
+- total cases attempted;
+- semantic correctness;
+- answer correctness;
+- metamorphic consistency;
+- hard failures;
+- soft failures/declines where reported;
+- runtime/errors;
+- output/report location.
+
+If V2 cannot run for some reason other than the allowed Git metadata lookup, classify the actual reason as `BLOCKED` and preserve the exact evidence.
 
 ## 8. Lint/build
 
@@ -1417,7 +1619,11 @@ Audit category by category:
 17. UI/browser rendering;
 18. runtime/performance;
 19. decline correctness;
-20. metamorphic consistency.
+20. metamorphic consistency;
+21. targeted Playwright UI audit;
+22. expanded stratified Playwright corpus;
+23. full existing 12,000-question UI corpus when present;
+24. full V2 stress/corpus execution when the repository runner and required development environment are available.
 
 For each category, classify:
 
@@ -1534,6 +1740,22 @@ For DB-backed truth, include concise evidence such as:
 Richmond v Essendon, Round 5 1984 -> Mark Lee, 29 hitouts (verified directly in afldb_dev).
 ```
 
+For `full` mode, report browser and V2 results separately.
+
+Browser reporting must include:
+
+- targeted smoke attempted/passed/failed;
+- expanded corpus attempted/passed/failed;
+- full UI corpus attempted/passed/failed when present;
+- page errors;
+- console errors;
+- hydration errors;
+- timeouts;
+- malformed-answer detections;
+- output/report paths.
+
+V2 reporting must include corpus size and key semantic/answer/metamorphic metrics. If it was not run, state the precise blocker; the permitted read-only `git rev-parse HEAD` command is not itself a blocker.
+
 ## Audit records
 
 State explicitly:
@@ -1578,6 +1800,10 @@ Do not declare the work complete until all applicable conditions are met:
 - no fixed phrase leaves a known collision regression;
 - parser versioning is correct;
 - the broader NL suite shows no unexplained regression;
+- in `full` mode, the targeted Playwright smoke has covered at least 60 high-risk questions unless a concrete environment blocker is recorded;
+- in `full` mode, an expanded stratified Playwright corpus of at least 500 meaningful unique questions has been exercised unless a concrete environment blocker is recorded;
+- in `full` mode, the repository's full 12,000-question UI corpus has been run when that corpus/harness exists and the development UI is available;
+- in `full` mode, the V2 stress runner has been executed when its required development environment is available; its permitted `git rev-parse HEAD` metadata lookup is not a valid reason to skip it;
 - every credible defect found is present in the existing `issuesFound` ledger;
 - resolved issue records include root cause, fix, and validation;
 - every code/test/documentation change made by the run is represented in `CHANGELOG.md`;

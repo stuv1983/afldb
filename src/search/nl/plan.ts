@@ -218,8 +218,13 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  * 22: clean "A v B" club pairs are match scope rather than subject/opponent
  *    role scope, and checkpoint lead/margin questions ("at half time",
  *    "but won") gained explicit plan fields.
+ * 23: bare finals match-type words are allowed only when a record/leader
+ *    cue and a player metric make them unambiguously scoped ("Grand Final
+ *    record for goals", "career goal leader against Collingwood"), while
+ *    career-final totals such as "most finals played" remain career
+ *    metrics.
  */
-export const PARSER_VERSION = 22;
+export const PARSER_VERSION = 23;
 
 // ------------------------------------------------------------------ grain
 

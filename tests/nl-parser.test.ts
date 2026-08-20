@@ -195,6 +195,21 @@ describe('6. finals', () => {
     expect(p.scope.matchType).toBe('grand_final');
   });
 
+  it('grand final record phrasing scopes the player-game metric', async () => {
+    for (const question of [
+      'Grand Final record for goals',
+      'please Grand Final record for goals thanks',
+      'Grand Final goal leader',
+    ]) {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('goals');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.matchType).toBe('grand_final');
+    }
+  });
+
   it('dusty top 5 disposal games in finals', async () => {
     const p = await plan('dusty top 5 disposal games in finals');
     expect(p.grain).toBe('player_game');
@@ -210,6 +225,13 @@ describe('6. finals', () => {
     expect(p.grain).toBe('player_career');
     expect(p.metric).toBe('finals');
     expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'premierships', op: 'eq', value: 0 });
+  });
+
+  it('bare finals still stays a career metric without record/leader context', async () => {
+    const p = await plan('most finals played');
+    expect(p.grain).toBe('player_career');
+    expect(p.metric).toBe('finals');
+    expect(p.scope.matchType).toBeUndefined();
   });
 
   it('reads a qualified finals count as its own builder, not the generic any-type total', async () => {
