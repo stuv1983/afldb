@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### Interactive Match Browser with Season & Club Filters — 20 August 2026
+
+- **Comprehensive Match Browser in Data Editor (`/admin/data-editor`)**:
+  - `src/db/queries/match-admin.ts`: Created `searchAdminMatches` with parameterized filtering across seasons, clubs, round numbers, and text queries, returning match details alongside player lineup counts (`playerCount`).
+  - `src/app/admin/data-editor/MatchBrowser.tsx`: Built an interactive match browser component featuring:
+    - Default view displaying recent matches with scores, venues, and lineup statuses.
+    - Quick season jump chips (`2026`, `2025`, `2024`, `2023`).
+    - Filter controls for Season (dropdown), Club (dropdown), Round # (number input), and Team/Venue Search.
+    - Direct action buttons on each match row: **`📋 Match sheet`** (instant player stats editor), **`Edit details`** (scores/venue editor), and public match link.
+  - `src/app/admin/data-editor/page.tsx`: Embedded `MatchBrowser` replacing the plain numeric season input.
+
 ### Quick Lineup Pre-Fill & Player Stats Entry Workflow — 20 August 2026
 
 - **1-Click Roster Pre-Fill & Live Match Sheet Stats**:

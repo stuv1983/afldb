@@ -12,13 +12,16 @@ import { PlayerFinder } from '@/app/admin/data-editor/PlayerFinder';
 import { listAwards, listHonourTeams } from '@/db/queries/awards';
 import { listClubs } from '@/db/queries/clubs';
 import { listVenues } from '@/db/queries/venues';
-import { getMatch, getMatchPlayers, getRecentClubLineup, getSeasonMatches } from '@/db/queries/matches';
+import { getMatch, getMatchPlayers, getRecentClubLineup } from '@/db/queries/matches';
 import { getEditableRow } from '@/db/queries/data-edits';
 import { listDraftPicks } from '@/db/queries/draft';
+import { searchAdminMatches } from '@/db/queries/match-admin';
+import { listSeasons } from '@/db/queries/seasons';
 import { requireSuperAdmin } from '@/lib/auth/session';
 import { formatDate, formatRoundShort } from '@/lib/format';
 import { firstValue, parseSeason } from '@/lib/params';
 import { isEditableEntity } from '@/lib/edit/spec';
+import { MatchBrowser } from '@/app/admin/data-editor/MatchBrowser';
 
 export const metadata: Metadata = { title: 'Data editor', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -41,14 +44,18 @@ export default async function DataEditorPage(
   const entity = isEditableEntity(entityParam) ? entityParam : null;
   const id = Number(firstValue(params.id));
   const seasonParam = parseSeason(firstValue(params.season) ?? '');
+  const clubIdParam = Number(firstValue(params.club_id)) || null;
+  const roundParam = Number(firstValue(params.round)) || null;
+  const matchQueryParam = firstValue(params.match_q)?.trim() ?? '';
   const draftQueryParam = firstValue(params.draft_q)?.trim() ?? '';
   const draftYearParam = parseSeason(firstValue(params.draft_year) ?? '');
 
-  const [clubs, venues, awards, honourTeams] = await Promise.all([
+  const [clubs, venues, awards, honourTeams, seasonsList] = await Promise.all([
     listClubs(),
     listVenues(),
     listAwards(),
     listHonourTeams(),
+    listSeasons(),
   ]);
   const existingTeamNames = honourTeams.map((t) => t.teamName);
 
@@ -67,7 +74,16 @@ export default async function DataEditorPage(
   const row = (mode !== 'match-sheet' && entity && Number.isInteger(id) && id > 0)
     ? await getEditableRow(entity, id)
     : null;
-  const seasonMatches = seasonParam ? await getSeasonMatches(seasonParam) : [];
+
+  const adminMatchesResult = (!matchForSheet && !row)
+    ? await searchAdminMatches({
+        season: seasonParam,
+        clubId: clubIdParam,
+        roundNumber: roundParam,
+        query: matchQueryParam,
+        limit: 35,
+      })
+    : { rows: [], total: 0 };
 
   const draftResults = (draftQueryParam || draftYearParam)
     ? await listDraftPicks({
@@ -114,25 +130,18 @@ export default async function DataEditorPage(
             <form method="get" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end' }}>
               <input type="hidden" name="entity" value="matches" />
               <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
-                Match details (scores/venue)
-                <input type="number" name="id" min={1} defaultValue={mode !== 'match-sheet' && entity === 'matches' && id > 0 ? id : undefined} />
+                Jump to match details (scores/venue)
+                <input type="number" name="id" min={1} placeholder="Match ID" defaultValue={mode !== 'match-sheet' && entity === 'matches' && id > 0 ? id : undefined} />
               </label>
               <button type="submit">Open details</button>
             </form>
             <form method="get" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end' }}>
               <input type="hidden" name="mode" value="match-sheet" />
               <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
-                Match sheet editor (lineup & player stats)
-                <input type="number" name="id" min={1} defaultValue={mode === 'match-sheet' && id > 0 ? id : undefined} />
+                Jump to match sheet (lineup & player stats)
+                <input type="number" name="id" min={1} placeholder="Match ID" defaultValue={mode === 'match-sheet' && id > 0 ? id : undefined} />
               </label>
               <button type="submit" className="btn btn-primary">Open match sheet</button>
-            </form>
-            <form method="get" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end' }}>
-              <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
-                Or browse a season
-                <input type="number" name="season" min={1897} max={2100} defaultValue={seasonParam ?? undefined} />
-              </label>
-              <button type="submit">List matches</button>
             </form>
           </div>
         </div>
@@ -219,40 +228,17 @@ export default async function DataEditorPage(
         </section>
       )}
 
-      {seasonParam !== null && seasonMatches.length > 0 && (
-        <section className="section">
-          <h2>{seasonParam} matches</h2>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Round</th>
-                  <th scope="col">Date</th>
-                  <th scope="col">Match</th>
-                  <th scope="col" className="num">Score</th>
-                  <th scope="col" />
-                </tr>
-              </thead>
-              <tbody>
-                {seasonMatches.map((m) => (
-                  <tr key={m.id}>
-                    <td className="nowrap">{formatRoundShort(m.roundType, m.roundNumber)}</td>
-                    <td className="nowrap">{formatDate(m.matchDate)}</td>
-                    <td className="wide">{m.homeName} v {m.awayName}</td>
-                    <td className="num nowrap">{m.homeScore}–{m.awayScore}</td>
-                    <td style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                      <Link href={`/admin/data-editor?entity=matches&id=${m.id}`}>Edit details</Link>
-                      <span className="muted">·</span>
-                      <Link href={`/admin/data-editor?mode=match-sheet&id=${m.id}`} style={{ fontWeight: 600 }}>
-                        Match sheet
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+      {!matchForSheet && !row && (
+        <MatchBrowser
+          matches={adminMatchesResult.rows}
+          total={adminMatchesResult.total}
+          clubs={clubs}
+          seasons={seasonsList}
+          currentSeason={seasonParam}
+          currentClubId={clubIdParam}
+          currentRound={roundParam}
+          currentQuery={matchQueryParam}
+        />
       )}
 
       {matchForSheet && (

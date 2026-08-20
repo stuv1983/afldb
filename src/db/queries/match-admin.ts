@@ -1,6 +1,7 @@
 import 'server-only';
 
 import postgres from 'postgres';
+import { sql } from '@/db/client';
 import { authSql } from '@/db/authClient';
 
 export type QuarterScoreInput = {
@@ -8,6 +9,86 @@ export type QuarterScoreInput = {
   behinds?: number | null;
   points?: number | null;
 };
+
+export type AdminMatchSummary = {
+  id: number;
+  season: number;
+  roundType: string;
+  roundNumber: number | null;
+  roundCode: string;
+  matchDate: Date;
+  homeClubId: number;
+  homeName: string;
+  homeSlug: string;
+  awayClubId: number;
+  awayName: string;
+  awaySlug: string;
+  homeGoals: number | null;
+  homeBehinds: number | null;
+  homeScore: number;
+  awayGoals: number | null;
+  awayBehinds: number | null;
+  awayScore: number;
+  margin: number;
+  result: string;
+  venueName: string;
+  attendance: number | null;
+  playerCount: number;
+};
+
+/**
+ * Super Admin: Search and browse matches with filters (season, club, round, query)
+ * and player lineup counts (see changeLog.md).
+ */
+export async function searchAdminMatches(options: {
+  season?: number | null;
+  clubId?: number | null;
+  roundNumber?: number | null;
+  query?: string | null;
+  limit?: number;
+}): Promise<{ rows: AdminMatchSummary[]; total: number }> {
+  const limit = options.limit ?? 30;
+  const whereClauses = [
+    options.season ? sql`m.season = ${options.season}` : sql`true`,
+    options.clubId ? sql`(m.home_club_id = ${options.clubId} OR m.away_club_id = ${options.clubId})` : sql`true`,
+    options.roundNumber ? sql`m.round_number = ${options.roundNumber}` : sql`true`,
+    options.query?.trim() ? sql`(h.name ILIKE ${'%' + options.query.trim() + '%'} OR a.name ILIKE ${'%' + options.query.trim() + '%'} OR COALESCE(v.canonical_name, m.venue_raw) ILIKE ${'%' + options.query.trim() + '%'})` : sql`true`,
+  ];
+
+  const combinedWhere = sql`${whereClauses.reduce((acc, clause) => sql`${acc} AND ${clause}`)}`;
+
+  const [countRow] = await sql<{ count: number }[]>`
+    SELECT count(*)::int AS count
+      FROM matches m
+      JOIN clubs h ON h.id = m.home_club_id
+      JOIN clubs a ON a.id = m.away_club_id
+      LEFT JOIN venues v ON v.id = m.venue_id
+     WHERE ${combinedWhere}
+  `;
+
+  const rows = await sql<AdminMatchSummary[]>`
+    SELECT m.id, m.season, m.round_type AS "roundType",
+           m.round_number AS "roundNumber", m.round_code AS "roundCode",
+           m.match_date AS "matchDate",
+           m.home_club_id AS "homeClubId", h.name AS "homeName", h.slug AS "homeSlug",
+           m.away_club_id AS "awayClubId", a.name AS "awayName", a.slug AS "awaySlug",
+           m.home_goals AS "homeGoals", m.home_behinds AS "homeBehinds", m.home_score AS "homeScore",
+           m.away_goals AS "awayGoals", m.away_behinds AS "awayBehinds", m.away_score AS "awayScore",
+           m.margin, m.result,
+           COALESCE(v.canonical_name, m.venue_raw) AS "venueName",
+           m.attendance,
+           (SELECT count(*)::int FROM player_match_stats pms WHERE pms.match_id = m.id) AS "playerCount"
+      FROM matches m
+      JOIN clubs h ON h.id = m.home_club_id
+      JOIN clubs a ON a.id = m.away_club_id
+      LEFT JOIN venues v ON v.id = m.venue_id
+     WHERE ${combinedWhere}
+     ORDER BY m.match_date DESC, m.id DESC
+     LIMIT ${limit}
+  `;
+
+  return { rows, total: countRow?.count ?? 0 };
+}
 
 export type CreateMatchInput = {
   season: number;
