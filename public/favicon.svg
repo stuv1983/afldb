@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<rect width="64" height="64" fill="#14130e"></rect>
+<circle cx="32" cy="32" r="26.2" fill="none" stroke="#c9a447" stroke-width="0.9"></circle>
+<text x="32" y="34" text-anchor="middle" dominant-baseline="middle" font-family="Georgia, &#39;Times New Roman&#39;, serif" font-weight="600" font-size="16.5" fill="#c9a447">afldb</text>
+<line x1="21.6" y1="52" x2="42.4" y2="52" stroke="#c9a447" stroke-width="1"></line>
+</svg>

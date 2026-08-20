@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { listAwards, listHonourTeams } from '@/db/queries/awards';
-import { awardPath, formatNumber, formatSpan, honourTeamPath } from '@/lib/format';
+import { listAwards, listHonourTeams, getAwardLeaders, getAwardWinners } from '@/db/queries/awards';
+import { awardPath, formatNumber, formatSpan, honourTeamPath, playerPath } from '@/lib/format';
 import { pageMetadata } from '@/lib/seo';
 import { honourTeamSlug } from '@/lib/slugs';
 
@@ -45,6 +45,16 @@ const CATEGORY_ORDER = ['honour_team', 'award', 'club_best_and_fairest', 'draft_
 export default async function AwardsPage() {
   const [awards, honourTeams] = await Promise.all([listAwards(), listHonourTeams()]);
 
+  const under22Award = awards.find(a => a.slug === '22-under-22-team');
+  let under22Leaders: Awaited<ReturnType<typeof getAwardLeaders>> = [];
+  let under22Winners: Awaited<ReturnType<typeof getAwardWinners>> = [];
+  if (under22Award) {
+    [under22Leaders, under22Winners] = await Promise.all([
+      getAwardLeaders(under22Award.id),
+      getAwardWinners(under22Award.id)
+    ]);
+  }
+
   const byCategory = new Map<string, typeof awards>();
   for (const award of awards) {
     const list = byCategory.get(award.category) ?? [];
@@ -73,6 +83,13 @@ export default async function AwardsPage() {
       {CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((category) => {
         const heading = CATEGORY_HEADINGS[category];
         const list = byCategory.get(category)!;
+        if (category === 'honour_team') {
+          list.sort((a, b) => {
+            if (a.name === 'All-Australian Team' && b.name === '22 Under 22 Team') return -1;
+            if (a.name === '22 Under 22 Team' && b.name === 'All-Australian Team') return 1;
+            return 0;
+          });
+        }
         return (
           <section className="section" key={category}>
             <h2>{heading?.title ?? category}</h2>
@@ -129,6 +146,64 @@ export default async function AwardsPage() {
                 </div>
               </Link>
             ))}
+          </div>
+        </section>
+      )}
+
+      {under22Award && under22Winners.length > 0 && (
+        <section className="section">
+          <h2>22 Under 22 Selections</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem' }}>
+            <div>
+              <h3>Most Selections</h3>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Player</th>
+                      <th>Selections</th>
+                      <th>Seasons</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {under22Leaders.slice(0, 20).map((l, i) => (
+                      <tr key={i}>
+                        <td className="wide">{l.slug ? <Link href={playerPath(l.slug)}>{l.displayName}</Link> : l.displayName}</td>
+                        <td className="nowrap">{l.wins}</td>
+                        <td className="wide muted">{l.seasons}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <h3>All Selections (Latest First)</h3>
+              <div className="table-wrap" style={{ maxHeight: '500px', overflowY: 'auto' }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Season</th>
+                      <th>Player</th>
+                      <th>Position</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {under22Winners.map((w, i) => (
+                      <tr key={i}>
+                        <td className="nowrap">{w.season}</td>
+                        <td className="wide">
+                          {w.playerSlug ? <Link href={playerPath(w.playerSlug)}>{w.playerName}</Link> : w.playerName}
+                          {w.isCaptain && ' (c)'}
+                          {w.isViceCaptain && ' (vc)'}
+                        </td>
+                        <td className="nowrap">{w.position}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </section>
       )}

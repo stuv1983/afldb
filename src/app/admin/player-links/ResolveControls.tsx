@@ -23,15 +23,13 @@ const INITIAL: PlayerLinkActionState = {};
  * 3. Confirm the person is genuinely not an AFL/VFL player.
  */
 export function ResolveControls({
-  targetTable,
-  targetId,
+  targets,
   playerName,
   context,
   linkStatus,
   suggestions,
 }: {
-  targetTable: string;
-  targetId: number;
+  targets: { table: string; id: number }[];
   playerName?: string;
   context?: string;
   linkStatus: string;
@@ -47,6 +45,8 @@ export function ResolveControls({
 
   const done = linkState.message ?? createState.message ?? confirmState.message;
   const warning = linkState.warning ?? createState.warning ?? confirmState.warning;
+
+  const targetsRaw = targets.map(t => `${t.table}:${t.id}`).join(',');
 
   // Split name for create pre-fill
   const cleanName = (playerName ?? '').trim();
@@ -116,8 +116,7 @@ export function ResolveControls({
       {/* Tab 1: Link Existing Player */}
       {tab === 'link' && (
         <form action={linkAction} style={{ display: 'grid', gap: '0.6rem' }}>
-          <input type="hidden" name="targetTable" value={targetTable} />
-          <input type="hidden" name="targetId" value={targetId} />
+          <input type="hidden" name="targets" value={targetsRaw} />
           <input type="hidden" name="playerId" value={picked?.id ?? ''} />
           <div>
             <PlayerPicker label="Find AFLDB player" onSelect={setPicked} />
@@ -146,8 +145,7 @@ export function ResolveControls({
       {/* Tab 2: Create & Link New Player */}
       {tab === 'create' && (
         <form action={createAction} style={{ display: 'grid', gap: '0.6rem' }}>
-          <input type="hidden" name="targetTable" value={targetTable} />
-          <input type="hidden" name="targetId" value={targetId} />
+          <input type="hidden" name="targets" value={targetsRaw} />
 
           <div style={{ display: 'grid', gap: '0.5rem' }}>
             <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.8rem' }}>
@@ -254,8 +252,7 @@ export function ResolveControls({
       {/* Tab 3: Confirm Not an AFL/VFL Player */}
       {tab === 'unlinked' && (
         <form action={confirmAction} style={{ display: 'grid', gap: '0.6rem' }}>
-          <input type="hidden" name="targetTable" value={targetTable} />
-          <input type="hidden" name="targetId" value={targetId} />
+          <input type="hidden" name="targets" value={targetsRaw} />
           <input type="hidden" name="previousStatus" value={linkStatus} />
           <p className="muted" style={{ fontSize: '0.85rem', margin: 0 }}>
             Mark this record as vetted non-AFL/VFL player (e.g. state-league or pioneer recipient).

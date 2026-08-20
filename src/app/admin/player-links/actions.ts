@@ -21,37 +21,30 @@ function combineWarnings(...warnings: Array<string | undefined>): string | undef
   return warnings.filter(Boolean).join(' ') || undefined;
 }
 
-/**
- * Every public page that renders linked-or-unmatched names from the
- * review tables. Four of these are statically generated with a 24-hour
- * revalidate window, so without an explicit revalidation a link applied
- * here kept rendering as "unmatched" for up to a day — the row left the
- * admin queue immediately while the public page showed the stale state
- * (found with the Team of the Century honour-team rows for Ted Whitten
- * and Ron Barassi). Link actions are rare, super-admin-only events, so
- * blanket revalidation of the whole family is cheaper than maintaining
- * a per-table map that would silently go stale as pages change.
- */
 function revalidatePublicLinkPages(): void {
   revalidatePath('/awards/[slug]', 'page');
   revalidatePath('/awards/[slug]/[season]', 'page');
   revalidatePath('/clubs/[slug]', 'page');
   revalidatePath('/honour-teams/[slug]', 'page');
   revalidatePath('/seasons/[year]', 'page');
-  // Dynamic today, listed so a future caching change cannot reintroduce
-  // the staleness silently.
   revalidatePath('/hall-of-fame');
   revalidatePath('/draft');
   revalidatePath('/records/first-kick-goal');
 }
 
-/**
- * The manual half of player linking (migration 056). Every action here
- * is guarded by requireSuperAdmin — the same gate the queue page uses —
- * and every enum-shaped input is checked against its closed set before
- * it reaches SQL, so a bad value comes back as a message rather than a
- * constraint violation.
- */
+function parseTargets(formData: FormData) {
+  const targetsRaw = String(formData.get('targets') ?? '');
+  const targets = targetsRaw.split(',').filter(Boolean).map(t => {
+    const [table, idStr] = t.split(':');
+    return { targetTable: table, targetId: Number(idStr) };
+  });
+
+  if (targets.length === 0) return { error: 'No targets selected.' };
+  if (targets.some(t => !isLinkTargetTable(t.targetTable))) return { error: 'Unknown table in targets.' };
+  if (targets.some(t => !Number.isInteger(t.targetId) || t.targetId <= 0)) return { error: 'Bad row id in targets.' };
+  
+  return { targets };
+}
 
 export async function linkPlayer(
   _prev: PlayerLinkActionState,
@@ -59,11 +52,8 @@ export async function linkPlayer(
 ): Promise<PlayerLinkActionState> {
   const admin = await requireSuperAdmin();
 
-  const targetTable = String(formData.get('targetTable') ?? '');
-  if (!isLinkTargetTable(targetTable)) return { error: 'Unknown table.' };
-
-  const targetId = Number(formData.get('targetId'));
-  if (!Number.isInteger(targetId) || targetId <= 0) return { error: 'Bad row id.' };
+  const { targets, error } = parseTargets(formData);
+  if (error || !targets) return { error };
 
   const playerId = Number(formData.get('playerId'));
   if (!Number.isInteger(playerId) || playerId <= 0) {
@@ -73,30 +63,26 @@ export async function linkPlayer(
   const note = String(formData.get('note') ?? '').trim();
   if (note.length > 2000) return { error: 'Notes are limited to 2000 characters.' };
 
-  const result = await resolveLink({
-    targetTable, targetId, playerId, adminUserId: admin.id, note,
-  });
-  if (!result.ok) return { error: result.error };
+  let warning: string | undefined;
 
-  let warning = result.auditWarning;
-  try {
-    await audit('player_link.linked', { targetTable, targetId, playerId },
-      { userId: admin.id, label: admin.email });
-  } catch (error) {
-    console.error('Failed to log administrative audit for player link', error);
-    warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
+  for (const { targetTable, targetId } of targets) {
+    const result = await resolveLink({
+      targetTable, targetId, playerId, adminUserId: admin.id, note,
+    });
+    if (!result.ok) return { error: `Error on ${targetTable}:${targetId}: ${result.error}` };
+
+    warning = combineWarnings(warning, result.auditWarning);
+    try {
+      await audit('player_link.linked', { targetTable, targetId, playerId },
+        { userId: admin.id, label: admin.email });
+    } catch (error) {
+      console.error('Failed to log administrative audit for player link', error);
+      warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
+    }
   }
 
-  // Deliberately NOT revalidatePath('/admin/player-links'): on this Next
-  // 15.5 line, revalidating the route the action was submitted from leaves
-  // the client transition pending forever and the queue never visibly
-  // updates (verified on dev 2026-08-19 — the POST returns a complete
-  // flight payload including this success message, and the browser never
-  // applies it; matches vercel/next.js discussion #82289). The client
-  // component refreshes the route itself after the action settles, which
-  // takes the ordinary navigation path that provably works.
   revalidatePublicLinkPages();
-  return { message: 'Player linked.', warning };
+  return { message: `Player linked to ${targets.length} record(s).`, warning };
 }
 
 export async function confirmUnlinked(
@@ -105,33 +91,29 @@ export async function confirmUnlinked(
 ): Promise<PlayerLinkActionState> {
   const admin = await requireSuperAdmin();
 
-  const targetTable = String(formData.get('targetTable') ?? '');
-  if (!isLinkTargetTable(targetTable)) return { error: 'Unknown table.' };
-
-  const targetId = Number(formData.get('targetId'));
-  if (!Number.isInteger(targetId) || targetId <= 0) return { error: 'Bad row id.' };
+  const { targets, error } = parseTargets(formData);
+  if (error || !targets) return { error };
 
   const previousStatus = String(formData.get('previousStatus') ?? '');
-  if (!['ambiguous', 'unmatched', 'implausible'].includes(previousStatus)) {
+  if (!['ambiguous', 'unmatched', 'implausible', 'mixed'].includes(previousStatus)) {
     return { error: 'Unknown link status.' };
   }
 
   const note = String(formData.get('note') ?? '').trim();
   if (note.length > 2000) return { error: 'Notes are limited to 2000 characters.' };
 
-  const result = await confirmUnlinkedQuery({
-    targetTable, targetId, previousStatus, adminUserId: admin.id, note,
-  });
-  if (!result.ok) return { error: result.error };
+  for (const { targetTable, targetId } of targets) {
+    const result = await confirmUnlinkedQuery({
+      targetTable, targetId, previousStatus, adminUserId: admin.id, note,
+    });
+    if (!result.ok) return { error: `Error on ${targetTable}:${targetId}: ${result.error}` };
 
-  await audit('player_link.confirmed_unlinked', { targetTable, targetId },
-    { userId: admin.id, label: admin.email });
+    await audit('player_link.confirmed_unlinked', { targetTable, targetId },
+      { userId: admin.id, label: admin.email });
+  }
 
-  // No self-revalidation — see the comment in linkPlayer. The vetted-unlinked
-  // row renders differently on the public pages too (no more reader
-  // suggestion prompt), so those revalidate here as before.
   revalidatePublicLinkPages();
-  return { message: 'Recorded as vetted — genuinely unlinked.' };
+  return { message: `Recorded ${targets.length} record(s) as vetted — genuinely unlinked.` };
 }
 
 export async function reviewSuggestion(
@@ -153,25 +135,17 @@ export async function reviewSuggestion(
   await audit('player_link.suggestion_reviewed', { suggestionId: id, status },
     { userId: admin.id, label: admin.email });
 
-  // No self-revalidation — see the comment in linkPlayer.
   return { message: `Suggestion ${status}.` };
 }
 
-/**
- * Create a new player record and link an unresolved item to it in one step (see changeLog.md).
- * Ideal for drafted players who have yet to debut (e.g., Riley Onley, Fred Rodriguez).
- */
 export async function createAndLinkPlayer(
   _prev: PlayerLinkActionState,
   formData: FormData,
 ): Promise<PlayerLinkActionState> {
   const admin = await requireSuperAdmin();
 
-  const targetTable = String(formData.get('targetTable') ?? '');
-  if (!isLinkTargetTable(targetTable)) return { error: 'Unknown table.' };
-
-  const targetId = Number(formData.get('targetId'));
-  if (!Number.isInteger(targetId) || targetId <= 0) return { error: 'Bad row id.' };
+  const { targets, error } = parseTargets(formData);
+  if (error || !targets) return { error };
 
   const displayName = String(formData.get('displayName') ?? '').trim();
   if (!displayName || displayName.length > 100) {
@@ -193,43 +167,62 @@ export async function createAndLinkPlayer(
   const note = String(formData.get('note') ?? '').trim();
   if (note.length > 2000) return { error: 'Notes are limited to 2000 characters.' };
 
-  const result = await createPlayerAndResolveLink({
-    targetTable,
-    targetId,
-    adminUserId: admin.id,
-    note,
-    player: {
-      displayName,
-      givenName,
-      surname,
-      dob,
-      dobConfidence,
-      heightCm,
-      weightKg,
-      notes,
-    },
-  });
-  if (!result.ok) return { error: result.error };
-  const { player } = result;
+  const playerFields = {
+    displayName, givenName, surname, dob, dobConfidence, heightCm, weightKg, notes,
+  };
 
-  let warning = result.auditWarning;
-  try {
-    await audit('player_link.created_and_linked', {
-      targetTable,
-      targetId,
-      playerId: player.id,
-      playerName: player.displayName,
-    }, { userId: admin.id, label: admin.email });
-  } catch (error) {
-    console.error('Failed to log administrative audit for create-and-link', error);
-    warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
+  let first = true;
+  let createdPlayerId = 0;
+  let createdPlayerName = '';
+  let warning: string | undefined;
+
+  for (const { targetTable, targetId } of targets) {
+    if (first) {
+      const result = await createPlayerAndResolveLink({
+        targetTable,
+        targetId,
+        adminUserId: admin.id,
+        note,
+        player: playerFields,
+      });
+      if (!result.ok) return { error: result.error };
+      const { player } = result;
+      createdPlayerId = player.id;
+      createdPlayerName = player.displayName;
+      warning = combineWarnings(warning, result.auditWarning);
+      try {
+        await audit('player_link.created_and_linked', {
+          targetTable,
+          targetId,
+          playerId: player.id,
+          playerName: player.displayName,
+        }, { userId: admin.id, label: admin.email });
+      } catch (error) {
+        console.error('Failed to log administrative audit for create-and-link', error);
+        warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
+      }
+      first = false;
+    } else {
+      const result = await resolveLink({
+        targetTable, targetId, playerId: createdPlayerId, adminUserId: admin.id, note,
+      });
+      if (!result.ok) return { error: `Error on ${targetTable}:${targetId}: ${result.error}` };
+      warning = combineWarnings(warning, result.auditWarning);
+      try {
+        await audit('player_link.linked', { targetTable, targetId, playerId: createdPlayerId },
+          { userId: admin.id, label: admin.email });
+      } catch (error) {
+        console.error('Failed to log administrative audit for player link', error);
+        warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
+      }
+    }
   }
 
   revalidatePublicLinkPages();
   revalidatePath('/players');
   revalidatePath('/admin/data-editor');
   return {
-    message: `Created player ${player.displayName} (ID #${player.id}) and linked successfully.`,
+    message: `Created player ${createdPlayerName} (ID #${createdPlayerId}) and linked successfully to ${targets.length} record(s).`,
     warning,
   };
 }
