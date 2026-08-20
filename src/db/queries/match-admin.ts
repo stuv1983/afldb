@@ -212,6 +212,7 @@ export async function deleteMatch(input: {
       const [match] = await tx<{
         id: number;
         season: number;
+        roundNumber: number | null;
         roundCode: string;
         matchDate: string;
         homeClubId: number;
@@ -219,7 +220,7 @@ export async function deleteMatch(input: {
         homeScore: number;
         awayScore: number;
       }[]>`
-        SELECT id, season, round_code AS "roundCode", match_date::text AS "matchDate",
+        SELECT id, season, round_number AS "roundNumber", round_code AS "roundCode", match_date::text AS "matchDate",
                home_club_id AS "homeClubId", away_club_id AS "awayClubId",
                home_score AS "homeScore", away_score AS "awayScore"
           FROM matches
@@ -247,6 +248,58 @@ export async function deleteMatch(input: {
 
       // 4. Recalculate player career and season stats for all affected players
       if (affectedIds.length > 0) {
+        // Sync Brownlow votes
+        if (match.roundNumber) {
+          await tx`
+            DELETE FROM brownlow_round_votes
+            WHERE season = ${match.season}
+              AND round_number = ${match.roundNumber}
+              AND player_id = ANY(${affectedIds})
+          `;
+        }
+
+        await tx`
+          INSERT INTO brownlow_season_votes (
+            season, player_id, club_id, votes,
+            three_vote_games, two_vote_games, one_vote_games, polling_games,
+            link_status_value
+          )
+          SELECT
+            m.season,
+            pms.player_id,
+            (array_agg(pms.club_id ORDER BY pms.id DESC))[1] AS club_id,
+            COALESCE(sum(pms.brownlow_votes), 0)::smallint AS votes,
+            count(*) FILTER (WHERE pms.brownlow_votes = 3)::smallint AS three_vote_games,
+            count(*) FILTER (WHERE pms.brownlow_votes = 2)::smallint AS two_vote_games,
+            count(*) FILTER (WHERE pms.brownlow_votes = 1)::smallint AS one_vote_games,
+            count(*) FILTER (WHERE pms.brownlow_votes > 0)::smallint AS polling_games,
+            'unique'::link_status
+          FROM player_match_stats pms
+          JOIN matches m ON m.id = pms.match_id
+          WHERE m.season = ${match.season}
+            AND pms.player_id = ANY(${affectedIds})
+            AND pms.brownlow_votes > 0
+          GROUP BY m.season, pms.player_id
+          ON CONFLICT (season, player_id) DO UPDATE SET
+            club_id = EXCLUDED.club_id,
+            votes = EXCLUDED.votes,
+            three_vote_games = EXCLUDED.three_vote_games,
+            two_vote_games = EXCLUDED.two_vote_games,
+            one_vote_games = EXCLUDED.one_vote_games,
+            polling_games = EXCLUDED.polling_games;
+
+          DELETE FROM brownlow_season_votes
+          WHERE season = ${match.season}
+            AND player_id = ANY(${affectedIds})
+            AND NOT EXISTS (
+              SELECT 1 FROM player_match_stats pms
+              JOIN matches m ON m.id = pms.match_id
+              WHERE m.season = ${match.season}
+                AND pms.player_id = brownlow_season_votes.player_id
+                AND pms.brownlow_votes > 0
+            );
+        `;
+
         // Career stats
         await tx`
           DELETE FROM player_career_stats WHERE player_id = ANY(${affectedIds});
