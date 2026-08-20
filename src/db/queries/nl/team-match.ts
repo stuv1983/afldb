@@ -19,6 +19,7 @@ type SqlFragment = ReturnType<typeof sql>;
 const SIDES = sql`
   SELECT m.id AS match_id, m.season, m.round_type, m.round_number, m.is_final,
          m.match_date, m.venue_id, m.attendance, m.winner_club_id,
+         m.winner_club_id AS final_winner_club_id,
          m.home_club_id AS club_id, m.away_club_id AS opponent_id,
          m.home_score AS score_for, m.away_score AS score_against,
          hq.points AS q3_score_for, aq.points AS q3_score_against
@@ -28,6 +29,7 @@ const SIDES = sql`
   UNION ALL
   SELECT m.id, m.season, m.round_type, m.round_number, m.is_final,
          m.match_date, m.venue_id, m.attendance, m.winner_club_id,
+         m.winner_club_id,
          m.away_club_id, m.home_club_id,
          m.away_score, m.home_score,
          aq.points, hq.points
@@ -81,6 +83,17 @@ function scopeClauses(scope: NlMatchScope): SqlFragment[] {
   if (scope.clubAgainst) {
     clauses.push(sql`t.opponent_id IN (SELECT id FROM clubs WHERE organization_id = ${scope.clubAgainst.organizationId})`);
   }
+  if (scope.matchup) {
+    clauses.push(sql`
+      (
+        (t.club_id IN (SELECT id FROM clubs WHERE organization_id = ${scope.matchup.clubA.organizationId})
+         AND t.opponent_id IN (SELECT id FROM clubs WHERE organization_id = ${scope.matchup.clubB.organizationId}))
+        OR
+        (t.club_id IN (SELECT id FROM clubs WHERE organization_id = ${scope.matchup.clubB.organizationId})
+         AND t.opponent_id IN (SELECT id FROM clubs WHERE organization_id = ${scope.matchup.clubA.organizationId}))
+      )
+    `);
+  }
   if (scope.venue) clauses.push(sql`t.venue_id = ${scope.venue.id}`);
   if (scope.seasonMin !== undefined) clauses.push(sql`t.season >= ${scope.seasonMin}`);
   if (scope.seasonMax !== undefined) clauses.push(sql`t.season <= ${scope.seasonMax}`);
@@ -109,10 +122,16 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
   const value = metricValueExpr(plan.metric!);
   const direction = plan.agg.kind === 'min' ? sql.unsafe('ASC') : sql.unsafe('DESC');
   const n = rankCutoff(plan.agg);
-  const where = foldAnd([...scopeClauses(plan.scope), plan.metric ? sql`${value} IS NOT NULL` : sql`TRUE`]);
+  const where = foldAnd([
+    ...scopeClauses(plan.scope),
+    plan.resultFilter === 'won' ? sql`t.final_winner_club_id = t.club_id` : sql`TRUE`,
+    plan.metric ? sql`${value} IS NOT NULL` : sql`TRUE`,
+  ]);
   
   let periodCte = sql``;
-  const sidesRef = plan.periodSplit && plan.periodSplit !== 'FULL_MATCH' ? sql.unsafe('period_sides') : sql.unsafe('sides');
+  const sidesRef = plan.scoreCheckpoint ? sql.unsafe('checkpoint_sides')
+    : plan.periodSplit && plan.periodSplit !== 'FULL_MATCH' ? sql.unsafe('period_sides')
+    : sql.unsafe('sides');
 
   if (plan.periodSplit && plan.periodSplit !== 'FULL_MATCH') {
     const split = plan.periodSplit;
@@ -142,7 +161,7 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
       ),
       period_sides AS (
         SELECT s.match_id, s.season, s.round_type, s.round_number, s.is_final,
-               s.match_date, s.venue_id, s.attendance,
+               s.match_date, s.venue_id, s.attendance, s.final_winner_club_id,
                CASE WHEN ${forPoints} > ${againstPoints} THEN s.club_id
                     WHEN ${forPoints} < ${againstPoints} THEN s.opponent_id
                     ELSE NULL END AS winner_club_id,
@@ -152,6 +171,39 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
           FROM sides s
           LEFT JOIN period_club pc ON pc.match_id = s.match_id AND pc.club_id = s.club_id
           LEFT JOIN period_club po ON po.match_id = s.match_id AND po.club_id = s.opponent_id
+      )`;
+  }
+
+  if (plan.scoreCheckpoint) {
+    const checkpoint = plan.scoreCheckpoint;
+    const forPoints = checkpoint === 'QT' ? sql`pc.q1`
+      : checkpoint === 'HT' ? sql`pc.q2`
+      : sql`pc.q3`;
+    const againstPoints = checkpoint === 'QT' ? sql`po.q1`
+      : checkpoint === 'HT' ? sql`po.q2`
+      : sql`po.q3`;
+    periodCte = sql`,
+      checkpoint_club AS (
+        SELECT match_id, club_id,
+               max(points) FILTER (WHERE period = 1) AS q1,
+               max(points) FILTER (WHERE period = 2) AS q2,
+               max(points) FILTER (WHERE period = 3) AS q3
+          FROM match_period_scores
+         WHERE period BETWEEN 1 AND 3
+         GROUP BY match_id, club_id
+      ),
+      checkpoint_sides AS (
+        SELECT s.match_id, s.season, s.round_type, s.round_number, s.is_final,
+               s.match_date, s.venue_id, s.attendance, s.final_winner_club_id,
+               CASE WHEN ${forPoints} > ${againstPoints} THEN s.club_id
+                    WHEN ${forPoints} < ${againstPoints} THEN s.opponent_id
+                    ELSE NULL END AS winner_club_id,
+               s.club_id, s.opponent_id,
+               ${forPoints} AS score_for, ${againstPoints} AS score_against,
+               s.q3_score_for, s.q3_score_against
+          FROM sides s
+          LEFT JOIN checkpoint_club pc ON pc.match_id = s.match_id AND pc.club_id = s.club_id
+          LEFT JOIN checkpoint_club po ON po.match_id = s.match_id AND po.club_id = s.opponent_id
       )`;
   }
 

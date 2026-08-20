@@ -296,12 +296,13 @@ export default async function SearchPage({
               close to exact when it fires, and burying it below 25 fuzzy
               player rows would hide the thing the reader typed. */}
           {(results.rounds.length > 0
+            || results.matches.length > 0
             || results.awards.length > 0
             || results.records.length > 0) && (
             <section className="section">
               <h2>Go to</h2>
               <ul className="ruled-list">
-                {[...results.rounds, ...results.awards, ...results.records].map((r) => (
+                {[...results.matches, ...results.rounds, ...results.awards, ...results.records].map((r) => (
                   <li key={`${r.type}-${r.slug}-${r.id}`}>
                     <Link href={searchResultHref(r)}>{r.title}</Link>{' '}
                     {r.subtitle && <span className="muted">— {r.subtitle}</span>}

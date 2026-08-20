@@ -25,6 +25,7 @@ import {
   type GridBoardState,
   type GridStatKey,
 } from '@/search/grid-solver-spec';
+import { buildMatchQueryString } from '@/search/match-spec';
 
 export type IntentClub = { slug: string; name: string };
 
@@ -41,6 +42,13 @@ export type QuerySignals = {
   topicWords: string;
   club: IntentClub | null;
   year: number | null;
+};
+
+export type MatchupQuery = {
+  clubA: IntentClub;
+  clubB: IntentClub;
+  year: number | null;
+  round: number | null;
 };
 
 /** A record/award hit is trusted for intent purposes at prefix strength or better. */
@@ -123,6 +131,44 @@ function buildHref(
   }
   const qs = search.toString();
   return `${path}${qs ? `?${qs}` : ''}${hash ? `#${hash}` : ''}`;
+}
+
+const ROUND_RE = /\b(?:round|rnd|r)\s*(\d{1,2})\b/;
+
+export function extractMatchupQuery(
+  query: string,
+  clubs: readonly IntentClub[],
+): MatchupQuery | null {
+  const lower = query.trim().toLowerCase();
+  const yearMatch = findYear(lower);
+  const roundMatch = ROUND_RE.exec(lower);
+  const round = roundMatch ? Number(roundMatch[1]) : null;
+
+  let best: { at: number; clubA: IntentClub; clubB: IntentClub } | null = null;
+  for (const clubA of clubs) {
+    for (const clubB of clubs) {
+      if (clubA.slug === clubB.slug) continue;
+      const pattern = new RegExp(
+        `\\b${escapeRegExp(clubA.name.toLowerCase())}\\b\\s+(?:v|vs\\.?|versus)\\s+\\b${escapeRegExp(clubB.name.toLowerCase())}\\b`,
+      );
+      const match = pattern.exec(lower);
+      if (!match) continue;
+      if (!best || match.index < best.at) best = { at: match.index, clubA, clubB };
+    }
+  }
+  if (!best) return null;
+  return { clubA: best.clubA, clubB: best.clubB, year: yearMatch?.year ?? null, round };
+}
+
+export function matchupMatchSearchHref(matchup: MatchupQuery): string {
+  const filters = matchup.year !== null
+    ? [{ field: 'season', min: matchup.year, max: matchup.year }]
+    : [];
+  return `/match-search?${buildMatchQueryString({
+    filters,
+    clubSlugs: [matchup.clubA.slug, matchup.clubB.slug],
+    sort: 'date_desc',
+  })}`;
 }
 
 // ------------------------------------------------------- player questions

@@ -1687,7 +1687,7 @@ Round extraction was added after the scope object was assembled and spread direc
 Round numbers now live in `scope`, default to the numbered home-and-away match type unless another type was explicit, and elect single-game player ranking. Parser version increased from 16 to 17.
 
 ### Validation
-The 38-question parser acceptance corpus and focused parser/plan suites pass. A database-backed regression now compares the compiler result with an independent season/round SQL maximum; it requires the unavailable `_test` database to execute.
+The 38-question parser acceptance corpus and focused parser/plan suites pass. On the development Linux host, the database-backed regression also passed against `afldb_test`, comparing the compiler result with an independent season/round SQL maximum.
 
 ### Follow-up
 Run the new integration assertion and the exact question through `/search` on the development Linux environment; verify Mark Lee, 29 hitouts against `afldb_dev`.
@@ -1723,7 +1723,7 @@ The new period compiler assumed a per-period representation without inspecting t
 The compiler now pivots cumulative Q1-Q4 checkpoints and subtracts the required boundaries. H2 uses final minus half-time, and no missing score is converted to zero.
 
 ### Validation
-Focused TypeScript/unit suites pass. Database-backed regressions independently calculate H2 and Q3 and assert `payload.value === clubScore`; they are added but cannot run without `AFLDB_TEST_DATABASE_URL`.
+Focused TypeScript/unit suites pass. On the development Linux host, the database-backed H2 and Q3 regressions passed against `afldb_test`; both independently calculate the period value and assert `payload.value === clubScore`.
 
 ### Follow-up
 Run the H2/Q3 integration cases, `EXPLAIN (ANALYZE, BUFFERS)`, and the exact Magpies query through development `/search`.
@@ -1759,7 +1759,7 @@ The known St Kilda v Brisbane 2005 (186) and Sydney v Essendon 1987 (236) sympto
 Added `team_aggregate` rows and a dedicated compiler/UI/description path. It groups by `club_organizations`, returns the count as `value`, and never invokes a match metric fallback. Added a validated per-match margin filter so `lose 5 times by more than 100 points` filters `loss_margin > 100` before `HAVING count(*) >= 5`.
 
 ### Validation
-Parser, plan, description, TypeScript and acceptance tests pass. Independent database tests for scoped wins and 100-point-loss counts are added but not run because no `_test` database is configured.
+Parser, plan, description, TypeScript and acceptance tests pass. On the development Linux host, the independent database tests for scoped wins and 100-point-loss counts passed against `afldb_test`.
 
 ### Follow-up
 Run both grouped integration truths and verify the three originating queries in `/search` on development.
@@ -1867,7 +1867,7 @@ Exact deterministic vocabulary lacked these narrow variants and there was no fir
 Added narrow phrase rules, explicit debut scope and its compiler predicate. Parser versions 20-21 record the vocabulary and debut changes separately. Negative coverage proves `winning street` is not fuzzily accepted and debut-season wording does not become debut-game scope.
 
 ### Validation
-All required samples and neighbouring parser variants pass; TypeScript passes. A database truth test for debut goals is added but awaits `_test` database access.
+All required samples and neighbouring parser variants pass; TypeScript passes. On the development Linux host, the database truth test for debut goals passed against `afldb_test`.
 
 ### Follow-up
 Verify the debut leader and venue-scoped margin answers directly in `afldb_dev` and through `/search`.
@@ -1903,7 +1903,7 @@ The streak compiler reused match-side identity IDs as the output identity instea
 Streak windows, groups and output now use `club_organizations`; match ordering also adds match ID as a deterministic same-date tiebreaker.
 
 ### Validation
-TypeScript and description tests pass. A database-backed integration test independently computes a selected organization's chronological win streak in TypeScript and compares the compiler result; it awaits the missing `_test` database.
+TypeScript and description tests pass. On the development Linux host, the database-backed test independently computed a selected organization's chronological win streak in TypeScript and matched the compiler result against `afldb_test`.
 
 ### Follow-up
 Run the lineage test and all six required streak queries through development `/search`.
@@ -1943,3 +1943,183 @@ With integration suites and this known failing file excluded, all 983 remaining 
 
 ### Follow-up
 Review the importer/test marker contract with the owner of the Under-22 work and update the implementation or test boundaries without weakening the behavioural assertions.
+
+## AFLDB-ISSUE-055 — Exact `A v B` player-match queries filter to the first club
+
+- **Status:** Resolved
+- **Severity:** High
+- **Area:** Search
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/search/nl/plan.ts`, `src/search/nl/parser.ts`, `src/db/queries/nl/player-game.ts`, `src/db/queries/nl/team-match.ts`, `tests/nl-audit-acceptance.test.ts`, `tests/integration/nl-answers-game-season.test.ts`
+
+### Symptom
+`most hitout Fitzroy v Richmond round 3 1984` answered Glenn Coleman with 20 hitouts, but the match leader is Mark Lee with 33.
+
+### Reproduction
+Ask the query above after the previous NL audit deployment.
+
+### Expected
+`Fitzroy v Richmond` selects the exact match between both clubs and ranks every player in that match. `most hitouts v Richmond round 3 1984` remains opponent-scoped and ranks only players opposed to Richmond.
+
+### Actual
+The clean `A v B` pair was represented as `clubFor=A` and `clubAgainst=B`, so the player-game compiler filtered `player_match_stats.club_id` to Fitzroy and excluded Richmond players.
+
+### Evidence
+Read-only `afldb_dev` SQL verified match `9087`, Fitzroy v Richmond, Round 3 1984. The top hitouts rows are Mark Lee, Richmond, 33 and Glenn Coleman, Fitzroy, 20. Applying only the `v Richmond` opponent filter correctly returns Glenn Coleman, 20.
+
+### Root cause
+The parser had no separate representation for a clean two-club matchup. It reused subject/opponent role fields that mean “the player's side” and “the player's opponent”.
+
+### Fix
+Added `scope.matchup` for clean `A v B` pairs, restricted it to match-level plans, and taught player/team match compilers to use it as a match-participant predicate without filtering the ranked side.
+
+### Validation
+`npm.cmd test -- tests/query-intent.test.ts tests/nl-audit-acceptance.test.ts` passed. The broader focused NL unit layer passed: `npm.cmd test -- tests/nl-parser.test.ts tests/nl-plan.test.ts tests/nl-describe.test.ts tests/query-intent.test.ts tests/nl-audit-acceptance.test.ts`. Integration regression coverage was added but could not run locally because `AFLDB_TEST_DATABASE_URL` is not set.
+
+### Follow-up
+Run the new integration tests against `afldb_test` on the Linux dev host after these local changes are promoted.
+
+## AFLDB-ISSUE-056 — Checkpoint lead/margin wording is not represented
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Area:** Search
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/search/nl/plan.ts`, `src/search/nl/parser.ts`, `src/search/nl/vocab.ts`, `src/db/queries/nl/team-match.ts`, `tests/nl-audit-acceptance.test.ts`, `tests/integration/nl-answers-team-club.test.ts`
+
+### Symptom
+`biggest margin at half time`, `biggest margin at half time but won`, `biggest margin at quarter time but won`, `biggest margin at three quarter time but won`, and `biggest lead at half time` declined or collided with unrelated grouped win parsing.
+
+### Reproduction
+Ask the checkpoint phrases above.
+
+### Expected
+Checkpoint wording uses cumulative quarter-time, half-time, or three-quarter-time scores. `but won` filters the final result after computing the checkpoint leader.
+
+### Actual
+The only existing period representation was period scoring (`Q3` means points scored during Q3), not checkpoint state. `lead` was also not a team metric word.
+
+### Evidence
+Read-only `afldb_dev` SQL verified the largest half-time lead and largest half-time lead by a final winner are Brisbane Bears v Sydney, Round 8 1993, 120 points.
+
+### Root cause
+The plan model lacked `scoreCheckpoint` and final-result filter fields, so the parser either declined the phrase or tried to read `won` through the grouped-result vocabulary.
+
+### Fix
+Added `scoreCheckpoint` (`QT`, `HT`, `3QT`) and `resultFilter: 'won'`, validation, parser extraction including `quatre time`, `lead` as a win-margin synonym, and a checkpoint SQL CTE that keeps checkpoint leader separate from final winner.
+
+### Validation
+Focused NL parser/plan/description/query-intent tests passed. TypeScript passed. Integration regression coverage was added for half-time margin and half-time margin-but-won but could not run locally because `AFLDB_TEST_DATABASE_URL` is not set.
+
+### Follow-up
+Run the new integration tests and `/search` UI checks on the Linux dev host after deployment.
+
+## AFLDB-ISSUE-057 — Single player-match answers hide the game link
+
+- **Status:** Resolved
+- **Severity:** Low
+- **Area:** Search
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/components/NlAnswerSection.tsx`
+
+### Symptom
+Player-match answers such as `most hitouts v Richmond round 3 1984` identify a player and value but do not link to the match when there is only one result row.
+
+### Reproduction
+Ask a single-result player-match query.
+
+### Expected
+The answer links to the match where the performance happened.
+
+### Actual
+The match link existed only in `PlayerGameTable`, and that table intentionally returns `null` for one-row answers because the headline already names the answer.
+
+### Evidence
+Source inspection showed `PlayerGameTable` links `matchPath(r.matchId)` only when `rows.length > 1`.
+
+### Root cause
+The lead/headline path had no companion link for the single-row player-match case.
+
+### Fix
+Added a lead match link under the answer interpretation when the payload is a single player-game row with a match ID.
+
+### Validation
+TypeScript passed.
+
+### Follow-up
+Verify the rendered link through `/search` after deployment.
+
+## AFLDB-ISSUE-058 — Plain `A v B season` search has no match result path
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Area:** Search
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/search/query-intent.ts`, `src/search/constants.ts`, `src/db/queries/search.ts`, `src/app/search/page.tsx`, `tests/query-intent.test.ts`
+
+### Symptom
+Plain search text such as `Richmond v Essendon 1984` or `Richmond v Essendon round 5 1984` should show games between those clubs in that season, but global search had no match-result type.
+
+### Reproduction
+Search for the phrases above in `/search`.
+
+### Expected
+Season-only matchup searches offer the corresponding Match Search filter, and exact-round wording surfaces direct match hits.
+
+### Actual
+Global search only returned players, clubs, venues, seasons, rounds, awards, records and AFLW results.
+
+### Evidence
+Source inspection of `globalSearch` and `SearchResultType` showed no `match` branch.
+
+### Root cause
+The global search intent layer had no DB-free parser for clean matchup text and no server query returning matching `matches` rows.
+
+### Fix
+Added `extractMatchupQuery`, a Match Search href builder, a `match` search result type, a server `searchMatches` query, and rendering in the existing “Go to” results section.
+
+### Validation
+`tests/query-intent.test.ts` covers both `1984 round 5` and `round 5 1984` orderings plus the negative `Richmond biggest win vs Essendon` collision. Focused tests passed.
+
+### Follow-up
+Run `/search` UI checks after deployment.
+
+## AFLDB-ISSUE-059 — Grouped qualifying counts have no drill-down link
+
+- **Status:** Open
+- **Severity:** Low
+- **Area:** Search
+- **Found:** 2026-08-20
+- **Resolved:** N/A
+- **Files:** `src/components/NlAnswerSection.tsx`, `src/search/match-spec.ts`, `src/db/queries/nl/team-match.ts`
+
+### Symptom
+Grouped answers with a `Qualifying matches` count should let a reader click the count and see the matches that make up that count.
+
+### Reproduction
+Ask `teams with at least 10 wins at the SCG` or `teams with more than 3 wins against the Lions`, then try to open the qualifying count for one row.
+
+### Expected
+The count opens the exact set of qualifying matches for that row.
+
+### Actual
+The count is plain text.
+
+### Evidence
+`TeamAggregateTable` renders `{formatNumber(r.value)}` without a link.
+
+### Root cause
+Current `match-search` URL filters do not yet express the full grouped-result predicate set: team perspective, opponent, venue, season range, win/loss/draw result, and optional per-match margin filter.
+
+### Fix
+Not yet fixed.
+
+### Validation
+Not yet run.
+
+### Follow-up
+Extend Match Search or add a dedicated NL drill-down route that can faithfully replay a `team_aggregate` row's predicates before linking counts.

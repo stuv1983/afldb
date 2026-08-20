@@ -16,6 +16,7 @@ const clubs: NlClubDirectoryEntry[] = [
   { organizationId: 9, slug: 'brisbane-lions', name: 'Brisbane Lions', names: ['brisbane lions', 'lions'] },
   { organizationId: 10, slug: 'brisbane-bears', name: 'Brisbane Bears', names: ['brisbane bears', 'bears'] },
   { organizationId: 11, slug: 'gold-coast', name: 'Gold Coast', names: ['gold coast', 'suns'] },
+  { organizationId: 12, slug: 'fitzroy', name: 'Fitzroy', names: ['fitzroy', 'lions'] },
 ];
 
 const venues: NlVenueDirectoryEntry[] = [
@@ -33,6 +34,7 @@ const ctx: NlParseContext = { clubs, venues, resolvePlayer: async () => [] };
 
 const questions = [
   'most hit out Richmond v Essendon Round 5 1984',
+  'most hitout Fitzroy v Richmond round 3 1984',
   'most disposals Collingwood v Carlton Round 1 2010',
   'highest score by Geelong in Round 15 2008',
   'most goals in a Grand Final',
@@ -41,6 +43,11 @@ const questions = [
   'highest H2 score by the Magpies',
   'most goals in Q1 by a player',
   'biggest win margin in a first half',
+  'biggest margin at half time',
+  'biggest margin at half time but won',
+  'biggest margin at quatre time but won',
+  'biggest margin at three quarter time but won',
+  'biggest lead at half time',
   'highest team score in Q3',
   'most disposals in the fourth quarter in 2023',
   'lowest second half score by Essendon',
@@ -88,18 +95,40 @@ describe('NL full-audit acceptance corpus', () => {
         expect(validated, question).not.toHaveProperty('error');
       }
     }
-    expect(questions).toHaveLength(38);
+    expect(questions).toHaveLength(44);
 
     expect(plans.get('most hit out Richmond v Essendon Round 5 1984')).toMatchObject({
       grain: 'player_game', metric: 'hitouts', mode: 'single', agg: { kind: 'max' },
       scope: {
-        clubFor: { slug: 'richmond' }, clubAgainst: { slug: 'essendon' },
+        matchup: { clubA: { slug: 'richmond' }, clubB: { slug: 'essendon' } },
         seasonMin: 1984, seasonMax: 1984, roundNumber: 5, matchType: 'home_and_away',
+      },
+    });
+    expect(plans.get('most hitout Fitzroy v Richmond round 3 1984')).toMatchObject({
+      grain: 'player_game', metric: 'hitouts', mode: 'single', agg: { kind: 'max' },
+      scope: {
+        matchup: { clubA: { slug: 'fitzroy' }, clubB: { slug: 'richmond' } },
+        seasonMin: 1984, seasonMax: 1984, roundNumber: 3, matchType: 'home_and_away',
       },
     });
     expect(plans.get('highest H2 score by the Magpies')).toMatchObject({
       grain: 'team_match', metric: 'team_score', periodSplit: 'H2',
       scope: { clubFor: { slug: 'collingwood' } },
+    });
+    expect(plans.get('biggest margin at half time')).toMatchObject({
+      grain: 'team_match', metric: 'win_margin', scoreCheckpoint: 'HT',
+    });
+    expect(plans.get('biggest margin at half time but won')).toMatchObject({
+      grain: 'team_match', metric: 'win_margin', scoreCheckpoint: 'HT', resultFilter: 'won',
+    });
+    expect(plans.get('biggest margin at quatre time but won')).toMatchObject({
+      grain: 'team_match', metric: 'win_margin', scoreCheckpoint: 'QT', resultFilter: 'won',
+    });
+    expect(plans.get('biggest margin at three quarter time but won')).toMatchObject({
+      grain: 'team_match', metric: 'win_margin', scoreCheckpoint: '3QT', resultFilter: 'won',
+    });
+    expect(plans.get('biggest lead at half time')).toMatchObject({
+      grain: 'team_match', metric: 'win_margin', scoreCheckpoint: 'HT',
     });
     expect(plans.get('teams with more than 3 wins against the Lions')).toMatchObject({
       grain: 'team_match', metric: null, agg: { kind: 'list' },
@@ -134,9 +163,22 @@ describe('NL full-audit acceptance corpus', () => {
       if (parsed.status === 'plan') {
         expect(parsed.plan).toMatchObject({
           grain: 'player_game', mode: 'single', metric: 'hitouts',
-          scope: { roundNumber: 5, matchType: 'home_and_away' },
+          scope: {
+            matchup: { clubA: { slug: 'richmond' }, clubB: { slug: 'essendon' } },
+            roundNumber: 5, matchType: 'home_and_away',
+          },
         });
       }
+    }
+
+    const resultScope = await parseNlQuestion('Richmond biggest win vs Carlton', ctx);
+    expect(resultScope.status).toBe('plan');
+    if (resultScope.status === 'plan') {
+      expect(resultScope.plan.scope).toMatchObject({
+        clubFor: { slug: 'richmond' },
+        clubAgainst: { slug: 'carlton' },
+      });
+      expect(resultScope.plan.scope.matchup).toBeUndefined();
     }
 
     const unrelated = await parseNlQuestion('richmond longest winning street', ctx);

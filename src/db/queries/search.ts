@@ -12,8 +12,10 @@ import {
   EVERY_PLAYER_AXIS,
   type ClubQuestionKind,
   type IntentMatch,
+  extractMatchupQuery,
   extractQuerySignals,
   gridSolverHref,
+  matchupMatchSearchHref,
   parseClubQuestion,
   parsePlayerQuestion,
   resolveIntent,
@@ -235,6 +237,55 @@ export async function searchRounds(query: string): Promise<SearchResult[]> {
   return [];
 }
 
+export async function searchMatches(query: string, clubs: readonly { slug: string; name: string }[], limit = 25): Promise<SearchResult[]> {
+  const matchup = extractMatchupQuery(query, clubs);
+  if (!matchup) return [];
+
+  const clauses = [
+    sql`
+      (
+        (h.organization_id = (SELECT organization_id FROM clubs WHERE slug = ${matchup.clubA.slug})
+         AND a.organization_id = (SELECT organization_id FROM clubs WHERE slug = ${matchup.clubB.slug}))
+        OR
+        (h.organization_id = (SELECT organization_id FROM clubs WHERE slug = ${matchup.clubB.slug})
+         AND a.organization_id = (SELECT organization_id FROM clubs WHERE slug = ${matchup.clubA.slug}))
+      )
+    `,
+  ];
+  if (matchup.year !== null) clauses.push(sql`m.season = ${matchup.year}`);
+  if (matchup.round !== null) {
+    clauses.push(sql`m.round_type = 'home_and_away'`);
+    clauses.push(sql`m.round_number = ${matchup.round}`);
+  }
+  const where = clauses.reduce((acc, clause) => sql`${acc} AND ${clause}`);
+
+  const rows = await sql<{
+    id: number; title: string; subtitle: string | null; rank: number;
+  }[]>`
+    SELECT m.id,
+           h.name || ' v ' || a.name || ', ' || m.season || ' ' || m.round_code AS title,
+           to_char(m.match_date, 'YYYY-MM-DD') || ' · ' ||
+             m.home_score || '-' || m.away_score || ' · ' ||
+             COALESCE(v.canonical_name, m.venue_raw) AS subtitle,
+           ${matchup.round !== null ? 980 : matchup.year !== null ? 940 : 850}::float AS rank
+      FROM matches m
+      JOIN clubs h ON h.id = m.home_club_id
+      JOIN clubs a ON a.id = m.away_club_id
+      LEFT JOIN venues v ON v.id = m.venue_id
+     WHERE ${where}
+     ORDER BY m.match_date DESC, m.id DESC
+     LIMIT ${limit}
+  `;
+  return rows.map((r) => ({
+    type: 'match' as const,
+    id: r.id,
+    slug: String(r.id),
+    title: r.title,
+    subtitle: r.subtitle,
+    rank: r.rank,
+  }));
+}
+
 /**
  * Awards, the Hall of Fame and the honour teams under their own names:
  * "brownlow", "rising star", "copeland", "hall of fame".
@@ -389,6 +440,7 @@ export type GlobalSearchResults = {
   venues: SearchResult[];
   seasons: SearchResult[];
   rounds: SearchResult[];
+  matches: SearchResult[];
   awards: SearchResult[];
   records: SearchResult[];
   aflwPlayers: SearchResult[];
@@ -548,7 +600,7 @@ async function answerPlayerQuestion(
 
 const EMPTY_RESULTS: GlobalSearchResults = {
   players: [], clubs: [], venues: [], seasons: [],
-  rounds: [], awards: [], records: [],
+  rounds: [], matches: [], awards: [], records: [],
   aflwPlayers: [], aflwClubs: [], intent: null,
   playerQuestion: null, clubQuestion: null, nlAnswer: null, total: 0,
 };
@@ -580,11 +632,12 @@ export async function globalSearch(
   // link below; every other entity is still searched on the full query.
   const clubDirectory = await getClubOptions();
   const signals = extractQuerySignals(trimmed, clubDirectory);
+  const matchup = extractMatchupQuery(trimmed, clubDirectory);
   const topicText = (signals.club || signals.year !== null) ? signals.topicWords : '';
   const runTopicSearch = topicText.length >= MIN_QUERY_LENGTH && topicText !== trimmed;
 
   const [
-    players, clubs, venues, seasons, rounds, awards, aflw, topicAwards,
+    players, clubs, venues, seasons, rounds, matches, awards, aflw, topicAwards,
     playerQuestionRaw, clubQuestionRaw, nlAnswer,
   ] = await Promise.all([
     searchPlayers(trimmed, playerLimit),
@@ -592,6 +645,7 @@ export async function globalSearch(
     searchVenues(trimmed),
     searchSeasons(trimmed),
     searchRounds(trimmed),
+    searchMatches(trimmed, clubDirectory),
     searchAwards(trimmed),
     aflwResults(trimmed, { players: 10, clubs: 4 }),
     runTopicSearch ? searchAwards(topicText, 3) : Promise.resolve([] as SearchResult[]),
@@ -611,13 +665,17 @@ export async function globalSearch(
 
   const bestAward = topicAwards[0] ?? awards[0] ?? null;
   const bestRecord = topicRecords[0] ?? records[0] ?? null;
-  const intent = resolveIntent(trimmed, signals, {
+  const intent = matchup ? {
+    href: matchupMatchSearchHref(matchup),
+    label: `${matchup.clubA.name} v ${matchup.clubB.name}${matchup.year ? `, ${matchup.year}` : ''}`,
+    detail: 'Open all matching games in Match Search.',
+  } : resolveIntent(trimmed, signals, {
     bestRecord: bestRecord && { slug: bestRecord.slug, title: bestRecord.title, score: bestRecord.rank },
     bestAward: bestAward && { slug: bestAward.slug, title: bestAward.title, score: bestAward.rank },
   });
 
   return {
-    players, clubs, venues, seasons, rounds, awards, records,
+    players, clubs, venues, seasons, rounds, matches, awards, records,
     aflwPlayers: aflw.players,
     aflwClubs: aflw.clubs,
     intent,
@@ -628,7 +686,7 @@ export async function globalSearch(
     // the question parser understands still renders the "no results"
     // empty state despite having an answer on screen.
     total: players.length + clubs.length + venues.length + seasons.length
-      + rounds.length + awards.length + records.length
+      + rounds.length + matches.length + awards.length + records.length
       + aflw.players.length + aflw.clubs.length
       + (playerQuestion ? 1 : 0) + (clubQuestion ? 1 : 0) + (nlAnswer ? 1 : 0),
   };

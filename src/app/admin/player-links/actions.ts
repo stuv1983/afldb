@@ -34,20 +34,20 @@ function revalidatePublicLinkPages(): void {
 }
 
 function parseTargets(formData: FormData): {
-  targets?: Array<{ targetTable: LinkTargetTable; targetId: number }>;
+  targets?: Array<{ targetTable: LinkTargetTable; targetId: number; previousStatus?: string }>;
   error?: string;
 } {
   const targetsRaw = String(formData.get('targets') ?? '');
   const rawList = targetsRaw.split(',').filter(Boolean).map(t => {
-    const [table, idStr] = t.split(':');
-    return { targetTable: table, targetId: Number(idStr) };
+    const [table, idStr, previousStatus] = t.split(':');
+    return { targetTable: table as LinkTargetTable, targetId: Number(idStr), previousStatus };
   });
 
   if (rawList.length === 0) return { error: 'No targets selected.' };
   if (rawList.some(t => !isLinkTargetTable(t.targetTable))) return { error: 'Unknown table in targets.' };
   if (rawList.some(t => !Number.isInteger(t.targetId) || t.targetId <= 0)) return { error: 'Bad row id in targets.' };
   
-  return { targets: rawList as Array<{ targetTable: LinkTargetTable; targetId: number }> };
+  return { targets: rawList };
 }
 
 export async function linkPlayer(
@@ -98,15 +98,14 @@ export async function confirmUnlinked(
   const { targets, error } = parseTargets(formData);
   if (error || !targets) return { error };
 
-  const previousStatus = String(formData.get('previousStatus') ?? '');
-  if (!['ambiguous', 'unmatched', 'implausible', 'mixed'].includes(previousStatus)) {
-    return { error: 'Unknown link status.' };
-  }
-
   const note = String(formData.get('note') ?? '').trim();
   if (note.length > 2000) return { error: 'Notes are limited to 2000 characters.' };
 
-  for (const { targetTable, targetId } of targets) {
+  for (const { targetTable, targetId, previousStatus } of targets) {
+    if (!previousStatus || !['ambiguous', 'unmatched', 'implausible'].includes(previousStatus)) {
+      return { error: `Unknown link status for target ${targetTable}:${targetId}.` };
+    }
+
     const result = await confirmUnlinkedQuery({
       targetTable, targetId, previousStatus, adminUserId: admin.id, note,
     });

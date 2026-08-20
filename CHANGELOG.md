@@ -24,7 +24,13 @@ commit.
 - Made answer prose grain-aware: team answers no longer use player tie wording, grouped lists cannot render a blank metric label, streak payloads have real headlines, and incompatible plan/payload combinations fail closed (`AFLDB-ISSUE-051`).
 - Added narrow deterministic coverage for `winning strea`, `blowout win`, a club's superlative bare `margin`, and `on debut`, with collision coverage and a first-career-game SQL predicate (`AFLDB-ISSUE-052`).
 - Computed team streak islands by club organization rather than historical club identity, preserving lineage across renames while keeping merger organizations separate (`AFLDB-ISSUE-053`).
-- Added a 38-question parser/validation acceptance corpus plus independent database-backed regressions for round scope, debut, grouped result counts, margin-before-HAVING, cumulative period arithmetic and organization-lineage streaks.
+- Added exact matchup scope for clean `A v B` NL queries so `Fitzroy v Richmond` ranks every player in the match while bare `v Richmond` remains opponent-scoped (`AFLDB-ISSUE-055`).
+- Added checkpoint lead/margin handling for quarter-time, half-time and three-quarter-time wording, including `but won` final-result filtering and `lead` as a team margin synonym (`AFLDB-ISSUE-056`).
+- Added a lead match link for single-row player-match NL answers, so the answer always links to the game where the performance occurred (`AFLDB-ISSUE-057`).
+- Added plain matchup search handling for `A v B season` and `A v B round N season`, including direct match results and a Match Search link for all meetings (`AFLDB-ISSUE-058`).
+- Recorded the remaining grouped-answer drill-down gap for clickable `Qualifying matches` counts (`AFLDB-ISSUE-059`).
+- Added a 44-question parser/validation acceptance corpus plus independent database-backed regressions for round scope, debut, grouped result counts, margin-before-HAVING, cumulative period arithmetic, checkpoint margins and organization-lineage streaks.
+- Verified the focused audit on the development Linux host: type checking passed and all 562 selected unit and `afldb_test` integration assertions passed before deployment.
 - Updated `docs/search.md` to describe all seven current grains, grouped team payloads, cumulative period arithmetic, streak semantics, and the explicit player-quarter coverage decline.
 
 ### AFLPA 22 Under 22 Awards History — 20 August 2026

@@ -25,7 +25,7 @@ export const MAX_PAGE_SIZE = Number.isSafeInteger(envMaxPageSize) && envMaxPageS
 export const DEFAULT_PAGE_SIZE = 50;
 
 export type SearchResultType =
-  | 'player' | 'club' | 'venue' | 'season' | 'round' | 'award' | 'record'
+  | 'player' | 'club' | 'venue' | 'season' | 'round' | 'match' | 'award' | 'record'
   | 'aflw_player' | 'aflw_club';
 
 /**
@@ -49,6 +49,7 @@ export function searchResultHref(result: {
     case 'season': return `/seasons/${result.slug}`;
     // slug is "1989#round-5": the season page with the round anchored.
     case 'round': return `/seasons/${result.slug}`;
+    case 'match': return `/matches/${result.id}`;
     case 'award': return `/awards/${result.slug}`;
     case 'record': return `/records/${result.slug}`;
     // AFLW keys are the source's own and may contain characters that must
@@ -66,6 +67,7 @@ export const SEARCH_TYPE_LABELS: Record<SearchResultType, string> = {
   venue: 'Venue',
   season: 'Season',
   round: 'Round',
+  match: 'Match',
   award: 'Award',
   record: 'Record',
   aflw_player: 'AFLW player',

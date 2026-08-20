@@ -40,6 +40,7 @@ export function NlAnswerSection({ answer }: { answer: NlAnswer }) {
     <section className="section">
       <h2>{answer.headline}</h2>
       {answer.interpretation && <p className="muted">{answer.interpretation}</p>}
+      {renderLeadMatchLink(answer)}
 
       {renderPayload(answer)}
 
@@ -91,6 +92,22 @@ function renderPayload(answer: NlAnswer) {
     case 'unanswerable':
       return null;
   }
+}
+
+function renderLeadMatchLink(answer: NlAnswer) {
+  if (answer.payload.kind !== 'player_game') return null;
+  const lead = answer.payload.lead;
+  if (!lead || lead.matchId === null || lead.roundType === null) return null;
+  return (
+    <p className="muted" style={{ marginTop: '-0.25rem' }}>
+      Match:{' '}
+      <Link href={matchPath(lead.matchId)}>
+        {lead.clubName} v {lead.opponentName}, {lead.season} {formatRoundShort(lead.roundType, lead.roundNumber)}
+      </Link>
+      {' '}
+      <span>{formatDate(lead.matchDate)}</span>
+    </p>
+  );
 }
 
 function TeamAggregateTable({ rows, total }: { rows: NlTeamAggregateRow[]; total: number }) {

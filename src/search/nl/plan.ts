@@ -215,8 +215,11 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  * 21: "on debut" is an explicit player-game boundary consumed by the
  *    career_game_no = 1 compiler predicate; debut-season wording remains
  *    distinct.
+ * 22: clean "A v B" club pairs are match scope rather than subject/opponent
+ *    role scope, and checkpoint lead/margin questions ("at half time",
+ *    "but won") gained explicit plan fields.
  */
-export const PARSER_VERSION = 21;
+export const PARSER_VERSION = 22;
 
 // ------------------------------------------------------------------ grain
 
@@ -299,6 +302,8 @@ export type NlMatchScope = {
   clubFor?: NlClubRef;
   /** "against Carlton": the opponent side. */
   clubAgainst?: NlClubRef;
+  /** "Richmond v Essendon": both clubs are match participants, not a side filter. */
+  matchup?: { clubA: NlClubRef; clubB: NlClubRef };
   /** "at the MCG". */
   venue?: NlVenueRef;
   seasonMin?: number;
@@ -703,6 +708,10 @@ export type NlQueryPlan = {
   /** team_streak only: whether the streak is of wins or losses. */
   streakDefinition?: { kind: 'win' | 'loss' | 'unbeaten' };
   periodSplit?: 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'H1' | 'H2' | 'FULL_MATCH';
+  /** team_match only: cumulative score checkpoint. */
+  scoreCheckpoint?: 'QT' | 'HT' | '3QT';
+  /** team_match only: final result filter applied after a period/checkpoint state. */
+  resultFilter?: 'won';
   /** player_game only: restrict player_match_stats to career_game_no = 1. */
   debutGame?: boolean;
   /** team_match grouped-list only: count qualifying results per organization. */
@@ -900,6 +909,25 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
     }
   }
 
+  if (raw.scoreCheckpoint !== undefined) {
+    if (!['QT', 'HT', '3QT'].includes(raw.scoreCheckpoint)) return { error: 'Unknown score checkpoint.' };
+    if (raw.grain !== 'team_match') return { error: 'Score checkpoints only apply to team-match questions.' };
+    if (!['team_score', 'opponent_score', 'total_score', 'win_margin', 'loss_margin'].includes(raw.metric ?? '')) {
+      return { error: 'This team-match statistic is not meaningful at a score checkpoint.' };
+    }
+    if (raw.periodSplit && raw.periodSplit !== 'FULL_MATCH') {
+      return { error: 'A question cannot ask for both a period split and a score checkpoint.' };
+    }
+    if (raw.havingClause) {
+      return { error: 'Grouped team-result counts do not currently support a score checkpoint.' };
+    }
+  }
+
+  if (raw.resultFilter !== undefined) {
+    if (raw.resultFilter !== 'won') return { error: 'Unknown result filter.' };
+    if (raw.grain !== 'team_match') return { error: 'A final-result filter only applies to a team-match question.' };
+  }
+
   if (raw.debutGame !== undefined) {
     if (raw.debutGame !== true || raw.grain !== 'player_game' || raw.mode !== 'single') {
       return { error: 'Debut scope applies only to a single player-game ranking.' };
@@ -979,6 +1007,24 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   if (forErr) return forErr;
   const againstErr = validateRef(raw.scope.clubAgainst, 'organizationId', 'Opponent club');
   if (againstErr) return againstErr;
+  if (raw.scope.matchup !== undefined) {
+    if (typeof raw.scope.matchup !== 'object' || raw.scope.matchup === null) {
+      return { error: 'Matchup scope is malformed.' };
+    }
+    const aErr = validateRef(raw.scope.matchup.clubA, 'organizationId', 'Matchup club');
+    if (aErr) return aErr;
+    const bErr = validateRef(raw.scope.matchup.clubB, 'organizationId', 'Matchup club');
+    if (bErr) return bErr;
+    if (raw.scope.matchup.clubA.organizationId === raw.scope.matchup.clubB.organizationId) {
+      return { error: 'A matchup needs two different clubs.' };
+    }
+    if (raw.scope.clubFor || raw.scope.clubAgainst) {
+      return { error: 'A matchup scope cannot also name a subject or opponent club.' };
+    }
+    if (raw.grain !== 'player_game' && raw.grain !== 'team_match') {
+      return { error: 'A two-club matchup scope only applies to match-level questions.' };
+    }
+  }
   const venueErr = validateRef(raw.scope.venue, 'id', 'Venue');
   if (venueErr) return venueErr;
 
@@ -1118,6 +1164,7 @@ export function describePlan(plan: NlQueryPlan): string[] {
   if (plan.player) lines.push(`Player: ${plan.player.name}.`);
   if (plan.scope.clubFor) lines.push(`Club: ${plan.scope.clubFor.name}.`);
   if (plan.scope.clubAgainst) lines.push(`Opponent: ${plan.scope.clubAgainst.name}.`);
+  if (plan.scope.matchup) lines.push(`Matchup: ${plan.scope.matchup.clubA.name} v ${plan.scope.matchup.clubB.name}.`);
   if (plan.scope.venue) lines.push(`Venue: ${plan.scope.venue.name}.`);
   if (plan.scope.roundNumber) lines.push(`Round: ${plan.scope.roundNumber}.`);
   if (plan.scope.matchType) lines.push(`Match type: ${plan.scope.matchType.replace(/_/g, ' ')}.`);
@@ -1143,6 +1190,8 @@ export function describePlan(plan: NlQueryPlan): string[] {
       plan.boundary.where === 'grand_final' ? 'Grand Final' : 'final'}.`);
   }
   if (plan.periodSplit && plan.periodSplit !== 'FULL_MATCH') lines.push(`Period: ${plan.periodSplit}.`);
+  if (plan.scoreCheckpoint) lines.push(`Score checkpoint: ${plan.scoreCheckpoint}.`);
+  if (plan.resultFilter === 'won') lines.push('Final result: selected club won the match.');
   if (plan.debutGame) lines.push("Match boundary: each player's debut game.");
   if (!plan.havingClause && plan.agg.kind !== 'list' && plan.agg.kind !== 'count') {
     const entity = TIE_ENTITY[plan.grain];

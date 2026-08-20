@@ -182,6 +182,50 @@ describe('team_match matches hand-written SQL', () => {
     expect(lead!.value).toBe(expected.max);
   });
 
+  it('derives half-time margin from cumulative checkpoints', async () => {
+    const { lead } = await teamMatch({ metric: 'win_margin', scoreCheckpoint: 'HT', agg: { kind: 'max' } });
+    expect(lead).not.toBeNull();
+
+    const [expected] = await sql<{ max: number }[]>`
+      WITH sides AS (
+        SELECT m.id AS match_id, m.home_club_id AS club_id, m.away_club_id AS opponent_id FROM matches m
+        UNION ALL
+        SELECT m.id, m.away_club_id, m.home_club_id FROM matches m
+      )
+      SELECT max(own.points - opp.points)::int AS max
+        FROM sides s
+        JOIN match_period_scores own
+          ON own.match_id = s.match_id AND own.club_id = s.club_id AND own.period = 2
+        JOIN match_period_scores opp
+          ON opp.match_id = s.match_id AND opp.club_id = s.opponent_id AND opp.period = 2
+       WHERE own.points > opp.points
+    `;
+    expect(lead!.value).toBe(expected.max);
+  });
+
+  it('applies "but won" against the final result, not only the checkpoint leader', async () => {
+    const { lead } = await teamMatch({
+      metric: 'win_margin', scoreCheckpoint: 'HT', resultFilter: 'won', agg: { kind: 'max' },
+    });
+    expect(lead).not.toBeNull();
+
+    const [expected] = await sql<{ max: number }[]>`
+      WITH sides AS (
+        SELECT m.id AS match_id, m.winner_club_id, m.home_club_id AS club_id, m.away_club_id AS opponent_id FROM matches m
+        UNION ALL
+        SELECT m.id, m.winner_club_id, m.away_club_id, m.home_club_id FROM matches m
+      )
+      SELECT max(own.points - opp.points)::int AS max
+        FROM sides s
+        JOIN match_period_scores own
+          ON own.match_id = s.match_id AND own.club_id = s.club_id AND own.period = 2
+        JOIN match_period_scores opp
+          ON opp.match_id = s.match_id AND opp.club_id = s.opponent_id AND opp.period = 2
+       WHERE own.points > opp.points AND s.winner_club_id = s.club_id
+    `;
+    expect(lead!.value).toBe(expected.max);
+  });
+
   it('returns organization-level win counts for HAVING queries rather than one arbitrary match', async () => {
     const [opponent] = await sql<{ organizationId: number }[]>`
       WITH sides AS (

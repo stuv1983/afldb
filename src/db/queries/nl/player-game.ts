@@ -47,6 +47,17 @@ function scopeClauses(scope: NlMatchScope, playerId: number | undefined, debutGa
         IN (SELECT id FROM clubs WHERE organization_id = ${scope.clubAgainst.organizationId})
     `);
   }
+  if (scope.matchup) {
+    clauses.push(sql`
+      (
+        (m.home_club_id IN (SELECT id FROM clubs WHERE organization_id = ${scope.matchup.clubA.organizationId})
+         AND m.away_club_id IN (SELECT id FROM clubs WHERE organization_id = ${scope.matchup.clubB.organizationId}))
+        OR
+        (m.home_club_id IN (SELECT id FROM clubs WHERE organization_id = ${scope.matchup.clubB.organizationId})
+         AND m.away_club_id IN (SELECT id FROM clubs WHERE organization_id = ${scope.matchup.clubA.organizationId}))
+      )
+    `);
+  }
   if (scope.venue) clauses.push(sql`m.venue_id = ${scope.venue.id}`);
   if (scope.seasonMin !== undefined) clauses.push(sql`m.season >= ${scope.seasonMin}`);
   if (scope.seasonMax !== undefined) clauses.push(sql`m.season <= ${scope.seasonMax}`);

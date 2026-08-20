@@ -264,7 +264,14 @@ export default async function PlayerLinksPage(
                 <table>
                   <thead>
                     <tr>
-                      <th scope="col" style={{ width: '1%' }} />
+                      <th scope="col" style={{ width: '1%' }}>
+                        <input
+                          type="checkbox"
+                          className="bulk-select-all-cb"
+                          data-target-table={t}
+                          aria-label={`Select all in ${TABLE_LABELS[t]}`}
+                        />
+                      </th>
                       <th scope="col">Source name</th>
                       <th scope="col">Context</th>
                       <th scope="col">Status</th>
@@ -284,6 +291,7 @@ export default async function PlayerLinksPage(
                               data-target-table={row.targetTable}
                               data-target-id={row.targetId}
                               data-player-name={row.playerName}
+                              data-link-status={row.linkStatus}
                               aria-label={`Select ${row.playerName}`}
                             />
                           </td>

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { ResolveControls } from '@/app/admin/player-links/ResolveControls';
 
 type OpenRow = {
-  targets: { table: string; id: number }[];
+  targets: { table: string; id: number; linkStatus?: string }[];
   playerName: string;
   context: string;
   linkStatus: string;
@@ -14,7 +14,7 @@ type OpenRow = {
 
 export function ResolvePanel() {
   const [row, setRow] = useState<OpenRow | null>(null);
-  const [selectedTargets, setSelectedTargets] = useState<{table: string, id: number, name: string}[]>([]);
+  const [selectedTargets, setSelectedTargets] = useState<{table: string, id: number, name: string, linkStatus: string}[]>([]);
 
   useEffect(() => {
     function onClick(event: MouseEvent) {
@@ -27,7 +27,7 @@ export function ResolvePanel() {
           suggestions = d.suggestions ? JSON.parse(d.suggestions) : [];
         } catch { /* malformed data attribute: open with no tips rather than not at all */ }
         setRow({
-          targets: [{ table: d.targetTable ?? '', id: Number(d.targetId) }],
+          targets: [{ table: d.targetTable ?? '', id: Number(d.targetId), linkStatus: d.linkStatus ?? '' }],
           playerName: d.playerName ?? '',
           context: d.context ?? '',
           linkStatus: d.linkStatus ?? '',
@@ -44,19 +44,52 @@ export function ResolvePanel() {
         const table = d.targetTable!;
         const id = Number(d.targetId);
         const name = d.playerName!;
+        const linkStatus = d.linkStatus!;
         if (target.checked) {
-          setSelectedTargets(prev => [...prev, { table, id, name }]);
+          setSelectedTargets(prev => [...prev, { table, id, name, linkStatus }]);
         } else {
           setSelectedTargets(prev => prev.filter(t => !(t.table === table && t.id === id)));
         }
+      } else if (target.classList?.contains('bulk-select-all-cb')) {
+        const table = target.dataset.targetTable!;
+        const isChecked = target.checked;
+        const rowCheckboxes = document.querySelectorAll<HTMLInputElement>(`.bulk-resolve-cb[data-target-table="${table}"]`);
+        
+        const newTargets: {table: string, id: number, name: string, linkStatus: string}[] = [];
+        rowCheckboxes.forEach(cb => {
+            cb.checked = isChecked;
+            newTargets.push({
+                table: cb.dataset.targetTable!,
+                id: Number(cb.dataset.targetId),
+                name: cb.dataset.playerName!,
+                linkStatus: cb.dataset.linkStatus!
+            });
+        });
+
+        setSelectedTargets(prev => {
+            const filtered = prev.filter(p => p.table !== table);
+            if (isChecked) {
+                return [...filtered, ...newTargets];
+            }
+            return filtered;
+        });
       }
+    }
+
+    function onResolved() {
+      setSelectedTargets([]);
+      document.querySelectorAll<HTMLInputElement>('.bulk-resolve-cb, .bulk-select-all-cb').forEach(cb => {
+         cb.checked = false;
+      });
     }
     
     document.addEventListener('click', onClick);
     document.addEventListener('change', onChange);
+    document.addEventListener('player-links-resolved', onResolved);
     return () => {
       document.removeEventListener('click', onClick);
       document.removeEventListener('change', onChange);
+      document.removeEventListener('player-links-resolved', onResolved);
     };
   }, []);
 
@@ -73,7 +106,7 @@ export function ResolvePanel() {
     if (selectedTargets.length === 0) return;
     const name = selectedTargets[0].name;
     setRow({
-      targets: selectedTargets.map(t => ({ table: t.table, id: t.id })),
+      targets: selectedTargets.map(t => ({ table: t.table, id: t.id, linkStatus: t.linkStatus })),
       playerName: name,
       context: `Bulk resolving ${selectedTargets.length} records.`,
       linkStatus: 'mixed',

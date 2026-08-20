@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   type IntentClub,
+  extractMatchupQuery,
   extractQuerySignals,
   gridSolverHref,
+  matchupMatchSearchHref,
   parseClubQuestion,
   parsePlayerQuestion,
   resolveIntent,
@@ -46,6 +48,32 @@ describe('extractQuerySignals', () => {
     const signals = extractQuerySignals('brownlow st kilda', CLUBS);
     expect(signals.club?.slug).toBe('st-kilda');
     expect(signals.topicWords).toBe('brownlow');
+  });
+});
+
+describe('extractMatchupQuery', () => {
+  it.each([
+    'richmond v essendon 1984 round 5',
+    'Richmond v essendon round 5 1984',
+    'richmond vs essendon 1984 r5',
+  ])('reads club pair, season and round from %s', (query) => {
+    const matchup = extractMatchupQuery(query, CLUBS);
+    expect(matchup).toMatchObject({
+      clubA: { slug: 'richmond' },
+      clubB: { slug: 'essendon' },
+      year: 1984,
+      round: 5,
+    });
+  });
+
+  it('builds a Match Search link for all meetings in the year', () => {
+    const matchup = extractMatchupQuery('richmond v essendon 1984', CLUBS);
+    expect(matchup).not.toBeNull();
+    expect(matchupMatchSearchHref(matchup!)).toBe('/match-search?search=1&season_min=1984&season_max=1984&club=richmond%2Cessendon');
+  });
+
+  it('does not treat result wording as a bare matchup search', () => {
+    expect(extractMatchupQuery('Richmond biggest win vs Essendon', CLUBS)).toBeNull();
   });
 });
 

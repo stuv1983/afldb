@@ -152,6 +152,63 @@ describe('player_game mode "single" matches hand-written SQL', () => {
     `;
     expect(lead!.value).toBe(expected.max);
   });
+
+  it('clean "Fitzroy v Richmond" scopes the exact match, not just Fitzroy players', async () => {
+    const [fitzroy] = await sql<{ id: number }[]>`SELECT id FROM club_organizations WHERE slug = 'fitzroy'`;
+    const [richmond] = await sql<{ id: number }[]>`SELECT id FROM club_organizations WHERE slug = 'richmond'`;
+    const { lead } = await game({
+      metric: 'hitouts',
+      agg: { kind: 'max' },
+      scope: {
+        matchup: {
+          clubA: { organizationId: fitzroy.id, slug: 'fitzroy', name: 'Fitzroy' },
+          clubB: { organizationId: richmond.id, slug: 'richmond', name: 'Richmond' },
+        },
+        seasonMin: 1984,
+        seasonMax: 1984,
+        roundNumber: 3,
+        matchType: 'home_and_away',
+      },
+    });
+    expect(lead).not.toBeNull();
+
+    const [expected] = await sql<{ playerName: string; hitouts: number }[]>`
+      SELECT p.display_name AS "playerName", s.hitouts
+        FROM player_match_stats s
+        JOIN players p ON p.id = s.player_id
+        JOIN matches m ON m.id = s.match_id
+        JOIN clubs h ON h.id = m.home_club_id
+        JOIN clubs a ON a.id = m.away_club_id
+       WHERE m.season = 1984 AND m.round_type = 'home_and_away' AND m.round_number = 3
+         AND ((h.organization_id = ${fitzroy.id} AND a.organization_id = ${richmond.id})
+           OR (h.organization_id = ${richmond.id} AND a.organization_id = ${fitzroy.id}))
+         AND s.hitouts IS NOT NULL
+       ORDER BY s.hitouts DESC, p.sort_name
+       LIMIT 1
+    `;
+    expect(lead!.playerName).toBe(expected.playerName);
+    expect(lead!.playerName).toBe('Mark Lee');
+    expect(lead!.value).toBe(expected.hitouts);
+    expect(lead!.value).toBe(33);
+  });
+
+  it('bare "v Richmond" still ranks only players opposed to Richmond', async () => {
+    const [richmond] = await sql<{ id: number }[]>`SELECT id FROM club_organizations WHERE slug = 'richmond'`;
+    const { lead } = await game({
+      metric: 'hitouts',
+      agg: { kind: 'max' },
+      scope: {
+        clubAgainst: { organizationId: richmond.id, slug: 'richmond', name: 'Richmond' },
+        seasonMin: 1984,
+        seasonMax: 1984,
+        roundNumber: 3,
+        matchType: 'home_and_away',
+      },
+    });
+    expect(lead).not.toBeNull();
+    expect(lead!.playerName).toBe('Glenn Coleman');
+    expect(lead!.value).toBe(20);
+  });
 });
 
 describe('player_game mode "sum" matches hand-written SQL', () => {

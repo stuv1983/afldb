@@ -226,6 +226,7 @@ export const TEAM_METRIC_WORDS: [RegExp, 'win_margin' | 'loss_margin' | 'team_sc
   // more general one, which is the ordering rule the rest of this file
   // follows.
   [/\b(?:3qt|three[- ]quarter time) comebacks?\b/, 'q3_deficit_overcome'],
+  [/\bleads?\b|\bleading margin\b/, 'win_margin'],
   [/\b(?:winning margin|win margin|margin of victory)\b/, 'win_margin'],
   [/\b(?:losing margin|loss margin|margin of defeat)\b/, 'loss_margin'],
   // A bare "margin" under a superlative is conventional shorthand for

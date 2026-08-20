@@ -101,6 +101,7 @@ type ClubExtraction = {
   text: string;
   clubFor?: NlEntityMatch<NlClubDirectoryEntry>;
   clubAgainst?: NlEntityMatch<NlClubDirectoryEntry>;
+  matchup?: { clubA: NlEntityMatch<NlClubDirectoryEntry>; clubB: NlEntityMatch<NlClubDirectoryEntry> };
   consumed: string[];
 };
 
@@ -108,6 +109,11 @@ type ClubExtraction = {
 function phrasePosition(text: string, phrase: string): number {
   const at = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).exec(text);
   return at ? at.index : Number.MAX_SAFE_INTEGER;
+}
+
+function phraseEnd(text: string, phrase: string): number {
+  const at = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).exec(text);
+  return at ? at.index + at[0].length : Number.MAX_SAFE_INTEGER;
 }
 
 /**
@@ -130,7 +136,7 @@ function phrasePosition(text: string, phrase: string): number {
 function extractClubs(text: string, clubs: readonly NlClubDirectoryEntry[]): ClubExtraction {
   let working = text;
   const consumed: string[] = [];
-  const found: { match: NlEntityMatch<NlClubDirectoryEntry>; governedAgainst: boolean; at: number }[] = [];
+  const found: { match: NlEntityMatch<NlClubDirectoryEntry>; governedAgainst: boolean; at: number; end: number }[] = [];
 
   for (let i = 0; i < 2; i++) {
     const match = findClub(working, clubs);
@@ -147,22 +153,35 @@ function extractClubs(text: string, clubs: readonly NlClubDirectoryEntry[]): Clu
       // matches spliced out, so its offsets no longer describe the
       // question the reader typed.
       at: phrasePosition(text, match.matchedText),
+      end: phraseEnd(text, match.matchedText),
     });
     working = stripMatch(working, match.matchedText);
+  }
+
+  const byPosition = [...found].sort((a, b) => a.at - b.at);
+  let matchup: ClubExtraction['matchup'];
+  if (byPosition.length >= 2) {
+    const [left, right] = byPosition;
+    const between = left.end <= right.at ? text.slice(left.end, right.at).trim() : '';
+    if (/^(?:v|vs\.?|versus)$/.test(between)) {
+      matchup = { clubA: left.match, clubB: right.match };
+    }
   }
 
   let clubFor: NlEntityMatch<NlClubDirectoryEntry> | undefined;
   let clubAgainst: NlEntityMatch<NlClubDirectoryEntry> | undefined;
 
-  for (const entry of found.filter((f) => f.governedAgainst)) {
-    if (!clubAgainst) clubAgainst = entry.match;
-  }
-  for (const entry of found.filter((f) => !f.governedAgainst).sort((a, b) => a.at - b.at)) {
-    if (!clubFor) clubFor = entry.match;
-    else if (!clubAgainst) clubAgainst = entry.match;
+  if (!matchup) {
+    for (const entry of found.filter((f) => f.governedAgainst)) {
+      if (!clubAgainst) clubAgainst = entry.match;
+    }
+    for (const entry of found.filter((f) => !f.governedAgainst).sort((a, b) => a.at - b.at)) {
+      if (!clubFor) clubFor = entry.match;
+      else if (!clubAgainst) clubAgainst = entry.match;
+    }
   }
 
-  return { text: working, clubFor, clubAgainst, consumed };
+  return { text: working, clubFor, clubAgainst, matchup, consumed };
 }
 
 // ------------------------------------------------------------------ seasons
@@ -879,6 +898,25 @@ function extractPeriodSplit(text: string): { text: string; periodSplit?: NlQuery
   return { text, consumed: [] };
 }
 
+function extractScoreCheckpoint(text: string): { text: string; scoreCheckpoint?: NlQueryPlan['scoreCheckpoint']; consumed: string[] } {
+  const entries: [RegExp, NonNullable<NlQueryPlan['scoreCheckpoint']>][] = [
+    [/\bat (?:3qt|three[- ]quarter)[- ]time\b|\b(?:3qt|three[- ]quarter)[- ]time\b/, '3QT'],
+    [/\bat half[- ]time\b|\bhalf[- ]time\b/, 'HT'],
+    [/\bat (?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b|\b(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b/, 'QT'],
+  ];
+  for (const [re, checkpoint] of entries) {
+    const match = re.exec(text);
+    if (match) return { text: stripMatch(text, match[0]), scoreCheckpoint: checkpoint, consumed: [match[0]] };
+  }
+  return { text, consumed: [] };
+}
+
+function extractResultFilter(text: string): { text: string; resultFilter?: NlQueryPlan['resultFilter']; consumed: string[] } {
+  const match = /\b(?:but|and|then|eventually|still|went on to)\s+won\b|\bwent on to win\b/.exec(text);
+  if (!match) return { text, consumed: [] };
+  return { text: stripMatch(text, match[0]), resultFilter: 'won', consumed: [match[0]] };
+}
+
 function extractHavingClause(text: string): {
   text: string;
   havingClause?: { metric: 'wins' | 'losses' | 'draws'; op: NlCompareOp; value: number };
@@ -1063,8 +1101,13 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   consumedTokens.push(...clubExtraction.consumed);
   const clubFor = byClubPlayer.clubFor ?? clubExtraction.clubFor;
   const clubAgainst = clubExtraction.clubAgainst;
+  const matchup = byClubPlayer.clubFor ? undefined : clubExtraction.matchup;
   if (clubFor) report.entityResolution.push({ mention: clubFor.matchedText, resolvedTo: clubFor.entity.name, certainty: 1 });
   if (clubAgainst) report.entityResolution.push({ mention: clubAgainst.matchedText, resolvedTo: clubAgainst.entity.name, certainty: 1 });
+  if (matchup) {
+    report.entityResolution.push({ mention: matchup.clubA.matchedText, resolvedTo: matchup.clubA.entity.name, certainty: 1 });
+    report.entityResolution.push({ mention: matchup.clubB.matchedText, resolvedTo: matchup.clubB.entity.name, certainty: 1 });
+  }
 
   // 5. Seasons, match type, award.
   const seasons = extractSeasons(text);
@@ -1185,9 +1228,17 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   text = matchFilterResult.text;
   consumedTokens.push(...matchFilterResult.consumed);
 
+  const resultFilterResult = extractResultFilter(text);
+  text = resultFilterResult.text;
+  consumedTokens.push(...resultFilterResult.consumed);
+
   const periodSplitResult = extractPeriodSplit(text);
   text = periodSplitResult.text;
   consumedTokens.push(...periodSplitResult.consumed);
+
+  const scoreCheckpointResult = extractScoreCheckpoint(text);
+  text = scoreCheckpointResult.text;
+  consumedTokens.push(...scoreCheckpointResult.consumed);
 
   const teamMetricResult = extractTeamMetric(text);
   // Do NOT update text with teamMetricResult.text here.
@@ -1478,7 +1529,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     // alongside one of these must not route there (it used to: "dusty's
     // career goals against Carlton" silently dropped "against Carlton"
     // and answered his whole career total instead).
-    const scoped = !!(venue || clubFor || clubAgainst || matchTypeResult.matchType);
+    const scoped = !!(venue || clubFor || clubAgainst || matchup || matchTypeResult.matchType);
     if (debutGame || (periodSplitResult.periodSplit && periodSplitResult.periodSplit !== 'FULL_MATCH')) {
       grain = 'player_game';
       mode = 'single';
@@ -1540,7 +1591,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       // wants the total across a span says so ("total tackles since
       // 1900"), and aggregateTotal already routes that to the sum below.
       !inOneGame && !aggregateTotal && !overCareer
-      && !venue && !clubAgainst && !matchTypeResult.matchType
+      && !venue && !clubAgainst && !matchup && !matchTypeResult.matchType
       && (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined)
     ) {
       grain = 'player_season';
@@ -1587,6 +1638,12 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const scope: NlMatchScope = emptyScope();
   if (clubFor) scope.clubFor = { organizationId: clubFor.entity.organizationId, slug: clubFor.entity.slug, name: clubFor.entity.name };
   if (clubAgainst) scope.clubAgainst = { organizationId: clubAgainst.entity.organizationId, slug: clubAgainst.entity.slug, name: clubAgainst.entity.name };
+  if (matchup) {
+    scope.matchup = {
+      clubA: { organizationId: matchup.clubA.entity.organizationId, slug: matchup.clubA.entity.slug, name: matchup.clubA.entity.name },
+      clubB: { organizationId: matchup.clubB.entity.organizationId, slug: matchup.clubB.entity.slug, name: matchup.clubB.entity.name },
+    };
+  }
   if (venue) scope.venue = { id: venue.entity.id, slug: venue.entity.slug, name: venue.entity.name };
   if (seasons.seasonMin !== undefined) scope.seasonMin = seasons.seasonMin;
   if (seasons.seasonMax !== undefined) scope.seasonMax = seasons.seasonMax;
@@ -1722,6 +1779,8 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       : {}),
     ...(streakResult.streakDefinition ? { streakDefinition: streakResult.streakDefinition } : {}),
     ...(periodSplitResult.periodSplit ? { periodSplit: periodSplitResult.periodSplit } : {}),
+    ...(scoreCheckpointResult.scoreCheckpoint ? { scoreCheckpoint: scoreCheckpointResult.scoreCheckpoint } : {}),
+    ...(resultFilterResult.resultFilter ? { resultFilter: resultFilterResult.resultFilter } : {}),
     ...(debutGame ? { debutGame: true } : {}),
     ...(havingResult.havingClause ? { havingClause: havingResult.havingClause } : {}),
     ...(matchFilterResult.matchFilter ? { matchFilter: matchFilterResult.matchFilter } : {}),

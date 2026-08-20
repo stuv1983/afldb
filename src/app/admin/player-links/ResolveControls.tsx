@@ -29,7 +29,7 @@ export function ResolveControls({
   linkStatus,
   suggestions,
 }: {
-  targets: { table: string; id: number }[];
+  targets: { table: string; id: number; linkStatus?: string }[];
   playerName?: string;
   context?: string;
   linkStatus: string;
@@ -46,7 +46,7 @@ export function ResolveControls({
   const done = linkState.message ?? createState.message ?? confirmState.message;
   const warning = linkState.warning ?? createState.warning ?? confirmState.warning;
 
-  const targetsRaw = targets.map(t => `${t.table}:${t.id}`).join(',');
+  const targetsRaw = targets.map(t => `${t.table}:${t.id}:${t.linkStatus ?? ''}`).join(',');
 
   // Split name for create pre-fill
   const cleanName = (playerName ?? '').trim();
@@ -55,7 +55,10 @@ export function ResolveControls({
   const initialSurname = parts.length > 1 ? parts[parts.length - 1] : parts[0] || '';
 
   useEffect(() => {
-    if (done && !warning) router.refresh();
+    if (done && !warning) {
+      document.dispatchEvent(new CustomEvent('player-links-resolved'));
+      router.refresh();
+    }
   }, [done, warning, router]);
 
   if (done) {
@@ -253,7 +256,6 @@ export function ResolveControls({
       {tab === 'unlinked' && (
         <form action={confirmAction} style={{ display: 'grid', gap: '0.6rem' }}>
           <input type="hidden" name="targets" value={targetsRaw} />
-          <input type="hidden" name="previousStatus" value={linkStatus} />
           <p className="muted" style={{ fontSize: '0.85rem', margin: 0 }}>
             Mark this record as vetted non-AFL/VFL player (e.g. state-league or pioneer recipient).
           </p>
