@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useActionState, useMemo, useState } from 'react';
 
 import { DeleteMatchButton } from '@/app/admin/data-editor/DeleteMatchButton';
@@ -9,6 +8,12 @@ import { saveMatchSheetAction, type MatchSheetActionState } from '@/app/admin/da
 import { PlayerPicker } from '@/components/PlayerPicker';
 import type { MatchDetail, MatchPlayerRow } from '@/db/queries/matches';
 import { formatDate, formatRoundShort } from '@/lib/format';
+import {
+  addPlayerToLineup,
+  removePlayerFromLineup,
+  replaceClubLineup,
+  type LineupEditorState,
+} from '@/lib/match-lineup-editor';
 
 const INITIAL: MatchSheetActionState = {};
 
@@ -17,6 +22,7 @@ type EditablePlayerStat = {
   slug: string;
   displayName: string;
   clubId: number;
+  editorOrder: number;
   jumperNumber: string;
   goals: string;
   behinds: string;
@@ -47,15 +53,15 @@ export function MatchSheetEditor({
   homeRecentLineup?: { playerId: number; slug: string; displayName: string; clubId: number; jumperNumber?: string | null }[];
   awayRecentLineup?: { playerId: number; slug: string; displayName: string; clubId: number; jumperNumber?: string | null }[];
 }) {
-  const router = useRouter();
   const [state, formAction, isPending] = useActionState(saveMatchSheetAction, INITIAL);
 
-  const [players, setPlayers] = useState<EditablePlayerStat[]>(() =>
-    initialPlayers.map((p) => ({
+  const [lineup, setLineup] = useState<LineupEditorState<EditablePlayerStat>>(() => ({
+    players: initialPlayers.map((p, editorOrder) => ({
       playerId: p.playerId,
       slug: p.slug,
       displayName: p.displayName,
       clubId: p.clubId,
+      editorOrder,
       jumperNumber: p.jumperNumber ?? '',
       goals: p.goals !== null && p.goals !== undefined ? String(p.goals) : '',
       behinds: p.behinds !== null && p.behinds !== undefined ? String(p.behinds) : '',
@@ -69,11 +75,11 @@ export function MatchSheetEditor({
       freesAgainst: p.freesAgainst !== null && p.freesAgainst !== undefined ? String(p.freesAgainst) : '',
       brownlowVotes: p.brownlowVotes !== null && p.brownlowVotes !== undefined ? String(p.brownlowVotes) : '',
     })),
-  );
-
-  const [removedPlayerIds, setRemovedPlayerIds] = useState<number[]>([]);
+    removedPlayerIds: [],
+    vacancies: [],
+  }));
+  const { players, removedPlayerIds, vacancies } = lineup;
   const [activeTab, setActiveTab] = useState<'home' | 'away' | 'all'>('all');
-  const [addTeamChoice, setAddTeamChoice] = useState<number>(match.homeClubId);
 
   function handleLoadRecentLineup(team: 'home' | 'away') {
     const targetClubId = team === 'home' ? match.homeClubId : match.awayClubId;
@@ -84,23 +90,17 @@ export function MatchSheetEditor({
       return;
     }
 
-    const replacementIds = new Set(lineupSource.map((row) => row.playerId));
-    const replacedPlayerIds = players
-      .filter((player) => player.clubId === targetClubId && !replacementIds.has(player.playerId))
-      .map((player) => player.playerId);
-    if (replacedPlayerIds.length > 0) {
-      setRemovedPlayerIds((previous) => Array.from(new Set([...previous, ...replacedPlayerIds])));
-    }
-
-    setPlayers((prev) => {
-      const otherTeamPlayers = prev.filter((p) => p.clubId !== targetClubId);
-      const newTeamPlayers: EditablePlayerStat[] = lineupSource.map((r) => {
-        const existing = prev.find((p) => p.playerId === r.playerId && p.clubId === targetClubId);
+    setLineup((previous) => {
+      const newTeamPlayers: EditablePlayerStat[] = lineupSource.map((r, editorOrder) => {
+        const existing = previous.players.find(
+          (player) => player.playerId === r.playerId && player.clubId === targetClubId,
+        );
         return {
           playerId: r.playerId,
           slug: r.slug,
           displayName: r.displayName,
           clubId: targetClubId,
+          editorOrder,
           jumperNumber: existing?.jumperNumber || r.jumperNumber || '',
           goals: existing?.goals || '',
           behinds: existing?.behinds || '',
@@ -115,13 +115,23 @@ export function MatchSheetEditor({
           brownlowVotes: existing?.brownlowVotes || '',
         };
       });
-      return [...otherTeamPlayers, ...newTeamPlayers];
+      return replaceClubLineup(previous, targetClubId, newTeamPlayers);
     });
   }
 
   // Group players by club
-  const homePlayers = useMemo(() => players.filter((p) => p.clubId === match.homeClubId), [players, match.homeClubId]);
-  const awayPlayers = useMemo(() => players.filter((p) => p.clubId === match.awayClubId), [players, match.awayClubId]);
+  const homePlayers = useMemo(
+    () => players
+      .filter((player) => player.clubId === match.homeClubId)
+      .sort((a, b) => a.editorOrder - b.editorOrder),
+    [players, match.homeClubId],
+  );
+  const awayPlayers = useMemo(
+    () => players
+      .filter((player) => player.clubId === match.awayClubId)
+      .sort((a, b) => a.editorOrder - b.editorOrder),
+    [players, match.awayClubId],
+  );
 
   // Calculate team totals
   function calculateTeamSummary(teamList: EditablePlayerStat[]) {
@@ -153,8 +163,9 @@ export function MatchSheetEditor({
   const awaySummary = useMemo(() => calculateTeamSummary(awayPlayers), [awayPlayers]);
 
   function handleFieldChange(playerId: number, field: keyof EditablePlayerStat, value: string) {
-    setPlayers((prev) =>
-      prev.map((p) => {
+    setLineup((previous) => ({
+      ...previous,
+      players: previous.players.map((p) => {
         if (p.playerId !== playerId) return p;
         const updated = { ...p, [field]: value };
 
@@ -168,42 +179,47 @@ export function MatchSheetEditor({
         }
         return updated;
       }),
-    );
+    }));
   }
 
   function handleRemovePlayer(playerId: number) {
-    setPlayers((prev) => prev.filter((p) => p.playerId !== playerId));
-    setRemovedPlayerIds((prev) => [...prev, playerId]);
+    setLineup((previous) => removePlayerFromLineup(previous, playerId));
   }
 
-  function handleAddPlayer(selected: { id: number; label: string } | null) {
+  function handleAddPlayer(
+    selected: { id: number; label: string } | null,
+    clubId: number,
+    vacancyRemovedPlayerId?: number,
+  ) {
     if (!selected) return;
     if (players.some((p) => p.playerId === selected.id)) {
       alert(`${selected.label} is already in the lineup for this match.`);
       return;
     }
 
-    setPlayers((prev) => [
-      ...prev,
-      {
-        playerId: selected.id,
-        slug: selected.label.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-        displayName: selected.label,
-        clubId: addTeamChoice,
-        jumperNumber: '',
-        goals: '',
-        behinds: '',
-        kicks: '',
-        handballs: '',
-        disposals: '',
-        marks: '',
-        tackles: '',
-        hitouts: '',
-        freesFor: '',
-        freesAgainst: '',
-        brownlowVotes: '',
-      },
-    ]);
+    const nextEditorOrder = players
+      .filter((player) => player.clubId === clubId)
+      .reduce((maximum, player) => Math.max(maximum, player.editorOrder), -1) + 1;
+
+    setLineup((previous) => addPlayerToLineup(previous, {
+      playerId: selected.id,
+      slug: selected.label.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      displayName: selected.label,
+      clubId,
+      editorOrder: nextEditorOrder,
+      jumperNumber: '',
+      goals: '',
+      behinds: '',
+      kicks: '',
+      handballs: '',
+      disposals: '',
+      marks: '',
+      tackles: '',
+      hitouts: '',
+      freesFor: '',
+      freesAgainst: '',
+      brownlowVotes: '',
+    }, vacancyRemovedPlayerId).state);
   }
 
   const payloadString = useMemo(() => {
@@ -231,6 +247,21 @@ export function MatchSheetEditor({
   }, [players, removedPlayerIds]);
 
   function renderPlayerTable(teamList: EditablePlayerStat[], clubName: string, clubId: number, summary: ReturnType<typeof calculateTeamSummary>) {
+    const teamRows = [
+      ...teamList.map((player) => ({
+        kind: 'player' as const,
+        editorOrder: player.editorOrder,
+        player,
+      })),
+      ...vacancies
+        .filter((vacancy) => vacancy.clubId === clubId)
+        .map((vacancy) => ({
+          kind: 'vacancy' as const,
+          editorOrder: vacancy.editorOrder,
+          vacancy,
+        })),
+    ].sort((a, b) => a.editorOrder - b.editorOrder);
+
     return (
       <div style={{ display: 'grid', gap: '0.5rem', marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -263,8 +294,42 @@ export function MatchSheetEditor({
               </tr>
             </thead>
             <tbody>
-              {teamList.map((p) => (
-                <tr key={p.playerId}>
+              {teamRows.map((row) => {
+                if (row.kind === 'vacancy') {
+                  const { vacancy } = row;
+                  return (
+                    <tr key={`vacancy-${vacancy.removedPlayerId}`} style={{ background: 'var(--bg-subtle)' }}>
+                      <td colSpan={14}>
+                        <div style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          padding: '0.25rem 0',
+                        }}>
+                          <span style={{ minWidth: '13rem' }}>
+                            <strong>Lineup spot open</strong>
+                            <span className="muted"> — {vacancy.removedPlayerName} removed</span>
+                          </span>
+                          <div style={{ flex: '1 1 18rem', maxWidth: '32rem' }}>
+                            <PlayerPicker
+                              label={`+ Add replacement for ${clubName}`}
+                              onSelect={(selected) => handleAddPlayer(
+                                selected,
+                                clubId,
+                                vacancy.removedPlayerId,
+                              )}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
+
+                const { player: p } = row;
+                return (
+                  <tr key={p.playerId}>
                   <td>
                     <input
                       type="text"
@@ -404,8 +469,9 @@ export function MatchSheetEditor({
                       ✕
                     </button>
                   </td>
-                </tr>
-              ))}
+                  </tr>
+                );
+              })}
             </tbody>
             <tfoot>
               <tr style={{ fontWeight: 600, background: 'var(--bg-subtle)' }}>
@@ -424,6 +490,27 @@ export function MatchSheetEditor({
               </tr>
             </tfoot>
           </table>
+        </div>
+
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: '0.75rem',
+          padding: '0.65rem 0.75rem',
+          border: '1px dashed var(--border-subtle)',
+          borderRadius: '6px',
+        }}>
+          <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+            Need another {clubName} lineup change?
+          </span>
+          <div style={{ flex: '1 1 18rem', maxWidth: '32rem' }}>
+            <PlayerPicker
+              key={`add-${clubId}-${teamList.length}`}
+              label={`+ Add another player to ${clubName}`}
+              onSelect={(selected) => handleAddPlayer(selected, clubId)}
+            />
+          </div>
         </div>
       </div>
     );
@@ -484,16 +571,14 @@ export function MatchSheetEditor({
         </div>
       )}
 
-      {/* Quick Lineup Helpers & Add Player Box */}
-      <div style={{
-        border: '1px solid var(--border-subtle)',
-        borderRadius: '6px',
-        padding: '0.85rem 1rem',
-        display: 'grid',
-        gap: '0.85rem',
-        background: 'var(--bg-subtle)',
-      }}>
-        {(homeRecentLineup.length > 0 || awayRecentLineup.length > 0) && (
+      {/* Quick Lineup Helpers */}
+      {(homeRecentLineup.length > 0 || awayRecentLineup.length > 0) && (
+        <div style={{
+          border: '1px solid var(--border-subtle)',
+          borderRadius: '6px',
+          padding: '0.85rem 1rem',
+          background: 'var(--bg-subtle)',
+        }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Quick lineup helpers:</span>
             {homeRecentLineup.length > 0 && (
@@ -519,32 +604,8 @@ export function MatchSheetEditor({
               </button>
             )}
           </div>
-        )}
-
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          alignItems: 'end',
-          borderTop: (homeRecentLineup.length > 0 || awayRecentLineup.length > 0) ? '1px solid var(--border-subtle)' : 'none',
-          paddingTop: (homeRecentLineup.length > 0 || awayRecentLineup.length > 0) ? '0.75rem' : '0',
-        }}>
-          <div style={{ flexGrow: 1, minWidth: '16rem' }}>
-            <PlayerPicker label="+ Add individual player to match lineup" onSelect={handleAddPlayer} />
-          </div>
-          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
-            Assign to team
-            <select
-              value={addTeamChoice}
-              onChange={(e) => setAddTeamChoice(Number(e.target.value))}
-              style={{ fontSize: '0.85rem', padding: '0.3rem 0.5rem' }}
-            >
-              <option value={match.homeClubId}>{match.homeName} (Home)</option>
-              <option value={match.awayClubId}>{match.awayName} (Away)</option>
-            </select>
-          </label>
         </div>
-      </div>
+      )}
 
       {/* View Filter Tabs */}
       <div style={{ display: 'flex', gap: '0.5rem' }}>

@@ -1439,3 +1439,39 @@ Type checking and all 951 runnable non-integration assertions pass independently
 
 ### Follow-up
 Choose a checked-in ESLint flat configuration, add compatible ESLint/Next plugins through the normal dependency-review process, and replace `next lint` with the ESLint CLI.
+
+## AFLDB-ISSUE-041 — Previous-lineup substitutions lack a team-scoped replacement control
+
+- **Status:** Resolved
+- **Severity:** High
+- **Area:** UI
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/app/admin/data-editor/MatchSheetEditor.tsx`, `src/lib/match-lineup-editor.ts`, `tests/match-lineup-editor.test.ts`, `tests/admin-match-mutations.test.ts`
+
+### Symptom
+After loading the previous match's lineup and removing one or two players with the row-level X button, the vacated team has no nearby replacement control. The administrator must return to the generic player search above both teams and separately choose the correct club; its Home default can also assign an Away replacement to the wrong side.
+
+### Reproduction
+Open a new match sheet, load either club's previous lineup, remove a player with X, and inspect the affected team section.
+
+### Expected
+Removing a player opens a clearly labelled `+ Add replacement` workflow for that same club. Multiple removals can be filled consecutively without repeatedly selecting the team.
+
+### Actual
+The player row disappears. The only add workflow is the shared `+ Add individual player to match lineup` picker and a sticky Home/Away selector above the tables.
+
+### Evidence
+The original `handleRemovePlayer` retained only the removed player ID, so it could not expose a club-specific vacancy. The original `handleAddPlayer` always assigned the shared `addTeamChoice`, which initialized to Home independently of the active team tab, and `renderPlayerTable` rendered no team-level replacement action.
+
+### Root cause
+The editor models the current player rows but not the lineup vacancies created by removals. Addition was implemented as a separate global workflow rather than the second half of a substitution.
+
+### Fix
+Added a pure lineup-state transition model that retains each vacancy's club, display order, removed player ID, and name. X now replaces the player row in place with a `+ Add replacement` search locked to that club; two removals create two independently fillable slots. Successful replacements keep the original row order, duplicate or wrong-team selections cannot consume a slot, and re-adding the same player cancels deletion bookkeeping. General additions also moved into explicit per-team controls, removing the sticky shared team selector.
+
+### Validation
+`npm.cmd run typecheck` passed. The focused substitution/match-sheet suites passed 25 assertions across three files, including Home/Away isolation, two-player substitutions, duplicate/wrong-team protection, restoration, and previous-lineup reload. The full safe non-integration suite passed 957 tests across 35 files.
+
+### Follow-up
+An authenticated browser fixture is not available locally, so visual interaction should also be exercised on the development deployment after review.

@@ -17,7 +17,7 @@ commit.
 
 ### Admin Mutation Integrity, Identity, and Audit Repair — 20 August 2026
 
-- **Match and player-stat correctness (AFLDB-ISSUE-001–009, 014–022, 029–036, 038)**:
+- **Match and player-stat correctness (AFLDB-ISSUE-001–009, 014–022, 029–036, 038, 041)**:
   - Added `src/lib/match-sheet.ts` and `src/lib/admin-match.ts` as shared server-boundary validators for match-sheet JSON, bounded statistics, exact Brownlow 3-2-1 allocations, new-match scores, attendance, and period totals.
   - Added `src/db/queries/player-derived.ts` as the single targeted rebuild path for career game numbers, club stints, club-season/player-season/career totals, nullable era statistics, career spans, search rank, season metadata, and season-wide Brownlow coverage.
   - Refactored match-sheet save and match deletion into supported one-command postgres.js queries, corrected match-FK deletion ordering, removed nonexistent coverage relations, and stopped all writes to authoritative `brownlow_season_votes` and independently sourced `brownlow_round_votes`.
@@ -26,6 +26,7 @@ commit.
   - Match creation now rejects duplicate natural keys, validates season-active club identities, requires finite consistent score inputs, cites `manual_admin_edit` for recorded attendance (including zero), and refreshes season metadata and coverage.
   - Match deletion now safely handles first/last-match foreign keys, zero-game players, empty latest seasons, and all affected derived player surfaces.
   - Previous-lineup prefill is now strictly relative to the edited match, and replacing a prefilled team correctly records dropped players for removal.
+  - Removing a copied-lineup player now leaves an inline `+ Add replacement` slot in the same row and locks the replacement to the correct club. Multiple substitutions can be filled consecutively, while general player additions are now explicit per-team controls instead of a sticky shared Home/Away selector (`AFLDB-ISSUE-041`).
   - Official Match Details score edits now use a sparse-safe final-period policy (period four unless explicit extra time exists). `club_seasons` remains explicitly flagged for source reconciliation because the canonical ladder is source-derived and season-rule dependent.
 
 - **Player, draft, and link identity integrity (AFLDB-ISSUE-007–008, 012–013, 018–020, 027–028)**:
@@ -51,9 +52,9 @@ commit.
   - Statistical writes that still require a separate-role audit now preserve the successful result and display a do-not-retry warning on audit failure. The remaining cross-role atomicity limitation is documented as open in `issues.md`.
 
 - **Validation and maintenance (AFLDB-ISSUE-039)**:
-  - Added focused regression suites for match input, match mutations, match-sheet semantics, awards/honours, draft/player links, and submission rejection.
+  - Added focused regression suites for match input, match mutations, match-sheet semantics, lineup substitution state, awards/honours, draft/player links, and submission rejection.
   - Renamed `vitest.config.ts` to `vitest.config.mts` so its existing ESM syntax loads without Vite's CommonJS compatibility warning.
-  - Created and maintained `issues.md` as the defect ledger: 37 repaired defects are marked resolved and three policy/architecture/tooling limitations remain open.
+  - Created and maintained `issues.md` as the defect ledger: 38 repaired defects are marked resolved and three policy/architecture/tooling limitations remain open.
 
 ### Interactive Match Browser with Season & Club Filters — 20 August 2026
 

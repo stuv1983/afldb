@@ -76,6 +76,15 @@ describe('admin match mutation source contracts', () => {
     expect(matchesQuery).toContain('(m.match_date, m.id) < (target.match_date, target.id)');
   });
 
+  it('turns a removed lineup row into a team-scoped replacement workflow', () => {
+    expect(matchSheetUi).toContain('removePlayerFromLineup');
+    expect(matchSheetUi).toContain('vacancy.clubId === clubId');
+    expect(matchSheetUi).toContain('vacancy.removedPlayerId');
+    expect(matchSheetUi).toContain('`+ Add replacement for ${clubName}`');
+    expect(matchSheetUi).toContain('`+ Add another player to ${clubName}`');
+    expect(matchSheetUi).not.toContain('addTeamChoice');
+  });
+
   it('keeps Match Details score corrections and dependent summaries together', () => {
     expect(dataEdits).toContain('INSERT INTO match_period_scores');
     expect(dataEdits).toContain('GREATEST(COALESCE(max(period), 4), 4)');
