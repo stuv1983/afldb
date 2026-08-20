@@ -1,12 +1,19 @@
 import { writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 const out = 'tmp-nl-ui-expanded-v23.csv';
-const rows = [['id', 'category', 'question', 'expected_status', 'tags']];
 
 function csv(value) {
   const text = String(value);
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
+
+export function pluralMetric(metric) {
+  return metric.endsWith('s') ? metric : `${metric}s`;
+}
+
+export function buildExpandedUiCorpusRows() {
+const rows = [['id', 'category', 'question', 'expected_status', 'tags']];
 
 function add(category, question, expected = 'plan', tags = []) {
   rows.push([
@@ -30,9 +37,9 @@ const slang = ['Dusty most possies against Carlton', 'Buddy most snags in a fina
 for (const metric of metrics) {
   add('grand_final_record', `Grand Final record for ${metric}`, 'plan', ['grand_final', 'record']);
   add('grand_final_record', `Grand Final ${metric} leader`, 'plan', ['grand_final', 'leader']);
-  add('grand_final_record', `most ${metric}s in a Grand Final`, 'plan', ['grand_final', 'plural']);
-  add('finals_record', `finals record for ${metric}s`, 'plan', ['finals', 'record']);
-  add('finals_record', `most ${metric}s in a final`, 'plan', ['finals', 'single_final']);
+  add('grand_final_record', `most ${pluralMetric(metric)} in a Grand Final`, 'plan', ['grand_final', 'plural']);
+  add('finals_record', `finals record for ${pluralMetric(metric)}`, 'plan', ['finals', 'record']);
+  add('finals_record', `most ${pluralMetric(metric)} in a final`, 'plan', ['finals', 'single_final']);
 }
 
 for (const opponent of opponents) {
@@ -106,7 +113,7 @@ for (const question of slang) add('slang_acronym', question, 'plan', ['slang']);
 
 for (const metric of ['goals', 'marks', 'disposals']) {
   add('debut_boundary', `most ${metric} on debut`, 'plan', ['debut']);
-  add('debut_boundary', `most ${metric} in debut season`, 'plan', ['debut_season']);
+  add('debut_boundary', `most ${metric} in debut season`, 'decline', ['debut_season', 'unsupported']);
   add('finals_boundary', `most finals played`, 'plan', ['finals_played']);
   add('finals_boundary', `most ${metric} in a final`, 'plan', ['in_a_final']);
 }
@@ -124,15 +131,26 @@ while (rows.length <= 501) {
   const venue = venues[(cursor * 7) % venues.length];
   const season = 1965 + (cursor % 60);
   const forms = [
-    [`stratified_player_game`, `most ${metric}s by a ${club} player against ${opponent}`, 'plan', ['player_game']],
+    [`stratified_player_game`, `most ${pluralMetric(metric)} by a ${club} player against ${opponent}`, 'plan', ['player_game']],
     [`stratified_team_match`, `${club} lowest score at ${venue}`, 'plan', ['team_match']],
-    [`stratified_season`, `most ${metric}s in ${season}`, 'plan', ['season']],
-    [`stratified_final`, `most ${metric}s in a final at ${venue}`, 'plan', ['final', 'venue']],
+    [`stratified_season`, `most ${pluralMetric(metric)} in ${season}`, 'plan', ['season']],
+    [`stratified_final`, `most ${pluralMetric(metric)} in a final at ${venue}`, 'plan', ['final', 'venue']],
   ];
   const [category, question, expected, tags] = forms[cursor % forms.length];
   add(category, question, expected, tags);
   cursor++;
 }
 
-writeFileSync(out, rows.map((row) => row.map(csv).join(',')).join('\n') + '\n');
-console.log(`${rows.length - 1} rows -> ${out}`);
+return rows;
+}
+
+export function writeExpandedUiCorpus(path = out) {
+  const rows = buildExpandedUiCorpusRows();
+  writeFileSync(path, rows.map((row) => row.map(csv).join(',')).join('\n') + '\n');
+  return rows.length - 1;
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const count = writeExpandedUiCorpus();
+  console.log(`${count} rows -> ${out}`);
+}

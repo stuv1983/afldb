@@ -2311,10 +2311,10 @@ Version 23 added `record` and `leader` coverage but did not treat `holder`/`hold
 Added `holder`/`holders` to the max aggregation vocabulary, bare record-cue gate, and consumed redundant role-word set. Bumped `PARSER_VERSION` to 24 and added focused parser coverage.
 
 ### Validation
-`npm.cmd test -- tests/nl-parser.test.ts tests/nl-audit-acceptance.test.ts tests/nl-plan.test.ts tests/nl-describe.test.ts` passed with 212 assertions. `npm.cmd run typecheck` passed. On the development host, `npm run typecheck` passed, and `npm test -- tests/nl-parser.test.ts tests/nl-audit-acceptance.test.ts tests/nl-plan.test.ts tests/nl-describe.test.ts tests/integration/nl-answer-boundary.test.ts tests/integration/nl-answers.test.ts tests/integration/nl-answers-game-season.test.ts tests/integration/nl-answers-team-club.test.ts tests/integration/nl-vocab.test.ts` passed with 279 assertions. `npm run build` passed and prepared the standalone bundle with parser version 24.
+`npm.cmd test -- tests/nl-parser.test.ts tests/nl-audit-acceptance.test.ts tests/nl-plan.test.ts tests/nl-describe.test.ts` passed with 212 assertions. `npm.cmd run typecheck` passed. On the development host, `npm run typecheck` passed, and `npm test -- tests/nl-parser.test.ts tests/nl-audit-acceptance.test.ts tests/nl-plan.test.ts tests/nl-describe.test.ts tests/integration/nl-answer-boundary.test.ts tests/integration/nl-answers.test.ts tests/integration/nl-answers-game-season.test.ts tests/integration/nl-answers-team-club.test.ts tests/integration/nl-vocab.test.ts` passed with 279 assertions. `npm run build` passed and prepared the standalone bundle with parser version 24. After the documented development-service restart, the `nl-audit-v24-proof-20260821` Playwright proof answered 3/3 rows against `/search`: `record holder for goals against Collingwood` rendered `Tony Lockett and Doug Wade - 97 goals (tied)`, `career goal leader against Collingwood` rendered the same control answer, and `Grand Final goal record holder` rendered `Gordon Coventry and Gary Ablett Snr - 9 goals (tied)`. A read-only `nl_search_log` check with the auth role showed `parser_version=24` for all three proof rows.
 
 ### Follow-up
-Restart through systemd is blocked by sudo requiring an interactive password. After the service is legitimately restarted, verify parser version 24 in `nl_search_log`, replay the record-holder browser row, and include it in the remaining UI sweeps.
+Resolved in the live development service. Include the record-holder rows in the remaining expanded and full UI sweeps.
 
 ## AFLDB-ISSUE-065 - Live-only player-season metric leaderboards can time out
 
@@ -2340,6 +2340,8 @@ The parser accepts the plan, but `answerPlayerSeason` computes live-only season 
 
 ### Evidence
 The expanded UI run reported eight `advanced_metric` failures for live-only `in a season` rows. The representative remote diagnostic showed `PostgresError: canceling statement due to statement timeout` from `src/db/queries/nl/player-season.ts`.
+
+The corrected v24 expanded Playwright rerun still reports the same eight `advanced_metric` failures with `outcome=absent` and HTTP 200: `most inside 50s in a season`, `most I50s in a season`, `most rebound 50s in a season`, `most R50s in a season`, `most clearances in a season`, `most clangers in a season`, `most contested possessions in a season`, and `most uncontested possessions in a season`.
 
 ### First wrong layer
 Compiler
@@ -2381,6 +2383,8 @@ The parser produced answered career-condition results, for example `players with
 ### Evidence
 The expanded browser corpus reported ten `collision` failures with `expected_status=decline` and `outcome=answered`. This is distinct from the already-fixed `at most` guard because there is no `at` token to anchor the comparison phrase.
 
+The corrected v24 expanded Playwright rerun still reports the same ten `collision` failures for `players with most 1 games`, `2`, `3`, `4`, `5`, `10`, `20`, `50`, `100`, and `200` games; each is answered despite `expected_status=decline`.
+
 ### First wrong layer
 Slot extraction
 
@@ -2395,3 +2399,205 @@ Open issue; no fix validation yet.
 
 ### Follow-up
 Add a targeted parser decline test for `players with most 10 games`, preserve positive controls for `players with at most 10 games` and `most games`, then implement the narrow malformed-condition guard.
+
+## AFLDB-ISSUE-067 - Expanded UI corpus generator double-pluralizes metric labels
+
+- **Status:** Resolved
+- **Severity:** Low
+- **Area:** Test Tooling
+- **Found:** 2026-08-21
+- **Resolved:** 2026-08-21
+- **Queries:** `most goalss by a Carlton player against Geelong`, `most markss in 1999`, `most handballss in 2003`
+- **Files:** `tmp-generate-expanded-ui-corpus.mjs`, `tests/nl-expanded-ui-corpus-generator.test.ts`, `tmp-nl-ui-expanded-v23.csv`
+
+### Symptom
+The expanded UI corpus contained malformed audit rows with doubled plural metric words such as `goalss`, `markss`, and `handballss`.
+
+### Reproduction
+Run `node tmp-generate-expanded-ui-corpus.mjs` before the fix and inspect generated questions matching `goalss|markss|handballss`.
+
+### Expected
+Generated audit questions should preserve existing plural metric labels, so `goals`, `marks`, and `handballs` remain valid words. Malformed generator rows must be classified separately from NL semantic correctness.
+
+### Actual
+The generator appended `s` to metric labels that were already plural. The first expanded browser run therefore included invalid rows that looked like NL/parser failures but were really generated-corpus defects.
+
+### Evidence
+Hydration-capture metadata from the first expanded run included `most goalss by a Carlton player against Geelong`, `most markss in 1999`, and `most handballss in 2003`.
+
+### First wrong layer
+Audit tooling
+
+### Root cause
+The temporary expanded-corpus generator interpolated `${metric}s` for metric labels without checking whether the sampled metric was already plural.
+
+### Fix
+Added `pluralMetric`, exported the generator for regression coverage, replaced the affected interpolations, and regenerated the 501-row expanded UI corpus.
+
+### Validation
+`npm.cmd test -- tests/nl-expanded-ui-corpus-generator.test.ts` passed. `node tmp-generate-expanded-ui-corpus.mjs` regenerated 501 rows and a scan for `goalss|markss|kickss|handballss|disposalss` returned zero matches.
+
+### Follow-up
+Keep this issue out of NL semantic defect counts. The regenerated expanded corpus is the input for the v24 browser rerun.
+
+## AFLDB-ISSUE-068 - Intermittent React hydration errors during NL UI sweeps
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** UI/Hydration
+- **Found:** 2026-08-21
+- **Resolved:** N/A
+- **Queries:** `Grand Final handballs leader`, `lowest H2 score by West Coast`, `Patrick Dangerfield total goals against Essendon`, `Gary Ablett Snr total goals against Richmond`, `players with at most 5 games`, `most goalss by a Carlton player against Geelong`, `most markss in 1999`, `most handballss in 2003`
+- **Files:** `tests/nl-ui/nl-stress.spec.ts`, `artifacts/hydration/exp_0022`, `artifacts/hydration/exp_0112`, `artifacts/hydration/exp_0183`, `artifacts/hydration/exp_0193`, `artifacts/hydration/exp_0255`, `artifacts/hydration/exp_0459`, `artifacts/hydration/exp_0481`, `artifacts/hydration/exp_0485`
+
+### Symptom
+The expanded Playwright corpus captured eight client-side React hydration errors on `/search` loads. Search outcomes were often semantically correct, but the browser still emitted `pageerror: Minified React error #418`.
+
+### Reproduction
+The first expanded UI sweep captured incidents under `artifacts/hydration/exp_*`. Each incident includes the exact query, failing server HTML, post-hydration DOM, screenshot, console log, and a same-question clean control.
+
+### Expected
+`/search` should hydrate without client-side React errors regardless of the NL query outcome.
+
+### Actual
+The initial expanded run intermittently emitted React #418 hydration errors. A serial v24 replay of all eight exact rows passed 8/8 with `clientErrors=0` and `hydration.totalHydrationErrors=0`, so the failure is not a deterministic per-query semantic defect.
+
+### Evidence
+Original captures:
+
+- `artifacts/hydration/exp_0022`: `Grand Final handballs leader`, answered, React #418, clean control succeeded.
+- `artifacts/hydration/exp_0112`: `lowest H2 score by West Coast`, answered, React #418, clean control succeeded.
+- `artifacts/hydration/exp_0183`: `Patrick Dangerfield total goals against Essendon`, answered, React #418, clean control succeeded.
+- `artifacts/hydration/exp_0193`: `Gary Ablett Snr total goals against Richmond`, answered, React #418, clean control succeeded.
+- `artifacts/hydration/exp_0255`: `players with at most 5 games`, answered, React #418, clean control succeeded.
+- `artifacts/hydration/exp_0459`: `most goalss by a Carlton player against Geelong`, absent, React #418, clean control succeeded.
+- `artifacts/hydration/exp_0481`: `most markss in 1999`, absent, React #418, clean control succeeded.
+- `artifacts/hydration/exp_0485`: `most handballss in 2003`, absent, React #418, clean control succeeded.
+
+The v24 serial replay report is archived at `artifacts/nl-ui/nl-audit-v24-hydration-replay-serial-20260821/summary.json`.
+
+The corrected v24 expanded 501-row rerun reproduced the issue under parallel browser load: `clientErrors=20`, `hydration.totalHydrationErrors=20`, HTTP failures 0, page errors 0, and report archived at `artifacts/nl-ui/nl-audit-v24-expanded-501-rerun-20260821/summary.json`.
+
+The live v24 12,000-question UI corpus also reproduced it: `clientErrors=235`, `hydration.totalHydrationErrors=235`, HTTP failures 0, page errors 0, and report archived at `artifacts/nl-ui/nl-audit-v24-ui-12000-20260821/summary.json`.
+
+### First wrong layer
+UI/runtime
+
+### Root cause
+Not yet confirmed. The existing harness evidence points to an intermittent hydration/runtime mismatch under the deployed Next.js standalone service, not to the NL parser or answer layer.
+
+### Fix
+Not yet fixed.
+
+### Validation
+Open issue; no fix validation yet. The serial replay only proves the eight exact rows are not deterministic query-level reproducers.
+
+### Follow-up
+Use the stored failing and clean HTML/DOM pairs to diff unstable markup, then replay under parallel load after the next UI/runtime fix. Do not count React #418 incidents as semantic NL failures, but do count them as UI/hydration failures in browser sweep summaries.
+
+## AFLDB-ISSUE-069 - Expanded UI corpus expects unsupported debut-season leaderboards to answer
+
+- **Status:** Resolved
+- **Severity:** Low
+- **Area:** Test Tooling
+- **Found:** 2026-08-21
+- **Resolved:** 2026-08-21
+- **Queries:** `most goals in debut season`, `most marks in debut season`, `most disposals in debut season`
+- **Files:** `tmp-generate-expanded-ui-corpus.mjs`, `tests/nl-expanded-ui-corpus-generator.test.ts`, `tmp-nl-ui-expanded-v23.csv`
+
+### Symptom
+The expanded UI corpus marked debut-season player-stat leaderboards as expected `plan` rows, producing three browser expectation failures.
+
+### Reproduction
+Run the regenerated expanded corpus before the oracle fix; `most goals in debut season`, `most marks in debut season`, and `most disposals in debut season` all render no NL panel while the corpus expects an answer.
+
+### Expected
+Current NL policy deliberately supports `on debut` as a debut-game boundary and does not treat `debut season` as a synonym. Until a separate player-debut-season compiler path exists, these generated rows should be expected declines.
+
+### Actual
+The corpus expected the unsupported `debut season` wording to answer, creating stale-oracle failures.
+
+### Evidence
+The v24 expanded 501-row sweep reported three `debut_boundary` failures, all expected `plan` and observed `absent`. Existing parser acceptance coverage explicitly prevents debut-season wording from being collapsed into debut-game scope.
+
+### First wrong layer
+Audit tooling
+
+### Root cause
+The expanded-corpus generator added deliberate debut-vs-debut-season contrast rows but assigned `expected_status=plan` to both sides.
+
+### Fix
+Changed generated `debut season` rows to `expected_status=decline` with `unsupported` tags and added generator regression coverage.
+
+### Validation
+`npm.cmd test -- tests/nl-expanded-ui-corpus-generator.test.ts` passed with two generator assertions. `node tmp-generate-expanded-ui-corpus.mjs` regenerated 501 rows; all three `debut season` rows now have `expected_status=decline`.
+
+### Follow-up
+If AFLDB later adds true debut-season ranking support, promote these rows back to expected `plan` alongside parser/compiler/answer tests for the new semantics.
+
+## AFLDB-ISSUE-070 - Parser-v24 full 12k UI corpus failure classification
+
+- **Status:** Resolved
+- **Severity:** Low
+- **Area:** Audit
+- **Found:** 2026-08-21
+- **Resolved:** 2026-08-21
+- **Queries:** `Gary Ablett most goals against North Melbourne`, `most disposals in 1898`, `longest winning streak`, `Ablett most goals`
+- **Files:** `artifacts/nl-ui/nl-audit-v24-ui-12000-20260821/summary.json`
+
+### Symptom
+The full 12,000-question UI corpus completed with 502 scored expectation failures and 235 client-side hydration errors.
+
+### Reproduction
+Run the full UI corpus against live parser version 24 with `NL_UI_CORPUS=C:\temp\stressTest\afldb_ui_nl_12000.csv`, `NL_UI_RUN_TAG=nl-audit-v24-ui-12000-20260821`, `NL_UI_BATCH=100`, `NL_UI_WORKERS=4`, and `NL_UI_TIMEOUT_MS=20000`.
+
+### Expected
+The audit must classify every failure cluster rather than stopping at aggregate counts.
+
+### Actual
+The harness observed all 12,000 rows and wrote a complete report. Scored failures were not new parser/compiler/answer defects. They split into data-coverage limitations and stale corpus policy/oracles. React hydration errors are tracked separately in `AFLDB-ISSUE-068`.
+
+### Evidence
+Run totals:
+
+- Attempted/observed: 12,000/12,000.
+- Passed: 11,442.
+- Scored expectation failures: 502.
+- Unscored: 56.
+- Outcomes: `answered=11403`, `unanswerable=342`, `absent=255`, `http_error=0`, `page_error=0`.
+- HTTP failures: 0.
+- Page errors: 0.
+- Console/client errors: 235.
+- Hydration errors: 235.
+- Timeouts: 0.
+- Malformed answer detections: 0.
+- Filler/metamorphic disagreements: 0.
+- Report: `artifacts/nl-ui/nl-audit-v24-ui-12000-20260821/summary.json`.
+
+Failure classification:
+
+- **Stale corpus oracle/policy, 200:** bare `Gary Ablett ...` full-name rows expect an answer but the parser safely declines ambiguous first+surname identity (`Gary Ablett Snr` vs `Gary Ablett Jnr`). Examples: `Gary Ablett most goals against North Melbourne`, `quick one Gary Ablett most clangers against Essendon in 1998`.
+- **Stale corpus oracle/policy, 8:** `longest winning streak` variants are expected declines in the corpus but now answer correctly, e.g. `Geelong - 23-match win streak`.
+- **Stale corpus oracle/policy, 8:** `Ablett most goals` variants are expected declines in the corpus but now answer a surname/career leaderboard, e.g. `Gary Ablett Snr - 1,031 goals`.
+- **Data coverage limitation, 99:** early-season all-club stat leaderboards visibly decline with `AFLDB can't answer this`, e.g. `most disposals in 1898`.
+- **Data coverage limitation, 99:** early-season club stat leaderboards visibly decline, e.g. `Essendon leading disposals in 1898`.
+- **Data coverage limitation, 45:** decade stat leaderboards visibly decline where requested metrics are outside coverage, e.g. `most disposals in the 1900s` and `most goal assists in the 1890s`.
+- **Data coverage limitation, 16:** season-range stat leaderboards visibly decline where the range predates metric coverage, e.g. `most clearances between 1965 and 1975`.
+- **Data coverage limitation, 14:** venue-season goal-assist rows visibly decline for 1998/1999 coverage, e.g. `most goal assists at the Docklands in 1999`.
+- **Data coverage limitation, 13:** club/opponent goal-assist rows visibly decline for 1998/1999 coverage, including impossible/self-opponent variants that currently hit coverage unavailability first.
+- **UI/hydration defect, 235:** React #418 client errors are counted separately under `AFLDB-ISSUE-068`.
+
+### First wrong layer
+Audit corpus/oracle and data coverage
+
+### Root cause
+The 12k corpus contains stale expected-status rows for behaviours that are now supported or intentionally ambiguous, and it marks historical metric rows as expected plans even when AFLDB correctly exposes coverage unavailability.
+
+### Fix
+No application fix was made for this issue. This ledger entry records the classification of the completed 12k run. `AFLDB-ISSUE-068` remains open for hydration, and `AFLDB-ISSUE-065`/`AFLDB-ISSUE-066` remain open from the expanded corpus.
+
+### Validation
+The Playwright harness completed all 120 batches in 20.9 minutes with all 12,000 questions observed. `nl-ui-out` was archived to `artifacts/nl-ui/nl-audit-v24-ui-12000-20260821`.
+
+### Follow-up
+Regenerate or re-baseline the 12k corpus oracles separately from NL semantic fixes. Keep ambiguous identity and historical metric coverage policy explicit in the generated expected statuses.

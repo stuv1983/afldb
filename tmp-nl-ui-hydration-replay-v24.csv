@@ -1,0 +1,9 @@
+id,category,question,expected_status,tags
+hyd_0001,hydration_replay,Grand Final handballs leader,plan,"hydration,exact_replay"
+hyd_0002,hydration_replay,lowest H2 score by West Coast,plan,"hydration,exact_replay"
+hyd_0003,hydration_replay,Patrick Dangerfield total goals against Essendon,plan,"hydration,exact_replay"
+hyd_0004,hydration_replay,Gary Ablett Snr total goals against Richmond,plan,"hydration,exact_replay"
+hyd_0005,hydration_replay,players with at most 5 games,plan,"hydration,exact_replay"
+hyd_0006,hydration_replay,most goalss by a Carlton player against Geelong,decline,"hydration,exact_replay,generator_defect"
+hyd_0007,hydration_replay,most markss in 1999,decline,"hydration,exact_replay,generator_defect"
+hyd_0008,hydration_replay,most handballss in 2003,decline,"hydration,exact_replay,generator_defect"

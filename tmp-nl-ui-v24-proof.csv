@@ -1,0 +1,4 @@
+id,category,question,expected_status,tags
+v24_0001,record_holder,record holder for goals against Collingwood,plan,"record_holder,parser_v24"
+v24_0002,record_holder,career goal leader against Collingwood,plan,"leader,control"
+v24_0003,record_holder,Grand Final goal record holder,plan,"grand_final,record_holder"
