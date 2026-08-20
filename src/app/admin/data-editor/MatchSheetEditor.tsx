@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useActionState, useMemo, useState } from 'react';
 
+import { DeleteMatchButton } from '@/app/admin/data-editor/DeleteMatchButton';
 import { saveMatchSheetAction, type MatchSheetActionState } from '@/app/admin/data-editor/actions';
 import { PlayerPicker } from '@/components/PlayerPicker';
 import type { MatchDetail, MatchPlayerRow } from '@/db/queries/matches';
@@ -528,6 +529,21 @@ export function MatchSheetEditor({
           </div>
         </div>
       </form>
+
+      {/* Danger Zone: Delete Match */}
+      <div style={{
+        marginTop: '2rem',
+        borderTop: '1px dashed var(--border-subtle)',
+        paddingTop: '1.25rem',
+        display: 'grid',
+        gap: '0.5rem',
+      }}>
+        <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--color-warn)' }}>Match Management</h4>
+        <DeleteMatchButton
+          matchId={match.id}
+          matchDescription={`${match.homeName} vs ${match.awayName} (${match.season} ${formatRoundShort(match.roundType, match.roundNumber)})`}
+        />
+      </div>
     </section>
   );
 }

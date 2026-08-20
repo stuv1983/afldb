@@ -15,6 +15,15 @@ commit.
 
 ## [Unreleased]
 
+### Safe Match Deletion & Automatic Player Statistics Rollback — 20 August 2026
+
+- **Transactional Match Deletion & Derived Stats Recomputation**:
+  - `src/db/queries/match-admin.ts`: Created `deleteMatch` query helper to safely remove a match, its lineups (`player_match_stats`), period scores (`match_period_scores`), and any match achievements (`player_achievements`) using the `afldb_import` pool.
+  - `src/db/queries/match-admin.ts`: Automatically recalculates `player_career_stats` and `player_season_stats` for all affected players across all statistics (games, goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts, Brownlow votes, best game records, debut/last match dates). If a player now has 0 remaining matches, a clean zero-game record is preserved so their biography remains intact.
+  - `src/app/admin/data-editor/DeleteMatchButton.tsx`: Created interactive super admin button with warning dialog and reason prompt for safely deleting test or invalid matches.
+  - `src/app/admin/data-editor/actions.ts`: Added `deleteMatchAction` with audit logging in `data_edits` and path revalidations.
+  - `src/app/admin/data-editor/MatchSheetEditor.tsx` & `src/app/admin/data-editor/EditorForm.tsx`: Embedded `DeleteMatchButton` directly in the Match Sheet Editor and Match Detail Editor interfaces.
+
 ### Super Admin Match Creation, Grounds & Live Stats Workflow — 20 August 2026
 
 - **Super Admin Match Creation GUI (`/admin/data-editor` → "+ Add new match")**:

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useActionState } from 'react';
 
+import { DeleteMatchButton } from '@/app/admin/data-editor/DeleteMatchButton';
 import { saveDataEdit, type DataEditState } from '@/app/admin/data-editor/actions';
 import { EDITABLE_ENTITIES, type EditGroup } from '@/lib/edit/spec';
 
@@ -135,6 +136,13 @@ export function EditorForm({
           values={values}
         />
       ))}
+
+      {entityKey === 'matches' && (
+        <div style={{ marginTop: '1.5rem', borderTop: '1px dashed var(--border-subtle)', paddingTop: '1rem' }}>
+          <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem', color: 'var(--color-warn)' }}>Danger Zone</h4>
+          <DeleteMatchButton matchId={rowId} />
+        </div>
+      )}
     </section>
   );
 }

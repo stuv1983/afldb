@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 
 import { createAwardWinner, createHallOfFameInductee, createHonourTeamMember } from '@/db/queries/awards-admin';
 import { saveEdit } from '@/db/queries/data-edits';
-import { createMatch } from '@/db/queries/match-admin';
+import { createMatch, deleteMatch } from '@/db/queries/match-admin';
 import { saveMatchSheet, type PlayerMatchStatInput } from '@/db/queries/match-sheet';
 import { createPlayer, type DraftPickInput } from '@/db/queries/players';
 import { EDITABLE_ENTITIES } from '@/lib/edit/spec';
@@ -559,4 +559,48 @@ export async function createMatchAction(
     return { error: `Could not create match: ${msg}` };
   }
 }
+
+/**
+ * Super Admin: Delete a match from the database (see changeLog.md).
+ * Removes match, lineups, stats, and automatically recalculates career/season stats.
+ */
+export async function deleteMatchAction(
+  _prev: SimpleAdminActionState,
+  formData: FormData,
+): Promise<SimpleAdminActionState> {
+  const admin = await requireSuperAdmin();
+
+  const matchId = Number(formData.get('matchId'));
+  if (!Number.isInteger(matchId) || matchId <= 0) {
+    return { error: 'Invalid match ID.' };
+  }
+
+  const reason = String(formData.get('reason') ?? '').trim() || 'Deleted match via Data Editor';
+
+  const result = await deleteMatch({
+    matchId,
+    adminUserId: admin.id,
+    reason,
+  });
+
+  if (!result.ok) {
+    return { error: result.error };
+  }
+
+  await audit('match.deleted', {
+    matchId,
+    affectedPlayers: result.affectedPlayers,
+  }, { userId: admin.id, label: admin.email });
+
+  revalidatePath('/matches');
+  revalidatePath(`/matches/${matchId}`);
+  revalidatePath('/players');
+  revalidatePath('/seasons');
+  revalidatePath('/admin/data-editor');
+
+  return {
+    message: `Match #${matchId} deleted successfully. Player stats recalculated for ${result.affectedPlayers} affected players.`,
+  };
+}
+
 
