@@ -12,9 +12,10 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { sql } from '@/db/client';
 import { answerClubSeason } from '@/db/queries/nl/club-season';
 import { answerTeamMatch } from '@/db/queries/nl/team-match';
+import { answerTeamStreak } from '@/db/queries/nl/team-streak';
 import { validatePlan, type NlQueryPlan } from '@/search/nl/plan';
 import type {
-  NlAnswerPayload, NlClubSeasonRow, NlTeamMatchRow,
+  NlAnswerPayload, NlClubSeasonRow, NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '@/search/nl/answer-types';
 
 afterAll(async () => {
@@ -46,12 +47,29 @@ async function teamMatch(overrides: Partial<NlQueryPlan>, limit = 25): Promise<{
   return payload;
 }
 
+async function teamAggregate(overrides: Partial<NlQueryPlan>, limit = 100): Promise<{ rows: NlTeamAggregateRow[]; total: number }> {
+  const payload: NlAnswerPayload = await answerTeamMatch(basePlan({
+    metric: null, agg: { kind: 'list' }, ...overrides,
+  }), limit);
+  if (payload.kind !== 'team_aggregate') throw new Error(`expected team_aggregate, got ${payload.kind}`);
+  return payload;
+}
+
 async function clubSeason(overrides: Partial<NlQueryPlan>, limit = 25): Promise<{ lead: NlClubSeasonRow | null; rows: NlClubSeasonRow[]; total: number }> {
   const payload: NlAnswerPayload = await answerClubSeason(
     basePlan({ grain: 'club_season', metric: null, agg: { kind: 'list' }, ...overrides }),
     limit,
   );
   if (payload.kind !== 'club_season') throw new Error(`expected club_season, got ${payload.kind}`);
+  return payload;
+}
+
+async function teamStreak(overrides: Partial<NlQueryPlan>, limit = 25): Promise<{ lead: NlTeamStreakRow | null; rows: NlTeamStreakRow[]; total: number }> {
+  const payload: NlAnswerPayload = await answerTeamStreak(basePlan({
+    grain: 'team_streak', metric: null, agg: { kind: 'max' },
+    streakDefinition: { kind: 'win' }, ...overrides,
+  }), limit);
+  if (payload.kind !== 'team_streak') throw new Error(`expected team_streak, got ${payload.kind}`);
   return payload;
 }
 
@@ -130,6 +148,103 @@ describe('team_match matches hand-written SQL', () => {
         `match ${e.matchId} score ${e.score} missing`).toBe(true);
     }
   });
+
+  it('derives H2 from final minus half-time, never by summing cumulative Q3 and Q4 checkpoints', async () => {
+    const { lead } = await teamMatch({ metric: 'team_score', periodSplit: 'H2', agg: { kind: 'max' } });
+    expect(lead).not.toBeNull();
+
+    const [expected] = await sql<{ max: number }[]>`
+      WITH sides AS (
+        SELECT m.id AS match_id, m.home_club_id AS club_id, m.home_score AS final_score FROM matches m
+        UNION ALL
+        SELECT m.id, m.away_club_id, m.away_score FROM matches m
+      )
+      SELECT max(s.final_score - ht.points)::int AS max
+        FROM sides s
+        JOIN match_period_scores ht
+          ON ht.match_id = s.match_id AND ht.club_id = s.club_id AND ht.period = 2
+       WHERE ht.points IS NOT NULL
+    `;
+    expect(lead!.value).toBe(expected.max);
+    expect(lead!.value).toBe(lead!.clubScore);
+  });
+
+  it('derives Q3 as the three-quarter checkpoint minus half-time', async () => {
+    const { lead } = await teamMatch({ metric: 'team_score', periodSplit: 'Q3', agg: { kind: 'max' } });
+    expect(lead).not.toBeNull();
+    const [expected] = await sql<{ max: number }[]>`
+      SELECT max(q3.points - q2.points)::int AS max
+        FROM match_period_scores q3
+        JOIN match_period_scores q2
+          ON q2.match_id = q3.match_id AND q2.club_id = q3.club_id AND q2.period = 2
+       WHERE q3.period = 3 AND q3.points IS NOT NULL AND q2.points IS NOT NULL
+    `;
+    expect(lead!.value).toBe(expected.max);
+  });
+
+  it('returns organization-level win counts for HAVING queries rather than one arbitrary match', async () => {
+    const [opponent] = await sql<{ organizationId: number }[]>`
+      WITH sides AS (
+        SELECT m.winner_club_id, m.home_club_id AS club_id, m.away_club_id AS opponent_id FROM matches m
+        UNION ALL
+        SELECT m.winner_club_id, m.away_club_id, m.home_club_id FROM matches m
+      )
+      SELECT opp.organization_id AS "organizationId"
+        FROM sides s JOIN clubs opp ON opp.id = s.opponent_id
+       WHERE s.winner_club_id = s.club_id
+       GROUP BY opp.organization_id
+      HAVING count(*) > 3
+       ORDER BY count(*) DESC
+       LIMIT 1
+    `;
+    const actual = await teamAggregate({
+      havingClause: { metric: 'wins', op: 'gt', value: 3 },
+      scope: { clubAgainst: { organizationId: opponent.organizationId, slug: 'x', name: 'x' } },
+    });
+    const expected = await sql<{ organizationId: number; value: number }[]>`
+      WITH sides AS (
+        SELECT m.winner_club_id, m.home_club_id AS club_id, m.away_club_id AS opponent_id FROM matches m
+        UNION ALL
+        SELECT m.winner_club_id, m.away_club_id, m.home_club_id FROM matches m
+      )
+      SELECT own.organization_id AS "organizationId", count(*)::int AS value
+        FROM sides s
+        JOIN clubs own ON own.id = s.club_id
+        JOIN clubs opp ON opp.id = s.opponent_id
+       WHERE s.winner_club_id = s.club_id AND opp.organization_id = ${opponent.organizationId}
+       GROUP BY own.organization_id
+      HAVING count(*) > 3
+       ORDER BY value DESC, own.organization_id
+    `;
+    expect(new Map(actual.rows.map((r) => [r.organizationId, r.value])))
+      .toEqual(new Map(expected.map((r) => [r.organizationId, r.value])));
+    expect(actual.total).toBe(expected.length);
+  });
+
+  it('filters 100-point losses before grouping and applying the requested count threshold', async () => {
+    const actual = await teamAggregate({
+      havingClause: { metric: 'losses', op: 'gte', value: 5 },
+      matchFilter: { metric: 'loss_margin', op: 'gt', value: 100 },
+    });
+    const expected = await sql<{ organizationId: number; value: number }[]>`
+      WITH losers AS (
+        SELECT m.home_club_id AS club_id, m.away_score - m.home_score AS loss_margin
+          FROM matches m WHERE m.winner_club_id = m.away_club_id
+        UNION ALL
+        SELECT m.away_club_id, m.home_score - m.away_score
+          FROM matches m WHERE m.winner_club_id = m.home_club_id
+      )
+      SELECT cl.organization_id AS "organizationId", count(*)::int AS value
+        FROM losers l JOIN clubs cl ON cl.id = l.club_id
+       WHERE l.loss_margin > 100
+       GROUP BY cl.organization_id
+      HAVING count(*) >= 5
+       ORDER BY value DESC, cl.organization_id
+    `;
+    expect(new Map(actual.rows.map((r) => [r.organizationId, r.value])))
+      .toEqual(new Map(expected.map((r) => [r.organizationId, r.value])));
+    expect(actual.total).toBe(expected.length);
+  });
 });
 
 describe('club_season matches hand-written SQL', () => {
@@ -191,5 +306,39 @@ describe('club_season matches hand-written SQL', () => {
     const madeIds = new Set(made.rows.map((r) => `${r.clubId}-${r.season}`));
     const missedIds = new Set(missed.rows.map((r) => `${r.clubId}-${r.season}`));
     for (const id of madeIds) expect(missedIds.has(id)).toBe(false);
+  });
+});
+
+describe('team_streak matches chronological truth', () => {
+  it('computes a club lineage winning streak across historical identity rows', async () => {
+    const [org] = await sql<{ id: number }[]>`
+      SELECT organization_id AS id FROM clubs GROUP BY organization_id
+       ORDER BY count(*) DESC, organization_id LIMIT 1
+    `;
+    const matches = await sql<{ matchId: number; matchDate: Date; won: boolean }[]>`
+      SELECT m.id AS "matchId", m.match_date AS "matchDate",
+             (m.winner_club_id = side.club_id) AS won
+        FROM matches m
+        JOIN LATERAL (
+          SELECT m.home_club_id AS club_id
+          UNION ALL SELECT m.away_club_id
+        ) side ON true
+        JOIN clubs cl ON cl.id = side.club_id
+       WHERE cl.organization_id = ${org.id}
+       ORDER BY m.match_date, m.id
+    `;
+    let longest = 0;
+    let current = 0;
+    for (const match of matches) {
+      current = match.won ? current + 1 : 0;
+      longest = Math.max(longest, current);
+    }
+
+    const { lead } = await teamStreak({
+      scope: { clubFor: { organizationId: org.id, slug: 'x', name: 'x' } },
+    });
+    expect(lead).not.toBeNull();
+    expect(lead!.clubId).toBe(org.id);
+    expect(lead!.streakLength).toBe(longest);
   });
 });

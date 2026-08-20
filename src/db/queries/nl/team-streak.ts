@@ -64,33 +64,34 @@ export async function answerTeamStreak(plan: NlQueryPlan, limit: number): Promis
   const rows = await sql<(NlTeamStreakRow & { total: string; rnk: number })[]>`
     WITH sides AS (${SIDES}),
     filtered AS (
-      SELECT t.*, (${targetSql}) AS is_target
+      SELECT t.*, cl.organization_id, (${targetSql}) AS is_target
         FROM sides t
+        JOIN clubs cl ON cl.id = t.club_id
        WHERE ${where}
     ),
     islands AS (
       SELECT f.*,
-             ROW_NUMBER() OVER (PARTITION BY f.club_id ORDER BY f.match_date) -
-             ROW_NUMBER() OVER (PARTITION BY f.club_id, f.is_target ORDER BY f.match_date) AS grp
+             ROW_NUMBER() OVER (PARTITION BY f.organization_id ORDER BY f.match_date, f.match_id) -
+             ROW_NUMBER() OVER (PARTITION BY f.organization_id, f.is_target ORDER BY f.match_date, f.match_id) AS grp
         FROM filtered f
     ),
     grouped AS (
-      SELECT club_id,
+      SELECT organization_id,
              COUNT(*) AS streak_length,
              MIN(match_date) AS start_date,
              MAX(match_date) AS end_date
         FROM islands
        WHERE is_target = TRUE
-       GROUP BY club_id, grp
+       GROUP BY organization_id, grp
     ),
     ranked AS (
-      SELECT g.club_id AS "clubId",
-             cl.name AS "clubName", cl.slug AS "clubSlug",
+      SELECT g.organization_id AS "clubId",
+             o.name AS "clubName", o.slug AS "clubSlug",
              g.streak_length::int AS "streakLength",
              g.start_date AS "startDate", g.end_date AS "endDate",
              rank() OVER (ORDER BY g.streak_length ${direction})::int AS rnk
         FROM grouped g
-        JOIN clubs cl ON cl.id = g.club_id
+        JOIN club_organizations o ON o.id = g.organization_id
     )
     SELECT r.*, count(*) OVER () AS total
       FROM ranked r

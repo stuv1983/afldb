@@ -26,9 +26,10 @@ function matchTypeSql(matchType: NlMatchType | undefined): SqlFragment {
 }
 
 /** WHERE clauses shared by both modes -- club/opponent/venue/season/match-type scope, plus an optional player filter (mode 'single' always has one; mode 'sum' may or may not). */
-function scopeClauses(scope: NlMatchScope, playerId: number | undefined): SqlFragment[] {
+function scopeClauses(scope: NlMatchScope, playerId: number | undefined, debutGame = false): SqlFragment[] {
   const clauses: SqlFragment[] = [];
   if (playerId) clauses.push(sql`s.player_id = ${playerId}`);
+  if (debutGame) clauses.push(sql`s.career_game_no = 1`);
   // An ambiguous surname ranking across every plausible candidate rather
   // than declining -- see NlMatchScope.playerIdIn. validatePlan keeps
   // this and `playerId` mutually exclusive, so only one of the two ever
@@ -79,7 +80,7 @@ async function answerSingle(plan: NlQueryPlan, limit: number): Promise<NlAnswerP
   const value = sql`${sql.unsafe(`s.${metricColumn(plan.metric!)}`)}`;
   const direction = plan.agg.kind === 'min' ? sql.unsafe('ASC') : sql.unsafe('DESC');
   const n = rankCutoff(plan.agg);
-  const where = foldAnd([...scopeClauses(plan.scope, plan.player?.id), sql`${value} IS NOT NULL`]);
+  const where = foldAnd([...scopeClauses(plan.scope, plan.player?.id, plan.debutGame), sql`${value} IS NOT NULL`]);
 
   let statsTarget = sql`player_match_stats s`;
   if (plan.periodSplit && plan.periodSplit !== 'FULL_MATCH') {
@@ -125,7 +126,7 @@ async function answerSum(plan: NlQueryPlan, limit: number): Promise<NlAnswerPayl
   const statColumn = sql.unsafe(metricColumn(plan.metric!));
   const direction = plan.agg.kind === 'min' ? sql.unsafe('ASC') : sql.unsafe('DESC');
   const n = rankCutoff(plan.agg);
-  const where = foldAnd(scopeClauses(plan.scope, plan.player?.id));
+  const where = foldAnd(scopeClauses(plan.scope, plan.player?.id, plan.debutGame));
 
   let statsTarget = sql`player_match_stats s`;
   if (plan.periodSplit && plan.periodSplit !== 'FULL_MATCH') {

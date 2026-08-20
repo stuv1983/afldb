@@ -2,7 +2,7 @@ import 'server-only';
 
 import { sql } from '@/db/client';
 import { type NlAggregation, type NlMatchScope, type NlMatchType, type NlQueryPlan } from '@/search/nl/plan';
-import type { NlAnswerPayload, NlTeamMatchRow } from '@/search/nl/answer-types';
+import type { NlAnswerPayload, NlTeamAggregateRow, NlTeamMatchRow } from '@/search/nl/answer-types';
 
 type SqlFragment = ReturnType<typeof sql>;
 
@@ -104,7 +104,9 @@ function rankCutoff(agg: NlAggregation): number {
  * rank cutoff, the same discipline every other grain here applies.
  */
 export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise<NlAnswerPayload> {
-  const value = metricValueExpr(plan.metric || 'team_score');
+  if (plan.havingClause) return answerTeamAggregate(plan, limit);
+
+  const value = metricValueExpr(plan.metric!);
   const direction = plan.agg.kind === 'min' ? sql.unsafe('ASC') : sql.unsafe('DESC');
   const n = rankCutoff(plan.agg);
   const where = foldAnd([...scopeClauses(plan.scope), plan.metric ? sql`${value} IS NOT NULL` : sql`TRUE`]);
@@ -113,29 +115,39 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
   const sidesRef = plan.periodSplit && plan.periodSplit !== 'FULL_MATCH' ? sql.unsafe('period_sides') : sql.unsafe('sides');
 
   if (plan.periodSplit && plan.periodSplit !== 'FULL_MATCH') {
-    let periodCondition = sql``;
-    if (plan.periodSplit === 'Q1') periodCondition = sql`period = 1`;
-    else if (plan.periodSplit === 'Q2') periodCondition = sql`period = 2`;
-    else if (plan.periodSplit === 'Q3') periodCondition = sql`period = 3`;
-    else if (plan.periodSplit === 'Q4') periodCondition = sql`period = 4`;
-    else if (plan.periodSplit === 'H1') periodCondition = sql`period IN (1, 2)`;
-    else if (plan.periodSplit === 'H2') periodCondition = sql`period IN (3, 4)`;
+    const split = plan.periodSplit;
+    const forPoints = split === 'Q1' ? sql`pc.q1`
+      : split === 'Q2' ? sql`CASE WHEN pc.q1 IS NOT NULL AND pc.q2 IS NOT NULL THEN pc.q2 - pc.q1 END`
+      : split === 'Q3' ? sql`CASE WHEN pc.q2 IS NOT NULL AND pc.q3 IS NOT NULL THEN pc.q3 - pc.q2 END`
+      : split === 'Q4' ? sql`CASE WHEN pc.q3 IS NOT NULL AND pc.q4 IS NOT NULL THEN pc.q4 - pc.q3 END`
+      : split === 'H1' ? sql`pc.q2`
+      : sql`CASE WHEN pc.q2 IS NOT NULL THEN s.score_for - pc.q2 END`;
+    const againstPoints = split === 'Q1' ? sql`po.q1`
+      : split === 'Q2' ? sql`CASE WHEN po.q1 IS NOT NULL AND po.q2 IS NOT NULL THEN po.q2 - po.q1 END`
+      : split === 'Q3' ? sql`CASE WHEN po.q2 IS NOT NULL AND po.q3 IS NOT NULL THEN po.q3 - po.q2 END`
+      : split === 'Q4' ? sql`CASE WHEN po.q3 IS NOT NULL AND po.q4 IS NOT NULL THEN po.q4 - po.q3 END`
+      : split === 'H1' ? sql`po.q2`
+      : sql`CASE WHEN po.q2 IS NOT NULL THEN s.score_against - po.q2 END`;
 
     periodCte = sql`,
       period_club AS (
-        SELECT match_id, club_id, SUM(points) AS points
+        SELECT match_id, club_id,
+               max(points) FILTER (WHERE period = 1) AS q1,
+               max(points) FILTER (WHERE period = 2) AS q2,
+               max(points) FILTER (WHERE period = 3) AS q3,
+               max(points) FILTER (WHERE period = 4) AS q4
           FROM match_period_scores
-         WHERE ${periodCondition}
+         WHERE period BETWEEN 1 AND 4
          GROUP BY match_id, club_id
       ),
       period_sides AS (
         SELECT s.match_id, s.season, s.round_type, s.round_number, s.is_final,
                s.match_date, s.venue_id, s.attendance,
-               CASE WHEN COALESCE(pc.points, 0) > COALESCE(po.points, 0) THEN s.club_id
-                    WHEN COALESCE(pc.points, 0) < COALESCE(po.points, 0) THEN s.opponent_id
+               CASE WHEN ${forPoints} > ${againstPoints} THEN s.club_id
+                    WHEN ${forPoints} < ${againstPoints} THEN s.opponent_id
                     ELSE NULL END AS winner_club_id,
                s.club_id, s.opponent_id,
-               COALESCE(pc.points, 0) AS score_for, COALESCE(po.points, 0) AS score_against,
+               ${forPoints} AS score_for, ${againstPoints} AS score_against,
                s.q3_score_for, s.q3_score_against
           FROM sides s
           LEFT JOIN period_club pc ON pc.match_id = s.match_id AND pc.club_id = s.club_id
@@ -143,35 +155,8 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
       )`;
   }
 
-  // If havingClause is present, we filter the clubs first.
-  let havingCte = sql``;
-  if (plan.havingClause) {
-    const { metric, op, value } = plan.havingClause;
-    let aggSql: SqlFragment;
-    if (metric === 'wins') aggSql = sql`SUM(CASE WHEN t.winner_club_id = t.club_id THEN 1 ELSE 0 END)`;
-    else if (metric === 'losses') aggSql = sql`SUM(CASE WHEN t.winner_club_id IS NOT NULL AND t.winner_club_id <> t.club_id THEN 1 ELSE 0 END)`;
-    else if (metric === 'draws') aggSql = sql`SUM(CASE WHEN t.winner_club_id IS NULL THEN 1 ELSE 0 END)`;
-    else aggSql = sql`COUNT(*)`;
-
-    let opSql = sql`>=`;
-    if (op === 'gte') opSql = sql`>=`;
-    else if (op === 'lte') opSql = sql`<=`;
-    else if (op === 'gt') opSql = sql`>`;
-    else if (op === 'lt') opSql = sql`<`;
-    else if (op === 'eq') opSql = sql`=`;
-
-    havingCte = sql`,
-      having_clubs AS (
-        SELECT t.club_id
-        FROM ${sidesRef} t
-        WHERE ${where}
-        GROUP BY t.club_id
-        HAVING ${aggSql} ${opSql} ${value}
-      )`;
-  }
-
   const rows = await sql<(NlTeamMatchRow & { total: string; rnk: number })[]>`
-    WITH sides AS (${SIDES})${periodCte}${havingCte},
+    WITH sides AS (${SIDES})${periodCte},
     ranked AS (
       SELECT t.match_id AS "matchId", t.season, t.round_type AS "roundType", t.round_number AS "roundNumber",
              t.match_date AS "matchDate",
@@ -186,7 +171,6 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
         JOIN clubs cl ON cl.id = t.club_id
         JOIN clubs opp ON opp.id = t.opponent_id
         LEFT JOIN venues v ON v.id = t.venue_id
-        ${plan.havingClause ? sql`JOIN having_clubs hc ON hc.club_id = t.club_id` : sql``}
        WHERE ${where}
     )
     SELECT r.*, count(*) OVER () AS total
@@ -198,4 +182,50 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
   const total = rows[0] ? Number(rows[0].total) : 0;
   const clean = rows.map(({ total: _t, rnk: _r, ...rest }) => rest);
   return { kind: 'team_match', lead: clean[0] ?? null, rows: clean, total };
+}
+
+const COMPARE_SQL = {
+  gte: '>=', lte: '<=', gt: '>', lt: '<', eq: '=',
+} as const;
+
+/**
+ * A HAVING question is organization-grained output, not a match ranking.
+ * Result and margin predicates are applied to individual matches first;
+ * only then are the surviving rows counted and thresholded per club.
+ */
+async function answerTeamAggregate(plan: NlQueryPlan, limit: number): Promise<NlAnswerPayload> {
+  const having = plan.havingClause!;
+  const clauses = scopeClauses(plan.scope);
+  if (having.metric === 'wins') clauses.push(sql`t.winner_club_id = t.club_id`);
+  else if (having.metric === 'losses') clauses.push(sql`t.winner_club_id IS NOT NULL AND t.winner_club_id <> t.club_id`);
+  else clauses.push(sql`t.winner_club_id IS NULL`);
+
+  if (plan.matchFilter) {
+    const filterValue = metricValueExpr(plan.matchFilter.metric);
+    const filterOp = sql.unsafe(COMPARE_SQL[plan.matchFilter.op]);
+    clauses.push(sql`${filterValue} ${filterOp} ${plan.matchFilter.value}`);
+  }
+
+  const where = foldAnd(clauses);
+  const havingOp = sql.unsafe(COMPARE_SQL[having.op]);
+  const rows = await sql<(NlTeamAggregateRow & { total: string })[]>`
+    WITH sides AS (${SIDES}),
+    grouped AS (
+      SELECT cl.organization_id, count(*)::int AS value
+        FROM sides t
+        JOIN clubs cl ON cl.id = t.club_id
+       WHERE ${where}
+       GROUP BY cl.organization_id
+      HAVING count(*) ${havingOp} ${having.value}
+    )
+    SELECT o.id AS "organizationId", o.name AS "clubName", o.slug AS "clubSlug",
+           g.value, count(*) OVER () AS total
+      FROM grouped g
+      JOIN club_organizations o ON o.id = g.organization_id
+     ORDER BY g.value DESC, o.name
+     LIMIT ${limit}
+  `;
+  const total = rows[0] ? Number(rows[0].total) : 0;
+  const clean = rows.map(({ total: _total, ...row }) => row);
+  return { kind: 'team_aggregate', rows: clean, total };
 }

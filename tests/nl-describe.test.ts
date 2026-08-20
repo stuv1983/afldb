@@ -18,7 +18,8 @@ import { describe, expect, it } from 'vitest';
 
 import { dedupeByIdentity, describeAnswer, tiedSubject } from '../src/search/nl/describe';
 import type {
-  NlClubSeasonRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow, NlTeamMatchRow,
+  NlClubSeasonRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
+  NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '../src/search/nl/answer-types';
 import type { NlQueryPlan } from '../src/search/nl/plan';
 
@@ -249,6 +250,49 @@ describe('describeAnswer — ties across the remaining grains', () => {
       { kind: 'player_career', lead: rows[0], rows, total: 320 },
     );
     expect(headline).toBe('320 players match');
+  });
+});
+
+describe('describeAnswer - team grouped and streak grains', () => {
+  it('describes a HAVING result as grouped clubs, never as Highest with a blank metric', () => {
+    const rows: NlTeamAggregateRow[] = [
+      { organizationId: 1, clubName: 'Carlton', clubSlug: 'carlton', value: 12 },
+      { organizationId: 2, clubName: 'Richmond', clubSlug: 'richmond', value: 8 },
+    ];
+    const result = describeAnswer(
+      plan({
+        grain: 'team_match', metric: null, mode: undefined, agg: { kind: 'list' },
+        havingClause: { metric: 'wins', op: 'gt', value: 3 },
+      }),
+      { kind: 'team_aggregate', rows, total: 2 },
+    );
+    expect(result.headline).toBe('2 clubs qualify');
+    expect(result.interpretation).toBe('Clubs with more than 3 wins.');
+    expect(`${result.headline} ${result.interpretation}`).not.toMatch(/Highest\s*\./);
+  });
+
+  it('names the real streak grain and tied club organizations', () => {
+    const rows: NlTeamStreakRow[] = [
+      { clubId: 1, clubName: 'Sydney', clubSlug: 'sydney', streakLength: 12, startDate: null, endDate: null },
+      { clubId: 2, clubName: 'Richmond', clubSlug: 'richmond', streakLength: 12, startDate: null, endDate: null },
+    ];
+    const result = describeAnswer(
+      plan({
+        grain: 'team_streak', metric: null, mode: undefined,
+        streakDefinition: { kind: 'win' },
+      }),
+      { kind: 'team_streak', lead: rows[0], rows, total: 2 },
+    );
+    expect(result.headline).toContain('Sydney and Richmond');
+    expect(result.headline).toContain('12-match win streak (tied)');
+    expect(result.interpretation).toBe('Longest win streak.');
+  });
+
+  it('rejects a payload whose kind cannot represent the plan grain', () => {
+    expect(() => describeAnswer(
+      plan({ grain: 'team_match', metric: 'team_score', mode: undefined }),
+      { kind: 'player_game', lead: null, rows: [], total: 0 },
+    )).toThrow(/incompatible/);
   });
 });
 

@@ -879,8 +879,12 @@ function extractPeriodSplit(text: string): { text: string; periodSplit?: NlQuery
   return { text, consumed: [] };
 }
 
-function extractHavingClause(text: string): { text: string; havingClause?: { metric: string; op: NlCompareOp; value: number }; consumed: string[] } {
-  const words: [RegExp, string][] = [
+function extractHavingClause(text: string): {
+  text: string;
+  havingClause?: { metric: 'wins' | 'losses' | 'draws'; op: NlCompareOp; value: number };
+  consumed: string[];
+} {
+  const words: [RegExp, 'wins' | 'losses' | 'draws'][] = [
     [/\bdraws?\b/, 'draws'],
     [/\bwins?\b/, 'wins'],
     [/\blosses?\b/, 'losses'],
@@ -925,6 +929,30 @@ function extractHavingClause(text: string): { text: string; havingClause?: { met
     }
   }
   return { text: working, consumed: [] };
+}
+
+function extractMatchFilter(
+  text: string,
+  resultMetric: 'wins' | 'losses' | 'draws' | undefined,
+): {
+  text: string;
+  matchFilter?: { metric: 'win_margin' | 'loss_margin'; op: NlCompareOp; value: number };
+  consumed: string[];
+} {
+  const match = /\bby\s+(?:(more than|over|at least|at most|less than|exactly)\s+)?(\d{1,3})(\+)?\s+points?\b/.exec(text);
+  if (!match || (resultMetric !== 'wins' && resultMetric !== 'losses')) return { text, consumed: [] };
+
+  let op: NlCompareOp = 'gte';
+  if (match[1] === 'more than' || match[1] === 'over') op = 'gt';
+  else if (match[1] === 'at most') op = 'lte';
+  else if (match[1] === 'less than') op = 'lt';
+  else if (match[1] === 'exactly') op = 'eq';
+
+  return {
+    text: stripMatch(text, match[0]),
+    matchFilter: { metric: resultMetric === 'wins' ? 'win_margin' : 'loss_margin', op, value: Number(match[2]) },
+    consumed: [match[0]],
+  };
 }
 
 function extractPlayerMetric(text: string): { text: string; metric?: string; consumed: string[] } {
@@ -1099,7 +1127,8 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // match-type scope inherently means individual matches of that type,
   // which is the single-game reading by nature -- "most disposals in a
   // final" ranks individual final performances, not a sum across finals.
-  const inOneGame = !!idiomMetric || IN_ONE_GAME.test(text) || !!matchTypeResult.matchType;
+  const inOneGame = !!idiomMetric || IN_ONE_GAME.test(text) || !!matchTypeResult.matchType
+    || roundResult.roundNumber !== undefined;
   const inOneSeason = IN_ONE_SEASON.test(text);
   const overCareer = OVER_CAREER.test(text);
   // "dusty TOTAL goals against Carlton" -- overrides the named-player
@@ -1119,6 +1148,13 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       consumedTokens.push(cueMatch[0]);
       text = text.replace(cueRe, ' ');
     }
+  }
+
+  const debutGameMatch = /\bon (?:their )?debut\b|\bdebut game\b/.exec(text);
+  const debutGame = !!debutGameMatch;
+  if (debutGameMatch) {
+    consumedTokens.push(debutGameMatch[0]);
+    text = stripMatch(text, debutGameMatch[0]);
   }
 
   const negated = NEGATION_WORDS.test(text);
@@ -1144,6 +1180,10 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const havingResult = extractHavingClause(text);
   text = havingResult.text;
   consumedTokens.push(...havingResult.consumed);
+
+  const matchFilterResult = extractMatchFilter(text, havingResult.havingClause?.metric);
+  text = matchFilterResult.text;
+  consumedTokens.push(...matchFilterResult.consumed);
 
   const periodSplitResult = extractPeriodSplit(text);
   text = periodSplitResult.text;
@@ -1439,7 +1479,11 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     // career goals against Carlton" silently dropped "against Carlton"
     // and answered his whole career total instead).
     const scoped = !!(venue || clubFor || clubAgainst || matchTypeResult.matchType);
-    if (inOneSeason) {
+    if (debutGame || (periodSplitResult.periodSplit && periodSplitResult.periodSplit !== 'FULL_MATCH')) {
+      grain = 'player_game';
+      mode = 'single';
+      metric = playerMetricResult.metric;
+    } else if (inOneSeason) {
       grain = 'player_season';
       metric = playerMetricResult.metric;
     } else if (overCareer && !scoped) {
@@ -1558,6 +1602,12 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   if (matchTypeResult.matchType && !boundary) {
     scope.matchType = matchTypeResult.matchType as NlMatchType;
   }
+  if (roundResult.roundNumber !== undefined) {
+    scope.roundNumber = roundResult.roundNumber;
+    // "Round N" is the numbered home-and-away round unless the reader
+    // explicitly named another match type.
+    scope.matchType ??= 'home_and_away';
+  }
 
   const careerConditions = grain === 'player_career' ? careerResult.conditions : [];
 
@@ -1642,14 +1692,16 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // list where the reader asked for all of them.
   const resolvedAgg = resolvePolarity(aggResult.agg, metric, aggResult.polarity);
   const structureOnly = careerConditions.length > 0 || careerPredicates.length > 0
-    || clubSeasonConditions.length > 0 || !!boundary;
+    || clubSeasonConditions.length > 0 || !!boundary || !!havingResult.havingClause;
   // A max/min with NO metric and structure present is not a ranking at
   // all -- there is nothing to rank by, and the answer path already
   // degrades it to a list, only capped at maxTiedRows(25) instead of
   // maxListRows(100). "players WHO PLAYED on anzac day" is the shape:
   // AGG_WORDS reads "who played" as the "who played the most..." idiom,
   // but with no stat named the honest reading is the full list.
-  const agg: NlAggregation = resolvedAgg && (resolvedAgg.kind === 'max' || resolvedAgg.kind === 'min')
+  const agg: NlAggregation = havingResult.havingClause
+    ? { kind: 'list' }
+    : resolvedAgg && (resolvedAgg.kind === 'max' || resolvedAgg.kind === 'min')
       && metric === null && structureOnly
     ? { kind: 'list' }
     : resolvedAgg ?? (structureOnly ? { kind: 'list' } : { kind: 'max' });
@@ -1670,9 +1722,9 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       : {}),
     ...(streakResult.streakDefinition ? { streakDefinition: streakResult.streakDefinition } : {}),
     ...(periodSplitResult.periodSplit ? { periodSplit: periodSplitResult.periodSplit } : {}),
+    ...(debutGame ? { debutGame: true } : {}),
     ...(havingResult.havingClause ? { havingClause: havingResult.havingClause } : {}),
-    ...(clubAgainst ? { opponentClubId: clubAgainst.entity.organizationId } : {}),
-    ...(roundResult.roundNumber !== undefined ? { roundNumber: roundResult.roundNumber } : {}),
+    ...(matchFilterResult.matchFilter ? { matchFilter: matchFilterResult.matchFilter } : {}),
     ...(boundary ? { boundary } : {}),
     tiePolicy: 'all',
     limit: agg.kind === 'top_n' || agg.kind === 'list' ? 100 : 25,

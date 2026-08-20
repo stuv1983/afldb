@@ -15,6 +15,18 @@ commit.
 
 ## [Unreleased]
 
+### Natural-Language Search Semantic Audit — 20 August 2026
+
+- Corrected numbered-round plans so `Round N` is stored in the match scope consumed by SQL, defaults to home-and-away when no other match type is named, and elects a single-game player ranking instead of a scoped career sum (`AFLDB-ISSUE-047`). Parser versions 17-21 record this and the other audit behaviour changes separately.
+- Reworked team quarter/half scoring around the schema's cumulative checkpoints: Q2-Q4 are boundary differences, H1 is half-time, H2 is final minus half-time, and missing checkpoints stay `NULL` (`AFLDB-ISSUE-048`).
+- Replaced the broken HAVING-to-match fallback with organization-level grouped result rows and a dedicated compiler, description and UI table. Per-match win/loss margin filters now apply before grouped count thresholds, including `5 losses by more than 100 points` (`AFLDB-ISSUE-049`).
+- Tightened plan validation so optional period, grouped, streak, margin-filter and debut fields are accepted only on compiler paths that consume them. Player-quarter requests now decline explicitly until authoritative quarter-player coverage is actually populated (`AFLDB-ISSUE-050`).
+- Made answer prose grain-aware: team answers no longer use player tie wording, grouped lists cannot render a blank metric label, streak payloads have real headlines, and incompatible plan/payload combinations fail closed (`AFLDB-ISSUE-051`).
+- Added narrow deterministic coverage for `winning strea`, `blowout win`, a club's superlative bare `margin`, and `on debut`, with collision coverage and a first-career-game SQL predicate (`AFLDB-ISSUE-052`).
+- Computed team streak islands by club organization rather than historical club identity, preserving lineage across renames while keeping merger organizations separate (`AFLDB-ISSUE-053`).
+- Added a 38-question parser/validation acceptance corpus plus independent database-backed regressions for round scope, debut, grouped result counts, margin-before-HAVING, cumulative period arithmetic and organization-lineage streaks.
+- Updated `docs/search.md` to describe all seven current grains, grouped team payloads, cumulative period arithmetic, streak semantics, and the explicit player-quarter coverage decline.
+
 ### AFLPA 22 Under 22 Awards History — 20 August 2026
 
 - Added the canonical 2012–2026 annual 22 Under 22 extract (330 selections, exactly 22 per season), preserving position, source club, captain and vice-captain markers. The supplied most-selections summary is intentionally excluded because those totals are derived from the annual teams and the file contains known omissions (`AFLDB-ISSUE-042`).

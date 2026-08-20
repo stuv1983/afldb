@@ -143,6 +143,10 @@ Use this order:
    - Does a tie name all record holders?
    - Is the answer claiming "highest" when the question asked "lowest"?
    - Is a list described as a single leader?
+   - Does any successful answer render a blank metric such as `Highest .`?
+   - Does the explanation use the correct noun for the grain, rather than hard-coded `player` wording?
+   - Does `payload.value` describe the same statistic named by `plan.metric`?
+   - For grouped/HAVING answers, is a grouped-team formatter used rather than a single-match formatter?
 
 9. **UI/runtime**
    - Does `/search` show the same answer as direct execution?
@@ -269,7 +273,10 @@ For each target query, Playwright should:
 7. Assert key result values/labels.
 8. Assert ties where applicable.
 9. Assert a correct decline when data/coverage is unavailable.
-10. Save a screenshot or trace only when useful for diagnosis; do not rely on screenshots instead of text assertions.
+10. Assert no malformed prose such as `Highest .`, `Lowest .`, or an incorrect `every player` tie explanation on a team result.
+11. For grouped/HAVING queries, assert the UI shows grouped club rows/counts rather than one arbitrary match.
+12. For `team_score`, assert the displayed numeric value equals the selected club's score from the independently verified match row.
+13. Save a screenshot or trace only when useful for diagnosis; do not rely on screenshots instead of text assertions.
 
 Prefer semantic locators (`role`, label, visible text, test id) over brittle CSS.
 
@@ -348,6 +355,142 @@ This catches silent-field bugs such as a validated `roundNumber`, `periodSplit`,
 
 Where practical, test the SQL result against a known development-database truth row rather than a synthetic-only fixture.
 
+# Known current regressions to reproduce first
+
+Treat the following as **active defects**, not hypothetical examples. Reproduce them on the current development build before broadening the search vocabulary.
+
+Observed bad output:
+
+```text
+Collingwood vs St Kilda (1980) — 357 team score
+Highest team score.
+
+How was this calculated?
+Searched for the highest match score.
+Club: Collingwood.
+Ties: every player sharing the value is included.
+```
+
+```text
+St Kilda vs Brisbane Lions (2005) — 186
+Highest .
+
+How was this calculated?
+Searched match records for every matching club.
+Opponent: Brisbane Lions.
+Ties: every player sharing the value is included.
+```
+
+```text
+Sydney vs Essendon (1987) — 236
+Highest .
+
+How was this calculated?
+Searched match records for every matching club.
+Venue: Sydney Cricket Ground.
+Ties: every player sharing the value is included.
+```
+
+These examples expose multiple possible layers of failure. Do **not** assume they share one root cause.
+
+Required investigation:
+
+1. Recover the exact originating question for each result.
+   - If the question is not supplied with the symptom, inspect `nl_search_log`, review data, browser history available through the test session, or reproducible nearby acceptance queries.
+   - Do not guess the original query from the rendered answer.
+2. Inspect the actual `NlQueryPlan`.
+3. Inspect the selected compiler and generated/bound SQL.
+4. Independently calculate the correct result from PostgreSQL.
+5. Inspect the answer payload before `describe.ts`.
+6. Inspect the final rendered headline, interpretation and "How was this calculated?" explanation.
+
+## Invariants these failures must enforce
+
+### Team score identity
+
+For a full-match `team_score` answer:
+
+```text
+payload.value == the selected club's actual final score
+```
+
+It must **not** equal:
+
+- home score + away score;
+- the opponent's score;
+- a cumulative total across several matches;
+- a score progression value for the wrong period;
+- a grouped count.
+
+If a returned row says `357 team score`, prove from the database whether 357 is a real single-team score. If it is not, identify the exact transformation that produced it.
+
+For a period-split `team_score`, `value` must equal the selected team's points scored **during that period**, derived from score progression correctly.
+
+### Metric labels may never disappear
+
+A successful ranked answer must never render:
+
+```text
+Highest .
+Lowest .
+Top 10 by .
+```
+
+If `plan.metric` is intentionally absent because the result is a grouped/HAVING list, route it to a description path designed for grouped counts rather than letting a single-match formatter interpolate an empty metric.
+
+Validation should reject a plan/answer combination that requires a metric label but has no metric.
+
+### Entity nouns must match the answer grain
+
+A team-match, team-streak, club-season or grouped-team answer must never say:
+
+```text
+Ties: every player sharing the value is included.
+```
+
+Use the correct entity:
+
+- player grain -> player/players
+- team match -> match/matches or club/teams as semantically appropriate
+- team streak -> club/streak
+- grouped team aggregation -> club/team
+- club season -> club season
+
+Search shared explanation/caveat code for hard-coded `player` wording. Do not patch only the visible sentence if the same helper is reused by other grains.
+
+### Grouped queries must not collapse into one arbitrary match
+
+Queries such as:
+
+```text
+teams with more than 3 wins against the Lions
+teams with at least 10 wins at the SCG
+```
+
+must return grouped club/team rows with the qualifying count.
+
+They must not return a single match such as:
+
+```text
+St Kilda vs Brisbane Lions (2005) — 186
+Sydney vs Essendon (1987) — 236
+```
+
+A missing `metric` on a grouped query is not permission to rank by an incidental numeric column.
+
+### Payload-description agreement
+
+For every answered query, assert that:
+
+- `payload.kind` is compatible with `plan.grain`;
+- the payload's `value` means the same thing as `plan.metric`;
+- the formatter used is appropriate for that payload;
+- the explanation text describes the SQL operation actually performed;
+- tie text names the correct record-holder entity;
+- a list/HAVING result is described as a list/count, not "Highest".
+
+Add regression tests at both the payload and rendered-description levels for these invariants.
+
 # Required sample acceptance suite
 
 Use these as the first acceptance corpus. Do not hardcode answers other than user-provided/DB-verified truths.
@@ -373,10 +516,16 @@ Primary checks:
 
 ## B. Period and quarter splits
 
-- `most goals in Q1 by a player`
-- `highest team score in Q3`
 - `highest H2 score by the Magpies`
+  - expected interpretation: maximum Collingwood team score in the second half of any match
+  - primary check: calculate H2 from score progression as the points scored in Q3 + Q4, not by dividing the final score and not by using the cumulative three-quarter/final score incorrectly
+- `most goals in Q1 by a player`
+  - expected interpretation: highest individual goals in the first quarter of one match
+  - primary check: return the real leader only if player-quarter goal data exists; otherwise decline explicitly for unavailable coverage
 - `biggest win margin in a first half`
+  - expected interpretation: largest lead held by any team at half-time
+  - primary check: calculate both teams' H1 scores and compare the H1 margin; do not use the full-time margin
+- `highest team score in Q3`
 - `most disposals in the fourth quarter in 2023`
 - `lowest second half score by Essendon`
 
@@ -386,9 +535,19 @@ Primary checks:
 - season/club scope retained
 - coverage declines when player quarter stats are not stored
 - never infer quarter-level player stats from full-match totals
+- score progression columns are cumulative unless schema inspection proves otherwise; convert cumulative checkpoints into period-only scores correctly
+- H1 is the score at half-time; H2 is final score minus half-time score
+- Q1 is quarter-time score
+- Q2 is half-time minus quarter-time
+- Q3 is three-quarter-time minus half-time
+- Q4 is final score minus three-quarter-time
+- period win margin compares the two teams at the same split
 
 ## C. Team streaks
 
+- `richmond's longest winning strea`
+  - expected interpretation: Richmond's longest winning streak
+  - primary check: reproduce the exact user text first. If support for the truncated/common typo `strea` is added, keep it narrowly scoped to an unambiguous streak cue and add negative tests so broad fuzzy matching does not turn unrelated unknown words into valid plans.
 - `longest winning streak against the Blues`
 - `Swans longest losing streak at the SCG`
 - `longest unbeaten streak in finals`
@@ -407,16 +566,28 @@ Primary checks:
 ## D. HAVING clauses, loss margins and grouped aggregation
 
 - `teams with more than 3 wins against the Lions`
+  - expected interpretation: grouped clubs that have defeated the Brisbane Lions more than 3 times, i.e. at least 4 wins
+  - primary check: retain opponent scope, group by club/team first, then apply strict `HAVING COUNT(*) > 3`
 - `teams to lose 5 times by more than 100 points`
+  - expected interpretation: grouped clubs with at least 5 qualifying losses where each qualifying match was lost by more than 100 points
+  - primary check: filter to `loss_margin > 100` before grouping/counting, then apply the requested count threshold
+  - ambiguity check: the phrase `lose 5 times` normally means at least 5 for this result-list query unless parser policy explicitly defines exact-count wording; test `exactly 5 losses` separately if exact equality is supported
 - `teams with at least 10 wins at the SCG`
+  - expected interpretation: grouped clubs with 10 or more wins at the Sydney Cricket Ground
+  - primary check: resolve the venue first, count only wins at that venue, and apply `HAVING COUNT(*) >= 10`
 - `teams with more than 5 losses against Geelong since 2000`
+  - expected interpretation: grouped clubs with more than 5 losses to Geelong from season 2000 onward
+  - primary check: both opponent and season predicates must filter the match set before grouping
 
 Primary checks:
 - group by team before `HAVING`
 - correct operator: `gt` vs `gte`
 - opponent, venue and season filters apply to the counted matches
 - margin threshold applies to the qualifying losses before the count
+- grouped output includes the qualifying count as its value
 - a grouped list is not described as one match record
+- no incidental score/margin column is used as a fallback ranking metric when `plan.metric` is absent
+- explanation text must say the result was grouped/count-filtered, not `Searched match records for every matching club`
 
 Important plan-model check:
 
@@ -727,6 +898,9 @@ Separate:
 Do not declare the work complete until:
 
 - every user-supplied sample question has a classified result;
+- the three known malformed team-result examples have been reproduced or their originating queries recovered and classified;
+- no successful answer can emit a blank metric label such as `Highest .`;
+- no team/grouped answer uses player-specific tie wording;
 - every fixed question is verified against the development database;
 - every fixed user-visible path is exercised through the real `/search` UI;
 - all meaningful plan fields are compiler-tested;

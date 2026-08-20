@@ -194,11 +194,29 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    (the predicate path ignores scope and neither builder takes a
  *    season). DECADE_RE also accepts "during the 1990s" now, not just
  *    "in the 1990s".
- * 16: "longest" added to the `max` aggregation group in `vocab.ts` so that 
- *    team streak queries like "richmond's longest winning streak" are parsed 
+ * 16: "longest" added to the `max` aggregation group in `vocab.ts` so that
+ *    team streak queries like "richmond's longest winning streak" are parsed
  *    successfully rather than being rejected as ambiguous.
+ * 17: Round N moved from an ignored top-level property into match scope,
+ *    gained its home-and-away meaning, and became a single-game cue. This
+ *    changes the plan shape and outcome for exact-round questions such as
+ *    Richmond v Essendon Round 5 1984.
+ * 18: grouped team-result language gained an explicit per-match margin
+ *    filter and always elects list aggregation. "Teams to lose 5 times by
+ *    more than 100 points" now preserves both thresholds in its plan.
+ * 19: a player period split now elects player_game/single rather than a
+ *    career or season total, then validation declines it honestly while
+ *    authoritative quarter-player coverage is unavailable. This changes
+ *    the plan and failure classification for Q1/Q4 player-stat questions.
+ * 20: narrowly scoped vocabulary covers "winning strea", consumes the full
+ *    "blowout win" phrase, and reads a superlative bare team "margin" as
+ *    winning margin. Negative coverage keeps unrelated "winning street"
+ *    outside the streak rule.
+ * 21: "on debut" is an explicit player-game boundary consumed by the
+ *    career_game_no = 1 compiler predicate; debut-season wording remains
+ *    distinct.
  */
-export const PARSER_VERSION = 16;
+export const PARSER_VERSION = 21;
 
 // ------------------------------------------------------------------ grain
 
@@ -685,8 +703,12 @@ export type NlQueryPlan = {
   /** team_streak only: whether the streak is of wins or losses. */
   streakDefinition?: { kind: 'win' | 'loss' | 'unbeaten' };
   periodSplit?: 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'H1' | 'H2' | 'FULL_MATCH';
-  opponentClubId?: number;
-  havingClause?: { metric: string; op: NlCompareOp; value: number };
+  /** player_game only: restrict player_match_stats to career_game_no = 1. */
+  debutGame?: boolean;
+  /** team_match grouped-list only: count qualifying results per organization. */
+  havingClause?: { metric: 'wins' | 'losses' | 'draws'; op: NlCompareOp; value: number };
+  /** team_match grouped-list only: filter each result before it is counted. */
+  matchFilter?: { metric: 'win_margin' | 'loss_margin'; op: NlCompareOp; value: number };
   boundary?: NlBoundary;
   /** Whether a value tied for the extreme all come back, or only the first found. Default 'all'. */
   tiePolicy: 'all' | 'first';
@@ -818,6 +840,70 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   // question shape to fall back to.
   if (raw.metric === null && (raw.grain === 'player_game' || raw.grain === 'player_season' || (raw.grain === 'team_match' && !raw.havingClause))) {
     return { error: 'This kind of question needs a statistic to rank by.' };
+  }
+
+  const compareOps: readonly NlCompareOp[] = ['gte', 'lte', 'gt', 'lt', 'eq'];
+  if (raw.havingClause) {
+    if (raw.grain !== 'team_match') return { error: 'A grouped result count only applies to a team-match question.' };
+    if (raw.metric !== null || raw.agg.kind !== 'list') {
+      return { error: 'A grouped team-result question must be an unranked club list.' };
+    }
+    if (!['wins', 'losses', 'draws'].includes(raw.havingClause.metric)) {
+      return { error: `Unknown grouped result metric "${raw.havingClause.metric}".` };
+    }
+    if (!compareOps.includes(raw.havingClause.op)) return { error: 'Unknown grouped result comparison.' };
+    if (!Number.isInteger(raw.havingClause.value) || raw.havingClause.value < 0) {
+      return { error: 'A grouped result threshold must be a non-negative integer.' };
+    }
+  }
+  if (raw.matchFilter) {
+    if (raw.grain !== 'team_match' || !raw.havingClause) {
+      return { error: 'A per-match result filter only applies before a grouped team-result count.' };
+    }
+    if (!['win_margin', 'loss_margin'].includes(raw.matchFilter.metric)) {
+      return { error: `Unknown per-match result filter "${raw.matchFilter.metric}".` };
+    }
+    if (!compareOps.includes(raw.matchFilter.op)) return { error: 'Unknown per-match result comparison.' };
+    if (!Number.isFinite(raw.matchFilter.value) || raw.matchFilter.value < 0) {
+      return { error: 'A per-match margin threshold must be non-negative.' };
+    }
+    const requiredHaving = raw.matchFilter.metric === 'win_margin' ? 'wins' : 'losses';
+    if (raw.havingClause.metric !== requiredHaving) {
+      return { error: `A ${raw.matchFilter.metric.replace('_', ' ')} filter must count ${requiredHaving}.` };
+    }
+  }
+
+  if (raw.streakDefinition) {
+    if (raw.grain !== 'team_streak') return { error: 'A streak definition only applies to a team-streak question.' };
+    if (!['win', 'loss', 'unbeaten'].includes(raw.streakDefinition.kind)) return { error: 'Unknown streak definition.' };
+  } else if (raw.grain === 'team_streak') {
+    return { error: 'A team-streak question must define the result that continues the streak.' };
+  }
+  if (raw.grain === 'team_streak' && (raw.metric !== null || !['max', 'top_n'].includes(raw.agg.kind))) {
+    return { error: 'A team-streak question ranks streak length.' };
+  }
+
+  if (raw.periodSplit !== undefined) {
+    const periods = ['Q1', 'Q2', 'Q3', 'Q4', 'H1', 'H2', 'FULL_MATCH'];
+    if (!periods.includes(raw.periodSplit)) return { error: 'Unknown match period.' };
+    if (raw.periodSplit !== 'FULL_MATCH' && raw.grain !== 'team_match') {
+      return { error: 'Quarter-by-quarter player statistics are not currently available to rank.' };
+    }
+    if (
+      raw.periodSplit !== 'FULL_MATCH' && raw.grain === 'team_match'
+      && !['team_score', 'opponent_score', 'total_score', 'win_margin', 'loss_margin'].includes(raw.metric ?? '')
+    ) {
+      return { error: 'This team-match statistic is not meaningful for a quarter or half.' };
+    }
+    if (raw.periodSplit !== 'FULL_MATCH' && raw.havingClause) {
+      return { error: 'Grouped team-result counts do not currently support a period split.' };
+    }
+  }
+
+  if (raw.debutGame !== undefined) {
+    if (raw.debutGame !== true || raw.grain !== 'player_game' || raw.mode !== 'single') {
+      return { error: 'Debut scope applies only to a single player-game ranking.' };
+    }
   }
 
   if (raw.grain === 'player_game' && raw.mode === undefined) {
@@ -979,6 +1065,16 @@ const GRAIN_SUBJECT: Record<NlGrain, string> = {
   achievement_summary: 'group',
 };
 
+const TIE_ENTITY: Record<NlGrain, string> = {
+  player_career: 'player',
+  player_game: 'player',
+  player_season: 'player',
+  team_match: 'match',
+  club_season: 'club season',
+  team_streak: 'streak',
+  achievement_summary: 'group',
+};
+
 const OP_WORDS: Record<NlCompareOp, string> = {
   gte: 'at least', lte: 'at most', gt: 'more than', lt: 'less than', eq: 'exactly',
 };
@@ -1005,7 +1101,13 @@ export function describePlan(plan: NlQueryPlan): string[] {
 
   const metricLabel = metricLabelOf(plan.grain, plan.metric);
   const aggWord = AGG_WORDS[plan.agg.kind];
-  if (metricLabel) {
+  if (plan.havingClause) {
+    const { metric, op, value } = plan.havingClause;
+    lines.push(`Grouped clubs by ${metric} and kept counts ${OP_WORDS[op]} ${value}.`);
+    if (plan.matchFilter) {
+      lines.push(`Counted only matches with ${plan.matchFilter.metric.replace(/_/g, ' ')} ${OP_WORDS[plan.matchFilter.op]} ${plan.matchFilter.value}.`);
+    }
+  } else if (metricLabel) {
     lines.push(plan.agg.kind === 'top_n'
       ? `Ranked ${GRAIN_LABEL[plan.grain]} ${metricLabel.toLowerCase()}, ${aggWord} ${(plan.agg as { n: number }).n}.`
       : `Searched for ${aggWord} ${GRAIN_LABEL[plan.grain]} ${metricLabel.toLowerCase()}.`);
@@ -1040,7 +1142,14 @@ export function describePlan(plan: NlQueryPlan): string[] {
     lines.push(`Boundary: ${plan.boundary.event === 'debut' ? 'debut' : 'final'} game was a ${
       plan.boundary.where === 'grand_final' ? 'Grand Final' : 'final'}.`);
   }
-  lines.push(plan.tiePolicy === 'all' ? 'Ties: every player sharing the value is included.' : 'Ties: only the first found is shown.');
+  if (plan.periodSplit && plan.periodSplit !== 'FULL_MATCH') lines.push(`Period: ${plan.periodSplit}.`);
+  if (plan.debutGame) lines.push("Match boundary: each player's debut game.");
+  if (!plan.havingClause && plan.agg.kind !== 'list' && plan.agg.kind !== 'count') {
+    const entity = TIE_ENTITY[plan.grain];
+    lines.push(plan.tiePolicy === 'all'
+      ? `Ties: every ${entity} sharing the value is included.`
+      : `Ties: only the first ${entity} found is shown.`);
+  }
 
   return lines;
 }

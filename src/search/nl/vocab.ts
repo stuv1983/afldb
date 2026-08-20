@@ -228,7 +228,11 @@ export const TEAM_METRIC_WORDS: [RegExp, 'win_margin' | 'loss_margin' | 'team_sc
   [/\b(?:3qt|three[- ]quarter time) comebacks?\b/, 'q3_deficit_overcome'],
   [/\b(?:winning margin|win margin|margin of victory)\b/, 'win_margin'],
   [/\b(?:losing margin|loss margin|margin of defeat)\b/, 'loss_margin'],
-  [/\b(?:win|victory|victories|thrashing|thumping|blowout)\b/, 'win_margin'],
+  // A bare "margin" under a superlative is conventional shorthand for
+  // winning margin ("Suns biggest margin"). Explicit loss-margin phrases
+  // above still win because extraction is first-match ordered.
+  [/\bmargin\b/, 'win_margin'],
+  [/\b(?:win|victory|victories|thrashing|thumping|blowout(?: win)?)\b/, 'win_margin'],
   [/\b(?:loss|defeat|beating)\b/, 'loss_margin'],
   // total_score BEFORE team_score: extraction returns the first match,
   // and \bscore\b matches inside "combined score", so the other order
@@ -250,7 +254,9 @@ export const PERIOD_SPLIT_WORDS: [RegExp, 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'H1' | 'H2
 ];
 
 export const STREAK_WORDS: [RegExp, 'win' | 'loss' | 'unbeaten'][] = [
-  [/\b(?:winning streak|win streak|consecutive wins?|wins? in a row)\b/, 'win'],
+  // "strea" is a narrowly scoped, common truncation accepted only after
+  // an explicit winning cue; no general fuzzy word matching is introduced.
+  [/\b(?:winning (?:streak|strea)|win streak|consecutive wins?|wins? in a row)\b/, 'win'],
   [/\b(?:losing streak|loss streak|consecutive losses|losses in a row)\b/, 'loss'],
   [/\b(?:unbeaten streak|undefeated streak|consecutive games unbeaten)\b/, 'unbeaten'],
 ];

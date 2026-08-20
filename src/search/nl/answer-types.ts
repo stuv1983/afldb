@@ -50,6 +50,15 @@ export type NlTeamMatchRow = {
   venueName: string | null;
 };
 
+/** One organization-level group returned by a team-result HAVING query. */
+export type NlTeamAggregateRow = {
+  organizationId: number;
+  clubName: string;
+  clubSlug: string;
+  /** Number of qualifying matches (wins/losses/draws) in the requested scope. */
+  value: number;
+};
+
 export type NlTeamStreakRow = {
   clubId: number; clubName: string; clubSlug: string;
   opponentId?: number; opponentName?: string; opponentSlug?: string;
@@ -82,6 +91,7 @@ export type NlAnswerPayload =
   | { kind: 'player_career'; lead: NlPlayerCareerRow | null; rows: NlPlayerCareerRow[]; total: number }
   | { kind: 'player_season'; lead: NlPlayerSeasonRow | null; rows: NlPlayerSeasonRow[]; total: number }
   | { kind: 'team_match'; lead: NlTeamMatchRow | null; rows: NlTeamMatchRow[]; total: number }
+  | { kind: 'team_aggregate'; rows: NlTeamAggregateRow[]; total: number }
   | { kind: 'team_streak'; lead: NlTeamStreakRow | null; rows: NlTeamStreakRow[]; total: number }
   | { kind: 'club_season'; lead: NlClubSeasonRow | null; rows: NlClubSeasonRow[]; total: number }
   | { kind: 'count'; value: number }

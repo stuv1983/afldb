@@ -7,7 +7,8 @@ import {
   matchPath, playerPath, seasonPath,
 } from '@/lib/format';
 import type {
-  NlAnswer, NlClubSeasonRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow, NlTeamMatchRow, NlTeamStreakRow
+  NlAnswer, NlClubSeasonRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
+  NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '@/search/nl/answer-types';
 
 /**
@@ -15,7 +16,7 @@ import type {
  * card, then a table of ties/top-N when there is more than one row, an
  * era-coverage note when the metric is era-limited, and an expandable
  * "How was this calculated?" trace. A recognised-but-unanswerable
- * question (no coaching data, streaks not yet supported, …) gets its own
+ * question (no coaching data, unavailable player-quarter coverage, …) gets its own
  * honest panel rather than the ordinary "no results" empty state.
  *
  * Every grain now has a real renderer; the switch below still covers
@@ -77,6 +78,8 @@ function renderPayload(answer: NlAnswer) {
       return <PlayerSeasonTable rows={payload.rows} total={payload.total} />;
     case 'team_match':
       return <TeamMatchTable rows={payload.rows} total={payload.total} />;
+    case 'team_aggregate':
+      return <TeamAggregateTable rows={payload.rows} total={payload.total} />;
     case 'team_streak':
       return <TeamStreakTable rows={payload.rows} total={payload.total} />;
     case 'club_season':
@@ -88,6 +91,39 @@ function renderPayload(answer: NlAnswer) {
     case 'unanswerable':
       return null;
   }
+}
+
+function TeamAggregateTable({ rows, total }: { rows: NlTeamAggregateRow[]; total: number }) {
+  if (rows.length === 0) return null;
+  return (
+    <>
+      <CollapsibleTable title="Every qualifying club" note={`${formatNumber(total)} total`}>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Club</th>
+                <th scope="col" className="num">Qualifying matches</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.organizationId}>
+                  <td className="wide"><Link href={clubPath(r.clubSlug)}>{r.clubName}</Link></td>
+                  <td className="num">{formatNumber(r.value)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CollapsibleTable>
+      {total > rows.length && (
+        <p className="muted" style={{ marginTop: '0.6rem' }}>
+          Showing {rows.length} of {formatNumber(total)}.
+        </p>
+      )}
+    </>
+  );
 }
 
 function AchievementSummaryTable({

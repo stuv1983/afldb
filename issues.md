@@ -1655,3 +1655,291 @@ Baseline TypeScript passed and the relevant suites passed 32 tests before the ch
 
 ### Follow-up
 Run `tests/integration/grid-solver.test.ts` against the development `_test` database after importing the Under22 source, then smoke-test the queue preset and a two-axis Grid Solver cell on dev.
+
+## AFLDB-ISSUE-047 — Numbered-round NL plans silently ignore the round
+
+- **Status:** Resolved
+- **Severity:** High
+- **Area:** Search
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/search/nl/parser.ts`, `src/search/nl/plan.ts`, `tests/nl-audit-acceptance.test.ts`, `tests/integration/nl-answers-game-season.test.ts`
+
+### Symptom
+Questions such as `most hit out Richmond v Essendon Round 5 1984` confidently rank a scoped total while ignoring Round 5, instead of ranking the players in that exact match.
+
+### Reproduction
+Parse the exact question and inspect the plan. Before the fix it had `mode: sum` and a top-level `roundNumber: 5`; every compiler reads `scope.roundNumber`, so the round predicate never reached SQL.
+
+### Expected
+The plan is `player_game`, `mode: single`, with both clubs, 1984, `scope.roundNumber = 5`, and `scope.matchType = home_and_away`.
+
+### Actual
+The parser selected sum mode and stored the round in a property that validation and compilers ignored.
+
+### Evidence
+The pre-fix acceptance probe printed the misplaced top-level field. Source search found no compiler reading `plan.roundNumber`; all three match compilers read only `scope.roundNumber`.
+
+### Root cause
+Round extraction was added after the scope object was assembled and spread directly onto the plan. Round scope also was not treated as a one-match grain cue.
+
+### Fix
+Round numbers now live in `scope`, default to the numbered home-and-away match type unless another type was explicit, and elect single-game player ranking. Parser version increased from 16 to 17.
+
+### Validation
+The 38-question parser acceptance corpus and focused parser/plan suites pass. A database-backed regression now compares the compiler result with an independent season/round SQL maximum; it requires the unavailable `_test` database to execute.
+
+### Follow-up
+Run the new integration assertion and the exact question through `/search` on the development Linux environment; verify Mark Lee, 29 hitouts against `afldb_dev`.
+
+## AFLDB-ISSUE-048 — Team quarter and half scores sum cumulative checkpoints
+
+- **Status:** Resolved
+- **Severity:** High
+- **Area:** Search
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/db/queries/nl/team-match.ts`, `tests/integration/nl-answers-team-club.test.ts`
+
+### Symptom
+`highest H2 score by the Magpies` can display an impossible single-team score such as `357 team score`.
+
+### Reproduction
+The compiler's period CTE selects periods 3 and 4 and runs `SUM(points)`, although `match_period_scores.points` is cumulative-to-date.
+
+### Expected
+Q1 = Q1 checkpoint; Q2 = half-time minus Q1; Q3 = three-quarter-time minus half-time; Q4 = Q4 minus Q3; H1 = half-time; H2 = final score minus half-time. Missing checkpoints remain NULL.
+
+### Actual
+Quarter checkpoints were treated as independent period scores. H2 added the cumulative three-quarter and final scores, explaining the malformed 357 result.
+
+### Evidence
+Migration 003 explicitly documents the table as cumulative. The original SQL used `SUM(points)` and `COALESCE(..., 0)`.
+
+### Root cause
+The new period compiler assumed a per-period representation without inspecting the schema contract.
+
+### Fix
+The compiler now pivots cumulative Q1-Q4 checkpoints and subtracts the required boundaries. H2 uses final minus half-time, and no missing score is converted to zero.
+
+### Validation
+Focused TypeScript/unit suites pass. Database-backed regressions independently calculate H2 and Q3 and assert `payload.value === clubScore`; they are added but cannot run without `AFLDB_TEST_DATABASE_URL`.
+
+### Follow-up
+Run the H2/Q3 integration cases, `EXPLAIN (ANALYZE, BUFFERS)`, and the exact Magpies query through development `/search`.
+
+## AFLDB-ISSUE-049 — Grouped HAVING questions collapse into one arbitrary match
+
+- **Status:** Resolved
+- **Severity:** High
+- **Area:** Search
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/search/nl/plan.ts`, `src/search/nl/parser.ts`, `src/search/nl/answer-types.ts`, `src/db/queries/nl/team-match.ts`, `src/search/nl/describe.ts`, `src/components/NlAnswerSection.tsx`, `tests/nl-audit-acceptance.test.ts`, `tests/nl-plan.test.ts`, `tests/nl-describe.test.ts`, `tests/integration/nl-answers-team-club.test.ts`
+
+### Symptom
+`teams with more than 3 wins against the Lions` and `teams with at least 10 wins at the SCG` render one high-scoring match, including malformed `Highest .` prose, instead of club rows and qualifying counts.
+
+### Reproduction
+Parse either question and execute the original team compiler. Its HAVING CTE retained qualifying club IDs, then the main path used `metricValueExpr(plan.metric || 'team_score')` and ranked matches by an incidental score.
+
+### Expected
+Filter qualifying matches, group by club organization, apply the requested strict/inclusive count threshold, and return each organization's qualifying match count.
+
+### Actual
+The grouped count was discarded after filtering and the response shape collapsed back to `NlTeamMatchRow`.
+
+### Evidence
+The known St Kilda v Brisbane 2005 (186) and Sydney v Essendon 1987 (236) symptoms match the two required grouped questions and the exact fallback path in source.
+
+### Root cause
+`havingClause` was modelled as a filter feeding a match-ranker rather than as a distinct organization-grained result payload.
+
+### Fix
+Added `team_aggregate` rows and a dedicated compiler/UI/description path. It groups by `club_organizations`, returns the count as `value`, and never invokes a match metric fallback. Added a validated per-match margin filter so `lose 5 times by more than 100 points` filters `loss_margin > 100` before `HAVING count(*) >= 5`.
+
+### Validation
+Parser, plan, description, TypeScript and acceptance tests pass. Independent database tests for scoped wins and 100-point-loss counts are added but not run because no `_test` database is configured.
+
+### Follow-up
+Run both grouped integration truths and verify the three originating queries in `/search` on development.
+
+## AFLDB-ISSUE-050 — Validation accepts advanced fields that selected compilers ignore
+
+- **Status:** Resolved
+- **Severity:** High
+- **Area:** Search
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/search/nl/plan.ts`, `src/search/nl/parser.ts`, `tests/nl-plan.test.ts`, `tests/nl-audit-acceptance.test.ts`
+
+### Symptom
+A plan may carry `periodSplit`, `havingClause`, `matchFilter`, `streakDefinition`, or debut scope on a grain that cannot execute it. `most disposals in the fourth quarter in 2023` elected `player_season`, whose compiler ignored the quarter and ranked full-season totals.
+
+### Reproduction
+Construct cross-grain plans with those optional fields and call the original `validatePlan`; they were accepted. The player-period compilers also reference migration 062's table, but no importer or populated coverage source exists in this workspace.
+
+### Expected
+Validation accepts only combinations fully consumed by the selected compiler. Unavailable player-quarter coverage declines explicitly.
+
+### Actual
+Optional fields had little or no grain/shape validation, allowing confident partial answers or runtime empty results.
+
+### Evidence
+Source tracing showed `player-season.ts` never reads `periodSplit`; `havingClause` was only read by team-match; and the repository contains no load path for `player_match_period_stats`.
+
+### Root cause
+Plan fields were added incrementally without a complete compiler-capability matrix in validation.
+
+### Fix
+Validation now closes each field to its executable grain and shape, checks grouped operators/metrics/thresholds, rejects meaningless period metrics, and explicitly declines non-full player period rankings. Parser period cues now elect the correct single-game semantic shape before that honest coverage decline.
+
+### Validation
+Focused validation and all 38 acceptance classifications pass; the two player-quarter samples are asserted as explicit correct declines.
+
+### Follow-up
+Only remove the decline after an authoritative quarter-player source is imported, coverage is registered, and compiler/database/UI tests prove the populated era.
+
+## AFLDB-ISSUE-051 — NL descriptions use player nouns for team answers and omit streak headlines
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Area:** Search
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/search/nl/plan.ts`, `src/search/nl/describe.ts`, `tests/nl-plan.test.ts`, `tests/nl-describe.test.ts`
+
+### Symptom
+Team answers say `Ties: every player sharing the value is included`; grouped answers can show `Highest .`; team streak payloads fall through to the generic `Results` headline.
+
+### Reproduction
+Call `describePlan` for a `team_match` plan, or `describeAnswer` with team-streak/grouped payloads.
+
+### Expected
+Explanations name the actual entity grain, grouped lists explain count filtering without tie prose, every ranked headline has a metric, and streaks name their club, length and type.
+
+### Actual
+One shared sentence hard-coded `player`, the team formatter interpolated a nullable metric, and `team_streak` had no description branch.
+
+### Evidence
+Direct source inspection found the hard-coded sentence and the missing switch branch. Unit construction reproduced the blank/group-incompatible formatting without a database.
+
+### Root cause
+Description helpers were expanded around player grains first and were not made exhaustive when team/grouped/streak shapes were introduced.
+
+### Fix
+Tie nouns are grain-specific, grouped plans have dedicated count prose and no tie line, streaks have a typed formatter, and payload/plan incompatibility now throws instead of rendering a plausible but false sentence.
+
+### Validation
+Description and plan tests assert no blank `Highest .`, no team `every player`, correct grouped wording, tied streak headlines, and fail-closed payload compatibility.
+
+### Follow-up
+Exercise the same text through the real answer panel on development `/search`.
+
+## AFLDB-ISSUE-052 — Required streak, margin, blowout and debut phrases decline
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Area:** Search
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/search/nl/vocab.ts`, `src/search/nl/parser.ts`, `src/search/nl/plan.ts`, `src/db/queries/nl/player-game.ts`, `tests/nl-audit-acceptance.test.ts`
+
+### Symptom
+`richmond's longest winning strea`, `Dons biggest blowout win at Optus Stadium`, `Suns biggest margin at the Gabba`, and `most goals on debut` decline despite having unambiguous deterministic meanings.
+
+### Reproduction
+The pre-fix parser classified the first and bare-margin query as unrecognised and the other two as ambiguous, with the remaining meaningful token treated as a failed player name.
+
+### Expected
+The typo is accepted only under the explicit `winning` cue; blowout consumes the full phrase; bare superlative margin means winning margin; debut restricts `career_game_no = 1`.
+
+### Actual
+Vocabulary consumed only part or none of each phrase, leaving unsupported tokens.
+
+### Evidence
+The parser acceptance probe recorded the exact decline classifications and leftovers (`winning strea`, `win`, `margin`, `debut`).
+
+### Root cause
+Exact deterministic vocabulary lacked these narrow variants and there was no first-career-game field for a player-match ranking.
+
+### Fix
+Added narrow phrase rules, explicit debut scope and its compiler predicate. Parser versions 20-21 record the vocabulary and debut changes separately. Negative coverage proves `winning street` is not fuzzily accepted and debut-season wording does not become debut-game scope.
+
+### Validation
+All required samples and neighbouring parser variants pass; TypeScript passes. A database truth test for debut goals is added but awaits `_test` database access.
+
+### Follow-up
+Verify the debut leader and venue-scoped margin answers directly in `afldb_dev` and through `/search`.
+
+## AFLDB-ISSUE-053 — Team streaks split one organization at historical renames
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Area:** Search
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/db/queries/nl/team-streak.ts`, `src/search/nl/describe.ts`, `tests/integration/nl-answers-team-club.test.ts`
+
+### Symptom
+A lineage query such as `Swans longest losing streak at the SCG` partitions streak islands by historical `club_id`, even though entity resolution scopes Sydney/South Melbourne by organization.
+
+### Reproduction
+Inspect the original streak SQL: scope accepts every club identity under the organization, but both window partitions and grouping use `club_id`.
+
+### Expected
+Organization-level names and nicknames continue chronology across renames while separate merger organizations remain separate.
+
+### Actual
+The filter widened to the lineage and then the streak computation split it back into historical identities.
+
+### Evidence
+The mismatch is visible directly between `scopeClauses` and the `PARTITION BY f.club_id` / `GROUP BY club_id` clauses.
+
+### Root cause
+The streak compiler reused match-side identity IDs as the output identity instead of joining the already-modelled organization.
+
+### Fix
+Streak windows, groups and output now use `club_organizations`; match ordering also adds match ID as a deterministic same-date tiebreaker.
+
+### Validation
+TypeScript and description tests pass. A database-backed integration test independently computes a selected organization's chronological win streak in TypeScript and compares the compiler result; it awaits the missing `_test` database.
+
+### Follow-up
+Run the lineage test and all six required streak queries through development `/search`.
+
+## AFLDB-ISSUE-054 — Under-22 importer contract tests cannot find their source boundaries
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Tests
+- **Found:** 2026-08-20
+- **Resolved:** N/A
+- **Files:** `tests/under-22-importer.test.ts`, `tools/migration/import_awards.py`
+
+### Symptom
+Four Under-22 importer contract tests fail before making their intended assertions because the helper cannot find the configured end marker in `import_awards.py`.
+
+### Reproduction
+Run `npm.cmd test -- --run`. The failures are `makes every destructive awards reload restore the independent team data`, `uses names only to find candidates...`, `upserts only its own facts...`, and `creates the existing seasonal honour-team shape...`.
+
+### Expected
+The test helper isolates the intended importer sections and asserts their contracts.
+
+### Actual
+`between()` receives `source.indexOf(end) === -1` in all four cases and fails its boundary assertion.
+
+### Evidence
+The full-suite run reported 4 failed and 986 passed assertions before excluding this file; none of the NL-search files modified in this audit are involved.
+
+### Root cause
+Not yet confirmed. The source section labels or function boundaries appear to have drifted from the test's literal markers.
+
+### Fix
+Not yet fixed; this is outside the NL-search audit scope and may overlap unrelated in-progress importer work.
+
+### Validation
+With integration suites and this known failing file excluded, all 983 remaining safe non-integration assertions pass.
+
+### Follow-up
+Review the importer/test marker contract with the owner of the Under-22 work and update the implementation or test boundaries without weakening the behavioural assertions.

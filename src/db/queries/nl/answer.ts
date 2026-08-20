@@ -186,7 +186,7 @@ export async function answerNlQuestion(
 function payloadTotal(payload: NlAnswerPayload): number {
   switch (payload.kind) {
     case 'player_game': case 'player_career': case 'player_season':
-    case 'team_match': case 'club_season': case 'team_streak':
+    case 'team_match': case 'team_aggregate': case 'club_season': case 'team_streak':
       return payload.total;
     case 'count':
       return 1;

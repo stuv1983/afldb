@@ -162,6 +162,43 @@ describe('validatePlan', () => {
     if (!('error' in listPlan)) expect(listPlan.limit).toBe(NL_LIMITS.maxListRows);
   });
 
+  it('accepts only executable grouped team-result shapes', () => {
+    const grouped = basePlan({
+      grain: 'team_match', metric: null, agg: { kind: 'list' },
+      havingClause: { metric: 'losses', op: 'gte', value: 5 },
+      matchFilter: { metric: 'loss_margin', op: 'gt', value: 100 },
+    });
+    expect(validatePlan(grouped)).not.toHaveProperty('error');
+    expect(validatePlan({ ...grouped, agg: { kind: 'max' } })).toHaveProperty('error');
+    expect(validatePlan({ ...grouped, grain: 'club_season' })).toHaveProperty('error');
+    expect(validatePlan({
+      ...grouped,
+      havingClause: { metric: 'wins', op: 'gte', value: 5 },
+    })).toHaveProperty('error');
+  });
+
+  it('rejects plan fields on grains whose compilers cannot consume them', () => {
+    expect(validatePlan(basePlan({
+      grain: 'player_season', metric: 'goals', periodSplit: 'Q1',
+    }))).toEqual({ error: 'Quarter-by-quarter player statistics are not currently available to rank.' });
+    expect(validatePlan(basePlan({
+      streakDefinition: { kind: 'win' },
+    }))).toHaveProperty('error');
+    expect(validatePlan(basePlan({
+      grain: 'player_game', metric: 'goals', mode: 'single', debutGame: true,
+    }))).not.toHaveProperty('error');
+    expect(validatePlan(basePlan({ debutGame: true }))).toHaveProperty('error');
+  });
+
+  it('limits period splits to meaningful team scoring metrics', () => {
+    expect(validatePlan(basePlan({
+      grain: 'team_match', metric: 'team_score', periodSplit: 'H2',
+    }))).not.toHaveProperty('error');
+    expect(validatePlan(basePlan({
+      grain: 'team_match', metric: 'attendance', periodSplit: 'Q1',
+    }))).toHaveProperty('error');
+  });
+
   it('never throws on a wildly malformed plan', () => {
     expect(() => validatePlan({} as NlQueryPlan)).not.toThrow();
   });
@@ -196,6 +233,19 @@ describe('describePlan', () => {
     const lines = describePlan(plan);
     expect(lines.some((l) => /premierships.*exactly 0/.test(l))).toBe(true);
     expect(lines.some((l) => l.includes('Played a grand final'))).toBe(true);
+  });
+
+  it('uses the answer grain in tie prose and describes grouped counts without a fake metric', () => {
+    const matchLines = describePlan(basePlan({ grain: 'team_match', metric: 'team_score' }));
+    expect(matchLines).toContain('Ties: every match sharing the value is included.');
+    expect(matchLines.join(' ')).not.toContain('every player');
+
+    const groupedLines = describePlan(basePlan({
+      grain: 'team_match', metric: null, agg: { kind: 'list' },
+      havingClause: { metric: 'wins', op: 'gt', value: 3 },
+    }));
+    expect(groupedLines).toContain('Grouped clubs by wins and kept counts more than 3.');
+    expect(groupedLines.some((line) => line.startsWith('Ties:'))).toBe(false);
   });
 });
 

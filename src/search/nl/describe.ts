@@ -10,7 +10,7 @@
 import type { NlQueryPlan } from '@/search/nl/plan';
 import type {
   NlAnswerPayload, NlClubSeasonRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
-  NlTeamMatchRow,
+  NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '@/search/nl/answer-types';
 
 
@@ -65,6 +65,11 @@ export function dedupeByIdentity<T extends { value: number | null }>(
 }
 
 export function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { headline: string; interpretation: string } {
+  const compatible = payload.kind === plan.grain
+    || (plan.grain === 'team_match' && payload.kind === 'team_aggregate');
+  if (!compatible) {
+    throw new Error(`NL payload kind "${payload.kind}" is incompatible with plan grain "${plan.grain}".`);
+  }
   if (payload.kind === 'player_career') {
     return describePlayerCareerAnswer(plan, payload.lead, payload.rows, payload.total);
   }
@@ -77,6 +82,12 @@ export function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { h
   if (payload.kind === 'team_match') {
     return describeTeamMatchAnswer(plan, payload.lead, payload.rows);
   }
+  if (payload.kind === 'team_aggregate') {
+    return describeTeamAggregateAnswer(plan, payload.rows, payload.total);
+  }
+  if (payload.kind === 'team_streak') {
+    return describeTeamStreakAnswer(plan, payload.lead, payload.rows);
+  }
   if (payload.kind === 'club_season') {
     return describeClubSeasonAnswer(plan, payload.lead, payload.rows, payload.total);
   }
@@ -84,6 +95,48 @@ export function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { h
     return describeAchievementSummaryAnswer(payload);
   }
   return { headline: 'Results', interpretation: '' };
+}
+
+const COMPARE_WORDS = {
+  gte: 'at least', lte: 'at most', gt: 'more than', lt: 'fewer than', eq: 'exactly',
+} as const;
+
+function describeTeamAggregateAnswer(
+  plan: NlQueryPlan,
+  rows: NlTeamAggregateRow[],
+  total: number,
+): { headline: string; interpretation: string } {
+  const having = plan.havingClause!;
+  const margin = plan.matchFilter
+    ? `, counting only ${plan.matchFilter.metric.replace(/_/g, ' ')} ${COMPARE_WORDS[plan.matchFilter.op]} ${plan.matchFilter.value}`
+    : '';
+  return {
+    headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'club qualifies' : 'clubs qualify'}`,
+    interpretation: `Clubs with ${COMPARE_WORDS[having.op]} ${having.value} ${having.metric}${margin}.`,
+  };
+}
+
+function describeTeamStreakAnswer(
+  plan: NlQueryPlan,
+  lead: NlTeamStreakRow | null,
+  rows: NlTeamStreakRow[],
+): { headline: string; interpretation: string } {
+  if (!lead) return { headline: 'No matching streak found', interpretation: '' };
+  const seen = new Set<number>();
+  const labels: string[] = [];
+  for (const row of rows) {
+    if (row.streakLength !== lead.streakLength || seen.has(row.clubId)) continue;
+    seen.add(row.clubId);
+    labels.push(row.clubName);
+  }
+  const { subject, tied } = tiedSubject(labels);
+  const kind = plan.streakDefinition?.kind ?? 'result';
+  return {
+    headline: `${subject} \u2014 ${lead.streakLength.toLocaleString('en-AU')}-match ${kind} streak${tied ? ' (tied)' : ''}`,
+    interpretation: plan.agg.kind === 'top_n'
+      ? `Top ${plan.agg.n} ${kind} streaks.`
+      : `Longest ${kind} streak.`,
+  };
 }
 
 function describeAchievementSummaryAnswer(

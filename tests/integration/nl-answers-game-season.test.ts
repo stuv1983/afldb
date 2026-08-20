@@ -120,6 +120,38 @@ describe('player_game mode "single" matches hand-written SQL', () => {
         `player ${e.playerId} match ${e.matchId} missing`).toBe(true);
     }
   });
+
+  it('round scope is consumed by the compiler and changes the result set', async () => {
+    const [pick] = await sql<{ season: number; roundNumber: number }[]>`
+      SELECT season, round_number AS "roundNumber" FROM matches
+       WHERE round_type = 'home_and_away' AND round_number IS NOT NULL
+       GROUP BY season, round_number ORDER BY count(*) DESC LIMIT 1
+    `;
+    const scoped = await game({
+      metric: 'goals', agg: { kind: 'max' },
+      scope: {
+        seasonMin: pick.season, seasonMax: pick.season,
+        roundNumber: pick.roundNumber, matchType: 'home_and_away',
+      },
+    });
+    const [expected] = await sql<{ max: number }[]>`
+      SELECT max(s.goals) AS max
+        FROM player_match_stats s JOIN matches m ON m.id = s.match_id
+       WHERE m.season = ${pick.season} AND m.round_type = 'home_and_away'
+         AND m.round_number = ${pick.roundNumber}
+    `;
+    expect(scoped.lead?.value).toBe(expected.max);
+    expect(scoped.rows.every((r) => r.roundNumber === pick.roundNumber)).toBe(true);
+  });
+
+  it('debut scope ranks only career_game_no = 1 rows', async () => {
+    const { lead } = await game({ metric: 'goals', agg: { kind: 'max' }, debutGame: true });
+    expect(lead).not.toBeNull();
+    const [expected] = await sql<{ max: number }[]>`
+      SELECT max(goals) AS max FROM player_match_stats WHERE career_game_no = 1
+    `;
+    expect(lead!.value).toBe(expected.max);
+  });
 });
 
 describe('player_game mode "sum" matches hand-written SQL', () => {
