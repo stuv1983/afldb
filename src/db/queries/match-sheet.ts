@@ -2,23 +2,16 @@ import 'server-only';
 
 import postgres from 'postgres';
 import { authSql } from '@/db/authClient';
+import { recomputePlayerDerivedStats, recomputeSeasonMetadata } from '@/db/queries/player-derived';
+import {
+  deriveDisposals,
+  scoreSyncCoverageError,
+  validateMatchSheetPayload,
+  type PlayerMatchStatInput,
+  type ScoreSyncCoverage,
+} from '@/lib/match-sheet';
 
-export type PlayerMatchStatInput = {
-  playerId: number;
-  clubId: number;
-  jumperNumber?: string | null;
-  goals?: number | null;
-  behinds?: number | null;
-  kicks?: number | null;
-  handballs?: number | null;
-  disposals?: number | null;
-  marks?: number | null;
-  tackles?: number | null;
-  hitouts?: number | null;
-  freesFor?: number | null;
-  freesAgainst?: number | null;
-  brownlowVotes?: number | null;
-};
+export type { PlayerMatchStatInput } from '@/lib/match-sheet';
 
 export type SaveMatchSheetInput = {
   matchId: number;
@@ -39,7 +32,14 @@ export type SaveMatchSheetResult =
  * and recomputes player career and season summaries in real time.
  */
 export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMatchSheetResult> {
-  const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL || process.env.DATABASE_URL;
+  const payload = validateMatchSheetPayload({
+    players: input.players,
+    removedPlayerIds: input.removedPlayerIds ?? [],
+  });
+  if (!payload.ok) return { ok: false, error: payload.error };
+
+  const { players, removedPlayerIds } = payload.value;
+  const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
   if (!importUrl) {
     return { ok: false, error: 'AFLDB_IMPORT_DATABASE_URL is not configured.' };
   }
@@ -70,8 +70,37 @@ export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMa
         throw new Error(`Match with ID #${input.matchId} does not exist.`);
       }
 
+      for (const player of players) {
+        if (player.clubId !== match.homeClubId && player.clubId !== match.awayClubId) {
+          throw new Error(
+            `Player #${player.playerId} must be assigned to one of the two clubs in this match.`,
+          );
+        }
+      }
+
+      if (players.some((player) => player.brownlowVotes != null)) {
+        if (match.isFinal) {
+          throw new Error('Brownlow votes cannot be recorded for finals.');
+        }
+        const [availability] = await tx<{ coverage: string }[]>`
+          SELECT coverage::text AS coverage
+            FROM stat_availability
+           WHERE stat_key = 'brownlow_match_votes'
+             AND season = ${match.season}
+        `;
+        if (!availability || !['complete', 'partial'].includes(availability.coverage)) {
+          throw new Error(`Per-match Brownlow votes are not recorded for the ${match.season} season.`);
+        }
+      }
+
+      const existingPlayers = await tx<{ playerId: number }[]>`
+        SELECT player_id AS "playerId"
+          FROM player_match_stats
+         WHERE match_id = ${input.matchId}
+      `;
+
       // 2. Remove players marked for removal
-      const removed = input.removedPlayerIds ?? [];
+      const removed = removedPlayerIds;
       if (removed.length > 0) {
         await tx`
           DELETE FROM player_match_stats
@@ -81,15 +110,10 @@ export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMa
       }
 
       // 3. Upsert player match stats
-      for (const p of input.players) {
-        if (!p.playerId || !p.clubId) continue;
-
+      for (const p of players) {
         const kicks = p.kicks ?? null;
         const handballs = p.handballs ?? null;
-        // Auto-calculate disposals if kicks/handballs are provided
-        const disposals = p.disposals !== null && p.disposals !== undefined
-          ? p.disposals
-          : (kicks !== null || handballs !== null) ? ((kicks ?? 0) + (handballs ?? 0)) : null;
+        const disposals = deriveDisposals(kicks, handballs, p.disposals);
 
         await tx`
           INSERT INTO player_match_stats (
@@ -123,249 +147,108 @@ export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMa
 
       // 4. Optional score synchronization from player goals/behinds
       if (input.syncMatchScores) {
-        const [totals] = await tx<{
-          homeGoals: number;
-          homeBehinds: number;
-          awayGoals: number;
-          awayBehinds: number;
-        }[]>`
+        const [totals] = await tx<({
+          homeGoals: number | null;
+          homeBehinds: number | null;
+          awayGoals: number | null;
+          awayBehinds: number | null;
+        } & ScoreSyncCoverage)[]>`
           SELECT
-            COALESCE(sum(goals) FILTER (WHERE club_id = ${match.homeClubId}), 0)::int AS "homeGoals",
-            COALESCE(sum(behinds) FILTER (WHERE club_id = ${match.homeClubId}), 0)::int AS "homeBehinds",
-            COALESCE(sum(goals) FILTER (WHERE club_id = ${match.awayClubId}), 0)::int AS "awayGoals",
-            COALESCE(sum(behinds) FILTER (WHERE club_id = ${match.awayClubId}), 0)::int AS "awayBehinds"
+            (sum(goals) FILTER (WHERE club_id = ${match.homeClubId}))::int AS "homeGoals",
+            (sum(behinds) FILTER (WHERE club_id = ${match.homeClubId}))::int AS "homeBehinds",
+            (sum(goals) FILTER (WHERE club_id = ${match.awayClubId}))::int AS "awayGoals",
+            (sum(behinds) FILTER (WHERE club_id = ${match.awayClubId}))::int AS "awayBehinds",
+            count(*) FILTER (WHERE club_id = ${match.homeClubId})::int AS "homePlayers",
+            count(*) FILTER (WHERE club_id = ${match.awayClubId})::int AS "awayPlayers",
+            count(goals) FILTER (WHERE club_id = ${match.homeClubId})::int AS "homeGoalsRecorded",
+            count(behinds) FILTER (WHERE club_id = ${match.homeClubId})::int AS "homeBehindsRecorded",
+            count(goals) FILTER (WHERE club_id = ${match.awayClubId})::int AS "awayGoalsRecorded",
+            count(behinds) FILTER (WHERE club_id = ${match.awayClubId})::int AS "awayBehindsRecorded"
           FROM player_match_stats
           WHERE match_id = ${input.matchId}
         `;
 
-        if (totals) {
-          const homeScore = totals.homeGoals * 6 + totals.homeBehinds;
-          const awayScore = totals.awayGoals * 6 + totals.awayBehinds;
-          const result = homeScore > awayScore ? 'home_win' : homeScore < awayScore ? 'away_win' : 'draw';
-          const winnerClubId = homeScore > awayScore ? match.homeClubId : homeScore < awayScore ? match.awayClubId : null;
-          const margin = Math.abs(homeScore - awayScore);
+        if (!totals) throw new Error('Could not read the saved match score components.');
+        const coverageError = scoreSyncCoverageError(totals);
+        if (coverageError) throw new Error(coverageError);
 
+        const homeGoals = totals.homeGoals as number;
+        const homeBehinds = totals.homeBehinds as number;
+        const awayGoals = totals.awayGoals as number;
+        const awayBehinds = totals.awayBehinds as number;
+        const homeScore = homeGoals * 6 + homeBehinds;
+        const awayScore = awayGoals * 6 + awayBehinds;
+        const result = homeScore > awayScore ? 'home_win' : homeScore < awayScore ? 'away_win' : 'draw';
+        const winnerClubId = homeScore > awayScore ? match.homeClubId : homeScore < awayScore ? match.awayClubId : null;
+        const margin = Math.abs(homeScore - awayScore);
+
+        await tx`
+          UPDATE matches
+             SET home_goals = ${homeGoals},
+                 home_behinds = ${homeBehinds},
+                 home_score = ${homeScore},
+                 away_goals = ${awayGoals},
+                 away_behinds = ${awayBehinds},
+                 away_score = ${awayScore},
+                 result = ${result}::match_result,
+                 winner_club_id = ${winnerClubId},
+                 margin = ${margin}
+           WHERE id = ${input.matchId}
+        `;
+
+        const [periodRow] = await tx<{ period: number }[]>`
+          SELECT COALESCE(max(period), 4)::int AS period
+            FROM match_period_scores
+           WHERE match_id = ${input.matchId}
+        `;
+        const finalPeriod = periodRow?.period ?? 4;
+        for (const score of [
+          { clubId: match.homeClubId, goals: homeGoals, behinds: homeBehinds, points: homeScore },
+          { clubId: match.awayClubId, goals: awayGoals, behinds: awayBehinds, points: awayScore },
+        ]) {
           await tx`
-            UPDATE matches
-               SET home_goals = ${totals.homeGoals},
-                   home_behinds = ${totals.homeBehinds},
-                   home_score = ${homeScore},
-                   away_goals = ${totals.awayGoals},
-                   away_behinds = ${totals.awayBehinds},
-                   away_score = ${awayScore},
-                   result = ${result}::match_result,
-                   winner_club_id = ${winnerClubId},
-                   margin = ${margin}
-             WHERE id = ${input.matchId}
+            INSERT INTO match_period_scores (match_id, club_id, period, goals, behinds, points)
+            VALUES (${input.matchId}, ${score.clubId}, ${finalPeriod}, ${score.goals}, ${score.behinds}, ${score.points})
+            ON CONFLICT (match_id, club_id, period) DO UPDATE SET
+              goals = EXCLUDED.goals,
+              behinds = EXCLUDED.behinds,
+              points = EXCLUDED.points
           `;
         }
       }
 
-      // 5. Recompute derived player_career_stats & player_season_stats for affected players
       const affectedIds = Array.from(new Set([
-        ...input.players.map((p) => p.playerId),
+        ...existingPlayers.map((row) => row.playerId),
+        ...players.map((player) => player.playerId),
         ...removed,
       ])).filter((id) => Number.isInteger(id) && id > 0);
 
-      if (affectedIds.length > 0) {
-        // Sync Brownlow round and season votes from match stats
-        if (match.roundNumber) {
-          for (const p of input.players) {
-            if (p.brownlowVotes !== null && p.brownlowVotes !== undefined) {
-              await tx`
-                INSERT INTO brownlow_round_votes (season, player_id, round_number, played, votes)
-                VALUES (${match.season}, ${p.playerId}, ${match.roundNumber}, true, ${p.brownlowVotes})
-                ON CONFLICT (season, player_id, round_number) DO UPDATE SET
-                  played = EXCLUDED.played,
-                  votes = EXCLUDED.votes
-              `;
-            }
-          }
-        }
-
+      // Round detail is independently recorded. Official season totals are
+      // never inferred from this incomplete match-grain source.
+      if (affectedIds.length > 0 && match.roundNumber !== null) {
         await tx`
-          INSERT INTO brownlow_season_votes (
-            season, player_id, club_id, votes,
-            three_vote_games, two_vote_games, one_vote_games, polling_games,
-            link_status_value
-          )
-          SELECT
-            m.season,
-            pms.player_id,
-            (array_agg(pms.club_id ORDER BY pms.id DESC))[1] AS club_id,
-            COALESCE(sum(pms.brownlow_votes), 0)::smallint AS votes,
-            count(*) FILTER (WHERE pms.brownlow_votes = 3)::smallint AS three_vote_games,
-            count(*) FILTER (WHERE pms.brownlow_votes = 2)::smallint AS two_vote_games,
-            count(*) FILTER (WHERE pms.brownlow_votes = 1)::smallint AS one_vote_games,
-            count(*) FILTER (WHERE pms.brownlow_votes > 0)::smallint AS polling_games,
-            'unique'::link_status
-          FROM player_match_stats pms
-          JOIN matches m ON m.id = pms.match_id
-          WHERE m.season = ${match.season}
-            AND pms.player_id = ANY(${affectedIds})
-            AND pms.brownlow_votes > 0
-          GROUP BY m.season, pms.player_id
-          ON CONFLICT (season, player_id) DO UPDATE SET
-            club_id = EXCLUDED.club_id,
-            votes = EXCLUDED.votes,
-            three_vote_games = EXCLUDED.three_vote_games,
-            two_vote_games = EXCLUDED.two_vote_games,
-            one_vote_games = EXCLUDED.one_vote_games,
-            polling_games = EXCLUDED.polling_games;
-
-          DELETE FROM brownlow_season_votes
-          WHERE season = ${match.season}
-            AND player_id = ANY(${affectedIds})
-            AND NOT EXISTS (
-              SELECT 1 FROM player_match_stats pms
-              JOIN matches m ON m.id = pms.match_id
-              WHERE m.season = ${match.season}
-                AND pms.player_id = brownlow_season_votes.player_id
-                AND pms.brownlow_votes > 0
-            );
+          DELETE FROM brownlow_round_votes
+           WHERE season = ${match.season}
+             AND round_number = ${match.roundNumber}
+             AND player_id = ANY(${affectedIds})
         `;
-
-        // Career stats recalculation
         await tx`
-          DELETE FROM player_career_stats WHERE player_id = ANY(${affectedIds});
-          INSERT INTO player_career_stats (
-            player_id, games, finals, premierships, wins, draws, losses,
-            goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts,
-            behinds_recorded_games, kicks_recorded_games, handballs_recorded_games,
-            disposals_recorded_games, marks_recorded_games, tackles_recorded_games,
-            hitouts_recorded_games,
-            brownlow_votes, brownlow_medals,
-            clubs_played, seasons_played, debut_season, final_season,
-            debut_date, last_match_date, best_goals_game, best_disposals_game
-          )
-          SELECT
-              g.player_id,
-              g.games, g.finals, g.premierships, g.wins, g.draws, g.losses,
-              g.goals, g.behinds, g.kicks, g.handballs, g.disposals, g.marks,
-              g.tackles, g.hitouts,
-              g.behinds_rec, g.kicks_rec, g.handballs_rec, g.disposals_rec,
-              g.marks_rec, g.tackles_rec, g.hitouts_rec,
-              COALESCE(b.votes, 0),
-              COALESCE(b.medals, 0),
-              g.clubs_played, g.seasons_played, g.debut_season, g.final_season,
-              g.debut_date, g.last_match_date, g.best_goals, g.best_disposals
-          FROM (
-              SELECT
-                  pms.player_id,
-                  count(*) AS games,
-                  count(*) FILTER (WHERE m.is_final) AS finals,
-                  count(*) FILTER (WHERE m.round_type = 'grand_final' AND (CASE WHEN m.result = 'draw' THEN 'D' WHEN (m.result = 'home_win') = (m.home_club_id = pms.club_id) THEN 'W' ELSE 'L' END) = 'W') AS premierships,
-                  count(*) FILTER (WHERE (CASE WHEN m.result = 'draw' THEN 'D' WHEN (m.result = 'home_win') = (m.home_club_id = pms.club_id) THEN 'W' ELSE 'L' END) = 'W') AS wins,
-                  count(*) FILTER (WHERE m.result = 'draw') AS draws,
-                  count(*) FILTER (WHERE (CASE WHEN m.result = 'draw' THEN 'D' WHEN (m.result = 'home_win') = (m.home_club_id = pms.club_id) THEN 'W' ELSE 'L' END) = 'L') AS losses,
-                  COALESCE(sum(pms.goals), 0) AS goals,
-                  sum(pms.behinds) AS behinds, sum(pms.kicks) AS kicks,
-                  sum(pms.handballs) AS handballs, sum(pms.disposals) AS disposals,
-                  sum(pms.marks) AS marks, sum(pms.tackles) AS tackles, sum(pms.hitouts) AS hitouts,
-                  count(pms.behinds) AS behinds_rec, count(pms.kicks) AS kicks_rec,
-                  count(pms.handballs) AS handballs_rec, count(pms.disposals) AS disposals_rec,
-                  count(pms.marks) AS marks_rec, count(pms.tackles) AS tackles_rec,
-                  count(pms.hitouts) AS hitouts_rec,
-                  count(DISTINCT cl.organization_id) AS clubs_played,
-                  count(DISTINCT m.season) AS seasons_played,
-                  min(m.season) AS debut_season, max(m.season) AS final_season,
-                  min(m.match_date) AS debut_date, max(m.match_date) AS last_match_date,
-                  max(pms.goals) AS best_goals, max(pms.disposals) AS best_disposals
-              FROM player_match_stats pms
-              JOIN matches m ON m.id = pms.match_id
-              JOIN clubs cl ON cl.id = pms.club_id
-              WHERE pms.player_id = ANY(${affectedIds})
-              GROUP BY pms.player_id
-          ) g
-          LEFT JOIN (
-              SELECT player_id,
-                     sum(votes) AS votes,
-                     count(*) FILTER (WHERE is_winner) AS medals
-              FROM brownlow_season_votes
-              WHERE player_id = ANY(${affectedIds})
-              GROUP BY player_id
-          ) b ON b.player_id = g.player_id;
-        `;
-
-        // Season stats recalculation
-        await tx`
-          DELETE FROM player_season_stats WHERE player_id = ANY(${affectedIds}) AND season = ${match.season};
-          INSERT INTO player_season_stats (
-            player_id, season, primary_club_id, club_count,
-            games, finals, wins, draws, losses,
-            goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts,
-            disposals_recorded_games, tackles_recorded_games, hitouts_recorded_games,
-            brownlow_votes, brownlow_status, is_premier
-          )
-          SELECT
-              a.player_id, a.season, a.primary_club_id, a.club_count,
-              a.games, a.finals, a.wins, a.draws, a.losses,
-              a.goals, a.behinds, a.kicks, a.handballs,
-              a.disposals, a.marks, a.tackles, a.hitouts,
-              a.disposals_rec, a.tackles_rec, a.hitouts_rec,
-              CASE WHEN sb.status = 'complete' THEN COALESCE(bsv.votes, 0) END,
-              sb.status,
-              a.is_premier
-          FROM (
-              SELECT
-                  c.player_id,
-                  c.season,
-                  count(*) AS games,
-                  count(*) FILTER (WHERE c.is_final) AS finals,
-                  count(*) FILTER (WHERE c.outcome = 'W') AS wins,
-                  count(*) FILTER (WHERE c.outcome = 'D') AS draws,
-                  count(*) FILTER (WHERE c.outcome = 'L') AS losses,
-                  sum(c.goals) AS goals, sum(c.behinds) AS behinds,
-                  sum(c.kicks) AS kicks, sum(c.handballs) AS handballs,
-                  sum(c.disposals) AS disposals, sum(c.marks) AS marks,
-                  sum(c.tackles) AS tackles, sum(c.hitouts) AS hitouts,
-                  count(c.disposals) AS disposals_rec,
-                  count(c.tackles) AS tackles_rec,
-                  count(c.hitouts) AS hitouts_rec,
-                  count(DISTINCT c.club_id) AS club_count,
-                  (array_agg(c.club_id ORDER BY cnt DESC, c.club_id))[1] AS primary_club_id,
-                  bool_or(c.round_type = 'grand_final' AND c.outcome = 'W') AS is_premier
-              FROM (
-                  SELECT pms.*, m.season, m.is_final, m.round_type,
-                         (CASE WHEN m.result = 'draw' THEN 'D' WHEN (m.result = 'home_win') = (m.home_club_id = pms.club_id) THEN 'W' ELSE 'L' END) AS outcome,
-                         count(*) OVER (PARTITION BY pms.player_id, m.season, pms.club_id) AS cnt
-                    FROM player_match_stats pms
-                    JOIN matches m ON m.id = pms.match_id
-                   WHERE pms.player_id = ANY(${affectedIds}) AND m.season = ${match.season}
-              ) c
-              GROUP BY c.player_id, c.season
-          ) a
-          JOIN (
-              SELECT s.year AS season,
-                     CASE
-                       WHEN EXISTS (SELECT 1 FROM brownlow_season_votes b WHERE b.season = s.year) THEN 'complete'
-                       WHEN s.status = 'in_progress' THEN 'pending'
-                       ELSE 'not_applicable'
-                     END::coverage_status AS status
-                FROM seasons s
-               WHERE s.year = ${match.season}
-          ) sb ON sb.season = a.season
-          LEFT JOIN brownlow_season_votes bsv
-                 ON bsv.player_id = a.player_id AND bsv.season = a.season;
-        `;
-
-        // Players career span
-        await tx`
-          UPDATE players p
-             SET debut_season = sub.debut_season,
-                 final_season = sub.final_season
-            FROM (
-              SELECT pms.player_id, min(m.season) AS debut_season, max(m.season) AS final_season
-                FROM player_match_stats pms
-                JOIN matches m ON m.id = pms.match_id
-               WHERE pms.player_id = ANY(${affectedIds})
-               GROUP BY pms.player_id
-            ) sub
-           WHERE p.id = sub.player_id;
+          INSERT INTO brownlow_round_votes (season, player_id, round_number, played, votes)
+          SELECT ${match.season}, pms.player_id, ${match.roundNumber}, true, pms.brownlow_votes
+            FROM player_match_stats pms
+           WHERE pms.match_id = ${input.matchId}
+             AND pms.player_id = ANY(${affectedIds})
+             AND pms.brownlow_votes IS NOT NULL
+          ON CONFLICT (season, player_id, round_number) DO UPDATE SET
+            played = EXCLUDED.played,
+            votes = EXCLUDED.votes
         `;
       }
 
-      return { playerCount: input.players.length, scoreUpdated: input.syncMatchScores };
+      await recomputePlayerDerivedStats(tx, affectedIds, match.season);
+      if (input.syncMatchScores) await recomputeSeasonMetadata(tx, match.season);
+
+      return { playerCount: players.length, scoreUpdated: input.syncMatchScores };
     });
 
     // 6. Audit log in data_edits
@@ -375,7 +258,7 @@ export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMa
               (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
         VALUES ('matches', ${input.matchId}, 'match_sheet',
                 '{}'::jsonb,
-                ${authSql.json({ playersCount: input.players.length, scoreUpdated: input.syncMatchScores })},
+                ${authSql.json({ playersCount: players.length, scoreUpdated: input.syncMatchScores })},
                 ${input.adminUserId},
                 ${(input.note ?? '').trim().slice(0, 2000) || null})
       `;

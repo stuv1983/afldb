@@ -4,11 +4,11 @@ import { revalidatePath } from 'next/cache';
 
 import {
   confirmUnlinked as confirmUnlinkedQuery,
+  createPlayerAndResolveLink,
   isLinkTargetTable,
   resolveLink,
   setSuggestionStatus,
 } from '@/db/queries/player-links';
-import { createPlayer } from '@/db/queries/players';
 import { audit, requireSuperAdmin } from '@/lib/auth/session';
 
 export type PlayerLinkActionState = { error?: string; message?: string };
@@ -177,11 +177,14 @@ export async function createAndLinkPlayer(
 
   const notes = String(formData.get('notes') ?? '').trim() || null;
   const note = String(formData.get('note') ?? '').trim();
+  if (note.length > 2000) return { error: 'Notes are limited to 2000 characters.' };
 
-  // Create the player
-  let player: { id: number; slug: string; displayName: string };
-  try {
-    player = await createPlayer({
+  const result = await createPlayerAndResolveLink({
+    targetTable,
+    targetId,
+    adminUserId: admin.id,
+    note,
+    player: {
       displayName,
       givenName,
       surname,
@@ -190,21 +193,10 @@ export async function createAndLinkPlayer(
       heightCm,
       weightKg,
       notes,
-    });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { error: `Could not create player: ${msg}` };
-  }
-
-  // Link the target row
-  const result = await resolveLink({
-    targetTable,
-    targetId,
-    playerId: player.id,
-    adminUserId: admin.id,
-    note: note || `Created player ${player.displayName} and linked to ${targetTable} #${targetId}`,
+    },
   });
   if (!result.ok) return { error: result.error };
+  const { player } = result;
 
   await audit('player_link.created_and_linked', {
     targetTable,

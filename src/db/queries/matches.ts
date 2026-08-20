@@ -151,13 +151,14 @@ export type RecentPlayerRoster = {
   jumperNumber: string | null;
 };
 
-/** Fetch the most recent match lineup for a club to allow 1-click roster populating in MatchSheetEditor. */
-export async function getRecentClubLineup(clubId: number, season?: number): Promise<RecentPlayerRoster[]> {
+/** Fetch the club's latest populated lineup strictly before the match being edited. */
+export async function getRecentClubLineup(clubId: number, beforeMatchId: number): Promise<RecentPlayerRoster[]> {
   const [lastMatch] = await sql<{ id: number }[]>`
     SELECT m.id
       FROM matches m
+      JOIN matches target ON target.id = ${beforeMatchId}
       JOIN player_match_stats pms ON pms.match_id = m.id AND pms.club_id = ${clubId}
-     WHERE (${season ? sql`m.season <= ${season}` : sql`true`})
+     WHERE (m.match_date, m.id) < (target.match_date, target.id)
      ORDER BY m.match_date DESC, m.id DESC
      LIMIT 1
   `;

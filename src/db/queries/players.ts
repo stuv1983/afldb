@@ -233,7 +233,8 @@ async function fetchPlayer(id: number): Promise<PlayerProfile | null> {
 
 export type DraftPickInput = {
   recruitedFrom?: string | null;
-  draftYear?: number | null;
+  /** A draft row is a historical fact, so its season is never inferred. */
+  draftYear: number;
   draftType?: string | null;
   pickNumber?: number | null;
   clubId?: number | null;
@@ -256,12 +257,24 @@ export type CreatePlayerInput = {
   draftInfo?: DraftPickInput | null;
 };
 
+export type CreatedPlayer = { id: number; slug: string; displayName: string };
+
 /**
- * Create a new player in the database (see changeLog.md).
- * Used for drafted players who have yet to play a match or historical players.
+ * The transaction-scoped half of player creation.
+ *
+ * Compound import mutations (notably "create and link") call this only
+ * after locking their own prerequisite row. Keeping the inserts here means
+ * those workflows share the standalone creation rules without opening a
+ * second connection or committing an orphan player halfway through.
  */
-export async function createPlayer(input: CreatePlayerInput): Promise<{ id: number; slug: string; displayName: string }> {
+export async function createPlayerInTransaction(
+  tx: postgres.TransactionSql,
+  input: CreatePlayerInput,
+): Promise<CreatedPlayer> {
   const displayName = input.displayName.trim();
+  if (!displayName || displayName.length > 100) {
+    throw new Error('Display name is required (up to 100 characters).');
+  }
   let givenName = input.givenName?.trim() || null;
   let surname = input.surname?.trim() || null;
 
@@ -285,86 +298,114 @@ export async function createPlayer(input: CreatePlayerInput): Promise<{ id: numb
   const dobConfidence = dob ? (input.dobConfidence || 'sourced') : 'unknown';
   const birthYear = dob && /^\d{4}/.test(dob) ? Number(dob.slice(0, 4)) : null;
 
-  const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL || process.env.DATABASE_URL;
+  if (input.draftInfo && (
+    !Number.isInteger(input.draftInfo.draftYear)
+    || input.draftInfo.draftYear < 1981
+    || input.draftInfo.draftYear > 2100
+  )) {
+    throw new Error(
+      'An explicit draft year from 1981 to 2100 is required when draft information is supplied.',
+    );
+  }
+
+  let draftClubNameRaw: string | null = null;
+  if (input.draftInfo?.clubId != null) {
+    if (!Number.isInteger(input.draftInfo.clubId) || input.draftInfo.clubId <= 0) {
+      throw new Error('Draft club ID must be a positive integer.');
+    }
+    const [club] = await tx<{ id: number; name: string; activeId: number | null }[]>`
+      SELECT c.id, c.name,
+             afldb_identity_for_season(c.organization_id, ${input.draftInfo.draftYear}) AS "activeId"
+        FROM clubs c
+       WHERE c.id = ${input.draftInfo.clubId}
+    `;
+    if (!club) throw new Error(`Draft club #${input.draftInfo.clubId} does not exist.`);
+    if (club.activeId !== club.id) {
+      throw new Error(`${club.name} is not the historical club identity active in ${input.draftInfo.draftYear}.`);
+    }
+    draftClubNameRaw = club.name;
+  }
+
+  const [row] = await tx<CreatedPlayer[]>`
+    INSERT INTO players (
+      display_name, given_name, surname, sort_name, search_name, slug,
+      dob, dob_confidence, birth_year, birth_year_confidence,
+      height_cm, weight_kg, notes,
+      debut_season, final_season
+    ) VALUES (
+      ${displayName}, ${givenName}, ${surname}, ${sortName},
+      afldb_normalise_name(${displayName}), ${slug},
+      ${dob}::date, ${dobConfidence}::value_confidence,
+      ${birthYear}, ${dobConfidence}::value_confidence,
+      ${input.heightCm ?? null}, ${input.weightKg ?? null}, ${input.notes?.trim() || null},
+      ${input.debutSeason ?? null}, ${input.finalSeason ?? null}
+    )
+    RETURNING id, slug, display_name AS "displayName"
+  `;
+
+  // Seed zero career stats.
+  await tx`
+    INSERT INTO player_career_stats (
+      player_id, games, goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts,
+      finals, premierships, wins, draws, losses, brownlow_votes, brownlow_medals,
+      clubs_played, seasons_played, behinds_recorded_games, kicks_recorded_games,
+      handballs_recorded_games, disposals_recorded_games, marks_recorded_games,
+      tackles_recorded_games, hitouts_recorded_games
+    ) VALUES (
+      ${row.id}, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+      0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0,
+      0, 0, 0,
+      0, 0
+    ) ON CONFLICT (player_id) DO NOTHING
+  `;
+
+  // Optional draft & recruitment record. The year is deliberately required:
+  // neither a birth date nor the wall clock is evidence of a draft season.
+  if (input.draftInfo) {
+    const d = input.draftInfo;
+    const draftType = d.draftType?.trim() || 'National Draft';
+
+    await tx`
+      INSERT INTO draft_picks (
+        draft_year, draft_type, pick_number, player_name_raw, player_id,
+        link_status_value, club_id, club_name_raw, original_club_raw,
+        height_cm, weight_kg, draft_age, pick_note, detail
+      ) VALUES (
+        ${d.draftYear},
+        ${draftType},
+        ${d.pickNumber ?? null},
+        ${displayName},
+        ${row.id},
+        'resolved',
+        ${d.clubId ?? null},
+        ${draftClubNameRaw},
+        ${d.recruitedFrom?.trim() || null},
+        ${input.heightCm ?? null},
+        ${input.weightKg ?? null},
+        ${d.draftAge ?? null},
+        ${d.pickNote?.trim() || null},
+        ${d.detail?.trim() || null}
+      )
+    `;
+  }
+
+  return row;
+}
+
+/**
+ * Create a new player in the database (see changeLog.md).
+ * Used for drafted players who have yet to play a match or historical players.
+ */
+export async function createPlayer(input: CreatePlayerInput): Promise<CreatedPlayer> {
+  const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
   if (!importUrl) {
     throw new Error('AFLDB_IMPORT_DATABASE_URL is not configured.');
   }
 
   const importSql = postgres(importUrl, { max: 1, onnotice: () => {} });
   try {
-    const created = await importSql.begin(async (tx) => {
-      const [row] = await tx<{ id: number; slug: string; displayName: string }[]>`
-        INSERT INTO players (
-          display_name, given_name, surname, sort_name, search_name, slug,
-          dob, dob_confidence, birth_year, birth_year_confidence,
-          height_cm, weight_kg, notes,
-          debut_season, final_season
-        ) VALUES (
-          ${displayName}, ${givenName}, ${surname}, ${sortName},
-          afldb_normalise_name(${displayName}), ${slug},
-          ${dob}::date, ${dobConfidence}::value_confidence,
-          ${birthYear}, ${dobConfidence}::value_confidence,
-          ${input.heightCm ?? null}, ${input.weightKg ?? null}, ${input.notes?.trim() || null},
-          ${input.debutSeason ?? null}, ${input.finalSeason ?? null}
-        )
-        RETURNING id, slug, display_name AS "displayName"
-      `;
-
-      // Seed zero career stats
-      await tx`
-        INSERT INTO player_career_stats (
-          player_id, games, goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts,
-          finals, premierships, wins, draws, losses, brownlow_votes, brownlow_medals,
-          clubs_played, seasons_played, behinds_recorded_games, kicks_recorded_games,
-          handballs_recorded_games, disposals_recorded_games, marks_recorded_games,
-          tackles_recorded_games, hitouts_recorded_games
-        ) VALUES (
-          ${row.id}, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-          0, 0, 0, 0, 0, 0, 0,
-          0, 0, 0, 0,
-          0, 0, 0,
-          0, 0
-        ) ON CONFLICT (player_id) DO NOTHING
-      `;
-
-      // Optional draft & recruitment record
-      if (input.draftInfo && (input.draftInfo.draftYear || input.draftInfo.recruitedFrom || input.draftInfo.pickNumber || input.draftInfo.clubId)) {
-        const d = input.draftInfo;
-        const draftYear = d.draftYear || (birthYear ? birthYear + 18 : new Date().getFullYear());
-        const draftType = d.draftType?.trim() || 'National Draft';
-
-        let clubNameRaw: string | null = null;
-        if (d.clubId) {
-          const [cl] = await tx<{ name: string }[]>`SELECT name FROM clubs WHERE id = ${d.clubId}`;
-          clubNameRaw = cl?.name ?? null;
-        }
-
-        await tx`
-          INSERT INTO draft_picks (
-            draft_year, draft_type, pick_number, player_name_raw, player_id,
-            link_status_value, club_id, club_name_raw, original_club_raw,
-            height_cm, weight_kg, draft_age, pick_note, detail
-          ) VALUES (
-            ${draftYear},
-            ${draftType},
-            ${d.pickNumber ?? null},
-            ${displayName},
-            ${row.id},
-            'resolved',
-            ${d.clubId ?? null},
-            ${clubNameRaw},
-            ${d.recruitedFrom?.trim() || null},
-            ${input.heightCm ?? null},
-            ${input.weightKg ?? null},
-            ${d.draftAge ?? null},
-            ${d.pickNote?.trim() || null},
-            ${d.detail?.trim() || null}
-          )
-        `;
-      }
-
-      return row;
-    });
+    const created = await importSql.begin((tx) => createPlayerInTransaction(tx, input));
 
     return created;
   } finally {

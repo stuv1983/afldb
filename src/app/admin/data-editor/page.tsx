@@ -65,9 +65,9 @@ export default async function DataEditorPage(
   const matchSheetPlayers = matchForSheet ? await getMatchPlayers(id) : [];
 
   const [homeRecentLineup, awayRecentLineup] = matchForSheet
-    ? await Promise.all([
-        getRecentClubLineup(matchForSheet.homeClubId, matchForSheet.season),
-        getRecentClubLineup(matchForSheet.awayClubId, matchForSheet.season),
+      ? await Promise.all([
+        getRecentClubLineup(matchForSheet.homeClubId, matchForSheet.id),
+        getRecentClubLineup(matchForSheet.awayClubId, matchForSheet.id),
       ])
     : [[], []];
 

@@ -4,6 +4,11 @@ import postgres from 'postgres';
 
 import { authSql } from '@/db/authClient';
 import { sql } from '@/db/client';
+import {
+  createPlayerInTransaction,
+  type CreatedPlayer,
+  type CreatePlayerInput,
+} from '@/db/queries/players';
 
 /**
  * Manual review of unresolved player links (migration 056).
@@ -199,6 +204,140 @@ export type ResolveResult =
   | { ok: true }
   | { ok: false; error: string };
 
+type Tx = postgres.TransactionSql;
+
+type LockedLinkTarget = {
+  previousStatus: string;
+  draftPersonId: number | null;
+};
+
+/**
+ * Lock and re-check the row whose stale form is being submitted.
+ *
+ * Draft picks are serialized through their durable draft_person identity
+ * before the individual row lock. The unlocked first read is used only to
+ * find the numeric identity to lock; the locked target must still point to
+ * that same identity before any caller may create or update anything.
+ */
+async function lockUnresolvedTarget(
+  tx: Tx,
+  targetTable: LinkTargetTable,
+  targetId: number,
+): Promise<LockedLinkTarget | null> {
+  if (targetTable === 'draft_picks') {
+    const [identity] = await tx<{ draftPersonId: number | null }[]>`
+      SELECT draft_person_id AS "draftPersonId"
+        FROM draft_picks
+       WHERE id = ${targetId}
+    `;
+    if (!identity) return null;
+    if (identity.draftPersonId === null) {
+      throw new Error('The draft pick has no draft person identity and cannot be resolved safely.');
+    }
+
+    const [person] = await tx<{ status: string; playerId: number | null }[]>`
+      SELECT link_status::text AS status, player_id AS "playerId"
+        FROM draft_persons
+       WHERE id = ${identity.draftPersonId}
+       FOR UPDATE
+    `;
+    if (!person) {
+      throw new Error('The draft pick references a draft person that no longer exists.');
+    }
+
+    const [row] = await tx<{ status: string; draftPersonId: number | null }[]>`
+      SELECT link_status_value::text AS status,
+             draft_person_id AS "draftPersonId"
+        FROM draft_picks
+       WHERE id = ${targetId}
+       FOR UPDATE
+    `;
+    if (!row || !(UNRESOLVED as readonly string[]).includes(row.status)) return null;
+    if (row.draftPersonId !== identity.draftPersonId) {
+      throw new Error('The draft pick identity changed while it was being resolved.');
+    }
+    if (!(UNRESOLVED as readonly string[]).includes(person.status) || person.playerId !== null) {
+      return null;
+    }
+
+    return { previousStatus: row.status, draftPersonId: identity.draftPersonId };
+  }
+
+  const [row] = await tx<{ status: string }[]>`
+    SELECT link_status_value::text AS status
+      FROM ${tx(targetTable)}
+     WHERE id = ${targetId}
+       FOR UPDATE
+  `;
+  if (!row || !(UNRESOLVED as readonly string[]).includes(row.status)) return null;
+  return { previousStatus: row.status, draftPersonId: null };
+}
+
+/** Apply the trusted link to the target already locked above. */
+async function applyLockedLink(
+  tx: Tx,
+  targetTable: LinkTargetTable,
+  targetId: number,
+  playerId: number,
+  draftPersonId: number | null,
+): Promise<void> {
+  if (targetTable === 'draft_picks') {
+    if (draftPersonId === null) {
+      throw new Error('A draft person identity is required to resolve a draft pick.');
+    }
+    await tx`
+      UPDATE draft_persons
+         SET player_id = ${playerId},
+             link_status = 'resolved',
+             is_matching_backlog = false
+       WHERE id = ${draftPersonId}
+    `;
+    // Identity is person-grained. Every pick for this exact durable person
+    // receives the same trusted link; displayed names never participate.
+    await tx`
+      UPDATE draft_picks
+         SET player_id = ${playerId},
+             link_status_value = 'resolved'
+       WHERE draft_person_id = ${draftPersonId}
+    `;
+    return;
+  }
+
+  await tx`
+    UPDATE ${tx(targetTable)}
+       SET player_id = ${playerId},
+           link_status_value = 'resolved'
+     WHERE id = ${targetId}
+  `;
+}
+
+async function recordLinkedResolution(input: {
+  targetTable: LinkTargetTable;
+  targetId: number;
+  playerId: number;
+  previousStatus: string;
+  adminUserId: number;
+  note?: string | null;
+}): Promise<ResolveResult> {
+  try {
+    await authSql`
+      INSERT INTO player_link_resolutions
+            (target_table, target_id, action, player_id, previous_status,
+             admin_user_id, note)
+      VALUES (${input.targetTable}, ${input.targetId}, 'linked', ${input.playerId},
+              ${input.previousStatus}::link_status, ${input.adminUserId},
+              ${(input.note ?? '').trim().slice(0, 2000) || null})
+    `;
+    return { ok: true };
+  } catch (error) {
+    console.error('player-link resolution audit row could not be written', error);
+    return {
+      ok: false,
+      error: 'The link was applied, but the audit record failed — check the server log.',
+    };
+  }
+}
+
 /**
  * Links one honours row to a player: the single statistical write in
  * this feature, run as afldb_import on a short-lived connection (the
@@ -223,33 +362,17 @@ export async function resolveLink(input: {
   const importSql = postgres(importUrl, { max: 1, onnotice: () => {} });
   let previousStatus: string | null;
   try {
-    // Select-then-update in one transaction: RETURNING sees the new row,
-    // so the status being replaced has to be read before the write.
     previousStatus = await importSql.begin(async (tx) => {
-      const [row] = await tx<{ status: string }[]>`
-        SELECT link_status_value::text AS status
-          FROM ${tx(input.targetTable)}
-         WHERE id = ${input.targetId}
-           FOR UPDATE
-      `;
-      if (!row || !(UNRESOLVED as readonly string[]).includes(row.status)) return null;
-      await tx`
-        UPDATE ${tx(input.targetTable)}
-           SET player_id = ${input.playerId},
-               link_status_value = 'resolved'
-         WHERE id = ${input.targetId}
-      `;
-      if (input.targetTable === 'draft_picks') {
-        await tx`
-          UPDATE draft_persons
-             SET player_id = ${input.playerId},
-                 link_status = 'resolved',
-                 is_matching_backlog = false
-           WHERE id = (SELECT draft_person_id FROM draft_picks WHERE id = ${input.targetId} AND draft_person_id IS NOT NULL)
-              OR (display_name_raw = (SELECT player_name_raw FROM draft_picks WHERE id = ${input.targetId}) AND player_id IS NULL)
-        `;
-      }
-      return row.status;
+      const target = await lockUnresolvedTarget(tx, input.targetTable, input.targetId);
+      if (!target) return null;
+      await applyLockedLink(
+        tx,
+        input.targetTable,
+        input.targetId,
+        input.playerId,
+        target.draftPersonId,
+      );
+      return target.previousStatus;
     }) as string | null;
     if (previousStatus === null) {
       return {
@@ -264,23 +387,69 @@ export async function resolveLink(input: {
     await importSql.end({ timeout: 5 });
   }
 
+  return recordLinkedResolution({ ...input, previousStatus });
+}
+
+export type CreateAndResolveResult =
+  | { ok: true; player: CreatedPlayer }
+  | { ok: false; error: string };
+
+/**
+ * Lock an unresolved review target, create the player, and apply the link in
+ * one import-role transaction. A stale form returns before the shared player
+ * insert helper is called, so it cannot leave an orphan profile behind.
+ */
+export async function createPlayerAndResolveLink(input: {
+  targetTable: LinkTargetTable;
+  targetId: number;
+  player: CreatePlayerInput;
+  adminUserId: number;
+  note?: string | null;
+}): Promise<CreateAndResolveResult> {
+  const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
+  if (!importUrl) return { ok: false, error: 'AFLDB_IMPORT_DATABASE_URL is not configured.' };
+
+  const importSql = postgres(importUrl, { max: 1, onnotice: () => {} });
+  let applied: { player: CreatedPlayer; previousStatus: string } | null;
   try {
-    await authSql`
-      INSERT INTO player_link_resolutions
-            (target_table, target_id, action, player_id, previous_status,
-             admin_user_id, note)
-      VALUES (${input.targetTable}, ${input.targetId}, 'linked', ${input.playerId},
-              ${previousStatus}::link_status, ${input.adminUserId},
-              ${(input.note ?? '').trim().slice(0, 2000) || null})
-    `;
+    applied = await importSql.begin(async (tx) => {
+      const target = await lockUnresolvedTarget(tx, input.targetTable, input.targetId);
+      if (!target) return null;
+
+      const player = await createPlayerInTransaction(tx, input.player);
+      await applyLockedLink(
+        tx,
+        input.targetTable,
+        input.targetId,
+        player.id,
+        target.draftPersonId,
+      );
+      return { player, previousStatus: target.previousStatus };
+    }) as { player: CreatedPlayer; previousStatus: string } | null;
+    if (applied === null) {
+      return {
+        ok: false,
+        error: 'No unresolved row with that id — it may already be linked.',
+      };
+    }
   } catch (error) {
-    console.error('player-link resolution audit row could not be written', error);
-    return {
-      ok: false,
-      error: 'The link was applied, but the audit record failed — check the server log.',
-    };
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: `The player and link could not be created: ${message}` };
+  } finally {
+    await importSql.end({ timeout: 5 });
   }
-  return { ok: true };
+
+  const resolution = await recordLinkedResolution({
+    targetTable: input.targetTable,
+    targetId: input.targetId,
+    playerId: applied.player.id,
+    previousStatus: applied.previousStatus,
+    adminUserId: input.adminUserId,
+    note: input.note?.trim()
+      || `Created player ${applied.player.displayName} and linked to ${input.targetTable} #${input.targetId}`,
+  });
+  if (!resolution.ok) return resolution;
+  return { ok: true, player: applied.player };
 }
 
 /**

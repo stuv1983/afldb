@@ -72,7 +72,7 @@ export function MatchSheetEditor({
   );
 
   const [removedPlayerIds, setRemovedPlayerIds] = useState<number[]>([]);
-  const [syncMatchScores, setSyncMatchScores] = useState(true);
+  const [syncMatchScores, setSyncMatchScores] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'away' | 'all'>('all');
   const [addTeamChoice, setAddTeamChoice] = useState<number>(match.homeClubId);
 
@@ -83,6 +83,14 @@ export function MatchSheetEditor({
     if (!lineupSource || lineupSource.length === 0) {
       alert(`No previous match lineup found for ${team === 'home' ? match.homeName : match.awayName}.`);
       return;
+    }
+
+    const replacementIds = new Set(lineupSource.map((row) => row.playerId));
+    const replacedPlayerIds = players
+      .filter((player) => player.clubId === targetClubId && !replacementIds.has(player.playerId))
+      .map((player) => player.playerId);
+    if (replacedPlayerIds.length > 0) {
+      setRemovedPlayerIds((previous) => Array.from(new Set([...previous, ...replacedPlayerIds])));
     }
 
     setPlayers((prev) => {
@@ -380,6 +388,7 @@ export function MatchSheetEditor({
                       style={{ width: '3rem', padding: '0.2rem' }}
                     >
                       <option value="">—</option>
+                      <option value="0">0</option>
                       <option value="1">1</option>
                       <option value="2">2</option>
                       <option value="3">3</option>

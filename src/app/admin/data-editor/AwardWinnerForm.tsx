@@ -20,6 +20,7 @@ export function AwardWinnerForm({
   awards: AwardSummary[];
   clubs: ClubSummary[];
 }) {
+  const editableAwards = awards.filter((award) => award.slug !== 'brownlow-medal');
   const [isOpen, setIsOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<{ id: number; label: string } | null>(null);
   const [state, formAction, isPending] = useActionState(createAwardWinnerAction, INITIAL);
@@ -59,13 +60,22 @@ export function AwardWinnerForm({
       </div>
 
       <p className="muted" style={{ fontSize: '0.85rem', margin: '0 0 1rem' }}>
-        Record an award recipient (e.g. Brownlow, Coleman, Rising Star, All-Australian, Club Best & Fairest, or AFLCA/AFLPA).
+        Record a Coleman, Rising Star, All-Australian, Club Best & Fairest, or AFLCA/AFLPA recipient.
+        Brownlow winners use the authoritative season-votes dataset and cannot be added here.
       </p>
 
       {state.message && (
         <div style={{ padding: '0.5rem 0.75rem', background: 'var(--bg-raised)', borderRadius: '6px', marginBottom: '1rem' }}>
           <p style={{ margin: 0, color: 'var(--accent)', fontWeight: 600, fontSize: '0.9rem' }}>
             ✓ {state.message}
+          </p>
+        </div>
+      )}
+
+      {state.warning && (
+        <div style={{ padding: '0.5rem 0.75rem', background: 'var(--bg-raised)', borderRadius: '6px', marginBottom: '1rem' }}>
+          <p style={{ margin: 0, color: 'var(--color-warn)', fontSize: '0.9rem' }}>
+            âš  {state.warning}
           </p>
         </div>
       )}
@@ -86,7 +96,7 @@ export function AwardWinnerForm({
             Award *
             <select name="awardId" required style={{ fontSize: '0.9rem' }}>
               <option value="">— Select an award —</option>
-              {awards.map((a) => (
+              {editableAwards.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name} ({a.category.replace(/_/g, ' ')})
                 </option>

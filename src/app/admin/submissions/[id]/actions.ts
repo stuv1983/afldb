@@ -62,11 +62,16 @@ export async function decideSubmission(
     await audit('submission.approved', { submissionId: id },
       { userId: admin.id, label: admin.email });
   } else if (decision === 'reject') {
-    await authSql`
+    const [updated] = await authSql<{ id: number }[]>`
       UPDATE data_submissions
          SET status = 'rejected', reviewed_by = ${admin.id}, reviewed_at = now()
        WHERE id = ${id}
+         AND status IN ('staged', 'validated', 'approved')
+      RETURNING id
     `;
+    if (!updated) {
+      return { error: 'Only a staged, validated, or approved submission can be rejected.' };
+    }
     await audit('submission.rejected', { submissionId: id },
       { userId: admin.id, label: admin.email });
   } else {

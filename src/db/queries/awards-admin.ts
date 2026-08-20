@@ -1,7 +1,37 @@
 import 'server-only';
 
+import { randomUUID } from 'node:crypto';
+
 import postgres from 'postgres';
 import { authSql } from '@/db/authClient';
+
+const MANUAL_ADMIN_SOURCE_KEY = 'manual_admin_edit';
+const BROWNLOW_AWARD_SLUG = 'brownlow-medal';
+
+type AwardDefinition = {
+  slug: string;
+  name: string;
+  category: string;
+  awardClubId: number | null;
+  seasonClubId: number | null;
+  seasonClubName: string | null;
+};
+
+type SelectedClubIdentity = {
+  selectedClubId: number;
+  seasonClubId: number | null;
+  seasonClubName: string | null;
+};
+
+export type CreateHonourRecordResult = {
+  id: number;
+  /** The statistical row committed, but its separate-role audit write failed. */
+  auditWarning?: string;
+};
+
+const AUDIT_WARNING =
+  'The record was created, but its data-edits audit snapshot could not be written. '
+  + 'Do not submit it again; ask an administrator to reconcile the audit log.';
 
 export type CreateAwardWinnerInput = {
   awardId: number;
@@ -48,14 +78,43 @@ export type CreateHonourTeamMemberInput = {
  * Super Admin operations for Awards, Hall of Fame, and Honour/Representative Teams (see changeLog.md).
  */
 
-export async function createAwardWinner(input: CreateAwardWinnerInput): Promise<{ id: number }> {
-  const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL || process.env.DATABASE_URL;
+export async function createAwardWinner(input: CreateAwardWinnerInput): Promise<CreateHonourRecordResult> {
+  const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
   if (!importUrl) throw new Error('AFLDB_IMPORT_DATABASE_URL is not configured.');
 
   const importSql = postgres(importUrl, { max: 1, onnotice: () => {} });
 
   try {
     const created = await importSql.begin(async (tx) => {
+      const [award] = await tx<AwardDefinition[]>`
+        SELECT a.slug, a.name, a.category,
+               a.club_id AS "awardClubId",
+               season_club.id AS "seasonClubId",
+               season_club.name AS "seasonClubName"
+          FROM awards a
+          LEFT JOIN clubs award_club ON award_club.id = a.club_id
+          LEFT JOIN clubs season_club
+            ON season_club.id = afldb_identity_for_season(
+                 award_club.organization_id,
+                 ${input.season}::smallint
+               )
+         WHERE a.id = ${input.awardId}
+      `;
+      if (!award) throw new Error('The selected award does not exist.');
+      if (award.slug === BROWNLOW_AWARD_SLUG) {
+        throw new Error(
+          'Brownlow Medal winners must be recorded in authoritative brownlow_season_votes, not award_winners.',
+        );
+      }
+
+      const [manualSource] = await tx<{ id: number }[]>`
+        SELECT id FROM sources WHERE key = ${MANUAL_ADMIN_SOURCE_KEY}
+      `;
+      if (!manualSource) {
+        throw new Error(`Required source '${MANUAL_ADMIN_SOURCE_KEY}' is not configured.`);
+      }
+      const sourceRecordId = `award_winner:${randomUUID()}`;
+
       // 1. Resolve player display name if playerId provided
       let playerName = input.playerNameRaw?.trim() || '';
       if (input.playerId) {
@@ -64,11 +123,49 @@ export async function createAwardWinner(input: CreateAwardWinnerInput): Promise<
       }
       if (!playerName) throw new Error('Player name is required.');
 
-      // 2. Resolve club name if clubId provided
+      // 2. Resolve the club. A club best-and-fairest belongs to the award
+      // definition's organization and must carry the identity active in the
+      // winner's season (for example Footscray rather than Western Bulldogs
+      // in 1980).
+      let clubId = input.clubId ?? null;
       let clubNameRaw = input.clubNameRaw?.trim() || null;
-      if (input.clubId) {
-        const [c] = await tx<{ name: string }[]>`SELECT name FROM clubs WHERE id = ${input.clubId}`;
-        if (c) clubNameRaw = c.name;
+      if (award.category === 'club_best_and_fairest') {
+        if (award.awardClubId === null) {
+          throw new Error(`Club best-and-fairest award '${award.name}' has no club definition.`);
+        }
+        if (award.seasonClubId === null || award.seasonClubName === null) {
+          throw new Error(`Award '${award.name}' has no club identity active in season ${input.season}.`);
+        }
+        if (clubId !== null && clubId !== award.seasonClubId) {
+          throw new Error(
+            `Award '${award.name}' must use ${award.seasonClubName} (club #${award.seasonClubId}) in ${input.season}.`,
+          );
+        }
+        clubId = award.seasonClubId;
+        clubNameRaw = award.seasonClubName;
+      } else if (clubId !== null) {
+        const [selectedClub] = await tx<SelectedClubIdentity[]>`
+          SELECT selected_club.id AS "selectedClubId",
+                 season_club.id AS "seasonClubId",
+                 season_club.name AS "seasonClubName"
+            FROM clubs selected_club
+            LEFT JOIN clubs season_club
+              ON season_club.id = afldb_identity_for_season(
+                   selected_club.organization_id,
+                   ${input.season}::smallint
+                 )
+           WHERE selected_club.id = ${clubId}
+        `;
+        if (!selectedClub) throw new Error('The selected club does not exist.');
+        if (selectedClub.seasonClubId === null || selectedClub.seasonClubName === null) {
+          throw new Error(`The selected club has no identity active in season ${input.season}.`);
+        }
+        if (clubId !== selectedClub.seasonClubId) {
+          throw new Error(
+            `${selectedClub.seasonClubName} (club #${selectedClub.seasonClubId}) is the identity active in ${input.season}.`,
+          );
+        }
+        clubNameRaw = selectedClub.seasonClubName;
       }
 
       const linkStatus = input.playerId ? 'resolved' : 'unmatched';
@@ -77,40 +174,46 @@ export async function createAwardWinner(input: CreateAwardWinnerInput): Promise<
         INSERT INTO award_winners (
           award_id, season, player_id, player_name_raw, link_status_value,
           club_id, club_name_raw, votes, position, is_captain, is_vice_captain,
-          note
+          note, source_id, source_record_id
         ) VALUES (
           ${input.awardId}, ${input.season}, ${input.playerId ?? null}, ${playerName},
-          ${linkStatus}::link_status, ${input.clubId ?? null}, ${clubNameRaw},
+          ${linkStatus}::link_status, ${clubId}, ${clubNameRaw},
           ${input.votes ?? null}, ${input.position?.trim() || null},
           ${input.isCaptain ?? false}, ${input.isViceCaptain ?? false},
-          ${input.note?.trim() || null}
+          ${input.note?.trim() || null}, ${manualSource.id}, ${sourceRecordId}
         )
         RETURNING id
       `;
 
-      return row;
+      return { ...row, clubId };
     });
 
-    // Audit in data_edits
     try {
       await authSql`
         INSERT INTO data_edits (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
         VALUES ('award_winners', ${created.id}, 'award_winner', '{}'::jsonb,
-                ${authSql.json({ awardId: input.awardId, season: input.season, playerId: input.playerId })},
+                ${authSql.json({
+                  awardId: input.awardId,
+                  season: input.season,
+                  playerId: input.playerId,
+                  clubId: created.clubId,
+                })},
                 ${input.adminUserId}, ${input.note?.trim() || null})
       `;
-    } catch (auditErr) {
-      console.error('Failed to log audit row for award winner creation', auditErr);
+      return { id: created.id };
+    } catch (error) {
+      console.error('Failed to log data-edits audit row for award winner creation', error);
+      return { id: created.id, auditWarning: AUDIT_WARNING };
     }
-
-    return created;
   } finally {
     await importSql.end({ timeout: 5 });
   }
 }
 
-export async function createHallOfFameInductee(input: CreateHallOfFameInducteeInput): Promise<{ id: number }> {
-  const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL || process.env.DATABASE_URL;
+export async function createHallOfFameInductee(
+  input: CreateHallOfFameInducteeInput,
+): Promise<CreateHonourRecordResult> {
+  const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
   if (!importUrl) throw new Error('AFLDB_IMPORT_DATABASE_URL is not configured.');
 
   const importSql = postgres(importUrl, { max: 1, onnotice: () => {} });
@@ -144,7 +247,6 @@ export async function createHallOfFameInductee(input: CreateHallOfFameInducteeIn
       return row;
     });
 
-    // Audit in data_edits
     try {
       await authSql`
         INSERT INTO data_edits (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
@@ -152,18 +254,20 @@ export async function createHallOfFameInductee(input: CreateHallOfFameInducteeIn
                 ${authSql.json({ name: input.name, year: input.inductedYear, playerId: input.playerId })},
                 ${input.adminUserId}, ${input.notes?.trim() || null})
       `;
-    } catch (auditErr) {
-      console.error('Failed to log audit row for hall of fame inductee creation', auditErr);
+      return created;
+    } catch (error) {
+      console.error('Failed to log data-edits audit row for Hall of Fame creation', error);
+      return { ...created, auditWarning: AUDIT_WARNING };
     }
-
-    return created;
   } finally {
     await importSql.end({ timeout: 5 });
   }
 }
 
-export async function createHonourTeamMember(input: CreateHonourTeamMemberInput): Promise<{ id: number }> {
-  const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL || process.env.DATABASE_URL;
+export async function createHonourTeamMember(
+  input: CreateHonourTeamMemberInput,
+): Promise<CreateHonourRecordResult> {
+  const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
   if (!importUrl) throw new Error('AFLDB_IMPORT_DATABASE_URL is not configured.');
 
   const importSql = postgres(importUrl, { max: 1, onnotice: () => {} });
@@ -183,31 +287,50 @@ export async function createHonourTeamMember(input: CreateHonourTeamMemberInput)
       const linkStatus = input.playerId ? 'resolved' : 'unmatched';
       const sortOrder = Number.isInteger(input.sortOrder) ? Number(input.sortOrder) : 0;
 
-      const [row] = await tx<{ id: number }[]>`
-        INSERT INTO honour_team_members (
-          team_name, player_id, player_name_raw, link_status_value,
-          position, role, club_name_raw, sort_order, note
-        ) VALUES (
-          ${teamName}, ${input.playerId ?? null}, ${playerName}, ${linkStatus}::link_status,
-          ${input.position?.trim() || null}, ${input.role?.trim() || null},
-          ${input.clubNameRaw?.trim() || null}, ${sortOrder},
-          ${input.note?.trim() || null}
-        )
-        ON CONFLICT (team_name, player_name_raw) DO UPDATE SET
-          player_id = EXCLUDED.player_id,
-          link_status_value = EXCLUDED.link_status_value,
-          position = EXCLUDED.position,
-          role = EXCLUDED.role,
-          club_name_raw = EXCLUDED.club_name_raw,
-          sort_order = EXCLUDED.sort_order,
-          note = EXCLUDED.note
-        RETURNING id
-      `;
+      const [row] = input.playerId
+        ? await tx<{ id: number }[]>`
+            INSERT INTO honour_team_members (
+              team_name, player_id, player_name_raw, link_status_value,
+              position, role, club_name_raw, sort_order, note
+            ) VALUES (
+              ${teamName}, ${input.playerId}, ${playerName}, ${linkStatus}::link_status,
+              ${input.position?.trim() || null}, ${input.role?.trim() || null},
+              ${input.clubNameRaw?.trim() || null}, ${sortOrder},
+              ${input.note?.trim() || null}
+            )
+            ON CONFLICT (team_name, player_id) WHERE player_id IS NOT NULL DO UPDATE SET
+              player_name_raw = EXCLUDED.player_name_raw,
+              link_status_value = EXCLUDED.link_status_value,
+              position = EXCLUDED.position,
+              role = EXCLUDED.role,
+              club_name_raw = EXCLUDED.club_name_raw,
+              sort_order = EXCLUDED.sort_order,
+              note = EXCLUDED.note
+            RETURNING id
+          `
+        : await tx<{ id: number }[]>`
+            INSERT INTO honour_team_members (
+              team_name, player_id, player_name_raw, link_status_value,
+              position, role, club_name_raw, sort_order, note
+            ) VALUES (
+              ${teamName}, NULL, ${playerName}, ${linkStatus}::link_status,
+              ${input.position?.trim() || null}, ${input.role?.trim() || null},
+              ${input.clubNameRaw?.trim() || null}, ${sortOrder},
+              ${input.note?.trim() || null}
+            )
+            ON CONFLICT (team_name, player_name_raw) WHERE player_id IS NULL DO UPDATE SET
+              link_status_value = EXCLUDED.link_status_value,
+              position = EXCLUDED.position,
+              role = EXCLUDED.role,
+              club_name_raw = EXCLUDED.club_name_raw,
+              sort_order = EXCLUDED.sort_order,
+              note = EXCLUDED.note
+            RETURNING id
+          `;
 
       return row;
     });
 
-    // Audit in data_edits
     try {
       await authSql`
         INSERT INTO data_edits (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
@@ -215,11 +338,11 @@ export async function createHonourTeamMember(input: CreateHonourTeamMemberInput)
                 ${authSql.json({ teamName: input.teamName, playerName: input.playerNameRaw, playerId: input.playerId })},
                 ${input.adminUserId}, ${input.note?.trim() || null})
       `;
-    } catch (auditErr) {
-      console.error('Failed to log audit row for honour team member creation', auditErr);
+      return created;
+    } catch (error) {
+      console.error('Failed to log data-edits audit row for honour-team creation', error);
+      return { ...created, auditWarning: AUDIT_WARNING };
     }
-
-    return created;
   } finally {
     await importSql.end({ timeout: 5 });
   }
