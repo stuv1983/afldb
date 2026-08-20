@@ -81,6 +81,9 @@ function scopeClauses(scope: NlMatchScope): SqlFragment[] {
   if (scope.clubAgainst) {
     clauses.push(sql`t.opponent_id IN (SELECT id FROM clubs WHERE organization_id = ${scope.clubAgainst.organizationId})`);
   }
+  if (scope.opponentClubId) {
+    clauses.push(sql`t.opponent_id IN (SELECT id FROM clubs WHERE organization_id = ${scope.opponentClubId})`);
+  }
   if (scope.venue) clauses.push(sql`t.venue_id = ${scope.venue.id}`);
   if (scope.seasonMin !== undefined) clauses.push(sql`t.season >= ${scope.seasonMin}`);
   if (scope.seasonMax !== undefined) clauses.push(sql`t.season <= ${scope.seasonMax}`);
@@ -103,13 +106,40 @@ function rankCutoff(agg: NlAggregation): number {
  * rank cutoff, the same discipline every other grain here applies.
  */
 export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise<NlAnswerPayload> {
-  const value = metricValueExpr(plan.metric!);
+  const value = metricValueExpr(plan.metric || 'team_score');
   const direction = plan.agg.kind === 'min' ? sql.unsafe('ASC') : sql.unsafe('DESC');
   const n = rankCutoff(plan.agg);
-  const where = foldAnd([...scopeClauses(plan.scope), sql`${value} IS NOT NULL`]);
+  const where = foldAnd([...scopeClauses(plan.scope), plan.metric ? sql`${value} IS NOT NULL` : sql`TRUE`]);
+  
+  // If havingClause is present, we filter the clubs first.
+  let havingCte = sql``;
+  if (plan.havingClause) {
+    const { metric, op, value } = plan.havingClause;
+    let aggSql: SqlFragment;
+    if (metric === 'wins') aggSql = sql`SUM(CASE WHEN t.winner_club_id = t.club_id THEN 1 ELSE 0 END)`;
+    else if (metric === 'losses') aggSql = sql`SUM(CASE WHEN t.winner_club_id IS NOT NULL AND t.winner_club_id <> t.club_id THEN 1 ELSE 0 END)`;
+    else if (metric === 'draws') aggSql = sql`SUM(CASE WHEN t.winner_club_id IS NULL THEN 1 ELSE 0 END)`;
+    else aggSql = sql`COUNT(*)`;
+
+    let opSql = sql`>=`;
+    if (op === 'gte') opSql = sql`>=`;
+    else if (op === 'lte') opSql = sql`<=`;
+    else if (op === 'gt') opSql = sql`>`;
+    else if (op === 'lt') opSql = sql`<`;
+    else if (op === 'eq') opSql = sql`=`;
+
+    havingCte = sql`,
+      having_clubs AS (
+        SELECT t.club_id
+        FROM sides t
+        WHERE ${where}
+        GROUP BY t.club_id
+        HAVING ${aggSql} ${opSql} ${value}
+      )`;
+  }
 
   const rows = await sql<(NlTeamMatchRow & { total: string; rnk: number })[]>`
-    WITH sides AS (${SIDES}),
+    WITH sides AS (${SIDES})${havingCte},
     ranked AS (
       SELECT t.match_id AS "matchId", t.season, t.round_type AS "roundType", t.round_number AS "roundNumber",
              t.match_date AS "matchDate",
@@ -125,6 +155,7 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
         JOIN clubs opp ON opp.id = t.opponent_id
         LEFT JOIN venues v ON v.id = t.venue_id
        WHERE ${where}
+       ${plan.havingClause ? sql`AND t.club_id IN (SELECT club_id FROM having_clubs)` : sql``}
     )
     SELECT r.*, count(*) OVER () AS total
       FROM ranked r

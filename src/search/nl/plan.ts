@@ -475,6 +475,12 @@ export const NL_METRICS: Record<NlGrain, Record<string, NlMetricDef>> = {
     contested: columnMetric('contested', 'Contested possessions', 'contested', 'contested'),
     uncontested: columnMetric('uncontested', 'Uncontested possessions', 'uncontested', 'uncontested'),
     goal_assists: columnMetric('goal_assists', 'Goal assists', 'goal_assists', 'goal_assists'),
+    centre_bounce_attendances: columnMetric('centre_bounce_attendances', 'Centre bounce attendances', 'centre_bounce_attendances', 'centre_bounce_attendances' as any),
+    time_on_ground: columnMetric('time_on_ground', 'Time on ground', 'time_on_ground', 'time_on_ground' as any),
+    score_involvements: columnMetric('score_involvements', 'Score involvements', 'score_involvements', 'score_involvements' as any),
+    disposal_efficiency: columnMetric('disposal_efficiency', 'Disposal efficiency', 'disposal_efficiency', 'disposal_efficiency' as any),
+    frees_for: columnMetric('frees_for', 'Frees for', 'frees_for', 'frees_for'),
+    frees_against: columnMetric('frees_against', 'Frees against', 'frees_against', 'frees_against'),
     // Award-count metrics: ranking "most X selections" rather than a
     // plain column.
     all_australian_selections: { kind: 'award_count', key: 'all_australian_selections', label: 'All-Australian selections', awardKey: 'all_australian' },
@@ -673,7 +679,10 @@ export type NlQueryPlan = {
   /** achievement_summary only: which achievement, summarised which way. */
   achievementSummary?: NlAchievementSummary;
   /** team_streak only: whether the streak is of wins or losses. */
-  streak?: 'win' | 'loss' | 'unbeaten';
+  streakDefinition?: { kind: 'win' | 'loss' | 'unbeaten' };
+  periodSplit?: 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'H1' | 'H2' | 'FULL_MATCH';
+  opponentClubId?: number;
+  havingClause?: { metric: string; op: NlCompareOp; value: number };
   boundary?: NlBoundary;
   /** Whether a value tied for the extreme all come back, or only the first found. Default 'all'. */
   tiePolicy: 'all' | 'first';

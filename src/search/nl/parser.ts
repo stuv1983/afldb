@@ -56,7 +56,7 @@ import {
   IN_A_FINAL, IN_A_GRAND_FINAL, IN_ONE_GAME, IN_ONE_SEASON,
   MATCH_TYPE_WORDS, METRIC_HIGHER_IS_WORSE, METRIC_WORDS, NEGATION_WORDS, NUMBER_PLUS_RE,
   NUMBER_WORDS, OVER_CAREER, POLARITY_AGG_RE,
-  PLAYER_NICKNAMES, SINCE_RE, STAT_GAMES_IDIOM_WORDS, STOPWORDS, TEAM_METRIC_WORDS, STREAK_WORDS, TOP_N_RE,
+  PLAYER_NICKNAMES, SINCE_RE, STAT_GAMES_IDIOM_WORDS, STOPWORDS, TEAM_METRIC_WORDS, STREAK_WORDS, PERIOD_SPLIT_WORDS, TOP_N_RE,
   UNANSWERABLE_TOPICS, canonicalise, readCount,
 } from '@/search/nl/vocab';
 
@@ -849,12 +849,64 @@ function extractTeamMetric(text: string): { text: string; metric?: string; consu
   return { text, consumed: [] };
 }
 
-function extractStreak(text: string): { text: string; streak?: 'win' | 'loss' | 'unbeaten'; consumed: string[] } {
-  for (const [re, streak] of STREAK_WORDS) {
+function extractStreakDefinition(text: string): { text: string; streakDefinition?: { kind: 'win' | 'loss' | 'unbeaten' }; consumed: string[] } {
+  for (const [re, kind] of STREAK_WORDS) {
     const match = re.exec(text);
-    if (match) return { text: stripMatch(text, match[0]), streak, consumed: [match[0]] };
+    if (match) return { text: stripMatch(text, match[0]), streakDefinition: { kind }, consumed: [match[0]] };
   }
   return { text, consumed: [] };
+}
+
+function extractPeriodSplit(text: string): { text: string; periodSplit?: NlQueryPlan['periodSplit']; consumed: string[] } {
+  for (const [re, split] of PERIOD_SPLIT_WORDS) {
+    const match = re.exec(text);
+    if (match) return { text: stripMatch(text, match[0]), periodSplit: split, consumed: [match[0]] };
+  }
+  return { text, consumed: [] };
+}
+
+function extractHavingClause(text: string): { text: string; havingClause?: { metric: string; op: NlCompareOp; value: number }; consumed: string[] } {
+  const words: [RegExp, string][] = [
+    [/\bdraws?\b/, 'draws'],
+    [/\bwins?\b/, 'wins'],
+    [/\blosses?\b/, 'losses']
+  ];
+  let working = text;
+  for (const [re, metric] of words) {
+    const match = re.exec(working);
+    if (match) {
+      const idx = working.indexOf(match[0]);
+      const windowStart = Math.max(0, idx - 20);
+      const windowEnd = Math.min(working.length, idx + match[0].length + 20);
+      const window = working.slice(windowStart, windowEnd);
+      let op: NlCompareOp = 'gte';
+      let value: number | null = null;
+      let countStr = '';
+      const twice = /\btwice\b/.exec(window);
+      const thrice = /\b(?:thrice|3 times)\b/.exec(window);
+      const times = /\b(\d{1,4})\s+times\b/.exec(window);
+      if (twice) { value = 2; countStr = twice[0]; }
+      else if (thrice) { value = 3; countStr = thrice[0]; }
+      else if (times) { value = Number(times[1]); countStr = times[0]; }
+      else {
+         const digits = /\b(\d{1,4})\b/.exec(window);
+         if (digits) { value = Number(digits[1]); countStr = digits[0]; }
+      }
+      if (value !== null) {
+        if (/\bat least\b/.test(window)) op = 'gte';
+        else if (/\bat most\b/.test(window)) op = 'lte';
+        else if (/\bmore than\b/.test(window)) op = 'gt';
+        else if (/\bless than\b/.test(window)) op = 'lt';
+        else if (/\bexactly\b/.test(window)) op = 'eq';
+        
+        let consumed = [match[0], countStr];
+        working = stripMatch(working, match[0]);
+        working = stripMatch(working, countStr);
+        return { text: working, havingClause: { metric, op, value }, consumed };
+      }
+    }
+  }
+  return { text: working, consumed: [] };
 }
 
 function extractPlayerMetric(text: string): { text: string; metric?: string; consumed: string[] } {
@@ -1066,9 +1118,17 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // 9. Team metric (checked before player metric: "richmond's biggest
   // win" must never be read as a player-stat question).
   const teamMetricResult = extractTeamMetric(text);
-  const streakResult = extractStreak(teamMetricResult.text);
+  const streakResult = extractStreakDefinition(teamMetricResult.text);
   text = streakResult.text;
   consumedTokens.push(...streakResult.consumed);
+
+  const havingResult = extractHavingClause(text);
+  text = havingResult.text;
+  consumedTokens.push(...havingResult.consumed);
+
+  const periodSplitResult = extractPeriodSplit(text);
+  text = periodSplitResult.text;
+  consumedTokens.push(...periodSplitResult.consumed);
   
   const clubSubjectPresent = CLUB_SUBJECT_LEADING.test(text.trim());
 
@@ -1335,7 +1395,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     grain = 'achievement_summary';
   } else if (achievementResult.achievementKey) {
     grain = 'player_career';
-  } else if (streakResult.streak) {
+  } else if (streakResult.streakDefinition) {
     grain = 'team_streak';
   } else if (teamMetricResult.metric) {
     grain = 'team_match';
@@ -1584,7 +1644,10 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     ...(grain === 'achievement_summary' && achievementResult.achievementKey && achievementResult.summaryKind
       ? { achievementSummary: { achievementKey: achievementResult.achievementKey, kind: achievementResult.summaryKind } }
       : {}),
-    ...(streakResult.streak ? { streak: streakResult.streak } : {}),
+    ...(streakResult.streakDefinition ? { streakDefinition: streakResult.streakDefinition } : {}),
+    ...(periodSplitResult.periodSplit ? { periodSplit: periodSplitResult.periodSplit } : {}),
+    ...(havingResult.havingClause ? { havingClause: havingResult.havingClause } : {}),
+    ...(clubAgainst ? { opponentClubId: clubAgainst.entity.organizationId } : {}),
     ...(boundary ? { boundary } : {}),
     tiePolicy: 'all',
     limit: agg.kind === 'top_n' || agg.kind === 'list' ? 100 : 25,
@@ -1603,8 +1666,8 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // correct in every other respect -- was declined as unrecognised.
   // An achievement_summary always carries its own descriptor, which
   // validatePlan requires, so reaching this point is itself the structure.
-  const structuralOk = grain === 'team_match' ? !!metric
-    : grain === 'team_streak' ? !!streakResult.streak
+  const structuralOk = grain === 'team_match' ? !!metric || !!havingResult.havingClause
+    : grain === 'team_streak' ? !!streakResult.streakDefinition
     : grain === 'club_season' ? clubSeasonCuePresent
     : grain === 'achievement_summary' ? true
     : grain === 'player_career' ? (metric !== null || careerConditions.length > 0 || careerPredicates.length > 0 || boundary !== undefined)

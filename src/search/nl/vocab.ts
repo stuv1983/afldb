@@ -228,7 +228,7 @@ export const TEAM_METRIC_WORDS: [RegExp, 'win_margin' | 'loss_margin' | 'team_sc
   [/\b(?:3qt|three[- ]quarter time) comebacks?\b/, 'q3_deficit_overcome'],
   [/\b(?:winning margin|win margin|margin of victory)\b/, 'win_margin'],
   [/\b(?:losing margin|loss margin|margin of defeat)\b/, 'loss_margin'],
-  [/\b(?:win|victory|victories|thrashing|thumping)\b/, 'win_margin'],
+  [/\b(?:win|victory|victories|thrashing|thumping|blowout)\b/, 'win_margin'],
   [/\b(?:loss|defeat|beating)\b/, 'loss_margin'],
   // total_score BEFORE team_score: extraction returns the first match,
   // and \bscore\b matches inside "combined score", so the other order
@@ -237,6 +237,16 @@ export const TEAM_METRIC_WORDS: [RegExp, 'win_margin' | 'loss_margin' | 'team_sc
   [/\b(?:combined|total|aggregate) (?:score|points)\b/, 'total_score'],
   [/\b(?:score|points scored)\b/, 'team_score'],
   [/\b(?:crowd|attendance)\b/, 'attendance'],
+];
+
+export const PERIOD_SPLIT_WORDS: [RegExp, 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'H1' | 'H2' | 'FULL_MATCH'][] = [
+  [/\b(?:q1|first (?:quarter|term))\b/, 'Q1'],
+  [/\b(?:q2|second (?:quarter|term))\b/, 'Q2'],
+  [/\b(?:q3|third (?:quarter|term))\b/, 'Q3'],
+  [/\b(?:q4|fourth (?:quarter|term))\b/, 'Q4'],
+  [/\b(?:h1|first half)\b/, 'H1'],
+  [/\b(?:h2|second half)\b/, 'H2'],
+  [/\b(?:full match|full game|whole match|whole game)\b/, 'FULL_MATCH'],
 ];
 
 export const STREAK_WORDS: [RegExp, 'win' | 'loss' | 'unbeaten'][] = [
@@ -289,10 +299,16 @@ export const CLUB_SEASON_CONDITION_WORDS: [RegExp, 'premier' | 'wooden_spoon' | 
  * existing grid-question parser keeps working unchanged).
  */
 export const METRIC_WORDS: [RegExp, string][] = [
-  [/\bgoal assists?\b/, 'goal_assists'],
+  [/\b(?:cba|centre bounce attendances?)\b/, 'centre_bounce_attendances'],
+  [/\b(?:tog|time on ground)\b/, 'time_on_ground'],
+  [/\b(?:si|score involvements?)\b/, 'score_involvements'],
+  [/\b(?:de%?|disposal efficiency)\b/, 'disposal_efficiency'],
+  [/\b(?:frees? for|free kicks? for)\b/, 'frees_for'],
+  [/\b(?:frees? against|free kicks? against)\b/, 'frees_against'],
+  [/\b(?:ga|goal assists?)\b/, 'goal_assists'],
   [/\bcontested marks?\b/, 'contested_marks'],
-  [/\bcontested possessions?\b/, 'contested'],
-  [/\buncontested possessions?\b/, 'uncontested'],
+  [/\b(?:cp|contested possessions?)\b/, 'contested'],
+  [/\b(?:up|uncontested possessions?)\b/, 'uncontested'],
   // The numeral form ("inside 50", "inside-50") is how most readers
   // actually type this, not the spelled-out "fifties" the original entry
   // required -- "50" reads as a bare year everywhere else in this parser,
@@ -300,9 +316,9 @@ export const METRIC_WORDS: [RegExp, string][] = [
   // that made the common phrasing unreachable. "forward entry/entries" is
   // commentary-speak for the same stat, textually unrelated enough to
   // need its own entry rather than another spacing variant.
-  [/\binside[- ]?(?:fifties|50s?)\b/, 'inside_50s'],
+  [/\b(?:i50s?|inside[- ]?(?:fifties|50s?))\b/, 'inside_50s'],
   [/\bforward entr(?:y|ies)\b/, 'inside_50s'],
-  [/\brebound[- ]?(?:fifties|50s?)\b/, 'rebounds'],
+  [/\b(?:r50s?|rebound[- ]?(?:fifties|50s?))\b/, 'rebounds'],
   [/\bbrownlow votes?\b/, 'brownlow_votes'],
   [/\bbiggest bags?\b/, 'goals'],
   // "bag of goals" / "bags of goals" as one phrase, BEFORE the bare
@@ -744,12 +760,16 @@ export const CLUB_NICKNAMES: Record<string, string> = {
   demons: 'melbourne',
   blues: 'carlton',
   swans: 'sydney',
+  bloods: 'sydney',
+  southerners: 'sydney',
   bombers: 'essendon',
   dons: 'essendon',
+  'same olds': 'essendon',
   saints: 'st kilda',
   roos: 'north melbourne',
   kangas: 'north melbourne',
   kangaroos: 'north melbourne',
+  shinboners: 'north melbourne',
   eagles: 'west coast',
   power: 'port adelaide',
   crows: 'adelaide',
@@ -759,6 +779,9 @@ export const CLUB_NICKNAMES: Record<string, string> = {
   giants: 'greater western sydney',
   gws: 'greater western sydney',
   lions: 'brisbane lions',
+  bears: 'brisbane lions',
+  gorillas: 'brisbane lions',
+  maroons: 'brisbane lions',
 };
 
 /**
@@ -791,6 +814,9 @@ export const VENUE_NICKNAMES: Record<string, string> = {
   docklands: 'docklands',
   marvel: 'docklands',
   etihad: 'docklands',
+  optus: 'perth stadium',
+  'optus stadium': 'perth stadium',
+  utas: 'york park',
   /**
    * The whole-phrase forms are not redundant. findLongestMatch takes the
    * longest name that appears, and stripMatch then removes only what

@@ -30,7 +30,7 @@ const COMPARE_SQL: Record<NlCompareOp, string> = {
  * proves out for the grid catalogue -- or a count of linked
  * award_winners rows for an award_count metric (NL_AWARDS).
  */
-function metricValueExpr(metric: string): SqlFragment {
+function metricValueExpr(metric: string, periodSplit?: string): SqlFragment {
   const def = NL_METRICS.player_career[metric];
   if (def.kind === 'award_count') {
     // count(*) is bigint in Postgres regardless of how small the count
@@ -42,11 +42,25 @@ function metricValueExpr(metric: string): SqlFragment {
                  WHERE a.slug = ${slug} AND w.player_id = p.id
                    AND w.link_status_value IN ('unique', 'resolved'))`;
   }
+  if (periodSplit && periodSplit !== 'FULL_MATCH') {
+    let periodCondition = sql`period = 1`;
+    if (periodSplit === 'Q2') periodCondition = sql`period = 2`;
+    else if (periodSplit === 'Q3') periodCondition = sql`period = 3`;
+    else if (periodSplit === 'Q4') periodCondition = sql`period = 4`;
+    else if (periodSplit === 'H1') periodCondition = sql`period IN (1, 2)`;
+    else if (periodSplit === 'H2') periodCondition = sql`period IN (3, 4)`;
+    
+    if (def.kind === 'column' && def.column === 'games') {
+      return sql`(SELECT count(DISTINCT match_id)::int FROM player_match_period_stats WHERE player_id = p.id AND ${periodCondition})`;
+    }
+    const col = def.statKey ? sql.unsafe(def.statKey) : (def.kind === 'column' ? sql.unsafe(def.column) : sql.unsafe('0'));
+    return sql`(SELECT sum(${col})::int FROM player_match_period_stats WHERE player_id = p.id AND ${periodCondition})`;
+  }
   if (def.statKey && GRID_STATS[def.statKey].grain === 'live_only') {
     // sum() over a smallint column is bigint too, same reason.
     return sql`(SELECT sum(${sql.unsafe(def.statKey)})::int FROM player_match_stats WHERE player_id = p.id)`;
   }
-  return sql`${sql.unsafe(def.column)}`;
+  return def.kind === 'column' ? sql`${sql.unsafe(def.column)}` : sql`0`;
 }
 
 /** A single career condition compiled to a bound predicate -- the only path a condition's threshold reaches SQL. */
@@ -170,7 +184,7 @@ async function answerRanked(
   extraWhere: SqlFragment,
   limit: number,
 ): Promise<NlAnswerPayload> {
-  const value = metricValueExpr(plan.metric!);
+  const value = metricValueExpr(plan.metric!, plan.periodSplit);
   const direction = plan.agg.kind === 'min' ? sql.unsafe('ASC') : sql.unsafe('DESC');
   const n = rankCutoff(plan.agg);
 

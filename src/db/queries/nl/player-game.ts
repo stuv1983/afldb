@@ -80,6 +80,18 @@ async function answerSingle(plan: NlQueryPlan, limit: number): Promise<NlAnswerP
   const n = rankCutoff(plan.agg);
   const where = foldAnd([...scopeClauses(plan.scope, plan.player?.id), sql`${value} IS NOT NULL`]);
 
+  let statsTarget = sql`player_match_stats s`;
+  if (plan.periodSplit && plan.periodSplit !== 'FULL_MATCH') {
+    let periodCondition = sql`period = 1`;
+    if (plan.periodSplit === 'Q2') periodCondition = sql`period = 2`;
+    else if (plan.periodSplit === 'Q3') periodCondition = sql`period = 3`;
+    else if (plan.periodSplit === 'Q4') periodCondition = sql`period = 4`;
+    else if (plan.periodSplit === 'H1') periodCondition = sql`period IN (1, 2)`;
+    else if (plan.periodSplit === 'H2') periodCondition = sql`period IN (3, 4)`;
+    const col = sql.unsafe(metricColumn(plan.metric!));
+    statsTarget = sql`(SELECT player_id, match_id, club_id, sum(${col})::int AS ${col} FROM player_match_period_stats WHERE ${periodCondition} GROUP BY player_id, match_id, club_id) s`;
+  }
+
   const rows = await sql<(NlPlayerGameRow & { total: string; rnk: number })[]>`
     WITH ranked AS (
       SELECT p.id AS "playerId", p.slug AS "playerSlug", p.display_name AS "playerName",
@@ -91,7 +103,7 @@ async function answerSingle(plan: NlQueryPlan, limit: number): Promise<NlAnswerP
              m.home_score AS "homeScore", m.away_score AS "awayScore",
              NULL::int AS games,
              rank() OVER (ORDER BY ${value} ${direction})::int AS rnk
-        FROM player_match_stats s
+        FROM ${statsTarget}
         JOIN players p ON p.id = s.player_id
         JOIN matches m ON m.id = s.match_id
         JOIN clubs cl ON cl.id = s.club_id
@@ -114,10 +126,21 @@ async function answerSum(plan: NlQueryPlan, limit: number): Promise<NlAnswerPayl
   const n = rankCutoff(plan.agg);
   const where = foldAnd(scopeClauses(plan.scope, plan.player?.id));
 
+  let statsTarget = sql`player_match_stats s`;
+  if (plan.periodSplit && plan.periodSplit !== 'FULL_MATCH') {
+    let periodCondition = sql`period = 1`;
+    if (plan.periodSplit === 'Q2') periodCondition = sql`period = 2`;
+    else if (plan.periodSplit === 'Q3') periodCondition = sql`period = 3`;
+    else if (plan.periodSplit === 'Q4') periodCondition = sql`period = 4`;
+    else if (plan.periodSplit === 'H1') periodCondition = sql`period IN (1, 2)`;
+    else if (plan.periodSplit === 'H2') periodCondition = sql`period IN (3, 4)`;
+    statsTarget = sql`(SELECT player_id, match_id, club_id, ${statColumn} FROM player_match_period_stats WHERE ${periodCondition}) s`;
+  }
+
   const rows = await sql<(NlPlayerGameRow & { total: string; rnk: number })[]>`
     WITH totals AS (
-      SELECT s.player_id, sum(${statColumn})::int AS value, count(*)::int AS games
-        FROM player_match_stats s
+      SELECT s.player_id, sum(${statColumn})::int AS value, count(DISTINCT s.match_id)::int AS games
+        FROM ${statsTarget}
         JOIN matches m ON m.id = s.match_id
        WHERE ${where} AND ${statColumn} IS NOT NULL
        GROUP BY s.player_id
