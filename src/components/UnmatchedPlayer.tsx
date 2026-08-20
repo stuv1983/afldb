@@ -1,11 +1,12 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useState, useEffect } from 'react';
 
 import {
   submitPlayerLinkSuggestion,
   type LinkSuggestionState,
 } from '@/app/player-link-suggestion-action';
+import { checkSuperAdminClient } from '@/components/useAdmin';
 
 const INITIAL: LinkSuggestionState = { status: 'idle' };
 
@@ -18,9 +19,7 @@ const INITIAL: LinkSuggestionState = { status: 'idle' };
  * form is disclosed on demand and posts to an anonymous, rate-limited
  * server action, from which a super admin reviews every tip by hand.
  *
- * Without JavaScript the badge still renders (this file's static
- * fallback is the badge markup itself); only the disclosure needs JS,
- * so the no-JS path loses the form, not the information.
+ * This badge is only visible to super admins.
  */
 export function UnmatchedPlayer({
   targetTable,
@@ -31,6 +30,15 @@ export function UnmatchedPlayer({
 }) {
   const [state, formAction, pending] = useActionState(submitPlayerLinkSuggestion, INITIAL);
   const [open, setOpen] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    checkSuperAdminClient().then(setIsSuperAdmin);
+  }, []);
+
+  if (!isSuperAdmin) {
+    return null;
+  }
 
   if (state.status === 'thanks') {
     return (

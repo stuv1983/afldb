@@ -2,7 +2,7 @@
 
 import { recordSuggestion } from '@/db/queries/player-links';
 import { RateLimiter } from '@/lib/auth/rate-limit';
-import { requestIp } from '@/lib/auth/session';
+import { requestIp, getAdminUser } from '@/lib/auth/session';
 
 export type LinkSuggestionState = { status: 'idle' | 'thanks' | 'error'; message?: string };
 
@@ -45,4 +45,9 @@ export async function submitPlayerLinkSuggestion(
     return { status: 'error', message: 'That suggestion could not be linked to a record.' };
   }
   return { status: 'thanks' };
+}
+
+export async function isSuperAdminAction(): Promise<boolean> {
+  const user = await getAdminUser();
+  return user?.role === 'super_admin';
 }
