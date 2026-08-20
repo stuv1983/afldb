@@ -65,20 +65,25 @@ export async function createMatch(input: CreateMatchInput): Promise<{ id: number
 
   const homeGoals = input.homeGoals !== null && input.homeGoals !== undefined ? Number(input.homeGoals) : null;
   const homeBehinds = input.homeBehinds !== null && input.homeBehinds !== undefined ? Number(input.homeBehinds) : null;
-  const homeScore = input.homeScore !== null && input.homeScore !== undefined
-    ? Number(input.homeScore)
-    : ((homeGoals ?? 0) * 6 + (homeBehinds ?? 0));
+  const homeScore = (homeGoals !== null && homeBehinds !== null)
+    ? (homeGoals * 6 + homeBehinds)
+    : (input.homeScore !== null && input.homeScore !== undefined ? Number(input.homeScore) : ((homeGoals ?? 0) * 6 + (homeBehinds ?? 0)));
 
   const awayGoals = input.awayGoals !== null && input.awayGoals !== undefined ? Number(input.awayGoals) : null;
   const awayBehinds = input.awayBehinds !== null && input.awayBehinds !== undefined ? Number(input.awayBehinds) : null;
-  const awayScore = input.awayScore !== null && input.awayScore !== undefined
-    ? Number(input.awayScore)
-    : ((awayGoals ?? 0) * 6 + (awayBehinds ?? 0));
+  const awayScore = (awayGoals !== null && awayBehinds !== null)
+    ? (awayGoals * 6 + awayBehinds)
+    : (input.awayScore !== null && input.awayScore !== undefined ? Number(input.awayScore) : ((awayGoals ?? 0) * 6 + (awayBehinds ?? 0)));
 
   const margin = Math.abs(homeScore - awayScore);
   const result: 'home_win' | 'away_win' | 'draw' =
     homeScore > awayScore ? 'home_win' : (awayScore > homeScore ? 'away_win' : 'draw');
   const winnerClubId = result === 'home_win' ? input.homeClubId : (result === 'away_win' ? input.awayClubId : null);
+
+  const attendance = (input.attendance !== null && input.attendance !== undefined && Number(input.attendance) >= 0)
+    ? Number(input.attendance)
+    : null;
+  const attendanceStatus: 'complete' | 'not_collected' = attendance !== null ? 'complete' : 'not_collected';
 
   const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL || process.env.DATABASE_URL;
   if (!importUrl) throw new Error('AFLDB_IMPORT_DATABASE_URL is not configured.');
@@ -122,7 +127,7 @@ export async function createMatch(input: CreateMatchInput): Promise<{ id: number
           home_goals, home_behinds, home_score,
           away_goals, away_behinds, away_score,
           result, winner_club_id, margin,
-          attendance, match_event, notes
+          attendance, attendance_status, match_event, notes
         ) VALUES (
           ${matchKey}, ${input.season}, ${roundCode}, ${roundNumber}, ${input.roundType}::round_type, ${isFinal},
           ${input.matchDate}::date, ${input.matchTime || null}, ${input.venueId || null}, ${venueRaw},
@@ -130,7 +135,7 @@ export async function createMatch(input: CreateMatchInput): Promise<{ id: number
           ${homeGoals}, ${homeBehinds}, ${homeScore},
           ${awayGoals}, ${awayBehinds}, ${awayScore},
           ${result}::match_result, ${winnerClubId}, ${margin},
-          ${input.attendance || null}, ${input.matchEvent?.trim() || null}, ${input.notes?.trim() || null}
+          ${attendance}, ${attendanceStatus}::coverage_status, ${input.matchEvent?.trim() || null}, ${input.notes?.trim() || null}
         )
         RETURNING id, season
       `;

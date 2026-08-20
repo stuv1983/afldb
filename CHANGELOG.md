@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### Fix Attendance Status Coverage Constraint on Match Creation — 20 August 2026
+
+- **Attendance Status & Score Reconciliation in Match Creation**:
+  - `src/db/queries/match-admin.ts`: Added `attendance_status` (`'complete'::coverage_status` when crowd attendance is provided, `'not_collected'::coverage_status` when absent) to satisfy the non-null `matches_attendance_status_ck` constraint in PostgreSQL migration 020. Also enforced strict score component reconciliation (`homeScore = 6*G + B`) to adhere to `matches_score_components_ck`.
+
 ### Super Admin Database Editing Security Governance — 20 August 2026
 
 - **Strict Super Admin Access Enforcement**:
