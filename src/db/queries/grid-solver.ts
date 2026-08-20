@@ -742,6 +742,12 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                             WHERE player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
                               AND award_id = ${awardId} AND season BETWEEN ${lo} AND ${hi})`;
     }
+    case 'under_22_selection':
+      return sql`p.id IN (SELECT w.player_id FROM award_winners w
+                            JOIN awards a ON a.id = w.award_id
+                           WHERE a.slug = '22-under-22'
+                             AND w.player_id IS NOT NULL
+                             AND w.link_status_value IN ('unique', 'resolved'))`;
     case 'all_australian_captain':
       return sql`p.id IN (SELECT w.player_id FROM award_winners w
                             JOIN awards a ON a.id = w.award_id

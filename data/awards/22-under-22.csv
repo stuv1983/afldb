@@ -1,0 +1,331 @@
+source_key,season,position,player,club,is_captain,is_vice_captain
+22under22:2012:b:1,2012,B,Phil Davis,Greater Western Sydney,0,0
+22under22:2012:b:2,2012,B,Daniel Talia,Adelaide,0,0
+22under22:2012:b:3,2012,B,Alex Rance,Richmond,0,0
+22under22:2012:hb:1,2012,HB,Dyson Heppell,Essendon,0,0
+22under22:2012:hb:2,2012,HB,Jackson Trengove,Port Adelaide,0,0
+22under22:2012:hb:3,2012,HB,Callan Ward,Greater Western Sydney,0,0
+22under22:2012:c:1,2012,C,Steele Sidebottom,Collingwood,0,0
+22under22:2012:c:2,2012,C,Patrick Dangerfield,Adelaide,1,0
+22under22:2012:c:3,2012,C,Dan Hannebery,Sydney,0,0
+22under22:2012:hf:1,2012,HF,David Zaharakis,Essendon,0,0
+22under22:2012:hf:2,2012,HF,Jack Darling,West Coast,0,0
+22under22:2012:hf:3,2012,HF,Dustin Martin,Richmond,0,0
+22under22:2012:f:1,2012,F,Luke Breust,Hawthorn,0,0
+22under22:2012:f:2,2012,F,Taylor Walker,Adelaide,0,0
+22under22:2012:f:3,2012,F,Steven Motlop,Geelong,0,0
+22under22:2012:r:1,2012,R,Nic Naitanui,West Coast,0,0
+22under22:2012:r:2,2012,R,Trent Cotchin,Richmond,0,0
+22under22:2012:r:3,2012,R,Dayne Beams,Collingwood,0,0
+22under22:2012:ic:1,2012,I/C,Michael Hurley,Essendon,0,0
+22under22:2012:ic:2,2012,I/C,Jack Redden,Brisbane Lions,0,0
+22under22:2012:ic:3,2012,I/C,Rory Sloane,Adelaide,0,0
+22under22:2012:ic:4,2012,I/C,Jeremy Howe,Melbourne,0,0
+22under22:2013:b:1,2013,B,Brandon Ellis,Richmond,0,0
+22under22:2013:b:2,2013,B,Rory Thompson,Gold Coast,0,0
+22under22:2013:b:3,2013,B,Daniel Talia,Adelaide,0,0
+22under22:2013:hb:1,2013,HB,Steele Sidebottom,Collingwood,0,0
+22under22:2013:hb:2,2013,HB,Jake Carlisle,Essendon,0,0
+22under22:2013:hb:3,2013,HB,Trent McKenzie,Gold Coast,0,0
+22under22:2013:c:1,2013,C,Nat Fyfe,Fremantle,0,0
+22under22:2013:c:2,2013,C,Dyson Heppell,Essendon,1,0
+22under22:2013:c:3,2013,C,Dan Hannebery,Sydney,0,0
+22under22:2013:hf:1,2013,HF,Dustin Martin,Richmond,0,0
+22under22:2013:hf:2,2013,HF,Jack Darling,West Coast,0,0
+22under22:2013:hf:3,2013,HF,Chad Wingard,Port Adelaide,0,0
+22under22:2013:f:1,2013,F,Luke Breust,Hawthorn,0,0
+22under22:2013:f:2,2013,F,Jeremy Cameron,Greater Western Sydney,0,0
+22under22:2013:f:3,2013,F,Steven Motlop,Geelong,0,0
+22under22:2013:r:1,2013,R,Tom Nicholls,Gold Coast,0,0
+22under22:2013:r:2,2013,R,Jaeger O'Meara,Gold Coast,0,0
+22under22:2013:r:3,2013,R,Tom Liberatore,Western Bulldogs,0,0
+22under22:2013:ic:1,2013,I/C,Aaron Mullett,North Melbourne,0,0
+22under22:2013:ic:2,2013,I/C,Dion Prestia,Gold Coast,0,0
+22under22:2013:ic:3,2013,I/C,Jack Ziebell,North Melbourne,0,1
+22under22:2013:ic:4,2013,I/C,Michael Walters,Fremantle,0,0
+22under22:2014:b:1,2014,B,Tom Langdon,Collingwood,0,0
+22under22:2014:b:2,2014,B,Daniel Talia,Adelaide,0,0
+22under22:2014:b:3,2014,B,Trent McKenzie,Gold Coast,0,0
+22under22:2014:hb:1,2014,HB,Brodie Smith,Adelaide,0,0
+22under22:2014:hb:2,2014,HB,Steven May,Gold Coast,0,0
+22under22:2014:hb:3,2014,HB,Kade Kolodjashnij,Gold Coast,0,0
+22under22:2014:c:1,2014,C,Luke Parker,Sydney,0,0
+22under22:2014:c:2,2014,C,Dyson Heppell,Essendon,1,0
+22under22:2014:c:3,2014,C,Harley Bennell,Gold Coast,0,0
+22under22:2014:hf:1,2014,HF,Adam Treloar,Greater Western Sydney,0,0
+22under22:2014:hf:2,2014,HF,Jack Darling,West Coast,0,0
+22under22:2014:hf:3,2014,HF,Marcus Bontempelli,Western Bulldogs,0,0
+22under22:2014:f:1,2014,F,Chad Wingard,Port Adelaide,0,0
+22under22:2014:f:2,2014,F,Jack Gunston,Hawthorn,0,1
+22under22:2014:f:3,2014,F,Jamie Elliott,Collingwood,0,0
+22under22:2014:r:1,2014,R,Jarrod Witts,Collingwood,0,0
+22under22:2014:r:2,2014,R,Tom Liberatore,Western Bulldogs,0,0
+22under22:2014:r:3,2014,R,Dion Prestia,Gold Coast,0,0
+22under22:2014:ic:1,2014,I/C,Luke McDonald,North Melbourne,0,0
+22under22:2014:ic:2,2014,I/C,David Swallow,Gold Coast,0,0
+22under22:2014:ic:3,2014,I/C,Brandon Ellis,Richmond,0,0
+22under22:2014:ic:4,2014,I/C,Jake Carlisle,Essendon,0,0
+22under22:2015:b:1,2015,B,Rory Laird,Adelaide,0,0
+22under22:2015:b:2,2015,B,Jack Hombsch,Port Adelaide,0,0
+22under22:2015:b:3,2015,B,Kade Kolodjashnij,Gold Coast,0,0
+22under22:2015:hb:1,2015,HB,Adam Saad,Gold Coast,0,0
+22under22:2015:hb:2,2015,HB,Jake Lever,Adelaide,0,0
+22under22:2015:hb:3,2015,HB,Elliot Yeo,West Coast,0,0
+22under22:2015:c:1,2015,C,Lachie Neale,Fremantle,0,0
+22under22:2015:c:2,2015,C,Patrick Cripps,Carlton,0,0
+22under22:2015:c:3,2015,C,Adam Treloar,Greater Western Sydney,0,0
+22under22:2015:hf:1,2015,HF,Jake Stringer,Western Bulldogs,1,0
+22under22:2015:hf:2,2015,HF,Jesse Hogan,Melbourne,0,0
+22under22:2015:hf:3,2015,HF,Luke Parker,Sydney,0,1
+22under22:2015:f:1,2015,F,Chad Wingard,Port Adelaide,0,0
+22under22:2015:f:2,2015,F,Jeremy Cameron,Greater Western Sydney,0,0
+22under22:2015:f:3,2015,F,Tom Lynch,Gold Coast,0,0
+22under22:2015:r:1,2015,R,Brodie Grundy,Collingwood,0,0
+22under22:2015:r:2,2015,R,Marcus Bontempelli,Western Bulldogs,0,0
+22under22:2015:r:3,2015,R,Ollie Wines,Port Adelaide,0,0
+22under22:2015:ic:1,2015,I/C,Tom Langdon,Collingwood,0,0
+22under22:2015:ic:2,2015,I/C,Dylan Shiel,Greater Western Sydney,0,0
+22under22:2015:ic:3,2015,I/C,Brandon Ellis,Richmond,0,0
+22under22:2015:ic:4,2015,I/C,Devon Smith,Greater Western Sydney,0,0
+22under22:2016:b:1,2016,B,Rory Laird,Adelaide,0,0
+22under22:2016:b:2,2016,B,Jacob Weitering,Carlton,0,0
+22under22:2016:b:3,2016,B,Sam Docherty,Carlton,0,0
+22under22:2016:hb:1,2016,HB,Callum Mills,Sydney,0,0
+22under22:2016:hb:2,2016,HB,Jake Lever,Adelaide,0,0
+22under22:2016:hb:3,2016,HB,Zac Williams,Greater Western Sydney,0,0
+22under22:2016:c:1,2016,C,Zach Merrett,Essendon,0,1
+22under22:2016:c:2,2016,C,Patrick Cripps,Carlton,0,0
+22under22:2016:c:3,2016,C,Stephen Coniglio,Greater Western Sydney,0,0
+22under22:2016:hf:1,2016,HF,Isaac Heeney,Sydney,0,0
+22under22:2016:hf:2,2016,HF,Jesse Hogan,Melbourne,0,0
+22under22:2016:hf:3,2016,HF,Christian Petracca,Melbourne,0,0
+22under22:2016:f:1,2016,F,Jake Stringer,Western Bulldogs,0,0
+22under22:2016:f:2,2016,F,Joe Daniher,Essendon,0,0
+22under22:2016:f:3,2016,F,Darcy Moore,Collingwood,0,0
+22under22:2016:r:1,2016,R,Brodie Grundy,Collingwood,0,0
+22under22:2016:r:2,2016,R,Marcus Bontempelli,Western Bulldogs,1,0
+22under22:2016:r:3,2016,R,Jack Viney,Melbourne,0,0
+22under22:2016:ic:1,2016,I/C,Jack Martin,Gold Coast,0,0
+22under22:2016:ic:2,2016,I/C,Tim Membrey,St Kilda,0,0
+22under22:2016:ic:3,2016,I/C,Ollie Wines,Port Adelaide,0,0
+22under22:2016:ic:4,2016,I/C,Lachie Hunter,Western Bulldogs,0,0
+22under22:2017:b:1,2017,B,Andrew McGrath,Essendon,0,0
+22under22:2017:b:2,2017,B,Harris Andrews,Brisbane Lions,0,0
+22under22:2017:b:3,2017,B,Callum Mills,Sydney,0,0
+22under22:2017:hb:1,2017,HB,Jayden Hunt,Melbourne,0,0
+22under22:2017:hb:2,2017,HB,Jake Lever,Adelaide,0,0
+22under22:2017:hb:3,2017,HB,Ryan Burton,Hawthorn,0,0
+22under22:2017:c:1,2017,C,Marcus Bontempelli,Western Bulldogs,1,0
+22under22:2017:c:2,2017,C,Clayton Oliver,Melbourne,0,0
+22under22:2017:c:3,2017,C,Josh Kelly,Greater Western Sydney,0,0
+22under22:2017:hf:1,2017,HF,Jack Billings,St Kilda,0,0
+22under22:2017:hf:2,2017,HF,Charlie Curnow,Carlton,0,0
+22under22:2017:hf:3,2017,HF,Jack Martin,Gold Coast,0,0
+22under22:2017:f:1,2017,F,Orazio Fantasia,Essendon,0,0
+22under22:2017:f:2,2017,F,Eric Hipwood,Brisbane Lions,0,0
+22under22:2017:f:3,2017,F,Tom Papley,Sydney,0,0
+22under22:2017:r:1,2017,R,Peter Wright,Gold Coast,0,0
+22under22:2017:r:2,2017,R,Zach Merrett,Essendon,0,1
+22under22:2017:r:3,2017,R,Matt Crouch,Adelaide,0,0
+22under22:2017:ic:1,2017,I/C,James Sicily,Hawthorn,0,0
+22under22:2017:ic:2,2017,I/C,Isaac Heeney,Sydney,0,0
+22under22:2017:ic:3,2017,I/C,Ollie Wines,Port Adelaide,0,0
+22under22:2017:ic:4,2017,I/C,Daniel Rioli,Richmond,0,0
+22under22:2018:b:1,2018,B,Alex Witherden,Brisbane Lions,0,0
+22under22:2018:b:2,2018,B,Harris Andrews,Brisbane Lions,0,0
+22under22:2018:b:3,2018,B,Andrew McGrath,Essendon,0,0
+22under22:2018:hb:1,2018,HB,Conor McKenna,Essendon,0,0
+22under22:2018:hb:2,2018,HB,Tom Doedee,Adelaide,0,0
+22under22:2018:hb:3,2018,HB,Jayden Short,Richmond,0,0
+22under22:2018:c:1,2018,C,Angus Brayshaw,Melbourne,0,0
+22under22:2018:c:2,2018,C,Clayton Oliver,Melbourne,0,1
+22under22:2018:c:3,2018,C,Isaac Heeney,Sydney,0,0
+22under22:2018:hf:1,2018,HF,Jade Gresham,St Kilda,0,0
+22under22:2018:hf:2,2018,HF,Charlie Curnow,Carlton,0,0
+22under22:2018:hf:3,2018,HF,Jordan De Goey,Collingwood,0,0
+22under22:2018:f:1,2018,F,Ben Ronke,Sydney,0,0
+22under22:2018:f:2,2018,F,Eric Hipwood,Brisbane Lions,0,0
+22under22:2018:f:3,2018,F,Jaidyn Stephenson,Collingwood,0,0
+22under22:2018:r:1,2018,R,Sean Darcy,Fremantle,0,0
+22under22:2018:r:2,2018,R,Marcus Bontempelli,Western Bulldogs,1,0
+22under22:2018:r:3,2018,R,Zach Merrett,Essendon,0,0
+22under22:2018:ic:1,2018,I/C,Ed Langdon,Fremantle,0,0
+22under22:2018:ic:2,2018,I/C,Christian Petracca,Melbourne,0,0
+22under22:2018:ic:3,2018,I/C,Tom Phillips,Collingwood,0,0
+22under22:2018:ic:4,2018,I/C,Dan Butler,Richmond,0,0
+22under22:2019:b:1,2019,B,Sydney Stack,Richmond,0,0
+22under22:2019:b:2,2019,B,Harris Andrews,Brisbane Lions,1,0
+22under22:2019:b:3,2019,B,Callum Mills,Sydney,0,0
+22under22:2019:hb:1,2019,HB,Alex Witherden,Brisbane Lions,0,0
+22under22:2019:hb:2,2019,HB,Jacob Weitering,Carlton,0,0
+22under22:2019:hb:3,2019,HB,Dan Houston,Port Adelaide,0,0
+22under22:2019:c:1,2019,C,Hugh McCluggage,Brisbane Lions,0,0
+22under22:2019:c:2,2019,C,Clayton Oliver,Melbourne,0,0
+22under22:2019:c:3,2019,C,Sam Walsh,Carlton,0,0
+22under22:2019:hf:1,2019,HF,Connor Rozee,Port Adelaide,0,0
+22under22:2019:hf:2,2019,HF,Eric Hipwood,Brisbane Lions,0,0
+22under22:2019:hf:3,2019,HF,Liam Ryan,West Coast,0,0
+22under22:2019:f:1,2019,F,Jade Gresham,St Kilda,0,0
+22under22:2019:f:2,2019,F,Aaron Naughton,Western Bulldogs,0,0
+22under22:2019:f:3,2019,F,Harry McKay,Carlton,0,0
+22under22:2019:r:1,2019,R,Tim English,Western Bulldogs,0,0
+22under22:2019:r:2,2019,R,Tim Taranto,Greater Western Sydney,0,0
+22under22:2019:r:3,2019,R,Josh Dunkley,Western Bulldogs,0,1
+22under22:2019:ic:1,2019,I/C,Wayne Milera,Adelaide,0,0
+22under22:2019:ic:2,2019,I/C,James Worpel,Hawthorn,0,0
+22under22:2019:ic:3,2019,I/C,Andrew McGrath,Essendon,0,0
+22under22:2019:ic:4,2019,I/C,Cameron Zurhaar,North Melbourne,0,0
+22under22:2020:b:1,2020,B,Jack Lukosius,Gold Coast,0,0
+22under22:2020:b:2,2020,B,Jacob Weitering,Carlton,0,1
+22under22:2020:b:3,2020,B,Jordan Ridley,Essendon,0,0
+22under22:2020:hb:1,2020,HB,Hunter Clark,St Kilda,0,0
+22under22:2020:hb:2,2020,HB,Noah Balta,Richmond,0,0
+22under22:2020:hb:3,2020,HB,Liam Baker,Richmond,0,0
+22under22:2020:c:1,2020,C,Hugh McCluggage,Brisbane Lions,0,0
+22under22:2020:c:2,2020,C,Andrew McGrath,Essendon,1,0
+22under22:2020:c:3,2020,C,Sam Walsh,Carlton,0,0
+22under22:2020:hf:1,2020,HF,Zak Butters,Port Adelaide,0,0
+22under22:2020:hf:2,2020,HF,Aaron Naughton,Western Bulldogs,0,0
+22under22:2020:hf:3,2020,HF,Gryan Miers,Geelong,0,0
+22under22:2020:f:1,2020,F,Izak Rankine,Gold Coast,0,0
+22under22:2020:f:2,2020,F,Max King,St Kilda,0,0
+22under22:2020:f:3,2020,F,Josh Daicos,Collingwood,0,0
+22under22:2020:r:1,2020,R,Sean Darcy,Fremantle,0,0
+22under22:2020:r:2,2020,R,Bailey Smith,Western Bulldogs,0,0
+22under22:2020:r:3,2020,R,Tim Taranto,Greater Western Sydney,0,0
+22under22:2020:ic:1,2020,I/C,Nick Coffield,St Kilda,0,0
+22under22:2020:ic:2,2020,I/C,Andrew Brayshaw,Fremantle,0,0
+22under22:2020:ic:3,2020,I/C,Adam Cerra,Fremantle,0,0
+22under22:2020:ic:4,2020,I/C,Ben King,Gold Coast,0,0
+22under22:2021:b:1,2021,B,Brandon Starcevich,Brisbane Lions,0,0
+22under22:2021:b:2,2021,B,Sam Taylor,Greater Western Sydney,0,0
+22under22:2021:b:3,2021,B,Wil Powell,Gold Coast,0,0
+22under22:2021:hb:1,2021,HB,Changkuoth Jiath,Hawthorn,0,0
+22under22:2021:hb:2,2021,HB,Jordan Ridley,Essendon,0,0
+22under22:2021:hb:3,2021,HB,Isaac Quaynor,Collingwood,0,0
+22under22:2021:c:1,2021,C,Bailey Smith,Western Bulldogs,0,0
+22under22:2021:c:2,2021,C,Sam Walsh,Carlton,1,0
+22under22:2021:c:3,2021,C,Jack Lukosius,Gold Coast,0,0
+22under22:2021:hf:1,2021,HF,Shai Bolton,Richmond,0,0
+22under22:2021:hf:2,2021,HF,Aaron Naughton,Western Bulldogs,0,0
+22under22:2021:hf:3,2021,HF,Zac Bailey,Brisbane Lions,0,0
+22under22:2021:f:1,2021,F,Kysaiah Pickett,Melbourne,0,0
+22under22:2021:f:2,2021,F,Ben King,Gold Coast,0,0
+22under22:2021:f:3,2021,F,Max King,St Kilda,0,0
+22under22:2021:r:1,2021,R,Luke Jackson,Melbourne,0,0
+22under22:2021:r:2,2021,R,Andrew Brayshaw,Fremantle,0,1
+22under22:2021:r:3,2021,R,Adam Cerra,Fremantle,0,0
+22under22:2021:ic:1,2021,I/C,Jaidyn Stephenson,North Melbourne,0,0
+22under22:2021:ic:2,2021,I/C,Oscar Allen,West Coast,0,0
+22under22:2021:ic:3,2021,I/C,Tom McCartin,Sydney,0,0
+22under22:2021:ic:4,2021,I/C,Trent Rivers,Melbourne,0,0
+22under22:2022:b:1,2022,B,Hayden Young,Fremantle,0,0
+22under22:2022:b:2,2022,B,Sam De Koning,Geelong,0,0
+22under22:2022:b:3,2022,B,Nick Blakey,Sydney,0,0
+22under22:2022:hb:1,2022,HB,Nick Daicos,Collingwood,0,0
+22under22:2022:hb:2,2022,HB,Tom McCartin,Sydney,0,0
+22under22:2022:hb:3,2022,HB,Jordan Clark,Fremantle,0,0
+22under22:2022:c:1,2022,C,Noah Anderson,Gold Coast,0,0
+22under22:2022:c:2,2022,C,Andrew Brayshaw,Fremantle,1,0
+22under22:2022:c:3,2022,C,Adam Cerra,Carlton,0,0
+22under22:2022:hf:1,2022,HF,Connor Rozee,Port Adelaide,0,0
+22under22:2022:hf:2,2022,HF,Aaron Naughton,Western Bulldogs,0,0
+22under22:2022:hf:3,2022,HF,Jack Ginnivan,Collingwood,0,0
+22under22:2022:f:1,2022,F,Kysaiah Pickett,Melbourne,0,0
+22under22:2022:f:2,2022,F,Max King,St Kilda,0,0
+22under22:2022:f:3,2022,F,Izak Rankine,Gold Coast,0,0
+22under22:2022:r:1,2022,R,Luke Jackson,Melbourne,0,0
+22under22:2022:r:2,2022,R,Sam Walsh,Carlton,0,1
+22under22:2022:r:3,2022,R,Bailey Smith,Western Bulldogs,0,0
+22under22:2022:ic:1,2022,I/C,Chad Warner,Sydney,0,0
+22under22:2022:ic:2,2022,I/C,Caleb Serong,Fremantle,0,0
+22under22:2022:ic:3,2022,I/C,Isaac Quaynor,Collingwood,0,0
+22under22:2022:ic:4,2022,I/C,Keidean Coleman,Brisbane Lions,0,0
+22under22:2023:b:1,2023,B,Nasiah Wanganeen-Milera,St Kilda,0,0
+22under22:2023:b:2,2023,B,Sam De Koning,Geelong,0,0
+22under22:2023:b:3,2023,B,Miles Bergman,Port Adelaide,0,0
+22under22:2023:hb:1,2023,HB,Nick Daicos,Collingwood,1,0
+22under22:2023:hb:2,2023,HB,Hayden Young,Fremantle,0,0
+22under22:2023:hb:3,2023,HB,Harry Sheezel,North Melbourne,0,0
+22under22:2023:c:1,2023,C,Errol Gulden,Sydney,0,0
+22under22:2023:c:2,2023,C,Caleb Serong,Fremantle,0,0
+22under22:2023:c:3,2023,C,Will Ashcroft,Brisbane Lions,0,0
+22under22:2023:hf:1,2023,HF,Mitch Owens,St Kilda,0,0
+22under22:2023:hf:2,2023,HF,Jamarra Ugle-Hagan,Western Bulldogs,0,0
+22under22:2023:hf:3,2023,HF,Cody Weightman,Western Bulldogs,0,0
+22under22:2023:f:1,2023,F,Kysaiah Pickett,Melbourne,0,0
+22under22:2023:f:2,2023,F,Jye Amiss,Fremantle,0,0
+22under22:2023:f:3,2023,F,Josh Rachele,Adelaide,0,0
+22under22:2023:r:1,2023,R,Luke Jackson,Fremantle,0,0
+22under22:2023:r:2,2023,R,Tom Green,Greater Western Sydney,0,0
+22under22:2023:r:3,2023,R,Jai Newcombe,Hawthorn,0,1
+22under22:2023:ic:1,2023,I/C,Bailey Smith,Western Bulldogs,0,0
+22under22:2023:ic:2,2023,I/C,Chad Warner,Sydney,0,0
+22under22:2023:ic:3,2023,I/C,Will Day,Hawthorn,0,0
+22under22:2023:ic:4,2023,I/C,Noah Anderson,Gold Coast,0,0
+22under22:2024:b:1,2024,B,Nasiah Wanganeen-Milera,St Kilda,0,0
+22under22:2024:b:2,2024,B,Mac Andrew,Gold Coast,0,0
+22under22:2024:b:3,2024,B,Darcy Wilmot,Brisbane Lions,0,0
+22under22:2024:hb:1,2024,HB,Max Holmes,Geelong,0,0
+22under22:2024:hb:2,2024,HB,Josh Weddle,Hawthorn,0,0
+22under22:2024:hb:3,2024,HB,Colby McKercher,North Melbourne,0,0
+22under22:2024:c:1,2024,C,Errol Gulden,Sydney,0,0
+22under22:2024:c:2,2024,C,Harley Reid,West Coast,0,0
+22under22:2024:c:3,2024,C,Jason Horne-Francis,Port Adelaide,0,0
+22under22:2024:hf:1,2024,HF,Jack Ginnivan,Hawthorn,0,0
+22under22:2024:hf:2,2024,HF,Sam Darcy,Western Bulldogs,0,0
+22under22:2024:hf:3,2024,HF,Oliver Dempsey,Geelong,0,0
+22under22:2024:f:1,2024,F,Josh Treacy,Fremantle,0,0
+22under22:2024:f:2,2024,F,Jamarra Ugle-Hagan,Western Bulldogs,0,0
+22under22:2024:f:3,2024,F,Jye Amiss,Fremantle,0,0
+22under22:2024:r:1,2024,R,Luke Jackson,Fremantle,0,0
+22under22:2024:r:2,2024,R,Harry Sheezel,North Melbourne,0,1
+22under22:2024:r:3,2024,R,Nick Daicos,Collingwood,1,0
+22under22:2024:ic:1,2024,I/C,Massimo D'Ambrosio,Hawthorn,0,0
+22under22:2024:ic:2,2024,I/C,George Wardlaw,North Melbourne,0,0
+22under22:2024:ic:3,2024,I/C,Josh Rachele,Adelaide,0,0
+22under22:2024:ic:4,2024,I/C,Josh Draper,Fremantle,0,0
+22under22:2025:b:1,2025,B,Max Michalanney,Adelaide,0,0
+22under22:2025:b:2,2025,B,Mac Andrew,Gold Coast,0,0
+22under22:2025:b:3,2025,B,Darcy Wilmot,Brisbane Lions,0,0
+22under22:2025:hb:1,2025,HB,Jaspa Fletcher,Brisbane Lions,0,0
+22under22:2025:hb:2,2025,HB,Josh Weddle,Hawthorn,0,0
+22under22:2025:hb:3,2025,HB,Nasiah Wanganeen-Milera,St Kilda,0,1
+22under22:2025:c:1,2025,C,Harry Sheezel,North Melbourne,0,0
+22under22:2025:c:2,2025,C,Harley Reid,West Coast,0,0
+22under22:2025:c:3,2025,C,Finn Callaghan,Greater Western Sydney,0,0
+22under22:2025:hf:1,2025,HF,Josh Rachele,Adelaide,0,0
+22under22:2025:hf:2,2025,HF,Logan Morris,Brisbane Lions,0,0
+22under22:2025:hf:3,2025,HF,Jason Horne-Francis,Port Adelaide,0,0
+22under22:2025:f:1,2025,F,Murphy Reid,Fremantle,0,0
+22under22:2025:f:2,2025,F,Aaron Cadman,Greater Western Sydney,0,0
+22under22:2025:f:3,2025,F,Nate Caddy,Essendon,0,0
+22under22:2025:r:1,2025,R,Sam Darcy,Western Bulldogs,0,0
+22under22:2025:r:2,2025,R,Will Ashcroft,Brisbane Lions,0,0
+22under22:2025:r:3,2025,R,Nick Daicos,Collingwood,1,0
+22under22:2025:ic:1,2025,I/C,Oliver Dempsey,Geelong,0,0
+22under22:2025:ic:2,2025,I/C,Levi Ashcroft,Brisbane Lions,0,0
+22under22:2025:ic:3,2025,I/C,Dan Curtin,Adelaide,0,0
+22under22:2025:ic:4,2025,I/C,Nick Watson,Hawthorn,0,0
+22under22:2026:b:1,2026,B,Josh Weddle,Hawthorn,0,0
+22under22:2026:b:2,2026,B,Harry Dean,Carlton,0,0
+22under22:2026:b:3,2026,B,Darcy Wilmot,Brisbane Lions,0,0
+22under22:2026:hb:1,2026,HB,Connor O'Sullivan,Geelong,0,0
+22under22:2026:hb:2,2026,HB,Reuben Ginbey,West Coast,0,0
+22under22:2026:hb:3,2026,HB,Jaspa Fletcher,Brisbane Lions,0,0
+22under22:2026:c:1,2026,C,Murphy Reid,Fremantle,0,0
+22under22:2026:c:2,2026,C,Will Ashcroft,Brisbane Lions,0,1
+22under22:2026:c:3,2026,C,Jagga Smith,Carlton,0,0
+22under22:2026:hf:1,2026,HF,Darcy Wilson,St Kilda,0,0
+22under22:2026:hf:2,2026,HF,Aaron Cadman,Greater Western Sydney,0,0
+22under22:2026:hf:3,2026,HF,Colby McKercher,North Melbourne,0,0
+22under22:2026:f:1,2026,F,Nick Watson,Hawthorn,0,0
+22under22:2026:f:2,2026,F,Logan Morris,Brisbane Lions,0,0
+22under22:2026:f:3,2026,F,Nate Caddy,Essendon,0,0
+22under22:2026:r:1,2026,R,Cooper Trembath,North Melbourne,0,0
+22under22:2026:r:2,2026,R,Harry Sheezel,North Melbourne,1,0
+22under22:2026:r:3,2026,R,Harley Reid,West Coast,0,0
+22under22:2026:ic:1,2026,I/C,Mac Andrew,Gold Coast,0,0
+22under22:2026:ic:2,2026,I/C,Willem Duursma,West Coast,0,0
+22under22:2026:ic:3,2026,I/C,Archie Roberts,Essendon,0,0
+22under22:2026:ic:4,2026,I/C,Ryley Sanders,Western Bulldogs,0,0

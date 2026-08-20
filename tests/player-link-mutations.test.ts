@@ -3,6 +3,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   postgres: vi.fn(),
   authSql: vi.fn(),
+  sql: vi.fn(),
   requireSuperAdmin: vi.fn(),
   audit: vi.fn(),
   revalidatePath: vi.fn(),
@@ -10,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('postgres', () => ({ default: mocks.postgres }));
 vi.mock('@/db/authClient', () => ({ authSql: mocks.authSql }));
-vi.mock('@/db/client', () => ({ sql: vi.fn() }));
+vi.mock('@/db/client', () => ({ sql: mocks.sql }));
 vi.mock('@/lib/auth/session', () => ({
   requireSuperAdmin: mocks.requireSuperAdmin,
   audit: mocks.audit,
@@ -20,6 +21,7 @@ vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
 import { createPlayerAction } from '@/app/admin/data-editor/actions';
 import {
   createPlayerAndResolveLink,
+  listUnresolvedLinks,
   resolveLink,
 } from '@/db/queries/player-links';
 import { createPlayer, type DraftPickInput } from '@/db/queries/players';
@@ -62,6 +64,7 @@ beforeEach(() => {
   mocks.postgres.mockReset();
   mocks.authSql.mockReset();
   mocks.authSql.mockResolvedValue([]);
+  mocks.sql.mockReset();
   mocks.requireSuperAdmin.mockReset();
   mocks.requireSuperAdmin.mockResolvedValue({ id: 5, email: 'admin@example.test' });
   mocks.audit.mockReset();
@@ -236,6 +239,62 @@ describe('draft identity resolution', () => {
     expect(playerInsert).toBeGreaterThan(targetLock);
     expect(seen.findIndex((query) => query.text.startsWith('UPDATE draft_picks')))
       .toBeGreaterThan(playerInsert);
+  });
+});
+
+describe('22Under22 award-winner resolution', () => {
+  it('surfaces unresolved award winners with searchable award context', async () => {
+    const expected = [{
+      targetTable: 'award_winners' as const,
+      targetId: 412,
+      playerName: 'Source Name',
+      linkStatus: 'unmatched',
+      context: '22 Under 22 Team · 2026 · Carlton',
+    }];
+    mocks.sql.mockImplementation((strings: TemplateStringsArray, ...values: unknown[]) => {
+      const text = compact(strings);
+      if (text.startsWith('q."targetTable"')) return { text, values };
+      return Promise.resolve(expected);
+    });
+
+    await expect(listUnresolvedLinks('award_winners')).resolves.toEqual(expected);
+    const outer = mocks.sql.mock.calls.find(([strings]) => (
+      compact(strings as TemplateStringsArray).includes('FROM award_winners w')
+    ));
+    expect(outer).toBeDefined();
+    const text = compact(outer![0] as TemplateStringsArray);
+    expect(text).toContain("SELECT 'award_winners' AS");
+    expect(text).toContain("concat_ws(' · ', a.name, w.season::text");
+    expect(text).toContain('JOIN awards a ON a.id = w.award_id');
+  });
+
+  it('locks and resolves an unmatched 22Under22 award_winners row by numeric id', async () => {
+    const { tx, seen } = fakeTransaction((text) => {
+      if (text.startsWith('SELECT link_status_value::text')) {
+        return [{ status: 'unmatched' }];
+      }
+      return [];
+    });
+    installImportClient(tx);
+
+    const result = await resolveLink({
+      targetTable: 'award_winners',
+      targetId: 412,
+      playerId: 77,
+      adminUserId: 5,
+      note: 'Verified against the annual team source.',
+    });
+
+    expect(result).toEqual({ ok: true });
+    const lock = seen.find((query) => query.text.startsWith('SELECT link_status_value::text'));
+    const update = seen.find((query) => query.text.startsWith('UPDATE ?'));
+    expect(lock?.text).toContain('FOR UPDATE');
+    expect(lock?.values).toEqual([{ identifier: 'award_winners' }, 412]);
+    expect(update?.values).toEqual([{ identifier: 'award_winners' }, 77, 412]);
+    expect(mocks.authSql.mock.calls[0].slice(1)).toEqual([
+      'award_winners', 412, 77, 'unmatched', 5,
+      'Verified against the annual team source.',
+    ]);
   });
 });
 

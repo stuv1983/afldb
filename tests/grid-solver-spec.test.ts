@@ -112,6 +112,16 @@ describe('isAxisComplete', () => {
 });
 
 describe('GRID_BUILDERS catalogue', () => {
+  it('offers AFLPA 22Under22 selection as a dedicated fixed criterion', () => {
+    expect(Object.keys(GRID_BUILDERS)).toHaveLength(108);
+    expect(GRID_BUILDERS.under_22_selection).toEqual({
+      key: 'under_22_selection',
+      label: 'Selected in AFLPA 22Under22 team',
+      group: 'Awards & honours',
+      params: [],
+    });
+  });
+
   it('gives every builder a label and a group', () => {
     for (const [key, def] of Object.entries(GRID_BUILDERS)) {
       expect(def.key, key).toBe(key);

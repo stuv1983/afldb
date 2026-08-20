@@ -31,7 +31,13 @@ next-env.d.ts
 # Databases, dumps and backups — never commit
 # Anchored for the same reason as /build/ above: this is the top-level
 # data directory (afl.db, the AFLW parsed CSVs), not any nested one.
-/data/
+# Raw databases and generated datasets stay local. Curated, reviewable import
+# manifests may opt in explicitly below so a fresh deployment can reproduce
+# the same sourced facts.
+/data/*
+!/data/awards/
+/data/awards/*
+!/data/awards/22-under-22.csv
 *.db
 *.db-journal
 *.db-wal

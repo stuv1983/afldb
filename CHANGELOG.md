@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### AFLPA 22 Under 22 Awards History — 20 August 2026
+
+- Added the canonical 2012–2026 annual 22 Under 22 extract (330 selections, exactly 22 per season), preserving position, source club, captain and vice-captain markers. The supplied most-selections summary is intentionally excluded because those totals are derived from the annual teams and the file contains known omissions (`AFLDB-ISSUE-042`).
+- Added migration `060_wikipedia_22_under_22_source.sql` and a dedicated `wikipedia_22under22` source so every imported selection carries source-record and import-batch provenance.
+- Added a scoped `under_22` group to `tools/migration/import_awards.py`. It can run without the legacy SQLite database, upserts only its own award and rows, preserves deliberate manual player resolutions, and remains intact across legacy full awards reloads.
+- Player links now require an exact canonical name or recorded alias plus corroborating match history for the source club and season. Ambiguous, unmatched and implausible candidates remain unlinked with their raw source names instead of being guessed.
+- Added migration `061_award_winner_sort_order.sql`; the existing seasonal honour-team Awards UI now exposes `22 Under 22 Team` automatically after import, including season pages in the supplied formation order, positions, clubs and leadership markers (`AFLDB-ISSUE-045`). Updated deployment/admin guidance and added fail-closed source/import contract coverage.
+- Added a linked-row-only **Selected in AFLPA 22Under22 team** Grid Solver criterion and a **22Under22** shortcut in the super-admin player-link queue. Untrusted source rows remain excluded from solver answers until they are resolved through the existing audited numeric-player workflow (`AFLDB-ISSUE-046`).
+- Marked the dated migration inventory and first-run report as historical snapshots and pointed operators to the active loader documentation (`AFLDB-ISSUE-043`).
+- Documented the pre-existing limitation that older destructive honours loaders do not yet replay later manual identity decisions; the new 22 Under 22 path is protected, while the general repair remains tracked as `AFLDB-ISSUE-044`.
+
 ### Admin Mutation Integrity, Identity, and Audit Repair — 20 August 2026
 
 - **Match and player-stat correctness (AFLDB-ISSUE-001–009, 014–022, 029–036, 038, 041)**:

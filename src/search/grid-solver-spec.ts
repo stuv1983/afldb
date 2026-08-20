@@ -298,6 +298,7 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   award_winner: { key: 'award_winner', label: 'Won an award…', group: 'Awards & honours', params: [award()] },
   award_winner_min_times: { key: 'award_winner_min_times', label: 'Won an award X+ times', group: 'Awards & honours', params: [award(), int('times', 'Times')] },
   award_winner_between_seasons: { key: 'award_winner_between_seasons', label: 'Won an award between years', group: 'Awards & honours', params: [award(), season('from', 'From season'), season('to', 'To season')] },
+  under_22_selection: { key: 'under_22_selection', label: 'Selected in AFLPA 22Under22 team', group: 'Awards & honours', params: [] },
   all_australian_captain: { key: 'all_australian_captain', label: 'All-Australian captain', group: 'Awards & honours', params: [] },
   all_australian_position: { key: 'all_australian_position', label: 'All-Australian in a position', group: 'Awards & honours', params: [aaPosition()] },
   club_best_and_fairest_min_times: { key: 'club_best_and_fairest_min_times', label: 'Club best and fairest, X+ times', group: 'Awards & honours', params: [int('times', 'Times')] },

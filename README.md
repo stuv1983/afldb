@@ -39,7 +39,7 @@ Recent changes are recorded in the [changelog](CHANGELOG.md).
 **Competitions and honours**
 - Brownlow Medal: season-by-season winners and vote history from 1924, plus career vote leaders
 - Draft and recruitment from 1981, filterable by year, drafting club, feeder/state-league club, and type
-- Coleman, Norm Smith, Rising Star, All-Australian, club best-and-fairests, and other awards, each with a winners history
+- Coleman, Norm Smith, Rising Star, All-Australian, AFLPA 22 Under 22, club best-and-fairests, and other awards, each with a winners or selection history
 - Australian Football Hall of Fame inductees and honour teams
 - AFLW as a separate competition: players, clubs, seasons, ladders, matches, scoring progressions, match search, and its own scoped global search
 
@@ -127,6 +127,10 @@ the queue. Both decisions are recorded in an append-only audit table; a tip's
 own words can never be edited, and a wrong decision gets a new row rather than
 a rewrite. The statistical write itself runs as the import role, the same
 single path every other statistical write takes.
+
+The queue includes unresolved AFLPA 22Under22 selections under **Award
+winners**. Its **22Under22** shortcut applies the table and source-name filters
+in one click; a manual link is retained by later scoped source refreshes.
 
 **Why a human is required** — two real rows from the queue:
 

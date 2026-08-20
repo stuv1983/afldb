@@ -2,6 +2,11 @@
 
 Maps every legacy table to its AFLDB target. Row counts are **measured** from the audited database (built 2026-08-12), not carried over from historical documentation.
 
+> **Historical planning snapshot.** The status column records the plan as it
+> stood on 12 August 2026; it is not the current deployment status. Use
+> `docs/migration-report.md` for the measured migration run and
+> `docs/admin-and-beta.md` for the active import commands and datasets.
+
 Status vocabulary: `PLANNED`, `IN PROGRESS`, `MIGRATED`, `VALIDATED`, `DEFERRED`, `NOT MIGRATED`.
 
 ---
@@ -33,6 +38,7 @@ Status vocabulary: `PLANNED`, `IN PROGRESS`, `MIGRATED`, `VALIDATED`, `DEFERRED`
 | `captaincies` | 1,375 | `captaincies` | All rows player-matched | PLANNED | 1,375 rows, 100% matched |
 | `rising_star_nominees` | 766 | `award_nominations` | Round nominations with stat line and eligibility | PLANNED | 766 rows |
 | `team_selections` | 113 | `honour_teams` | Teams of the Century etc. | PLANNED | 113 rows |
+| committed 22 Under 22 extract | 330 | `award_winners` | 2012–2026 annual teams; exact name/alias candidates require season-and-club match evidence; untrusted links retained | IN PROGRESS | 22 rows per season; 330 source rows |
 
 ## 3. Draft and relationships
 

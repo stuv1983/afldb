@@ -1475,3 +1475,183 @@ Added a pure lineup-state transition model that retains each vacancy's club, dis
 
 ### Follow-up
 An authenticated browser fixture is not available locally, so visual interaction should also be exercised on the development deployment after review.
+
+## AFLDB-ISSUE-042 — AFLPA 22 Under 22 teams are absent from Awards
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Area:** Import
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `data/awards/22-under-22.csv`, `tools/migration/under_22.py`, `tools/migration/import_awards.py`, `src/db/migrations/060_wikipedia_22_under_22_source.sql`, `src/db/migrations/061_award_winner_sort_order.sql`, `src/db/queries/awards.ts`
+
+### Symptom
+The Awards page has no 22 Under 22 representative team, even though annual Wikipedia extracts were supplied for every season from 2012 through 2026.
+
+### Reproduction
+Open `/awards` or look up the `22-under-22` award slug after the existing awards import.
+
+### Expected
+The Awards index lists 22 Under 22 as a representative team, with 22 selections per season plus positions, clubs, captain and vice-captain details for each supplied year.
+
+### Actual
+No award definition or winner rows exist for the series, so it cannot appear on the Awards page.
+
+### Evidence
+The 15 annual CSVs contain exactly 330 parseable selections (22 per season). The separate summary file is not authoritative: it omits three players with three selections and contains a malformed Harry Sheezel season list.
+
+### Root cause
+The legacy awards importer knows only its existing award tables and All-Australian sources; it has no canonical 22 Under 22 source or import group.
+
+### Fix
+Normalized the annual extracts into one committed, fail-closed source manifest and added a dedicated provenance record plus a scoped `under_22` awards import group. The loader creates the seasonal honour-team definition consumed by the existing Awards UI, resolves exact name/alias candidates only when source club and season match player-game evidence, preserves uncertain raw names as unlinked, retains deliberate manual resolutions and row IDs, and is included whenever the destructive full awards loader runs. Source order 1–22 now keeps each season page in formation order.
+
+### Validation
+The canonical checker reports 330 rows across 15 seasons, exactly 22 per year, 15 captains and 14 vice-captains (the supplied 2012 table names none). An independent tuple comparison against all 15 supplied annual CSVs found 330 expected, 330 actual and zero differences. Four focused source/importer/Awards files passed 43 tests, the full non-integration suite passed 976 tests, TypeScript passed, and Python AST parsing passed. Production build compilation and type validation succeeded but page-data collection could not run because this checkout has no `DATABASE_URL`. No database-backed import was run because no `_test` database is configured.
+
+### Follow-up
+After review, run the database migrations (including 060 and 061) and then run `tools/migration/import_awards.py --groups under_22` against development. Build/restart and verify 330 source rows plus `/awards/22-under-22`. Review any unlinked names reported by that database-specific resolution pass before considering a production load.
+
+## AFLDB-ISSUE-043 — Migration planning documents read as current status
+
+- **Status:** Resolved
+- **Severity:** Low
+- **Area:** Other
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `docs/migration-inventory.md`, `docs/migration-report.md`
+
+### Symptom
+The migration inventory labels every core and awards dataset `PLANNED`, while the migration report says awards and draft are not migrated, contradicting the active pages and import tooling.
+
+### Reproduction
+Read the status table in `docs/migration-inventory.md` or section 7 of `docs/migration-report.md` as current operational guidance.
+
+### Expected
+Dated planning and run-result documents clearly state their time scope and point operators to the current import documentation.
+
+### Actual
+The old status language was unqualified, so it appeared to describe the current codebase.
+
+### Evidence
+The documents are dated 12–15 August 2026, while `tools/migration/import_awards.py`, `tools/migration/import_draft.py` and the public Awards/Draft pages are now active.
+
+### Root cause
+Historical planning and first-run notes were retained after Phase 3b without being labelled as snapshots.
+
+### Fix
+Labelled the inventory as a historical planning snapshot, time-scoped the report's outstanding section to its 15 August run, and linked both to the current importer documentation. Added the 22 Under 22 source to the inventory.
+
+### Validation
+Direct documentation review confirms the old statements are now explicitly dated and the current loader paths are named.
+
+### Follow-up
+Do not rewrite the historical measured counts; add a new dated migration report after the next full server-side refresh.
+
+## AFLDB-ISSUE-044 — Full awards reload discards existing manual player resolutions
+
+- **Status:** Open
+- **Severity:** High
+- **Area:** Import
+- **Found:** 2026-08-20
+- **Resolved:** N/A
+- **Files:** `tools/migration/import_awards.py`, `src/db/queries/player-links.ts`
+
+### Symptom
+Running the legacy full awards group can turn manually resolved award, Hall of Fame, honour-team or captaincy links back into their legacy automated link state.
+
+### Reproduction
+Resolve an untrusted historical honours row through `/admin/player-links`, then run the destructive full `tools/migration/import_awards.py` reload and inspect the reconstructed row.
+
+### Expected
+Append-only human identity decisions remain authoritative across repeatable source reloads unless the source fact itself changed and needs review.
+
+### Actual
+The importer truncates and recreates the honours tables from legacy source link fields, so later manual decisions are not generally replayed.
+
+### Evidence
+`import_awards.py` rebuilds the shared legacy awards/honours targets, while manual link decisions are stored separately in `player_link_resolutions`. The new 22 Under 22 award and winner rows are explicitly excluded from those deletes, but the older loaders do not yet preserve their durable target IDs.
+
+### Root cause
+The bulk loader predates the append-only manual-resolution workflow and treats reconstructed source rows as the whole identity state.
+
+### Fix
+Not fixed globally. The new `under_22` group preserves its award/winner rows, durable IDs and deliberate `resolved` links on both targeted and destructive full reloads, without changing the older loaders in this scoped feature.
+
+### Validation
+Source-contract tests confirm 22 Under 22 is excluded from the legacy awards deletes, preflights preserved names before destructive work and reapplies links only when the source player name is unchanged. No database-backed full-reload reproduction was run locally.
+
+### Follow-up
+Replace destructive honours reloads with source-scoped upserts that preserve target row IDs, or redesign resolution audit targets around durable `(source_id, source_record_id)` keys before migrating existing audit history. Add a database integration test spanning manual resolve → full reload → preserved link and audit target.
+
+## AFLDB-ISSUE-045 — Seasonal honour teams lose their supplied formation order
+
+- **Status:** Resolved
+- **Severity:** Low
+- **Area:** UI
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/db/migrations/061_award_winner_sort_order.sql`, `src/db/queries/awards.ts`, `tools/migration/under_22.py`, `tools/migration/import_awards.py`
+
+### Symptom
+A 22 Under 22 season page would list positions lexically and pull the captain to the first row instead of showing the supplied B, HB, C, HF, F, R, I/C formation.
+
+### Reproduction
+Import a season with only position labels and call `getAwardSeason`; its original order is captain first, then textual position and player name.
+
+### Expected
+When a representative-team source supplies an order, the season page preserves it; existing award sources without one keep their current fallback ordering.
+
+### Actual
+`award_winners` had no source-order field, so the source's 22 formation slots were discarded.
+
+### Evidence
+The annual files encode an ordered seven-line formation, while `getAwardSeason` originally ordered `is_captain DESC, position, playerName`.
+
+### Root cause
+The seasonal honour-team model stored position labels but not their display order.
+
+### Fix
+Added nullable, bounded `award_winners.sort_order`; the 22 Under 22 importer derives 1–22 from its validated source slots, and the season query uses it before the existing fallback sort. Other awards remain `NULL` and retain their prior behavior.
+
+### Validation
+The source checker proves every season covers sort orders 1–22 exactly, a focused test verifies the 2012 formation sequence, importer contracts cover persistence/upsert, and the Awards query contract covers source-first ordering.
+
+### Follow-up
+Populate `sort_order` for other seasonal team sources only when their source data supplies a defensible order.
+
+## AFLDB-ISSUE-046 — 22Under22 selections lack a dedicated Grid Solver criterion
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Area:** Search
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/search/grid-solver-spec.ts`, `src/db/queries/grid-solver.ts`, `src/app/admin/player-links/page.tsx`, `tests/grid-solver-under22.test.ts`, `tests/grid-solver-spec.test.ts`, `tests/player-link-mutations.test.ts`, `tests/integration/grid-solver.test.ts`
+
+### Symptom
+The Grid Solver cannot directly ask for players selected in the AFLPA 22Under22 team, and the super-admin player-link queue has no one-click view of unresolved rows from that source.
+
+### Reproduction
+Open `/grid-solver` and inspect Awards & honours: the only applicable choice is the parameterised “Won an award…” builder. Open `/admin/player-links`: unresolved 22Under22 rows are present under the generic Award winners table but require manually entering the award name in search.
+
+### Expected
+Grid Solver offers “Selected in AFLPA 22Under22 team” as a fixed criterion. Any untrusted selections remain linkable through the existing super-admin player-links workflow and are easy to isolate there.
+
+### Actual
+There is no dedicated builder or queue shortcut. Treating a representative-team selection as “winning” an award is also misleading wording.
+
+### Evidence
+`GRID_BUILDERS` contains All-Australian-specific builders and generic award-winner builders but no fixed `22-under-22` selection builder. The player-link query already includes every unresolved `award_winners` row with award name, season and club context, and its mutation path already accepts `award_winners`.
+
+### Root cause
+The source was added after the Grid Solver catalogue and player-link queue navigation were designed.
+
+### Fix
+Added a no-parameter `under_22_selection` builder labelled “Selected in AFLPA 22Under22 team”. Its fixed, parameterised-query-safe SQL reads only `award_winners` rows for slug `22-under-22` with a trusted numeric player link (`unique` or `resolved`). Added a **22Under22** preset to the super-admin queue, which applies the existing Award winners table and searchable award-context filters. The normal locked numeric-ID mutation and audit path remains the only way to establish a manual link.
+
+### Validation
+Baseline TypeScript passed and the relevant suites passed 32 tests before the change. After the fix, four focused files passed 37 tests, TypeScript passed, and the complete non-integration suite passed 981 tests across 38 files. The production build compiled and completed its lint/type phase, then stopped at database-backed page collection because `DATABASE_URL` is unset. A database integration assertion compares the builder with a hand-written count, but it was not run locally because `AFLDB_TEST_DATABASE_URL` is not configured.
+
+### Follow-up
+Run `tests/integration/grid-solver.test.ts` against the development `_test` database after importing the Under22 source, then smoke-test the queue preset and a two-axis Grid Solver cell on dev.

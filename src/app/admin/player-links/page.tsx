@@ -67,6 +67,7 @@ export default async function PlayerLinksPage(
   const table = isLinkTargetTable(rawTable) ? rawTable : undefined;
   const query = (firstValue(params.q) ?? '').trim();
   const queryLower = query.toLowerCase();
+  const under22Preset = table === 'award_winners' && queryLower === '22 under 22';
 
   const [unresolved, vetted, suggestions] = await Promise.all([
     listUnresolvedLinks(table),
@@ -192,6 +193,12 @@ export default async function PlayerLinksPage(
               : <Link href={`/admin/player-links?table=${t}${query ? `&q=${encodeURIComponent(query)}` : ''}`}>{TABLE_LABELS[t]}</Link>}
           </span>
         ))}
+        <span>
+          {' · '}
+          {under22Preset
+            ? <strong aria-current="true">22Under22</strong>
+            : <Link href="/admin/player-links?table=award_winners&q=22%20Under%2022">22Under22</Link>}
+        </span>
       </nav>
 
       {suggestions.length > 0 && (

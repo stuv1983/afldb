@@ -176,7 +176,7 @@ set, showing an eligible-player count and a top-ranked answer, with a
 drill-down to the full ranked list.
 
 **Named builders, not user-chosen columns.** `src/search/grid-solver-spec.ts`
-holds `GRID_BUILDERS`: 107 fixed, parameterised questions across eleven
+holds `GRID_BUILDERS`: 108 fixed, parameterised questions across eleven
 categories (clubs & journeys, career milestones, single-game feats,
 season & era, finals & premierships, grounds & venues, rivalries &
 marquee matches, teammates, captaincy, awards & honours, draft &
@@ -215,15 +215,20 @@ for the 8 stats that have one, and fall back to a live `SUM()` over
 that precomputation wherever it exists.
 
 **A generic `award` parameter replaces one-off builders per medal.**
-`awards`/`award_winners` hold 39 real rows — Brownlow, Coleman, Norm
+`awards`/`award_winners` hold 40 real rows — Brownlow, Coleman, Norm
 Smith, eight state-league medals, all 18 club best-and-fairests, the
-All-Australian squad, National Draft Pick #1 — so three generic builders
+All-Australian and AFLPA 22Under22 teams, National Draft Pick #1 — so three generic builders
 (`award_winner`, `award_winner_min_times`, `award_winner_between_seasons`)
 cover what would otherwise be a dozen-plus near-identical questions.
 Picking a specific club's B&F award already scopes to that club's full
 lineage, since the award keeps one id across renames. Brownlow and Hall
 of Fame stay as dedicated builders reading their own authoritative
 tables rather than going through this generic mechanism.
+
+Representative-team selection is not labelled as an award win: the fixed
+**Selected in AFLPA 22Under22 team** builder reads linked rows from the
+`22-under-22` award series directly. Unlinked source names stay out of Grid
+Solver answers until a super admin resolves them in `/admin/player-links`.
 
 Not ported from the reference, deliberately: the daily board fetch from
 an external trivia site, saved-grids-per-account (AFLDB has no

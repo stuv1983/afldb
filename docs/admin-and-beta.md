@@ -528,16 +528,35 @@ The historical award load remains a Python importer, run on the server:
 
 ```bash
 .venv/bin/python tools/migration/import_awards.py            # idempotent full reload
+.venv/bin/python tools/migration/import_awards.py --groups under_22  # scoped 22under22 refresh
 .venv/bin/python tools/migration/import_awards.py --list-groups
 ```
 
-It fills `awards` (39 definitions), `award_winners` (2,968 rows: 1,810
-draftguru awards + 1,158 All-Australian selections from two sources),
+It fills `awards` (40 definitions), `award_winners` (3,298 rows: 1,810
+DraftGuru awards + 1,158 All-Australian selections from two sources + 330
+AFLPA 22 Under 22 selections from the committed 2012–2026 Wikipedia extract),
 `award_nominations` (766 Rising Star), `hall_of_fame` (343),
 `honour_team_members` (113) and `captaincies` (1,375). Groups that share
-tables (`awards`, `all_australian`, `rising_star`) are pulled in
-together automatically so a partial run cannot cascade-empty another
-group's rows.
+tables (`awards`, `all_australian`, `under_22`, `rising_star`) are pulled in
+together automatically when a destructive legacy reload needs them, so it
+cannot cascade-empty another group's rows. `under_22` itself is a scoped,
+non-destructive upsert and can run alone without the legacy SQLite database.
+
+The 22 Under 22 loader reads `data/awards/22-under-22.csv`, records the
+dedicated `wikipedia_22under22` provenance and preserves the source spelling
+and 1–22 formation order for every player and club. A player link is trusted only when an exact canonical
+name or recorded alias is corroborated by that season's match history for the
+source club; ambiguous,
+unmatched and implausible names remain visible but unlinked. The supplied
+"Most Selections" CSV is deliberately not loaded because it is derivable from
+the annual teams and contains known omissions.
+
+Any `ambiguous`, `unmatched` or `implausible` selection appears in the
+super-admin `/admin/player-links` queue under **Award winners**. The
+**22Under22** preset isolates those rows; linking uses the normal audited
+numeric-player workflow, and a later scoped `under_22` refresh preserves the
+manual resolution. Linked selections are eligible for the Grid Solver's fixed
+**Selected in AFLPA 22Under22 team** criterion.
 
 Club references resolve through the identity of the era (a 1980 Charles
 Sutton Medal reads **Footscray**), and names the sources could not link

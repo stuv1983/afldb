@@ -143,6 +143,7 @@ source .venv/bin/activate    # or use ./.venv/bin/python directly
 ./.venv/bin/python tools/migration/import_legacy_afl.py       # ~114s  core reload
 ./.venv/bin/python tools/migration/enrich_birth_dates.py      # ~6s    DOB recovery
 ./.venv/bin/python tools/migration/import_draft.py            # ~2s    draft links
+./.venv/bin/python tools/migration/import_awards.py           # awards and representative teams
 ./.venv/bin/python tools/migration/rebuild_derived.py         # ~30s   summaries
 ./.venv/bin/python tools/validation/validate_migration.py     # every check must pass
 
@@ -151,7 +152,15 @@ npm run build && sudo systemctl restart afldb                 # refresh cached p
 
 The order matters. `rebuild_derived.py` must run last: it reads the tables the earlier steps write, and its first target, `season_metadata`, decides whether a season is still in progress — which in turn decides whether that season's Brownlow reads as a zero or as "not yet awarded".
 
-Options: `--dry-run` on every script, plus `--groups <name>...` and `--list-groups` on the legacy import and `--targets` on the rebuild.
+For a 22 Under 22-only correction, run
+`./.venv/bin/python tools/migration/import_awards.py --groups under_22` after
+`npm run db:migrate`. That scoped group needs no legacy SQLite database and
+does not rewrite other awards; rebuild-derived is not required because award
+selections are sourced facts rather than match-derived summaries. Follow it
+with the normal build and service restart so the cached Awards index, award
+routes and sitemap are regenerated from the new rows.
+
+Options: `--dry-run` on every script, plus `--groups <name>...` and `--list-groups` on the legacy and awards imports and `--targets` on the rebuild.
 
 **A partial import protects what it will not rebuild.** Reloading a subset
 with `--groups` refuses to start if `TRUNCATE … CASCADE` would empty a table

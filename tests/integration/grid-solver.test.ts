@@ -48,6 +48,23 @@ describe('every grid builder compiles and solves', () => {
 });
 
 describe('grid solver correctness', () => {
+  it('22Under22 selection matches linked rows from the fixed award series', async () => {
+    const summary = await solveCellSummary(
+      { builder: 'under_22_selection', params: {} },
+      { builder: 'career_games_min', params: { games: '0' } },
+      'games_asc',
+    );
+    const [expected] = await sql<{ count: string }[]>`
+      SELECT count(DISTINCT w.player_id)
+        FROM award_winners w
+        JOIN awards a ON a.id = w.award_id
+       WHERE a.slug = '22-under-22'
+         AND w.player_id IS NOT NULL
+         AND w.link_status_value IN ('unique', 'resolved')
+    `;
+    expect(summary.eligible).toBe(Number(expected.count));
+  });
+
   it('career_games_min(200) AND career_games_min(0) matches a hand-written equivalent count', async () => {
     const summary = await solveCellSummary(
       { builder: 'career_games_min', params: { games: '200' } },

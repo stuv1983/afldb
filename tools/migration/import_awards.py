@@ -4,15 +4,17 @@
     python tools/migration/import_awards.py                 # full run
     python tools/migration/import_awards.py --dry-run       # counts only
     python tools/migration/import_awards.py --groups rising_star
+    python tools/migration/import_awards.py --groups under_22
     python tools/migration/import_awards.py --list-groups
 
 Every target table already exists (migration 005). This importer fills
 them from the legacy SQLite database, which holds the scraped award data
 that Phase 3 deliberately left until the core entities were proven.
 
-Like the core importer, each group truncates its targets and reloads, so
-a rerun always produces the same result, and nothing is written to the
-legacy database.
+Like the core importer, the legacy rebuild groups truncate their targets and
+reload, so a rerun always produces the same result. Independently sourced
+groups such as ``under_22`` use scoped upserts instead. Nothing is written to
+the legacy database.
 
 Two rules carried over from Phase 3
 -----------------------------------
@@ -57,6 +59,7 @@ from common import (  # noqa: E402
     to_int,
     truncate,
 )
+from under_22 import Under22Selection, load_under_22  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Link status
@@ -232,6 +235,8 @@ COMPETITION_RE = re.compile(r"\(([^)]+)\)\s*$")
 
 ALL_AUSTRALIAN_SLUG = "all-australian"
 RISING_STAR_SLUG = "rising-star"
+UNDER_22_SLUG = "22-under-22"
+UNDER_22_SOURCE_KEY = "wikipedia_22under22"
 
 
 def slugify(value: str) -> str:
@@ -268,6 +273,9 @@ AWARD_DESCRIPTIONS = {
         "The representative team of the season's best players. Selected from "
         "interstate carnivals until 1982 and from the national competition "
         "since; players from other leagues appear in the earlier teams.",
+    UNDER_22_SLUG:
+        "The AFL Players' Association's annual representative team recognising "
+        "the best AFL players aged 22 or younger.",
     "coleman": "Awarded to the leading goalkicker of the home-and-away season.",
     "norm-smith-medal": "Awarded to the best player afield in the Grand Final.",
     "brownlow-medal":
@@ -281,7 +289,12 @@ AWARD_DESCRIPTIONS = {
 # ---------------------------------------------------------------------------
 def import_awards(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
                   sources: dict[str, int], person_links: dict[int, tuple]) -> None:
-    truncate(pg, "awards")
+    # 22 Under 22 is independently sourced and owns durable winner ids used by
+    # the append-only player-link audit. Preserve its award row across this
+    # legacy rebuild instead of letting DELETE CASCADE turn those audit targets
+    # into dead pointers.
+    with pg.cursor() as cur:
+        cur.execute("DELETE FROM awards WHERE slug <> %s", (UNDER_22_SLUG,))
 
     rows = lite.execute(
         """SELECT award_category, award_name, award_slug, source_category, season,
@@ -358,7 +371,14 @@ def import_awards(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
         award_ids = dict(cur.fetchall())
 
     # 2. Winners.
-    truncate(pg, "award_winners")
+    with pg.cursor() as cur:
+        cur.execute(
+            """DELETE FROM award_winners w
+                 USING awards a
+                 WHERE a.id = w.award_id
+                   AND a.slug <> %s""",
+            (UNDER_22_SLUG,),
+        )
     source_id = sources.get("draftguru")
 
     def build_winners():
@@ -528,6 +548,283 @@ def import_all_australian(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
         pg, "SELECT count(DISTINCT season) FROM award_winners WHERE award_id = %s", (award_id,)
     )
     rep.result("all_australian selections", total, f"({seasons} seasons, {linked} linked)")
+
+
+# ---------------------------------------------------------------------------
+# Group: AFLPA 22 Under 22
+# ---------------------------------------------------------------------------
+def resolve_under_22_player(
+    pg: psycopg.Connection,
+    row: Under22Selection,
+    club_id: int,
+) -> tuple[int | None, str, int]:
+    """Resolve only an exact name/alias corroborated by season and club.
+
+    Names locate candidates; they never establish identity on their own. A
+    trusted link requires exactly one candidate whose player-match history
+    puts that player at the source club in the selection season. This is
+    deliberately stricter than the generic upload resolver because every row
+    in this source names an AFL club and a current-season AFL player.
+    """
+    with pg.cursor() as cur:
+        cur.execute(
+            """SELECT DISTINCT p.id,
+                       EXISTS (
+                         SELECT 1
+                           FROM player_match_stats pms
+                           JOIN matches m ON m.id = pms.match_id
+                          WHERE pms.player_id = p.id
+                            AND pms.club_id = %s
+                            AND m.season = %s
+                       ) AS corroborated
+                  FROM players p
+                 WHERE p.search_name = afldb_normalise_name(%s)
+                    OR EXISTS (
+                         SELECT 1
+                           FROM player_name_aliases a
+                          WHERE a.player_id = p.id
+                            AND a.search_alias = afldb_normalise_name(%s)
+                       )
+                 ORDER BY p.id""",
+            (club_id, row.season, row.player, row.player),
+        )
+        candidates = cur.fetchall()
+
+    corroborated = [candidate[0] for candidate in candidates if candidate[1]]
+    if len(corroborated) == 1:
+        status = "unique" if len(candidates) == 1 else "resolved"
+        return corroborated[0], status, len(candidates)
+    if len(corroborated) > 1:
+        return None, "ambiguous", len(candidates)
+    if candidates:
+        return None, "implausible", len(candidates)
+    return None, "unmatched", 0
+
+
+Under22Prepared = tuple[int, int | None, str, int]
+
+
+def prepare_under_22(
+    pg: psycopg.Connection,
+    rows: list[Under22Selection],
+    clubs: ClubResolver,
+    preserved_resolutions: dict[str, tuple[str, int, int]] | None = None,
+) -> dict[str, Under22Prepared]:
+    """Validate every database reference and resolve every player up front.
+
+    A full awards run is destructive and commits by group. Doing all source,
+    season, club and player resolution before that loop means an invalid
+    prerequisite cannot erase the previous awards family and fail only later.
+    """
+    source_seasons = {row.season for row in rows}
+    with pg.cursor() as cur:
+        cur.execute("SELECT year FROM seasons WHERE year = ANY(%s)", (list(source_seasons),))
+        loaded_seasons = {record[0] for record in cur.fetchall()}
+    missing_seasons = sorted(source_seasons - loaded_seasons)
+    if missing_seasons:
+        raise RuntimeError(
+            "22 Under 22 source refers to seasons not loaded in AFLDB: "
+            + ", ".join(map(str, missing_seasons))
+        )
+
+    preserved_resolutions = preserved_resolutions or {}
+    prepared: dict[str, Under22Prepared] = {}
+    trusted_player_seasons: dict[tuple[int, int], str] = {}
+    for row in rows:
+        club_id, _ = clubs.resolve(row.club, row.season)
+        club = clubs.clubs.get(club_id) if club_id is not None else None
+        active = club is not None and (
+            (club["first"] is None or row.season >= club["first"])
+            and (club["last"] is None or row.season <= club["last"])
+        )
+        if not active:
+            raise RuntimeError(
+                f"{row.source_key}: club {row.club!r} has no AFL identity active "
+                f"in {row.season}"
+            )
+
+        player_id, status, candidate_count = resolve_under_22_player(pg, row, club_id)
+        preserved = preserved_resolutions.get(row.source_key)
+        if preserved is not None:
+            prior_name, prior_player_id, prior_candidates = preserved
+            if prior_name != row.player:
+                raise RuntimeError(
+                    f"{row.source_key}: source player changed from {prior_name!r} to "
+                    f"{row.player!r}; review the preserved manual resolution first"
+                )
+            player_id = prior_player_id
+            status = "resolved"
+            candidate_count = prior_candidates
+
+        if player_id is not None:
+            identity_key = (row.season, player_id)
+            prior_key = trusted_player_seasons.get(identity_key)
+            if prior_key is not None:
+                raise RuntimeError(
+                    f"{row.source_key}: resolved player {player_id} is already selected "
+                    f"for {row.season} by {prior_key}"
+                )
+            trusted_player_seasons[identity_key] = row.source_key
+
+        prepared[row.source_key] = (club_id, player_id, status, candidate_count)
+    return prepared
+
+
+def import_under_22(
+    pg: psycopg.Connection,
+    rep: Reporter,
+    batch,
+    clubs: ClubResolver,
+    sources: dict[str, int],
+    source_rows: list[Under22Selection] | None = None,
+    prepared_rows: dict[str, Under22Prepared] | None = None,
+) -> None:
+    """Load the complete committed 2012-2026 annual team extract.
+
+    This is a scoped upsert: a targeted rerun does not touch any other award.
+    The legacy ``awards`` group includes this group so a full refresh also
+    applies the current independently sourced manifest; its own deletes leave
+    these durable Under 22 rows and IDs intact.
+    """
+    rows = source_rows if source_rows is not None else load_under_22()
+    batch.records_read += len(rows)
+
+    source_id = sources.get(UNDER_22_SOURCE_KEY)
+    if source_id is None:
+        raise RuntimeError(
+            f"source {UNDER_22_SOURCE_KEY!r} is missing; run database migration 060 first"
+        )
+
+    source_seasons = {row.season for row in rows}
+    prepared_rows = prepared_rows or prepare_under_22(pg, rows, clubs)
+
+    first_season = min(source_seasons)
+    last_season = max(source_seasons)
+    with pg.cursor() as cur:
+        cur.execute(
+            """INSERT INTO awards
+                 (slug, name, category, competition, club_id, description,
+                  first_season, last_season)
+               VALUES (%s, %s, 'honour_team', 'AFL', NULL, %s, %s, %s)
+               ON CONFLICT (slug) DO UPDATE
+                 SET name = EXCLUDED.name,
+                     category = EXCLUDED.category,
+                     competition = EXCLUDED.competition,
+                     club_id = NULL,
+                     description = EXCLUDED.description,
+                     first_season = EXCLUDED.first_season,
+                     last_season = EXCLUDED.last_season
+               RETURNING id""",
+            (
+                UNDER_22_SLUG,
+                "22 Under 22 Team",
+                AWARD_DESCRIPTIONS[UNDER_22_SLUG],
+                first_season,
+                last_season,
+            ),
+        )
+        award_id = cur.fetchone()[0]
+
+    keys = [row.source_key for row in rows]
+    with pg.cursor() as cur:
+        cur.execute(
+            """SELECT source_record_id, award_id, player_name_raw,
+                      link_status_value::text, player_id, candidate_count
+                 FROM award_winners
+                WHERE source_id = %s
+                  AND source_record_id = ANY(%s)""",
+            (source_id, keys),
+        )
+        existing = {record[0]: record[1:] for record in cur.fetchall()}
+        cur.execute(
+            """SELECT source_record_id
+                 FROM award_winners
+                WHERE award_id = %s
+                  AND source_record_id = ANY(%s)
+                  AND source_id IS DISTINCT FROM %s
+                LIMIT 1""",
+            (award_id, keys, source_id),
+        )
+        cross_source_collision = cur.fetchone()
+    if cross_source_collision:
+        raise RuntimeError(
+            "22 Under 22 source key collides with another source: "
+            + cross_source_collision[0]
+        )
+
+    prepared: list[tuple] = []
+    status_counts = {"unique": 0, "resolved": 0, "ambiguous": 0,
+                     "unmatched": 0, "implausible": 0}
+    for row in rows:
+        club_id, player_id, status, candidate_count = prepared_rows[row.source_key]
+        prior = existing.get(row.source_key)
+        if prior is not None:
+            prior_award_id, prior_name, prior_status, prior_player_id, prior_candidates = prior
+            if prior_award_id != award_id:
+                raise RuntimeError(
+                    f"{row.source_key}: existing source row belongs to award {prior_award_id}, "
+                    f"not {award_id}"
+                )
+            if prior_status == "resolved" and prior_player_id is not None:
+                if prior_name != row.player:
+                    raise RuntimeError(
+                        f"{row.source_key}: source player changed from {prior_name!r} to "
+                        f"{row.player!r}; review the existing manual resolution first"
+                    )
+                player_id = prior_player_id
+                status = "resolved"
+                candidate_count = prior_candidates
+
+        status_counts[status] += 1
+        prepared.append((
+            award_id, row.season, player_id, row.player, status, candidate_count,
+            club_id, row.club, row.position, row.sort_order,
+            row.is_captain, row.is_vice_captain, source_id, row.source_key, batch.id,
+        ))
+
+    with pg.cursor() as cur:
+        cur.execute(
+            """DELETE FROM award_winners
+                WHERE award_id = %s
+                  AND source_id = %s
+                  AND (source_record_id IS NULL OR source_record_id <> ALL(%s))""",
+            (award_id, source_id, keys),
+        )
+        cur.executemany(
+            """INSERT INTO award_winners
+                 (award_id, season, player_id, player_name_raw, link_status_value,
+                  candidate_count, club_id, club_name_raw, position,
+                  sort_order, is_captain, is_vice_captain, source_id,
+                  source_record_id, import_batch_id)
+               VALUES (%s, %s, %s, %s, %s::link_status, %s, %s, %s, %s,
+                       %s, %s, %s, %s, %s, %s)
+               ON CONFLICT ON CONSTRAINT award_winners_source_uq DO UPDATE
+                 SET award_id = EXCLUDED.award_id,
+                     season = EXCLUDED.season,
+                     player_id = EXCLUDED.player_id,
+                     player_name_raw = EXCLUDED.player_name_raw,
+                     link_status_value = EXCLUDED.link_status_value,
+                     candidate_count = EXCLUDED.candidate_count,
+                     club_id = EXCLUDED.club_id,
+                     club_name_raw = EXCLUDED.club_name_raw,
+                     position = EXCLUDED.position,
+                     sort_order = EXCLUDED.sort_order,
+                     is_captain = EXCLUDED.is_captain,
+                     is_vice_captain = EXCLUDED.is_vice_captain,
+                     import_batch_id = EXCLUDED.import_batch_id""",
+            prepared,
+        )
+    batch.records_inserted += len(rows) - len(existing)
+    batch.records_updated += len(existing)
+    pg.commit()
+
+    linked = status_counts["unique"] + status_counts["resolved"]
+    rep.result(
+        "22 Under 22 selections",
+        len(rows),
+        f"({len(source_seasons)} seasons, {linked} linked, "
+        f"{len(rows) - linked} awaiting identity review)",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -769,28 +1066,31 @@ def import_captaincies(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
 GROUPS = {
     "awards":         ("Award definitions and winners", ["awards", "award_winners"]),
     "all_australian": ("All-Australian teams", ["award_winners"]),
+    "under_22":       ("AFLPA 22 Under 22 teams", ["awards", "award_winners"]),
     "rising_star":    ("Rising Star nominations", ["award_nominations"]),
     "hall_of_fame":   ("Australian Football Hall of Fame", ["hall_of_fame"]),
     "honour_teams":   ("Teams of the century and similar", ["honour_team_members"]),
     "captaincies":    ("Club captains by season", ["captaincies"]),
 }
 
-# all_australian and rising_star both need the award definitions, so
-# 'awards' always runs first.
-GROUP_ORDER = ["awards", "all_australian", "rising_star", "hall_of_fame",
+# all_australian and rising_star both need the legacy award definitions, so
+# 'awards' always runs first. under_22 can also run alone because it upserts
+# only its own definition and rows.
+GROUP_ORDER = ["awards", "all_australian", "under_22", "rising_star", "hall_of_fame",
                "honour_teams", "captaincies"]
 
 # Groups that cannot be run without another.
 #
-# 'awards' and 'all_australian' write the same table and 'awards' rebuilds
-# the definitions those winners hang off, so reloading either alone would
-# take the other's rows with it via ON DELETE CASCADE and then report
-# success. They are pulled in together rather than left to a flag nobody
-# would think to pass.
+# 'awards', 'all_australian' and 'rising_star' share definitions/tables, so a
+# legacy-family refresh must close over all three. A full awards refresh also
+# includes independently sourced under_22 so its current manifest is applied,
+# while its rows and durable IDs are excluded from the legacy deletes.
+# under_22 itself is deliberately asymmetric and may run alone as a scoped
+# upsert.
 GROUP_REQUIRES = {
-    "awards": {"all_australian"},
+    "awards": {"all_australian", "under_22", "rising_star"},
     "all_australian": {"awards"},
-    "rising_star": {"awards", "all_australian"},
+    "rising_star": {"awards"},
 }
 
 
@@ -845,25 +1145,36 @@ def main() -> int:
 
     load_env()
     rep = Reporter(verbose=not args.quiet)
-    legacy_path = require_env("AFLDB_LEGACY_SQLITE")
-    dsn = require_env("AFLDB_IMPORT_DATABASE_URL")
+    needs_legacy = any(key != "under_22" for key in selected)
+    legacy_path = require_env("AFLDB_LEGACY_SQLITE") if needs_legacy else None
 
-    rep.step(f"legacy source : {legacy_path}")
-    rep.step(f"target        : {safe_dsn(dsn)}")
+    if legacy_path:
+        rep.step(f"legacy source : {legacy_path}")
     rep.step(f"groups        : {', '.join(selected)}")
     if added:
         rep.step(f"                (+{', '.join(sorted(added))} — required by the groups you asked for)")
 
-    lite = connect_legacy(legacy_path)
+    lite = connect_legacy(legacy_path) if legacy_path else None
 
     if args.dry_run:
         rep.step("dry run — source counts only")
-        for table in ("awards", "all_australian", "all_australian_history",
-                      "rising_star_nominees", "hall_of_fame", "team_selections",
-                      "captaincies"):
-            rep.result(table, lite.execute(f"SELECT count(*) FROM {table}").fetchone()[0])
+        if lite is not None:
+            for table in ("awards", "all_australian", "all_australian_history",
+                          "rising_star_nominees", "hall_of_fame", "team_selections",
+                          "captaincies"):
+                rep.result(table, lite.execute(f"SELECT count(*) FROM {table}").fetchone()[0])
+            lite.close()
+        if "under_22" in selected:
+            under_22_rows = load_under_22()
+            rep.result(
+                "22 Under 22 source",
+                len(under_22_rows),
+                f"({len({row.season for row in under_22_rows})} seasons)",
+            )
         return 0
 
+    dsn = require_env("AFLDB_IMPORT_DATABASE_URL")
+    rep.step(f"target        : {safe_dsn(dsn)}")
     started = time.time()
     pg = connect_pg(dsn)
 
@@ -879,15 +1190,73 @@ def main() -> int:
             cur.execute("SELECT key, id FROM sources")
             sources = dict(cur.fetchall())
         clubs = ClubResolver(pg)
-        person_links = load_person_links(lite)
+        person_links = load_person_links(lite) if lite is not None else {}
+        preserved_under_22_resolutions: dict[str, tuple[str, int, int]] = {}
+        under_22_rows: list[Under22Selection] | None = None
+        under_22_prepared: dict[str, Under22Prepared] | None = None
+        under_22_source_id = sources.get(UNDER_22_SOURCE_KEY)
+        if "under_22" in selected:
+            # Validate every source/reference prerequisite before a requested
+            # shared legacy awards rebuild deletes or rewrites its own rows.
+            if under_22_source_id is None:
+                raise RuntimeError(
+                    f"source {UNDER_22_SOURCE_KEY!r} is missing; "
+                    "run database migration 060 first"
+                )
+            with pg.cursor() as cur:
+                cur.execute(
+                    """SELECT EXISTS (
+                         SELECT 1
+                           FROM information_schema.columns
+                          WHERE table_schema = 'public'
+                            AND table_name = 'award_winners'
+                            AND column_name = 'sort_order'
+                       )"""
+                )
+                has_sort_order = cur.fetchone()[0]
+            if not has_sort_order:
+                raise RuntimeError(
+                    "award_winners.sort_order is missing; run database migration 061 first"
+                )
+            under_22_rows = load_under_22()
+
+            # Capture deliberate human links before any shared-family rebuild.
+            # The legacy awards loader now preserves Under 22 rows and IDs, and
+            # this preflight also prevents a changed raw name from silently
+            # inheriting an earlier manual resolution.
+            with pg.cursor() as cur:
+                cur.execute(
+                    """SELECT w.source_record_id, w.player_name_raw,
+                              w.player_id, w.candidate_count
+                         FROM award_winners w
+                         JOIN awards a ON a.id = w.award_id
+                        WHERE a.slug = %s
+                          AND w.source_id = %s
+                          AND w.link_status_value = 'resolved'
+                          AND w.player_id IS NOT NULL""",
+                    (UNDER_22_SLUG, under_22_source_id),
+                )
+                preserved_under_22_resolutions = {
+                    row[0]: (row[1], row[2], row[3]) for row in cur.fetchall()
+                }
+            under_22_prepared = prepare_under_22(
+                pg, under_22_rows, clubs, preserved_under_22_resolutions
+            )
 
         for key in selected:
             rep.step(f"{key} — {GROUPS[key][0]}")
-            with import_batch(pg, "sports_data_lab", "import_awards.py", key) as batch:
+            batch_source = UNDER_22_SOURCE_KEY if key == "under_22" else "sports_data_lab"
+            with import_batch(pg, batch_source, "import_awards.py", key) as batch:
                 if key == "awards":
                     import_awards(pg, lite, rep, batch, clubs, sources, person_links)
                 elif key == "all_australian":
                     import_all_australian(pg, lite, rep, batch, clubs, sources, person_links)
+                elif key == "under_22":
+                    import_under_22(
+                        pg, rep, batch, clubs, sources,
+                        source_rows=under_22_rows,
+                        prepared_rows=under_22_prepared,
+                    )
                 elif key == "rising_star":
                     import_rising_star(pg, lite, rep, batch, clubs, sources)
                 elif key == "hall_of_fame":
@@ -911,7 +1280,8 @@ def main() -> int:
             )
     finally:
         pg.close()
-        lite.close()
+        if lite is not None:
+            lite.close()
 
     rep.step(f"done in {time.time() - started:.0f} s")
     return 0

@@ -225,6 +225,12 @@ Discovered by running the migration rather than by inspection:
 
 ---
 
-## 7. Outstanding for Phase 3b
+## 7. Outstanding at the time of this 15 August migration run
 
 Awards, All-Australian, Hall of Fame, honour teams, captaincies, draft picks and player relationships are not yet migrated. All target tables exist and accept unresolved links, so they can be loaded without further schema change.
+
+This section is a dated result, not the current loader inventory. The later
+Phase 3b tooling in `tools/migration/import_awards.py` now loads awards,
+All-Australian, AFLPA 22 Under 22, Hall of Fame, honour teams and captaincies;
+`tools/migration/import_draft.py` loads draft history. Player relationships
+remain separately deferred as described in the current README.

@@ -59,7 +59,7 @@ export async function listAwards(): Promise<AwardSummary[]> {
 }
 
 /**
- * All 39 awards, for a dropdown -- the grid solver's generic "won an
+ * All awards, for a dropdown -- the grid solver's generic "won an
  * award…" builders. Grouped by category (award / club_best_and_fairest /
  * draft_pick / honour_team) so the picker can render an <optgroup>;
  * mirrors getClubOptions() in advanced-search.ts.
@@ -134,7 +134,8 @@ export async function getAwardSeason(
       LEFT JOIN players p ON p.id = w.player_id
       LEFT JOIN clubs c   ON c.id = w.club_id
      WHERE w.award_id = ${awardId} AND w.season = ${season}
-     ORDER BY w.is_captain DESC, w.position NULLS LAST, "playerName"
+     ORDER BY w.sort_order NULLS LAST,
+              w.is_captain DESC, w.position NULLS LAST, "playerName"
   `;
 }
 

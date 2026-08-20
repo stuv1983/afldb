@@ -53,6 +53,12 @@ SOURCES = [
      "Brownlow votes, match details, venue and club records."),
     ("wikipedia", "Wikipedia", "https://en.wikipedia.org", "scrape",
      "Awards, captaincies, hall of fame, football families."),
+    ("wikipedia_22under22", "22 Under 22 team",
+     "https://en.wikipedia.org/wiki/22_Under_22_team", "scrape",
+     "Annual AFL Players' Association 22 Under 22 team tables extracted from "
+     "Wikipedia on 2026-08-20. The committed extract covers 2012-2026; the "
+     "separate most-selections summary is excluded because it is derived and "
+     "contains known omissions."),
     ("draftguru", "DraftGuru", "https://draftguru.com.au", "scrape",
      "Draft and recruitment history."),
     ("footywire", "FootyWire", "https://footywire.com", "scrape",
