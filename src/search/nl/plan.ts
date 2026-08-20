@@ -283,6 +283,7 @@ export type NlMatchScope = {
   seasonMin?: number;
   seasonMax?: number;
   matchType?: NlMatchType;
+  roundNumber?: number;
   /**
    * "Ablett most goals" -- a surname that names several real players
    * (Jnr, Snr, Geoff, Luke, Len), none confident enough on its own to
@@ -895,6 +896,11 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   if (raw.scope.matchType !== undefined && !isNlMatchType(raw.scope.matchType)) {
     return { error: `Unknown match type "${raw.scope.matchType}".` };
   }
+  if (raw.scope.roundNumber !== undefined) {
+    if (!Number.isInteger(raw.scope.roundNumber) || raw.scope.roundNumber < 1 || raw.scope.roundNumber > 30) {
+      return { error: 'Round number must be between 1 and 30.' };
+    }
+  }
 
   const { seasonMin, seasonMax } = raw.scope;
   if (seasonMin !== undefined && (seasonMin < NL_LIMITS.minSeason || seasonMin > NL_LIMITS.maxSeason)) {
@@ -1006,6 +1012,7 @@ export function describePlan(plan: NlQueryPlan): string[] {
   if (plan.scope.clubFor) lines.push(`Club: ${plan.scope.clubFor.name}.`);
   if (plan.scope.clubAgainst) lines.push(`Opponent: ${plan.scope.clubAgainst.name}.`);
   if (plan.scope.venue) lines.push(`Venue: ${plan.scope.venue.name}.`);
+  if (plan.scope.roundNumber) lines.push(`Round: ${plan.scope.roundNumber}.`);
   if (plan.scope.matchType) lines.push(`Match type: ${plan.scope.matchType.replace(/_/g, ' ')}.`);
   if (plan.scope.seasonMin !== undefined || plan.scope.seasonMax !== undefined) {
     lines.push(`Seasons: ${plan.scope.seasonMin ?? '…'}-${plan.scope.seasonMax ?? '…'}.`);

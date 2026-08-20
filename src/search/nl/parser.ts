@@ -741,6 +741,20 @@ function extractClubSeasonMetric(text: string): { text: string; metric?: string;
   return { text, consumed: [] };
 }
 
+// ------------------------------------------------------------------ rounds
+
+function extractRound(text: string): { text: string; roundNumber?: number; consumed: string[] } {
+  const roundRe = /\b(?:round|rd)\s+(\d{1,2})\b/i;
+  const match = roundRe.exec(text);
+  if (match) {
+    const roundNumber = Number(match[1]);
+    if (roundNumber >= 1 && roundNumber <= 25) {
+      return { text: stripMatch(text, match[0]), roundNumber, consumed: [match[0]] };
+    }
+  }
+  return { text, consumed: [] };
+}
+
 // -------------------------------------------------------------- boundary
 
 const DEBUT_RE = /\b(?:first|debut(?:ed)?)\b/;
@@ -1036,6 +1050,10 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const matchTypeResult = extractMatchType(text, hasTeamMetricWord(text));
   text = matchTypeResult.text;
   consumedTokens.push(...matchTypeResult.consumed);
+
+  const roundResult = extractRound(text);
+  text = roundResult.text;
+  consumedTokens.push(...roundResult.consumed);
 
   const awardResult = extractAward(text);
   text = awardResult.text;
@@ -1654,6 +1672,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     ...(periodSplitResult.periodSplit ? { periodSplit: periodSplitResult.periodSplit } : {}),
     ...(havingResult.havingClause ? { havingClause: havingResult.havingClause } : {}),
     ...(clubAgainst ? { opponentClubId: clubAgainst.entity.organizationId } : {}),
+    ...(roundResult.roundNumber !== undefined ? { roundNumber: roundResult.roundNumber } : {}),
     ...(boundary ? { boundary } : {}),
     tiePolicy: 'all',
     limit: agg.kind === 'top_n' || agg.kind === 'list' ? 100 : 25,

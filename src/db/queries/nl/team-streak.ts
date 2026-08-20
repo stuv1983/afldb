@@ -7,12 +7,12 @@ import type { NlAnswerPayload, NlTeamStreakRow } from '@/search/nl/answer-types'
 type SqlFragment = ReturnType<typeof sql>;
 
 const SIDES = sql`
-  SELECT m.id AS match_id, m.season, m.round_type, m.is_final,
+  SELECT m.id AS match_id, m.season, m.round_type, m.round_number, m.is_final,
          m.match_date, m.venue_id, m.winner_club_id,
          m.home_club_id AS club_id, m.away_club_id AS opponent_id
     FROM matches m
   UNION ALL
-  SELECT m.id, m.season, m.round_type, m.is_final,
+  SELECT m.id, m.season, m.round_type, m.round_number, m.is_final,
          m.match_date, m.venue_id, m.winner_club_id,
          m.away_club_id, m.home_club_id
     FROM matches m
@@ -35,6 +35,7 @@ function scopeClauses(scope: NlMatchScope): SqlFragment[] {
   if (scope.venue) clauses.push(sql`t.venue_id = ${scope.venue.id}`);
   if (scope.seasonMin !== undefined) clauses.push(sql`t.season >= ${scope.seasonMin}`);
   if (scope.seasonMax !== undefined) clauses.push(sql`t.season <= ${scope.seasonMax}`);
+  if (scope.roundNumber !== undefined) clauses.push(sql`t.round_number = ${scope.roundNumber}`);
   clauses.push(matchTypeSql(scope.matchType));
   return clauses;
 }

@@ -87,6 +87,7 @@ function scopeClauses(scope: NlMatchScope): SqlFragment[] {
   if (scope.venue) clauses.push(sql`t.venue_id = ${scope.venue.id}`);
   if (scope.seasonMin !== undefined) clauses.push(sql`t.season >= ${scope.seasonMin}`);
   if (scope.seasonMax !== undefined) clauses.push(sql`t.season <= ${scope.seasonMax}`);
+  if (scope.roundNumber !== undefined) clauses.push(sql`t.round_number = ${scope.roundNumber}`);
   clauses.push(matchTypeSql(scope.matchType));
   return clauses;
 }
@@ -188,8 +189,8 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
         JOIN clubs cl ON cl.id = t.club_id
         JOIN clubs opp ON opp.id = t.opponent_id
         LEFT JOIN venues v ON v.id = t.venue_id
+        ${plan.havingClause ? sql`JOIN having_clubs hc ON hc.club_id = t.club_id` : sql``}
        WHERE ${where}
-       ${plan.havingClause ? sql`AND t.club_id IN (SELECT club_id FROM having_clubs)` : sql``}
     )
     SELECT r.*, count(*) OVER () AS total
       FROM ranked r

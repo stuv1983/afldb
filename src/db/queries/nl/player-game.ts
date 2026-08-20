@@ -49,6 +49,7 @@ function scopeClauses(scope: NlMatchScope, playerId: number | undefined): SqlFra
   if (scope.venue) clauses.push(sql`m.venue_id = ${scope.venue.id}`);
   if (scope.seasonMin !== undefined) clauses.push(sql`m.season >= ${scope.seasonMin}`);
   if (scope.seasonMax !== undefined) clauses.push(sql`m.season <= ${scope.seasonMax}`);
+  if (scope.roundNumber !== undefined) clauses.push(sql`m.round_number = ${scope.roundNumber}`);
   clauses.push(matchTypeSql(scope.matchType));
   return clauses;
 }
