@@ -51,6 +51,33 @@ function positiveInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
+function normaliseStatString(value: string): string {
+  return value.trim();
+}
+
+function parseStatString(value: string): number | null {
+  const trimmed = normaliseStatString(value);
+  if (trimmed === '') return null;
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+/**
+ * Keep the editor's derived disposal cell aligned with the NULL semantics of
+ * player_match_stats. If either component is blank, disposals must not be
+ * auto-filled from a partial total; the admin can still type an explicit
+ * disposal value if the source records one.
+ */
+export function autoDisposalsFromComponents(
+  kicks: string,
+  handballs: string,
+): string {
+  const parsedKicks = parseStatString(kicks);
+  const parsedHandballs = parseStatString(handballs);
+  if (parsedKicks === null || parsedHandballs === null) return '';
+  return String(parsedKicks + parsedHandballs);
+}
+
 /**
  * Validate the client-controlled JSON carried by the match-sheet action.
  * HTML min/max attributes are presentation only; this is the write boundary.
@@ -92,6 +119,12 @@ export function validateMatchSheetPayload(value: unknown): ValidationResult {
     }
     if (playerIds.has(rawPlayer.playerId)) {
       return { ok: false, error: `Player ID ${rawPlayer.playerId} appears more than once in the match sheet.` };
+    }
+    if (removedSeen.has(rawPlayer.playerId)) {
+      return {
+        ok: false,
+        error: `Player ID ${rawPlayer.playerId} cannot be both active and removed in the match sheet.`,
+      };
     }
     playerIds.add(rawPlayer.playerId);
 

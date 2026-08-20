@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  autoDisposalsFromComponents,
   deriveDisposals,
   validateMatchSheetPayload,
 } from '@/lib/match-sheet';
@@ -47,6 +48,7 @@ describe('match-sheet write validation', () => {
     [{ players: [{ playerId: 1, clubId: 2, goals: -1 }] }, 'invalid goals'],
     [{ players: [{ playerId: 1, clubId: 2, brownlowVotes: 4 }] }, 'invalid brownlowVotes'],
     [{ players: [{ playerId: 1, clubId: 2 }, { playerId: 1, clubId: 3 }] }, 'appears more than once'],
+    [{ players: [{ playerId: 1, clubId: 2 }], removedPlayerIds: [1] }, 'cannot be both active and removed'],
     [{ players: [{ playerId: 1, clubId: 2, kicks: 4, handballs: 3, disposals: 8 }] }, 'do not equal'],
     [{ players: 'not-an-array' }, 'must be an array'],
   ])('rejects malformed or unsafe payloads', (payload, message) => {
@@ -60,6 +62,16 @@ describe('match-sheet write validation', () => {
     expect(deriveDisposals(10, null, null)).toBeNull();
     expect(deriveDisposals(null, 5, null)).toBeNull();
     expect(deriveDisposals(10, 5, 16)).toBe(16);
+  });
+
+  it('auto-fills disposals only from two recorded components', () => {
+    expect(autoDisposalsFromComponents('10', '5')).toBe('15');
+    expect(autoDisposalsFromComponents('11', '5')).toBe('16');
+    expect(autoDisposalsFromComponents('0', '5')).toBe('5');
+    expect(autoDisposalsFromComponents('10', '0')).toBe('10');
+    expect(autoDisposalsFromComponents('', '5')).toBe('');
+    expect(autoDisposalsFromComponents('10', '')).toBe('');
+    expect(autoDisposalsFromComponents('', '')).toBe('');
   });
 
   it('accepts exactly one 3-2-1 Brownlow allocation or an entirely blank allocation', () => {

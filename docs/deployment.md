@@ -60,6 +60,16 @@ npm run build                # production build + standalone preparation
 sudo systemctl restart afldb
 ```
 
+From a Windows workstation with SSH access to the development host, the same
+routine can be run with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1
+```
+
+Use `-WhatIf` to print the target without touching the server, and
+`-SkipMigrate`, `-SkipBuild` or `-SkipRestart` for narrower maintenance runs.
+
 `npm run build` runs `next build` then `tools/build/prepare-standalone.mjs`, which copies `.next/static` into the standalone bundle and creates `.next/cache`. **Both are required** — without them the site starts but every stylesheet 404s and ISR cannot persist.
 
 ## 4. Service management

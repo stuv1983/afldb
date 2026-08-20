@@ -8,6 +8,7 @@ import { saveMatchSheetAction, type MatchSheetActionState } from '@/app/admin/da
 import { PlayerPicker } from '@/components/PlayerPicker';
 import type { MatchDetail, MatchPlayerRow } from '@/db/queries/matches';
 import { formatDate, formatRoundShort } from '@/lib/format';
+import { autoDisposalsFromComponents } from '@/lib/match-sheet';
 import {
   addPlayerToLineup,
   removePlayerFromLineup,
@@ -171,11 +172,9 @@ export function MatchSheetEditor({
 
         // If kicks or handballs change, auto-update disposals if not custom
         if (field === 'kicks' || field === 'handballs') {
-          const k = field === 'kicks' ? Number(value) || 0 : Number(p.kicks) || 0;
-          const h = field === 'handballs' ? Number(value) || 0 : Number(p.handballs) || 0;
-          if (value !== '' || p.kicks !== '' || p.handballs !== '') {
-            updated.disposals = String(k + h);
-          }
+          const kicks = field === 'kicks' ? value : p.kicks;
+          const handballs = field === 'handballs' ? value : p.handballs;
+          updated.disposals = autoDisposalsFromComponents(kicks, handballs);
         }
         return updated;
       }),
