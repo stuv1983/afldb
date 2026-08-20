@@ -285,7 +285,7 @@ function extractSeasons(text: string): SeasonExtraction {
 // answered as an all-time career total with the Grand Final scope
 // silently gone.
 const SCOPE_GOVERNS_MATCH_TYPE = /\b(?:in|during|was|is|were)\s+(?:the same|(?:a )?single|an?|any|one|the)?\s*$/;
-const BARE_MATCH_TYPE_RECORD_RE = /\b(?:record|leader|leaders?)\b/;
+const BARE_MATCH_TYPE_RECORD_RE = /\b(?:record|holder|holders|leader|leaders?)\b/;
 
 /**
  * `allowBare` lifts the governing-word requirement, and is passed when the

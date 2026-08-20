@@ -159,7 +159,7 @@ export const AGG_WORDS: [RegExp, AggWord][] = [
   // only, which is what made the failure look like an exotic two-clause
   // interaction rather than one missing lookbehind: the second "at most"
   // was always read correctly. 6,428 questions in the qualification run.
-  [/\b(?:highest|best|biggest|largest|greatest|longest|maximum|record|leader|leaders|leading|led|heaviest)\b|(?<!\bat )\bmost\b/, 'max'],
+  [/\b(?:highest|best|biggest|largest|greatest|longest|maximum|record|holder|holders|leader|leaders|leading|led|heaviest)\b|(?<!\bat )\bmost\b/, 'max'],
   // Bare "least" is deliberately excluded: "at least" (an operator
   // phrase, handled by COMPARE_OP_WORDS) is far more common in real
   // questions than "least" meaning minimum, and the two must not compete.
@@ -628,7 +628,7 @@ export const STOPWORDS = new Set([
   // Filler verbs attached to a stat/condition word that has already been
   // consumed ("finals played", "goals kicked", "votes recorded") --
   // meaningful as English, redundant once their subject is resolved.
-  'played', 'kicked', 'scored', 'recorded', 'achieved', 'won', 'whose',
+  'played', 'kicked', 'scored', 'recorded', 'achieved', 'won', 'holder', 'holders', 'whose',
   // Conversational pronouns, as a safety net BEHIND CONVERSATIONAL_FILLER
   // rather than instead of it. The phrase list removes "for me" and "if you
   // can" outright; these catch the same words when a reader arranges them a

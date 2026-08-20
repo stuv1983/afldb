@@ -1,0 +1,11 @@
+id,category,question,expected_status,tags
+v23_0001,record_leader,Grand Final record for goals,plan,"record,grand_final,parser_v23"
+v23_0002,record_leader,please Grand Final record for goals thanks,plan,"record,grand_final,filler,parser_v23"
+v23_0003,record_leader,career goal leader against Collingwood,plan,"leader,opponent,parser_v23"
+v23_0004,record_leader,most goals in a Grand Final,plan,"control,grand_final"
+v23_0005,no_results,Dustin Martin most handballs against Richmond,plan,"self_opponent,no_results"
+v23_0006,no_results,Dustin Martin total handballs against Richmond,plan,"self_opponent,no_results"
+v23_0007,no_results,Dustin Martin highest handballs game against Richmond,plan,"self_opponent,no_results"
+v23_0008,no_results,Dustin Martin most handballs against Carlton,plan,"control,non_empty"
+v23_0009,decline,Dustin Martin most moonballs against Richmond,decline,"unsupported"
+v23_0010,coverage,most tackles in 1960,decline,"coverage,unanswerable"

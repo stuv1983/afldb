@@ -200,6 +200,7 @@ describe('6. finals', () => {
       'Grand Final record for goals',
       'please Grand Final record for goals thanks',
       'Grand Final goal leader',
+      'Grand Final goal record holder',
     ]) {
       const p = await plan(question);
       expect(p.grain).toBe('player_game');
@@ -208,6 +209,15 @@ describe('6. finals', () => {
       expect(p.agg).toEqual({ kind: 'max' });
       expect(p.scope.matchType).toBe('grand_final');
     }
+  });
+
+  it('record-holder phrasing scopes opponent career totals like leader phrasing', async () => {
+    const p = await plan('record holder for goals against Collingwood');
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('sum');
+    expect(p.metric).toBe('goals');
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(p.scope.clubAgainst?.slug).toBe('collingwood');
   });
 
   it('dusty top 5 disposal games in finals', async () => {

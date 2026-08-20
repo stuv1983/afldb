@@ -1,0 +1,502 @@
+id,category,question,expected_status,tags
+exp_0001,grand_final_record,Grand Final record for goals,plan,"grand_final,record"
+exp_0002,grand_final_record,Grand Final goals leader,plan,"grand_final,leader"
+exp_0003,grand_final_record,most goalss in a Grand Final,plan,"grand_final,plural"
+exp_0004,finals_record,finals record for goalss,plan,"finals,record"
+exp_0005,finals_record,most goalss in a final,plan,"finals,single_final"
+exp_0006,grand_final_record,Grand Final record for goal,plan,"grand_final,record"
+exp_0007,grand_final_record,Grand Final goal leader,plan,"grand_final,leader"
+exp_0008,grand_final_record,most goals in a Grand Final,plan,"grand_final,plural"
+exp_0009,finals_record,finals record for goals,plan,"finals,record"
+exp_0010,finals_record,most goals in a final,plan,"finals,single_final"
+exp_0011,grand_final_record,Grand Final record for marks,plan,"grand_final,record"
+exp_0012,grand_final_record,Grand Final marks leader,plan,"grand_final,leader"
+exp_0013,grand_final_record,most markss in a Grand Final,plan,"grand_final,plural"
+exp_0014,finals_record,finals record for markss,plan,"finals,record"
+exp_0015,finals_record,most markss in a final,plan,"finals,single_final"
+exp_0016,grand_final_record,Grand Final record for kicks,plan,"grand_final,record"
+exp_0017,grand_final_record,Grand Final kicks leader,plan,"grand_final,leader"
+exp_0018,grand_final_record,most kickss in a Grand Final,plan,"grand_final,plural"
+exp_0019,finals_record,finals record for kickss,plan,"finals,record"
+exp_0020,finals_record,most kickss in a final,plan,"finals,single_final"
+exp_0021,grand_final_record,Grand Final record for handballs,plan,"grand_final,record"
+exp_0022,grand_final_record,Grand Final handballs leader,plan,"grand_final,leader"
+exp_0023,grand_final_record,most handballss in a Grand Final,plan,"grand_final,plural"
+exp_0024,finals_record,finals record for handballss,plan,"finals,record"
+exp_0025,finals_record,most handballss in a final,plan,"finals,single_final"
+exp_0026,grand_final_record,Grand Final record for disposals,plan,"grand_final,record"
+exp_0027,grand_final_record,Grand Final disposals leader,plan,"grand_final,leader"
+exp_0028,grand_final_record,most disposalss in a Grand Final,plan,"grand_final,plural"
+exp_0029,finals_record,finals record for disposalss,plan,"finals,record"
+exp_0030,finals_record,most disposalss in a final,plan,"finals,single_final"
+exp_0031,career_leader,career goal leader against Collingwood,plan,"leader,opponent"
+exp_0032,career_leader,record holder for goals against Collingwood,plan,"record_holder,opponent"
+exp_0033,career_leader,leading goal kicker against Collingwood,plan,"leading,opponent"
+exp_0034,career_leader,career goal leader against Carlton,plan,"leader,opponent"
+exp_0035,career_leader,record holder for goals against Carlton,plan,"record_holder,opponent"
+exp_0036,career_leader,leading goal kicker against Carlton,plan,"leading,opponent"
+exp_0037,career_leader,career goal leader against Essendon,plan,"leader,opponent"
+exp_0038,career_leader,record holder for goals against Essendon,plan,"record_holder,opponent"
+exp_0039,career_leader,leading goal kicker against Essendon,plan,"leading,opponent"
+exp_0040,career_leader,career goal leader against Richmond,plan,"leader,opponent"
+exp_0041,career_leader,record holder for goals against Richmond,plan,"record_holder,opponent"
+exp_0042,career_leader,leading goal kicker against Richmond,plan,"leading,opponent"
+exp_0043,career_leader,career goal leader against Geelong,plan,"leader,opponent"
+exp_0044,career_leader,record holder for goals against Geelong,plan,"record_holder,opponent"
+exp_0045,career_leader,leading goal kicker against Geelong,plan,"leading,opponent"
+exp_0046,career_leader,career goal leader against Hawthorn,plan,"leader,opponent"
+exp_0047,career_leader,record holder for goals against Hawthorn,plan,"record_holder,opponent"
+exp_0048,career_leader,leading goal kicker against Hawthorn,plan,"leading,opponent"
+exp_0049,career_leader,career goal leader against Sydney,plan,"leader,opponent"
+exp_0050,career_leader,record holder for goals against Sydney,plan,"record_holder,opponent"
+exp_0051,career_leader,leading goal kicker against Sydney,plan,"leading,opponent"
+exp_0052,career_leader,career goal leader against West Coast,plan,"leader,opponent"
+exp_0053,career_leader,record holder for goals against West Coast,plan,"record_holder,opponent"
+exp_0054,career_leader,leading goal kicker against West Coast,plan,"leading,opponent"
+exp_0055,highest_lowest_pair,highest score by Richmond,plan,highest
+exp_0056,highest_lowest_pair,lowest score by Richmond,plan,lowest
+exp_0057,period_split,highest H1 score by Richmond,plan,H1
+exp_0058,period_split,lowest H2 score by Richmond,plan,H2
+exp_0059,period_split,highest Q1 score by Richmond,plan,Q1
+exp_0060,period_split,lowest Q4 score by Richmond,plan,Q4
+exp_0061,highest_lowest_pair,highest score by Collingwood,plan,highest
+exp_0062,highest_lowest_pair,lowest score by Collingwood,plan,lowest
+exp_0063,period_split,highest H1 score by Collingwood,plan,H1
+exp_0064,period_split,lowest H2 score by Collingwood,plan,H2
+exp_0065,period_split,highest Q1 score by Collingwood,plan,Q1
+exp_0066,period_split,lowest Q4 score by Collingwood,plan,Q4
+exp_0067,highest_lowest_pair,highest score by Carlton,plan,highest
+exp_0068,highest_lowest_pair,lowest score by Carlton,plan,lowest
+exp_0069,period_split,highest H1 score by Carlton,plan,H1
+exp_0070,period_split,lowest H2 score by Carlton,plan,H2
+exp_0071,period_split,highest Q1 score by Carlton,plan,Q1
+exp_0072,period_split,lowest Q4 score by Carlton,plan,Q4
+exp_0073,highest_lowest_pair,highest score by Essendon,plan,highest
+exp_0074,highest_lowest_pair,lowest score by Essendon,plan,lowest
+exp_0075,period_split,highest H1 score by Essendon,plan,H1
+exp_0076,period_split,lowest H2 score by Essendon,plan,H2
+exp_0077,period_split,highest Q1 score by Essendon,plan,Q1
+exp_0078,period_split,lowest Q4 score by Essendon,plan,Q4
+exp_0079,highest_lowest_pair,highest score by Geelong,plan,highest
+exp_0080,highest_lowest_pair,lowest score by Geelong,plan,lowest
+exp_0081,period_split,highest H1 score by Geelong,plan,H1
+exp_0082,period_split,lowest H2 score by Geelong,plan,H2
+exp_0083,period_split,highest Q1 score by Geelong,plan,Q1
+exp_0084,period_split,lowest Q4 score by Geelong,plan,Q4
+exp_0085,highest_lowest_pair,highest score by Hawthorn,plan,highest
+exp_0086,highest_lowest_pair,lowest score by Hawthorn,plan,lowest
+exp_0087,period_split,highest H1 score by Hawthorn,plan,H1
+exp_0088,period_split,lowest H2 score by Hawthorn,plan,H2
+exp_0089,period_split,highest Q1 score by Hawthorn,plan,Q1
+exp_0090,period_split,lowest Q4 score by Hawthorn,plan,Q4
+exp_0091,highest_lowest_pair,highest score by Melbourne,plan,highest
+exp_0092,highest_lowest_pair,lowest score by Melbourne,plan,lowest
+exp_0093,period_split,highest H1 score by Melbourne,plan,H1
+exp_0094,period_split,lowest H2 score by Melbourne,plan,H2
+exp_0095,period_split,highest Q1 score by Melbourne,plan,Q1
+exp_0096,period_split,lowest Q4 score by Melbourne,plan,Q4
+exp_0097,highest_lowest_pair,highest score by Sydney,plan,highest
+exp_0098,highest_lowest_pair,lowest score by Sydney,plan,lowest
+exp_0099,period_split,highest H1 score by Sydney,plan,H1
+exp_0100,period_split,lowest H2 score by Sydney,plan,H2
+exp_0101,period_split,highest Q1 score by Sydney,plan,Q1
+exp_0102,period_split,lowest Q4 score by Sydney,plan,Q4
+exp_0103,highest_lowest_pair,highest score by Brisbane Lions,plan,highest
+exp_0104,highest_lowest_pair,lowest score by Brisbane Lions,plan,lowest
+exp_0105,period_split,highest H1 score by Brisbane Lions,plan,H1
+exp_0106,period_split,lowest H2 score by Brisbane Lions,plan,H2
+exp_0107,period_split,highest Q1 score by Brisbane Lions,plan,Q1
+exp_0108,period_split,lowest Q4 score by Brisbane Lions,plan,Q4
+exp_0109,highest_lowest_pair,highest score by West Coast,plan,highest
+exp_0110,highest_lowest_pair,lowest score by West Coast,plan,lowest
+exp_0111,period_split,highest H1 score by West Coast,plan,H1
+exp_0112,period_split,lowest H2 score by West Coast,plan,H2
+exp_0113,period_split,highest Q1 score by West Coast,plan,Q1
+exp_0114,period_split,lowest Q4 score by West Coast,plan,Q4
+exp_0115,venue_alias,highest score at MCG,plan,venue
+exp_0116,venue_alias,fewest points scored at MCG,plan,"venue,lowest"
+exp_0117,venue_alias,most goals in a final at MCG,plan,"venue,final"
+exp_0118,venue_alias,highest score at Marvel,plan,venue
+exp_0119,venue_alias,fewest points scored at Marvel,plan,"venue,lowest"
+exp_0120,venue_alias,most goals in a final at Marvel,plan,"venue,final"
+exp_0121,venue_alias,highest score at Kardinia,plan,venue
+exp_0122,venue_alias,fewest points scored at Kardinia,plan,"venue,lowest"
+exp_0123,venue_alias,most goals in a final at Kardinia,plan,"venue,final"
+exp_0124,venue_alias,highest score at Gabba,plan,venue
+exp_0125,venue_alias,fewest points scored at Gabba,plan,"venue,lowest"
+exp_0126,venue_alias,most goals in a final at Gabba,plan,"venue,final"
+exp_0127,venue_alias,highest score at SCG,plan,venue
+exp_0128,venue_alias,fewest points scored at SCG,plan,"venue,lowest"
+exp_0129,venue_alias,most goals in a final at SCG,plan,"venue,final"
+exp_0130,venue_alias,highest score at Optus Stadium,plan,venue
+exp_0131,venue_alias,fewest points scored at Optus Stadium,plan,"venue,lowest"
+exp_0132,venue_alias,most goals in a final at Optus Stadium,plan,"venue,final"
+exp_0133,venue_alias,highest score at Waverley,plan,venue
+exp_0134,venue_alias,fewest points scored at Waverley,plan,"venue,lowest"
+exp_0135,venue_alias,most goals in a final at Waverley,plan,"venue,final"
+exp_0136,venue_alias,highest score at Football Park,plan,venue
+exp_0137,venue_alias,fewest points scored at Football Park,plan,"venue,lowest"
+exp_0138,venue_alias,most goals in a final at Football Park,plan,"venue,final"
+exp_0139,venue_alias,highest score at UTAS,plan,venue
+exp_0140,venue_alias,fewest points scored at UTAS,plan,"venue,lowest"
+exp_0141,venue_alias,most goals in a final at UTAS,plan,"venue,final"
+exp_0142,venue_alias,highest score at Adelaide Oval,plan,venue
+exp_0143,venue_alias,fewest points scored at Adelaide Oval,plan,"venue,lowest"
+exp_0144,venue_alias,most goals in a final at Adelaide Oval,plan,"venue,final"
+exp_0145,historical_identity,Brisbane Bears highest score,plan,historical_club
+exp_0146,historical_identity,fewest points scored by Brisbane Bears,plan,"historical_club,lowest"
+exp_0147,historical_identity,Brisbane Bears biggest win at the MCG,plan,"historical_club,venue"
+exp_0148,historical_identity,Fitzroy highest score,plan,historical_club
+exp_0149,historical_identity,fewest points scored by Fitzroy,plan,"historical_club,lowest"
+exp_0150,historical_identity,Fitzroy biggest win at the MCG,plan,"historical_club,venue"
+exp_0151,historical_identity,South Melbourne highest score,plan,historical_club
+exp_0152,historical_identity,fewest points scored by South Melbourne,plan,"historical_club,lowest"
+exp_0153,historical_identity,South Melbourne biggest win at the MCG,plan,"historical_club,venue"
+exp_0154,historical_identity,Footscray highest score,plan,historical_club
+exp_0155,historical_identity,fewest points scored by Footscray,plan,"historical_club,lowest"
+exp_0156,historical_identity,Footscray biggest win at the MCG,plan,"historical_club,venue"
+exp_0157,historical_identity,University highest score,plan,historical_club
+exp_0158,historical_identity,fewest points scored by University,plan,"historical_club,lowest"
+exp_0159,historical_identity,University biggest win at the MCG,plan,"historical_club,venue"
+exp_0160,player_opponent,Dustin Martin most handballs against Richmond,plan,"player,opponent"
+exp_0161,player_opponent,Dustin Martin total goals against Richmond,plan,"player,sum"
+exp_0162,player_opponent,Dustin Martin most handballs against Carlton,plan,"player,opponent"
+exp_0163,player_opponent,Dustin Martin total goals against Carlton,plan,"player,sum"
+exp_0164,player_opponent,Dustin Martin most handballs against Collingwood,plan,"player,opponent"
+exp_0165,player_opponent,Dustin Martin total goals against Collingwood,plan,"player,sum"
+exp_0166,player_opponent,Dustin Martin most handballs against Essendon,plan,"player,opponent"
+exp_0167,player_opponent,Dustin Martin total goals against Essendon,plan,"player,sum"
+exp_0168,player_opponent,Scott Pendlebury most handballs against Richmond,plan,"player,opponent"
+exp_0169,player_opponent,Scott Pendlebury total goals against Richmond,plan,"player,sum"
+exp_0170,player_opponent,Scott Pendlebury most handballs against Carlton,plan,"player,opponent"
+exp_0171,player_opponent,Scott Pendlebury total goals against Carlton,plan,"player,sum"
+exp_0172,player_opponent,Scott Pendlebury most handballs against Collingwood,plan,"player,opponent"
+exp_0173,player_opponent,Scott Pendlebury total goals against Collingwood,plan,"player,sum"
+exp_0174,player_opponent,Scott Pendlebury most handballs against Essendon,plan,"player,opponent"
+exp_0175,player_opponent,Scott Pendlebury total goals against Essendon,plan,"player,sum"
+exp_0176,player_opponent,Patrick Dangerfield most handballs against Richmond,plan,"player,opponent"
+exp_0177,player_opponent,Patrick Dangerfield total goals against Richmond,plan,"player,sum"
+exp_0178,player_opponent,Patrick Dangerfield most handballs against Carlton,plan,"player,opponent"
+exp_0179,player_opponent,Patrick Dangerfield total goals against Carlton,plan,"player,sum"
+exp_0180,player_opponent,Patrick Dangerfield most handballs against Collingwood,plan,"player,opponent"
+exp_0181,player_opponent,Patrick Dangerfield total goals against Collingwood,plan,"player,sum"
+exp_0182,player_opponent,Patrick Dangerfield most handballs against Essendon,plan,"player,opponent"
+exp_0183,player_opponent,Patrick Dangerfield total goals against Essendon,plan,"player,sum"
+exp_0184,player_opponent,Lance Franklin most handballs against Richmond,plan,"player,opponent"
+exp_0185,player_opponent,Lance Franklin total goals against Richmond,plan,"player,sum"
+exp_0186,player_opponent,Lance Franklin most handballs against Carlton,plan,"player,opponent"
+exp_0187,player_opponent,Lance Franklin total goals against Carlton,plan,"player,sum"
+exp_0188,player_opponent,Lance Franklin most handballs against Collingwood,plan,"player,opponent"
+exp_0189,player_opponent,Lance Franklin total goals against Collingwood,plan,"player,sum"
+exp_0190,player_opponent,Lance Franklin most handballs against Essendon,plan,"player,opponent"
+exp_0191,player_opponent,Lance Franklin total goals against Essendon,plan,"player,sum"
+exp_0192,player_opponent,Gary Ablett Snr most handballs against Richmond,plan,"player,opponent"
+exp_0193,player_opponent,Gary Ablett Snr total goals against Richmond,plan,"player,sum"
+exp_0194,player_opponent,Gary Ablett Snr most handballs against Carlton,plan,"player,opponent"
+exp_0195,player_opponent,Gary Ablett Snr total goals against Carlton,plan,"player,sum"
+exp_0196,player_opponent,Gary Ablett Snr most handballs against Collingwood,plan,"player,opponent"
+exp_0197,player_opponent,Gary Ablett Snr total goals against Collingwood,plan,"player,sum"
+exp_0198,player_opponent,Gary Ablett Snr most handballs against Essendon,plan,"player,opponent"
+exp_0199,player_opponent,Gary Ablett Snr total goals against Essendon,plan,"player,sum"
+exp_0200,advanced_metric,most inside 50s in a game,plan,advanced
+exp_0201,advanced_metric,most inside 50s in a season,plan,"advanced,season"
+exp_0202,coverage,most inside 50s in the 1960s,decline,coverage
+exp_0203,coverage,most inside 50s between 1897 and 1900,decline,coverage
+exp_0204,advanced_metric,most I50s in a game,plan,advanced
+exp_0205,advanced_metric,most I50s in a season,plan,"advanced,season"
+exp_0206,coverage,most I50s in the 1960s,decline,coverage
+exp_0207,coverage,most I50s between 1897 and 1900,decline,coverage
+exp_0208,advanced_metric,most rebound 50s in a game,plan,advanced
+exp_0209,advanced_metric,most rebound 50s in a season,plan,"advanced,season"
+exp_0210,coverage,most rebound 50s in the 1960s,decline,coverage
+exp_0211,coverage,most rebound 50s between 1897 and 1900,decline,coverage
+exp_0212,advanced_metric,most R50s in a game,plan,advanced
+exp_0213,advanced_metric,most R50s in a season,plan,"advanced,season"
+exp_0214,coverage,most R50s in the 1960s,decline,coverage
+exp_0215,coverage,most R50s between 1897 and 1900,decline,coverage
+exp_0216,advanced_metric,most clearances in a game,plan,advanced
+exp_0217,advanced_metric,most clearances in a season,plan,"advanced,season"
+exp_0218,coverage,most clearances in the 1960s,decline,coverage
+exp_0219,coverage,most clearances between 1897 and 1900,decline,coverage
+exp_0220,advanced_metric,most clangers in a game,plan,advanced
+exp_0221,advanced_metric,most clangers in a season,plan,"advanced,season"
+exp_0222,coverage,most clangers in the 1960s,decline,coverage
+exp_0223,coverage,most clangers between 1897 and 1900,decline,coverage
+exp_0224,advanced_metric,most contested possessions in a game,plan,advanced
+exp_0225,advanced_metric,most contested possessions in a season,plan,"advanced,season"
+exp_0226,coverage,most contested possessions in the 1960s,decline,coverage
+exp_0227,coverage,most contested possessions between 1897 and 1900,decline,coverage
+exp_0228,advanced_metric,most uncontested possessions in a game,plan,advanced
+exp_0229,advanced_metric,most uncontested possessions in a season,plan,"advanced,season"
+exp_0230,coverage,most uncontested possessions in the 1960s,decline,coverage
+exp_0231,coverage,most uncontested possessions between 1897 and 1900,decline,coverage
+exp_0232,having_threshold,teams with at least 1 wins against Carlton,plan,"having,gte"
+exp_0233,having_threshold,teams with more than 1 losses against Geelong,plan,"having,gt"
+exp_0234,career_conditions,players with 1+ games and exactly 1 goals,plan,"numeric,gte_eq"
+exp_0235,career_conditions,players with at most 1 games,plan,at_most
+exp_0236,collision,players with most 1 games,decline,most_number_collision
+exp_0237,having_threshold,teams with at least 2 wins against Carlton,plan,"having,gte"
+exp_0238,having_threshold,teams with more than 2 losses against Geelong,plan,"having,gt"
+exp_0239,career_conditions,players with 2+ games and exactly 2 goals,plan,"numeric,gte_eq"
+exp_0240,career_conditions,players with at most 2 games,plan,at_most
+exp_0241,collision,players with most 2 games,decline,most_number_collision
+exp_0242,having_threshold,teams with at least 3 wins against Carlton,plan,"having,gte"
+exp_0243,having_threshold,teams with more than 3 losses against Geelong,plan,"having,gt"
+exp_0244,career_conditions,players with 3+ games and exactly 3 goals,plan,"numeric,gte_eq"
+exp_0245,career_conditions,players with at most 3 games,plan,at_most
+exp_0246,collision,players with most 3 games,decline,most_number_collision
+exp_0247,having_threshold,teams with at least 4 wins against Carlton,plan,"having,gte"
+exp_0248,having_threshold,teams with more than 4 losses against Geelong,plan,"having,gt"
+exp_0249,career_conditions,players with 4+ games and exactly 4 goals,plan,"numeric,gte_eq"
+exp_0250,career_conditions,players with at most 4 games,plan,at_most
+exp_0251,collision,players with most 4 games,decline,most_number_collision
+exp_0252,having_threshold,teams with at least 5 wins against Carlton,plan,"having,gte"
+exp_0253,having_threshold,teams with more than 5 losses against Geelong,plan,"having,gt"
+exp_0254,career_conditions,players with 5+ games and exactly 5 goals,plan,"numeric,gte_eq"
+exp_0255,career_conditions,players with at most 5 games,plan,at_most
+exp_0256,collision,players with most 5 games,decline,most_number_collision
+exp_0257,having_threshold,teams with at least 10 wins against Carlton,plan,"having,gte"
+exp_0258,having_threshold,teams with more than 10 losses against Geelong,plan,"having,gt"
+exp_0259,career_conditions,players with 10+ games and exactly 10 goals,plan,"numeric,gte_eq"
+exp_0260,career_conditions,players with at most 10 games,plan,at_most
+exp_0261,collision,players with most 10 games,decline,most_number_collision
+exp_0262,having_threshold,teams with at least 20 wins against Carlton,plan,"having,gte"
+exp_0263,having_threshold,teams with more than 20 losses against Geelong,plan,"having,gt"
+exp_0264,career_conditions,players with 20+ games and exactly 20 goals,plan,"numeric,gte_eq"
+exp_0265,career_conditions,players with at most 20 games,plan,at_most
+exp_0266,collision,players with most 20 games,decline,most_number_collision
+exp_0267,having_threshold,teams with at least 50 wins against Carlton,plan,"having,gte"
+exp_0268,having_threshold,teams with more than 50 losses against Geelong,plan,"having,gt"
+exp_0269,career_conditions,players with 50+ games and exactly 50 goals,plan,"numeric,gte_eq"
+exp_0270,career_conditions,players with at most 50 games,plan,at_most
+exp_0271,collision,players with most 50 games,decline,most_number_collision
+exp_0272,having_threshold,teams with at least 100 wins against Carlton,plan,"having,gte"
+exp_0273,having_threshold,teams with more than 100 losses against Geelong,plan,"having,gt"
+exp_0274,career_conditions,players with 100+ games and exactly 100 goals,plan,"numeric,gte_eq"
+exp_0275,career_conditions,players with at most 100 games,plan,at_most
+exp_0276,collision,players with most 100 games,decline,most_number_collision
+exp_0277,having_threshold,teams with at least 200 wins against Carlton,plan,"having,gte"
+exp_0278,having_threshold,teams with more than 200 losses against Geelong,plan,"having,gt"
+exp_0279,career_conditions,players with 200+ games and exactly 200 goals,plan,"numeric,gte_eq"
+exp_0280,career_conditions,players with at most 200 games,plan,at_most
+exp_0281,collision,players with most 200 games,decline,most_number_collision
+exp_0282,self_opponent,Dustin Martin most handballs against Richmond,plan,"self_opponent,impossible_scope"
+exp_0283,self_opponent,Dustin Martin total handballs against Richmond,plan,"self_opponent,impossible_scope"
+exp_0284,self_opponent,Dustin Martin highest handballs game against Richmond,plan,"self_opponent,impossible_scope"
+exp_0285,self_opponent,Scott Pendlebury most goals against Collingwood,plan,"self_opponent,impossible_scope"
+exp_0286,self_opponent,Patrick Dangerfield most disposals against Geelong,plan,"self_opponent,impossible_scope"
+exp_0287,self_opponent,Lance Franklin total goals against Hawthorn,plan,"self_opponent,impossible_scope"
+exp_0288,self_opponent,Richmond most goals against Richmond,plan,"self_opponent,impossible_scope"
+exp_0289,self_opponent,Carlton highest score against Carlton,plan,"self_opponent,impossible_scope"
+exp_0290,ambiguous_surname,Ablett most goals,plan,ambiguous_surname
+exp_0291,ambiguous_surname,Ablett most games,plan,ambiguous_surname
+exp_0292,ambiguous_surname,Brown most goals,plan,ambiguous_surname
+exp_0293,ambiguous_surname,Brown most games,plan,ambiguous_surname
+exp_0294,ambiguous_surname,Smith most goals,plan,ambiguous_surname
+exp_0295,ambiguous_surname,Smith most games,plan,ambiguous_surname
+exp_0296,ambiguous_surname,Jones most goals,plan,ambiguous_surname
+exp_0297,ambiguous_surname,Jones most games,plan,ambiguous_surname
+exp_0298,ambiguous_surname,Johnson most goals,plan,ambiguous_surname
+exp_0299,ambiguous_surname,Johnson most games,plan,ambiguous_surname
+exp_0300,ambiguous_surname,Williams most goals,plan,ambiguous_surname
+exp_0301,ambiguous_surname,Williams most games,plan,ambiguous_surname
+exp_0302,slang_acronym,Dusty most possies against Carlton,plan,slang
+exp_0303,slang_acronym,Buddy most snags in a final,plan,slang
+exp_0304,slang_acronym,Danger most touches in a game,plan,slang
+exp_0305,slang_acronym,Pies biggest win at the G,plan,slang
+exp_0306,slang_acronym,Dons highest score at Marvel,plan,slang
+exp_0307,debut_boundary,most goals on debut,plan,debut
+exp_0308,debut_boundary,most goals in debut season,plan,debut_season
+exp_0309,finals_boundary,most finals played,plan,finals_played
+exp_0310,finals_boundary,most goals in a final,plan,in_a_final
+exp_0311,debut_boundary,most marks on debut,plan,debut
+exp_0312,debut_boundary,most marks in debut season,plan,debut_season
+exp_0313,finals_boundary,most finals played,plan,finals_played
+exp_0314,finals_boundary,most marks in a final,plan,in_a_final
+exp_0315,debut_boundary,most disposals on debut,plan,debut
+exp_0316,debut_boundary,most disposals in debut season,plan,debut_season
+exp_0317,finals_boundary,most finals played,plan,finals_played
+exp_0318,finals_boundary,most disposals in a final,plan,in_a_final
+exp_0319,filler_metamorphic,please Grand Final record for goals,plan,"filler,record"
+exp_0320,filler_metamorphic,please career goal leader against Collingwood,plan,"filler,leader"
+exp_0321,filler_metamorphic,quick one Grand Final record for goals,plan,"filler,record"
+exp_0322,filler_metamorphic,quick one career goal leader against Collingwood,plan,"filler,leader"
+exp_0323,filler_metamorphic,show me Grand Final record for goals,plan,"filler,record"
+exp_0324,filler_metamorphic,show me career goal leader against Collingwood,plan,"filler,leader"
+exp_0325,filler_metamorphic,can you tell me Grand Final record for goals,plan,"filler,record"
+exp_0326,filler_metamorphic,can you tell me career goal leader against Collingwood,plan,"filler,leader"
+exp_0327,stratified_player_game,most goalss by a Richmond player against Collingwood,plan,player_game
+exp_0328,stratified_team_match,Collingwood lowest score at Football Park,plan,team_match
+exp_0329,stratified_season,most handballss in 1967,plan,season
+exp_0330,stratified_final,most kickss in a final at Marvel,plan,"final,venue"
+exp_0331,stratified_player_game,most markss by a Geelong player against Geelong,plan,player_game
+exp_0332,stratified_team_match,Hawthorn lowest score at Optus Stadium,plan,team_match
+exp_0333,stratified_season,most goalss in 1971,plan,season
+exp_0334,stratified_final,most disposalss in a final at Adelaide Oval,plan,"final,venue"
+exp_0335,stratified_player_game,most handballss by a Brisbane Lions player against Collingwood,plan,player_game
+exp_0336,stratified_team_match,West Coast lowest score at Gabba,plan,team_match
+exp_0337,stratified_season,most markss in 1975,plan,season
+exp_0338,stratified_final,most goals in a final at Football Park,plan,"final,venue"
+exp_0339,stratified_player_game,most goalss by a Carlton player against Geelong,plan,player_game
+exp_0340,stratified_team_match,Essendon lowest score at Marvel,plan,team_match
+exp_0341,stratified_season,most handballss in 1979,plan,season
+exp_0342,stratified_final,most kickss in a final at Optus Stadium,plan,"final,venue"
+exp_0343,stratified_player_game,most markss by a Melbourne player against Collingwood,plan,player_game
+exp_0344,stratified_team_match,Sydney lowest score at Adelaide Oval,plan,team_match
+exp_0345,stratified_season,most goalss in 1983,plan,season
+exp_0346,stratified_final,most disposalss in a final at Gabba,plan,"final,venue"
+exp_0347,stratified_player_game,most handballss by a Richmond player against Geelong,plan,player_game
+exp_0348,stratified_team_match,Collingwood lowest score at Football Park,plan,team_match
+exp_0349,stratified_season,most markss in 1987,plan,season
+exp_0350,stratified_final,most goals in a final at Marvel,plan,"final,venue"
+exp_0351,stratified_player_game,most goalss by a Geelong player against Collingwood,plan,player_game
+exp_0352,stratified_team_match,Hawthorn lowest score at Optus Stadium,plan,team_match
+exp_0353,stratified_season,most handballss in 1991,plan,season
+exp_0354,stratified_final,most kickss in a final at Adelaide Oval,plan,"final,venue"
+exp_0355,stratified_player_game,most markss by a Brisbane Lions player against Geelong,plan,player_game
+exp_0356,stratified_team_match,West Coast lowest score at Gabba,plan,team_match
+exp_0357,stratified_season,most goalss in 1995,plan,season
+exp_0358,stratified_final,most disposalss in a final at Football Park,plan,"final,venue"
+exp_0359,stratified_player_game,most handballss by a Carlton player against Collingwood,plan,player_game
+exp_0360,stratified_team_match,Essendon lowest score at Marvel,plan,team_match
+exp_0361,stratified_season,most markss in 1999,plan,season
+exp_0362,stratified_final,most goals in a final at Optus Stadium,plan,"final,venue"
+exp_0363,stratified_player_game,most goalss by a Melbourne player against Geelong,plan,player_game
+exp_0364,stratified_team_match,Sydney lowest score at Adelaide Oval,plan,team_match
+exp_0365,stratified_season,most handballss in 2003,plan,season
+exp_0366,stratified_final,most kickss in a final at Gabba,plan,"final,venue"
+exp_0367,stratified_player_game,most markss by a Richmond player against Collingwood,plan,player_game
+exp_0368,stratified_team_match,Collingwood lowest score at Football Park,plan,team_match
+exp_0369,stratified_season,most goalss in 2007,plan,season
+exp_0370,stratified_final,most disposalss in a final at Marvel,plan,"final,venue"
+exp_0371,stratified_player_game,most handballss by a Geelong player against Geelong,plan,player_game
+exp_0372,stratified_team_match,Hawthorn lowest score at Optus Stadium,plan,team_match
+exp_0373,stratified_season,most markss in 2011,plan,season
+exp_0374,stratified_final,most goals in a final at Adelaide Oval,plan,"final,venue"
+exp_0375,stratified_player_game,most goalss by a Brisbane Lions player against Collingwood,plan,player_game
+exp_0376,stratified_team_match,West Coast lowest score at Gabba,plan,team_match
+exp_0377,stratified_season,most handballss in 2015,plan,season
+exp_0378,stratified_final,most kickss in a final at Football Park,plan,"final,venue"
+exp_0379,stratified_player_game,most markss by a Carlton player against Geelong,plan,player_game
+exp_0380,stratified_team_match,Essendon lowest score at Marvel,plan,team_match
+exp_0381,stratified_season,most goalss in 2019,plan,season
+exp_0382,stratified_final,most disposalss in a final at Optus Stadium,plan,"final,venue"
+exp_0383,stratified_player_game,most handballss by a Melbourne player against Collingwood,plan,player_game
+exp_0384,stratified_team_match,Sydney lowest score at Adelaide Oval,plan,team_match
+exp_0385,stratified_season,most markss in 2023,plan,season
+exp_0386,stratified_final,most goals in a final at Gabba,plan,"final,venue"
+exp_0387,stratified_player_game,most goalss by a Richmond player against Geelong,plan,player_game
+exp_0388,stratified_team_match,Collingwood lowest score at Football Park,plan,team_match
+exp_0389,stratified_season,most handballss in 1967,plan,season
+exp_0390,stratified_final,most kickss in a final at Marvel,plan,"final,venue"
+exp_0391,stratified_player_game,most markss by a Geelong player against Collingwood,plan,player_game
+exp_0392,stratified_team_match,Hawthorn lowest score at Optus Stadium,plan,team_match
+exp_0393,stratified_season,most goalss in 1971,plan,season
+exp_0394,stratified_final,most disposalss in a final at Adelaide Oval,plan,"final,venue"
+exp_0395,stratified_player_game,most handballss by a Brisbane Lions player against Geelong,plan,player_game
+exp_0396,stratified_team_match,West Coast lowest score at Gabba,plan,team_match
+exp_0397,stratified_season,most markss in 1975,plan,season
+exp_0398,stratified_final,most goals in a final at Football Park,plan,"final,venue"
+exp_0399,stratified_player_game,most goalss by a Carlton player against Collingwood,plan,player_game
+exp_0400,stratified_team_match,Essendon lowest score at Marvel,plan,team_match
+exp_0401,stratified_season,most handballss in 1979,plan,season
+exp_0402,stratified_final,most kickss in a final at Optus Stadium,plan,"final,venue"
+exp_0403,stratified_player_game,most markss by a Melbourne player against Geelong,plan,player_game
+exp_0404,stratified_team_match,Sydney lowest score at Adelaide Oval,plan,team_match
+exp_0405,stratified_season,most goalss in 1983,plan,season
+exp_0406,stratified_final,most disposalss in a final at Gabba,plan,"final,venue"
+exp_0407,stratified_player_game,most handballss by a Richmond player against Collingwood,plan,player_game
+exp_0408,stratified_team_match,Collingwood lowest score at Football Park,plan,team_match
+exp_0409,stratified_season,most markss in 1987,plan,season
+exp_0410,stratified_final,most goals in a final at Marvel,plan,"final,venue"
+exp_0411,stratified_player_game,most goalss by a Geelong player against Geelong,plan,player_game
+exp_0412,stratified_team_match,Hawthorn lowest score at Optus Stadium,plan,team_match
+exp_0413,stratified_season,most handballss in 1991,plan,season
+exp_0414,stratified_final,most kickss in a final at Adelaide Oval,plan,"final,venue"
+exp_0415,stratified_player_game,most markss by a Brisbane Lions player against Collingwood,plan,player_game
+exp_0416,stratified_team_match,West Coast lowest score at Gabba,plan,team_match
+exp_0417,stratified_season,most goalss in 1995,plan,season
+exp_0418,stratified_final,most disposalss in a final at Football Park,plan,"final,venue"
+exp_0419,stratified_player_game,most handballss by a Carlton player against Geelong,plan,player_game
+exp_0420,stratified_team_match,Essendon lowest score at Marvel,plan,team_match
+exp_0421,stratified_season,most markss in 1999,plan,season
+exp_0422,stratified_final,most goals in a final at Optus Stadium,plan,"final,venue"
+exp_0423,stratified_player_game,most goalss by a Melbourne player against Collingwood,plan,player_game
+exp_0424,stratified_team_match,Sydney lowest score at Adelaide Oval,plan,team_match
+exp_0425,stratified_season,most handballss in 2003,plan,season
+exp_0426,stratified_final,most kickss in a final at Gabba,plan,"final,venue"
+exp_0427,stratified_player_game,most markss by a Richmond player against Geelong,plan,player_game
+exp_0428,stratified_team_match,Collingwood lowest score at Football Park,plan,team_match
+exp_0429,stratified_season,most goalss in 2007,plan,season
+exp_0430,stratified_final,most disposalss in a final at Marvel,plan,"final,venue"
+exp_0431,stratified_player_game,most handballss by a Geelong player against Collingwood,plan,player_game
+exp_0432,stratified_team_match,Hawthorn lowest score at Optus Stadium,plan,team_match
+exp_0433,stratified_season,most markss in 2011,plan,season
+exp_0434,stratified_final,most goals in a final at Adelaide Oval,plan,"final,venue"
+exp_0435,stratified_player_game,most goalss by a Brisbane Lions player against Geelong,plan,player_game
+exp_0436,stratified_team_match,West Coast lowest score at Gabba,plan,team_match
+exp_0437,stratified_season,most handballss in 2015,plan,season
+exp_0438,stratified_final,most kickss in a final at Football Park,plan,"final,venue"
+exp_0439,stratified_player_game,most markss by a Carlton player against Collingwood,plan,player_game
+exp_0440,stratified_team_match,Essendon lowest score at Marvel,plan,team_match
+exp_0441,stratified_season,most goalss in 2019,plan,season
+exp_0442,stratified_final,most disposalss in a final at Optus Stadium,plan,"final,venue"
+exp_0443,stratified_player_game,most handballss by a Melbourne player against Geelong,plan,player_game
+exp_0444,stratified_team_match,Sydney lowest score at Adelaide Oval,plan,team_match
+exp_0445,stratified_season,most markss in 2023,plan,season
+exp_0446,stratified_final,most goals in a final at Gabba,plan,"final,venue"
+exp_0447,stratified_player_game,most goalss by a Richmond player against Collingwood,plan,player_game
+exp_0448,stratified_team_match,Collingwood lowest score at Football Park,plan,team_match
+exp_0449,stratified_season,most handballss in 1967,plan,season
+exp_0450,stratified_final,most kickss in a final at Marvel,plan,"final,venue"
+exp_0451,stratified_player_game,most markss by a Geelong player against Geelong,plan,player_game
+exp_0452,stratified_team_match,Hawthorn lowest score at Optus Stadium,plan,team_match
+exp_0453,stratified_season,most goalss in 1971,plan,season
+exp_0454,stratified_final,most disposalss in a final at Adelaide Oval,plan,"final,venue"
+exp_0455,stratified_player_game,most handballss by a Brisbane Lions player against Collingwood,plan,player_game
+exp_0456,stratified_team_match,West Coast lowest score at Gabba,plan,team_match
+exp_0457,stratified_season,most markss in 1975,plan,season
+exp_0458,stratified_final,most goals in a final at Football Park,plan,"final,venue"
+exp_0459,stratified_player_game,most goalss by a Carlton player against Geelong,plan,player_game
+exp_0460,stratified_team_match,Essendon lowest score at Marvel,plan,team_match
+exp_0461,stratified_season,most handballss in 1979,plan,season
+exp_0462,stratified_final,most kickss in a final at Optus Stadium,plan,"final,venue"
+exp_0463,stratified_player_game,most markss by a Melbourne player against Collingwood,plan,player_game
+exp_0464,stratified_team_match,Sydney lowest score at Adelaide Oval,plan,team_match
+exp_0465,stratified_season,most goalss in 1983,plan,season
+exp_0466,stratified_final,most disposalss in a final at Gabba,plan,"final,venue"
+exp_0467,stratified_player_game,most handballss by a Richmond player against Geelong,plan,player_game
+exp_0468,stratified_team_match,Collingwood lowest score at Football Park,plan,team_match
+exp_0469,stratified_season,most markss in 1987,plan,season
+exp_0470,stratified_final,most goals in a final at Marvel,plan,"final,venue"
+exp_0471,stratified_player_game,most goalss by a Geelong player against Collingwood,plan,player_game
+exp_0472,stratified_team_match,Hawthorn lowest score at Optus Stadium,plan,team_match
+exp_0473,stratified_season,most handballss in 1991,plan,season
+exp_0474,stratified_final,most kickss in a final at Adelaide Oval,plan,"final,venue"
+exp_0475,stratified_player_game,most markss by a Brisbane Lions player against Geelong,plan,player_game
+exp_0476,stratified_team_match,West Coast lowest score at Gabba,plan,team_match
+exp_0477,stratified_season,most goalss in 1995,plan,season
+exp_0478,stratified_final,most disposalss in a final at Football Park,plan,"final,venue"
+exp_0479,stratified_player_game,most handballss by a Carlton player against Collingwood,plan,player_game
+exp_0480,stratified_team_match,Essendon lowest score at Marvel,plan,team_match
+exp_0481,stratified_season,most markss in 1999,plan,season
+exp_0482,stratified_final,most goals in a final at Optus Stadium,plan,"final,venue"
+exp_0483,stratified_player_game,most goalss by a Melbourne player against Geelong,plan,player_game
+exp_0484,stratified_team_match,Sydney lowest score at Adelaide Oval,plan,team_match
+exp_0485,stratified_season,most handballss in 2003,plan,season
+exp_0486,stratified_final,most kickss in a final at Gabba,plan,"final,venue"
+exp_0487,stratified_player_game,most markss by a Richmond player against Collingwood,plan,player_game
+exp_0488,stratified_team_match,Collingwood lowest score at Football Park,plan,team_match
+exp_0489,stratified_season,most goalss in 2007,plan,season
+exp_0490,stratified_final,most disposalss in a final at Marvel,plan,"final,venue"
+exp_0491,stratified_player_game,most handballss by a Geelong player against Geelong,plan,player_game
+exp_0492,stratified_team_match,Hawthorn lowest score at Optus Stadium,plan,team_match
+exp_0493,stratified_season,most markss in 2011,plan,season
+exp_0494,stratified_final,most goals in a final at Adelaide Oval,plan,"final,venue"
+exp_0495,stratified_player_game,most goalss by a Brisbane Lions player against Collingwood,plan,player_game
+exp_0496,stratified_team_match,West Coast lowest score at Gabba,plan,team_match
+exp_0497,stratified_season,most handballss in 2015,plan,season
+exp_0498,stratified_final,most kickss in a final at Football Park,plan,"final,venue"
+exp_0499,stratified_player_game,most markss by a Carlton player against Geelong,plan,player_game
+exp_0500,stratified_team_match,Essendon lowest score at Marvel,plan,team_match
+exp_0501,stratified_season,most goalss in 2019,plan,season

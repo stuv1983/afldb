@@ -18,6 +18,7 @@ commit.
 ### Natural-Language Search Record Phrasing - 21 August 2026
 
 - Fixed NL record/leader phrasing so `Grand Final record for goals` and `career goal leader against Collingwood` parse through the supported player-stat paths instead of declining as unsupported terms, while preserving the career-finals reading of `most finals played` (`AFLDB-ISSUE-062`). Parser version 23 records the outcome change, with focused parser regressions for Grand Final record variants and the finals collision guard.
+- Fixed NL `record holder` phrasing so `record holder for goals against Collingwood` is consumed as the same max-record cue as `leader`, with parser version 24 and focused parser coverage (`AFLDB-ISSUE-064`).
 - Changed valid zero-result NL plans to render their existing no-match answer text instead of returning no NL panel, so self-opponent/impossible scopes such as `Dustin Martin most handballs against Richmond` explain the empty result while still logging `no_results` (`AFLDB-ISSUE-063`).
 
 ### External Current-Season Data Sources - 20 August 2026

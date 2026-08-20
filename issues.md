@@ -2271,7 +2271,127 @@ The answer layer treated recognised-but-empty NL plans the same as unrecognised 
 `answerNlQuestion` now still logs `no_results` but returns the normal described answer for zero-row payloads. A focused integration regression covers the boundary between a supported zero-row plan, a neighbouring supported non-empty answer, an unsupported metric decline, and a historical coverage-unavailable answer.
 
 ### Validation
-`npm.cmd test -- tests/nl-describe.test.ts tests/nl-parser.test.ts tests/nl-audit-acceptance.test.ts tests/nl-plan.test.ts` passed with 211 assertions. `npm.cmd run typecheck` passed. Remote guard confirmed `test_database=afldb_test`, then `PATH=/home/arm/.nvm/versions/node/v22.23.2/bin:$PATH npm test -- tests/integration/nl-answer-boundary.test.ts tests/integration/nl-answers.test.ts tests/integration/nl-answers-game-season.test.ts tests/integration/nl-answers-team-club.test.ts tests/integration/nl-vocab.test.ts` passed with 67 assertions. The new boundary test proves supported zero rows return an `NlAnswer` and log `no_results`, supported non-empty controls remain answered, unsupported metrics still decline, and coverage-unavailable eras stay explicit coverage answers. Local `npm.cmd test -- tests/integration/nl-answer-boundary.test.ts` is blocked on Windows because `AFLDB_TEST_DATABASE_URL` is intentionally absent there. Live UI verification is blocked until the development `afldb` service can be restarted with the rebuilt parser-v23 bundle.
+`npm.cmd test -- tests/nl-describe.test.ts tests/nl-parser.test.ts tests/nl-audit-acceptance.test.ts tests/nl-plan.test.ts` passed with 211 assertions. `npm.cmd run typecheck` passed. Remote guard confirmed `test_database=afldb_test`, then `PATH=/home/arm/.nvm/versions/node/v22.23.2/bin:$PATH npm test -- tests/integration/nl-answer-boundary.test.ts tests/integration/nl-answers.test.ts tests/integration/nl-answers-game-season.test.ts tests/integration/nl-answers-team-club.test.ts tests/integration/nl-vocab.test.ts` passed with 67 assertions. The new boundary test proves supported zero rows return an `NlAnswer` and log `no_results`, supported non-empty controls remain answered, unsupported metrics still decline, and coverage-unavailable eras stay explicit coverage answers. Local `npm.cmd test -- tests/integration/nl-answer-boundary.test.ts` is blocked on Windows because `AFLDB_TEST_DATABASE_URL` is intentionally absent there. After the development service was restarted through systemd, `tmp-nl-ui-v23-targeted.csv` passed 10/10 browser rows against `/search`: all three Dustin Martin-v-Richmond cases rendered `No matching performance found`; the Carlton control rendered Dustin Martin's 16-handball answer; the unsupported metric row remained absent; and the 1960 tackles row rendered `AFLDB can't answer this`. A read-only `nl_search_log` check using the auth role showed parser version 23 for every targeted row, with the three Dustin/Richmond rows logged as `no_results|empty_result`, unsupported as `unrecognised|unsupported_term`, and coverage as `unanswerable|coverage_unavailable`.
 
 ### Follow-up
-After development service restart, replay the three Dustin Martin-v-Richmond UI cases and confirm the rendered panel says no matching performance was found.
+Continue expanded and full UI corpus sweeps now that the restarted development service is serving parser version 23.
+
+## AFLDB-ISSUE-064 - Record-holder NL phrasing leaves `holder` unsupported
+
+- **Status:** Resolved
+- **Severity:** Low
+- **Area:** NL Search
+- **Found:** 2026-08-21
+- **Resolved:** 2026-08-21
+- **Queries:** `record holder for goals against Collingwood`, `Grand Final goal record holder`
+- **Files:** `src/search/nl/vocab.ts`, `src/search/nl/parser.ts`, `src/search/nl/plan.ts`, `tests/nl-parser.test.ts`
+
+### Symptom
+Expanded browser corpus rows using `record holder` rendered no NL panel even though neighbouring `leader` phrasing was supported.
+
+### Reproduction
+Run the expanded UI corpus `tmp-nl-ui-expanded-v23.csv`. The row `record holder for goals against Collingwood` was expected to answer but rendered `absent`.
+
+### Expected
+`record holder for goals against Collingwood` should parse like `career goal leader against Collingwood`: a player-game sum-mode max plan scoped to Collingwood as opponent.
+
+### Actual
+The parser consumed `record` as the aggregation cue but left `holder` as an unsupported leftover token, causing a safe decline/no panel.
+
+### Evidence
+A direct remote parser diagnostic on `afldb_dev` showed `record holder for goals against Collingwood` as `status=none`, `reason=ambiguous`, `unsupported=holder`, while `career goal leader against Collingwood` parsed to `player_game`, `mode=sum`, `metric=goals`, `agg=max`, and answered Tony Lockett/Doug Wade with 97 goals.
+
+### First wrong layer
+Slot extraction
+
+### Root cause
+Version 23 added `record` and `leader` coverage but did not treat `holder`/`holders` as record-cue vocabulary or as a redundant role noun after `record` was consumed.
+
+### Fix
+Added `holder`/`holders` to the max aggregation vocabulary, bare record-cue gate, and consumed redundant role-word set. Bumped `PARSER_VERSION` to 24 and added focused parser coverage.
+
+### Validation
+`npm.cmd test -- tests/nl-parser.test.ts tests/nl-audit-acceptance.test.ts tests/nl-plan.test.ts tests/nl-describe.test.ts` passed with 212 assertions. `npm.cmd run typecheck` passed. On the development host, `npm run typecheck` passed, and `npm test -- tests/nl-parser.test.ts tests/nl-audit-acceptance.test.ts tests/nl-plan.test.ts tests/nl-describe.test.ts tests/integration/nl-answer-boundary.test.ts tests/integration/nl-answers.test.ts tests/integration/nl-answers-game-season.test.ts tests/integration/nl-answers-team-club.test.ts tests/integration/nl-vocab.test.ts` passed with 279 assertions. `npm run build` passed and prepared the standalone bundle with parser version 24.
+
+### Follow-up
+Restart through systemd is blocked by sudo requiring an interactive password. After the service is legitimately restarted, verify parser version 24 in `nl_search_log`, replay the record-holder browser row, and include it in the remaining UI sweeps.
+
+## AFLDB-ISSUE-065 - Live-only player-season metric leaderboards can time out
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Performance
+- **Found:** 2026-08-21
+- **Resolved:** N/A
+- **Queries:** `most inside 50s in a season`, `most clearances in a season`, `most contested possessions in a season`
+- **Files:** `src/db/queries/nl/player-season.ts`
+
+### Symptom
+Expanded browser corpus rows for live-only player-season metrics rendered no NL panel instead of a visible answer or explicit timeout/error state.
+
+### Reproduction
+Run the expanded UI corpus `tmp-nl-ui-expanded-v23.csv`; live-only season rows such as `most inside 50s in a season` were `absent`. A direct remote diagnostic against `afldb_dev` parsed `most inside 50s in a season` to a valid player-season plan, then the compiler query failed with SQLSTATE `57014` statement timeout.
+
+### Expected
+Supported player-season metric leaderboards should answer within the configured statement timeout, or the UI should expose a safe explicit failure rather than disappearing.
+
+### Actual
+The parser accepts the plan, but `answerPlayerSeason` computes live-only season values through a correlated SUM over `player_match_stats`; broad all-season leaderboards can exceed the statement timeout and `answerNlQuestion` returns `null`.
+
+### Evidence
+The expanded UI run reported eight `advanced_metric` failures for live-only `in a season` rows. The representative remote diagnostic showed `PostgresError: canceling statement due to statement timeout` from `src/db/queries/nl/player-season.ts`.
+
+### First wrong layer
+Compiler
+
+### Root cause
+The live-only player-season metric expression recomputes per-player/per-season totals via a correlated subquery inside a broad ranked scan. That is too slow for unscoped all-season leaderboards.
+
+### Fix
+Not yet fixed.
+
+### Validation
+Open issue; no fix validation yet. Neighbouring scoped control `most inside 50s in 2020` still needs replay after the query path is optimized.
+
+### Follow-up
+Rewrite the live-only player-season compiler path to pre-aggregate `(player_id, season)` once before ranking, then verify with `EXPLAIN (ANALYZE, BUFFERS)` on `afldb_dev`, focused integration tests, and browser replays.
+
+## AFLDB-ISSUE-066 - Malformed `most N games` conditions answer instead of declining
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Parser
+- **Found:** 2026-08-21
+- **Resolved:** N/A
+- **Queries:** `players with most 10 games`, `players with most 200 games`
+- **Files:** `src/search/nl/parser.ts`
+
+### Symptom
+Expanded browser corpus rows intended to exercise `at most` versus bare `most` collisions rendered confident career-condition answers.
+
+### Reproduction
+Run the expanded UI corpus `tmp-nl-ui-expanded-v23.csv`. Rows `players with most 1 games`, `players with most 2 games`, `players with most 3 games`, `players with most 4 games`, `players with most 5 games`, `players with most 10 games`, `players with most 20 games`, `players with most 50 games`, `players with most 100 games`, and `players with most 200 games` all rendered answered panels.
+
+### Expected
+`at most 10 games` is a supported `lte` career condition. Bare `most 10 games` is malformed and should decline rather than being treated as a threshold or as a superlative ranking.
+
+### Actual
+The parser produced answered career-condition results, for example `players with most 10 games` rendered `8,573 players match`.
+
+### Evidence
+The expanded browser corpus reported ten `collision` failures with `expected_status=decline` and `outcome=answered`. This is distinct from the already-fixed `at most` guard because there is no `at` token to anchor the comparison phrase.
+
+### First wrong layer
+Slot extraction
+
+### Root cause
+Not yet confirmed. The career-condition extractor can still bind a bare number near a career stat after aggregation extraction has seen `most`, so malformed `most N <career stat>` wording reaches execution instead of being treated as unsupported.
+
+### Fix
+Not yet fixed.
+
+### Validation
+Open issue; no fix validation yet.
+
+### Follow-up
+Add a targeted parser decline test for `players with most 10 games`, preserve positive controls for `players with at most 10 games` and `most games`, then implement the narrow malformed-condition guard.

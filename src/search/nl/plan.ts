@@ -223,8 +223,12 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    record for goals", "career goal leader against Collingwood"), while
  *    career-final totals such as "most finals played" remain career
  *    metrics.
+ * 24: "record holder" is treated as the same max-record cue as "record"
+ *    and "leader"; the redundant holder noun is consumed so
+ *    "record holder for goals against Collingwood" reaches the same scoped
+ *    sum plan as "career goal leader against Collingwood".
  */
-export const PARSER_VERSION = 23;
+export const PARSER_VERSION = 24;
 
 // ------------------------------------------------------------------ grain
 
