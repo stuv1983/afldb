@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### Quick Lineup Pre-Fill & Player Stats Entry Workflow — 20 August 2026
+
+- **1-Click Roster Pre-Fill & Live Match Sheet Stats**:
+  - `src/db/queries/matches.ts`: Added `getRecentClubLineup` to fetch the previous match lineup (players, names, and jumper numbers) for any club in the competition.
+  - `src/app/admin/data-editor/page.tsx`: Loaded previous club lineups for both home and away teams when viewing the match sheet editor.
+  - `src/app/admin/data-editor/MatchSheetEditor.tsx`: Added quick lineup helper buttons to instantly pre-fill all 23 players for home and away clubs with their jumper numbers, while retaining full individual player addition/removal (`PlayerPicker`, `✕` button) and live tabular stat entry (kicks, handballs, disposals, marks, goals, behinds, tackles, hitouts, frees, and Brownlow 3-2-1 votes).
+
 ### Fix Attendance Status Coverage Constraint on Match Creation — 20 August 2026
 
 - **Attendance Status & Score Reconciliation in Match Creation**:

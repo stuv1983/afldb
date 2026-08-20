@@ -12,7 +12,7 @@ import { PlayerFinder } from '@/app/admin/data-editor/PlayerFinder';
 import { listAwards, listHonourTeams } from '@/db/queries/awards';
 import { listClubs } from '@/db/queries/clubs';
 import { listVenues } from '@/db/queries/venues';
-import { getMatch, getMatchPlayers, getSeasonMatches } from '@/db/queries/matches';
+import { getMatch, getMatchPlayers, getRecentClubLineup, getSeasonMatches } from '@/db/queries/matches';
 import { getEditableRow } from '@/db/queries/data-edits';
 import { listDraftPicks } from '@/db/queries/draft';
 import { requireSuperAdmin } from '@/lib/auth/session';
@@ -56,6 +56,13 @@ export default async function DataEditorPage(
     ? await getMatch(id)
     : null;
   const matchSheetPlayers = matchForSheet ? await getMatchPlayers(id) : [];
+
+  const [homeRecentLineup, awayRecentLineup] = matchForSheet
+    ? await Promise.all([
+        getRecentClubLineup(matchForSheet.homeClubId, matchForSheet.season),
+        getRecentClubLineup(matchForSheet.awayClubId, matchForSheet.season),
+      ])
+    : [[], []];
 
   const row = (mode !== 'match-sheet' && entity && Number.isInteger(id) && id > 0)
     ? await getEditableRow(entity, id)
@@ -249,7 +256,12 @@ export default async function DataEditorPage(
       )}
 
       {matchForSheet && (
-        <MatchSheetEditor match={matchForSheet} initialPlayers={matchSheetPlayers} />
+        <MatchSheetEditor
+          match={matchForSheet}
+          initialPlayers={matchSheetPlayers}
+          homeRecentLineup={homeRecentLineup}
+          awayRecentLineup={awayRecentLineup}
+        />
       )}
 
       {mode === 'match-sheet' && id > 0 && !matchForSheet && (

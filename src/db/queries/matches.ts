@@ -143,6 +143,36 @@ export async function getMatchPlayers(matchId: number): Promise<MatchPlayerRow[]
   `;
 }
 
+export type RecentPlayerRoster = {
+  playerId: number;
+  slug: string;
+  displayName: string;
+  clubId: number;
+  jumperNumber: string | null;
+};
+
+/** Fetch the most recent match lineup for a club to allow 1-click roster populating in MatchSheetEditor. */
+export async function getRecentClubLineup(clubId: number, season?: number): Promise<RecentPlayerRoster[]> {
+  const [lastMatch] = await sql<{ id: number }[]>`
+    SELECT m.id
+      FROM matches m
+      JOIN player_match_stats pms ON pms.match_id = m.id AND pms.club_id = ${clubId}
+     WHERE (${season ? sql`m.season <= ${season}` : sql`true`})
+     ORDER BY m.match_date DESC, m.id DESC
+     LIMIT 1
+  `;
+  if (!lastMatch) return [];
+
+  return sql<RecentPlayerRoster[]>`
+    SELECT p.id AS "playerId", p.slug, p.display_name AS "displayName",
+           ${clubId} AS "clubId", pms.jumper_number AS "jumperNumber"
+      FROM player_match_stats pms
+      JOIN players p ON p.id = pms.player_id
+     WHERE pms.match_id = ${lastMatch.id} AND pms.club_id = ${clubId}
+     ORDER BY NULLIF(regexp_replace(pms.jumper_number, '[^0-9]', '', 'g'), '')::int NULLS LAST, p.display_name
+  `;
+}
+
 /** Recent matches for the homepage. */
 export async function getRecentMatches(limit = 8): Promise<MatchListRow[]> {
   return sql<MatchListRow[]>`

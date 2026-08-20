@@ -39,9 +39,13 @@ type EditablePlayerStat = {
 export function MatchSheetEditor({
   match,
   initialPlayers,
+  homeRecentLineup = [],
+  awayRecentLineup = [],
 }: {
   match: MatchDetail;
   initialPlayers: MatchPlayerRow[];
+  homeRecentLineup?: { playerId: number; slug: string; displayName: string; clubId: number; jumperNumber?: string | null }[];
+  awayRecentLineup?: { playerId: number; slug: string; displayName: string; clubId: number; jumperNumber?: string | null }[];
 }) {
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(saveMatchSheetAction, INITIAL);
@@ -71,6 +75,42 @@ export function MatchSheetEditor({
   const [syncMatchScores, setSyncMatchScores] = useState(true);
   const [activeTab, setActiveTab] = useState<'home' | 'away' | 'all'>('all');
   const [addTeamChoice, setAddTeamChoice] = useState<number>(match.homeClubId);
+
+  function handleLoadRecentLineup(team: 'home' | 'away') {
+    const targetClubId = team === 'home' ? match.homeClubId : match.awayClubId;
+    const lineupSource = team === 'home' ? homeRecentLineup : awayRecentLineup;
+
+    if (!lineupSource || lineupSource.length === 0) {
+      alert(`No previous match lineup found for ${team === 'home' ? match.homeName : match.awayName}.`);
+      return;
+    }
+
+    setPlayers((prev) => {
+      const otherTeamPlayers = prev.filter((p) => p.clubId !== targetClubId);
+      const newTeamPlayers: EditablePlayerStat[] = lineupSource.map((r) => {
+        const existing = prev.find((p) => p.playerId === r.playerId && p.clubId === targetClubId);
+        return {
+          playerId: r.playerId,
+          slug: r.slug,
+          displayName: r.displayName,
+          clubId: targetClubId,
+          jumperNumber: existing?.jumperNumber || r.jumperNumber || '',
+          goals: existing?.goals || '',
+          behinds: existing?.behinds || '',
+          kicks: existing?.kicks || '',
+          handballs: existing?.handballs || '',
+          disposals: existing?.disposals || '',
+          marks: existing?.marks || '',
+          tackles: existing?.tackles || '',
+          hitouts: existing?.hitouts || '',
+          freesFor: existing?.freesFor || '',
+          freesAgainst: existing?.freesAgainst || '',
+          brownlowVotes: existing?.brownlowVotes || '',
+        };
+      });
+      return [...otherTeamPlayers, ...newTeamPlayers];
+    });
+  }
 
   // Group players by club
   const homePlayers = useMemo(() => players.filter((p) => p.clubId === match.homeClubId), [players, match.homeClubId]);
@@ -430,30 +470,66 @@ export function MatchSheetEditor({
         </div>
       )}
 
-      {/* Add Player Box */}
+      {/* Quick Lineup Helpers & Add Player Box */}
       <div style={{
         border: '1px solid var(--border-subtle)',
         borderRadius: '6px',
-        padding: '0.75rem 1rem',
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        alignItems: 'end',
+        padding: '0.85rem 1rem',
+        display: 'grid',
+        gap: '0.85rem',
+        background: 'var(--bg-subtle)',
       }}>
-        <div style={{ flexGrow: 1, minWidth: '16rem' }}>
-          <PlayerPicker label="+ Add player to match lineup" onSelect={handleAddPlayer} />
+        {(homeRecentLineup.length > 0 || awayRecentLineup.length > 0) && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Quick lineup helpers:</span>
+            {homeRecentLineup.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem' }}
+                onClick={() => handleLoadRecentLineup('home')}
+                title={`Copy previous ${homeRecentLineup.length}-player team lineup for ${match.homeName}`}
+              >
+                📋 Load {match.homeName} previous lineup ({homeRecentLineup.length} players)
+              </button>
+            )}
+            {awayRecentLineup.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem' }}
+                onClick={() => handleLoadRecentLineup('away')}
+                title={`Copy previous ${awayRecentLineup.length}-player team lineup for ${match.awayName}`}
+              >
+                📋 Load {match.awayName} previous lineup ({awayRecentLineup.length} players)
+              </button>
+            )}
+          </div>
+        )}
+
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '1rem',
+          alignItems: 'end',
+          borderTop: (homeRecentLineup.length > 0 || awayRecentLineup.length > 0) ? '1px solid var(--border-subtle)' : 'none',
+          paddingTop: (homeRecentLineup.length > 0 || awayRecentLineup.length > 0) ? '0.75rem' : '0',
+        }}>
+          <div style={{ flexGrow: 1, minWidth: '16rem' }}>
+            <PlayerPicker label="+ Add individual player to match lineup" onSelect={handleAddPlayer} />
+          </div>
+          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
+            Assign to team
+            <select
+              value={addTeamChoice}
+              onChange={(e) => setAddTeamChoice(Number(e.target.value))}
+              style={{ fontSize: '0.85rem', padding: '0.3rem 0.5rem' }}
+            >
+              <option value={match.homeClubId}>{match.homeName} (Home)</option>
+              <option value={match.awayClubId}>{match.awayName} (Away)</option>
+            </select>
+          </label>
         </div>
-        <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
-          Assign to team
-          <select
-            value={addTeamChoice}
-            onChange={(e) => setAddTeamChoice(Number(e.target.value))}
-            style={{ fontSize: '0.85rem', padding: '0.3rem 0.5rem' }}
-          >
-            <option value={match.homeClubId}>{match.homeName} (Home)</option>
-            <option value={match.awayClubId}>{match.awayName} (Away)</option>
-          </select>
-        </label>
       </div>
 
       {/* View Filter Tabs */}
