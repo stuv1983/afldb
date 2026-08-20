@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { authSql } from '@/db/authClient';
-import { audit, requireAdmin } from '@/lib/auth/session';
+import { audit, requireAdmin, requireSuperAdmin } from '@/lib/auth/session';
 import { promoteSubmission, validateSubmission } from '@/lib/ingest/pipeline';
 
 export type ReviewState = { error?: string; message?: string };
@@ -33,13 +33,13 @@ export async function runValidation(
 /**
  * The human verdicts. Approval requires a validated file with no error
  * rows; the pipeline re-checks both, so the button is a convenience and
- * the constraint is real.
+ * the constraint is real. Restricted strictly to super admins.
  */
 export async function decideSubmission(
   _previous: ReviewState,
   formData: FormData,
 ): Promise<ReviewState> {
-  const admin = await requireAdmin();
+  const admin = await requireSuperAdmin();
   const id = Number(formData.get('id'));
   const decision = String(formData.get('decision'));
   if (!Number.isInteger(id)) return { error: 'Bad submission id.' };
@@ -62,13 +62,11 @@ export async function decideSubmission(
     await audit('submission.approved', { submissionId: id },
       { userId: admin.id, label: admin.email });
   } else if (decision === 'reject') {
-    const [updated] = await authSql<{ id: number }[]>`
+    await authSql`
       UPDATE data_submissions
          SET status = 'rejected', reviewed_by = ${admin.id}, reviewed_at = now()
-       WHERE id = ${id} AND status IN ('staged', 'validated', 'approved')
-      RETURNING id
+       WHERE id = ${id}
     `;
-    if (!updated) return { error: 'This submission cannot be rejected from its current state.' };
     await audit('submission.rejected', { submissionId: id },
       { userId: admin.id, label: admin.email });
   } else {
@@ -83,7 +81,7 @@ export async function runPromotion(
   _previous: ReviewState,
   formData: FormData,
 ): Promise<ReviewState> {
-  const admin = await requireAdmin();
+  const admin = await requireSuperAdmin();
   const id = Number(formData.get('id'));
   if (!Number.isInteger(id)) return { error: 'Bad submission id.' };
 

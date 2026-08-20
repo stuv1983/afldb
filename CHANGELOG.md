@@ -15,6 +15,16 @@ commit.
 
 ## [Unreleased]
 
+### Super Admin Database Editing Security Governance — 20 August 2026
+
+- **Strict Super Admin Access Enforcement**:
+  - Confirmed and verified that all direct database editing tools, forms, and server actions are restricted exclusively to `super_admin` sessions via `requireSuperAdmin()`:
+    - **Data Editor & Forms**: Match creation, Match Sheet Lineup & Stats Editor, Player Creation & Bio Details, Award Winners, Hall of Fame Inductees, Honour & Representative Teams, and Data Edits (`/admin/data-editor`).
+    - **Entity Link Resolutions**: Resolving and linking unlinked player identities in draft and historical records (`/admin/player-links`).
+    - **Data QA Search & Query Execution**: Raw SQL QA query builder (`/admin/query-builder`).
+    - **Ingest Pipeline Decisions**: Elevated `decideSubmission` (approval/rejection) and `runPromotion` (applying ingested CSV data into production database) in `src/app/admin/submissions/[id]/actions.ts` from `requireAdmin` to `requireSuperAdmin()`.
+    - **Navigation Visibility**: The admin sidebar model in `src/app/admin/nav-model.ts` hides all database editing links from regular `admin` and `contributor` accounts.
+
 ### Fix Seasons Generated Column in Match Creation — 20 August 2026
 
 - **Fix Seasons Table Insert in Match Creation**:
