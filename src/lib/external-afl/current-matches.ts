@@ -54,7 +54,31 @@ function dateOnly(value: unknown): string | null {
   const text = stringValue(value);
   if (!text) return null;
   const match = text.match(/^(\d{4}-\d{2}-\d{2})/);
-  return match?.[1] ?? null;
+  if (match) return match[1];
+  const human = text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)\s+(\d{4})\b/);
+  if (!human) return null;
+  const months: Record<string, string> = {
+    january: '01',
+    february: '02',
+    march: '03',
+    april: '04',
+    may: '05',
+    june: '06',
+    july: '07',
+    august: '08',
+    september: '09',
+    october: '10',
+    november: '11',
+    december: '12',
+  };
+  const month = months[human[2].toLowerCase()];
+  if (!month) return null;
+  return `${human[3]}-${month}-${human[1].padStart(2, '0')}`;
+}
+
+function isPastOrToday(date: string | null): boolean {
+  if (!date) return false;
+  return date <= new Date().toISOString().slice(0, 10);
 }
 
 function pick(record: JsonRecord, keys: string[]): unknown {
@@ -142,19 +166,23 @@ export async function fetchKaliCurrentMatches(year: number): Promise<ExternalCur
 
   return asArray(payload.data).map((value) => {
     const match = asRecord(value);
+    const matchDate = dateOnly(pick(match, ['date', 'matchDate', 'startTime', 'scheduledAt']));
+    const homeScore = scoreComponent(pick(match, ['homeScore', 'homePoints']));
+    const awayScore = scoreComponent(pick(match, ['awayScore', 'awayPoints']));
+    const rawComplete = intValue(pick(match, ['complete', 'completePercent']));
     return {
       source: 'kali' as const,
       externalGameId: String(pick(match, ['id', 'matchId', 'gameId']) ?? ''),
       season: intValue(pick(match, ['year', 'season'])) ?? year,
       roundLabel: stringValue(pick(match, ['roundName', 'roundLabel', 'round'])),
       roundNumber: intValue(pick(match, ['round', 'roundNumber'])),
-      completePercent: intValue(pick(match, ['complete', 'completePercent'])),
-      matchDate: dateOnly(pick(match, ['date', 'matchDate', 'startTime', 'scheduledAt'])),
+      completePercent: rawComplete ?? (homeScore !== null && awayScore !== null && isPastOrToday(matchDate) ? 100 : null),
+      matchDate,
       venueRaw: stringValue(pick(match, ['venue', 'venueName'])),
       homeTeamRaw: stringValue(pick(match, ['homeTeam', 'homeTeamName', 'homeTeamId', 'homeTeamSlug'])),
       awayTeamRaw: stringValue(pick(match, ['awayTeam', 'awayTeamName', 'awayTeamId', 'awayTeamSlug'])),
-      homeScore: scoreComponent(pick(match, ['homeScore', 'homePoints'])),
-      awayScore: scoreComponent(pick(match, ['awayScore', 'awayPoints'])),
+      homeScore,
+      awayScore,
       homeGoals: scoreComponent(pick(match, ['homeGoals'])),
       homeBehinds: scoreComponent(pick(match, ['homeBehinds'])),
       awayGoals: scoreComponent(pick(match, ['awayGoals'])),

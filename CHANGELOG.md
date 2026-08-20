@@ -19,7 +19,12 @@ commit.
 
 - Added Squiggle and Kali AFL Stats as provenance-tracked external sources for current-season match reconciliation (`AFLDB-ISSUE-060`).
 - Added migration `063_external_current_match_sources.sql`, creating `staging.external_current_matches` so external API payloads are snapshotted before any local fact table is touched.
-- Added `npm run current-season:update`, which defaults to dry-run, can stage Squiggle or Kali current-season match rows, and only updates completed local match scores when `--apply --update-matches` is explicitly supplied and the AFLDB match resolves unambiguously.
+- Added migration `064_matches_external_provenance.sql`, adding match-row provenance for externally inserted current-season results.
+- Added `npm run current-season:update`, which defaults to dry-run, can stage Squiggle or Kali current-season match rows, inserts missing completed matches only with `--apply --insert-missing-matches`, and updates existing completed match scores only when `--apply --update-matches` is explicitly supplied and the AFLDB match resolves unambiguously.
+- Added `--report` for staged resolution counts and handled Squiggle's 2024+ Opening Round numbering (`R0`) against AFLDB's local convention that counts Opening Round as round `1`.
+- Added source-name normalisation for current-season feeds so Kali's `Brisbane` rows resolve to AFLDB's active `Brisbane Lions` club identity.
+- Kali match rows now parse human-readable dates such as `Friday, 14th August 2026` and infer `complete_percent = 100` only when both scores are present and the match date is not in the future, because Kali's match payload may carry final scores without a Squiggle-style completion field.
+- Added a super-admin-only `/admin/current-season` refresh screen that calls the same server-side importer as the CLI, reads external API credentials from the environment, stages API rows automatically from Kali by default, and leaves existing final-score overwrites behind an explicit manual option (`AFLDB-ISSUE-061`).
 - Documented `AFLDB_EXTERNAL_API_USER_AGENT`, `KALI_AFL_API_KEY`, and optional `KALI_AFL_API_BASE_URL`; credentials remain environment-only.
 - Added source-contract tests for secret handling, server-side API usage, staging-first writes, opt-in match updates, and provenance stamping.
 

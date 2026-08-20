@@ -2131,7 +2131,7 @@ Extend Match Search or add a dedicated NL drill-down route that can faithfully r
 - **Area:** Import
 - **Found:** 2026-08-20
 - **Resolved:** 2026-08-20
-- **Files:** `src/db/migrations/063_external_current_match_sources.sql`, `src/lib/external-afl/current-matches.ts`, `tools/current-season/update-current-season.ts`, `tests/current-season-import.test.ts`, `.env.example`, `package.json`
+- **Files:** `src/db/migrations/063_external_current_match_sources.sql`, `src/db/migrations/064_matches_external_provenance.sql`, `src/lib/external-afl/current-matches.ts`, `tools/current-season/update-current-season.ts`, `tests/current-season-import.test.ts`, `.env.example`, `package.json`
 
 ### Symptom
 The database snapshot is loaded through 9 August 2026, so current-season results can drift behind available external public/current sources until a full legacy refresh or manual upload occurs.
@@ -2152,10 +2152,46 @@ Squiggle documents current fixture/score access and an identifying User-Agent re
 External API sources had not yet been modelled in AFLDB's provenance/staging/import architecture.
 
 ### Fix
-Added `squiggle_api` and `kali_afl_stats` source records, a staging snapshot table, external API clients, and a dry-run-first current-season refresh command. The command writes through `AFLDB_IMPORT_DATABASE_URL`, keeps Kali credentials in `KALI_AFL_API_KEY`, stages raw payloads first, and requires `--apply --update-matches` before final score updates are attempted.
+Added `squiggle_api` and `kali_afl_stats` source records, a staging snapshot table, match-row provenance columns, external API clients, and a dry-run-first current-season refresh command. The command writes through `AFLDB_IMPORT_DATABASE_URL`, keeps Kali credentials in `KALI_AFL_API_KEY`, stages raw payloads first, parses Kali human-readable match dates, maps known current-source club names such as `Brisbane` to AFLDB's active club identity, handles Squiggle's 2024+ Opening Round numbering, exposes `--report`, inserts missing completed matches only with `--apply --insert-missing-matches`, and requires `--apply --update-matches` before existing final score updates are attempted.
 
 ### Validation
-`npm.cmd test -- tests/current-season-import.test.ts` passed 6 focused tests, including the Squiggle team-id normalisation case. `npm.cmd run typecheck` passed. Live API/database application was not run locally because applying the migration and import needs the configured development database.
+`npm.cmd test -- tests/current-season-import.test.ts` passed 12 focused tests, including Squiggle team-id normalisation, Opening Round resolver coverage, external club-name normalisation, explicit missing-match insertion, match provenance migration coverage, and Kali completion inference. `npm.cmd run typecheck` passed. On the development host, migrations 063 and 064 applied, `npm run typecheck` passed, `npm test -- tests/current-season-import.test.ts` passed 12 tests, Squiggle staging imported 218 rows, and `--insert-missing-matches` inserted 10 completed missing 2026 matches. Kali dry-run fetched 197 rows and inferred all 197 as complete after human-date parsing; Kali staging then wrote 197 rows with 197 resolved and 0 unresolved teams after the Brisbane alias correction. The combined dev report shows `kali_afl_stats: staged 197, resolved 197, complete 197, with scores 197, unresolved teams 0` and `squiggle_api: staged 218, resolved 199, complete 199, with scores 218, unresolved teams 11`. `npm run build` passed on the development host and prepared the standalone bundle.
 
 ### Follow-up
-Run migration 063 and then run `npm run current-season:update -- --year 2026 --source squiggle --apply` on the development host. Add `--update-matches` only after reviewing the staged resolution counts.
+Restart the development service with `sudo systemctl restart afldb` so the rebuilt standalone bundle is served. Add `--update-matches` only when deliberately reconciling existing match scores.
+
+## AFLDB-ISSUE-061 - Current-season API refresh requires shell access
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Area:** Admin
+- **Found:** 2026-08-21
+- **Resolved:** 2026-08-21
+- **Files:** `src/lib/external-afl/current-season-import.ts`, `tools/current-season/update-current-season.ts`, `src/app/admin/current-season/page.tsx`, `src/app/admin/current-season/actions.ts`, `src/app/admin/current-season/CurrentSeasonControls.tsx`, `src/app/admin/nav-model.ts`, `tests/current-season-import.test.ts`, `CHANGELOG.md`, `issues.md`
+
+### Symptom
+A super admin can log into AFLDB, but current-season API refreshes still require SSH access and the `npm run current-season:update` CLI.
+
+### Reproduction
+Log in as a super admin and inspect the admin data tools. There is no current-season API refresh page or action; the only working path is the shell command.
+
+### Expected
+A logged-in super admin can trigger a server-side current-season refresh from the admin UI. Provider keys stay in server environment variables, external payloads are staged first, and risky match-score overwrites remain opt-in.
+
+### Actual
+The importer exists only as a CLI script, so operational access to the host is required.
+
+### Evidence
+`src/app/admin/nav-model.ts` had no current-season admin destination, and no admin page or server action called the current-season importer.
+
+### Root cause
+The current-season import transaction was implemented inside the CLI wrapper rather than as a reusable server-only module.
+
+### Fix
+Extracted the import/report transaction into `src/lib/external-afl/current-season-import.ts`, kept the CLI as a thin wrapper, and added `/admin/current-season` guarded by `requireSuperAdmin()`. The primary admin action automatically uses Kali, applies staging rows, and inserts unambiguously resolved completed matches while leaving existing final-score overwrites off unless a manual option is deliberately selected. The action audits refresh/report events and revalidates public match/season/club/record paths when match facts change.
+
+### Validation
+`npm.cmd test -- tests/current-season-import.test.ts` passed 14 focused tests, including the super-admin action/page guardrails. `npm.cmd run typecheck` passed. On the development Linux host, `npm run typecheck` passed, `npm test -- tests/current-season-import.test.ts` passed 14 tests, the refactored `npm run current-season:update -- --year 2026 --report` CLI path passed, and `npm run build` passed with `/admin/current-season` compiled as a dynamic route in the standalone bundle.
+
+### Follow-up
+Deploy to the development host and restart the service so the new admin route is served.
