@@ -62,6 +62,18 @@ function Add-RemoteCommand {
   $Commands.Add($Command) | Out-Null
 }
 
+function Add-RemoteStep {
+  param(
+    [System.Collections.Generic.List[string]] $Commands,
+    [Parameter(Mandatory = $true)][string] $Label,
+    [Parameter(Mandatory = $true)][string] $Command
+  )
+
+  $safeLabel = $Label -replace "'", "'\''"
+  Add-RemoteCommand $Commands "echo '[deploy] >>> $safeLabel'"
+  Add-RemoteCommand $Commands $Command
+}
+
 Assert-Command ssh
 
 $quotedProjectDir = Escape-BashSingleQuoted $ProjectDir
@@ -70,48 +82,49 @@ $quotedHealthUrl = Escape-BashSingleQuoted $HealthUrl
 $quotedRemoteRef = if ($RemoteRef.Trim()) { Escape-BashSingleQuoted $RemoteRef.Trim() } else { "''" }
 
 $remoteCommands = [System.Collections.Generic.List[string]]::new()
-Add-RemoteCommand $remoteCommands 'set -euo pipefail'
-Add-RemoteCommand $remoteCommands "cd $quotedProjectDir"
-Add-RemoteCommand $remoteCommands "echo '[deploy] host:' `"$(hostname)`""
-Add-RemoteCommand $remoteCommands "echo '[deploy] directory:' `"$(pwd)`""
-Add-RemoteCommand $remoteCommands "echo '[deploy] node:' `"$(node --version)`""
-Add-RemoteCommand $remoteCommands "echo '[deploy] npm:' `"$(npm --version)`""
-Add-RemoteCommand $remoteCommands "echo '[deploy] before:' `"$(git rev-parse --short HEAD)`" `"$(git branch --show-current)`""
+Add-RemoteCommand $remoteCommands 'set -Eeuo pipefail'
+Add-RemoteCommand $remoteCommands 'trap ''code=$?; echo "[deploy] FAILED line ${LINENO}: ${BASH_COMMAND}" >&2; exit $code'' ERR'
+Add-RemoteStep $remoteCommands 'enter project directory' "cd $quotedProjectDir"
+Add-RemoteStep $remoteCommands 'show host' "echo '[deploy] host:' `"$(hostname)`""
+Add-RemoteStep $remoteCommands 'show directory' "echo '[deploy] directory:' `"$(pwd)`""
+Add-RemoteStep $remoteCommands 'show node version' "echo '[deploy] node:' `"$(node --version)`""
+Add-RemoteStep $remoteCommands 'show npm version' "echo '[deploy] npm:' `"$(npm --version)`""
+Add-RemoteStep $remoteCommands 'show current revision' "echo '[deploy] before:' `"$(git rev-parse --short HEAD)`" `"$(git branch --show-current)`""
 
 if (-not $AllowDirtyServer) {
-  Add-RemoteCommand $remoteCommands "test -z `"$(git status --porcelain)`" || { echo '[deploy] server working tree is dirty; use -AllowDirtyServer to deploy anyway' >&2; git status --short; exit 20; }"
+  Add-RemoteStep $remoteCommands 'check server working tree' "test -z `"$(git status --porcelain)`" || { echo '[deploy] server working tree is dirty; use -AllowDirtyServer to deploy anyway' >&2; git status --short; exit 20; }"
 }
 
 if (-not $NoPrune) {
-  Add-RemoteCommand $remoteCommands 'git fetch --prune'
+  Add-RemoteStep $remoteCommands 'fetch Git refs with prune' 'git fetch --prune'
 } else {
-  Add-RemoteCommand $remoteCommands 'git fetch'
+  Add-RemoteStep $remoteCommands 'fetch Git refs' 'git fetch'
 }
 
-Add-RemoteCommand $remoteCommands "if [ -n $quotedRemoteRef ]; then git checkout $quotedRemoteRef; fi"
-Add-RemoteCommand $remoteCommands 'git pull --ff-only'
-Add-RemoteCommand $remoteCommands "echo '[deploy] after:' `"$(git rev-parse --short HEAD)`" `"$(git branch --show-current)`""
+Add-RemoteStep $remoteCommands 'checkout requested ref if supplied' "if [ -n $quotedRemoteRef ]; then git checkout $quotedRemoteRef; fi"
+Add-RemoteStep $remoteCommands 'pull latest commit' 'git pull --ff-only'
+Add-RemoteStep $remoteCommands 'show deployed revision' "echo '[deploy] after:' `"$(git rev-parse --short HEAD)`" `"$(git branch --show-current)`""
 
 if (-not $SkipInstall) {
-  Add-RemoteCommand $remoteCommands 'npm ci'
+  Add-RemoteStep $remoteCommands 'install dependencies' 'npm ci'
 }
 
 if (-not $SkipMigrate) {
-  Add-RemoteCommand $remoteCommands 'npm run db:migrate'
+  Add-RemoteStep $remoteCommands 'run database migrations' 'npm run db:migrate'
 }
 
 if (-not $SkipBuild) {
-  Add-RemoteCommand $remoteCommands 'npm run build'
+  Add-RemoteStep $remoteCommands 'build Next.js standalone output' 'npm run build'
 }
 
 if (-not $SkipRestart) {
-  Add-RemoteCommand $remoteCommands "sudo -n systemctl restart $quotedServiceName"
-  Add-RemoteCommand $remoteCommands "systemctl --no-pager --lines=20 status $quotedServiceName"
+  Add-RemoteStep $remoteCommands 'restart systemd service' "sudo -n systemctl restart $quotedServiceName"
+  Add-RemoteStep $remoteCommands 'show systemd service status' "systemctl --no-pager --lines=20 status $quotedServiceName"
 }
 
 if (-not $SkipHealth) {
-  Add-RemoteCommand $remoteCommands "curl --fail --silent --show-error $quotedHealthUrl"
-  Add-RemoteCommand $remoteCommands "echo"
+  Add-RemoteStep $remoteCommands 'check health endpoint' "curl --fail --silent --show-error $quotedHealthUrl"
+  Add-RemoteCommand $remoteCommands 'echo'
 }
 
 $remoteScript = $remoteCommands -join "`n"
@@ -128,6 +141,6 @@ Write-Host ''
 if ($PSCmdlet.ShouldProcess($SshTarget, 'sync AFLDB dev deployment from Git')) {
   $remoteScript | ssh $SshTarget 'bash -s'
   if ($LASTEXITCODE -ne 0) {
-    throw "Remote deployment failed with exit code $LASTEXITCODE."
+    throw "Remote deployment failed with exit code $LASTEXITCODE. Look above for the '[deploy] FAILED' line."
   }
 }
