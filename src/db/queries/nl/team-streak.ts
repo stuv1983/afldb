@@ -101,7 +101,7 @@ export async function answerTeamStreak(plan: NlQueryPlan, limit: number): Promis
 
   // Attach opponent context if scoped
   if (plan.scope.clubAgainst) {
-    const oppName = plan.scope.clubAgainst.names[0].name;
+    const oppName = plan.scope.clubAgainst.name;
     const oppSlug = plan.scope.clubAgainst.slug;
     for (const row of rows) {
       row.opponentName = oppName;

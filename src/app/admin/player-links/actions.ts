@@ -8,6 +8,7 @@ import {
   isLinkTargetTable,
   resolveLink,
   setSuggestionStatus,
+  type LinkTargetTable,
 } from '@/db/queries/player-links';
 import { audit, requireSuperAdmin } from '@/lib/auth/session';
 
@@ -32,18 +33,21 @@ function revalidatePublicLinkPages(): void {
   revalidatePath('/records/first-kick-goal');
 }
 
-function parseTargets(formData: FormData) {
+function parseTargets(formData: FormData): {
+  targets?: Array<{ targetTable: LinkTargetTable; targetId: number }>;
+  error?: string;
+} {
   const targetsRaw = String(formData.get('targets') ?? '');
-  const targets = targetsRaw.split(',').filter(Boolean).map(t => {
+  const rawList = targetsRaw.split(',').filter(Boolean).map(t => {
     const [table, idStr] = t.split(':');
     return { targetTable: table, targetId: Number(idStr) };
   });
 
-  if (targets.length === 0) return { error: 'No targets selected.' };
-  if (targets.some(t => !isLinkTargetTable(t.targetTable))) return { error: 'Unknown table in targets.' };
-  if (targets.some(t => !Number.isInteger(t.targetId) || t.targetId <= 0)) return { error: 'Bad row id in targets.' };
+  if (rawList.length === 0) return { error: 'No targets selected.' };
+  if (rawList.some(t => !isLinkTargetTable(t.targetTable))) return { error: 'Unknown table in targets.' };
+  if (rawList.some(t => !Number.isInteger(t.targetId) || t.targetId <= 0)) return { error: 'Bad row id in targets.' };
   
-  return { targets };
+  return { targets: rawList as Array<{ targetTable: LinkTargetTable; targetId: number }> };
 }
 
 export async function linkPlayer(

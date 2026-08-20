@@ -81,9 +81,6 @@ function scopeClauses(scope: NlMatchScope): SqlFragment[] {
   if (scope.clubAgainst) {
     clauses.push(sql`t.opponent_id IN (SELECT id FROM clubs WHERE organization_id = ${scope.clubAgainst.organizationId})`);
   }
-  if (scope.opponentClubId) {
-    clauses.push(sql`t.opponent_id IN (SELECT id FROM clubs WHERE organization_id = ${scope.opponentClubId})`);
-  }
   if (scope.venue) clauses.push(sql`t.venue_id = ${scope.venue.id}`);
   if (scope.seasonMin !== undefined) clauses.push(sql`t.season >= ${scope.seasonMin}`);
   if (scope.seasonMax !== undefined) clauses.push(sql`t.season <= ${scope.seasonMax}`);

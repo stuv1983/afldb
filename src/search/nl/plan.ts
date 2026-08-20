@@ -964,6 +964,7 @@ const GRAIN_LABEL: Record<NlGrain, string> = {
   player_season: 'season',
   team_match: 'match',
   club_season: 'club season',
+  team_streak: 'streak',
   achievement_summary: 'achievement',
 };
 
@@ -974,6 +975,7 @@ const GRAIN_SUBJECT: Record<NlGrain, string> = {
   player_season: 'player',
   team_match: 'club',
   club_season: 'club season',
+  team_streak: 'streak',
   achievement_summary: 'group',
 };
 

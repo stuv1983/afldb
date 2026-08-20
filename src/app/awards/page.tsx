@@ -1,7 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { listAwards, listHonourTeams, getAwardLeaders, getAwardWinners } from '@/db/queries/awards';
+import {
+  listAwards,
+  listHonourTeams,
+  getAwardLeaders,
+  getAwardWinners,
+  type AwardWinnerRow,
+} from '@/db/queries/awards';
 import { awardPath, formatNumber, formatSpan, honourTeamPath, playerPath } from '@/lib/format';
 import { pageMetadata } from '@/lib/seo';
 import { honourTeamSlug } from '@/lib/slugs';
@@ -42,17 +48,27 @@ const CATEGORY_HEADINGS: Record<string, { title: string; note: string }> = {
 
 const CATEGORY_ORDER = ['honour_team', 'award', 'club_best_and_fairest', 'draft_pick'];
 
+type AwardLeaderRow = {
+  playerId: number | null;
+  slug: string | null;
+  displayName: string;
+  wins: number;
+  seasons: string;
+};
+
 export default async function AwardsPage() {
   const [awards, honourTeams] = await Promise.all([listAwards(), listHonourTeams()]);
 
   const under22Award = awards.find(a => a.slug === '22-under-22-team');
-  let under22Leaders: Awaited<ReturnType<typeof getAwardLeaders>> = [];
-  let under22Winners: Awaited<ReturnType<typeof getAwardWinners>> = [];
+  let under22Leaders: AwardLeaderRow[] = [];
+  let under22Winners: AwardWinnerRow[] = [];
   if (under22Award) {
-    [under22Leaders, under22Winners] = await Promise.all([
+    const [leaders, winners] = await Promise.all([
       getAwardLeaders(under22Award.id),
       getAwardWinners(under22Award.id)
     ]);
+    under22Leaders = leaders;
+    under22Winners = winners;
   }
 
   const byCategory = new Map<string, typeof awards>();
@@ -168,7 +184,7 @@ export default async function AwardsPage() {
                   <tbody>
                     {under22Leaders.slice(0, 20).map((l, i) => (
                       <tr key={i}>
-                        <td className="wide">{l.slug ? <Link href={playerPath(l.slug)}>{l.displayName}</Link> : l.displayName}</td>
+                        <td className="wide">{l.slug && l.playerId ? <Link href={playerPath(l.slug, l.playerId)}>{l.displayName}</Link> : l.displayName}</td>
                         <td className="nowrap">{l.wins}</td>
                         <td className="wide muted">{l.seasons}</td>
                       </tr>
@@ -193,7 +209,7 @@ export default async function AwardsPage() {
                       <tr key={i}>
                         <td className="nowrap">{w.season}</td>
                         <td className="wide">
-                          {w.playerSlug ? <Link href={playerPath(w.playerSlug)}>{w.playerName}</Link> : w.playerName}
+                          {w.playerSlug && w.playerId ? <Link href={playerPath(w.playerSlug, w.playerId)}>{w.playerName}</Link> : w.playerName}
                           {w.isCaptain && ' (c)'}
                           {w.isViceCaptain && ' (vc)'}
                         </td>
