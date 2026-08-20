@@ -165,6 +165,27 @@ export async function getSeasonGoalkickers(year: number, limit = 10) {
   `;
 }
 
+/** Top 5 player stats for a season. */
+export async function getSeasonTopStats(
+  year: number,
+  stat: 'marks' | 'kicks' | 'handballs' | 'disposals' | 'tackles'
+) {
+  return sql<{
+    id: number; slug: string; displayName: string;
+    clubName: string | null; clubSlug: string | null; value: number; games: number;
+  }[]>`
+    SELECT p.id, p.slug, p.display_name AS "displayName",
+           c.name AS "clubName", c.slug AS "clubSlug",
+           s.${sql.unsafe(stat)} AS value, s.games
+      FROM player_season_stats s
+      JOIN players p ON p.id = s.player_id
+      LEFT JOIN clubs c ON c.id = s.primary_club_id
+     WHERE s.season = ${year} AND s.${sql.unsafe(stat)} IS NOT NULL
+     ORDER BY s.${sql.unsafe(stat)} DESC, s.games
+     LIMIT 5
+  `;
+}
+
 /** Brownlow leaders for a season, from the authoritative source. */
 export async function getSeasonBrownlow(year: number, limit = 10) {
   return sql<{

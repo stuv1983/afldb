@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { RECORD_CATEGORIES } from '@/db/queries/records';
+import { getSiteSettings } from '@/db/queries/site-settings';
 import { pageMetadata } from '@/lib/seo';
 
 export const revalidate = 3600;
@@ -14,17 +15,19 @@ export const metadata: Metadata = pageMetadata({
   path: '/records',
 });
 
-export default function RecordsPage() {
+export default async function RecordsPage() {
   const categories = Object.values(RECORD_CATEGORIES);
+  const settings = await getSiteSettings();
 
   return (
     <>
       <div className="page-header">
         <h1>Records</h1>
-        <p className="subtitle">
-          Each record states its exact definition and the era for which the underlying
-          statistic was collected.
-        </p>
+        {settings.pageIntros.records && (
+          <p className="subtitle" style={{ whiteSpace: 'pre-wrap' }}>
+            {settings.pageIntros.records}
+          </p>
+        )}
       </div>
 
       <div className="grid grid-wide">

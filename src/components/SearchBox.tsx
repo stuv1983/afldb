@@ -69,6 +69,7 @@ export function SearchBox({
     }
 
     if (isFocused || query.length > 0) {
+      setDisplayedPlaceholder(candidateList[placeholderIndex % candidateList.length] || '');
       return;
     }
 

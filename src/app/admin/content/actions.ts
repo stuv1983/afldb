@@ -7,7 +7,7 @@ import { deleteMedia as deleteMediaRow } from '@/db/queries/site-content';
 import { audit, requireSuperAdmin } from '@/lib/auth/session';
 import { describePublishResult, publishApex } from '@/lib/apex-publish';
 import { parseApexContent, parseSiteFooter } from '@/lib/site-content';
-import { SETTING_KEYS } from '@/lib/site-settings';
+import { SETTING_KEYS, parsePageIntros } from '@/lib/site-settings';
 
 export type ContentState = { error?: string; message?: string };
 
@@ -44,11 +44,13 @@ export async function saveSiteContent(
 
   const content = parseApexContent(decode('content'));
   const footer = parseSiteFooter(decode('footer'));
+  const pageIntros = parsePageIntros(decode('pageIntros'));
 
   await authSql.begin(async (tx) => {
     for (const [key, value] of [
       [SETTING_KEYS.apexContent, content],
       [SETTING_KEYS.siteFooter, footer],
+      [SETTING_KEYS.pageIntros, pageIntros],
     ] as const) {
       await tx`
         INSERT INTO site_settings (key, value, updated_by)

@@ -172,16 +172,20 @@ export function seasonFilterFields(options: {
 }
 
 export function draftFilterFields(options: {
-  years: SelectOption[];
+  years?: SelectOption[];
   clubs: SelectOption[];
   types: SelectOption[];
 }): FilterField[] {
-  return [
+  const fields: FilterField[] = [
     { kind: 'text', key: 'q', label: 'Player', placeholder: 'Search by name' },
-    {
+  ];
+  if (options.years) {
+    fields.push({
       kind: 'select', key: 'year', label: 'Year',
       options: options.years, anyLabel: 'Any year',
-    },
+    });
+  }
+  fields.push(
     {
       kind: 'select', key: 'club', label: 'Drafted to',
       options: options.clubs, anyLabel: 'Any club',
@@ -204,7 +208,8 @@ export function draftFilterFields(options: {
       kind: 'range', key: 'games', label: 'Career games', min: 0, max: 1000,
       help: 'Games played after being drafted. Unlinked selections are excluded.',
     },
-  ];
+  );
+  return fields;
 }
 
 export function hallOfFameFilterFields(categories: SelectOption[]): FilterField[] {

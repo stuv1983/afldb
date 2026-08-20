@@ -22,6 +22,7 @@ import {
   getSeasonBrownlow,
   getSeasonGoalkickers,
   getSeasonLadder,
+  getSeasonTopStats,
   listSeasons,
 } from '@/db/queries/seasons';
 import {
@@ -94,6 +95,7 @@ export default async function SeasonPage({
     roundLadder, roundVotes,
     allAustralianAward, risingStarAward,
     bestAndFairest, hallOfFame,
+    topMarks, topKicks, topHandballs, topDisposals, topTackles,
   ] = await Promise.all([
     getSeasonLadder(parsed),
     getSeasonMatches(parsed),
@@ -106,6 +108,11 @@ export default async function SeasonPage({
     getAward('rising-star'),
     getSeasonBestAndFairest(parsed),
     getHallOfFameInductees(parsed),
+    getSeasonTopStats(parsed, 'marks'),
+    getSeasonTopStats(parsed, 'kicks'),
+    getSeasonTopStats(parsed, 'handballs'),
+    getSeasonTopStats(parsed, 'disposals'),
+    getSeasonTopStats(parsed, 'tackles'),
   ]);
 
   const [allAustralianTeam, risingStarNominations] = await Promise.all([
@@ -145,7 +152,7 @@ export default async function SeasonPage({
     label: 'Ladder',
     node: (
       <section className="section">
-        <CollapsibleTable title="Ladder">
+        <CollapsibleTable title="Ladder" defaultOpen={false}>
         <div className="table-wrap">
           <table>
             <thead>
@@ -194,7 +201,7 @@ export default async function SeasonPage({
     node: (
       <div className="grid grid-panels">
         <section className="section">
-          <CollapsibleTable title="Leading goalkickers">
+          <CollapsibleTable title="Leading goalkickers" defaultOpen={false}>
           <div className="table-wrap">
             <table>
               <thead>
@@ -238,7 +245,7 @@ export default async function SeasonPage({
               </div>
             </>
           ) : (
-            <CollapsibleTable title="Brownlow Medal">
+            <CollapsibleTable title="Brownlow Medal" defaultOpen={false}>
             <div className="table-wrap">
               <table>
                 <thead>
@@ -265,6 +272,171 @@ export default async function SeasonPage({
             </CollapsibleTable>
           )}
         </section>
+
+        {topMarks.length > 0 && (
+          <section className="section">
+            <CollapsibleTable title="Top 5 Marks" defaultOpen={false}>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Player</th>
+                      <th scope="col">Club</th>
+                      <th scope="col" className="num">Marks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topMarks.map((p) => (
+                      <tr key={`${p.id}-${p.clubSlug}`}>
+                        <td className="wide"><Link href={playerPath(p.slug, p.id)}>{p.displayName}</Link></td>
+                        <td>
+                          {p.clubSlug ? (
+                            <Link href={clubPath(p.clubSlug)}>{p.clubName}</Link>
+                          ) : (
+                            <span className="not-recorded">—</span>
+                          )}
+                        </td>
+                        <td className="num">{formatNumber(p.value)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CollapsibleTable>
+          </section>
+        )}
+
+        {topKicks.length > 0 && (
+          <section className="section">
+            <CollapsibleTable title="Top 5 Kicks" defaultOpen={false}>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Player</th>
+                      <th scope="col">Club</th>
+                      <th scope="col" className="num">Kicks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topKicks.map((p) => (
+                      <tr key={`${p.id}-${p.clubSlug}`}>
+                        <td className="wide"><Link href={playerPath(p.slug, p.id)}>{p.displayName}</Link></td>
+                        <td>
+                          {p.clubSlug ? (
+                            <Link href={clubPath(p.clubSlug)}>{p.clubName}</Link>
+                          ) : (
+                            <span className="not-recorded">—</span>
+                          )}
+                        </td>
+                        <td className="num">{formatNumber(p.value)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CollapsibleTable>
+          </section>
+        )}
+
+        {topHandballs.length > 0 && (
+          <section className="section">
+            <CollapsibleTable title="Top 5 Handballs" defaultOpen={false}>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Player</th>
+                      <th scope="col">Club</th>
+                      <th scope="col" className="num">Handballs</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topHandballs.map((p) => (
+                      <tr key={`${p.id}-${p.clubSlug}`}>
+                        <td className="wide"><Link href={playerPath(p.slug, p.id)}>{p.displayName}</Link></td>
+                        <td>
+                          {p.clubSlug ? (
+                            <Link href={clubPath(p.clubSlug)}>{p.clubName}</Link>
+                          ) : (
+                            <span className="not-recorded">—</span>
+                          )}
+                        </td>
+                        <td className="num">{formatNumber(p.value)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CollapsibleTable>
+          </section>
+        )}
+
+        {topDisposals.length > 0 && (
+          <section className="section">
+            <CollapsibleTable title="Top 5 Disposals" defaultOpen={false}>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Player</th>
+                      <th scope="col">Club</th>
+                      <th scope="col" className="num">Disposals</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topDisposals.map((p) => (
+                      <tr key={`${p.id}-${p.clubSlug}`}>
+                        <td className="wide"><Link href={playerPath(p.slug, p.id)}>{p.displayName}</Link></td>
+                        <td>
+                          {p.clubSlug ? (
+                            <Link href={clubPath(p.clubSlug)}>{p.clubName}</Link>
+                          ) : (
+                            <span className="not-recorded">—</span>
+                          )}
+                        </td>
+                        <td className="num">{formatNumber(p.value)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CollapsibleTable>
+          </section>
+        )}
+
+        {topTackles.length > 0 && (
+          <section className="section">
+            <CollapsibleTable title="Top 5 Tackles" defaultOpen={false}>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Player</th>
+                      <th scope="col">Club</th>
+                      <th scope="col" className="num">Tackles</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topTackles.map((p) => (
+                      <tr key={`${p.id}-${p.clubSlug}`}>
+                        <td className="wide"><Link href={playerPath(p.slug, p.id)}>{p.displayName}</Link></td>
+                        <td>
+                          {p.clubSlug ? (
+                            <Link href={clubPath(p.clubSlug)}>{p.clubName}</Link>
+                          ) : (
+                            <span className="not-recorded">—</span>
+                          )}
+                        </td>
+                        <td className="num">{formatNumber(p.value)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CollapsibleTable>
+          </section>
+        )}
       </div>
     ),
   });
@@ -280,7 +452,7 @@ export default async function SeasonPage({
         <div className="grid grid-panels">
           {allAustralianTeam.length > 0 && (
             <section className="section">
-              <CollapsibleTable title="All-Australian team">
+              <CollapsibleTable title="All-Australian team" defaultOpen={false}>
               <div className="table-wrap">
                 <table>
                   <thead>
@@ -322,7 +494,7 @@ export default async function SeasonPage({
 
           {bestAndFairest.length > 0 && (
             <section className="section">
-              <CollapsibleTable title="Club best and fairest">
+              <CollapsibleTable title="Club best and fairest" defaultOpen={false}>
               <div className="table-wrap">
                 <table>
                   <thead>
@@ -362,7 +534,7 @@ export default async function SeasonPage({
 
           {risingStarWinner && (
             <section className="section">
-              <CollapsibleTable title="Rising Star">
+              <CollapsibleTable title="Rising Star" defaultOpen={false}>
               <div className="table-wrap">
                 <table>
                   <thead>
@@ -403,7 +575,7 @@ export default async function SeasonPage({
 
           {hallOfFame.length > 0 && (
             <section className="section">
-              <CollapsibleTable title="Hall of Fame inductees">
+              <CollapsibleTable title="Hall of Fame inductees" defaultOpen={false}>
               <div className="table-wrap">
                 <table>
                   <thead>
@@ -468,39 +640,6 @@ export default async function SeasonPage({
               className="anchor"
               style={{ marginBottom: '1.25rem' }}
             >
-              <CollapsibleTable title={roundName}>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th scope="col">Date</th>
-                      <th scope="col">Home</th>
-                      <th scope="col" className="num">Score</th>
-                      <th scope="col">Away</th>
-                      <th scope="col">Venue</th>
-                      <th scope="col" className="num">Crowd</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {roundMatches.map((m) => (
-                      <tr key={m.id}>
-                        <td className="nowrap"><Link href={matchPath(m.id)}>{formatDate(m.matchDate)}</Link></td>
-                        <td className="wide"><Link href={clubPath(m.homeSlug)}>{m.homeName}</Link></td>
-                        <td className="num nowrap">{m.homeScore}–{m.awayScore}</td>
-                        <td className="wide"><Link href={clubPath(m.awaySlug)}>{m.awayName}</Link></td>
-                        <td>{m.venueName}</td>
-                        <td className="num">
-                          {m.attendance === null
-                            ? <span className="not-recorded">—</span>
-                            : formatNumber(m.attendance)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              </CollapsibleTable>
-
               {thisRoundLadder && thisRoundLadder.length > 0 && (
                 <CollapsibleTable title={`Ladder after ${roundName}`} defaultOpen={false}>
                 <div className="table-wrap">
@@ -539,6 +678,39 @@ export default async function SeasonPage({
                 </div>
                 </CollapsibleTable>
               )}
+
+              <CollapsibleTable title={roundName} defaultOpen={false}>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Date</th>
+                      <th scope="col">Home</th>
+                      <th scope="col" className="num">Score</th>
+                      <th scope="col">Away</th>
+                      <th scope="col">Venue</th>
+                      <th scope="col" className="num">Crowd</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {roundMatches.map((m) => (
+                      <tr key={m.id}>
+                        <td className="nowrap"><Link href={matchPath(m.id)}>{formatDate(m.matchDate)}</Link></td>
+                        <td className="wide"><Link href={clubPath(m.homeSlug)}>{m.homeName}</Link></td>
+                        <td className="num nowrap">{m.homeScore}–{m.awayScore}</td>
+                        <td className="wide"><Link href={clubPath(m.awaySlug)}>{m.awayName}</Link></td>
+                        <td>{m.venueName}</td>
+                        <td className="num">
+                          {m.attendance === null
+                            ? <span className="not-recorded">—</span>
+                            : formatNumber(m.attendance)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              </CollapsibleTable>
 
               {thisRoundVotes && thisRoundVotes.length > 0 && (
                 <CollapsibleTable title="Brownlow votes" defaultOpen={false}>
@@ -617,7 +789,13 @@ export default async function SeasonPage({
         )}
       </nav>
 
-      <ReorderableSections storageKey={`/seasons/${season.year}`} sections={sections} />
+      <ReorderableSections
+        storageKey={`/seasons/${season.year}`}
+        sections={[
+          sections.find((s) => s.id === 'matches')!,
+          ...sections.filter((s) => s.id !== 'matches'),
+        ]}
+      />
     </>
   );
 }

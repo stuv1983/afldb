@@ -80,6 +80,7 @@ export default async function ContentPage() {
       <ContentEditor
         content={content}
         footer={settings.footer}
+        pageIntros={settings.pageIntros}
         imageOptions={imageOptions}
       />
 

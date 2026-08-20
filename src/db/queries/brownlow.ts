@@ -128,3 +128,28 @@ export async function getBrownlowCareerLeaders(filters: {
     total: rows.length > 0 ? Number(rows[0].total) : 0,
   };
 }
+
+export type MultipleBrownlowWinnerRow = {
+  playerId: number;
+  slug: string;
+  displayName: string;
+  medals: number;
+  seasons: number[];
+};
+
+/**
+ * Players who have won more than one Brownlow Medal.
+ */
+export async function getMultipleBrownlowWinners(): Promise<MultipleBrownlowWinnerRow[]> {
+  return sql<MultipleBrownlowWinnerRow[]>`
+    SELECT p.id AS "playerId", p.slug, p.display_name AS "displayName",
+           COUNT(b.season)::int AS medals,
+           array_agg(b.season ORDER BY b.season) AS seasons
+      FROM brownlow_season_votes b
+      JOIN players p ON p.id = b.player_id
+     WHERE b.is_winner
+     GROUP BY p.id, p.slug, p.display_name, p.sort_name
+    HAVING COUNT(b.season) > 1
+     ORDER BY medals DESC, p.sort_name
+  `;
+}

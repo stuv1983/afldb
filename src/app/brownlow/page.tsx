@@ -6,7 +6,8 @@ import { FilterErrors } from '@/components/FilterErrors';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import { TableFilters } from '@/components/TableFilters';
 import { getClubOptions } from '@/db/queries/advanced-search';
-import { getBrownlowCareerLeaders, getBrownlowWinners } from '@/db/queries/brownlow';
+import { getBrownlowCareerLeaders, getBrownlowWinners, getMultipleBrownlowWinners } from '@/db/queries/brownlow';
+import { getSiteSettings } from '@/db/queries/site-settings';
 import { clubPath, formatNumber, playerPath } from '@/lib/format';
 import { pageMetadata } from '@/lib/seo';
 import {
@@ -36,6 +37,7 @@ export default async function BrownlowPage({
 }) {
   const params = await searchParams;
   const clubs = await getClubOptions();
+  const settings = await getSiteSettings();
 
   // Two independent tables on one URL, so each panel owns its own
   // parameter names and neither can disturb the other's controls. Each
@@ -49,7 +51,7 @@ export default async function BrownlowPage({
   const winnerCarried = filterQueryParams(winnerFields, winnerValues);
   const leaderCarried = filterQueryParams(leaderFields, leaderValues);
 
-  const [winners, leaders] = await Promise.all([
+  const [winners, leaders, multipleWinners] = await Promise.all([
     getBrownlowWinners({
       q: winnerValues.text.q,
       club: winnerValues.select.club,
@@ -60,6 +62,7 @@ export default async function BrownlowPage({
       ranges: leaderValues,
       limit: LEADER_LIMIT,
     }),
+    getMultipleBrownlowWinners(),
   ]);
 
   const errors = [...winnerValues.errors, ...leaderValues.errors];
@@ -205,26 +208,79 @@ export default async function BrownlowPage({
     ),
   });
 
+  sections.push({
+    id: 'multiple-winners',
+    label: 'Multiple winners',
+    node: (
+      <section className="section">
+        <div id="multiple-winners" className="anchor">
+          <CollapsibleTable
+            id="multiple"
+            title="Multiple winners"
+            note={`${multipleWinners.length} players`}
+          >
+            {multipleWinners.length === 0 ? (
+              <div className="empty">
+                <h2>No multiple winners found</h2>
+              </div>
+            ) : (
+              <div className="table-wrap">
+                <table>
+                  <caption>Players with more than one Brownlow Medal</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Player</th>
+                      <th scope="col" className="num">Medals</th>
+                      <th scope="col">Seasons</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {multipleWinners.map((row) => (
+                      <tr key={row.playerId}>
+                        <td className="wide">
+                          <Link href={playerPath(row.slug, row.playerId)}>{row.displayName}</Link>
+                        </td>
+                        <td className="num"><strong>{row.medals}</strong></td>
+                        <td>
+                          {row.seasons.map((season, i) => (
+                            <span key={season}>
+                              <Link href={`/brownlow/${season}`}>{season}</Link>
+                              {i < row.seasons.length - 1 ? ', ' : ''}
+                            </span>
+                          ))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CollapsibleTable>
+        </div>
+      </section>
+    ),
+  });
+
   return (
     <>
       <div className="page-header">
         <h1>Brownlow Medal</h1>
-        <p className="subtitle">
-          Awarded to the fairest and best player of the season, first presented in 1924.
-          {/* Both tables' active filters surface here, the way every other
-              index page states what the reader is looking at. The two are
-              named because this page carries two independent lists. */}
-          {leadersDescribed.length > 0 && ` · Leaders: ${leadersDescribed.join(' · ')}`}
-          {winnersDescribed.length > 0 && ` · Winners: ${winnersDescribed.join(' · ')}`}
-        </p>
+        {settings.pageIntros.brownlow && (
+          <p className="subtitle" style={{ whiteSpace: 'pre-wrap' }}>
+            {settings.pageIntros.brownlow}
+          </p>
+        )}
+        {(leadersDescribed.length > 0 || winnersDescribed.length > 0) && (
+          <p className="subtitle">
+            {/* Both tables' active filters surface here, the way every other
+                index page states what the reader is looking at. The two are
+                named because this page carries two independent lists. */}
+            {leadersDescribed.length > 0 && `Leaders: ${leadersDescribed.join(' · ')}`}
+            {leadersDescribed.length > 0 && winnersDescribed.length > 0 && ' · '}
+            {winnersDescribed.length > 0 && `Winners: ${winnersDescribed.join(' · ')}`}
+          </p>
+        )}
       </div>
-
-      <p className="notice">
-        Vote totals come from the official season counts. Round-by-round votes are
-        available from 1984; per-game votes were also published for 1931–1934. For
-        the seasons in between, only the season total is on record — an absent
-        per-game vote means it was not published, not that no vote was polled.
-      </p>
 
       <FilterErrors errors={errors} />
 

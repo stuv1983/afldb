@@ -18,6 +18,7 @@ import {
   type ApexStat,
   type SiteFooter,
 } from '@/lib/site-content';
+import { type PageIntros } from '@/lib/site-settings';
 
 /**
  * The whole of /admin/content: one form, one Save, which also publishes.
@@ -112,15 +113,18 @@ const SECTION_LABELS = new Map<ApexSectionId, string>(
 export function ContentEditor({
   content: initialContent,
   footer: initialFooter,
+  pageIntros: initialPageIntros,
   imageOptions: initialOptions,
 }: {
   content: ApexContent;
   footer: SiteFooter;
+  pageIntros: PageIntros;
   imageOptions: ImageOption[];
 }) {
   const [state, action, saving] = useActionState<ContentState, FormData>(saveSiteContent, {});
   const [content, setContent] = useState<ApexContent>(initialContent);
   const [footer, setFooter] = useState<SiteFooter>(initialFooter);
+  const [pageIntros, setPageIntros] = useState<PageIntros>(initialPageIntros);
   const [options, setOptions] = useState<ImageOption[]>(initialOptions);
 
   /** Add a freshly uploaded image to every picker's list of choices. */
@@ -172,6 +176,7 @@ export function ContentEditor({
       {/* Both documents ride along as JSON; the server owns their shape. */}
       <input type="hidden" name="content" value={JSON.stringify(content)} />
       <input type="hidden" name="footer" value={JSON.stringify(footer)} />
+      <input type="hidden" name="pageIntros" value={JSON.stringify(pageIntros)} />
 
       {state.message && <p className="notice">{state.message}</p>}
       {/* pre-wrap: a failed publish's message carries the shell that repairs
@@ -228,6 +233,60 @@ export function ContentEditor({
           The masthead and the footer are not in this list: they are the frame the page sits
           in rather than bands of it, and both are edited below.
         </p>
+      </AdminSection>
+
+      {/* ---------------------------------------------------------------- */}
+      <AdminSection id="page-intros" title="Page Introductions">
+        <p className="section-note">
+          The introductory text shown at the top of various application pages.
+        </p>
+
+        <div style={{ marginTop: '0.75rem' }}>
+          <label htmlFor="intro-records">Records Page Intro</label>
+          <textarea
+            id="intro-records"
+            rows={2}
+            value={pageIntros.records}
+            maxLength={2000}
+            onChange={(event) => setPageIntros((prev) => ({ ...prev, records: event.target.value }))}
+          />
+        </div>
+
+        <div style={{ marginTop: '0.75rem' }}>
+          <label htmlFor="intro-brownlow">Brownlow Medal Page Intro</label>
+          <textarea
+            id="intro-brownlow"
+            rows={4}
+            value={pageIntros.brownlow}
+            maxLength={2000}
+            onChange={(event) => setPageIntros((prev) => ({ ...prev, brownlow: event.target.value }))}
+          />
+          <span className="muted" style={{ fontSize: '0.78rem' }}>
+            Leave a blank line to split into multiple paragraphs.
+          </span>
+        </div>
+
+        <div style={{ marginTop: '0.75rem' }}>
+          <label htmlFor="intro-clubs">Clubs Page Intro</label>
+          <textarea
+            id="intro-clubs"
+            rows={3}
+            value={pageIntros.clubs}
+            maxLength={2000}
+            onChange={(event) => setPageIntros((prev) => ({ ...prev, clubs: event.target.value }))}
+          />
+        </div>
+
+        <div style={{ marginTop: '0.75rem' }}>
+          <label htmlFor="intro-draft">Draft Page Intro</label>
+          <textarea
+            id="intro-draft"
+            rows={2}
+            value={pageIntros.draft}
+            maxLength={2000}
+            onChange={(event) => setPageIntros((prev) => ({ ...prev, draft: event.target.value }))}
+          />
+        </div>
       </AdminSection>
 
       {/* ---------------------------------------------------------------- */}

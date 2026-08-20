@@ -45,6 +45,7 @@ export const SETTING_KEYS = {
   searchPlaceholdersAflw: 'search.placeholders_aflw',
   searchPlaceholderInterval: 'search.placeholder_interval',
   searchPlaceholderAnimation: 'search.placeholder_animation',
+  pageIntros: 'site.page_intros',
 } as const;
 
 // --- Home page layout ---
@@ -535,6 +536,32 @@ export function parseSearchAnimation(value: unknown): SearchAnimationType {
   return DEFAULT_SEARCH_ANIMATION;
 }
 
+export type PageIntros = {
+  records: string;
+  brownlow: string;
+  clubs: string;
+  draft: string;
+};
+
+export const DEFAULT_PAGE_INTROS: PageIntros = {
+  records: 'Each record states its exact definition and the era for which the underlying statistic was collected.',
+  brownlow: 'Awarded to the fairest and best player of the season, first presented in 1924.\n\nVote totals come from the official season counts. Round-by-round votes are available from 1984; per-game votes were also published for 1931–1934. For the seasons in between, only the season total is on record — an absent per-game vote means it was not published, not that no vote was polled.',
+  clubs: 'Historical identities are preserved rather than folded away, so a player’s record shows the club as it was at the time. A rename or relocation carries the club’s record forward; a merger does not, so the two sit in different columns.',
+  draft: 'National draft selections since 1986.', // Draft doesn't have an intro currently, let's just make one up or leave empty. I'll make a basic one or leave it empty.
+};
+
+export function parsePageIntros(value: unknown): PageIntros {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return DEFAULT_PAGE_INTROS;
+  const raw = value as Record<string, unknown>;
+  const text = (v: unknown, fallback: string) => typeof v === 'string' ? v.trim().slice(0, 2000) : fallback;
+  return {
+    records: text(raw.records, DEFAULT_PAGE_INTROS.records),
+    brownlow: text(raw.brownlow, DEFAULT_PAGE_INTROS.brownlow),
+    clubs: text(raw.clubs, DEFAULT_PAGE_INTROS.clubs),
+    draft: text(raw.draft, DEFAULT_PAGE_INTROS.draft),
+  };
+}
+
 export type SiteSettings = {
   homeLayout: HomeLayout;
   homeRecord: HomeRecordCategory;
@@ -556,6 +583,7 @@ export type SiteSettings = {
   searchPlaceholdersAflw: string[];
   searchPlaceholderInterval: number;
   searchPlaceholderAnimation: SearchAnimationType;
+  pageIntros: PageIntros;
 };
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
@@ -573,6 +601,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   searchPlaceholdersAflw: DEFAULT_AFLW_PLACEHOLDERS,
   searchPlaceholderInterval: DEFAULT_PLACEHOLDER_INTERVAL,
   searchPlaceholderAnimation: DEFAULT_SEARCH_ANIMATION,
+  pageIntros: DEFAULT_PAGE_INTROS,
 };
 
 /**
@@ -636,5 +665,8 @@ export function parseSiteSettings(
     searchPlaceholderAnimation: byKey.has(SETTING_KEYS.searchPlaceholderAnimation)
       ? parseSearchAnimation(byKey.get(SETTING_KEYS.searchPlaceholderAnimation))
       : DEFAULT_SEARCH_ANIMATION,
+    pageIntros: byKey.has(SETTING_KEYS.pageIntros)
+      ? parsePageIntros(byKey.get(SETTING_KEYS.pageIntros))
+      : DEFAULT_PAGE_INTROS,
   };
 }
