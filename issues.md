@@ -2123,3 +2123,39 @@ Not yet run.
 
 ### Follow-up
 Extend Match Search or add a dedicated NL drill-down route that can faithfully replay a `team_aggregate` row's predicates before linking counts.
+
+## AFLDB-ISSUE-060 - Current-season results depend on a stale manual snapshot
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Area:** Import
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/db/migrations/063_external_current_match_sources.sql`, `src/lib/external-afl/current-matches.ts`, `tools/current-season/update-current-season.ts`, `tests/current-season-import.test.ts`, `.env.example`, `package.json`
+
+### Symptom
+The database snapshot is loaded through 9 August 2026, so current-season results can drift behind available external public/current sources until a full legacy refresh or manual upload occurs.
+
+### Reproduction
+Read `README.md`: the current data snapshot covers 1897-2026 but is loaded only through 9 August 2026 and the 2026 season is provisional. No dedicated current-season API refresh tool exists in `package.json`.
+
+### Expected
+External current-season sources can be fetched safely, snapshotted with provenance, and used to fill current result gaps only when the local match identity is unambiguous.
+
+### Actual
+The only available update paths are the manual CSV/admin import flows or full migration refreshes; no Squiggle/Kali source integration exists.
+
+### Evidence
+Squiggle documents current fixture/score access and an identifying User-Agent requirement. Kali documents key-authenticated AFL v1 endpoints for matches, standings and player stats from 2000 onward. The repository had no `squiggle`, `kali`, or `current-season:update` command before this change.
+
+### Root cause
+External API sources had not yet been modelled in AFLDB's provenance/staging/import architecture.
+
+### Fix
+Added `squiggle_api` and `kali_afl_stats` source records, a staging snapshot table, external API clients, and a dry-run-first current-season refresh command. The command writes through `AFLDB_IMPORT_DATABASE_URL`, keeps Kali credentials in `KALI_AFL_API_KEY`, stages raw payloads first, and requires `--apply --update-matches` before final score updates are attempted.
+
+### Validation
+`npm.cmd test -- tests/current-season-import.test.ts` passed 6 focused tests, including the Squiggle team-id normalisation case. `npm.cmd run typecheck` passed. Live API/database application was not run locally because applying the migration and import needs the configured development database.
+
+### Follow-up
+Run migration 063 and then run `npm run current-season:update -- --year 2026 --source squiggle --apply` on the development host. Add `--update-matches` only after reviewing the staged resolution counts.

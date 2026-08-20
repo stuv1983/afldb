@@ -15,6 +15,14 @@ commit.
 
 ## [Unreleased]
 
+### External Current-Season Data Sources - 20 August 2026
+
+- Added Squiggle and Kali AFL Stats as provenance-tracked external sources for current-season match reconciliation (`AFLDB-ISSUE-060`).
+- Added migration `063_external_current_match_sources.sql`, creating `staging.external_current_matches` so external API payloads are snapshotted before any local fact table is touched.
+- Added `npm run current-season:update`, which defaults to dry-run, can stage Squiggle or Kali current-season match rows, and only updates completed local match scores when `--apply --update-matches` is explicitly supplied and the AFLDB match resolves unambiguously.
+- Documented `AFLDB_EXTERNAL_API_USER_AGENT`, `KALI_AFL_API_KEY`, and optional `KALI_AFL_API_BASE_URL`; credentials remain environment-only.
+- Added source-contract tests for secret handling, server-side API usage, staging-first writes, opt-in match updates, and provenance stamping.
+
 ### Natural-Language Search Semantic Audit — 20 August 2026
 
 - Corrected numbered-round plans so `Round N` is stored in the match scope consumed by SQL, defaults to home-and-away when no other match type is named, and elects a single-game player ranking instead of a scoped career sum (`AFLDB-ISSUE-047`). Parser versions 17-21 record this and the other audit behaviour changes separately.
