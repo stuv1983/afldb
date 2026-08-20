@@ -194,8 +194,11 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    (the predicate path ignores scope and neither builder takes a
  *    season). DECADE_RE also accepts "during the 1990s" now, not just
  *    "in the 1990s".
+ * 16: "longest" added to the `max` aggregation group in `vocab.ts` so that 
+ *    team streak queries like "richmond's longest winning streak" are parsed 
+ *    successfully rather than being rejected as ambiguous.
  */
-export const PARSER_VERSION = 15;
+export const PARSER_VERSION = 16;
 
 // ------------------------------------------------------------------ grain
 

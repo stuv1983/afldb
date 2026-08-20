@@ -481,9 +481,12 @@ describe('unanswerable topics decline with a reason rather than a wrong answer',
     }
   });
 
-  it('streak questions are declined', async () => {
-    const result = await parse("richmond's longest winning streak");
-    expect(result.status).toBe('unanswerable');
+  it('streak questions are parsed', async () => {
+    const p = await plan("richmond's longest winning streak");
+    expect(p.grain).toBe('team_streak');
+    expect(p.streakDefinition).toEqual({ kind: 'win' });
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(p.scope.clubFor?.name).toBe('Richmond');
   });
 
   it('youngest/oldest questions are declined pending dob completeness', async () => {

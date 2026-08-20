@@ -159,7 +159,7 @@ export const AGG_WORDS: [RegExp, AggWord][] = [
   // only, which is what made the failure look like an exotic two-clause
   // interaction rather than one missing lookbehind: the second "at most"
   // was always read correctly. 6,428 questions in the qualification run.
-  [/\b(?:highest|best|biggest|largest|greatest|maximum|record|leading|led|heaviest)\b|(?<!\bat )\bmost\b/, 'max'],
+  [/\b(?:highest|best|biggest|largest|greatest|longest|maximum|record|leading|led|heaviest)\b|(?<!\bat )\bmost\b/, 'max'],
   // Bare "least" is deliberately excluded: "at least" (an operator
   // phrase, handled by COMPARE_OP_WORDS) is far more common in real
   // questions than "least" meaning minimum, and the two must not compete.
