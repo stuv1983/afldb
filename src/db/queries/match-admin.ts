@@ -90,8 +90,8 @@ export async function createMatch(input: CreateMatchInput): Promise<{ id: number
       // 1. Ensure season row exists
       const league = input.season >= 1990 ? 'AFL' : 'VFL';
       await tx`
-        INSERT INTO seasons (year, league, is_complete)
-        VALUES (${input.season}, ${league}, false)
+        INSERT INTO seasons (year, league, status)
+        VALUES (${input.season}, ${league}, 'in_progress'::season_status)
         ON CONFLICT (year) DO NOTHING
       `;
 

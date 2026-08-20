@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### Fix Seasons Generated Column in Match Creation — 20 August 2026
+
+- **Fix Seasons Table Insert in Match Creation**:
+  - `src/db/queries/match-admin.ts`: Updated `createMatch` to insert `status = 'in_progress'::season_status` into `seasons` instead of `is_complete`, resolving PostgreSQL error `cannot insert a non-DEFAULT value into column "is_complete"` (`is_complete` is a generated stored column mirroring `status = 'complete'`).
+
 ### Safe Match Deletion & Automatic Player Statistics Rollback — 20 August 2026
 
 - **Transactional Match Deletion & Derived Stats Recomputation**:
