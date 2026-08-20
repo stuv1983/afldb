@@ -136,7 +136,7 @@ export const EDITABLE_ENTITIES: Record<string, EditEntity> = {
         key: 'score', label: 'Score',
         fields: ['home_goals', 'home_behinds', 'away_goals', 'away_behinds'],
         help: 'Scores, result, winner and margin are derived from goals and behinds — they are never typed by hand.',
-        affectsDerived: ['player_season_stats', 'player_club_season_stats', 'player_career_stats'],
+        affectsDerived: ['club_seasons'],
       },
       match_time: { key: 'match_time', label: 'Match time', fields: ['match_time'], help: '' },
       match_event: { key: 'match_event', label: 'Match event', fields: ['match_event'], help: '' },

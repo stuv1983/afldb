@@ -332,6 +332,44 @@ export async function recomputePlayerDerivedStats(
       ) span
      WHERE p.id = span.player_id
   `;
+
+  await tx`
+    UPDATE players p
+       SET search_rank = career.games
+      FROM player_career_stats career
+     WHERE career.player_id = p.id
+       AND p.id = ANY(${ids})
+  `;
+}
+
+/** Refresh season-grain Brownlow coverage after a season status transition. */
+export async function recomputeSeasonBrownlowStatus(tx: Tx, season: number): Promise<void> {
+  await tx`
+    WITH coverage AS (
+      SELECT CASE
+               WHEN EXISTS (
+                 SELECT 1 FROM brownlow_season_votes b WHERE b.season = s.year
+               ) THEN 'complete'
+               WHEN s.status = 'in_progress' THEN 'pending'
+               ELSE 'not_applicable'
+             END::coverage_status AS status
+        FROM seasons s
+       WHERE s.year = ${season}
+    )
+    UPDATE player_season_stats pss
+       SET brownlow_status = coverage.status,
+           brownlow_votes = CASE
+             WHEN coverage.status = 'complete' THEN COALESCE((
+               SELECT bsv.votes
+                 FROM brownlow_season_votes bsv
+                WHERE bsv.season = pss.season
+                  AND bsv.player_id = pss.player_id
+             ), 0)
+             ELSE NULL
+           END
+      FROM coverage
+     WHERE pss.season = ${season}
+  `;
 }
 
 /** Refresh the match-derived metadata held directly on one season row. */
@@ -354,6 +392,8 @@ export async function recomputeSeasonMetadata(tx: Tx, season: number): Promise<v
             count(DISTINCT m.id)::int AS match_count,
             count(DISTINCT club.club_id)::smallint AS club_count,
             CASE
+              WHEN count(m.id) = 0
+              THEN 'in_progress'::season_status
               WHEN target.year = (SELECT max(season) FROM matches)
                AND NOT EXISTS (
                  SELECT 1 FROM matches decisive

@@ -95,7 +95,7 @@ export function HonourTeamForm({
       {state.warning && (
         <div style={{ padding: '0.5rem 0.75rem', background: 'var(--bg-raised)', borderRadius: '6px', marginBottom: '1rem' }}>
           <p style={{ margin: 0, color: 'var(--color-warn)', fontSize: '0.9rem' }}>
-            âš  {state.warning}
+            Warning: {state.warning}
           </p>
         </div>
       )}

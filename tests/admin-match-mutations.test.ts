@@ -11,12 +11,14 @@ describe('admin match mutation source contracts', () => {
   const matchSheet = source('src', 'db', 'queries', 'match-sheet.ts');
   const matchAdmin = source('src', 'db', 'queries', 'match-admin.ts');
   const playerDerived = source('src', 'db', 'queries', 'player-derived.ts');
+  const dataEdits = source('src', 'db', 'queries', 'data-edits.ts');
   const matchSheetUi = source('src', 'app', 'admin', 'data-editor', 'MatchSheetEditor.tsx');
   const matchesQuery = source('src', 'db', 'queries', 'matches.ts');
 
   it('never mutates authoritative Brownlow season totals from match detail', () => {
     for (const mutation of [matchSheet, matchAdmin]) {
       expect(mutation).not.toMatch(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+brownlow_season_votes/i);
+      expect(mutation).not.toMatch(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+brownlow_round_votes/i);
     }
     expect(playerDerived).toContain('FROM brownlow_season_votes');
     expect(playerDerived).not.toMatch(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+brownlow_season_votes/i);
@@ -46,8 +48,12 @@ describe('admin match mutation source contracts', () => {
       expect(playerDerived).toContain(table);
     }
     expect(playerDerived).toContain('career_game_no');
+    expect(playerDerived).toContain('search_rank = career.games');
     expect(playerDerived).toContain('debut_season = span.debut_season');
     expect(matchAdmin).toContain('clearPlayerClubMatchReferences');
+    expect(matchAdmin).toContain('recomputeSeasonBrownlowStatus');
+    expect(matchAdmin.indexOf('recomputeSeasonMetadata(tx, match.season)'))
+      .toBeLessThan(matchAdmin.indexOf('recomputePlayerDerivedStats(tx, affectedIds, match.season)'));
   });
 
   it('does not silently duplicate a natural match key and cites manual attendance', () => {
@@ -58,15 +64,25 @@ describe('admin match mutation source contracts', () => {
     expect(matchAdmin).toContain('afldb_identity_for_season');
   });
 
-  it('makes score synchronization opt-in and keeps the final period consistent', () => {
-    expect(matchSheetUi).toContain('useState(false)');
-    expect(matchSheet).not.toMatch(/COALESCE\(sum\((?:goals|behinds)\)/);
-    expect(matchSheet).toContain('scoreSyncCoverageError');
-    expect(matchSheet).toContain('INSERT INTO match_period_scores');
+  it('refuses to derive team scores from player totals that omit rushed behinds', () => {
+    expect(matchSheetUi).toContain('name="syncMatchScores" value="false"');
+    expect(matchSheetUi).toContain('rushed behinds are not attributed to a player');
+    expect(matchSheet).toContain('Team scores cannot be synchronized from player statistics');
+    expect(matchSheet).not.toMatch(/(?:UPDATE\s+matches|INSERT\s+INTO\s+match_period_scores)/i);
   });
 
   it('selects a prefill lineup strictly before the edited match', () => {
     expect(matchesQuery).toContain('beforeMatchId');
     expect(matchesQuery).toContain('(m.match_date, m.id) < (target.match_date, target.id)');
+  });
+
+  it('keeps Match Details score corrections and dependent summaries together', () => {
+    expect(dataEdits).toContain('INSERT INTO match_period_scores');
+    expect(dataEdits).toContain('GREATEST(COALESCE(max(period), 4), 4)');
+    expect(dataEdits).toContain('recomputeSeasonMetadata(tx, match.season)');
+    expect(dataEdits).toContain('recomputePlayerDerivedStats(tx, affectedIds, match.season)');
+    expect(dataEdits).toContain('recomputeSeasonBrownlowStatus(tx, match.season)');
+    expect(dataEdits.indexOf('recomputeSeasonMetadata(tx, match.season)'))
+      .toBeLessThan(dataEdits.indexOf('recomputePlayerDerivedStats(tx, affectedIds, match.season)'));
   });
 });

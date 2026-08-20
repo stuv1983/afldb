@@ -36,19 +36,19 @@ export function CreateMatchForm({
 
   const [state, formAction, isPending] = useActionState(createMatchAction, INITIAL);
 
-  const calculatedHomeScore = (homeGoals !== '' || homeBehinds !== '')
-    ? (Number(homeGoals || 0) * 6 + Number(homeBehinds || 0))
+  const calculatedHomeScore = (homeGoals !== '' && homeBehinds !== '')
+    ? (Number(homeGoals) * 6 + Number(homeBehinds))
     : '';
 
-  const calculatedAwayScore = (awayGoals !== '' || awayBehinds !== '')
-    ? (Number(awayGoals || 0) * 6 + Number(awayBehinds || 0))
+  const calculatedAwayScore = (awayGoals !== '' && awayBehinds !== '')
+    ? (Number(awayGoals) * 6 + Number(awayBehinds))
     : '';
 
   useEffect(() => {
-    if (state.createdId) {
+    if (state.createdId && !state.warning) {
       router.push(`/admin/data-editor?mode=match-sheet&id=${state.createdId}`);
     }
-  }, [state.createdId, router]);
+  }, [state.createdId, state.warning, router]);
 
   if (!isOpen && !state.createdId) {
     return (
@@ -98,6 +98,12 @@ export function CreateMatchForm({
               </Link>
             )}
           </p>
+        </div>
+      )}
+
+      {state.warning && (
+        <div className="badge badge-warn" style={{ marginBottom: '1rem' }}>
+          {state.warning}
         </div>
       )}
 
@@ -259,6 +265,7 @@ export function CreateMatchForm({
                 type="number"
                 name="homeScore"
                 min={0}
+                required
                 defaultValue={calculatedHomeScore}
                 key={`homeScore-${calculatedHomeScore}`}
                 placeholder="0"
@@ -311,6 +318,7 @@ export function CreateMatchForm({
                 type="number"
                 name="awayScore"
                 min={0}
+                required
                 defaultValue={calculatedAwayScore}
                 key={`awayScore-${calculatedAwayScore}`}
                 placeholder="0"

@@ -7,6 +7,14 @@ import { authSql } from '@/db/authClient';
 
 const MANUAL_ADMIN_SOURCE_KEY = 'manual_admin_edit';
 const BROWNLOW_AWARD_SLUG = 'brownlow-medal';
+const HALL_OF_FAME_CATEGORIES = new Set([
+  'Player',
+  'Coach',
+  'Umpire',
+  'Media',
+  'Administrator',
+  'Pioneer',
+]);
 
 type AwardDefinition = {
   slug: string;
@@ -79,6 +87,18 @@ export type CreateHonourTeamMemberInput = {
  */
 
 export async function createAwardWinner(input: CreateAwardWinnerInput): Promise<CreateHonourRecordResult> {
+  if (!Number.isInteger(input.awardId) || input.awardId <= 0) {
+    throw new Error('Award ID must be a positive integer.');
+  }
+  if (!Number.isInteger(input.season) || input.season < 1897 || input.season > 2100) {
+    throw new Error('Award season must be from 1897 to 2100.');
+  }
+  if (
+    input.votes != null
+    && (!Number.isFinite(input.votes) || input.votes < 0 || input.votes > 999_999.99)
+  ) {
+    throw new Error('Award votes or statistic must be from 0 to 999999.99.');
+  }
   const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
   if (!importUrl) throw new Error('AFLDB_IMPORT_DATABASE_URL is not configured.');
 
@@ -213,6 +233,22 @@ export async function createAwardWinner(input: CreateAwardWinnerInput): Promise<
 export async function createHallOfFameInductee(
   input: CreateHallOfFameInducteeInput,
 ): Promise<CreateHonourRecordResult> {
+  const category = input.category?.trim() || 'Player';
+  if (!HALL_OF_FAME_CATEGORIES.has(category)) {
+    throw new Error('Invalid Hall of Fame category.');
+  }
+  if (!Number.isInteger(input.inductedYear) || input.inductedYear < 1996 || input.inductedYear > 2100) {
+    throw new Error('Inducted year must be from 1996 to 2100.');
+  }
+  if (input.isLegend) {
+    if (
+      !Number.isInteger(input.legendYear)
+      || (input.legendYear as number) < input.inductedYear
+      || (input.legendYear as number) > 2100
+    ) {
+      throw new Error('Legend year must be from the induction year to 2100.');
+    }
+  }
   const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
   if (!importUrl) throw new Error('AFLDB_IMPORT_DATABASE_URL is not configured.');
 
@@ -236,7 +272,7 @@ export async function createHallOfFameInductee(
           notes
         ) VALUES (
           ${name}, ${input.playerId ?? null}, ${linkStatus}::link_status,
-          ${input.category?.trim() || 'Player'}, ${input.inductedYear},
+          ${category}, ${input.inductedYear},
           ${input.isLegend ?? false}, ${input.legendYear ?? null},
           ${input.clubNameRaw?.trim() || null}, ${input.state?.trim() || null},
           ${input.playingCareer?.trim() || null}, ${input.notes?.trim() || null}
@@ -267,6 +303,13 @@ export async function createHallOfFameInductee(
 export async function createHonourTeamMember(
   input: CreateHonourTeamMemberInput,
 ): Promise<CreateHonourRecordResult> {
+  if (input.sortOrder != null && (
+    !Number.isInteger(input.sortOrder)
+    || input.sortOrder < 0
+    || input.sortOrder > 50
+  )) {
+    throw new Error('Lineup order must be a whole number from 0 to 50.');
+  }
   const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
   if (!importUrl) throw new Error('AFLDB_IMPORT_DATABASE_URL is not configured.');
 

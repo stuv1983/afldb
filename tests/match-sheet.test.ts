@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   deriveDisposals,
-  scoreSyncCoverageError,
   validateMatchSheetPayload,
 } from '@/lib/match-sheet';
 
@@ -16,7 +15,6 @@ describe('match-sheet write validation', () => {
         kicks: 12,
         handballs: 8,
         disposals: 20,
-        brownlowVotes: 3,
       }],
       removedPlayerIds: [11, 11],
     });
@@ -38,7 +36,7 @@ describe('match-sheet write validation', () => {
           hitouts: null,
           freesFor: null,
           freesAgainst: null,
-          brownlowVotes: 3,
+          brownlowVotes: null,
         }],
         removedPlayerIds: [11],
       },
@@ -64,32 +62,33 @@ describe('match-sheet write validation', () => {
     expect(deriveDisposals(10, 5, 16)).toBe(16);
   });
 
-  it('requires complete player scoring before synchronizing a match result', () => {
-    expect(scoreSyncCoverageError({
-      homePlayers: 0,
-      awayPlayers: 0,
-      homeGoalsRecorded: 0,
-      homeBehindsRecorded: 0,
-      awayGoalsRecorded: 0,
-      awayBehindsRecorded: 0,
-    })).toContain('both team lineups');
+  it('accepts exactly one 3-2-1 Brownlow allocation or an entirely blank allocation', () => {
+    expect(validateMatchSheetPayload({
+      players: [
+        { playerId: 1, clubId: 10, brownlowVotes: 3 },
+        { playerId: 2, clubId: 10, brownlowVotes: 2 },
+        { playerId: 3, clubId: 20, brownlowVotes: 1 },
+        { playerId: 4, clubId: 20, brownlowVotes: 0 },
+      ],
+    }).ok).toBe(true);
+    expect(validateMatchSheetPayload({
+      players: [{ playerId: 1, clubId: 10 }, { playerId: 2, clubId: 20 }],
+    }).ok).toBe(true);
+  });
 
-    expect(scoreSyncCoverageError({
-      homePlayers: 2,
-      awayPlayers: 2,
-      homeGoalsRecorded: 2,
-      homeBehindsRecorded: 1,
-      awayGoalsRecorded: 2,
-      awayBehindsRecorded: 2,
-    })).toContain('every player');
-
-    expect(scoreSyncCoverageError({
-      homePlayers: 2,
-      awayPlayers: 2,
-      homeGoalsRecorded: 2,
-      homeBehindsRecorded: 2,
-      awayGoalsRecorded: 2,
-      awayBehindsRecorded: 2,
-    })).toBeNull();
+  it.each([
+    [[3, 3, 2, 1]],
+    [[3, 2]],
+    [[0, 0, 0]],
+  ])('rejects an invalid published Brownlow distribution: %j', (votes) => {
+    const result = validateMatchSheetPayload({
+      players: votes.map((brownlowVotes, index) => ({
+        playerId: index + 1,
+        clubId: index % 2 === 0 ? 10 : 20,
+        brownlowVotes,
+      })),
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('exactly one player with 3 votes');
   });
 });

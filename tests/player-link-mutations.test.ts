@@ -142,6 +142,33 @@ describe('draft identity resolution', () => {
     ]);
   });
 
+  it('reports a post-commit resolution-audit failure as success with a do-not-retry warning', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { tx } = fakeTransaction((text) => {
+      if (text.startsWith('SELECT draft_person_id AS')) return [{ draftPersonId: 901 }];
+      if (text.startsWith('SELECT link_status::text')) return [{ status: 'unmatched', playerId: null }];
+      if (text.startsWith('SELECT link_status_value::text')) {
+        return [{ status: 'unmatched', draftPersonId: 901 }];
+      }
+      return [];
+    });
+    installImportClient(tx);
+    mocks.authSql.mockRejectedValueOnce(new Error('audit unavailable'));
+
+    const result = await resolveLink({
+      targetTable: 'draft_picks',
+      targetId: 41,
+      playerId: 77,
+      adminUserId: 5,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      auditWarning: expect.stringContaining('Do not submit it again'),
+    });
+    consoleError.mockRestore();
+  });
+
   it('does not insert a player when the locked target has gone stale', async () => {
     const { tx, seen } = fakeTransaction((text) => {
       if (text.startsWith('SELECT draft_person_id AS')) return [{ draftPersonId: 901 }];

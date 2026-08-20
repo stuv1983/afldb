@@ -72,7 +72,6 @@ export function MatchSheetEditor({
   );
 
   const [removedPlayerIds, setRemovedPlayerIds] = useState<number[]>([]);
-  const [syncMatchScores, setSyncMatchScores] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'away' | 'all'>('all');
   const [addTeamChoice, setAddTeamChoice] = useState<number>(match.homeClubId);
 
@@ -471,6 +470,12 @@ export function MatchSheetEditor({
         </div>
       )}
 
+      {state.warning && (
+        <div className="badge badge-warn" style={{ justifySelf: 'start' }}>
+          {state.warning}
+        </div>
+      )}
+
       {state.error && (
         <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-subtle)', borderRadius: '6px', borderLeft: '4px solid var(--color-warn)' }}>
           <p style={{ margin: 0, color: 'var(--color-warn)', fontSize: '0.95rem' }}>
@@ -570,7 +575,7 @@ export function MatchSheetEditor({
       <form action={formAction} style={{ display: 'grid', gap: '1rem' }}>
         <input type="hidden" name="matchId" value={match.id} />
         <input type="hidden" name="payload" value={payloadString} />
-        <input type="hidden" name="syncMatchScores" value={syncMatchScores ? 'true' : 'false'} />
+        <input type="hidden" name="syncMatchScores" value="false" />
 
         {(activeTab === 'all' || activeTab === 'home') &&
           renderPlayerTable(homePlayers, match.homeName, match.homeClubId, homeSummary)}
@@ -584,14 +589,10 @@ export function MatchSheetEditor({
           display: 'grid',
           gap: '0.75rem',
         }}>
-          <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.9rem', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={syncMatchScores}
-              onChange={(e) => setSyncMatchScores(e.target.checked)}
-            />
-            <strong>Synchronize final match score, result and margin from player goals and behinds</strong>
-          </label>
+          <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+            Team scores stay separate from player totals because rushed behinds are not attributed to a player.
+            Use Match Details to edit the official team score.
+          </p>
 
           <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
             Verification / Audit note (optional)

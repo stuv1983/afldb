@@ -6,8 +6,10 @@ import { authSql } from '@/db/authClient';
 import {
   clearPlayerClubMatchReferences,
   recomputePlayerDerivedStats,
+  recomputeSeasonBrownlowStatus,
   recomputeSeasonMetadata,
 } from '@/db/queries/player-derived';
+import { validateAdminMatchNumbers } from '@/lib/admin-match';
 
 export type QuarterScoreInput = {
   goals?: number | null;
@@ -125,10 +127,16 @@ export type CreateMatchInput = {
  * Enables adding live/current season matches with venue, scores, quarter breakdowns,
  * followed by immediate lineup, player statistics and Brownlow votes entry in MatchSheetEditor.
  */
-export async function createMatch(input: CreateMatchInput): Promise<{ id: number; season: number }> {
+export async function createMatch(input: CreateMatchInput): Promise<{
+  id: number;
+  season: number;
+  auditWarning?: string;
+}> {
   if (input.homeClubId === input.awayClubId) {
     throw new Error('Home club and away club must be different.');
   }
+  const numericError = validateAdminMatchNumbers(input);
+  if (numericError) throw new Error(numericError);
 
   const isFinal = input.roundType !== 'home_and_away';
   const roundNumber = isFinal ? null : (Number.isInteger(input.roundNumber) ? Number(input.roundNumber) : 1);
@@ -153,13 +161,13 @@ export async function createMatch(input: CreateMatchInput): Promise<{ id: number
   const homeBehinds = input.homeBehinds !== null && input.homeBehinds !== undefined ? Number(input.homeBehinds) : null;
   const homeScore = (homeGoals !== null && homeBehinds !== null)
     ? (homeGoals * 6 + homeBehinds)
-    : (input.homeScore !== null && input.homeScore !== undefined ? Number(input.homeScore) : ((homeGoals ?? 0) * 6 + (homeBehinds ?? 0)));
+    : Number(input.homeScore);
 
   const awayGoals = input.awayGoals !== null && input.awayGoals !== undefined ? Number(input.awayGoals) : null;
   const awayBehinds = input.awayBehinds !== null && input.awayBehinds !== undefined ? Number(input.awayBehinds) : null;
   const awayScore = (awayGoals !== null && awayBehinds !== null)
     ? (awayGoals * 6 + awayBehinds)
-    : (input.awayScore !== null && input.awayScore !== undefined ? Number(input.awayScore) : ((awayGoals ?? 0) * 6 + (awayBehinds ?? 0)));
+    : Number(input.awayScore);
 
   const margin = Math.abs(homeScore - awayScore);
   const result: 'home_win' | 'away_win' | 'draw' =
@@ -278,11 +286,13 @@ export async function createMatch(input: CreateMatchInput): Promise<{ id: number
       }
 
       await recomputeSeasonMetadata(tx, input.season);
+      await recomputeSeasonBrownlowStatus(tx, input.season);
 
       return matchRow;
     });
 
     // 6. Audit in data_edits
+    let auditWarning: string | undefined;
     try {
       await authSql`
         INSERT INTO data_edits (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
@@ -300,9 +310,10 @@ export async function createMatch(input: CreateMatchInput): Promise<{ id: number
       `;
     } catch (auditErr) {
       console.error('Failed to log audit row for match creation', auditErr);
+      auditWarning = 'The match was created, but its data-edits audit snapshot failed. Do not submit it again; ask an administrator to reconcile the audit log.';
     }
 
-    return created;
+    return { ...created, auditWarning };
   } finally {
     await importSql.end({ timeout: 5 });
   }
@@ -317,7 +328,10 @@ export async function deleteMatch(input: {
   matchId: number;
   adminUserId: number;
   reason?: string | null;
-}): Promise<{ ok: true; deletedId: number; affectedPlayers: number } | { ok: false; error: string }> {
+}): Promise<
+  | { ok: true; deletedId: number; affectedPlayers: number; auditWarning?: string }
+  | { ok: false; error: string }
+> {
   const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
   if (!importUrl) return { ok: false, error: 'AFLDB_IMPORT_DATABASE_URL is not configured.' };
 
@@ -332,7 +346,6 @@ export async function deleteMatch(input: {
       const [match] = await tx<{
         id: number;
         season: number;
-        roundNumber: number | null;
         roundCode: string;
         matchDate: string;
         homeClubId: number;
@@ -340,7 +353,7 @@ export async function deleteMatch(input: {
         homeScore: number;
         awayScore: number;
       }[]>`
-        SELECT id, season, round_number AS "roundNumber", round_code AS "roundCode", match_date::text AS "matchDate",
+        SELECT id, season, round_code AS "roundCode", match_date::text AS "matchDate",
                home_club_id AS "homeClubId", away_club_id AS "awayClubId",
                home_score AS "homeScore", away_score AS "awayScore"
           FROM matches
@@ -365,23 +378,15 @@ export async function deleteMatch(input: {
       // the same transaction rebuilds them from what remains below.
       await clearPlayerClubMatchReferences(tx, affectedIds);
 
-      if (affectedIds.length > 0 && match.roundNumber !== null) {
-        await tx`
-          DELETE FROM brownlow_round_votes
-           WHERE season = ${match.season}
-             AND round_number = ${match.roundNumber}
-             AND player_id = ANY(${affectedIds})
-        `;
-      }
-
       // 3. Delete dependent rows
       await tx`DELETE FROM player_achievements WHERE match_id = ${input.matchId}`;
       await tx`DELETE FROM player_match_stats WHERE match_id = ${input.matchId}`;
       await tx`DELETE FROM match_period_scores WHERE match_id = ${input.matchId}`;
       await tx`DELETE FROM matches WHERE id = ${input.matchId}`;
 
-      await recomputePlayerDerivedStats(tx, affectedIds, match.season);
       await recomputeSeasonMetadata(tx, match.season);
+      await recomputePlayerDerivedStats(tx, affectedIds, match.season);
+      await recomputeSeasonBrownlowStatus(tx, match.season);
 
       return {
         ok: true as const,
@@ -396,6 +401,7 @@ export async function deleteMatch(input: {
     }
 
     // Audit in data_edits
+    let auditWarning: string | undefined;
     try {
       await authSql`
         INSERT INTO data_edits (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
@@ -406,12 +412,14 @@ export async function deleteMatch(input: {
       `;
     } catch (auditErr) {
       console.error('Failed to log audit row for match deletion', auditErr);
+      auditWarning = 'The match was deleted, but its data-edits audit snapshot failed. Do not submit it again; ask an administrator to reconcile the audit log.';
     }
 
     return {
       ok: true,
       deletedId: result.deletedId,
       affectedPlayers: result.affectedPlayers,
+      auditWarning,
     };
   } finally {
     await importSql.end({ timeout: 5 });

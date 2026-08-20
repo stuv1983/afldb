@@ -140,6 +140,19 @@ export function validateMatchSheetPayload(value: unknown): ValidationResult {
     players.push(player);
   }
 
+  const recordedVotes = players
+    .map((player) => player.brownlowVotes)
+    .filter((votes): votes is number => votes !== null && votes !== undefined);
+  if (recordedVotes.length > 0) {
+    const count = (votes: number) => recordedVotes.filter((value) => value === votes).length;
+    if (count(3) !== 1 || count(2) !== 1 || count(1) !== 1) {
+      return {
+        ok: false,
+        error: 'A recorded Brownlow allocation requires exactly one player with 3 votes, one with 2, and one with 1.',
+      };
+    }
+  }
+
   return { ok: true, value: { players, removedPlayerIds } };
 }
 
@@ -154,29 +167,4 @@ export function deriveDisposals(
     return null;
   }
   return kicks + handballs;
-}
-
-export type ScoreSyncCoverage = {
-  homePlayers: number;
-  awayPlayers: number;
-  homeGoalsRecorded: number;
-  homeBehindsRecorded: number;
-  awayGoalsRecorded: number;
-  awayBehindsRecorded: number;
-};
-
-/** Return a user-facing refusal when a score would require NULL-to-zero inference. */
-export function scoreSyncCoverageError(coverage: ScoreSyncCoverage): string | null {
-  if (coverage.homePlayers === 0 || coverage.awayPlayers === 0) {
-    return 'Match scores can be synchronized only after both team lineups have been entered.';
-  }
-  if (
-    coverage.homeGoalsRecorded !== coverage.homePlayers
-    || coverage.homeBehindsRecorded !== coverage.homePlayers
-    || coverage.awayGoalsRecorded !== coverage.awayPlayers
-    || coverage.awayBehindsRecorded !== coverage.awayPlayers
-  ) {
-    return 'Match scores can be synchronized only when goals and behinds are recorded for every player on both teams.';
-  }
-  return null;
 }

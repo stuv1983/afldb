@@ -46,6 +46,7 @@ export function ResolveControls({
   const [picked, setPicked] = useState<{ id: number; label: string } | null>(null);
 
   const done = linkState.message ?? createState.message ?? confirmState.message;
+  const warning = linkState.warning ?? createState.warning ?? confirmState.warning;
 
   // Split name for create pre-fill
   const cleanName = (playerName ?? '').trim();
@@ -54,13 +55,16 @@ export function ResolveControls({
   const initialSurname = parts.length > 1 ? parts[parts.length - 1] : parts[0] || '';
 
   useEffect(() => {
-    if (done) router.refresh();
-  }, [done, router]);
+    if (done && !warning) router.refresh();
+  }, [done, warning, router]);
 
   if (done) {
     return (
       <div style={{ padding: '0.75rem', background: 'var(--bg-subtle)', borderRadius: '6px', marginTop: '0.5rem' }}>
         <p style={{ margin: 0, fontWeight: 600, color: 'var(--accent)' }}>✓ {done}</p>
+        {warning && (
+          <p className="badge badge-warn" style={{ margin: '0.5rem 0 0' }}>{warning}</p>
+        )}
       </div>
     );
   }

@@ -201,7 +201,7 @@ export async function recordSuggestion(input: {
 }
 
 export type ResolveResult =
-  | { ok: true }
+  | { ok: true; auditWarning?: string }
   | { ok: false; error: string };
 
 type Tx = postgres.TransactionSql;
@@ -332,8 +332,8 @@ async function recordLinkedResolution(input: {
   } catch (error) {
     console.error('player-link resolution audit row could not be written', error);
     return {
-      ok: false,
-      error: 'The link was applied, but the audit record failed — check the server log.',
+      ok: true,
+      auditWarning: 'The link was applied, but its resolution audit failed. Do not submit it again; ask an administrator to reconcile the audit log.',
     };
   }
 }
@@ -391,7 +391,7 @@ export async function resolveLink(input: {
 }
 
 export type CreateAndResolveResult =
-  | { ok: true; player: CreatedPlayer }
+  | { ok: true; player: CreatedPlayer; auditWarning?: string }
   | { ok: false; error: string };
 
 /**
@@ -449,7 +449,9 @@ export async function createPlayerAndResolveLink(input: {
       || `Created player ${applied.player.displayName} and linked to ${input.targetTable} #${input.targetId}`,
   });
   if (!resolution.ok) return resolution;
-  return { ok: true, player: applied.player };
+  return resolution.auditWarning
+    ? { ok: true, player: applied.player, auditWarning: resolution.auditWarning }
+    : { ok: true, player: applied.player };
 }
 
 /**

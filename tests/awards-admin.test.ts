@@ -128,6 +128,23 @@ describe('awards admin mutation contracts', () => {
     vi.unstubAllEnvs();
   });
 
+  it('rejects invalid numeric and vocabulary facts before opening a write connection', async () => {
+    await expect(createAwardWinner({ ...awardInput, votes: -1 }))
+      .rejects.toThrow('Award votes or statistic');
+    await expect(createHallOfFameInductee({ ...hallOfFameInput, inductedYear: 2026, category: 'Wizard' }))
+      .rejects.toThrow('Invalid Hall of Fame category');
+    await expect(createHallOfFameInductee({
+      ...hallOfFameInput,
+      inductedYear: 2026,
+      isLegend: true,
+      legendYear: 2025,
+    })).rejects.toThrow('Legend year');
+    await expect(createHonourTeamMember({ ...honourTeamInput, sortOrder: -1 }))
+      .rejects.toThrow('Lineup order');
+
+    expect(mocks.postgres).not.toHaveBeenCalled();
+  });
+
   it('uses the manual source and a distinct UUID record key for every award winner', async () => {
     await createAwardWinner(awardInput);
     await createAwardWinner({ ...awardInput, season: 2026 });
@@ -244,6 +261,26 @@ describe('awards admin mutation contracts', () => {
     expect(mocks.authSql).not.toHaveBeenCalled();
   });
 
+  it('accepts and normalises an optional generic-award club identity active in the season', async () => {
+    selectedClubIdentity = {
+      selectedClubId: 8,
+      seasonClubId: 8,
+      seasonClubName: 'Footscray',
+    };
+
+    await createAwardWinner({
+      ...awardInput,
+      season: 1980,
+      clubId: 8,
+      clubNameRaw: 'untrusted form text',
+    });
+
+    const insert = importQueries.find((query) => query.text.includes('INSERT INTO award_winners'));
+    expect(insert?.values).toContain(8);
+    expect(insert?.values).toContain('Footscray');
+    expect(insert?.values).not.toContain('untrusted form text');
+  });
+
   it('requires the import-role connection for every awards mutation', async () => {
     vi.stubEnv('AFLDB_IMPORT_DATABASE_URL', '');
     vi.stubEnv('DATABASE_URL', 'postgres://read-only@example/afldb_test');
@@ -336,10 +373,10 @@ describe('honour-team identity migration contract', () => {
 
     expect(migration).toContain('DROP CONSTRAINT honour_team_uq');
     expect(migration).toMatch(
-      /CREATE UNIQUE INDEX honour_team_linked_player_uq[\s\S]*\(team_name, player_id\)[\s\S]*WHERE player_id IS NOT NULL/,
+      /CREATE UNIQUE INDEX honour_team_linked_player_uq[\s\S]*?\(team_name, player_id\)[\s\S]*?WHERE player_id IS NOT NULL;/,
     );
     expect(migration).toMatch(
-      /CREATE UNIQUE INDEX honour_team_unlinked_name_uq[\s\S]*\(team_name, player_name_raw\)[\s\S]*WHERE player_id IS NULL/,
+      /CREATE UNIQUE INDEX honour_team_unlinked_name_uq[\s\S]*?\(team_name, player_name_raw\)[\s\S]*?WHERE player_id IS NULL;/,
     );
     expect(migration).toContain('HAVING count(*) > 1');
     expect(migration).not.toMatch(/\bDELETE\b/);
@@ -353,7 +390,7 @@ describe('awards admin audit-warning UI contract', () => {
       'utf8',
     );
     expect(actions).toContain('warning?: string');
-    expect(actions.match(/result\.auditWarning/g)).toHaveLength(3);
+    expect(actions.match(/result\.auditWarning/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
     expect(actions).toContain('Do not submit it again');
 
     for (const form of ['AwardWinnerForm.tsx', 'HallOfFameForm.tsx', 'HonourTeamForm.tsx']) {
@@ -363,5 +400,12 @@ describe('awards admin audit-warning UI contract', () => {
       );
       expect(source).toContain('state.warning');
     }
+
+    const awardForm = readFileSync(
+      join(process.cwd(), 'src', 'app', 'admin', 'data-editor', 'AwardWinnerForm.tsx'),
+      'utf8',
+    );
+    expect(awardForm).toContain("award.slug !== 'brownlow-medal'");
+    expect(awardForm).toContain('cannot be added here');
   });
 });

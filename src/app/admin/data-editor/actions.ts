@@ -2,11 +2,13 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { authSql } from '@/db/authClient';
 import { createAwardWinner, createHallOfFameInductee, createHonourTeamMember } from '@/db/queries/awards-admin';
 import { saveEdit } from '@/db/queries/data-edits';
 import { createMatch, deleteMatch } from '@/db/queries/match-admin';
 import { saveMatchSheet } from '@/db/queries/match-sheet';
 import { createPlayer, type DraftPickInput } from '@/db/queries/players';
+import { validateAdminMatchNumbers } from '@/lib/admin-match';
 import { EDITABLE_ENTITIES } from '@/lib/edit/spec';
 import { audit, requireSuperAdmin } from '@/lib/auth/session';
 import { validateMatchSheetPayload } from '@/lib/match-sheet';
@@ -29,6 +31,7 @@ function combineWarnings(...warnings: Array<string | undefined>): string | undef
 export type DataEditState = {
   error?: string;
   message?: string;
+  warning?: string;
   /** rebuild_derived targets left stale by the saved edit, if any. */
   staleDerived?: string[];
 };
@@ -36,12 +39,14 @@ export type DataEditState = {
 export type MatchSheetActionState = {
   error?: string;
   message?: string;
+  warning?: string;
   playerCount?: number;
 };
 
 export type CreatePlayerActionState = {
   error?: string;
   message?: string;
+  warning?: string;
   createdId?: number;
 };
 
@@ -120,19 +125,39 @@ export async function createPlayerAction(
       draftInfo,
     });
 
-    await audit('player.created', {
-      playerId: player.id,
-      displayName: player.displayName,
-      hasDraftInfo: Boolean(draftInfo),
-    }, { userId: admin.id, label: admin.email });
+    let warning: string | undefined;
+    try {
+      await authSql`
+        INSERT INTO data_edits
+              (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
+        VALUES ('players', ${player.id}, 'player_creation', '{}'::jsonb,
+                ${authSql.json({ displayName: player.displayName, hasDraftInfo: Boolean(draftInfo) })},
+                ${admin.id}, ${notes?.slice(0, 2000) || null})
+      `;
+    } catch (error) {
+      console.error('Failed to log data-edits audit for player creation', error);
+      warning = 'The player was created, but its data-edits audit snapshot failed. Do not submit it again; ask an administrator to reconcile the audit log.';
+    }
+    try {
+      await audit('player.created', {
+        playerId: player.id,
+        displayName: player.displayName,
+        hasDraftInfo: Boolean(draftInfo),
+      }, { userId: admin.id, label: admin.email });
+    } catch (error) {
+      console.error('Failed to log administrative audit for player creation', error);
+      warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
+    }
 
     revalidatePath('/admin/data-editor');
     revalidatePath('/players');
+    revalidatePath('/players/[slug]', 'page');
     revalidatePath('/draft');
 
     return {
       message: `Created player "${player.displayName}" (ID #${player.id})${draftInfo ? ' with draft selection record' : ''}.`,
       createdId: player.id,
+      warning,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -175,7 +200,10 @@ export async function createAwardWinnerAction(
     : null;
 
   const rawVotes = formData.get('votes');
-  const votes = rawVotes && !isNaN(Number(rawVotes)) ? Number(rawVotes) : null;
+  const votes = rawVotes !== null && rawVotes !== '' ? Number(rawVotes) : null;
+  if (votes !== null && (!Number.isFinite(votes) || votes < 0 || votes > 999_999.99)) {
+    return { error: 'Votes or statistic must be from 0 to 999999.99.' };
+  }
   const position = String(formData.get('position') ?? '').trim() || null;
   const isCaptain = formData.get('isCaptain') === 'true' || formData.get('isCaptain') === 'on';
   const isViceCaptain = formData.get('isViceCaptain') === 'true' || formData.get('isViceCaptain') === 'on';
@@ -210,8 +238,15 @@ export async function createAwardWinnerAction(
     }
 
     revalidatePath('/awards');
+    revalidatePath('/awards/[slug]', 'page');
+    revalidatePath('/awards/[slug]/[season]', 'page');
+    revalidatePath('/clubs/[slug]', 'page');
+    revalidatePath('/seasons/[year]', 'page');
     revalidatePath('/admin/data-editor');
-    if (playerId) revalidatePath('/players');
+    if (playerId) {
+      revalidatePath('/players');
+      revalidatePath('/players/[slug]', 'page');
+    }
 
     return {
       message: `Added award recipient for season ${season} (Record #${result.id}).`,
@@ -243,17 +278,30 @@ export async function createHallOfFameAction(
     return { error: 'Inductee name is required.' };
   }
 
-  const category = String(formData.get('category') ?? 'Player').trim();
+  const category = String(formData.get('category') ?? 'Player').trim() || 'Player';
+  const categories = ['Player', 'Coach', 'Umpire', 'Media', 'Administrator', 'Pioneer'];
+  if (!categories.includes(category)) return { error: 'Invalid Hall of Fame category.' };
   const rawInductedYear = formData.get('inductedYear');
-  const inductedYear = rawInductedYear && Number.isInteger(Number(rawInductedYear))
+  const inductedYear = rawInductedYear !== null && rawInductedYear !== ''
     ? Number(rawInductedYear)
-    : new Date().getFullYear();
+    : null;
+  if (inductedYear === null || !Number.isInteger(inductedYear) || inductedYear < 1996 || inductedYear > 2100) {
+    return { error: 'Valid inducted year is required (1996–2100).' };
+  }
 
   const isLegend = formData.get('isLegend') === 'true' || formData.get('isLegend') === 'on';
   const rawLegendYear = formData.get('legendYear');
-  const legendYear = isLegend && rawLegendYear && Number.isInteger(Number(rawLegendYear))
+  const legendYear = isLegend && rawLegendYear !== null && rawLegendYear !== ''
     ? Number(rawLegendYear)
-    : (isLegend ? inductedYear : null);
+    : null;
+  if (isLegend && (
+    legendYear === null
+    || !Number.isInteger(legendYear)
+    || legendYear < inductedYear
+    || legendYear > 2100
+  )) {
+    return { error: 'Legend year must be from the induction year to 2100.' };
+  }
 
   const clubNameRaw = String(formData.get('clubNameRaw') ?? '').trim() || null;
   const state = String(formData.get('state') ?? '').trim() || null;
@@ -290,7 +338,10 @@ export async function createHallOfFameAction(
 
     revalidatePath('/hall-of-fame');
     revalidatePath('/admin/data-editor');
-    if (playerId) revalidatePath('/players');
+    if (playerId) {
+      revalidatePath('/players');
+      revalidatePath('/players/[slug]', 'page');
+    }
 
     return {
       message: `Added Hall of Fame inductee "${name}" in ${inductedYear} (Record #${result.id}).`,
@@ -331,7 +382,10 @@ export async function createHonourTeamMemberAction(
   const role = String(formData.get('role') ?? '').trim() || null;
   const clubNameRaw = String(formData.get('clubNameRaw') ?? '').trim() || null;
   const rawSortOrder = formData.get('sortOrder');
-  const sortOrder = rawSortOrder && Number.isInteger(Number(rawSortOrder)) ? Number(rawSortOrder) : 0;
+  const sortOrder = rawSortOrder !== null && rawSortOrder !== '' ? Number(rawSortOrder) : 0;
+  if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 50) {
+    return { error: 'Lineup order must be a whole number from 0 to 50.' };
+  }
   const note = String(formData.get('note') ?? '').trim() || null;
 
   try {
@@ -361,8 +415,12 @@ export async function createHonourTeamMemberAction(
     }
 
     revalidatePath('/honour-teams');
+    revalidatePath('/honour-teams/[slug]', 'page');
     revalidatePath('/admin/data-editor');
-    if (playerId) revalidatePath('/players');
+    if (playerId) {
+      revalidatePath('/players');
+      revalidatePath('/players/[slug]', 'page');
+    }
 
     return {
       message: `Added member to "${teamName}" (Record #${result.id}).`,
@@ -412,19 +470,45 @@ export async function saveDataEdit(
   if (!result.ok) return { error: result.error };
 
   if (Object.keys(result.changed).length === 0) {
-    return { message: 'No change — the values already match.' };
+    return {
+      message: 'No change — the values already match.',
+      warning: result.auditWarning,
+    };
   }
 
-  await audit('data_edit.saved', { entity: entityKey, rowId, group: groupKey },
-    { userId: admin.id, label: admin.email });
+  let warning = result.auditWarning;
+  try {
+    await audit('data_edit.saved', { entity: entityKey, rowId, group: groupKey },
+      { userId: admin.id, label: admin.email });
+  } catch (error) {
+    console.error('Failed to log administrative audit for data edit', error);
+    warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
+  }
 
   revalidatePath('/admin/data-editor');
+  if (entityKey === 'matches') {
+    revalidatePath('/matches');
+    revalidatePath(`/matches/${rowId}`);
+    revalidatePath('/players/[slug]', 'page');
+    revalidatePath('/players/[slug]/matches', 'page');
+    revalidatePath('/seasons');
+    revalidatePath('/seasons/[year]', 'page');
+    revalidatePath('/clubs/[slug]', 'page');
+    revalidatePath('/records/[category]', 'page');
+  } else if (entityKey === 'players') {
+    revalidatePath('/players');
+    revalidatePath('/players/[slug]', 'page');
+  } else if (entityKey === 'draft_picks') {
+    revalidatePath('/draft');
+    revalidatePath('/players/[slug]', 'page');
+  }
 
   const summary = Object.entries(result.changed)
     .map(([k, c]) => `${entity.fields[k].label}: ${c.from ?? '—'} → ${c.to ?? '—'}`)
     .join('; ');
   return {
     message: `Saved. ${summary}.`,
+    warning,
     staleDerived: group.affectsDerived,
   };
 }
@@ -471,11 +555,17 @@ export async function saveMatchSheetAction(
     return { error: result.error };
   }
 
-  await audit('match.sheet_saved', {
-    matchId,
-    playerCount: result.playerCount,
-    scoreUpdated: result.scoreUpdated,
-  }, { userId: admin.id, label: admin.email });
+  let warning = result.auditWarning;
+  try {
+    await audit('match.sheet_saved', {
+      matchId,
+      playerCount: result.playerCount,
+      scoreUpdated: result.scoreUpdated,
+    }, { userId: admin.id, label: admin.email });
+  } catch (error) {
+    console.error('Failed to log administrative audit for match-sheet save', error);
+    warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
+  }
 
   revalidatePath(`/matches/${matchId}`);
   revalidatePath('/matches');
@@ -491,6 +581,7 @@ export async function saveMatchSheetAction(
   return {
     message: `Match sheet saved successfully (${result.playerCount} players). ${result.scoreUpdated ? 'Match scores synchronized.' : ''} Career and season stats updated.`,
     playerCount: result.playerCount,
+    warning,
   };
 }
 
@@ -550,7 +641,7 @@ export async function createMatchAction(
 
   const parseScoreNum = (key: string) => {
     const v = formData.get(key);
-    return v !== null && v !== '' && !isNaN(Number(v)) ? Number(v) : null;
+    return v !== null && v !== '' ? Number(v) : null;
   };
 
   const homeGoals = parseScoreNum('homeGoals');
@@ -581,6 +672,19 @@ export async function createMatchAction(
     };
   }
 
+  const numericError = validateAdminMatchNumbers({
+    homeGoals,
+    homeBehinds,
+    homeScore,
+    awayGoals,
+    awayBehinds,
+    awayScore,
+    attendance,
+    homeQuarters,
+    awayQuarters,
+  });
+  if (numericError) return { error: numericError };
+
   try {
     const result = await createMatch({
       season,
@@ -607,22 +711,33 @@ export async function createMatchAction(
       adminUserId: admin.id,
     });
 
-    await audit('match.created', {
-      matchId: result.id,
-      season: result.season,
-      homeClubId,
-      awayClubId,
-      matchDate,
-    }, { userId: admin.id, label: admin.email });
+    let warning = result.auditWarning;
+    try {
+      await audit('match.created', {
+        matchId: result.id,
+        season: result.season,
+        homeClubId,
+        awayClubId,
+        matchDate,
+      }, { userId: admin.id, label: admin.email });
+    } catch (error) {
+      console.error('Failed to log administrative audit for match creation', error);
+      warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
+    }
 
     revalidatePath('/matches');
     revalidatePath(`/matches/${result.id}`);
     revalidatePath(`/seasons/${result.season}`);
+    revalidatePath('/seasons');
+    revalidatePath('/seasons/[year]', 'page');
+    revalidatePath('/clubs/[slug]', 'page');
+    revalidatePath('/records/[category]', 'page');
     revalidatePath('/admin/data-editor');
 
     return {
       message: `Created match #${result.id} (${matchDate}).`,
       createdId: result.id,
+      warning,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -657,10 +772,16 @@ export async function deleteMatchAction(
     return { error: result.error };
   }
 
-  await audit('match.deleted', {
-    matchId,
-    affectedPlayers: result.affectedPlayers,
-  }, { userId: admin.id, label: admin.email });
+  let warning = result.auditWarning;
+  try {
+    await audit('match.deleted', {
+      matchId,
+      affectedPlayers: result.affectedPlayers,
+    }, { userId: admin.id, label: admin.email });
+  } catch (error) {
+    console.error('Failed to log administrative audit for match deletion', error);
+    warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
+  }
 
   revalidatePath('/matches');
   revalidatePath(`/matches/${matchId}`);
@@ -675,5 +796,6 @@ export async function deleteMatchAction(
 
   return {
     message: `Match #${matchId} deleted successfully. Player stats recalculated for ${result.affectedPlayers} affected players.`,
+    warning,
   };
 }

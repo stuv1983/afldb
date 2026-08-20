@@ -11,7 +11,15 @@ import {
 } from '@/db/queries/player-links';
 import { audit, requireSuperAdmin } from '@/lib/auth/session';
 
-export type PlayerLinkActionState = { error?: string; message?: string };
+export type PlayerLinkActionState = { error?: string; message?: string; warning?: string };
+
+const ACTIVITY_AUDIT_WARNING =
+  'The change succeeded, but its administrative activity audit failed. '
+  + 'Do not submit it again; ask an administrator to reconcile the audit log.';
+
+function combineWarnings(...warnings: Array<string | undefined>): string | undefined {
+  return warnings.filter(Boolean).join(' ') || undefined;
+}
 
 /**
  * Every public page that renders linked-or-unmatched names from the
@@ -70,8 +78,14 @@ export async function linkPlayer(
   });
   if (!result.ok) return { error: result.error };
 
-  await audit('player_link.linked', { targetTable, targetId, playerId },
-    { userId: admin.id, label: admin.email });
+  let warning = result.auditWarning;
+  try {
+    await audit('player_link.linked', { targetTable, targetId, playerId },
+      { userId: admin.id, label: admin.email });
+  } catch (error) {
+    console.error('Failed to log administrative audit for player link', error);
+    warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
+  }
 
   // Deliberately NOT revalidatePath('/admin/player-links'): on this Next
   // 15.5 line, revalidating the route the action was submitted from leaves
@@ -82,7 +96,7 @@ export async function linkPlayer(
   // component refreshes the route itself after the action settles, which
   // takes the ordinary navigation path that provably works.
   revalidatePublicLinkPages();
-  return { message: 'Player linked.' };
+  return { message: 'Player linked.', warning };
 }
 
 export async function confirmUnlinked(
@@ -198,15 +212,24 @@ export async function createAndLinkPlayer(
   if (!result.ok) return { error: result.error };
   const { player } = result;
 
-  await audit('player_link.created_and_linked', {
-    targetTable,
-    targetId,
-    playerId: player.id,
-    playerName: player.displayName,
-  }, { userId: admin.id, label: admin.email });
+  let warning = result.auditWarning;
+  try {
+    await audit('player_link.created_and_linked', {
+      targetTable,
+      targetId,
+      playerId: player.id,
+      playerName: player.displayName,
+    }, { userId: admin.id, label: admin.email });
+  } catch (error) {
+    console.error('Failed to log administrative audit for create-and-link', error);
+    warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
+  }
 
   revalidatePublicLinkPages();
   revalidatePath('/players');
   revalidatePath('/admin/data-editor');
-  return { message: `Created player ${player.displayName} (ID #${player.id}) and linked successfully.` };
+  return {
+    message: `Created player ${player.displayName} (ID #${player.id}) and linked successfully.`,
+    warning,
+  };
 }

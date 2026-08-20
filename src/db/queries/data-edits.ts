@@ -5,6 +5,11 @@ import postgres from 'postgres';
 import { authSql } from '@/db/authClient';
 import { sql } from '@/db/client';
 import {
+  recomputePlayerDerivedStats,
+  recomputeSeasonBrownlowStatus,
+  recomputeSeasonMetadata,
+} from '@/db/queries/player-derived';
+import {
   EDITABLE_ENTITIES,
   type EditEntity,
   type FieldValue,
@@ -108,7 +113,11 @@ function stringify(entity: EditEntity, row: Record<string, unknown>): Record<str
 }
 
 export type SaveEditResult =
-  | { ok: true; changed: Record<string, { from: FieldValue; to: FieldValue }> }
+  | {
+      ok: true;
+      changed: Record<string, { from: FieldValue; to: FieldValue }>;
+      auditWarning?: string;
+    }
   | { ok: false; error: string };
 
 /**
@@ -193,8 +202,9 @@ export async function saveEdit(input: {
   } catch (error) {
     console.error('data_edits audit row could not be written', error);
     return {
-      ok: false,
-      error: 'The edit was applied, but the audit record failed — check the server log.',
+      ok: true,
+      changed,
+      auditWarning: 'The edit was applied, but its data-edits audit snapshot failed. Do not submit it again; ask an administrator to reconcile the audit log.',
     };
   }
 
@@ -313,6 +323,24 @@ async function applyMatchEdit(
       const home = hg * 6 + hb;
       const away = ag * 6 + ab;
       const result = home > away ? 'home_win' : home < away ? 'away_win' : 'draw';
+      const [match] = await tx<{
+        season: number;
+        homeClubId: number;
+        awayClubId: number;
+      }[]>`
+        SELECT season, home_club_id AS "homeClubId", away_club_id AS "awayClubId"
+          FROM matches
+         WHERE id = ${rowId}
+      `;
+      if (!match) throw new Error('No match with that id.');
+
+      const playerRows = await tx<{ playerId: number }[]>`
+        SELECT DISTINCT player_id AS "playerId"
+          FROM player_match_stats
+         WHERE match_id = ${rowId}
+      `;
+      const affectedIds = playerRows.map((row) => row.playerId);
+
       await tx`
         UPDATE matches
            SET home_goals = ${hg}, home_behinds = ${hb}, home_score = ${home},
@@ -325,6 +353,33 @@ async function applyMatchEdit(
                margin = ${Math.abs(home - away)}
          WHERE id = ${rowId}
       `;
+
+      // Period rows are cumulative. A sparse Q1/Q2/Q3 set does not identify
+      // the final period, so regulation time is period 4 unless explicit
+      // extra-time rows (5+) already establish a later final period.
+      const [periodRow] = await tx<{ period: number }[]>`
+        SELECT GREATEST(COALESCE(max(period), 4), 4)::int AS period
+          FROM match_period_scores
+         WHERE match_id = ${rowId}
+      `;
+      const finalPeriod = periodRow?.period ?? 4;
+      for (const score of [
+        { clubId: match.homeClubId, goals: hg, behinds: hb, points: home },
+        { clubId: match.awayClubId, goals: ag, behinds: ab, points: away },
+      ]) {
+        await tx`
+          INSERT INTO match_period_scores (match_id, club_id, period, goals, behinds, points)
+          VALUES (${rowId}, ${score.clubId}, ${finalPeriod}, ${score.goals}, ${score.behinds}, ${score.points})
+          ON CONFLICT (match_id, club_id, period) DO UPDATE SET
+            goals = EXCLUDED.goals,
+            behinds = EXCLUDED.behinds,
+            points = EXCLUDED.points
+        `;
+      }
+
+      await recomputeSeasonMetadata(tx, match.season);
+      await recomputePlayerDerivedStats(tx, affectedIds, match.season);
+      await recomputeSeasonBrownlowStatus(tx, match.season);
       return;
     }
     case 'match_time':

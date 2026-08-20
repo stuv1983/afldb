@@ -82,6 +82,12 @@ export function CreatePlayerForm({
         </div>
       )}
 
+      {state.warning && (
+        <div className="badge badge-warn" style={{ marginBottom: '1rem' }}>
+          {state.warning}
+        </div>
+      )}
+
       {state.error && (
         <div style={{ padding: '0.5rem 0.75rem', background: 'var(--bg-raised)', borderRadius: '6px', marginBottom: '1rem' }}>
           <p style={{ margin: 0, color: 'var(--color-warn)', fontSize: '0.9rem' }}>

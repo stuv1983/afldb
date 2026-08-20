@@ -24,10 +24,10 @@ export function DeleteMatchButton({
   const [state, formAction, isPending] = useActionState(deleteMatchAction, INITIAL);
 
   useEffect(() => {
-    if (state.message) {
+    if (state.message && !state.warning) {
       router.push('/admin/data-editor');
     }
-  }, [state.message, router]);
+  }, [state.message, state.warning, router]);
 
   if (!isConfirming) {
     return (
@@ -71,6 +71,18 @@ export function DeleteMatchButton({
         </p>
       )}
 
+      {state.message && (
+        <p style={{ margin: 0, color: 'var(--accent)', fontSize: '0.8rem' }}>
+          ✓ {state.message}
+        </p>
+      )}
+
+      {state.warning && (
+        <p className="badge badge-warn" style={{ margin: 0, fontSize: '0.8rem' }}>
+          {state.warning}
+        </p>
+      )}
+
       <form action={formAction} style={{ display: 'grid', gap: '0.5rem' }}>
         <input type="hidden" name="matchId" value={matchId} />
         <input
@@ -85,7 +97,7 @@ export function DeleteMatchButton({
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isPending || Boolean(state.message)}
             style={{
               background: 'var(--color-warn)',
               color: '#fff',

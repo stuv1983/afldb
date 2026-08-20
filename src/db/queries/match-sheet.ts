@@ -2,13 +2,11 @@ import 'server-only';
 
 import postgres from 'postgres';
 import { authSql } from '@/db/authClient';
-import { recomputePlayerDerivedStats, recomputeSeasonMetadata } from '@/db/queries/player-derived';
+import { recomputePlayerDerivedStats } from '@/db/queries/player-derived';
 import {
   deriveDisposals,
-  scoreSyncCoverageError,
   validateMatchSheetPayload,
   type PlayerMatchStatInput,
-  type ScoreSyncCoverage,
 } from '@/lib/match-sheet';
 
 export type { PlayerMatchStatInput } from '@/lib/match-sheet';
@@ -23,13 +21,14 @@ export type SaveMatchSheetInput = {
 };
 
 export type SaveMatchSheetResult =
-  | { ok: true; playerCount: number; scoreUpdated: boolean }
+  | { ok: true; playerCount: number; scoreUpdated: boolean; auditWarning?: string }
   | { ok: false; error: string };
 
 /**
  * Save complete match sheet (lineup and statistics) for a game (see changeLog.md).
- * Automatically updates player_match_stats, synchronizes match scores (if enabled),
- * and recomputes player career and season summaries in real time.
+ * Updates player_match_stats and recomputes player career and season summaries
+ * in real time. Team scores remain a separate fact because rushed behinds are
+ * not attributable to player rows.
  */
 export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMatchSheetResult> {
   const payload = validateMatchSheetPayload({
@@ -37,6 +36,13 @@ export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMa
     removedPlayerIds: input.removedPlayerIds ?? [],
   });
   if (!payload.ok) return { ok: false, error: payload.error };
+
+  if (input.syncMatchScores) {
+    return {
+      ok: false,
+      error: 'Team scores cannot be synchronized from player statistics because rushed behinds are not attributed to players. Edit the team score in Match Details.',
+    };
+  }
 
   const { players, removedPlayerIds } = payload.value;
   const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
@@ -52,15 +58,12 @@ export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMa
       const [match] = await tx<{
         id: number;
         season: number;
-        roundNumber: number | null;
         homeClubId: number;
         awayClubId: number;
         isFinal: boolean;
-        roundType: string;
       }[]>`
-        SELECT id, season, round_number AS "roundNumber", home_club_id AS "homeClubId",
-               away_club_id AS "awayClubId", is_final AS "isFinal",
-               round_type AS "roundType"
+        SELECT id, season, home_club_id AS "homeClubId",
+               away_club_id AS "awayClubId", is_final AS "isFinal"
           FROM matches
          WHERE id = ${input.matchId}
            FOR UPDATE
@@ -145,113 +148,19 @@ export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMa
         `;
       }
 
-      // 4. Optional score synchronization from player goals/behinds
-      if (input.syncMatchScores) {
-        const [totals] = await tx<({
-          homeGoals: number | null;
-          homeBehinds: number | null;
-          awayGoals: number | null;
-          awayBehinds: number | null;
-        } & ScoreSyncCoverage)[]>`
-          SELECT
-            (sum(goals) FILTER (WHERE club_id = ${match.homeClubId}))::int AS "homeGoals",
-            (sum(behinds) FILTER (WHERE club_id = ${match.homeClubId}))::int AS "homeBehinds",
-            (sum(goals) FILTER (WHERE club_id = ${match.awayClubId}))::int AS "awayGoals",
-            (sum(behinds) FILTER (WHERE club_id = ${match.awayClubId}))::int AS "awayBehinds",
-            count(*) FILTER (WHERE club_id = ${match.homeClubId})::int AS "homePlayers",
-            count(*) FILTER (WHERE club_id = ${match.awayClubId})::int AS "awayPlayers",
-            count(goals) FILTER (WHERE club_id = ${match.homeClubId})::int AS "homeGoalsRecorded",
-            count(behinds) FILTER (WHERE club_id = ${match.homeClubId})::int AS "homeBehindsRecorded",
-            count(goals) FILTER (WHERE club_id = ${match.awayClubId})::int AS "awayGoalsRecorded",
-            count(behinds) FILTER (WHERE club_id = ${match.awayClubId})::int AS "awayBehindsRecorded"
-          FROM player_match_stats
-          WHERE match_id = ${input.matchId}
-        `;
-
-        if (!totals) throw new Error('Could not read the saved match score components.');
-        const coverageError = scoreSyncCoverageError(totals);
-        if (coverageError) throw new Error(coverageError);
-
-        const homeGoals = totals.homeGoals as number;
-        const homeBehinds = totals.homeBehinds as number;
-        const awayGoals = totals.awayGoals as number;
-        const awayBehinds = totals.awayBehinds as number;
-        const homeScore = homeGoals * 6 + homeBehinds;
-        const awayScore = awayGoals * 6 + awayBehinds;
-        const result = homeScore > awayScore ? 'home_win' : homeScore < awayScore ? 'away_win' : 'draw';
-        const winnerClubId = homeScore > awayScore ? match.homeClubId : homeScore < awayScore ? match.awayClubId : null;
-        const margin = Math.abs(homeScore - awayScore);
-
-        await tx`
-          UPDATE matches
-             SET home_goals = ${homeGoals},
-                 home_behinds = ${homeBehinds},
-                 home_score = ${homeScore},
-                 away_goals = ${awayGoals},
-                 away_behinds = ${awayBehinds},
-                 away_score = ${awayScore},
-                 result = ${result}::match_result,
-                 winner_club_id = ${winnerClubId},
-                 margin = ${margin}
-           WHERE id = ${input.matchId}
-        `;
-
-        const [periodRow] = await tx<{ period: number }[]>`
-          SELECT COALESCE(max(period), 4)::int AS period
-            FROM match_period_scores
-           WHERE match_id = ${input.matchId}
-        `;
-        const finalPeriod = periodRow?.period ?? 4;
-        for (const score of [
-          { clubId: match.homeClubId, goals: homeGoals, behinds: homeBehinds, points: homeScore },
-          { clubId: match.awayClubId, goals: awayGoals, behinds: awayBehinds, points: awayScore },
-        ]) {
-          await tx`
-            INSERT INTO match_period_scores (match_id, club_id, period, goals, behinds, points)
-            VALUES (${input.matchId}, ${score.clubId}, ${finalPeriod}, ${score.goals}, ${score.behinds}, ${score.points})
-            ON CONFLICT (match_id, club_id, period) DO UPDATE SET
-              goals = EXCLUDED.goals,
-              behinds = EXCLUDED.behinds,
-              points = EXCLUDED.points
-          `;
-        }
-      }
-
       const affectedIds = Array.from(new Set([
         ...existingPlayers.map((row) => row.playerId),
         ...players.map((player) => player.playerId),
         ...removed,
       ])).filter((id) => Number.isInteger(id) && id > 0);
 
-      // Round detail is independently recorded. Official season totals are
-      // never inferred from this incomplete match-grain source.
-      if (affectedIds.length > 0 && match.roundNumber !== null) {
-        await tx`
-          DELETE FROM brownlow_round_votes
-           WHERE season = ${match.season}
-             AND round_number = ${match.roundNumber}
-             AND player_id = ANY(${affectedIds})
-        `;
-        await tx`
-          INSERT INTO brownlow_round_votes (season, player_id, round_number, played, votes)
-          SELECT ${match.season}, pms.player_id, ${match.roundNumber}, true, pms.brownlow_votes
-            FROM player_match_stats pms
-           WHERE pms.match_id = ${input.matchId}
-             AND pms.player_id = ANY(${affectedIds})
-             AND pms.brownlow_votes IS NOT NULL
-          ON CONFLICT (season, player_id, round_number) DO UPDATE SET
-            played = EXCLUDED.played,
-            votes = EXCLUDED.votes
-        `;
-      }
-
       await recomputePlayerDerivedStats(tx, affectedIds, match.season);
-      if (input.syncMatchScores) await recomputeSeasonMetadata(tx, match.season);
 
-      return { playerCount: players.length, scoreUpdated: input.syncMatchScores };
+      return { playerCount: players.length, scoreUpdated: false };
     });
 
     // 6. Audit log in data_edits
+    let auditWarning: string | undefined;
     try {
       await authSql`
         INSERT INTO data_edits
@@ -264,9 +173,15 @@ export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMa
       `;
     } catch (auditErr) {
       console.error('Audit row error in saveMatchSheet', auditErr);
+      auditWarning = 'The match sheet was saved, but its data-edits audit snapshot failed. Do not submit it again; ask an administrator to reconcile the audit log.';
     }
 
-    return { ok: true, playerCount: result.playerCount, scoreUpdated: result.scoreUpdated };
+    return {
+      ok: true,
+      playerCount: result.playerCount,
+      scoreUpdated: result.scoreUpdated,
+      auditWarning,
+    };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, error: `Failed to save match sheet: ${msg}` };

@@ -92,9 +92,14 @@ function GroupForm({
 
       {state.error && <span className="muted" style={{ fontSize: '0.85rem' }}>{state.error}</span>}
       {state.message && <span style={{ fontSize: '0.85rem' }}>{state.message}</span>}
+      {state.warning && (
+        <span className="badge badge-warn" style={{ justifySelf: 'start' }}>
+          {state.warning}
+        </span>
+      )}
       {state.staleDerived && state.staleDerived.length > 0 && (
         <span className="badge badge-warn" style={{ justifySelf: 'start' }}>
-          Derived tables now stale — run rebuild_derived.py ({state.staleDerived.join(', ')})
+          Derived data requires source reconciliation ({state.staleDerived.join(', ')}).
         </span>
       )}
     </form>

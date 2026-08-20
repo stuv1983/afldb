@@ -2,11 +2,11 @@
 
 ## AFLDB-ISSUE-001 — Match mutations overwrite authoritative Brownlow totals
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Admin
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/match-sheet.ts`, `src/db/queries/match-admin.ts`, `tools/migration/rebuild_derived.py`
 
 ### Symptom
@@ -28,21 +28,21 @@ Both mutation paths upsert and delete rows in `brownlow_season_votes` using per-
 The real-time derived-stat implementation duplicated the rebuild logic but treated incomplete match-grain Brownlow detail as the season-grain source of truth.
 
 ### Fix
-Not yet fixed.
+Removed every match-mutation write to `brownlow_season_votes`. Targeted player-season and career rebuilds now read the authoritative table without deriving or deleting it.
 
 ### Validation
-Static source/schema trace completed. Database integration validation is not yet available because `AFLDB_TEST_DATABASE_URL` is not configured.
+The Brownlow source-contract regression test passed and type checking passed. Database integration was not run because `AFLDB_TEST_DATABASE_URL` is not configured.
 
 ### Follow-up
 Add a regression guard that prevents match mutation modules from writing `brownlow_season_votes`.
 
 ## AFLDB-ISSUE-002 — Match deletion is blocked by derived `player_clubs` foreign keys
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Admin
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/match-admin.ts`, `src/db/migrations/007_derived_stats.sql`
 
 ### Symptom
@@ -64,21 +64,21 @@ The deletion transaction removes or refreshes derived rows in an order that perm
 The new deletion workflow omitted a match-referencing derived table from its dependency order.
 
 ### Fix
-Not yet fixed.
+The deletion transaction now clears affected derived `player_clubs` rows before deleting the referenced match and rebuilds them before commit.
 
 ### Validation
-Static foreign-key trace completed. Database integration validation not run because no guarded test database is configured.
+The match-mutation regression test asserts the dependency ordering and passed. Database integration was not run because no guarded test database is configured.
 
 ### Follow-up
 Search all match foreign keys and cover deletion of a career-first/career-last match in integration tests.
 
 ## AFLDB-ISSUE-003 — Match deletion queries a nonexistent Brownlow table
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Admin
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/match-admin.ts`, `src/db/migrations/015_brownlow_grain_and_coverage.sql`
 
 ### Symptom
@@ -100,21 +100,21 @@ Repository search finds `brownlow_seasons` and `not_awarded` only in `src/db/que
 The deletion-specific summary SQL diverged from the canonical `tools/migration/rebuild_derived.py` definition.
 
 ### Fix
-Not yet fixed.
+Deleted the divergent deletion-only SQL and routed save/delete through the shared canonical targeted rebuild helper. No `brownlow_seasons` or invalid coverage value remains.
 
 ### Validation
-Static schema trace completed. Database integration validation not run because no guarded test database is configured.
+Source-contract tests for schema names, coverage logic, and single-command tagged queries passed; database integration was unavailable.
 
 ### Follow-up
 Centralise targeted derived-stat recomputation so save and delete cannot drift into separate definitions.
 
 ## AFLDB-ISSUE-004 — Match mutations leave related derived summaries stale
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Database
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/match-sheet.ts`, `src/db/queries/match-admin.ts`, `tools/migration/rebuild_derived.py`
 
 ### Symptom
@@ -136,21 +136,21 @@ The canonical rebuild lists `player_clubs`, `player_club_season_stats`, `player_
 Hand-copied partial rebuild SQL was added independently to two mutation functions rather than sharing the complete canonical definition.
 
 ### Fix
-Not yet fixed.
+Added one shared targeted rebuild for `player_clubs`, `player_club_season_stats`, `player_season_stats`, `player_career_stats`, player career spans, career game numbers, and search rank.
 
 ### Validation
-Static input-to-output trace completed. Database integration validation not run because no guarded test database is configured.
+Focused source-contract and NULL-semantics tests passed with type checking. Database-backed first/last-match fixtures remain unrun.
 
 ### Follow-up
 Add targeted integration coverage for club changes and first/last-match removal.
 
 ## AFLDB-ISSUE-005 — Blank lineup statistics can reset a match to a 0–0 draw
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Admin
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/app/admin/data-editor/MatchSheetEditor.tsx`, `src/db/queries/match-sheet.ts`
 
 ### Symptom
@@ -172,21 +172,21 @@ The component initialises `syncMatchScores` to `true`; the aggregate in `saveMat
 The score-sync path has no completeness gate and conflates “not entered” with a recorded zero.
 
 ### Fix
-Not yet fixed.
+Removed player-stat-to-team-score synchronization. The UI posts `false`, explains rushed/unattributed behinds, and the lower helper rejects a forged opt-in before opening a database connection.
 
 ### Validation
-Static UI-to-SQL trace completed.
+Focused match-sheet and source-contract tests passed; the query contains no match or period score write.
 
 ### Follow-up
 Cover legitimate zero scores separately from absent scoring data.
 
 ## AFLDB-ISSUE-006 — Match-sheet payload is not validated on the server
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Admin
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/app/admin/data-editor/actions.ts`, `src/db/queries/match-sheet.ts`
 
 ### Symptom
@@ -208,21 +208,21 @@ The action only parses JSON. The query skips falsy IDs but otherwise binds all s
 HTML input limits were treated as validation even though the server action consumes a client-controlled hidden JSON field.
 
 ### Fix
-Not yet fixed.
+Added a shared pure validator at both the server action and query boundary for shape, bounded row counts, positive distinct IDs, jumper format, non-negative bounded integers, disposal consistency, and Brownlow allocation.
 
 ### Validation
-Static action/query/schema trace completed.
+`tests/match-sheet.test.ts` passed its valid, malformed, NULL-semantics, and allocation cases; type checking passed.
 
 ### Follow-up
 Keep lower-level validation as well as action-level validation so non-UI callers fail closed.
 
 ## AFLDB-ISSUE-007 — Statistical mutation connections fall back to the read URL
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Database
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/match-sheet.ts`, `src/db/queries/match-admin.ts`, `src/db/queries/awards-admin.ts`, `src/db/queries/players.ts`
 
 ### Symptom
@@ -244,21 +244,21 @@ The modules' own error messages say the import URL is required, while their conn
 A development convenience fallback bypassed the fail-closed role boundary.
 
 ### Fix
-Not yet fixed.
+Removed every `DATABASE_URL` fallback from the affected match, player, player-link, and awards mutation helpers. Missing import credentials now fail closed.
 
 ### Validation
-Repository-wide search confirmed seven instances across the four new mutation modules.
+Focused tests assert fail-closed behavior and repository search finds no fallback in the repaired mutation modules.
 
 ### Follow-up
 Add a source-level or unit guard preventing future mutation helpers from introducing this fallback.
 
 ## AFLDB-ISSUE-008 — Partial draft details invent the current year
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Admin
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/app/admin/data-editor/actions.ts`, `src/db/queries/players.ts`
 
 ### Symptom
@@ -280,21 +280,21 @@ The action constructs `draftInfo` when recruitment origin alone is present. The 
 An optional form section was forced into a non-null schema row using a guessed default rather than explicit validation.
 
 ### Fix
-Not yet fixed.
+Both action and query boundaries now require an explicit draft year from 1981 to 2100 whenever any draft detail is supplied.
 
 ### Validation
-Static action-to-query trace completed.
+Focused tests cover partial rejection and preservation of the supplied year; all passed.
 
 ### Follow-up
 Confirm whether manually created draft rows should also create a `draft_persons` identity row; the current changelog says they do, but the implementation does not.
 
 ## AFLDB-ISSUE-009 — Match save and delete use unsupported prepared multi-statements
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Admin
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/match-sheet.ts`, `src/db/queries/match-admin.ts`
 
 ### Symptom
@@ -316,21 +316,21 @@ The local postgres.js documentation states that extended/prepared queries suppor
 Canonical rebuild script fragments were copied into parameterised application queries without adapting them to postgres.js's single-statement protocol.
 
 ### Fix
-Not yet fixed.
+Replaced copied multi-command blocks with a shared helper whose parameterized tagged queries each contain exactly one SQL command inside the surrounding transaction.
 
 ### Validation
-Static query/API contract trace completed. Database integration validation not run because no guarded test database is configured.
+The single-command source-contract test and type check passed. Database execution remains unrun without the guarded test URL.
 
 ### Follow-up
 Split every mutation statement and retain the surrounding database transaction; do not use unparameterised `.simple()` as a workaround.
 
 ## AFLDB-ISSUE-010 — Manual award winners collide on a single null source key
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Admin
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/awards-admin.ts`, `src/db/migrations/042_awards_natural_keys.sql`
 
 ### Symptom
@@ -352,21 +352,21 @@ The insert column list in `createAwardWinner` contains neither provenance field.
 The GUI insertion path was added after the natural-key constraint but did not mint provenance for manual facts.
 
 ### Fix
-Not yet fixed.
+Manual winners now require the `manual_admin_edit` source and receive a collision-resistant `award_winner:<UUID>` source record ID before insertion.
 
 ### Validation
-Static insert/constraint trace completed. Database integration validation not run because no guarded test database is configured.
+Focused award mutation tests cover distinct keys and missing-source refusal; database constraint execution remains unrun.
 
 ### Follow-up
 Use the existing `manual_admin_edit` source and a collision-resistant per-record identifier.
 
 ## AFLDB-ISSUE-011 — New editor entities cannot write their promised audit snapshots
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Admin
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/migrations/057_data_edits.sql`, `src/db/queries/awards-admin.ts`, `src/db/queries/data-edits.ts`
 
 ### Symptom
@@ -388,21 +388,21 @@ The migration CHECK is `table_name IN ('players', 'matches')`, while the new cod
 New editable entities were added without the required follow-up migration widening the allowlisted audit vocabulary.
 
 ### Fix
-Not yet fixed.
+Migration 058 widens the existing `data_edits.table_name` CHECK only to the registered player, match, draft, award, Hall of Fame, and honour-team entities. Audit failures are surfaced as do-not-retry warnings.
 
 ### Validation
-Static insert/constraint trace completed. Database integration validation not run because no guarded test database is configured.
+Focused awards and edit-spec tests passed. Migration 058 was reviewed but not applied because no guarded test database is configured.
 
 ### Follow-up
 Add an ordered migration and privilege-safe integration assertions for every registered entity.
 
 ## AFLDB-ISSUE-012 — Draft resolution links unrelated same-name people
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Import
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/player-links.ts`, `src/db/migrations/019_draft_persons.sql`
 
 ### Symptom
@@ -424,21 +424,21 @@ Migration 019 explicitly states that names vary and identity is keyed by `(sourc
 A convenience fallback treated a display name as an identity key in a subsystem created specifically to avoid name-keyed identity.
 
 ### Fix
-Not yet fixed.
+Resolution now requires the target's numeric `draft_person_id`, updates that exact person, and propagates only to picks carrying the same durable ID. All raw-name fanout was removed.
 
 ### Validation
-Static identity-model/query trace completed.
+Focused tests cover same-name safety, exact propagation, missing identity, and parameterized audit values; all passed.
 
 ### Follow-up
 Cover same-name people and propagation across multiple picks for one `draft_person_id`.
 
 ## AFLDB-ISSUE-013 — Create-and-link can leave an orphan player after a stale submission
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Admin
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/app/admin/player-links/actions.ts`, `src/db/queries/players.ts`, `src/db/queries/player-links.ts`
 
 ### Symptom
@@ -460,21 +460,21 @@ The action commits `createPlayer` first, then starts a separate transaction in `
 A compound user operation was composed at the action layer instead of inside one database transaction.
 
 ### Fix
-Not yet fixed.
+Create-and-link now locks and rechecks the unresolved target first, then creates the player and applies the link in one import-role transaction using a shared transaction-scoped player helper.
 
 ### Validation
-Static transaction-boundary trace completed. Database integration validation not run because no guarded test database is configured.
+Focused mocked-transaction tests prove lock-before-insert, stale refusal without insert, and a single transaction. Database concurrency execution remains unrun.
 
 ### Follow-up
 Keep auth audit recording visible if the statistical transaction succeeds but the separate auth-role audit write fails.
 
 ## AFLDB-ISSUE-014 — Zero attendance cannot be created without provenance
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Admin
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/match-admin.ts`, `src/db/migrations/020_attendance_provenance.sql`
 
 ### Symptom
@@ -496,37 +496,37 @@ Migration 020 requires a source whenever attendance is zero; the original insert
 The match-creation path implemented attendance coverage without implementing the schema's provenance contract.
 
 ### Fix
-Implementation added; final combined validation and status update pending.
+Match creation now resolves the existing `manual_admin_edit` source whenever attendance is recorded, including zero, and stores its ID with complete coverage.
 
 ### Validation
-Static source/schema regression coverage added. Database integration is unavailable without `AFLDB_TEST_DATABASE_URL`.
+The source/schema regression test passed. Database constraint execution remains unavailable without `AFLDB_TEST_DATABASE_URL`.
 
 ### Follow-up
 Exercise the zero-attendance insert in the guarded integration suite when a test database is available.
 
-## AFLDB-ISSUE-015 — Match creation and deletion leave season summaries and ladders stale
+## AFLDB-ISSUE-015 — Match mutations leave source-derived club-season ladders stale
 
-- **Status:** Investigating
+- **Status:** Open
 - **Severity:** High
 - **Area:** Database
 - **Found:** 2026-08-20
 - **Resolved:** N/A
-- **Files:** `src/db/queries/match-admin.ts`, `src/db/queries/player-derived.ts`, `src/db/queries/seasons.ts`
+- **Files:** `src/db/queries/match-admin.ts`, `src/db/queries/data-edits.ts`, `src/db/queries/player-derived.ts`, `src/db/queries/seasons.ts`
 
 ### Symptom
-After creating or deleting a match, season dates/counts and stored club-season ladder rows can disagree with the authoritative `matches` table.
+After creating, deleting, or correcting the score of a match, stored `club_seasons` ladder rows can disagree with the authoritative match facts.
 
 ### Reproduction
-Create the first match in a new season, or delete an existing-season match, then read the season index and ladder.
+Create or delete a match, or correct an existing match score, then read the affected season's ladder.
 
 ### Expected
-Match-derived season metadata and ladder materialisations are refreshed before commit.
+The canonical, season-aware `club_seasons` materialisation is refreshed before commit.
 
 ### Actual
-The original mutation paths inserted/deleted match facts without rebuilding either summary family.
+Season metadata is now refreshed, but the mutation paths still leave `club_seasons` unchanged.
 
 ### Evidence
-Public season queries read stored `seasons` metadata and `club_seasons`; the original helpers touched neither after changing `matches`.
+Public ladder queries read stored `club_seasons`; the repaired mutation helpers update match facts, season metadata, and player summaries but do not rebuild those rows.
 
 ### Root cause
 The new point mutations were not connected to the canonical season-level rebuild pipeline.
@@ -542,11 +542,11 @@ Extract a targeted `club_seasons` rebuild from the canonical migration logic, in
 
 ## AFLDB-ISSUE-016 — Duplicate match retries create duplicate fixtures
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Admin
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/match-admin.ts`, `src/db/migrations/003_matches.sql`
 
 ### Symptom
@@ -568,21 +568,21 @@ Migration 003 defines `match_key` as the unique season/round/date/home/away iden
 A uniqueness violation was treated as a key-generation problem rather than duplicate-fact detection.
 
 ### Fix
-Implementation added; final combined validation and status update pending.
+Removed the time-based key suffix. An existing stable match key now returns a clear duplicate error, while the database unique constraint remains the concurrent backstop.
 
 ### Validation
-Static regression coverage asserts the time-based suffix is absent and duplicate detection fails closed.
+The duplicate-key source regression passed; a concurrent database test remains unrun.
 
 ### Follow-up
 Add a concurrent database integration test for two identical submissions.
 
 ## AFLDB-ISSUE-017 — “Previous lineup” can come from the current or a future match
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Admin
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/matches.ts`, `src/app/admin/data-editor/page.tsx`
 
 ### Symptom
@@ -604,21 +604,21 @@ The page did not pass the target match ID and the query had no strict date/ID bo
 The prefill lookup used a season ceiling instead of the edited match as its temporal anchor.
 
 ### Fix
-Implementation added; final combined validation and status update pending.
+The page now passes the edited match ID and the query selects the latest lineup under a strict `(match_date, id)` predecessor bound.
 
 ### Validation
-Static query regression coverage requires a strict `(match_date, id)` predecessor bound.
+The strict-predecessor source regression passed.
 
 ### Follow-up
 Cover same-day double-headers in a database-backed test.
 
 ## AFLDB-ISSUE-018 — Zero-game players display unrecorded era statistics as zero
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Statistics
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/players.ts`, `src/db/queries/player-derived.ts`, `src/db/migrations/007_derived_stats.sql`
 
 ### Symptom
@@ -640,22 +640,22 @@ Migration 007 documents `NULL` for never-recorded disposals; the UI directly ren
 The zero-game seed conflated an additive identity with absence of measurement.
 
 ### Fix
-Implementation added; final combined validation and status update pending.
+Both player creation and last-match deletion seed additive always-recorded totals at zero while keeping era-limited totals `NULL` with recorded-game counts at zero. Player reads preserve those nullable values.
 
 ### Validation
-Focused player-link tests and static match-mutation coverage assert nullable era totals are seeded as `NULL`.
+Focused player creation and match-mutation tests passed; a database-backed profile fixture remains unrun.
 
 ### Follow-up
 Run a database integration assertion covering create and delete-last-match paths.
 
 ## AFLDB-ISSUE-019 — Admin forms accept historically inactive club identities
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Identity
 - **Found:** 2026-08-20
-- **Resolved:** N/A
-- **Files:** `src/db/queries/match-admin.ts`, `src/db/queries/awards-admin.ts`, `src/db/migrations/017_club_organizations.sql`
+- **Resolved:** 2026-08-20
+- **Files:** `src/db/queries/match-admin.ts`, `src/db/queries/awards-admin.ts`, `src/db/queries/players.ts`, `src/db/migrations/017_club_organizations.sql`
 
 ### Symptom
 An administrator can attach a modern club identity to a historical match or club-scoped award, rewriting how that history is labelled publicly.
@@ -676,21 +676,21 @@ Migration 017 provides the season-aware identity function, but the original matc
 UI dropdown membership was mistaken for historical-identity validation.
 
 ### Fix
-Match creation now validates the season-active identity. Award-path repair is still being consolidated.
+Match creation, draft selection creation, club best-and-fairest inference, and every optional award club context now validate `afldb_identity_for_season` at the query boundary.
 
 ### Validation
-Static regression coverage confirms the match helper invokes the season-aware identity function.
+Focused match, draft, and award identity tests passed.
 
 ### Follow-up
 Keep the validation at the query boundary for every season-scoped club fact.
 
 ## AFLDB-ISSUE-020 — Partial disposal components manufacture a total
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Statistics
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/match-sheet.ts`, `src/lib/match-sheet.ts`
 
 ### Symptom
@@ -712,21 +712,21 @@ The write path used null-coalescing for each component before addition, violatin
 Arithmetic convenience erased measurement coverage.
 
 ### Fix
-Implementation added; final combined validation and status update pending.
+Disposals are derived only when both kicks and handballs are recorded; an explicit disposal total is preserved and a partial component pair stays `NULL`.
 
 ### Validation
-Focused unit tests cover both complete and partial component combinations.
+Focused unit tests for complete, partial, and explicit totals passed.
 
 ### Follow-up
 None beyond database-backed mutation coverage.
 
 ## AFLDB-ISSUE-021 — Match mutations leave career game numbers stale
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Statistics
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/player-derived.ts`, `src/db/queries/match-sheet.ts`, `src/db/queries/match-admin.ts`
 
 ### Symptom
@@ -748,21 +748,21 @@ Public match grids and natural-language features consume this stored field, whil
 The point-mutation derived-stat subset omitted an ordering-dependent column.
 
 ### Fix
-Implementation added; final combined validation and status update pending.
+The shared targeted rebuild renumbers every affected player's appearances deterministically by match date and match ID in the same transaction.
 
 ### Validation
-Static regression coverage asserts the shared helper performs a windowed renumber.
+The source-contract regression for the windowed renumber passed; a database mid-career deletion fixture remains unrun.
 
 ### Follow-up
 Add an integration fixture for a mid-career deletion.
 
 ## AFLDB-ISSUE-022 — Score synchronization leaves the final period total stale
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Statistics
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/match-sheet.ts`, `src/db/migrations/003_matches.sql`
 
 ### Symptom
@@ -784,21 +784,21 @@ Public match rendering reads both match and period score data; the mutation cont
 The denormalized final-period representation was omitted from synchronization.
 
 ### Fix
-Implementation added; final combined validation and status update pending.
+Unsafe player-stat score synchronization was removed. Official Match Details score edits now upsert the explicit cumulative final period, using period four unless existing extra-time rows establish a later period.
 
 ### Validation
-Static regression coverage asserts a final-period upsert occurs with the match update.
+Source-contract tests cover both synchronization refusal and the explicit-score period upsert; type checking passed.
 
 ### Follow-up
 Confirm overtime-period policy with a database fixture; the implementation updates the greatest existing period, defaulting to period four.
 
 ## AFLDB-ISSUE-023 — Generic awards editor bypasses authoritative Brownlow storage
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Statistics
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/awards-admin.ts`, `src/app/admin/data-editor/AwardWinnerForm.tsx`, `src/db/queries/awards.ts`
 
 ### Symptom
@@ -820,21 +820,21 @@ The two query families use different source tables and no synchronization joins 
 All award definitions were exposed to one generic mutation despite Brownlow's separate authoritative grain.
 
 ### Fix
-Not yet fixed.
+The generic form omits Brownlow and explains the authoritative workflow; the lower helper rejects the Brownlow slug before provenance lookup or insertion.
 
 ### Validation
-Static UI/query trace completed.
+Focused UI/source and mocked-query tests passed.
 
 ### Follow-up
 Fail closed in both the action and lower-level helper unless a provenance-aware Brownlow editor is implemented.
 
 ## AFLDB-ISSUE-024 — Club best-and-fairest winners can use the wrong or no club
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Identity
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/awards-admin.ts`, `src/app/admin/data-editor/AwardWinnerForm.tsx`, `src/db/queries/awards.ts`
 
 ### Symptom
@@ -856,21 +856,21 @@ Public club award queries filter the winner's club context; no query-boundary co
 Definition metadata and winner context were independently user-selectable.
 
 ### Fix
-Not yet fixed.
+The award definition's organization now determines the historical club identity for the winner's season. Missing definitions, missing active identities, and mismatched submitted clubs fail closed.
 
 ### Validation
-Static definition/form/query trace completed.
+Focused award tests cover inferred, missing, and wrong-era club contexts; all passed.
 
 ### Follow-up
 Pin club-scoped winners to the award definition and validate the historical identity at the query boundary.
 
 ## AFLDB-ISSUE-025 — Honour-team upsert can overwrite a distinct same-name player
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Identity
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/awards-admin.ts`, `src/db/migrations/042_awards_natural_keys.sql`
 
 ### Symptom
@@ -892,21 +892,21 @@ The mutation's conflict branch explicitly assigns the new linked identity to the
 A presentation name was used as the durable identity key.
 
 ### Fix
-Not yet fixed.
+Migration 059 replaces name-only uniqueness with partial keys for linked `(team_name, player_id)` and unlinked `(team_name, player_name_raw)` rows. Upserts target the matching identity-aware index.
 
 ### Validation
-Static schema/query trace completed.
+Focused source/query tests passed. Migration 059 was not applied; it deliberately fails closed if existing linked duplicates require review.
 
 ### Follow-up
 Use separate partial uniqueness for linked player IDs and unlinked names, and make creation fail rather than overwrite.
 
 ## AFLDB-ISSUE-026 — Submission rejection can overwrite a concurrent workflow transition
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Admin
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/db/queries/submissions.ts`, `src/app/admin/submissions/actions.ts`
 
 ### Symptom
@@ -928,10 +928,10 @@ Other workflow transitions use explicit state checks; rejection lacked the equiv
 One terminal action bypassed the submission state machine's compare-and-set pattern.
 
 ### Fix
-Not yet fixed.
+Rejection is now one conditional `UPDATE ... WHERE status IN (...) RETURNING id`. A zero-row result reports a stale/invalid transition and skips success audit and revalidation.
 
 ### Validation
-Static workflow trace completed.
+The regression reproduced as two failures before the fix and passed 2/2 afterward; type checking passed.
 
 ### Follow-up
 Add a concurrency-oriented query contract test.
@@ -943,7 +943,7 @@ Add a concurrency-oriented query contract test.
 - **Area:** Architecture
 - **Found:** 2026-08-20
 - **Resolved:** N/A
-- **Files:** `src/db/queries/match-sheet.ts`, `src/db/queries/match-admin.ts`, `src/db/queries/awards-admin.ts`, `src/db/queries/data-edits.ts`
+- **Files:** `src/db/queries/match-sheet.ts`, `src/db/queries/match-admin.ts`, `src/db/queries/awards-admin.ts`, `src/db/queries/data-edits.ts`, `src/db/queries/player-links.ts`, `src/app/admin/data-editor/actions.ts`
 
 ### Symptom
 A statistical mutation can commit without its promised audit snapshot, or can commit and then return an error that encourages a duplicate retry.
@@ -964,21 +964,21 @@ The helpers close the import transaction before calling `authSql`; no cross-conn
 Audit storage and statistical storage use role-separated connections without an atomic delivery design.
 
 ### Fix
-Not fixed. Suppressed award-audit failures were made visible, but that does not make the two commits atomic.
+Not fixed architecturally. Repaired admin paths now return an explicit success-with-warning result on post-commit audit failure, render “do not retry,” and avoid automatic redirects/refreshes that would hide it. Player creation also writes a `data_edits` snapshot. The two role-separated commits are still not atomic.
 
 ### Validation
-Static transaction-boundary trace completed.
+Focused warning-path tests passed for awards and player links; source review covers match, player, and generic-edit warnings. No cross-role failure integration fixture was available.
 
 ### Follow-up
 Choose and implement a database-owned audit function callable within the import transaction, or a durable transactional outbox with idempotent delivery.
 
 ## AFLDB-ISSUE-028 — Mutation cache invalidation omits dynamic public pages
 
-- **Status:** Investigating
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Web
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-20
 - **Files:** `src/app/admin/data-editor/actions.ts`, `src/app/admin/player-links/actions.ts`
 
 ### Symptom
@@ -1000,10 +1000,442 @@ The changed facts feed multiple dynamic page queries and Next.js requires a rout
 Cache invalidation was scoped to form redirects rather than the query dependency graph.
 
 ### Fix
-Match-sheet and match-delete actions now invalidate the affected dynamic route patterns. Other mutation families remain under review.
+Match, match-sheet, generic edit, player, draft-link, award, Hall of Fame, and honour-team actions now invalidate the dynamic route families that consume their changed facts.
 
 ### Validation
-Type checking accepts the route-pattern calls; source-level coverage is present for match mutations.
+Type checking passed and source review confirmed dynamic route-pattern calls use the required `page` type.
 
 ### Follow-up
 Audit award, player creation, and link-resolution route dependencies and add action-level tests where practical.
+
+## AFLDB-ISSUE-029 — New-match numeric fields trust browser-only constraints
+
+- **Status:** Resolved
+- **Severity:** High
+- **Area:** Admin
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/app/admin/data-editor/CreateMatchForm.tsx`, `src/app/admin/data-editor/actions.ts`, `src/db/queries/match-admin.ts`
+
+### Symptom
+A hand-posted new-match request can store negative or fractional scores, and partially entered score components can be converted into a total by treating the missing component as zero.
+
+### Reproduction
+Submit `homeGoals=-1`, a fractional score, or `homeGoals=3` with both home behinds and total score absent.
+
+### Expected
+The action and lower-level write boundary require bounded non-negative integers, preserve partial component uncertainty, and require an explicit score representation for both clubs.
+
+### Actual
+The original action accepted any JavaScript number and the query performed arithmetic with `?? 0`; the match schema has no non-negative score constraints.
+
+### Evidence
+HTML `min` attributes are bypassable. `parseScoreNum` accepted negative, fractional, and infinite values, while the query defaulted missing components and totals to zero.
+
+### Root cause
+Presentation-layer input constraints were treated as the statistical validation boundary.
+
+### Fix
+Added one shared pure numeric validator at action and query boundaries. It requires bounded finite integers, consistent component totals, and an explicit score representation for both clubs; the form no longer derives a total from one partial component.
+
+### Validation
+`tests/admin-match-input.test.ts` passed all valid, negative, fractional, infinite, partial, mismatch, attendance, and quarter-score cases.
+
+### Follow-up
+Add a shared pure validator used by both the server action and the database helper, with focused boundary tests.
+
+## AFLDB-ISSUE-030 — Match mutations overwrite independently sourced Brownlow round votes
+
+- **Status:** Resolved
+- **Severity:** High
+- **Area:** Statistics
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/db/queries/match-sheet.ts`, `src/db/queries/match-admin.ts`, `src/db/migrations/005_brownlow_awards.sql`
+
+### Symptom
+Saving or deleting a match can delete an official Brownlow round row, including one belonging to an unrelated match in the same round.
+
+### Reproduction
+Seed a round-vote row for a player outside the target match, pass that ID in `removedPlayerIds`, and save the target match.
+
+### Expected
+Independently imported `brownlow_round_votes` change only through an explicit provenance-aware round-vote workflow.
+
+### Actual
+The match helpers delete affected season/round/player rows and rebuild them from per-match detail.
+
+### Evidence
+Migration 005 and the public round query describe round detail as independently sourced; affected IDs include caller-supplied removals not proven to belong to the target match.
+
+### Root cause
+The same grain-collapse mistake as ISSUE-001 was retained for round totals after season-total writes were removed.
+
+### Fix
+Removed every match-save/delete write to `brownlow_round_votes`; per-match detail remains in `player_match_stats` and independent round facts require their own workflow.
+
+### Validation
+The Brownlow source-contract test asserts no round or season authority mutation and passed.
+
+### Follow-up
+Remove all round-table writes from match mutations and add a source-level regression guard.
+
+## AFLDB-ISSUE-031 — Player-stat score sync loses rushed behinds
+
+- **Status:** Resolved
+- **Severity:** High
+- **Area:** Statistics
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/db/queries/match-sheet.ts`, `src/app/admin/data-editor/MatchSheetEditor.tsx`
+
+### Symptom
+Synchronizing a legitimate match score from player statistics can reduce the team behind total and change the result.
+
+### Reproduction
+Use a match with team score 10.5 and player-attributed totals of 10.4 because one behind was rushed, then enable synchronization.
+
+### Expected
+Unattributed scoring is preserved explicitly; a player-only aggregate never claims to be the team total.
+
+### Actual
+The helper replaces team behinds with the sum of player behinds after checking only that player fields are non-null.
+
+### Evidence
+The AFL/AFLW profiling code explicitly models team behinds as potentially greater than attributed player behinds.
+
+### Root cause
+The feature assumed every team scoring event belongs to a player row.
+
+### Fix
+Removed the unsafe synchronization control, hard-coded the UI submission to false, explained the attribution limitation, and reject a forged true value before database access.
+
+### Validation
+Focused source-contract and match-sheet tests passed; no player-stat path writes team or period scores.
+
+### Follow-up
+Disable this synchronization path until unattributed/rushed scoring has an explicit write model.
+
+## AFLDB-ISSUE-032 — Season-status changes leave player Brownlow coverage stale
+
+- **Status:** Resolved
+- **Severity:** High
+- **Area:** Statistics
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/db/queries/player-derived.ts`, `src/db/queries/match-admin.ts`, `tools/migration/rebuild_derived.py`
+
+### Symptom
+Completing or reopening a season can leave player-season Brownlow status at the prior `pending` or final value.
+
+### Reproduction
+Create or delete the decisive Grand Final in the latest season and inspect players who were not in that match.
+
+### Expected
+Season metadata changes first, then Brownlow coverage is refreshed for every player-season row in that season.
+
+### Actual
+The original repair recomputed affected players before season metadata and never refreshed uninvolved players.
+
+### Evidence
+The canonical rebuild explicitly orders season metadata before player-season stats because coverage reads `seasons.status`.
+
+### Root cause
+A match-participant scope was incorrectly applied to a season-wide state transition.
+
+### Fix
+Added a season-wide Brownlow coverage update and ordered metadata before participant recomputation for create, delete, and official score correction paths.
+
+### Validation
+The dependency-order source regression passed, and the follow-up SQL review found the single-command CTE update valid. Database execution remains unrun.
+
+### Follow-up
+Add a season-wide targeted coverage refresh and enforce call ordering in regression tests.
+
+## AFLDB-ISSUE-033 — Deleting an auto-created season's only match marks it complete
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Area:** Database
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/db/queries/player-derived.ts`, `src/db/queries/match-admin.ts`
+
+### Symptom
+Deleting the sole match from a newly created latest season leaves a zero-match season labelled complete.
+
+### Reproduction
+Create the first match for a future season, then delete it.
+
+### Expected
+An empty retained season stays in progress, or is removed only when it is proven safe and unreferenced.
+
+### Actual
+The metadata CASE falls through to `complete` because the season is no longer the maximum season in `matches`.
+
+### Evidence
+The canonical rebuild updates only seasons present in its loaded-match CTE; it never turns an empty season complete.
+
+### Root cause
+The targeted summary omitted an explicit zero-match branch.
+
+### Fix
+The targeted metadata aggregate has an explicit zero-match branch that retains the season as `in_progress` with zero count and null dates.
+
+### Validation
+Source regression and follow-up SQL review passed; a database delete-only-match fixture remains unrun.
+
+### Follow-up
+Preserve the empty season as `in_progress` and cover it in database-backed tests.
+
+## AFLDB-ISSUE-034 — Match mutations leave player search rank stale
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Area:** Search
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/db/queries/player-derived.ts`, `src/db/migrations/008_search.sql`, `src/db/queries/search.ts`
+
+### Symptom
+Adding or deleting games changes career totals but not the player's search ordering weight.
+
+### Reproduction
+Mutate an affected player's match count and compare `players.search_rank` with `player_career_stats.games`.
+
+### Expected
+Search rank is refreshed from the recomputed career game count in the same transaction.
+
+### Actual
+The targeted helper updates only debut/final seasons on `players`.
+
+### Evidence
+Migration 008 and the canonical rebuild define rank from career games, and public search orders by it.
+
+### Root cause
+The denormalized search field was omitted from the point-rebuild dependency list.
+
+### Fix
+The shared player rebuild now updates `players.search_rank` from the rebuilt career games for every affected player, including zero-game rows.
+
+### Validation
+The search-rank source regression and follow-up SQL review passed.
+
+### Follow-up
+Update rank after career insertion and add a source-level regression guard.
+
+## AFLDB-ISSUE-035 — Score sync can overwrite a sparse early-period row as the final score
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Area:** Statistics
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/db/queries/match-sheet.ts`, `src/db/migrations/003_matches.sql`
+
+### Symptom
+If only Q1 or Q2 is recorded, score synchronization overwrites that period with the final match total.
+
+### Reproduction
+Create a match with only a Q1 period row and synchronize the score from a complete lineup.
+
+### Expected
+Sparse cumulative period observations remain at their actual period; final-period identity is never inferred from `max(period)`.
+
+### Actual
+The repair selected the greatest existing period and treated it as final.
+
+### Evidence
+The schema permits sparse period rows and the create form inserts any subset of Q1–Q4.
+
+### Root cause
+Row availability was mistaken for period semantics.
+
+### Fix
+Player-stat score sync was removed. Explicit Match Details corrections select at least period four and use a later period only when existing extra-time rows establish one.
+
+### Validation
+Source-contract tests assert both the absence of match-sheet period writes and the sparse-safe explicit-score policy.
+
+### Follow-up
+Remove the unsafe synchronization write pending an explicit final-period policy.
+
+## AFLDB-ISSUE-036 — Brownlow vote allocation lacks cross-player validation
+
+- **Status:** Resolved
+- **Severity:** High
+- **Area:** Statistics
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/lib/match-sheet.ts`, `src/db/queries/match-sheet.ts`
+
+### Symptom
+A match sheet can award three votes to multiple players, omit a placing, or publish any other invalid distribution.
+
+### Reproduction
+Submit two player rows with `brownlowVotes: 3` in an eligible home-and-away match.
+
+### Expected
+A recorded allocation has exactly one 3, one 2, and one 1; an unpublished allocation is entirely blank.
+
+### Actual
+Validation checks each value independently only for the range 0–3.
+
+### Evidence
+No cross-row count or six-vote distribution check exists before the upserts.
+
+### Root cause
+Row validation did not encode the match-level invariant.
+
+### Fix
+Any non-null published allocation must contain exactly one 3, one 2, and one 1; zeroes may accompany it, while an entirely blank pending allocation remains valid.
+
+### Validation
+Focused tests cover valid, blank, duplicate-three, partial, and all-zero distributions; all passed.
+
+### Follow-up
+Add duplicate, partial, valid, and all-blank allocation tests.
+
+## AFLDB-ISSUE-037 — Honours numeric facts rely on browser validation
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Area:** Admin
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/app/admin/data-editor/actions.ts`, `src/db/queries/awards-admin.ts`
+
+### Symptom
+Hand-posted honours forms can silently replace an invalid induction year with the current year, accept an invalid category, or store out-of-range votes and lineup order values.
+
+### Reproduction
+Submit a blank/non-numeric `inductedYear`, negative award votes, or a negative/fractional honour-team sort order.
+
+### Expected
+Factual numbers and vocabularies are validated at both action and query boundaries; missing history is never inferred from the wall clock.
+
+### Actual
+The original action defaulted an invalid induction year to `new Date().getFullYear()` and other fields relied on form attributes or permissive coercion.
+
+### Evidence
+The lower-level helpers accepted their typed inputs without runtime bounds, while server actions receive client-controlled `FormData`.
+
+### Root cause
+HTML controls and TypeScript types were treated as runtime data validation.
+
+### Fix
+Action and query boundaries now validate award season/votes, Hall of Fame category/induction/Legend years, and honour-team order. Invalid induction years are rejected rather than replaced by the current year.
+
+### Validation
+Focused lower-boundary tests passed, including proof that invalid values fail before a write connection opens; type checking passed.
+
+### Follow-up
+Add action and lower-boundary tests for years, categories, votes, and sort order.
+
+## AFLDB-ISSUE-038 — Match Details score edits leave dependent facts stale
+
+- **Status:** Resolved
+- **Severity:** High
+- **Area:** Statistics
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `src/db/queries/data-edits.ts`, `src/lib/edit/spec.ts`, `src/db/queries/player-derived.ts`
+
+### Symptom
+Correcting an official team score changes the match result but leaves the displayed final period and participant win/loss, premiership, season, career, and season-status summaries at their old values.
+
+### Reproduction
+Use Match Details to change a winner or Grand Final result, then inspect period scoring and affected player summaries.
+
+### Expected
+The score, final cumulative period, result-dependent player summaries, season metadata, and season-wide Brownlow coverage update in one import transaction.
+
+### Actual
+The generic score group originally issued one `UPDATE matches` and returned without invoking any recomputation.
+
+### Evidence
+Public match queries read `match_period_scores`; player derived tables encode outcomes; the score edit path touched none of them.
+
+### Root cause
+The generic editor declared derived targets for display but did not connect the mutation to their rebuild functions.
+
+### Fix
+The score edit now updates the match and explicit final cumulative period, then recomputes season metadata, affected player summaries, season-wide Brownlow coverage, career game numbers, spans, and search rank inside the same import transaction.
+
+### Validation
+The dependency/order source regression passed and type checking passed. Database execution remains unrun; `club_seasons` is still explicitly reported for source reconciliation under ISSUE-015.
+
+### Follow-up
+Repair period and player/season dependencies transactionally. `club_seasons` remains the separate policy-bound limitation recorded in ISSUE-015.
+
+## AFLDB-ISSUE-039 — Vitest configuration is loaded through a deprecated module mismatch
+
+- **Status:** Resolved
+- **Severity:** Low
+- **Area:** Tooling
+- **Found:** 2026-08-20
+- **Resolved:** 2026-08-20
+- **Files:** `vitest.config.ts`, `package.json`
+
+### Symptom
+Every test run warns that ESM syntax is being loaded as CommonJS and will be unsupported by Vite's planned native config-loader default.
+
+### Reproduction
+Run any `npm.cmd test -- ...` command.
+
+### Expected
+The configuration extension declares its ESM module format and tests start without compatibility warnings.
+
+### Actual
+`vitest.config.ts` uses ESM imports and `import.meta.url` in a package without `"type": "module"`.
+
+### Evidence
+Vitest emits the module-mismatch warning before every run and recommends an `.mjs`-family extension or package module declaration.
+
+### Root cause
+The config's filename does not communicate its existing ESM semantics to the loader.
+
+### Fix
+Renamed the unchanged ESM TypeScript configuration to `vitest.config.mts`, making its module semantics explicit without changing the package-wide module type.
+
+### Validation
+A post-rename focused Vitest run passed without the prior config-loader warning.
+
+### Follow-up
+None.
+
+## AFLDB-ISSUE-040 — Lint script is not configured for non-interactive validation
+
+- **Status:** Open
+- **Severity:** Low
+- **Area:** Tooling
+- **Found:** 2026-08-20
+- **Resolved:** N/A
+- **Files:** `package.json`
+
+### Symptom
+`npm.cmd run lint` opens Next.js's first-time ESLint configuration prompt instead of linting the repository.
+
+### Reproduction
+Run the package lint script in a clean non-interactive shell.
+
+### Expected
+The checked-in lint configuration and dependencies let CI and local agents run a deterministic lint command.
+
+### Actual
+No ESLint dependency or configuration is installed, and the script calls the deprecated `next lint` command.
+
+### Evidence
+The final validation run reached the interactive Strict/Base/Cancel prompt; `npm.cmd ls eslint --depth=0` reported an empty dependency tree.
+
+### Root cause
+The package script was added without completing or checking in the lint-tool setup, and Next.js 15 now warns that its wrapper will be removed in Next.js 16.
+
+### Fix
+Not fixed because adding the required lint packages would modify dependencies and require registry access outside this local-only repair.
+
+### Validation
+Type checking and all 951 runnable non-integration assertions pass independently; lint is explicitly not run.
+
+### Follow-up
+Choose a checked-in ESLint flat configuration, add compatible ESLint/Next plugins through the normal dependency-review process, and replace `next lint` with the ESLint CLI.

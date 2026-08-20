@@ -15,6 +15,46 @@ commit.
 
 ## [Unreleased]
 
+### Admin Mutation Integrity, Identity, and Audit Repair — 20 August 2026
+
+- **Match and player-stat correctness (AFLDB-ISSUE-001–009, 014–022, 029–036, 038)**:
+  - Added `src/lib/match-sheet.ts` and `src/lib/admin-match.ts` as shared server-boundary validators for match-sheet JSON, bounded statistics, exact Brownlow 3-2-1 allocations, new-match scores, attendance, and period totals.
+  - Added `src/db/queries/player-derived.ts` as the single targeted rebuild path for career game numbers, club stints, club-season/player-season/career totals, nullable era statistics, career spans, search rank, season metadata, and season-wide Brownlow coverage.
+  - Refactored match-sheet save and match deletion into supported one-command postgres.js queries, corrected match-FK deletion ordering, removed nonexistent coverage relations, and stopped all writes to authoritative `brownlow_season_votes` and independently sourced `brownlow_round_votes`.
+  - Removed player-stat-to-team-score synchronization because rushed behinds are not attributable to players. Match Details remains the explicit official-score editor and now transactionally refreshes the final cumulative period, match outcome, season metadata, and affected player summaries.
+  - Made score synchronization fail closed at the query boundary, made it permanently off in the UI, and documented the attribution limitation beside the match sheet.
+  - Match creation now rejects duplicate natural keys, validates season-active club identities, requires finite consistent score inputs, cites `manual_admin_edit` for recorded attendance (including zero), and refreshes season metadata and coverage.
+  - Match deletion now safely handles first/last-match foreign keys, zero-game players, empty latest seasons, and all affected derived player surfaces.
+  - Previous-lineup prefill is now strictly relative to the edited match, and replacing a prefilled team correctly records dropped players for removal.
+  - Official Match Details score edits now use a sparse-safe final-period policy (period four unless explicit extra time exists). `club_seasons` remains explicitly flagged for source reconciliation because the canonical ladder is source-derived and season-rule dependent.
+
+- **Player, draft, and link identity integrity (AFLDB-ISSUE-007–008, 012–013, 018–020, 027–028)**:
+  - Player creation and link resolution require `AFLDB_IMPORT_DATABASE_URL`; the application read URL is no longer a write fallback.
+  - Optional draft history now requires an explicit 1981–2100 year and a club identity active in that season; no DOB or wall-clock year is invented.
+  - Zero-game profiles preserve `NULL` for never-recorded era statistics while keeping recorded-game counts and always-recorded totals at zero.
+  - Draft resolution follows only the durable numeric `draft_person_id`, propagates to picks for that exact identity, and no longer fans out by raw name.
+  - “Create & link” now locks/rechecks the unresolved target and creates the player plus link in one import transaction, preventing stale-form orphan players.
+  - Player-link audit failures now return visible success-with-warning results that explicitly say not to retry, and dynamic public link consumers are revalidated.
+
+- **Awards and honours integrity (AFLDB-ISSUE-010–011, 019, 023–025, 027–028, 037)**:
+  - Manual award winners now use the `manual_admin_edit` source with unique UUID-backed source record IDs.
+  - Brownlow is excluded from the generic awards form and rejected in the lower helper because `brownlow_season_votes` is authoritative.
+  - Club best-and-fairest winners derive their required historical club identity from the award definition; all optional award club contexts are season validated.
+  - Added migration `058_data_edits_editor_entities.sql` to allow audit snapshots for every registered editor entity.
+  - Added migration `059_honour_team_member_identity.sql` to replace name-only honour-team uniqueness with separate linked-player and unlinked-name partial unique indexes.
+  - Hall of Fame categories/years, Legend years, award vote/stat values, and honour-team ordering now have action- and query-boundary validation rather than browser-only constraints.
+  - Award, Hall of Fame, and honour-team audit failures are shown as committed-with-warning states and their forms invalidate affected dynamic public pages.
+
+- **Workflow, cache, and audit safety (AFLDB-ISSUE-026–028)**:
+  - Submission rejection is now a conditional compare-and-set transition with `RETURNING`; stale or missing rows cannot be reported or audited as successfully rejected.
+  - Added dynamic path invalidation for player, match, season, club, record, award, Hall of Fame, honour-team, and draft consumers after their corresponding mutations.
+  - Statistical writes that still require a separate-role audit now preserve the successful result and display a do-not-retry warning on audit failure. The remaining cross-role atomicity limitation is documented as open in `issues.md`.
+
+- **Validation and maintenance (AFLDB-ISSUE-039)**:
+  - Added focused regression suites for match input, match mutations, match-sheet semantics, awards/honours, draft/player links, and submission rejection.
+  - Renamed `vitest.config.ts` to `vitest.config.mts` so its existing ESM syntax loads without Vite's CommonJS compatibility warning.
+  - Created and maintained `issues.md` as the defect ledger: 37 repaired defects are marked resolved and three policy/architecture/tooling limitations remain open.
+
 ### Interactive Match Browser with Season & Club Filters — 20 August 2026
 
 - **Comprehensive Match Browser in Data Editor (`/admin/data-editor`)**:
