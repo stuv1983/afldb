@@ -254,6 +254,23 @@ describe('describeAnswer — ties across the remaining grains', () => {
 });
 
 describe('describeAnswer - team grouped and streak grains', () => {
+  it('uses lowest wording for min-ranked answers instead of describing them as highest', () => {
+    expect(describeAnswer(
+      plan({ grain: 'team_match', metric: 'team_score', mode: undefined, agg: { kind: 'min' } }),
+      { kind: 'team_match', lead: matchRow({ value: 0, clubScore: 0, opponentScore: 80 }), rows: [matchRow({ value: 0 })], total: 1 },
+    ).interpretation).toBe('Lowest team score.');
+
+    expect(describeAnswer(
+      plan({ grain: 'player_game', metric: 'goals', agg: { kind: 'min' } }),
+      { kind: 'player_game', lead: gameRow({ value: 0 }), rows: [gameRow({ value: 0 })], total: 1 },
+    ).interpretation).toBe('Lowest single-game performance.');
+
+    expect(describeAnswer(
+      plan({ grain: 'club_season', metric: 'wins', mode: undefined, agg: { kind: 'min' } }),
+      { kind: 'club_season', lead: clubSeasonRow({ value: 0 }), rows: [clubSeasonRow({ value: 0 })], total: 1 },
+    ).interpretation).toBe('Lowest wins.');
+  });
+
   it('describes a HAVING result as grouped clubs, never as Highest with a blank metric', () => {
     const rows: NlTeamAggregateRow[] = [
       { organizationId: 1, clubName: 'Carlton', clubSlug: 'carlton', value: 12 },

@@ -1,14 +1,14 @@
 ---
 name: afldb-nl-search-audit
-description: Review, debug, expand and regression-test AFLDB's deterministic natural-language search against the real PostgreSQL data and the real /search UI. Use for parser, plan, SQL compiler, alias, coverage, answer-rendering and NL-search regression work.
+description: Review, debug, expand, regression-test, document, and verify AFLDB's deterministic natural-language search against the real PostgreSQL development data and the real /search UI. Use for parser, plan, SQL compiler, alias, coverage, answer-rendering, NL-search regression, audit, and repair work. Maintain issues.md and CHANGELOG.md when defects or codebase changes are found.
 disable-model-invocation: true
 ---
 
 # AFLDB Natural-Language Search Audit
 
-Use this skill when AFLDB natural-language search gives a wrong answer, declines an answerable question, ignores part of a question, returns the wrong grain, or needs a new supported query family.
+Use this skill when AFLDB natural-language search gives a wrong answer, declines an answerable question, ignores part of a question, returns the wrong grain, renders a misleading explanation, exposes a browser/runtime failure, or needs a new supported query family.
 
-The objective is **semantic correctness against AFLDB's real data**, not merely making a parser unit test pass.
+The objective is **semantic correctness against AFLDB's real data and real `/search` behaviour**, not merely making a parser unit test pass.
 
 A successful change must satisfy all of these:
 
@@ -16,36 +16,532 @@ A successful change must satisfy all of these:
 2. The structured plan preserves every meaningful constraint.
 3. `validatePlan` accepts only combinations the SQL layer can actually execute.
 4. The grain compiler honours every field in the validated plan.
-5. The SQL result agrees with an independently written PostgreSQL truth query.
-6. The `/search` UI renders the same answer, ties and caveats correctly.
+5. The SQL result agrees with an independently written PostgreSQL truth query when the query is database-backed.
+6. The `/search` UI renders the same answer, ties, wording, interpretation, and caveats correctly.
 7. Existing NL regression tests and representative neighbouring phrasings do not regress.
 8. Parser behaviour changes carry a `PARSER_VERSION` bump.
-9. No unsupported scope, metric, qualifier or data gap is silently dropped.
+9. No unsupported scope, metric, qualifier, historical coverage gap, or ambiguity is silently dropped.
+10. Every credible defect found is recorded in the repository's `issuesFound` ledger.
+11. Every codebase change made by the audit is recorded in the existing `CHANGELOG.md`.
+12. The final report distinguishes verified, blocked, not-run, and environment-limited checks.
 
-## Safety and repository rules
+---
 
-- Work on the local working tree only.
-- Expected Windows editing copy: `D:\dev\afldb`.
-- Authoritative Linux/database-backed environment: `/home/arm/projects/afldb`.
-- Development PostgreSQL database: `afldb_dev`.
-- The Linux database-backed result is authoritative; a Windows-only result is not sufficient.
-- Do not commit, push, merge, rebase, checkout, reset, stash or otherwise mutate Git state. The user reviews local changes first.
+# Invocation modes
+
+The first argument may be one of:
+
+- `audit` — inspect, reproduce, classify, verify, and document problems; do not edit application source.
+- `fix` — reproduce, patch the smallest correct layer, add regression tests, document, and verify.
+- `verify` — run the acceptance set and report results without broad code changes.
+- `full` — audit the NL system category by category, fix justified defects, expand tests, update audit records, verify against the development database/UI, and run the broader regression suite.
+
+If no mode is supplied, use `full`.
+
+A remaining argument may identify one query, category, or defect. Prioritise that scope first, then run neighbouring regressions.
+
+Documentation files required by this skill are not considered application-source edits. In `audit` mode, it is valid to update the existing `issuesFound` ledger with defects discovered even though application source must remain untouched.
+
+---
+
+# Safety and repository rules
+
+## Local editing workspace
+
+- Primary Windows editing copy: `D:\dev\afldb`.
+- Make source/test/documentation edits in this local working tree first.
+- Preserve unrelated local content.
+- Do not broadly reformat files as part of an unrelated NL fix.
+- Do not modify `tools/migration/**` or `*.py` unless the user explicitly authorises migration/import work.
+- Do not change source data to make a search test pass.
 - Do not deploy production changes.
 - Do not write to production data.
-- Treat the development database as read-only for NL verification unless the user explicitly requests a data change.
-- Do not change source data to make a search test pass.
-- Do not weaken validation, confidence thresholds or coverage protections just to turn a decline into an answer.
-- Do not replace deterministic NL search with an LLM.
-- Never interpolate reader text into SQL identifiers. New metrics and operations must remain closed/allowlisted.
-- Preserve AFLDB's rule that `NULL` means "not recorded", not zero.
+- Do not use production as a test target.
 
-## Current architecture to preserve
+## Leave Git untouched
+
+Unless the user explicitly asks for Git work:
+
+- do not run `git`;
+- do not run `gh`;
+- do not inspect or mutate `.git`;
+- do not commit;
+- do not stage;
+- do not stash;
+- do not branch;
+- do not merge/rebase;
+- do not checkout/restore/reset;
+- do not pull/fetch/push;
+- do not use Git history as an investigative shortcut.
+
+The user reviews the working-tree changes first.
+
+Track the files changed during the session yourself so the final report does not depend on Git.
+
+## Search-system invariants
+
+- Natural-language search remains deterministic and LLM-free.
+- Reader text must never be interpolated into SQL identifiers.
+- New metrics/operations remain closed and allowlisted.
+- Preserve `NULL` as "not recorded"; do not silently coerce it to zero.
+- Preserve historical club identity semantics.
+- Preserve stable numeric player identity.
+- Brownlow season/career totals must use the authoritative season-level source where required.
+- Tied records must retain every qualifying holder when the product contract requires ties.
+- Do not weaken validation, confidence, coverage, or ambiguity protections just to turn a decline into an answer.
+
+## Never make a failure disappear artificially
+
+Do not "fix" an NL problem by:
+
+- deleting/skipping a valid failing test;
+- weakening an assertion without evidence the assertion was wrong;
+- swallowing exceptions;
+- returning fabricated fallback data;
+- using arbitrary sleeps as a race fix;
+- suppressing hydration warnings;
+- increasing timeouts as the sole fix;
+- changing `NULL` to zero;
+- hiding unsupported coverage;
+- bypassing the beta gate, auth, permissions, or other security controls;
+- changing the database to agree with a buggy query.
+
+Fix the first wrong layer.
+
+---
+
+# Development server access
+
+The authoritative Linux environment is a **remote development server**. It is not WSL.
+
+## Development targets
+
+- Windows editing workspace: `D:\dev\afldb`
+- Development server: `10.0.40.100`
+- SSH target: `arm@10.0.40.100`
+- Remote AFLDB checkout: `/home/arm/projects/afldb`
+- Development application: `http://10.0.40.100:8090`
+- Development PostgreSQL database: `afldb_dev`
+- Integration-test database: the database referenced by remote `AFLDB_TEST_DATABASE_URL`, which must end in `_test`
+- Existing NL UI auth state when valid: `tests/nl-ui/.auth/state.json`
+
+The Windows working tree is the primary editing workspace.
+
+The Linux development server is authoritative for:
+
+- PostgreSQL truth queries;
+- PostgreSQL-backed integration tests;
+- Linux runtime behaviour;
+- production-style build behaviour;
+- NL stress execution requiring real data;
+- browser verification against the development deployment.
+
+## Do not use WSL as the AFLDB server
+
+Do not probe WSL for `/home/arm/projects/afldb`.
+
+Do not conclude that the authoritative environment is unavailable because:
+
+- Windows lacks `.env`;
+- Windows lacks `psql`;
+- WSL lacks Node/PostgreSQL;
+- WSL has a different home directory.
+
+Try the development server by SSH first.
+
+Use Windows OpenSSH directly:
+
+```powershell
+ssh.exe arm@10.0.40.100
+```
+
+A safe initial probe is:
+
+```powershell
+ssh.exe arm@10.0.40.100 'cd /home/arm/projects/afldb && pwd && command -v node && command -v npm && command -v psql && test -f .env && echo HAS_ENV'
+```
+
+If the execution sandbox blocks SSH/network access, request permission for the exact non-destructive SSH command and retry outside the sandbox.
+
+A sandbox access-denied error does not prove the development server is unavailable.
+
+## Secret handling
+
+The development server owns its environment configuration.
+
+Never:
+
+- print `.env`;
+- copy `.env` to Windows;
+- display a database URL;
+- display passwords/tokens;
+- print beta/session cookie values;
+- copy production credentials;
+- manufacture a replacement database URL.
+
+Load environment variables only inside the remote shell:
+
+```bash
+cd /home/arm/projects/afldb
+set -a
+[ -f .env ] && . ./.env
+set +a
+```
+
+Do not echo secret environment variables after loading them.
+
+## Development database truth queries
+
+Use the development server's `DATABASE_URL` only for read-only truth verification.
+
+Before querying, prove the database target is exactly `afldb_dev`:
+
+```powershell
+ssh.exe arm@10.0.40.100 'cd /home/arm/projects/afldb && set -a && . ./.env && set +a && db="$(psql "$DATABASE_URL" -Atqc "SELECT current_database()")" && printf "database=%s\n" "$db" && test "$db" = "afldb_dev"'
+```
+
+If the database is not exactly `afldb_dev`, stop.
+
+Truth queries must be explicitly read-only:
+
+```sql
+BEGIN READ ONLY;
+
+-- independent verification SQL
+
+ROLLBACK;
+```
+
+`DATABASE_URL` / `afldb_dev` may be used to independently verify AFL facts and the semantic result expected from an NL query.
+
+Do not mutate `afldb_dev` during an NL audit.
+
+## Integration tests
+
+Database-backed integration tests must use the remote environment's existing `AFLDB_TEST_DATABASE_URL`.
+
+Never substitute `DATABASE_URL` or `afldb_dev` for `AFLDB_TEST_DATABASE_URL`.
+
+Before running integration tests:
+
+```powershell
+ssh.exe arm@10.0.40.100 'cd /home/arm/projects/afldb && set -a && . ./.env && set +a && test -n "$AFLDB_TEST_DATABASE_URL" || { echo "AFLDB_TEST_DATABASE_URL is unavailable"; exit 20; }; db="$(psql "$AFLDB_TEST_DATABASE_URL" -Atqc "SELECT current_database()")"; printf "test_database=%s\n" "$db"; case "$db" in *_test) ;; *) echo "REFUSED: integration database does not end in _test"; exit 21 ;; esac'
+```
+
+Only after that guard passes may integration tests run.
+
+Example:
+
+```powershell
+ssh.exe arm@10.0.40.100 'cd /home/arm/projects/afldb && set -a && . ./.env && set +a && npm test -- tests/integration/nl-answers-team-club.test.ts'
+```
+
+The `_test` database suffix safety rule is mandatory.
+
+## Remote verification of local source changes
+
+Source fixes are made first in:
+
+```text
+D:\dev\afldb
+```
+
+For authoritative Linux verification, only files changed by the current NL task may be transferred to the development server.
+
+Never blindly synchronise the whole repository.
+
+Never transfer or overwrite:
+
+```text
+.git/
+.env
+node_modules/
+.next/
+artifacts/
+database files
+secret files
+credential files
+```
+
+Do not transfer `tools/migration/**` or `*.py` unless explicitly authorised.
+
+Before the first local edit to a file that may later be tested remotely:
+
+1. read the corresponding remote file;
+2. establish that the remote copy represents the same baseline logic;
+3. note a checksum when practical.
+
+When transferring a changed file:
+
+1. copy it first to a temporary remote staging directory such as `/tmp/afldb-nl-audit-upload/`;
+2. compare the staged file with `/home/arm/projects/afldb/<path>`;
+3. confirm the remote destination does not contain unrelated work that would be overwritten;
+4. replace only the intended file;
+5. never use Git as the transfer mechanism.
+
+If the remote destination contains unrelated changes or its baseline cannot be reconciled safely, do not overwrite it. Report the remote verification step as blocked for that changed file.
+
+`issuesFound.md` and `CHANGELOG.md` are part of the task's changed-file set and should be kept consistent between the local working copy and the remote development checkout if source files are transferred for authoritative verification.
+
+## Development application verification
+
+The development application is:
+
+```text
+http://10.0.40.100:8090
+```
+
+Use the repository's existing Playwright configuration and, when valid:
+
+```text
+tests/nl-ui/.auth/state.json
+```
+
+for the beta gate.
+
+Do not print cookie contents.
+
+For every user-visible NL fix, verify the exact failing question against the development application after the changed source is actually running there.
+
+If the development application requires a rebuild/restart to pick up changes:
+
+1. inspect the repository's documented development deployment/service workflow;
+2. identify the development AFLDB service from existing configuration;
+3. use the repository-supported development build/restart procedure;
+4. restart only the development AFLDB application;
+5. do not alter DNS, Caddy configuration, PostgreSQL configuration, systemd unit definitions, or production services merely to run an NL audit;
+6. do not guess a service name.
+
+Do not deploy to `afldb.com` or the production application.
+
+## Remote verification priority
+
+For `full` mode, do not report database-backed verification as blocked merely because the Windows shell lacks database tooling.
+
+Expected order:
+
+```text
+Windows/source inspection
+-> Windows DB-independent parser/plan/description tests
+-> Windows typecheck
+-> SSH afldb_dev independent truth queries
+-> SSH _test database integration tests
+-> development /search UI
+-> broader NL regression/stress/UI suite
+```
+
+Only report the database portion as blocked if the remote development server itself cannot provide the required environment after SSH access has been attempted.
+
+---
+
+# Required audit records
+
+The NL audit is not complete if it finds/fixes an issue but fails to update the repository's issue ledger and changelog.
+
+## `issuesFound` / `issuesFound.md`
+
+The canonical NL defect ledger is the existing root-level `issuesFound` file.
+
+At the beginning of the run:
+
+1. inspect the repository root for an existing file named `issuesFound`, `issuesFound.md`, or the same name with different casing;
+2. use the existing file if one exists;
+3. do not create a duplicate under different casing;
+4. if no existing `issuesFound` ledger exists, create `issuesFound.md` at the repository root.
+
+Do **not** silently substitute a generic `issues.md` file unless the repository already explicitly uses that file as the `issuesFound` ledger. The user's requested audit record is `issuesFound`.
+
+Every credible NL defect discovered must be recorded, including:
+
+- defects fixed immediately;
+- description-only defects;
+- parser/compiler defects;
+- database/data defects;
+- UI/runtime defects;
+- incorrect declines;
+- malformed explanations;
+- test/tooling defects that materially limit verification;
+- suspicious conditions that remain under investigation;
+- blocked verification that prevents a claim of completion.
+
+Do not remove resolved issues. Update their status and preserve their diagnostic history.
+
+If the existing file already has an ID/format convention, preserve it.
+
+If no convention exists, use monotonically increasing IDs:
+
+```text
+AFLDB-ISSUE-001
+AFLDB-ISSUE-002
+...
+```
+
+Recommended new-entry format:
+
+```markdown
+## AFLDB-ISSUE-### — Short descriptive title
+
+- **Status:** Open | Investigating | Resolved | Blocked | Won't fix
+- **Severity:** Critical | High | Medium | Low
+- **Area:** NL Search | Parser | Plan | Compiler | Database | Description | UI | Runtime | Tests | Data
+- **Found:** YYYY-MM-DD
+- **Resolved:** YYYY-MM-DD or N/A
+- **Queries:** `exact query`, `variant`
+- **Files:** `path/to/file.ts`, `path/to/test.ts`
+
+### Symptom
+What the reader/system observes.
+
+### Reproduction
+Exact query, command, or UI sequence.
+
+### Expected
+Correct semantic behaviour.
+
+### Actual
+Observed behaviour.
+
+### Evidence
+Relevant plan shape, result value, UI text, error, DB truth, failing test, or code path.
+
+### First wrong layer
+Canonicalisation | Entity resolution | Slot extraction | Grain | Validation | Compiler | Database/data | Description | UI/runtime
+
+### Root cause
+Technical cause. If not proven, write `Not yet confirmed`.
+
+### Fix
+What changed, or `Not yet fixed`.
+
+### Validation
+Exact tests/commands and results. Include DB/UI evidence where applicable.
+
+### Follow-up
+Remaining risk, related cases, blocked checks, or `None`.
+```
+
+### Update timing
+
+Update the issue ledger during the investigation, not only at the end:
+
+- on credible reproduction: create/update as `Investigating`;
+- when root cause is proven: add first-wrong-layer/root-cause evidence;
+- when patched: record the fix;
+- after validation: set `Resolved` only if the relevant gates pass;
+- if verification cannot be completed: use `Blocked` or retain `Investigating` as appropriate.
+
+A defect found and fixed in one session still requires a retained issue entry.
+
+### Example: description-direction defect
+
+A defect such as:
+
+```text
+lowest second half score by Essendon
+```
+
+returning the correct low value but describing it as:
+
+```text
+Highest team score.
+```
+
+must be recorded even though the database result itself is correct.
+
+Its first wrong layer is `Description`, and resolution evidence must include the focused description regression plus a real `/search` re-check when available.
+
+## `CHANGELOG.md`
+
+The repository already uses uppercase:
+
+```text
+CHANGELOG.md
+```
+
+Use that exact existing file.
+
+Do not create a second:
+
+```text
+changelog.md
+Changelog.md
+CHANGELOG.MD
+```
+
+on case-sensitive systems.
+
+Update `CHANGELOG.md` for every codebase change made during the audit, including:
+
+- bug fixes;
+- parser/vocabulary changes;
+- plan/validation changes;
+- compiler/query changes;
+- description/rendering changes;
+- user-visible behaviour changes;
+- regression-test additions;
+- meaningful test corrections;
+- performance changes;
+- operational guidance changes;
+- audit-skill/documentation changes that materially change project workflow.
+
+Do not add a changelog entry merely for:
+
+- reading files;
+- running tests;
+- confirming an already-correct behaviour;
+- a blocked check when no codebase behaviour/documentation changed.
+
+Match the repository's existing changelog format.
+
+Each change entry should state:
+
+1. what changed;
+2. why;
+3. the affected NL behaviour;
+4. related regression coverage;
+5. the related `AFLDB-ISSUE-###` ID where applicable.
+
+Example:
+
+```markdown
+- Fixed NL ranked-answer descriptions so `min` aggregations use "Lowest" rather than "Highest" across player, team-match, club-season, player-season and career results (`AFLDB-ISSUE-###`). Added regression coverage for minimum and maximum wording, including `lowest second half score by Essendon`.
+```
+
+Do not mark a changelog item as fully fixed if the related issue remains open/blocked.
+
+## Documentation completion gate
+
+Before the final response:
+
+- inspect the current `issuesFound` ledger and confirm every defect discovered in this run appears in it;
+- inspect `CHANGELOG.md` and confirm every source/test/documentation change from this run is represented;
+- cross-check issue IDs referenced by changelog entries;
+- make sure resolved issue entries contain validation evidence;
+- ensure blocked checks are not written as passes;
+- include both files in the final "Files changed" list whenever they were modified.
+
+If a code fix was made but `issuesFound` or `CHANGELOG.md` is missing its required update, the audit is **not complete**.
+
+---
+
+# Current architecture to preserve
 
 The NL pipeline is:
 
-`question -> canonicalise -> parser -> NlQueryPlan -> validatePlan -> grain compiler -> PostgreSQL -> NlAnswer -> describe/render`
+```text
+question
+-> canonicalise
+-> parser
+-> NlQueryPlan
+-> validatePlan
+-> grain compiler
+-> PostgreSQL
+-> NlAnswer
+-> describe/render
+-> /search UI
+```
 
-Important source areas:
+Important source areas include:
 
 - `src/search/nl/parser.ts`
 - `src/search/nl/plan.ts`
@@ -59,10 +555,12 @@ Important source areas:
 - `tests/`
 - `tools/nl/`
 - `docs/search.md`
-- migrations and schema definitions when a query depends on stored/derived columns
+- schema definitions/migrations when a query depends on stored/derived columns
 - `nl_search_log` and NL review tables when available
+- `issuesFound` / `issuesFound.md`
+- `CHANGELOG.md`
 
-The current plan vocabulary already includes:
+The current plan vocabulary includes or may include:
 
 - grains: `player_career`, `player_game`, `player_season`, `team_match`, `club_season`, `team_streak`, `achievement_summary`
 - match scope: club for/against, venue, season range, match type, round number
@@ -72,135 +570,189 @@ The current plan vocabulary already includes:
 - player stat allowlists
 - tie policy and bounded limits
 
-Do not invent a second representation when an existing plan field correctly models the question. Extend the existing field or compiler path where appropriate.
+Do not invent a second representation when an existing plan field correctly models the question.
 
-# Invocation modes
-
-The first argument may be one of:
-
-- `audit` — inspect and reproduce problems; do not edit source.
-- `fix` — reproduce, patch the smallest correct layer, add regression tests, and verify.
-- `verify` — run the acceptance set and report results without broad code changes.
-- `full` — audit the NL system category by category, fix justified defects, expand tests and run the broader regression suite.
-
-If no mode is supplied, use `full`.
-
-A remaining argument may identify one query, category or defect. Prioritise that scope first, then run neighbouring regressions.
+---
 
 # Core principle: prove where the defect lives
 
-For every failing question, classify the first incorrect layer.
+For every failing question, classify the **first incorrect layer**.
 
-Use this order:
+Use this order.
 
-1. **Canonicalisation**
-   - Did punctuation, slang or filler change the intended meaning?
-   - Did a number such as `50` become a year accidentally?
-   - Did a qualifier survive as an unsupported token?
+## 1. Canonicalisation
 
-2. **Entity resolution**
-   - Was the correct club, historical alias, nickname or venue selected?
-   - Was a club inside a venue name incorrectly extracted?
-   - For two clubs, are subject/opponent roles correct?
-   - Does the resolved club organisation deliberately include historical lineage where the query semantics require it?
+Check:
 
-3. **Slot extraction**
-   - aggregation
-   - metric
-   - match type
-   - season
-   - round
-   - period split
-   - streak
-   - HAVING/count threshold
-   - margin threshold
-   - career conditions
-   - player mention
+- punctuation;
+- slang/filler;
+- number interpretation;
+- unsupported tokens;
+- phrase collision.
 
-4. **Grain election**
-   - Is this one player-match performance, player-season total, career total, one team match, a grouped team result, a club season or a streak?
-   - Never patch the compiler to compensate for a plan that chose the wrong grain.
+Examples:
 
-5. **Plan validation**
-   - Does `validatePlan` reject a valid combination?
-   - More importantly: does it accept a combination a compiler ignores?
+- Did `50` become a year accidentally?
+- Did `at most` collide with `most`?
+- Did a filler stripper remove meaningful `one`, `against`, `final`, or another semantic token?
 
-6. **SQL compiler**
-   - Does the selected grain compiler use every plan field?
-   - Are predicates applied before ranking?
-   - Are ties retained?
-   - Are historical aliases resolved by organisation identity rather than brittle display strings?
-   - Are `NULL` historical stats excluded honestly?
+## 2. Entity resolution
 
-7. **Database/data coverage**
-   - Does the requested stat exist for the requested era and grain?
-   - Is a "no result" genuinely historical truth, or missing coverage?
-   - Do period/quarter fields exist for the era?
-   - Is Brownlow data being read from the authoritative season-level source where required?
+Check:
 
-8. **Answer description/rendering**
-   - Is the data correct but headline/interpretation wrong?
-   - Does a tie name all record holders?
-   - Is the answer claiming "highest" when the question asked "lowest"?
-   - Is a list described as a single leader?
-   - Does any successful answer render a blank metric such as `Highest .`?
-   - Does the explanation use the correct noun for the grain, rather than hard-coded `player` wording?
-   - Does `payload.value` describe the same statistic named by `plan.metric`?
-   - For grouped/HAVING answers, is a grouped-team formatter used rather than a single-match formatter?
+- club;
+- historical club identity;
+- organisation lineage;
+- nickname;
+- venue;
+- venue alias;
+- subject/opponent roles;
+- player identity.
 
-9. **UI/runtime**
-   - Does `/search` show the same answer as direct execution?
-   - Any stale navigation, hydration, timeout or rendering issue?
+Examples:
+
+- Did `Melbourne` get extracted from `Melbourne Cricket Ground` as a club?
+- Did `Brisbane Bears` get silently widened to Brisbane Lions?
+- Did `Dons` resolve to Essendon?
+- Were two clubs reversed?
+
+## 3. Slot extraction
+
+Check every meaningful slot:
+
+- aggregation;
+- metric;
+- mode;
+- match type;
+- season;
+- round;
+- period split;
+- streak;
+- HAVING/count threshold;
+- per-match margin predicate;
+- career conditions;
+- player mention;
+- venue/opponent/club scope.
+
+## 4. Grain election
+
+Determine the required semantic grain:
+
+- player match;
+- player season;
+- player career;
+- one team match;
+- grouped team result;
+- club season;
+- streak;
+- achievement summary.
+
+Never patch the compiler to compensate for a plan that chose the wrong grain.
+
+## 5. Plan validation
+
+Ask:
+
+- Does `validatePlan` reject a valid combination?
+- Does it accept a combination that a compiler ignores?
+- Does it permit a payload/description combination that cannot be rendered meaningfully?
+- Can a successful ranked answer reach description code without the metric/entity information it requires?
+
+## 6. SQL compiler
+
+Check:
+
+- every validated plan field is consumed;
+- predicates run at the correct grain;
+- filtering occurs before ranking/grouping where semantically required;
+- one-to-many joins do not multiply aggregates;
+- home/away perspective is symmetric where required;
+- ties are retained;
+- ordering is deterministic;
+- historical identities are scoped correctly;
+- `NULL` historical data is excluded honestly;
+- grouped/HAVING results do not collapse into one arbitrary match.
+
+## 7. Database/data coverage
+
+Check:
+
+- requested stat exists for requested era/grain;
+- "no result" is truth rather than missing coverage;
+- quarter/half fields exist;
+- Brownlow source is authoritative;
+- historical identity data supports the requested distinction;
+- source data itself is not corrupt.
+
+## 8. Answer description/rendering
+
+Check:
+
+- headline direction (`Highest` / `Lowest`);
+- list versus single leader;
+- blank metric labels;
+- noun/entity wording;
+- tie wording;
+- payload/metric agreement;
+- grouped/HAVING explanation;
+- period wording;
+- answer value versus described statistic.
+
+Explicit invariant:
+
+```text
+agg.kind === 'min' -> wording must express lowest/minimum semantics
+agg.kind === 'max' -> wording must express highest/maximum semantics
+```
+
+Do not infer semantic direction from incidental result ordering when the canonical plan already carries the aggregation.
+
+## 9. UI/runtime
+
+Check:
+
+- `/search` matches direct execution;
+- beta auth/session;
+- browser console/page errors;
+- hydration;
+- stale navigation;
+- pending state;
+- runtime timeout;
+- malformed DOM/prose.
 
 Fix the **first wrong layer**, not a downstream symptom.
+
+---
 
 # Baseline before editing
 
 Before any source change:
 
-1. Inspect the relevant parser, plan, vocabulary, compiler and tests.
-2. Record the current `PARSER_VERSION`.
-3. Run the target question through the real `/search` UI.
-4. Capture:
-   - question
-   - outcome
-   - displayed headline
-   - interpretation
-   - result rows
-   - caveats/coverage note
-   - parsed/normalised query if exposed
-   - plan token or debug plan if available
-   - any failure reason
-5. Run or add a small parser-only diagnostic that prints the actual `NlParse`/`NlQueryPlan`.
-6. Independently query PostgreSQL for the ground truth.
-7. Only then edit code.
+1. Read `README.md`, `CHANGELOG.md`, the existing `issuesFound` ledger, `package.json`, `docs/search.md`, and relevant implementation/tests.
+2. Record current `PARSER_VERSION`.
+3. Inspect the specific parser/plan/vocabulary/compiler/description path.
+4. Run the target question through the real `/search` UI when reachable.
+5. Capture:
+   - question;
+   - outcome;
+   - displayed headline;
+   - interpretation;
+   - result rows;
+   - caveats/coverage note;
+   - parsed/normalised query if exposed;
+   - plan token/debug plan if available;
+   - browser/runtime errors.
+6. Run or add a DB-independent diagnostic that exposes the actual `NlParse`/`NlQueryPlan`.
+7. Independently query PostgreSQL for ground truth when the question is database-backed.
+8. Only then edit code.
 
-Do not call a question "fixed" because the AST looks correct. AFLDB has previously had cases where the parser produced the right plan but a metric/compiler path rejected or ignored it.
+Do not call a question fixed because the AST looks correct.
+
+---
 
 # Database-grounded truth checks
 
 Use PostgreSQL on the development server as the source of truth.
-
-Prefer the project's existing environment/configuration. If `DATABASE_URL` is available, a safe read-only pattern is:
-
-```bash
-cd /home/arm/projects/afldb
-set -a
-[ -f .env ] && . ./.env
-set +a
-
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1
-```
-
-Inside `psql`, make verification explicitly read-only:
-
-```sql
-BEGIN READ ONLY;
--- truth queries here
-ROLLBACK;
-```
-
-If the project uses another existing DB wrapper/script, use it rather than inventing credentials.
 
 Before writing a truth query, inspect the real schema. Do not guess column names.
 
@@ -230,29 +782,33 @@ WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
 ORDER BY table_schema, table_name, ordinal_position;
 ```
 
-For each sample query, write an **independent SQL truth query** that does not simply copy the NL compiler SQL. Its purpose is to catch compiler bugs.
+For each sample query, write an **independent SQL truth query** that does not simply copy the NL compiler SQL.
 
 Truth-query rules:
 
-- Use stable IDs/organisation IDs once resolved.
-- For exact games, identify the one match first, then rank player rows inside it.
-- For team-match records, derive both team perspectives if the schema stores one canonical home/away match row.
-- For round queries, verify round type plus round number; do not assume a number alone means home-and-away.
-- For finals, verify the stored phase/round semantics before filtering.
-- For historical aliases, verify whether the intended question is historical identity-specific or organisation-lineage-wide.
-- For quarter/half calculations, prove the calculation from actual score progression columns.
-- For streaks, sort chronologically by real match date/order and explicitly define what breaks the streak.
-- For grouped "teams with N wins/losses" queries, use `GROUP BY ... HAVING`.
-- For margin-threshold counts, apply the margin predicate before grouping/counting.
-- For Brownlow season totals, use the authoritative Brownlow season/results data, not incomplete per-match votes.
+- use stable IDs/organisation IDs once resolved;
+- for exact games, identify the match first, then rank inside it;
+- for team records, correctly model both team perspectives from canonical home/away rows;
+- for round queries, verify round type and number;
+- for finals, verify stored phase/round semantics;
+- for historical aliases, distinguish identity-specific from organisation-lineage questions;
+- for quarter/half calculations, prove the calculation from score progression;
+- for streaks, use chronological match order and define breaks explicitly;
+- for grouped team counts, use `GROUP BY ... HAVING`;
+- for margin-threshold counts, apply the margin predicate before grouping/counting;
+- for Brownlow season totals, use authoritative Brownlow season/results data.
 
-When a user supplies an expected answer, treat it as a test hypothesis, not unquestionable truth. Confirm it against the database.
+Treat user-supplied expected answers as hypotheses until verified.
+
+---
 
 # Playwright/UI verification
 
-Browser verification is mandatory for any user-visible NL fix.
+Browser verification is mandatory for any user-visible NL fix when the development UI can be safely exercised.
 
-Use the existing Playwright configuration and test helpers where possible. First inspect:
+Use existing Playwright configuration/helpers.
+
+Inspect actual project tooling before inventing commands:
 
 ```bash
 ls -la playwright*.config.*
@@ -260,53 +816,43 @@ find tests -maxdepth 3 -type f | sort | grep -Ei 'playwright|search|nl'
 find tools/nl -maxdepth 3 -type f | sort
 ```
 
-Start or use the existing dev service according to the repository's documented workflow. Do not create a parallel ad-hoc server if one already exists.
+For each target query:
 
-For each target query, Playwright should:
+1. navigate to `/search`;
+2. enter the exact query;
+3. submit using the real reader control;
+4. wait for observable NL answer state, not an arbitrary sleep;
+5. assert no browser console/page error;
+6. capture/assert headline and interpretation;
+7. assert key result values and labels;
+8. assert ties where applicable;
+9. assert a correct decline for unavailable coverage;
+10. reject malformed prose such as:
+   - `Highest .`
+   - `Lowest .`
+   - team/grouped results saying `every player`
+   - a `min` query described as `Highest`
+11. for grouped/HAVING queries, assert grouped club rows/counts;
+12. for `team_score`, assert displayed value equals the independently verified selected-team score;
+13. use screenshots/traces only as diagnostic evidence, not as a substitute for text assertions.
 
-1. Navigate to `/search`.
-2. Enter the exact query text.
-3. Submit/search using the same control a reader uses.
-4. Wait for the NL answer section, not an arbitrary sleep.
-5. Assert there is no client error/hydration failure.
-6. Capture the answer headline and interpretation.
-7. Assert key result values/labels.
-8. Assert ties where applicable.
-9. Assert a correct decline when data/coverage is unavailable.
-10. Assert no malformed prose such as `Highest .`, `Lowest .`, or an incorrect `every player` tie explanation on a team result.
-11. For grouped/HAVING queries, assert the UI shows grouped club rows/counts rather than one arbitrary match.
-12. For `team_score`, assert the displayed numeric value equals the selected club's score from the independently verified match row.
-13. Save a screenshot or trace only when useful for diagnosis; do not rely on screenshots instead of text assertions.
-
-Prefer semantic locators (`role`, label, visible text, test id) over brittle CSS.
+Prefer semantic locators.
 
 Do not use arbitrary `waitForTimeout()` as a correctness mechanism.
 
-A representative skeleton, adapted to the app's actual controls:
-
-```ts
-test('NL: exact Richmond v Essendon R5 1984 hitouts', async ({ page }) => {
-  await page.goto('/search');
-  // Use the real labelled input/combobox discovered in the page.
-  await page.getByRole('searchbox').fill('most hit out Richmond v Essendon Round 5 1984');
-  await page.keyboard.press('Enter');
-
-  const answer = page.getByTestId('nl-answer');
-  await expect(answer).toBeVisible();
-  await expect(answer).toContainText('Mark Lee');
-  await expect(answer).toContainText('29');
-});
-```
-
-Do not copy this locator blindly. Inspect the rendered DOM and use the real accessible control.
+---
 
 # Parser and plan regression tests
 
 Every parser fix needs direct plan-shape coverage.
 
-Assert the complete semantic shape that matters, not merely `status === "plan"`.
+Assert the complete semantic shape that matters, not merely:
 
-For example:
+```text
+status === "plan"
+```
+
+Example:
 
 ```ts
 expect(plan).toMatchObject({
@@ -323,110 +869,98 @@ expect(plan).toMatchObject({
 });
 ```
 
-Also assert that fields that would change the answer are **not absent**.
+Also assert meaningful fields are not absent.
 
-When adding a new phrase, add neighbouring language variants and collision tests. Examples:
+For every new semantic rule, add:
 
-- `most` vs `at most`
-- `win` vs `wins`
-- `loss` vs `losses`
-- `final` as match scope vs `finals` as a career count
-- `inside 50` as a metric vs a season/year-looking number
-- `Melbourne` vs `Melbourne Cricket Ground`
-- `Brisbane` historical lineage vs `Brisbane Bears` identity-specific wording
-- `Round 3` with and without a season
-- `v`, `vs`, `versus`, `against`
-- `highest`, `most`, `biggest`, `fewest`, `lowest`
-- singular/plural stat forms
-- nickname/official club name pairs
-- venue current name/historical alias pairs
+- exact failing phrasing;
+- at least 2-3 equivalent/metamorphic variants;
+- a neighbouring non-equivalent case;
+- collision/negative cases.
+
+Important collision pairs include:
+
+- `most` vs `at most`;
+- `win` vs `wins`;
+- `loss` vs `losses`;
+- `final` match scope vs career `finals`;
+- `inside 50` metric vs number/year parsing;
+- `Melbourne` vs `Melbourne Cricket Ground`;
+- `Brisbane` lineage vs `Brisbane Bears`;
+- `v`, `vs`, `versus`, `against`;
+- `highest`, `most`, `biggest`, `fewest`, `lowest`;
+- singular/plural stat names;
+- current/historical venue aliases.
+
+---
 
 # Compiler regression tests
 
-For every plan field involved in a fix, add a database-backed test proving the compiler consumes it.
+For every plan field involved in a compiler fix, add a database-backed test proving the compiler consumes it.
 
-At minimum, compare:
+At minimum compare:
 
-- baseline plan without the field
-- plan with the field
-- result difference expected from the real data
+- baseline plan without the field;
+- plan with the field;
+- expected difference against real data.
 
-This catches silent-field bugs such as a validated `roundNumber`, `periodSplit`, `havingClause` or `streakDefinition` that never reaches SQL.
+This is particularly important for:
 
-Where practical, test the SQL result against a known development-database truth row rather than a synthetic-only fixture.
+- `roundNumber`;
+- `periodSplit`;
+- `havingClause`;
+- streak definition;
+- match type;
+- opponent;
+- venue;
+- season bounds;
+- margin thresholds;
+- historical club identity.
 
-# Known current regressions to reproduce first
+---
 
-Treat the following as **active defects**, not hypothetical examples. Reproduce them on the current development build before broadening the search vocabulary.
+# Regression classes to verify first
 
-Observed bad output:
+Do not assume these are currently broken. They are known high-risk classes that must remain covered.
+
+## Ranked direction wording
+
+Queries such as:
 
 ```text
-Collingwood vs St Kilda (1980) — 357 team score
+lowest second half score by Essendon
+highest second half score by Essendon
+```
+
+must produce semantically matched direction wording.
+
+A correct low value with:
+
+```text
 Highest team score.
-
-How was this calculated?
-Searched for the highest match score.
-Club: Collingwood.
-Ties: every player sharing the value is included.
 ```
+
+is a real user-facing correctness defect even though parser/SQL are correct.
+
+## Team-score identity
+
+For full-match `team_score`:
 
 ```text
-St Kilda vs Brisbane Lions (2005) — 186
-Highest .
-
-How was this calculated?
-Searched match records for every matching club.
-Opponent: Brisbane Lions.
-Ties: every player sharing the value is included.
+payload.value == selected club's actual final score
 ```
 
-```text
-Sydney vs Essendon (1987) — 236
-Highest .
+It must not equal:
 
-How was this calculated?
-Searched match records for every matching club.
-Venue: Sydney Cricket Ground.
-Ties: every player sharing the value is included.
-```
+- home + away total;
+- opponent score;
+- cumulative total across matches;
+- wrong-period checkpoint;
+- grouped count.
 
-These examples expose multiple possible layers of failure. Do **not** assume they share one root cause.
+For period splits, value must equal the selected team's points during that period.
 
-Required investigation:
-
-1. Recover the exact originating question for each result.
-   - If the question is not supplied with the symptom, inspect `nl_search_log`, review data, browser history available through the test session, or reproducible nearby acceptance queries.
-   - Do not guess the original query from the rendered answer.
-2. Inspect the actual `NlQueryPlan`.
-3. Inspect the selected compiler and generated/bound SQL.
-4. Independently calculate the correct result from PostgreSQL.
-5. Inspect the answer payload before `describe.ts`.
-6. Inspect the final rendered headline, interpretation and "How was this calculated?" explanation.
-
-## Invariants these failures must enforce
-
-### Team score identity
-
-For a full-match `team_score` answer:
-
-```text
-payload.value == the selected club's actual final score
-```
-
-It must **not** equal:
-
-- home score + away score;
-- the opponent's score;
-- a cumulative total across several matches;
-- a score progression value for the wrong period;
-- a grouped count.
-
-If a returned row says `357 team score`, prove from the database whether 357 is a real single-team score. If it is not, identify the exact transformation that produced it.
-
-For a period-split `team_score`, `value` must equal the selected team's points scored **during that period**, derived from score progression correctly.
-
-### Metric labels may never disappear
+## Metric labels may never disappear
 
 A successful ranked answer must never render:
 
@@ -436,164 +970,127 @@ Lowest .
 Top 10 by .
 ```
 
-If `plan.metric` is intentionally absent because the result is a grouped/HAVING list, route it to a description path designed for grouped counts rather than letting a single-match formatter interpolate an empty metric.
+If the answer is a grouped/list operation without a ranked metric, route it to a grouped/list description path rather than interpolating an empty metric.
 
-Validation should reject a plan/answer combination that requires a metric label but has no metric.
+## Entity nouns must match grain
 
-### Entity nouns must match the answer grain
+A team-match, team-streak, club-season, or grouped-team answer must not use player-specific tie wording.
 
-A team-match, team-streak, club-season or grouped-team answer must never say:
+Use semantically appropriate nouns:
 
-```text
-Ties: every player sharing the value is included.
-```
+- player grain -> player(s)
+- team-match -> match(es) or team/club as appropriate
+- team-streak -> club/streak
+- grouped team -> team/club
+- club-season -> club season
 
-Use the correct entity:
+## Grouped queries must not collapse into one arbitrary match
 
-- player grain -> player/players
-- team match -> match/matches or club/teams as semantically appropriate
-- team streak -> club/streak
-- grouped team aggregation -> club/team
-- club season -> club season
-
-Search shared explanation/caveat code for hard-coded `player` wording. Do not patch only the visible sentence if the same helper is reused by other grains.
-
-### Grouped queries must not collapse into one arbitrary match
-
-Queries such as:
+Examples:
 
 ```text
 teams with more than 3 wins against the Lions
 teams with at least 10 wins at the SCG
 ```
 
-must return grouped club/team rows with the qualifying count.
+must return grouped team rows with qualifying counts.
 
-They must not return a single match such as:
+They must not return one incidental high-scoring match.
 
-```text
-St Kilda vs Brisbane Lions (2005) — 186
-Sydney vs Essendon (1987) — 236
-```
+## Payload-description agreement
 
-A missing `metric` on a grouped query is not permission to rank by an incidental numeric column.
+For every answer:
 
-### Payload-description agreement
+- `payload.kind` must match `plan.grain`;
+- `payload.value` must mean the same statistic as `plan.metric` where a metric applies;
+- the formatter must fit the payload;
+- explanation must describe the SQL operation actually performed;
+- tie wording must identify the correct holder type;
+- grouped/HAVING result must be described as grouped/count-filtered, not as a ranked match record.
 
-For every answered query, assert that:
-
-- `payload.kind` is compatible with `plan.grain`;
-- the payload's `value` means the same thing as `plan.metric`;
-- the formatter used is appropriate for that payload;
-- the explanation text describes the SQL operation actually performed;
-- tie text names the correct record-holder entity;
-- a list/HAVING result is described as a list/count, not "Highest".
-
-Add regression tests at both the payload and rendered-description levels for these invariants.
+---
 
 # Required sample acceptance suite
 
-Use these as the first acceptance corpus. Do not hardcode answers other than user-provided/DB-verified truths.
+Use these as the first acceptance corpus. Do not hardcode answers except where the answer has been independently verified.
 
-## A. Exact game, round and match type
+## A. Exact game, round, and match type
 
 - `most hit out Richmond v Essendon Round 5 1984`
-  - expected interpretation: highest individual hitouts in the Richmond v Essendon Round 5, 1984 match
-  - expected leader supplied by user: **Mark Lee — 29 hitouts**
+  - expected leader supplied by user: Mark Lee — 29 hitouts
+  - independently verify in `afldb_dev`
 - `most disposals Collingwood v Carlton Round 1 2010`
 - `highest score by Geelong in Round 15 2008`
 - `most goals in a Grand Final`
 - `fewest points scored in a final at the MCG`
 - `Hawthorn highest score in Round 3`
 
-Primary checks:
-- exact season+round scoping
-- two-club role assignment
-- singular match scope vs all matching rounds
-- finals/grand-final scope
-- venue+match-type intersection
-- round number without season must remain a multi-season ranking, not invent a season
+Check:
 
-## B. Period and quarter splits
+- season+round scoping;
+- two-club role assignment;
+- finals/grand-final scope;
+- venue+match-type intersection;
+- round without season stays multi-season.
+
+## B. Period/quarter splits
 
 - `highest H2 score by the Magpies`
-  - expected interpretation: maximum Collingwood team score in the second half of any match
-  - primary check: calculate H2 from score progression as the points scored in Q3 + Q4, not by dividing the final score and not by using the cumulative three-quarter/final score incorrectly
+- `lowest second half score by Essendon`
+- `highest second half score by Essendon`
 - `most goals in Q1 by a player`
-  - expected interpretation: highest individual goals in the first quarter of one match
-  - primary check: return the real leader only if player-quarter goal data exists; otherwise decline explicitly for unavailable coverage
 - `biggest win margin in a first half`
-  - expected interpretation: largest lead held by any team at half-time
-  - primary check: calculate both teams' H1 scores and compare the H1 margin; do not use the full-time margin
 - `highest team score in Q3`
 - `most disposals in the fourth quarter in 2023`
-- `lowest second half score by Essendon`
 
-Primary checks:
-- player stat split vs team scoring split
-- Q1-Q4 and H1/H2 calculations
-- season/club scope retained
-- coverage declines when player quarter stats are not stored
-- never infer quarter-level player stats from full-match totals
-- score progression columns are cumulative unless schema inspection proves otherwise; convert cumulative checkpoints into period-only scores correctly
-- H1 is the score at half-time; H2 is final score minus half-time score
-- Q1 is quarter-time score
-- Q2 is half-time minus quarter-time
-- Q3 is three-quarter-time minus half-time
-- Q4 is final score minus three-quarter-time
-- period win margin compares the two teams at the same split
+Check:
+
+- Q1 = quarter-time score;
+- Q2 = half-time minus quarter-time;
+- Q3 = three-quarter-time minus half-time;
+- Q4 = final minus three-quarter-time;
+- H1 = half-time score;
+- H2 = final minus half-time;
+- period margin compares the same checkpoint/split for both teams;
+- player-quarter stats must decline honestly if not stored;
+- min/max description direction is correct.
 
 ## C. Team streaks
 
 - `richmond's longest winning strea`
-  - expected interpretation: Richmond's longest winning streak
-  - primary check: reproduce the exact user text first. If support for the truncated/common typo `strea` is added, keep it narrowly scoped to an unambiguous streak cue and add negative tests so broad fuzzy matching does not turn unrelated unknown words into valid plans.
 - `longest winning streak against the Blues`
 - `Swans longest losing streak at the SCG`
 - `longest unbeaten streak in finals`
 - `Hawthorn longest winning streak at Waverley`
 - `longest losing streak against Collingwood`
 
-Primary checks:
-- chronological ordering
-- opponent scope
-- club scope
-- venue scope
-- finals scope
-- draws continue `unbeaten` but break pure `win`
-- draws break both winning and losing streaks unless the defined semantics explicitly say otherwise
+Check:
 
-## D. HAVING clauses, loss margins and grouped aggregation
+- chronology;
+- club/opponent/venue/finals scope;
+- draws continue unbeaten;
+- draws break pure win/loss streaks unless semantics explicitly say otherwise;
+- typo support remains narrow and collision-safe.
+
+## D. HAVING, grouped counts, and margin predicates
 
 - `teams with more than 3 wins against the Lions`
-  - expected interpretation: grouped clubs that have defeated the Brisbane Lions more than 3 times, i.e. at least 4 wins
-  - primary check: retain opponent scope, group by club/team first, then apply strict `HAVING COUNT(*) > 3`
 - `teams to lose 5 times by more than 100 points`
-  - expected interpretation: grouped clubs with at least 5 qualifying losses where each qualifying match was lost by more than 100 points
-  - primary check: filter to `loss_margin > 100` before grouping/counting, then apply the requested count threshold
-  - ambiguity check: the phrase `lose 5 times` normally means at least 5 for this result-list query unless parser policy explicitly defines exact-count wording; test `exactly 5 losses` separately if exact equality is supported
 - `teams with at least 10 wins at the SCG`
-  - expected interpretation: grouped clubs with 10 or more wins at the Sydney Cricket Ground
-  - primary check: resolve the venue first, count only wins at that venue, and apply `HAVING COUNT(*) >= 10`
 - `teams with more than 5 losses against Geelong since 2000`
-  - expected interpretation: grouped clubs with more than 5 losses to Geelong from season 2000 onward
-  - primary check: both opponent and season predicates must filter the match set before grouping
 
-Primary checks:
-- group by team before `HAVING`
-- correct operator: `gt` vs `gte`
-- opponent, venue and season filters apply to the counted matches
-- margin threshold applies to the qualifying losses before the count
-- grouped output includes the qualifying count as its value
-- a grouped list is not described as one match record
-- no incidental score/margin column is used as a fallback ranking metric when `plan.metric` is absent
-- explanation text must say the result was grouped/count-filtered, not `Searched match records for every matching club`
+Check:
 
-Important plan-model check:
+- filtering before grouping;
+- `gt` vs `gte`;
+- margin threshold applies per qualifying match before count;
+- grouped output includes count;
+- no incidental score becomes fallback metric;
+- explanation identifies grouped/count filtering.
 
-The current `havingClause` shape is `{ metric, op, value }`. If a query such as "lose 5 times by more than 100 points" needs an additional per-match margin predicate, do not smuggle that threshold into an unrelated field or encode it in a metric string. Add an explicit, validated representation if the existing plan cannot express it cleanly, then update the compiler and tests together.
+If the current plan shape cannot cleanly express both a group count and per-match predicate, extend the plan explicitly rather than smuggling meaning into strings.
 
-## E. Historical club aliases, slang and venues
+## E. Historical aliases, slang, and venues
 
 - `Bloods biggest win at Marvel`
 - `Dons biggest blowout win at Optus Stadium`
@@ -601,18 +1098,14 @@ The current `havingClause` shape is `{ metric, op, value }`. If a query such as 
 - `Pies highest score at Kardinia`
 - `Suns biggest margin at the Gabba`
 
-Primary checks:
-- `Bloods` -> Sydney/South Melbourne lineage only if that is the intended organisation-level query
-- `Dons` -> Essendon
-- `Bears` must not be silently rewritten to modern Brisbane Lions if the wording asks specifically for Brisbane Bears historical identity
-- `Pies` -> Collingwood
-- `Suns` -> Gold Coast
-- venue aliases resolve through DB alias tables
-- `Marvel`, `Optus Stadium`, `UTAS`, `Kardinia`, `Gabba` must resolve to the real venue IDs/aliases present in the database
+Check:
 
-Historical identity is semantic, not just vocabulary. Verify whether each alias points at a specific historical club identity or an organisation lineage before deciding the SQL scope.
+- nickname resolution;
+- historical identity versus organisation lineage;
+- venue aliases through maintained DB aliases;
+- Brisbane Bears is not silently rewritten to modern Brisbane Lions when identity-specific wording is used.
 
-## F. Advanced player statistics and acronyms
+## F. Advanced player stats/acronyms
 
 - `most contested possessions in a game`
 - `most uncontested possessions in a season`
@@ -622,32 +1115,35 @@ Historical identity is semantic, not just vocabulary. Verify whether each alias 
 - `most rebound 50s in a final`
 - `most goal assists in a match`
 
-Primary checks:
-- metric alias -> correct allowlisted key
-- correct grain: game vs season
-- club filter retained
-- match-type filter retained
-- era coverage is explicit
-- Brownlow season totals use authoritative season-level data
-- no `NULL -> 0` conversion
+Check:
 
-## G. Player career and milestone queries
+- allowlisted metric key;
+- correct grain;
+- club/match-type scope;
+- era coverage;
+- authoritative Brownlow season source;
+- no `NULL -> 0`.
+
+## G. Career/milestone
 
 - `players with more than 300 games and 500 goals`
 - `most goals on debut`
 - `most premierships with 3+ clubs`
 - `most games without a final`
 
-Primary checks:
-- multiple career conditions remain in the same plan
-- `more than` means strict `gt`, not `gte`
-- `on debut` is a first-match boundary/scope, not a debut season
-- `3+ clubs` remains a career condition while premierships remains the ranking metric
-- `without a final` means finals = 0 and must not be confused with "not in a final" match scope
+Check:
 
-# User-supplied expected plan examples
+- multiple career conditions remain together;
+- `more than` is strict `gt`;
+- debut is first-match boundary, not debut season;
+- `3+ clubs` is career condition while premierships is ranking metric;
+- `without a final` means finals = 0, not a match-type scope.
 
-Use these shapes as semantic targets, adapting only to the actual current type definitions.
+---
+
+# Semantic target examples
+
+Adapt to actual type definitions.
 
 ## Exact Richmond v Essendon match
 
@@ -666,7 +1162,7 @@ Use these shapes as semantic targets, adapting only to the actual current type d
 }
 ```
 
-## Collingwood second-half team score
+## Collingwood second-half score
 
 ```json
 {
@@ -710,44 +1206,34 @@ Use these shapes as semantic targets, adapting only to the actual current type d
 }
 ```
 
-## Essendon biggest win at Optus Stadium
-
-```json
-{
-  "grain": "team_match",
-  "metric": "win_margin",
-  "agg": { "kind": "max" },
-  "scope": {
-    "clubFor": { "name": "Essendon", "slug": "essendon" },
-    "venue": { "name": "Optus Stadium", "slug": "optus-stadium" }
-  }
-}
-```
+---
 
 # Expansion strategy
 
-When the sample suite is stable, expand systematically rather than adding random phrases.
+When the sample suite is stable, expand systematically.
 
-For each semantic feature, generate a small matrix across:
+For each semantic feature, vary:
 
-- aggregation: max / min / top N / list / count
-- grain: game / season / career / team match / streak
-- club role: for / against / both clubs
-- venue: none / named / alias
-- time: all-time / exact season / since / range
-- match type: H&A / final / grand final / specific final type
-- period: full match / quarter / half where supported
-- wording: formal / common slang / abbreviation
-- operator: `>`, `>=`, `<`, `<=`, `=`
-- singular/plural and punctuation variants
+- aggregation: max / min / top N / list / count;
+- grain: game / season / career / team match / streak;
+- club role: for / against / both clubs;
+- venue: none / named / alias;
+- time: all-time / exact season / since / range;
+- match type: H&A / final / grand final / specific final;
+- period: full / quarter / half;
+- wording: formal / slang / abbreviation;
+- operator: `>`, `>=`, `<`, `<=`, `=`;
+- singular/plural and punctuation variants.
 
-Prefer 3-8 strong variants per new rule over hundreds of mechanically duplicated strings.
+Prefer several strong variants per semantic rule over hundreds of mechanically duplicated strings.
 
-Then run the existing larger NL corpus/stress tooling so local fixes are measured against broad behaviour.
+Then run the existing larger NL corpus/stress tooling.
+
+---
 
 # Metamorphic tests
 
-Equivalent wording should produce the same canonical plan or the same semantic answer.
+Equivalent wording should produce the same canonical plan or semantic answer.
 
 Examples:
 
@@ -756,7 +1242,7 @@ Examples:
 - `Pies` == `Collingwood`
 - `Q4` == `fourth quarter`
 - `H2` == `second half`
-- `most` == `highest` when the metric semantics are the same
+- `most` == `highest` when metric semantics match
 - `more than 3` == `> 3`
 - `at least 10` == `>= 10`
 - `rebound 50s` == `R50s`
@@ -765,11 +1251,14 @@ Examples:
 Non-equivalent wording must remain different:
 
 - `at most 20` != `most 20`
-- `win` != `wins` where one means one-match margin and the other a tally
+- `win` != `wins` when one is match-margin and the other tally
 - `Brisbane Bears` != `Brisbane Lions` when historical identity matters
 - `a final` != `finals played`
 - `on debut` != `in debut season`
 - `most goals in a Grand Final` != `most Grand Finals`
+- `lowest` != `highest`
+
+---
 
 # Parser-version rule
 
@@ -777,135 +1266,327 @@ Any parser vocabulary or decision-logic change that alters outcomes must increme
 
 Update the version-history comment with:
 
-- old defect
-- why it happened
-- semantic fix
-- meaningful regression/example
-- whether outcome, plan shape or only failure classification changed
+- old defect;
+- why it happened;
+- semantic fix;
+- meaningful regression/example;
+- whether outcome, plan shape, or failure classification changed.
 
-Do not bundle unrelated parser behaviours under one version.
+Do not bump parser version for a pure description-only fix unless parser output changes.
+
+---
 
 # Performance checks
 
-Correctness comes first, but do not introduce avoidable full-table work.
+Correctness comes first.
 
-For new SQL/compiler paths:
+For new or materially changed SQL/compiler paths:
 
-- run `EXPLAIN (ANALYZE, BUFFERS)` on representative development queries
-- confirm filters are pushed before ranking/grouping where possible
-- inspect existing indexes before proposing new ones
-- avoid per-row correlated work when a grouped CTE/window query is clearer
-- preserve bounded result limits and tie policy
-- do not add an index merely because a query "looks complex"; measure it
+- measure on the development environment;
+- inspect query predicates/grouping/ranking first;
+- use `EXPLAIN (ANALYZE, BUFFERS)` only on safe development/test targets;
+- confirm filtering occurs before ranking/grouping where possible;
+- inspect existing indexes before proposing new ones;
+- avoid per-row correlated work when a grouped CTE/window is clearer;
+- preserve result limits/tie policy.
 
-A query that is semantically correct but routinely times out is not complete.
+Do not add an index merely because a query looks complex.
+
+A semantically correct query that routinely times out is incomplete.
+
+Record meaningful before/after performance evidence in `issuesFound` and `CHANGELOG.md`.
+
+---
 
 # How to patch
 
 Prefer the smallest coherent change.
 
-Typical decision table:
-
 | Finding | Correct place to change |
 |---|---|
 | New nickname/synonym only | `vocab.ts` or maintained alias table |
-| Club/venue resolves to wrong entity | entity/alias resolution |
-| Words understood but wrong roles | `parser.ts` |
+| Club/venue resolves wrongly | entity/alias resolution |
+| Words understood but roles wrong | `parser.ts` |
 | Needed semantic field absent | `plan.ts` + validation + parser + compiler |
 | Plan correct but answer wrong | grain compiler |
-| SQL result correct but headline wrong | `describe.ts` |
-| Correct decline due to unavailable era | coverage metadata/message, not fake data |
+| SQL/result correct but headline/interpretation wrong | `describe.ts` |
+| Correct decline due to unavailable era | coverage metadata/message |
 | UI differs from direct answer | answer component/search page/runtime |
-| Database truth itself wrong | report separately; do not hide with NL logic |
+| Database truth itself wrong | document separately; do not hide in NL logic |
 
 Do not solve a missing plan concept by encoding structured meaning into arbitrary strings.
 
-# Minimum verification after a fix
+---
 
-Run, in this order:
+# Progressive verification
 
-1. focused unit tests for changed parser/plan/description logic
-2. focused DB-backed compiler/integration tests
-3. the exact failing query through `/search`
-4. at least 3 neighbouring variants
-5. at least 2 negative/collision cases
-6. relevant NL test suite
-7. existing larger NL regression/stress corpus if available
-8. TypeScript/typecheck/lint/build checks used by the repository
-9. Playwright search smoke test
+Discover actual scripts from `package.json`; do not assume names.
 
-Discover the repository's actual script names from `package.json`; do not assume them.
+On Windows PowerShell, if `npm.ps1` is blocked by execution policy, use `npm.cmd`.
 
-Example discovery:
+Recommended sequence:
 
-```bash
-node -e "console.log(require('./package.json').scripts)"
+## 1. Focused DB-independent tests
+
+Examples:
+
+```powershell
+npm.cmd test -- tests/nl-describe.test.ts
+npm.cmd test -- tests/nl-plan.test.ts
+npm.cmd test -- tests/nl-parser.test.ts
 ```
+
+Run only files that actually exist.
+
+## 2. Typecheck
+
+```powershell
+npm.cmd run typecheck
+```
+
+## 3. Focused remote DB-backed integration
+
+Use SSH and the guarded `_test` environment.
+
+## 4. Independent `afldb_dev` truth query
+
+For exact database-backed claims.
+
+## 5. Exact `/search` reproduction
+
+Test the original query against the development deployment.
+
+## 6. Neighbouring regressions
+
+At minimum for a semantic fix:
+
+- exact failing query;
+- 3 neighbouring/equivalent variants;
+- 2 negative/collision cases.
+
+For a pure description-direction fix, explicitly include both min and max cases.
+
+## 7. Broader NL suites
+
+Run relevant parser/regression/stress/UI corpus suites.
+
+## 8. Lint/build
+
+Use only repository-defined non-interactive commands.
+
+If `npm run lint` launches an interactive/deprecated Next.js ESLint migration prompt, record that as a tooling limitation. Do not claim lint passed and do not interactively rewrite lint configuration as part of an NL bug fix unless explicitly requested.
+
+Run build when relevant and safely configured.
+
+## 9. Live UI smoke
+
+Verify:
+
+- exact corrected query;
+- inverse/min-max counterpart;
+- grouped/HAVING;
+- tie wording;
+- one normal player record;
+- no malformed `Highest .` / `Lowest .`;
+- no browser console/page errors for sampled paths.
+
+---
+
+# Full-mode category audit
+
+In `full` mode, do not stop after the first defect.
+
+Audit category by category:
+
+1. canonicalisation/collisions;
+2. club/player/venue entity resolution;
+3. aggregation/operators;
+4. match/round/season scope;
+5. period splits;
+6. player game;
+7. player season;
+8. career conditions;
+9. team match;
+10. grouped/HAVING;
+11. streaks;
+12. finals/match types;
+13. historical club identities;
+14. advanced metrics/coverage;
+15. answer payload/description;
+16. ties;
+17. UI/browser rendering;
+18. runtime/performance;
+19. decline correctness;
+20. metamorphic consistency.
+
+For each category, classify:
+
+- verified clean;
+- defect found/fixed;
+- defect found/open;
+- blocked;
+- intentionally unsupported;
+- data-coverage limited.
+
+Do not manufacture source changes to make a full audit look productive. A clean category is a valid result.
+
+---
+
+# Issue severity guide
+
+Use impact, not implementation difficulty.
+
+## Critical
+
+Examples:
+
+- security/authorisation bypass;
+- secret exposure;
+- production data corruption;
+- arbitrary SQL/code execution;
+- beta-gate bypass.
+
+## High
+
+Examples:
+
+- materially wrong historical/statistical answer presented as correct;
+- widespread compiler/query family failure;
+- incorrect data source that materially changes published records.
+
+## Medium
+
+Examples:
+
+- incorrect answer in a limited supported query class;
+- grouped query returns wrong grain;
+- repeated decline of valid common queries;
+- reproducible user-visible runtime/hydration failure.
+
+## Low
+
+Examples:
+
+- misleading description with correct data;
+- malformed non-data wording;
+- minor edge case;
+- test/tooling defect that does not affect runtime correctness.
+
+The `lowest second half score by Essendon` value-correct/wording-wrong defect is normally Low severity unless broader evidence shows the same description bug materially misrepresents many result classes.
+
+---
 
 # Reporting format
 
-At the end of an `audit`, `fix`, `verify` or `full` run, report:
+At the end of `audit`, `fix`, `verify`, or `full`, report:
 
 ## Summary
 
-- queries tested
-- correct
-- wrong answer
-- incorrect decline
-- correct decline / unavailable coverage
-- runtime/UI failures
+- mode;
+- categories inspected;
+- queries tested;
+- correct;
+- wrong answers;
+- wording/description defects;
+- incorrect declines;
+- correct declines/coverage limitations;
+- runtime/UI failures;
+- defects fixed;
+- defects still open.
 
 ## Defects found
 
-For each defect:
+For each:
 
-- exact query
-- observed result
-- DB truth
-- first incorrect layer
-- root cause
-- files involved
-- severity
-- fix status
+- `AFLDB-ISSUE-###`;
+- exact query;
+- observed result;
+- independent DB truth if applicable;
+- first incorrect layer;
+- root cause;
+- severity;
+- files involved;
+- status.
 
 ## Changes made
 
-List local files changed and the semantic reason for each.
+List each local file changed and semantic reason.
 
-Do not report Git commits because this skill does not commit.
+Always include `issuesFound` and `CHANGELOG.md` if modified.
+
+Do not report Git commits.
 
 ## Verification
 
-List the exact tests/commands run and their results.
+List exact commands/checks and results.
 
-For database-backed answers, include a compact truth statement such as:
+Distinguish:
 
-`Richmond v Essendon, Round 5 1984 -> Mark Lee, 29 hitouts (verified directly in afldb_dev).`
+- PASS;
+- FAIL;
+- BLOCKED;
+- NOT RUN;
+- NOT REQUIRED.
+
+For DB-backed truth, include concise evidence such as:
+
+```text
+Richmond v Essendon, Round 5 1984 -> Mark Lee, 29 hitouts (verified directly in afldb_dev).
+```
+
+## Audit records
+
+State explicitly:
+
+```text
+issuesFound: updated / unchanged (reason)
+CHANGELOG.md: updated / unchanged (reason)
+```
+
+If a defect was found, `issuesFound` should not be `unchanged`.
+
+If code/test/documentation behaviour was changed, `CHANGELOG.md` should not be `unchanged`.
 
 ## Remaining gaps
 
 Separate:
 
-- parser/feature gaps
-- compiler gaps
-- data coverage limitations
-- data-quality defects
-- performance concerns
-- intentionally unsupported ambiguity
+- parser/feature gaps;
+- compiler gaps;
+- data coverage limitations;
+- data-quality defects;
+- performance concerns;
+- UI/runtime gaps;
+- intentionally unsupported ambiguity;
+- environment/tooling blocks.
+
+---
 
 # Completion standard
 
-Do not declare the work complete until:
+Do not declare the work complete until all applicable conditions are met:
 
 - every user-supplied sample question has a classified result;
-- the three known malformed team-result examples have been reproduced or their originating queries recovered and classified;
-- no successful answer can emit a blank metric label such as `Highest .`;
+- known high-risk team/grouped/period/description regression classes are covered;
+- no successful answer can emit blank ranked metric labels;
 - no team/grouped answer uses player-specific tie wording;
-- every fixed question is verified against the development database;
-- every fixed user-visible path is exercised through the real `/search` UI;
-- all meaningful plan fields are compiler-tested;
+- min/max ranked descriptions agree with the canonical aggregation;
+- every fixed DB-backed question is verified against `afldb_dev` when the remote environment is available;
+- DB-backed integration tests use only the guarded `_test` database;
+- every fixed user-visible path is exercised through the real `/search` UI when deployable safely;
+- meaningful plan fields have compiler coverage;
 - no fixed phrase leaves a known collision regression;
 - parser versioning is correct;
-- the broader NL suite shows no unexplained regression.
+- the broader NL suite shows no unexplained regression;
+- every credible defect found is present in the existing `issuesFound` ledger;
+- resolved issue records include root cause, fix, and validation;
+- every code/test/documentation change made by the run is represented in `CHANGELOG.md`;
+- no blocked/unrun check is presented as passed;
+- final report lists every changed file;
+- no secrets, temporary debug output, or generated forensic artefacts were accidentally added to tracked project files.
 
-If a sample cannot be answered from stored data, say exactly which required field/grain/era is unavailable and make the parser decline honestly. A safe, precise refusal is better than a confident answer built from the wrong statistic.
+If a query cannot be answered from stored data, say which required field/grain/era is unavailable and decline honestly.
+
+A safe, precise refusal is better than a confident answer built from the wrong statistic.
+
+A clean full audit with zero source changes is also a valid outcome, but any defect discovered during that audit must still be documented in `issuesFound`.

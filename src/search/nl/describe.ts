@@ -101,6 +101,10 @@ const COMPARE_WORDS = {
   gte: 'at least', lte: 'at most', gt: 'more than', lt: 'fewer than', eq: 'exactly',
 } as const;
 
+function rankWord(plan: NlQueryPlan): 'Highest' | 'Lowest' {
+  return plan.agg.kind === 'min' ? 'Lowest' : 'Highest';
+}
+
 function describeTeamAggregateAnswer(
   plan: NlQueryPlan,
   rows: NlTeamAggregateRow[],
@@ -205,8 +209,8 @@ function describeTeamMatchAnswer(
   return {
     headline: `${subject} — ${lead.value.toLocaleString('en-AU')} ${metricLabel}${tied ? ' (tied)' : ''}`,
     interpretation: plan.agg.kind === 'top_n'
-      ? `Top ${plan.agg.n} matches by ${metricLabel}.`
-      : `Highest ${metricLabel}.`,
+      ? `Top ${plan.agg.n} ${rankWord(plan).toLowerCase()} matches by ${metricLabel}.`
+      : `${rankWord(plan)} ${metricLabel}.`,
   };
 }
 
@@ -237,8 +241,8 @@ function describeClubSeasonAnswer(
   return {
     headline: `${subject} — ${formattedValue} ${metricLabel}${tied ? ' (tied)' : ''}`,
     interpretation: plan.agg.kind === 'top_n'
-      ? `Top ${plan.agg.n} club seasons by ${metricLabel}.`
-      : `Highest ${metricLabel}.`,
+      ? `Top ${plan.agg.n} ${rankWord(plan).toLowerCase()} club seasons by ${metricLabel}.`
+      : `${rankWord(plan)} ${metricLabel}.`,
   };
 }
 
@@ -263,8 +267,8 @@ function describePlayerGameAnswer(
   return {
     headline: `${subject} — ${lead.value.toLocaleString('en-AU')} ${metricLabel}${tied ? ' (tied)' : ''}`,
     interpretation: plan.agg.kind === 'top_n'
-      ? `Top ${plan.agg.n} single-game performances.`
-      : 'Highest single-game performance.',
+      ? `Top ${plan.agg.n} ${rankWord(plan).toLowerCase()} single-game performances.`
+      : `${rankWord(plan)} single-game performance.`,
   };
 }
 
@@ -280,8 +284,8 @@ function describePlayerSeasonAnswer(
   return {
     headline: `${subject} — ${lead.value.toLocaleString('en-AU')} ${metricLabel} (${lead.season})${tied ? ', tied' : ''}`,
     interpretation: plan.agg.kind === 'top_n'
-      ? `Top ${plan.agg.n} player-seasons by ${metricLabel}.`
-      : `Highest single season by ${metricLabel}.`,
+      ? `Top ${plan.agg.n} ${rankWord(plan).toLowerCase()} player-seasons by ${metricLabel}.`
+      : `${rankWord(plan)} single season by ${metricLabel}.`,
   };
 }
 
@@ -303,7 +307,7 @@ function describePlayerCareerAnswer(
   return {
     headline: `${subject} — ${lead.value.toLocaleString('en-AU')} ${metricLabel}${tied ? ' (tied)' : ''}`,
     interpretation: plan.agg.kind === 'top_n'
-      ? `Top ${plan.agg.n} by career ${metricLabel}.`
-      : `Highest career ${metricLabel}.`,
+      ? `Top ${plan.agg.n} ${rankWord(plan).toLowerCase()} by career ${metricLabel}.`
+      : `${rankWord(plan)} career ${metricLabel}.`,
   };
 }
