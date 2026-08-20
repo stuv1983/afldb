@@ -55,9 +55,9 @@ export async function answerTeamStreak(plan: NlQueryPlan, limit: number): Promis
 
   // streak target logic
   let targetSql: SqlFragment;
-  if (plan.streak === 'win') targetSql = sql`t.winner_club_id = t.club_id`;
-  else if (plan.streak === 'loss') targetSql = sql`t.winner_club_id IS NOT NULL AND t.winner_club_id <> t.club_id`;
-  else if (plan.streak === 'unbeaten') targetSql = sql`t.winner_club_id = t.club_id OR t.winner_club_id IS NULL`;
+  if (plan.streakDefinition?.kind === 'win') targetSql = sql`t.winner_club_id = t.club_id`;
+  else if (plan.streakDefinition?.kind === 'loss') targetSql = sql`t.winner_club_id IS NOT NULL AND t.winner_club_id <> t.club_id`;
+  else if (plan.streakDefinition?.kind === 'unbeaten') targetSql = sql`t.winner_club_id = t.club_id OR t.winner_club_id IS NULL`;
   else throw new Error('Unknown streak type');
 
   const rows = await sql<(NlTeamStreakRow & { total: string; rnk: number })[]>`

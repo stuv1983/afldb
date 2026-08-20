@@ -869,7 +869,9 @@ function extractHavingClause(text: string): { text: string; havingClause?: { met
   const words: [RegExp, string][] = [
     [/\bdraws?\b/, 'draws'],
     [/\bwins?\b/, 'wins'],
-    [/\blosses?\b/, 'losses']
+    [/\blosses?\b/, 'losses'],
+    [/\b(?:lose|lost)\b/, 'losses'],
+    [/\b(?:win|won)\b/, 'wins']
   ];
   let working = text;
   for (const [re, metric] of words) {
@@ -882,6 +884,7 @@ function extractHavingClause(text: string): { text: string; havingClause?: { met
       let op: NlCompareOp = 'gte';
       let value: number | null = null;
       let countStr = '';
+      
       const twice = /\btwice\b/.exec(window);
       const thrice = /\b(?:thrice|3 times)\b/.exec(window);
       const times = /\b(\d{1,4})\s+times\b/.exec(window);
@@ -889,9 +892,10 @@ function extractHavingClause(text: string): { text: string; havingClause?: { met
       else if (thrice) { value = 3; countStr = thrice[0]; }
       else if (times) { value = Number(times[1]); countStr = times[0]; }
       else {
-         const digits = /\b(\d{1,4})\b/.exec(window);
-         if (digits) { value = Number(digits[1]); countStr = digits[0]; }
+        const digits = /\b(\d{1,4})\b/.exec(window);
+        if (digits) { value = Number(digits[1]); countStr = digits[0]; }
       }
+      
       if (value !== null) {
         if (/\bat least\b/.test(window)) op = 'gte';
         else if (/\bat most\b/.test(window)) op = 'lte';
@@ -1115,10 +1119,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   text = aggResult.text;
   consumedTokens.push(...aggResult.consumed);
 
-  // 9. Team metric (checked before player metric: "richmond's biggest
-  // win" must never be read as a player-stat question).
-  const teamMetricResult = extractTeamMetric(text);
-  const streakResult = extractStreakDefinition(teamMetricResult.text);
+  const streakResult = extractStreakDefinition(text);
   text = streakResult.text;
   consumedTokens.push(...streakResult.consumed);
 
@@ -1129,7 +1130,12 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const periodSplitResult = extractPeriodSplit(text);
   text = periodSplitResult.text;
   consumedTokens.push(...periodSplitResult.consumed);
-  
+
+  const teamMetricResult = extractTeamMetric(text);
+  // Do NOT update text with teamMetricResult.text here.
+  // The match is stripped at step 11 instead to allow career conditions
+  // to see unstripped words if they overlap.
+
   const clubSubjectPresent = CLUB_SUBJECT_LEADING.test(text.trim());
 
   // 10. Career conditions (numeric thresholds/negatives on career columns).
@@ -1397,9 +1403,9 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     grain = 'player_career';
   } else if (streakResult.streakDefinition) {
     grain = 'team_streak';
-  } else if (teamMetricResult.metric) {
+  } else if (havingResult.havingClause || teamMetricResult.metric) {
     grain = 'team_match';
-    metric = teamMetricResult.metric;
+    metric = teamMetricResult.metric ?? null;
   } else if (clubSeasonCuePresent && !player) {
     grain = 'club_season';
     metric = clubSeasonMetricResult.metric ?? null;

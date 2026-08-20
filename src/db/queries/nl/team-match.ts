@@ -111,6 +111,40 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
   const n = rankCutoff(plan.agg);
   const where = foldAnd([...scopeClauses(plan.scope), plan.metric ? sql`${value} IS NOT NULL` : sql`TRUE`]);
   
+  let periodCte = sql``;
+  const sidesRef = plan.periodSplit && plan.periodSplit !== 'FULL_MATCH' ? sql.unsafe('period_sides') : sql.unsafe('sides');
+
+  if (plan.periodSplit && plan.periodSplit !== 'FULL_MATCH') {
+    let periodCondition = sql``;
+    if (plan.periodSplit === 'Q1') periodCondition = sql`period = 1`;
+    else if (plan.periodSplit === 'Q2') periodCondition = sql`period = 2`;
+    else if (plan.periodSplit === 'Q3') periodCondition = sql`period = 3`;
+    else if (plan.periodSplit === 'Q4') periodCondition = sql`period = 4`;
+    else if (plan.periodSplit === 'H1') periodCondition = sql`period IN (1, 2)`;
+    else if (plan.periodSplit === 'H2') periodCondition = sql`period IN (3, 4)`;
+
+    periodCte = sql`,
+      period_club AS (
+        SELECT match_id, club_id, SUM(points) AS points
+          FROM match_period_scores
+         WHERE ${periodCondition}
+         GROUP BY match_id, club_id
+      ),
+      period_sides AS (
+        SELECT s.match_id, s.season, s.round_type, s.round_number, s.is_final,
+               s.match_date, s.venue_id, s.attendance,
+               CASE WHEN COALESCE(pc.points, 0) > COALESCE(po.points, 0) THEN s.club_id
+                    WHEN COALESCE(pc.points, 0) < COALESCE(po.points, 0) THEN s.opponent_id
+                    ELSE NULL END AS winner_club_id,
+               s.club_id, s.opponent_id,
+               COALESCE(pc.points, 0) AS score_for, COALESCE(po.points, 0) AS score_against,
+               s.q3_score_for, s.q3_score_against
+          FROM sides s
+          LEFT JOIN period_club pc ON pc.match_id = s.match_id AND pc.club_id = s.club_id
+          LEFT JOIN period_club po ON po.match_id = s.match_id AND po.club_id = s.opponent_id
+      )`;
+  }
+
   // If havingClause is present, we filter the clubs first.
   let havingCte = sql``;
   if (plan.havingClause) {
@@ -131,7 +165,7 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
     havingCte = sql`,
       having_clubs AS (
         SELECT t.club_id
-        FROM sides t
+        FROM ${sidesRef} t
         WHERE ${where}
         GROUP BY t.club_id
         HAVING ${aggSql} ${opSql} ${value}
@@ -139,7 +173,7 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
   }
 
   const rows = await sql<(NlTeamMatchRow & { total: string; rnk: number })[]>`
-    WITH sides AS (${SIDES})${havingCte},
+    WITH sides AS (${SIDES})${periodCte}${havingCte},
     ranked AS (
       SELECT t.match_id AS "matchId", t.season, t.round_type AS "roundType", t.round_number AS "roundNumber",
              t.match_date AS "matchDate",
@@ -149,7 +183,7 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
              t.score_for AS "clubScore", t.score_against AS "opponentScore",
              COALESCE(v.canonical_name, m.venue_raw) AS "venueName",
              rank() OVER (ORDER BY ${value} ${direction})::int AS rnk
-        FROM sides t
+        FROM ${sidesRef} t
         JOIN matches m ON m.id = t.match_id
         JOIN clubs cl ON cl.id = t.club_id
         JOIN clubs opp ON opp.id = t.opponent_id

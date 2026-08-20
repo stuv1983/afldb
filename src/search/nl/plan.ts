@@ -812,7 +812,7 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   // with no ranked metric ("players with 300 games and no premiership").
   // Every other grain's compiler ranks by a metric and has no other
   // question shape to fall back to.
-  if (raw.metric === null && (raw.grain === 'player_game' || raw.grain === 'player_season' || raw.grain === 'team_match')) {
+  if (raw.metric === null && (raw.grain === 'player_game' || raw.grain === 'player_season' || (raw.grain === 'team_match' && !raw.havingClause))) {
     return { error: 'This kind of question needs a statistic to rank by.' };
   }
 
