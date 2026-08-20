@@ -7,7 +7,7 @@ import {
   matchPath, playerPath, seasonPath,
 } from '@/lib/format';
 import type {
-  NlAnswer, NlClubSeasonRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow, NlTeamMatchRow,
+  NlAnswer, NlClubSeasonRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow, NlTeamMatchRow, NlTeamStreakRow
 } from '@/search/nl/answer-types';
 
 /**
@@ -77,6 +77,8 @@ function renderPayload(answer: NlAnswer) {
       return <PlayerSeasonTable rows={payload.rows} total={payload.total} />;
     case 'team_match':
       return <TeamMatchTable rows={payload.rows} total={payload.total} />;
+    case 'team_streak':
+      return <TeamStreakTable rows={payload.rows} total={payload.total} />;
     case 'club_season':
       return <ClubSeasonTable rows={payload.rows} total={payload.total} />;
     case 'count':
@@ -362,6 +364,47 @@ function ClubSeasonTable({ rows, total }: { rows: NlClubSeasonRow[]; total: numb
                   <td className="num">{formatNumber(r.played)}</td>
                   <td className="num nowrap">{r.wins}–{r.draws}–{r.losses}</td>
                   <td className="num">{r.ladderRank ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CollapsibleTable>
+      {total > rows.length && (
+        <p className="muted" style={{ marginTop: '0.6rem' }}>
+          Showing {rows.length} of {formatNumber(total)}.
+        </p>
+      )}
+    </>
+  );
+}
+
+function TeamStreakTable({ rows, total }: { rows: NlTeamStreakRow[]; total: number }) {
+  if (rows.length <= 1) return null;
+  return (
+    <>
+      <CollapsibleTable title="Every matching streak" note={`${formatNumber(total)} total`}>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Club</th>
+                {rows[0]?.opponentName && <th scope="col">Opponent</th>}
+                <th scope="col" className="num">Streak Length</th>
+                <th scope="col">Started</th>
+                <th scope="col">Ended</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={`${r.clubId}-${i}`}>
+                  <td className="wide"><Link href={clubPath(r.clubSlug)}>{r.clubName}</Link></td>
+                  {r.opponentName && r.opponentSlug && (
+                    <td><Link href={clubPath(r.opponentSlug)}>{r.opponentName}</Link></td>
+                  )}
+                  <td className="num">{formatNumber(r.streakLength)}</td>
+                  <td className="nowrap">{formatDate(r.startDate)}</td>
+                  <td className="nowrap">{formatDate(r.endDate)}</td>
                 </tr>
               ))}
             </tbody>

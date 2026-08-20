@@ -20,14 +20,20 @@ const SIDES = sql`
   SELECT m.id AS match_id, m.season, m.round_type, m.round_number, m.is_final,
          m.match_date, m.venue_id, m.attendance, m.winner_club_id,
          m.home_club_id AS club_id, m.away_club_id AS opponent_id,
-         m.home_score AS score_for, m.away_score AS score_against
+         m.home_score AS score_for, m.away_score AS score_against,
+         hq.points AS q3_score_for, aq.points AS q3_score_against
     FROM matches m
+    LEFT JOIN match_period_scores hq ON hq.match_id = m.id AND hq.club_id = m.home_club_id AND hq.period = 3
+    LEFT JOIN match_period_scores aq ON aq.match_id = m.id AND aq.club_id = m.away_club_id AND aq.period = 3
   UNION ALL
   SELECT m.id, m.season, m.round_type, m.round_number, m.is_final,
          m.match_date, m.venue_id, m.attendance, m.winner_club_id,
          m.away_club_id, m.home_club_id,
-         m.away_score, m.home_score
+         m.away_score, m.home_score,
+         aq.points, hq.points
     FROM matches m
+    LEFT JOIN match_period_scores hq ON hq.match_id = m.id AND hq.club_id = m.home_club_id AND hq.period = 3
+    LEFT JOIN match_period_scores aq ON aq.match_id = m.id AND aq.club_id = m.away_club_id AND aq.period = 3
 `;
 
 /**
@@ -53,6 +59,8 @@ function metricValueExpr(metric: string): SqlFragment {
       return sql`(t.score_for + t.score_against)`;
     case 'attendance':
       return sql`t.attendance`;
+    case 'q3_deficit_overcome':
+      return sql`CASE WHEN t.winner_club_id = t.club_id AND t.q3_score_against IS NOT NULL THEN (t.q3_score_against - t.q3_score_for) END`;
     default:
       throw new Error(`team_match metric "${metric}" is not recognised.`);
   }

@@ -50,6 +50,13 @@ export type NlTeamMatchRow = {
   venueName: string | null;
 };
 
+export type NlTeamStreakRow = {
+  clubId: number; clubName: string; clubSlug: string;
+  opponentId?: number; opponentName?: string; opponentSlug?: string;
+  streakLength: number;
+  startDate: Date | null; endDate: Date | null;
+};
+
 export type NlClubSeasonRow = {
   clubId: number; clubSlug: string; clubName: string;
   season: number;
@@ -75,6 +82,7 @@ export type NlAnswerPayload =
   | { kind: 'player_career'; lead: NlPlayerCareerRow | null; rows: NlPlayerCareerRow[]; total: number }
   | { kind: 'player_season'; lead: NlPlayerSeasonRow | null; rows: NlPlayerSeasonRow[]; total: number }
   | { kind: 'team_match'; lead: NlTeamMatchRow | null; rows: NlTeamMatchRow[]; total: number }
+  | { kind: 'team_streak'; lead: NlTeamStreakRow | null; rows: NlTeamStreakRow[]; total: number }
   | { kind: 'club_season'; lead: NlClubSeasonRow | null; rows: NlClubSeasonRow[]; total: number }
   | { kind: 'count'; value: number }
   | {

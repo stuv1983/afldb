@@ -219,12 +219,13 @@ export const METRIC_HIGHER_IS_WORSE = new Set(['loss_margin', 'opponent_score'])
  * was read as team_match before club_season ever got a chance to claim
  * "losses" as its own ranking metric.
  */
-export const TEAM_METRIC_WORDS: [RegExp, 'win_margin' | 'loss_margin' | 'team_score' | 'total_score' | 'attendance'][] = [
+export const TEAM_METRIC_WORDS: [RegExp, 'win_margin' | 'loss_margin' | 'team_score' | 'total_score' | 'attendance' | 'q3_deficit_overcome'][] = [
   // Explicit margin phrases first. They cannot collide with the bare
   // "win"/"loss" patterns below (\bwin\b does not match "winning"), but
   // stating them first keeps the more specific reading in front of the
   // more general one, which is the ordering rule the rest of this file
   // follows.
+  [/\b(?:3qt|three[- ]quarter time) comebacks?\b/, 'q3_deficit_overcome'],
   [/\b(?:winning margin|win margin|margin of victory)\b/, 'win_margin'],
   [/\b(?:losing margin|loss margin|margin of defeat)\b/, 'loss_margin'],
   [/\b(?:win|victory|victories|thrashing|thumping)\b/, 'win_margin'],
@@ -236,6 +237,12 @@ export const TEAM_METRIC_WORDS: [RegExp, 'win_margin' | 'loss_margin' | 'team_sc
   [/\b(?:combined|total|aggregate) (?:score|points)\b/, 'total_score'],
   [/\b(?:score|points scored)\b/, 'team_score'],
   [/\b(?:crowd|attendance)\b/, 'attendance'],
+];
+
+export const STREAK_WORDS: [RegExp, 'win' | 'loss' | 'unbeaten'][] = [
+  [/\b(?:winning streak|win streak|consecutive wins?|wins? in a row)\b/, 'win'],
+  [/\b(?:losing streak|loss streak|consecutive losses|losses in a row)\b/, 'loss'],
+  [/\b(?:unbeaten streak|undefeated streak|consecutive games unbeaten)\b/, 'unbeaten'],
 ];
 
 /**
@@ -834,16 +841,6 @@ export const UNANSWERABLE_TOPICS: UnanswerableTopic[] = [
     re: /\bposition(?:s)?\b|\b(?:centre half[- ](?:forward|back)|full[- ](?:forward|back)|half[- ](?:forward|back)(?:[- ]flank)?|(?:forward|back) pocket|ruck[- ]?rovers?|ruck(?:m[ae]n)?|rovers?|wing(?:ers?|m[ae]n)?|centrem[ae]n|followers?|interchange)\b/,
     topic: 'playing position',
     reason: 'AFLDB does not record which position a player lined up in.',
-  },
-  {
-    re: /\b(?:consecutive|in a row|winning streak|losing streak|unbeaten streak|win streak|loss streak)\b/,
-    topic: 'streaks',
-    reason: 'Consecutive-game streaks are not precomputed in AFLDB yet.',
-  },
-  {
-    re: /\bcomeback|trailing|three[- ]quarter time\b/,
-    topic: 'quarter-by-quarter comebacks',
-    reason: 'Comeback questions need quarter-by-quarter analysis AFLDB does not yet compute.',
   },
   {
     re: /\b(?:youngest|oldest)\b/,

@@ -200,7 +200,7 @@ export const PARSER_VERSION = 15;
 // ------------------------------------------------------------------ grain
 
 export type NlGrain =
-  | 'player_career' | 'player_game' | 'player_season' | 'team_match' | 'club_season'
+  | 'player_career' | 'player_game' | 'player_season' | 'team_match' | 'club_season' | 'team_streak'
   /**
    * Summaries OF an achievement rather than a list of players who hold it
    * ("which club has had the most players kick a goal with their first
@@ -486,6 +486,7 @@ export const NL_METRICS: Record<NlGrain, Record<string, NlMetricDef>> = {
     opponent_score: columnMetric('opponent_score', "Opponent's score", 'score_against'),
     total_score: columnMetric('total_score', 'Combined score', '(score_for + score_against)'),
     attendance: columnMetric('attendance', 'Attendance', 'attendance'),
+    q3_deficit_overcome: columnMetric('q3_deficit_overcome', '3QT deficit overcome', 'q3_deficit'),
   },
   club_season: {
     wins: columnMetric('wins', 'Wins', 'wins'),
@@ -493,9 +494,11 @@ export const NL_METRICS: Record<NlGrain, Record<string, NlMetricDef>> = {
     draws: columnMetric('draws', 'Draws', 'draws'),
     percentage: columnMetric('percentage', 'Percentage', 'percentage'),
   },
+  team_streak: {},
 };
 
 export function isNlMetric(grain: NlGrain, metric: string): boolean {
+  if (grain === 'team_streak') return false;
   return Object.hasOwn(NL_METRICS[grain], metric);
 }
 
@@ -669,6 +672,8 @@ export type NlQueryPlan = {
   clubSeasonConditions: NlClubSeasonCondition[];
   /** achievement_summary only: which achievement, summarised which way. */
   achievementSummary?: NlAchievementSummary;
+  /** team_streak only: whether the streak is of wins or losses. */
+  streak?: 'win' | 'loss' | 'unbeaten';
   boundary?: NlBoundary;
   /** Whether a value tied for the extreme all come back, or only the first found. Default 'all'. */
   tiePolicy: 'all' | 'first';
@@ -760,7 +765,7 @@ function validateCondition(cond: NlCareerCondition): NlValidationError | null {
 export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError {
   if (raw.v !== 1) return { error: 'Unrecognised plan version.' };
 
-  const grains: NlGrain[] = ['player_career', 'player_game', 'player_season', 'team_match', 'club_season', 'achievement_summary'];
+  const grains: NlGrain[] = ['player_career', 'player_game', 'player_season', 'team_match', 'club_season', 'team_streak', 'achievement_summary'];
   if (!grains.includes(raw.grain)) return { error: `Unknown grain "${raw.grain}".` };
 
   // An achievement summary counts rows; it never ranks by a statistic, so

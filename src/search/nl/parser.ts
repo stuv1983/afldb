@@ -56,7 +56,7 @@ import {
   IN_A_FINAL, IN_A_GRAND_FINAL, IN_ONE_GAME, IN_ONE_SEASON,
   MATCH_TYPE_WORDS, METRIC_HIGHER_IS_WORSE, METRIC_WORDS, NEGATION_WORDS, NUMBER_PLUS_RE,
   NUMBER_WORDS, OVER_CAREER, POLARITY_AGG_RE,
-  PLAYER_NICKNAMES, SINCE_RE, STAT_GAMES_IDIOM_WORDS, STOPWORDS, TEAM_METRIC_WORDS, TOP_N_RE,
+  PLAYER_NICKNAMES, SINCE_RE, STAT_GAMES_IDIOM_WORDS, STOPWORDS, TEAM_METRIC_WORDS, STREAK_WORDS, TOP_N_RE,
   UNANSWERABLE_TOPICS, canonicalise, readCount,
 } from '@/search/nl/vocab';
 
@@ -849,6 +849,14 @@ function extractTeamMetric(text: string): { text: string; metric?: string; consu
   return { text, consumed: [] };
 }
 
+function extractStreak(text: string): { text: string; streak?: 'win' | 'loss' | 'unbeaten'; consumed: string[] } {
+  for (const [re, streak] of STREAK_WORDS) {
+    const match = re.exec(text);
+    if (match) return { text: stripMatch(text, match[0]), streak, consumed: [match[0]] };
+  }
+  return { text, consumed: [] };
+}
+
 function extractPlayerMetric(text: string): { text: string; metric?: string; consumed: string[] } {
   for (const [re, metric] of METRIC_WORDS) {
     const match = re.exec(text);
@@ -1058,6 +1066,10 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // 9. Team metric (checked before player metric: "richmond's biggest
   // win" must never be read as a player-stat question).
   const teamMetricResult = extractTeamMetric(text);
+  const streakResult = extractStreak(teamMetricResult.text);
+  text = streakResult.text;
+  consumedTokens.push(...streakResult.consumed);
+  
   const clubSubjectPresent = CLUB_SUBJECT_LEADING.test(text.trim());
 
   // 10. Career conditions (numeric thresholds/negatives on career columns).
@@ -1323,6 +1335,8 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     grain = 'achievement_summary';
   } else if (achievementResult.achievementKey) {
     grain = 'player_career';
+  } else if (streakResult.streak) {
+    grain = 'team_streak';
   } else if (teamMetricResult.metric) {
     grain = 'team_match';
     metric = teamMetricResult.metric;
@@ -1570,6 +1584,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     ...(grain === 'achievement_summary' && achievementResult.achievementKey && achievementResult.summaryKind
       ? { achievementSummary: { achievementKey: achievementResult.achievementKey, kind: achievementResult.summaryKind } }
       : {}),
+    ...(streakResult.streak ? { streak: streakResult.streak } : {}),
     ...(boundary ? { boundary } : {}),
     tiePolicy: 'all',
     limit: agg.kind === 'top_n' || agg.kind === 'list' ? 100 : 25,
@@ -1589,6 +1604,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // An achievement_summary always carries its own descriptor, which
   // validatePlan requires, so reaching this point is itself the structure.
   const structuralOk = grain === 'team_match' ? !!metric
+    : grain === 'team_streak' ? !!streakResult.streak
     : grain === 'club_season' ? clubSeasonCuePresent
     : grain === 'achievement_summary' ? true
     : grain === 'player_career' ? (metric !== null || careerConditions.length > 0 || careerPredicates.length > 0 || boundary !== undefined)
