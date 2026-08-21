@@ -2740,8 +2740,41 @@ Local verification after the patch:
 - `npm.cmd test -- tests/nl-answer-feedback-boundary.test.ts`: passed 2 tests. The regression asserts the form remains server-owned, uses the plain Server Action entrypoint, keeps the expected controls in a client child, does not reintroduce `useActionState`, and the plain form entrypoint calls `recordNlFeedback`.
 - `npm.cmd test -- tests/nl-feedback.test.ts`: passed 31 tests.
 
+Post-patch live discriminator gate:
+
+- Live build check: `.next/standalone/.next/BUILD_ID` and `/search` response header `x-afldb-build` both reported `DOoGeJqYceleN9QLcG2kI`.
+- Health check: `/api/health` returned `status=ok`, `database=ok`, `latencyMs=19`.
+- Corpus: `artifacts/nl-ui/issue-068-feedback-discriminator-nohang.csv`.
+- Command shape: `AFLDB_E2E_BASE_URL=http://10.0.40.100:8090`, `NL_UI_BATCH=12`, `NL_UI_WORKERS=4`, Playwright project `nl-stress`, `--workers=4 --no-deps`.
+- Rows: 118 attempted, 118 observed.
+- Semantic pass/fail/unscored: 0 / 0 / 118 (`expected_status=unknown` by design).
+- Outcomes: answered 68, absent 50, HTTP errors 0, page errors 0, timeouts 0.
+- Client-side error loads: 3.
+- Hydration errors: 2 React #418.
+- Report: `nl-ui-out/summary.json`.
+
+Rendered-DOM cohort rates from the post-patch 118-row discriminator:
+
+- Feedback absent (`SearchBox` present, no `NlAnswerFeedback`): 0/50 React #418 (0.00%).
+- Feedback present, single answered: 1/57 React #418 (1.75%).
+- Feedback present, grouped answered: 1/11 React #418 (9.09%).
+- Overall rows with feedback present: 2/68 React #418 (2.94%).
+- Overall rows without feedback present: 0/50 React #418 (0.00%).
+
+Runtime failures captured in the post-patch discriminator:
+
+- `fb_015`: `Lance Franklin highest handballs game against Port Adelaide`, previous `nf_014` / `MCG`; feedback present; answered single result; client error was `net::ERR_NO_BUFFER_SPACE`, not React #418; first `_rsc` at ~24 ms, 5 RSC requests before observation cutoff, 0 probe mutations.
+- `fb_029`: `Tony Lockett most clearances against Hawthorn`, previous `nf_028` / `Gold Coast`; feedback present; grouped answer (`Every matching performance3 total`, 3 rows); React #418 at ~10 ms, first `_rsc` at ~22 ms, 0 RSC requests before hydration-error cutoff, 0 probe mutations.
+- `nf_054`: label cohort was `feedback_absent_search_results`, but the rendered DOM legitimately contained `NlAnswerFeedback` for `draw` (`Jack Riewoldt - 8 draws`); previous `fb_054` / `Dustin Martin total disposals against Port Adelaide`; feedback present; single answer; React #418 at ~553 ms by page timing and ~63 ms in the document-start probe, no `_rsc` before hydration-error cutoff, 0 probe mutations.
+
+Decision from the post-patch discriminator:
+
+- The patch prediction is not satisfied. Feedback-present rows still produced unexplained React #418 after the server-owned form patch, while true feedback-absent rows remained clean.
+- The old Client Component `useActionState` Server Action form boundary remains a plausible contributor or adjacent risk, but this result does not support treating it as the complete root cause.
+- The 125-row, 501-row, and 12,000-row gates were not run. Preserve the `nl-ui-out` artifacts and reassess the remaining feedback-present first-client-render boundary before broadening any source patch.
+
 ### Follow-up
-Keep the issue open. The next step is Linux/dev-host verification of this narrow feedback-boundary patch: run focused tests, build, perform a legitimate service restart, prove the live `BUILD_ID`, then rerun the 118-row feedback discriminator. Only if that is clean should the exact 125-row corpus be run repeatedly. Do not run the 501-row or full 12,000-row acceptance corpus yet.
+Keep the issue open. The next step is to inspect the two post-patch feedback-present React #418 artifacts and compare the server-owned feedback form plus `NlAnswerFeedbackControls` first-client-render structure. Do not broaden the patch, and do not run the 125-row, 501-row, or full 12,000-row acceptance corpus until the post-patch discriminator failure is explained or a narrower hypothesis is justified.
 
 ## AFLDB-ISSUE-069 - Expanded UI corpus expects unsupported debut-season leaderboards to answer
 
