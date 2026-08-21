@@ -227,8 +227,12 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    and "leader"; the redundant holder noun is consumed so
  *    "record holder for goals against Collingwood" reaches the same scoped
  *    sum plan as "career goal leader against Collingwood".
+ * 25: malformed bare numeric conditions such as "players with most 10
+ *    games" decline instead of being accepted as a threshold condition.
+ *    "At most 10 games" remains the supported upper-bound operator and
+ *    "most games" remains the career leaderboard.
  */
-export const PARSER_VERSION = 24;
+export const PARSER_VERSION = 25;
 
 // ------------------------------------------------------------------ grain
 

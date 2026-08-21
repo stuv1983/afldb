@@ -80,6 +80,7 @@ export function PrimaryNav() {
         <Link
           key={item.href}
           href={item.href}
+          prefetch={false}
           aria-current={isCurrent(pathname, item.href) ? 'page' : undefined}
         >
           {item.label}
@@ -99,6 +100,7 @@ export function TabBar() {
         <Link
           key={item.href}
           href={item.href}
+          prefetch={false}
           aria-current={isCurrent(pathname, item.href) ? 'page' : undefined}
         >
           {item.label}

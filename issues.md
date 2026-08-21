@@ -2360,13 +2360,13 @@ Rewrite the live-only player-season compiler path to pre-aggregate `(player_id, 
 
 ## AFLDB-ISSUE-066 - Malformed `most N games` conditions answer instead of declining
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Parser
 - **Found:** 2026-08-21
-- **Resolved:** N/A
+- **Resolved:** 2026-08-21
 - **Queries:** `players with most 10 games`, `players with most 200 games`
-- **Files:** `src/search/nl/parser.ts`
+- **Files:** `src/search/nl/parser.ts`, `src/search/nl/plan.ts`, `tests/nl-regression-corpus.test.ts`
 
 ### Symptom
 Expanded browser corpus rows intended to exercise `at most` versus bare `most` collisions rendered confident career-condition answers.
@@ -2389,16 +2389,27 @@ The corrected v24 expanded Playwright rerun still reports the same ten `collisio
 Slot extraction
 
 ### Root cause
-Not yet confirmed. The career-condition extractor can still bind a bare number near a career stat after aggregation extraction has seen `most`, so malformed `most N <career stat>` wording reaches execution instead of being treated as unsupported.
+The parser consumed bare `most` as a valid `max` aggregation before career-condition extraction. The remaining `N <career stat>` span then looked like an ordinary threshold with the default `gte` operator, so malformed `players with most N games` reached execution as though the reader had typed a supported condition.
 
 ### Fix
-Not yet fixed.
+Added a narrow pre-extraction guard for `players with most N <career stat>` so it declines as malformed. Parser version 25 records the outcome change. Positive controls preserve `players with at most N games`, `players with most games`, and `most goals by players with at most 3 clubs`.
 
 ### Validation
-Open issue; no fix validation yet.
+Local:
+
+- `npm.cmd test -- tests/nl-regression-corpus.test.ts tests/nl-audit-acceptance.test.ts tests/nl-parser.test.ts tests/nl-plan.test.ts` passed: 352 assertions.
+- `npm.cmd test -- tests/nl-audit-acceptance.test.ts tests/nl-parser.test.ts tests/nl-plan.test.ts tests/nl-describe.test.ts tests/nl-regression-corpus.test.ts tests/nl-stress-corpus.test.ts tests/nl-stress-v2.test.ts tests/nl-ui-corpus.test.ts tests/nl-expanded-ui-corpus-generator.test.ts` passed: 513 assertions.
+
+Remote development host, staged source:
+
+- `npm test -- tests/nl-regression-corpus.test.ts tests/nl-audit-acceptance.test.ts tests/nl-parser.test.ts tests/nl-plan.test.ts` passed: 352 assertions.
+- `npm run typecheck` passed.
+- `npm run nl:stress -- --corpus ~/nl-killer-250k.csv --out ~/nl-stress-out-codex-v25-v2 --concurrency 6` completed with parser version 25 and 100% safe declines for adversarial/unanswerable rows; unsafe answers to expected-decline rows: 0.
+
+Rendered `/search` verification for parser version 25 is blocked because the development build completed but `sudo -n systemctl restart afldb` failed with `sudo: a password is required`; the public dev service on `:8090` was therefore not restarted onto the staged v25 build during this audit.
 
 ### Follow-up
-Add a targeted parser decline test for `players with most 10 games`, preserve positive controls for `players with at most 10 games` and `most games`, then implement the narrow malformed-condition guard.
+Restart the development `afldb` service and rerun the expanded UI corpus so the ten `players with most N games` browser rows can be verified against the rendered parser-v25 deployment.
 
 ## AFLDB-ISSUE-067 - Expanded UI corpus generator double-pluralizes metric labels
 
@@ -2480,20 +2491,22 @@ The corrected v24 expanded 501-row rerun reproduced the issue under parallel bro
 
 The live v24 12,000-question UI corpus also reproduced it: `clientErrors=235`, `hydration.totalHydrationErrors=235`, HTTP failures 0, page errors 0, and report archived at `artifacts/nl-ui/nl-audit-v24-ui-12000-20260821/summary.json`.
 
+The parser-v25 audit reran the 501-row expanded browser corpus before the dev restart was blocked. It reproduced the same runtime class with `clientErrors=12`, `hydration.totalHydrationErrors=9`, HTTP failures 0, page errors 0, and report at `nl-ui-out/summary.json`. Captured React #418 examples included `Grand Final marks leader`, `finals record for disposals`, `fewest points scored at Adelaide Oval`, `Scott Pendlebury most handballs against Carlton`, `Patrick Dangerfield total goals against Richmond`, `Patrick Dangerfield total goals against Essendon`, `players with at most 1 games`, `players with most 2 games`, and `Ablett most games`. Three additional client errors were RSC payload fallback messages rather than hydration errors.
+
 ### First wrong layer
 UI/runtime
 
 ### Root cause
-Not yet confirmed. The existing harness evidence points to an intermittent hydration/runtime mismatch under the deployed Next.js standalone service, not to the NL parser or answer layer.
+The current evidence points to eager App Router RSC prefetch from the persistent site navigation during `/search` hydration. In the parser-v25 expanded run, each React #418 capture had identical failing and clean server HTML for the same query, a clean same-question control, and a burst of successful `?_rsc=` fetches for visible nav links within the first few dozen milliseconds of the document load. Those RSC fetches were served by mixed standalone cluster workers, including workers different from the document worker. This keeps the first wrong layer in UI/runtime, not the NL parser or answer SQL.
 
 ### Fix
-Not yet fixed.
+Disabled automatic Next.js prefetch on `PrimaryNav` and `TabBar` links in `src/components/SiteNav.tsx`. The links still navigate normally when clicked, but `/search` hydration no longer starts by prefetching the full visible nav route set across cluster workers.
 
 ### Validation
-Open issue; no fix validation yet. The serial replay only proves the eight exact rows are not deterministic query-level reproducers.
+`npm.cmd run typecheck` passed locally. Full runtime validation is still required against a restarted deployed/dev standalone service containing the `SiteNav` change: rerun the varied 501-row expanded browser corpus first, then the 12,000-row UI corpus. The earlier serial replay only proves the exact rows are not deterministic query-level reproducers.
 
 ### Follow-up
-Use the stored failing and clean HTML/DOM pairs to diff unstable markup, then replay under parallel load after the next UI/runtime fix. Do not count React #418 incidents as semantic NL failures, but do count them as UI/hydration failures in browser sweep summaries.
+Deploy/restart a build containing the `SiteNav` prefetch change and replay the varied parallel corpus. Do not count React #418 incidents as semantic NL failures, but do count them as UI/hydration failures in browser sweep summaries until the expanded and full UI sweeps are clean.
 
 ## AFLDB-ISSUE-069 - Expanded UI corpus expects unsupported debut-season leaderboards to answer
 
@@ -2594,10 +2607,57 @@ Audit corpus/oracle and data coverage
 The 12k corpus contains stale expected-status rows for behaviours that are now supported or intentionally ambiguous, and it marks historical metric rows as expected plans even when AFLDB correctly exposes coverage unavailability.
 
 ### Fix
-No application fix was made for this issue. This ledger entry records the classification of the completed 12k run. `AFLDB-ISSUE-068` remains open for hydration, and `AFLDB-ISSUE-065`/`AFLDB-ISSUE-066` remain open from the expanded corpus.
+No application fix was made for this issue. This ledger entry records the classification of the completed 12k run. `AFLDB-ISSUE-068` remains open for hydration, `AFLDB-ISSUE-065` remains open from the expanded corpus, and `AFLDB-ISSUE-066` was resolved later by parser version 25.
 
 ### Validation
 The Playwright harness completed all 120 batches in 20.9 minutes with all 12,000 questions observed. `nl-ui-out` was archived to `artifacts/nl-ui/nl-audit-v24-ui-12000-20260821`.
 
 ### Follow-up
 Regenerate or re-baseline the 12k corpus oracles separately from NL semantic fixes. Keep ambiguous identity and historical metric coverage policy explicit in the generated expected statuses.
+
+## AFLDB-ISSUE-071 - Parser-v25 V2 stress residual failure classification
+
+- **Status:** Open
+- **Severity:** Low
+- **Area:** Audit
+- **Found:** 2026-08-21
+- **Resolved:** N/A
+- **Queries:** `record tackles since 2010`, `most bounces in the 1960s`, `players with 3+ goals and exactly 3 clubs`
+- **Files:** `tools/nl/v2-runner.ts`, `/home/arm/nl-stress-out-codex-v25-v2/report.md`
+
+### Symptom
+The full 250,000-row V2 qualification corpus completed against parser version 25 with residual hard and soft findings even though verified football-answer rows and expected-decline safety rows passed.
+
+### Reproduction
+Run `npm run nl:stress -- --corpus ~/nl-killer-250k.csv --out ~/nl-stress-out-codex-v25-v2 --concurrency 6` on the development host with `DATABASE_URL` guarded to `afldb_dev`.
+
+### Expected
+The audit report should classify residual failures as product defects, data coverage, or corpus/oracle debt rather than treating the blended failure count as one parser bug.
+
+### Actual
+The run scored 245,464 rows: 233,021 clean, 5,263 soft, 7,180 hard, 0 unsafe answers, and 0 of 6,788 metamorphic groups divergent. All 20,000 verified football-result rows passed and all 24,393 adversarial/unanswerable expected-decline rows declined safely. The runner also quarantined 4,536 self-contradicting corpus-oracle rows before scoring.
+
+### Evidence
+Headline V2 report:
+
+- Semantic correctness: 191,722 / 201,071 (95.35%).
+- Answer correctness: 20,000 / 20,000 (100%).
+- Safe declines: 24,393 / 24,393 (100%).
+- Metamorphic consistency: 6,788 / 6,788 groups (100%).
+- Hard classes: `WRONG_GRAIN`/`WRONG_MODE` season-range sum expectations (6,643 rows), numeric-condition `DROPPED_FILTER`/`EXTRA_FILTER` clusters (537 rows).
+- Soft classes: expected-plan historical coverage declines (2,169 rows) and wrong decline reason classifications (3,094 rows).
+
+### First wrong layer
+Generated corpus/oracle classification, with possible parser follow-up for the remaining numeric-condition clusters.
+
+### Root cause
+Not yet fully classified. The largest clusters match known oracle/policy tension: generated range rows expect `player_game` sum semantics where AFLDB intentionally routes named season/range leaderboards to `player_season`, and historical stat rows expect answerable plans where coverage correctly declines. The smaller numeric-condition clusters need separate generator/oracle review because the report shows expectations such as `3+ goals and exactly 3 clubs` disagreeing with the actual English operators.
+
+### Fix
+No application fix made for this classification entry. Parser version 25 was separately fixed under `AFLDB-ISSUE-066`.
+
+### Validation
+The full V2 run completed in 5m10s against `afldb_dev`, parser version 25, concurrency 6. Report path: `/home/arm/nl-stress-out-codex-v25-v2/report.md`.
+
+### Follow-up
+Review and re-baseline the V2 generator/oracles for season-range sum expectations, historical coverage policy, wrong-decline-reason expectations, and numeric-condition operator contradictions. Only promote any remaining product defect after the oracle layer is reconciled.

@@ -24,6 +24,9 @@ A successful change must satisfy all of these:
 10. Every credible defect found is recorded in the repository's `issuesFound` ledger.
 11. Every codebase change made by the audit is recorded in the existing `CHANGELOG.md`.
 12. The final report distinguishes verified, blocked, not-run, and environment-limited checks.
+13. Browser answer correctness and browser runtime health are measured independently: a query may satisfy its answer expectation and still fail the audit because of a console/client/hydration error.
+14. An intermittent hydration/client failure is not cleared merely because the same query passes when replayed serially.
+15. Generated corpus/oracle defects are classified separately from product defects and repaired at the generator/oracle layer rather than in the parser.
 
 ---
 
@@ -132,7 +135,11 @@ Do not "fix" an NL problem by:
 - changing `NULL` to zero;
 - hiding unsupported coverage;
 - bypassing the beta gate, auth, permissions, or other security controls;
-- changing the database to agree with a buggy query.
+- changing the database to agree with a buggy query;
+- reducing browser concurrency only to make hydration errors disappear and then calling the issue fixed;
+- classifying React hydration recovery as harmless because answer text eventually appears;
+- discarding a failing parallel run because an individual serial replay passes;
+- changing the NL parser to accept malformed strings produced by a broken corpus generator.
 
 Fix the first wrong layer.
 
@@ -465,6 +472,16 @@ Exact tests/commands and results. Include DB/UI evidence where applicable.
 ### Follow-up
 Remaining risk, related cases, blocked checks, or `None`.
 ```
+
+For an intermittent hydration/client-runtime issue, also record when available:
+
+- full/expanded corpus baseline count and rate;
+- harness concurrency/worker settings;
+- exact React/client error code/message;
+- serial replay result;
+- whether raw failing server HTML exists;
+- whether a clean same-query control exists;
+- post-fix comparable-run count/rate.
 
 ### Update timing
 
@@ -958,17 +975,22 @@ Use the repository's existing safe concurrency defaults. If the harness exposes 
 
 Capture:
 
-- total attempted;
-- passed;
-- failed;
-- declined;
+- total attempted/observed;
+- semantic/expectation passes;
+- semantic/expectation failures;
+- visible declines;
+- data-coverage limitations;
+- stale-oracle/policy rows;
+- HTTP failures;
 - page errors;
-- console errors;
+- console/client errors;
 - hydration errors;
 - timeouts;
 - malformed answer text;
 - query/result mismatches;
 - report/output paths.
+
+Report semantic expectation failures and runtime/hydration errors separately. A row may belong to both dimensions.
 
 ### Phase 4 — failure replay and controls
 
@@ -984,6 +1006,8 @@ For every Playwright failure:
 8. independently verify PostgreSQL truth when the answer is database-backed.
 
 Intermittent failures must not be dismissed because one replay passes.
+
+For hydration/client failures specifically, a serial replay passing changes the diagnosis to intermittent/load-sensitive; it does not change the original failure to PASS.
 
 ### Browser assertions
 
@@ -1011,6 +1035,136 @@ When new high-value queries are generated during the audit:
 - keep large generated runs in existing generated-output/corpus locations;
 - record newly discovered semantic families in `issuesFound` when they expose a defect;
 - document meaningful permanent corpus/test expansion in `CHANGELOG.md`.
+
+## Hydration and client-runtime audit
+
+Hydration/client errors are a separate correctness dimension from NL semantic expectations.
+
+A browser row may count as semantically correct while still recording a React/client/hydration error. Do not merge those dimensions into one pass percentage.
+
+Treat any unexplained hydration/client error as an open runtime defect until classified. This includes React minified hydration errors such as `#418`, recoverable hydration warnings, client exceptions, and server/client tree mismatches even when React recovers and visible answer text appears correct.
+
+### Required run metadata
+
+For every expanded/full UI run record enough information to reproduce the load shape:
+
+- parser version;
+- application build/version identifier when available;
+- corpus path/version;
+- run tag;
+- total questions;
+- Playwright worker/process count;
+- harness concurrency;
+- navigation/reuse strategy if relevant;
+- target base URL;
+- timestamp;
+- server worker count when known;
+- relevant runtime limits when known;
+- output/report directory.
+
+Do not expose secrets while capturing metadata.
+
+### Hydration failure capture
+
+When a hydration/client error occurs in the varied or parallel corpus:
+
+1. preserve the exact query and corpus row/index;
+2. preserve browser console text/error classification;
+3. preserve page URL/search params and visible NL state;
+4. capture the **raw server HTML for the failing request** before hydration when the harness can do so;
+5. capture the post-hydration DOM or relevant rendered text;
+6. capture screenshot/trace when useful;
+7. capture parser version/build identity associated with the run;
+8. save a same-query clean control when one can be obtained;
+9. save a neighbouring clean query/control;
+10. correlate repeated failures by query, worker/process, timing, and run position when possible.
+
+Prefer adding this capture to the real corpus harness so evidence is collected at the moment the intermittent failure occurs. Do not rely solely on a bespoke repeated-query script when the defect only reproduces under sustained varied traffic.
+
+### Serial replay is diagnostic, not clearance
+
+If a hydration failure passes when replayed individually or serially:
+
+- record the serial pass;
+- keep the original parallel failure valid;
+- classify the issue as concurrency/load-shape/intermittent until disproven;
+- continue investigation using the real failing harness conditions.
+
+A serial 8/8 or 100/100 pass does **not** close a defect that reproduces under the expanded/full concurrent corpus.
+
+### Compare failing HTML with a clean control
+
+For a reproducible hydration family, compare:
+
+```text
+failing varied/parallel request
+-> raw server HTML
+-> hydrated/client DOM
+
+same query clean control
+-> raw server HTML
+-> hydrated/client DOM
+```
+
+Look for:
+
+- unstable element order;
+- missing/extra nodes;
+- differing text/value formatting;
+- unstable keys/component identity;
+- browser-only values entering initial render;
+- non-deterministic ordering of tied results;
+- search-param interpretation differences;
+- stale previous-query state;
+- RSC/client boundary differences;
+- revalidation/tree replacement;
+- data/result differences between server render and hydration;
+- concurrent request/build/cache interactions.
+
+Fix the first wrong boundary. Do not add `suppressHydrationWarning` unless the mismatch is deliberate and documented.
+
+### Before/after validation for a hydration fix
+
+Preserve the pre-fix full-corpus baseline in the issue ledger. The baseline is evidence, not a permanent acceptable threshold.
+
+After a hydration/runtime patch:
+
+1. rerun the exact failing examples;
+2. rerun the expanded >=500 corpus at the **same concurrency/load shape** used to reproduce the problem;
+3. rerun the same full UI corpus with the same harness configuration;
+4. compare hydration/client-error counts and rates before versus after;
+5. verify semantic/expectation results did not regress;
+6. if the defect is intermittent, run another comparable full/expanded pass when practical before calling it resolved.
+
+Do not validate a concurrency-sensitive fix only with serial execution.
+
+A fix is not proven merely because the hydration rate decreased. Unexplained remaining errors stay open and must be classified.
+
+## Generated corpus and oracle quality
+
+Generated test inputs are part of the audit system and can themselves be wrong.
+
+Before interpreting a large failure cluster as an NL product defect, inspect the generated questions/oracles for systematic generator mistakes such as:
+
+- doubled plurals (`goalss`, `markss`, `handballss`);
+- invalid singular/plural transforms;
+- malformed aliases;
+- impossible/self-contradictory scope produced accidentally;
+- stale policy expectations;
+- expectations for intentionally unsupported semantics;
+- outdated ambiguity policy;
+- outdated parser-version assumptions.
+
+When the generator/oracle is wrong:
+
+1. fix the generator/oracle, not the parser;
+2. add focused regression coverage for the generator rule;
+3. regenerate the affected corpus/output where appropriate;
+4. rerun the affected audit slice;
+5. record the tooling/oracle defect in the issue ledger when it materially distorted audit results;
+6. record permanent generator/test changes in `CHANGELOG.md`.
+
+Keep product correctness metrics separate from invalid generated-row counts.
 
 ---
 
@@ -1622,8 +1776,10 @@ Audit category by category:
 20. metamorphic consistency;
 21. targeted Playwright UI audit;
 22. expanded stratified Playwright corpus;
-23. full existing 12,000-question UI corpus when present;
-24. full V2 stress/corpus execution when the repository runner and required development environment are available.
+23. generated-corpus/oracle quality;
+24. hydration/client-runtime stability under varied/concurrent traffic;
+25. full existing 12,000-question UI corpus when present;
+26. full V2 stress/corpus execution when the repository runner and required development environment are available.
 
 For each category, classify:
 
@@ -1632,7 +1788,9 @@ For each category, classify:
 - defect found/open;
 - blocked;
 - intentionally unsupported;
-- data-coverage limited.
+- data-coverage limited;
+- stale corpus/oracle;
+- intermittent runtime/hydration defect.
 
 Do not manufacture source changes to make a full audit look productive. A clean category is a valid result.
 
@@ -1697,6 +1855,9 @@ At the end of `audit`, `fix`, `verify`, or `full`, report:
 - incorrect declines;
 - correct declines/coverage limitations;
 - runtime/UI failures;
+- hydration/client errors (separate from semantic failures);
+- stale corpus/oracle rows;
+- data-coverage rows;
 - defects fixed;
 - defects still open.
 
@@ -1745,14 +1906,30 @@ For `full` mode, report browser and V2 results separately.
 Browser reporting must include:
 
 - targeted smoke attempted/passed/failed;
-- expanded corpus attempted/passed/failed;
-- full UI corpus attempted/passed/failed when present;
+- expanded corpus attempted/semantic-passed/expectation-failed;
+- full UI corpus attempted/observed/semantic-passed/expectation-failed when present;
+- visible declines;
+- data-coverage limitations;
+- stale corpus/oracle/policy rows;
+- HTTP failures;
 - page errors;
-- console errors;
-- hydration errors;
+- console/client errors;
+- hydration errors and hydration-error rate;
 - timeouts;
 - malformed-answer detections;
+- harness concurrency/worker configuration;
+- parser version/build identity;
 - output/report paths.
+
+Do not report a single combined `passed` number as if it covers both semantic correctness and browser-runtime stability.
+
+If hydration/client errors occurred, report:
+
+- how many reproduced under parallel/varied traffic;
+- how many passed serial replay;
+- whether raw failing server HTML was captured;
+- whether a same-query clean control was captured;
+- current issue/status.
 
 V2 reporting must include corpus size and key semantic/answer/metamorphic metrics. If it was not run, state the precise blocker; the permitted read-only `git rev-parse HEAD` command is not itself a blocker.
 
@@ -1779,6 +1956,8 @@ Separate:
 - data-quality defects;
 - performance concerns;
 - UI/runtime gaps;
+- hydration/client-runtime stability;
+- corpus-generator/oracle debt;
 - intentionally unsupported ambiguity;
 - environment/tooling blocks.
 
@@ -1803,6 +1982,11 @@ Do not declare the work complete until all applicable conditions are met:
 - in `full` mode, the targeted Playwright smoke has covered at least 60 high-risk questions unless a concrete environment blocker is recorded;
 - in `full` mode, an expanded stratified Playwright corpus of at least 500 meaningful unique questions has been exercised unless a concrete environment blocker is recorded;
 - in `full` mode, the repository's full 12,000-question UI corpus has been run when that corpus/harness exists and the development UI is available;
+- full-mode browser results report semantic expectation failures separately from console/client/hydration failures;
+- a full NL audit is **not clean** while unexplained hydration/client errors remain above zero, even if all associated answer assertions eventually pass;
+- serial replay success does not close an error that reproduces under the real varied/concurrent harness;
+- when a hydration/runtime fix is made, validation repeats the same expanded/full corpus at comparable concurrency/load shape and records before/after counts;
+- systematic invalid generated questions/oracles are fixed at the generator/oracle layer and excluded from product-defect conclusions after revalidation;
 - in `full` mode, the V2 stress runner has been executed when its required development environment is available; its permitted `git rev-parse HEAD` metadata lookup is not a valid reason to skip it;
 - every credible defect found is present in the existing `issuesFound` ledger;
 - resolved issue records include root cause, fix, and validation;
@@ -1810,6 +1994,8 @@ Do not declare the work complete until all applicable conditions are met:
 - no blocked/unrun check is presented as passed;
 - final report lists every changed file;
 - no secrets, temporary debug output, or generated forensic artefacts were accidentally added to tracked project files.
+
+When an open hydration/runtime issue already has a full-corpus baseline, preserve that baseline in the issue ledger before changing code. Use the same corpus and comparable harness settings for the post-fix comparison. Do not encode one historical error rate as an acceptable permanent threshold.
 
 If a query cannot be answered from stored data, say which required field/grain/era is unavailable and decline honestly.
 

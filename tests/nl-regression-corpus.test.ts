@@ -1042,8 +1042,25 @@ describe('NL-024: "at most" is an operator, never the superlative', () => {
     );
   });
 
+  it('bare "most N games" declines instead of pretending to be an upper-bound condition', async () => {
+    const result = await parseNlQuestion('players with most 10 games', ctx);
+    expect(result.status).toBe('none');
+  });
+
+  it('bare "most N" declines for word numbers too', async () => {
+    const result = await parseNlQuestion('players with most two games', ctx);
+    expect(result.status).toBe('none');
+  });
+
   // The superlative reading must be untouched -- this is the common case
   // and the whole reason bare "most" is in AGG_WORDS at all.
+  it('bare "most games" still reads as a career leaderboard', async () => {
+    const p = await plan('players with most games');
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(p.metric).toBe('games');
+    expect(p.careerConditions).toEqual([]);
+  });
+
   it.each([
     'most goals',
     'most career goals at the mcg',

@@ -556,6 +556,20 @@ const CAREER_ONLY_METRICS: ReadonlySet<string> = new Set(
   CAREER_STAT_WORDS.map(([, column]) => column).filter((column) => column !== 'goals' && column !== 'brownlow_votes'),
 );
 
+const NUMBER_WORD_PATTERN = Object.keys(NUMBER_WORDS).join('|');
+const BARE_MOST_NUMERIC_CAREER_CONDITION_RE = new RegExp(
+  `\\bplayers?\\s+with\\b[^.]{0,60}?\\bmost\\s+(?:\\d{1,4}|${NUMBER_WORD_PATTERN})\\s+`
+  + String.raw`(?:games?|goals?|finals?|clubs?|premierships?|flags?|wins?|losses?|draws?|brownlow\s+(?:medals?|votes?))\b`,
+);
+
+function hasBareMostNumericCareerCondition(text: string): boolean {
+  const match = BARE_MOST_NUMERIC_CAREER_CONDITION_RE.exec(text);
+  if (!match) return false;
+  const mostAt = match[0].lastIndexOf('most');
+  const beforeMost = match[0].slice(Math.max(0, mostAt - 3), mostAt);
+  return !/\bat\s+$/.test(beforeMost);
+}
+
 function extractCareerConditions(text: string): {
   text: string; conditions: NlCareerCondition[]; predicates: GridAxisState[]; consumed: string[];
 } {
@@ -1047,6 +1061,12 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const totalTokens = meaningfulTokens(normalised);
   const consumedTokens: string[] = [];
   const notes: string[] = [];
+
+  if (hasBareMostNumericCareerCondition(text)) {
+    report.confidence = 1;
+    report.notes.push('"most N games" is malformed; use "at most N games" for an upper bound or "most games" for a leaderboard.');
+    return { status: 'none', reason: 'unrecognised', report };
+  }
 
   // 1. Unanswerable-topic gate, before anything else consumes a token
   // that would otherwise make an absent-data question look partially
