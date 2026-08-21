@@ -1,12 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useFormStatus } from 'react-dom';
 
 import { NL_FEEDBACK_MAX_LENGTH } from '@/search/nl/feedback-spec';
 
 export function NlAnswerFeedbackControls() {
-  const { pending } = useFormStatus();
   const [choice, setChoice] = useState<'none' | 'incorrect'>('none');
   const [dismissed, setDismissed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -31,7 +29,6 @@ export function NlAnswerFeedbackControls() {
         type="submit"
         name="verdict"
         value="correct"
-        disabled={pending}
         onClick={() => setSubmitted(true)}
         style={{ fontSize: '0.85rem' }}
       >
@@ -42,7 +39,6 @@ export function NlAnswerFeedbackControls() {
         type="submit"
         name="verdict"
         value="incorrect"
-        disabled={pending}
         onClick={(event) => {
           if (choice === 'none') {
             event.preventDefault();

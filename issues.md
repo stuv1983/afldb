@@ -2773,8 +2773,94 @@ Decision from the post-patch discriminator:
 - The old Client Component `useActionState` Server Action form boundary remains a plausible contributor or adjacent risk, but this result does not support treating it as the complete root cause.
 - The 125-row, 501-row, and 12,000-row gates were not run. Preserve the `nl-ui-out` artifacts and reassess the remaining feedback-present first-client-render boundary before broadening any source patch.
 
+Post-patch artifact inspection and H7 diagnostic setup:
+
+- `src/components/NlAnswerFeedbackControls.tsx` still had deterministic local first-render state (`choice = none`, `dismissed = false`, `submitted = false`) and no browser/environment-derived initializer. The only first-render value derived from form context was `useFormStatus().pending`, used only to add/remove `disabled` on the Yes/No submit buttons.
+- Current probe fingerprints do not include the `disabled` attribute, button `value`, button `aria-label`, or client component boundary marker details, so the saved 118-row artifacts cannot prove or disprove an initial `pending` divergence.
+- Saved hydration artifacts exist for both post-patch React #418 rows: `artifacts/hydration/fb_029` and `artifacts/hydration/nf_054`.
+- The saved same-query server HTML for each failing row matched its clean-control server HTML byte-for-byte in size and captured form shape. The browser-parsed DOM at `DOMContentLoaded` contained the expected server action hidden input followed by `clientRef`, the prompt span, Yes/No/Dismiss buttons, and `noscript`; no parser repair, nested form, or nested button evidence was found.
+- `fb_029` captured the React #418 too early for a hydration-error snapshot, but its `DOMContentLoaded` and final feedback fingerprints remained the server-action form shape.
+- `nf_054` captured recovery clearly: `DOMContentLoaded` had the server-action form shape (`method=POST`, `$ACTION_ID_409fff3fb3d737400a62ea78bf000886dd81308d7b`, `clientRef`), while the hydration-error/final snapshots had React's client fallback form action and only `clientRef`. With 0 mutations captured before the error, this remains classified as recovery evidence rather than proof of the first mismatch.
+
+H7 `useFormStatus` initial pending-state hypothesis:
+
+- Prediction: if `useFormStatus().pending` sometimes differs between the server-rendered controls and first client render under parallel production hydration, removing that hook while preserving the server form and button names/values should make the 118-row discriminator hydration-clean.
+- Diagnostic experiment prepared locally and synced to the dev host: temporarily remove `useFormStatus` from `NlAnswerFeedbackControls` and remove only the pending-derived `disabled={pending}` attributes. The server-owned form, `submitNlFeedbackForm`, `clientRef`, verdict button names/values, textarea reveal path, dismiss control, and optimistic submitted acknowledgement were otherwise preserved.
+- Local `npm.cmd run typecheck`: passed after the diagnostic change.
+- Remote dev-host `npm run typecheck`: passed.
+- Remote dev-host `npm run build`: passed, and `prepare-standalone` completed.
+- Built diagnostic `BUILD_ID`: `0aYQumjOtVYcrJKPCj0_a`.
+- Service restart was blocked because `sudo systemctl restart afldb` required a TTY/password.
+- Running `/search` still reports `x-afldb-build: DOoGeJqYceleN9QLcG2kI`; health remains OK. Browser evidence cannot be run or interpreted until the legitimate service restart makes `0aYQumjOtVYcrJKPCj0_a` live.
+
 ### Follow-up
-Keep the issue open. The next step is to inspect the two post-patch feedback-present React #418 artifacts and compare the server-owned feedback form plus `NlAnswerFeedbackControls` first-client-render structure. Do not broaden the patch, and do not run the 125-row, 501-row, or full 12,000-row acceptance corpus until the post-patch discriminator failure is explained or a narrower hypothesis is justified.
+End-of-day status for 2026-08-21:
+
+Current diagnostic experiment:
+
+- The current narrow H7 experiment removes only `useFormStatus` from `NlAnswerFeedbackControls` and pending-derived `disabled={pending}` from the Yes/No buttons.
+- Everything else remains preserved: the server-owned feedback form, `submitNlFeedbackForm`, `clientRef`, verdict field names/values, incorrect textarea path, dismiss behaviour, and submission behaviour.
+- Local `npm.cmd run typecheck`: passed.
+- Remote `npm run typecheck`: passed.
+- Remote `npm run build`: passed.
+- Built diagnostic `BUILD_ID`: `0aYQumjOtVYcrJKPCj0_a`.
+
+Current live-service state:
+
+- A legitimate restart was attempted with `sudo systemctl restart afldb`.
+- `systemctl is-active afldb` returned `active`.
+- Immediately after restart, `curl -sS http://127.0.0.1:3100/api/health` and `curl -sSI http://127.0.0.1:3100/search` both failed with connection refused on port 3100.
+- The freshly built standalone artifact still reports `0aYQumjOtVYcrJKPCj0_a`.
+- The live `x-afldb-build` could not yet be verified because the application was not accepting connections immediately after restart.
+- Do not classify this as a failed build or failed service yet; it may simply have been checked before the Node/Next process had finished binding to port 3100.
+- No Playwright run was started because the intended diagnostic build was not yet proven live.
+
+Last known valid runtime before this restart:
+
+- Previous running build: `DOoGeJqYceleN9QLcG2kI`.
+- Previous service/database health was good before the diagnostic restart.
+
+Current ISSUE-068 evidence:
+
+- The previous post-patch 118-row discriminator still showed 118/118 observed, feedback absent 0/50 React #418, feedback present 2/68 React #418, feedback-present single answers 1/57, feedback-present grouped answers 1/11, HTTP failures 0, page errors 0, and timeouts 0.
+- Hydration failures remained feedback-present and occurred before observed RSC/navigation activity with 0 captured pre-error DOM mutations.
+- The server-owned feedback form patch therefore did not fully resolve ISSUE-068.
+- Current leading hypothesis H7: `useFormStatus().pending` inside `NlAnswerFeedbackControls` may occasionally cause the first hydrated client render to differ from the server-rendered feedback controls.
+- H7 is not proven. The current diagnostic build removes only that variable.
+
+Exact next step for the next session:
+
+- First, do not rebuild.
+- Check whether the restarted service has now finished starting:
+  - `systemctl is-active afldb`
+  - `curl -sS http://127.0.0.1:3100/api/health`
+  - `curl -sSI http://127.0.0.1:3100/search | grep -i x-afldb-build`
+- Expected diagnostic build: `0aYQumjOtVYcrJKPCj0_a`.
+- If port 3100 still refuses connections, collect:
+  - `systemctl status afldb --no-pager -l`
+  - `systemctl show afldb -p ActiveState -p SubState -p MainPID -p ExecMainStatus -p Result`
+  - `ss -ltnp | grep ':3100' || echo "Nothing listening on 3100"`
+  - `journalctl -u afldb -n 100 --no-pager`
+- Do not rebuild or modify source until the service state is understood.
+- If the service is healthy and built `BUILD_ID` equals live `x-afldb-build` equals `0aYQumjOtVYcrJKPCj0_a`, then rerun only the unchanged 118-row feedback discriminator:
+  - `$env:AFLDB_E2E_BASE_URL='http://10.0.40.100:8090'`
+  - `$env:NL_UI_CORPUS='artifacts\nl-ui\issue-068-feedback-discriminator-nohang.csv'`
+  - `$env:NL_UI_BATCH='12'`
+  - `$env:NL_UI_WORKERS='4'`
+  - `.\node_modules\.bin\playwright.cmd test --config=playwright.nl-stress.config.ts --project=nl-stress --workers=4 --no-deps`
+
+H7 prediction:
+
+- If `useFormStatus().pending` is causal, the exact 118-row discriminator should produce 0 React #418 in feedback-present rows, feedback-absent rows should remain clean, and HTTP/page/timeouts should remain 0.
+- Historical comparison immediately before the H7 experiment: feedback absent 0/50, feedback present 2/68.
+- If any feedback-present React #418 remains, H7 is falsified or materially weakened. Stop, preserve artifacts, do not run 125/501/12k, and do not broaden the patch.
+- If the discriminator is 0/118, repeat the exact 118-row run before accepting H7. Do not immediately mark ISSUE-068 resolved.
+
+Project status:
+
+- AFLDB-ISSUE-068 remains open.
+- Do not mark it resolved.
+- Do not update `CHANGELOG.md` for this end-of-day status entry.
 
 ## AFLDB-ISSUE-069 - Expanded UI corpus expects unsupported debut-season leaderboards to answer
 
