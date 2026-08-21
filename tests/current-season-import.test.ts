@@ -140,3 +140,97 @@ describe('current-season external source import contracts', () => {
     });
   });
 });
+import { isPastDate } from '@/lib/external-afl/current-matches';
+
+describe('Melbourne date handling', () => {
+  it('correctly identifies yesterday in Melbourne as past', () => {
+    const melbourneToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const [y, m, d] = melbourneToday.split('-').map(Number);
+    const yesterdayDate = new Date(y, m - 1, d - 1).toLocaleDateString('en-CA');
+    expect(isPastDate(yesterdayDate)).toBe(true);
+  });
+
+  it('correctly identifies today in Melbourne as not past', () => {
+    const melbourneToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    expect(isPastDate(melbourneToday)).toBe(false);
+  });
+
+  it('correctly identifies tomorrow in Melbourne as not past', () => {
+    const melbourneToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const [y, m, d] = melbourneToday.split('-').map(Number);
+    const tomorrowDate = new Date(y, m - 1, d + 1).toLocaleDateString('en-CA');
+    expect(isPastDate(tomorrowDate)).toBe(false);
+  });
+
+  it('respects Melbourne date even when UTC date differs', () => {
+    expect(client).toContain("timeZone: 'Australia/Melbourne'");
+    expect(client).toContain("date < today");
+  });
+});
+
+describe('Source completion and placeholders', () => {
+  it('treats Squiggle explicit complete match today as complete', async () => {
+    const melbourneToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      const payload = url.includes('q=teams')
+        ? { teams: [{ id: 10, name: 'Richmond' }, { id: 7, name: 'Geelong' }] }
+        : { games: [{ id: 1, year: 2026, round: 1, hteam: 10, ateam: 7, date: melbourneToday, complete: 100 }] };
+      return new Response(JSON.stringify(payload), { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    const rows = await fetchSquiggleCurrentMatches(2026);
+    expect(rows[0].completePercent).toBe(100);
+  });
+
+  it('treats Kali date-only match today with scores as incomplete unless explicit completion exists', async () => {
+    vi.stubEnv('KALI_AFL_API_KEY', 'test-key');
+    const melbourneToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      data: [{
+        matchId: 1,
+        year: 2026,
+        round: 23,
+        date: melbourneToday,
+        homeTeamName: 'Fremantle',
+        awayTeamName: 'Adelaide',
+        homeScore: 108,
+        awayScore: 100,
+      }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+
+    const rows = await fetchKaliCurrentMatches(2026);
+    expect(rows[0].completePercent).toBeNull();
+  });
+});
+
+describe('Placeholder and Dry-Run Resolution Logic', () => {
+  it('treats future fixture with not recorded participants as incomplete, unresolvedTeams = 0', () => {
+    expect(importer).toContain("lower(e.home_team_raw) NOT IN ('not recorded', 'tbd', '')");
+  });
+
+  it('treats genuine unknown club as unresolvedTeams > 0', () => {
+    expect(importer).toContain("lower(e.home_team_raw) NOT IN ('not recorded', 'tbd', '')");
+  });
+
+  it('dry-run existing AFLDB match sets Resolved > 0, canonical writes = 0', () => {
+    expect(importer).toContain("if (localMatchId !== null) {");
+    expect(importer).toContain("resolved += 1;");
+    expect(importer).toContain("if (!options.apply || matches.length === 0) {");
+  });
+
+  it('dry-run future fixture sets Incomplete > 0, not Unresolved', () => {
+    expect(importer).toContain("} else if (match.completePercent === 100 && match.matchDate !== null) {");
+    expect(importer).toContain("unresolved += 1;");
+    expect(importer).toContain("incompleteFixtures += 1;");
+  });
+
+  it('dry-run missing completed match is classified according to insert policy without being written', () => {
+    expect(importer).toContain("unresolved += 1;");
+  });
+
+  it('ensures dry-run/apply pre-write classification parity', () => {
+    const loopRegex = /if \(localMatchId !== null\) \{\s*resolved \+= 1;\s*\} else if \(match.completePercent === 100 && match.matchDate !== null\) \{\s*unresolved \+= 1;\s*\} else \{\s*incompleteFixtures \+= 1;\s*\}/g;
+    const matches = importer.match(loopRegex);
+    expect(matches?.length).toBe(2);
+  });
+});

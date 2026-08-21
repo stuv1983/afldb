@@ -76,7 +76,7 @@ function dateOnly(value: unknown): string | null {
   return `${human[3]}-${month}-${human[1].padStart(2, '0')}`;
 }
 
-function isPastDate(date: string | null): boolean {
+export function isPastDate(date: string | null): boolean {
   if (!date) return false;
   const today = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Australia/Melbourne',

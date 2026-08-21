@@ -79,9 +79,10 @@ async function main(): Promise<void> {
     console.log(`  ${source}: ${result.sourceCounts[source]}`);
   }
   console.log(`  complete: ${result.complete}`);
-  console.log(`  with scores: ${result.withScores}`);
+  console.log(`  has score fields: ${result.withScores}`);
 
   if (!args.apply) {
+    console.log(`\nStaged ${result.staged}; inserted matches ${result.inserted}; resolved ${result.resolved}; updated matches ${result.updated}; unresolved ${result.unresolved}; incomplete fixtures ${result.incompleteFixtures}.`);
     console.log('\nDry run. Nothing was written. Re-run with --apply to stage snapshots.');
     console.log('Add --insert-missing-matches with --apply to insert completed matches missing from AFLDB.');
     console.log('Add --update-matches with --apply only to overwrite local final scores for unambiguously resolved completed matches.');
