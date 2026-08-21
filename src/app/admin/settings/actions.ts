@@ -19,6 +19,7 @@ import {
   parsePlaceholderInterval,
   parsePlaceholders,
   parseSearchAnimation,
+  parseSiteTheme,
   type HomeSectionId,
 } from '@/lib/site-settings';
 
@@ -86,6 +87,8 @@ export async function saveSiteSettings(
   const searchPlaceholderAnimation = parseSearchAnimation(
     formData.get('searchPlaceholderAnimation'),
   );
+  
+  const frontendTheme = parseSiteTheme(formData.get('frontendTheme'));
 
   await authSql.begin(async (tx) => {
     for (const [key, value] of [
@@ -102,6 +105,7 @@ export async function saveSiteSettings(
       [SETTING_KEYS.searchPlaceholdersAflw, searchPlaceholdersAflw],
       [SETTING_KEYS.searchPlaceholderInterval, searchPlaceholderInterval],
       [SETTING_KEYS.searchPlaceholderAnimation, searchPlaceholderAnimation],
+      [SETTING_KEYS.frontendTheme, frontendTheme],
     ] as const) {
       await tx`
         INSERT INTO site_settings (key, value, updated_by)
@@ -124,6 +128,7 @@ export async function saveSiteSettings(
     earlyAccessQuestionCount: earlyAccessQuestions.length,
     searchPlaceholderInterval,
     searchPlaceholderAnimation,
+    frontendTheme,
   }, { userId: admin.id, label: admin.email });
 
   revalidatePath('/');

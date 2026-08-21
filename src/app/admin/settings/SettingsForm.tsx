@@ -9,6 +9,7 @@ import { saveSiteSettings, type SettingsState } from '@/app/admin/settings/actio
 import {
   AFLW_LEADER_CATEGORIES,
   GRID_AUDIENCES,
+  SITE_THEMES,
   homeSection,
   type HomeLayout,
   type HomeSectionId,
@@ -78,6 +79,31 @@ export function SettingsForm({
       {state.error && <p className="notice" role="alert">{state.error}</p>}
 
       <input type="hidden" name="order" value={layout.order.join(',')} />
+
+      <AdminSection id="settings-appearance" title="Appearance">
+        <p className="section-note">
+          Select the visual theme for the public frontend. This changes the design and layout of public pages while preserving identical application behaviour and features.
+        </p>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+          {SITE_THEMES.map((theme) => (
+            <label key={theme.value} style={{ display: 'block', margin: '0 0 0.8rem', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <input
+                  type="radio"
+                  name="frontendTheme"
+                  value={theme.value}
+                  defaultChecked={settings.frontendTheme === theme.value}
+                  style={{ marginRight: '0.45rem' }}
+                />
+                <strong style={{ fontWeight: 500 }}>{theme.label}</strong>
+              </div>
+              <span className="muted" style={{ display: 'block', marginLeft: '1.45rem', fontSize: '0.85rem' }}>
+                {theme.help}
+              </span>
+            </label>
+          ))}
+        </div>
+      </AdminSection>
 
       <AdminSection id="settings-home" title="Home page">
         <p className="section-note">

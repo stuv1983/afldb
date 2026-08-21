@@ -7,9 +7,11 @@ import { sql } from '@/db/client';
 import { DEFAULT_SITE_FOOTER, type SiteFooter } from '@/lib/site-content';
 import {
   DEFAULT_SITE_SETTINGS,
+  DEFAULT_SITE_THEME,
   SETTING_KEYS,
   parseSiteSettings,
   type SiteSettings,
+  type SiteTheme,
 } from '@/lib/site-settings';
 
 /**
@@ -66,6 +68,14 @@ export async function getSiteFooter(): Promise<SiteFooter> {
     return (await getSiteSettings()).footer;
   } catch {
     return DEFAULT_SITE_FOOTER;
+  }
+}
+
+export async function getSiteTheme(): Promise<SiteTheme> {
+  try {
+    return (await getSiteSettings()).frontendTheme;
+  } catch {
+    return DEFAULT_SITE_THEME;
   }
 }
 

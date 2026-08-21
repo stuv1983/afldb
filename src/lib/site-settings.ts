@@ -46,6 +46,7 @@ export const SETTING_KEYS = {
   searchPlaceholderInterval: 'search.placeholder_interval',
   searchPlaceholderAnimation: 'search.placeholder_animation',
   pageIntros: 'site.page_intros',
+  frontendTheme: 'site.frontend_theme',
 } as const;
 
 // --- Home page layout ---
@@ -562,6 +563,26 @@ export function parsePageIntros(value: unknown): PageIntros {
   };
 }
 
+// --- Frontend Theme ---
+
+export type SiteTheme = 'classic' | 'modern' | 'editorial' | 'data-dense' | 'minimal';
+
+export const SITE_THEMES: { value: SiteTheme; label: string; help: string }[] = [
+  { value: 'classic', label: 'AFLDB Classic', help: 'The original AFLDB layout and styling.' },
+  { value: 'modern', label: 'Modern Sports Database', help: 'Modern statistics-focused presentation with cleaner cards.' },
+  { value: 'editorial', label: 'Editorial / Historical', help: 'A historical and editorial presentation with strong typography.' },
+  { value: 'data-dense', label: 'Data Dense', help: 'Compact presentation for statistics-heavy users.' },
+  { value: 'minimal', label: 'Clean Minimal', help: 'A restrained content-first presentation.' },
+];
+
+export const DEFAULT_SITE_THEME: SiteTheme = 'classic';
+
+export function parseSiteTheme(value: unknown): SiteTheme {
+  return SITE_THEMES.some((option) => option.value === value)
+    ? value as SiteTheme
+    : DEFAULT_SITE_THEME;
+}
+
 export type SiteSettings = {
   homeLayout: HomeLayout;
   homeRecord: HomeRecordCategory;
@@ -584,6 +605,7 @@ export type SiteSettings = {
   searchPlaceholderInterval: number;
   searchPlaceholderAnimation: SearchAnimationType;
   pageIntros: PageIntros;
+  frontendTheme: SiteTheme;
 };
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
@@ -602,6 +624,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   searchPlaceholderInterval: DEFAULT_PLACEHOLDER_INTERVAL,
   searchPlaceholderAnimation: DEFAULT_SEARCH_ANIMATION,
   pageIntros: DEFAULT_PAGE_INTROS,
+  frontendTheme: DEFAULT_SITE_THEME,
 };
 
 /**
@@ -668,5 +691,8 @@ export function parseSiteSettings(
     pageIntros: byKey.has(SETTING_KEYS.pageIntros)
       ? parsePageIntros(byKey.get(SETTING_KEYS.pageIntros))
       : DEFAULT_PAGE_INTROS,
+    frontendTheme: byKey.has(SETTING_KEYS.frontendTheme)
+      ? parseSiteTheme(byKey.get(SETTING_KEYS.frontendTheme))
+      : DEFAULT_SITE_THEME,
   };
 }

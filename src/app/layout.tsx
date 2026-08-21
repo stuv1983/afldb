@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { ConsentBanner } from '@/components/ConsentBanner';
 import { PrimaryNav, TabBar } from '@/components/SiteNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { getSiteFooter } from '@/db/queries/site-settings';
+import { getSiteFooter, getSiteTheme } from '@/db/queries/site-settings';
 import { HEALTH_INIT_SCRIPT } from '@/lib/health-init-script';
 import { indexingEnabled } from '@/lib/indexing';
 import { siteUrl } from '@/lib/seo';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
 import '@/styles/globals.css';
+import '@/styles/themes.css';
 
 const baseUrl = siteUrl();
 
@@ -88,12 +89,12 @@ export const metadata: Metadata = {
  */
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const fonts = `${newsreader.variable} ${plexSans.variable} ${plexMono.variable}`;
-  const footer = await getSiteFooter();
+  const [footer, siteTheme] = await Promise.all([getSiteFooter(), getSiteTheme()]);
 
   return (
     // The pre-paint script below sets data-theme on this element, so the
     // server markup and the first client render legitimately differ.
-    <html lang="en-AU" className={fonts} suppressHydrationWarning>
+    <html lang="en-AU" className={fonts} data-site-theme={siteTheme} suppressHydrationWarning>
       <head>
         {/* Blocking and first in <head>: the stored theme must be applied
             before any styled markup paints, or a reader who chose dark
