@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### Match Mutations Refresh Stored Season Ladders - 22 August 2026
+
+- Match creation, deletion, and score corrections now rebuild the affected season's stored `club_seasons` ladder rows inside the same import transaction, via a new targeted `recomputeClubSeasons` helper kept in lockstep with the canonical full rebuild in `tools/migration/rebuild_derived.py` (`AFLDB-ISSUE-015`). Ladder tallies remain sourced from the published `staging.team_seasons` ladder; only the match-derived premiership flag, finals count, and completion-gated wooden spoon are recomputed from match facts.
+- The targeted rebuild fails closed: a season with no canonical staging ladder rows raises an error before any stored ladder row is deleted, rolling back the surrounding match mutation instead of silently emptying the ladder.
+
 ### Natural-Language Search Record Phrasing - 21 August 2026
 
 - Fixed NL record/leader phrasing so `Grand Final record for goals` and `career goal leader against Collingwood` parse through the supported player-stat paths instead of declining as unsupported terms, while preserving the career-finals reading of `most finals played` (`AFLDB-ISSUE-062`). Parser version 23 records the outcome change, with focused parser regressions for Grand Final record variants and the finals collision guard.

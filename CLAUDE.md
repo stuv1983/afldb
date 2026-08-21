@@ -605,6 +605,258 @@ Do not execute state-changing database commands unless the task requires them an
 
 ---
 
+
+# Existing Test Reuse Policy
+
+AFLDB already has substantial regression, integration, parser, UI, data,
+migration, admin, and audit coverage.
+
+Do **not** create a new test file by default.
+
+Before adding or changing tests:
+
+1. Identify the affected subsystem.
+2. Search the known test areas below for the relevant implementation symbol,
+   route, parser/compiler, query, feature name, issue ID, or nearby regression.
+3. Inspect the smallest relevant existing test file.
+4. Add the new regression to that existing suite when it belongs there.
+5. Create a new test file only when no existing suite provides a sensible
+   semantic home.
+
+Do not create a separate test file merely because the current defect is new.
+Prefer extending established suites so related behaviour stays grouped.
+
+## Reuse existing tests before writing new ones
+
+If an existing test already proves the required behaviour:
+
+- do not create an equivalent test;
+- run the existing test;
+- modify it only if the expected behaviour has intentionally changed.
+
+If a nearby existing test can cover the regression with another case, table
+entry, fixture, or parameterised example, extend that test instead of creating
+another file.
+
+When possible, add the smallest regression that reproduces the exact failure.
+
+## Preserve valuable regression coverage
+
+Do not delete, disable, skip, or weaken an existing regression merely because a
+new implementation makes it inconvenient.
+
+When behaviour intentionally changes:
+
+1. understand why the existing expectation exists;
+2. update only the expectation that is intentionally changing;
+3. retain useful collision, negative, boundary, and fail-closed coverage.
+
+Do not turn a meaningful assertion into a weaker smoke test just to make a
+suite pass.
+
+## Use issue history before designing tests
+
+For work linked to an AFLDB issue, inspect that issue's `Validation` and
+`Follow-up` sections before creating or rerunning tests.
+
+The issue may already record:
+
+- exact reproduction queries;
+- existing regression tests;
+- integration tests that were added but not yet run;
+- test environments already used;
+- known test limitations;
+- failed or invalid diagnostic runs;
+- missing fixtures;
+- the exact next test required.
+
+Do not repeat completed debugging or validation unless:
+
+- current code changes can affect that result;
+- the issue explicitly requires the test to be rerun;
+- previous validation was incomplete or invalid;
+- a fresh run is required to prove the current change.
+
+## Prefer updating an existing fixture or corpus
+
+Before creating a new fixture, corpus, or diagnostic file:
+
+1. check whether an existing one already represents the same behaviour;
+2. extend or update it when the semantics are the same;
+3. create a new one only when isolation is important or the new data has a
+   genuinely different purpose.
+
+Do not create repeated files such as `new-test.csv`, `new-test-2.csv`,
+`fixed-test.csv`, or `final-test.csv` when an existing tracked fixture can be
+safely updated.
+
+For forensic work where historical evidence matters, preserve the existing
+artifact and create a clearly named new diagnostic artifact only when the
+distinction is meaningful.
+
+---
+
+# Known Test Suite Map
+
+Use this map before walking `tests/`.
+
+The filenames below are known homes for established AFLDB coverage. Confirm a
+file still exists before editing it, but do not rediscover the entire test tree
+first.
+
+## Natural-Language Search
+
+`tests/nl-parser.test.ts`
+
+Use for parser behaviour, wording recognition, parser collisions, and supported
+or unsupported phrase handling.
+
+`tests/nl-plan.test.ts`
+
+Use for plan selection, grain/mode decisions, scope construction, and planner
+validation.
+
+`tests/nl-describe.test.ts`
+
+Use for descriptions, labels, headlines, explanation text, and grain-aware
+wording.
+
+`tests/query-intent.test.ts`
+
+Use for intent-aware routing and collisions between search intent families.
+
+`tests/nl-audit-acceptance.test.ts`
+
+Use for focused known-query regressions and audit acceptance cases.
+
+`tests/integration/nl-*.test.ts`
+
+Use for real PostgreSQL result correctness, SQL compiler behaviour, and
+database-backed scope/filter correctness.
+
+Do not create another NL integration file if an existing file already covers
+the same grain/compiler family.
+
+`tests/nl-ui/nl-stress.spec.ts`
+
+Use for rendered `/search` behaviour, browser/runtime NL testing,
+hydration/runtime diagnostics, and Playwright NL corpus execution.
+
+Do not create a separate Playwright spec for a single NL runtime defect if the
+existing NL stress harness can represent it cleanly.
+
+Extend existing NL corpus-generator tests for generator/oracle defects rather
+than creating one-off generator test files.
+
+## Grid Solver
+
+`tests/grid-solver-spec.test.ts`
+
+Use for criterion parsing, solver specification, supported combinations, and
+validation rules.
+
+`tests/grid-solver*.test.ts`
+
+Use the closest existing Grid Solver regression suite for feature-specific
+criteria.
+
+`tests/integration/grid-solver.test.ts`
+
+Use for database-backed Grid Solver correctness and real player/result
+validation.
+
+## Match Sheet and Match Administration
+
+`tests/match-sheet.test.ts`
+
+Use for match-sheet payload validation, player-stat semantics, Brownlow
+allocation, NULL/zero handling, and lower-boundary match-sheet behaviour.
+
+`tests/admin-match-mutations.test.ts`
+
+Use for match creation/deletion, mutation contracts, derived-data refresh,
+source/provenance behaviour, and admin mutation safety.
+
+`tests/match-lineup-editor.test.ts`
+
+Use for lineup state, previous-lineup behaviour, replacements/substitutions,
+team isolation, and duplicate/wrong-team protection.
+
+Before creating another match-admin test file, determine whether the regression
+belongs in one of these established suites.
+
+## Player Identity and Links
+
+Use existing `tests/player-link-*.test.ts` suites for resolution behaviour,
+same-name safety, create-and-link, audit behaviour, durable identity handling,
+and manual-resolution preservation.
+
+Extend the closest player-link suite rather than creating a feature-specific
+one-off file.
+
+## Awards and Imports
+
+`tests/under-22-importer.test.ts`
+
+Use for Under-22 importer source contracts, destructive reload protection,
+source boundaries, upsert behaviour, and preserved identity/link semantics.
+
+Use existing awards/import suites for other award and honours import behaviour.
+
+Do not create a new importer test file merely because the failing importer
+function changed location.
+
+## Current-Season External Sources
+
+`tests/current-season-import.test.ts`
+
+Use for Squiggle/Kali source handling, staging-first behaviour, club-name
+normalisation, date/completion parsing, missing-match insertion,
+current-season provenance, and update safety.
+
+## Editor / Data Mutation Coverage
+
+Use existing editor, data-edit, award, player, submission, and mutation suites
+before creating new admin test files.
+
+Search for the relevant action/helper name within `tests/` first.
+
+## Integration Tests
+
+Use existing `tests/integration/` files organised by the affected subsystem.
+
+Do not create a new integration file until checking whether the corresponding
+query/compiler/domain already has an integration suite.
+
+Integration coverage should test database behaviour that cannot be proven
+reliably through source-contract or mocked tests.
+
+## Browser / E2E Tests
+
+Use existing Playwright specs for the relevant user journey.
+
+Do not create a second browser suite for a route already represented by an
+existing spec unless the new test requires a materially different harness.
+
+---
+
+# Test File Creation Gate
+
+Creating a new test file requires all of the following:
+
+1. existing suites were checked;
+2. no existing suite is a sensible semantic home;
+3. the new file represents a distinct subsystem, harness, or test boundary;
+4. placing the test in an existing file would make that suite misleading or
+   structurally inappropriate.
+
+If those conditions are not met, update an existing test file.
+
+When a new test file is created, briefly report why an existing suite was not
+an appropriate home.
+
+---
+
 # 10. Build Policy
 
 Do not run `npm run build` after every change.
@@ -830,97 +1082,3 @@ A task is complete when:
 Then stop.
 
 Do not automatically start another investigation.
-
-
-# 21. Existing Test Reuse Policy
-
-AFLDB already has substantial regression, integration, parser, UI, data,
-migration, and audit coverage.
-
-Do not create a new test file by default.
-
-Before adding tests:
-
-1. Identify the affected subsystem.
-2. Search `tests/` for the relevant:
-   - implementation symbol;
-   - route;
-   - parser/compiler;
-   - query;
-   - feature name;
-   - existing issue ID;
-   - nearby regression cases.
-3. Inspect the smallest relevant existing test file.
-4. Add the regression to that existing suite when it belongs there.
-5. Create a new test file only when no existing suite provides a sensible
-   semantic home.
-
-Do not create a separate test file merely because the current defect is new.
-
-Prefer extending established coverage so related behaviour remains grouped.
-
-## Test hierarchy
-
-For NL search, prefer existing suites in roughly this order:
-
-- parser behaviour -> existing NL parser tests
-- plan behaviour -> existing NL plan tests
-- answer/description behaviour -> existing NL answer/description tests
-- accepted query regressions -> existing NL audit/acceptance tests
-- SQL/result correctness -> existing NL integration suites
-- rendered browser behaviour -> existing NL UI/Playwright suites
-- corpus-generation defects -> existing corpus-generator tests
-
-For admin/database work:
-
-- match-sheet behaviour -> existing match-sheet tests
-- match mutations -> existing admin/match mutation tests
-- lineup behaviour -> existing lineup-editor tests
-- player-link behaviour -> existing player-link tests
-- awards/import behaviour -> existing award/import suites
-- database correctness requiring real PostgreSQL -> relevant existing
-  integration suite
-
-For Grid Solver:
-
-- criterion/spec parsing -> existing Grid Solver spec tests
-- result correctness -> existing Grid Solver integration tests
-
-## Do Not Duplicate Existing Tests
-
-If an existing test already proves the required behaviour:
-
-- do not create another equivalent test;
-- run the existing test;
-- update it only if the expected behaviour has legitimately changed.
-
-If a nearby existing test can cover the regression with another case/table row,
-extend it rather than creating another file.
-
-## Preserve Valuable Regression Coverage
-
-Do not delete or weaken an existing regression merely because a new
-implementation makes it inconvenient.
-
-When behaviour intentionally changes:
-
-1. understand why the previous expectation existed;
-2. update the expectation;
-3. preserve collision/negative cases where still applicable.
-
-## Use Issue History Before Designing Tests
-
-For a task linked to an AFLDB issue, inspect that issue's `Validation` and
-`Follow-up` sections before creating tests.
-
-They may already identify:
-
-- tests that exist;
-- tests already run;
-- missing integration coverage;
-- failed test approaches;
-- exact reproduction queries;
-- required future fixtures.
-
-Do not repeat completed validation unless current changes can affect it or the
-issue explicitly calls for rerunning it.

@@ -5,6 +5,7 @@ import postgres from 'postgres';
 import { authSql } from '@/db/authClient';
 import { sql } from '@/db/client';
 import {
+  recomputeClubSeasons,
   recomputePlayerDerivedStats,
   recomputeSeasonBrownlowStatus,
   recomputeSeasonMetadata,
@@ -378,6 +379,7 @@ async function applyMatchEdit(
       }
 
       await recomputeSeasonMetadata(tx, match.season);
+      await recomputeClubSeasons(tx, match.season);
       await recomputePlayerDerivedStats(tx, affectedIds, match.season);
       await recomputeSeasonBrownlowStatus(tx, match.season);
       return;

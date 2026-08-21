@@ -56,6 +56,30 @@ describe('admin match mutation source contracts', () => {
       .toBeLessThan(matchAdmin.indexOf('recomputePlayerDerivedStats(tx, affectedIds, match.season)'));
   });
 
+  it('rebuilds the stored season ladder after every match fact mutation', () => {
+    // Both createMatch and deleteMatch refresh club_seasons, and only after the
+    // season status is current (wooden spoons are gated on completion).
+    expect(matchAdmin).toContain('recomputeClubSeasons(tx, input.season)');
+    expect(matchAdmin).toContain('recomputeClubSeasons(tx, match.season)');
+    expect(matchAdmin.indexOf('recomputeSeasonMetadata(tx, input.season)'))
+      .toBeLessThan(matchAdmin.indexOf('recomputeClubSeasons(tx, input.season)'));
+    expect(matchAdmin.indexOf('recomputeSeasonMetadata(tx, match.season)'))
+      .toBeLessThan(matchAdmin.indexOf('recomputeClubSeasons(tx, match.season)'));
+    expect(dataEdits).toContain('recomputeClubSeasons(tx, match.season)');
+    expect(dataEdits.indexOf('recomputeSeasonMetadata(tx, match.season)'))
+      .toBeLessThan(dataEdits.indexOf('recomputeClubSeasons(tx, match.season)'));
+    // Fail closed: the canonical staging guard throws before anything is
+    // deleted, so a season without published ladder rows keeps its stored rows.
+    expect(playerDerived).toContain('no canonical staging.team_seasons rows');
+    expect(playerDerived.indexOf('no canonical staging.team_seasons rows'))
+      .toBeLessThan(playerDerived.indexOf('DELETE FROM club_seasons'));
+    // Ladder tallies stay sourced from the published staging ladder, never an
+    // improvised aggregate over matches.
+    expect(playerDerived).toContain('FROM staging.team_seasons s');
+    expect(playerDerived).toContain("wooden_spoon AND r.season_status = 'complete'");
+    expect(playerDerived).toContain("(SELECT id FROM sources WHERE key = 'sports_data_lab')");
+  });
+
   it('does not silently duplicate a natural match key and cites manual attendance', () => {
     expect(matchAdmin).not.toContain('Date.now()');
     expect(matchAdmin).toContain('already exists for that season, round, date and clubs');

@@ -384,6 +384,85 @@ export async function recomputeSeasonBrownlowStatus(tx: Tx, season: number): Pro
   `;
 }
 
+/**
+ * Targeted per-season counterpart of REBUILDS["club_seasons"] in
+ * tools/migration/rebuild_derived.py. Keep the two definitions in lockstep.
+ *
+ * Ladder tallies (played/wins/draws/losses/points_for/points_against,
+ * premiership_points, percentage, ladder_rank) are canonical published values
+ * from staging.team_seasons and are never derived from matches here. Only
+ * is_premier, finals_played, and the completion-gated wooden_spoon are
+ * refreshed from current match facts and season status, so this must run
+ * after recomputeSeasonMetadata in the same transaction.
+ *
+ * Fails closed: a season with no canonical staging ladder rows throws before
+ * anything is deleted, so the surrounding mutation transaction rolls back
+ * rather than silently emptying the stored ladder.
+ */
+export async function recomputeClubSeasons(tx: Tx, season: number): Promise<void> {
+  const [{ count }] = await tx<[{ count: string }]>`
+    SELECT count(*) AS count FROM staging.team_seasons WHERE season = ${season}
+  `;
+  if (Number(count) === 0) {
+    throw new Error(
+      `recomputeClubSeasons: no canonical staging.team_seasons rows for season ${season}; ` +
+        'refusing to rebuild club_seasons from nothing',
+    );
+  }
+
+  await tx`DELETE FROM club_seasons WHERE season = ${season}`;
+
+  await tx`
+    INSERT INTO club_seasons
+          (season, club_id, played, wins, draws, losses, points_for, points_against,
+           premiership_points, percentage, ladder_rank, wooden_spoon, is_premier,
+           finals_played, source_id)
+    WITH resolved AS (
+        SELECT
+            s.*,
+            se.status AS season_status,
+            COALESCE(
+                afldb_identity_for_season(rc.organization_id, s.season),
+                s.club_id
+            ) AS identity_id
+        FROM staging.team_seasons s
+        JOIN seasons se ON se.year = s.season
+        JOIN clubs   rc ON rc.id = s.club_id
+        WHERE s.season = ${season}
+    )
+    SELECT
+        r.season,
+        r.identity_id,
+        r.played, r.wins, r.draws, r.losses, r.points_for, r.points_against,
+        r.premiership_points, r.percentage, r.ladder_rank,
+        -- A wooden spoon is only awarded once a season has finished. The raw
+        -- ladder flags whoever is currently last, which for an in-progress
+        -- season is a standing, not an honour.
+        r.wooden_spoon AND r.season_status = 'complete',
+        COALESCE(gf.won, false),
+        COALESCE(f.finals, 0),
+        (SELECT id FROM sources WHERE key = 'sports_data_lab')
+    FROM resolved r
+    LEFT JOIN (
+        -- winner_club_id is NULL for a drawn Grand Final, so the 1948, 1977
+        -- and 2010 draws drop out and only the replays count.
+        SELECT season, winner_club_id AS club_id, true AS won
+        FROM matches
+        WHERE round_type = 'grand_final' AND winner_club_id IS NOT NULL
+          AND season = ${season}
+    ) gf ON gf.season = r.season AND gf.club_id = r.identity_id
+    LEFT JOIN (
+        SELECT season, club_id, count(*) AS finals FROM (
+            SELECT season, home_club_id AS club_id FROM matches
+             WHERE is_final AND season = ${season}
+            UNION ALL
+            SELECT season, away_club_id FROM matches
+             WHERE is_final AND season = ${season}
+        ) x GROUP BY season, club_id
+    ) f ON f.season = r.season AND f.club_id = r.identity_id
+  `;
+}
+
 /** Refresh the match-derived metadata held directly on one season row. */
 export async function recomputeSeasonMetadata(tx: Tx, season: number): Promise<void> {
   await tx`

@@ -5,6 +5,7 @@ import { sql } from '@/db/client';
 import { authSql } from '@/db/authClient';
 import {
   clearPlayerClubMatchReferences,
+  recomputeClubSeasons,
   recomputePlayerDerivedStats,
   recomputeSeasonBrownlowStatus,
   recomputeSeasonMetadata,
@@ -286,6 +287,7 @@ export async function createMatch(input: CreateMatchInput): Promise<{
       }
 
       await recomputeSeasonMetadata(tx, input.season);
+      await recomputeClubSeasons(tx, input.season);
       await recomputeSeasonBrownlowStatus(tx, input.season);
 
       return matchRow;
@@ -385,6 +387,7 @@ export async function deleteMatch(input: {
       await tx`DELETE FROM matches WHERE id = ${input.matchId}`;
 
       await recomputeSeasonMetadata(tx, match.season);
+      await recomputeClubSeasons(tx, match.season);
       await recomputePlayerDerivedStats(tx, affectedIds, match.season);
       await recomputeSeasonBrownlowStatus(tx, match.season);
 

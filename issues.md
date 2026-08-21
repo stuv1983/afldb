@@ -7,11 +7,10 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 8
+**Open issues:** 7
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
-| `AFLDB-ISSUE-015` | High | Database | Match mutations leave source-derived `club_seasons` ladder rows stale. | Extract the canonical season-aware `club_seasons` rebuild, including season-specific points/finals policy, then add database-backed fixtures. |
 | `AFLDB-ISSUE-027` | High | Architecture | Statistical mutations and required audit writes still commit through separate role-scoped transactions. | Choose and implement either a database-owned audit function inside the import transaction or a durable transactional outbox with idempotent delivery. |
 | `AFLDB-ISSUE-040` | Low | Tooling | The lint script invokes deprecated `next lint` without a checked-in ESLint setup and becomes interactive. | Add a reviewed ESLint flat configuration and compatible dependencies, then replace `next lint` with the ESLint CLI. |
 | `AFLDB-ISSUE-044` | High | Import | Legacy full awards reloads can discard manual player-link resolutions outside the protected Under-22 path. | Preserve durable manual resolutions across legacy honours reloads and add manual-resolve → full-reload → preserved-link integration coverage. |
@@ -528,12 +527,12 @@ Exercise the zero-attendance insert in the guarded integration suite when a test
 
 ## AFLDB-ISSUE-015 — Match mutations leave source-derived club-season ladders stale
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Database
 - **Found:** 2026-08-20
-- **Resolved:** N/A
-- **Files:** `src/db/queries/match-admin.ts`, `src/db/queries/data-edits.ts`, `src/db/queries/player-derived.ts`, `src/db/queries/seasons.ts`
+- **Resolved:** 2026-08-22
+- **Files:** `src/db/queries/match-admin.ts`, `src/db/queries/data-edits.ts`, `src/db/queries/player-derived.ts`, `src/db/queries/seasons.ts`, `tests/admin-match-mutations.test.ts`, `tests/integration/data-editor.test.ts`
 
 ### Symptom
 After creating, deleting, or correcting the score of a match, stored `club_seasons` ladder rows can disagree with the authoritative match facts.
@@ -551,18 +550,27 @@ Season metadata is now refreshed, but the mutation paths still leave `club_seaso
 Public ladder queries read stored `club_seasons`; the repaired mutation helpers update match facts, season metadata, and player summaries but do not rebuild those rows.
 
 ### Root cause
-The new point mutations were not connected to the canonical season-level rebuild pipeline.
+The new point mutations were not connected to the canonical season-level rebuild pipeline. Investigation on 2026-08-22 refined the earlier premise: the canonical build (`REBUILDS["club_seasons"]` in `tools/migration/rebuild_derived.py`) contains **no season-specific points policy** — ladder tallies (`played`, `wins`, `draws`, `losses`, `points_for`, `points_against`, `premiership_points`, `percentage`, `ladder_rank`) are copied verbatim from the published source ladder in `staging.team_seasons`, re-pointed to historical club identity via `afldb_identity_for_season`. Only `is_premier` (Grand Final `winner_club_id`, drawn GFs excluded), `finals_played` (count of `matches.is_final` appearances), and completion-gated `wooden_spoon` are derived from match facts.
 
 ### Fix
-Season metadata recomputation is implemented. `club_seasons` remains open because historical ladder/premiership rules require the canonical policy rather than an improvised local aggregate.
+Added `recomputeClubSeasons(tx, season)` to `src/db/queries/player-derived.ts` — a targeted per-season counterpart of the canonical full rebuild, kept in lockstep with `rebuild_derived.py`. It deletes and reinserts the season's `club_seasons` rows using the canonical SQL (staging-sourced tallies, match-derived flags, `sports_data_lab` source resolved by key). It **fails closed**: if `staging.team_seasons` has no rows for the season it throws before deleting anything, rolling back the surrounding mutation.
+
+Wired into all three match-fact mutation paths, each running after `recomputeSeasonMetadata` in the same import transaction (wooden-spoon gating depends on freshly recomputed season status):
+
+- `createMatch` (`src/db/queries/match-admin.ts`)
+- `deleteMatch` (`src/db/queries/match-admin.ts`)
+- `applyMatchEdit` score case (`src/db/queries/data-edits.ts`)
+
+**Deliberate design decision:** match score corrections intentionally do **not** recalculate published ladder tallies from match facts. Those values remain sourced from `staging.team_seasons`; correcting a source ladder discrepancy requires correcting/reloading the canonical staging source. Only the match-derived `is_premier`, `finals_played`, and completion-gated `wooden_spoon` track match mutations.
 
 ### Validation
-Static regression coverage confirms both create and delete invoke season metadata recomputation. Ladder correctness is not yet repaired.
-
-Current review on 2026-08-21 confirmed this remains a genuine product defect, not a stale ledger entry: public season/ladders still read stored `club_seasons`, and point-mutation paths still do not call a targeted `club_seasons` rebuild. No code change was made during the NL audit because this requires extracting the canonical season-aware ladder policy rather than improvising a local aggregate.
+- Static source contracts extended in `tests/admin-match-mutations.test.ts` (new "rebuilds the stored season ladder" test): both mutation modules call `recomputeClubSeasons` ordered after `recomputeSeasonMetadata`; the fail-closed guard precedes the delete; tallies remain staging-sourced. Suite passed (10/10) on 2026-08-22.
+- `npm run typecheck` passed.
+- Database-backed integration tests added to `tests/integration/data-editor.test.ts`: (1) semantic canonical-parity — the targeted rebuild reproduces the stored rows field-by-field (season, club_id, tallies, flags, source_id, ordered by club identity) for a completed season; (2) premiership flag follows match facts (simulated drawn GF clears `is_premier`); (3) fail-closed regression — missing staging rows throw without removing or changing existing `club_seasons` rows. All three run inside deliberately rolled-back transactions.
+- **Linux/PostgreSQL run, 2026-08-22 (dev host, throwaway clone of `e90b393` + working-tree patch, against `afldb_test`):** all three ISSUE-015 integration tests passed, and the four relevant `tests/integration/release-gates.test.ts` gates passed — ladder-row identity attachment, one identity per organization per season, no premier/wooden spoon for in-progress 2026, and raw staging ladder preserved. The pre-existing `propagates kicks correctly` test initially failed with `column "frees_for" of relation "player_club_season_stats" does not exist`; reproduced identically on the clean unpatched checkout, so unrelated to this issue — `afldb_test` was 8 migrations stale (57/65, the known migrate:test gap). After `npm run db:migrate:test` (058–065 applied) the full `data-editor.test.ts` suite passed 4/4. A non-fatal `data_edits_admin_user_id_fkey` audit warning surfaced during the match-sheet test; that is the known separate-transaction audit behaviour tracked as `AFLDB-ISSUE-027`.
 
 ### Follow-up
-Extract a targeted `club_seasons` rebuild from the canonical migration logic, including season-specific points and finals policy, then add database-backed fixtures.
+- Operational note from the fail-closed guard: creating the first match of a season whose ladder has never been loaded into `staging.team_seasons` will now fail until that season's staging ladder rows exist. Intentional (prevents silently emptying stored ladders), but worth remembering when a new season starts.
 
 ## AFLDB-ISSUE-016 — Duplicate match retries create duplicate fixtures
 

@@ -6,8 +6,8 @@
 > `issues.md` disagree, trust `issues.md` and immediately synchronize this file
 > and the Open Issues table at the top of `issues.md`.
 
-**Last updated:** 2026-08-21  
-**Open issues:** 8
+**Last updated:** 2026-08-22  
+**Open issues:** 7
 
 ## How Claude should use this file
 
@@ -24,7 +24,6 @@
 
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
-| `AFLDB-ISSUE-015` | High | Database | `club_seasons` ladder materialisation remains stale after match create/delete/score correction. |
 | `AFLDB-ISSUE-027` | High | Architecture | Statistical writes and required audit records remain non-atomic across role-separated connections. |
 | `AFLDB-ISSUE-040` | Low | Tooling | Lint cannot run deterministically/non-interactively because ESLint is not configured. |
 | `AFLDB-ISSUE-044` | High | Import | Legacy honours reloads can overwrite manual identity resolutions; Under-22 is protected but older loaders are not. |
@@ -34,15 +33,6 @@
 | `AFLDB-ISSUE-071` | Low | Audit | V2 residual failures require generator/oracle re-baselining before any remaining parser defect is promoted. |
 
 ---
-
-## AFLDB-ISSUE-015 — Match mutations leave source-derived club-season ladders stale
-
-- **Severity:** High
-- **Area:** Database
-- **Key files:** `src/db/queries/match-admin.ts`, `src/db/queries/data-edits.ts`, `src/db/queries/player-derived.ts`, `src/db/queries/seasons.ts`
-- **Current state:** Season metadata refresh exists, but public ladder queries still read stored `club_seasons` rows that point mutations do not rebuild. The 2026-08-21 review confirmed this remains a real product defect.
-- **Next action:** Extract a targeted `club_seasons` rebuild from the canonical migration logic, including season-specific points and finals policy, then add database-backed fixtures.
-- **Do not:** Improvise a generic local ladder aggregate that ignores historical season rules.
 
 ## AFLDB-ISSUE-027 — Statistical mutations and required audits commit separately
 
