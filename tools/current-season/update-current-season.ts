@@ -62,11 +62,23 @@ async function main(): Promise<void> {
     }
     console.log(`Staged external current-match rows for ${args.year}:`);
     for (const row of report.rows) {
-      console.log(`  ${row.source}: staged ${row.staged}, resolved ${row.resolved}, complete ${row.complete}, with scores ${row.withScores}, unresolved teams ${row.unresolvedTeams}`);
+      console.log(`  ${row.source}: staged ${row.staged}, resolved ${row.resolved}, complete ${row.complete}, has score fields ${row.withScores}, unresolved teams ${row.unresolvedTeams}`);
     }
-    if (report.unresolvedSamples.length > 0) {
-      console.log('\nFirst unresolved samples:');
-      for (const sample of report.unresolvedSamples) {
+    if (report.incompleteSamples.length > 0) {
+      console.log('\nIncomplete fixture samples:');
+      for (const sample of report.incompleteSamples) {
+        console.log(`  ${sample.source} ${sample.externalGameId}: ${sample.matchDate ?? 'no date'} R${sample.round ?? '?'} ${sample.home ?? '?'} (${sample.homeClubId ?? 'unresolved'}) v ${sample.away ?? '?'} (${sample.awayClubId ?? 'unresolved'})`);
+      }
+    }
+    if (report.unresolvedMatchSamples.length > 0) {
+      console.log('\nUnresolved match samples:');
+      for (const sample of report.unresolvedMatchSamples) {
+        console.log(`  ${sample.source} ${sample.externalGameId}: ${sample.matchDate ?? 'no date'} R${sample.round ?? '?'} ${sample.home ?? '?'} (${sample.homeClubId ?? 'unresolved'}) v ${sample.away ?? '?'} (${sample.awayClubId ?? 'unresolved'})`);
+      }
+    }
+    if (report.unresolvedTeamSamples.length > 0) {
+      console.log('\nUnresolved team samples:');
+      for (const sample of report.unresolvedTeamSamples) {
         console.log(`  ${sample.source} ${sample.externalGameId}: ${sample.matchDate ?? 'no date'} R${sample.round ?? '?'} ${sample.home ?? '?'} (${sample.homeClubId ?? 'unresolved'}) v ${sample.away ?? '?'} (${sample.awayClubId ?? 'unresolved'})`);
       }
     }
@@ -82,7 +94,7 @@ async function main(): Promise<void> {
   console.log(`  has score fields: ${result.withScores}`);
 
   if (!args.apply) {
-    console.log(`\nStaged ${result.staged}; inserted matches ${result.inserted}; resolved ${result.resolved}; updated matches ${result.updated}; unresolved ${result.unresolved}; incomplete fixtures ${result.incompleteFixtures}.`);
+    console.log(`\nProcessed ${result.staged}; inserted matches ${result.inserted}; resolved ${result.resolved}; updated matches ${result.updated}; unresolved ${result.unresolved}; incomplete fixtures ${result.incompleteFixtures}.`);
     console.log('\nDry run. Nothing was written. Re-run with --apply to stage snapshots.');
     console.log('Add --insert-missing-matches with --apply to insert completed matches missing from AFLDB.');
     console.log('Add --update-matches with --apply only to overwrite local final scores for unambiguously resolved completed matches.');

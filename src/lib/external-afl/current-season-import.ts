@@ -54,7 +54,9 @@ export type CurrentSeasonUnresolvedSample = {
 export type CurrentSeasonReport = {
   year: number;
   rows: CurrentSeasonReportRow[];
-  unresolvedSamples: CurrentSeasonUnresolvedSample[];
+  incompleteSamples: CurrentSeasonUnresolvedSample[];
+  unresolvedMatchSamples: CurrentSeasonUnresolvedSample[];
+  unresolvedTeamSamples: CurrentSeasonUnresolvedSample[];
 };
 
 type Db = postgres.Sql | postgres.TransactionSql;
@@ -564,7 +566,7 @@ async function reportStaging(sql: postgres.Sql, year: number): Promise<CurrentSe
      ORDER BY s.key
   `;
 
-  const unresolvedSamples = await sql<CurrentSeasonUnresolvedSample[]>`
+  const incompleteSamples = await sql<CurrentSeasonUnresolvedSample[]>`
     SELECT s.key AS source,
            e.external_game_id AS "externalGameId",
            e.match_date::text AS "matchDate",
@@ -576,9 +578,46 @@ async function reportStaging(sql: postgres.Sql, year: number): Promise<CurrentSe
       FROM staging.external_current_matches e
       JOIN sources s ON s.id = e.source_id
      WHERE e.season = ${year} AND e.local_match_id IS NULL
+       AND (e.complete_percent IS NULL OR e.complete_percent < 100 OR e.match_date IS NULL)
+       AND NOT ((e.home_club_id IS NULL AND lower(e.home_team_raw) NOT IN ('not recorded', 'tbd', '')) OR (e.away_club_id IS NULL AND lower(e.away_team_raw) NOT IN ('not recorded', 'tbd', '')))
      ORDER BY s.key, e.match_date NULLS LAST, e.external_game_id
      LIMIT 10
   `;
 
-  return { year, rows, unresolvedSamples };
+  const unresolvedMatchSamples = await sql<CurrentSeasonUnresolvedSample[]>`
+    SELECT s.key AS source,
+           e.external_game_id AS "externalGameId",
+           e.match_date::text AS "matchDate",
+           e.round_number AS round,
+           e.home_team_raw AS home,
+           e.away_team_raw AS away,
+           e.home_club_id AS "homeClubId",
+           e.away_club_id AS "awayClubId"
+      FROM staging.external_current_matches e
+      JOIN sources s ON s.id = e.source_id
+     WHERE e.season = ${year} AND e.local_match_id IS NULL
+       AND e.complete_percent = 100 AND e.match_date IS NOT NULL
+       AND NOT ((e.home_club_id IS NULL AND lower(e.home_team_raw) NOT IN ('not recorded', 'tbd', '')) OR (e.away_club_id IS NULL AND lower(e.away_team_raw) NOT IN ('not recorded', 'tbd', '')))
+     ORDER BY s.key, e.match_date NULLS LAST, e.external_game_id
+     LIMIT 10
+  `;
+
+  const unresolvedTeamSamples = await sql<CurrentSeasonUnresolvedSample[]>`
+    SELECT s.key AS source,
+           e.external_game_id AS "externalGameId",
+           e.match_date::text AS "matchDate",
+           e.round_number AS round,
+           e.home_team_raw AS home,
+           e.away_team_raw AS away,
+           e.home_club_id AS "homeClubId",
+           e.away_club_id AS "awayClubId"
+      FROM staging.external_current_matches e
+      JOIN sources s ON s.id = e.source_id
+     WHERE e.season = ${year} AND e.local_match_id IS NULL
+       AND ((e.home_club_id IS NULL AND lower(e.home_team_raw) NOT IN ('not recorded', 'tbd', '')) OR (e.away_club_id IS NULL AND lower(e.away_team_raw) NOT IN ('not recorded', 'tbd', '')))
+     ORDER BY s.key, e.match_date NULLS LAST, e.external_game_id
+     LIMIT 10
+  `;
+
+  return { year, rows, incompleteSamples, unresolvedMatchSamples, unresolvedTeamSamples };
 }

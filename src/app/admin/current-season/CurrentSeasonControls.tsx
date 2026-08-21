@@ -93,8 +93,9 @@ export function CurrentSeasonReportTable({
         </table>
       </div>
 
-      {report.unresolvedSamples.length > 0 && (
+      {report.incompleteSamples.length > 0 && (
         <div className="table-wrap" style={{ marginTop: '1rem' }}>
+          <h4>Incomplete fixture samples</h4>
           <table>
             <thead>
               <tr>
@@ -107,7 +108,65 @@ export function CurrentSeasonReportTable({
               </tr>
             </thead>
             <tbody>
-              {report.unresolvedSamples.map((sample) => (
+              {report.incompleteSamples.map((sample) => (
+                <tr key={`${sample.source}-${sample.externalGameId}`}>
+                  <td className="mono">{sample.source}</td>
+                  <td className="mono">{sample.externalGameId}</td>
+                  <td>{sample.matchDate ?? 'not recorded'}</td>
+                  <td>{sample.round ?? 'not recorded'}</td>
+                  <td>{sample.home ?? 'not recorded'}</td>
+                  <td>{sample.away ?? 'not recorded'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {report.unresolvedMatchSamples.length > 0 && (
+        <div className="table-wrap" style={{ marginTop: '1rem' }}>
+          <h4>Unresolved match samples</h4>
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Source</th>
+                <th scope="col">External id</th>
+                <th scope="col">Date</th>
+                <th scope="col">Round</th>
+                <th scope="col">Home</th>
+                <th scope="col">Away</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.unresolvedMatchSamples.map((sample) => (
+                <tr key={`${sample.source}-${sample.externalGameId}`}>
+                  <td className="mono">{sample.source}</td>
+                  <td className="mono">{sample.externalGameId}</td>
+                  <td>{sample.matchDate ?? 'not recorded'}</td>
+                  <td>{sample.round ?? 'not recorded'}</td>
+                  <td>{sample.home ?? 'not recorded'}</td>
+                  <td>{sample.away ?? 'not recorded'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {report.unresolvedTeamSamples.length > 0 && (
+        <div className="table-wrap" style={{ marginTop: '1rem' }}>
+          <h4>Unresolved team samples</h4>
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Source</th>
+                <th scope="col">External id</th>
+                <th scope="col">Date</th>
+                <th scope="col">Round</th>
+                <th scope="col">Home</th>
+                <th scope="col">Away</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.unresolvedTeamSamples.map((sample) => (
                 <tr key={`${sample.source}-${sample.externalGameId}`}>
                   <td className="mono">{sample.source}</td>
                   <td className="mono">{sample.externalGameId}</td>
