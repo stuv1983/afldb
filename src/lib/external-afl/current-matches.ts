@@ -78,7 +78,13 @@ function dateOnly(value: unknown): string | null {
 
 function isPastDate(date: string | null): boolean {
   if (!date) return false;
-  return date < new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Australia/Melbourne',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+  return date < today;
 }
 
 function pick(record: JsonRecord, keys: string[]): unknown {
