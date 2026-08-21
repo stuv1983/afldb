@@ -74,7 +74,8 @@ export async function recomputePlayerDerivedStats(
     INSERT INTO player_club_season_stats
           (player_id, season, club_id, games, finals, wins, draws, losses,
            goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts,
-           disposals_recorded_games, tackles_recorded_games, hitouts_recorded_games,
+           frees_for, frees_against,
+           disposals_recorded_games, tackles_recorded_games, hitouts_recorded_games, frees_recorded_games,
            is_premier)
     WITH context AS (
       SELECT
@@ -89,7 +90,7 @@ export async function recomputePlayerDerivedStats(
             ELSE 'L'
           END AS outcome,
           pms.goals, pms.behinds, pms.kicks, pms.handballs, pms.disposals,
-          pms.marks, pms.tackles, pms.hitouts
+          pms.marks, pms.tackles, pms.hitouts, pms.frees_for, pms.frees_against
       FROM player_match_stats pms
       JOIN matches m ON m.id = pms.match_id
       WHERE pms.player_id = ANY(${ids})
@@ -106,7 +107,8 @@ export async function recomputePlayerDerivedStats(
         count(*) FILTER (WHERE c.outcome = 'L'),
         sum(c.goals), sum(c.behinds), sum(c.kicks), sum(c.handballs),
         sum(c.disposals), sum(c.marks), sum(c.tackles), sum(c.hitouts),
-        count(c.disposals), count(c.tackles), count(c.hitouts),
+        sum(c.frees_for), sum(c.frees_against),
+        count(c.disposals), count(c.tackles), count(c.hitouts), count(c.frees_for),
         bool_or(c.round_type = 'grand_final' AND c.outcome = 'W')
     FROM context c
     GROUP BY c.player_id, c.season, c.club_id
@@ -122,7 +124,8 @@ export async function recomputePlayerDerivedStats(
           (player_id, season, primary_club_id, club_count,
            games, finals, wins, draws, losses,
            goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts,
-           disposals_recorded_games, tackles_recorded_games, hitouts_recorded_games,
+           frees_for, frees_against,
+           disposals_recorded_games, tackles_recorded_games, hitouts_recorded_games, frees_recorded_games,
            brownlow_votes, brownlow_status, is_premier)
     WITH season_brownlow AS (
       SELECT s.year AS season,
@@ -148,7 +151,7 @@ export async function recomputePlayerDerivedStats(
             ELSE 'L'
           END AS outcome,
           pms.goals, pms.behinds, pms.kicks, pms.handballs, pms.disposals,
-          pms.marks, pms.tackles, pms.hitouts,
+          pms.marks, pms.tackles, pms.hitouts, pms.frees_for, pms.frees_against,
           count(*) OVER (PARTITION BY pms.player_id, m.season, pms.club_id) AS club_games
       FROM player_match_stats pms
       JOIN matches m ON m.id = pms.match_id
@@ -172,9 +175,12 @@ export async function recomputePlayerDerivedStats(
           sum(c.marks) AS marks,
           sum(c.tackles) AS tackles,
           sum(c.hitouts) AS hitouts,
+          sum(c.frees_for) AS frees_for,
+          sum(c.frees_against) AS frees_against,
           count(c.disposals) AS disposals_recorded_games,
           count(c.tackles) AS tackles_recorded_games,
           count(c.hitouts) AS hitouts_recorded_games,
+          count(c.frees_for) AS frees_recorded_games,
           count(DISTINCT c.club_id) AS club_count,
           (array_agg(c.club_id ORDER BY c.club_games DESC, c.club_id))[1] AS primary_club_id,
           bool_or(c.round_type = 'grand_final' AND c.outcome = 'W') AS is_premier
@@ -185,8 +191,8 @@ export async function recomputePlayerDerivedStats(
         a.player_id, a.season, a.primary_club_id, a.club_count,
         a.games, a.finals, a.wins, a.draws, a.losses,
         a.goals, a.behinds, a.kicks, a.handballs, a.disposals, a.marks,
-        a.tackles, a.hitouts,
-        a.disposals_recorded_games, a.tackles_recorded_games, a.hitouts_recorded_games,
+        a.tackles, a.hitouts, a.frees_for, a.frees_against,
+        a.disposals_recorded_games, a.tackles_recorded_games, a.hitouts_recorded_games, a.frees_recorded_games,
         CASE WHEN sb.status = 'complete' THEN COALESCE(bsv.votes, 0) END,
         sb.status,
         a.is_premier
@@ -201,10 +207,11 @@ export async function recomputePlayerDerivedStats(
   await tx`
     INSERT INTO player_career_stats
           (player_id, games, finals, premierships, wins, draws, losses,
-           goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts,
+            goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts,
+           frees_for, frees_against,
            behinds_recorded_games, kicks_recorded_games, handballs_recorded_games,
            disposals_recorded_games, marks_recorded_games, tackles_recorded_games,
-           hitouts_recorded_games, brownlow_votes, brownlow_medals,
+           hitouts_recorded_games, frees_recorded_games, brownlow_votes, brownlow_medals,
            clubs_played, seasons_played, debut_season, final_season,
            debut_date, last_match_date, best_goals_game, best_disposals_game)
     WITH context AS (
@@ -221,7 +228,7 @@ export async function recomputePlayerDerivedStats(
             ELSE 'L'
           END AS outcome,
           pms.goals, pms.behinds, pms.kicks, pms.handballs, pms.disposals,
-          pms.marks, pms.tackles, pms.hitouts
+          pms.marks, pms.tackles, pms.hitouts, pms.frees_for, pms.frees_against
       FROM player_match_stats pms
       JOIN matches m ON m.id = pms.match_id
       JOIN clubs cl ON cl.id = pms.club_id
@@ -244,6 +251,8 @@ export async function recomputePlayerDerivedStats(
           sum(c.marks) AS marks,
           sum(c.tackles) AS tackles,
           sum(c.hitouts) AS hitouts,
+          sum(c.frees_for) AS frees_for,
+          sum(c.frees_against) AS frees_against,
           count(c.behinds) AS behinds_recorded_games,
           count(c.kicks) AS kicks_recorded_games,
           count(c.handballs) AS handballs_recorded_games,
@@ -251,6 +260,7 @@ export async function recomputePlayerDerivedStats(
           count(c.marks) AS marks_recorded_games,
           count(c.tackles) AS tackles_recorded_games,
           count(c.hitouts) AS hitouts_recorded_games,
+          count(c.frees_for) AS frees_recorded_games,
           count(DISTINCT c.organization_id) AS clubs_played,
           count(DISTINCT c.season) AS seasons_played,
           min(c.season) AS debut_season,
@@ -273,10 +283,10 @@ export async function recomputePlayerDerivedStats(
     SELECT
         p.player_id, p.games, p.finals, p.premierships, p.wins, p.draws, p.losses,
         p.goals, p.behinds, p.kicks, p.handballs, p.disposals, p.marks, p.tackles,
-        p.hitouts,
+        p.hitouts, p.frees_for, p.frees_against,
         p.behinds_recorded_games, p.kicks_recorded_games, p.handballs_recorded_games,
         p.disposals_recorded_games, p.marks_recorded_games, p.tackles_recorded_games,
-        p.hitouts_recorded_games,
+        p.hitouts_recorded_games, p.frees_recorded_games,
         COALESCE(b.votes, 0), COALESCE(b.medals, 0),
         p.clubs_played, p.seasons_played, p.debut_season, p.final_season,
         p.debut_date, p.last_match_date, p.best_goals_game, p.best_disposals_game
@@ -289,15 +299,17 @@ export async function recomputePlayerDerivedStats(
   await tx`
     INSERT INTO player_career_stats
           (player_id, games, finals, premierships, wins, draws, losses,
-           goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts,
+            goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts,
+           frees_for, frees_against,
            behinds_recorded_games, kicks_recorded_games, handballs_recorded_games,
            disposals_recorded_games, marks_recorded_games, tackles_recorded_games,
-           hitouts_recorded_games, brownlow_votes, brownlow_medals,
+           hitouts_recorded_games, frees_recorded_games, brownlow_votes, brownlow_medals,
            clubs_played, seasons_played)
     SELECT
         p.id, 0, 0, 0, 0, 0, 0,
         0, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-        0, 0, 0, 0, 0, 0, 0,
+        NULL, NULL,
+        0, 0, 0, 0, 0, 0, 0, 0,
         COALESCE(b.votes, 0), COALESCE(b.medals, 0),
         0, 0
     FROM players p

@@ -149,10 +149,7 @@ export async function createPlayerAction(
       warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
     }
 
-    revalidatePath('/admin/data-editor');
-    revalidatePath('/players');
-    revalidatePath('/players/[slug]', 'page');
-    revalidatePath('/draft');
+    revalidatePath('/', 'layout');
 
     return {
       message: `Created player "${player.displayName}" (ID #${player.id})${draftInfo ? ' with draft selection record' : ''}.`,
@@ -237,16 +234,7 @@ export async function createAwardWinnerAction(
       warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
     }
 
-    revalidatePath('/awards');
-    revalidatePath('/awards/[slug]', 'page');
-    revalidatePath('/awards/[slug]/[season]', 'page');
-    revalidatePath('/clubs/[slug]', 'page');
-    revalidatePath('/seasons/[year]', 'page');
-    revalidatePath('/admin/data-editor');
-    if (playerId) {
-      revalidatePath('/players');
-      revalidatePath('/players/[slug]', 'page');
-    }
+    revalidatePath('/', 'layout');
 
     return {
       message: `Added award recipient for season ${season} (Record #${result.id}).`,
@@ -336,12 +324,7 @@ export async function createHallOfFameAction(
       warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
     }
 
-    revalidatePath('/hall-of-fame');
-    revalidatePath('/admin/data-editor');
-    if (playerId) {
-      revalidatePath('/players');
-      revalidatePath('/players/[slug]', 'page');
-    }
+    revalidatePath('/', 'layout');
 
     return {
       message: `Added Hall of Fame inductee "${name}" in ${inductedYear} (Record #${result.id}).`,
@@ -414,13 +397,7 @@ export async function createHonourTeamMemberAction(
       warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
     }
 
-    revalidatePath('/honour-teams');
-    revalidatePath('/honour-teams/[slug]', 'page');
-    revalidatePath('/admin/data-editor');
-    if (playerId) {
-      revalidatePath('/players');
-      revalidatePath('/players/[slug]', 'page');
-    }
+    revalidatePath('/', 'layout');
 
     return {
       message: `Added member to "${teamName}" (Record #${result.id}).`,
@@ -485,23 +462,7 @@ export async function saveDataEdit(
     warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
   }
 
-  revalidatePath('/admin/data-editor');
-  if (entityKey === 'matches') {
-    revalidatePath('/matches');
-    revalidatePath(`/matches/${rowId}`);
-    revalidatePath('/players/[slug]', 'page');
-    revalidatePath('/players/[slug]/matches', 'page');
-    revalidatePath('/seasons');
-    revalidatePath('/seasons/[year]', 'page');
-    revalidatePath('/clubs/[slug]', 'page');
-    revalidatePath('/records/[category]', 'page');
-  } else if (entityKey === 'players') {
-    revalidatePath('/players');
-    revalidatePath('/players/[slug]', 'page');
-  } else if (entityKey === 'draft_picks') {
-    revalidatePath('/draft');
-    revalidatePath('/players/[slug]', 'page');
-  }
+  revalidatePath('/', 'layout');
 
   const summary = Object.entries(result.changed)
     .map(([k, c]) => `${entity.fields[k].label}: ${c.from ?? '—'} → ${c.to ?? '—'}`)
@@ -567,16 +528,7 @@ export async function saveMatchSheetAction(
     warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
   }
 
-  revalidatePath(`/matches/${matchId}`);
-  revalidatePath('/matches');
-  revalidatePath('/players');
-  revalidatePath('/players/[slug]', 'page');
-  revalidatePath('/players/[slug]/matches', 'page');
-  revalidatePath('/seasons');
-  revalidatePath('/seasons/[year]', 'page');
-  revalidatePath('/clubs/[slug]', 'page');
-  revalidatePath('/records/[category]', 'page');
-  revalidatePath('/admin/data-editor');
+  revalidatePath('/', 'layout');
 
   return {
     message: `Match sheet saved successfully (${result.playerCount} players). ${result.scoreUpdated ? 'Match scores synchronized.' : ''} Career and season stats updated.`,
@@ -725,14 +677,7 @@ export async function createMatchAction(
       warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
     }
 
-    revalidatePath('/matches');
-    revalidatePath(`/matches/${result.id}`);
-    revalidatePath(`/seasons/${result.season}`);
-    revalidatePath('/seasons');
-    revalidatePath('/seasons/[year]', 'page');
-    revalidatePath('/clubs/[slug]', 'page');
-    revalidatePath('/records/[category]', 'page');
-    revalidatePath('/admin/data-editor');
+    revalidatePath('/', 'layout');
 
     return {
       message: `Created match #${result.id} (${matchDate}).`,
@@ -783,16 +728,7 @@ export async function deleteMatchAction(
     warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
   }
 
-  revalidatePath('/matches');
-  revalidatePath(`/matches/${matchId}`);
-  revalidatePath('/players');
-  revalidatePath('/players/[slug]', 'page');
-  revalidatePath('/players/[slug]/matches', 'page');
-  revalidatePath('/seasons');
-  revalidatePath('/seasons/[year]', 'page');
-  revalidatePath('/clubs/[slug]', 'page');
-  revalidatePath('/records/[category]', 'page');
-  revalidatePath('/admin/data-editor');
+  revalidatePath('/', 'layout');
 
   return {
     message: `Match #${matchId} deleted successfully. Player stats recalculated for ${result.affectedPlayers} affected players.`,
