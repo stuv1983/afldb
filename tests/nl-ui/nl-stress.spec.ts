@@ -1,11 +1,12 @@
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Request } from '@playwright/test';
 
 import { PARSER_VERSION } from '../../src/search/nl/plan';
 import {
-  isHydrationError, readUiCorpus, type UiCase, type UiObservation, type UiOutcome,
+  isHydrationError, readUiCorpus, type UiAnswerShape, type UiCase, type UiObservation, type UiOutcome,
+  type UiHydrationProbe, type UiRscSummary,
 } from '../../tools/nl/ui-corpus';
 import { buildReport, formatSummary } from '../../tools/nl/ui-summary';
 
@@ -56,6 +57,7 @@ const RUN_TAG = process.env.NL_UI_RUN_TAG ?? '';
  * captureHydrationIncident below.
  */
 const HYDRATION_ARTIFACTS_DIR = resolve('artifacts/hydration');
+const probedPages = new WeakSet<Page>();
 
 const all = readUiCorpus(CORPUS_PATH);
 const limit = Number(process.env.NL_UI_LIMIT ?? 0);
@@ -112,6 +114,252 @@ async function stubAutocomplete(page: Page): Promise<void> {
   }));
 }
 
+async function installHydrationProbe(page: Page): Promise<void> {
+  if (probedPages.has(page)) return;
+  probedPages.add(page);
+  await page.addInitScript(() => {
+    type ProbeSnapshot = {
+      atMs: number;
+      readyState: string;
+      htmlAttrs: Record<string, string>;
+      bodyAttrs: Record<string, string>;
+      searchBoxIds: {
+        labelFor: string | null;
+        inputId: string | null;
+        controls: string | null;
+        activeDescendant: string | null;
+      };
+      feedbackForms: {
+        action: string | null;
+        method: string | null;
+        hiddenNames: string[];
+        actionRef: string | null;
+        actionKey: string | null;
+        clientRef: string | null;
+        buttonTexts: string[];
+        fingerprint: string;
+        parentFingerprint: string | null;
+      }[];
+      searchBoxFingerprint: string | null;
+      searchBoxParentFingerprint: string | null;
+      searchSubtreeFingerprint: string | null;
+      firstMutation: {
+        atMs: number;
+        target: string;
+        type: string;
+        attributeName: string | null;
+        oldValue: string | null;
+        newValue: string | null;
+        nodePath: string;
+        parentFingerprint: string | null;
+        hydrationErrorAlreadyEmitted: boolean;
+      } | null;
+    };
+    type Probe = {
+      startedAt: number;
+      marks: { name: string; atMs: number }[];
+      mutations: {
+        atMs: number;
+        target: string;
+        type: string;
+        attributeName: string | null;
+        oldValue: string | null;
+        newValue: string | null;
+        nodePath: string;
+        parentFingerprint: string | null;
+        hydrationErrorAlreadyEmitted: boolean;
+      }[];
+      hydrationErrorSeen: boolean;
+      documentStart: ProbeSnapshot | null;
+      domContentLoaded: ProbeSnapshot | null;
+      hydrationError: ProbeSnapshot | null;
+      final: ProbeSnapshot | null;
+    };
+    const win = window as typeof window & { __afldbHydrationProbe?: Probe };
+    const startedAt = performance.now();
+    const atMs = () => Math.round(performance.now() - startedAt);
+    let observer: MutationObserver | null = null;
+    const attrs = (element: Element | null): Record<string, string> => {
+      const out: Record<string, string> = {};
+      if (!element) return out;
+      for (const attr of Array.from(element.attributes)) out[attr.name] = attr.value;
+      return out;
+    };
+    const normalId = (value: string | null) => {
+      if (!value) return null;
+      return value
+        .replace(/_R_[A-Za-z0-9_-]+_/g, '_R_*_')
+        .replace(/_r_[A-Za-z0-9_-]+_/g, '_r_*_')
+        .replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, 'uuid');
+    };
+    const nodePath = (node: Node | null) => {
+      const parts: string[] = [];
+      let current: Node | null = node;
+      while (current && current !== document && parts.length < 8) {
+        if (current.nodeType === Node.ELEMENT_NODE) {
+          const element = current as Element;
+          const parent = element.parentElement;
+          const siblings = parent ? Array.from(parent.children).filter((child) => child.tagName === element.tagName) : [];
+          const index = siblings.indexOf(element) + 1;
+          parts.push(`${element.tagName.toLowerCase()}${element.id ? `#${normalId(element.id)}` : ''}${index > 1 ? `:nth(${index})` : ''}`);
+        } else {
+          parts.push(current.nodeType === Node.TEXT_NODE ? '#text' : `#node-${current.nodeType}`);
+        }
+        current = current.parentNode;
+      }
+      return parts.reverse().join('>');
+    };
+    const fingerprint = (root: Element | null, depth = 4): string | null => {
+      if (!root) return null;
+      const walk = (node: Node, level: number): string => {
+        if (node.nodeType === Node.TEXT_NODE) return '#text';
+        if (node.nodeType === Node.COMMENT_NODE) return '#comment';
+        if (node.nodeType !== Node.ELEMENT_NODE) return `#node-${node.nodeType}`;
+        const element = node as Element;
+        const attrParts: string[] = [];
+        for (const name of ['id', 'for', 'name', 'type', 'role', 'aria-controls', 'aria-expanded', 'aria-autocomplete', 'action', 'method']) {
+          const value = element.getAttribute(name);
+          if (value !== null) attrParts.push(`${name}=${normalId(value)}`);
+        }
+        if (element instanceof HTMLInputElement) {
+          attrParts.push(`value=${normalId(element.value) ?? ''}`);
+          attrParts.push(`defaultValue=${normalId(element.defaultValue) ?? ''}`);
+        }
+        if (element instanceof HTMLTextAreaElement) attrParts.push(`value-len=${element.value.length}`);
+        const head = `${element.tagName.toLowerCase()}${attrParts.length ? `[${attrParts.join(',')}]` : ''}`;
+        if (level >= depth) return head;
+        const children = Array.from(element.childNodes)
+          .filter((child) => child.nodeType !== Node.TEXT_NODE || child.textContent?.trim())
+          .slice(0, 80)
+          .map((child) => walk(child, level + 1));
+        return `${head}${children.length ? `(${children.join('|')})` : ''}`;
+      };
+      return walk(root, 0);
+    };
+    const snapshot = (): ProbeSnapshot => {
+      if (observer) {
+        try {
+          for (const mutation of observer.takeRecords()) rememberMutation(mutation);
+        } catch {
+          // Probe-only.
+        }
+      }
+      const input = document.querySelector('form.search-form input[name="q"]');
+      const label = document.querySelector('form.search-form label');
+      const searchForm = document.querySelector('form.search-form');
+      const searchRoot = document.querySelector('main .container');
+      const feedbackForms = Array.from(document.querySelectorAll('form'))
+        .filter((form) => form.querySelector('input[name="clientRef"]'))
+        .map((form) => {
+          const hidden = Array.from(form.querySelectorAll('input[type="hidden"]')) as HTMLInputElement[];
+          return {
+            action: form.getAttribute('action'),
+            method: form.getAttribute('method'),
+            hiddenNames: hidden.map((input_) => input_.name).filter(Boolean),
+            actionRef: (form.querySelector('input[name="$ACTION_REF_1"]') as HTMLInputElement | null)?.value ?? null,
+            actionKey: (form.querySelector('input[name="$ACTION_KEY"]') as HTMLInputElement | null)?.value ?? null,
+            clientRef: (form.querySelector('input[name="clientRef"]') as HTMLInputElement | null)?.value ?? null,
+            buttonTexts: Array.from(form.querySelectorAll('button')).map((button) => button.textContent?.trim() ?? ''),
+            fingerprint: fingerprint(form, 5) ?? '',
+            parentFingerprint: fingerprint(form.parentElement, 3),
+          };
+        });
+      return {
+        atMs: atMs(),
+        readyState: document.readyState,
+        htmlAttrs: attrs(document.documentElement),
+        bodyAttrs: attrs(document.body),
+        searchBoxIds: {
+          labelFor: label?.getAttribute('for') ?? null,
+          inputId: input?.getAttribute('id') ?? null,
+          controls: input?.getAttribute('aria-controls') ?? null,
+          activeDescendant: input?.getAttribute('aria-activedescendant') ?? null,
+        },
+        feedbackForms,
+        searchBoxFingerprint: fingerprint(searchForm, 5),
+        searchBoxParentFingerprint: fingerprint(searchForm?.parentElement ?? null, 3),
+        searchSubtreeFingerprint: fingerprint(searchRoot, 4),
+        firstMutation: probe.mutations[0] ?? null,
+      };
+    };
+    const probe: Probe = {
+      startedAt,
+      marks: [{ name: 'document-start-probe', atMs: 0 }],
+      mutations: [],
+      hydrationErrorSeen: false,
+      documentStart: null,
+      domContentLoaded: null,
+      hydrationError: null,
+      final: null,
+    };
+    win.__afldbHydrationProbe = probe;
+    const mark = (name: string) => probe.marks.push({ name, atMs: atMs() });
+    const rememberMutation = (mutation: MutationRecord) => {
+      if (probe.mutations.length >= 80) return;
+      const target = mutation.target === document.documentElement
+        ? 'html'
+        : mutation.target === document.body
+          ? 'body'
+          : (mutation.target as Element).tagName?.toLowerCase?.() ?? 'node';
+      const element = mutation.target instanceof Element ? mutation.target : null;
+      probe.mutations.push({
+        atMs: atMs(),
+        target,
+        type: mutation.type,
+        attributeName: mutation.attributeName,
+        oldValue: mutation.oldValue,
+        newValue: mutation.attributeName && element ? element.getAttribute(mutation.attributeName) : null,
+        nodePath: nodePath(mutation.target),
+        parentFingerprint: fingerprint(element?.parentElement ?? null, 2),
+        hydrationErrorAlreadyEmitted: probe.hydrationErrorSeen,
+      });
+    };
+    try {
+      probe.documentStart = snapshot();
+    } catch {
+      probe.documentStart = null;
+    }
+    try {
+      observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) rememberMutation(mutation);
+      });
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeOldValue: true,
+        childList: true,
+        subtree: true,
+        attributeFilter: ['class', 'style', 'data-theme', 'id', 'for', 'aria-controls', 'aria-activedescendant', 'action'],
+      });
+    } catch {
+      // Probe-only; page behaviour must not depend on it.
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      mark('domcontentloaded');
+      try {
+        probe.domContentLoaded = snapshot();
+      } catch {
+        probe.domContentLoaded = null;
+      }
+    }, { once: true });
+    window.addEventListener('load', () => {
+      mark('load');
+    }, { once: true });
+    window.addEventListener('error', (event) => {
+      const message = String(event.error?.message ?? event.message ?? '');
+      if (/minified react error #(418|419|420|421|422|423|424|425)\b/i.test(message)
+        || message.toLowerCase().includes('hydration')) {
+        probe.hydrationErrorSeen = true;
+        mark('hydration-error');
+        try {
+          probe.hydrationError = snapshot();
+        } catch {
+          probe.hydrationError = null;
+        }
+      }
+    }, true);
+  });
+}
+
 /**
  * Reads one question and classifies what the page did.
  *
@@ -127,11 +375,23 @@ async function stubAutocomplete(page: Page): Promise<void> {
 async function observe(
   page: Page,
   test_: UiCase,
-): Promise<UiObservation & { serverHtml: string | null; network: NetworkEvent[] }> {
+  previous: PreviousObservation | null,
+): Promise<UiObservation & { serverHtml: string | null; network: NetworkEvent[]; rscRequests: RscRequest[] }> {
+  await installHydrationProbe(page);
   const errors: string[] = [];
-  const onPageError = (error: Error) => errors.push(`pageerror: ${error.message}`);
+  const clientEvents: ClientEvent[] = [];
+  const onPageError = (error: Error) => {
+    const atMs = Date.now() - started;
+    const text = `pageerror: ${error.message}`;
+    errors.push(text);
+    clientEvents.push({ kind: 'pageerror', text, atMs });
+  };
   const onConsole = (message: { type(): string; text(): string }) => {
-    if (message.type() === 'error') errors.push(`console: ${message.text()}`);
+    if (message.type() !== 'error') return;
+    const atMs = Date.now() - started;
+    const text = `console: ${message.text()}`;
+    errors.push(text);
+    clientEvents.push({ kind: 'console', text, atMs });
   };
   page.on('pageerror', onPageError);
   page.on('console', onConsole);
@@ -148,6 +408,10 @@ async function observe(
   // unless this question turns out to be one of the ~1-2% that errors;
   // see captureHydrationIncident.
   const network: NetworkEvent[] = [];
+  const rscRequests: RscRequest[] = [];
+  const rscByRequest = new Map<Request, RscRequest>();
+  let requestSeq = 0;
+  let completionSeq = 0;
   // Persisted for EVERY row, unlike `network` above -- the point is a
   // same-run, same-conditions baseline of ordinary loads to compare
   // against captured hydration incidents. `fetch`-typed responses with a
@@ -165,19 +429,56 @@ async function observe(
     serverHtmlPromise: null, worker: null, atMs: null,
   };
   const started = Date.now();
+  const onRequest = (request: Request) => {
+    if (!isRscUrl(request.url())) return;
+    const path = pathWithSearch(request.url());
+    const rsc: RscRequest = {
+      url: request.url(),
+      path,
+      kind: classifyRequestKind(request),
+      resourceType: request.resourceType(),
+      startSeq: ++requestSeq,
+      startAtMs: Date.now() - started,
+      completionSeq: null,
+      responseAtMs: null,
+      finishAtMs: null,
+      failureAtMs: null,
+      status: null,
+      worker: null,
+      pid: null,
+      requestId: null,
+      build: null,
+      failureText: null,
+      linkClass: classifyRscPath(path),
+    };
+    rscByRequest.set(request, rsc);
+    rscRequests.push(rsc);
+  };
   const onResponse = (response: {
     headers(): Record<string, string>;
     url(): string;
     status(): number;
-    request(): { resourceType(): string };
+    request(): Request;
     text(): Promise<string>;
   }) => {
     const worker = response.headers()['x-afldb-worker'] ?? null;
+    const pid = response.headers()['x-afldb-pid'] ?? null;
+    const requestId = response.headers()['x-afldb-request-id'] ?? null;
+    const build = response.headers()['x-afldb-build'] ?? null;
     const resourceType = response.request().resourceType();
     const atMs = Date.now() - started;
     network.push({
-      url: response.url(), status: response.status(), resourceType, worker, atMs,
+      url: response.url(), status: response.status(), resourceType, worker, pid, requestId, build, atMs,
     });
+    const rsc = rscByRequest.get(response.request());
+    if (rsc) {
+      rsc.responseAtMs = atMs;
+      rsc.status = response.status();
+      rsc.worker = worker;
+      rsc.pid = pid;
+      rsc.requestId = requestId;
+      rsc.build = build;
+    }
     if (worker) {
       subresourceWorkers.add(worker);
       subresourceTrace.push({ worker, atMs, resourceType });
@@ -195,13 +496,30 @@ async function observe(
       doc.atMs = atMs;
     }
   };
+  const onRequestFinished = (request: Request) => {
+    const rsc = rscByRequest.get(request);
+    if (!rsc) return;
+    rsc.finishAtMs = Date.now() - started;
+    rsc.completionSeq = ++completionSeq;
+  };
+  const onRequestFailed = (request: Request) => {
+    const rsc = rscByRequest.get(request);
+    if (!rsc) return;
+    rsc.failureAtMs = Date.now() - started;
+    rsc.completionSeq = ++completionSeq;
+    rsc.failureText = request.failure()?.errorText ?? null;
+  };
+  page.on('request', onRequest);
   page.on('response', onResponse);
+  page.on('requestfinished', onRequestFinished);
+  page.on('requestfailed', onRequestFailed);
 
   let outcome: UiOutcome;
   let httpStatus: number | null = null;
   let headline: string | null = null;
   let interpretation: string | null = null;
   let trace: UiObservation['trace'];
+  let firstVisibleResultAtMs: number | null = null;
 
   try {
     const response = await page.goto(
@@ -232,6 +550,7 @@ async function observe(
       if (await panel.count() === 0) {
         outcome = 'absent';
       } else {
+        firstVisibleResultAtMs = Date.now() - started;
         headline = (await panel.locator('h2').first().textContent())?.trim() ?? null;
         const answered = await panel.getByText('How was this calculated?').count() > 0;
         outcome = answered ? 'answered' : 'unanswerable';
@@ -249,10 +568,22 @@ async function observe(
   } finally {
     page.off('pageerror', onPageError);
     page.off('console', onConsole);
+    page.off('request', onRequest);
     page.off('response', onResponse);
+    page.off('requestfinished', onRequestFinished);
+    page.off('requestfailed', onRequestFailed);
   }
 
   const serverHtml = doc.serverHtmlPromise ? await doc.serverHtmlPromise.catch(() => null) : null;
+  const hydrationErrorAtMs = clientEvents.find((event) => isHydrationError(event.text))?.atMs ?? null;
+  const answerShape = await readAnswerShape(page, outcome, headline, interpretation).catch(() => null);
+  const hydrationProbe = await readHydrationProbe(page).catch(() => null);
+  const timingSummary = summarizeTiming(network, rscRequests, hydrationProbe, hydrationErrorAtMs, firstVisibleResultAtMs);
+  const rscSummary = summarizeRscRequests(
+    rscRequests,
+    hydrationErrorAtMs,
+    { worker: trace?.worker ?? doc.worker, pid: trace?.pid ?? null, build: trace?.build ?? null },
+  );
 
   // Deliberately NOT folded into `outcome`; see UiOutcome in
   // tools/nl/ui-corpus.ts for why a 1% intermittent hydration error is
@@ -276,9 +607,136 @@ async function observe(
     // timing per prefetch) rather than a pre-baked overlap boolean, so
     // count/timing questions asked after the fact don't need a re-run.
     networkSummary: { docWorker: doc.worker, docAtMs: doc.atMs, prefetches },
+    ...(answerShape ? { answerShape } : {}),
+    previous,
+    clientEvents,
+    ...(hydrationProbe ? { hydrationProbe } : {}),
+    timingSummary,
+    rscSummary,
     serverHtml,
     network,
+    rscRequests,
   };
+}
+
+function summarizeTiming(
+  network: NetworkEvent[],
+  rscRequests: RscRequest[],
+  hydrationProbe: UiHydrationProbe | null,
+  hydrationErrorAtMs: number | null,
+  firstVisibleResultAtMs: number | null,
+): UiObservation['timingSummary'] {
+  const markAt = (name: string) => hydrationProbe?.marks.find((mark) => mark.name === name)?.atMs ?? null;
+  const scriptResponses = network
+    .filter((event) => event.resourceType === 'script' && event.url.includes('/_next/static/'))
+    .map((event) => event.atMs);
+  const firstRsc = rscRequests.length > 0
+    ? Math.min(...rscRequests.map((request) => request.startAtMs))
+    : null;
+  return {
+    navigationStartAtMs: 0,
+    domContentLoadedAtMs: markAt('domcontentloaded'),
+    firstApplicationScriptResponseAtMs: scriptResponses.length > 0 ? Math.min(...scriptResponses) : null,
+    hydrationErrorAtMs,
+    firstRscRequestAtMs: firstRsc,
+    firstVisibleResultAtMs,
+    loadAtMs: markAt('load'),
+  };
+}
+
+async function readHydrationProbe(page: Page): Promise<UiHydrationProbe | null> {
+  return page.evaluate(() => {
+    const win = window as typeof window & {
+      __afldbHydrationProbe?: UiHydrationProbe & { startedAt: number };
+    };
+    const probe = win.__afldbHydrationProbe;
+    if (!probe) return null;
+    const attrs = (element: Element | null): Record<string, string> => {
+      const out: Record<string, string> = {};
+      if (!element) return out;
+      for (const attr of Array.from(element.attributes)) out[attr.name] = attr.value;
+      return out;
+    };
+    const normalId = (value: string | null) => {
+      if (!value) return null;
+      return value
+        .replace(/_R_[A-Za-z0-9_-]+_/g, '_R_*_')
+        .replace(/_r_[A-Za-z0-9_-]+_/g, '_r_*_')
+        .replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, 'uuid');
+    };
+    const fingerprint = (root: Element | null, depth = 4): string | null => {
+      if (!root) return null;
+      const walk = (node: Node, level: number): string => {
+        if (node.nodeType === Node.TEXT_NODE) return '#text';
+        if (node.nodeType === Node.COMMENT_NODE) return '#comment';
+        if (node.nodeType !== Node.ELEMENT_NODE) return `#node-${node.nodeType}`;
+        const element = node as Element;
+        const attrParts: string[] = [];
+        for (const name of ['id', 'for', 'name', 'type', 'role', 'aria-controls', 'aria-expanded', 'aria-autocomplete', 'action', 'method']) {
+          const value = element.getAttribute(name);
+          if (value !== null) attrParts.push(`${name}=${normalId(value)}`);
+        }
+        if (element instanceof HTMLInputElement) {
+          attrParts.push(`value=${normalId(element.value) ?? ''}`);
+          attrParts.push(`defaultValue=${normalId(element.defaultValue) ?? ''}`);
+        }
+        if (element instanceof HTMLTextAreaElement) attrParts.push(`value-len=${element.value.length}`);
+        const head = `${element.tagName.toLowerCase()}${attrParts.length ? `[${attrParts.join(',')}]` : ''}`;
+        if (level >= depth) return head;
+        const children = Array.from(element.childNodes)
+          .filter((child) => child.nodeType !== Node.TEXT_NODE || child.textContent?.trim())
+          .slice(0, 80)
+          .map((child) => walk(child, level + 1));
+        return `${head}${children.length ? `(${children.join('|')})` : ''}`;
+      };
+      return walk(root, 0);
+    };
+    const input = document.querySelector('form.search-form input[name="q"]');
+    const label = document.querySelector('form.search-form label');
+    const searchForm = document.querySelector('form.search-form');
+    const searchRoot = document.querySelector('main .container');
+    const feedbackForms = Array.from(document.querySelectorAll('form'))
+      .filter((form) => form.querySelector('input[name="clientRef"]'))
+      .map((form) => {
+        const hidden = Array.from(form.querySelectorAll('input[type="hidden"]')) as HTMLInputElement[];
+        return {
+          action: form.getAttribute('action'),
+          method: form.getAttribute('method'),
+          hiddenNames: hidden.map((input_) => input_.name).filter(Boolean),
+          actionRef: (form.querySelector('input[name="$ACTION_REF_1"]') as HTMLInputElement | null)?.value ?? null,
+          actionKey: (form.querySelector('input[name="$ACTION_KEY"]') as HTMLInputElement | null)?.value ?? null,
+          clientRef: (form.querySelector('input[name="clientRef"]') as HTMLInputElement | null)?.value ?? null,
+          buttonTexts: Array.from(form.querySelectorAll('button')).map((button) => button.textContent?.trim() ?? ''),
+          fingerprint: fingerprint(form, 5) ?? '',
+          parentFingerprint: fingerprint(form.parentElement, 3),
+        };
+      });
+    probe.final = {
+      atMs: Math.round(performance.now() - probe.startedAt),
+      readyState: document.readyState,
+      htmlAttrs: attrs(document.documentElement),
+      bodyAttrs: attrs(document.body),
+      searchBoxIds: {
+        labelFor: label?.getAttribute('for') ?? null,
+        inputId: input?.getAttribute('id') ?? null,
+        controls: input?.getAttribute('aria-controls') ?? null,
+        activeDescendant: input?.getAttribute('aria-activedescendant') ?? null,
+      },
+      feedbackForms,
+      searchBoxFingerprint: fingerprint(searchForm, 5),
+      searchBoxParentFingerprint: fingerprint(searchForm?.parentElement ?? null, 3),
+      searchSubtreeFingerprint: fingerprint(searchRoot, 4),
+      firstMutation: probe.mutations[0] ?? null,
+    };
+    return {
+      marks: probe.marks,
+      mutations: probe.mutations,
+      documentStart: probe.documentStart,
+      domContentLoaded: probe.domContentLoaded,
+      hydrationError: probe.hydrationError,
+      final: probe.final,
+    };
+  });
 }
 
 type NetworkEvent = {
@@ -286,8 +744,176 @@ type NetworkEvent = {
   status: number | null;
   resourceType: string;
   worker: string | null;
+  pid: string | null;
+  requestId: string | null;
+  build: string | null;
   atMs: number;
 };
+
+type ClientEvent = {
+  kind: 'console' | 'pageerror';
+  text: string;
+  atMs: number;
+};
+
+type PreviousObservation = {
+  id: string;
+  question: string;
+  answerShape: UiAnswerShape | null;
+};
+
+type RscRequest = {
+  url: string;
+  path: string;
+  kind: 'navigation' | 'automatic_prefetch' | 'user_triggered';
+  resourceType: string;
+  startSeq: number;
+  startAtMs: number;
+  completionSeq: number | null;
+  responseAtMs: number | null;
+  finishAtMs: number | null;
+  failureAtMs: number | null;
+  status: number | null;
+  worker: string | null;
+  pid: string | null;
+  requestId: string | null;
+  build: string | null;
+  failureText: string | null;
+  linkClass: 'home_about' | 'answer_result' | 'search' | 'other';
+};
+
+function isRscUrl(url: string): boolean {
+  return url.includes('_rsc=');
+}
+
+function pathWithSearch(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    return url;
+  }
+}
+
+function classifyRequestKind(request: Request): RscRequest['kind'] {
+  if (request.isNavigationRequest()) return 'navigation';
+  return request.resourceType() === 'fetch' ? 'automatic_prefetch' : 'user_triggered';
+}
+
+function classifyRscPath(path: string): RscRequest['linkClass'] {
+  const pathname = path.split('?')[0];
+  if (pathname === '/' || pathname === '/about') return 'home_about';
+  if (pathname === '/search') return 'search';
+  if (/^\/(players|matches|clubs|seasons|records|grid-solver)\b/.test(pathname)) return 'answer_result';
+  return 'other';
+}
+
+async function readAnswerShape(
+  page: Page,
+  outcome: UiOutcome,
+  headline: string | null,
+  interpretation: string | null,
+): Promise<UiAnswerShape | null> {
+  const panel = page.locator('section.section', {
+    has: page.getByText('Did AFLDB understand this question?'),
+  });
+  if (await panel.count() === 0) {
+    return {
+      outcome,
+      headline,
+      interpretation,
+      tableTitle: null,
+      tableNote: null,
+      columnHeaders: [],
+      rowCount: 0,
+      linkPaths: [],
+    };
+  }
+
+  const summary = panel.locator('details summary').filter({ hasNotText: 'How was this calculated?' }).first();
+  const tableTitle = await summary.count() > 0 ? (await summary.textContent())?.trim() ?? null : null;
+  const tableNote = await panel.locator('details .muted').first().textContent().catch(() => null);
+  const columnHeaders = await panel.locator('table thead th').evaluateAll((nodes) => (
+    nodes.map((node) => node.textContent?.trim() ?? '').filter(Boolean)
+  ));
+  const rowCount = await panel.locator('table tbody tr').count();
+  const linkPaths = await panel.locator('a').evaluateAll((nodes) => {
+    const paths: string[] = [];
+    for (const node of nodes) {
+      const href = node.getAttribute('href');
+      if (!href) continue;
+      try {
+        const url = new URL(href, window.location.origin);
+        paths.push(`${url.pathname}${url.search}`);
+      } catch {
+        paths.push(href);
+      }
+    }
+    return paths;
+  });
+
+  return {
+    outcome,
+    headline,
+    interpretation,
+    tableTitle,
+    tableNote: tableNote?.trim() ?? null,
+    columnHeaders,
+    rowCount,
+    linkPaths: [...new Set(linkPaths)].slice(0, 50),
+  };
+}
+
+function summarizeRscRequests(
+  rscRequests: RscRequest[],
+  hydrationErrorAtMs: number | null,
+  doc: { worker: string | null; pid: string | null; build: string | null },
+): UiRscSummary {
+  const cutoff = hydrationErrorAtMs ?? Number.POSITIVE_INFINITY;
+  const before = rscRequests.filter((request) => request.startAtMs <= cutoff);
+  const responseBuilds = [...new Set([
+    doc.build,
+    ...rscRequests.map((request) => request.build),
+  ].filter((value): value is string => Boolean(value)))];
+  const crossCandidates = before
+    .map((request) => request.worker)
+    .filter((worker): worker is string => Boolean(worker));
+  const crossWorkerRsc = !doc.worker || crossCandidates.length === 0
+    ? null
+    : crossCandidates.some((worker) => worker !== doc.worker);
+
+  return {
+    hydrationErrorAtMs,
+    cutoffReason: hydrationErrorAtMs === null ? 'observation_window' : 'hydration_error',
+    docWorker: doc.worker,
+    docPid: doc.pid,
+    docBuild: doc.build,
+    responseBuilds,
+    rscStartedBeforeCutoff: before.length,
+    concurrentRscBeforeCutoff: maxConcurrent(before),
+    hasHomeOrAboutRsc: before.some((request) => request.linkClass === 'home_about'),
+    hasAnswerResultLinkRsc: before.some((request) => request.linkClass === 'answer_result'),
+    crossWorkerRsc,
+    pathsBeforeCutoff: before.map((request) => request.path),
+  };
+}
+
+function maxConcurrent(requests: RscRequest[]): number {
+  const events: { atMs: number; delta: 1 | -1 }[] = [];
+  for (const request of requests) {
+    events.push({ atMs: request.startAtMs, delta: 1 });
+    const end = request.finishAtMs ?? request.failureAtMs ?? request.responseAtMs;
+    if (end !== null) events.push({ atMs: end, delta: -1 });
+  }
+  events.sort((a, b) => a.atMs - b.atMs || b.delta - a.delta);
+  let current = 0;
+  let max = 0;
+  for (const event of events) {
+    current += event.delta;
+    if (current > max) max = current;
+  }
+  return max;
+}
 
 /**
  * Saves everything a hydration incident needs for forensic diffing,
@@ -310,6 +936,7 @@ async function captureHydrationIncident(
   observation: UiObservation,
   serverHtml: string | null,
   network: NetworkEvent[],
+  rscRequests: RscRequest[],
 ): Promise<void> {
   const dir = resolve(HYDRATION_ARTIFACTS_DIR, test_.id);
   mkdirSync(dir, { recursive: true });
@@ -334,7 +961,14 @@ async function captureHydrationIncident(
     elapsedMs: observation.elapsedMs,
     outcome: observation.outcome,
     headline: observation.headline,
+    previous: observation.previous ?? null,
+    answerShape: observation.answerShape ?? null,
     consoleErrors: observation.errors,
+    clientEvents: observation.clientEvents ?? [],
+    hydrationProbe: observation.hydrationProbe ?? null,
+    timingSummary: observation.timingSummary ?? null,
+    rscSummary: observation.rscSummary ?? null,
+    rscRequests,
     network,
     cleanControl: clean,
   }, null, 2), 'utf8');
@@ -355,58 +989,71 @@ async function captureCleanControl(
   cleanCaptureSucceeded: boolean;
   trace: UiObservation['trace'] | null;
   errors: string[];
+  answerShape: UiAnswerShape | null;
+  rscSummary: UiRscSummary | null;
+  hydrationProbe: UiHydrationProbe | null;
+  rscRequests: RscRequest[];
 }> {
   const context = page.context();
 
   for (let attempt = 1; attempt <= 3; attempt++) {
-    const errors: string[] = [];
-    // A property, not a bare `let` -- see the identical comment in
-    // observe() above.
-    const doc: { serverHtmlPromise: Promise<string> | null } = { serverHtmlPromise: null };
-    let trace: UiObservation['trace'];
     const retryPage = await context.newPage();
-    retryPage.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
-    retryPage.on('console', (message) => {
-      if (message.type() === 'error') errors.push(`console: ${message.text()}`);
-    });
-    retryPage.on('response', (response) => {
-      if (response.request().resourceType() === 'document') doc.serverHtmlPromise = response.text();
-    });
+    await stubAutocomplete(retryPage);
+    if (RUN_TAG) await retryPage.setExtraHTTPHeaders({ 'x-afldb-run-tag': RUN_TAG });
 
+    let observation: UiObservation & { serverHtml: string | null; rscRequests: RscRequest[] };
     try {
-      const response = await retryPage.goto(
-        `/search?q=${encodeURIComponent(test_.question)}`,
-        { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS },
-      );
-      const headers = response?.headers() ?? {};
-      trace = {
-        worker: headers['x-afldb-worker'] ?? null,
-        pid: headers['x-afldb-pid'] ?? null,
-        requestId: headers['x-afldb-request-id'] ?? null,
-        build: headers['x-afldb-build'] ?? null,
-      };
-      // Give hydration (and its console warning, if it fails again) a
-      // moment to happen before the tab closes.
+      const { network: _network, ...observed } = await observe(retryPage, test_, null);
+      observation = observed;
       await retryPage.waitForTimeout(300);
     } catch (error) {
-      errors.push(`navigation: ${(error as Error).message}`);
+      observation = {
+        id: test_.id,
+        question: test_.question,
+        outcome: 'page_error',
+        httpStatus: null,
+        headline: null,
+        interpretation: null,
+        errors: [`navigation: ${(error as Error).message}`],
+        elapsedMs: 0,
+        previous: null,
+        serverHtml: null,
+        rscRequests: [],
+      };
     }
 
-    const serverHtml = doc.serverHtmlPromise ? await doc.serverHtmlPromise.catch(() => null) : null;
     const domHtml = await retryPage.content().catch(() => null);
     const screenshot = await retryPage.screenshot({ fullPage: true }).catch(() => null);
     await retryPage.close();
 
-    const hydro = errors.some(isHydrationError);
+    const hydro = observation.errors.some(isHydrationError);
     if (!hydro || attempt === 3) {
-      if (serverHtml !== null) writeFileSync(resolve(dir, 'clean-server.html'), serverHtml, 'utf8');
+      if (observation.serverHtml !== null) writeFileSync(resolve(dir, 'clean-server.html'), observation.serverHtml, 'utf8');
       if (domHtml !== null) writeFileSync(resolve(dir, 'clean-dom.html'), domHtml, 'utf8');
       if (screenshot) writeFileSync(resolve(dir, 'clean.png'), screenshot);
-      return { attempts: attempt, cleanCaptureSucceeded: !hydro, trace: trace ?? null, errors };
+      return {
+        attempts: attempt,
+        cleanCaptureSucceeded: !hydro,
+        trace: observation.trace ?? null,
+        errors: observation.errors,
+        answerShape: observation.answerShape ?? null,
+        rscSummary: observation.rscSummary ?? null,
+        hydrationProbe: observation.hydrationProbe ?? null,
+        rscRequests: observation.rscRequests,
+      };
     }
   }
   /* istanbul ignore next -- loop above always returns by attempt 3 */
-  return { attempts: 3, cleanCaptureSucceeded: false, trace: null, errors: [] };
+  return {
+    attempts: 3,
+    cleanCaptureSucceeded: false,
+    trace: null,
+    errors: [],
+    answerShape: null,
+    rscSummary: null,
+    hydrationProbe: null,
+    rscRequests: [],
+  };
 }
 
 for (const [index, batch] of batches.entries()) {
@@ -421,16 +1068,22 @@ for (const [index, batch] of batches.entries()) {
     if (RUN_TAG) await page.setExtraHTTPHeaders({ 'x-afldb-run-tag': RUN_TAG });
 
     const observations: UiObservation[] = [];
+    let previous: PreviousObservation | null = null;
     for (const test_ of batch) {
-      const { serverHtml, network, ...observation } = await observe(page, test_);
+      const { serverHtml, network, rscRequests, ...observation } = await observe(page, test_, previous);
       observations.push(observation);
       if (observation.errors.some(isHydrationError)) {
         // Best-effort: a capture failure (disk, a closed page) must not
         // sink the batch or cost the observation already recorded above.
-        await captureHydrationIncident(page, test_, observation, serverHtml, network).catch((error) => {
+        await captureHydrationIncident(page, test_, observation, serverHtml, network, rscRequests).catch((error) => {
           console.error(`[hydration-capture] failed for ${test_.id}: ${(error as Error).message}`);
         });
       }
+      previous = {
+        id: observation.id,
+        question: observation.question,
+        answerShape: observation.answerShape ?? null,
+      };
     }
 
     /**

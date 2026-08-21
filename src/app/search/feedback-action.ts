@@ -35,6 +35,14 @@ export async function submitNlFeedback(
   _prev: NlFeedbackState,
   formData: FormData,
 ): Promise<NlFeedbackState> {
+  return handleNlFeedback(formData);
+}
+
+export async function submitNlFeedbackForm(formData: FormData): Promise<void> {
+  await handleNlFeedback(formData);
+}
+
+async function handleNlFeedback(formData: FormData): Promise<NlFeedbackState> {
   const clientRef = String(formData.get('clientRef') ?? '');
   const verdict = String(formData.get('verdict') ?? '');
   const expectedAnswer = String(formData.get('expectedAnswer') ?? '').slice(0, NL_FEEDBACK_MAX_LENGTH);

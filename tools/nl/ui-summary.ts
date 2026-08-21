@@ -106,6 +106,33 @@ export function formatSummary(report: ReturnType<typeof buildReport>): string {
       );
     }
     if (hydration.untraced > 0) lines.push(`    (${hydration.untraced} loads carried no trace headers)`);
+    const { clusters } = hydration;
+    lines.push(
+      '  RSC clusters before hydration/error cutoff:',
+      `    home/about RSC:       ${clusters.homeAboutRsc.hydrationErrors} of ${clusters.homeAboutRsc.loads} (${clusters.homeAboutRsc.ratePercent}%)`,
+      `    answer/result RSC:    ${clusters.answerResultLinkRsc.hydrationErrors} of ${clusters.answerResultLinkRsc.loads} (${clusters.answerResultLinkRsc.ratePercent}%)`,
+      `    cross-worker RSC:     ${clusters.crossWorkerRsc.hydrationErrors} of ${clusters.crossWorkerRsc.loads} (${clusters.crossWorkerRsc.ratePercent}%)`,
+      `    same-worker RSC:      ${clusters.sameWorkerRsc.hydrationErrors} of ${clusters.sameWorkerRsc.loads} (${clusters.sameWorkerRsc.ratePercent}%)`,
+      `    no RSC before cutoff: ${clusters.noRscBeforeCutoff.hydrationErrors} of ${clusters.noRscBeforeCutoff.loads} (${clusters.noRscBeforeCutoff.ratePercent}%)`,
+    );
+    const transitions = Object.entries(clusters.byTransition)
+      .filter(([, stats]) => stats.hydrationErrors > 0)
+      .sort(([, a], [, b]) => b.hydrationErrors - a.hydrationErrors || b.ratePercent - a.ratePercent)
+      .slice(0, 8);
+    if (transitions.length > 0) {
+      lines.push('  hydration answer-shape transitions:');
+      for (const [transition, stats] of transitions) {
+        lines.push(`    ${transition}: ${stats.hydrationErrors} of ${stats.loads} (${stats.ratePercent}%)`);
+      }
+    }
+    const concurrency = Object.entries(clusters.byConcurrentRsc)
+      .filter(([, stats]) => stats.hydrationErrors > 0)
+      .sort(([a], [b]) => Number(a) - Number(b));
+    if (concurrency.length > 0) {
+      lines.push(
+        `  hydration by concurrent RSC count: ${concurrency.map(([count, stats]) => `${count}: ${stats.hydrationErrors}/${stats.loads} (${stats.ratePercent}%)`).join(', ')}`,
+      );
+    }
   }
 
   lines.push('');

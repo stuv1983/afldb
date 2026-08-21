@@ -2330,11 +2330,11 @@ Resolved in the live development service. Include the record-holder rows in the 
 
 ## AFLDB-ISSUE-065 - Live-only player-season metric leaderboards can time out
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Performance
 - **Found:** 2026-08-21
-- **Resolved:** N/A
+- **Resolved:** 2026-08-21
 - **Queries:** `most inside 50s in a season`, `most clearances in a season`, `most contested possessions in a season`
 - **Files:** `src/db/queries/nl/player-season.ts`
 
@@ -2382,10 +2382,15 @@ Local validation: `npm.cmd run typecheck` passed, and `npm.cmd test -- tests\nl-
 
 Remote guarded `_test` validation: with `AFLDB_TEST_DATABASE_URL` confirmed as `afldb_test`, `npx vitest run tests/integration/nl-answers-game-season.test.ts` passed 15 tests, including the new broad live-only leaderboard regression in 687 ms. Remote `npm run typecheck` passed.
 
-Remote `npm run build` passed and prepared the standalone bundle, but rendered `/search` verification is still blocked because `sudo -n systemctl restart afldb` failed with `sudo: a password is required`. Do not mark the browser/UI portion complete until the legitimate development service restart has happened.
+Remote `npm run build` passed and prepared the standalone bundle. After the legitimate development service restart, live `/search` browser verification on build `sGc7mkDlFHLMEWu3wk522` returned HTTP 200, rendered the expected verified headline, and recorded no console/page errors for all four samples:
+
+- `most inside 50s in a season`: `Patrick Dangerfield — 194 inside 50s (2016)`, 1,562 ms.
+- `most rebound 50s in a season`: `Dustin Fletcher — 206 rebounds (2004)`, 1,378 ms.
+- `most clearances in a season`: `Brett Ratten — 265 clearances (1999)`, 1,385 ms.
+- `most contested possessions in a season`: `Clayton Oliver — 434 contested (2021)`, 1,133 ms.
 
 ### Follow-up
-After the legitimate development service restart, verify the four sample questions through real `/search`, then rerun the expanded UI corpus so the former `advanced_metric` failures disappear without introducing hydration/client errors.
+None for the compiler defect. The broader `/search` hydration failures that still occur under varied parallel UI load are tracked separately under `AFLDB-ISSUE-068`.
 
 ## AFLDB-ISSUE-066 - Malformed `most N games` conditions answer instead of declining
 
@@ -2526,7 +2531,7 @@ The parser-v25 audit reran the 501-row expanded browser corpus before the dev re
 UI/runtime
 
 ### Root cause
-The current evidence points to eager App Router RSC prefetch from the persistent site navigation during `/search` hydration. In the parser-v25 expanded run, each React #418 capture had identical failing and clean server HTML for the same query, a clean same-question control, and a burst of successful `?_rsc=` fetches for visible nav links within the first few dozen milliseconds of the document load. Those RSC fetches were served by mixed standalone cluster workers, including workers different from the document worker. This keeps the first wrong layer in UI/runtime, not the NL parser or answer SQL.
+Not yet confirmed. Earlier parser-v25 captures pointed to eager App Router RSC prefetch from the persistent site navigation as a contributor: each React #418 capture had identical failing and clean server HTML for the same query, a clean same-question control, and a burst of successful `?_rsc=` fetches for visible nav links within the first few dozen milliseconds of the document load. Post-fix evidence below shows that disabling the persistent nav prefetch reduced but did not eliminate the defect, and the remaining dominant cluster can fire before any observed `_rsc` request starts. This keeps the first wrong layer in UI/runtime, not the NL parser or answer SQL, but no final root cause is proven.
 
 ### Fix
 Disabled automatic Next.js prefetch on `PrimaryNav` and `TabBar` links in `src/components/SiteNav.tsx`. The links still navigate normally when clicked, but `/search` hydration no longer starts by prefetching the full visible nav route set across cluster workers.
@@ -2536,8 +2541,207 @@ Disabled automatic Next.js prefetch on `PrimaryNav` and `TabBar` links in `src/c
 
 Current verification attempt on 2026-08-21 found the live dev checkout still lacked `prefetch={false}` in `src/components/SiteNav.tsx`, so the running service could not validate the fix. The existing local `SiteNav` change was staged and diffed on the dev host; the diff was exactly the two intended `prefetch={false}` props. `npm run build` completed and prepared the standalone bundle. After the later ISSUE-065 compiler change, `npm run build` completed again with both fixes included. The legitimate restart remains blocked: `sudo -n systemctl restart afldb` fails with `sudo: a password is required`. No varied 501-row or full 12,000-row post-fix browser corpus was run because the intended build is not live.
 
+Post-restart validation on 2026-08-21 proved the intended build is live: `/search` responses carry `x-afldb-build: sGc7mkDlFHLMEWu3wk522`, matching `.next/standalone/.next/BUILD_ID`; source has both `SiteNav` `prefetch={false}` props; `PARSER_VERSION = 25`; and the live ISSUE-065 browser probes used that same build.
+
+The comparable varied expanded corpus was rerun locally against the restarted dev service with the same 501 questions, JavaScript enabled, saved beta auth state, normal `/search` navigation, `NL_UI_TIMEOUT_MS=20000`, and four Playwright workers. Batch size was changed from 100 to 25 only so Playwright would actually schedule four workers; earlier local attempts with six 100-row batches reported only three workers and were discarded. Remote Linux Playwright could not be used because Chromium failed to launch with missing `libasound.so.2`.
+
+Expanded post-fix result archived at `artifacts/nl-ui/nl-audit-v25-postfix-expanded-501-20260821/summary.json`:
+
+- Observed: 501 / 501.
+- Semantic pass/fail/unscored: 501 / 0 / 0.
+- Outcomes: answered 472, unanswerable 16, absent 13, HTTP errors 0, page errors 0.
+- Client-side errors: 8.
+- Hydration errors: 8 (1.60%).
+- Worker rates: worker 1 = 3/76, worker 2 = 0/143, worker 3 = 2/211, worker 4 = 3/71.
+- Worker agreement: same-worker 0/4, different-worker 8/497.
+
+All eight client errors were still React #418 hydration failures with successful same-query clean controls: `exp_0173`, `exp_0175`, `exp_0221`, `exp_0242`, `exp_0253`, `exp_0335`, `exp_0341`, and `exp_0422`. No HTTP failures, page failures, timeouts, semantic failures, or RSC payload fallback errors were recorded. The persistent nav prefetch burst is gone, so `SiteNav` prefetch was a contributor, not the complete root cause. Remaining failures still correlate with early RSC fetches for home/about and/or viewport-visible answer/result links, often served by workers different from the document worker.
+
+The NL UI stress harness was then instrumented to record exact current/previous queries, DOM-derived current/previous answer shapes, structured client-event timestamps, every `_rsc` request start/finish/response order, path, request kind, traced worker/PID/request/build headers, response build identifiers, and same-query clean-control RSC/shape evidence. The instrumented 501-row run used the same first 501 UI corpus rows, JavaScript enabled, saved beta auth state, normal `/search` navigation, `NL_UI_BATCH=25`, and four Playwright workers against live build `sGc7mkDlFHLMEWu3wk522`.
+
+Instrumented result in `nl-ui-out/summary.json`:
+
+- Observed: 501 / 501.
+- Semantic pass/fail/unscored: 501 / 0 / 0.
+- Outcomes: answered 501, unanswerable 0, absent 0, HTTP errors 0, page errors 0.
+- Client-side errors: 7.
+- Hydration errors: 7 (1.40%).
+- Worker rates: worker 1 = 2/151, worker 2 = 1/122, worker 3 = 4/167, worker 4 = 0/61.
+- Worker agreement: same-worker 0/2, different-worker 7/499.
+- RSC clusters before the hydration-error timestamp: home/about RSC 1/176, answer/result-link RSC 0/148, cross-worker RSC 1/46, same-worker RSC 0/2, and no RSC before cutoff 6/319.
+
+The seven React #418 examples were `ui_00039`, `ui_00146`, `ui_00228`, `ui_00265`, `ui_00454`, `ui_00473`, and `ui_00495`; every same-query clean control succeeded. Six failures recorded no `_rsc` request before the hydration error timestamp, and the only pre-error RSC case was `/about?_rsc=unnn1` on a worker different from the document worker. Several failures did start home/about or answer/result RSC prefetches later in the same load, but after the captured React #418 timestamp. This weakens the remaining prefetch hypothesis and does not justify disabling footer/about, brand/home, or answer/result Link prefetch yet.
+
+Nearby clean controls from the same run support the same classification. `ui_00145`, `ui_00453`, and `ui_00496` were adjacent clean rows with home/about plus answer/result RSC prefetches before the observation cutoff and no client error. `ui_00455` was an adjacent clean row with home/about RSC prefetch only and no client error. The adjacent failure `ui_00473` had pre-error `/about?_rsc=unnn1`, but the broader local neighborhood shows that this link class is not sufficient by itself to trigger React #418 under the same worker/concurrency conditions.
+
+Link inspection after the instrumented run:
+
+- `src/components/SiteNav.tsx`: persistent primary and tab navigation already uses `prefetch={false}`.
+- `src/app/layout.tsx`: brand Home and footer About links still use default Next.js prefetch.
+- `src/components/NlAnswerSection.tsx`: lead match, player, club, season, record/achievement and table links still use default Next.js prefetch.
+
+Additional capture note: in five of the seven failing DOM snapshots, React recovery regenerated the `SearchBox` `useId()`-derived input/list ids from the server form id `_R_15fiutb_...` to client-only `_r_0_...`; matching clean controls retained the server ids. Two failing snapshots retained the server id, so this is a recovery symptom and possible component-boundary clue rather than a proven sole cause.
+
+Follow-up instrumentation added a document-start Playwright probe using `page.addInitScript`, plus a 125-row fast transition corpus at `artifacts/nl-ui/issue-068-fast-transition-corpus.csv`. A broader 180-row reduced corpus at `artifacts/nl-ui/issue-068-reduced-transition-corpus.csv` was abandoned as a quick diagnostic after roughly eight minutes because several broad/edge batches did not complete promptly; the fast corpus uses known failures, adjacent controls, and spacer rows from the fast first-501 region. It is not a full acceptance corpus.
+
+The fast corpus reproduced React #418 under the preserving workload shape:
+
+- Corpus: `artifacts/nl-ui/issue-068-fast-transition-corpus.csv`.
+- Rows: 125.
+- Playwright workers: 4, with `NL_UI_BATCH=12` so all four workers were active.
+- Result: 125 observed, semantic pass/fail/unscored 125 / 0 / 0, HTTP errors 0, page errors 0, timeouts 0.
+- Hydration/client errors: 7 React #418.
+- RSC before hydration-error cutoff: home/about 2/60, answer/result-link 3/52, cross-worker RSC 2/10, same-worker RSC 1/2, no RSC before cutoff 4/63.
+- Report: `nl-ui-out/summary.json`.
+
+Representative document-start probe evidence from the 125-row run:
+
+- `ui_00042`, `ui_00266`, `ui_00267`, `ui_00287`, `ui_00011`, `ui_00012`, and `ui_00013` all had zero recorded DOM mutations between the document-start probe and React #418. No `data-theme` mutation was recorded, and the test browser had no stored theme value.
+- Hydration-error snapshots consistently showed React recovery had replaced the server-hydrated `SearchBox` id family (`_R_15fiutb_...`) with client-rendered ids (`_r_0_...`) and reduced the feedback form to the client-rendered shape with only `clientRef`; clean same-query controls retained the server id family and the Server Action hidden fields (`$ACTION_REF_1`, `$ACTION_1:0`, `$ACTION_1:1`, `$ACTION_KEY`, `clientRef`).
+- Server HTML comparison for `ui_00039` and `ui_00146` showed identical Server Action metadata between failing and clean same-query responses: action id `603332301bd4c4781a4f31f78f6ad5b9ba71e32a1f` and `$ACTION_KEY` `k0e63af938132d65b5064ded1df47fc02`. Only `clientRef` differs, as expected for per-search feedback correlation.
+
+Current hypothesis log:
+
+- H1 pre-paint DOM mutation. Prediction: the theme/health inline scripts or another pre-hydration script mutates React-owned markup before hydration. Test: document-start probe records html/body/search/form mutations plus `data-theme` and SearchBox/form snapshots. Evidence: 7/7 fast-corpus failures recorded zero mutations and no `data-theme`; the only pre-paint script with a DOM write, `THEME_INIT_SCRIPT`, had no stored value to apply in the test browser. Result: weakened for current captures, not globally ruled out for browsers with a stored theme.
+- H2 useId/component-tree ordering. Prediction: server/client tree order differs before `SearchBox`, causing `useId` ids to diverge. Evidence: failing recovered DOM has `_r_0_...`, clean DOM has `_R_15fiutb_...`; however the hydration-error snapshot is already after React recovery, and no pre-error DOM mutation or conditional tree change before `SearchBox` is proven. Result: supported as a recovery symptom and next inspection target, not yet proven as the first wrong boundary.
+- H3 Server Action form/action metadata. Prediction: standalone workers emit different Server Action ids/keys for the same feedback form, causing hydration to fail. Evidence: failing and clean server HTML for same-query captures have identical action id and action key; clean controls retain the hidden fields after hydration, while failing pages lose them only after React client recovery. Result: weakened as a root cause.
+- H4 answer-shape conditional tree. Prediction: failures cluster on a previous/current answer-shape transition. Evidence: fast-corpus failures mostly cluster on `answered -> answered`, with one `Every matching performance11 total -> answered`; the latest 501 also had mostly `answered -> answered`. Result: weakened as a specific answer-shape transition, but still compatible with general repeated `/search` client-tree hydration under load.
+- H5 cross-worker build/action identity mismatch. Prediction: failures require different build/action identity across workers. Evidence: all captured responses report build `sGc7mkDlFHLMEWu3wk522`; Server Action metadata matches between failing and clean server HTML; four fast-corpus failures occur with no pre-error RSC. Result: weakened for build/action identity mismatch.
+
+Further 125-row instrumentation on 2026-08-21 added stable structural fingerprints for the `/search` subtree, `SearchBox`, and `NlAnswerFeedback`, plus a drained `MutationObserver.takeRecords()` path so the probe records the first queued DOM mutation even when React recovery and the page error happen in the same turn. `npm.cmd run typecheck` passed after the harness changes.
+
+The exact fast corpus was then repeated without changing row order, worker count, batch size, browser project, or deployment:
+
+- Corpus: `artifacts/nl-ui/issue-068-fast-transition-corpus.csv`.
+- Workers: 4.
+- Batch: `NL_UI_BATCH=12`.
+- First post-fingerprint run before the observer drain: 125 observed, semantic pass/fail/unscored 125 / 0 / 0, HTTP errors 0, page errors 0, timeouts 0, hydration/client errors 1 React #418. The failure was `ui_00001`, with answer/result RSC requests already started before the error; `firstMutation` was still unavailable because pending mutation records were not being drained.
+- Repeat after the observer drain: 125 observed, semantic pass/fail/unscored 125 / 0 / 0, HTTP errors 0, page errors 0, timeouts 0, hydration/client errors 0.
+- Second repeat after the observer drain: 125 observed, semantic pass/fail/unscored 125 / 0 / 0, HTTP errors 0, page errors 0, timeouts 0, hydration/client errors 1 React #418.
+
+Representative latest failure from the second drained-observer repeat:
+
+- Row: `ui_00229`.
+- Query: `Lance Franklin most handballs against Richmond`.
+- Previous query: `Lance Franklin highest handballs game against Adelaide`.
+- Current shape: answered headline `Lance Franklin — 7 handballs`, no table rows, one match link (`/matches/13782`).
+- Previous shape: answered headline `Lance Franklin — 11 handballs`, no table rows, one match link (`/matches/13668`).
+- Timing: DOMContentLoaded at ~11 ms, first visible result at ~194 ms, React #418 at ~206 ms, first `_rsc` request at ~210 ms, load at ~47 ms.
+- RSC before hydration-error cutoff: 0; no home/about RSC, no answer/result-link RSC, no cross-worker RSC before the error.
+- Probe mutations: 0; first observed mutation: none.
+- Server DOM at DOMContentLoaded: `SearchBox` ids used the server `useId` family (`_R_15fiutb_...`), and the feedback form contained `$ACTION_REF_1`, `$ACTION_1:0`, `$ACTION_1:1`, `$ACTION_KEY`, and `clientRef`.
+- Hydration-error/final DOM: React recovery had regenerated the `SearchBox` ids to the client-only `_r_0_...` family and reduced the feedback form to the client-rendered shape with only `clientRef`; no pre-error DOM mutation was captured before that recovery state.
+
+This latest failure makes the remaining answer/result/home/about prefetch hypothesis weaker again: React #418 occurred before any observed RSC/navigation activity. It also strengthens the conclusion that the `_r_...` ids and missing Server Action hidden fields are recovery symptoms rather than proven causes. The first externally observable wrong event in this capture is still the React #418 page error itself.
+
+`SearchBox` first-render inspection: the component is a Client Component with one unconditional `useId()` before rendering, followed by stable `useState(initialQuery)`, suggestion/open/active/focus state, and placeholder state. The first-render input is controlled by `query` from `initialQuery`, while autocomplete, click-outside handling, and placeholder animation are effect-driven after hydration. No conditional hook path or browser-only first-render branch was found in `SearchBox`.
+
+`NlAnswerFeedback` first-render inspection: the component is a Client Component with unconditional `useActionState(submitNlFeedback, INITIAL)`, `choice = none`, and `dismissed = false`. The initial client render should be the form, not the thanks/error/dismissed branches. The server action id and `$ACTION_KEY` were already shown stable in failing and clean same-query server HTML, and the current latest failure again shows action hidden fields disappearing only after React recovery.
+
+125-row presence classification from the latest drained-observer run: `SearchBox` was present in 125/125 rows and `NlAnswerFeedback` was present in 125/125 rows, so this corpus cannot discriminate feedback-present from feedback-absent loads. The one failure was in an answered, one-link, zero-table-row result. Rows with zero result links were 0/44, one link 1/54, two to three links 0/13, and four or more links 0/14. The link-count evidence is too sparse to justify a link prefetch change.
+
+Development React diagnostic status: a separate `next dev` sidecar was started on the dev host at `http://10.0.40.100:3101` using the same remote source checkout and private `.env`, without replacing or restarting the existing standalone service on port 8090. The sidecar health endpoint returned `status=ok` and `database=ok`. The same 125-row fast corpus was run against it three times with `NL_UI_BATCH=12`, four Playwright workers, JavaScript enabled, and the same saved beta/session state. All three development-mode runs were clean:
+
+- Run 1: 125 observed, semantic pass/fail/unscored 125 / 0 / 0, client-side errors 0.
+- Run 2: 125 observed, semantic pass/fail/unscored 125 / 0 / 0, client-side errors 0.
+- Run 3: 125 observed, semantic pass/fail/unscored 125 / 0 / 0, client-side errors 0.
+
+No unminified React hydration diagnostic was captured because the dev-mode runtime did not reproduce React #418 in 375 comparable diagnostic loads. This weakens the usefulness of `next dev` as a reproducer but does not clear the issue: the production-style standalone 125-row corpus still reproduced 1/125 on the latest comparable repeat.
+
+The dev-mode sidecar was stopped after the diagnostic run. Running `next dev` in the same remote checkout disturbed the shared `.next` artifacts used by the standalone service's static file path: a subsequent production-style feedback-cohort attempt saw `_next/static` CSS/JS chunk requests return `400 text/html`, causing broad MIME-type console errors across both cohorts. That cohort was stopped and is invalid for hydration or feedback-form conclusions. A remote `npm run build` completed successfully and `prepare-standalone` recopied `.next/static`; direct chunk checks then returned `200 application/javascript` again. However, the running standalone service still reports the old live build header `sGc7mkDlFHLMEWu3wk522`, while the rebuilt standalone artifact has a new build id. Do not run further authoritative browser diagnostics until the development service has been legitimately restarted and the intended build/static pair is live.
+
+Feedback-presence discriminator status: a generated artifact `artifacts/nl-ui/issue-068-feedback-discriminator-corpus.csv` contains 60 real NL-answer rows expected to render `SearchBox + NlAnswerFeedback` and 60 ordinary `/search` keyword rows expected to render `SearchBox` without the NL feedback form, all marked `expected_status=unknown`. The first attempted run was invalidated by the static-asset/build-artifact disturbance above, so no feedback-present versus feedback-absent hydration rate is recorded yet.
+
+After the development standalone runtime was legitimately restarted, the build/static pair was confirmed consistent by the operator: built `BUILD_ID` and running `x-afldb-build` both reported `PXHGYcAVxXxgGrfPSViE-`.
+
+The exact production-style 125-row fast transition corpus was rerun unchanged against that build:
+
+- Corpus: `artifacts/nl-ui/issue-068-fast-transition-corpus.csv`.
+- Rows: 125 attempted, 125 observed.
+- Workers: 4 active Playwright workers.
+- Batch: `NL_UI_BATCH=12`.
+- Semantic pass/fail/unscored: 125 / 0 / 0.
+- Outcomes: answered 125, unanswerable 0, absent 0, HTTP errors 0, page errors 0.
+- Hydration/client errors: 3 React #418.
+- Timeouts: 0.
+- Report: `nl-ui-out/summary.json`.
+
+Failing rows:
+
+- `ui_00010`: previous `Dustin Martin highest goals game against Brisbane Lions` (`Every matching performance2 total`) -> current `Dustin Martin most goals against Western Bulldogs` (single answered match link). React #418 at ~265 ms; no `_rsc` request before the error; 0 probe mutations; first mutation null.
+- `ui_00225`: previous `Dustin Martin total clangers against Carlton` (single answered total, no links) -> current `Lance Franklin highest handballs game against Port Adelaide` (single answered match link). React #418 at ~268 ms; first `_rsc` at ~272 ms; 0 probe mutations; first mutation null.
+- `ui_00472`: previous `Tony Lockett highest clangers game against Melbourne` (`Every matching performance2 total`) -> current `Tony Lockett most clangers against Brisbane Lions` (`Every matching performance4 total`). React #418 at ~355 ms; first `_rsc` at ~359 ms; 0 probe mutations; first mutation null.
+
+All three failures reported build `PXHGYcAVxXxgGrfPSViE-`. In every failure the DOMContentLoaded snapshot still had the server `SearchBox` id family (`_R_15fiutb_...`) and Server Action hidden fields (`$ACTION_REF_1`, `$ACTION_1:0`, `$ACTION_1:1`, `$ACTION_KEY`, `clientRef`). The hydration-error/final snapshots showed the recovered client shape (`_r_0_...` ids and feedback form reduced to `clientRef`), again with no captured mutation before the React #418 signal. This further supports the ordering: React reports/enters hydration recovery before any observable React-owned DOM mutation is recorded by the document-start probe.
+
+Transition correlation for this 125-row run remained suggestive but sparse:
+
+- `answered -> answered`: 1/75 (1.33%).
+- `Every matching performance2 total -> answered`: 1/6 (16.67%).
+- `Every matching performance2 total -> Every matching performance4 total`: 1/2 (50%).
+
+No transition family has enough sample size to promote as the root cause. The common feature across the 125-row corpus remains that every row renders an NL answer and therefore renders `NlAnswerFeedback`.
+
+The feedback-present/absent discriminator was then rerun. The original 120-row cohort again hung on the `fb_050` / `nf_050` pair (`Dustin Martin most goals against Brisbane Lions` / `coach`). A diagnostic 12-row slice showed the other ten missing rows complete quickly, narrowing the hang to that two-row pair. A 118-row discriminator excluding only that independently hanging pair completed with the same 4-worker, `NL_UI_BATCH=12`, production-style standalone setup:
+
+- Corpus: `artifacts/nl-ui/issue-068-feedback-discriminator-nohang.csv`.
+- Rows: 118 attempted, 118 observed.
+- Workers: 4.
+- Batch: `NL_UI_BATCH=12`.
+- Semantic pass/fail/unscored: 0 / 0 / 118 (`expected_status=unknown` by design).
+- Outcomes: answered 68, absent 50, HTTP errors 0, page errors 0.
+- Hydration/client errors: 3 React #418.
+- Report: `nl-ui-out/summary.json`.
+
+Rendered-DOM cohort rates from the 118-row discriminator:
+
+- Feedback absent (`SearchBox` present, no `NlAnswerFeedback`): 0/50 (0.00%).
+- Feedback present, single answered: 3/57 (5.26%).
+- Feedback present, grouped answered: 0/11 (0.00%).
+- Overall rows with feedback present: 3/68 (4.41%).
+- Overall rows without feedback present: 0/50 (0.00%).
+
+The three discriminator failures were:
+
+- `fb_015`: `Lance Franklin highest handballs game against Port Adelaide`, previous `MCG`; feedback present; React #418 at ~380 ms. This row had pre-error RSC activity, so it is not useful for ruling RSC out by itself.
+- `fb_026`: `Lance Franklin total tackles against West Coast`, previous `Hawthorn`; feedback present; React #418 at ~10 ms, first `_rsc` at ~12 ms, 0 probe mutations.
+- `nf_060`: label cohort was `feedback_absent_search_results`, but the query `tackles` legitimately rendered an NL answer (`Scott Pendlebury — 2,022 tackles`) and therefore rendered `NlAnswerFeedback`; React #418 at ~30 ms, first `_rsc` at ~32 ms, 0 probe mutations.
+
+This discriminator materially weakens the "SearchBox alone" hypothesis and strengthens H3/H6 around the `NlAnswerFeedback` / Server Action form hydration boundary. It still does not prove that Server Action metadata values differ: the stable action id and `$ACTION_KEY` evidence remains. The narrower supported statement is that React #418 has now concentrated on real rendered NL feedback-form states while true feedback-absent `/search` states stayed clean under the same worker/batch/navigation shape.
+
+Updated hypothesis status:
+
+- H1 pre-paint DOM mutation: weakened further; latest 125-row failures and feedback-cohort failures still recorded 0 pre-error probe mutations.
+- H2 useId/component-tree ordering: visible recovery symptom; weakened as a SearchBox-only explanation because 50 true SearchBox-without-feedback rows had 0 hydration errors in the discriminator.
+- H3 Server Action metadata/form hydration: strengthened as a boundary hypothesis, despite stable action id/key values, because all discriminator failures occurred when the feedback form was truly rendered.
+- H4 answer-shape transition: still weakened as a single trigger; latest 125-row transitions are sparse and mixed.
+- H5 cross-worker build/action mismatch: weakened further; current build/static pair is proven consistent and failures report the same build.
+- H6 first client-render state/input divergence: strengthened and now focused on the first client render of the feedback/Server Action form boundary rather than on `SearchBox` alone.
+
+Feedback boundary source inspection before patching:
+
+- `NlAnswerSection` is a Server Component that renders the answer section and conditionally includes `NlAnswerFeedback` for answered and unanswerable NL panels.
+- Before the patch, `NlAnswerFeedback` was a Client Component that imported `submitNlFeedback` and bound it through `useActionState(submitNlFeedback, INITIAL)`.
+- The first client render had unconditional local state (`choice = none`, `dismissed = false`) and no `useId`, `useEffect`, browser-state branch, nested form, nested button, or parent form.
+- Server HTML/browser-parser checks on captured failing rows found no nested `<form>`, no button-inside-button, no form-inside-`p`, and no repaired ancestor path for the feedback form. The browser-parsed form remained a direct child of `section.section`.
+- The concrete mismatch candidate is therefore not invalid HTML; it is the Client Component `useActionState` form boundary hydrating a server-emitted Server Action form. Every relevant failure recovered that boundary from server action hidden fields to the client fallback action shape while true feedback-absent rows stayed clean.
+
+Narrow source patch:
+
+- Added `submitNlFeedbackForm(formData)` as a plain Server Action form entrypoint that reuses the existing feedback validation/rate-limit/recording logic.
+- Changed `src/components/NlAnswerFeedback.tsx` back into a Server Component that renders the `<form action={submitNlFeedbackForm}>` and hidden `clientRef`.
+- Added `src/components/NlAnswerFeedbackControls.tsx` as the small Client Component child for `useFormStatus`, reveal-on-first-`No`, dismiss, and the local thanks acknowledgement.
+- Removed `useActionState` from the feedback form boundary. SearchBox, answer rendering, Link prefetch, parser/search semantics, and the Server Component answer architecture were not changed.
+- Prediction: feedback-present rows should stop producing React #418 if the root cause is the hydrated `useActionState` Server Action form boundary; feedback submission should still insert through the same server-side recording path.
+
+Local verification after the patch:
+
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd test -- tests/nl-answer-feedback-boundary.test.ts`: passed 2 tests. The regression asserts the form remains server-owned, uses the plain Server Action entrypoint, keeps the expected controls in a client child, does not reintroduce `useActionState`, and the plain form entrypoint calls `recordNlFeedback`.
+- `npm.cmd test -- tests/nl-feedback.test.ts`: passed 31 tests.
+
 ### Follow-up
-Deploy/restart a build containing the `SiteNav` prefetch change and replay the varied parallel corpus. Do not count React #418 incidents as semantic NL failures, but do count them as UI/hydration failures in browser sweep summaries until the expanded and full UI sweeps are clean.
+Keep the issue open. The next step is Linux/dev-host verification of this narrow feedback-boundary patch: run focused tests, build, perform a legitimate service restart, prove the live `BUILD_ID`, then rerun the 118-row feedback discriminator. Only if that is clean should the exact 125-row corpus be run repeatedly. Do not run the 501-row or full 12,000-row acceptance corpus yet.
 
 ## AFLDB-ISSUE-069 - Expanded UI corpus expects unsupported debut-season leaderboards to answer
 
@@ -2638,7 +2842,7 @@ Audit corpus/oracle and data coverage
 The 12k corpus contains stale expected-status rows for behaviours that are now supported or intentionally ambiguous, and it marks historical metric rows as expected plans even when AFLDB correctly exposes coverage unavailability.
 
 ### Fix
-No application fix was made for this issue. This ledger entry records the classification of the completed 12k run. `AFLDB-ISSUE-068` remains open for hydration, `AFLDB-ISSUE-065` remains open from the expanded corpus, and `AFLDB-ISSUE-066` was resolved later by parser version 25.
+No application fix was made for this issue. This ledger entry records the classification of the completed 12k run. `AFLDB-ISSUE-068` remains open for hydration, `AFLDB-ISSUE-065` was resolved later by the live-only player-season compiler rewrite, and `AFLDB-ISSUE-066` was resolved later by parser version 25.
 
 ### Validation
 The Playwright harness completed all 120 batches in 20.9 minutes with all 12,000 questions observed. `nl-ui-out` was archived to `artifacts/nl-ui/nl-audit-v24-ui-12000-20260821`.

@@ -194,6 +194,7 @@ export type UiObservation = {
   /** The one-line reading-back of the question, when shown. */
   interpretation: string | null;
   errors: string[];
+  clientEvents?: { kind: 'console' | 'pageerror'; text: string; atMs: number }[];
   elapsedMs: number;
   /**
    * Which cluster worker served this navigation, from deploy/server-cluster.mjs's
@@ -242,6 +243,113 @@ export type UiObservation = {
     docAtMs: number | null;
     prefetches: { worker: string; atMs: number }[];
   };
+  /** DOM-derived shape of the answer/result payload rendered for this row. */
+  answerShape?: UiAnswerShape;
+  /** The immediately previous row on the same reused Playwright page. */
+  previous?: {
+    id: string;
+    question: string;
+    answerShape: UiAnswerShape | null;
+  } | null;
+  /**
+   * RSC/prefetch forensic rollup captured for every row so hydration
+   * failures can be compared against nearby clean controls from the
+   * same run instead of a later replay with a different traffic shape.
+   */
+  rscSummary?: UiRscSummary;
+  hydrationProbe?: UiHydrationProbe;
+  timingSummary?: {
+    navigationStartAtMs: number;
+    domContentLoadedAtMs: number | null;
+    firstApplicationScriptResponseAtMs: number | null;
+    hydrationErrorAtMs: number | null;
+    firstRscRequestAtMs: number | null;
+    firstVisibleResultAtMs: number | null;
+    loadAtMs: number | null;
+  };
+};
+
+export type UiAnswerShape = {
+  outcome: UiOutcome;
+  headline: string | null;
+  interpretation: string | null;
+  tableTitle: string | null;
+  tableNote: string | null;
+  columnHeaders: string[];
+  rowCount: number;
+  linkPaths: string[];
+};
+
+export type UiRscSummary = {
+  hydrationErrorAtMs: number | null;
+  cutoffReason: 'hydration_error' | 'observation_window';
+  docWorker: string | null;
+  docPid: string | null;
+  docBuild: string | null;
+  responseBuilds: string[];
+  rscStartedBeforeCutoff: number;
+  concurrentRscBeforeCutoff: number;
+  hasHomeOrAboutRsc: boolean;
+  hasAnswerResultLinkRsc: boolean;
+  crossWorkerRsc: boolean | null;
+  pathsBeforeCutoff: string[];
+};
+
+export type UiHydrationProbe = {
+  marks: { name: string; atMs: number }[];
+  mutations: {
+    atMs: number;
+    target: string;
+    type: string;
+    attributeName: string | null;
+    oldValue: string | null;
+    newValue: string | null;
+    nodePath?: string;
+    parentFingerprint?: string | null;
+    hydrationErrorAlreadyEmitted?: boolean;
+  }[];
+  documentStart: UiDomSnapshot | null;
+  domContentLoaded: UiDomSnapshot | null;
+  hydrationError: UiDomSnapshot | null;
+  final: UiDomSnapshot | null;
+};
+
+export type UiDomSnapshot = {
+  atMs: number;
+  readyState: string;
+  htmlAttrs: Record<string, string>;
+  bodyAttrs: Record<string, string>;
+  searchBoxIds: {
+    labelFor: string | null;
+    inputId: string | null;
+    controls: string | null;
+    activeDescendant: string | null;
+  };
+  feedbackForms: {
+    action: string | null;
+    method: string | null;
+    hiddenNames: string[];
+    actionRef: string | null;
+    actionKey: string | null;
+    clientRef: string | null;
+    buttonTexts?: string[];
+    fingerprint?: string;
+    parentFingerprint?: string | null;
+  }[];
+  searchBoxFingerprint?: string | null;
+  searchBoxParentFingerprint?: string | null;
+  searchSubtreeFingerprint?: string | null;
+  firstMutation?: {
+    atMs: number;
+    target: string;
+    type: string;
+    attributeName: string | null;
+    oldValue: string | null;
+    newValue: string | null;
+    nodePath?: string;
+    parentFingerprint?: string | null;
+    hydrationErrorAlreadyEmitted?: boolean;
+  } | null;
 };
 
 export type UiVerdict = 'pass' | 'fail' | 'unscored';
@@ -355,6 +463,15 @@ export type HydrationByWorker = {
   /** Loads carrying no trace headers at all -- tracing off, or an untraced deployment. */
   untraced: number;
   totalHydrationErrors: number;
+  clusters: {
+    homeAboutRsc: { loads: number; hydrationErrors: number; ratePercent: number };
+    answerResultLinkRsc: { loads: number; hydrationErrors: number; ratePercent: number };
+    crossWorkerRsc: { loads: number; hydrationErrors: number; ratePercent: number };
+    sameWorkerRsc: { loads: number; hydrationErrors: number; ratePercent: number };
+    noRscBeforeCutoff: { loads: number; hydrationErrors: number; ratePercent: number };
+    byTransition: Record<string, { loads: number; hydrationErrors: number; ratePercent: number }>;
+    byConcurrentRsc: Record<string, { loads: number; hydrationErrors: number; ratePercent: number }>;
+  };
 };
 
 /**
@@ -371,12 +488,47 @@ export function hydrationByWorker(observations: Iterable<UiObservation>): Hydrat
   const different = { loads: 0, hydrationErrors: 0, ratePercent: 0 };
   let untraced = 0;
   let totalHydrationErrors = 0;
+  const clusters = {
+    homeAboutRsc: { loads: 0, hydrationErrors: 0, ratePercent: 0 },
+    answerResultLinkRsc: { loads: 0, hydrationErrors: 0, ratePercent: 0 },
+    crossWorkerRsc: { loads: 0, hydrationErrors: 0, ratePercent: 0 },
+    sameWorkerRsc: { loads: 0, hydrationErrors: 0, ratePercent: 0 },
+    noRscBeforeCutoff: { loads: 0, hydrationErrors: 0, ratePercent: 0 },
+    byTransition: {} as Record<string, { loads: number; hydrationErrors: number; ratePercent: number }>,
+    byConcurrentRsc: {} as Record<string, { loads: number; hydrationErrors: number; ratePercent: number }>,
+  };
+  const bump = (
+    bucket: { loads: number; hydrationErrors: number; ratePercent: number },
+    hydrated: boolean,
+  ) => {
+    bucket.loads++;
+    if (hydrated) bucket.hydrationErrors++;
+  };
 
   for (const observation of observations) {
     const hydrated = observation.errors.some(isHydrationError);
     if (hydrated) totalHydrationErrors++;
 
     const worker = observation.trace?.worker;
+    const rsc = observation.rscSummary;
+    if (rsc) {
+      if (rsc.hasHomeOrAboutRsc) bump(clusters.homeAboutRsc, hydrated);
+      if (rsc.hasAnswerResultLinkRsc) bump(clusters.answerResultLinkRsc, hydrated);
+      if (rsc.crossWorkerRsc === true) bump(clusters.crossWorkerRsc, hydrated);
+      if (rsc.crossWorkerRsc === false) bump(clusters.sameWorkerRsc, hydrated);
+      if (rsc.rscStartedBeforeCutoff === 0) bump(clusters.noRscBeforeCutoff, hydrated);
+      const current = observation.answerShape?.tableTitle ?? observation.answerShape?.outcome ?? observation.outcome;
+      const previous = observation.previous?.answerShape?.tableTitle
+        ?? observation.previous?.answerShape?.outcome
+        ?? 'start';
+      const transition = `${previous} -> ${current}`;
+      clusters.byTransition[transition] ??= { loads: 0, hydrationErrors: 0, ratePercent: 0 };
+      bump(clusters.byTransition[transition], hydrated);
+      const concurrent = String(rsc.concurrentRscBeforeCutoff);
+      clusters.byConcurrentRsc[concurrent] ??= { loads: 0, hydrationErrors: 0, ratePercent: 0 };
+      bump(clusters.byConcurrentRsc[concurrent], hydrated);
+    }
+
     if (!worker) { untraced++; continue; }
 
     byWorker[worker] ??= { loads: 0, hydrationErrors: 0, ratePercent: 0 };
@@ -400,10 +552,16 @@ export function hydrationByWorker(observations: Iterable<UiObservation>): Hydrat
       : Number(((bucket.hydrationErrors / bucket.loads) * 100).toFixed(3));
   };
   for (const bucket of Object.values(byWorker)) rate(bucket);
+  for (const bucket of [
+    clusters.homeAboutRsc, clusters.answerResultLinkRsc, clusters.crossWorkerRsc,
+    clusters.sameWorkerRsc, clusters.noRscBeforeCutoff,
+  ]) rate(bucket);
+  for (const bucket of Object.values(clusters.byTransition)) rate(bucket);
+  for (const bucket of Object.values(clusters.byConcurrentRsc)) rate(bucket);
   rate(same);
   rate(different);
 
-  return { byWorker, crossWorker: { sameWorker: same, differentWorker: different }, untraced, totalHydrationErrors };
+  return { byWorker, crossWorker: { sameWorker: same, differentWorker: different }, untraced, totalHydrationErrors, clusters };
 }
 
 export function summarise(
