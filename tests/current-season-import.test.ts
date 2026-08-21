@@ -39,7 +39,7 @@ describe('current-season external source import contracts', () => {
 
   it('only applies final-score updates when explicitly requested', () => {
     expect(tool).toContain("argv.includes('--update-matches')");
-    expect(importer).toContain('if (!updateMatches || localMatchId === null || match.completePercent !== 100) continue;');
+    expect(importer).toContain('if (updateMatches) {');
   });
 
   it('accounts for AFLDB counting Opening Round as round 1 from 2024 onward', () => {
@@ -61,7 +61,7 @@ describe('current-season external source import contracts', () => {
   it('inserts missing completed matches only behind an explicit flag', () => {
     expect(tool).toContain("argv.includes('--insert-missing-matches')");
     expect(importer).toContain('INSERT INTO matches');
-    expect(importer).toContain("match.completePercent !== 100 || match.matchDate === null");
+    expect(importer).toContain("if (localMatchId === null && match.completePercent === 100 && match.matchDate !== null");
   });
 
   it('records source and import-batch provenance on local score updates', () => {
@@ -232,5 +232,49 @@ describe('Placeholder and Dry-Run Resolution Logic', () => {
     const loopRegex = /if \(localMatchId !== null\) \{\s*resolved \+= 1;\s*\} else if \(match.completePercent === 100 && match.matchDate !== null\) \{\s*unresolved \+= 1;\s*\} else \{\s*incompleteFixtures \+= 1;\s*\}/g;
     const matches = importer.match(loopRegex);
     expect(matches?.length).toBe(2);
+  });
+});
+
+describe('Update logic genuine-change and disagreements', () => {
+  it('No-op canonical update: skips update if scores match identically', () => {
+    expect(importer).toContain('const scoreChanged = current.homeScore !== agreedHomeScore');
+    expect(importer).toContain('if (!scoreChanged && !componentsChanged) {\n          continue;\n        }');
+  });
+
+  it('Genuine score correction: updates canonical if score changes', () => {
+    expect(importer).toContain('if (!scoreChanged && !componentsChanged) {\n          continue;\n        }');
+    expect(importer).toContain('UPDATE matches');
+    expect(importer).toContain('home_score = ${agreedHomeScore}');
+  });
+
+  it('Two agreeing sources: deduplicates update to canonical match', () => {
+    expect(importer).toContain('const updatesByLocalMatchId = new Map<number, UpdateCandidate[]>();');
+    expect(importer).toContain('let arr = updatesByLocalMatchId.get(localMatchId);');
+    expect(importer).toContain('for (const [localMatchId, candidates] of updatesByLocalMatchId.entries())');
+  });
+
+  it('Two disagreeing sources: does not update and logs disagreement', () => {
+    expect(importer).toContain('if (agreedHomeScore !== candidateHomeScore || agreedAwayScore !== candidateAwayScore) {');
+    expect(importer).toContain('disagreement = true;\n              break;');
+    expect(importer).toContain('if (disagreement) {\n          sourceDisagreements += 1;\n          continue;\n        }');
+  });
+
+  it('Orientation reversal: correctly aligns home/away before comparison', () => {
+    expect(importer).toContain('const isHome = current.homeClubId === homeClubId;');
+    expect(importer).toContain('const candidateHomeScore = isHome ? match.homeScore : match.awayScore;');
+    expect(importer).toContain('const candidateAwayScore = isHome ? match.awayScore : match.homeScore;');
+  });
+
+  it('Null score components: does not silently overwrite known canonical components', () => {
+    expect(importer).toContain('agreedHomeGoals = agreedHomeGoals ?? current.homeGoals;');
+    expect(importer).toContain('agreedAwayBehinds = agreedAwayBehinds ?? current.awayBehinds;');
+  });
+
+  it('Dual-source missing insert: deduplicates insert for missing match', () => {
+    expect(importer).toContain('const insertsByMatchKey = new Map<string, InsertCandidate[]>();');
+    expect(importer).toContain('for (const [matchKey, candidates] of insertsByMatchKey.entries())');
+    expect(importer).toContain('unresolved -= candidates.length;');
+    expect(importer).toContain('for (const candidate of candidates) {');
+    expect(importer).toContain('UPDATE staging.external_current_matches');
   });
 });

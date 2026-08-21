@@ -28,6 +28,7 @@ export type CurrentSeasonRunResult = {
   updated: number;
   unresolved: number;
   incompleteFixtures: number;
+  sourceDisagreements: number;
   applied: boolean;
 };
 
@@ -119,6 +120,7 @@ export async function runCurrentSeasonRefresh(options: CurrentSeasonRunOptions):
         updated: 0,
         unresolved: 0,
         incompleteFixtures: 0,
+        sourceDisagreements: 0,
         applied: false,
       };
     }
@@ -151,6 +153,7 @@ export async function runCurrentSeasonRefresh(options: CurrentSeasonRunOptions):
         updated: 0,
         unresolved,
         incompleteFixtures,
+        sourceDisagreements: 0,
         applied: false,
       };
     } finally {
@@ -177,6 +180,7 @@ export async function runCurrentSeasonRefresh(options: CurrentSeasonRunOptions):
       updated: result.updated,
       unresolved: result.unresolved,
       incompleteFixtures: result.incompleteFixtures,
+      sourceDisagreements: result.sourceDisagreements,
       applied: true,
     };
   } finally {
@@ -344,6 +348,7 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
   updated: number;
   unresolved: number;
   incompleteFixtures: number;
+  sourceDisagreements: number;
 }> {
   let staged = 0;
   let inserted = 0;
@@ -351,6 +356,7 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
   let updated = 0;
   let unresolved = 0;
   let incompleteFixtures = 0;
+  let sourceDisagreements = 0;
   const touchedSeasons = new Set<number>();
 
   await sql.begin(async (tx) => {
@@ -374,6 +380,11 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
       RETURNING id
     `;
 
+    type UpdateCandidate = { match: ExternalCurrentMatch, homeClubId: number, awayClubId: number };
+    const updatesByLocalMatchId = new Map<number, UpdateCandidate[]>();
+    type InsertCandidate = { match: ExternalCurrentMatch, homeClubId: number, awayClubId: number };
+    const insertsByMatchKey = new Map<string, InsertCandidate[]>();
+
     for (const match of matches) {
       const sourceId = sourceIds.get(match.source);
       if (!sourceId) throw new Error(`No source id for ${match.source}`);
@@ -381,6 +392,7 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
       const homeClubId = await resolveClub(tx, match.homeTeamRaw, match.season);
       const awayClubId = await resolveClub(tx, match.awayTeamRaw, match.season);
       const localMatchId = await resolveLocalMatch(tx, match, homeClubId, awayClubId);
+      
       if (localMatchId !== null) {
         resolved += 1;
       } else if (match.completePercent === 100 && match.matchDate !== null) {
@@ -428,75 +440,170 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
       `;
       staged += 1;
 
-      if (!updateMatches || localMatchId === null || match.completePercent !== 100) continue;
-      const result = resultFromScores(match);
-      if (result === null || match.homeScore === null || match.awayScore === null) continue;
+      if (localMatchId !== null && match.completePercent === 100 && match.homeScore !== null && match.awayScore !== null) {
+        let arr = updatesByLocalMatchId.get(localMatchId);
+        if (!arr) { arr = []; updatesByLocalMatchId.set(localMatchId, arr); }
+        arr.push({ match, homeClubId: homeClubId!, awayClubId: awayClubId! });
+      }
 
-      const [current] = await tx<{
-        homeClubId: number;
-        awayClubId: number;
-        homeScore: number;
-        awayScore: number;
-      }[]>`
-        SELECT home_club_id AS "homeClubId", away_club_id AS "awayClubId",
-               home_score AS "homeScore", away_score AS "awayScore"
-          FROM matches WHERE id = ${localMatchId}
-      `;
-      if (!current) continue;
-      const localHomeScore = current.homeClubId === homeClubId ? match.homeScore : match.awayScore;
-      const localAwayScore = current.homeClubId === homeClubId ? match.awayScore : match.homeScore;
-      if (localHomeScore === null || localAwayScore === null) continue;
+      if (localMatchId === null && match.completePercent === 100 && match.matchDate !== null && homeClubId !== null && awayClubId !== null && match.homeScore !== null && match.awayScore !== null) {
+        const roundCode = primaryLocalRoundCode(match);
+        if (roundCode !== null) {
+          const homeName = await clubName(tx, homeClubId);
+          const awayName = await clubName(tx, awayClubId);
+          const matchKey = `${match.season}|${roundCode}|${match.matchDate}|${homeName}|${awayName}`;
+          let arr = insertsByMatchKey.get(matchKey);
+          if (!arr) { arr = []; insertsByMatchKey.set(matchKey, arr); }
+          arr.push({ match, homeClubId, awayClubId });
+        }
+      }
+    }
 
-      await tx`
-        UPDATE matches
-           SET home_score = ${localHomeScore},
-               away_score = ${localAwayScore},
-               home_goals = ${current.homeClubId === homeClubId ? match.homeGoals : match.awayGoals},
-               home_behinds = ${current.homeClubId === homeClubId ? match.homeBehinds : match.awayBehinds},
-               away_goals = ${current.homeClubId === homeClubId ? match.awayGoals : match.homeGoals},
-               away_behinds = ${current.homeClubId === homeClubId ? match.awayBehinds : match.homeBehinds},
-               result = CASE
-                 WHEN ${localHomeScore} = ${localAwayScore} THEN 'draw'::match_result
-                 WHEN ${localHomeScore} > ${localAwayScore} THEN 'home_win'::match_result
-                 ELSE 'away_win'::match_result
-               END,
-               winner_club_id = CASE
-                 WHEN ${localHomeScore} = ${localAwayScore} THEN NULL
-                 WHEN ${localHomeScore} > ${localAwayScore} THEN home_club_id
-                 ELSE away_club_id
-               END,
-               margin = abs(${localHomeScore} - ${localAwayScore}),
-               source_id = ${sourceId},
-               source_record_id = ${match.externalGameId},
-               import_batch_id = ${batch.id}
-         WHERE id = ${localMatchId}
-      `;
-      updated += 1;
-      touchedSeasons.add(match.season);
+    if (updateMatches) {
+      for (const [localMatchId, candidates] of updatesByLocalMatchId.entries()) {
+        const [current] = await tx<{
+          homeClubId: number;
+          awayClubId: number;
+          homeScore: number;
+          awayScore: number;
+          homeGoals: number | null;
+          homeBehinds: number | null;
+          awayGoals: number | null;
+          awayBehinds: number | null;
+        }[]>`
+          SELECT home_club_id AS "homeClubId", away_club_id AS "awayClubId",
+                 home_score AS "homeScore", away_score AS "awayScore",
+                 home_goals AS "homeGoals", home_behinds AS "homeBehinds",
+                 away_goals AS "awayGoals", away_behinds AS "awayBehinds"
+            FROM matches WHERE id = ${localMatchId}
+        `;
+        if (!current) continue;
+
+        let disagreement = false;
+        let agreedHomeScore: number | null = null;
+        let agreedAwayScore: number | null = null;
+        let agreedHomeGoals: number | null = null;
+        let agreedHomeBehinds: number | null = null;
+        let agreedAwayGoals: number | null = null;
+        let agreedAwayBehinds: number | null = null;
+        let representativeCandidate: UpdateCandidate | null = null;
+
+        for (const candidate of candidates) {
+          const { match, homeClubId } = candidate;
+          const isHome = current.homeClubId === homeClubId;
+          const candidateHomeScore = isHome ? match.homeScore : match.awayScore;
+          const candidateAwayScore = isHome ? match.awayScore : match.homeScore;
+          const candidateHomeGoals = isHome ? match.homeGoals : match.awayGoals;
+          const candidateHomeBehinds = isHome ? match.homeBehinds : match.awayBehinds;
+          const candidateAwayGoals = isHome ? match.awayGoals : match.homeGoals;
+          const candidateAwayBehinds = isHome ? match.awayBehinds : match.homeBehinds;
+
+          if (agreedHomeScore === null) {
+            agreedHomeScore = candidateHomeScore;
+            agreedAwayScore = candidateAwayScore;
+            agreedHomeGoals = candidateHomeGoals;
+            agreedHomeBehinds = candidateHomeBehinds;
+            agreedAwayGoals = candidateAwayGoals;
+            agreedAwayBehinds = candidateAwayBehinds;
+            representativeCandidate = candidate;
+          } else {
+            if (agreedHomeScore !== candidateHomeScore || agreedAwayScore !== candidateAwayScore) {
+              disagreement = true;
+              break;
+            }
+            
+            const merge = (agreed: number | null, cand: number | null) => {
+              if (agreed === null) return cand;
+              if (cand === null) return agreed;
+              if (agreed !== cand) return 'conflict';
+              return agreed;
+            };
+
+            const hg = merge(agreedHomeGoals, candidateHomeGoals);
+            const hb = merge(agreedHomeBehinds, candidateHomeBehinds);
+            const ag = merge(agreedAwayGoals, candidateAwayGoals);
+            const ab = merge(agreedAwayBehinds, candidateAwayBehinds);
+
+            if (hg === 'conflict' || hb === 'conflict' || ag === 'conflict' || ab === 'conflict') {
+              disagreement = true;
+              break;
+            }
+
+            agreedHomeGoals = hg as number | null;
+            agreedHomeBehinds = hb as number | null;
+            agreedAwayGoals = ag as number | null;
+            agreedAwayBehinds = ab as number | null;
+            
+            if ((candidateHomeGoals !== null && representativeCandidate!.match.homeGoals === null) ||
+                (candidateAwayGoals !== null && representativeCandidate!.match.awayGoals === null)) {
+               representativeCandidate = candidate;
+            }
+          }
+        }
+
+        if (disagreement) {
+          sourceDisagreements += 1;
+          continue;
+        }
+
+        if (agreedHomeScore === null || agreedAwayScore === null || representativeCandidate === null) continue;
+
+        agreedHomeGoals = agreedHomeGoals ?? current.homeGoals;
+        agreedHomeBehinds = agreedHomeBehinds ?? current.homeBehinds;
+        agreedAwayGoals = agreedAwayGoals ?? current.awayGoals;
+        agreedAwayBehinds = agreedAwayBehinds ?? current.awayBehinds;
+
+        const scoreChanged = current.homeScore !== agreedHomeScore || current.awayScore !== agreedAwayScore;
+        const componentsChanged = current.homeGoals !== agreedHomeGoals || current.homeBehinds !== agreedHomeBehinds ||
+                                  current.awayGoals !== agreedAwayGoals || current.awayBehinds !== agreedAwayBehinds;
+
+        if (!scoreChanged && !componentsChanged) {
+          continue;
+        }
+
+        const { match } = representativeCandidate;
+        const sourceId = sourceIds.get(match.source)!;
+
+        await tx`
+          UPDATE matches
+             SET home_score = ${agreedHomeScore},
+                 away_score = ${agreedAwayScore},
+                 home_goals = ${agreedHomeGoals},
+                 home_behinds = ${agreedHomeBehinds},
+                 away_goals = ${agreedAwayGoals},
+                 away_behinds = ${agreedAwayBehinds},
+                 result = CASE
+                   WHEN ${agreedHomeScore} = ${agreedAwayScore} THEN 'draw'::match_result
+                   WHEN ${agreedHomeScore} > ${agreedAwayScore} THEN 'home_win'::match_result
+                   ELSE 'away_win'::match_result
+                 END,
+                 winner_club_id = CASE
+                   WHEN ${agreedHomeScore} = ${agreedAwayScore} THEN NULL
+                   WHEN ${agreedHomeScore} > ${agreedAwayScore} THEN home_club_id
+                   ELSE away_club_id
+                 END,
+                 margin = abs(${agreedHomeScore} - ${agreedAwayScore}),
+                 source_id = ${sourceId},
+                 source_record_id = ${match.externalGameId},
+                 import_batch_id = ${batch.id}
+           WHERE id = ${localMatchId}
+        `;
+        updated += 1;
+        touchedSeasons.add(match.season);
+      }
     }
 
     if (insertMissingMatches) {
-      for (const match of matches) {
-        if (match.completePercent !== 100 || match.matchDate === null) continue;
-        const sourceId = sourceIds.get(match.source);
-        if (!sourceId) throw new Error(`No source id for ${match.source}`);
-        const homeClubId = await resolveClub(tx, match.homeTeamRaw, match.season);
-        const awayClubId = await resolveClub(tx, match.awayTeamRaw, match.season);
-        if (homeClubId === null || awayClubId === null) continue;
-        const existing = await resolveLocalMatch(tx, match, homeClubId, awayClubId);
-        if (existing !== null) continue;
-
+      for (const [matchKey, candidates] of insertsByMatchKey.entries()) {
+        const { match, homeClubId, awayClubId } = candidates[0];
         const result = resultFromScores(match);
         const roundCode = primaryLocalRoundCode(match);
         const roundType = localRoundType(match);
-        if (result === null || roundCode === null || roundType === null
-          || match.homeScore === null || match.awayScore === null) {
-          continue;
-        }
-        const homeName = await clubName(tx, homeClubId);
-        const awayName = await clubName(tx, awayClubId);
-        const matchKey = `${match.season}|${roundCode}|${match.matchDate}|${homeName}|${awayName}`;
+        if (result === null || roundCode === null || roundType === null) continue;
+
         const winnerClubId = result === 'draw' ? null : result === 'home_win' ? homeClubId : awayClubId;
+        const sourceId = sourceIds.get(match.source)!;
+
         const [insertedRow] = await tx<{ id: number }[]>`
           INSERT INTO matches (
             match_key, season, round_code, round_number, round_type, is_final,
@@ -513,23 +620,28 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
             ${homeClubId}, ${awayClubId},
             ${match.homeGoals}, ${match.homeBehinds}, ${match.homeScore},
             ${match.awayGoals}, ${match.awayBehinds}, ${match.awayScore},
-            ${result}::match_result, ${winnerClubId}, ${Math.abs(match.homeScore - match.awayScore)},
+            ${result}::match_result, ${winnerClubId}, ${Math.abs(match.homeScore! - match.awayScore!)},
             NULL, 'not_collected'::coverage_status, NULL,
             ${sourceId}, ${match.externalGameId}, ${batch.id}
           )
           ON CONFLICT (match_key) DO NOTHING
           RETURNING id
         `;
+
         if (insertedRow) {
           inserted += 1;
-          unresolved -= 1;
+          unresolved -= candidates.length;
           touchedSeasons.add(match.season);
-          await tx`
-            UPDATE staging.external_current_matches
-               SET local_match_id = ${insertedRow.id}
-             WHERE source_id = ${sourceId}
-               AND external_game_id = ${match.externalGameId}
-          `;
+          
+          for (const candidate of candidates) {
+            const cSourceId = sourceIds.get(candidate.match.source)!;
+            await tx`
+              UPDATE staging.external_current_matches
+                 SET local_match_id = ${insertedRow.id}
+               WHERE source_id = ${cSourceId}
+                 AND external_game_id = ${candidate.match.externalGameId}
+            `;
+          }
         }
       }
     }
@@ -543,12 +655,12 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
          SET completed_at = now(), status = 'completed',
              records_inserted = ${staged + inserted}, records_updated = ${updated},
              records_rejected = ${unresolved},
-             validation_result = ${tx.json({ staged, inserted, resolved, updated, unresolved, incompleteFixtures } as never)}
+             validation_result = ${tx.json({ staged, inserted, resolved, updated, unresolved, incompleteFixtures, sourceDisagreements } as never)}
        WHERE id = ${batch.id}
     `;
   });
 
-  return { staged, inserted, resolved, updated, unresolved, incompleteFixtures };
+  return { staged, inserted, resolved, updated, unresolved, incompleteFixtures, sourceDisagreements };
 }
 
 async function reportStaging(sql: postgres.Sql, year: number): Promise<CurrentSeasonReport> {
