@@ -537,6 +537,8 @@ Season metadata recomputation is implemented. `club_seasons` remains open becaus
 ### Validation
 Static regression coverage confirms both create and delete invoke season metadata recomputation. Ladder correctness is not yet repaired.
 
+Current review on 2026-08-21 confirmed this remains a genuine product defect, not a stale ledger entry: public season/ladders still read stored `club_seasons`, and point-mutation paths still do not call a targeted `club_seasons` rebuild. No code change was made during the NL audit because this requires extracting the canonical season-aware ladder policy rather than improvising a local aggregate.
+
 ### Follow-up
 Extract a targeted `club_seasons` rebuild from the canonical migration logic, including season-specific points and finals policy, then add database-backed fixtures.
 
@@ -968,6 +970,8 @@ Not fixed architecturally. Repaired admin paths now return an explicit success-w
 
 ### Validation
 Focused warning-path tests passed for awards and player links; source review covers match, player, and generic-edit warnings. No cross-role failure integration fixture was available.
+
+Current review on 2026-08-21 confirmed this remains a genuine architecture gap: statistical writes and audit writes still use separate role-scoped connections, so the warning UI mitigates duplicate retries but does not provide atomic audit durability. No code change was made during the NL audit.
 
 ### Follow-up
 Choose and implement a database-owned audit function callable within the import transaction, or a durable transactional outbox with idempotent delivery.
@@ -1437,6 +1441,8 @@ Not fixed because adding the required lint packages would modify dependencies an
 ### Validation
 Type checking and all 951 runnable non-integration assertions pass independently; lint is explicitly not run.
 
+Current review on 2026-08-21 reproduced the dependency side of this issue: `npm.cmd ls eslint --depth=0` reports an empty dependency tree while `package.json` still maps `lint` to `next lint`. No dependency or lint-config change was made during this audit.
+
 ### Follow-up
 Choose a checked-in ESLint flat configuration, add compatible ESLint/Next plugins through the normal dependency-review process, and replace `next lint` with the ESLint CLI.
 
@@ -1580,6 +1586,8 @@ Not fixed globally. The new `under_22` group preserves its award/winner rows, du
 
 ### Validation
 Source-contract tests confirm 22 Under 22 is excluded from the legacy awards deletes, preflights preserved names before destructive work and reapplies links only when the source player name is unchanged. No database-backed full-reload reproduction was run locally.
+
+Current review on 2026-08-21 confirmed this remains a genuine import/design gap for legacy honours reloads outside the scoped Under-22 path. No destructive full reload was run during the NL audit.
 
 ### Follow-up
 Replace destructive honours reloads with source-scoped upserts that preserve target row IDs, or redesign resolution audit targets around durable `(source_id, source_record_id)` keys before migrating existing audit history. Add a database integration test spanning manual resolve → full reload → preserved link and audit target.
@@ -1941,6 +1949,8 @@ Not yet fixed; this is outside the NL-search audit scope and may overlap unrelat
 ### Validation
 With integration suites and this known failing file excluded, all 983 remaining safe non-integration assertions pass.
 
+Current review on 2026-08-21 reproduced the issue unchanged: `npm.cmd test -- tests\under-22-importer.test.ts` failed 4 of 7 tests, all at `between()` because the expected end marker was not found. This remains a test/tooling defect outside the NL search path.
+
 ### Follow-up
 Review the importer/test marker contract with the owner of the Under-22 work and update the implementation or test boundaries without weakening the behavioural assertions.
 
@@ -2120,6 +2130,8 @@ Not yet fixed.
 
 ### Validation
 Not yet run.
+
+Current review on 2026-08-21 confirmed this remains an intentionally open product gap: `TeamAggregateTable` still renders `Qualifying matches` as plain numeric text, and existing Match Search filters still do not encode every grouped predicate needed to link a row safely.
 
 ### Follow-up
 Extend Match Search or add a dedicated NL drill-down route that can faithfully replay a `team_aggregate` row's predicates before linking counts.
@@ -2350,13 +2362,30 @@ Compiler
 The live-only player-season metric expression recomputes per-player/per-season totals via a correlated subquery inside a broad ranked scan. That is too slow for unscoped all-season leaderboards.
 
 ### Fix
-Not yet fixed.
+Rewrote the live-only `player_season` compiler branch so it pre-aggregates `player_match_stats` once by `(player_id, season)` in a `metric_totals` CTE, then joins that compact result to `player_season_stats` for ranking, display fields, club eligibility and season/player scopes. Precomputed season metrics still use the existing `player_season_stats` column path.
 
 ### Validation
-Open issue; no fix validation yet. Neighbouring scoped control `most inside 50s in 2020` still needs replay after the query path is optimized.
+Reproduced before the fix on `afldb_dev`: all four canonical plans were valid `player_season` plans and all timed out at about 5,003-5,010 ms with SQLSTATE `57014`.
+
+Independent read-only truth queries against `afldb_dev` verified:
+
+- `most inside 50s in a season`: Patrick Dangerfield, 194 inside 50s, 2016, Geelong.
+- `most rebound 50s in a season`: Dustin Fletcher, 206 rebound 50s, 2004, Essendon.
+- `most clearances in a season`: Brett Ratten, 265 clearances, 1999, Carlton.
+- `most contested possessions in a season`: Clayton Oliver, 434 contested possessions, 2021, Melbourne.
+
+`EXPLAIN (BUFFERS)` on the old correlated shape estimated cost around 26,300,533 and repeated the same subplan for filtering and ranking. `EXPLAIN (ANALYZE, BUFFERS)` on the pre-aggregate shape completed in 634.044 ms on `afldb_dev`.
+
+After the fix, direct compiler probes on `afldb_dev` answered the four sample queries in 479 ms, 470 ms, 479 ms and 485 ms respectively with the independently verified leaders above.
+
+Local validation: `npm.cmd run typecheck` passed, and `npm.cmd test -- tests\nl-parser.test.ts tests\nl-plan.test.ts tests\nl-describe.test.ts tests\nl-regression-corpus.test.ts` passed 373 assertions.
+
+Remote guarded `_test` validation: with `AFLDB_TEST_DATABASE_URL` confirmed as `afldb_test`, `npx vitest run tests/integration/nl-answers-game-season.test.ts` passed 15 tests, including the new broad live-only leaderboard regression in 687 ms. Remote `npm run typecheck` passed.
+
+Remote `npm run build` passed and prepared the standalone bundle, but rendered `/search` verification is still blocked because `sudo -n systemctl restart afldb` failed with `sudo: a password is required`. Do not mark the browser/UI portion complete until the legitimate development service restart has happened.
 
 ### Follow-up
-Rewrite the live-only player-season compiler path to pre-aggregate `(player_id, season)` once before ranking, then verify with `EXPLAIN (ANALYZE, BUFFERS)` on `afldb_dev`, focused integration tests, and browser replays.
+After the legitimate development service restart, verify the four sample questions through real `/search`, then rerun the expanded UI corpus so the former `advanced_metric` failures disappear without introducing hydration/client errors.
 
 ## AFLDB-ISSUE-066 - Malformed `most N games` conditions answer instead of declining
 
@@ -2504,6 +2533,8 @@ Disabled automatic Next.js prefetch on `PrimaryNav` and `TabBar` links in `src/c
 
 ### Validation
 `npm.cmd run typecheck` passed locally. Full runtime validation is still required against a restarted deployed/dev standalone service containing the `SiteNav` change: rerun the varied 501-row expanded browser corpus first, then the 12,000-row UI corpus. The earlier serial replay only proves the exact rows are not deterministic query-level reproducers.
+
+Current verification attempt on 2026-08-21 found the live dev checkout still lacked `prefetch={false}` in `src/components/SiteNav.tsx`, so the running service could not validate the fix. The existing local `SiteNav` change was staged and diffed on the dev host; the diff was exactly the two intended `prefetch={false}` props. `npm run build` completed and prepared the standalone bundle. After the later ISSUE-065 compiler change, `npm run build` completed again with both fixes included. The legitimate restart remains blocked: `sudo -n systemctl restart afldb` fails with `sudo: a password is required`. No varied 501-row or full 12,000-row post-fix browser corpus was run because the intended build is not live.
 
 ### Follow-up
 Deploy/restart a build containing the `SiteNav` prefetch change and replay the varied parallel corpus. Do not count React #418 incidents as semantic NL failures, but do count them as UI/hydration failures in browser sweep summaries until the expanded and full UI sweeps are clean.

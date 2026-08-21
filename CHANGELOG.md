@@ -27,6 +27,7 @@ commit.
 - Recorded the live parser-v24 12,000-question `/search` UI audit classification: all rows observed with no HTTP/page/timeouts or malformed-answer detections; remaining scored failures classify as data-coverage limitations or stale corpus policy/oracles, with the separate hydration defect still open (`AFLDB-ISSUE-070`).
 - Recorded the parser-v25 full V2 stress classification: verified football-answer rows and safe-decline rows passed completely, metamorphic groups stayed consistent, and residual findings were separated into stale/generated oracle-policy clusters, historical coverage expectations, wrong-decline-reason expectations, and numeric-condition oracle follow-up (`AFLDB-ISSUE-071`).
 - Disabled eager Next.js prefetch on the persistent primary and mobile navigation links after React #418 captures showed `/search` hydration racing a burst of cross-worker RSC nav prefetches under varied parallel UI load (`AFLDB-ISSUE-068`).
+- Rewrote live-only player-season NL metric leaderboards to pre-aggregate match stats once by player and season before ranking, fixing broad `inside 50s`/`rebound 50s`/`clearances`/`contested possessions` season queries that previously hit the statement timeout; added guarded integration coverage for the broad live-only season path (`AFLDB-ISSUE-065`).
 
 ### External Current-Season Data Sources - 20 August 2026
 

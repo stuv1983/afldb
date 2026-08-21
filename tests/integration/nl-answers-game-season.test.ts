@@ -304,6 +304,29 @@ describe('player_season matches hand-written SQL', () => {
     expect(lead!.value).toBe(Number(expected.max));
   });
 
+  it('a broad live_only season leaderboard pre-aggregates once instead of timing out', async () => {
+    const { lead } = await season({
+      metric: 'inside_50s', agg: { kind: 'max' },
+    });
+    expect(lead).not.toBeNull();
+
+    const [expected] = await sql<{ playerId: number; season: number; max: string }[]>`
+      WITH totals AS (
+        SELECT pms.player_id AS "playerId", m.season, sum(pms.inside_50s) AS total
+          FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
+         WHERE pms.inside_50s IS NOT NULL
+         GROUP BY pms.player_id, m.season
+      )
+      SELECT "playerId", season, total AS max
+        FROM totals
+       ORDER BY total DESC, season, "playerId"
+       LIMIT 1
+    `;
+    expect(lead!.playerId).toBe(expected.playerId);
+    expect(lead!.season).toBe(expected.season);
+    expect(lead!.value).toBe(Number(expected.max));
+  });
+
   it('a player-scoped season query answers with a real season row for that player', async () => {
     const [anchor] = await sql<{ playerId: number; season: number; goals: number }[]>`
       SELECT player_id AS "playerId", season, goals FROM player_season_stats

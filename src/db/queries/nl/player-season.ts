@@ -36,6 +36,11 @@ function rankCutoff(agg: NlAggregation): number {
   return agg.kind === 'top_n' ? agg.n : 1;
 }
 
+function isLiveOnlyMetric(metric: string): boolean {
+  const def = NL_METRICS.player_season[metric];
+  return def.kind === 'column' && def.statKey !== undefined && GRID_STATS[def.statKey].grain === 'live_only';
+}
+
 /**
  * Answers a player_season plan: player_season_stats is true player+season
  * grain (migration 015) -- a season total belongs to the player, not to
@@ -47,6 +52,7 @@ function rankCutoff(agg: NlAggregation): number {
  */
 export async function answerPlayerSeason(plan: NlQueryPlan, limit: number): Promise<NlAnswerPayload> {
   const value = metricValueExpr(plan.metric!);
+  const liveOnly = isLiveOnlyMetric(plan.metric!);
   const direction = plan.agg.kind === 'min' ? sql.unsafe('ASC') : sql.unsafe('DESC');
   const n = rankCutoff(plan.agg);
 
@@ -65,8 +71,50 @@ export async function answerPlayerSeason(plan: NlQueryPlan, limit: number): Prom
          AND pcs.club_id IN (SELECT id FROM clubs WHERE organization_id = ${plan.scope.clubFor.organizationId})
     )`);
   }
-  clauses.push(sql`${value} IS NOT NULL`);
+  clauses.push(liveOnly ? sql`mt.value IS NOT NULL` : sql`${value} IS NOT NULL`);
   const where = clauses.reduce((acc, clause) => sql`${acc} AND ${clause}`, sql`TRUE`);
+
+  if (liveOnly) {
+    const def = NL_METRICS.player_season[plan.metric!];
+    if (def.kind !== 'column' || def.statKey === undefined) {
+      throw new Error(`player_season metric "${plan.metric}" has no live stat key.`);
+    }
+    const totalClauses: SqlFragment[] = [];
+    if (plan.player) totalClauses.push(sql`pms.player_id = ${plan.player.id}`);
+    if (plan.scope.playerIdIn) totalClauses.push(sql`pms.player_id = ANY(${plan.scope.playerIdIn})`);
+    if (plan.scope.seasonMin !== undefined) totalClauses.push(sql`m.season >= ${plan.scope.seasonMin}`);
+    if (plan.scope.seasonMax !== undefined) totalClauses.push(sql`m.season <= ${plan.scope.seasonMax}`);
+    const totalsWhere = totalClauses.reduce((acc, clause) => sql`${acc} AND ${clause}`, sql`TRUE`);
+
+    const liveRows = await sql<(NlPlayerSeasonRow & { total: string; rnk: number })[]>`
+      WITH metric_totals AS (
+        SELECT pms.player_id, m.season, sum(${sql.unsafe(def.statKey)})::int AS value
+          FROM player_match_stats pms
+          JOIN matches m ON m.id = pms.match_id
+         WHERE ${totalsWhere}
+         GROUP BY pms.player_id, m.season
+        HAVING sum(${sql.unsafe(def.statKey)}) IS NOT NULL
+      ), ranked AS (
+        SELECT p.id AS "playerId", p.slug, p.display_name AS "displayName",
+               mt.value, s.season, s.games,
+               cl.name AS "clubName", cl.slug AS "clubSlug",
+               rank() OVER (ORDER BY mt.value ${direction})::int AS rnk
+          FROM metric_totals mt
+          JOIN player_season_stats s ON s.player_id = mt.player_id AND s.season = mt.season
+          JOIN players p ON p.id = s.player_id
+          LEFT JOIN clubs cl ON cl.id = s.primary_club_id
+         WHERE ${where}
+      )
+      SELECT r.*, count(*) OVER () AS total
+        FROM ranked r
+       WHERE r.rnk <= ${n}
+       ORDER BY r.value ${direction}, r.season, r."displayName"
+       LIMIT ${limit}
+    `;
+    const liveTotal = liveRows[0] ? Number(liveRows[0].total) : 0;
+    const liveClean = liveRows.map(({ total: _t, rnk: _r, ...rest }) => rest);
+    return { kind: 'player_season', lead: liveClean[0] ?? null, rows: liveClean, total: liveTotal };
+  }
 
   const rows = await sql<(NlPlayerSeasonRow & { total: string; rnk: number })[]>`
     WITH ranked AS (
