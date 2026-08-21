@@ -1,5 +1,27 @@
 # AFLDB Issues
 
+## Open Issues
+
+This table is the quick index of currently open issues. The detailed entries
+below remain authoritative. `IssuesIndex.md` mirrors these open items in a
+session-friendly format and must be kept synchronized whenever an issue is
+created, reopened, resolved, or materially reclassified.
+
+**Open issues:** 8
+
+| Issue | Severity | Area | Summary | Current next action |
+|---|---|---|---|---|
+| `AFLDB-ISSUE-015` | High | Database | Match mutations leave source-derived `club_seasons` ladder rows stale. | Extract the canonical season-aware `club_seasons` rebuild, including season-specific points/finals policy, then add database-backed fixtures. |
+| `AFLDB-ISSUE-027` | High | Architecture | Statistical mutations and required audit writes still commit through separate role-scoped transactions. | Choose and implement either a database-owned audit function inside the import transaction or a durable transactional outbox with idempotent delivery. |
+| `AFLDB-ISSUE-040` | Low | Tooling | The lint script invokes deprecated `next lint` without a checked-in ESLint setup and becomes interactive. | Add a reviewed ESLint flat configuration and compatible dependencies, then replace `next lint` with the ESLint CLI. |
+| `AFLDB-ISSUE-044` | High | Import | Legacy full awards reloads can discard manual player-link resolutions outside the protected Under-22 path. | Preserve durable manual resolutions across legacy honours reloads and add manual-resolve → full-reload → preserved-link integration coverage. |
+| `AFLDB-ISSUE-054` | Medium | Tests | Under-22 importer contract tests fail because literal source-boundary markers drifted from `import_awards.py`. | Repair the importer/test boundary contract without weakening the behavioural assertions. |
+| `AFLDB-ISSUE-059` | Low | Search | Grouped `Qualifying matches` counts have no safe drill-down to the exact matching fixtures. | Extend Match Search or add a dedicated NL drill-down route that can faithfully replay the grouped row predicates. |
+| `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
+| `AFLDB-ISSUE-071` | Low | Audit | Parser-v25 V2 residual failures still mix corpus/oracle debt with possible smaller parser follow-up. | Re-baseline V2 generator/oracles first; promote a product defect only after the oracle layer is reconciled. |
+
+---
+
 ## AFLDB-ISSUE-001 — Match mutations overwrite authoritative Brownlow totals
 
 - **Status:** Resolved
