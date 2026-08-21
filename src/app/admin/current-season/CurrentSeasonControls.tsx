@@ -25,12 +25,13 @@ function ResultSummary({ state }: { state: CurrentSeasonAdminState }) {
               <tr>
                 <th scope="col">Fetched</th>
                 <th scope="col">Complete</th>
-                <th scope="col">With scores</th>
+                <th scope="col">Has score fields</th>
                 <th scope="col">Staged</th>
                 <th scope="col">Inserted</th>
                 <th scope="col">Resolved</th>
                 <th scope="col">Updated</th>
                 <th scope="col">Unresolved</th>
+                <th scope="col">Incomplete</th>
               </tr>
             </thead>
             <tbody>
@@ -43,6 +44,7 @@ function ResultSummary({ state }: { state: CurrentSeasonAdminState }) {
                 <td className="num">{result.resolved}</td>
                 <td className="num">{result.updated}</td>
                 <td className="num">{result.unresolved}</td>
+                <td className="num">{result.incompleteFixtures}</td>
               </tr>
             </tbody>
           </table>
@@ -72,7 +74,7 @@ export function CurrentSeasonReportTable({
               <th scope="col" className="num">Staged</th>
               <th scope="col" className="num">Resolved</th>
               <th scope="col" className="num">Complete</th>
-              <th scope="col" className="num">With scores</th>
+              <th scope="col" className="num">Has score fields</th>
               <th scope="col" className="num">Unresolved teams</th>
             </tr>
           </thead>

@@ -88,7 +88,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.log(`\nStaged ${result.staged}; inserted matches ${result.inserted}; resolved ${result.resolved}; updated matches ${result.updated}; unresolved ${result.unresolved}.`);
+  console.log(`\nStaged ${result.staged}; inserted matches ${result.inserted}; resolved ${result.resolved}; updated matches ${result.updated}; unresolved ${result.unresolved}; incomplete fixtures ${result.incompleteFixtures}.`);
 }
 
 main().catch((error) => {

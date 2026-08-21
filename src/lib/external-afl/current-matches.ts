@@ -76,9 +76,9 @@ function dateOnly(value: unknown): string | null {
   return `${human[3]}-${month}-${human[1].padStart(2, '0')}`;
 }
 
-function isPastOrToday(date: string | null): boolean {
+function isPastDate(date: string | null): boolean {
   if (!date) return false;
-  return date <= new Date().toISOString().slice(0, 10);
+  return date < new Date().toISOString().slice(0, 10);
 }
 
 function pick(record: JsonRecord, keys: string[]): unknown {
@@ -176,7 +176,7 @@ export async function fetchKaliCurrentMatches(year: number): Promise<ExternalCur
       season: intValue(pick(match, ['year', 'season'])) ?? year,
       roundLabel: stringValue(pick(match, ['roundName', 'roundLabel', 'round'])),
       roundNumber: intValue(pick(match, ['round', 'roundNumber'])),
-      completePercent: rawComplete ?? (homeScore !== null && awayScore !== null && isPastOrToday(matchDate) ? 100 : null),
+      completePercent: rawComplete ?? (homeScore !== null && awayScore !== null && isPastDate(matchDate) ? 100 : null),
       matchDate,
       venueRaw: stringValue(pick(match, ['venue', 'venueName'])),
       homeTeamRaw: stringValue(pick(match, ['homeTeam', 'homeTeamName', 'homeTeamId', 'homeTeamSlug'])),

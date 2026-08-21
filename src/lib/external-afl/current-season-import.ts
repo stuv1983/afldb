@@ -27,6 +27,7 @@ export type CurrentSeasonRunResult = {
   resolved: number;
   updated: number;
   unresolved: number;
+  incompleteFixtures: number;
   applied: boolean;
 };
 
@@ -104,18 +105,55 @@ export async function runCurrentSeasonRefresh(options: CurrentSeasonRunOptions):
   const withScores = matches.filter((m) => m.homeScore !== null && m.awayScore !== null).length;
 
   if (!options.apply || matches.length === 0) {
-    return {
-      fetched,
-      sourceCounts,
-      complete,
-      withScores,
-      staged: 0,
-      inserted: 0,
-      resolved: 0,
-      updated: 0,
-      unresolved: matches.length,
-      applied: false,
-    };
+    if (matches.length === 0) {
+      return {
+        fetched,
+        sourceCounts,
+        complete,
+        withScores,
+        staged: 0,
+        inserted: 0,
+        resolved: 0,
+        updated: 0,
+        unresolved: 0,
+        incompleteFixtures: 0,
+        applied: false,
+      };
+    }
+
+    const sql = createImportClient();
+    try {
+      let resolved = 0;
+      let unresolved = 0;
+      let incompleteFixtures = 0;
+      for (const match of matches) {
+        const homeClubId = await resolveClub(sql, match.homeTeamRaw, match.season);
+        const awayClubId = await resolveClub(sql, match.awayTeamRaw, match.season);
+        const localMatchId = await resolveLocalMatch(sql, match, homeClubId, awayClubId);
+        if (localMatchId !== null) {
+          resolved += 1;
+        } else if (match.completePercent === 100 && match.matchDate !== null) {
+          unresolved += 1;
+        } else {
+          incompleteFixtures += 1;
+        }
+      }
+      return {
+        fetched,
+        sourceCounts,
+        complete,
+        withScores,
+        staged: matches.length,
+        inserted: 0,
+        resolved,
+        updated: 0,
+        unresolved,
+        incompleteFixtures,
+        applied: false,
+      };
+    } finally {
+      await sql.end({ timeout: 5 });
+    }
   }
 
   const sql = createImportClient();
@@ -135,7 +173,8 @@ export async function runCurrentSeasonRefresh(options: CurrentSeasonRunOptions):
       inserted: result.inserted,
       resolved: result.resolved,
       updated: result.updated,
-      unresolved: result.rejected,
+      unresolved: result.unresolved,
+      incompleteFixtures: result.incompleteFixtures,
       applied: true,
     };
   } finally {
@@ -211,7 +250,9 @@ function clubAliasKey(raw: string): string {
 }
 
 function localClubNameCandidate(raw: string): string {
-  return EXTERNAL_CLUB_NAME_ALIASES.get(clubAliasKey(raw)) ?? raw;
+  const key = clubAliasKey(raw);
+  if (key === 'not recorded' || key === 'tbd') return '';
+  return EXTERNAL_CLUB_NAME_ALIASES.get(key) ?? raw;
 }
 
 async function resolveClub(sql: Db, raw: string | null, season: number): Promise<number | null> {
@@ -299,13 +340,15 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
   inserted: number;
   resolved: number;
   updated: number;
-  rejected: number;
+  unresolved: number;
+  incompleteFixtures: number;
 }> {
   let staged = 0;
   let inserted = 0;
   let resolved = 0;
   let updated = 0;
-  let rejected = 0;
+  let unresolved = 0;
+  let incompleteFixtures = 0;
   const touchedSeasons = new Set<number>();
 
   await sql.begin(async (tx) => {
@@ -336,7 +379,13 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
       const homeClubId = await resolveClub(tx, match.homeTeamRaw, match.season);
       const awayClubId = await resolveClub(tx, match.awayTeamRaw, match.season);
       const localMatchId = await resolveLocalMatch(tx, match, homeClubId, awayClubId);
-      if (localMatchId !== null) resolved += 1;
+      if (localMatchId !== null) {
+        resolved += 1;
+      } else if (match.completePercent === 100 && match.matchDate !== null) {
+        unresolved += 1;
+      } else {
+        incompleteFixtures += 1;
+      }
 
       await tx`
         INSERT INTO staging.external_current_matches (
@@ -471,6 +520,7 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
         `;
         if (insertedRow) {
           inserted += 1;
+          unresolved -= 1;
           touchedSeasons.add(match.season);
           await tx`
             UPDATE staging.external_current_matches
@@ -486,18 +536,17 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
       await refreshSeasonMetadata(tx, season);
     }
 
-    rejected = matches.length - resolved;
     await tx`
       UPDATE import_batches
          SET completed_at = now(), status = 'completed',
              records_inserted = ${staged + inserted}, records_updated = ${updated},
-             records_rejected = ${rejected},
-             validation_result = ${tx.json({ staged, inserted, resolved, updated, rejected } as never)}
+             records_rejected = ${unresolved},
+             validation_result = ${tx.json({ staged, inserted, resolved, updated, unresolved, incompleteFixtures } as never)}
        WHERE id = ${batch.id}
     `;
   });
 
-  return { staged, inserted, resolved, updated, rejected };
+  return { staged, inserted, resolved, updated, unresolved, incompleteFixtures };
 }
 
 async function reportStaging(sql: postgres.Sql, year: number): Promise<CurrentSeasonReport> {
@@ -507,7 +556,7 @@ async function reportStaging(sql: postgres.Sql, year: number): Promise<CurrentSe
            count(*) FILTER (WHERE e.local_match_id IS NOT NULL)::int AS resolved,
            count(*) FILTER (WHERE e.complete_percent = 100)::int AS complete,
            count(*) FILTER (WHERE e.home_score IS NOT NULL AND e.away_score IS NOT NULL)::int AS "withScores",
-           count(*) FILTER (WHERE e.home_club_id IS NULL OR e.away_club_id IS NULL)::int AS "unresolvedTeams"
+           count(*) FILTER (WHERE (e.home_club_id IS NULL AND lower(e.home_team_raw) NOT IN ('not recorded', 'tbd', '')) OR (e.away_club_id IS NULL AND lower(e.away_team_raw) NOT IN ('not recorded', 'tbd', '')))::int AS "unresolvedTeams"
       FROM staging.external_current_matches e
       JOIN sources s ON s.id = e.source_id
      WHERE e.season = ${year}
