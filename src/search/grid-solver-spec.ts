@@ -386,9 +386,9 @@ export const DEFAULT_BOARD_STATE: GridBoardState = {
     { builder: 'career_games_min', params: { games: '300' } },
   ],
   cols: [
-    { builder: 'debuted_between', params: { from: '1990', to: '1999' } },
-    { builder: 'debuted_between', params: { from: '2000', to: '2009' } },
-    { builder: 'debuted_between', params: { from: '2010', to: '2019' } },
+    { builder: 'played_in_decade', params: { decade: '1990' } },
+    { builder: 'played_in_decade', params: { decade: '2000' } },
+    { builder: 'played_in_decade', params: { decade: '2010' } },
   ],
   order: 'games_asc',
 };

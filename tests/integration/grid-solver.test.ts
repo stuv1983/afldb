@@ -88,7 +88,7 @@ describe('grid solver correctness', () => {
     expect(summary.eligible).toBe(0);
   });
 
-  it('teammate_of includes a player independently known to share a club in a match', async () => {
+  it('teammate_of includes a player independently known to share a club in a season', async () => {
     // Anchored on one long-career player first so the discovery query is
     // an index seek rather than an unbounded self-join -- see the
     // identical reasoning in tests/integration/player-compare.test.ts.
@@ -96,12 +96,12 @@ describe('grid solver correctness', () => {
       SELECT player_id AS "playerId" FROM player_career_stats ORDER BY games DESC LIMIT 1
     `;
     const [pairRow] = await sql<{ other: number }[]>`
-      SELECT pms2.player_id AS other
-        FROM player_match_stats pms1
-        JOIN player_match_stats pms2
-          ON pms2.match_id = pms1.match_id AND pms2.club_id = pms1.club_id AND pms2.player_id <> pms1.player_id
-       WHERE pms1.player_id = ${anchor.playerId}
-       GROUP BY pms2.player_id
+      SELECT pcs2.player_id AS other
+        FROM player_club_season_stats pcs1
+        JOIN player_club_season_stats pcs2
+          ON pcs2.season = pcs1.season AND pcs2.club_id = pcs1.club_id AND pcs2.player_id <> pcs1.player_id
+       WHERE pcs1.player_id = ${anchor.playerId}
+       GROUP BY pcs2.player_id
        ORDER BY count(*) DESC
        LIMIT 1
     `;
@@ -161,6 +161,33 @@ describe('grid solver correctness', () => {
       { builder: 'never_minor_premier', params: {} },
       'games_asc',
     );
+    expect(summary.eligible).toBe(0);
+  });
+
+  it('career_games_max is inclusive (<=) of the threshold', async () => {
+    const [sample] = await sql<{ games: number }[]>`
+      SELECT games FROM player_career_stats LIMIT 1
+    `;
+    expect(sample).toBeDefined();
+
+    const summary = await solveCellSummary(
+      { builder: 'career_games_max', params: { games: String(sample.games) } },
+      { builder: 'career_games_min', params: { games: String(sample.games) } },
+      'games_asc',
+    );
+    expect(summary.eligible).toBeGreaterThan(0);
+  });
+
+  it('single_game_stat_min correctly returns 0 for a player whose matches predate stat recording (NULL semantics)', async () => {
+    // 30+ disposals shouldn't silently include players who played before disposals were recorded.
+    // We force this by intersecting with 'career_games_min: 0' and testing a known historic player who
+    // has no recorded disposals. Here we test a generic case where a historic decade shouldn't match.
+    const summary = await solveCellSummary(
+      { builder: 'single_game_stat_min', params: { stat: 'disposals', x: '30' } },
+      { builder: 'played_in_decade', params: { decade: '1890' } },
+      'games_asc',
+    );
+    // Since disposals were not recorded in the 1890s, they are NULL. NULL >= 30 is false.
     expect(summary.eligible).toBe(0);
   });
 

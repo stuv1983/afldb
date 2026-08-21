@@ -243,7 +243,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     case 'career_games_min':
       return sql`c.games >= ${requireInt(axis, 'games', 'Games')}`;
     case 'career_games_max':
-      return sql`c.games < ${requireInt(axis, 'games', 'Games')}`;
+      return sql`c.games <= ${requireInt(axis, 'games', 'Games')}`;
     case 'career_goals_min':
       return sql`c.goals >= ${requireInt(axis, 'goals', 'Goals')}`;
     case 'career_goals_max':
@@ -626,10 +626,10 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     // in db/queries/player-compare.ts. ------------------------------
     case 'teammate_of': {
       const otherId = requireInt(axis, 'player', 'Player');
-      return sql`p.id IN (SELECT pms1.player_id FROM player_match_stats pms1
-                            JOIN player_match_stats pms2
-                              ON pms2.match_id = pms1.match_id AND pms2.club_id = pms1.club_id
-                           WHERE pms2.player_id = ${otherId} AND pms1.player_id <> ${otherId})`;
+      return sql`p.id IN (SELECT pcs1.player_id FROM player_club_season_stats pcs1
+                            JOIN player_club_season_stats pcs2
+                              ON pcs2.season = pcs1.season AND pcs2.club_id = pcs1.club_id
+                           WHERE pcs2.player_id = ${otherId} AND pcs1.player_id <> ${otherId})`;
     }
     case 'played_against': {
       const otherId = requireInt(axis, 'player', 'Player');
