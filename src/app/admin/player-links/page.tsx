@@ -544,7 +544,18 @@ export default async function PlayerLinksPage(
                           </td>
 
                           <td className="wide">
-                            {match ? (
+                            {match && match.band === 'none' ? (
+                              // Below the suggestion threshold. The closest
+                              // candidate is still named, because knowing who
+                              // was considered and rejected is useful, but it
+                              // is never dressed up as a proposal.
+                              <>
+                                <span className="muted">Nothing confident enough to propose</span>
+                                <div className="muted" style={{ fontSize: '0.8rem' }}>
+                                  Closest was {match.playerName} ({match.score}) — review manually
+                                </div>
+                              </>
+                            ) : match ? (
                               <>
                                 <Link href={`/players/${match.playerSlug}`}>{match.playerName}</Link>
                                 <div className="muted" style={{ fontSize: '0.85rem' }}>
@@ -579,10 +590,13 @@ export default async function PlayerLinksPage(
                                   </span>
                                 </div>
                                 {bulkReady && <span className="badge">Bulk-ready</span>}
-                                {match.ambiguous && <span className="badge badge-warn">Needs review</span>}
-                                <div className="muted" style={{ fontSize: '0.8rem' }}>
-                                  {describeAlternative(match.gap, nextBest)}
-                                </div>
+                                {match.ambiguous && match.band !== 'none'
+                                  && <span className="badge badge-warn">Needs review</span>}
+                                {match.band !== 'none' && (
+                                  <div className="muted" style={{ fontSize: '0.8rem' }}>
+                                    {describeAlternative(match.gap, nextBest)}
+                                  </div>
+                                )}
                               </>
                             ) : (
                               <span className="muted">—</span>
