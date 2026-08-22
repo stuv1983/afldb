@@ -19,6 +19,7 @@ import {
   type TemporalEvidence,
 } from '@/lib/player-matching/types';
 import { parseCareerSpan } from '@/lib/player-matching/parse-career-span';
+import type { SourceDetail } from '@/lib/player-matching/describe';
 import type { LinkTargetTable } from '@/db/queries/player-links';
 
 /**
@@ -747,4 +748,108 @@ export function formatPlayerSummary(summary: PlayerSummary | undefined): string 
   const games = summary.games !== null ? `${summary.games} games` : '';
   const goals = summary.goals !== null && summary.goals > 0 ? `${summary.goals} goals` : '';
   return [clubs, span, games, goals].filter(Boolean).join(' · ');
+}
+
+/**
+ * The identifying fields of the source rows on ONE page.
+ *
+ * Kept out of the queue query on purpose. Building this for all ~2,000
+ * unresolved rows cost around 200 ms of jsonb construction on every
+ * load, and the reviewer only ever sees fifty of them; the queue query
+ * stays lean for filtering and counting, and the detail is fetched
+ * set-wise for what is actually rendered -- the same shape already used
+ * for alternatives and career summaries.
+ */
+export async function readSourceDetails(
+  sql: Sql,
+  targets: ReadonlyArray<{ targetTable: LinkTargetTable; targetId: number }>,
+): Promise<Map<string, SourceDetail>> {
+  const details = new Map<string, SourceDetail>();
+  if (targets.length === 0) return details;
+
+  const idsFor = (table: LinkTargetTable) =>
+    targets.filter((t) => t.targetTable === table).map((t) => t.targetId);
+
+  const awards = idsFor('award_winners');
+  const nominations = idsFor('award_nominations');
+  const hof = idsFor('hall_of_fame');
+  const teams = idsFor('honour_team_members');
+  const captaincies = idsFor('captaincies');
+  const achievements = idsFor('player_achievements');
+  const drafts = idsFor('draft_picks');
+
+  const rows = await sql<{ targetTable: LinkTargetTable; targetId: number; detail: SourceDetail }[]>`
+    SELECT 'award_winners' AS "targetTable", w.id AS "targetId",
+           jsonb_build_object(
+             'kind', 'award_winner', 'award', a.name, 'season', w.season,
+             'club', COALESCE(c.name, w.club_name_raw), 'position', w.position
+           ) AS detail
+      FROM award_winners w
+      JOIN awards a ON a.id = w.award_id
+      LEFT JOIN clubs c ON c.id = w.club_id
+     WHERE w.id = ANY(${awards})
+    UNION ALL
+    SELECT 'award_nominations', n.id,
+           jsonb_build_object(
+             'kind', 'award_nomination', 'award', a.name, 'season', n.season,
+             'club', nc.name, 'round', n.round_number
+           )
+      FROM award_nominations n
+      JOIN awards a ON a.id = n.award_id
+      LEFT JOIN clubs nc ON nc.id = n.club_id
+     WHERE n.id = ANY(${nominations})
+    UNION ALL
+    SELECT 'hall_of_fame', h.id,
+           jsonb_build_object(
+             'kind', 'hall_of_fame', 'category', h.category,
+             'inductedYear', h.inducted_year, 'playingCareer', h.playing_career,
+             'club', h.club_name_raw, 'isLegend', h.is_legend
+           )
+      FROM hall_of_fame h
+     WHERE h.id = ANY(${hof})
+    UNION ALL
+    SELECT 'honour_team_members', m.id,
+           jsonb_build_object(
+             'kind', 'honour_team', 'team', m.team_name, 'position', m.position,
+             'role', m.role, 'club', m.club_name_raw
+           )
+      FROM honour_team_members m
+     WHERE m.id = ANY(${teams})
+    UNION ALL
+    SELECT 'captaincies', cp.id,
+           jsonb_build_object(
+             'kind', 'captaincy', 'season', cp.season, 'club', cc.name, 'role', cp.role
+           )
+      FROM captaincies cp
+      JOIN clubs cc ON cc.id = cp.club_id
+     WHERE cp.id = ANY(${captaincies})
+    UNION ALL
+    SELECT 'player_achievements', pa.id,
+           jsonb_build_object(
+             'kind', 'achievement', 'achievement', pa.achievement_type::text,
+             'season', pa.season, 'club', COALESCE(pac.name, pa.club_name_raw),
+             'round', pa.round_raw
+           )
+      FROM player_achievements pa
+      LEFT JOIN clubs pac ON pac.id = pa.club_id
+     WHERE pa.id = ANY(${achievements})
+    UNION ALL
+    SELECT 'draft_picks', dp.id,
+           jsonb_build_object(
+             'kind', 'draft', 'draftYear', dp.draft_year, 'club', dpc.name,
+             'draftType', dp.draft_type, 'pick', dp.pick_number,
+             'reportedGames', per.reported_games, 'reportedGoals', per.reported_goals,
+             'picks', (SELECT count(*) FROM draft_picks dp2
+                        WHERE dp2.draft_person_id = dp.draft_person_id)
+           )
+      FROM draft_picks dp
+      LEFT JOIN draft_persons per ON per.id = dp.draft_person_id
+      LEFT JOIN clubs dpc ON dpc.id = dp.club_id
+     WHERE dp.id = ANY(${drafts})
+  `;
+
+  for (const row of rows) {
+    details.set(`${row.targetTable}:${row.targetId}`, row.detail);
+  }
+  return details;
 }

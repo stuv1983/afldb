@@ -18,6 +18,7 @@ import {
   formatPlayerSummary,
   readBestSuggestions,
   readPlayerSummaries,
+  readSourceDetails,
   readSuggestionsForEntities,
 } from '@/db/queries/player-match-candidates';
 import { sql } from '@/db/client';
@@ -101,8 +102,15 @@ function queueRank(band: ConfidenceBand | undefined, bulkEligible: boolean, ambi
  *
  * Pagination happens here on the server after the vetted filter — the
  * client never receives more than one page. The queue query itself stays
- * unpaginated: it costs ~11 ms for the full seven-table scan, and the
- * vetted exclusion needs the flat list anyway for correct totals.
+ * unpaginated because the vetted exclusion and the band counts both need
+ * the flat list for correct totals; at ~2,000 rows the seven-table scan
+ * measures ~180 ms on dev.
+ *
+ * Everything a reviewer reads BEYOND that list is fetched only for the
+ * fifty rows actually rendered — ranked alternatives, career summaries
+ * and per-source record detail, ~10 ms each. Building the record detail
+ * for the whole queue instead cost ~200 ms of jsonb per load for
+ * information forty-nine fiftieths of which was never displayed.
  */
 export default async function PlayerLinksPage(
   { searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> },
@@ -175,6 +183,7 @@ export default async function PlayerLinksPage(
   const pageEntities = [...new Set(pageRows.map((r) => r.resolutionEntityId))];
   const pageEntityTypes = [...new Set(pageRows.map((r) => r.resolutionEntityType))];
   const candidatesByEntity = await readSuggestionsForEntities(sql, pageEntities, pageEntityTypes);
+  const sourceDetails = await readSourceDetails(sql, pageRows);
 
   const bandCounts = new Map<string, number>();
   for (const row of searched) {
@@ -491,7 +500,9 @@ export default async function PlayerLinksPage(
                       const match = bestByEntity.get(entityKey);
                       const ranked = candidatesByEntity.get(entityKey) ?? [];
                       const alternatives = ranked.filter((c) => c.rank > 1);
-                      const record = describeSourceRecord(row.sourceDetail);
+                      const record = describeSourceRecord(
+                        sourceDetails.get(`${row.targetTable}:${row.targetId}`) ?? null,
+                      );
                       const summary = match ? summaries.get(match.playerId) : undefined;
                       // A group whose records disagree about the player is
                       // never offered for unattended approval, whatever the
