@@ -165,9 +165,10 @@ describe('bulk readiness is explained, not asserted', () => {
       [],
       null,
     );
+    // Counted without the name: club is the one thing corroborating it.
     expect(criteria).toEqual([
       'Strong identity match',
-      'Independent football evidence (2 kinds)',
+      'Independent football evidence (1 kind)',
       'No hard conflicts',
       'No credible alternative',
     ]);
@@ -180,7 +181,7 @@ describe('bulk readiness is explained, not asserted', () => {
       3,
     );
     expect(criteria[0]).toBe('Name evidence is not exact');
-    expect(criteria[1]).toBe('Only one kind of evidence');
+    expect(criteria[1]).toBe('Nothing corroborates the name');
     expect(criteria[2]).toBe('Contradicted by the source');
     expect(criteria[3]).toBe('No close alternative (gap 3)');
   });

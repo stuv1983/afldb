@@ -235,14 +235,18 @@ export function describeBulkCriteria(
   conflicts: readonly HardConflict[],
   gap: number | null,
 ): string[] {
-  const families = independentFamilyCount(evidence);
+  // Counted WITHOUT the name. The eligibility rule wants a name plus at
+  // least one other kind of agreement, so quoting the total here would
+  // credit the name twice -- once as identity, once as corroboration of
+  // itself.
+  const corroborating = independentFamilyCount(evidence.filter((e) => e.family !== 'name'));
   return [
     hasStrongNameEvidence(evidence)
       ? 'Strong identity match'
       : 'Name evidence is not exact',
-    families >= 2
-      ? `Independent football evidence (${families} kinds)`
-      : 'Only one kind of evidence',
+    corroborating >= 1
+      ? `Independent football evidence (${corroborating} kind${corroborating === 1 ? '' : 's'})`
+      : 'Nothing corroborates the name',
     conflicts.length === 0 ? 'No hard conflicts' : 'Contradicted by the source',
     gap === null ? 'No credible alternative' : `No close alternative (gap ${gap})`,
   ];
