@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-22  
-**Open issues:** 12
+**Open issues:** 14
 
 ## How Claude should use this file
 
@@ -33,8 +33,10 @@
 | `AFLDB-ISSUE-073` | Medium | Database | Four migration-056/057 foreign keys lack supporting indexes; `fk-indexes.test.ts` fails. |
 | `AFLDB-ISSUE-074` | Low | Tests | email-intake integration test picks a real dev admin instead of its fixture and leaves a staged row behind. |
 | `AFLDB-ISSUE-076` | Medium | Performance | `won_final_at_venue` Grid Solver combinations can exceed the 5-second PostgreSQL statement timeout and crash the rendered page. |
-| `AFLDB-ISSUE-078` | High | Import | Draft and first-kick-goal reloads still destroy manual player links the way the honours loaders did before ISSUE-044. |
 | `AFLDB-ISSUE-079` | High | Data integrity | Pre-ISSUE-044 reloads may have left dangling `player_link_resolutions.target_id` values. Dev audited clean; production not yet audited. |
+| `AFLDB-ISSUE-080` | High | Data integrity | Legacy honours reloads reconcile the whole table, so admin-created `hall_of_fame`/`honour_team_members` rows are deleted — or now abort the reload if they carry a manual link. |
+| `AFLDB-ISSUE-081` | Low | Tests | Honours reload suite mutates rows the release gates count, with no lock between the files. Latent. |
+| `AFLDB-ISSUE-082` | Medium | Admin | `confirmUnlinked` takes no lock and never re-reads its target, so a stale form can contradict an applied link. |
 | `AFLDB-ISSUE-077` | Medium | UI/Settings | The saved super-admin frontend theme can change between pages during the same browsing session. |
 
 ---
@@ -138,24 +140,6 @@
 - **Current state:** A theme selected by a super admin is not stable during ordinary browsing. One public page can render with the configured theme and the next internal navigation can render a different theme without any settings change. This is separate from ISSUE-072, which only covers the stale `frontendTheme` default-shape test.
 - **Next action:** Trace every `frontendTheme` authority and cache boundary (database, admin mutation/revalidation, SSR layout, cookie/local storage, hydration), reduce them to one authoritative resolved theme, then add browser coverage that navigates across multiple routes and proves the theme remains unchanged until a super admin deliberately changes it.
 
-## AFLDB-ISSUE-078 — Draft and first-kick-goal reloads still discard manual player links
-
-- **Severity:** High
-- **Area:** Import
-- **Key files:** `tools/migration/import_draft.py:241`, `tools/records/import-first-kick-goal.ts:480`
-- **First wrong layer:** Import/ETL.
-- **Current state:** Found by inspection during `AFLDB-ISSUE-044` and kept out of
-  its scope. Both loaders destroy and recreate `LINK_TARGET_TABLES` targets
-  (`truncate(pg, "draft_picks", "draft_persons")`; `DELETE FROM
-  player_achievements WHERE achievement_type = 'first_kick_goal'`), so a manual
-  resolution is lost and its audit row is left dangling. `draft_picks` is the
-  worse case because one decision propagates to every pick of a `draft_person`.
-  Not yet reproduced against a database.
-- **Next action:** Reproduce both against `afldb_test`, then apply the
-  `reload_keyed()` pattern from `tools/migration/common.py` (and its equivalent
-  in TypeScript for the first-kick-goal loader), keyed on the durable source
-  identity each already carries.
-
 ## AFLDB-ISSUE-079 — Audit historical `player_link_resolutions` rows for dangling targets
 
 - **Severity:** High
@@ -174,3 +158,71 @@
   join), keep the full output as an artifact, and record the counts. Relink or
   delete nothing: remediation must be designed as a separate issue and reviewed
   explicitly. If production is clean, close this with the recorded counts.
+
+## AFLDB-ISSUE-080 — Legacy honours reloads delete admin-created Hall of Fame and honour-team rows
+
+- **Severity:** High
+- **Area:** Data integrity
+- **Key files:** `src/db/queries/awards-admin.ts:264,331,351`;
+  `tools/migration/import_awards.py` (`import_hall_of_fame`,
+  `import_honour_teams`); `src/db/migrations/042_awards_natural_keys.sql`
+- **First wrong layer:** Import/ETL scoping — which rows the loader treats as its own.
+- **Current state:** Both loaders reconcile their entire table, because neither
+  source supplies a `source_record_id`. Admin inserts omit `source_id`, so admin
+  rows are `source_id IS NULL` while the loaders stamp `wikipedia` — the
+  ownership distinction already exists in the data and is simply not used. A
+  reload therefore deletes admin-created rows; since `AFLDB-ISSUE-044` one
+  carrying a manual link instead aborts the whole reload (fail-closed, but it
+  blocks every refresh until `--allow-link-loss`). The other four honours
+  loaders are unaffected — they key on `(source_id, source_record_id)`.
+  An admin row with **no** decision is invisible to that guard and is still
+  deleted silently. `--allow-link-loss` is not the answer here: it would discard
+  the decision *and* still delete the row.
+  **Latent on dev, not disproven:** `afldb_dev` has 0 admin-created rows in
+  either table (343 `hall_of_fame`, 113 `honour_team_members`, 2026-08-22) — the
+  behaviour is unchanged and wrong, there is simply nothing there to destroy
+  yet. Production unchecked. **Not to be implemented yet.**
+- **Next action:** Settle the `hall_of_fame_name_uq` policy FIRST — it is a
+  global `UNIQUE NULLS NOT DISTINCT (name, inducted_year)`, so once the reload
+  is scoped an admin row duplicating a source key becomes a constraint violation
+  instead of being silently overwritten. Then run the read-only production
+  exposure audit recorded in `issues.md` (admin-created rows in both tables,
+  which of them carry link decisions, and any `(name, inducted_year)` collision
+  with a source row) — **only on explicit instruction**. Then scope both loaders
+  via `reload_keyed`'s existing `scope_column`/`scope_values` so an importer
+  only updates/inserts/deletes rows it owns, and cover it in
+  `tests/integration/awards-reload-links.test.ts`. No schema change is needed
+  for the ownership distinction itself.
+
+## AFLDB-ISSUE-081 — Honours reload suite races the release gates over shared rows
+
+- **Severity:** Low
+- **Area:** Tests
+- **Key files:** `tests/integration/awards-reload-links.test.ts`,
+  `tests/integration/release-gates.test.ts`, `tests/integration/draft-lock.ts`
+- **Current state:** Latent, not yet observed failing. Vitest runs test files in
+  parallel; the honours suite links real rows to fixture players while the
+  release gate counts them. The identical race in the draft suite DID fail
+  during `AFLDB-ISSUE-078` (3,461 linked instead of 3,459) and was fixed with an
+  advisory lock.
+- **Next action:** Either apply the same `tests/integration/draft-lock.ts`
+  treatment to the honours pair, or establish and record why the gate's honours
+  assertions cannot overlap that suite's fixtures. Do not serialise the whole
+  test run.
+
+## AFLDB-ISSUE-082 — `confirmUnlinked` can record a decision contradicting an applied link
+
+- **Severity:** Medium
+- **Area:** Admin
+- **Key files:** `src/db/queries/player-links.ts:489`
+- **First wrong layer:** Admin mutation path.
+- **Current state:** `confirmUnlinked` takes no lock, does not re-read its
+  target and runs on `authSql` rather than the import transaction, taking
+  `previousStatus` straight from the form. A stale form can therefore vet a row
+  whose draft person was linked moments earlier. `resolveLink` locks and
+  re-checks; this does not. The `AFLDB-ISSUE-078` draft reload now aborts on the
+  resulting contradiction, which is a backstop, not a fix.
+- **Next action:** Lock and re-check the target the way `lockUnresolvedTarget`
+  does, reject a confirmation whose target (or draft person) is already
+  resolved, and extend `tests/player-link-mutations.test.ts`.
+

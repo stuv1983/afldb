@@ -1,0 +1,335 @@
+Id,Player,Club,Rd.,Year,Status
+fkg-001,Jack Kirby,Essendon,11,1911,active
+fkg-002,Gordon Coventry,Collingwood,15,1920,active
+fkg-003,Ray Brew,Carlton,3,1923,active
+fkg-004,Col Deane,Melbourne,4,1925,active
+fkg-005,Mickey Crisp,Carlton,1,1931,active
+fkg-006,Clen Denning,Carlton,4,1935,active
+fkg-007,Jack McMillan,Footscray,7,1936,active
+fkg-008,Brendon O'Donnell,St Kilda,4,1939,active
+fkg-009,Kevin O'Halloran,St Kilda,9,1939,active
+fkg-010,Ian Chinn,South Melbourne,6,1940,active
+fkg-011,Alby Oatway,St Kilda,11,1941,active
+fkg-012,Alec Mathieson,Geelong,5,1944,active
+fkg-013,Jeff Brisbane,Geelong,12,1944,active
+fkg-014,Clive Yewers,Footscray,11,1947,active
+fkg-015,Bob Reid,Footscray,1,1948,active
+fkg-016,Jack Marr,Hawthorn,7,1948,active
+fkg-017,John Coleman,Essendon,1,1949,active
+fkg-018,Arthur Pound,Melbourne,8,1950,active
+fkg-019,Bob Trainer,South Melbourne,13,1950,active
+fkg-020,Len Kent,Footscray,1,1951,active
+fkg-021,Bill Smeaton,Melbourne,1,1951,active
+fkg-022,Ted Whitten,Footscray,1,1951,active
+fkg-023,Fred Anderson,Fitzroy,10,1951,active
+fkg-024,Harry Herbert,Geelong,13,1952,active
+fkg-025,Tom Hafey,Richmond,6,1953,active
+fkg-026,Keith Bromage,Collingwood,17,1953,active
+fkg-027,Owen Abrahams,Fitzroy,7,1954,active
+fkg-028,Glen Bow,Geelong,11,1954,active
+fkg-029,Bob Crowe,Carlton,17,1954,active
+fkg-030,Robert Fox,Essendon,1,1955,active
+fkg-031,Stuart Lennie,St Kilda,1,1955,active
+fkg-032,Alan Anton,Fitzroy,2,1955,active
+fkg-033,Bob Pratt Jr.,South Melbourne,4,1955,active
+fkg-034,Ray Allsopp,Richmond,7,1955,active
+fkg-035,Max Oaten,South Melbourne,9,1956,active
+fkg-036,Bernie Jeffrey,South Melbourne,13,1956,active
+fkg-037,Ken Timms,Essendon,1,1957,active
+fkg-038,Keith Burns,Collingwood,9,1957,active
+fkg-039,Ted Fordham,Essendon,1,1961,active
+fkg-040,Doug Wade,Geelong,1,1961,active
+fkg-041,Edo Benetti,Richmond,8,1961,active
+fkg-042,Bill Ryan,Geelong,9,1963,active
+fkg-043,Frank Davis,Melbourne,13,1964,active
+fkg-044,Ian Randle,South Melbourne,16,1964,active
+fkg-045,Vin Crowe,Richmond,17,1964,active
+fkg-046,Gareth Andrews,Geelong,1,1965,active
+fkg-047,Don Gross,Essendon,1,1965,active
+fkg-048,Denis Hughson,Fitzroy,7,1965,active
+fkg-049,Vin Waite,Carlton,5,1966,active
+fkg-050,Graham Croft,St Kilda,14,1966,active
+fkg-051,Gary Farrant,North Melbourne,1,1967,active
+fkg-052,Robert Walls,Carlton,2,1967,active
+fkg-053,Jeff McGee,South Melbourne,7,1967,active
+fkg-054,Gerald O'Loughlin,Geelong,16,1968,active
+fkg-055,Barry Round,Footscray,1,1969,active
+fkg-056,Peter Weightman,Fitzroy,10,1969,active
+fkg-057,Leigh Matthews,Hawthorn,16,1969,active
+fkg-058,Ray Carr,Melbourne,1,1970,active
+fkg-059,David Clarke,Geelong,1,1971,active
+fkg-060,Michael Tuck,Hawthorn,8,1972,active
+fkg-061,Ian George,St Kilda,8,1973,active
+fkg-062,Tony Dullard,Melbourne,19,1973,active
+fkg-063,Billy Picken,Collingwood,5,1974,active
+fkg-064,David Armour,Geelong,8,1974,active
+fkg-065,Michael Cooke,Hawthorn,SF,1975,active
+fkg-066,David Miller,Richmond,4,1977,active
+fkg-067,Laurie Serafini,Fitzroy,15,1977,active
+fkg-068,Dale Weightman,Richmond,1,1978,active
+fkg-069,Malcolm Reed,Geelong,2,1978,active
+fkg-070,Chris Stone,St Kilda,10,1978,active
+fkg-071,Leigh Carlson,Collingwood,16,1978,active
+fkg-072,Des O'Dwyer,Melbourne,17,1978,active
+fkg-073,Rino Pretto,Fitzroy,19,1978,active
+fkg-074,John Mossop,Geelong,1,1979,active
+fkg-075,Matthew Wall,Richmond,1,1980,active
+fkg-076,Dave McGlashan,Melbourne,4,1981,active
+fkg-077,Spiro Kourkoumelis,Carlton,17,1981,active
+fkg-078,Wally Lovett,Collingwood,2,1982,active
+fkg-079,Peter Tossol,Melbourne,6,1982,active
+fkg-080,Rod Owen,St Kilda,1,1983,active
+fkg-081,Daryl Gilmore,Carlton,4,1983,active
+fkg-082,Tony Lockett,St Kilda,4,1983,active
+fkg-083,Ian Fairley,North Melbourne,7,1983,active
+fkg-084,Mark Harvey,Essendon,4,1984,active
+fkg-085,Jason Dunstall,Hawthorn,2,1985,active
+fkg-086,Scott Morphett,Geelong,22,1985,active
+fkg-087,Stephen Kernahan,Carlton,1,1986,active
+fkg-088,David Cameron,Geelong,5,1986,active
+fkg-089,Barry Stoneham,Geelong,6,1986,active
+fkg-090,Stewart Loewe,St Kilda,9,1986,active
+fkg-091,Dean Bailey,Essendon,13,1986,active
+fkg-092,Brendan Littler,St Kilda,20,1986,active
+fkg-093,Simon Atkins,Footscray,2,1987,active
+fkg-094,Garry Hocking,Geelong,3,1987,active
+fkg-095,John Barnes,Essendon,6,1987,active
+fkg-096,Gary Cameron,Geelong,11,1987,active
+fkg-097,Mark Hepburn,North Melbourne,18,1987,active
+fkg-098,Jamie Shaw,Fitzroy,18,1987,active
+fkg-099,Sean Denham,Geelong,21,1987,active
+fkg-100,John Brinkkotter,Sydney,1,1988,active
+fkg-101,Andy Lovell,Melbourne,3,1988,active
+fkg-102,Justin Stubbs,Essendon,12,1988,active
+fkg-103,Stephen Tingay,Melbourne,1,1989,active
+fkg-104,Richard Lounder,Richmond,5,1989,active
+fkg-105,Chris O'Sullivan,Brisbane Bears,9,1989,active
+fkg-106,David Welsby,Geelong,2,1990,active
+fkg-107,Tim Rieniets,Carlton,6,1990,active
+fkg-108,Brent Heaver,Melbourne,11,1990,active
+fkg-109,Dale Lewis,Sydney,15,1990,active
+fkg-110,Brett Ratten,Carlton,22,1990,active
+fkg-111,Nathan Bower,Richmond,24,1991,active
+fkg-112,Andrew Lamprill,Melbourne,2,1992,active
+fkg-113,Randall Bone,Adelaide,3,1992,active
+fkg-114,Daniel Metropolis,West Coast,3,1992,active
+fkg-115,Michael Dunstan,Fitzroy,1,1993,active
+fkg-116,Peter Everitt,St Kilda,1,1993,active
+fkg-117,Ilija Grgic,Footscray,2,1993,active
+fkg-118,Ricky Olarenshaw,Essendon,3,1993,active
+fkg-119,Paul Hopgood,Melbourne,4,1993,active
+fkg-120,Tim Hargreaves,Hawthorn,5,1994,active
+fkg-121,Warren Campbell,North Melbourne,7,1994,active
+fkg-122,Damian Houlihan,Collingwood,7,1994,active
+fkg-123,Daniel Hargraves,Footscray,10,1994,active
+fkg-124,Scott Cummings,Essendon,14,1994,active
+fkg-125,Lachlan Ross,Essendon,14,1994,active
+fkg-126,Matthew Allan,Carlton,15,1994,active
+fkg-127,Peter Bell,Fremantle,1,1995,active
+fkg-128,Shannon Grant,Sydney,1,1995,active
+fkg-129,Chad Liddell,Collingwood,1,1995,active
+fkg-130,Leigh Wardell-Johnson,Fremantle,2,1995,active
+fkg-131,Jeff White,Fremantle,3,1995,active
+fkg-132,Jason Heatley,West Coast,4,1995,active
+fkg-133,Michael O'Loughlin,Sydney,5,1995,active
+fkg-134,Jeff Farmer,Melbourne,6,1995,active
+fkg-135,Jeff Bruce,Fitzroy,9,1995,active
+fkg-136,Simon Beaumont,Carlton,10,1995,active
+fkg-137,Mark Stevens,North Melbourne,10,1995,active
+fkg-138,Matthew Lloyd,Essendon,14,1995,active
+fkg-139,Ben Moore,Richmond,11,1996,active
+fkg-140,Peter Vardy,Adelaide,14,1996,active
+fkg-141,Blake Caracella,Essendon,3,1997,active
+fkg-142,Leigh Newton,Melbourne,3,1997,active
+fkg-143,Brent Harvey,North Melbourne,5,1997,active
+fkg-144,Jacob Anstey,Carlton,7,1997,active
+fkg-145,Jarrod Cotton,Port Adelaide,10,1997,active
+fkg-146,Paul Dooley,Western Bulldogs,1,1998,active
+fkg-147,Andrew Pugsley,Collingwood,4,1998,active
+fkg-148,Brett O'Farrell,Sydney,13,1998,active
+fkg-149,Leigh Brockman,Geelong,14,1998,active
+fkg-150,Tom Harley,Port Adelaide,14,1998,active
+fkg-151,Michael Gardiner,Collingwood,21,1998,active
+fkg-152,Lucas Herbert,Adelaide,1,1999,active
+fkg-153,Des Headland,Brisbane Lions,13,1999,active
+fkg-154,Damien Adkins,Collingwood,1,2000,active
+fkg-155,Cameron Bruce,Melbourne,1,2000,active
+fkg-156,Ryan Fitzgerald,Sydney,1,2000,active
+fkg-157,Luke McPharlin,Hawthorn,5,2000,active
+fkg-158,Matthew Pavlich,Fremantle,5,2000,active
+fkg-159,Aaron Fiora,Richmond,7,2000,active
+fkg-160,John Spaull,North Melbourne,13,2000,active
+fkg-161,Daniel Schell,Fremantle,15,2000,active
+fkg-162,Marcus Baldwin,Geelong,21,2000,active
+fkg-163,Alan Didak,Collingwood,7,2001,active
+fkg-164,Troy Broadbridge,Melbourne,8,2001,active
+fkg-165,Dean Brogan,Port Adelaide,9,2001,active
+fkg-166,Daniel Giansiracusa,Western Bulldogs,11,2001,active
+fkg-167,Tim Hazell,Hawthorn,14,2001,active
+fkg-168,Leigh Harding,North Melbourne,17,2001,active
+fkg-169,Michael Osborne,Hawthorn,21,2001,active
+fkg-170,Paul Medhurst,Fremantle,1,2002,active
+fkg-171,Mark Williams,Hawthorn,3,2002,active
+fkg-172,Quinten Lynch,West Coast,12,2002,active
+fkg-173,Ashley Sampi,West Coast,14,2002,active
+fkg-174,Sam Hunt,Essendon,20,2002,active
+fkg-175,Jonathon McCormick,Carlton,1,2003,active
+fkg-176,Steven Salopek,Port Adelaide,1,2003,active
+fkg-177,Allan Murray,St Kilda,10,2003,active
+fkg-178,Laurence Angwin,Carlton,14,2003,active
+fkg-179,Ben Rutten,Adelaide,16,2003,active
+fkg-180,Brent Staker,West Coast,17,2003,active
+fkg-181,Kane Tenace,Geelong,2,2004,active
+fkg-182,Nathan Bock,Adelaide,5,2004,active
+fkg-183,Cameron Faulkner,Western Bulldogs,6,2004,active
+fkg-184,Brock McLean,Melbourne,11,2004,active
+fkg-185,Colin Sylvia,Melbourne,21,2004,active
+fkg-186,Jaymie Graham,West Coast,3,2005,active
+fkg-187,Ryan Griffen,Western Bulldogs,4,2005,active
+fkg-188,Setanta Ã hAilpÃ­n,Carlton,7,2005,active
+fkg-189,Tim Walsh,Western Bulldogs,8,2005,active
+fkg-190,Nick Malceski,Sydney,11,2005,active
+fkg-191,Henry Slattery,Essendon,13,2005,active
+fkg-192,Nathan Ablett,Geelong,20,2005,active
+fkg-193,Mitch Clark,Brisbane Lions,1,2006,active
+fkg-194,Matthew Bate,Melbourne,5,2006,active
+fkg-195,Shannon Hurn,West Coast,5,2006,active
+fkg-196,Fabian Deluca,Port Adelaide,8,2006,active
+fkg-197,Joel Patfull,Brisbane Lions,8,2006,active
+fkg-198,Scott Pendlebury,Collingwood,10,2006,active
+fkg-199,Michael Rix,St Kilda,11,2006,active
+fkg-200,Matt Thomas,Port Adelaide,14,2006,active
+fkg-201,Greg Bentley,Port Adelaide,19,2006,active
+fkg-202,Bryce Gibbs,Carlton,1,2007,active
+fkg-203,Travis Varcoe,Geelong,2,2007,active
+fkg-204,Bachar Houli,Essendon,7,2007,active
+fkg-205,Justin Westhoff,Port Adelaide,10,2007,active
+fkg-206,Jay Neagle,Essendon,22,2007,active
+fkg-207,Jack Anthony,Collingwood,3,2008,active
+fkg-208,Matthew Kreuzer,Carlton,3,2008,active
+fkg-209,Clayton Hinkley,Fremantle,5,2008,active
+fkg-210,Trent Cotchin,Richmond,8,2008,active
+fkg-211,Ryan Davis,West Coast,8,2008,active
+fkg-212,Chris Dawes,Collingwood,19,2008,active
+fkg-213,Patrick Dangerfield,Adelaide,20,2008,active
+fkg-214,Jeff Garlett,Carlton,1,2009,active
+fkg-215,Stephen Hill,Fremantle,1,2009,active
+fkg-216,Taylor Walker,Adelaide,1,2009,active
+fkg-217,Brent Macaffer,Collingwood,5,2009,active
+fkg-218,Matt de Boer,Fremantle,6,2009,active
+fkg-219,Brodie Martin,Adelaide,16,2009,active
+fkg-220,Callum Wilson,West Coast,18,2009,active
+fkg-221,Cameron Hitchcock,Port Adelaide,1,2010,active
+fkg-222,Luke Shuey,West Coast,1,2010,active
+fkg-223,Jordan Roughead,Western Bulldogs,5,2010,active
+fkg-224,Andrew Strijk,West Coast,13,2010,active
+fkg-225,Kyle Hardingham,Essendon,17,2010,active
+fkg-226,Ben Speight,North Melbourne,17,2010,active
+fkg-227,Jake Carlisle,Essendon,20,2010,active
+fkg-228,Daniel Menzel,Geelong,20,2010,active
+fkg-229,Marcus Marigliani,Essendon,21,2010,active
+fkg-230,Claye Beams,Brisbane Lions,1,2011,active
+fkg-231,Charlie Dixon,Gold Coast,2,2011,active
+fkg-232,Jamie Cripps,St Kilda,6,2011,active
+fkg-233,Joseph Daye,Gold Coast,7,2011,active
+fkg-234,Alex Fasolo,Collingwood,12,2011,active
+fkg-235,Patrick Karnezis,Brisbane Lions,13,2011,active
+fkg-236,Mitch Brown,Geelong,14,2011,active
+fkg-237,Scott Lycett,West Coast,19,2011,active
+fkg-238,Jason Tutt,Western Bulldogs,22,2011,active
+fkg-239,Casey Sibosado,Fremantle,24,2011,active
+fkg-240,James Magner,Melbourne,1,2012,active
+fkg-241,George Horlin-Smith,Geelong,3,2012,active
+fkg-242,Josh Bruce,Greater Western Sydney,5,2012,active
+fkg-243,Ahmed Saad,St Kilda,6,2012,active
+fkg-244,Josh Jenkins,Adelaide,7,2012,active
+fkg-245,Tim McIntyre,Adelaide,15,2012,active
+fkg-246,Rhys Cooyou,Greater Western Sydney,22,2012,active
+fkg-247,Nick O'Brien,Essendon,22,2012,active
+fkg-248,Luke Mitchell,Carlton,23,2012,active
+fkg-249,Dylan Buckley,Carlton,3,2013,active
+fkg-250,Majak Daw,North Melbourne,4,2013,active
+fkg-251,Sam Grimley,Hawthorn,9,2013,active
+fkg-252,Kristian Jaksch,Greater Western Sydney,22,2013,active
+fkg-253,Tim O'Brien,Hawthorn,1,2014,active
+fkg-254,Sam Lloyd,Richmond,4,2014,active
+fkg-255,Ben Lennon,Richmond,9,2014,active
+fkg-256,Rory Lobb,Greater Western Sydney,12,2014,active
+fkg-257,Luke Lowden,Hawthorn,12,2014,active
+fkg-258,Shane Kersten,Geelong,14,2014,active
+fkg-259,Mitch Honeychurch,Western Bulldogs,15,2014,active
+fkg-260,Max Duffy,Fremantle,20,2014,active
+fkg-261,Cam McCarthy,Greater Western Sydney,23,2014,active
+fkg-262,Josh Glenn,Gold Coast,5,2015,active
+fkg-263,Billy Stretch,Melbourne,6,2015,active
+fkg-264,Bailey Dale,Western Bulldogs,7,2015,active
+fkg-265,Liam Dawson,Brisbane Lions,8,2015,active
+fkg-266,Keegan Brooksby,Gold Coast,9,2015,active
+fkg-267,Conor McKenna,Essendon,22,2015,active
+fkg-268,Jade Gresham,St Kilda,1,2016,active
+fkg-269,Jayden Short,Richmond,2,2016,active
+fkg-270,Mason Cox,Collingwood,5,2016,active
+fkg-271,Lewis Pierce,St Kilda,12,2016,active
+fkg-272,Sam Weideman,Melbourne,20,2016,active
+fkg-273,Ryan Burton,Hawthorn,21,2016,active
+fkg-274,Sam Powell-Pepper,Port Adelaide,1,2017,active
+fkg-275,Aidyn Johnson,Port Adelaide,5,2017,active
+fkg-276,Ryan Nyhuis,Fremantle,16,2017,active
+fkg-277,Josh Williams,North Melbourne,18,2017,active
+fkg-278,Josh Begley,Essendon,22,2017,active
+fkg-279,Tom Doedee,Adelaide,1,2018,active
+fkg-280,Darcy Fogarty,Adelaide,1,2018,active
+fkg-281,Lachie Fogarty,Geelong,1,2018,active
+fkg-282,Esava Ratugolea,Geelong,1,2018,active
+fkg-283,Jack Higgins,Richmond,3,2018,active
+fkg-284,Jacob Heron,Gold Coast,9,2018,active
+fkg-285,Jamaine Jones,Geelong,10,2018,active
+fkg-286,Wil Powell,Gold Coast,15,2018,active
+fkg-287,Ryan Abbott,Geelong,20,2018,active
+fkg-288,Noah Balta,Richmond,1,2019,active
+fkg-289,Tom Sparrow,Melbourne,1,2019,active
+fkg-290,Chayce Jones,Adelaide,1,2019,active
+fkg-291,Chris Burgess,Gold Coast,11,2019,active
+fkg-292,Nick Hind,St Kilda,13,2019,active
+fkg-293,Ben Cavarra,Western Bulldogs,1,2020,active
+fkg-294,Max King,St Kilda,1,2020,active
+fkg-295,Will Kelly,Collingwood,6,2020,active
+fkg-296,Izak Rankine,Gold Coast,6,2020,active
+fkg-297,Cody Weightman,Western Bulldogs,7,2020,active
+fkg-298,Brad Close,Geelong,8,2020,active
+fkg-299,Irving Mosquito,Essendon,13,2020,active
+fkg-300,Jy Farrar,Gold Coast,18,2020,active
+fkg-301,Tom Powell,North Melbourne,1,2021,active
+fkg-302,Francis Evans,Geelong,2,2021,active
+fkg-303,Beau McCreery,Collingwood,4,2021,active
+fkg-304,Isiah Winder,West Coast,4,2021,active
+fkg-305,Cooper Sharman,St Kilda,20,2021,active
+fkg-306,Callum Brown,Greater Western Sydney,21,2021,active
+fkg-307,Josh Rachele,Adelaide,1,2022,active
+fkg-308,Nathan O'Driscoll,Fremantle,2,2022,active
+fkg-309,Jack Carroll,Carlton,7,2022,active
+fkg-310,Jye Amiss,Fremantle,8,2022,active
+fkg-311,Judson Clarke,Richmond,13,2022,active
+fkg-312,Hewago Oea,Gold Coast,16,2022,active
+fkg-313,Elijah Hollands,Gold Coast,19,2022,active
+fkg-314,Samson Ryan,Richmond,2,2023,active
+fkg-315,Corey Warner,Sydney,5,2023,active
+fkg-316,Ryan Maric,West Coast,13,2023,active
+fkg-317,Patrick Voss,Fremantle,7,2024,active
+fkg-318,Lachie Sullivan,Collingwood,8,2024,active
+fkg-319,Caiden Cleary,Sydney,15,2024,active
+fkg-320,Isaac Kako,Essendon,1,2025,active
+fkg-321,Matthew Jefferson,Melbourne,1,2025,active
+fkg-322,Jack Henderson,Melbourne,1,2025,active
+fkg-323,Tom Edwards,Essendon,2,2025,active
+fkg-324,Isaac Keeler,St Kilda,2,2025,active
+fkg-325,Finnbar Maley,North Melbourne,8,2025,active
+fkg-326,Archer Day-Wicks,Essendon,9,2025,active
+fkg-327,Luamon Lual,Essendon,13,2025,active
+fkg-328,Charlie West,Collingwood,16,2025,active
+fkg-329,Liam McMahon,Essendon,19,2025,active
+fkg-330,Cooper Trembath,North Melbourne,22,2025,active
+fkg-331,Milan Murdock,West Coast,1,2026,active
+fkg-332,Noah Roberts-Thomson,Richmond,10,2026,active
+fkg-333,Zane Peucker,Richmond,18,2026,active
+fkg-334,Jay Polkinghorne,Geelong,19,2026,active

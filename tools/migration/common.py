@@ -333,6 +333,7 @@ def reload_keyed(
     scope_values: Sequence[Any] = (),
     scope_exclude: bool = False,
     allow_link_loss: bool = False,
+    delete_missing: bool = True,
 ) -> ReloadStats:
     """Reload ``table`` from ``rows`` by key, preserving ids and decisions.
 
@@ -340,6 +341,12 @@ def reload_keyed(
     table. Passing ``link_columns=None`` — as ``awards`` does — means the table
     bears no player link at all: no resolution is read and no link column is
     referenced, so the helper is usable for plain reference data too.
+
+    ``delete_missing=False`` upserts without removing vanished keys. A parent
+    whose children are reconciled by a later call needs this: draft_persons is
+    referenced by draft_picks under a NO ACTION foreign key, so a person can
+    only be deleted once its picks have been, which is a different statement's
+    job (AFLDB-ISSUE-078).
     """
     key_columns = list(key_columns)
     columns = list(columns)
@@ -532,15 +539,16 @@ def reload_keyed(
         )
         stats.inserted = cur.rowcount
 
-        cur.execute(
-            f"""DELETE FROM public.{table} e
-                 WHERE {scope_e}
-                   AND NOT EXISTS (
-                         SELECT 1 FROM {_INCOMING} i
-                          WHERE {_key_match('e', 'i', key_columns)})""",
-            tuple(scope_params),
-        )
-        stats.deleted = cur.rowcount
+        if delete_missing:
+            cur.execute(
+                f"""DELETE FROM public.{table} e
+                     WHERE {scope_e}
+                       AND NOT EXISTS (
+                             SELECT 1 FROM {_INCOMING} i
+                              WHERE {_key_match('e', 'i', key_columns)})""",
+                tuple(scope_params),
+            )
+            stats.deleted = cur.rowcount
 
         cur.execute(f"DROP TABLE IF EXISTS {_INCOMING}")
         if target_table is not None:

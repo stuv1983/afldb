@@ -20,9 +20,11 @@ import './guard';
 
 import { createHash } from 'node:crypto';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
+
+import { lockDraftTables, unlockDraftTables } from './draft-lock';
 import { runAdvancedSearch } from '@/db/queries/advanced-search';
 import { runMatchSearch } from '@/db/queries/match-search';
 import { parseAdvancedQuery } from '@/search/advanced-spec';
@@ -380,6 +382,13 @@ describe('gate: club organizations and identities', () => {
 // IMMUTABLE — draft links
 // ---------------------------------------------------------------------
 describe('gate: draft links', () => {
+  // These counts are only meaningful over a quiescent draft dataset, and
+  // draft-reload-links.test.ts deliberately links real draft people to
+  // fixture players while it runs. Wait it out rather than read a moving
+  // target; the assertions below are unchanged.
+  beforeAll(lockDraftTables, 300_000);
+  afterAll(unlockDraftTables);
+
   it('retains all 6,810 rows, including unresolved ones', async () => {
     const [row] = await sql<{ n: number }[]>`
       SELECT count(*)::int AS n FROM draft_picks

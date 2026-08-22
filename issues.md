@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 12
+**Open issues:** 13
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
@@ -21,8 +21,10 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-074` | Low | Tests | `tests/integration/email-intake.test.ts` assumes the first `auth_users` row is its fixture admin and fails against real dev-host admin data. | Make the test create/select its own fixture admin deterministically instead of `ORDER BY`-picking one. |
 | `AFLDB-ISSUE-076` | Medium | Performance | Grid Solver combinations using `won_final_at_venue` can exceed PostgreSQL's 5-second statement timeout and crash the page. | Capture and compare the generated SQL/EXPLAIN plan against `played_at_venue`, then optimise the `won_final_at_venue` query shape without raising the application timeout. |
 | `AFLDB-ISSUE-077` | Medium | UI/Settings | The super-admin-selected frontend theme is not stable within a browsing session; different pages can render different themes as the user navigates. | Trace every theme source (database setting, server render, cookie/local storage and client hydration), establish one authoritative theme value per request/session, and add navigation regression coverage. |
-| `AFLDB-ISSUE-078` | High | Import | The draft and first-kick-goal reloads still destroy manual player-link resolutions the way the honours loaders did before `AFLDB-ISSUE-044`. | Apply the `reload_keyed` pattern to `tools/migration/import_draft.py` and `tools/records/import-first-kick-goal.ts`, keyed on the durable source identity each already carries. |
 | `AFLDB-ISSUE-079` | High | Data integrity | Destructive reloads run before `AFLDB-ISSUE-044` may have left `player_link_resolutions` rows pointing at target ids that no longer exist. `afldb_dev` audited clean (75 resolutions, 0 dangling); production not yet audited. | Run the documented read-only dangling-target audit against production, record the per-table counts and any affected rows, and change nothing. |
+| `AFLDB-ISSUE-080` | High | Data integrity | `import_hall_of_fame` and `import_honour_teams` reconcile their whole table, so admin-created rows (`source_id IS NULL`) are deleted by a legacy reload — or now abort it if they carry a manual link. | Settle the global `hall_of_fame_name_uq` collision policy, audit production for `source_id IS NULL` rows, then scope both loaders to their own `source_id`. |
+| `AFLDB-ISSUE-081` | Low | Tests | The honours reload integration suite mutates rows that `release-gates.test.ts` counts, with no lock between the two files; latent, not yet observed failing. | Give it the same `tests/integration/draft-lock.ts` treatment, or prove the two files never overlap. |
+| `AFLDB-ISSUE-082` | Medium | Admin | `confirmUnlinked` takes no lock and never re-reads its target, so a stale form can vet a row whose person was linked moments earlier. | Lock and re-check the target the way `resolveLink` does, and reject a decision that contradicts an applied link. |
 
 ---
 
@@ -1802,8 +1804,8 @@ read-only legacy SQLite were untouched.
   recovered by this change; they are invisible to the new guard because their
   `target_id` matches no row. Audited read-only under `AFLDB-ISSUE-079`:
   `afldb_dev` is clean, production not yet checked.
-- **Separate defect found during review, deliberately not fixed here and not yet
-  given its own issue number — raise one if it should be tracked.**
+- **Separate defect found during review, deliberately not fixed here and tracked
+  as `AFLDB-ISSUE-080`.**
   `createHallOfFameEntry` and `createHonourTeamMember`
   (`src/db/queries/awards-admin.ts:264,331`) insert `hall_of_fame` /
   `honour_team_members` rows with `source_id` left NULL. Those rows are not in
@@ -1817,7 +1819,9 @@ read-only legacy SQLite were untouched.
   (`source_id = <the loader's source>`) so admin-created rows are out of scope
   entirely — deferred because it changes which rows a reload deletes, and
   `hall_of_fame_name_uq` is global, so an admin row duplicating a source key
-  would then surface as a constraint violation needing its own decision.
+  would then surface as a constraint violation needing its own decision. See
+  `AFLDB-ISSUE-080` for the full analysis; `afldb_dev` currently holds zero
+  admin-created rows in either table, so the defect is latent there.
 
 ## AFLDB-ISSUE-045 — Seasonal honour teams lose their supplied formation order
 
@@ -3708,19 +3712,31 @@ Not yet run.
 
 ## AFLDB-ISSUE-078 — Draft and first-kick-goal reloads still discard manual player links
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Import
 - **Found:** 2026-08-22
-- **Resolved:** N/A
-- **Files:** `tools/migration/import_draft.py`, `tools/records/import-first-kick-goal.ts`,
-  `src/db/queries/player-links.ts`
+- **Resolved:** 2026-08-22
+- **Files:** `tools/migration/import_draft.py`, `tools/migration/common.py`,
+  `src/db/migrations/069_draft_source_identity.sql`,
+  `tests/integration/draft-reload-links.test.ts`,
+  `tests/integration/draft-lock.ts`, `tests/integration/release-gates.test.ts`,
+  `tools/records/import-first-kick-goal.ts`,
+  `data/records/first-kick-goal-ids.csv` (new, tracked), `.gitignore`,
+  `src/db/migrations/070_import_reads_link_suggestions.sql`,
+  `tools/maintenance/privileges.sql`,
+  `tests/integration/first-kick-goal-reload-links.test.ts`,
+  `src/db/queries/player-links.ts`, `src/db/queries/players.ts`,
+  `src/db/migrations/019_draft_persons.sql`, `src/db/migrations/006_draft_relationships.sql`.
+  Upstream source generator (outside this repository, read-only):
+  `sports_data_lab/utils/afl/load_draftguru.py`, `sports_data_lab/afl/link_draft.py`.
 
 ### Symptom
 Reloading the draft or the first-kick-goal record turns manually resolved
 `draft_picks` / `player_achievements` links back into their import-derived
 state, and leaves the matching `player_link_resolutions` rows pointing at ids
-that no longer exist.
+that no longer exist. The draft reload additionally deletes admin-created
+`draft_picks` rows outright.
 
 ### Reproduction
 Resolve an unresolved draft pick or first-kick-goal row through
@@ -3731,6 +3747,7 @@ rebuilt row.
 Append-only human identity decisions remain authoritative across repeatable
 source reloads, and their audit targets keep resolving to the row the decision
 was about — the guarantee `AFLDB-ISSUE-044` established for the honours family.
+A row the importer does not own is neither updated nor deleted by it.
 
 ### Actual
 Both loaders destroy and recreate their targets:
@@ -3742,43 +3759,548 @@ Both loaders destroy and recreate their targets:
 (`src/db/queries/player-links.ts`), so both accept manual resolutions.
 
 `draft_picks` is the more serious of the two: `applyLockedLink` resolves a draft
-pick through its durable `draft_person_id` and propagates the link to every pick
-of that person, so one lost decision can unlink several rows.
+pick through its `draft_person_id` and propagates the link to every pick of that
+person, so one lost decision can unlink several rows.
 
 ### Evidence
 Found by inspection while fixing `AFLDB-ISSUE-044`; the mechanism is identical
 to the one reproduced there against `afldb_test` (manual link lost, row id
 regenerated, `player_link_resolutions.target_id` left dangling because the
-loaders never `RESTART IDENTITY` and so never reuse an id). Deliberately kept
-out of that issue's scope and **not** reproduced against a database yet.
+loaders never `RESTART IDENTITY` and so never reuse an id).
+
+**Database-backed reproduction, `afldb_test`, 2026-08-22 (draft).**
+`tests/integration/draft-reload-links.test.ts` was written first and run
+against the unmodified importer: **7 of 7 failed**, one per predicted defect —
+the id fingerprints of both tables changed, the resolved link and its person
+reverted to source state, the confirmed-unlinked decision's target no longer
+existed, the source disagreement was not reported, a renamed row did not fail
+closed, contradictory decisions were not detected, and the admin-created pick
+came back `undefined` (deleted outright).
+
+Repeated reloads had already advanced `draft_picks` to ids **88,532-95,341**
+and `draft_persons` to **65,788-70,844** for the same 6,810 and 5,057 rows —
+ids advance monotonically and are never reused, so as in `AFLDB-ISSUE-044` the
+harm is a lost link plus an unresolvable audit pointer, **not** a decision
+transferred to another person's row.
+
+#### Draft source-identity investigation, 2026-08-22
+
+Read-only investigation of the upstream generator, the legacy SQLite and both
+`afldb_test` and `afldb_dev`. Nothing was written.
+
+**The candidate six-column reload key
+`(source_id, dg_person_id, draft_year, draft_type, draft_kind, pick_number)` is
+REJECTED.** It is unique across all 6,810 rows on both sides, but uniqueness is
+not durability:
+
+| Column | Durable identity? | Evidence |
+|---|---|---|
+| `source_id` | Yes | AFLDB constant, resolved from `sources` at runtime (`import_draft.py:133`) |
+| `dg_person_id` | **No — fatal** | `load_draftguru.py:355` assigns `p.index + 1` over a person frame sorted by `player_url` and de-duplicated. It is a **rank recomputed on every load**, not DraftGuru's id. Observed: ids 1, 2, 3 are `aaron_black/1`, `aaron_black/2`, `aaron_bruce/1`. The frame spans draft **plus awards plus all-Australian** rows (5,320 people vs 5,057 draft people), so a new award row renumbers draft persons |
+| `draft_year` | Yes | `source_url` corresponds 1:1 with `draft_year` (42 pages, 42 years, 42 combinations): the year *is* the scraped page |
+| `draft_type` | Partly | DraftGuru's own wording; 11 values and already inconsistent — `National` x2976 vs `National Draft` x113 (1981/1982/1987 only, the pages with no Draft column, where the scraper metadata label is the fallback). A re-wording is a correction, not a new selection |
+| `draft_kind` | Partly | Derived — `draft_type.map(draft_kind)` from `afl/draft_kinds.py`. Insulated from wording changes (it already folds both spellings to `national`) but movable by reclassification; an unmapped wording yields NULL via pandas `.map` |
+| `pick_number` | **No** | `first_int(pick)`; NULL for trades, free agency and signings, and a corrected pick number is the textbook "same selection, corrected fact" |
+
+`import_draft.py:17` claims identity "hangs off draft_persons, keyed on
+DraftGuru's own person id". **That claim is false** and the docstring must be
+corrected.
+
+**The current `source_record_id` is rejected on the same grounds.** It holds
+`str(draft_rowid)`; the legacy `draft` table has no `INTEGER PRIMARY KEY` and
+`load_draftguru.py:418` writes it with `to_sql(..., if_exists="replace")`, so
+every rowid is reissued on every source rebuild. Upstream already treats it as
+snapshot-local: `link_draft.py:289` drops and rebuilds `draft_links` (keyed
+`draft_rowid INTEGER PRIMARY KEY`) on every run.
+
+**The durable identity that does exist is `player_url`** — DraftGuru's own
+person page, e.g. `https://www.draftguru.com.au/players/aaron_black/2`, whose
+trailing ordinal disambiguates same-name people. It is `build_people`'s own
+`person_key`, of which `dg_person_id` is merely the rank. Present on 6,810/6,810
+source rows and 5,320/5,320 people, and **already stored** as
+`draft_persons.player_url` (NOT NULL) and `draft_picks.player_url`, so no new
+column, no re-key migration and no raw data are required.
+
+Verified reconciliation keys (0 duplicates, 0 relevant NULLs, both databases and
+the source):
+
+- `draft_persons` — `(source_id, player_url)`, unique over 5,057 rows
+- `draft_picks` — `(source_id, player_url, draft_year, draft_kind)`, unique over
+  6,810 rows in PostgreSQL and 6,810 rows in the source
+
+`(player_url, draft_year)` alone leaves **23** duplicate groups —
+`Pre-Draft + Trade` x13, `National + Pre-Season` x4, `National + Rookie` x2, and
+one each of `Rookie + Trade`, `Mid-Season + Trade`, `Mid-Season + Pre-Season`,
+`Mid-Season + National`. Those are genuinely different selections for the same
+person in the same year, so the selection-type component is load-bearing.
+`draft_kind` is preferred over `draft_type` because a source re-wording is the
+likelier change and `draft_kind` already absorbs the one that exists; an
+incoming NULL `draft_kind` must abort the reload rather than key on NULL.
+
+#### Ownership scope
+
+Both draft reloads currently treat the whole table as their dataset.
+`createPlayerInTransaction` (`src/db/queries/players.ts:390-411`) inserts
+admin-created `draft_picks` with `source_id` NULL, no `source_record_id` and no
+`draft_person_id`, so every reload destroys them silently. Because they have no
+`draft_person_id`, `lockUnresolvedTarget` throws for them and they can **never**
+carry a link decision — the manual-decision guard is structurally incapable of
+protecting them, and only source scoping can. This is the same ownership defect
+as `AFLDB-ISSUE-080` on a different table, and is fixed as part of this issue.
+
+The importer-owned scope is `source_id = <draftguru>`; admin rows
+(`source_id IS NULL`) must be outside UPDATE, INSERT and DELETE.
+
+#### `draft_persons` lifecycle
+
+- Exactly one foreign key points at `draft_persons.id`:
+  `draft_picks.draft_person_id`, with **no `ON DELETE`** clause (NO ACTION).
+  Nothing references `draft_picks.id` or `player_achievements.id` by FK.
+- Durable non-FK references do exist:
+  `player_link_match_candidates(resolution_entity_type = 'draft_person', id)` —
+  **2,304 rows on `afldb_dev`** — and `data_issues(entity_type = 'draft_person')`.
+- `draft_persons` carries the applied human link (`applyLockedLink` writes
+  `player_id`, `link_status`, `is_matching_backlog`) and has no
+  `source_record_id`, `import_batch_id` or `imported_at`.
+- **It therefore cannot remain rebuildable.** Reconciling only `draft_picks`
+  while rebuilding `draft_persons` breaks the relationship: the FK is NO ACTION,
+  so the delete fails, and `TRUNCATE ... CASCADE` empties the picks with it.
+- No non-DraftGuru `draft_persons` row can exist today (`source_id` NOT NULL,
+  one distinct value, importer-only inserts), but the reload should be scoped by
+  construction anyway.
+- Delete ordering under the NO ACTION FK: reload persons **without** deletes,
+  reload picks fully, then delete persons left with no pick. That last set is
+  exactly the vanished persons, because a person exists only where a pick
+  references them.
+- The importer already concedes (lines 336-343) that it clears only *unresolved*
+  `data_issues` because the reload orphans the ids, so adjudicated draft-person
+  issues are dangling by design. Id preservation removes the cause.
+  `afldb_dev` currently holds 100 open and 0 resolved, so this is latent.
+
+#### Decision grain
+
+`player_link_resolutions` records `target_table = 'draft_picks'` and
+`target_id = <one pick id>`, but `applyLockedLink` writes `draft_persons` and
+**every pick of that person**. The audit target is row-grained; the decision is
+person-grained, and must be normalised through `draft_person_id` to `player_url`
+before a reload can honour it. A `confirmed_unlinked` decision therefore has to
+be replayed person-grained as well, or a sibling pick would take a source link
+the admin has already rejected.
+
+**Conflicting-decision failure mode.** `confirmUnlinked`
+(`src/db/queries/player-links.ts:489`) takes no lock, does not re-read the
+target and runs on `authSql` rather than the import transaction, so a stale form
+can record `confirmed_unlinked` against a pick whose person was linked moments
+earlier. One person can consequently hold contradictory operative decisions. A
+reload must **abort before mutation** and report both rather than pick a winner
+by `created_at`.
+
+#### First-kick-goal source-identity investigation, 2026-08-22
+
+**There is no upstream generator to trace.** `data/records/first-kick-goal.csv`
+is **untracked and gitignored** (`.gitignore /data/*`) — a hand-curated extract
+of a Wikipedia table with four columns (`Player,Club,Rd.,Year`) and no
+identifier of any kind. "Regenerating the source" means a person re-extracting
+it, so row order, the `[8]`-style citation markers, the mojibake dagger and the
+legend glyphs are all volatile.
+
+**Every content-derived key was rejected, including the one first shipped.**
+An interim fix reconciled on `player_name_clean`, which is unique (334/334 on
+both sides) — but the final review established that uniqueness is not
+durability, and the clean name fails as identity:
+
+- the `Setanta Ã hAilpÃ­n` mojibake row is **guaranteed** to change on any
+  correctly decoded re-extract;
+- `MANUAL_NAME_OVERRIDES` carries 8 spelling divergences and its own comment
+  anticipates the source being corrected;
+- the clean name is derived by `splitPlayerName()`, so changing the legend
+  handling also moves it;
+- no alternative content key is even unique: `(season, club, round)` has 5
+  duplicate groups, `(season, round)` 34, `(season, club)` 48.
+
+An undecided row would churn its surrogate id on a legitimate correction,
+silently orphaning the reader suggestions, match candidates and adjudicated
+`data_issues` that name it without a foreign key. The issue was therefore
+**reopened** rather than documenting that as a limitation.
+
+The old `source_record_id` (`"{season}|{round}|{playerNameRaw}"`) was rejected
+on the same grounds — three mutable facts, one carrying the legend markers.
+
+#### The tracked identity manifest
+
+Identity is **assigned, not derived**: `data/records/first-kick-goal-ids.csv`,
+committed to git via the same `.gitignore` opt-in pattern as
+`data/awards/22-under-22.csv` (whose first column is likewise an explicit
+stable record id feeding `source_record_id`). The raw extract stays ignored;
+the manifest is the durable artifact:
+
+```csv
+Id,Player,Club,Rd.,Year,Status
+fkg-001,Jack Kirby,Essendon,11,1911,active
+```
+
+`Id` is opaque and sequential — deliberately not row position, a content hash,
+the cleaned name, a `player_id` or a season/round/club tuple. `Player` is the
+join key to the extract's clean name; `Club`/`Rd.`/`Year` are curator context.
+`Status=retired` reserves a number permanently: it counts toward
+max-ever-issued and is never reissued. The invariant:
+
+```text
+new logical fact      -> next number above max-ever-issued
+existing logical fact -> same number forever
+retired fact          -> reserved permanently, never reissued
+```
+
+**The core allocation rule:** the extract has no identifier, so an unmatched
+extract name can never be classified as new while an active manifest row is
+also unmatched — that pair is more likely one spelling correction. Any
+unmatched active manifest row aborts the run and `--assign-ids` alike, with
+both unmatched sets printed for curator classification (rename → edit the
+manifest `Player`, keep the id; removal → `Status=retired`; only then may
+genuinely additional rows be allocated). This is what prevents
+`rename → accidental new id` and `remove one + add one → identity
+reassignment`.
+
+#### First-kick-goal ownership
+
+The importer owns `achievement_type = 'first_kick_goal'` **and**
+`source_id = <wikipedia_first_kick_goal>`. The original
+`DELETE ... WHERE achievement_type = 'first_kick_goal'` was type-scoped but not
+source-scoped, and **destroying a row owned by another source was reproduced**:
+a `manual_admin_edit`-sourced fixture was deleted outright by the unmodified
+importer. There is no admin INSERT or UPDATE path for `player_achievements`
+today (the only non-importer write is the cascade `DELETE ... WHERE match_id`
+in `src/db/queries/match-admin.ts:381`), but the scope is bound by both columns
+because the type is meant to grow — the assumption AFLDB-ISSUE-080 records the
+honours loaders making. `player_achievement_type` has exactly one enum value,
+so the regression asserts that cardinality and the second-type case is added
+the day one lands.
+
+#### First-kick-goal reproduction, `afldb_test`, 2026-08-22
+
+The original destructive defect was reproduced before any fix: the integration
+suite failed 6 of 6 against the unmodified importer, ids moved from **1-334**
+to **2674-3007** over repeated reloads (monotonic, never reused — the harm is a
+lost link plus an unresolvable audit pointer, not a decision transferred to
+another person's row), and the foreign-source fixture was deleted.
+
+#### Final independent review, 2026-08-22 — two bounded defects found and fixed
+
+The implementation was reviewed against the code rather than this ledger. Every
+claimed invariant held except two, both in the retirement path, both corrected
+and re-validated.
+
+**1. A grant gap the test harness structurally could not catch.** The retirement
+preflight read `player_link_suggestions` and `player_link_match_candidates`.
+`afldb_import` held **no privilege of any kind** on either table, so the first
+retirement in production would have aborted on `permission denied` instead of
+the intended report. Every test passed because the suite connects as
+`afldb_owner` — the importer had never once been exercised under its own role.
+
+Fixed two ways: `player_link_match_candidates` was dropped from the preflight
+entirely (it is advisory and self-limiting — see the classification below), and
+migration `070_import_reads_link_suggestions.sql` grants `afldb_import` SELECT
+(only) on `player_link_suggestions`, mirrored in `tools/maintenance/privileges.sql`
+whose import revoke loop would otherwise strip it. Exactly the shape migration
+068 established. Proven by running the importer **as `afldb_import`** against
+`afldb_test`: a referenced retirement now reports
+`fkg-050 "Graham Croft" (db id 2723) still has 1 reader suggestions; rerun with
+--accept-retirement fkg-050`, and the acknowledged run reports
+`fkg-050 retired: row 2723 deleted; ACKNOWLEDGED durable references left behind`.
+A new regression asserts the import role's grants directly, so the class cannot
+recur silently.
+
+**2. `--accept-retirement` authorised the delete but cleaned nothing.** The
+refile of the importer's own `data_issues` is scoped to the *surviving* ids, so a
+retired row's own unresolved issues outlived the row they described. They are now
+deleted with it. Adjudicated issues are still preserved deliberately — that is
+what the gate exists for.
+
+**Every non-FK reference to `player_achievements.id`, classified.** (`data_edits`
+does not apply: `player_achievements` is absent from migration 058's
+`table_name` allowlist.)
+
+| Reference | Class | On retirement |
+|---|---|---|
+| `player_link_resolutions` | **Durable**, append-only by grant — it cannot be cleaned by anyone | Fail closed; only `--allow-link-loss` proceeds, and the dangling audit row is the `AFLDB-ISSUE-079` class |
+| `player_link_suggestions` | **Durable.** Orphans *are* surfaced: `/admin/player-links` renders every open tip unjoined, so a stranded one sits in that queue forever and can never be approved | Fail closed; `--accept-retirement <id>` proceeds and **reports what it strands** |
+| `data_issues`, adjudicated | **Durable** — deliberately preserved history | Fail closed; same acknowledgement |
+| `data_issues`, unresolved | **Disposable** — the importer files and refiles them each run | Deleted with the row, in the same transaction |
+| `player_link_match_candidates` | **Disposable and self-limiting** — every read is keyed by the entity ids on the page, so an orphan is never fetched, and approval rescores from source data | Not read, not cleaned, and deliberately outside the import role's privileges |
+
+Migration 056's comment calling a dead `target_id` "a harmless unsurfaced row"
+is accurate for the per-row lookup it describes and **not** for the standalone
+suggestions panel; that discrepancy is why the suggestion gate is fail-closed
+rather than advisory.
+
+**A stale test assertion was also found and corrected** — it still expected the
+pre-review message wording, and would have passed for the wrong reason.
+
+**Verified in the review, from code and tests rather than the ledger:**
+`fkg-NNN` is persisted in the tracked manifest and never regenerated after
+bootstrap; an unmatched active manifest row blocks all allocation (proven by
+`--assign-ids` refusing and leaving the manifest byte-identical); retired ids
+count toward max-ever-issued and are never reused (335 retired → next is 336);
+`(source_id, source_record_id)` is the reconciliation key and
+`player_achievements_source_uq` enforces it; `--rekey` preserves every
+surrogate id, is retry-safe and fails closed on mixed/ambiguous states;
+undecided spelling corrections update in place; decided renames abort until
+that exact id is acknowledged, and acknowledgement preserves both row id and
+decision; unknown/duplicate/irrelevant acknowledgements fail; no `::int`
+narrowing remains and the bigint representation is pinned by a regression;
+every abort precedes the first target mutation; and the forced late-FK failure
+genuinely rolls back both the early DELETE and the `import_batches` insert.
 
 ### First wrong layer
-Import/ETL.
+Import/ETL — which rows the loader treats as its own, and what it treats as
+durable identity.
 
 ### Root cause
-Not yet confirmed for these two loaders specifically; presumed identical to
-`AFLDB-ISSUE-044` — the loaders predate the append-only manual-resolution
-workflow and treat reconstructed source rows as the whole identity state.
+Confirmed for the draft loader: it rebuilds `draft_picks` and `draft_persons`
+from a source that has **no stable row identifier at all** (both the SQLite
+rowid and `dg_person_id` are regenerated on every upstream load), and it treats
+the reconstructed source rows as the whole identity state. The surrogate ids the
+audit trail, the suggestion cache and the issue history depend on are therefore
+reissued on every run, and rows the importer does not own are destroyed with
+them.
+
+Not yet confirmed for `import-first-kick-goal.ts`; presumed identical to
+`AFLDB-ISSUE-044`.
 
 ### Fix
-Not yet fixed.
+Both halves fixed, 2026-08-22.
+
+#### First-kick-goal
+`tools/records/import-first-kick-goal.ts` reconciles on
+`(source_id, source_record_id)` where `source_record_id` is the manifest's
+`fkg-NNN` — enforced by the existing `player_achievements_source_uq`, so no
+migration and no privilege change were needed. In one transaction, in this
+order: manifest/extract bijection (settled before the database is even
+opened); duplicate incoming ids; legacy/mixed `source_record_id` format guard;
+unknown stored ids; decisions read and classified; decided renames and at-risk
+retirements checked against their acknowledgements; **then** the first target
+write — delete retired ids, update matched ids in place, insert new ids,
+replay human decisions, refile scoped `data_issues`.
+
+New modes and flags, all fail-closed:
+
+- `--assign-ids` — bootstrap the manifest (one-time positional assignment,
+  acceptable only because no prior identity exists), or allocate ids for
+  genuinely new rows strictly above max-ever-issued once every active row
+  maps 1:1. Never rewrites an allocation, never reuses a retired number, no-op
+  on unchanged inputs, aborts allocating **nothing** while any active row is
+  unmatched.
+- `--rekey` — the one-time database transition from the legacy
+  `source_record_id` format, bridged by the current clean names. Prints the
+  preflight report (active manifest rows / owned rows / exact 1:1 mappings /
+  unmatched manifest / unmatched database / ambiguous — 334/334/334/0/0/0 on
+  the real transition) and writes only on an exact bijection. Retry-safe:
+  all-legacy → rekey in place; all-stable → verify and report "already
+  rekeyed"; a mixture → abort. It writes `source_record_id` and nothing else.
+- Renames: same `fkg-NNN`, changed name = the same achievement with corrected
+  descriptive data. An undecided row updates in place (reported); a decided
+  row aborts until the per-record `--accept-rename fkg-NNN`, which keeps the
+  row, the surrogate id **and** the decision. Deliberately not
+  `--allow-link-loss`: accepting a spelling fix must never cost a decision.
+  Acknowledgements are validated against renames actually detected in that
+  run — unknown ids, non-renaming ids and duplicate arguments all fail.
+- Retirements: `Status=retired` means the source fact went away, never
+  "delete regardless of application history". A retiring row still carrying
+  adjudicated `data_issues`, suggestions or match candidates aborts until
+  `--accept-retirement fkg-NNN`; one carrying a link decision is a decision
+  loss and additionally requires `--allow-link-loss`.
+- `AFLDB_FIRST_KICK_GOAL_CSV` / `AFLDB_FIRST_KICK_GOAL_MANIFEST` point a run
+  at candidate copies, which is how the tests avoid touching the real files.
+
+**Deployment order for the transition:** freeze the current extract →
+bootstrap and commit the manifest → deploy importer + manifest → run
+`--rekey` on each target database **before** any source correction → only
+then permit ordinary re-extracts. If the source changes first, the bridge
+fails closed.
+
+**A postgres.js trap found and corrected during review:**
+`player_link_resolutions.target_id` is `bigint`, and postgres.js returns int8
+as a **string**. The decision lookup was number-keyed, so every decision was
+read and silently dropped — the source simply won. An interim fix cast
+`target_id::int`; the final review rejected that as an unguarded narrowing of
+a bigint identity, and the lookup now keeps the driver's representation and
+keys both sides through `String(...)`, correct whichever representation
+arrives. The Python loaders are unaffected: psycopg returns an int.
+
+#### Draft
+
+Migration `069_draft_source_identity.sql` establishes the importer-owned
+identity and fails closed on existing duplicates:
+
+- `UNIQUE (source_id, player_url)` on `draft_persons`;
+- `UNIQUE NULLS NOT DISTINCT (source_id, player_url, draft_year, draft_kind)
+  WHERE source_id IS NOT NULL` on `draft_picks` — partial, so admin-created
+  rows stay outside the importer's identity space and two admins can still
+  create players drafted at the same year and pick;
+- `draft_persons`'s existing `UNIQUE (source_id, dg_person_id)` re-declared
+  `DEFERRABLE INITIALLY IMMEDIATE`. It is not dropped — dg_person_id is still
+  stored and quoted — but a reload PERMUTES it once the source renumbers, and a
+  bulk UPDATE fails row by row against a non-deferrable unique constraint. The
+  importer defers it inside its own transaction; ordinary writes are unaffected.
+
+`tools/migration/import_draft.py` no longer truncates. It now:
+
+- reconciles `draft_persons` on `(source_id, player_url)` with
+  `delete_missing=False`, then `draft_picks` on `(source_id, player_url,
+  draft_year, draft_kind)`, then deletes the childless people the source
+  dropped — the only order a NO ACTION foreign key permits, and the vanished
+  set exactly, since a person exists only where a pick references them;
+- scopes every statement to `source_id = draftguru`, so admin-created picks are
+  outside UPDATE, INSERT and DELETE alike;
+- classifies every human decision **before the first write**, normalising each
+  from the pick the audit row names to its `player_url`;
+- replays survivors person-grained, exactly as `applyLockedLink` writes them:
+  the `draft_person` and every pick belonging to it. A `linked` decision
+  restores the admin's player and `resolved`; a `confirmed_unlinked` decision
+  keeps the person and all its picks unlinked even when the source now supplies
+  a link. Either disagreement is reported by person, name and both player ids;
+- aborts before mutation when a decision cannot be carried — the source dropped
+  the person, dropped the key, or renamed the row under it — with
+  `--allow-link-loss` as the deliberate escape hatch that itemises what it
+  discards;
+- aborts **unconditionally** when two picks of one person carry contradictory
+  operative decisions. `--allow-link-loss` deliberately does not apply: there is
+  no safe decision to keep, and identity is person-grained;
+- refuses to run at all if the source supplies a row with no `player_url` or no
+  `draft_kind` — a NULL kind means the upstream `draft_kinds.py` mapping does
+  not know a new wording yet, and keying on NULL would silently merge rows;
+- drops its intermediate `pg.commit()` calls, so one rollback undoes the run;
+- files its `data_issues` after the decision replay, so a person an admin has
+  just adjudicated is no longer reported as matching backlog.
+
+`tools/migration/common.py` gained one parameter, `delete_missing`, for the
+parent/child delete ordering. Nothing existing was weakened.
 
 ### Validation
-Not yet performed.
+All database work ran against `afldb_test` on the dev host; production, the
+read-only legacy SQLite and the raw/curated source datasets were untouched.
+
+#### First-kick-goal
+- Original destructive defect reproduced first (6/6 failures, id churn
+  1-334 → 2674-3007, foreign-source row destroyed), as recorded above.
+- The rewritten `tests/integration/first-kick-goal-reload-links.test.ts` —
+  **13/13 pass** on the dev host against `afldb_test`, over temp copies of
+  both files (the tracked manifest and curated extract are never modified):
+  1. `--rekey` in place, retry-safely — the 334/334/334/0/0/0 preflight
+     report, id fingerprint byte-identical, every owned row stable-keyed,
+     second run "already rekeyed" writes nothing, a seeded mixture aborts;
+  2. resolved link survives with its row id; the admin beats a contradicting
+     source and the disagreement is reported; audit target live;
+  3. confirmed-unlinked survives with its audit target live;
+  4. **a source-side spelling correction keeps the row id** (why the issue
+     was reopened): the corrected extract first aborts with both unmatched
+     sets printed and nothing allocated (`--assign-ids` refuses too), then
+     the curator's manifest edit keeps `fkg-NNN` and the reload updates the
+     same row in place;
+  5. corrected club, round and season under one stable id keep the same row;
+  6. a decided rename aborts listing id, both names and the decision; an
+     unknown acknowledgement fails; `--accept-rename` updates the same row
+     and keeps the decision;
+  7. allocation: a new row is blocked until `--assign-ids`, which allocates
+     `fkg-335` only, no-ops on repeat, and after retiring 335 the next
+     allocation is `fkg-336` — never a reuse;
+  8. a referenced retirement aborts until `--accept-retirement`; an
+     un-retired fact returns as a new row under the same stable id;
+  9. a decided retirement is a decision loss gated by `--allow-link-loss`;
+  10. a foreign-source `first_kick_goal` row survives untouched;
+  11. rollback: one safe retirement plus one new row violating
+      `player_achievements_season_fkey` — the early DELETE rolls back with
+      the transaction, the row survives at its original id, and **no
+      `import_batches` row survives** (architecture, not a defect: the batch
+      row is created inside the same transaction, unlike the Python loaders
+      which commit theirs first and mark it `failed`);
+  12. `target_id` is `bigint` and the driver returns it as a JavaScript
+      string — the representation is pinned so the lookup mismatch cannot
+      silently return;
+  13. two further reloads change no row id and stack no duplicate
+      `data_issues`.
+- A reload against the **real** tracked manifest (no env overrides):
+  `334 updated, 0 inserted, 0 deleted`, fingerprint byte-identical — the
+  committed manifest matches the deterministic bootstrap exactly.
+
+#### Draft
+
+- Migration 069 applied to `afldb_test` in 217 ms — both unique indexes built
+  over the live 6,810/5,057 rows without a duplicate, which is the fail-closed
+  proof on real data. No new grants, so `privileges.sql` is unchanged.
+- Defect reproduced first: 7/7 of the new suite failed against the unmodified
+  importer, as tabulated under Evidence.
+- After the fix a full reload reports `draft_persons: 5,057 updated, 0 inserted,
+  0 deleted` and `draft_picks: 6,810 updated, 0 inserted, 0 deleted`, with the
+  `md5(string_agg(id))` fingerprint of both tables **byte-identical** before and
+  after, and the same 3,459 linked / 100 backlog / 1,498 never-played counts the
+  release gate asserts.
+- `tests/integration/draft-reload-links.test.ts` — **7/7 pass**: resolved link
+  survives on every pick of the person with every row id intact;
+  confirmed-unlinked survives person-grained with its audit target still live;
+  the admin's link wins over a contradicting source and the disagreement is
+  reported; a renamed row aborts with exit 1 and writes nothing, then
+  `--allow-link-loss` proceeds and itemises; contradictory person decisions
+  abort before mutation; an admin-created pick survives unchanged **with no
+  decision of its own**; two further reloads change no row id and stack no
+  duplicate `data_issues`.
+- Regression: `tests/integration/awards-reload-links.test.ts`,
+  `tests/player-link-mutations.test.ts`, `tests/under-22-importer.test.ts` and
+  `tests/integration/release-gates.test.ts` all pass — 106 tests — so
+  `AFLDB-ISSUE-044` is intact.
+- Full `tests/integration`: 388 passed, 2 failed, both pre-existing and
+  unrelated (`AFLDB-ISSUE-073` fk-indexes, `AFLDB-ISSUE-074` email-intake).
+- Full non-integration suite: 1,132 passed, 2 failed, both pre-existing and
+  unrelated (`AFLDB-ISSUE-072` site-settings, the `AFLDB-ISSUE-068` H7
+  diagnostic).
+#### Combined, after both halves
+- Full `tests/integration`: **401 passed, 2 failed**, both pre-existing and
+  unrelated (`AFLDB-ISSUE-073` fk-indexes, `AFLDB-ISSUE-074` email-intake).
+  `tests/integration/awards-reload-links.test.ts` (6/6) and
+  `tests/integration/draft-reload-links.test.ts` (7/7) both pass, so
+  `AFLDB-ISSUE-044` and the draft half are intact.
+- After the review corrections: `tests/integration/first-kick-goal-reload-links.test.ts`
+  **14/14**, `draft-reload-links.test.ts` **7/7**,
+  `awards-reload-links.test.ts` **6/6**; full `tests/integration` **402 passed,
+  2 failed** (pre-existing `AFLDB-ISSUE-073`, `AFLDB-ISSUE-074`); full
+  non-integration suite **1,132 passed, 2 failed** (pre-existing
+  `AFLDB-ISSUE-072`, `AFLDB-ISSUE-068`). `tests/integration/privileges.test.ts`
+  passes with the new grant.
+- The importer was additionally run end to end **as `afldb_import`** against
+  `afldb_test`, covering a baseline reload, a gated retirement and an
+  acknowledged retirement — the role the tests do not use.
+- `npx tsc --noEmit` clean on Windows and the dev host. No Next.js build run:
+  no application code changed.
+- `afldb_test` left clean: no fixture rows, resolutions, suggestions or
+  admins remain, and a further reload of each importer changes no id.
+
+**Test-harness finding, fixed here.** Vitest runs test files in parallel, and
+the new suite links real draft people to fixture players for over two minutes
+while `release-gates.test.ts` asserts the exact number of linked draft people.
+Run concurrently the gate counted the fixtures and failed on numbers that were
+correct for the instant it read them. Neither assertion was weakened: a
+PostgreSQL advisory lock (`tests/integration/draft-lock.ts`) serialises the two.
+The suite also runs one final reload in `afterAll`, because deleting a fixture
+audit row does not undo the link it already applied.
 
 ### Follow-up
-1. Reproduce both against `afldb_test`, capturing the before/after row ids and
-   the state of the affected `player_link_resolutions` rows, as
-   `AFLDB-ISSUE-044` did.
-2. Move `import_draft.py` onto `reload_keyed()` from
-   `tools/migration/common.py`, keyed on the durable draft identity rather than
-   a name; confirm whether the person-grained propagation in `applyLockedLink`
-   needs the decision re-applied per pick or per `draft_person`.
-3. `import-first-kick-goal.ts` is TypeScript and cannot call the Python helper;
-   it needs the same shape — classify decisions first, upsert by
-   `(source_id, source_record_id)`, abort rather than lose a decision.
-4. Extend `tests/integration/awards-reload-links.test.ts`, or add a sibling, so
-   both paths carry the same reload-survival proof.
+1. Reviewed independently and closed 2026-08-22. Two bounded defects were found
+   and fixed during that review (see above); all other invariants held.
+2. **Draft deployment order, as for migrations 066 and 068:** apply migration
+   `069_draft_source_identity.sql` **before** the new `import_draft.py` runs.
+   No privilege reconciliation is needed.
+3. **First-kick-goal deployment order:** apply migration
+   `070_import_reads_link_suggestions.sql` and run `npm run db:privileges`
+   **before** the new importer code, exactly as for 066 and 068 — without the
+   grant the first retirement fails closed on the read. Commit
+   `data/records/first-kick-goal-ids.csv` with the importer, then run `--rekey`
+   once per target database (dev, production) **before** the extract is next
+   corrected or re-extracted.
+4. Decisions already made dangling by a previous destructive reload cannot be
+   recovered — they match no row and are invisible to the new guards. Tracked
+   read-only under `AFLDB-ISSUE-079`.
+5. `confirmUnlinked` remains lock-free (`AFLDB-ISSUE-082`); the honours
+   suite's latent fixture race is `AFLDB-ISSUE-081`.
 
 ## AFLDB-ISSUE-079 — Audit historical `player_link_resolutions` rows for dangling targets
 
@@ -3849,7 +4371,11 @@ carrying the defect.
 No remediation is authorised by this issue. It covers **diagnosis only**.
 
 ### Validation
-Not yet performed against production.
+Not yet performed against production. **The clean `afldb_dev` result above does
+not close this issue and must not be read as completing the audit:** dev and
+production are separate databases with separate reload histories and separate
+admin activity. This issue stays Open until production has been audited and its
+counts recorded here.
 
 ### The audit
 
@@ -3906,7 +4432,8 @@ should be counted the same way while the audit is being run.
 
 ### Follow-up
 1. Run both queries against production, and re-run against `afldb_dev`, keeping
-   the full output as an artifact. Record the counts here.
+   the full output as an artifact. Record the counts here. **Only on explicit
+   instruction** — this touches production, read-only or not.
 2. **Relink or delete nothing automatically.** This issue authorises no writes.
 3. Where a dangling decision can be reconstructed safely — the source key and
    `player_name_raw` recorded in the audit row still identify exactly one live
@@ -3919,3 +4446,334 @@ should be counted the same way while the audit is being run.
    `/admin/player-links`.
 5. If production is clean, close this issue with the recorded counts. Do not
    leave it open on the assumption that damage must exist.
+
+## AFLDB-ISSUE-080 — Legacy honours reloads delete admin-created Hall of Fame and honour-team rows
+
+- **Status:** Open
+- **Severity:** High
+- **Area:** Data integrity
+- **Found:** 2026-08-22
+- **Resolved:** N/A
+- **Files:** `src/db/queries/awards-admin.ts` (`createHallOfFameEntry`,
+  `createHonourTeamMember`), `tools/migration/import_awards.py`
+  (`import_hall_of_fame`, `import_honour_teams`), `tools/migration/common.py`
+  (`reload_keyed`), `src/db/migrations/042_awards_natural_keys.sql`
+
+### Symptom
+A Hall of Fame inductee or honour-team member created through the admin UI is
+destroyed by the next legacy awards reload. Before `AFLDB-ISSUE-044` this
+happened silently; since that change the row is still deleted, and if it carries
+a manual player link the reload now aborts instead.
+
+### Reproduction
+Create a Hall of Fame entry via the admin screen (or an honour-team member),
+then run `tools/migration/import_awards.py --groups hall_of_fame honour_teams`.
+The admin row is gone. Repeat with the row manually linked to a player and the
+reload aborts with `LinkDecisionLoss` instead of completing.
+
+### Expected
+A source reload reconciles only the rows that source owns. Rows AFLDB created
+itself are not the legacy source's to delete, and must survive any reload.
+
+### Actual
+Both loaders treat the whole table as theirs:
+
+- `import_hall_of_fame` reloads all of `hall_of_fame`, keyed on
+  `(name, inducted_year)`;
+- `import_honour_teams` reloads all of `honour_team_members`, keyed on
+  `(team_name, player_name_raw)`.
+
+Any row whose key is absent from the legacy source is deleted, and an
+admin-created row is by definition absent from it.
+
+### Evidence
+**Ownership is already expressible and is simply not used.** Both admin inserts
+omit `source_id` entirely, so admin rows carry `source_id IS NULL`, while the
+loaders stamp `sources.get('wikipedia')`. The distinction the fix needs is
+therefore already in the data:
+
+- `src/db/queries/awards-admin.ts:264` — `INSERT INTO hall_of_fame (name,
+  player_id, link_status_value, category, inducted_year, is_legend, legend_year,
+  club_name_raw, state, playing_career, notes)` — no `source_id`.
+- `src/db/queries/awards-admin.ts:331,351` — the two `INSERT INTO
+  honour_team_members (...)` branches — no `source_id`.
+
+The other four honours loaders are unaffected: `award_winners`,
+`award_nominations` and `captaincies` key on `(source_id, source_record_id)`, so
+a NULL-source row is already outside their reload key space, and `under_22`
+scopes itself to its own `source_id`.
+
+**No schema change is required for the ownership distinction itself.**
+`source_id` already exists on both tables and already separates the two
+populations; the loaders simply do not consult it. Any schema work that emerges
+belongs to the collision policy below, not to ownership.
+
+**Exposure on `afldb_dev`, 2026-08-22 (read-only):**
+
+| Table | Total rows | `source_id IS NULL` (admin-created) | Admin-created and linked |
+|---|---|---|---|
+| `hall_of_fame` | 343 | 0 | 0 |
+| `honour_team_members` | 113 | 0 | 0 |
+
+**This means the defect is latent on dev, not disproven.** The reload behaviour
+is unchanged and wrong; there simply happens to be nothing on dev for it to
+destroy today. The first admin-created inductee or honour-team member changes
+that immediately. **Production has not been checked.**
+
+### First wrong layer
+Import/ETL scoping — the loader's notion of which rows it owns.
+
+### Root cause
+The two loaders that have no `source_record_id` fall back to a natural key and,
+with it, to reconciling the entire table. Table-wide reconciliation conflates
+"row this source did not supply" with "row this source deleted".
+
+### Interaction with AFLDB-ISSUE-044
+`AFLDB-ISSUE-044` did not introduce the deletion and did not fix it; it changed
+the failure mode, in both directions:
+
+- **Better:** an admin-created row carrying a manual `player_link_resolutions`
+  decision is no longer silently destroyed. `reload_keyed`'s strict analysis
+  classifies it as `the source no longer carries this key`, raises
+  `LinkDecisionLoss` before any write, and the loader's transaction rolls back
+  with the table untouched.
+- **Worse operationally:** that abort blocks the *entire* reload. One decided
+  admin-created row stops every subsequent honours refresh until someone passes
+  `--allow-link-loss`.
+- **Unchanged and still wrong:** an admin-created row with **no** player-link
+  decision is invisible to that guard — `reload_keyed` only classifies rows that
+  have a resolution — so it is still deleted silently, exactly as before.
+
+`--allow-link-loss` is **not** the long-term answer for admin-owned rows. It is
+the deliberate escape hatch for a *source* row whose key genuinely changed, and
+using it here does the wrong thing twice over: it discards the human decision
+and it still deletes the admin-created row. Reaching for it to unblock a reload
+converts a correct fail-closed stop into the silent data loss this issue exists
+to end. The row must stop being in the reload's scope at all.
+
+### Fix
+Not fixed. Do not implement yet.
+
+The intended outcome is **source-scoped reconciliation**: an importer may only
+UPDATE, INSERT and DELETE rows it owns, and a row it does not own is neither
+read as a candidate nor deleted as a stranger. Concretely, scope
+`import_hall_of_fame` and `import_honour_teams` to their own `source_id` via
+`reload_keyed`'s existing `scope_column`/`scope_values` parameters, the way
+`under_22` already does. Admin-created rows (`source_id IS NULL`) then fall
+outside every one of the three write steps, and survive any reload untouched
+whether or not they carry a player-link decision.
+
+### The constraint that must be considered first
+`hall_of_fame_name_uq` is a **global** `UNIQUE NULLS NOT DISTINCT (name,
+inducted_year)` (migration 042) — it is not scoped by `source_id`. Today the
+table-wide reload deletes a colliding admin row before inserting the source row,
+so a duplicate can never surface. Once the reload is scoped, an admin row
+duplicating a source key stops being silently overwritten and becomes a
+constraint violation that aborts the reload.
+
+That is a deliberate design decision, not an incidental detail, and it must be
+settled before the scoping change lands. Options, in the order they should be
+weighed:
+
+1. Detect the collision during `reload_keyed`'s pre-write analysis and report it
+   with both row ids, so it fails before touching anything and names the rows a
+   human must merge.
+2. Treat an admin row that exactly matches a source key as the same fact and
+   adopt it into the source's ownership, stamping `source_id` on it. This
+   silently changes ownership, so it needs explicit sign-off.
+3. Re-scope the constraint itself. Least attractive: the key exists to stop the
+   same inductee being loaded twice regardless of provenance, and per-source
+   uniqueness would weaken exactly the guarantee migration 042 was written for.
+
+`honour_team_members` has no equivalent problem: migration 059 already replaced
+its table-wide constraint with two partial unique indexes.
+
+### Required production exposure audit (read-only, must run before implementation)
+
+Not yet run, and **must not be run without explicit instruction.** It performs
+no writes: `SELECT` only, no `INSERT`/`UPDATE`/`DELETE`/`DDL`, no temporary
+tables. Run it as `AFLDB_OWNER_DATABASE_URL` — `afldb_app` cannot read
+`player_link_resolutions`, which report 3 needs.
+
+It must report four things:
+
+**1 + 2. Admin-created rows in both tables, with counts and full detail.**
+
+```sql
+SELECT 'hall_of_fame' AS tbl, count(*) AS total,
+       count(*) FILTER (WHERE source_id IS NULL) AS admin_created
+  FROM hall_of_fame
+UNION ALL
+SELECT 'honour_team_members', count(*),
+       count(*) FILTER (WHERE source_id IS NULL)
+  FROM honour_team_members
+ORDER BY 1;
+
+SELECT id, name, inducted_year, category, player_id,
+       link_status_value::text AS link_status, club_name_raw, import_batch_id
+  FROM hall_of_fame WHERE source_id IS NULL ORDER BY id;
+
+SELECT id, team_name, player_name_raw, position, player_id,
+       link_status_value::text AS link_status, sort_order, import_batch_id
+  FROM honour_team_members WHERE source_id IS NULL ORDER BY id;
+```
+
+**3. Whether any admin-created row carries a player-link decision** — these are
+the rows that would abort a reload today rather than vanish from it.
+
+```sql
+SELECT r.target_table, r.target_id, r.action, r.player_id, r.previous_status,
+       r.created_at, r.admin_user_id, r.match_method
+  FROM player_link_resolutions r
+ WHERE (r.target_table = 'hall_of_fame'
+        AND r.target_id IN (SELECT id FROM hall_of_fame WHERE source_id IS NULL))
+    OR (r.target_table = 'honour_team_members'
+        AND r.target_id IN (SELECT id FROM honour_team_members WHERE source_id IS NULL))
+ ORDER BY r.target_table, r.target_id, r.created_at;
+```
+
+**4. Whether any admin-created Hall of Fame row collides on
+`(name, inducted_year)` with an importer-owned row.** This is the set that
+decides the collision policy: today the table-wide delete hides these, and
+source-scoping turns each one into a `hall_of_fame_name_uq` violation.
+
+```sql
+SELECT a.id AS admin_id, a.name, a.inducted_year,
+       s.id AS source_id_row, s.source_id AS owning_source,
+       a.player_id AS admin_player, s.player_id AS source_player
+  FROM hall_of_fame a
+  JOIN hall_of_fame s
+    ON s.source_id IS NOT NULL
+   AND s.name IS NOT DISTINCT FROM a.name
+   AND s.inducted_year IS NOT DISTINCT FROM a.inducted_year
+ WHERE a.source_id IS NULL
+ ORDER BY a.name;
+```
+
+A collision against the *incoming legacy source* rather than the currently
+stored rows is the stricter question, and needs the loader's own extract; the
+query above is the safe stored-state approximation and is sufficient to decide
+whether the collision set is empty.
+
+Record the results here. The scoping change is only safe once the collision set
+is known to be empty or has been deliberately resolved.
+
+### Validation
+Not yet performed.
+
+### Follow-up
+1. Decide the `hall_of_fame_name_uq` collision policy above before writing code.
+2. Run the read-only production exposure audit above and record its output —
+   only on explicit instruction.
+3. Scope the two loaders to their own `source_id`, then extend
+   `tests/integration/awards-reload-links.test.ts` with an admin-created row
+   (linked and unlinked) that survives a full reload untouched.
+4. Consider whether `createHallOfFameEntry` and `createHonourTeamMember` should
+   stamp an explicit `manual_admin_edit` source rather than leaving `source_id`
+   NULL, so ownership is asserted positively instead of inferred from absence.
+
+## AFLDB-ISSUE-081 — Honours reload suite races the release gates over shared rows
+
+- **Status:** Open
+- **Severity:** Low
+- **Area:** Tests
+- **Found:** 2026-08-22
+- **Resolved:** N/A
+- **Files:** `tests/integration/awards-reload-links.test.ts`,
+  `tests/integration/release-gates.test.ts`, `tests/integration/draft-lock.ts`
+
+### Symptom
+Not yet observed failing. `awards-reload-links.test.ts` links real honours rows
+to fixture players and reloads the honours family repeatedly, while
+`release-gates.test.ts` asserts exact honours counts. Vitest runs test files in
+parallel, so the gate can read the database mid-fixture.
+
+### Reproduction
+Not yet reproduced. Found while fixing the identical race in the draft suite
+under `AFLDB-ISSUE-078`, which DID fail: the draft gate counted two fixture
+links and reported 3,461 linked people instead of 3,459.
+
+### Expected
+A release gate counts a quiescent dataset, or is serialised against whatever is
+mutating it.
+
+### Actual
+Nothing serialises the two files. The honours case has not bitten, most likely
+because its per-test `restore` callbacks put rows back sooner than the draft
+suite could, and because the gate's honours assertions overlap its fixtures less
+directly.
+
+### First wrong layer
+Test harness.
+
+### Root cause
+Not confirmed. Presumed identical to the draft case: file-level parallelism over
+shared database fixtures with no mutex.
+
+### Fix
+Not yet fixed.
+
+### Validation
+Not yet performed.
+
+### Follow-up
+Either give the honours pair the same advisory-lock treatment as
+`tests/integration/draft-lock.ts`, or establish that the gate's honours
+assertions cannot overlap that suite's fixtures and record why. Do not serialise
+the whole test run: file parallelism is worth keeping.
+
+## AFLDB-ISSUE-082 — `confirmUnlinked` can record a decision contradicting an applied link
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Admin
+- **Found:** 2026-08-22
+- **Resolved:** N/A
+- **Files:** `src/db/queries/player-links.ts` (`confirmUnlinked`)
+
+### Symptom
+Two picks of one draft person can end up carrying contradictory operative
+decisions — one `linked`, one `confirmed_unlinked` — which the draft reload now
+refuses to guess between and aborts on.
+
+### Reproduction
+Open `/admin/player-links`, resolve one pick of a multi-pick draft person, then
+submit a stale "confirm unlinked" form for a sibling pick of the same person.
+
+### Expected
+A confirmation is checked against the row's current state, as a link is.
+
+### Actual
+`confirmUnlinked` (`src/db/queries/player-links.ts:489`) takes no lock, does not
+re-read the target, and runs on `authSql` rather than the import transaction. It
+takes `previousStatus` straight from the form and inserts the audit row
+unconditionally. `resolveLink` does the opposite: it locks the draft person,
+then the pick, and re-checks both.
+
+### Evidence
+Established by inspection during `AFLDB-ISSUE-078`, and the reason that issue's
+draft reload aborts unconditionally on a contradiction rather than taking the
+latest decision by `created_at`. The importer's guard is a backstop, not a fix:
+the contradictory state should not be creatable.
+
+### First wrong layer
+Admin mutation path.
+
+### Root cause
+`confirmUnlinked` records an audit-only decision and was written as though that
+made a concurrency check unnecessary. It does not: the decision is
+person-grained in effect for draft picks, and it can contradict a link applied
+between the page render and the submit.
+
+### Fix
+Not yet fixed.
+
+### Validation
+Not yet performed.
+
+### Follow-up
+Lock and re-check the target the way `lockUnresolvedTarget` does, and reject a
+confirmation whose target — or, for a draft pick, whose draft person — is
+already resolved. Extend `tests/player-link-mutations.test.ts`, which already
+owns the draft identity-resolution cases.
+

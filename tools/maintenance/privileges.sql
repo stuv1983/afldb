@@ -301,6 +301,17 @@ BEGIN
     -- DELETE or TRUNCATE: the table stays append-only.
     GRANT SELECT ON player_link_resolutions TO afldb_import;
   END IF;
+  IF to_regclass('public.player_link_suggestions') IS NOT NULL THEN
+    -- Migration 070 (AFLDB-ISSUE-078): a keyed reload that retires a
+    -- source fact deletes a player_achievements row, and
+    -- player_link_suggestions.target_id points at it without a foreign
+    -- key. An orphan there is NOT unsurfaced -- the "Reader suggestions"
+    -- panel renders every open row unjoined -- so the loader refuses to
+    -- retire a referenced row unless the curator names it explicitly.
+    -- This read is what lets it see them. Read only: no INSERT, UPDATE,
+    -- DELETE or TRUNCATE for the import role.
+    GRANT SELECT ON player_link_suggestions TO afldb_import;
+  END IF;
 
   -- Staging is the importer's own workspace and holds no operational
   -- table, so it keeps its blanket grants and its default privileges.

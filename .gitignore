@@ -38,6 +38,9 @@ next-env.d.ts
 !/data/awards/
 /data/awards/*
 !/data/awards/22-under-22.csv
+!/data/records/
+/data/records/*
+!/data/records/first-kick-goal-ids.csv
 *.db
 *.db-journal
 *.db-wal
