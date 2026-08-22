@@ -478,7 +478,7 @@ export async function assessSources(
   for (const source of sources) {
     const key = resolutionKey(source.target);
     const scored = (candidates.get(key) ?? []).map((c) => scoreCandidate(source, c));
-    assessments.set(key, assessMatch(scored));
+    assessments.set(key, assessMatch(scored, source.target.resolutionEntityType));
   }
   return assessments;
 }

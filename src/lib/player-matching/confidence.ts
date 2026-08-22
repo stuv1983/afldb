@@ -119,6 +119,56 @@ export const MATCH_POLICY = {
     minGap: 25,
     minCorroboratingFamilies: 2,
     requireStrongName: true,
+
+    /**
+     * Which source classes may be approved unattended, measured per
+     * class rather than inferred from the total.
+     *
+     * The aggregate bulk precision is 99.99%, which reads as safe and
+     * is not: the whole of the error sits in one class. Backtest over
+     * 9,356 confirmed links, bulk-eligible population and false
+     * positives by source:
+     *
+     *   award_winners        2,750   0 FP
+     *   draft_person         2,319   0 FP
+     *   award_nominations      702   0 FP
+     *   player_achievements    253   0 FP
+     *   captaincies          1,313   1 FP
+     *   hall_of_fame             0   -- never reaches the band
+     *   honour_team_members      0   -- never reaches the band
+     *
+     * captaincies is excluded, and not merely because it held the one
+     * failure. A club's recorded captain for a season and the player
+     * who actually led the side can legitimately differ -- suspension,
+     * injury, a mid-season handover, a co-captaincy -- so the source
+     * name and the correct link disagree by design. captaincies#3230
+     * names Jobe Watson as Essendon's 2016 captain where AFLDB
+     * deliberately links Brendon Goddard, who led the side while Watson
+     * was suspended for the season. No evidence available to this
+     * matcher distinguishes that row from a correct one: it scores 97
+     * with a gap of 82. The class also carries 7 of the 8 hard
+     * conflicts raised across the whole backtest.
+     *
+     * Such rows still surface as very_high suggestions with their full
+     * evidence, and a human may approve them one at a time. What they
+     * may not do is pass unattended.
+     *
+     * hall_of_fame and honour_team_members are excluded for the
+     * opposite reason: they carry only name and career-span evidence,
+     * never reach the band, and so have NO measured bulk population.
+     * Absence of failures in a population of zero is not evidence of
+     * safety.
+     */
+    sourceTypes: {
+      award_winners: true,
+      award_nominations: true,
+      draft_person: true,
+      player_achievements: true,
+      captaincies: false,
+      hall_of_fame: false,
+      honour_team_members: false,
+      draft_picks: false,
+    } as Record<string, boolean>,
   },
 } as const;
 
@@ -175,7 +225,15 @@ function bandFor(score: number, gap: number | null, hardConflict: boolean): Conf
  * widen the gap exactly when the evidence is muddiest, and this feature
  * is built to prefer an unmatched player over a wrong one.
  */
-export function assessMatch(candidates: readonly ScoredCandidate[]): MatchAssessment {
+export function assessMatch(
+  candidates: readonly ScoredCandidate[],
+  /**
+   * The logical source class. Required, not optional: bulk eligibility
+   * is decided per class from measured evidence, and a default would
+   * silently pick one for a caller that forgot to say.
+   */
+  sourceType: string,
+): MatchAssessment {
   const ranked = rank(candidates);
   const best = ranked[0] ?? null;
   const alternatives = ranked.slice(1);
@@ -208,7 +266,11 @@ export function assessMatch(candidates: readonly ScoredCandidate[]): MatchAssess
 
   const { bulk } = MATCH_POLICY;
   const bulkEligible =
-    !best.hardConflict
+    // Source class first: a class whose measured population does not
+    // justify unattended approval never becomes eligible, however well
+    // an individual row scores.
+    bulk.sourceTypes[sourceType] === true
+    && !best.hardConflict
     && !ambiguous
     && band === 'very_high'
     && best.score >= bulk.minScore

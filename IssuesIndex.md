@@ -33,7 +33,7 @@
 | `AFLDB-ISSUE-072` | Low | Tests | `tests/site-settings.test.ts` default-shape expectation is stale after the `frontendTheme` settings landed. |
 | `AFLDB-ISSUE-073` | Medium | Database | Four migration-056/057 foreign keys lack supporting indexes; `fk-indexes.test.ts` fails. |
 | `AFLDB-ISSUE-074` | Low | Tests | email-intake integration test picks a real dev admin instead of its fixture and leaves a staged row behind. |
-| `AFLDB-ISSUE-075` | Medium | Admin/Matching | Confidence-scored player-link suggestions built and calibrated (76 tests pass, backtest over 9,356 links); dev browser validation outstanding. |
+| `AFLDB-ISSUE-076` | Medium | Performance | `won_final_at_venue` Grid Solver combinations can exceed the 5-second PostgreSQL statement timeout and crash the rendered page. |
 
 ---
 
@@ -121,10 +121,12 @@
 - **Current state:** The end-to-end CSV test picks an admin by query ordering and fails on the dev host where real admins sort first; it also leaves a staged `data_submissions` row behind (one artifact row left in `afldb_dev` on 2026-08-22).
 - **Next action:** Provision or deterministically select a dedicated fixture admin inside the test and clean up the staged row.
 
-## AFLDB-ISSUE-075 - Confidence-scored suggestions for /admin/player-links
+## AFLDB-ISSUE-076 — Grid Solver `won_final_at_venue` queries can hit statement timeout
 
 - **Severity:** Medium
-- **Area:** Admin/Matching
-- **Key files:** `src/lib/player-matching/*`, `src/db/queries/player-match-candidates.ts`, `src/db/migrations/067_player_link_match_candidates.sql`, `src/app/admin/player-links/*`, `tools/matching/backtest.ts`
-- **Current state:** Deterministic scoring, candidate blocking, the suggestion cache, the evidence UI and suggested/bulk approval with in-transaction rescoring are implemented. Algorithm `v1` calibrated against 9,356 confirmed links: 99.69% top-1, very_high precision 99.99%, bulk-eligible 7,337 at 99.99%, and all 44 live bulk-eligible proposals verified correct by hand. Migration 067 and privileges are applied on `afldb_dev` and `afldb_test`; 76 tests pass on the dev host.
-- **Next action:** Deploy the application code to dev, press `Recompute suggestions`, then work the browser checklist (band filters, evidence matches score, conflicts not approvable, manual paths intact, non-super-admin blocked) and perform one reversible real approval with before/after state captured.
+- **Area:** Performance
+- **Key files:** `src/db/queries/grid-solver.ts`, `src/search/grid-solver-spec.ts`, `tests/integration/grid-solver.test.ts`
+- **First wrong layer:** Database query/compiler performance.
+- **Current state:** Reproducible on build `NQrtI3zQGWx62e6zbI5bR`. PostgreSQL cancels the exact Grid Solver query at ~5.05–5.14 seconds with SQLSTATE `57014` and Next.js digest `1511510695`. The failing grid combines `games_at_multiple_clubs_min(50,2)`, `teammate_of(12603)`, `single_game_stat_min(kicks,20)`, clubs 103/108 and `won_final_at_venue(234)`. Changing only `won_final_at_venue(234)` to `played_at_venue(234)` makes the otherwise identical grid complete in ~360–397 ms. Do not raise the normal statement timeout as the fix.
+- **Next action:** Capture the exact generated SQL/bind parameters for the failing and successful variants, compare `EXPLAIN (ANALYZE, BUFFERS)` plans, then optimise the `won_final_at_venue` query shape (and add an index only if the plan demonstrates one is appropriate). Add a regression for this exact grid and require correct results comfortably below the 5-second guard, preferably below 1 second on dev.
+

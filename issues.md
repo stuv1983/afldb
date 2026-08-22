@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 9
+**Open issues:** 10
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
@@ -20,7 +20,7 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-072` | Low | Tests | `tests/site-settings.test.ts` default-shape expectation predates the `frontendTheme` settings added in `d5243ba`. | Extend the expected defaults object to the current `parseSiteSettings` output and re-run the suite. |
 | `AFLDB-ISSUE-073` | Medium | Database | Four pre-066 foreign keys (`data_edits.admin_user_id`, `player_link_resolutions.admin_user_id`/`player_id`, `player_link_suggestions.resolved_by`) have no supporting index; `tests/integration/fk-indexes.test.ts` fails. | Add the partial indexes in a new migration (the 041 shape) or justify `DELETE_FREE_PARENTS` entries. |
 | `AFLDB-ISSUE-074` | Low | Tests | `tests/integration/email-intake.test.ts` assumes the first `auth_users` row is its fixture admin and fails against real dev-host admin data. | Make the test create/select its own fixture admin deterministically instead of `ORDER BY`-picking one. |
-| `AFLDB-ISSUE-075` | Medium | Admin/Matching | Confidence-scored player-link suggestions are implemented, calibrated and tested, but dev browser validation has not been run. | Deploy to dev, recompute suggestions, then complete the browser checklist and one reversible real approval before closing. |
+| `AFLDB-ISSUE-076` | Medium | Performance | Grid Solver combinations using `won_final_at_venue` can exceed PostgreSQL's 5-second statement timeout and crash the page. | Capture and compare the generated SQL/EXPLAIN plan against `played_at_venue`, then optimise the `won_final_at_venue` query shape without raising the application timeout. |
 
 ---
 
@@ -3175,120 +3175,86 @@ Not yet run.
 ### Follow-up
 Create (or select by exact fixture email) a dedicated test admin inside the test, and clean up the staged submission row.
 
-## AFLDB-ISSUE-075 — Confidence-scored suggestions for /admin/player-links
+## AFLDB-ISSUE-076 — Grid Solver `won_final_at_venue` queries can hit statement timeout
 
-- **Status:** Open — implementation and calibration complete; dev browser validation outstanding
+- **Status:** Open
 - **Severity:** Medium
-- **Area:** Admin/Matching
+- **Area:** Performance
 - **Found:** 2026-08-22
-- **Resolved:** Not yet resolved
+- **Resolved:** N/A
+- **Files:** `src/db/queries/grid-solver.ts`, `src/search/grid-solver-spec.ts`, `tests/integration/grid-solver.test.ts`
 
 ### Symptom
+A valid `/grid-solver` grid can repeatedly crash during server rendering with Next.js digest `1511510695`.
 
-Every unmatched source name on `/admin/player-links` had to be searched for by
-hand. The queue holds 1,879 unresolved resolution entities (2,055 physical rows),
-so a manual-only workflow made the backlog effectively permanent, while the page
-already held enough evidence — name, season, club, draft totals — to identify
-many of them deterministically.
+### Reproduction
+The failure was reproduced on development build `NQrtI3zQGWx62e6zbI5bR` with this grid:
 
-### Files
+Rows:
 
-- `src/lib/player-matching/{types,confidence,score-candidate,parse-career-span}.ts` (new)
-- `src/db/queries/player-match-candidates.ts` (new)
-- `src/db/migrations/067_player_link_match_candidates.sql` (new)
-- `tools/matching/backtest.ts` (new)
-- `src/db/queries/player-links.ts`, `src/app/admin/player-links/*`
-- `tools/maintenance/privileges.sql`
+1. `games_at_multiple_clubs_min` — `games=50`, `clubs=2`
+2. `teammate_of` — `player=12603`
+3. `single_game_stat_min` — `stat=kicks`, `x=20`
 
-### Approach
+Columns:
 
-Deterministic and explainable; no LLM anywhere in the path. Candidate generation
-(three index-backed lookups per source: exact normalised name, exact alias, a
-bounded trigram neighbourhood) is separate from scoring, per migration 019's rule
-that a name-similarity score is a candidate and never a link. Scoring is pure and
-runs identically on the page, inside the approval transaction and in the offline
-backtest, and pays at most one signal per evidence family.
+1. `played_for_club` — `club=103`
+2. `played_for_club` — `club=108`
+3. `won_final_at_venue` — `venue=234`
 
-### Evidence — what the data forced
+Order: `games_asc`.
 
-The assumption that source rows carry a date of birth is false: **no** source
-table has one, so the reachable score ceiling is name + club-in-season + era (97)
-or name + draft timing + games + goals (97). Band thresholds were therefore set
-from the measured score distribution rather than assumed.
+### Expected
+A supported Grid Solver criterion combination returns the matching players comfortably within the existing PostgreSQL application timeout, or fails gracefully without crashing the page.
 
-The first backtest raised **617 hard conflicts, every one of them against a link
-AFLDB had already confirmed**:
+### Actual
+PostgreSQL repeatedly cancels the query at approximately the configured five-second statement timeout:
 
-- `uniqueness_collision` 87/87 false — an already-linked row collided with
-  itself; the row being assessed is now excluded from its own check.
-- `club_not_in_history` 249/252 false — a draft pick names the club that DRAFTED
-  the player, who may never have played a senior game for it. A club now
-  contradicts only when the source places the player at that club in an AFLDB
-  season.
-- `season_outside_career` 99/108 false — all from `award_winners`: Magarey
-  (SANFL), Sandover (WAFL), Liston (VFL), Morrish, U18 Championships and
-  pre-1993 All-Australian carnival sides, where a player legitimately had no
-  AFLDB season that year. Temporal evidence is now typed, and only
-  `competitionScope: 'afldb'` seasons may contradict a career range.
-- `reported_games_divergent` 200/202 false — removed entirely. Draft sources
-  count their own way and migration 019 states the column is never a career
-  statistic, so agreement is rewarded and disagreement is simply not evidence.
+- 5,136 ms
+- 5,107 ms
+- 5,082 ms
+- 5,057 ms
 
-After calibration the same 9,356 rows raise **8 conflicts, none against a
-correct link**.
+The server logs:
+
+```text
+PostgresError: canceling statement due to statement timeout
+code: 57014
+digest: 1511510695
+```
+
+At least one ordinary page request was traced as HTTP 500. Some RSC requests were traced as HTTP 200 despite the subsequent server-component exception, because the response had already begun streaming.
+
+### Evidence
+The same session produced repeated `/grid-solver` crash telemetry with digest `1511510695`. `journalctl -u afldb` correlated every digest occurrence with SQLSTATE `57014`.
+
+The key discriminator is changing only the third column criterion:
+
+- `won_final_at_venue(venue=234)` → repeated timeout/crash at ~5 seconds.
+- `played_at_venue(venue=234)` → the otherwise identical grid completed successfully in approximately 360–397 ms.
+
+This isolates the expensive path to the `won_final_at_venue` implementation or its interaction with the combined Grid Solver query shape rather than to Grid Solver generally.
+
+### First wrong layer
+Database query/compiler performance.
+
+### Root cause
+Not yet confirmed. Likely candidates include an expensive correlated subquery, repeated scans of `player_match_stats`/match facts, planner-hostile join order, late application of final/venue/winner predicates, or a missing/ineffective index. The exact generated SQL and execution plan have not yet been captured.
+
+### Fix
+Not yet fixed. Do **not** treat increasing PostgreSQL `statement_timeout` as the fix; the successful `played_at_venue` comparison shows the query shape should be investigated first.
 
 ### Validation
-
-Backtest over 9,356 confirmed links (`npm run match:backtest`, algorithm `v1`,
-commit `3f5b6e7`, read-only connection, no row mutated):
-
-| Measure | Result |
-|---|---|
-| Candidate-generation recall | 9,341/9,356 (99.84%) |
-| Top-1 / Top-3 / Top-5 | 99.69% / 99.83% / 99.84% |
-| very_high | n=7,558, precision 99.99% |
-| high | n=580, precision 100% |
-| medium | n=627, precision 99.52% |
-| low | n=557, precision 98.56% |
-| Bulk-eligible | n=7,337, precision 99.99%, 1 false positive |
-
-The single bulk-band false positive is `captaincies#3230`: the source names "Jobe
-Watson" as Essendon's 2016 captain and AFLDB deliberately links it to Brendon
-Goddard, who captained while Watson was suspended for the season. The matcher
-cannot infer a human override that contradicts the name, and the class is
-unreachable in production because approval only ever touches rows still in an
-unresolved state.
-
-Live-queue check (1,879 entities): 54 very_high, 11 high, 32 medium, 103 low,
-1,679 none, 44 bulk-eligible. **All 44 bulk-eligible proposals were inspected by
-hand and all 44 are correct** — overwhelmingly punctuation variants AFLDB stores
-without the apostrophe (Gary O'Donnell → "Gary ODonnell", Massimo D'Ambrosio,
-Cory Dell'Olio, Jay Kennedy-Harris), corroborated by club-in-season or by exact
-draft games and goals.
-
-Tests: 44 unit (`tests/player-matching.test.ts`), 24 mutation/contract
-(`tests/player-link-mutations.test.ts`), 8 integration
-(`tests/integration/player-matching.test.ts`) — 76 passing on the dev host.
-Migration 067 applied to `afldb_dev` and `afldb_test`; privileges reconciled and
-verified (`afldb_app` SELECT, `afldb_auth` full DML, `afldb_import` no read).
-
-### Safety model
-
-The cache is advice, never authority. Approving a suggestion locks the target,
-confirms it is still unresolved, re-reads the source and candidate evidence and
-**runs the scorer again inside the same import transaction**, requiring the fresh
-result to still name that player with no contradiction. A score posted by the
-browser is never read. Bulk approval re-checks eligibility per row while holding
-that row's lock, and one row's failure neither aborts the batch nor affects
-another row.
+Runtime evidence only. The timeout is reproducible and correlated to the exact digest and grid configuration. No SQL-plan remediation has yet been tested.
 
 ### Follow-up
+1. Locate and compare `won_final_at_venue` and `played_at_venue` in the Grid Solver compiler.
+2. Reproduce the exact failing grid against development PostgreSQL and capture generated SQL plus bind parameters.
+3. Run `EXPLAIN (ANALYZE, BUFFERS)` in development, temporarily raising the diagnostic session timeout only if required.
+4. Inspect sequential scans, nested loops, correlated subqueries, repeated large-table scans, predicate timing, `DISTINCT`/`GROUP BY`, cardinality estimates and existing indexes.
+5. Prefer a better query shape before adding an index unless the execution plan demonstrates an index is appropriate.
+6. Preserve semantics: the player must have won, the match must be a final, and the match must have been played at the requested venue.
+7. Add regression coverage for the exact failing combination plus standalone and mixed `won_final_at_venue` cases.
+8. Acceptance target: correct result, no timeout, comfortably below five seconds and preferably below one second on the development dataset.
+9. Track the misleading RSC `status=200` trace behaviour separately as an observability follow-up if needed; do not mix it into the query-performance fix.
 
-- Dev browser validation and one reversible real approval — the remaining work.
-- 5 queue entities generate no candidate, and 15 confirmed links have their true
-  player outside the candidate set: nickname variants (Robert → Bob Nash,
-  William → Bill Thomas, John → Ivor Lawson). An alias-backed nickname table
-  would recover them; deliberately not guessed at here.
-- AFLDB stores many surnames without their apostrophe. Matching is unaffected
-  because normalisation strips it from both sides, but those display names are
-  wrong on public pages and deserve a separate data fix.

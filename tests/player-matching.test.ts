@@ -398,7 +398,7 @@ describe('assessment, gap and bands', () => {
   it('ranks deterministically and reports the gap to the runner-up', () => {
     const best = scoreCandidate(rich(), candidate());
     const rival = scoreCandidate(rich(), candidate({ playerId: 200, clubs: [], nameSimilarity: 1 }));
-    const assessment = assessMatch([rival, best]);
+    const assessment = assessMatch([rival, best], 'award_winners');
 
     expect(assessment.best?.playerId).toBe(100);
     expect(assessment.gap).toBe(best.score - rival.score);
@@ -408,7 +408,7 @@ describe('assessment, gap and bands', () => {
   it('gives a lone candidate a null gap rather than a zero one', () => {
     // No rival is the least ambiguous case, not the most, and a zero
     // would read as a dead heat.
-    const assessment = assessMatch([scoreCandidate(rich(), candidate())]);
+    const assessment = assessMatch([scoreCandidate(rich(), candidate())], 'award_winners');
     expect(assessment.gap).toBeNull();
     expect(assessment.band).toBe('very_high');
   });
@@ -416,7 +416,7 @@ describe('assessment, gap and bands', () => {
   it('flags two near-identical candidates as ambiguous and refuses bulk', () => {
     const a = scoreCandidate(rich(), candidate({ playerId: 100 }));
     const b = scoreCandidate(rich(), candidate({ playerId: 200 }));
-    const assessment = assessMatch([a, b]);
+    const assessment = assessMatch([a, b], 'award_winners');
 
     expect(assessment.gap).toBe(0);
     expect(assessment.nearTies).toBe(1);
@@ -429,7 +429,7 @@ describe('assessment, gap and bands', () => {
       rich(),
       candidate({ uniquenessConflict: 'already in that team' }),
     );
-    const assessment = assessMatch([conflicted]);
+    const assessment = assessMatch([conflicted], 'award_winners');
 
     expect(conflicted.score).toBeGreaterThanOrEqual(MATCH_POLICY.bands.veryHighScore);
     expect(assessment.band).toBe('low');
@@ -437,7 +437,7 @@ describe('assessment, gap and bands', () => {
   });
 
   it('reports no band and no candidate for an empty set', () => {
-    const assessment = assessMatch([]);
+    const assessment = assessMatch([], 'award_winners');
     expect(assessment.best).toBeNull();
     expect(assessment.band).toBe('none');
     expect(assessment.bulkEligible).toBe(false);
@@ -450,7 +450,7 @@ describe('bulk eligibility is stricter than the display band', () => {
       source({ clubId: 7, clubNameRaw: 'Richmond', temporal: [activeSeason(1994)] }),
       candidate(),
     );
-    const assessment = assessMatch([scored]);
+    const assessment = assessMatch([scored], 'award_winners');
     expect(assessment.band).toBe('very_high');
     expect(assessment.bulkEligible).toBe(true);
   });
@@ -459,7 +459,7 @@ describe('bulk eligibility is stricter than the display band', () => {
     // The queue is full of state-league footballers who share a name
     // with an AFL player and have no AFLDB record of their own. A name
     // agreeing with itself is not corroboration.
-    const assessment = assessMatch([scoreCandidate(source(), candidate())]);
+    const assessment = assessMatch([scoreCandidate(source(), candidate())], 'award_winners');
     expect(assessment.bulkEligible).toBe(false);
   });
 
@@ -473,7 +473,7 @@ describe('bulk eligibility is stricter than the display band', () => {
       }),
       candidate({ nameSimilarity: 0.95 }),
     );
-    const assessment = assessMatch([scored]);
+    const assessment = assessMatch([scored], 'award_winners');
     expect(assessment.best?.strongName).toBe(false);
     expect(assessment.bulkEligible).toBe(false);
   });
@@ -483,7 +483,7 @@ describe('bulk eligibility is stricter than the display band', () => {
       source({ clubId: 7, temporal: [] }),
       candidate(),
     );
-    const assessment = assessMatch([scored]);
+    const assessment = assessMatch([scored], 'award_winners');
     expect(scored.score).toBeLessThan(MATCH_POLICY.bulk.minScore);
     expect(assessment.bulkEligible).toBe(false);
   });
@@ -500,6 +500,59 @@ describe('determinism', () => {
     const s = source({ clubId: 7, temporal: [activeSeason(1994)] });
     const a = scoreCandidate(s, candidate({ playerId: 100 }));
     const b = scoreCandidate(s, candidate({ playerId: 200, clubs: [] }));
-    expect(assessMatch([a, b])).toEqual(assessMatch([b, a]));
+    expect(assessMatch([a, b], 'award_winners')).toEqual(assessMatch([b, a], 'award_winners'));
+  });
+});
+
+describe('bulk eligibility is decided per source class', () => {
+  const perfect = () =>
+    scoreCandidate(
+      source({ clubId: 7, clubNameRaw: 'Richmond', temporal: [activeSeason(1994)] }),
+      candidate(),
+    );
+
+  it('admits the classes whose measured population showed no false positive', () => {
+    // award_winners 2,750 bulk / 0 FP; draft_person 2,319 / 0;
+    // award_nominations 702 / 0; player_achievements 253 / 0.
+    for (const sourceType of [
+      'award_winners', 'award_nominations', 'draft_person', 'player_achievements',
+    ]) {
+      const assessment = assessMatch([perfect()], sourceType);
+      expect(assessment.band).toBe('very_high');
+      expect(assessment.bulkEligible).toBe(true);
+    }
+  });
+
+  it('keeps captaincies out of bulk while still suggesting it', () => {
+    // A club's recorded captain and the player who actually led the
+    // side can legitimately differ (captaincies#3230 names Jobe Watson
+    // where AFLDB links Brendon Goddard, who captained while Watson was
+    // suspended). Nothing available to the matcher separates that row
+    // from a correct one, so a human decides it.
+    const assessment = assessMatch([perfect()], 'captaincies');
+    expect(assessment.band).toBe('very_high');
+    expect(assessment.bulkEligible).toBe(false);
+  });
+
+  it('keeps classes with no measured bulk population out of bulk', () => {
+    // Zero failures out of zero rows is not evidence of safety.
+    for (const sourceType of ['hall_of_fame', 'honour_team_members']) {
+      expect(assessMatch([perfect()], sourceType).bulkEligible).toBe(false);
+    }
+  });
+
+  it('refuses an unknown source class rather than defaulting to allowed', () => {
+    expect(assessMatch([perfect()], 'some_future_table').bulkEligible).toBe(false);
+  });
+
+  it('still requires every row-level rule inside an admitted class', () => {
+    const conflicted = scoreCandidate(
+      source({ clubId: 7, clubNameRaw: 'Richmond', temporal: [activeSeason(1994)] }),
+      candidate({ uniquenessConflict: 'already linked in that scope' }),
+    );
+    expect(assessMatch([conflicted], 'award_winners').bulkEligible).toBe(false);
+
+    const nameOnly = scoreCandidate(source(), candidate());
+    expect(assessMatch([nameOnly], 'award_winners').bulkEligible).toBe(false);
   });
 });

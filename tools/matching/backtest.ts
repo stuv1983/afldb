@@ -82,6 +82,13 @@ function gitCommit(): string {
 
 type CaseResult = {
   key: string;
+  /**
+   * The LOGICAL source type. Draft rows report 'draft_person', not
+   * 'draft_picks': one person owning four picks is one decision, and
+   * counting it four times would inflate both the population and the
+   * apparent precision of the draft class.
+   */
+  sourceType: string;
   targetTable: LinkTargetTable;
   targetId: number;
   rawName: string;
@@ -112,6 +119,7 @@ function toCaseResult(row: SourceEvidenceRow, assessment: MatchAssessment): Case
   const index = ranked.findIndex((c) => c.playerId === row.knownPlayerId);
   return {
     key: resolutionKey(row.source.target),
+    sourceType: row.source.target.resolutionEntityType,
     targetTable: row.source.target.targetTable,
     targetId: row.source.target.targetId,
     rawName: row.source.rawName,
@@ -262,14 +270,79 @@ function report(cases: CaseResult[]): void {
   }
 
   console.log('');
-  console.log('=== BY SOURCE TABLE ===');
-  const tables = [...new Set(cases.map((c) => c.targetTable))].sort();
-  for (const table of tables) {
-    const rows = cases.filter((c) => c.targetTable === table);
-    const correct = rows.filter((c) => c.correct).length;
+  console.log('=== BY LOGICAL SOURCE TYPE ===');
+  console.log(
+    'Aggregate precision hides which source class carries the risk, and bulk',
+  );
+  console.log(
+    'eligibility is decided per class from these numbers -- never from the total.',
+  );
+  console.log('');
+  const header = [
+    'source'.padEnd(21),
+    'n'.padStart(6),
+    'recall'.padStart(8),
+    'top1'.padStart(8),
+    'vhigh'.padStart(6),
+    'vh prec'.padStart(9),
+    'vh FP'.padStart(6),
+    'bulk'.padStart(6),
+    'bulk prec'.padStart(10),
+    'bulk FP'.padStart(8),
+    'conflict'.padStart(9),
+  ].join(' ');
+  console.log(header);
+  console.log('-'.repeat(header.length));
+
+  const sourceTypes = [...new Set(cases.map((c) => c.sourceType))].sort();
+  for (const sourceType of sourceTypes) {
+    const rows = cases.filter((c) => c.sourceType === sourceType);
+    const recalled = rows.filter((c) => c.rank !== null).length;
+    const top1 = rows.filter((c) => c.correct).length;
+    const veryHigh = rows.filter((c) => c.band === 'very_high');
+    const vhCorrect = veryHigh.filter((c) => c.correct).length;
+    const bulk = rows.filter((c) => c.bulkEligible);
+    const bulkCorrect = bulk.filter((c) => c.correct).length;
+    console.log([
+      sourceType.padEnd(21),
+      String(rows.length).padStart(6),
+      pct(recalled, rows.length).padStart(8),
+      pct(top1, rows.length).padStart(8),
+      String(veryHigh.length).padStart(6),
+      pct(vhCorrect, veryHigh.length).padStart(9),
+      String(veryHigh.length - vhCorrect).padStart(6),
+      String(bulk.length).padStart(6),
+      pct(bulkCorrect, bulk.length).padStart(10),
+      String(bulk.length - bulkCorrect).padStart(8),
+      String(rows.filter((c) => c.hardConflict).length).padStart(9),
+    ].join(' '));
+  }
+
+  console.log('');
+  console.log('=== EVERY BULK-ELIGIBLE FALSE POSITIVE ===');
+  const bulkFps = cases.filter((c) => c.bulkEligible && !c.correct);
+  if (bulkFps.length === 0) console.log('none');
+  for (const c of bulkFps) {
     console.log(
-      `${table.padEnd(22)} n=${String(rows.length).padStart(5)}  `
-      + `top1=${pct(correct, rows.length).padStart(7)}`,
+      `  ${c.sourceType} ${c.targetTable}#${c.targetId} "${c.rawName}" (${c.context})`,
+    );
+    console.log(
+      `      chose ${c.chosenName} #${c.chosenPlayerId} score=${c.score} gap=${c.gap} `
+      + `expected #${c.expectedPlayerId} rank=${c.rank ?? 'absent'} signals=${c.signals.join(',')}`,
+    );
+  }
+
+  console.log('');
+  console.log('=== EVERY VERY-HIGH FALSE POSITIVE ===');
+  const vhFps = cases.filter((c) => c.band === 'very_high' && !c.correct);
+  if (vhFps.length === 0) console.log('none');
+  for (const c of vhFps) {
+    console.log(
+      `  ${c.sourceType} ${c.targetTable}#${c.targetId} "${c.rawName}" (${c.context})`,
+    );
+    console.log(
+      `      chose ${c.chosenName} #${c.chosenPlayerId} score=${c.score} gap=${c.gap} `
+      + `expected #${c.expectedPlayerId} rank=${c.rank ?? 'absent'} bulk=${c.bulkEligible}`,
     );
   }
 }
