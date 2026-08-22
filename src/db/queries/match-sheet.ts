@@ -1,7 +1,7 @@
 import 'server-only';
 
 import postgres from 'postgres';
-import { authSql } from '@/db/authClient';
+import { recordDataEdit } from '@/db/queries/audit-log';
 import { recomputePlayerDerivedStats } from '@/db/queries/player-derived';
 import {
   deriveDisposals,
@@ -21,7 +21,7 @@ export type SaveMatchSheetInput = {
 };
 
 export type SaveMatchSheetResult =
-  | { ok: true; playerCount: number; scoreUpdated: boolean; auditWarning?: string }
+  | { ok: true; playerCount: number; scoreUpdated: boolean }
   | { ok: false; error: string };
 
 /**
@@ -156,31 +156,25 @@ export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMa
 
       await recomputePlayerDerivedStats(tx, affectedIds, match.season);
 
+      // 6. Required audit, same transaction: a failed insert rolls the
+      // whole match sheet back (AFLDB-ISSUE-027).
+      await recordDataEdit(tx, {
+        tableName: 'matches',
+        rowId: input.matchId,
+        fieldGroup: 'match_sheet',
+        oldValues: {},
+        newValues: { playersCount: players.length, scoreUpdated: input.syncMatchScores },
+        adminUserId: input.adminUserId,
+        note: input.note,
+      });
+
       return { playerCount: players.length, scoreUpdated: false };
     });
-
-    // 6. Audit log in data_edits
-    let auditWarning: string | undefined;
-    try {
-      await authSql`
-        INSERT INTO data_edits
-              (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
-        VALUES ('matches', ${input.matchId}, 'match_sheet',
-                '{}'::jsonb,
-                ${authSql.json({ playersCount: players.length, scoreUpdated: input.syncMatchScores })},
-                ${input.adminUserId},
-                ${(input.note ?? '').trim().slice(0, 2000) || null})
-      `;
-    } catch (auditErr) {
-      console.error('Audit row error in saveMatchSheet', auditErr);
-      auditWarning = 'The match sheet was saved, but its data-edits audit snapshot failed. Do not submit it again; ask an administrator to reconcile the audit log.';
-    }
 
     return {
       ok: true,
       playerCount: result.playerCount,
       scoreUpdated: result.scoreUpdated,
-      auditWarning,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

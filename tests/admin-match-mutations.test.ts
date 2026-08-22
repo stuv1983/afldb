@@ -38,6 +38,26 @@ describe('admin match mutation source contracts', () => {
     }
   });
 
+  it('writes every required data_edits audit inside the import transaction (AFLDB-ISSUE-027)', () => {
+    const awardsAdmin = source('src', 'db', 'queries', 'awards-admin.ts');
+    const players = source('src', 'db', 'queries', 'players.ts');
+    for (const mutation of [matchSheet, matchAdmin, dataEdits, awardsAdmin, players]) {
+      // The audit rides the mutation's own transaction handle...
+      expect(mutation).toContain('recordDataEdit(tx');
+      // ...and nothing may fall back to the old post-commit auth-pool write.
+      expect(mutation).not.toContain('authSql');
+      expect(mutation).not.toContain('auditWarning');
+    }
+    // The shared helper owns the one data_edits INSERT and never
+    // swallows a failure — the transaction must abort with it.
+    const auditLog = source('src', 'db', 'queries', 'audit-log.ts');
+    expect(auditLog).toContain('INSERT INTO data_edits');
+    expect(auditLog).not.toMatch(/catch\s*\(/);
+    const playerLinks = source('src', 'db', 'queries', 'player-links.ts');
+    expect(playerLinks).toContain('recordLinkedResolution(tx');
+    expect(playerLinks).not.toMatch(/authSql`\s*INSERT INTO player_link_resolutions[\s\S]*?'linked'/);
+  });
+
   it('refreshes every player-derived surface affected by a match fact', () => {
     for (const table of [
       'player_clubs',

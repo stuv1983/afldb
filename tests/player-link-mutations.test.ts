@@ -44,7 +44,9 @@ function fakeTransaction(respond: QueryResponder): {
     const text = compact(first);
     seen.push({ text, values });
     return Promise.resolve(respond(text, values));
-  });
+  }) as any;
+  // postgres.js transactions expose the full Sql surface, including .json.
+  tx.json = (value: unknown) => ({ json: value });
   return { tx, seen };
 }
 
@@ -136,27 +138,37 @@ describe('draft identity resolution', () => {
     expect(picksUpdate?.text).toContain('WHERE draft_person_id = ?');
     expect(picksUpdate?.values).toEqual([77, 901]);
 
-    // The auth-role resolution audit remains a separate, parameterized write.
-    expect(mocks.authSql).toHaveBeenCalledOnce();
-    const auditValues = mocks.authSql.mock.calls[0].slice(1);
-    expect(auditValues).toEqual([
+    // The required resolution audit rides the same import transaction
+    // (migration 066, AFLDB-ISSUE-027); nothing touches the auth pool.
+    expect(mocks.authSql).not.toHaveBeenCalled();
+    const auditInsert = seen.find((query) => (
+      query.text.startsWith('INSERT INTO player_link_resolutions')
+    ));
+    expect(auditInsert?.values).toEqual([
       'draft_picks', 41, 77, 'ambiguous', 5,
       'Verified against the source profile.',
     ]);
+    const picksUpdateIndex = seen.findIndex((query) => query.text.startsWith('UPDATE draft_picks'));
+    expect(seen.findIndex((query) => query.text.startsWith('INSERT INTO player_link_resolutions')))
+      .toBeGreaterThan(picksUpdateIndex);
   });
 
-  it('reports a post-commit resolution-audit failure as success with a do-not-retry warning', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  it('fails the whole link when the required resolution audit cannot be written (AFLDB-ISSUE-027)', async () => {
+    // The audit INSERT runs inside the import transaction: with the real
+    // driver its failure aborts the transaction, so the link never
+    // commits. The result is a plain error — never success-with-warning.
     const { tx } = fakeTransaction((text) => {
       if (text.startsWith('SELECT draft_person_id AS')) return [{ draftPersonId: 901 }];
       if (text.startsWith('SELECT link_status::text')) return [{ status: 'unmatched', playerId: null }];
       if (text.startsWith('SELECT link_status_value::text')) {
         return [{ status: 'unmatched', draftPersonId: 901 }];
       }
+      if (text.startsWith('INSERT INTO player_link_resolutions')) {
+        throw new Error('audit unavailable');
+      }
       return [];
     });
     installImportClient(tx);
-    mocks.authSql.mockRejectedValueOnce(new Error('audit unavailable'));
 
     const result = await resolveLink({
       targetTable: 'draft_picks',
@@ -166,10 +178,10 @@ describe('draft identity resolution', () => {
     });
 
     expect(result).toEqual({
-      ok: true,
-      auditWarning: expect.stringContaining('Do not submit it again'),
+      ok: false,
+      error: expect.stringContaining('The link could not be applied'),
     });
-    consoleError.mockRestore();
+    expect(mocks.authSql).not.toHaveBeenCalled();
   });
 
   it('does not insert a player when the locked target has gone stale', async () => {
@@ -291,7 +303,12 @@ describe('22Under22 award-winner resolution', () => {
     expect(lock?.text).toContain('FOR UPDATE');
     expect(lock?.values).toEqual([{ identifier: 'award_winners' }, 412]);
     expect(update?.values).toEqual([{ identifier: 'award_winners' }, 77, 412]);
-    expect(mocks.authSql.mock.calls[0].slice(1)).toEqual([
+    // Required audit on the same import transaction (AFLDB-ISSUE-027).
+    expect(mocks.authSql).not.toHaveBeenCalled();
+    const auditInsert = seen.find((query) => (
+      query.text.startsWith('INSERT INTO player_link_resolutions')
+    ));
+    expect(auditInsert?.values).toEqual([
       'award_winners', 412, 77, 'unmatched', 5,
       'Verified against the annual team source.',
     ]);
@@ -322,7 +339,7 @@ describe('player creation facts', () => {
       displayName: 'New Draftee',
       dob: '2007-03-01',
       draftInfo: partialDraft,
-    })).rejects.toThrow('An explicit draft year');
+    }, { adminUserId: 5 })).rejects.toThrow('An explicit draft year');
 
     expect(seen.some((query) => query.text.startsWith('INSERT INTO players'))).toBe(false);
     expect(seen.some((query) => query.text.startsWith('INSERT INTO draft_picks'))).toBe(false);
@@ -341,10 +358,21 @@ describe('player creation facts', () => {
       displayName: 'New Draftee',
       dob: '1980-03-01',
       draftInfo: { draftYear: 2005, recruitedFrom: 'Murray U18' },
-    });
+    }, { adminUserId: 5, note: 'Historic draftee backfill' });
 
     const draftInsert = seen.find((query) => query.text.startsWith('INSERT INTO draft_picks'));
     expect(draftInsert?.values[0]).toBe(2005);
+
+    // The required data_edits audit is part of the same transaction
+    // (AFLDB-ISSUE-027) and snapshots the created identity.
+    const auditInsert = seen.find((query) => query.text.startsWith('INSERT INTO data_edits'));
+    expect(auditInsert?.values).toEqual([
+      'players', 88, 'player_creation',
+      { json: {} },
+      { json: { displayName: 'New Draftee', hasDraftInfo: true } },
+      5, 'Historic draftee backfill',
+    ]);
+    expect(mocks.authSql).not.toHaveBeenCalled();
 
     const careerInsert = seen.find((query) => query.text.startsWith('INSERT INTO player_career_stats'));
     expect(careerInsert?.text).toContain(
@@ -364,7 +392,7 @@ describe('player creation facts', () => {
     await expect(createPlayer({
       displayName: 'Historical Draftee',
       draftInfo: { draftYear: 1981, clubId: 24 },
-    })).rejects.toThrow('not the historical club identity active in 1981');
+    }, { adminUserId: 5 })).rejects.toThrow('not the historical club identity active in 1981');
 
     expect(seen.some((query) => query.text.includes('afldb_identity_for_season'))).toBe(true);
     expect(seen.some((query) => query.text.startsWith('INSERT INTO players'))).toBe(false);
@@ -374,7 +402,7 @@ describe('player creation facts', () => {
     delete process.env.AFLDB_IMPORT_DATABASE_URL;
     process.env.DATABASE_URL = 'postgres://overprivileged-app@example/afldb_test';
 
-    await expect(createPlayer({ displayName: 'No Import Role' }))
+    await expect(createPlayer({ displayName: 'No Import Role' }, { adminUserId: 5 }))
       .rejects.toThrow('AFLDB_IMPORT_DATABASE_URL is not configured.');
     expect(mocks.postgres).not.toHaveBeenCalled();
   });

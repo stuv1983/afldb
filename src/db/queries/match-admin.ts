@@ -2,7 +2,7 @@ import 'server-only';
 
 import postgres from 'postgres';
 import { sql } from '@/db/client';
-import { authSql } from '@/db/authClient';
+import { recordDataEdit } from '@/db/queries/audit-log';
 import {
   clearPlayerClubMatchReferences,
   recomputeClubSeasons,
@@ -131,7 +131,6 @@ export type CreateMatchInput = {
 export async function createMatch(input: CreateMatchInput): Promise<{
   id: number;
   season: number;
-  auditWarning?: string;
 }> {
   if (input.homeClubId === input.awayClubId) {
     throw new Error('Home club and away club must be different.');
@@ -290,32 +289,30 @@ export async function createMatch(input: CreateMatchInput): Promise<{
       await recomputeClubSeasons(tx, input.season);
       await recomputeSeasonBrownlowStatus(tx, input.season);
 
+      // 6. Required audit, same transaction: a failed insert rolls the
+      // match creation back (AFLDB-ISSUE-027).
+      await recordDataEdit(tx, {
+        tableName: 'matches',
+        rowId: matchRow.id,
+        fieldGroup: 'match_creation',
+        oldValues: {},
+        newValues: {
+          season: input.season,
+          roundCode,
+          matchDate: input.matchDate,
+          homeClubId: input.homeClubId,
+          awayClubId: input.awayClubId,
+          homeScore,
+          awayScore,
+        },
+        adminUserId: input.adminUserId,
+        note: input.notes?.trim() || 'Created match via Data Editor',
+      });
+
       return matchRow;
     });
 
-    // 6. Audit in data_edits
-    let auditWarning: string | undefined;
-    try {
-      await authSql`
-        INSERT INTO data_edits (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
-        VALUES ('matches', ${created.id}, 'match_creation', '{}'::jsonb,
-                ${authSql.json({
-                  season: input.season,
-                  roundCode,
-                  matchDate: input.matchDate,
-                  homeClubId: input.homeClubId,
-                  awayClubId: input.awayClubId,
-                  homeScore,
-                  awayScore,
-                })},
-                ${input.adminUserId}, ${input.notes?.trim() || 'Created match via Data Editor'})
-      `;
-    } catch (auditErr) {
-      console.error('Failed to log audit row for match creation', auditErr);
-      auditWarning = 'The match was created, but its data-edits audit snapshot failed. Do not submit it again; ask an administrator to reconcile the audit log.';
-    }
-
-    return { ...created, auditWarning };
+    return created;
   } finally {
     await importSql.end({ timeout: 5 });
   }
@@ -331,7 +328,7 @@ export async function deleteMatch(input: {
   adminUserId: number;
   reason?: string | null;
 }): Promise<
-  | { ok: true; deletedId: number; affectedPlayers: number; auditWarning?: string }
+  | { ok: true; deletedId: number; affectedPlayers: number }
   | { ok: false; error: string }
 > {
   const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
@@ -391,6 +388,18 @@ export async function deleteMatch(input: {
       await recomputePlayerDerivedStats(tx, affectedIds, match.season);
       await recomputeSeasonBrownlowStatus(tx, match.season);
 
+      // Required audit, same transaction: a failed insert rolls the
+      // deletion back (AFLDB-ISSUE-027).
+      await recordDataEdit(tx, {
+        tableName: 'matches',
+        rowId: input.matchId,
+        fieldGroup: 'match_deletion',
+        oldValues: { deletedMatchId: input.matchId, season: match.season },
+        newValues: {},
+        adminUserId: input.adminUserId,
+        note: input.reason?.trim() || 'Deleted match via Data Editor',
+      });
+
       return {
         ok: true as const,
         deletedId: input.matchId,
@@ -403,26 +412,10 @@ export async function deleteMatch(input: {
       return result;
     }
 
-    // Audit in data_edits
-    let auditWarning: string | undefined;
-    try {
-      await authSql`
-        INSERT INTO data_edits (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
-        VALUES ('matches', ${input.matchId}, 'match_deletion',
-                ${authSql.json({ deletedMatchId: input.matchId, season: result.season })},
-                '{}'::jsonb,
-                ${input.adminUserId}, ${input.reason?.trim() || 'Deleted match via Data Editor'})
-      `;
-    } catch (auditErr) {
-      console.error('Failed to log audit row for match deletion', auditErr);
-      auditWarning = 'The match was deleted, but its data-edits audit snapshot failed. Do not submit it again; ask an administrator to reconcile the audit log.';
-    }
-
     return {
       ok: true,
       deletedId: result.deletedId,
       affectedPlayers: result.affectedPlayers,
-      auditWarning,
     };
   } finally {
     await importSql.end({ timeout: 5 });

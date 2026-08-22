@@ -4,6 +4,7 @@ import { cache } from 'react';
 import postgres from 'postgres';
 
 import { sql } from '@/db/client';
+import { recordDataEdit } from '@/db/queries/audit-log';
 import { allOf, containsPattern, rangeConditions } from '@/db/queries/filters';
 import type { FilterValues } from '@/search/table-filters';
 
@@ -396,8 +397,18 @@ export async function createPlayerInTransaction(
 /**
  * Create a new player in the database (see changeLog.md).
  * Used for drafted players who have yet to play a match or historical players.
+ *
+ * The audit argument is required on purpose: the admin data editor's
+ * required data_edits row is written inside the same import-role
+ * transaction as the player insert (AFLDB-ISSUE-027), so no caller can
+ * silently create a player without its audit. The create-and-link flow
+ * does NOT come through here — it calls createPlayerInTransaction and
+ * audits via player_link_resolutions instead.
  */
-export async function createPlayer(input: CreatePlayerInput): Promise<CreatedPlayer> {
+export async function createPlayer(
+  input: CreatePlayerInput,
+  audit: { adminUserId: number; note?: string | null },
+): Promise<CreatedPlayer> {
   const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
   if (!importUrl) {
     throw new Error('AFLDB_IMPORT_DATABASE_URL is not configured.');
@@ -405,7 +416,19 @@ export async function createPlayer(input: CreatePlayerInput): Promise<CreatedPla
 
   const importSql = postgres(importUrl, { max: 1, onnotice: () => {} });
   try {
-    const created = await importSql.begin((tx) => createPlayerInTransaction(tx, input));
+    const created = await importSql.begin(async (tx) => {
+      const player = await createPlayerInTransaction(tx, input);
+      await recordDataEdit(tx, {
+        tableName: 'players',
+        rowId: player.id,
+        fieldGroup: 'player_creation',
+        oldValues: {},
+        newValues: { displayName: player.displayName, hasDraftInfo: Boolean(input.draftInfo) },
+        adminUserId: audit.adminUserId,
+        note: audit.note,
+      });
+      return player;
+    });
 
     return created;
   } finally {

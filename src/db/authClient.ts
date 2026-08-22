@@ -11,6 +11,14 @@
  * asserts that role holds no write on the statistical tables. A SQL injection
  * in a public page still cannot write; a compromise of the auth path still
  * cannot touch statistics.
+ *
+ * Required statistical-mutation audits (data_edits, linked
+ * player_link_resolutions) do NOT ride this pool: since migration 066
+ * (AFLDB-ISSUE-027) they are written by afldb_import inside the same
+ * transaction as the mutation, via src/db/queries/audit-log.ts. This
+ * pool keeps the operational writes: sessions, submissions,
+ * suggestions, confirmed-unlinked resolutions, and the best-effort
+ * auth_audit_log activity trail.
  */
 import 'server-only';
 

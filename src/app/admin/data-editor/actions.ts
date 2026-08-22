@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { authSql } from '@/db/authClient';
 import { createAwardWinner, createHallOfFameInductee, createHonourTeamMember } from '@/db/queries/awards-admin';
 import { saveEdit } from '@/db/queries/data-edits';
 import { createMatch, deleteMatch } from '@/db/queries/match-admin';
@@ -113,6 +112,9 @@ export async function createPlayerAction(
   }
 
   try {
+    // The required data_edits audit is written inside createPlayer's
+    // import-role transaction (AFLDB-ISSUE-027): the player and its
+    // audit row commit or roll back together.
     const player = await createPlayer({
       displayName,
       givenName,
@@ -123,21 +125,9 @@ export async function createPlayerAction(
       weightKg,
       notes,
       draftInfo,
-    });
+    }, { adminUserId: admin.id, note: notes });
 
     let warning: string | undefined;
-    try {
-      await authSql`
-        INSERT INTO data_edits
-              (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
-        VALUES ('players', ${player.id}, 'player_creation', '{}'::jsonb,
-                ${authSql.json({ displayName: player.displayName, hasDraftInfo: Boolean(draftInfo) })},
-                ${admin.id}, ${notes?.slice(0, 2000) || null})
-      `;
-    } catch (error) {
-      console.error('Failed to log data-edits audit for player creation', error);
-      warning = 'The player was created, but its data-edits audit snapshot failed. Do not submit it again; ask an administrator to reconcile the audit log.';
-    }
     try {
       await audit('player.created', {
         playerId: player.id,
@@ -221,7 +211,7 @@ export async function createAwardWinnerAction(
       adminUserId: admin.id,
     });
 
-    let warning = result.auditWarning;
+    let warning: string | undefined;
     try {
       await audit('award_winner.created', {
         awardId,
@@ -311,7 +301,7 @@ export async function createHallOfFameAction(
       adminUserId: admin.id,
     });
 
-    let warning = result.auditWarning;
+    let warning: string | undefined;
     try {
       await audit('hall_of_fame.created', {
         name,
@@ -384,7 +374,7 @@ export async function createHonourTeamMemberAction(
       adminUserId: admin.id,
     });
 
-    let warning = result.auditWarning;
+    let warning: string | undefined;
     try {
       await audit('honour_team_member.created', {
         teamName,
@@ -447,13 +437,10 @@ export async function saveDataEdit(
   if (!result.ok) return { error: result.error };
 
   if (Object.keys(result.changed).length === 0) {
-    return {
-      message: 'No change — the values already match.',
-      warning: result.auditWarning,
-    };
+    return { message: 'No change — the values already match.' };
   }
 
-  let warning = result.auditWarning;
+  let warning: string | undefined;
   try {
     await audit('data_edit.saved', { entity: entityKey, rowId, group: groupKey },
       { userId: admin.id, label: admin.email });
@@ -516,7 +503,7 @@ export async function saveMatchSheetAction(
     return { error: result.error };
   }
 
-  let warning = result.auditWarning;
+  let warning: string | undefined;
   try {
     await audit('match.sheet_saved', {
       matchId,
@@ -663,7 +650,7 @@ export async function createMatchAction(
       adminUserId: admin.id,
     });
 
-    let warning = result.auditWarning;
+    let warning: string | undefined;
     try {
       await audit('match.created', {
         matchId: result.id,
@@ -717,7 +704,7 @@ export async function deleteMatchAction(
     return { error: result.error };
   }
 
-  let warning = result.auditWarning;
+  let warning: string | undefined;
   try {
     await audit('match.deleted', {
       matchId,

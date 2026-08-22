@@ -7,17 +7,19 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 7
+**Open issues:** 9
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
-| `AFLDB-ISSUE-027` | High | Architecture | Statistical mutations and required audit writes still commit through separate role-scoped transactions. | Choose and implement either a database-owned audit function inside the import transaction or a durable transactional outbox with idempotent delivery. |
 | `AFLDB-ISSUE-040` | Low | Tooling | The lint script invokes deprecated `next lint` without a checked-in ESLint setup and becomes interactive. | Add a reviewed ESLint flat configuration and compatible dependencies, then replace `next lint` with the ESLint CLI. |
 | `AFLDB-ISSUE-044` | High | Import | Legacy full awards reloads can discard manual player-link resolutions outside the protected Under-22 path. | Preserve durable manual resolutions across legacy honours reloads and add manual-resolve → full-reload → preserved-link integration coverage. |
 | `AFLDB-ISSUE-054` | Medium | Tests | Under-22 importer contract tests fail because literal source-boundary markers drifted from `import_awards.py`. | Repair the importer/test boundary contract without weakening the behavioural assertions. |
 | `AFLDB-ISSUE-059` | Low | Search | Grouped `Qualifying matches` counts have no safe drill-down to the exact matching fixtures. | Extend Match Search or add a dedicated NL drill-down route that can faithfully replay the grouped row predicates. |
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
 | `AFLDB-ISSUE-071` | Low | Audit | Parser-v25 V2 residual failures still mix corpus/oracle debt with possible smaller parser follow-up. | Re-baseline V2 generator/oracles first; promote a product defect only after the oracle layer is reconciled. |
+| `AFLDB-ISSUE-072` | Low | Tests | `tests/site-settings.test.ts` default-shape expectation predates the `frontendTheme` settings added in `d5243ba`. | Extend the expected defaults object to the current `parseSiteSettings` output and re-run the suite. |
+| `AFLDB-ISSUE-073` | Medium | Database | Four pre-066 foreign keys (`data_edits.admin_user_id`, `player_link_resolutions.admin_user_id`/`player_id`, `player_link_suggestions.resolved_by`) have no supporting index; `tests/integration/fk-indexes.test.ts` fails. | Add the partial indexes in a new migration (the 041 shape) or justify `DELETE_FREE_PARENTS` entries. |
+| `AFLDB-ISSUE-074` | Low | Tests | `tests/integration/email-intake.test.ts` assumes the first `auth_users` row is its fixture admin and fails against real dev-host admin data. | Make the test create/select its own fixture admin deterministically instead of `ORDER BY`-picking one. |
 
 ---
 
@@ -970,11 +972,11 @@ Add a concurrency-oriented query contract test.
 
 ## AFLDB-ISSUE-027 — Statistical mutations and required audits commit separately
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Architecture
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-22
 - **Files:** `src/db/queries/match-sheet.ts`, `src/db/queries/match-admin.ts`, `src/db/queries/awards-admin.ts`, `src/db/queries/data-edits.ts`, `src/db/queries/player-links.ts`, `src/app/admin/data-editor/actions.ts`
 
 ### Symptom
@@ -993,18 +995,27 @@ The writes use different pools/transactions. Some paths swallow the audit failur
 The helpers close the import transaction before calling `authSql`; no cross-connection transaction coordinates them.
 
 ### Root cause
-Audit storage and statistical storage use role-separated connections without an atomic delivery design.
+Audit storage and statistical storage use role-separated connections without an atomic delivery design. Mechanically: `data_edits` (057) and `player_link_resolutions` (056) granted INSERT to `afldb_auth` only, so the mutation role could not write its own audit row and every helper committed the import transaction first, then inserted the audit on the separate `authSql` pool.
 
 ### Fix
-Not fixed architecturally. Repaired admin paths now return an explicit success-with-warning result on post-commit audit failure, render “do not retry,” and avoid automatic redirects/refreshes that would hide it. Player creation also writes a `data_edits` snapshot. The two role-separated commits are still not atomic.
+Implemented and validated 2026-08-22. Database-owned same-transaction audit via a narrow direct grant, chosen over both a SECURITY DEFINER function (adds the repo's first definer surface while providing no security property the grant lacks — the app supplies all audit columns either way, and table CHECKs/FKs already enforce validity) and a transactional outbox (worker/idempotency/dead-letter machinery plus delayed audit visibility, disproportionate for a single-process app).
+
+- Migration `066_atomic_audit_import_grants.sql`: `afldb_import` gains INSERT on `data_edits` + `player_link_resolutions` and USAGE on their sequences — nothing else. The tables deliberately stay out of `afldb_meta.import_writable_tables` (its loop grants full DML and would destroy append-only). Mirrored in `tools/maintenance/privileges.sql` after the import revoke loop (the `data_submissions` narrow-grant precedent).
+- New `src/db/queries/audit-log.ts` `recordDataEdit(tx, …)`: single parameterised INSERT on the caller's import transaction handle, throws on failure so the transaction aborts.
+- All eight `data_edits` writers converted to audit inside `sql.begin`: `saveEdit`, `saveMatchSheet`, `createMatch`, `deleteMatch`, `createAwardWinner`, `createHallOfFameInductee`, `createHonourTeamMember`, and `createPlayer` (which now takes a required `audit: {adminUserId, note?}` argument; the inline `authSql` insert in `createPlayerAction` is gone).
+- `recordLinkedResolution` now takes the transaction and is called inside `resolveLink` / `createPlayerAndResolveLink`; a failed resolution audit rolls the link (and created player) back. `confirmUnlinked`, `recordSuggestion`, and the best-effort `auth_audit_log` activity trail stay on `authSql` by design.
+- All `auditWarning` success-with-warning plumbing for required audits removed from queries and both admin action modules — the state it reported ("committed but unaudited, do not retry") is structurally unreachable; an audit failure now surfaces as a plain error with nothing committed. `ACTIVITY_AUDIT_WARNING` for the intentionally best-effort activity audit is retained.
 
 ### Validation
-Focused warning-path tests passed for awards and player links; source review covers match, player, and generic-edit warnings. No cross-role failure integration fixture was available.
-
-Current review on 2026-08-21 confirmed this remains a genuine architecture gap: statistical writes and audit writes still use separate role-scoped connections, so the warning UI mitigates duplicate retries but does not provide atomic audit durability. No code change was made during the NL audit.
+- `npm run typecheck` passed (2026-08-22, Windows).
+- Mocked suites passed 58/58: `tests/awards-admin.test.ts` (audit rides the import tx after the statistical insert; forced audit failure rejects the create with `authSql` untouched; migration-066 + privileges.sql + actions source contracts), `tests/player-link-mutations.test.ts` (resolution audit on the tx with exact values and ordering; forced audit failure returns `ok:false`; `createPlayer` audits `data_edits` in-transaction), `tests/admin-match-mutations.test.ts` (every mutation module contains `recordDataEdit(tx` and no `authSql`/`auditWarning`; helper has no catch), `tests/match-sheet.test.ts`.
+- **Linux/PostgreSQL run, 2026-08-22 (dev host `streamanator`, throwaway snapshot of the working tree at `~/tmp/afldb-027`, against `afldb_test`, deleted after):** `npm run db:migrate:test` applied `066_atomic_audit_import_grants.sql` cleanly (13 ms); `npm run db:privileges:test` reconciled without error including the new re-grant block. `tests/integration/privileges.test.ts` passed 24/24, proving from the catalogue that `afldb_import` holds INSERT-and-nothing-else on both audit tables and USAGE-and-nothing-else on their sequences, with the registry drift test intact. `tests/integration/data-editor.test.ts` passed 6/6 including the two ISSUE-027 behavioural proofs: a committed `saveMatchSheet` persists the mutation and its `data_edits` row together, and a save with an FK-violating `adminUserId` returns `ok:false` with the statistical row byte-unchanged and zero audit rows behind. The mocked suites (58/58) and `npm run typecheck` were also re-run green on Linux. The full `tests/integration` folder run showed 367/369 with 2 failures reproduced identically on the untouched `d5243ba` checkout — pre-existing, tracked as `AFLDB-ISSUE-073` (unindexed FKs) and `AFLDB-ISSUE-074` (email-intake fixture assumption), not caused by this change.
+- Environment notes from the run: the `afldb_test` migration ledger checksums are LF-based; a snapshot taken from the Windows working tree carries CRLF and must be LF-normalised before `db:migrate:test` will verify the applied prefix. Inline `sed`/`perl`/`tr` escape sequences must never be sent through PowerShell→ssh (backslashes get eaten — one pass literally deleted every lowercase `r` from two SQL files); ship script files instead.
 
 ### Follow-up
-Choose and implement a database-owned audit function callable within the import transaction, or a durable transactional outbox with idempotent delivery.
+- Deploy ordering: migration 066 + `npm run db:privileges` must run on an environment **before** the new code serves traffic there, or every admin mutation fails closed on the audit INSERT (safe, but an editor outage). Conversely a stale checkout's `privileges.sql` run would revoke the grants (the new privileges test catches this).
+- `promoteSubmission` (`src/lib/ingest/pipeline.ts`) deliberately not absorbed: its post-commit `data_submissions` status flip is a workflow state write, not a required audit, and its failure-path write must survive the rollback. The success-path flip could move inside the import transaction using the existing column grant — separate review.
+- Optional tightening: `afldb_auth` retains its now-mostly-unused INSERT on `data_edits` (kept for future admin-side correction entries; append-only unaffected).
 
 ## AFLDB-ISSUE-028 — Mutation cache invalidation omits dynamic public pages
 
@@ -3045,3 +3056,120 @@ The full V2 run completed in 5m10s against `afldb_dev`, parser version 25, concu
 
 ### Follow-up
 Review and re-baseline the V2 generator/oracles for season-range sum expectations, historical coverage policy, wrong-decline-reason expectations, and numeric-condition operator contradictions. Only promote any remaining product defect after the oracle layer is reconciled.
+
+## AFLDB-ISSUE-072 — site-settings default-shape test is stale after frontendTheme
+
+- **Status:** Open
+- **Severity:** Low
+- **Area:** Tests
+- **Found:** 2026-08-22
+- **Resolved:** N/A
+- **Files:** `tests/site-settings.test.ts`, `src/db/queries/site-settings.ts`
+
+### Symptom
+`tests/site-settings.test.ts` › `supplies every default from an empty table` fails: the parsed defaults now include `frontendTheme: 'classic'` (and any sibling keys added with it), which the test's expected object predates.
+
+### Reproduction
+`npx vitest run tests/site-settings.test.ts` on `dev` at `59a232e` (observed during unrelated AFLDB-ISSUE-027 work).
+
+### Expected
+The default-shape regression covers every current settings key.
+
+### Actual
+The themeable-frontend work (commit `d5243ba`) added new settings defaults without extending the test's expected object.
+
+### Evidence
+AssertionError diff shows `frontendTheme: "classic"` present in received, absent in expected.
+
+### First wrong layer
+Test expectation.
+
+### Root cause
+Not yet confirmed beyond the stale expectation; likely the d5243ba settings additions were not mirrored into the default-shape test.
+
+### Fix
+Not yet fixed.
+
+### Validation
+Not yet run.
+
+### Follow-up
+Extend the expected defaults object in `tests/site-settings.test.ts` to the current `parseSiteSettings` output and re-run the suite.
+
+## AFLDB-ISSUE-073 — Four audit/link foreign keys have no supporting index
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Database
+- **Found:** 2026-08-22
+- **Resolved:** N/A
+- **Files:** `src/db/migrations/056_player_link_review.sql`, `src/db/migrations/057_data_edits.sql`, `tests/integration/fk-indexes.test.ts`
+
+### Symptom
+`tests/integration/fk-indexes.test.ts` › `indexes every foreign key whose parent can be deleted from` fails, listing: `data_edits(admin_user_id) -> auth_users`, `player_link_resolutions(admin_user_id) -> auth_users`, `player_link_resolutions(player_id) -> players`, `player_link_suggestions(resolved_by) -> auth_users`.
+
+### Reproduction
+`npx vitest run tests/integration/fk-indexes.test.ts` on the dev host against `afldb_test` (schema at migration 066).
+
+### Expected
+Every FK whose parent can be deleted from has a usable index, or its parent is justified in `DELETE_FREE_PARENTS`.
+
+### Actual
+The four FKs above, all introduced by migrations 056/057, have no index; deleting from `auth_users` or `players` sequentially scans the child tables.
+
+### Evidence
+Reproduced identically 2026-08-22 on the untouched dev checkout at `d5243ba` (pre-dating the ISSUE-027 change, which added no FK) and on the ISSUE-027 working tree. Pre-existing; likely first surfaced now because `afldb_test` only recently caught up past migration 056 (the known migrate:test lag).
+
+### First wrong layer
+Schema (missing indexes) — migrations 056/057 declared the FKs without the migration-041-shape partial indexes.
+
+### Root cause
+Not yet confirmed beyond the missing indexes themselves.
+
+### Fix
+Not yet fixed.
+
+### Validation
+Not yet run.
+
+### Follow-up
+Add the four partial indexes in a new migration (the `CREATE INDEX ... WHERE col IS NOT NULL` shape from migration 041), or add `auth_users`/`players` justifications to `DELETE_FREE_PARENTS` — note `fk-indexes.test.ts` explicitly argues `auth_users` is deletable, so indexes are the likely answer.
+
+## AFLDB-ISSUE-074 — email-intake integration test assumes a fixture admin ordering
+
+- **Status:** Open
+- **Severity:** Low
+- **Area:** Tests
+- **Found:** 2026-08-22
+- **Resolved:** N/A
+- **Files:** `tests/integration/email-intake.test.ts`
+
+### Symptom
+`stages and validates a real CSV from a real admin end to end` fails on the dev host: `uploadedBy` is a real admin email (`streamanatordashboard@gmail.com`) while the test expected `fwab-nav-test@afldb.local`.
+
+### Reproduction
+`npx vitest run tests/integration/email-intake.test.ts` on the dev host, where `auth_users` (via `authSql` → `afldb_dev`) contains real admin rows.
+
+### Expected
+The test provisions or deterministically selects its own fixture admin.
+
+### Actual
+It picks an admin by query ordering, so whichever row sorts first on the host under test wins; on shared/dev data that is not the fixture. The test also stages a real `data_submissions` row with no cleanup (one such artifact row was left in `afldb_dev` by the 2026-08-22 run).
+
+### Evidence
+Assertion diff at `tests/integration/email-intake.test.ts:94` during the ISSUE-027 validation run; the ISSUE-027 change touches nothing in email intake.
+
+### First wrong layer
+Test fixture assumption.
+
+### Root cause
+Not yet confirmed in detail.
+
+### Fix
+Not yet fixed.
+
+### Validation
+Not yet run.
+
+### Follow-up
+Create (or select by exact fixture email) a dedicated test admin inside the test, and clean up the staged submission row.

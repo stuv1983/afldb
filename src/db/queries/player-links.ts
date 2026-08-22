@@ -17,12 +17,16 @@ import {
  *
  *   afldb_app     reads the honours rows for the queue -- the same
  *                 SELECT the public pages already run on.
- *   afldb_auth    writes suggestions and resolutions, the operational
- *                 record of what readers said and admins decided.
- *   afldb_import  performs the one statistical write (player_id +
+ *   afldb_auth    writes suggestions and the audit-only resolutions
+ *                 (confirmed-unlinked), the operational record of what
+ *                 readers said and admins decided.
+ *   afldb_import  performs the statistical write (player_id +
  *                 link_status_value on the honours row), on a
- *                 short-lived connection exactly like promoteSubmission.
- *                 There is one way into the statistical tables, not two.
+ *                 short-lived connection exactly like promoteSubmission,
+ *                 and appends the required linked-resolution audit row
+ *                 inside that same transaction (migration 066,
+ *                 AFLDB-ISSUE-027). There is one way into the
+ *                 statistical tables, not two.
  */
 
 /** The tables a link may be reviewed on. The migration CHECK mirrors this. */
@@ -201,7 +205,7 @@ export async function recordSuggestion(input: {
 }
 
 export type ResolveResult =
-  | { ok: true; auditWarning?: string }
+  | { ok: true }
   | { ok: false; error: string };
 
 type Tx = postgres.TransactionSql;
@@ -311,31 +315,28 @@ async function applyLockedLink(
   `;
 }
 
-async function recordLinkedResolution(input: {
+/**
+ * Required audit for an applied link. Must run on the same import-role
+ * transaction as the statistical link write (migration 066,
+ * AFLDB-ISSUE-027): a failed insert propagates, aborting the
+ * transaction and rolling the link back with it.
+ */
+async function recordLinkedResolution(tx: Tx, input: {
   targetTable: LinkTargetTable;
   targetId: number;
   playerId: number;
   previousStatus: string;
   adminUserId: number;
   note?: string | null;
-}): Promise<ResolveResult> {
-  try {
-    await authSql`
-      INSERT INTO player_link_resolutions
-            (target_table, target_id, action, player_id, previous_status,
-             admin_user_id, note)
-      VALUES (${input.targetTable}, ${input.targetId}, 'linked', ${input.playerId},
-              ${input.previousStatus}::link_status, ${input.adminUserId},
-              ${(input.note ?? '').trim().slice(0, 2000) || null})
-    `;
-    return { ok: true };
-  } catch (error) {
-    console.error('player-link resolution audit row could not be written', error);
-    return {
-      ok: true,
-      auditWarning: 'The link was applied, but its resolution audit failed. Do not submit it again; ask an administrator to reconcile the audit log.',
-    };
-  }
+}): Promise<void> {
+  await tx`
+    INSERT INTO player_link_resolutions
+          (target_table, target_id, action, player_id, previous_status,
+           admin_user_id, note)
+    VALUES (${input.targetTable}, ${input.targetId}, 'linked', ${input.playerId},
+            ${input.previousStatus}::link_status, ${input.adminUserId},
+            ${(input.note ?? '').trim().slice(0, 2000) || null})
+  `;
 }
 
 /**
@@ -344,10 +345,10 @@ async function recordLinkedResolution(input: {
  * promoteSubmission pattern). Guarded to the unresolved statuses so an
  * import-confirmed 'unique' link can never be overwritten from here.
  *
- * The audit row is written afterwards on the auth pool. The two writes
- * cannot share a transaction across two roles; if the audit insert
- * fails the link stands and the failure is surfaced to the admin
- * rather than hidden.
+ * The required resolution audit is written inside the same transaction
+ * (migration 066, AFLDB-ISSUE-027): if the audit insert fails, the
+ * link rolls back with it, so a link can never exist without its
+ * resolution row.
  */
 export async function resolveLink(input: {
   targetTable: LinkTargetTable;
@@ -360,11 +361,10 @@ export async function resolveLink(input: {
   if (!importUrl) return { ok: false, error: 'AFLDB_IMPORT_DATABASE_URL is not configured.' };
 
   const importSql = postgres(importUrl, { max: 1, onnotice: () => {} });
-  let previousStatus: string | null;
   try {
-    previousStatus = await importSql.begin(async (tx) => {
+    const applied = await importSql.begin(async (tx) => {
       const target = await lockUnresolvedTarget(tx, input.targetTable, input.targetId);
-      if (!target) return null;
+      if (!target) return false;
       await applyLockedLink(
         tx,
         input.targetTable,
@@ -372,26 +372,26 @@ export async function resolveLink(input: {
         input.playerId,
         target.draftPersonId,
       );
-      return target.previousStatus;
-    }) as string | null;
-    if (previousStatus === null) {
+      await recordLinkedResolution(tx, { ...input, previousStatus: target.previousStatus });
+      return true;
+    }) as boolean;
+    if (!applied) {
       return {
         ok: false,
         error: 'No unresolved row with that id — it may already be linked.',
       };
     }
+    return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, error: `The link could not be applied: ${message}` };
   } finally {
     await importSql.end({ timeout: 5 });
   }
-
-  return recordLinkedResolution({ ...input, previousStatus });
 }
 
 export type CreateAndResolveResult =
-  | { ok: true; player: CreatedPlayer; auditWarning?: string }
+  | { ok: true; player: CreatedPlayer }
   | { ok: false; error: string };
 
 /**
@@ -410,9 +410,8 @@ export async function createPlayerAndResolveLink(input: {
   if (!importUrl) return { ok: false, error: 'AFLDB_IMPORT_DATABASE_URL is not configured.' };
 
   const importSql = postgres(importUrl, { max: 1, onnotice: () => {} });
-  let applied: { player: CreatedPlayer; previousStatus: string } | null;
   try {
-    applied = await importSql.begin(async (tx) => {
+    const applied = await importSql.begin(async (tx) => {
       const target = await lockUnresolvedTarget(tx, input.targetTable, input.targetId);
       if (!target) return null;
 
@@ -424,34 +423,32 @@ export async function createPlayerAndResolveLink(input: {
         player.id,
         target.draftPersonId,
       );
-      return { player, previousStatus: target.previousStatus };
-    }) as { player: CreatedPlayer; previousStatus: string } | null;
+      // Required audit, same transaction (AFLDB-ISSUE-027): a failed
+      // insert rolls back the player creation and the link together.
+      await recordLinkedResolution(tx, {
+        targetTable: input.targetTable,
+        targetId: input.targetId,
+        playerId: player.id,
+        previousStatus: target.previousStatus,
+        adminUserId: input.adminUserId,
+        note: input.note?.trim()
+          || `Created player ${player.displayName} and linked to ${input.targetTable} #${input.targetId}`,
+      });
+      return { player };
+    }) as { player: CreatedPlayer } | null;
     if (applied === null) {
       return {
         ok: false,
         error: 'No unresolved row with that id — it may already be linked.',
       };
     }
+    return { ok: true, player: applied.player };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, error: `The player and link could not be created: ${message}` };
   } finally {
     await importSql.end({ timeout: 5 });
   }
-
-  const resolution = await recordLinkedResolution({
-    targetTable: input.targetTable,
-    targetId: input.targetId,
-    playerId: applied.player.id,
-    previousStatus: applied.previousStatus,
-    adminUserId: input.adminUserId,
-    note: input.note?.trim()
-      || `Created player ${applied.player.displayName} and linked to ${input.targetTable} #${input.targetId}`,
-  });
-  if (!resolution.ok) return resolution;
-  return resolution.auditWarning
-    ? { ok: true, player: applied.player, auditWarning: resolution.auditWarning }
-    : { ok: true, player: applied.player };
 }
 
 /**

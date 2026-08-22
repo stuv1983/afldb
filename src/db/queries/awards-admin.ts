@@ -3,7 +3,7 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 
 import postgres from 'postgres';
-import { authSql } from '@/db/authClient';
+import { recordDataEdit } from '@/db/queries/audit-log';
 
 const MANUAL_ADMIN_SOURCE_KEY = 'manual_admin_edit';
 const BROWNLOW_AWARD_SLUG = 'brownlow-medal';
@@ -33,13 +33,7 @@ type SelectedClubIdentity = {
 
 export type CreateHonourRecordResult = {
   id: number;
-  /** The statistical row committed, but its separate-role audit write failed. */
-  auditWarning?: string;
 };
-
-const AUDIT_WARNING =
-  'The record was created, but its data-edits audit snapshot could not be written. '
-  + 'Do not submit it again; ask an administrator to reconcile the audit log.';
 
 export type CreateAwardWinnerInput = {
   awardId: number;
@@ -205,26 +199,27 @@ export async function createAwardWinner(input: CreateAwardWinnerInput): Promise<
         RETURNING id
       `;
 
-      return { ...row, clubId };
+      // Required audit, same transaction: a failed insert rolls the
+      // award-winner creation back (AFLDB-ISSUE-027).
+      await recordDataEdit(tx, {
+        tableName: 'award_winners',
+        rowId: row.id,
+        fieldGroup: 'award_winner',
+        oldValues: {},
+        newValues: {
+          awardId: input.awardId,
+          season: input.season,
+          playerId: input.playerId,
+          clubId,
+        },
+        adminUserId: input.adminUserId,
+        note: input.note,
+      });
+
+      return row;
     });
 
-    try {
-      await authSql`
-        INSERT INTO data_edits (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
-        VALUES ('award_winners', ${created.id}, 'award_winner', '{}'::jsonb,
-                ${authSql.json({
-                  awardId: input.awardId,
-                  season: input.season,
-                  playerId: input.playerId,
-                  clubId: created.clubId,
-                })},
-                ${input.adminUserId}, ${input.note?.trim() || null})
-      `;
-      return { id: created.id };
-    } catch (error) {
-      console.error('Failed to log data-edits audit row for award winner creation', error);
-      return { id: created.id, auditWarning: AUDIT_WARNING };
-    }
+    return { id: created.id };
   } finally {
     await importSql.end({ timeout: 5 });
   }
@@ -280,21 +275,22 @@ export async function createHallOfFameInductee(
         RETURNING id
       `;
 
+      // Required audit, same transaction: a failed insert rolls the
+      // induction back (AFLDB-ISSUE-027).
+      await recordDataEdit(tx, {
+        tableName: 'hall_of_fame',
+        rowId: row.id,
+        fieldGroup: 'hall_of_fame',
+        oldValues: {},
+        newValues: { name: input.name, year: input.inductedYear, playerId: input.playerId },
+        adminUserId: input.adminUserId,
+        note: input.notes,
+      });
+
       return row;
     });
 
-    try {
-      await authSql`
-        INSERT INTO data_edits (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
-        VALUES ('hall_of_fame', ${created.id}, 'hall_of_fame', '{}'::jsonb,
-                ${authSql.json({ name: input.name, year: input.inductedYear, playerId: input.playerId })},
-                ${input.adminUserId}, ${input.notes?.trim() || null})
-      `;
-      return created;
-    } catch (error) {
-      console.error('Failed to log data-edits audit row for Hall of Fame creation', error);
-      return { ...created, auditWarning: AUDIT_WARNING };
-    }
+    return created;
   } finally {
     await importSql.end({ timeout: 5 });
   }
@@ -371,21 +367,22 @@ export async function createHonourTeamMember(
             RETURNING id
           `;
 
+      // Required audit, same transaction: a failed insert rolls the
+      // honour-team entry back (AFLDB-ISSUE-027).
+      await recordDataEdit(tx, {
+        tableName: 'honour_team_members',
+        rowId: row.id,
+        fieldGroup: 'honour_team',
+        oldValues: {},
+        newValues: { teamName: input.teamName, playerName: input.playerNameRaw, playerId: input.playerId },
+        adminUserId: input.adminUserId,
+        note: input.note,
+      });
+
       return row;
     });
 
-    try {
-      await authSql`
-        INSERT INTO data_edits (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
-        VALUES ('honour_team_members', ${created.id}, 'honour_team', '{}'::jsonb,
-                ${authSql.json({ teamName: input.teamName, playerName: input.playerNameRaw, playerId: input.playerId })},
-                ${input.adminUserId}, ${input.note?.trim() || null})
-      `;
-      return created;
-    } catch (error) {
-      console.error('Failed to log data-edits audit row for honour-team creation', error);
-      return { ...created, auditWarning: AUDIT_WARNING };
-    }
+    return created;
   } finally {
     await importSql.end({ timeout: 5 });
   }

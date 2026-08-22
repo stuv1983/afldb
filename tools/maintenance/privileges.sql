@@ -281,6 +281,20 @@ BEGIN
     GRANT SELECT ON data_submission_rows TO afldb_import;
   END IF;
 
+  -- Migration 066 (AFLDB-ISSUE-027): required mutation audits commit in
+  -- the same import-role transaction as the mutation. INSERT only —
+  -- append-only from afldb_import's side, and deliberately NOT
+  -- registered in import_writable_tables, whose loop above would grant
+  -- full DML. The revoke loop strips these each run; re-grant them here.
+  IF to_regclass('public.data_edits') IS NOT NULL THEN
+    GRANT INSERT ON data_edits TO afldb_import;
+    GRANT USAGE ON SEQUENCE data_edits_id_seq TO afldb_import;
+  END IF;
+  IF to_regclass('public.player_link_resolutions') IS NOT NULL THEN
+    GRANT INSERT ON player_link_resolutions TO afldb_import;
+    GRANT USAGE ON SEQUENCE player_link_resolutions_id_seq TO afldb_import;
+  END IF;
+
   -- Staging is the importer's own workspace and holds no operational
   -- table, so it keeps its blanket grants and its default privileges.
   IF to_regnamespace('staging') IS NOT NULL THEN

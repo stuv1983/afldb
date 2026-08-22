@@ -75,7 +75,6 @@ export async function linkPlayer(
     });
     if (!result.ok) return { error: `Error on ${targetTable}:${targetId}: ${result.error}` };
 
-    warning = combineWarnings(warning, result.auditWarning);
     try {
       await audit('player_link.linked', { targetTable, targetId, playerId },
         { userId: admin.id, label: admin.email });
@@ -192,7 +191,6 @@ export async function createAndLinkPlayer(
       const { player } = result;
       createdPlayerId = player.id;
       createdPlayerName = player.displayName;
-      warning = combineWarnings(warning, result.auditWarning);
       try {
         await audit('player_link.created_and_linked', {
           targetTable,
@@ -210,7 +208,6 @@ export async function createAndLinkPlayer(
         targetTable, targetId, playerId: createdPlayerId, adminUserId: admin.id, note,
       });
       if (!result.ok) return { error: `Error on ${targetTable}:${targetId}: ${result.error}` };
-      warning = combineWarnings(warning, result.auditWarning);
       try {
         await audit('player_link.linked', { targetTable, targetId, playerId: createdPlayerId },
           { userId: admin.id, label: admin.email });

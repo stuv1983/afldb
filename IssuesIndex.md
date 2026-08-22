@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-22  
-**Open issues:** 7
+**Open issues:** 9
 
 ## How Claude should use this file
 
@@ -24,23 +24,17 @@
 
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
-| `AFLDB-ISSUE-027` | High | Architecture | Statistical writes and required audit records remain non-atomic across role-separated connections. |
 | `AFLDB-ISSUE-040` | Low | Tooling | Lint cannot run deterministically/non-interactively because ESLint is not configured. |
 | `AFLDB-ISSUE-044` | High | Import | Legacy honours reloads can overwrite manual identity resolutions; Under-22 is protected but older loaders are not. |
 | `AFLDB-ISSUE-054` | Medium | Tests | Four Under-22 importer contract tests fail at stale literal source-boundary markers. |
 | `AFLDB-ISSUE-059` | Low | Search | Grouped qualifying-match counts are plain text because current Match Search cannot replay every grouped predicate. |
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | React #418 remains intermittent under production-style NL search hydration; narrow H7 diagnostic is awaiting authoritative live-build validation. |
 | `AFLDB-ISSUE-071` | Low | Audit | V2 residual failures require generator/oracle re-baselining before any remaining parser defect is promoted. |
+| `AFLDB-ISSUE-072` | Low | Tests | `tests/site-settings.test.ts` default-shape expectation is stale after the `frontendTheme` settings landed. |
+| `AFLDB-ISSUE-073` | Medium | Database | Four migration-056/057 foreign keys lack supporting indexes; `fk-indexes.test.ts` fails. |
+| `AFLDB-ISSUE-074` | Low | Tests | email-intake integration test picks a real dev admin instead of its fixture and leaves a staged row behind. |
 
 ---
-
-## AFLDB-ISSUE-027 — Statistical mutations and required audits commit separately
-
-- **Severity:** High
-- **Area:** Architecture
-- **Key files:** `src/db/queries/match-sheet.ts`, `src/db/queries/match-admin.ts`, `src/db/queries/awards-admin.ts`, `src/db/queries/data-edits.ts`, `src/db/queries/player-links.ts`, `src/app/admin/data-editor/actions.ts`
-- **Current state:** User-facing success-with-warning handling reduces unsafe retries, but statistical and audit writes still use separate role-scoped transactions and are not atomic.
-- **Next action:** Choose and implement either a database-owned audit function callable inside the import transaction or a durable transactional outbox with idempotent delivery.
 
 ## AFLDB-ISSUE-040 — Lint script is not configured for non-interactive validation
 
@@ -101,3 +95,27 @@
 - **Key files:** `tools/nl/v2-runner.ts`; report `/home/arm/nl-stress-out-codex-v25-v2/report.md`
 - **Current state:** The 250k V2 run had 20,000/20,000 verified football answers correct, 24,393/24,393 expected declines safe, zero unsafe answers, and 6,788/6,788 metamorphic groups consistent. Residual hard/soft findings are dominated by known corpus/oracle-policy tension, with smaller numeric-condition clusters requiring review.
 - **Next action:** Re-baseline the V2 generator/oracles for season-range sum expectations, historical coverage policy, wrong-decline-reason expectations, and numeric-condition operator contradictions. Promote a product defect only after the oracle layer is reconciled.
+
+## AFLDB-ISSUE-072 — site-settings default-shape test is stale after frontendTheme
+
+- **Severity:** Low
+- **Area:** Tests
+- **Key files:** `tests/site-settings.test.ts`, `src/db/queries/site-settings.ts`
+- **Current state:** `supplies every default from an empty table` fails because commit `d5243ba` added `frontendTheme` (and sibling defaults) without extending the test's expected object. Observed during AFLDB-ISSUE-027 work; unrelated to that change.
+- **Next action:** Extend the expected defaults object to the current `parseSiteSettings` output and re-run `tests/site-settings.test.ts`.
+
+## AFLDB-ISSUE-073 — Four audit/link foreign keys have no supporting index
+
+- **Severity:** Medium
+- **Area:** Database
+- **Key files:** `src/db/migrations/056_player_link_review.sql`, `src/db/migrations/057_data_edits.sql`, `tests/integration/fk-indexes.test.ts`
+- **Current state:** `fk-indexes.test.ts` fails on `data_edits(admin_user_id)`, `player_link_resolutions(admin_user_id)`, `player_link_resolutions(player_id)`, `player_link_suggestions(resolved_by)`. Reproduced on the untouched `d5243ba` checkout — pre-existing, surfaced once `afldb_test` caught up past migration 056.
+- **Next action:** Add the four partial indexes in a new migration (migration-041 shape); `DELETE_FREE_PARENTS` is unlikely to be justifiable for `auth_users`/`players`.
+
+## AFLDB-ISSUE-074 — email-intake integration test assumes a fixture admin ordering
+
+- **Severity:** Low
+- **Area:** Tests
+- **Key files:** `tests/integration/email-intake.test.ts`
+- **Current state:** The end-to-end CSV test picks an admin by query ordering and fails on the dev host where real admins sort first; it also leaves a staged `data_submissions` row behind (one artifact row left in `afldb_dev` on 2026-08-22).
+- **Next action:** Provision or deterministically select a dedicated fixture admin inside the test and clean up the staged row.

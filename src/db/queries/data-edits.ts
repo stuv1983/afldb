@@ -2,7 +2,7 @@ import 'server-only';
 
 import postgres from 'postgres';
 
-import { authSql } from '@/db/authClient';
+import { recordDataEdit, type DataEditTableName } from '@/db/queries/audit-log';
 import { sql } from '@/db/client';
 import {
   recomputeClubSeasons,
@@ -23,8 +23,10 @@ import {
  * Reads run on the public client — everything editable is app-readable.
  * The statistical UPDATE runs as afldb_import on a short-lived
  * connection, the promoteSubmission pattern, so afldb_auth keeps zero
- * write access to the statistical tables. The audit row is written on
- * the auth pool afterwards; a failure there is surfaced, never hidden.
+ * write access to the statistical tables. The required data_edits audit
+ * row is written inside the same import-role transaction (migration
+ * 066, AFLDB-ISSUE-027): if the audit insert fails, the edit rolls
+ * back with it, so an edit can never exist without its audit row.
  */
 
 export type EditableRow = {
@@ -117,7 +119,6 @@ export type SaveEditResult =
   | {
       ok: true;
       changed: Record<string, { from: FieldValue; to: FieldValue }>;
-      auditWarning?: string;
     }
   | { ok: false; error: string };
 
@@ -175,6 +176,17 @@ export async function saveEdit(input: {
       } else {
         await applyMatchEdit(tx, input.rowId, input.groupKey, values);
       }
+      // Required audit, same transaction: a failed insert rolls the
+      // edit back (AFLDB-ISSUE-027).
+      await recordDataEdit(tx, {
+        tableName: entity.table as DataEditTableName,
+        rowId: input.rowId,
+        fieldGroup: input.groupKey,
+        oldValues: before,
+        newValues: values,
+        adminUserId: input.adminUserId,
+        note: input.note,
+      });
       return before;
     }) as Record<string, FieldValue> | null;
     if (applied === null) return { ok: false, error: 'No row with that id.' };
@@ -189,24 +201,6 @@ export async function saveEdit(input: {
   const changed: Record<string, { from: FieldValue; to: FieldValue }> = {};
   for (const key of group.fields) {
     if (old[key] !== values[key]) changed[key] = { from: old[key], to: values[key] };
-  }
-
-  try {
-    await authSql`
-      INSERT INTO data_edits
-            (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
-      VALUES (${entity.table}, ${input.rowId}, ${input.groupKey},
-              ${authSql.json(old)}, ${authSql.json(values)},
-              ${input.adminUserId},
-              ${(input.note ?? '').trim().slice(0, 2000) || null})
-    `;
-  } catch (error) {
-    console.error('data_edits audit row could not be written', error);
-    return {
-      ok: true,
-      changed,
-      auditWarning: 'The edit was applied, but its data-edits audit snapshot failed. Do not submit it again; ask an administrator to reconcile the audit log.',
-    };
   }
 
   return { ok: true, changed };

@@ -65,6 +65,8 @@ describe('awards admin mutation contracts', () => {
     begin: ReturnType<typeof vi.fn>;
     end: ReturnType<typeof vi.fn>;
   };
+  let txJson: ReturnType<typeof vi.fn>;
+  let auditUnavailable: boolean;
 
   beforeEach(() => {
     vi.stubEnv('AFLDB_IMPORT_DATABASE_URL', 'postgres://import@example/afldb_test');
@@ -81,8 +83,10 @@ describe('awards admin mutation contracts', () => {
     nextId = 100;
     importQueries = [];
     authQueries = [];
+    auditUnavailable = false;
+    txJson = vi.fn((value: unknown) => value);
 
-    const tx = vi.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+    const tx = Object.assign(vi.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
       const text = strings.join('?');
       importQueries.push({ text, values });
 
@@ -105,8 +109,12 @@ describe('awards admin mutation contracts', () => {
       ) {
         return [{ id: nextId++ }];
       }
+      if (text.includes('INSERT INTO data_edits')) {
+        if (auditUnavailable) throw new Error('audit unavailable');
+        return [];
+      }
       throw new Error(`Unexpected test query: ${text}`);
-    });
+    }), { json: txJson });
 
     importSql = {
       begin: vi.fn(async (callback: (sql: typeof tx) => Promise<unknown>) => callback(tx)),
@@ -166,7 +174,13 @@ describe('awards admin mutation contracts', () => {
       expect.stringMatching(/^award_winner:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
     ]);
     expect(new Set(recordIds).size).toBe(2);
-    expect(authQueries).toHaveLength(2);
+
+    // Required audits ride the import transaction (AFLDB-ISSUE-027);
+    // the auth pool is never touched.
+    const audits = importQueries.filter((query) => query.text.includes('INSERT INTO data_edits'));
+    expect(audits).toHaveLength(2);
+    expect(mocks.authSql).not.toHaveBeenCalled();
+    expect(authQueries).toHaveLength(0);
   });
 
   it('fails before insertion when the required manual source is missing', async () => {
@@ -216,7 +230,7 @@ describe('awards admin mutation contracts', () => {
     const insert = importQueries.find((query) => query.text.includes('INSERT INTO award_winners'));
     expect(insert?.values).toContain(8);
     expect(insert?.values).toContain('Footscray');
-    expect(mocks.authSql.json).toHaveBeenCalledWith(expect.objectContaining({ clubId: 8 }));
+    expect(txJson).toHaveBeenCalledWith(expect.objectContaining({ clubId: 8 }));
   });
 
   it('rejects a club best-and-fairest identity that conflicts with the award season', async () => {
@@ -302,18 +316,37 @@ describe('awards admin mutation contracts', () => {
     ['award winner', () => createAwardWinner(awardInput)],
     ['Hall of Fame inductee', () => createHallOfFameInductee(hallOfFameInput)],
     ['honour team member', () => createHonourTeamMember(honourTeamInput)],
-  ])('reports a committed %s with an explicit audit warning instead of inviting a retry', async (_label, create) => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    mocks.authSql.mockRejectedValueOnce(new Error('audit unavailable'));
+  ])('rejects a %s whose required audit cannot be written, so nothing commits (AFLDB-ISSUE-027)', async (_label, create) => {
+    // The data_edits INSERT runs inside the import transaction: with the
+    // real driver its failure aborts the transaction and the statistical
+    // insert rolls back. There is no success-with-warning state left.
+    auditUnavailable = true;
 
+    await expect(create()).rejects.toThrow('audit unavailable');
+    expect(mocks.authSql).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['award winner', () => createAwardWinner(awardInput)],
+    ['Hall of Fame inductee', () => createHallOfFameInductee(hallOfFameInput)],
+    ['honour team member', () => createHonourTeamMember(honourTeamInput)],
+  ])('writes the required %s audit inside the import transaction, after the statistical insert', async (_label, create) => {
     const result = await create();
 
-    expect(result).toEqual({
-      id: 100,
-      auditWarning: expect.stringContaining('Do not submit it again'),
-    });
-    expect(consoleError).toHaveBeenCalledOnce();
-    consoleError.mockRestore();
+    expect(result).toEqual({ id: 100 });
+    const statIndex = importQueries.findIndex((query) => (
+      query.text.includes('INSERT INTO award_winners')
+      || query.text.includes('INSERT INTO hall_of_fame')
+      || query.text.includes('INSERT INTO honour_team_members')
+    ));
+    const auditIndex = importQueries.findIndex((query) => query.text.includes('INSERT INTO data_edits'));
+    expect(statIndex).toBeGreaterThanOrEqual(0);
+    expect(auditIndex).toBeGreaterThan(statIndex);
+    const audit = importQueries[auditIndex];
+    expect(audit.values[0]).toMatch(/^(award_winners|hall_of_fame|honour_team_members)$/);
+    expect(audit.values[1]).toBe(100);
+    expect(audit.values).toContain(9); // adminUserId
+    expect(mocks.authSql).not.toHaveBeenCalled();
   });
 
   it('keys linked honour-team upserts by stable player identity, not display name', async () => {
@@ -364,6 +397,38 @@ describe('data_edits migration contract', () => {
   });
 });
 
+describe('atomic audit grant migration contract (AFLDB-ISSUE-027)', () => {
+  it('grants afldb_import append-only access to both audit tables, guarded on the role', () => {
+    const migration = readFileSync(
+      join(process.cwd(), 'src', 'db', 'migrations', '066_atomic_audit_import_grants.sql'),
+      'utf8',
+    );
+
+    expect(migration).toContain("pg_roles WHERE rolname = 'afldb_import'");
+    expect(migration).toContain('GRANT INSERT ON data_edits TO afldb_import');
+    expect(migration).toContain('GRANT USAGE ON SEQUENCE data_edits_id_seq TO afldb_import');
+    expect(migration).toContain('GRANT INSERT ON player_link_resolutions TO afldb_import');
+    expect(migration).toContain('GRANT USAGE ON SEQUENCE player_link_resolutions_id_seq TO afldb_import');
+    // Append-only: the migration must never widen beyond INSERT/USAGE.
+    expect(migration).not.toMatch(/GRANT[^;]*\b(UPDATE|DELETE|TRUNCATE)\b/);
+    expect(migration).not.toMatch(/GRANT SELECT/);
+    // And it must not route through the full-DML import registry.
+    expect(migration).not.toContain('grant_import_write');
+  });
+
+  it('is mirrored by the privileges reconciler after the import revoke loop', () => {
+    const privileges = readFileSync(
+      join(process.cwd(), 'tools', 'maintenance', 'privileges.sql'),
+      'utf8',
+    );
+
+    expect(privileges).toContain('GRANT INSERT ON data_edits TO afldb_import');
+    expect(privileges).toContain('GRANT USAGE ON SEQUENCE data_edits_id_seq TO afldb_import');
+    expect(privileges).toContain('GRANT INSERT ON player_link_resolutions TO afldb_import');
+    expect(privileges).toContain('GRANT USAGE ON SEQUENCE player_link_resolutions_id_seq TO afldb_import');
+  });
+});
+
 describe('honour-team identity migration contract', () => {
   it('replaces name-only uniqueness with linked-player and unlinked-name keys', () => {
     const migration = readFileSync(
@@ -384,13 +449,21 @@ describe('honour-team identity migration contract', () => {
 });
 
 describe('awards admin audit-warning UI contract', () => {
-  it('carries post-commit audit warnings through the actions and all three forms', () => {
+  it('keeps only the best-effort activity-audit warning; the required-audit warning state is gone', () => {
     const actions = readFileSync(
       join(process.cwd(), 'src', 'app', 'admin', 'data-editor', 'actions.ts'),
       'utf8',
     );
+    // Required data_edits audits are atomic with the mutation now
+    // (AFLDB-ISSUE-027): a "committed but unaudited" warning can no
+    // longer exist, so no action may read result.auditWarning or write
+    // data_edits itself on the auth pool.
+    expect(actions).not.toContain('auditWarning');
+    expect(actions).not.toContain('authSql');
+    expect(actions).not.toContain('INSERT INTO data_edits');
+    // The intentionally best-effort activity audit keeps its warning.
     expect(actions).toContain('warning?: string');
-    expect(actions.match(/result\.auditWarning/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    expect(actions).toContain('ACTIVITY_AUDIT_WARNING');
     expect(actions).toContain('Do not submit it again');
 
     for (const form of ['AwardWinnerForm.tsx', 'HallOfFameForm.tsx', 'HonourTeamForm.tsx']) {

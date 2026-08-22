@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### Required Mutation Audits Commit Atomically - 22 August 2026
+
+- Every required statistical-mutation audit now commits inside the same import-role transaction as the mutation it records, so a mutation can no longer exist without its audit row and an audit failure rolls the whole mutation back (`AFLDB-ISSUE-027`). Migration 066 grants `afldb_import` INSERT-only on `data_edits` and `player_link_resolutions` (plus sequence USAGE), mirrored in the privileges reconciler; both audit tables stay append-only and outside the full-DML import registry. A shared `recordDataEdit` helper replaces the eight post-commit `authSql` audit writes across the data editor, match sheet, match creation/deletion, awards/Hall of Fame/honour-team creation, and player creation; player-link resolutions likewise audit inside the link transaction.
+- Removed the now-unreachable "saved, but its audit snapshot failed — do not submit it again" success-with-warning states from the admin actions and forms; a required-audit failure now surfaces as a plain error with nothing committed. The intentionally best-effort administrative activity audit (`auth_audit_log`) and its warning are unchanged.
+- Deployment note: migration 066 and `npm run db:privileges` must be applied before the new code serves traffic, or admin mutations fail closed on the audit insert.
+
 ### Match Mutations Refresh Stored Season Ladders - 22 August 2026
 
 - Match creation, deletion, and score corrections now rebuild the affected season's stored `club_seasons` ladder rows inside the same import transaction, via a new targeted `recomputeClubSeasons` helper kept in lockstep with the canonical full rebuild in `tools/migration/rebuild_derived.py` (`AFLDB-ISSUE-015`). Ladder tallies remain sourced from the published `staging.team_seasons` ladder; only the match-derived premiership flag, finals count, and completion-gated wooden spoon are recomputed from match facts.

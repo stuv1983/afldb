@@ -572,6 +572,14 @@ describe('afldb_import is confined to the statistical tables', () => {
     // data_submissions grant (SELECT plus four updatable columns)
     // deliberately withholds -- so that table reads as unregistered here,
     // which it is.
+    //
+    // data_edits and player_link_resolutions are the two deliberate
+    // exceptions (migration 066, AFLDB-ISSUE-027): the mutation role
+    // holds INSERT-only on the audit tables so the required audit row
+    // commits inside the mutation transaction. They stay out of the
+    // registry on purpose -- registering them would grant full DML and
+    // destroy their append-only property -- and their exact narrow shape
+    // is asserted in its own test below.
     const rows = await sql<{ name: string; registered: boolean; writable: boolean }[]>`
       SELECT c.relname AS name,
              (w.name IS NOT NULL) AS registered,
@@ -581,6 +589,7 @@ describe('afldb_import is confined to the statistical tables', () => {
         LEFT JOIN afldb_meta.import_writable_tables w ON w.name = c.relname
        WHERE n.nspname = 'public'
          AND c.relkind IN ('r', 'p')
+         AND c.relname NOT IN ('data_edits', 'player_link_resolutions')
        ORDER BY 1
     `;
     expect(rows.length).toBeGreaterThan(0);
@@ -594,6 +603,46 @@ describe('afldb_import is confined to the statistical tables', () => {
       'run npm run db:privileges, or register the table with '
       + "SELECT afldb_meta.grant_import_write('<table>') in its migration",
     ).toEqual([]);
+  });
+
+  it('appends its own required audit rows and can never read or rewrite them (AFLDB-ISSUE-027)', async () => {
+    // Migration 066: every audited statistical mutation writes its
+    // required data_edits / player_link_resolutions row inside its own
+    // import-role transaction, so the mutation and its audit commit or
+    // roll back together. The grant is INSERT alone -- the audit trail
+    // stays append-only and unreadable from the mutation role.
+    const tables = await sql<{
+      name: string; inserts: boolean; selects: boolean;
+      updates: boolean; deletes: boolean; truncates: boolean;
+    }[]>`
+      SELECT t.name,
+             has_table_privilege(${IMPORT_ROLE}, t.name, 'INSERT')   AS inserts,
+             has_table_privilege(${IMPORT_ROLE}, t.name, 'SELECT')   AS selects,
+             has_table_privilege(${IMPORT_ROLE}, t.name, 'UPDATE')   AS updates,
+             has_table_privilege(${IMPORT_ROLE}, t.name, 'DELETE')   AS deletes,
+             has_table_privilege(${IMPORT_ROLE}, t.name, 'TRUNCATE') AS truncates
+        FROM unnest(ARRAY['data_edits', 'player_link_resolutions']) AS t(name)
+       ORDER BY 1
+    `;
+    expect(tables).toEqual([
+      { name: 'data_edits', inserts: true, selects: false, updates: false, deletes: false, truncates: false },
+      { name: 'player_link_resolutions', inserts: true, selects: false, updates: false, deletes: false, truncates: false },
+    ]);
+
+    const sequences = await sql<{
+      name: string; usage: boolean; selects: boolean; updates: boolean;
+    }[]>`
+      SELECT s.name,
+             has_sequence_privilege(${IMPORT_ROLE}, 'public.' || quote_ident(s.name), 'USAGE')  AS usage,
+             has_sequence_privilege(${IMPORT_ROLE}, 'public.' || quote_ident(s.name), 'SELECT') AS selects,
+             has_sequence_privilege(${IMPORT_ROLE}, 'public.' || quote_ident(s.name), 'UPDATE') AS updates
+        FROM unnest(ARRAY['data_edits_id_seq', 'player_link_resolutions_id_seq']) AS s(name)
+       ORDER BY 1
+    `;
+    expect(sequences).toEqual([
+      { name: 'data_edits_id_seq', usage: true, selects: false, updates: false },
+      { name: 'player_link_resolutions_id_seq', usage: true, selects: false, updates: false },
+    ]);
   });
 
   it('cannot reset the sequence behind an operational table', async () => {
