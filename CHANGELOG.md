@@ -29,6 +29,11 @@ commit.
 - The queue can be filtered by confidence band or narrowed to bulk-ready rows, and is ordered so the clearest decisions and the genuinely ambiguous ones surface first.
 - Player-link resolutions now record how a link was decided (`manual`, `suggested`, `bulk_suggested`), the score the server calculated and the algorithm version, so the model can be audited later.
 - Calibrated against 9,356 confirmed links: 99.69% top-1 accuracy, 99.84% candidate recall, 99.99% precision in the `very_high` band, and 7,337 bulk-eligible rows at 99.99%. All 44 bulk-eligible proposals in the live dev queue were checked by hand and all were correct.
+- Bulk eligibility is decided per source class from measured evidence, not from the aggregate. `award_winners` (2,750), `draft_person` (2,319), `award_nominations` (702) and `player_achievements` (253) showed no false positive; `captaincies` is excluded because a club's recorded captain and the player who actually led the side can legitimately differ, and `hall_of_fame`/`honour_team_members` are excluded for having no measured bulk population at all. Final bulk population 6,024 at 100% precision, zero false positives, with `very_high` unchanged at 7,558/99.99%.
+- The queue is source-record-centric rather than name-centric: each row states what KIND of record it is in that source's own terms — an award and its season, a nomination and its round, an honour team and position, a draft's year, club, pick and source-reported totals, a Hall of Fame playing career shown separately from its induction year.
+- The suggested player carries career context (clubs, span, games, goals) and the evidence behind the score appears as plain chips in the row itself, so the drawer is for detail rather than for discovering why a score exists.
+- Repeated source names are grouped visually with a shared-suggestion summary, and a group whose records suggest different players is flagged and withheld from bulk approval. Grouping is presentation only: every record keeps its own identity, status, approval rules and audit trail.
+- `BULK-READY` explains the four criteria that earn it, so it reads as a separate judgement from the confidence score rather than a louder version of it.
 
 ### Dynamic Column Sorting for Statistical Tables - 22 August 2026
 
