@@ -605,12 +605,21 @@ describe('afldb_import is confined to the statistical tables', () => {
     ).toEqual([]);
   });
 
-  it('appends its own required audit rows and can never read or rewrite them (AFLDB-ISSUE-027)', async () => {
+  it('appends its own required audit rows and can never rewrite them (AFLDB-ISSUE-027)', async () => {
     // Migration 066: every audited statistical mutation writes its
     // required data_edits / player_link_resolutions row inside its own
     // import-role transaction, so the mutation and its audit commit or
-    // roll back together. The grant is INSERT alone -- the audit trail
-    // stays append-only and unreadable from the mutation role.
+    // roll back together.
+    //
+    // Migration 068 (AFLDB-ISSUE-044) adds SELECT on
+    // player_link_resolutions alone: a repeatable honours reload has to
+    // read the human decisions it must not overwrite, and the honours row
+    // itself cannot distinguish a manual link from an import-derived one.
+    // data_edits stays unreadable -- nothing in the import path needs it.
+    //
+    // The append-only property is unchanged and is what this test still
+    // guards: no UPDATE, no DELETE, no TRUNCATE on either table, and no
+    // sequence SELECT or UPDATE.
     const tables = await sql<{
       name: string; inserts: boolean; selects: boolean;
       updates: boolean; deletes: boolean; truncates: boolean;
@@ -626,7 +635,7 @@ describe('afldb_import is confined to the statistical tables', () => {
     `;
     expect(tables).toEqual([
       { name: 'data_edits', inserts: true, selects: false, updates: false, deletes: false, truncates: false },
-      { name: 'player_link_resolutions', inserts: true, selects: false, updates: false, deletes: false, truncates: false },
+      { name: 'player_link_resolutions', inserts: true, selects: true, updates: false, deletes: false, truncates: false },
     ]);
 
     const sequences = await sql<{

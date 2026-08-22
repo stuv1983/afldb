@@ -11,10 +11,14 @@ Every target table already exists (migration 005). This importer fills
 them from the legacy SQLite database, which holds the scraped award data
 that Phase 3 deliberately left until the core entities were proven.
 
-Like the core importer, the legacy rebuild groups truncate their targets and
-reload, so a rerun always produces the same result. Independently sourced
-groups such as ``under_22`` use scoped upserts instead. Nothing is written to
-the legacy database.
+Every group reloads its targets by the source's own key, so a rerun always
+produces the same result *and* the target rows keep their ids. That matters
+because ``player_link_resolutions.target_id`` points at those ids: the earlier
+truncate-and-reload discarded every manual identity decision and left its audit
+row dangling (AFLDB-ISSUE-044). Human decisions are re-applied on top of the
+refreshed source facts, and a decision that cannot be carried safely stops the
+run before anything is written unless ``--allow-link-loss`` is given. Nothing is
+written to the legacy database.
 
 Two rules carried over from Phase 3
 -----------------------------------
@@ -44,20 +48,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import psycopg  # noqa: E402
 
 from common import (  # noqa: E402
+    LinkDecisionLoss,
     Reporter,
     analyze,
     clean_text,
     connect_legacy,
     connect_pg,
-    copy_rows,
     import_batch,
     load_env,
+    reload_keyed,
+    report_reload,
     require_env,
     safe_dsn,
     scalar,
     set_reload_scope,
     to_int,
-    truncate,
 )
 from under_22 import Under22Selection, load_under_22  # noqa: E402
 
@@ -288,14 +293,13 @@ AWARD_DESCRIPTIONS = {
 # Group: awards and their winners
 # ---------------------------------------------------------------------------
 def import_awards(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
-                  sources: dict[str, int], person_links: dict[int, tuple]) -> None:
-    # 22 Under 22 is independently sourced and owns durable winner ids used by
-    # the append-only player-link audit. Preserve its award row across this
-    # legacy rebuild instead of letting DELETE CASCADE turn those audit targets
-    # into dead pointers.
-    with pg.cursor() as cur:
-        cur.execute("DELETE FROM awards WHERE slug <> %s", (UNDER_22_SLUG,))
-
+                  sources: dict[str, int], person_links: dict[int, tuple],
+                  allow_link_loss: bool = False) -> None:
+    # Both targets are reloaded by key rather than emptied and refilled. 22
+    # Under 22 is independently sourced and owns durable winner ids used by the
+    # append-only player-link audit, so it stays outside this group's scope
+    # entirely instead of being deleted and rebuilt; the All-Australian award's
+    # winners belong to the next group and are likewise out of scope here.
     rows = lite.execute(
         """SELECT award_category, award_name, award_slug, source_category, season,
                   player, player_url, club, original_club, votes, prior_games,
@@ -358,28 +362,31 @@ def import_awards(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
                 entry["first"], entry["last"],
             )
 
-    copy_rows(
-        pg, "awards",
+    # An award definition is a plain source fact with no player link of its
+    # own, so no resolution is read here. Keying on the slug is what keeps
+    # awards.id stable, and with it the award_winners rows that reference it
+    # through an ON DELETE CASCADE foreign key.
+    reload_keyed(
+        pg, "awards", ["slug"],
         ["slug", "name", "category", "competition", "club_id",
          "description", "first_season", "last_season"],
         build_definitions(), batch,
+        link_columns=None,
+        scope_column="slug", scope_values=[UNDER_22_SLUG], scope_exclude=True,
     )
-    pg.commit()
 
     with pg.cursor() as cur:
         cur.execute("SELECT slug, id FROM awards")
         award_ids = dict(cur.fetchall())
 
     # 2. Winners.
-    with pg.cursor() as cur:
-        cur.execute(
-            """DELETE FROM award_winners w
-                 USING awards a
-                 WHERE a.id = w.award_id
-                   AND a.slug <> %s""",
-            (UNDER_22_SLUG,),
-        )
     source_id = sources.get("draftguru")
+    # Winners owned by another group: 22 Under 22 upserts its own rows, and the
+    # All-Australian team is loaded from its own two sources immediately after.
+    other_group_awards = [
+        award_ids[slug] for slug in (UNDER_22_SLUG, ALL_AUSTRALIAN_SLUG)
+        if slug in award_ids
+    ]
 
     def build_winners():
         for row_no, r in enumerate(rows, start=1):
@@ -389,6 +396,11 @@ def import_awards(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
             player = clean_text(r["player"])
             if award_id is None or not player:
                 batch.reject(r["source_row"], "award or player name missing", dict(r))
+                continue
+            if award_id in other_group_awards:
+                # Out of this reload's scope, so an inserted row here could
+                # never be matched again and would double on the next run.
+                batch.reject(r["source_row"], f"award {slug!r} is loaded by another group", dict(r))
                 continue
 
             linked = person_links.get(r["dg_person_id"]) if r["dg_person_id"] else None
@@ -418,15 +430,19 @@ def import_awards(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
                 source_id, record_id, batch.id,
             )
 
-    copy_rows(
-        pg, "award_winners",
+    winners = reload_keyed(
+        pg, "award_winners", ["source_id", "source_record_id"],
         ["award_id", "season", "player_id", "player_name_raw", "link_status_value",
          "candidate_count", "club_id", "club_name_raw", "votes", "position",
          "is_captain", "is_vice_captain", "note", "source_id", "source_record_id",
          "import_batch_id"],
         build_winners(), batch,
+        target_table="award_winners",
+        scope_column="award_id", scope_values=other_group_awards, scope_exclude=True,
+        allow_link_loss=allow_link_loss,
     )
     pg.commit()
+    report_reload(rep, "award_winners", winners)
 
     rep.result("awards", scalar(pg, "SELECT count(*) FROM awards"))
     rep.result("award_winners", scalar(pg, "SELECT count(*) FROM award_winners"),
@@ -437,7 +453,8 @@ def import_awards(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
 # Group: All-Australian
 # ---------------------------------------------------------------------------
 def import_all_australian(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
-                          sources: dict[str, int], person_links: dict[int, tuple]) -> None:
+                          sources: dict[str, int], person_links: dict[int, tuple],
+                          allow_link_loss: bool = False) -> None:
     """Load the All-Australian teams from both legacy sources.
 
     ``all_australian`` is draftguru's 1979-2025 table and carries position
@@ -456,8 +473,6 @@ def import_all_australian(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
                 "run the 'awards' group first"
             )
         award_id = row[0]
-        cur.execute("DELETE FROM award_winners WHERE award_id = %s", (award_id,))
-    pg.commit()
 
     detailed = lite.execute(
         """SELECT season, player, club, position, is_captain, is_vice_captain,
@@ -518,14 +533,20 @@ def import_all_australian(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
                 f"aah:{r['season']}:{r['player_source']}:{r['club_source'] or ''}", batch.id,
             )
 
-    copy_rows(
-        pg, "award_winners",
+    # Scoped to this one award: both All-Australian sources live here, and the
+    # legacy awards group above deliberately leaves them alone.
+    stats = reload_keyed(
+        pg, "award_winners", ["source_id", "source_record_id"],
         ["award_id", "season", "player_id", "player_name_raw", "link_status_value",
          "candidate_count", "club_id", "club_name_raw", "votes", "position",
          "is_captain", "is_vice_captain", "note", "source_id", "source_record_id",
          "import_batch_id"],
         build(), batch,
+        target_table="award_winners",
+        scope_column="award_id", scope_values=[award_id],
+        allow_link_loss=allow_link_loss,
     )
+    report_reload(rep, "all_australian", stats)
 
     with pg.cursor() as cur:
         cur.execute(
@@ -837,15 +858,13 @@ STAT_COLUMNS = [
 
 
 def import_rising_star(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
-                       sources: dict[str, int]) -> None:
+                       sources: dict[str, int], allow_link_loss: bool = False) -> None:
     """Load every round-by-round Rising Star nomination, 1993 on.
 
     The award itself is already in ``awards`` from the draftguru load —
     this adds the nominees, which is the part that makes the award
     browsable rather than a list of 33 winners.
     """
-    truncate(pg, "award_nominations")
-
     with pg.cursor() as cur:
         cur.execute("SELECT id FROM awards WHERE slug = %s", (RISING_STAR_SLUG,))
         row = cur.fetchone()
@@ -904,15 +923,19 @@ def import_rising_star(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
                 source_id, r["source_key"], batch.id,
             )
 
-    copy_rows(
-        pg, "award_nominations",
+    stats = reload_keyed(
+        pg, "award_nominations", ["source_id", "source_record_id"],
         ["award_id", "season", "round_number", "player_id", "player_name_raw",
          "link_status_value", "club_id", "opponent_club_id", "is_winner",
          "is_ineligible", "ineligible_reason", "votes", "stat_line",
          "source_id", "source_record_id", "import_batch_id"],
         build(), batch,
+        target_table="award_nominations",
+        scope_column="award_id", scope_values=[award_id],
+        allow_link_loss=allow_link_loss,
     )
     pg.commit()
+    report_reload(rep, "award_nominations", stats)
 
     total = scalar(pg, "SELECT count(*) FROM award_nominations")
     linked = scalar(pg, "SELECT count(*) FROM award_nominations WHERE player_id IS NOT NULL")
@@ -925,9 +948,8 @@ def import_rising_star(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
 # ---------------------------------------------------------------------------
 # Group: Hall of Fame
 # ---------------------------------------------------------------------------
-def import_hall_of_fame(pg, lite, rep: Reporter, batch, sources: dict[str, int]) -> None:
-    truncate(pg, "hall_of_fame")
-
+def import_hall_of_fame(pg, lite, rep: Reporter, batch, sources: dict[str, int],
+                        allow_link_loss: bool = False) -> None:
     rows = lite.execute(
         """SELECT name, category, inducted_year, is_legend, legend_year, club,
                   state, playing_career, games_goals, removed_year, player_id,
@@ -953,14 +975,21 @@ def import_hall_of_fame(pg, lite, rep: Reporter, batch, sources: dict[str, int])
                 sources.get("wikipedia"), batch.id,
             )
 
-    copy_rows(
-        pg, "hall_of_fame",
+    # This source carries no record id of its own, so migration 042's natural
+    # key does the work. The name is therefore part of the key: a renamed
+    # inductee reads as "old key gone, new key arrived", which is exactly the
+    # case that must stop rather than quietly delete and reinsert a decided row.
+    stats = reload_keyed(
+        pg, "hall_of_fame", ["name", "inducted_year"],
         ["name", "player_id", "link_status_value", "category", "inducted_year",
          "is_legend", "legend_year", "club_name_raw", "state", "playing_career",
          "removed_year", "notes", "source_id", "import_batch_id"],
         build(), batch,
+        target_table="hall_of_fame", name_column="name",
+        allow_link_loss=allow_link_loss,
     )
     pg.commit()
+    report_reload(rep, "hall_of_fame", stats)
 
     rep.result("hall_of_fame", scalar(pg, "SELECT count(*) FROM hall_of_fame"),
                f"({scalar(pg, 'SELECT count(*) FROM hall_of_fame WHERE is_legend')} legends, "
@@ -970,9 +999,8 @@ def import_hall_of_fame(pg, lite, rep: Reporter, batch, sources: dict[str, int])
 # ---------------------------------------------------------------------------
 # Group: honour teams
 # ---------------------------------------------------------------------------
-def import_honour_teams(pg, lite, rep: Reporter, batch, sources: dict[str, int]) -> None:
-    truncate(pg, "honour_team_members")
-
+def import_honour_teams(pg, lite, rep: Reporter, batch, sources: dict[str, int],
+                        allow_link_loss: bool = False) -> None:
     rows = lite.execute(
         """SELECT team_name, position, sort_order, name, club, role, note,
                   player_id, match_status, candidate_count, notes, source_url
@@ -996,14 +1024,21 @@ def import_honour_teams(pg, lite, rep: Reporter, batch, sources: dict[str, int])
                 sources.get("wikipedia"), batch.id,
             )
 
-    copy_rows(
-        pg, "honour_team_members",
+    # No source record id here either. (team_name, player_name_raw) was this
+    # table's original uniqueness rule and is still the only key the source
+    # supplies, so — as for the Hall of Fame — a source rename cannot be
+    # separated from a deletion and must stop a decided row from being lost.
+    stats = reload_keyed(
+        pg, "honour_team_members", ["team_name", "player_name_raw"],
         ["team_name", "player_id", "player_name_raw", "link_status_value",
          "position", "role", "club_name_raw", "sort_order", "note",
          "source_id", "import_batch_id"],
         build(), batch,
+        target_table="honour_team_members",
+        allow_link_loss=allow_link_loss,
     )
     pg.commit()
+    report_reload(rep, "honour_team_members", stats)
 
     rep.result("honour_team_members", scalar(pg, "SELECT count(*) FROM honour_team_members"),
                f"({scalar(pg, 'SELECT count(DISTINCT team_name) FROM honour_team_members')} teams)")
@@ -1013,9 +1048,7 @@ def import_honour_teams(pg, lite, rep: Reporter, batch, sources: dict[str, int])
 # Group: captaincies
 # ---------------------------------------------------------------------------
 def import_captaincies(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
-                       sources: dict[str, int]) -> None:
-    truncate(pg, "captaincies")
-
+                       sources: dict[str, int], allow_link_loss: bool = False) -> None:
     with pg.cursor() as cur:
         cur.execute("SELECT year FROM seasons")
         valid_seasons = {r[0] for r in cur.fetchall()}
@@ -1048,13 +1081,16 @@ def import_captaincies(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
                 sources.get("wikipedia"), r["source_row_id"], batch.id,
             )
 
-    copy_rows(
-        pg, "captaincies",
+    stats = reload_keyed(
+        pg, "captaincies", ["source_id", "source_record_id"],
         ["season", "club_id", "player_id", "player_name_raw", "link_status_value",
          "role", "period", "notes", "source_id", "source_record_id", "import_batch_id"],
         build(), batch,
+        target_table="captaincies",
+        allow_link_loss=allow_link_loss,
     )
     pg.commit()
+    report_reload(rep, "captaincies", stats)
 
     rep.result("captaincies", scalar(pg, "SELECT count(*) FROM captaincies"),
                f"({scalar(pg, 'SELECT count(*) FROM captaincies WHERE player_id IS NOT NULL')} linked)")
@@ -1128,6 +1164,11 @@ def main() -> int:
     parser.add_argument("--list-groups", action="store_true")
     parser.add_argument("--dry-run", action="store_true",
                         help="report source counts without writing")
+    parser.add_argument(
+        "--allow-link-loss", action="store_true",
+        help="proceed even when a manual player-link decision cannot survive "
+             "the reload; every discarded decision is itemised",
+    )
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args()
 
@@ -1248,9 +1289,11 @@ def main() -> int:
             batch_source = UNDER_22_SOURCE_KEY if key == "under_22" else "sports_data_lab"
             with import_batch(pg, batch_source, "import_awards.py", key) as batch:
                 if key == "awards":
-                    import_awards(pg, lite, rep, batch, clubs, sources, person_links)
+                    import_awards(pg, lite, rep, batch, clubs, sources, person_links,
+                                  allow_link_loss=args.allow_link_loss)
                 elif key == "all_australian":
-                    import_all_australian(pg, lite, rep, batch, clubs, sources, person_links)
+                    import_all_australian(pg, lite, rep, batch, clubs, sources, person_links,
+                                          allow_link_loss=args.allow_link_loss)
                 elif key == "under_22":
                     import_under_22(
                         pg, rep, batch, clubs, sources,
@@ -1258,13 +1301,17 @@ def main() -> int:
                         prepared_rows=under_22_prepared,
                     )
                 elif key == "rising_star":
-                    import_rising_star(pg, lite, rep, batch, clubs, sources)
+                    import_rising_star(pg, lite, rep, batch, clubs, sources,
+                                       allow_link_loss=args.allow_link_loss)
                 elif key == "hall_of_fame":
-                    import_hall_of_fame(pg, lite, rep, batch, sources)
+                    import_hall_of_fame(pg, lite, rep, batch, sources,
+                                        allow_link_loss=args.allow_link_loss)
                 elif key == "honour_teams":
-                    import_honour_teams(pg, lite, rep, batch, sources)
+                    import_honour_teams(pg, lite, rep, batch, sources,
+                                        allow_link_loss=args.allow_link_loss)
                 elif key == "captaincies":
-                    import_captaincies(pg, lite, rep, batch, clubs, sources)
+                    import_captaincies(pg, lite, rep, batch, clubs, sources,
+                                       allow_link_loss=args.allow_link_loss)
 
         analyze(pg, "awards", "award_winners", "award_nominations", "hall_of_fame",
                 "honour_team_members", "captaincies")
@@ -1278,6 +1325,11 @@ def main() -> int:
                 f"(kept as club_name_raw): "
                 + ", ".join(f"{name} x{count}" for name, count in top)
             )
+    except LinkDecisionLoss as loss:
+        # Raised during analysis, before the group wrote anything; import_batch
+        # has already rolled its transaction back, so the targets are untouched.
+        rep.warn(str(loss))
+        return 1
     finally:
         pg.close()
         if lite is not None:

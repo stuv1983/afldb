@@ -15,6 +15,12 @@ const orderingMigration = readFileSync(
   'utf8',
 );
 const awardQueries = readFileSync(join(root, 'src', 'db', 'queries', 'awards.ts'), 'utf8');
+const coreCommon = readFileSync(join(root, 'tools', 'migration', 'common.py'), 'utf8');
+const linkResolutionGrant = readFileSync(
+  join(root, 'src', 'db', 'migrations', '068_import_reads_link_resolutions.sql'),
+  'utf8',
+);
+const privileges = readFileSync(join(root, 'tools', 'maintenance', 'privileges.sql'), 'utf8');
 const ignoreRules = readFileSync(join(root, '.gitignore'), 'utf8');
 const python = process.env.PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3');
 
@@ -92,10 +98,59 @@ describe('22 Under 22 awards import contract', () => {
       'def import_awards(',
       '\n\n\n# ---------------------------------------------------------------------------\n# Group: All-Australian',
     );
-    expect(legacyAwardsLoader).not.toContain('truncate(pg, "awards")');
-    expect(legacyAwardsLoader).not.toContain('truncate(pg, "award_winners")');
-    expect(legacyAwardsLoader).toContain('DELETE FROM awards WHERE slug <> %s');
-    expect(legacyAwardsLoader).toContain('a.slug <> %s');
+    // The legacy group must never empty these tables wholesale, and must
+    // leave the independently sourced 22 Under 22 award and its winners
+    // alone. Since AFLDB-ISSUE-044 it no longer deletes and rebuilds at all:
+    // it reloads by key and scopes itself out of the Under-22 rows, which is
+    // the same guarantee expressed against a stronger mechanism.
+    expect(legacyAwardsLoader).not.toContain('truncate(');
+    expect(legacyAwardsLoader).not.toContain('DELETE FROM awards');
+    expect(legacyAwardsLoader).not.toContain('DELETE FROM award_winners');
+    expect(legacyAwardsLoader).toMatch(
+      /reload_keyed\([\s\S]*?"awards", \["slug"\][\s\S]*?scope_column="slug", scope_values=\[UNDER_22_SLUG\], scope_exclude=True/,
+    );
+    expect(legacyAwardsLoader).toContain('other_group_awards = [');
+    expect(legacyAwardsLoader).toContain('for slug in (UNDER_22_SLUG, ALL_AUSTRALIAN_SLUG)');
+    expect(legacyAwardsLoader).toMatch(
+      /reload_keyed\([\s\S]*?"award_winners", \["source_id", "source_record_id"\][\s\S]*?scope_column="award_id", scope_values=other_group_awards, scope_exclude=True/,
+    );
+    // A row belonging to another group must be rejected rather than inserted
+    // outside this reload's scope, where it could never be matched again.
+    expect(legacyAwardsLoader).toContain('is loaded by another group');
+  });
+
+  it('preserves the manual identity decisions a legacy reload used to discard', () => {
+    // AFLDB-ISSUE-044: the honours loaders keep their target row ids, so
+    // player_link_resolutions.target_id stays valid, and they re-apply the
+    // admin's decision on top of the refreshed source facts.
+    for (const table of [
+      'award_winners', 'award_nominations', 'hall_of_fame',
+      'honour_team_members', 'captaincies',
+    ]) {
+      expect(importer).toContain(`target_table="${table}"`);
+    }
+    expect(importer).not.toContain('truncate(');
+    // Definitions carry no player link at all, so no resolution is read.
+    expect(importer).toContain('link_columns=None');
+    const helper = between(
+      coreCommon,
+      'def reload_keyed(',
+      '\n\n\ndef report_reload(',
+    );
+    // Classification is complete before the first write, so a strict abort
+    // rolls back with the target table untouched.
+    expect(helper.indexOf('raise LinkDecisionLoss'))
+      .toBeLessThan(helper.indexOf('UPDATE public.{table} e'));
+    expect(helper).toContain('DISTINCT ON (target_id)');
+    expect(helper).toContain('ORDER BY target_id, created_at DESC, id DESC');
+    expect(helper).toContain("WHEN 'linked' THEN i._dec_player");
+    expect(helper).toContain("WHEN 'confirmed_unlinked' THEN NULL");
+    expect(helper).toContain('the source no longer carries this key');
+    expect(helper).toContain('the source name changed to');
+    // The grant the read depends on, and its deployment order.
+    expect(linkResolutionGrant).toContain('GRANT SELECT ON player_link_resolutions TO afldb_import');
+    expect(linkResolutionGrant).not.toMatch(/GRANT[^;]*\b(UPDATE|DELETE|TRUNCATE)\b[^;]*player_link_resolutions/);
+    expect(privileges).toContain('GRANT SELECT ON player_link_resolutions TO afldb_import;');
   });
 
   it('uses names only to find candidates and requires season/club evidence to trust one', () => {

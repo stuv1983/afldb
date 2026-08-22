@@ -293,6 +293,13 @@ BEGIN
   IF to_regclass('public.player_link_resolutions') IS NOT NULL THEN
     GRANT INSERT ON player_link_resolutions TO afldb_import;
     GRANT USAGE ON SEQUENCE player_link_resolutions_id_seq TO afldb_import;
+    -- Migration 068 (AFLDB-ISSUE-044): a repeatable honours reload must
+    -- read the append-only decisions it is forbidden to overwrite. The
+    -- honours row stores only the outcome, and the legacy vocabulary maps
+    -- 'from_draft' onto the same 'resolved', so a human link cannot be
+    -- told from an import-derived one without this read. Still no UPDATE,
+    -- DELETE or TRUNCATE: the table stays append-only.
+    GRANT SELECT ON player_link_resolutions TO afldb_import;
   END IF;
 
   -- Staging is the importer's own workspace and holds no operational

@@ -228,6 +228,346 @@ def copy_rows(conn: psycopg.Connection, table: str, columns: Sequence[str],
     return count
 
 
+# --------------------------------------------------------------------------
+# Keyed reload (AFLDB-ISSUE-044)
+# --------------------------------------------------------------------------
+# A repeatable source can be reloaded in two ways. TRUNCATE-and-COPY is the
+# simplest, and it is what every honours loader used to do — but it throws the
+# target rows away, and with them their surrogate ids. Those ids are not
+# private bookkeeping: player_link_resolutions.target_id points at them, so a
+# reload discarded every manual identity decision an admin had recorded and
+# left its audit row pointing at an id that no longer exists.
+#
+# reload_keyed() reloads the same source by its own key instead. Matched rows
+# are UPDATEd in place, so ``id`` survives; new keys are inserted; keys the
+# source no longer carries are deleted. Human decisions recorded in
+# player_link_resolutions are then re-applied on top of the refreshed source
+# facts, because the honours row itself cannot tell a human link from an
+# import-derived one — both end up as player_id + 'resolved'.
+#
+# Nothing is written until every decision has been classified. A decision that
+# cannot be carried safely — because the source name changed under the key, or
+# the key disappeared entirely — aborts the reload before the first UPDATE, so
+# the caller's transaction rolls back with the target table untouched.
+
+
+class LinkDecisionLoss(RuntimeError):
+    """A reload would discard or reattribute a human identity decision."""
+
+
+@dataclass
+class DiscardedDecision:
+    """One human decision a reload cannot carry across, and why."""
+
+    table: str
+    target_id: int
+    key: str
+    name: str | None
+    reason: str
+    action: str
+    player_id: int | None
+
+    def describe(self) -> str:
+        who = f"player {self.player_id}" if self.player_id is not None else "no player"
+        return (
+            f"{self.table} id={self.target_id} key=[{self.key}] "
+            f"name={self.name!r} decision={self.action} ({who}): {self.reason}"
+        )
+
+
+@dataclass
+class ReloadStats:
+    """What a keyed reload actually did, for the run report."""
+
+    inserted: int = 0
+    updated: int = 0
+    deleted: int = 0
+    preserved: int = 0
+    disagreements: list[str] = field(default_factory=list)
+    discarded: list[DiscardedDecision] = field(default_factory=list)
+
+
+_INCOMING = "_afldb_incoming"
+_DECISIONS = "_afldb_decisions"
+
+
+def _scope_clause(
+    alias: str,
+    scope_column: str | None,
+    scope_values: Sequence[Any],
+    scope_exclude: bool,
+) -> str:
+    """Predicate limiting a reload to the rows this loader owns.
+
+    An empty value list is resolved here rather than sent to PostgreSQL: an
+    empty Python list adapts to an untyped ``'{}'``, which cannot be compared
+    with an integer column.
+    """
+    if scope_column is None:
+        return "TRUE"
+    if not scope_values:
+        return "TRUE" if scope_exclude else "FALSE"
+    operator = "<> ALL" if scope_exclude else "= ANY"
+    return f"{alias}.{scope_column} {operator}(%s)"
+
+
+def _key_match(left: str, right: str, key_columns: Sequence[str]) -> str:
+    """NULL-safe key equality: hall_of_fame keys on a nullable year."""
+    return " AND ".join(
+        f"{left}.{col} IS NOT DISTINCT FROM {right}.{col}" for col in key_columns
+    )
+
+
+def reload_keyed(
+    conn: psycopg.Connection,
+    table: str,
+    key_columns: Sequence[str],
+    columns: Sequence[str],
+    rows: Iterable[Sequence[Any]],
+    batch: ImportBatch | None = None,
+    *,
+    target_table: str | None = None,
+    link_columns: Sequence[str] | None = ("player_id", "link_status_value"),
+    name_column: str | None = "player_name_raw",
+    scope_column: str | None = None,
+    scope_values: Sequence[Any] = (),
+    scope_exclude: bool = False,
+    allow_link_loss: bool = False,
+) -> ReloadStats:
+    """Reload ``table`` from ``rows`` by key, preserving ids and decisions.
+
+    ``target_table`` is the player_link_resolutions vocabulary name for this
+    table. Passing ``link_columns=None`` — as ``awards`` does — means the table
+    bears no player link at all: no resolution is read and no link column is
+    referenced, so the helper is usable for plain reference data too.
+    """
+    key_columns = list(key_columns)
+    columns = list(columns)
+    link_columns = list(link_columns or [])
+    if not link_columns:
+        target_table = None
+        name_column = None
+    missing = [c for c in (*key_columns, *link_columns) if c not in columns]
+    if missing:
+        raise ValueError(f"{table}: key/link columns not loaded: {', '.join(missing)}")
+
+    scope_values = list(scope_values)
+    scope_e = _scope_clause("e", scope_column, scope_values, scope_exclude)
+    scope_params = [scope_values] if "%s" in scope_e else []
+    collist = ", ".join(columns)
+    stats = ReloadStats()
+
+    with conn.cursor() as cur:
+        cur.execute(f"DROP TABLE IF EXISTS {_INCOMING}")
+        cur.execute(
+            f"CREATE TEMP TABLE {_INCOMING} AS "
+            f"SELECT {collist} FROM public.{table} WITH NO DATA"
+        )
+
+    copy_rows(conn, _INCOMING, columns, rows)
+
+    with conn.cursor() as cur:
+        # The reload key must actually be a key. migration 059 replaced
+        # honour_team_uq with two partial indexes, so a duplicated source key
+        # there would no longer be caught by a constraint: it would make the
+        # UPDATE pick an arbitrary source row and the INSERT double the row.
+        # Fail loudly instead, which is what migration 042 set out to buy.
+        cur.execute(
+            f"""SELECT {', '.join(f'{c}::text' for c in key_columns)}, count(*)
+                  FROM {_INCOMING}
+                 GROUP BY {', '.join(str(n) for n in range(1, len(key_columns) + 1))}
+                HAVING count(*) > 1
+                 LIMIT 5"""
+        )
+        duplicates = cur.fetchall()
+        if duplicates:
+            listed = "; ".join(
+                f"[{' | '.join(str(v) for v in row[:-1])}] x{row[-1]}"
+                for row in duplicates
+            )
+            raise RuntimeError(
+                f"{table}: the source supplied duplicate reload keys "
+                f"({', '.join(key_columns)}): {listed}. Nothing has been written."
+            )
+
+        if target_table is not None:
+            cur.execute(f"DROP TABLE IF EXISTS {_DECISIONS}")
+            # The latest decision per target is the operative one: the audit
+            # trail is append-only, so a corrected decision is a newer row.
+            cur.execute(
+                f"""CREATE TEMP TABLE {_DECISIONS} AS
+                    SELECT DISTINCT ON (target_id)
+                           target_id, action, player_id
+                      FROM player_link_resolutions
+                     WHERE target_table = %s
+                     ORDER BY target_id, created_at DESC, id DESC""",
+                (target_table,),
+            )
+
+            # ----------------------------------------------------------------
+            # Classify every decision BEFORE anything is written.
+            # ----------------------------------------------------------------
+            key_expr = ", ".join(f"e.{col}::text" for col in key_columns)
+            name_expr = f"e.{name_column}" if name_column else "NULL::text"
+            incoming_name = f"i.{name_column}" if name_column else "NULL::text"
+            cur.execute(
+                f"""SELECT e.id,
+                           concat_ws(' | ', {key_expr}) AS key_text,
+                           {name_expr} AS existing_name,
+                           d.action, d.player_id AS decided_player,
+                           i.ctid IS NOT NULL AS matched,
+                           {incoming_name} AS incoming_name,
+                           i.player_id AS incoming_player
+                      FROM public.{table} e
+                      JOIN {_DECISIONS} d ON d.target_id = e.id
+                      LEFT JOIN {_INCOMING} i
+                             ON {_key_match('e', 'i', key_columns)}
+                     WHERE {scope_e}""",
+                tuple(scope_params),
+            )
+            for (row_id, key_text, existing_name, action, decided_player,
+                 matched, incoming_name_value, incoming_player) in cur.fetchall():
+                if not matched:
+                    stats.discarded.append(DiscardedDecision(
+                        table, row_id, key_text, existing_name,
+                        "the source no longer carries this key",
+                        action, decided_player,
+                    ))
+                    continue
+                if name_column and existing_name != incoming_name_value:
+                    stats.discarded.append(DiscardedDecision(
+                        table, row_id, key_text, existing_name,
+                        f"the source name changed to {incoming_name_value!r}",
+                        action, decided_player,
+                    ))
+                    continue
+                stats.preserved += 1
+                if (action == "linked" and incoming_player is not None
+                        and incoming_player != decided_player):
+                    stats.disagreements.append(
+                        f"{table} id={row_id} [{key_text}] {existing_name!r}: the "
+                        f"source now links player {incoming_player}, an admin "
+                        f"linked player {decided_player}; keeping the admin's "
+                        f"decision — review it"
+                    )
+                elif action == "confirmed_unlinked" and incoming_player is not None:
+                    stats.disagreements.append(
+                        f"{table} id={row_id} [{key_text}] {existing_name!r}: the "
+                        f"source now links player {incoming_player}, an admin "
+                        f"confirmed this row is genuinely unlinked; keeping it "
+                        f"unlinked — review it"
+                    )
+
+            if stats.discarded and not allow_link_loss:
+                raise LinkDecisionLoss(
+                    f"{len(stats.discarded)} human identity decision(s) cannot "
+                    f"survive this {table} reload; nothing has been written:\n  "
+                    + "\n  ".join(d.describe() for d in stats.discarded)
+                    + "\nReview them in /admin/player-links, or rerun with "
+                      "--allow-link-loss to discard them deliberately."
+                )
+
+            # Carry each decision onto its incoming row so the UPDATE below is
+            # a plain two-table join rather than a per-row correlated lookup.
+            name_guard = (
+                f"e.{name_column} = i.{name_column}" if name_column else "TRUE"
+            )
+            cur.execute(
+                f"""ALTER TABLE {_INCOMING}
+                      ADD COLUMN _dec_action text,
+                      ADD COLUMN _dec_player integer,
+                      ADD COLUMN _dec_status text"""
+            )
+            cur.execute(
+                f"""UPDATE {_INCOMING} i
+                       SET _dec_action = d.action,
+                           _dec_player = d.player_id,
+                           _dec_status = e.link_status_value::text
+                      FROM public.{table} e
+                      JOIN {_DECISIONS} d ON d.target_id = e.id
+                     WHERE {scope_e}
+                       AND {_key_match('e', 'i', key_columns)}
+                       AND {name_guard}""",
+                tuple(scope_params),
+            )
+
+        # --------------------------------------------------------------------
+        # Write. Matched rows keep their id; only their columns change.
+        # --------------------------------------------------------------------
+        plain = [c for c in columns if c not in key_columns and c not in link_columns]
+        assignments = [f"{c} = i.{c}" for c in plain]
+        if link_columns and target_table is not None:
+            assignments += [
+                "player_id = CASE i._dec_action"
+                " WHEN 'linked' THEN i._dec_player"
+                " WHEN 'confirmed_unlinked' THEN NULL"
+                " ELSE i.player_id END",
+                "link_status_value = CASE i._dec_action"
+                " WHEN 'linked' THEN 'resolved'::link_status"
+                " WHEN 'confirmed_unlinked' THEN i._dec_status::link_status"
+                " ELSE i.link_status_value END",
+            ]
+        else:
+            assignments += [f"{c} = i.{c}" for c in link_columns]
+
+        cur.execute(
+            f"""UPDATE public.{table} e
+                   SET {', '.join(assignments)}
+                  FROM {_INCOMING} i
+                 WHERE {scope_e}
+                   AND {_key_match('e', 'i', key_columns)}""",
+            tuple(scope_params),
+        )
+        stats.updated = cur.rowcount
+
+        cur.execute(
+            f"""INSERT INTO public.{table} ({collist})
+                SELECT {', '.join('i.' + c for c in columns)}
+                  FROM {_INCOMING} i
+                 WHERE NOT EXISTS (
+                         SELECT 1 FROM public.{table} e
+                          WHERE {scope_e}
+                            AND {_key_match('e', 'i', key_columns)})""",
+            tuple(scope_params),
+        )
+        stats.inserted = cur.rowcount
+
+        cur.execute(
+            f"""DELETE FROM public.{table} e
+                 WHERE {scope_e}
+                   AND NOT EXISTS (
+                         SELECT 1 FROM {_INCOMING} i
+                          WHERE {_key_match('e', 'i', key_columns)})""",
+            tuple(scope_params),
+        )
+        stats.deleted = cur.rowcount
+
+        cur.execute(f"DROP TABLE IF EXISTS {_INCOMING}")
+        if target_table is not None:
+            cur.execute(f"DROP TABLE IF EXISTS {_DECISIONS}")
+
+    if batch is not None:
+        batch.records_inserted += stats.inserted
+        batch.records_updated += stats.updated
+
+    return stats
+
+
+def report_reload(rep: Any, label: str, stats: ReloadStats) -> None:
+    """Print a keyed reload's decision outcome. Loss is always itemised."""
+    if stats.preserved:
+        rep.result(f"  {label} decisions preserved", stats.preserved)
+    for message in stats.disagreements:
+        rep.warn(message)
+    if stats.discarded:
+        rep.warn(
+            f"--allow-link-loss: DISCARDING {len(stats.discarded)} human "
+            f"identity decision(s) on {label}:"
+        )
+        for discarded in stats.discarded:
+            rep.warn(f"  {discarded.describe()}")
+
+
 # Tables the current run undertakes to rebuild. None means "everything":
 # a full reload repopulates whatever CASCADE empties, so there is nothing
 # to protect against. A partial run sets this to the tables its selected

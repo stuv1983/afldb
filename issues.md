@@ -7,13 +7,12 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 10
+**Open issues:** 12
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
 | `AFLDB-ISSUE-040` | Low | Tooling | The lint script invokes deprecated `next lint` without a checked-in ESLint setup and becomes interactive. | Add a reviewed ESLint flat configuration and compatible dependencies, then replace `next lint` with the ESLint CLI. |
-| `AFLDB-ISSUE-044` | High | Import | Legacy full awards reloads can discard manual player-link resolutions outside the protected Under-22 path. | Preserve durable manual resolutions across legacy honours reloads and add manual-resolve → full-reload → preserved-link integration coverage. |
-| `AFLDB-ISSUE-054` | Medium | Tests | Under-22 importer contract tests fail because literal source-boundary markers drifted from `import_awards.py`. | Repair the importer/test boundary contract without weakening the behavioural assertions. |
+| `AFLDB-ISSUE-054` | Low | Tests | Four Under-22 importer contract tests fail only on a Windows checkout: `between()` matches `\n\n\n` against a CRLF working copy. The same tests pass on Linux. | Make the source-contract `between()` helper newline-agnostic (normalise CRLF on read) so the suite is not platform-dependent. |
 | `AFLDB-ISSUE-059` | Low | Search | Grouped `Qualifying matches` counts have no safe drill-down to the exact matching fixtures. | Extend Match Search or add a dedicated NL drill-down route that can faithfully replay the grouped row predicates. |
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
 | `AFLDB-ISSUE-071` | Low | Audit | Parser-v25 V2 residual failures still mix corpus/oracle debt with possible smaller parser follow-up. | Re-baseline V2 generator/oracles first; promote a product defect only after the oracle layer is reconciled. |
@@ -21,6 +20,9 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-073` | Medium | Database | Four pre-066 foreign keys (`data_edits.admin_user_id`, `player_link_resolutions.admin_user_id`/`player_id`, `player_link_suggestions.resolved_by`) have no supporting index; `tests/integration/fk-indexes.test.ts` fails. | Add the partial indexes in a new migration (the 041 shape) or justify `DELETE_FREE_PARENTS` entries. |
 | `AFLDB-ISSUE-074` | Low | Tests | `tests/integration/email-intake.test.ts` assumes the first `auth_users` row is its fixture admin and fails against real dev-host admin data. | Make the test create/select its own fixture admin deterministically instead of `ORDER BY`-picking one. |
 | `AFLDB-ISSUE-076` | Medium | Performance | Grid Solver combinations using `won_final_at_venue` can exceed PostgreSQL's 5-second statement timeout and crash the page. | Capture and compare the generated SQL/EXPLAIN plan against `played_at_venue`, then optimise the `won_final_at_venue` query shape without raising the application timeout. |
+| `AFLDB-ISSUE-077` | Medium | UI/Settings | The super-admin-selected frontend theme is not stable within a browsing session; different pages can render different themes as the user navigates. | Trace every theme source (database setting, server render, cookie/local storage and client hydration), establish one authoritative theme value per request/session, and add navigation regression coverage. |
+| `AFLDB-ISSUE-078` | High | Import | The draft and first-kick-goal reloads still destroy manual player-link resolutions the way the honours loaders did before `AFLDB-ISSUE-044`. | Apply the `reload_keyed` pattern to `tools/migration/import_draft.py` and `tools/records/import-first-kick-goal.ts`, keyed on the durable source identity each already carries. |
+| `AFLDB-ISSUE-079` | High | Data integrity | Destructive reloads run before `AFLDB-ISSUE-044` may have left `player_link_resolutions` rows pointing at target ids that no longer exist. `afldb_dev` audited clean (75 resolutions, 0 dangling); production not yet audited. | Run the documented read-only dangling-target audit against production, record the per-table counts and any affected rows, and change nothing. |
 
 ---
 
@@ -1643,12 +1645,16 @@ Do not rewrite the historical measured counts; add a new dated migration report 
 
 ## AFLDB-ISSUE-044 — Full awards reload discards existing manual player resolutions
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Import
 - **Found:** 2026-08-20
-- **Resolved:** N/A
-- **Files:** `tools/migration/import_awards.py`, `src/db/queries/player-links.ts`
+- **Resolved:** 2026-08-22
+- **Files:** `tools/migration/common.py`, `tools/migration/import_awards.py`,
+  `src/db/migrations/068_import_reads_link_resolutions.sql`,
+  `tools/maintenance/privileges.sql`,
+  `tests/integration/awards-reload-links.test.ts`,
+  `tests/under-22-importer.test.ts`, `tests/integration/privileges.test.ts`
 
 ### Symptom
 Running the legacy full awards group can turn manually resolved award, Hall of Fame, honour-team or captaincy links back into their legacy automated link state.
@@ -1663,21 +1669,155 @@ Append-only human identity decisions remain authoritative across repeatable sour
 The importer truncates and recreates the honours tables from legacy source link fields, so later manual decisions are not generally replayed.
 
 ### Evidence
-`import_awards.py` rebuilds the shared legacy awards/honours targets, while manual link decisions are stored separately in `player_link_resolutions`. The new 22 Under 22 award and winner rows are explicitly excluded from those deletes, but the older loaders do not yet preserve their durable target IDs.
+`import_awards.py` rebuilt the shared legacy awards/honours targets, while manual link decisions are stored separately in `player_link_resolutions`. The new 22 Under 22 award and winner rows were explicitly excluded from those deletes, but the older loaders did not preserve their durable target IDs.
+
+Six destructive paths were confirmed by inspection, one per loader:
+
+| Loader | Destructive statement |
+|---|---|
+| `import_awards` (definitions) | `DELETE FROM awards WHERE slug <> %s` |
+| `import_awards` (winners) | `DELETE FROM award_winners w USING awards a … a.slug <> %s` |
+| `import_all_australian` | `DELETE FROM award_winners WHERE award_id = %s` |
+| `import_rising_star` | `truncate(pg, "award_nominations")` |
+| `import_hall_of_fame` | `truncate(pg, "hall_of_fame")` |
+| `import_honour_teams` | `truncate(pg, "honour_team_members")` |
+| `import_captaincies` | `truncate(pg, "captaincies")` |
+
+`awards.id` churn matters on its own: `award_winners.award_id` is `ON DELETE
+CASCADE`, so rebuilding the definitions is what cascaded the winners away.
+
+**Database-backed reproduction, `afldb_test`, 2026-08-22** (the before-state the
+ledger previously lacked). Awards family loaded from the legacy SQLite, then
+three decisions recorded exactly as `resolveLink` / `confirmUnlinked` write
+them, then the unmodified `--groups hall_of_fame honour_teams` reload:
+
+| Decision | Before | After the reload |
+|---|---|---|
+| `hall_of_fame` id 1 "Alf Brown", linked to player 1 | `player_id=1`, `resolved` | row is now **id 344**, `player_id NULL`, `unmatched` |
+| `honour_team_members` id 6 "Ted Whitten", linked to player 2 | `player_id=2`, `resolved` | row is now **id 119**, `player_id NULL`, `ambiguous` |
+| `hall_of_fame` id 2 "Bill Deller", confirmed unlinked | audit row only | row is now **id 345**; the decision no longer suppresses it in the queue |
+
+Table id ranges moved from `1-343` to `344-686` (`hall_of_fame`) and `1-113` to
+`114-226` (`honour_team_members`). All three
+`player_link_resolutions.target_id` values became **dangling**: no row exists at
+that id any more.
+
+**Audit reattribution was specifically tested for and did not occur.**
+`truncate()` deliberately omits `RESTART IDENTITY` and the loaders never
+`setval()` these sequences, so ids advance monotonically and are never reused.
+The harm is therefore a lost link plus an unresolvable audit pointer — not a
+decision silently transferred to another person's row. The earlier hypothesis
+that a reload could reattribute a decision is **not supported** by this
+reproduction.
 
 ### Root cause
-The bulk loader predates the append-only manual-resolution workflow and treats reconstructed source rows as the whole identity state.
+Two faults, one mechanism. The bulk loader predates the append-only
+manual-resolution workflow and treated reconstructed source rows as the whole
+identity state, so (a) the human link was overwritten by legacy link state, and
+(b) the surrogate row id the audit trail points at was regenerated.
+
+The loader also had no way to tell a human link from an import-derived one: the
+honours row stores only the outcome, and `LINK_STATUS` maps the legacy
+`from_draft` vocabulary onto the same `'resolved'`. `afldb_import` held
+INSERT-only on `player_link_resolutions` (migration 066) and so could not read
+the decisions it was overwriting.
 
 ### Fix
-Not fixed globally. The new `under_22` group preserves its award/winner rows, durable IDs and deliberate `resolved` links on both targeted and destructive full reloads, without changing the older loaders in this scoped feature.
+Added `reload_keyed()` to `tools/migration/common.py` and moved all six legacy
+honours loaders onto it. Each reloads by the source's own key — `(source_id,
+source_record_id)` for `award_winners`/`award_nominations`/`captaincies`,
+`slug` for `awards`, and migration 042/005's name-based natural keys for
+`hall_of_fame` and `honour_team_members`, which carry no source record id.
+Matched rows are UPDATEd in place, so `id` survives; new keys are inserted;
+vanished keys are deleted. Nothing is truncated.
+
+Migration `068` grants `afldb_import` SELECT (only) on
+`player_link_resolutions`, mirrored in `tools/maintenance/privileges.sql`. The
+helper reads the latest decision per target and re-applies it on top of the
+refreshed source facts:
+
+- `linked` → the admin's `player_id` and `'resolved'` are restored;
+- `linked` but the source now names a **different** player → the admin wins and
+  the disagreement is reported by row, name and both player ids;
+- `confirmed_unlinked` → the row stays unlinked even if the source now supplies
+  a link, and the disagreement is reported;
+- no decision → the source wins outright, as before.
+
+Classification completes **before** the first UPDATE/INSERT/DELETE. A decision
+that cannot be carried — the source renamed the row under a name-based key, or
+the key vanished — raises `LinkDecisionLoss` inside the loader's `import_batch`
+transaction, which rolls back with the target table untouched. `--allow-link-loss`
+downgrades the abort to a report and itemises every discarded decision with its
+table, id, key, name, reason, action and player id.
+
+The name-equality guard is also what makes the positional `award_winners` keys
+(`"{slug}:{season}:{row_no}"`, `"aa:{season}:{row_no}"`) safe: if the legacy
+source shifts row numbering, the name under a key changes and the run stops
+rather than reattributing a link.
+
+`under_22` is unchanged.
 
 ### Validation
-Source-contract tests confirm 22 Under 22 is excluded from the legacy awards deletes, preflights preserved names before destructive work and reapplies links only when the source player name is unchanged. No database-backed full-reload reproduction was run locally.
+All database work ran against `afldb_test` on the dev host; production and the
+read-only legacy SQLite were untouched.
 
-Current review on 2026-08-21 confirmed this remains a genuine import/design gap for legacy honours reloads outside the scoped Under-22 path. No destructive full reload was run during the NL audit.
+- Migration 068 applied to `afldb_test`; `privileges.sql` reconciled.
+  `has_table_privilege('afldb_import','player_link_resolutions', …)` is
+  SELECT `t`, INSERT `t`, UPDATE `f`, DELETE `f` — still append-only.
+- Baseline: full awards family loaded (39→40 awards, 3,298 `award_winners`,
+  766 `award_nominations`, 343 `hall_of_fame`, 113 `honour_team_members`,
+  1,375 `captaincies`).
+- Defect reproduced on the unmodified importer, as tabulated above.
+- After the fix, a full reload left **every row count and every id fingerprint
+  byte-identical** (`md5(string_agg(id))` unchanged for all six tables).
+- Four decisions applied (linked HoF, confirmed-unlinked HoF, linked honour-team
+  member, and an `award_winners` row where the source names someone else); the
+  full reload preserved all four, kept every row id, and reported the
+  disagreement: `award_winners id=79 [4 | aflpa-mvp:1982:79] 'Leigh Matthews':
+  the source now links player 1949, an admin linked player 3; keeping the
+  admin's decision — review it`.
+- Two further consecutive full reloads: identical counts, identical id
+  fingerprints, decisions still intact — idempotent.
+- Renaming a decided `hall_of_fame` row aborted the reload with exit 1 and wrote
+  nothing; the same for `honour_team_members`. `--allow-link-loss` then
+  proceeded and itemised the discarded decision.
+- `tests/integration/awards-reload-links.test.ts` — 6/6 passed on the dev host
+  (67.5 s, including the full 64-second legacy `awards` group closure).
+- `tests/under-22-importer.test.ts` 8/8, `tests/player-link-mutations.test.ts`,
+  `tests/awards-admin.test.ts`, `tests/under-22-source.test.ts`,
+  `tests/integration/privileges.test.ts` 24/24 — all pass on Linux.
+- Full non-integration suite on the dev host: 1,136 passed, 2 failed, both
+  pre-existing and unrelated (`AFLDB-ISSUE-072`, and the `AFLDB-ISSUE-068` H7
+  diagnostic — both reproduce on an untouched checkout).
+- `npx tsc --noEmit` clean. No Next.js build run: no application code changed.
 
 ### Follow-up
-Replace destructive honours reloads with source-scoped upserts that preserve target row IDs, or redesign resolution audit targets around durable `(source_id, source_record_id)` keys before migrating existing audit history. Add a database integration test spanning manual resolve → full reload → preserved link and audit target.
+- **Deployment order (as for migration 066):** apply migration 068 and run
+  `npm run db:privileges` *before* the new importer code runs, or the honours
+  loaders fail closed on the resolution read.
+- The same defect remains in `tools/migration/import_draft.py` and
+  `tools/records/import-first-kick-goal.ts`, tracked separately as
+  `AFLDB-ISSUE-078`. Neither was modified here.
+- Decisions already made dangling by a previous destructive reload cannot be
+  recovered by this change; they are invisible to the new guard because their
+  `target_id` matches no row. Audited read-only under `AFLDB-ISSUE-079`:
+  `afldb_dev` is clean, production not yet checked.
+- **Separate defect found during review, deliberately not fixed here and not yet
+  given its own issue number — raise one if it should be tracked.**
+  `createHallOfFameEntry` and `createHonourTeamMember`
+  (`src/db/queries/awards-admin.ts:264,331`) insert `hall_of_fame` /
+  `honour_team_members` rows with `source_id` left NULL. Those rows are not in
+  the legacy source, so the old `truncate()` destroyed them on every reload —
+  silent, pre-existing data loss this change does not repair. Under the new
+  loaders they are still deleted (their key is absent from the incoming set),
+  and if one carries a manual link the strict guard now aborts the whole reload
+  instead. That is strictly better than silent destruction, but it means an
+  admin-created honours row can block a reload until `--allow-link-loss` is
+  used. The proper repair is to scope these two loaders to the rows they own
+  (`source_id = <the loader's source>`) so admin-created rows are out of scope
+  entirely — deferred because it changes which rows a reload deletes, and
+  `hall_of_fame_name_uq` is global, so an admin row duplicating a source key
+  would then surface as a constraint violation needing its own decision.
 
 ## AFLDB-ISSUE-045 — Seasonal honour teams lose their supplied formation order
 
@@ -2006,7 +2146,7 @@ Run the lineage test and all six required streak queries through development `/s
 ## AFLDB-ISSUE-054 — Under-22 importer contract tests cannot find their source boundaries
 
 - **Status:** Open
-- **Severity:** Medium
+- **Severity:** Low
 - **Area:** Tests
 - **Found:** 2026-08-20
 - **Resolved:** N/A
@@ -2028,18 +2168,40 @@ The test helper isolates the intended importer sections and asserts their contra
 The full-suite run reported 4 failed and 986 passed assertions before excluding this file; none of the NL-search files modified in this audit are involved.
 
 ### Root cause
-Not yet confirmed. The source section labels or function boundaries appear to have drifted from the test's literal markers.
+**Confirmed 2026-08-22 (during `AFLDB-ISSUE-044`): a line-ending mismatch, not
+marker drift.** Every failing marker begins `'\n\n\n'` — for example
+`'\n\n\ndef import_under_22('`. `.gitattributes`/`core.autocrlf` check
+`import_awards.py` out with CRLF on the Windows working copy, so the file
+contains `\r\n\r\n\r\n` and `indexOf` returns `-1`. The markers themselves are
+correct and have not moved.
+
+Proof: on the Linux dev host, an untouched `HEAD` checkout runs
+`tests/under-22-importer.test.ts` **7/7 green**. The same file fails 4/7 on the
+Windows checkout of the same commit. The importer sections referenced by the
+three markers unrelated to `AFLDB-ISSUE-044`'s change were never edited, so the
+platform is the only variable.
+
+Severity lowered from Medium to Low: this never affected Linux, which is the
+supported runtime and the release-gate environment.
 
 ### Fix
-Not yet fixed; this is outside the NL-search audit scope and may overlap unrelated in-progress importer work.
+Not yet fixed. The repair is in the test helper, not the importer: `between()`
+(and the files it reads) should normalise `\r\n` to `\n` on read so the suite is
+platform-independent.
 
 ### Validation
 With integration suites and this known failing file excluded, all 983 remaining safe non-integration assertions pass.
 
 Current review on 2026-08-21 reproduced the issue unchanged: `npm.cmd test -- tests\under-22-importer.test.ts` failed 4 of 7 tests, all at `between()` because the expected end marker was not found. This remains a test/tooling defect outside the NL search path.
 
+2026-08-22: reproduced again on Windows (4 of 8 failing after
+`AFLDB-ISSUE-044` added a test to this file) and shown green on Linux for both
+the pristine `HEAD` tree (7/7) and the updated tree (8/8).
+
 ### Follow-up
-Review the importer/test marker contract with the owner of the Under-22 work and update the implementation or test boundaries without weakening the behavioural assertions.
+Normalise line endings when the source-contract tests read a file — for example
+`readFileSync(...).replace(/\r\n/g, '\n')` — rather than editing the importer.
+Keep the behavioural assertions unchanged.
 
 ## AFLDB-ISSUE-055 — Exact `A v B` player-match queries filter to the first club
 
@@ -2880,6 +3042,14 @@ H7 `useFormStatus` initial pending-state hypothesis:
 - Service restart was blocked because `sudo systemctl restart afldb` required a TTY/password.
 - Running `/search` still reports `x-afldb-build: DOoGeJqYceleN9QLcG2kI`; health remains OK. Browser evidence cannot be run or interpreted until the legitimate service restart makes `0aYQumjOtVYcrJKPCj0_a` live.
 
+2026-08-22 (observed during `AFLDB-ISSUE-044`, not investigated here): the H7
+diagnostic patch leaves `tests/nl-answer-feedback-boundary.test.ts >
+keeps the Server Action form owned by the server component boundary` failing —
+it still expects `NlAnswerFeedbackControls` to contain `useFormStatus`, which
+H7 deliberately removed. Reproduces on an untouched checkout on both Windows and
+the Linux dev host. Whoever concludes H7 must either restore `useFormStatus` or
+update that expectation to the intended boundary; it should not be left red.
+
 ### Follow-up
 End-of-day status for 2026-08-21:
 
@@ -3487,3 +3657,265 @@ another row.
 - AFLDB stores many surnames without their apostrophe. Matching is unaffected
   because normalisation strips it from both sides, but those display names are
   wrong on public pages and deserve a separate data fix.
+
+## AFLDB-ISSUE-077 — Frontend theme changes unpredictably during a user session
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** UI/Settings
+- **Found:** 2026-08-22
+- **Resolved:** N/A
+- **Files:** `src/db/queries/site-settings.ts`, `src/app/layout.tsx`, theme/layout components and any client-side theme initialisation/storage code
+
+### Symptom
+A super admin can select one of the available frontend themes, but the chosen theme does not remain visually consistent while a user browses the site. One page can render with the selected theme, then following an ordinary internal link can cause the next page to render with a different theme.
+
+### Reproduction
+1. As a super admin, select and save a frontend theme.
+2. Open the public site and confirm the selected theme is visible.
+3. Navigate between normal internal pages using the site links.
+4. Continue through several pages in the same browser session.
+5. Observe that the active theme can change between page loads/navigation events without the super admin changing the setting.
+
+### Expected
+The saved super-admin theme is the authoritative frontend theme. Once selected, every public page and navigation in that session should render the same theme until the setting is deliberately changed by a super admin. Server-rendered HTML, hydration and client navigation must agree on the same value.
+
+### Actual
+Theme presentation is inconsistent within a single browsing session. Different pages can use different themes, making the site appear to switch templates as the user navigates.
+
+### Evidence
+Observed manually during normal navigation after enabling the themeable frontend. The existing open ISSUE-072 confirms `frontendTheme` is part of the site-settings model, but that issue is limited to a stale test expectation and does not explain this runtime switching behaviour.
+
+### First wrong layer
+UI/settings state propagation or cache consistency.
+
+### Root cause
+Not yet confirmed. Likely areas to inspect include competing theme sources (database setting versus cookie/local storage/default), stale cached `site-settings` reads across server-rendered routes, inconsistent layout boundaries, and a server/client hydration path that can initialise from different theme values.
+
+### Fix
+Not yet fixed.
+
+### Validation
+Not yet run.
+
+### Follow-up
+1. Identify every read/write path for `frontendTheme`, including database defaults, admin mutation/revalidation, server layout reads, cookies/local storage and any inline/client theme initialiser.
+2. Confirm whether two consecutive page requests in one session can receive different resolved theme values while the database setting is unchanged.
+3. Remove competing authorities so one resolved site theme drives both SSR and client hydration.
+4. Ensure changing the theme invalidates all relevant cached settings/layout data.
+5. Add a browser regression that saves a theme, navigates across a representative route set, and asserts the same theme marker/class/data attribute remains active on every page.
+6. Include a second test proving a deliberate super-admin theme change propagates consistently rather than requiring a new session or random navigation.
+
+## AFLDB-ISSUE-078 — Draft and first-kick-goal reloads still discard manual player links
+
+- **Status:** Open
+- **Severity:** High
+- **Area:** Import
+- **Found:** 2026-08-22
+- **Resolved:** N/A
+- **Files:** `tools/migration/import_draft.py`, `tools/records/import-first-kick-goal.ts`,
+  `src/db/queries/player-links.ts`
+
+### Symptom
+Reloading the draft or the first-kick-goal record turns manually resolved
+`draft_picks` / `player_achievements` links back into their import-derived
+state, and leaves the matching `player_link_resolutions` rows pointing at ids
+that no longer exist.
+
+### Reproduction
+Resolve an unresolved draft pick or first-kick-goal row through
+`/admin/player-links`, then rerun the corresponding importer and inspect the
+rebuilt row.
+
+### Expected
+Append-only human identity decisions remain authoritative across repeatable
+source reloads, and their audit targets keep resolving to the row the decision
+was about — the guarantee `AFLDB-ISSUE-044` established for the honours family.
+
+### Actual
+Both loaders destroy and recreate their targets:
+
+- `tools/migration/import_draft.py:241` — `truncate(pg, "draft_picks", "draft_persons")`
+- `tools/records/import-first-kick-goal.ts:480` — `DELETE FROM player_achievements WHERE achievement_type = 'first_kick_goal'`
+
+`draft_picks` and `player_achievements` are both in `LINK_TARGET_TABLES`
+(`src/db/queries/player-links.ts`), so both accept manual resolutions.
+
+`draft_picks` is the more serious of the two: `applyLockedLink` resolves a draft
+pick through its durable `draft_person_id` and propagates the link to every pick
+of that person, so one lost decision can unlink several rows.
+
+### Evidence
+Found by inspection while fixing `AFLDB-ISSUE-044`; the mechanism is identical
+to the one reproduced there against `afldb_test` (manual link lost, row id
+regenerated, `player_link_resolutions.target_id` left dangling because the
+loaders never `RESTART IDENTITY` and so never reuse an id). Deliberately kept
+out of that issue's scope and **not** reproduced against a database yet.
+
+### First wrong layer
+Import/ETL.
+
+### Root cause
+Not yet confirmed for these two loaders specifically; presumed identical to
+`AFLDB-ISSUE-044` — the loaders predate the append-only manual-resolution
+workflow and treat reconstructed source rows as the whole identity state.
+
+### Fix
+Not yet fixed.
+
+### Validation
+Not yet performed.
+
+### Follow-up
+1. Reproduce both against `afldb_test`, capturing the before/after row ids and
+   the state of the affected `player_link_resolutions` rows, as
+   `AFLDB-ISSUE-044` did.
+2. Move `import_draft.py` onto `reload_keyed()` from
+   `tools/migration/common.py`, keyed on the durable draft identity rather than
+   a name; confirm whether the person-grained propagation in `applyLockedLink`
+   needs the decision re-applied per pick or per `draft_person`.
+3. `import-first-kick-goal.ts` is TypeScript and cannot call the Python helper;
+   it needs the same shape — classify decisions first, upsert by
+   `(source_id, source_record_id)`, abort rather than lose a decision.
+4. Extend `tests/integration/awards-reload-links.test.ts`, or add a sibling, so
+   both paths carry the same reload-survival proof.
+
+## AFLDB-ISSUE-079 — Audit historical `player_link_resolutions` rows for dangling targets
+
+- **Status:** Open
+- **Severity:** High
+- **Area:** Data integrity
+- **Found:** 2026-08-22
+- **Resolved:** N/A
+- **Files:** `src/db/queries/player-links.ts` (`LINK_TARGET_TABLES`),
+  `tools/migration/import_awards.py`, `tools/migration/import_draft.py`,
+  `tools/records/import-first-kick-goal.ts`
+
+### Symptom
+A `player_link_resolutions` row can name a `target_id` that no longer exists in
+its `target_table`. The human decision it records is then unrecoverable from the
+audit trail alone, and the honours row the admin decided about is back in the
+`/admin/player-links` queue as though it had never been reviewed.
+
+### Reproduction
+Historical, not reproducible forward: `AFLDB-ISSUE-044` fixed the honours
+loaders and `AFLDB-ISSUE-078` tracks the two that remain. This issue exists
+because reloads run *before* those fixes may already have left orphans behind.
+
+### Expected
+Every `player_link_resolutions` row resolves to a live row in its target table,
+so any decision can be traced back to what it was about.
+
+### Actual
+Unknown, and that is the point of this issue. `player_link_resolutions` dates
+from migration 056; any destructive honours or draft reload run after an admin
+started resolving links could have orphaned rows.
+
+### Evidence
+The mechanism is confirmed, reproduced against `afldb_test` under
+`AFLDB-ISSUE-044`:
+
+1. a destructive reload regenerates the target row id;
+2. the manual link is lost with the old row;
+3. the existing `player_link_resolutions.target_id` becomes dangling, because
+   the old id is no longer present;
+4. ids are **not** reused, because the reload does not reset the identity
+   sequence — so the pointer goes nowhere rather than to a different row.
+
+**First read-only audit, `afldb_dev`, 2026-08-22 — clean:**
+
+| target_table | resolutions | dangling | earliest | latest |
+|---|---|---|---|---|
+| `award_winners` | 63 | 0 | 2026-08-19 | 2026-08-21 |
+| `draft_picks` | 6 | 0 | 2026-08-20 | 2026-08-21 |
+| `hall_of_fame` | 5 | 0 | 2026-08-20 | 2026-08-22 |
+| `honour_team_members` | 1 | 0 | 2026-08-19 | 2026-08-19 |
+
+75 resolutions, none dangling. `award_nominations`, `captaincies` and
+`player_achievements` hold no resolutions on dev at all.
+
+**Production has not been audited.** That is the outstanding work.
+
+### First wrong layer
+Data integrity / operational history. No current code path creates new orphans
+in the honours family.
+
+### Root cause
+Historical: the pre-`AFLDB-ISSUE-044` destructive reloads. Nothing to fix in
+current honours-loader code; `AFLDB-ISSUE-078` covers the two loaders still
+carrying the defect.
+
+### Fix
+No remediation is authorised by this issue. It covers **diagnosis only**.
+
+### Validation
+Not yet performed against production.
+
+### The audit
+
+Read-only, no writes, safe to run against production. It must cover every table
+in `LINK_TARGET_TABLES` (`src/db/queries/player-links.ts`): `award_winners`,
+`award_nominations`, `hall_of_fame`, `honour_team_members`, `captaincies`,
+`player_achievements`, `draft_picks`.
+
+Run it as `AFLDB_OWNER_DATABASE_URL`. `afldb_app` cannot read
+`player_link_resolutions` at all (migration 056 grants it to `afldb_auth`, and
+`afldb_import` gained SELECT only in migration 068), and `afldb_auth` cannot
+read every honours table, so no single application role can join both sides.
+
+Per-table counts:
+
+```sql
+WITH live AS (
+  SELECT 'award_winners'       AS target_table, id FROM award_winners
+  UNION ALL SELECT 'award_nominations',   id FROM award_nominations
+  UNION ALL SELECT 'hall_of_fame',        id FROM hall_of_fame
+  UNION ALL SELECT 'honour_team_members', id FROM honour_team_members
+  UNION ALL SELECT 'captaincies',         id FROM captaincies
+  UNION ALL SELECT 'player_achievements', id FROM player_achievements
+  UNION ALL SELECT 'draft_picks',         id FROM draft_picks
+)
+SELECT r.target_table,
+       count(*)                             AS resolutions,
+       count(*) FILTER (WHERE l.id IS NULL) AS dangling,
+       min(r.created_at)::date              AS earliest,
+       max(r.created_at)::date              AS latest
+  FROM player_link_resolutions r
+  LEFT JOIN live l ON l.target_table = r.target_table AND l.id = r.target_id
+ GROUP BY r.target_table
+ ORDER BY dangling DESC, r.target_table;
+```
+
+The affected rows in full, which is the evidence that must be preserved:
+
+```sql
+WITH live AS ( /* as above */ )
+SELECT r.id, r.target_table, r.target_id, r.action, r.player_id,
+       r.previous_status, r.created_at,
+       r.admin_user_id, u.email AS admin_email,
+       r.match_method, r.match_score, r.algorithm_version, r.note
+  FROM player_link_resolutions r
+  LEFT JOIN live l ON l.target_table = r.target_table AND l.id = r.target_id
+  LEFT JOIN auth_users u ON u.id = r.admin_user_id
+ WHERE l.id IS NULL
+ ORDER BY r.target_table, r.target_id;
+```
+
+`player_link_suggestions` carries the same `(target_table, target_id)` shape and
+should be counted the same way while the audit is being run.
+
+### Follow-up
+1. Run both queries against production, and re-run against `afldb_dev`, keeping
+   the full output as an artifact. Record the counts here.
+2. **Relink or delete nothing automatically.** This issue authorises no writes.
+3. Where a dangling decision can be reconstructed safely — the source key and
+   `player_name_raw` recorded in the audit row still identify exactly one live
+   honours row, and the recorded `player_id` still exists — design that
+   remediation as its own issue and require explicit review before it runs. It
+   would be a re-application of a human decision, so it needs the same
+   `resolveLink` path and a fresh audit row, not a hand-edited old one.
+4. Where a decision cannot be reconstructed confidently, preserve the audit
+   evidence, leave the row untouched, and flag the target for manual review in
+   `/admin/player-links`.
+5. If production is clean, close this issue with the recorded counts. Do not
+   leave it open on the assumption that damage must exist.

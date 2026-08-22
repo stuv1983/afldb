@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-22  
-**Open issues:** 9
+**Open issues:** 12
 
 ## How Claude should use this file
 
@@ -25,8 +25,7 @@
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
 | `AFLDB-ISSUE-040` | Low | Tooling | Lint cannot run deterministically/non-interactively because ESLint is not configured. |
-| `AFLDB-ISSUE-044` | High | Import | Legacy honours reloads can overwrite manual identity resolutions; Under-22 is protected but older loaders are not. |
-| `AFLDB-ISSUE-054` | Medium | Tests | Four Under-22 importer contract tests fail at stale literal source-boundary markers. |
+| `AFLDB-ISSUE-054` | Low | Tests | Four Under-22 importer contract tests fail on Windows only: `between()` matches a three-newline marker against a CRLF checkout. Linux is green. |
 | `AFLDB-ISSUE-059` | Low | Search | Grouped qualifying-match counts are plain text because current Match Search cannot replay every grouped predicate. |
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | React #418 remains intermittent under production-style NL search hydration; narrow H7 diagnostic is awaiting authoritative live-build validation. |
 | `AFLDB-ISSUE-071` | Low | Audit | V2 residual failures require generator/oracle re-baselining before any remaining parser defect is promoted. |
@@ -34,6 +33,9 @@
 | `AFLDB-ISSUE-073` | Medium | Database | Four migration-056/057 foreign keys lack supporting indexes; `fk-indexes.test.ts` fails. |
 | `AFLDB-ISSUE-074` | Low | Tests | email-intake integration test picks a real dev admin instead of its fixture and leaves a staged row behind. |
 | `AFLDB-ISSUE-076` | Medium | Performance | `won_final_at_venue` Grid Solver combinations can exceed the 5-second PostgreSQL statement timeout and crash the rendered page. |
+| `AFLDB-ISSUE-078` | High | Import | Draft and first-kick-goal reloads still destroy manual player links the way the honours loaders did before ISSUE-044. |
+| `AFLDB-ISSUE-079` | High | Data integrity | Pre-ISSUE-044 reloads may have left dangling `player_link_resolutions.target_id` values. Dev audited clean; production not yet audited. |
+| `AFLDB-ISSUE-077` | Medium | UI/Settings | The saved super-admin frontend theme can change between pages during the same browsing session. |
 
 ---
 
@@ -45,21 +47,18 @@
 - **Current state:** `npm run lint` still maps to deprecated `next lint`; ESLint is not installed/configured, so the command becomes interactive instead of providing deterministic validation.
 - **Next action:** Add a reviewed ESLint flat configuration and compatible Next/ESLint dependencies through the normal dependency process, then replace `next lint` with the ESLint CLI.
 
-## AFLDB-ISSUE-044 — Full awards reload discards existing manual player resolutions
-
-- **Severity:** High
-- **Area:** Import
-- **Key files:** `tools/migration/import_awards.py`, `src/db/queries/player-links.ts`
-- **Current state:** The scoped Under-22 path preserves durable IDs/resolutions, but older destructive honours loaders can reconstruct rows from legacy link state and lose later human decisions.
-- **Next action:** Replace destructive honours reloads with source-scoped upserts that preserve target row IDs, or redesign resolution targeting around durable `(source_id, source_record_id)` keys; add database integration coverage for manual resolve → full reload → preserved link.
-
 ## AFLDB-ISSUE-054 — Under-22 importer contract tests cannot find their source boundaries
 
-- **Severity:** Medium
+- **Severity:** Low
 - **Area:** Tests
-- **Key files:** `tests/under-22-importer.test.ts`, `tools/migration/import_awards.py`
-- **Current state:** Four contract tests fail in the `between()` helper because the expected end marker is no longer found. The defect was reproduced unchanged on 2026-08-21.
-- **Next action:** Review the importer/test marker contract and repair the source boundaries without weakening the behavioural assertions.
+- **Key files:** `tests/under-22-importer.test.ts`
+- **Current state:** Root cause confirmed 2026-08-22: a line-ending mismatch, not
+  marker drift. The markers begin with three newlines; a Windows checkout holds
+  `import_awards.py` with CRLF, so `indexOf` returns -1. An untouched `HEAD`
+  tree is 7/7 green on the Linux dev host and 4/7 red on Windows.
+- **Next action:** Normalise CRLF to LF where the source-contract tests read
+  a file (`between()` and its `readFileSync` callers). Do not edit the importer,
+  and do not weaken the behavioural assertions.
 
 ## AFLDB-ISSUE-059 — Grouped qualifying counts have no drill-down link
 
@@ -130,3 +129,48 @@
 - **Current state:** Reproducible on build `NQrtI3zQGWx62e6zbI5bR`. PostgreSQL cancels the exact Grid Solver query at ~5.05–5.14 seconds with SQLSTATE `57014` and Next.js digest `1511510695`. The failing grid combines `games_at_multiple_clubs_min(50,2)`, `teammate_of(12603)`, `single_game_stat_min(kicks,20)`, clubs 103/108 and `won_final_at_venue(234)`. Changing only `won_final_at_venue(234)` to `played_at_venue(234)` makes the otherwise identical grid complete in ~360–397 ms. Do not raise the normal statement timeout as the fix.
 - **Next action:** Capture the exact generated SQL/bind parameters for the failing and successful variants, compare `EXPLAIN (ANALYZE, BUFFERS)` plans, then optimise the `won_final_at_venue` query shape (and add an index only if the plan demonstrates one is appropriate). Add a regression for this exact grid and require correct results comfortably below the 5-second guard, preferably below 1 second on dev.
 
+## AFLDB-ISSUE-077 — Frontend theme changes unpredictably during a user session
+
+- **Severity:** Medium
+- **Area:** UI/Settings
+- **Key files:** `src/db/queries/site-settings.ts`, `src/app/layout.tsx`, theme/layout components, and any client-side theme initialisation/storage code.
+- **First wrong layer:** UI/settings state propagation or cache consistency.
+- **Current state:** A theme selected by a super admin is not stable during ordinary browsing. One public page can render with the configured theme and the next internal navigation can render a different theme without any settings change. This is separate from ISSUE-072, which only covers the stale `frontendTheme` default-shape test.
+- **Next action:** Trace every `frontendTheme` authority and cache boundary (database, admin mutation/revalidation, SSR layout, cookie/local storage, hydration), reduce them to one authoritative resolved theme, then add browser coverage that navigates across multiple routes and proves the theme remains unchanged until a super admin deliberately changes it.
+
+## AFLDB-ISSUE-078 — Draft and first-kick-goal reloads still discard manual player links
+
+- **Severity:** High
+- **Area:** Import
+- **Key files:** `tools/migration/import_draft.py:241`, `tools/records/import-first-kick-goal.ts:480`
+- **First wrong layer:** Import/ETL.
+- **Current state:** Found by inspection during `AFLDB-ISSUE-044` and kept out of
+  its scope. Both loaders destroy and recreate `LINK_TARGET_TABLES` targets
+  (`truncate(pg, "draft_picks", "draft_persons")`; `DELETE FROM
+  player_achievements WHERE achievement_type = 'first_kick_goal'`), so a manual
+  resolution is lost and its audit row is left dangling. `draft_picks` is the
+  worse case because one decision propagates to every pick of a `draft_person`.
+  Not yet reproduced against a database.
+- **Next action:** Reproduce both against `afldb_test`, then apply the
+  `reload_keyed()` pattern from `tools/migration/common.py` (and its equivalent
+  in TypeScript for the first-kick-goal loader), keyed on the durable source
+  identity each already carries.
+
+## AFLDB-ISSUE-079 — Audit historical `player_link_resolutions` rows for dangling targets
+
+- **Severity:** High
+- **Area:** Data integrity
+- **Key files:** `src/db/queries/player-links.ts` (`LINK_TARGET_TABLES`); the audit SQL is recorded in full in `issues.md`
+- **First wrong layer:** Data integrity / operational history — no current honours code path creates new orphans.
+- **Current state:** Diagnosis only. Destructive reloads run before
+  `AFLDB-ISSUE-044` regenerated target row ids, so a decision's
+  `player_link_resolutions.target_id` can point at an id that no longer exists
+  (ids are never reused, so it dangles rather than naming another row). First
+  read-only audit on `afldb_dev`, 2026-08-22, found **75 resolutions and 0
+  dangling** across `award_winners`, `draft_picks`, `hall_of_fame` and
+  `honour_team_members`. **Production has not been audited.**
+- **Next action:** Run the two documented read-only queries against production
+  as `AFLDB_OWNER_DATABASE_URL` (no application role can read both sides of the
+  join), keep the full output as an artifact, and record the counts. Relink or
+  delete nothing: remediation must be designed as a separate issue and reviewed
+  explicitly. If production is clean, close this with the recorded counts.
