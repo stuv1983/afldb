@@ -136,7 +136,24 @@ export default async function PlayerLinksPage(
 
   // Rows an admin has already vetted as genuinely unlinked stay honest in
   // the honours tables but leave the queue.
-  const queue = unresolved.filter((r) => !vetted.has(`${r.targetTable}:${r.targetId}`));
+  const vettedFiltered = unresolved.filter((r) => !vetted.has(`${r.targetTable}:${r.targetId}`));
+
+  // One row per RESOLUTION entity, not per source row.
+  //
+  // Six of the seven tables resolve themselves, so this changes nothing
+  // for them. Draft picks resolve through draft_persons: one person
+  // named in five drafts is one decision, and listing it five times
+  // would ask a reviewer to make the same judgement over and over --
+  // and would let five near-identical rows be selected for a bulk
+  // approval that the first of them already settled. The representative
+  // row carries the pick count in its own detail line.
+  const seenEntities = new Set<string>();
+  const queue = vettedFiltered.filter((r) => {
+    const key = `${r.resolutionEntityType}:${r.resolutionEntityId}`;
+    if (seenEntities.has(key)) return false;
+    seenEntities.add(key);
+    return true;
+  });
 
   // Search by player name or record context (see changeLog.md).
   const searched = queryLower

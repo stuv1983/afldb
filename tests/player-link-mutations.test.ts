@@ -714,3 +714,38 @@ describe('suggestion cache jsonb contract', () => {
     expect(candidates).toContain('asArray<HardConflict>(row.conflicts)');
   });
 });
+
+describe('queue page contracts', () => {
+  const page = readFileSync(
+    join(process.cwd(), 'src', 'app', 'admin', 'player-links', 'page.tsx'),
+    'utf8',
+  );
+
+  it('lists one row per resolution entity, not per source row', () => {
+    // A draft person named in five drafts is one decision. Listing it
+    // five times would ask for the same judgement repeatedly and would
+    // let five rows be selected for a bulk approval the first already
+    // settled.
+    expect(page).toContain('seenEntities');
+    expect(page).toContain('resolutionEntityType}:${r.resolutionEntityId}');
+  });
+
+  it('withholds a disagreeing name group from bulk selection', () => {
+    expect(page).toContain('&& !group.disagrees');
+  });
+
+  it('reads evidence from the server-scored cache rather than recomputing it', () => {
+    // The page must never form its own view of why a score is what it
+    // is; it renders what the scorer recorded.
+    expect(page).toContain('match.evidence.map');
+    expect(page).not.toContain('scoreCandidate');
+    expect(page).not.toContain('assessMatch');
+  });
+
+  it('fetches page-scoped detail set-wise, never per row', () => {
+    expect(page).toContain('readSourceDetails(sql, pageRows)');
+    expect(page).toContain('readPlayerSummaries(');
+    // One shared client panel, not a component per row.
+    expect(page).toContain('<ResolvePanel />');
+  });
+});
