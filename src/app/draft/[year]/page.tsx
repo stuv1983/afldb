@@ -121,12 +121,11 @@ export default async function DraftYearPage({
                     <RouteSortHeader sortKey="year" defaultSort="pick" defaultDir="asc" className="num">Year</RouteSortHeader>
                     <RouteSortHeader sortKey="pick" defaultSort="pick" defaultDir="asc" className="num">Pick</RouteSortHeader>
                     <RouteSortHeader sortKey="player" defaultSort="pick" defaultDir="asc" className="wide">Player</RouteSortHeader>
-                    <RouteSortHeader sortKey="club" defaultSort="pick" defaultDir="asc">Club</RouteSortHeader>
-                    <th scope="col">Status</th>
-                    <th scope="col" className="muted">Recruited from</th>
-                    <RouteSortHeader sortKey="games" defaultSort="pick" defaultDir="asc">Games</RouteSortHeader>
-                    <RouteSortHeader sortKey="goals" defaultSort="pick" defaultDir="asc" className="num">Goals</RouteSortHeader>
-                    <RouteSortHeader sortKey="draft_games" defaultSort="pick" defaultDir="asc" className="num">Draft Club Games</RouteSortHeader>
+                    <th scope="col">Drafted to</th>
+                    <th scope="col" className="muted">Drafted from</th>
+                    <RouteSortHeader sortKey="type" defaultSort="pick" defaultDir="asc">Type</RouteSortHeader>
+                    <RouteSortHeader sortKey="age" defaultSort="pick" defaultDir="asc" className="num">Age</RouteSortHeader>
+                    <RouteSortHeader sortKey="games" defaultSort="pick" defaultDir="asc" className="num">Games</RouteSortHeader>
                   </tr>
                 </thead>
                 <tbody>

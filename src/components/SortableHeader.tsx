@@ -50,7 +50,7 @@ export function SortableHeader({
         type="button"
         onClick={onClick}
         className="sort-control"
-        style={{ all: 'unset', cursor: 'pointer', display: 'inline-flex', width: '100%' }}
+        style={{ all: 'unset', cursor: 'pointer', display: 'inline-flex' }}
       >
         {content}
       </button>

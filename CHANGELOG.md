@@ -24,6 +24,7 @@ commit.
 - Applied client-side sorting to `/awards`, `/brownlow`, `/clubs`, `/hall-of-fame`, `/matches/[id]`, `/players/[slug]`, `/records`, and select admin dashboards (`/admin/access`, `/admin/admins`, `/admin/db-health`, `/admin/nl-search`).
 - Applied URL-driven server-side sorting to paginated/live datasets: `/draft/[year]`, `/players/[slug]/matches`, and draft listings in the data editor (`/admin/data-editor`).
 - Deliberately excluded structural/chronological layouts, such as Match Lineups, Search Results, Gridley, and specific workflow queues, preserving their innate semantic ordering.
+- Resolved a column-alignment regression where sortable headers stretched (`width: 100%`) and ignored standard CSS `text-align`, and corrected column-header mapping on the `/draft/[year]` page.
 
 ### Required Mutation Audits Commit Atomically - 22 August 2026
 
