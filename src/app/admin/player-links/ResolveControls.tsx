@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useState } from 'react';
 
 import {
+  approveSuggestion,
   confirmUnlinked,
   createAndLinkPlayer,
   linkPlayer,
@@ -12,6 +13,65 @@ import {
 import { PlayerPicker } from '@/components/PlayerPicker';
 
 const INITIAL: PlayerLinkActionState = {};
+
+type EvidenceItem = { family: string; signal: string; detail: string; points: number };
+type ConflictItem = { reason: string; detail: string };
+
+export type SuggestedMatch = {
+  playerId: number;
+  playerName: string;
+  playerSlug: string;
+  score: number;
+  band: string;
+  gap: number | null;
+  ambiguous: boolean;
+  hardConflict: boolean;
+  bulkEligible: boolean;
+  evidence: EvidenceItem[];
+  conflicts: ConflictItem[];
+  algorithmVersion: string;
+  alternatives: {
+    playerId: number;
+    playerName: string;
+    score: number;
+    evidence: EvidenceItem[];
+    conflicts: ConflictItem[];
+  }[];
+};
+
+const BAND_LABELS: Record<string, string> = {
+  very_high: 'Very high',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+  none: 'No suggestion',
+};
+
+/**
+ * The score, itemised.
+ *
+ * A reviewer approving an identity is entitled to see what the number
+ * was made of, so every signal that paid and every contradiction found
+ * is listed. A bare percentage would be asking for trust rather than
+ * offering evidence.
+ */
+function EvidenceTable({ evidence, conflicts }: { evidence: EvidenceItem[]; conflicts: ConflictItem[] }) {
+  return (
+    <div style={{ fontSize: '0.8rem' }}>
+      {evidence.map((item) => (
+        <div key={item.signal} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
+          <span>{item.detail}</span>
+          <span className="nowrap" style={{ fontVariantNumeric: 'tabular-nums' }}>+{item.points}</span>
+        </div>
+      ))}
+      {conflicts.map((conflict) => (
+        <div key={conflict.reason} className="badge badge-warn" style={{ marginTop: '0.35rem', display: 'block' }}>
+          {conflict.detail}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /**
  * The resolve panel for one unresolved honours or draft row (see changeLog.md).
@@ -28,23 +88,26 @@ export function ResolveControls({
   context,
   linkStatus,
   suggestions,
+  match,
 }: {
   targets: { table: string; id: number; linkStatus?: string }[];
   playerName?: string;
   context?: string;
   linkStatus: string;
   suggestions: { id: number; suggestedName: string; note: string | null }[];
+  match?: SuggestedMatch | null;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<'link' | 'create' | 'unlinked'>('link');
 
+  const [approveState, approveAction, approvePending] = useActionState(approveSuggestion, INITIAL);
   const [linkState, linkAction, linkPending] = useActionState(linkPlayer, INITIAL);
   const [createState, createAction, createPending] = useActionState(createAndLinkPlayer, INITIAL);
   const [confirmState, confirmAction, confirmPending] = useActionState(confirmUnlinked, INITIAL);
   const [picked, setPicked] = useState<{ id: number; label: string } | null>(null);
 
-  const done = linkState.message ?? createState.message ?? confirmState.message;
-  const warning = linkState.warning ?? createState.warning ?? confirmState.warning;
+  const done = approveState.message ?? linkState.message ?? createState.message ?? confirmState.message;
+  const warning = approveState.warning ?? linkState.warning ?? createState.warning ?? confirmState.warning;
 
   const targetsRaw = targets.map(t => `${t.table}:${t.id}:${t.linkStatus ?? ''}`).join(',');
 
@@ -85,6 +148,95 @@ export function ResolveControls({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Suggested match, with the evidence behind its score. */}
+      {match && (
+        <div style={{
+          padding: '0.6rem 0.75rem',
+          borderRadius: '6px',
+          background: 'var(--bg-subtle)',
+          border: '1px solid var(--border-subtle)',
+          display: 'grid',
+          gap: '0.5rem',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'baseline' }}>
+            <strong>{match.playerName}</strong>
+            <span className={match.hardConflict ? 'badge badge-warn' : 'badge'}>
+              {BAND_LABELS[match.band] ?? match.band} · {match.score}/100
+            </span>
+          </div>
+
+          <EvidenceTable evidence={match.evidence} conflicts={match.conflicts} />
+
+          <div className="muted" style={{ fontSize: '0.78rem' }}>
+            Gap to next candidate: {match.gap === null ? 'no other candidate' : match.gap}
+            {' · '}algorithm {match.algorithmVersion}
+            {match.bulkEligible && ' · bulk-ready'}
+          </div>
+
+          {match.hardConflict ? (
+            <p className="badge badge-warn" style={{ margin: 0 }}>
+              Not approvable as a suggestion: the source evidence contradicts this candidate.
+              Link manually below if you can verify it another way.
+            </p>
+          ) : match.ambiguous ? (
+            <p className="badge badge-warn" style={{ margin: 0 }}>
+              Needs review: another candidate scores almost as highly. Check the alternatives
+              before approving.
+            </p>
+          ) : null}
+
+          {!match.hardConflict && targets.length === 1 && (
+            <form action={approveAction} style={{ display: 'grid', gap: '0.4rem' }}>
+              <input type="hidden" name="targets" value={targetsRaw} />
+              <input type="hidden" name="playerId" value={match.playerId} />
+              <input
+                type="text"
+                name="note"
+                maxLength={2000}
+                placeholder="Verification note (optional)"
+                style={{ fontSize: '0.85rem', width: '100%' }}
+              />
+              <button type="submit" className="btn btn-primary" disabled={approvePending}>
+                {approvePending ? 'Approving…' : `Approve match: ${match.playerName}`}
+              </button>
+              {approveState.error && (
+                <span className="badge badge-warn" style={{ fontSize: '0.8rem' }}>{approveState.error}</span>
+              )}
+            </form>
+          )}
+
+          {match.alternatives.length > 0 && (
+            <details>
+              <summary style={{ fontSize: '0.85rem', cursor: 'pointer' }}>
+                {match.alternatives.length} alternative candidate
+                {match.alternatives.length === 1 ? '' : 's'}
+              </summary>
+              <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.4rem' }}>
+                {match.alternatives.map((alt) => (
+                  <div key={alt.playerId} style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '0.4rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                      <span>{alt.playerName}</span>
+                      <span className="muted" style={{ fontSize: '0.8rem' }}>{alt.score}/100</span>
+                    </div>
+                    <EvidenceTable evidence={alt.evidence} conflicts={alt.conflicts} />
+                    {/* Choosing an alternative is a manual decision and is
+                        recorded as one: it is not the model's suggestion. */}
+                    <form action={linkAction} style={{ marginTop: '0.3rem' }}>
+                      <input type="hidden" name="targets" value={targetsRaw} />
+                      <input type="hidden" name="playerId" value={alt.playerId} />
+                      <button type="submit" className="btn btn-secondary" disabled={linkPending}
+                        style={{ fontSize: '0.78rem', padding: '0.25rem 0.5rem' }}>
+                        Link this player instead
+                      </button>
+                    </form>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
         </div>
       )}
 

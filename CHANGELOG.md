@@ -15,6 +15,21 @@ commit.
 
 ## [Unreleased]
 
+### Confidence-Scored Player-Link Suggestions - 22 August 2026
+
+- Added deterministic, explainable match suggestions to `/admin/player-links`, so unmatched source names arrive with a ranked candidate, a 0-100 confidence score and the evidence behind it instead of having to be searched for by hand (`AFLDB-ISSUE-075`).
+- Scoring is pure and shared by the page, the approval path and the offline backtest; no LLM takes part in candidate generation, scoring, ranking or approval.
+- Candidate generation stays separate from scoring, honouring migration 019's rule that a name-similarity score is a candidate and never a link: exact normalised name, exact alias and a bounded trigram neighbourhood, all index-backed.
+- At most one signal per evidence family may score, so an exact name is not also paid for as a trigram and a surname match.
+- Temporal evidence is now typed by competition. A Hall of Fame induction year and a draft year are no longer read as playing seasons, and only AFLDB's own seasons may contradict a career range - state-league award seasons (Magarey, Sandover, Liston, U18) cannot.
+- Contradictions are tracked separately from the score, cap the confidence band and always block bulk approval; a contradiction is only ever drawn from complete data.
+- Suggestions are cached per resolution entity (migration 067), so a draft person with several picks is one decision rather than several near-duplicates that could disagree.
+- Approving a suggestion locks the row, re-reads the evidence and rescores inside the same import transaction, requiring the fresh result to still name that player. A score supplied by the browser is never read, and stale or contradicted suggestions are refused.
+- Bulk approval is available only for rows meeting stricter rules than the display band - exact-quality name evidence, two independent corroborating families, a wide candidate gap and no contradiction - and re-checks each row under its own lock. A failure on one row neither aborts the batch nor affects any other row.
+- The queue can be filtered by confidence band or narrowed to bulk-ready rows, and is ordered so the clearest decisions and the genuinely ambiguous ones surface first.
+- Player-link resolutions now record how a link was decided (`manual`, `suggested`, `bulk_suggested`), the score the server calculated and the algorithm version, so the model can be audited later.
+- Calibrated against 9,356 confirmed links: 99.69% top-1 accuracy, 99.84% candidate recall, 99.99% precision in the `very_high` band, and 7,337 bulk-eligible rows at 99.99%. All 44 bulk-eligible proposals in the live dev queue were checked by hand and all were correct.
+
 ### Dynamic Column Sorting for Statistical Tables - 22 August 2026
 
 - Implemented standard dynamic column sorting across all primary application data tables (`AFLDB-ISSUE-XYZ`).

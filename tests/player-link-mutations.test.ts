@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -7,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   requireSuperAdmin: vi.fn(),
   audit: vi.fn(),
   revalidatePath: vi.fn(),
+  fetchSourceEvidence: vi.fn(),
+  assessOneSource: vi.fn(),
 }));
 
 vi.mock('postgres', () => ({ default: mocks.postgres }));
@@ -17,12 +22,18 @@ vi.mock('@/lib/auth/session', () => ({
   audit: mocks.audit,
 }));
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
+vi.mock('@/db/queries/player-match-candidates', () => ({
+  fetchSourceEvidence: mocks.fetchSourceEvidence,
+  assessOneSource: mocks.assessOneSource,
+  refreshMatchCandidates: vi.fn(),
+}));
 
 import { createPlayerAction } from '@/app/admin/data-editor/actions';
 import {
   createPlayerAndResolveLink,
   listUnresolvedLinks,
   resolveLink,
+  resolveLinkFromSuggestion,
 } from '@/db/queries/player-links';
 import { createPlayer, type DraftPickInput } from '@/db/queries/players';
 
@@ -71,6 +82,8 @@ beforeEach(() => {
   mocks.requireSuperAdmin.mockResolvedValue({ id: 5, email: 'admin@example.test' });
   mocks.audit.mockReset();
   mocks.revalidatePath.mockReset();
+  mocks.fetchSourceEvidence.mockReset();
+  mocks.assessOneSource.mockReset();
   process.env.AFLDB_IMPORT_DATABASE_URL = 'postgres://import@example/afldb_test';
   process.env.DATABASE_URL = 'postgres://app@example/afldb_test';
 });
@@ -144,9 +157,13 @@ describe('draft identity resolution', () => {
     const auditInsert = seen.find((query) => (
       query.text.startsWith('INSERT INTO player_link_resolutions')
     ));
+    // Provenance (migration 067) rides the same row: a hand-made link
+    // is recorded as 'manual' and carries no score or algorithm version,
+    // so a later calibration audit can tell the two apart.
     expect(auditInsert?.values).toEqual([
       'draft_picks', 41, 77, 'ambiguous', 5,
       'Verified against the source profile.',
+      'manual', null, null,
     ]);
     const picksUpdateIndex = seen.findIndex((query) => query.text.startsWith('UPDATE draft_picks'));
     expect(seen.findIndex((query) => query.text.startsWith('INSERT INTO player_link_resolutions')))
@@ -311,6 +328,7 @@ describe('22Under22 award-winner resolution', () => {
     expect(auditInsert?.values).toEqual([
       'award_winners', 412, 77, 'unmatched', 5,
       'Verified against the annual team source.',
+      'manual', null, null,
     ]);
   });
 });
@@ -405,5 +423,271 @@ describe('player creation facts', () => {
     await expect(createPlayer({ displayName: 'No Import Role' }, { adminUserId: 5 }))
       .rejects.toThrow('AFLDB_IMPORT_DATABASE_URL is not configured.');
     expect(mocks.postgres).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Approving a suggestion (migration 067).
+ *
+ * The cache is advice. These tests pin the rule that makes it safe to
+ * treat it that way: the link is written only if a FRESH score,
+ * computed inside the same transaction that holds the row's lock, still
+ * names the player being approved.
+ */
+describe('suggested match approval', () => {
+  const sourceRow = {
+    source: {
+      target: {
+        targetTable: 'award_winners',
+        targetId: 412,
+        resolutionEntityType: 'award_winners',
+        resolutionEntityId: 412,
+      },
+      rawName: "Michael O'Loughlin",
+      normalisedName: 'michael oloughlin',
+      temporal: [],
+      clubId: 9,
+      clubNameRaw: 'Sydney',
+      reportedGames: null,
+      reportedGoals: null,
+      context: 'Bob Skilton Medal',
+      linkStatus: 'unmatched',
+      uniquenessScope: { kind: 'none' },
+    },
+    knownPlayerId: null,
+  };
+
+  function assessment(overrides: Record<string, unknown> = {}) {
+    return {
+      best: {
+        playerId: 1000,
+        displayName: 'Michael OLoughlin',
+        score: 97,
+        evidence: [],
+        conflicts: [],
+        hardConflict: false,
+        corroboratingFamilies: 3,
+        strongName: true,
+      },
+      alternatives: [],
+      band: 'very_high',
+      gap: null,
+      nearTies: 0,
+      ambiguous: false,
+      hardConflict: false,
+      bulkEligible: true,
+      algorithmVersion: 'v1',
+      ...overrides,
+    };
+  }
+
+  function lockedUnmatchedRow() {
+    return fakeTransaction((text) => {
+      if (text.startsWith('SELECT link_status_value::text AS status')) {
+        return [{ status: 'unmatched' }];
+      }
+      return [];
+    });
+  }
+
+  it('records the score the SERVER computed, not one supplied by a caller', async () => {
+    const { tx, seen } = lockedUnmatchedRow();
+    installImportClient(tx);
+    mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+    mocks.assessOneSource.mockResolvedValue(assessment());
+
+    const result = await resolveLinkFromSuggestion({
+      targetTable: 'award_winners',
+      targetId: 412,
+      playerId: 1000,
+      adminUserId: 5,
+      method: 'suggested',
+      note: 'Apostrophe variant.',
+    });
+
+    expect(result).toEqual({ ok: true });
+    const auditInsert = seen.find((query) => (
+      query.text.startsWith('INSERT INTO player_link_resolutions')
+    ));
+    expect(auditInsert?.values).toEqual([
+      'award_winners', 412, 1000, 'unmatched', 5,
+      'Apostrophe variant.',
+      'suggested', 97, 'v1',
+    ]);
+  });
+
+  it('rescores inside the transaction that holds the lock', async () => {
+    const { tx, seen } = lockedUnmatchedRow();
+    installImportClient(tx);
+    mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+    mocks.assessOneSource.mockResolvedValue(assessment());
+
+    await resolveLinkFromSuggestion({
+      targetTable: 'award_winners', targetId: 412, playerId: 1000,
+      adminUserId: 5, method: 'suggested',
+    });
+
+    // Both reads are handed the transaction, not a pool: scoring a
+    // different snapshot from the one being written would make the
+    // re-check meaningless.
+    expect(mocks.fetchSourceEvidence).toHaveBeenCalledWith(tx, expect.objectContaining({
+      status: 'unresolved',
+      entity: { type: 'award_winners', id: 412 },
+    }));
+    expect(mocks.assessOneSource).toHaveBeenCalledWith(tx, sourceRow.source);
+
+    const lockIndex = seen.findIndex((q) => q.text.includes('FOR UPDATE'));
+    const updateIndex = seen.findIndex((q) => q.text.startsWith('UPDATE'));
+    expect(lockIndex).toBeGreaterThanOrEqual(0);
+    expect(updateIndex).toBeGreaterThan(lockIndex);
+  });
+
+  it('refuses when the fresh score names a different player', async () => {
+    const { tx, seen } = lockedUnmatchedRow();
+    installImportClient(tx);
+    mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+    mocks.assessOneSource.mockResolvedValue(
+      assessment({ best: { ...assessment().best, playerId: 4331 } }),
+    );
+
+    const result = await resolveLinkFromSuggestion({
+      targetTable: 'award_winners', targetId: 412, playerId: 1000,
+      adminUserId: 5, method: 'suggested',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(seen.some((q) => q.text.startsWith('UPDATE'))).toBe(false);
+    expect(seen.some((q) => q.text.startsWith('INSERT INTO player_link_resolutions'))).toBe(false);
+  });
+
+  it('refuses a contradicted candidate', async () => {
+    const { tx, seen } = lockedUnmatchedRow();
+    installImportClient(tx);
+    mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+    mocks.assessOneSource.mockResolvedValue(assessment({
+      best: { ...assessment().best, hardConflict: true, conflicts: [{ reason: 'x', detail: 'y' }] },
+      hardConflict: true,
+      bulkEligible: false,
+    }));
+
+    const result = await resolveLinkFromSuggestion({
+      targetTable: 'award_winners', targetId: 412, playerId: 1000,
+      adminUserId: 5, method: 'suggested',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(seen.some((q) => q.text.startsWith('UPDATE'))).toBe(false);
+  });
+
+  it('refuses a bulk approval that is no longer bulk-eligible', async () => {
+    const { tx, seen } = lockedUnmatchedRow();
+    installImportClient(tx);
+    mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+    mocks.assessOneSource.mockResolvedValue(
+      assessment({ bulkEligible: false, band: 'high', ambiguous: true }),
+    );
+
+    const bulk = await resolveLinkFromSuggestion({
+      targetTable: 'award_winners', targetId: 412, playerId: 1000,
+      adminUserId: 5, method: 'bulk_suggested',
+    });
+    expect(bulk.ok).toBe(false);
+    expect(seen.some((q) => q.text.startsWith('UPDATE'))).toBe(false);
+
+    // The same row remains approvable one at a time, by a human who can
+    // read the evidence.
+    const single = await resolveLinkFromSuggestion({
+      targetTable: 'award_winners', targetId: 412, playerId: 1000,
+      adminUserId: 5, method: 'suggested',
+    });
+    expect(single).toEqual({ ok: true });
+  });
+
+  it('refuses a row that stopped being unresolved while the page was open', async () => {
+    const { tx, seen } = fakeTransaction((text) => {
+      if (text.startsWith('SELECT link_status_value::text AS status')) {
+        return [{ status: 'resolved' }];
+      }
+      return [];
+    });
+    installImportClient(tx);
+    mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+    mocks.assessOneSource.mockResolvedValue(assessment());
+
+    const result = await resolveLinkFromSuggestion({
+      targetTable: 'award_winners', targetId: 412, playerId: 1000,
+      adminUserId: 5, method: 'suggested',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(mocks.assessOneSource).not.toHaveBeenCalled();
+    expect(seen.some((q) => q.text.startsWith('UPDATE'))).toBe(false);
+  });
+
+  it('refuses to run without the import role', async () => {
+    delete process.env.AFLDB_IMPORT_DATABASE_URL;
+    const result = await resolveLinkFromSuggestion({
+      targetTable: 'award_winners', targetId: 412, playerId: 1000,
+      adminUserId: 5, method: 'suggested',
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: 'AFLDB_IMPORT_DATABASE_URL is not configured.',
+    });
+    expect(mocks.postgres).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Source contracts for the admin actions.
+ *
+ * Behaviour tests cannot easily prove a NEGATIVE about a whole module —
+ * that nothing anywhere reads a score out of the request — so these read
+ * the source, in the style of tests/admin-match-mutations.test.ts.
+ */
+describe('player-link action contracts', () => {
+  const actions = readFileSync(
+    join(process.cwd(), 'src', 'app', 'admin', 'player-links', 'actions.ts'),
+    'utf8',
+  );
+
+  it('never reads a score, band or eligibility flag from the request', () => {
+    for (const field of ['score', 'band', 'bulkEligible', 'confidence', 'algorithmVersion']) {
+      expect(actions).not.toContain(`formData.get('${field}')`);
+    }
+  });
+
+  it('routes suggested and bulk approvals through the rescoring path', () => {
+    expect(actions).toContain('resolveLinkFromSuggestion');
+    expect(actions).toContain("method: 'suggested'");
+    expect(actions).toContain("method: 'bulk_suggested'");
+  });
+
+  it('keeps revalidatePath out of the new actions', () => {
+    // Next 15.5 can hang the client commit when the submitting form
+    // unmounts; the suggestion controls refresh after the action
+    // settles instead (see SuggestionControls).
+    const approval = actions.slice(actions.indexOf('export async function approveSuggestion'));
+    expect(approval).not.toContain('revalidatePath');
+    expect(approval).not.toContain('revalidatePublicLinkPages');
+  });
+
+  it('reports every skipped row instead of abandoning the batch', () => {
+    const bulk = actions.slice(
+      actions.indexOf('export async function bulkApproveSuggestions'),
+      actions.indexOf('export async function refreshSuggestions'),
+    );
+    // A per-row failure must continue, not return, or one stale row
+    // would silently strand the rest of the selection.
+    expect(bulk).toContain('skipped.push');
+    expect(bulk).toContain('continue;');
+    expect(bulk).not.toMatch(/if \(!result\.ok\) return/);
+  });
+
+  it('gates every action behind super admin', () => {
+    const exported = actions.match(/export async function (\w+)/g) ?? [];
+    expect(exported.length).toBeGreaterThanOrEqual(7);
+    const guards = actions.match(/await requireSuperAdmin\(\)/g) ?? [];
+    expect(guards.length).toBe(exported.length);
   });
 });

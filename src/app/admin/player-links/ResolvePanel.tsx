@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 
-import { ResolveControls } from '@/app/admin/player-links/ResolveControls';
+import { BulkApproveControls } from '@/app/admin/player-links/BulkApproveControls';
+import { ResolveControls, type SuggestedMatch } from '@/app/admin/player-links/ResolveControls';
 
 type OpenRow = {
   targets: { table: string; id: number; linkStatus?: string }[];
@@ -10,11 +11,22 @@ type OpenRow = {
   context: string;
   linkStatus: string;
   suggestions: { id: number; suggestedName: string; note: string | null }[];
+  /** The cached suggestion for this row, when the model produced one. */
+  match: SuggestedMatch | null;
+};
+
+type SelectedTarget = {
+  table: string;
+  id: number;
+  name: string;
+  linkStatus: string;
+  bulkEligible: boolean;
+  suggestPlayerId: number | null;
 };
 
 export function ResolvePanel() {
   const [row, setRow] = useState<OpenRow | null>(null);
-  const [selectedTargets, setSelectedTargets] = useState<{table: string, id: number, name: string, linkStatus: string}[]>([]);
+  const [selectedTargets, setSelectedTargets] = useState<SelectedTarget[]>([]);
 
   useEffect(() => {
     function onClick(event: MouseEvent) {
@@ -26,12 +38,17 @@ export function ResolvePanel() {
         try {
           suggestions = d.suggestions ? JSON.parse(d.suggestions) : [];
         } catch { /* malformed data attribute: open with no tips rather than not at all */ }
+        let match: SuggestedMatch | null = null;
+        try {
+          match = d.match ? JSON.parse(d.match) as SuggestedMatch : null;
+        } catch { /* same rule: a broken payload must not block manual resolution */ }
         setRow({
           targets: [{ table: d.targetTable ?? '', id: Number(d.targetId), linkStatus: d.linkStatus ?? '' }],
           playerName: d.playerName ?? '',
           context: d.context ?? '',
           linkStatus: d.linkStatus ?? '',
           suggestions,
+          match,
         });
         return;
       }
@@ -45,8 +62,10 @@ export function ResolvePanel() {
         const id = Number(d.targetId);
         const name = d.playerName!;
         const linkStatus = d.linkStatus!;
+        const bulkEligible = d.bulkEligible === '1';
+        const suggestPlayerId = d.suggestPlayerId ? Number(d.suggestPlayerId) : null;
         if (target.checked) {
-          setSelectedTargets(prev => [...prev, { table, id, name, linkStatus }]);
+          setSelectedTargets(prev => [...prev, { table, id, name, linkStatus, bulkEligible, suggestPlayerId }]);
         } else {
           setSelectedTargets(prev => prev.filter(t => !(t.table === table && t.id === id)));
         }
@@ -55,14 +74,16 @@ export function ResolvePanel() {
         const isChecked = target.checked;
         const rowCheckboxes = document.querySelectorAll<HTMLInputElement>(`.bulk-resolve-cb[data-target-table="${table}"]`);
         
-        const newTargets: {table: string, id: number, name: string, linkStatus: string}[] = [];
+        const newTargets: SelectedTarget[] = [];
         rowCheckboxes.forEach(cb => {
             cb.checked = isChecked;
             newTargets.push({
                 table: cb.dataset.targetTable!,
                 id: Number(cb.dataset.targetId),
                 name: cb.dataset.playerName!,
-                linkStatus: cb.dataset.linkStatus!
+                linkStatus: cb.dataset.linkStatus!,
+                bulkEligible: cb.dataset.bulkEligible === '1',
+                suggestPlayerId: cb.dataset.suggestPlayerId ? Number(cb.dataset.suggestPlayerId) : null,
             });
         });
 
@@ -111,6 +132,9 @@ export function ResolvePanel() {
       context: `Bulk resolving ${selectedTargets.length} records.`,
       linkStatus: 'mixed',
       suggestions: [],
+      // A bulk resolve links one chosen player to many rows, which is a
+      // different act from approving each row's own suggestion.
+      match: null,
     });
   };
 
@@ -125,9 +149,13 @@ export function ResolvePanel() {
           display: 'flex', gap: '1rem', alignItems: 'center'
         }}>
           <strong>{selectedTargets.length} records selected</strong>
-          <button type="button" className="btn btn-primary" onClick={handleBulkResolve}>
+          <button type="button" className="btn btn-secondary" onClick={handleBulkResolve}>
             Resolve Selected
           </button>
+          <BulkApproveControls
+            targets={selectedTargets.filter((t) => t.bulkEligible && t.suggestPlayerId !== null)}
+            totalSelected={selectedTargets.length}
+          />
         </div>
       )}
 
@@ -168,6 +196,7 @@ export function ResolvePanel() {
               context={row.context}
               linkStatus={row.linkStatus}
               suggestions={row.suggestions}
+              match={row.match}
             />
           </div>
         </div>

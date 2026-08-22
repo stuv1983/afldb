@@ -5,6 +5,10 @@ import postgres from 'postgres';
 import { authSql } from '@/db/authClient';
 import { sql } from '@/db/client';
 import {
+  assessOneSource,
+  fetchSourceEvidence,
+} from '@/db/queries/player-match-candidates';
+import {
   createPlayerInTransaction,
   type CreatedPlayer,
   type CreatePlayerInput,
@@ -56,6 +60,14 @@ export type UnresolvedLinkRow = {
   linkStatus: string;
   /** Human context: which award/team/club/season the row belongs to. */
   context: string;
+  /**
+   * What resolving this row actually settles. Every table but draft
+   * picks settles itself; a draft pick settles its draft_person, and so
+   * every pick of that person shares one suggestion and one decision
+   * rather than accumulating near-duplicates of both.
+   */
+  resolutionEntityType: string;
+  resolutionEntityId: number;
 };
 
 /**
@@ -76,7 +88,9 @@ export async function listUnresolvedLinks(
              w.player_name_raw AS "playerName",
              w.link_status_value::text AS "linkStatus",
              concat_ws(' · ', a.name, w.season::text,
-                       COALESCE(c.name, w.club_name_raw)) AS context
+                       COALESCE(c.name, w.club_name_raw)) AS context,
+             'award_winners' AS "resolutionEntityType",
+             w.id AS "resolutionEntityId"
         FROM award_winners w
         JOIN awards a ON a.id = w.award_id
         LEFT JOIN clubs c ON c.id = w.club_id
@@ -86,7 +100,8 @@ export async function listUnresolvedLinks(
              n.link_status_value::text,
              concat_ws(' · ', a.name, n.season::text,
                        CASE WHEN n.round_number IS NOT NULL
-                            THEN 'Round ' || n.round_number END)
+                            THEN 'Round ' || n.round_number END),
+             'award_nominations', n.id
         FROM award_nominations n
         JOIN awards a ON a.id = n.award_id
        WHERE n.link_status_value::text = ANY(${statusValues})
@@ -96,7 +111,8 @@ export async function listUnresolvedLinks(
              concat_ws(' · ', 'Hall of Fame', h.category,
                        CASE WHEN h.inducted_year IS NOT NULL
                             THEN 'inducted ' || h.inducted_year END,
-                       h.club_name_raw)
+                       h.club_name_raw),
+             'hall_of_fame', h.id
         FROM hall_of_fame h
         LEFT JOIN aflw.players ap ON lower(trim(ap.display_name)) = lower(trim(h.name))
        WHERE h.link_status_value::text = ANY(${statusValues})
@@ -105,13 +121,15 @@ export async function listUnresolvedLinks(
       UNION ALL
       SELECT 'honour_team_members', m.id, m.player_name_raw,
              m.link_status_value::text,
-             concat_ws(' · ', m.team_name, m.position, m.club_name_raw)
+             concat_ws(' · ', m.team_name, m.position, m.club_name_raw),
+             'honour_team_members', m.id
         FROM honour_team_members m
        WHERE m.link_status_value::text = ANY(${statusValues})
       UNION ALL
       SELECT 'captaincies', cp.id, cp.player_name_raw,
              cp.link_status_value::text,
-             concat_ws(' · ', c.name, cp.season::text, cp.role)
+             concat_ws(' · ', c.name, cp.season::text, cp.role),
+             'captaincies', cp.id
         FROM captaincies cp
         JOIN clubs c ON c.id = cp.club_id
        WHERE cp.link_status_value::text = ANY(${statusValues})
@@ -119,13 +137,15 @@ export async function listUnresolvedLinks(
       SELECT 'player_achievements', pa.id, pa.player_name_raw,
              pa.link_status_value::text,
              concat_ws(' · ', replace(pa.achievement_type::text, '_', ' '),
-                       pa.season::text)
+                       pa.season::text),
+             'player_achievements', pa.id
         FROM player_achievements pa
        WHERE pa.link_status_value::text = ANY(${statusValues})
       UNION ALL
       SELECT 'draft_picks', dp.id, dp.player_name_raw,
              dp.link_status_value::text,
-             concat_ws(' · ', dp.draft_type, dp.draft_year::text)
+             concat_ws(' · ', dp.draft_type, dp.draft_year::text),
+             'draft_person', dp.draft_person_id
         FROM draft_picks dp
        WHERE dp.link_status_value::text = ANY(${statusValues})
     ) q
@@ -328,14 +348,24 @@ async function recordLinkedResolution(tx: Tx, input: {
   previousStatus: string;
   adminUserId: number;
   note?: string | null;
+  /**
+   * How the link was decided (migration 067). The score is always the
+   * one the server recomputed a moment earlier in this transaction,
+   * never a number the browser sent.
+   */
+  matchMethod?: 'manual' | 'suggested' | 'bulk_suggested';
+  matchScore?: number | null;
+  algorithmVersion?: string | null;
 }): Promise<void> {
   await tx`
     INSERT INTO player_link_resolutions
           (target_table, target_id, action, player_id, previous_status,
-           admin_user_id, note)
+           admin_user_id, note, match_method, match_score, algorithm_version)
     VALUES (${input.targetTable}, ${input.targetId}, 'linked', ${input.playerId},
             ${input.previousStatus}::link_status, ${input.adminUserId},
-            ${(input.note ?? '').trim().slice(0, 2000) || null})
+            ${(input.note ?? '').trim().slice(0, 2000) || null},
+            ${input.matchMethod ?? 'manual'},
+            ${input.matchScore ?? null}, ${input.algorithmVersion ?? null})
   `;
 }
 
@@ -489,4 +519,106 @@ export async function setSuggestionStatus(
        SET status = ${status}, resolved_by = ${adminUserId}, resolved_at = now()
      WHERE id = ${id} AND status = 'open'
   `;
+}
+
+export type SuggestedLinkMethod = 'suggested' | 'bulk_suggested';
+
+/**
+ * Approve a suggested match.
+ *
+ * The cache is advice, not authority, so none of it is trusted here.
+ * Inside the same import transaction that will do the writing, this:
+ *
+ *   1. locks the target and confirms it is still unresolved;
+ *   2. re-reads the source row's evidence;
+ *   3. re-reads the candidates and runs the scorer again;
+ *   4. requires the recomputed best candidate to be the very player the
+ *      admin is approving, with no contradiction, and -- for a bulk
+ *      approval -- to still satisfy bulk eligibility;
+ *   5. writes the link and its audit row, recording the score the
+ *      SERVER just calculated.
+ *
+ * A score posted by the browser is therefore incapable of influencing
+ * anything: it is not read, and a stale page fails step 4 rather than
+ * quietly linking a player the evidence no longer supports.
+ */
+export async function resolveLinkFromSuggestion(input: {
+  targetTable: LinkTargetTable;
+  targetId: number;
+  playerId: number;
+  adminUserId: number;
+  method: SuggestedLinkMethod;
+  note?: string | null;
+}): Promise<ResolveResult> {
+  const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
+  if (!importUrl) return { ok: false, error: 'AFLDB_IMPORT_DATABASE_URL is not configured.' };
+
+  const importSql = postgres(importUrl, { max: 1, onnotice: () => {} });
+  try {
+    const outcome = await importSql.begin(async (tx) => {
+      const target = await lockUnresolvedTarget(tx, input.targetTable, input.targetId);
+      if (!target) return { ok: false as const, error: 'stale' };
+
+      const entityType = input.targetTable === 'draft_picks' ? 'draft_person' : input.targetTable;
+      const entityId = input.targetTable === 'draft_picks'
+        ? target.draftPersonId!
+        : input.targetId;
+
+      const [row] = await fetchSourceEvidence(tx, {
+        status: 'unresolved',
+        table: input.targetTable,
+        entity: { type: entityType, id: entityId },
+      });
+      if (!row) return { ok: false as const, error: 'evidence' };
+
+      const assessment = await assessOneSource(tx, row.source);
+      const best = assessment.best;
+      if (!best || best.playerId !== input.playerId) {
+        return { ok: false as const, error: 'changed' };
+      }
+      if (best.hardConflict) return { ok: false as const, error: 'conflict' };
+      if (assessment.band === 'none') return { ok: false as const, error: 'weak' };
+      if (input.method === 'bulk_suggested' && !assessment.bulkEligible) {
+        return { ok: false as const, error: 'not_bulk' };
+      }
+
+      await applyLockedLink(
+        tx,
+        input.targetTable,
+        input.targetId,
+        input.playerId,
+        target.draftPersonId,
+      );
+      await recordLinkedResolution(tx, {
+        targetTable: input.targetTable,
+        targetId: input.targetId,
+        playerId: input.playerId,
+        previousStatus: target.previousStatus,
+        adminUserId: input.adminUserId,
+        note: input.note,
+        matchMethod: input.method,
+        matchScore: best.score,
+        algorithmVersion: assessment.algorithmVersion,
+      });
+      return { ok: true as const };
+    }) as { ok: true } | { ok: false; error: string };
+
+    if (outcome.ok) return { ok: true };
+    const messages: Record<string, string> = {
+      stale: 'No unresolved row with that id — it may already be linked.',
+      evidence: 'The source row could not be re-read for scoring.',
+      changed:
+        'The evidence no longer supports that player as the best match. '
+        + 'Refresh the queue and review the suggestion again.',
+      conflict: 'That candidate is contradicted by the source evidence and cannot be approved.',
+      weak: 'The recomputed confidence is too low to approve as a suggestion.',
+      not_bulk: 'That row no longer meets the bulk-approval rules; approve it individually.',
+    };
+    return { ok: false, error: messages[outcome.error] ?? 'The suggestion could not be approved.' };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: `The link could not be applied: ${message}` };
+  } finally {
+    await importSql.end({ timeout: 5 });
+  }
 }

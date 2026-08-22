@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-22  
-**Open issues:** 9
+**Open issues:** 10
 
 ## How Claude should use this file
 
@@ -33,6 +33,7 @@
 | `AFLDB-ISSUE-072` | Low | Tests | `tests/site-settings.test.ts` default-shape expectation is stale after the `frontendTheme` settings landed. |
 | `AFLDB-ISSUE-073` | Medium | Database | Four migration-056/057 foreign keys lack supporting indexes; `fk-indexes.test.ts` fails. |
 | `AFLDB-ISSUE-074` | Low | Tests | email-intake integration test picks a real dev admin instead of its fixture and leaves a staged row behind. |
+| `AFLDB-ISSUE-075` | Medium | Admin/Matching | Confidence-scored player-link suggestions built and calibrated (76 tests pass, backtest over 9,356 links); dev browser validation outstanding. |
 
 ---
 
@@ -119,3 +120,11 @@
 - **Key files:** `tests/integration/email-intake.test.ts`
 - **Current state:** The end-to-end CSV test picks an admin by query ordering and fails on the dev host where real admins sort first; it also leaves a staged `data_submissions` row behind (one artifact row left in `afldb_dev` on 2026-08-22).
 - **Next action:** Provision or deterministically select a dedicated fixture admin inside the test and clean up the staged row.
+
+## AFLDB-ISSUE-075 - Confidence-scored suggestions for /admin/player-links
+
+- **Severity:** Medium
+- **Area:** Admin/Matching
+- **Key files:** `src/lib/player-matching/*`, `src/db/queries/player-match-candidates.ts`, `src/db/migrations/067_player_link_match_candidates.sql`, `src/app/admin/player-links/*`, `tools/matching/backtest.ts`
+- **Current state:** Deterministic scoring, candidate blocking, the suggestion cache, the evidence UI and suggested/bulk approval with in-transaction rescoring are implemented. Algorithm `v1` calibrated against 9,356 confirmed links: 99.69% top-1, very_high precision 99.99%, bulk-eligible 7,337 at 99.99%, and all 44 live bulk-eligible proposals verified correct by hand. Migration 067 and privileges are applied on `afldb_dev` and `afldb_test`; 76 tests pass on the dev host.
+- **Next action:** Deploy the application code to dev, press `Recompute suggestions`, then work the browser checklist (band filters, evidence matches score, conflicts not approvable, manual paths intact, non-super-admin blocked) and perform one reversible real approval with before/after state captured.

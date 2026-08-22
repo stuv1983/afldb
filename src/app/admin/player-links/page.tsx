@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { RefreshSuggestionsControls } from '@/app/admin/player-links/RefreshSuggestionsControls';
 import { ResolvePanel } from '@/app/admin/player-links/ResolvePanel';
 import { SuggestionControls } from '@/app/admin/player-links/SuggestionControls';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
@@ -12,7 +13,11 @@ import {
   listUnresolvedLinks,
   type LinkTargetTable,
 } from '@/db/queries/player-links';
+import { readBestSuggestions, readSuggestionsForEntities } from '@/db/queries/player-match-candidates';
+import { sql } from '@/db/client';
 import { requireSuperAdmin } from '@/lib/auth/session';
+import { BAND_ORDER, isConfidenceBand } from '@/lib/player-matching/confidence';
+import type { ConfidenceBand } from '@/lib/player-matching/types';
 import { formatDate, formatNumber } from '@/lib/format';
 import { firstValue } from '@/lib/params';
 
@@ -36,6 +41,33 @@ const TABLE_LABELS: Record<LinkTargetTable, string> = {
  * per navigation.
  */
 const PAGE_SIZE = 50;
+
+const BAND_LABELS: Record<ConfidenceBand, string> = {
+  very_high: 'Very high',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+  none: 'No suggestion',
+};
+
+/**
+ * Queue order: the rows a reviewer can clear fastest first, then the
+ * ones needing a decision, then everything the model could not help
+ * with. Ambiguous rows are pulled up behind the confident ones rather
+ * than buried, because a near-tie is exactly the case that needs a
+ * human and would otherwise never be looked at.
+ */
+function queueRank(band: ConfidenceBand | undefined, bulkEligible: boolean, ambiguous: boolean): number {
+  if (bulkEligible) return 0;
+  if (ambiguous) return 2;
+  switch (band) {
+    case 'very_high': return 1;
+    case 'high': return 3;
+    case 'medium': return 4;
+    case 'low': return 5;
+    default: return 6;
+  }
+}
 
 /**
  * The manual half of player linking.
@@ -69,10 +101,15 @@ export default async function PlayerLinksPage(
   const queryLower = query.toLowerCase();
   const under22Preset = table === 'award_winners' && queryLower === '22 under 22';
 
-  const [unresolved, vetted, suggestions] = await Promise.all([
+  const rawBand = firstValue(params.band) ?? '';
+  const band = isConfidenceBand(rawBand) ? rawBand : undefined;
+  const bulkOnly = firstValue(params.bulk) === '1';
+
+  const [unresolved, vetted, suggestions, bestByEntity] = await Promise.all([
     listUnresolvedLinks(table),
     listConfirmedUnlinked(),
     listSuggestions('open'),
+    readBestSuggestions(sql),
   ]);
 
   // Rows an admin has already vetted as genuinely unlinked stay honest in
@@ -80,7 +117,7 @@ export default async function PlayerLinksPage(
   const queue = unresolved.filter((r) => !vetted.has(`${r.targetTable}:${r.targetId}`));
 
   // Search by player name or record context (see changeLog.md).
-  const filteredQueue = queryLower
+  const searched = queryLower
     ? queue.filter(
         (r) =>
           r.playerName.toLowerCase().includes(queryLower) ||
@@ -88,18 +125,68 @@ export default async function PlayerLinksPage(
       )
     : queue;
 
-  const totalPages = Math.max(1, Math.ceil(filteredQueue.length / PAGE_SIZE));
+  // Suggestions are keyed on the resolution entity, so every draft pick
+  // belonging to one draft_person reads the same cached decision.
+  const suggestionFor = (row: (typeof searched)[number]) =>
+    bestByEntity.get(`${row.resolutionEntityType}:${row.resolutionEntityId}`);
+
+  const bandFiltered = band
+    ? searched.filter((r) => (suggestionFor(r)?.band ?? 'none') === band)
+    : searched;
+  const filteredQueue = bulkOnly
+    ? bandFiltered.filter((r) => suggestionFor(r)?.bulkEligible === true)
+    : bandFiltered;
+
+  // Confidence first, then the original table/name order so the page is
+  // stable between loads.
+  const orderedQueue = [...filteredQueue].sort((a, b) => {
+    const sa = suggestionFor(a);
+    const sb = suggestionFor(b);
+    return (
+      queueRank(sa?.band as ConfidenceBand | undefined, sa?.bulkEligible ?? false, sa?.ambiguous ?? false)
+      - queueRank(sb?.band as ConfidenceBand | undefined, sb?.bulkEligible ?? false, sb?.ambiguous ?? false)
+      || (sb?.score ?? -1) - (sa?.score ?? -1)
+      || a.targetTable.localeCompare(b.targetTable)
+      || a.playerName.localeCompare(b.playerName)
+    );
+  });
+
+  const totalPages = Math.max(1, Math.ceil(orderedQueue.length / PAGE_SIZE));
   const rawPage = Number(firstValue(params.page) ?? '1');
   const page = Number.isInteger(rawPage) ? Math.min(Math.max(1, rawPage), totalPages) : 1;
-  const pageRows = filteredQueue.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageRows = orderedQueue.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const pageHref = (p: number) => {
+  // Alternatives and evidence are fetched only for the rows actually
+  // rendered; the whole-queue read above is rank 1 alone.
+  const pageEntities = [...new Set(pageRows.map((r) => r.resolutionEntityId))];
+  const pageEntityTypes = [...new Set(pageRows.map((r) => r.resolutionEntityType))];
+  const candidatesByEntity = await readSuggestionsForEntities(sql, pageEntities, pageEntityTypes);
+
+  const bandCounts = new Map<string, number>();
+  for (const row of searched) {
+    const key = suggestionFor(row)?.band ?? 'none';
+    bandCounts.set(key, (bandCounts.get(key) ?? 0) + 1);
+  }
+  const bulkCount = searched.filter((r) => suggestionFor(r)?.bulkEligible === true).length;
+  const lastComputed = [...bestByEntity.values()]
+    .reduce<Date | null>((latest, s2) => {
+      const at = s2.computedAt instanceof Date ? s2.computedAt : new Date(s2.computedAt);
+      return latest === null || at > latest ? at : latest;
+    }, null);
+
+  const hrefWith = (overrides: Record<string, string | undefined>) => {
     const qParams = new URLSearchParams();
-    if (table) qParams.set('table', table);
-    if (query) qParams.set('q', query);
-    qParams.set('page', String(p));
-    return `/admin/player-links?${qParams.toString()}`;
+    const merged: Record<string, string | undefined> = {
+      table, q: query || undefined, band, bulk: bulkOnly ? '1' : undefined, ...overrides,
+    };
+    for (const [key, value] of Object.entries(merged)) {
+      if (value) qParams.set(key, value);
+    }
+    const queryString = qParams.toString();
+    return queryString ? `/admin/player-links?${queryString}` : '/admin/player-links';
   };
+
+  const pageHref = (p: number) => hrefWith({ page: String(p) });
 
   const suggestionsByTarget = new Map<string, typeof suggestions>();
   for (const s of suggestions) {
@@ -201,6 +288,40 @@ export default async function PlayerLinksPage(
         </span>
       </nav>
 
+      {/* Confidence filters. Counts describe the current table/search. */}
+      <nav className="section" aria-label="Filter by confidence">
+        {band === undefined && !bulkOnly
+          ? <strong aria-current="true">All confidence</strong>
+          : <Link href={hrefWith({ band: undefined, bulk: undefined })}>All confidence</Link>}
+        {BAND_ORDER.map((b) => (
+          <span key={b}>
+            {' · '}
+            {band === b && !bulkOnly
+              ? <strong aria-current="true">{BAND_LABELS[b]} ({formatNumber(bandCounts.get(b) ?? 0)})</strong>
+              : (
+                <Link href={hrefWith({ band: b, bulk: undefined })}>
+                  {BAND_LABELS[b]} ({formatNumber(bandCounts.get(b) ?? 0)})
+                </Link>
+              )}
+          </span>
+        ))}
+        <span>
+          {' · '}
+          {bulkOnly
+            ? <strong aria-current="true">Bulk-ready ({formatNumber(bulkCount)})</strong>
+            : <Link href={hrefWith({ band: undefined, bulk: '1' })}>Bulk-ready ({formatNumber(bulkCount)})</Link>}
+        </span>
+      </nav>
+
+      <section className="section">
+        <RefreshSuggestionsControls computedAt={lastComputed} />
+        <p className="section-note">
+          A suggestion is evidence for a decision, never the decision itself. Approving one
+          rescores it against the live data first, and anything contradicted or too close to
+          call stays here for you to settle by hand.
+        </p>
+      </section>
+
       {suggestions.length > 0 && (
         <section className="section">
           <CollapsibleTable
@@ -274,6 +395,7 @@ export default async function PlayerLinksPage(
                       </th>
                       <th scope="col">Source name</th>
                       <th scope="col">Context</th>
+                      <th scope="col">Suggested match</th>
                       <th scope="col">Status</th>
                       <th scope="col" />
                     </tr>
@@ -282,6 +404,10 @@ export default async function PlayerLinksPage(
                     {rows.map((row) => {
                       const rowSuggestions =
                         suggestionsByTarget.get(`${row.targetTable}:${row.targetId}`) ?? [];
+                      const entityKey = `${row.resolutionEntityType}:${row.resolutionEntityId}`;
+                      const match = bestByEntity.get(entityKey);
+                      const ranked = candidatesByEntity.get(entityKey) ?? [];
+                      const alternatives = ranked.filter((c) => c.rank > 1);
                       return (
                         <tr key={`${row.targetTable}-${row.targetId}`}>
                           <td className="nowrap" style={{ width: '1%' }}>
@@ -292,6 +418,8 @@ export default async function PlayerLinksPage(
                               data-target-id={row.targetId}
                               data-player-name={row.playerName}
                               data-link-status={row.linkStatus}
+                              data-bulk-eligible={match?.bulkEligible ? '1' : '0'}
+                              data-suggest-player-id={match?.playerId ?? ''}
                               aria-label={`Select ${row.playerName}`}
                             />
                           </td>
@@ -301,7 +429,25 @@ export default async function PlayerLinksPage(
                               <span className="badge">{rowSuggestions.length} tip{rowSuggestions.length > 1 ? 's' : ''}</span>
                             )}
                           </td>
-                          <td className="wide muted">{row.context}</td>
+                          <td className="wide">
+                            {match ? (
+                              <>
+                                <Link href={`/players/${match.playerSlug}`}>{match.playerName}</Link>
+                                {' '}
+                                <span className={match.hardConflict ? 'badge badge-warn' : 'badge'}>
+                                  {BAND_LABELS[match.band as ConfidenceBand] ?? match.band} {match.score}
+                                </span>
+                                {match.bulkEligible && <span className="badge">bulk-ready</span>}
+                                {match.ambiguous && <span className="badge badge-warn">needs review</span>}
+                                {match.hardConflict && <span className="badge badge-warn">conflict</span>}
+                                <span className="muted" style={{ fontSize: '0.8rem' }}>
+                                  {' '}gap {match.gap === null ? 'no rival' : match.gap}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="muted">—</span>
+                            )}
+                          </td>
                           <td className="nowrap">{row.linkStatus}</td>
                           <td className="nowrap">
                             <button
@@ -317,6 +463,29 @@ export default async function PlayerLinksPage(
                                 ? JSON.stringify(rowSuggestions.map((s) => ({
                                   id: s.id, suggestedName: s.suggestedName, note: s.note,
                                 })))
+                                : undefined}
+                              data-match={match
+                                ? JSON.stringify({
+                                  playerId: match.playerId,
+                                  playerName: match.playerName,
+                                  playerSlug: match.playerSlug,
+                                  score: match.score,
+                                  band: match.band,
+                                  gap: match.gap,
+                                  ambiguous: match.ambiguous,
+                                  hardConflict: match.hardConflict,
+                                  bulkEligible: match.bulkEligible,
+                                  evidence: match.evidence,
+                                  conflicts: match.conflicts,
+                                  algorithmVersion: match.algorithmVersion,
+                                  alternatives: alternatives.map((c) => ({
+                                    playerId: c.playerId,
+                                    playerName: c.playerName,
+                                    score: c.score,
+                                    evidence: c.evidence,
+                                    conflicts: c.conflicts,
+                                  })),
+                                })
                                 : undefined}
                             >
                               Resolve…

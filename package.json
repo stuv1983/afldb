@@ -16,6 +16,7 @@
     "db:privileges:test": "psql \"$AFLDB_TEST_DATABASE_URL\" -v ON_ERROR_STOP=1 -f tools/maintenance/privileges.sql",
     "current-season:update": "tsx tools/current-season/update-current-season.ts",
     "records:first-kick-goal": "tsx --conditions=react-server tools/records/import-first-kick-goal.ts",
+    "match:backtest": "tsx --conditions=react-server tools/matching/backtest.ts",
     "nl:stress": "tsx --conditions=react-server tools/nl/stress-test.ts",
     "nl:stress:compare": "tsx tools/nl/compare-runs.ts",
     "test": "vitest run",

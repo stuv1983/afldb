@@ -357,6 +357,9 @@ DECLARE
     ['player_link_resolutions', 'SELECT, INSERT'],                  -- 056
     -- Append-only by grant: no UPDATE, no DELETE (see migration 057).
     ['data_edits',              'SELECT, INSERT'],                  -- 057
+    -- Regenerated wholesale by the admin refresh action, so unlike the
+    -- audit tables this one is fully writable (see migration 067).
+    ['player_link_match_candidates', 'SELECT, INSERT, UPDATE, DELETE'], -- 067
     -- Read-only: validation resolves submitted names against these.
     ['players',                'SELECT'],                           -- 023
     ['player_clubs',           'SELECT'],                           -- 023
@@ -379,7 +382,8 @@ DECLARE
     'beta_join_requests', 'data_submissions', 'data_submission_rows',
     'admin_invites', 'site_settings', 'site_media', 'nl_search_log', 'nl_search_review',
     'nl_search_feedback', 'app_health_events',
-    'player_link_suggestions', 'player_link_resolutions', 'data_edits'
+    'player_link_suggestions', 'player_link_resolutions', 'data_edits',
+    'player_link_match_candidates'
   ];
   named text[] := ARRAY[]::text[];
   i int;
