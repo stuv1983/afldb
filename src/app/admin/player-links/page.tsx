@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Fragment } from 'react';
 
 import { RefreshSuggestionsControls } from '@/app/admin/player-links/RefreshSuggestionsControls';
 import { ResolvePanel } from '@/app/admin/player-links/ResolvePanel';
@@ -13,10 +14,23 @@ import {
   listUnresolvedLinks,
   type LinkTargetTable,
 } from '@/db/queries/player-links';
-import { readBestSuggestions, readSuggestionsForEntities } from '@/db/queries/player-match-candidates';
+import {
+  formatPlayerSummary,
+  readBestSuggestions,
+  readPlayerSummaries,
+  readSuggestionsForEntities,
+} from '@/db/queries/player-match-candidates';
 import { sql } from '@/db/client';
 import { requireSuperAdmin } from '@/lib/auth/session';
 import { BAND_ORDER, isConfidenceBand } from '@/lib/player-matching/confidence';
+import {
+  conflictLabel,
+  describeAlternative,
+  describeBulkCriteria,
+  describeSourceRecord,
+  evidenceDescription,
+  evidenceLabel,
+} from '@/lib/player-matching/describe';
 import type { ConfidenceBand } from '@/lib/player-matching/types';
 import { formatDate, formatNumber } from '@/lib/format';
 import { firstValue } from '@/lib/params';
@@ -195,11 +209,62 @@ export default async function PlayerLinksPage(
     suggestionsByTarget.get(key)!.push(s);
   }
 
-  const byTable = new Map<LinkTargetTable, typeof pageRows>();
+  // Presentation grouping only.
+  //
+  // One source name routinely produces several unrelated records -- an
+  // award, a nomination, an honour team -- and the old queue rendered
+  // them as near-identical lines a reviewer could not tell apart.
+  // Grouping them puts the differences side by side. It changes nothing
+  // about resolution: each record keeps its own id, status, approval
+  // rules and audit trail, and is resolved on its own.
+  const groups = new Map<string, typeof pageRows>();
   for (const row of pageRows) {
-    if (!byTable.has(row.targetTable)) byTable.set(row.targetTable, []);
-    byTable.get(row.targetTable)!.push(row);
+    const key = row.playerName.trim().toLowerCase();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(row);
   }
+
+  const suggestionOf = (row: (typeof pageRows)[number]) =>
+    bestByEntity.get(`${row.resolutionEntityType}:${row.resolutionEntityId}`);
+
+  /**
+   * When several records for one name suggest DIFFERENT players, that
+   * disagreement is the most useful thing on the page: at least one of
+   * them is wrong. Such a group is never offered for bulk approval.
+   */
+  const groupViews = [...groups.entries()].map(([key, rows]) => {
+    const suggested = rows
+      .map((r) => suggestionOf(r))
+      .filter((s2): s2 is NonNullable<typeof s2> => s2 !== undefined);
+    const distinct = new Set(suggested.map((s2) => s2.playerId));
+    const agrees = distinct.size === 1 && suggested.length === rows.length && rows.length > 1;
+    return {
+      key,
+      rows,
+      name: rows[0].playerName,
+      sharedPlayer: agrees ? suggested[0] : null,
+      disagrees: distinct.size > 1,
+      suggestedCount: suggested.length,
+    };
+  });
+
+  const rankOf = (row: (typeof pageRows)[number]) => {
+    const s2 = suggestionOf(row);
+    return queueRank(
+      s2?.band as ConfidenceBand | undefined,
+      s2?.bulkEligible ?? false,
+      s2?.ambiguous ?? false,
+    );
+  };
+  groupViews.sort((a, b) =>
+    Math.min(...a.rows.map(rankOf)) - Math.min(...b.rows.map(rankOf))
+    || a.name.localeCompare(b.name));
+
+  // Career context for every player suggested on this page, in one query.
+  const summaries = await readPlayerSummaries(
+    sql,
+    [...new Set(pageRows.map((r) => suggestionOf(r)?.playerId).filter((id): id is number => !!id))],
+  );
 
   const pager = totalPages > 1 && (
     <nav className="section" aria-label="Queue pages" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -362,7 +427,7 @@ export default async function PlayerLinksPage(
 
       {pager}
 
-      {filteredQueue.length === 0 ? (
+      {orderedQueue.length === 0 ? (
         <section className="section">
           <div className="empty">
             <h3>Nothing to review</h3>
@@ -374,40 +439,68 @@ export default async function PlayerLinksPage(
           </div>
         </section>
       ) : (
-        [...byTable.entries()].map(([t, rows]) => (
-          <section className="section" key={t}>
-            <CollapsibleTable
-              title={TABLE_LABELS[t]}
-              note={`${formatNumber(rows.length)} on this page`}
-              defaultOpen
-            >
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th scope="col" style={{ width: '1%' }}>
-                        <input
-                          type="checkbox"
-                          className="bulk-select-all-cb"
-                          data-target-table={t}
-                          aria-label={`Select all in ${TABLE_LABELS[t]}`}
-                        />
-                      </th>
-                      <th scope="col">Source name</th>
-                      <th scope="col">Context</th>
-                      <th scope="col">Suggested match</th>
-                      <th scope="col">Status</th>
-                      <th scope="col" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row) => {
+        <section className="section">
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col" style={{ width: '1%' }}>
+                    <input
+                      type="checkbox"
+                      className="bulk-select-all-cb"
+                      data-target-table="all"
+                      aria-label="Select all on this page"
+                    />
+                  </th>
+                  <th scope="col">Source record</th>
+                  <th scope="col">Suggested AFLDB player</th>
+                  <th scope="col">Confidence</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" />
+                </tr>
+              </thead>
+              <tbody>
+                {groupViews.map((group) => (
+                  <Fragment key={group.key}>
+                    {group.rows.length > 1 && (
+                      <tr>
+                        <td />
+                        <td colSpan={5} style={{ paddingTop: '0.9rem' }}>
+                          <strong>{group.name}</strong>
+                          <span className="muted" style={{ marginLeft: '0.5rem', fontSize: '0.85rem' }}>
+                            {formatNumber(group.rows.length)} unresolved records
+                          </span>
+                          {group.disagrees ? (
+                            <span className="badge badge-warn" style={{ marginLeft: '0.5rem' }}>
+                              ⚠ Suggestions disagree — review each record individually
+                            </span>
+                          ) : group.sharedPlayer ? (
+                            <span className="muted" style={{ marginLeft: '0.5rem', fontSize: '0.85rem' }}>
+                              {formatNumber(group.suggestedCount)}/{formatNumber(group.rows.length)}
+                              {' '}independently suggest {group.sharedPlayer.playerName}
+                            </span>
+                          ) : null}
+                        </td>
+                      </tr>
+                    )}
+
+                    {group.rows.map((row) => {
                       const rowSuggestions =
                         suggestionsByTarget.get(`${row.targetTable}:${row.targetId}`) ?? [];
                       const entityKey = `${row.resolutionEntityType}:${row.resolutionEntityId}`;
                       const match = bestByEntity.get(entityKey);
                       const ranked = candidatesByEntity.get(entityKey) ?? [];
                       const alternatives = ranked.filter((c) => c.rank > 1);
+                      const record = describeSourceRecord(row.sourceDetail);
+                      const summary = match ? summaries.get(match.playerId) : undefined;
+                      // A group whose records disagree about the player is
+                      // never offered for unattended approval, whatever the
+                      // individual rows scored.
+                      const bulkReady = (match?.bulkEligible ?? false) && !group.disagrees;
+                      const nextBest = alternatives[0]
+                        ? { playerName: alternatives[0].playerName, score: alternatives[0].score }
+                        : null;
+
                       return (
                         <tr key={`${row.targetTable}-${row.targetId}`}>
                           <td className="nowrap" style={{ width: '1%' }}>
@@ -418,37 +511,75 @@ export default async function PlayerLinksPage(
                               data-target-id={row.targetId}
                               data-player-name={row.playerName}
                               data-link-status={row.linkStatus}
-                              data-bulk-eligible={match?.bulkEligible ? '1' : '0'}
+                              data-bulk-eligible={bulkReady ? '1' : '0'}
                               data-suggest-player-id={match?.playerId ?? ''}
-                              aria-label={`Select ${row.playerName}`}
+                              aria-label={`Select ${row.playerName}, ${record.typeLabel}`}
                             />
                           </td>
+
                           <td className="wide">
-                            {row.playerName}
-                            {rowSuggestions.length > 0 && (
-                              <span className="badge">{rowSuggestions.length} tip{rowSuggestions.length > 1 ? 's' : ''}</span>
-                            )}
+                            <div>{row.playerName}</div>
+                            <div>
+                              <span className="badge">{record.typeLabel}</span>
+                              {rowSuggestions.length > 0 && (
+                                <span className="badge">
+                                  {rowSuggestions.length} tip{rowSuggestions.length > 1 ? 's' : ''}
+                                </span>
+                              )}
+                            </div>
+                            {record.lines.map((line: string) => (
+                              <div key={line} className="muted" style={{ fontSize: '0.85rem' }}>{line}</div>
+                            ))}
                           </td>
+
                           <td className="wide">
                             {match ? (
                               <>
                                 <Link href={`/players/${match.playerSlug}`}>{match.playerName}</Link>
-                                {' '}
-                                <span className={match.hardConflict ? 'badge badge-warn' : 'badge'}>
-                                  {BAND_LABELS[match.band as ConfidenceBand] ?? match.band} {match.score}
-                                </span>
-                                {match.bulkEligible && <span className="badge">bulk-ready</span>}
-                                {match.ambiguous && <span className="badge badge-warn">needs review</span>}
-                                {match.hardConflict && <span className="badge badge-warn">conflict</span>}
-                                <span className="muted" style={{ fontSize: '0.8rem' }}>
-                                  {' '}gap {match.gap === null ? 'no rival' : match.gap}
-                                </span>
+                                <div className="muted" style={{ fontSize: '0.85rem' }}>
+                                  {formatPlayerSummary(summary)}
+                                </div>
+                                <div style={{ marginTop: '0.2rem' }}>
+                                  {match.evidence.map((item) => (
+                                    <span key={item.signal} className="badge" title={evidenceDescription(item)}>
+                                      ✓ {evidenceLabel(item.signal)}
+                                    </span>
+                                  ))}
+                                  {match.conflicts.map((conflict) => (
+                                    <span key={conflict.reason} className="badge badge-warn" title={conflict.detail}>
+                                      ✗ {conflictLabel(conflict)}
+                                    </span>
+                                  ))}
+                                </div>
+                              </>
+                            ) : (
+                              <span className="muted">No candidate found</span>
+                            )}
+                          </td>
+
+                          <td className="nowrap">
+                            {match ? (
+                              <>
+                                <div>
+                                  <strong>{match.score}</strong>
+                                  {' '}
+                                  <span className={match.hardConflict ? 'badge badge-warn' : 'badge'}>
+                                    {BAND_LABELS[match.band as ConfidenceBand] ?? match.band}
+                                  </span>
+                                </div>
+                                {bulkReady && <span className="badge">Bulk-ready</span>}
+                                {match.ambiguous && <span className="badge badge-warn">Needs review</span>}
+                                <div className="muted" style={{ fontSize: '0.8rem' }}>
+                                  {describeAlternative(match.gap, nextBest)}
+                                </div>
                               </>
                             ) : (
                               <span className="muted">—</span>
                             )}
                           </td>
+
                           <td className="nowrap">{row.linkStatus}</td>
+
                           <td className="nowrap">
                             <button
                               type="button"
@@ -457,32 +588,44 @@ export default async function PlayerLinksPage(
                               data-target-table={row.targetTable}
                               data-target-id={row.targetId}
                               data-player-name={row.playerName}
-                              data-context={row.context}
+                              data-context={[record.typeLabel, ...record.lines].join(' · ')}
                               data-link-status={row.linkStatus}
                               data-suggestions={rowSuggestions.length > 0
-                                ? JSON.stringify(rowSuggestions.map((s) => ({
-                                  id: s.id, suggestedName: s.suggestedName, note: s.note,
+                                ? JSON.stringify(rowSuggestions.map((sug) => ({
+                                  id: sug.id, suggestedName: sug.suggestedName, note: sug.note,
                                 })))
                                 : undefined}
+                              data-source-record={JSON.stringify(record)}
                               data-match={match
                                 ? JSON.stringify({
                                   playerId: match.playerId,
                                   playerName: match.playerName,
                                   playerSlug: match.playerSlug,
+                                  playerSummary: formatPlayerSummary(summary),
                                   score: match.score,
                                   band: match.band,
                                   gap: match.gap,
                                   ambiguous: match.ambiguous,
                                   hardConflict: match.hardConflict,
-                                  bulkEligible: match.bulkEligible,
-                                  evidence: match.evidence,
-                                  conflicts: match.conflicts,
+                                  bulkEligible: bulkReady,
+                                  bulkCriteria: describeBulkCriteria(
+                                    match.evidence, match.conflicts, match.gap,
+                                  ),
+                                  evidence: match.evidence.map((item) => ({
+                                    ...item, label: evidenceDescription(item),
+                                  })),
+                                  conflicts: match.conflicts.map((conflict) => ({
+                                    ...conflict, label: conflictLabel(conflict),
+                                  })),
                                   algorithmVersion: match.algorithmVersion,
                                   alternatives: alternatives.map((c) => ({
                                     playerId: c.playerId,
                                     playerName: c.playerName,
+                                    playerSummary: formatPlayerSummary(summaries.get(c.playerId)),
                                     score: c.score,
-                                    evidence: c.evidence,
+                                    evidence: c.evidence.map((item) => ({
+                                      ...item, label: evidenceDescription(item),
+                                    })),
                                     conflicts: c.conflicts,
                                   })),
                                 })
@@ -494,12 +637,12 @@ export default async function PlayerLinksPage(
                         </tr>
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
-            </CollapsibleTable>
-          </section>
-        ))
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
 
       {pager}

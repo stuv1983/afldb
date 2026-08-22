@@ -4,6 +4,7 @@ import postgres from 'postgres';
 
 import { authSql } from '@/db/authClient';
 import { sql } from '@/db/client';
+import type { SourceDetail } from '@/lib/player-matching/describe';
 import {
   assessOneSource,
   fetchSourceEvidence,
@@ -68,6 +69,13 @@ export type UnresolvedLinkRow = {
    */
   resolutionEntityType: string;
   resolutionEntityId: number;
+  /**
+   * The identifying fields of this record in ITS OWN terms, built per
+   * branch. A reviewer looking at three rows for one name has to be
+   * able to see that they are an award, a nomination and an honour
+   * team; a single flattened context string could not tell them.
+   */
+  sourceDetail: SourceDetail | null;
 };
 
 /**
@@ -90,7 +98,11 @@ export async function listUnresolvedLinks(
              concat_ws(' · ', a.name, w.season::text,
                        COALESCE(c.name, w.club_name_raw)) AS context,
              'award_winners' AS "resolutionEntityType",
-             w.id AS "resolutionEntityId"
+             w.id AS "resolutionEntityId",
+             jsonb_build_object(
+               'kind', 'award_winner', 'award', a.name, 'season', w.season,
+               'club', COALESCE(c.name, w.club_name_raw), 'position', w.position
+             ) AS "sourceDetail"
         FROM award_winners w
         JOIN awards a ON a.id = w.award_id
         LEFT JOIN clubs c ON c.id = w.club_id
@@ -101,7 +113,12 @@ export async function listUnresolvedLinks(
              concat_ws(' · ', a.name, n.season::text,
                        CASE WHEN n.round_number IS NOT NULL
                             THEN 'Round ' || n.round_number END),
-             'award_nominations', n.id
+             'award_nominations', n.id,
+             jsonb_build_object(
+               'kind', 'award_nomination', 'award', a.name, 'season', n.season,
+               'club', (SELECT cl.name FROM clubs cl WHERE cl.id = n.club_id),
+               'round', n.round_number
+             )
         FROM award_nominations n
         JOIN awards a ON a.id = n.award_id
        WHERE n.link_status_value::text = ANY(${statusValues})
@@ -112,7 +129,12 @@ export async function listUnresolvedLinks(
                        CASE WHEN h.inducted_year IS NOT NULL
                             THEN 'inducted ' || h.inducted_year END,
                        h.club_name_raw),
-             'hall_of_fame', h.id
+             'hall_of_fame', h.id,
+             jsonb_build_object(
+               'kind', 'hall_of_fame', 'category', h.category,
+               'inductedYear', h.inducted_year, 'playingCareer', h.playing_career,
+               'club', h.club_name_raw, 'isLegend', h.is_legend
+             )
         FROM hall_of_fame h
         LEFT JOIN aflw.players ap ON lower(trim(ap.display_name)) = lower(trim(h.name))
        WHERE h.link_status_value::text = ANY(${statusValues})
@@ -122,14 +144,21 @@ export async function listUnresolvedLinks(
       SELECT 'honour_team_members', m.id, m.player_name_raw,
              m.link_status_value::text,
              concat_ws(' · ', m.team_name, m.position, m.club_name_raw),
-             'honour_team_members', m.id
+             'honour_team_members', m.id,
+             jsonb_build_object(
+               'kind', 'honour_team', 'team', m.team_name, 'position', m.position,
+               'role', m.role, 'club', m.club_name_raw
+             )
         FROM honour_team_members m
        WHERE m.link_status_value::text = ANY(${statusValues})
       UNION ALL
       SELECT 'captaincies', cp.id, cp.player_name_raw,
              cp.link_status_value::text,
              concat_ws(' · ', c.name, cp.season::text, cp.role),
-             'captaincies', cp.id
+             'captaincies', cp.id,
+             jsonb_build_object(
+               'kind', 'captaincy', 'season', cp.season, 'club', c.name, 'role', cp.role
+             )
         FROM captaincies cp
         JOIN clubs c ON c.id = cp.club_id
        WHERE cp.link_status_value::text = ANY(${statusValues})
@@ -138,15 +167,30 @@ export async function listUnresolvedLinks(
              pa.link_status_value::text,
              concat_ws(' · ', replace(pa.achievement_type::text, '_', ' '),
                        pa.season::text),
-             'player_achievements', pa.id
+             'player_achievements', pa.id,
+             jsonb_build_object(
+               'kind', 'achievement', 'achievement', pa.achievement_type::text,
+               'season', pa.season, 'club', COALESCE(
+                 (SELECT cl2.name FROM clubs cl2 WHERE cl2.id = pa.club_id), pa.club_name_raw),
+               'round', pa.round_raw
+             )
         FROM player_achievements pa
        WHERE pa.link_status_value::text = ANY(${statusValues})
       UNION ALL
       SELECT 'draft_picks', dp.id, dp.player_name_raw,
              dp.link_status_value::text,
              concat_ws(' · ', dp.draft_type, dp.draft_year::text),
-             'draft_person', dp.draft_person_id
+             'draft_person', dp.draft_person_id,
+             jsonb_build_object(
+               'kind', 'draft', 'draftYear', dp.draft_year,
+               'club', (SELECT cl3.name FROM clubs cl3 WHERE cl3.id = dp.club_id),
+               'draftType', dp.draft_type, 'pick', dp.pick_number,
+               'reportedGames', per.reported_games, 'reportedGoals', per.reported_goals,
+               'picks', (SELECT count(*) FROM draft_picks dp2
+                          WHERE dp2.draft_person_id = dp.draft_person_id)
+             )
         FROM draft_picks dp
+        LEFT JOIN draft_persons per ON per.id = dp.draft_person_id
        WHERE dp.link_status_value::text = ANY(${statusValues})
     ) q
     WHERE ${table ? sql`q."targetTable" = ${table}` : sql`TRUE`}

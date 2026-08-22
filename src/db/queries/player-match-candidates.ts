@@ -681,3 +681,70 @@ export async function refreshMatchCandidates(
     algorithmVersion: ALGORITHM_VERSION,
   };
 }
+
+export type PlayerSummary = {
+  playerId: number;
+  displayName: string;
+  slug: string;
+  debutSeason: number | null;
+  finalSeason: number | null;
+  games: number | null;
+  goals: number | null;
+  /** Biggest clubs first, so the line reads as the career reads. */
+  clubs: string[];
+};
+
+/**
+ * Career context for the players being suggested on one page.
+ *
+ * A reviewer cannot judge "Gary ODonnell" without knowing he played 243
+ * games for Essendon between 1987 and 1998. Fetched set-wise for the
+ * whole page in one query: the queue is deliberately free of per-row
+ * lookups, and a summary per visible row would reintroduce exactly that.
+ */
+export async function readPlayerSummaries(
+  sql: Sql,
+  playerIds: readonly number[],
+): Promise<Map<number, PlayerSummary>> {
+  const summaries = new Map<number, PlayerSummary>();
+  if (playerIds.length === 0) return summaries;
+
+  const rows = await sql<PlayerSummary[]>`
+    SELECT p.id AS "playerId", p.display_name AS "displayName", p.slug,
+           p.debut_season::int AS "debutSeason", p.final_season::int AS "finalSeason",
+           pcs.games::int AS games, pcs.goals::int AS goals,
+           COALESCE((
+             SELECT array_agg(c.name ORDER BY pc.games DESC NULLS LAST, c.name)
+               FROM player_clubs pc
+               JOIN clubs c ON c.id = pc.club_id
+              WHERE pc.player_id = p.id
+           ), ARRAY[]::text[]) AS clubs
+      FROM players p
+      LEFT JOIN player_career_stats pcs ON pcs.player_id = p.id
+     WHERE p.id = ANY(${[...playerIds]})
+  `;
+  for (const row of rows) {
+    summaries.set(Number(row.playerId), {
+      ...row,
+      playerId: Number(row.playerId),
+      debutSeason: row.debutSeason === null ? null : Number(row.debutSeason),
+      finalSeason: row.finalSeason === null ? null : Number(row.finalSeason),
+      games: row.games === null ? null : Number(row.games),
+      goals: row.goals === null ? null : Number(row.goals),
+      clubs: row.clubs ?? [],
+    });
+  }
+  return summaries;
+}
+
+/** "Essendon · 1987-1998 · 243 games · 46 goals" */
+export function formatPlayerSummary(summary: PlayerSummary | undefined): string {
+  if (!summary) return '';
+  const clubs = summary.clubs.slice(0, 2).join(', ');
+  const span = summary.debutSeason !== null && summary.finalSeason !== null
+    ? `${summary.debutSeason}-${summary.finalSeason}`
+    : '';
+  const games = summary.games !== null ? `${summary.games} games` : '';
+  const goals = summary.goals !== null && summary.goals > 0 ? `${summary.goals} goals` : '';
+  return [clubs, span, games, goals].filter(Boolean).join(' · ');
+}

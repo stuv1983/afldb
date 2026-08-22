@@ -3,7 +3,11 @@
 import { useEffect, useState } from 'react';
 
 import { BulkApproveControls } from '@/app/admin/player-links/BulkApproveControls';
-import { ResolveControls, type SuggestedMatch } from '@/app/admin/player-links/ResolveControls';
+import {
+  ResolveControls,
+  type SourceRecordView,
+  type SuggestedMatch,
+} from '@/app/admin/player-links/ResolveControls';
 
 type OpenRow = {
   targets: { table: string; id: number; linkStatus?: string }[];
@@ -13,6 +17,8 @@ type OpenRow = {
   suggestions: { id: number; suggestedName: string; note: string | null }[];
   /** The cached suggestion for this row, when the model produced one. */
   match: SuggestedMatch | null;
+  /** What KIND of record this is, in its own terms. */
+  sourceRecord: SourceRecordView | null;
 };
 
 type SelectedTarget = {
@@ -42,6 +48,10 @@ export function ResolvePanel() {
         try {
           match = d.match ? JSON.parse(d.match) as SuggestedMatch : null;
         } catch { /* same rule: a broken payload must not block manual resolution */ }
+        let sourceRecord: SourceRecordView | null = null;
+        try {
+          sourceRecord = d.sourceRecord ? JSON.parse(d.sourceRecord) as SourceRecordView : null;
+        } catch { /* likewise */ }
         setRow({
           targets: [{ table: d.targetTable ?? '', id: Number(d.targetId), linkStatus: d.linkStatus ?? '' }],
           playerName: d.playerName ?? '',
@@ -49,6 +59,7 @@ export function ResolvePanel() {
           linkStatus: d.linkStatus ?? '',
           suggestions,
           match,
+          sourceRecord,
         });
         return;
       }
@@ -135,6 +146,7 @@ export function ResolvePanel() {
       // A bulk resolve links one chosen player to many rows, which is a
       // different act from approving each row's own suggestion.
       match: null,
+      sourceRecord: null,
     });
   };
 
@@ -197,6 +209,7 @@ export function ResolvePanel() {
               linkStatus={row.linkStatus}
               suggestions={row.suggestions}
               match={row.match}
+              sourceRecord={row.sourceRecord}
             />
           </div>
         </div>

@@ -14,25 +14,37 @@ import { PlayerPicker } from '@/components/PlayerPicker';
 
 const INITIAL: PlayerLinkActionState = {};
 
-type EvidenceItem = { family: string; signal: string; detail: string; points: number };
-type ConflictItem = { reason: string; detail: string };
+type EvidenceItem = {
+  family: string; signal: string; detail: string; points: number;
+  /** Reviewer-facing wording, produced server-side from the same signal. */
+  label?: string;
+};
+type ConflictItem = { reason: string; detail: string; label?: string };
+
+/** What kind of source record this is, and how to identify it. */
+export type SourceRecordView = { typeLabel: string; lines: string[] };
 
 export type SuggestedMatch = {
   playerId: number;
   playerName: string;
   playerSlug: string;
+  /** "Essendon · 1987-1998 · 243 games · 46 goals" */
+  playerSummary: string;
   score: number;
   band: string;
   gap: number | null;
   ambiguous: boolean;
   hardConflict: boolean;
   bulkEligible: boolean;
+  /** Why unattended approval is allowed, in four plain statements. */
+  bulkCriteria: string[];
   evidence: EvidenceItem[];
   conflicts: ConflictItem[];
   algorithmVersion: string;
   alternatives: {
     playerId: number;
     playerName: string;
+    playerSummary: string;
     score: number;
     evidence: EvidenceItem[];
     conflicts: ConflictItem[];
@@ -55,20 +67,41 @@ const BAND_LABELS: Record<string, string> = {
  * is listed. A bare percentage would be asking for trust rather than
  * offering evidence.
  */
-function EvidenceTable({ evidence, conflicts }: { evidence: EvidenceItem[]; conflicts: ConflictItem[] }) {
+function EvidenceTable({
+  evidence, conflicts, total,
+}: {
+  evidence: EvidenceItem[];
+  conflicts: ConflictItem[];
+  total?: number;
+}) {
   return (
     <div style={{ fontSize: '0.8rem' }}>
       {evidence.map((item) => (
         <div key={item.signal} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
-          <span>{item.detail}</span>
+          <span>
+            {item.label ?? item.detail}
+            <span className="muted"> — {item.detail}</span>
+          </span>
           <span className="nowrap" style={{ fontVariantNumeric: 'tabular-nums' }}>+{item.points}</span>
         </div>
       ))}
+      {evidence.length === 0 && <div className="muted">No evidence scored.</div>}
       {conflicts.map((conflict) => (
         <div key={conflict.reason} className="badge badge-warn" style={{ marginTop: '0.35rem', display: 'block' }}>
-          {conflict.detail}
+          {conflict.label ?? conflict.detail}
+          <span className="muted"> — {conflict.detail}</span>
         </div>
       ))}
+      {total !== undefined && (
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', gap: '0.75rem',
+          borderTop: '1px solid var(--border-subtle)', marginTop: '0.35rem', paddingTop: '0.25rem',
+          fontWeight: 600,
+        }}>
+          <span>Total</span>
+          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{total}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -89,6 +122,7 @@ export function ResolveControls({
   linkStatus,
   suggestions,
   match,
+  sourceRecord,
 }: {
   targets: { table: string; id: number; linkStatus?: string }[];
   playerName?: string;
@@ -96,6 +130,7 @@ export function ResolveControls({
   linkStatus: string;
   suggestions: { id: number; suggestedName: string; note: string | null }[];
   match?: SuggestedMatch | null;
+  sourceRecord?: SourceRecordView | null;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<'link' | 'create' | 'unlinked'>('link');
@@ -151,6 +186,20 @@ export function ResolveControls({
         </div>
       )}
 
+      {/* What this record actually is, in its own terms. */}
+      {sourceRecord && (
+        <div>
+          <div className="muted" style={{ fontSize: '0.72rem', letterSpacing: '0.06em' }}>
+            SOURCE RECORD
+          </div>
+          <strong>{playerName}</strong>
+          <div><span className="badge">{sourceRecord.typeLabel}</span></div>
+          {sourceRecord.lines.map((line) => (
+            <div key={line} className="muted" style={{ fontSize: '0.85rem' }}>{line}</div>
+          ))}
+        </div>
+      )}
+
       {/* Suggested match, with the evidence behind its score. */}
       {match && (
         <div style={{
@@ -159,22 +208,51 @@ export function ResolveControls({
           background: 'var(--bg-subtle)',
           border: '1px solid var(--border-subtle)',
           display: 'grid',
-          gap: '0.5rem',
+          gap: '0.6rem',
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'baseline' }}>
-            <strong>{match.playerName}</strong>
-            <span className={match.hardConflict ? 'badge badge-warn' : 'badge'}>
-              {BAND_LABELS[match.band] ?? match.band} · {match.score}/100
-            </span>
+          <div>
+            <div className="muted" style={{ fontSize: '0.72rem', letterSpacing: '0.06em' }}>
+              SUGGESTED AFLDB PLAYER
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'baseline' }}>
+              <strong>{match.playerName}</strong>
+              <span className={match.hardConflict ? 'badge badge-warn' : 'badge'}>
+                {BAND_LABELS[match.band] ?? match.band} · {match.score}/100
+              </span>
+            </div>
+            {match.playerSummary && (
+              <div className="muted" style={{ fontSize: '0.85rem' }}>{match.playerSummary}</div>
+            )}
           </div>
 
-          <EvidenceTable evidence={match.evidence} conflicts={match.conflicts} />
+          <div>
+            <div className="muted" style={{ fontSize: '0.72rem', letterSpacing: '0.06em' }}>
+              MATCH EVIDENCE
+            </div>
+            <EvidenceTable
+              evidence={match.evidence}
+              conflicts={match.conflicts}
+              total={match.score}
+            />
+          </div>
 
           <div className="muted" style={{ fontSize: '0.78rem' }}>
-            Gap to next candidate: {match.gap === null ? 'no other candidate' : match.gap}
+            {match.gap === null
+              ? 'No credible alternative candidate.'
+              : `Next best candidate is ${match.gap} points behind.`}
             {' · '}algorithm {match.algorithmVersion}
-            {match.bulkEligible && ' · bulk-ready'}
           </div>
+
+          {match.bulkEligible && (
+            <div>
+              <div className="muted" style={{ fontSize: '0.72rem', letterSpacing: '0.06em' }}>
+                BULK-READY
+              </div>
+              {match.bulkCriteria.map((criterion) => (
+                <div key={criterion} style={{ fontSize: '0.8rem' }}>✓ {criterion}</div>
+              ))}
+            </div>
+          )}
 
           {match.hardConflict ? (
             <p className="badge badge-warn" style={{ margin: 0 }}>
@@ -183,8 +261,8 @@ export function ResolveControls({
             </p>
           ) : match.ambiguous ? (
             <p className="badge badge-warn" style={{ margin: 0 }}>
-              Needs review: another candidate scores almost as highly. Check the alternatives
-              before approving.
+              Needs review: another candidate scores almost as highly. Compare the
+              alternatives before approving.
             </p>
           ) : null}
 
@@ -211,16 +289,18 @@ export function ResolveControls({
           {match.alternatives.length > 0 && (
             <details>
               <summary style={{ fontSize: '0.85rem', cursor: 'pointer' }}>
-                {match.alternatives.length} alternative candidate
-                {match.alternatives.length === 1 ? '' : 's'}
+                ALTERNATIVES ({match.alternatives.length})
               </summary>
               <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.4rem' }}>
-                {match.alternatives.map((alt) => (
+                {match.alternatives.map((alt, index) => (
                   <div key={alt.playerId} style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '0.4rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
-                      <span>{alt.playerName}</span>
+                      <span>{index + 2}. {alt.playerName}</span>
                       <span className="muted" style={{ fontSize: '0.8rem' }}>{alt.score}/100</span>
                     </div>
+                    {alt.playerSummary && (
+                      <div className="muted" style={{ fontSize: '0.8rem' }}>{alt.playerSummary}</div>
+                    )}
                     <EvidenceTable evidence={alt.evidence} conflicts={alt.conflicts} />
                     {/* Choosing an alternative is a manual decision and is
                         recorded as one: it is not the model's suggestion. */}
