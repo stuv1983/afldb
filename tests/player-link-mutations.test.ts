@@ -691,3 +691,26 @@ describe('player-link action contracts', () => {
     expect(guards.length).toBe(exported.length);
   });
 });
+
+describe('suggestion cache jsonb contract', () => {
+  const candidates = readFileSync(
+    join(process.cwd(), 'src', 'db', 'queries', 'player-match-candidates.ts'),
+    'utf8',
+  );
+
+  it('writes evidence through the driver json wrapper, not JSON.stringify', () => {
+    // Handing postgres.js a STRING for a jsonb column stores the JSON of
+    // that string, so the value reads back as text and every consumer
+    // expecting an array throws. This reached the deployed page once.
+    expect(candidates).toContain('writeSql.json(candidate.evidence)');
+    expect(candidates).toContain('writeSql.json(candidate.conflicts)');
+    expect(candidates).not.toContain('JSON.stringify(candidate.evidence)');
+    expect(candidates).not.toContain('JSON.stringify(candidate.conflicts)');
+  });
+
+  it('reads those columns tolerantly, so a stale cache degrades instead of throwing', () => {
+    expect(candidates).toContain('function asArray');
+    expect(candidates).toContain('asArray<EvidenceItem>(row.evidence)');
+    expect(candidates).toContain('asArray<HardConflict>(row.conflicts)');
+  });
+});

@@ -520,6 +520,26 @@ export type CachedSuggestion = {
   computedAt: Date;
 };
 
+/**
+ * Read a jsonb column back as the array it should be.
+ *
+ * Tolerates a value that was double-encoded by an earlier write, so a
+ * cache written before that bug was fixed degrades to correct data
+ * rather than throwing on the page.
+ */
+function asArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (typeof value === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed as T[] : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 const CACHE_COLUMNS = `
   c.resolution_entity_type AS "resolutionEntityType",
   c.resolution_entity_id   AS "resolutionEntityId",
@@ -551,7 +571,11 @@ export async function readBestSuggestions(
   `;
   const byEntity = new Map<string, CachedSuggestion>();
   for (const row of rows) {
-    byEntity.set(`${row.resolutionEntityType}:${row.resolutionEntityId}`, row);
+    byEntity.set(`${row.resolutionEntityType}:${row.resolutionEntityId}`, {
+      ...row,
+      evidence: asArray<EvidenceItem>(row.evidence),
+      conflicts: asArray<HardConflict>(row.conflicts),
+    });
   }
   return byEntity;
 }
@@ -575,7 +599,11 @@ export async function readSuggestionsForEntities(
   for (const row of rows) {
     const key = `${row.resolutionEntityType}:${row.resolutionEntityId}`;
     const list = byEntity.get(key) ?? [];
-    list.push(row);
+    list.push({
+      ...row,
+      evidence: asArray<EvidenceItem>(row.evidence),
+      conflicts: asArray<HardConflict>(row.conflicts),
+    });
     byEntity.set(key, list);
   }
   return byEntity;
@@ -622,8 +650,10 @@ export async function refreshMatchCandidates(
     ambiguous: boolean;
     hard_conflict: boolean;
     bulk_eligible: boolean;
-    evidence: string;
-    conflicts: string;
+    // postgres.js's own JSON wrapper, so the driver encodes these as
+    // jsonb rather than as text containing JSON.
+    evidence: ReturnType<postgres.Sql['json']>;
+    conflicts: ReturnType<postgres.Sql['json']>;
     algorithm_version: string;
   };
 
@@ -657,8 +687,12 @@ export async function refreshMatchCandidates(
           ambiguous: index === 0 ? assessment.ambiguous : false,
           hard_conflict: candidate.hardConflict,
           bulk_eligible: index === 0 ? assessment.bulkEligible : false,
-          evidence: JSON.stringify(candidate.evidence),
-          conflicts: JSON.stringify(candidate.conflicts),
+          // sql.json, NOT JSON.stringify: handing postgres.js a string
+          // for a jsonb column stores the JSON *of that string*, so the
+          // value reads back as text and every consumer that expected an
+          // array breaks.
+          evidence: writeSql.json(candidate.evidence),
+          conflicts: writeSql.json(candidate.conflicts),
           algorithm_version: assessment.algorithmVersion,
         });
       });
