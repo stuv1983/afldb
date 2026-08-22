@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
+import { SortableTable } from '@/components/SortableTable';
 import { TableFilters } from '@/components/TableFilters';
 import { getClubOptions } from '@/db/queries/advanced-search';
 import { getSeasonLeagues, listSeasons } from '@/db/queries/seasons';
@@ -95,19 +96,28 @@ export default async function SeasonsPage({
           </div>
         ) : (
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Season</th>
-                  <th scope="col">League</th>
-                  <th scope="col">Premier</th>
-                  <th scope="col" className="num">Matches</th>
-                  <th scope="col" className="num">Clubs</th>
-                  <th scope="col">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {seasons.map((s) => (
+            <SortableTable
+              defaultSort="season"
+              defaultDir="desc"
+              columns={[
+                { key: 'season', label: 'Season', sortType: 'number' },
+                { key: 'league', label: 'League', sortType: 'text' },
+                { key: 'premier', label: 'Premier', sortType: 'text' },
+                { key: 'matches', label: 'Matches', sortType: 'number', className: 'num' },
+                { key: 'clubs', label: 'Clubs', sortType: 'number', className: 'num' },
+                { key: 'status', label: 'Status', sortType: 'text' },
+              ]}
+              items={seasons.map((s) => ({
+                id: s.year,
+                values: {
+                  season: s.year,
+                  league: s.league,
+                  premier: s.premierName ?? '',
+                  matches: s.matchCount,
+                  clubs: s.clubCount,
+                  status: s.isComplete ? 'Complete' : 'In progress',
+                },
+                element: (
                   <tr key={s.year}>
                     <td><Link href={seasonPath(s.year)}>{s.year}</Link></td>
                     <td>{s.league}</td>
@@ -126,9 +136,9 @@ export default async function SeasonsPage({
                         : <span className="badge badge-warn">In progress</span>}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ),
+              }))}
+            />
           </div>
         )}
       </CollapsibleTable>

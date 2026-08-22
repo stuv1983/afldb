@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { SortableTable } from '@/components/SortableTable';
 import {
   getNlFailureBreakdown,
   getNlLogOverview,
@@ -256,16 +257,22 @@ export default async function NlSearchAdminPage({
                 <p className="muted">No unrecognised terms in this period.</p>
               ) : (
                 <div className="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th scope="col">Term</th>
-                        <th scope="col" className="num">Searches</th>
-                        <th scope="col">Most recent example</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {terms.map((t) => (
+                  <SortableTable
+                    defaultSort="searches"
+                    defaultDir="desc"
+                    columns={[
+                      { key: 'term', label: 'Term', sortType: 'text' },
+                      { key: 'searches', label: 'Searches', sortType: 'number', className: 'num' },
+                      { key: 'example', label: 'Most recent example', sortType: 'text' },
+                    ]}
+                    items={terms.map((t) => ({
+                      id: t.term,
+                      values: {
+                        term: t.term,
+                        searches: t.count,
+                        example: t.example,
+                      },
+                      element: (
                         <tr key={t.term}>
                           <td className="wide"><code>{t.term}</code></td>
                           <td className="num">{formatNumber(t.count)}</td>
@@ -273,9 +280,9 @@ export default async function NlSearchAdminPage({
                             <Link href={`/admin/nl-search/${t.exampleId}`}>{t.example}</Link>
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      ),
+                    }))}
+                  />
                 </div>
               )}
             </CollapsibleTable>
@@ -291,22 +298,27 @@ export default async function NlSearchAdminPage({
                 <p className="muted">Nobody asked for an unsupported topic in this period.</p>
               ) : (
                 <div className="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th scope="col">Topic</th>
-                        <th scope="col" className="num">Requests</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {topics.map((t) => (
+                  <SortableTable
+                    defaultSort="requests"
+                    defaultDir="desc"
+                    columns={[
+                      { key: 'topic', label: 'Topic', sortType: 'text' },
+                      { key: 'requests', label: 'Requests', sortType: 'number', className: 'num' },
+                    ]}
+                    items={topics.map((t) => ({
+                      id: t.topic,
+                      values: {
+                        topic: t.topic,
+                        requests: t.count,
+                      },
+                      element: (
                         <tr key={t.topic}>
                           <td className="wide">{t.topic}</td>
                           <td className="num">{formatNumber(t.count)}</td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      ),
+                    }))}
+                  />
                 </div>
               )}
             </CollapsibleTable>
@@ -324,34 +336,45 @@ export default async function NlSearchAdminPage({
               <p className="muted">Nothing matching in this period.</p>
             ) : (
               <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th scope="col">When</th>
-                      <th scope="col">Question</th>
-                      <th scope="col">Reason</th>
-                      <th scope="col" className="num">Confidence</th>
-                      <th scope="col">Review</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {problems.map((p) => (
-                      <tr key={p.id}>
-                        <td className="nowrap muted">{timestamp(p.at)}</td>
-                        <td className="wide">
-                          <Link href={`/admin/nl-search/${p.id}`}>{p.question}</Link>
-                        </td>
-                        <td className="nowrap">
-                          {p.failureReason
-                            ? NL_FAILURE_REASON_LABEL[p.failureReason] ?? p.failureReason
-                            : NL_OUTCOME_LABEL[p.outcome] ?? p.outcome}
-                        </td>
-                        <td className="num">{confidence(p.confidence)}</td>
-                        <td className="nowrap">{reviewBadge(p.reviewStatus)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <SortableTable
+                  defaultSort="when"
+                  defaultDir="desc"
+                  columns={[
+                    { key: 'when', label: 'When', sortType: 'text', className: 'nowrap' },
+                    { key: 'question', label: 'Question', sortType: 'text' },
+                    { key: 'reason', label: 'Reason', sortType: 'text', className: 'nowrap' },
+                    { key: 'confidence', label: 'Confidence', sortType: 'number', className: 'num' },
+                    { key: 'review', label: 'Review', sortType: 'text', className: 'nowrap' },
+                  ]}
+                  items={problems.map((p) => {
+                    const reason = p.failureReason
+                      ? NL_FAILURE_REASON_LABEL[p.failureReason] ?? p.failureReason
+                      : NL_OUTCOME_LABEL[p.outcome] ?? p.outcome;
+                    return {
+                      id: String(p.id),
+                      values: {
+                        when: timestamp(p.at),
+                        question: p.question,
+                        reason: reason,
+                        confidence: p.confidence ?? -1,
+                        review: p.reviewStatus ?? 'unreviewed', // text sort for badge
+                      },
+                      element: (
+                        <tr key={p.id}>
+                          <td className="nowrap muted">{timestamp(p.at)}</td>
+                          <td className="wide">
+                            <Link href={`/admin/nl-search/${p.id}`}>{p.question}</Link>
+                          </td>
+                          <td className="nowrap">
+                            {reason}
+                          </td>
+                          <td className="num">{confidence(p.confidence)}</td>
+                          <td className="nowrap">{reviewBadge(p.reviewStatus)}</td>
+                        </tr>
+                      ),
+                    };
+                  })}
+                />
               </div>
             )}
           </section>
@@ -373,17 +396,24 @@ export default async function NlSearchAdminPage({
                 <p className="muted">No reformulation chains in this period.</p>
               ) : (
                 <div className="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th scope="col">First asked</th>
-                        <th scope="col">Then asked</th>
-                        <th scope="col" className="num">Apart</th>
-                        <th scope="col">First outcome</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {reformulations.map((r) => (
+                  <SortableTable
+                    defaultSort="apart"
+                    defaultDir="asc"
+                    columns={[
+                      { key: 'first', label: 'First asked', sortType: 'text' },
+                      { key: 'then', label: 'Then asked', sortType: 'text' },
+                      { key: 'apart', label: 'Apart', sortType: 'number', className: 'num nowrap' },
+                      { key: 'outcome', label: 'First outcome', sortType: 'text', className: 'nowrap' },
+                    ]}
+                    items={reformulations.map((r) => ({
+                      id: String(r.id),
+                      values: {
+                        first: r.parentQuestion,
+                        then: r.question,
+                        apart: r.secondsApart,
+                        outcome: NL_OUTCOME_LABEL[r.parentOutcome] ?? r.parentOutcome,
+                      },
+                      element: (
                         <tr key={r.id}>
                           <td className="wide">
                             <Link href={`/admin/nl-search/${r.parentId}`}>{r.parentQuestion}</Link>
@@ -398,9 +428,9 @@ export default async function NlSearchAdminPage({
                               : <span className="muted">{NL_OUTCOME_LABEL[r.parentOutcome] ?? r.parentOutcome}</span>}
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      ),
+                    }))}
+                  />
                 </div>
               )}
             </CollapsibleTable>
@@ -422,18 +452,26 @@ export default async function NlSearchAdminPage({
                 <p className="muted">No plans executed in this period.</p>
               ) : (
                 <div className="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th scope="col">Example question</th>
-                        <th scope="col">Grain</th>
-                        <th scope="col">Metric</th>
-                        <th scope="col" className="num">Searches</th>
-                        <th scope="col" className="num">Distinct phrasings</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {plans.map((p) => (
+                  <SortableTable
+                    defaultSort="searches"
+                    defaultDir="desc"
+                    columns={[
+                      { key: 'question', label: 'Example question', sortType: 'text' },
+                      { key: 'grain', label: 'Grain', sortType: 'text', className: 'nowrap' },
+                      { key: 'metric', label: 'Metric', sortType: 'text', className: 'nowrap' },
+                      { key: 'searches', label: 'Searches', sortType: 'number', className: 'num' },
+                      { key: 'phrasings', label: 'Distinct phrasings', sortType: 'number', className: 'num' },
+                    ]}
+                    items={plans.map((p) => ({
+                      id: p.planHash,
+                      values: {
+                        question: p.example,
+                        grain: p.grain ?? '',
+                        metric: p.metric ?? '',
+                        searches: p.searches,
+                        phrasings: p.distinctQuestions,
+                      },
+                      element: (
                         <tr key={p.planHash}>
                           <td className="wide">
                             <Link href={`/admin/nl-search/${p.exampleId}`}>{p.example}</Link>
@@ -443,9 +481,9 @@ export default async function NlSearchAdminPage({
                           <td className="num">{formatNumber(p.searches)}</td>
                           <td className="num">{formatNumber(p.distinctQuestions)}</td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      ),
+                    }))}
+                  />
                 </div>
               )}
             </CollapsibleTable>

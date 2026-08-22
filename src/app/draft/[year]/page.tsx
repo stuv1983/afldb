@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
 import { Pagination } from '@/components/Pagination';
+import { RouteSortHeader } from '@/components/RouteSortHeader';
 import { TableFilters } from '@/components/TableFilters';
 import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import { getClubOptions } from '@/db/queries/advanced-search';
@@ -65,6 +66,8 @@ export default async function DraftYearPage({
     draftType: values.select.type,
     q: values.text.q,
     ranges: values,
+    sort: firstValue(sParams.sort),
+    dir: firstValue(sParams.dir),
     page,
     pageSize: DEFAULT_PAGE_SIZE,
   });
@@ -115,14 +118,15 @@ export default async function DraftYearPage({
                 </caption>
                 <thead>
                   <tr>
-                    <th scope="col" className="num">Year</th>
-                    <th scope="col" className="num">Pick</th>
-                    <th scope="col">Player</th>
-                    <th scope="col">Drafted to</th>
-                    <th scope="col">Drafted from</th>
-                    <th scope="col">Type</th>
-                    <th scope="col" className="num">Age</th>
-                    <th scope="col" className="num">Games</th>
+                    <RouteSortHeader sortKey="year" defaultSort="pick" defaultDir="asc" className="num">Year</RouteSortHeader>
+                    <RouteSortHeader sortKey="pick" defaultSort="pick" defaultDir="asc" className="num">Pick</RouteSortHeader>
+                    <RouteSortHeader sortKey="player" defaultSort="pick" defaultDir="asc" className="wide">Player</RouteSortHeader>
+                    <RouteSortHeader sortKey="club" defaultSort="pick" defaultDir="asc">Club</RouteSortHeader>
+                    <th scope="col">Status</th>
+                    <th scope="col" className="muted">Recruited from</th>
+                    <RouteSortHeader sortKey="games" defaultSort="pick" defaultDir="asc">Games</RouteSortHeader>
+                    <RouteSortHeader sortKey="goals" defaultSort="pick" defaultDir="asc" className="num">Goals</RouteSortHeader>
+                    <RouteSortHeader sortKey="draft_games" defaultSort="pick" defaultDir="asc" className="num">Draft Club Games</RouteSortHeader>
                   </tr>
                 </thead>
                 <tbody>

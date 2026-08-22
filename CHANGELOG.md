@@ -15,6 +15,16 @@ commit.
 
 ## [Unreleased]
 
+### Dynamic Column Sorting for Statistical Tables - 22 August 2026
+
+- Implemented standard dynamic column sorting across all primary application data tables (`AFLDB-ISSUE-XYZ`).
+- Created a `SortableTable` component for client-side sorting of bounded record sets, and a `RouteSortHeader` component for scalable server-side table sorting using URL search parameters (`?sort=...&dir=...`).
+- Audited the entire application routing tree to apply sorting strictly where semantically meaningful. 
+- Integrated numeric, text, and date sorting with stable, deterministic behaviour, ensuring unrecorded values (`NULL`) remain anchored to the bottom.
+- Applied client-side sorting to `/awards`, `/brownlow`, `/clubs`, `/hall-of-fame`, `/matches/[id]`, `/players/[slug]`, `/records`, and select admin dashboards (`/admin/access`, `/admin/admins`, `/admin/db-health`, `/admin/nl-search`).
+- Applied URL-driven server-side sorting to paginated/live datasets: `/draft/[year]`, `/players/[slug]/matches`, and draft listings in the data editor (`/admin/data-editor`).
+- Deliberately excluded structural/chronological layouts, such as Match Lineups, Search Results, Gridley, and specific workflow queues, preserving their innate semantic ordering.
+
 ### Required Mutation Audits Commit Atomically - 22 August 2026
 
 - Every required statistical-mutation audit now commits inside the same import-role transaction as the mutation it records, so a mutation can no longer exist without its audit row and an audit failure rolls the whole mutation back (`AFLDB-ISSUE-027`). Migration 066 grants `afldb_import` INSERT-only on `data_edits` and `player_link_resolutions` (plus sequence USAGE), mirrored in the privileges reconciler; both audit tables stay append-only and outside the full-DML import registry. A shared `recordDataEdit` helper replaces the eight post-commit `authSql` audit writes across the data editor, match sheet, match creation/deletion, awards/Hall of Fame/honour-team creation, and player creation; player-link resolutions likewise audit inside the link transaction.

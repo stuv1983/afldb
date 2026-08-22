@@ -5,6 +5,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
 import { ReorderableSections } from '@/components/ReorderableSections';
+import { SortableTable } from '@/components/SortableTable';
 import { TableFilters } from '@/components/TableFilters';
 import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import { getHallOfFameCategories, listHallOfFame } from '@/db/queries/awards';
@@ -84,19 +85,26 @@ export default async function HallOfFamePage({
         </p>
         <CollapsibleTable title="Legends">
         <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col" className="num">Elevated</th>
-                <th scope="col">Club</th>
-                <th scope="col">Career</th>
-              </tr>
-            </thead>
-            <tbody>
-              {legends
-                .sort((a, b) => (a.legendYear ?? 0) - (b.legendYear ?? 0))
-                .map((i) => (
+          <SortableTable
+            defaultSort="elevated"
+            defaultDir="asc"
+            columns={[
+              { key: 'name', label: 'Name', sortType: 'text' },
+              { key: 'elevated', label: 'Elevated', sortType: 'number', className: 'num' },
+              { key: 'club', label: 'Club', sortType: 'text' },
+              { key: 'career', label: 'Career', sortType: 'text' },
+            ]}
+            items={legends
+              .sort((a, b) => (a.legendYear ?? 0) - (b.legendYear ?? 0))
+              .map((i) => ({
+                id: String(i.id),
+                values: {
+                  name: i.name,
+                  elevated: i.legendYear ?? i.inductedYear ?? 9999,
+                  club: i.clubNameRaw ?? '',
+                  career: i.playingCareer ?? '',
+                },
+                element: (
                   <tr key={i.id}>
                     <td className="wide">
                       {i.playerId && isLinked(i.linkStatus) ? (
@@ -115,9 +123,9 @@ export default async function HallOfFamePage({
                     </td>
                     <td className="nowrap muted">{i.playingCareer ?? '—'}</td>
                   </tr>
-                ))}
-            </tbody>
-          </table>
+                ),
+              }))}
+          />
         </div>
         </CollapsibleTable>
       </section>
@@ -131,20 +139,28 @@ export default async function HallOfFamePage({
       <section className="section">
         <CollapsibleTable title="All inductees">
         <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col" className="num">Inducted</th>
-                <th scope="col">Name</th>
-                <th scope="col">Category</th>
-                <th scope="col">Club</th>
-                <th scope="col">Career</th>
-              </tr>
-            </thead>
-            <tbody>
-              {byYear.map((i) => {
-                const nonPlayer = isNonPlayerHallOfFameCategory(i.category);
-                return (
+          <SortableTable
+            defaultSort="inducted"
+            defaultDir="asc"
+            columns={[
+              { key: 'inducted', label: 'Inducted', sortType: 'number', className: 'num' },
+              { key: 'name', label: 'Name', sortType: 'text' },
+              { key: 'category', label: 'Category', sortType: 'text' },
+              { key: 'club', label: 'Club', sortType: 'text' },
+              { key: 'career', label: 'Career', sortType: 'text' },
+            ]}
+            items={byYear.map((i) => {
+              const nonPlayer = isNonPlayerHallOfFameCategory(i.category);
+              return {
+                id: String(i.id),
+                values: {
+                  inducted: i.inductedYear ?? 9999,
+                  name: i.name,
+                  category: CATEGORY_LABELS[i.category ?? ''] ?? i.category ?? '',
+                  club: i.clubNameRaw ?? '',
+                  career: i.playingCareer ?? '',
+                },
+                element: (
                   <tr key={i.id}>
                     <td className="num">{i.inductedYear ?? '—'}</td>
                     <td className="wide">
@@ -178,10 +194,10 @@ export default async function HallOfFamePage({
                     </td>
                     <td className="nowrap muted">{i.playingCareer ?? '—'}</td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ),
+              };
+            })}
+          />
         </div>
         </CollapsibleTable>
       </section>

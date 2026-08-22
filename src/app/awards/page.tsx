@@ -8,6 +8,7 @@ import {
   getAwardWinners,
   type AwardWinnerRow,
 } from '@/db/queries/awards';
+import { SortableTable } from '@/components/SortableTable';
 import { awardPath, formatNumber, formatSpan, honourTeamPath, playerPath } from '@/lib/format';
 import { pageMetadata } from '@/lib/seo';
 import { honourTeamSlug } from '@/lib/slugs';
@@ -173,39 +174,51 @@ export default async function AwardsPage() {
             <div>
               <h3>Most Selections</h3>
               <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Player</th>
-                      <th>Selections</th>
-                      <th>Seasons</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {under22Leaders.slice(0, 20).map((l, i) => (
+                <SortableTable
+                  defaultSort="selections"
+                  defaultDir="desc"
+                  columns={[
+                    { key: 'player', label: 'Player', sortType: 'text' },
+                    { key: 'selections', label: 'Selections', sortType: 'number' },
+                    { key: 'seasons', label: 'Seasons', sortType: 'text' },
+                  ]}
+                  items={under22Leaders.slice(0, 20).map((l, i) => ({
+                    id: String(i),
+                    values: {
+                      player: l.displayName,
+                      selections: l.wins,
+                      seasons: l.seasons,
+                    },
+                    element: (
                       <tr key={i}>
                         <td className="wide">{l.slug && l.playerId ? <Link href={playerPath(l.slug, l.playerId)}>{l.displayName}</Link> : l.displayName}</td>
                         <td className="nowrap">{l.wins}</td>
                         <td className="wide muted">{l.seasons}</td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    ),
+                  }))}
+                />
               </div>
             </div>
             <div>
               <h3>All Selections (Latest First)</h3>
               <div className="table-wrap" style={{ maxHeight: '500px', overflowY: 'auto' }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Season</th>
-                      <th>Player</th>
-                      <th>Position</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {under22Winners.map((w, i) => (
+                <SortableTable
+                  defaultSort="season"
+                  defaultDir="desc"
+                  columns={[
+                    { key: 'season', label: 'Season', sortType: 'number' },
+                    { key: 'player', label: 'Player', sortType: 'text' },
+                    { key: 'position', label: 'Position', sortType: 'text' },
+                  ]}
+                  items={under22Winners.map((w, i) => ({
+                    id: String(i),
+                    values: {
+                      season: w.season,
+                      player: w.playerName,
+                      position: w.position,
+                    },
+                    element: (
                       <tr key={i}>
                         <td className="nowrap">{w.season}</td>
                         <td className="wide">
@@ -215,9 +228,9 @@ export default async function AwardsPage() {
                         </td>
                         <td className="nowrap">{w.position}</td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    ),
+                  }))}
+                />
               </div>
             </div>
           </div>

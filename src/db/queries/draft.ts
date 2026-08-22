@@ -38,6 +38,23 @@ export const DRAFT_FILTER_COLUMNS: Record<string, string> = {
   games: 'pcs.games',
 };
 
+export const DRAFT_SORTS: Record<string, string> = {
+  year: 'dp.draft_year',
+  pick: 'dp.pick_number',
+  player: 'COALESCE(p.sort_name, dp.player_name_raw)',
+  type: 'dp.draft_type',
+  age: 'dp.draft_age',
+  games: 'pcs.games',
+};
+
+export function isDraftSort(s: string | undefined): s is keyof typeof DRAFT_SORTS {
+  return s !== undefined && s in DRAFT_SORTS;
+}
+
+export function isDraftSortDir(d: string | undefined): d is 'asc' | 'desc' {
+  return d === 'asc' || d === 'desc';
+}
+
 export type DraftPickFilters = {
   year?: number;
   clubSlug?: string;
@@ -45,6 +62,8 @@ export type DraftPickFilters = {
   draftType?: string;
   q?: string;
   ranges?: FilterValues;
+  sort?: string;
+  dir?: string;
   page: number;
   pageSize: number;
 };
@@ -84,6 +103,13 @@ export async function listDraftPicks(
   const where = allOf(conditions);
   const offset = (filters.page - 1) * filters.pageSize;
 
+  let orderBy = sql`dp.draft_year DESC, dp.pick_number NULLS LAST`;
+  if (isDraftSort(filters.sort) && isDraftSortDir(filters.dir)) {
+    const sortCol = DRAFT_SORTS[filters.sort];
+    const sqlDir = filters.dir === 'asc' ? sql`ASC` : sql`DESC`;
+    orderBy = sql`${sql.unsafe(sortCol)} ${sqlDir} NULLS LAST, dp.draft_year DESC, dp.pick_number NULLS LAST`;
+  }
+
   const rows = await sql<(DraftPickRow & { total: string })[]>`
     SELECT dp.id, dp.draft_year AS "draftYear", dp.draft_type AS "draftType",
            dp.draft_kind AS "draftKind", dp.pick_number AS "pickNumber",
@@ -100,7 +126,7 @@ export async function listDraftPicks(
       LEFT JOIN player_career_stats pcs ON pcs.player_id = dp.player_id
       LEFT JOIN clubs c ON c.id = dp.club_id
      WHERE ${where}
-     ORDER BY dp.draft_year DESC, dp.pick_number NULLS LAST
+     ORDER BY ${orderBy}
      LIMIT ${filters.pageSize} OFFSET ${offset}
   `;
 

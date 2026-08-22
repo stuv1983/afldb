@@ -4,9 +4,10 @@ import Link from 'next/link';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
 import { Pagination } from '@/components/Pagination';
+import { SortableHeader } from '@/components/SortableHeader';
 import { TableFilters } from '@/components/TableFilters';
 import { getClubOptions } from '@/db/queries/advanced-search';
-import { isPlayerSort, listPlayers, type PlayerSort } from '@/db/queries/players';
+import { isPlayerSort, isPlayerSortDir, listPlayers, type PlayerSort, type PlayerSortDir } from '@/db/queries/players';
 import { getSeasonBounds } from '@/db/queries/seasons';
 import { formatNumber, playerPath } from '@/lib/format';
 import { redirectPastEnd } from '@/lib/pagination';
@@ -57,15 +58,6 @@ export async function generateMetadata({
   });
 }
 
-const SORT_OPTIONS: { value: PlayerSort; label: string }[] = [
-  { value: 'games', label: 'Games' },
-  { value: 'goals', label: 'Goals' },
-  { value: 'brownlow_votes', label: 'Brownlow' },
-  { value: 'finals', label: 'Finals' },
-  { value: 'premierships', label: 'Premierships' },
-  { value: 'debut', label: 'Debut' },
-  { value: 'name', label: 'Name' },
-];
 
 /**
  * Searches worth starting from, shown only on an unfiltered index.
@@ -107,6 +99,8 @@ export default async function PlayersPage({
   const page = parsePage(firstValue(params.page));
   const sortParam = firstValue(params.sort);
   const sort: PlayerSort = isPlayerSort(sortParam) ? sortParam : 'games';
+  const dirParam = firstValue(params.dir);
+  const dir: PlayerSortDir = isPlayerSortDir(dirParam) ? dirParam : (sort === 'name' ? 'asc' : 'desc');
 
   const [clubs, bounds] = await Promise.all([getClubOptions(), getSeasonBounds()]);
   const fields = playerFilterFields({
@@ -117,6 +111,7 @@ export default async function PlayersPage({
 
   const { rows, total } = await listPlayers({
     sort,
+    dir,
     limit: DEFAULT_PAGE_SIZE,
     offset: (page - 1) * DEFAULT_PAGE_SIZE,
     club: values.select.club,
@@ -125,7 +120,7 @@ export default async function PlayersPage({
     ranges: values,
   });
 
-  const linkParams = { ...filterQueryParams(fields, values), sort };
+  const linkParams = { ...filterQueryParams(fields, values), sort, dir };
 
   redirectPastEnd({
     basePath: '/players',
@@ -137,11 +132,12 @@ export default async function PlayersPage({
 
   const described = describeFilters(fields, values);
 
-  // Sort is a row of links rather than a control inside the panel: it is
-  // one click, it stays shareable, and it survives a filter submission
-  // through the hidden field below.
-  const sortHref = (key: PlayerSort) =>
-    `/players?${filterSearchParams(fields, values, { sort: key })}`;
+  const sortHref = (key: PlayerSort) => {
+    const newDir = sort === key
+      ? (dir === 'asc' ? 'desc' : 'asc')
+      : (key === 'name' ? 'asc' : 'desc');
+    return `/players?${filterSearchParams(fields, values, { sort: key, dir: newDir })}`;
+  };
 
   const filters = (
     <TableFilters
@@ -150,7 +146,7 @@ export default async function PlayersPage({
       fields={fields}
       values={values}
       groups={CAREER_GROUPS}
-      hidden={{ sort }}
+      hidden={{ sort, dir }}
     />
   );
 
@@ -171,20 +167,6 @@ export default async function PlayersPage({
 
       <FilterErrors errors={values.errors} />
 
-      <nav className="sort-nav" aria-label="Sort players">
-        <span className="sort-label">Sort by</span>
-        {SORT_OPTIONS.map((option) => (
-          <Link
-            key={option.value}
-            href={sortHref(option.value)}
-            className="sort-link"
-            aria-current={option.value === sort ? 'true' : undefined}
-          >
-            {option.label}
-          </Link>
-        ))}
-      </nav>
-
       <CollapsibleTable
         id="players"
         title="Players"
@@ -203,14 +185,55 @@ export default async function PlayersPage({
                 <caption>Career totals. Brownlow votes are season totals from 1924.</caption>
                 <thead>
                   <tr>
-                    <th scope="col">Player</th>
+                    <SortableHeader
+                      label="Player"
+                      active={sort === 'name'}
+                      direction={dir}
+                      href={sortHref('name')}
+                    />
                     <th scope="col">Clubs</th>
-                    <th scope="col" className="num">Span</th>
-                    <th scope="col" className="num">Games</th>
-                    <th scope="col" className="num">Goals</th>
-                    <th scope="col" className="num">Finals</th>
-                    <th scope="col" className="num">Prem</th>
-                    <th scope="col" className="num">Brownlow</th>
+                    <SortableHeader
+                      label="Span"
+                      className="num"
+                      active={sort === 'debut'}
+                      direction={dir}
+                      href={sortHref('debut')}
+                    />
+                    <SortableHeader
+                      label="Games"
+                      className="num"
+                      active={sort === 'games'}
+                      direction={dir}
+                      href={sortHref('games')}
+                    />
+                    <SortableHeader
+                      label="Goals"
+                      className="num"
+                      active={sort === 'goals'}
+                      direction={dir}
+                      href={sortHref('goals')}
+                    />
+                    <SortableHeader
+                      label="Finals"
+                      className="num"
+                      active={sort === 'finals'}
+                      direction={dir}
+                      href={sortHref('finals')}
+                    />
+                    <SortableHeader
+                      label="Prem"
+                      className="num"
+                      active={sort === 'premierships'}
+                      direction={dir}
+                      href={sortHref('premierships')}
+                    />
+                    <SortableHeader
+                      label="Brownlow"
+                      className="num"
+                      active={sort === 'brownlow_votes'}
+                      direction={dir}
+                      href={sortHref('brownlow_votes')}
+                    />
                   </tr>
                 </thead>
                 <tbody>

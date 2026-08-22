@@ -23,23 +23,27 @@ export type PlayerListRow = {
   clubNames: string | null;
 };
 
-export const PLAYER_SORTS = {
-  games: 'c.games DESC, p.sort_name',
-  goals: 'c.goals DESC, p.sort_name',
+export const PLAYER_SORTS: Record<string, string> = {
+  games: 'c.games',
+  goals: 'c.goals',
   name: 'p.sort_name',
-  debut: 'c.debut_season DESC NULLS LAST, p.sort_name',
-  final_game: 'c.final_season DESC NULLS LAST, p.sort_name',
-  brownlow_votes: 'c.brownlow_votes DESC, p.sort_name',
-  finals: 'c.finals DESC, p.sort_name',
-  // Ties on a small integer are the norm here, so games breaks them: four
-  // premierships in 120 games is the more remarkable career.
-  premierships: 'c.premierships DESC, c.games DESC, p.sort_name',
-} as const;
+  debut: 'c.debut_season',
+  final_game: 'c.final_season',
+  brownlow_votes: 'c.brownlow_votes',
+  finals: 'c.finals',
+  premierships: 'c.premierships',
+};
 
 export type PlayerSort = keyof typeof PLAYER_SORTS;
 
 export function isPlayerSort(value: string | undefined): value is PlayerSort {
   return value !== undefined && Object.hasOwn(PLAYER_SORTS, value);
+}
+
+export type PlayerSortDir = 'asc' | 'desc';
+
+export function isPlayerSortDir(value: string | undefined): value is PlayerSortDir {
+  return value === 'asc' || value === 'desc';
 }
 
 /**
@@ -79,12 +83,28 @@ export type PlayerListFilters = {
  */
 export async function listPlayers(options: PlayerListFilters & {
   sort: PlayerSort;
+  dir?: PlayerSortDir;
   limit: number;
   offset: number;
 }): Promise<{ rows: PlayerListRow[]; total: number }> {
-  const { sort, limit, offset, club, season, name, ranges } = options;
-  // Sort key is resolved through a fixed map; user input never reaches SQL.
-  const orderBy = PLAYER_SORTS[sort];
+  const { sort, dir = 'desc', limit, offset, club, season, name, ranges } = options;
+  
+  // Base column for the sort
+  const sortCol = PLAYER_SORTS[sort];
+  const sqlDir = dir === 'asc' ? sql`ASC` : sql`DESC`;
+  
+  // Custom orderBy construction to handle ties and specific requirements
+  let orderBy;
+  if (sort === 'name') {
+    orderBy = sql`${sql.unsafe(sortCol)} ${sqlDir}`;
+  } else if (sort === 'debut' || sort === 'final_game') {
+    const nulls = dir === 'asc' ? sql`NULLS LAST` : sql`NULLS LAST`;
+    orderBy = sql`${sql.unsafe(sortCol)} ${sqlDir} ${nulls}, p.sort_name ASC`;
+  } else if (sort === 'premierships') {
+    orderBy = sql`${sql.unsafe(sortCol)} ${sqlDir}, c.games ${sqlDir}, p.sort_name ASC`;
+  } else {
+    orderBy = sql`${sql.unsafe(sortCol)} ${sqlDir}, p.sort_name ASC`;
+  }
 
   const conditions = ranges ? rangeConditions(ranges, PLAYER_FILTER_COLUMNS) : [];
   if (name) conditions.push(sql`p.display_name ILIKE ${containsPattern(name)}`);
@@ -122,7 +142,7 @@ export async function listPlayers(options: PlayerListFilters & {
       FROM players p
       LEFT JOIN player_career_stats c ON c.player_id = p.id
      WHERE ${where}
-     ORDER BY ${sql.unsafe(orderBy)}
+     ORDER BY ${orderBy}
      LIMIT ${limit} OFFSET ${offset}
   `;
 
@@ -566,12 +586,44 @@ export type PlayerMatchRow = {
   careerGameNo: number | null;
 };
 
+export const PLAYER_MATCH_SORTS: Record<string, string> = {
+  no: 's.career_game_no',
+  date: 'm.match_date',
+  rd: 'm.round_number',
+  club: 'cl.name',
+  opponent: 'opp.name',
+  score: 'CASE WHEN m.home_club_id = s.club_id THEN m.home_score ELSE m.away_score END', // Usually score sorting is complex, wait, maybe just skip it if it's too complex or just sort by pointsFor
+  g: 's.goals',
+  b: 's.behinds',
+  k: 's.kicks',
+  hb: 's.handballs',
+  d: 's.disposals',
+  m: 's.marks',
+  t: 's.tackles',
+  ho: 's.hitouts',
+  bv: 's.brownlow_votes',
+};
+
+export function isPlayerMatchSort(s: string | undefined): s is keyof typeof PLAYER_MATCH_SORTS {
+  return s !== undefined && s in PLAYER_MATCH_SORTS;
+}
+export function isPlayerMatchSortDir(d: string | undefined): d is 'asc' | 'desc' {
+  return d === 'asc' || d === 'desc';
+}
+
 /** Paged match log. */
 export async function getPlayerMatches(
   playerId: number,
-  options: { limit: number; offset: number; season?: number },
+  options: { limit: number; offset: number; season?: number; sort?: string; dir?: string },
 ): Promise<{ rows: PlayerMatchRow[]; total: number }> {
-  const { limit, offset, season } = options;
+  const { limit, offset, season, sort, dir } = options;
+
+  let orderBy = sql`m.match_date DESC, m.id DESC`;
+  if (isPlayerMatchSort(sort) && isPlayerMatchSortDir(dir)) {
+    const sortCol = PLAYER_MATCH_SORTS[sort];
+    const sqlDir = dir === 'asc' ? sql`ASC` : sql`DESC`;
+    orderBy = sql`${sql.unsafe(sortCol)} ${sqlDir} NULLS LAST, m.match_date DESC, m.id DESC`;
+  }
   const rows = await sql<(PlayerMatchRow & { total: string })[]>`
     SELECT m.id AS "matchId", m.season, m.round_type AS "roundType",
            m.round_number AS "roundNumber", m.match_date AS "matchDate",
@@ -596,7 +648,7 @@ export async function getPlayerMatches(
       LEFT JOIN venues v ON v.id = m.venue_id
      WHERE s.player_id = ${playerId}
        AND (${season ?? null}::int IS NULL OR m.season = ${season ?? null})
-     ORDER BY m.match_date DESC, m.id DESC
+     ORDER BY ${orderBy}
      LIMIT ${limit} OFFSET ${offset}
   `;
   if (rows.length > 0) {

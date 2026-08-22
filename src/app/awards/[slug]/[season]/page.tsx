@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { ReorderableSections } from '@/components/ReorderableSections';
+import { SortableTable } from '@/components/SortableTable';
 import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import {
   getAward,
@@ -168,20 +169,33 @@ export default async function AwardSeasonPage({
           </p>
           <CollapsibleTable title="Round-by-round nominations">
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col" className="num">Rd</th>
-                  <th scope="col">Player</th>
-                  <th scope="col">Club</th>
-                  <th scope="col">Opponent</th>
-                  {shownStats.map((s) => (
-                    <th scope="col" className="num" key={s.key}>{s.label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {nominations.map((n) => (
+            <SortableTable
+              defaultSort="rd"
+              defaultDir="asc"
+              columns={[
+                { key: 'rd', label: 'Rd', sortType: 'number', className: 'num' },
+                { key: 'player', label: 'Player', sortType: 'text' },
+                { key: 'club', label: 'Club', sortType: 'text' },
+                { key: 'opponent', label: 'Opponent', sortType: 'text' },
+                ...shownStats.map((s) => ({
+                  key: s.key,
+                  label: s.label,
+                  sortType: 'number' as const,
+                  className: 'num',
+                })),
+              ]}
+              items={nominations.map((n) => ({
+                id: String(n.id),
+                values: {
+                  rd: n.roundNumber ?? 999,
+                  player: n.playerName,
+                  club: n.clubName ?? '',
+                  opponent: n.opponentName ?? '',
+                  ...Object.fromEntries(
+                    shownStats.map((s) => [s.key, n.statLine?.[s.key] ?? -1])
+                  ),
+                },
+                element: (
                   <tr key={n.id}>
                     <td className="num">{n.roundNumber ?? '—'}</td>
                     <td className="wide">
@@ -220,9 +234,9 @@ export default async function AwardSeasonPage({
                       </td>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ),
+              }))}
+            />
           </div>
           </CollapsibleTable>
         </section>

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { SortableTable } from '@/components/SortableTable';
 import { collectHealthReport } from '@/db/queries/db-health';
 import { formatDate, formatNumber, NOT_RECORDED } from '@/lib/format';
 import { requireSuperAdmin } from '@/lib/auth/session';
@@ -150,18 +151,26 @@ export default async function DatabaseHealthPage() {
       <section className="section">
         <CollapsibleTable title="Derived-data rebuild log" note={`${formatNumber(rebuilds.length)} recent`} defaultOpen={false}>
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Started</th>
-                  <th scope="col">Completed</th>
-                  <th scope="col">Target</th>
-                  <th scope="col">Status</th>
-                  <th scope="col" className="num">Rows</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rebuilds.map((r) => (
+            <SortableTable
+              defaultSort="started"
+              defaultDir="desc"
+              columns={[
+                { key: 'started', label: 'Started', sortType: 'text', className: 'nowrap' },
+                { key: 'completed', label: 'Completed', sortType: 'text', className: 'nowrap' },
+                { key: 'target', label: 'Target', sortType: 'text' },
+                { key: 'status', label: 'Status', sortType: 'text' },
+                { key: 'rows', label: 'Rows', sortType: 'number', className: 'num' },
+              ]}
+              items={rebuilds.map((r) => ({
+                id: String(r.id),
+                values: {
+                  started: timestamp(r.startedAt),
+                  completed: timestamp(r.completedAt),
+                  target: r.target,
+                  status: r.status,
+                  rows: r.rowCount ?? -1,
+                },
+                element: (
                   <tr key={r.id}>
                     <td className="nowrap muted">{timestamp(r.startedAt)}</td>
                     <td className="nowrap muted">{timestamp(r.completedAt)}</td>
@@ -173,9 +182,9 @@ export default async function DatabaseHealthPage() {
                     </td>
                     <td className="num">{r.rowCount === null ? NOT_RECORDED : formatNumber(r.rowCount)}</td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ),
+              }))}
+            />
           </div>
         </CollapsibleTable>
       </section>
@@ -223,24 +232,30 @@ export default async function DatabaseHealthPage() {
             not a zero the player recorded.
           </p>
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Statistic</th>
-                  <th scope="col">First recorded season</th>
-                  <th scope="col" className="num">Seasons recorded</th>
-                </tr>
-              </thead>
-              <tbody>
-                {statEras.map((s) => (
+            <SortableTable
+              defaultSort="first"
+              defaultDir="asc"
+              columns={[
+                { key: 'stat', label: 'Statistic', sortType: 'text' },
+                { key: 'first', label: 'First recorded season', sortType: 'number' },
+                { key: 'seasons', label: 'Seasons recorded', sortType: 'number', className: 'num' },
+              ]}
+              items={statEras.map((s) => ({
+                id: s.key,
+                values: {
+                  stat: s.label,
+                  first: s.firstRecordedSeason ?? 9999,
+                  seasons: s.seasonsRecorded,
+                },
+                element: (
                   <tr key={s.key}>
                     <td>{s.label}</td>
                     <td>{s.firstRecordedSeason ?? 'never'}</td>
                     <td className="num">{formatNumber(s.seasonsRecorded)}</td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ),
+              }))}
+            />
           </div>
         </CollapsibleTable>
       </section>
@@ -253,24 +268,30 @@ export default async function DatabaseHealthPage() {
             or unexpectedly huge, without scanning the whole database on every page load.
           </p>
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Table</th>
-                  <th scope="col" className="num">Rows (est.)</th>
-                  <th scope="col">Holds</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tables.map((t) => (
+            <SortableTable
+              defaultSort="table"
+              defaultDir="asc"
+              columns={[
+                { key: 'table', label: 'Table', sortType: 'text' },
+                { key: 'rows', label: 'Rows (est.)', sortType: 'number', className: 'num' },
+                { key: 'holds', label: 'Holds', sortType: 'text' },
+              ]}
+              items={tables.map((t) => ({
+                id: t.table,
+                values: {
+                  table: t.table,
+                  rows: t.estimatedRows,
+                  holds: t.purpose ?? '',
+                },
+                element: (
                   <tr key={t.table}>
                     <td className="wide">{t.table}</td>
                     <td className="num">{formatNumber(t.estimatedRows)}</td>
                     <td className="muted">{t.purpose ?? '—'}</td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ),
+              }))}
+            />
           </div>
         </CollapsibleTable>
       </section>

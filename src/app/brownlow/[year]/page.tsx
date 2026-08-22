@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { JsonLd } from '@/components/JsonLd';
+import { SortableTable } from '@/components/SortableTable';
 import { sql } from '@/db/client';
 import { formatNumber, playerPath, seasonPath } from '@/lib/format';
 import { parseSeason } from '@/lib/params';
@@ -126,19 +127,27 @@ export default async function BrownlowYearPage({
 
       <CollapsibleTable title="Full vote count">
       <div className="table-wrap">
-        <table>
-          <caption>{rows.length} players polled votes</caption>
-          <thead>
-            <tr>
-              <th scope="col" className="num">Rank</th>
-              <th scope="col">Player</th>
-              <th scope="col" className="num">Votes</th>
-              <th scope="col" className="num">Games</th>
-              <th scope="col" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
+        <SortableTable
+          defaultSort="rank"
+          defaultDir="asc"
+          caption={`${rows.length} players polled votes`}
+          columns={[
+            { key: 'rank', label: 'Rank', sortType: 'number', className: 'num' },
+            { key: 'player', label: 'Player', sortType: 'text' },
+            { key: 'votes', label: 'Votes', sortType: 'number', className: 'num' },
+            { key: 'games', label: 'Games', sortType: 'number', className: 'num' },
+            { key: 'status', label: '', sortType: 'text' },
+          ]}
+          items={rows.map((row) => ({
+            id: String(row.playerId),
+            values: {
+              rank: row.voteRank ?? 9999,
+              player: row.displayName,
+              votes: row.votes,
+              games: row.games ?? 0,
+              status: row.isWinner ? 'Winner' : row.isIneligible ? 'Ineligible' : '',
+            },
+            element: (
               <tr key={row.playerId}>
                 <td className="num">{row.voteRank ?? '—'}</td>
                 <td className="wide">
@@ -151,9 +160,9 @@ export default async function BrownlowYearPage({
                   {row.isIneligible && <span className="badge badge-warn">Ineligible</span>}
                 </td>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            ),
+          }))}
+        />
       </div>
       </CollapsibleTable>
     </>

@@ -5,6 +5,7 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { Pagination } from '@/components/Pagination';
+import { RouteSortHeader } from '@/components/RouteSortHeader';
 import { getPlayer, getPlayerMatches } from '@/db/queries/players';
 import {
   clubPath,
@@ -73,10 +74,15 @@ export default async function PlayerMatchesPage({
   const page = parsePage(firstValue(query.page));
   const seasonFilter = parseSeason(firstValue(query.season));
 
+  const sort = firstValue(query.sort);
+  const dir = firstValue(query.dir);
+
   const matches = await getPlayerMatches(player.id, {
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
     season: seasonFilter,
+    sort,
+    dir,
   });
 
   const profilePath = playerPath(player.slug, player.id);
@@ -110,22 +116,22 @@ export default async function PlayerMatchesPage({
               <caption>“—” means the statistic was not recorded in that era.</caption>
               <thead>
                 <tr>
-                  <th scope="col" className="num">#</th>
-                  <th scope="col">Date</th>
-                  <th scope="col">Rd</th>
-                  <th scope="col">Club</th>
-                  <th scope="col">Opponent</th>
+                  <RouteSortHeader sortKey="no" defaultSort="no" defaultDir="asc" className="num">#</RouteSortHeader>
+                  <RouteSortHeader sortKey="date" defaultSort="no" defaultDir="asc">Date</RouteSortHeader>
+                  <RouteSortHeader sortKey="rd" defaultSort="no" defaultDir="asc">Rd</RouteSortHeader>
+                  <RouteSortHeader sortKey="club" defaultSort="no" defaultDir="asc">Club</RouteSortHeader>
+                  <RouteSortHeader sortKey="opponent" defaultSort="no" defaultDir="asc">Opponent</RouteSortHeader>
                   <th scope="col">Res</th>
-                  <th scope="col" className="num">Score</th>
-                  <th scope="col" className="num">G</th>
-                  <th scope="col" className="num">B</th>
-                  <th scope="col" className="num">K</th>
-                  <th scope="col" className="num">HB</th>
-                  <th scope="col" className="num">D</th>
-                  <th scope="col" className="num">M</th>
-                  <th scope="col" className="num">T</th>
-                  <th scope="col" className="num">HO</th>
-                  <th scope="col" className="num">BV</th>
+                  <RouteSortHeader sortKey="score" defaultSort="no" defaultDir="asc" className="num">Score</RouteSortHeader>
+                  <RouteSortHeader sortKey="g" defaultSort="no" defaultDir="asc" className="num">G</RouteSortHeader>
+                  <RouteSortHeader sortKey="b" defaultSort="no" defaultDir="asc" className="num">B</RouteSortHeader>
+                  <RouteSortHeader sortKey="k" defaultSort="no" defaultDir="asc" className="num">K</RouteSortHeader>
+                  <RouteSortHeader sortKey="hb" defaultSort="no" defaultDir="asc" className="num">HB</RouteSortHeader>
+                  <RouteSortHeader sortKey="d" defaultSort="no" defaultDir="asc" className="num">D</RouteSortHeader>
+                  <RouteSortHeader sortKey="m" defaultSort="no" defaultDir="asc" className="num">M</RouteSortHeader>
+                  <RouteSortHeader sortKey="t" defaultSort="no" defaultDir="asc" className="num">T</RouteSortHeader>
+                  <RouteSortHeader sortKey="ho" defaultSort="no" defaultDir="asc" className="num">HO</RouteSortHeader>
+                  <RouteSortHeader sortKey="bv" defaultSort="no" defaultDir="asc" className="num">BV</RouteSortHeader>
                 </tr>
               </thead>
               <tbody>

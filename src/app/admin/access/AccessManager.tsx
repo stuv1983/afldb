@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { SortableTable } from '@/components/SortableTable';
 
 import {
   addAllowedEmail,
@@ -79,26 +80,31 @@ export function AccessManager({
         ) : (
           <CollapsibleTable title="Requests" note={`${requests.length} pending`}>
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Email</th>
-                  <th scope="col">Name</th>
-                  <th scope="col">What they said</th>
-                  <th scope="col">Requested</th>
-                  <th scope="col" />
-                </tr>
-              </thead>
-              <tbody>
-                {requests.map((request) => (
+          <div className="table-wrap">
+            <SortableTable
+              defaultSort="requested"
+              defaultDir="asc"
+              columns={[
+                { key: 'email', label: 'Email', sortType: 'text' },
+                { key: 'name', label: 'Name', sortType: 'text' },
+                { key: 'said', label: 'What they said', sortType: 'text' },
+                { key: 'requested', label: 'Requested', sortType: 'text', className: 'nowrap' },
+                { key: 'actions', label: '', sortType: 'none' },
+              ]}
+              items={requests.map((request) => ({
+                id: String(request.id),
+                values: {
+                  email: request.email,
+                  name: request.name ?? '',
+                  said: request.message ?? '',
+                  requested: request.requestedAt,
+                  actions: null,
+                },
+                element: (
                   <tr key={request.id}>
                     <td className="wide">{request.email}</td>
                     <td className="muted">{request.name ?? ''}</td>
                     <td className="wide muted">
-                      {/* A request carries either the old gate form's single
-                          message or the configured questions' answers, never
-                          both — but both are rendered so neither form's
-                          history becomes unreadable. */}
                       {request.message && <p style={{ margin: 0 }}>{request.message}</p>}
                       {request.answers.map((answer) => (
                         <p key={answer.label} style={{ margin: '0 0 0.35rem' }}>
@@ -129,9 +135,10 @@ export function AccessManager({
                       </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ),
+              }))}
+            />
+          </div>
           </div>
           </CollapsibleTable>
         )}
@@ -186,48 +193,56 @@ export function AccessManager({
 
         <CollapsibleTable title="Existing codes">
         <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Label</th>
-                <th scope="col" className="num">Used</th>
-                <th scope="col">Expires</th>
-                <th scope="col">State</th>
-                <th scope="col" />
-              </tr>
-            </thead>
-            <tbody>
-              {codes.map((code) => {
-                // A null maxUses is unlimited (migration 036) and can never be
-                // spent — only revoked or expired.
+          <div className="table-wrap">
+            <SortableTable
+              defaultSort="expires"
+              defaultDir="desc"
+              columns={[
+                { key: 'label', label: 'Label', sortType: 'text' },
+                { key: 'used', label: 'Used', sortType: 'number', className: 'num' },
+                { key: 'expires', label: 'Expires', sortType: 'text', className: 'nowrap' },
+                { key: 'state', label: 'State', sortType: 'text' },
+                { key: 'actions', label: '', sortType: 'none' },
+              ]}
+              items={codes.map((code) => {
                 const spent = code.maxUses !== null && code.useCount >= code.maxUses;
                 const expired = code.expiresAt !== null && code.expiresAt < new Date().toISOString();
                 const state = code.revokedAt ? 'revoked' : spent ? 'spent' : expired ? 'expired' : 'live';
-                return (
-                  <tr key={code.id}>
-                    <td className="wide">{code.label}</td>
-                    <td className="num">
-                      {code.useCount}/{code.maxUses ?? '∞'}
-                    </td>
-                    <td className="nowrap muted">{code.expiresAt?.slice(0, 10) ?? 'never'}</td>
-                    <td>
-                      <span className={state === 'live' ? 'badge' : 'badge badge-warn'}>
-                        {state}
-                      </span>
-                    </td>
-                    <td>
-                      {state === 'live' && (
-                        <form action={revokeCodeAction}>
-                          <input type="hidden" name="id" value={code.id} />
-                          <button className="btn btn-secondary" type="submit">Revoke</button>
-                        </form>
-                      )}
-                    </td>
-                  </tr>
-                );
+                return {
+                  id: String(code.id),
+                  values: {
+                    label: code.label,
+                    used: code.useCount,
+                    expires: code.expiresAt ?? 'z',
+                    state: state,
+                    actions: null,
+                  },
+                  element: (
+                    <tr key={code.id}>
+                      <td className="wide">{code.label}</td>
+                      <td className="num">
+                        {code.useCount}/{code.maxUses ?? '∞'}
+                      </td>
+                      <td className="nowrap muted">{code.expiresAt?.slice(0, 10) ?? 'never'}</td>
+                      <td>
+                        <span className={state === 'live' ? 'badge' : 'badge badge-warn'}>
+                          {state}
+                        </span>
+                      </td>
+                      <td>
+                        {state === 'live' && (
+                          <form action={revokeCodeAction}>
+                            <input type="hidden" name="id" value={code.id} />
+                            <button className="btn btn-secondary" type="submit">Revoke</button>
+                          </form>
+                        )}
+                      </td>
+                    </tr>
+                  ),
+                };
               })}
-            </tbody>
-          </table>
+            />
+          </div>
         </div>
         </CollapsibleTable>
       </section>
@@ -262,37 +277,46 @@ export function AccessManager({
 
         <CollapsibleTable title="Allowed addresses">
         <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Email</th>
-                <th scope="col">Note</th>
-                <th scope="col">State</th>
-                <th scope="col" />
-              </tr>
-            </thead>
-            <tbody>
-              {emails.map((entry) => (
-                <tr key={entry.id}>
-                  <td className="wide">{entry.email}</td>
-                  <td className="muted">{entry.note ?? ''}</td>
-                  <td>
-                    <span className={entry.revokedAt ? 'badge badge-warn' : 'badge'}>
-                      {entry.revokedAt ? 'revoked' : 'allowed'}
-                    </span>
-                  </td>
-                  <td>
-                    {!entry.revokedAt && (
-                      <form action={revokeEmailAction}>
-                        <input type="hidden" name="id" value={entry.id} />
-                        <button className="btn btn-secondary" type="submit">Revoke</button>
-                      </form>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-wrap">
+            <SortableTable
+              defaultSort="email"
+              defaultDir="asc"
+              columns={[
+                { key: 'email', label: 'Email', sortType: 'text' },
+                { key: 'note', label: 'Note', sortType: 'text' },
+                { key: 'state', label: 'State', sortType: 'text' },
+                { key: 'actions', label: '', sortType: 'none' },
+              ]}
+              items={emails.map((entry) => ({
+                id: String(entry.id),
+                values: {
+                  email: entry.email,
+                  note: entry.note ?? '',
+                  state: entry.revokedAt ? 'revoked' : 'allowed',
+                  actions: null,
+                },
+                element: (
+                  <tr key={entry.id}>
+                    <td className="wide">{entry.email}</td>
+                    <td className="muted">{entry.note ?? ''}</td>
+                    <td>
+                      <span className={entry.revokedAt ? 'badge badge-warn' : 'badge'}>
+                        {entry.revokedAt ? 'revoked' : 'allowed'}
+                      </span>
+                    </td>
+                    <td>
+                      {!entry.revokedAt && (
+                        <form action={revokeEmailAction}>
+                          <input type="hidden" name="id" value={entry.id} />
+                          <button className="btn btn-secondary" type="submit">Revoke</button>
+                        </form>
+                      )}
+                    </td>
+                  </tr>
+                ),
+              }))}
+            />
+          </div>
         </div>
         </CollapsibleTable>
       </section>

@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { SortableTable } from '@/components/SortableTable';
 
 import { createInvite, revokeInvite, type InviteState } from '@/app/admin/admins/invite-actions';
 
@@ -82,55 +83,64 @@ export function InviteManager({
         <p className="muted">No invites yet.</p>
       ) : (
         <CollapsibleTable title="Invites">
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Email</th>
-                <th scope="col">Role</th>
-                <th scope="col">Invited by</th>
-                <th scope="col">Expires</th>
-                <th scope="col">State</th>
-                <th scope="col" />
-              </tr>
-            </thead>
-            <tbody>
-              {invites.map((invite) => {
+          <div className="table-wrap">
+            <SortableTable
+              defaultSort="expires"
+              defaultDir="desc"
+              columns={[
+                { key: 'email', label: 'Email', sortType: 'text' },
+                { key: 'role', label: 'Role', sortType: 'text' },
+                { key: 'invitedBy', label: 'Invited by', sortType: 'text' },
+                { key: 'expires', label: 'Expires', sortType: 'text', className: 'nowrap' },
+                { key: 'state', label: 'State', sortType: 'text' },
+                { key: 'actions', label: '', sortType: 'none' },
+              ]}
+              items={invites.map((invite) => {
                 const expired = !invite.usedAt && !invite.revokedAt
                   && invite.expiresAt < new Date().toISOString();
                 const state = invite.usedAt ? 'accepted'
                   : invite.revokedAt ? 'revoked'
                   : expired ? 'expired' : 'pending';
-                return (
-                  <tr key={invite.id}>
-                    <td className="wide">{invite.email}</td>
-                    <td>
-                      {invite.role === 'super_admin' ? 'Super admin'
-                        : invite.role === 'contributor' ? 'Contributor'
-                        : 'Admin'}
-                      {invite.canManageAdmins && invite.role === 'admin' ? ' (+ manage admins)' : ''}
-                    </td>
-                    <td className="muted">{invite.invitedByEmail}</td>
-                    <td className="nowrap muted">{invite.expiresAt.slice(0, 10)}</td>
-                    <td>
-                      <span className={state === 'pending' ? 'badge' : 'badge badge-warn'}>
-                        {state}
-                      </span>
-                    </td>
-                    <td>
-                      {state === 'pending' && (
-                        <form action={revokeAction}>
-                          <input type="hidden" name="id" value={invite.id} />
-                          <button className="btn btn-secondary" type="submit">Revoke</button>
-                        </form>
-                      )}
-                    </td>
-                  </tr>
-                );
+                const roleText = invite.role === 'super_admin' ? 'Super admin'
+                  : invite.role === 'contributor' ? 'Contributor'
+                  : 'Admin';
+                const roleFull = invite.canManageAdmins && invite.role === 'admin' ? `${roleText} (+ manage admins)` : roleText;
+                
+                return {
+                  id: String(invite.id),
+                  values: {
+                    email: invite.email,
+                    role: roleFull,
+                    invitedBy: invite.invitedByEmail,
+                    expires: invite.expiresAt,
+                    state: state,
+                    actions: null,
+                  },
+                  element: (
+                    <tr key={invite.id}>
+                      <td className="wide">{invite.email}</td>
+                      <td>{roleFull}</td>
+                      <td className="muted">{invite.invitedByEmail}</td>
+                      <td className="nowrap muted">{invite.expiresAt.slice(0, 10)}</td>
+                      <td>
+                        <span className={state === 'pending' ? 'badge' : 'badge badge-warn'}>
+                          {state}
+                        </span>
+                      </td>
+                      <td>
+                        {state === 'pending' && (
+                          <form action={revokeAction}>
+                            <input type="hidden" name="id" value={invite.id} />
+                            <button className="btn btn-secondary" type="submit">Revoke</button>
+                          </form>
+                        )}
+                      </td>
+                    </tr>
+                  ),
+                };
               })}
-            </tbody>
-          </table>
-        </div>
+            />
+          </div>
         </CollapsibleTable>
       )}
     </section>

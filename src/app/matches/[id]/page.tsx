@@ -6,6 +6,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { JsonLd } from '@/components/JsonLd';
 import { ReorderableSections } from '@/components/ReorderableSections';
+import { SortableTable } from '@/components/SortableTable';
 import {
   getMatch,
   getMatchPeriods,
@@ -171,24 +172,37 @@ export default async function MatchPage({
           </p>
           <CollapsibleTable title={side.name}>
           <div className="table-wrap">
-            <table>
-              <caption>{squad.length} players</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Player</th>
-                  <th scope="col" className="num">G</th>
-                  <th scope="col" className="num">B</th>
-                  <th scope="col" className="num">K</th>
-                  <th scope="col" className="num">HB</th>
-                  <th scope="col" className="num">D</th>
-                  <th scope="col" className="num">M</th>
-                  <th scope="col" className="num">T</th>
-                  <th scope="col" className="num">HO</th>
-                  {hasBrownlow && <th scope="col" className="num">BV</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {squad.map((p) => (
+            <SortableTable
+              defaultSort="d"
+              defaultDir="desc"
+              caption={`${squad.length} players`}
+              columns={[
+                { key: 'player', label: 'Player', sortType: 'text' },
+                { key: 'g', label: 'G', sortType: 'number', className: 'num' },
+                { key: 'b', label: 'B', sortType: 'number', className: 'num' },
+                { key: 'k', label: 'K', sortType: 'number', className: 'num' },
+                { key: 'hb', label: 'HB', sortType: 'number', className: 'num' },
+                { key: 'd', label: 'D', sortType: 'number', className: 'num' },
+                { key: 'm', label: 'M', sortType: 'number', className: 'num' },
+                { key: 't', label: 'T', sortType: 'number', className: 'num' },
+                { key: 'ho', label: 'HO', sortType: 'number', className: 'num' },
+                ...(hasBrownlow ? [{ key: 'bv', label: 'BV', sortType: 'number' as const, className: 'num' }] : []),
+              ]}
+              items={squad.map((p) => ({
+                id: String(p.playerId),
+                values: {
+                  player: p.displayName,
+                  g: p.goals ?? -1,
+                  b: p.behinds ?? -1,
+                  k: p.kicks ?? -1,
+                  hb: p.handballs ?? -1,
+                  d: p.disposals ?? -1,
+                  m: p.marks ?? -1,
+                  t: p.tackles ?? -1,
+                  ho: p.hitouts ?? -1,
+                  ...(hasBrownlow ? { bv: p.brownlowVotes ?? -1 } : {}),
+                },
+                element: (
                   <tr key={p.playerId}>
                     <td className="wide">
                       <Link href={playerPath(p.slug, p.playerId)}>{p.displayName}</Link>
@@ -203,9 +217,9 @@ export default async function MatchPage({
                     <td className="num">{formatStat(p.hitouts)}</td>
                     {hasBrownlow && <td className="num">{formatStat(p.brownlowVotes)}</td>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ),
+              }))}
+            />
           </div>
           </CollapsibleTable>
         </section>

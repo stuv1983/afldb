@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { ReorderableSections } from '@/components/ReorderableSections';
+import { SortableTable } from '@/components/SortableTable';
 import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import {
   getAward,
@@ -154,23 +155,36 @@ export default async function SeasonPage({
       <section className="section">
         <CollapsibleTable title="Ladder" defaultOpen={false}>
         <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col" className="num">Pos</th>
-                <th scope="col">Club</th>
-                <th scope="col" className="num">P</th>
-                <th scope="col" className="num">W</th>
-                <th scope="col" className="num">L</th>
-                <th scope="col" className="num">D</th>
-                <th scope="col" className="num">For</th>
-                <th scope="col" className="num">Agst</th>
-                <th scope="col" className="num">%</th>
-                <th scope="col" className="num">Pts</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ladder.map((row) => (
+          <SortableTable
+            defaultSort="rank"
+            defaultDir="asc"
+            columns={[
+              { key: 'rank', label: 'Pos', sortType: 'number', className: 'num', initialDirection: 'asc' },
+              { key: 'club', label: 'Club', sortType: 'text' },
+              { key: 'played', label: 'P', sortType: 'number', className: 'num' },
+              { key: 'wins', label: 'W', sortType: 'number', className: 'num' },
+              { key: 'losses', label: 'L', sortType: 'number', className: 'num' },
+              { key: 'draws', label: 'D', sortType: 'number', className: 'num' },
+              { key: 'pointsFor', label: 'For', sortType: 'number', className: 'num' },
+              { key: 'pointsAgainst', label: 'Agst', sortType: 'number', className: 'num', initialDirection: 'asc' },
+              { key: 'percentage', label: '%', sortType: 'number', className: 'num' },
+              { key: 'pts', label: 'Pts', sortType: 'number', className: 'num' },
+            ]}
+            items={ladder.map((row) => ({
+              id: row.clubId,
+              values: {
+                rank: row.ladderRank,
+                club: row.clubName,
+                played: row.played,
+                wins: row.wins,
+                losses: row.losses,
+                draws: row.draws,
+                pointsFor: row.pointsFor,
+                pointsAgainst: row.pointsAgainst,
+                percentage: row.percentage,
+                pts: row.premiershipPoints,
+              },
+              element: (
                 <tr key={row.clubId}>
                   <td className="num">{row.ladderRank ?? '—'}</td>
                   <td className="wide">
@@ -186,9 +200,9 @@ export default async function SeasonPage({
                   <td className="num">{formatPercentage(row.percentage)}</td>
                   <td className="num">{formatNumber(row.premiershipPoints)}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              ),
+            }))}
+          />
         </div>
         </CollapsibleTable>
       </section>
@@ -203,16 +217,22 @@ export default async function SeasonPage({
         <section className="section">
           <CollapsibleTable title="Leading goalkickers" defaultOpen={false}>
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Player</th>
-                  <th scope="col">Club</th>
-                  <th scope="col" className="num">Goals</th>
-                </tr>
-              </thead>
-              <tbody>
-                {goalkickers.map((p) => (
+            <SortableTable
+              defaultSort="goals"
+              defaultDir="desc"
+              columns={[
+                { key: 'player', label: 'Player', sortType: 'text' },
+                { key: 'club', label: 'Club', sortType: 'text' },
+                { key: 'goals', label: 'Goals', sortType: 'number', className: 'num' },
+              ]}
+              items={goalkickers.map((p) => ({
+                id: `${p.id}-${p.clubSlug}`,
+                values: {
+                  player: p.displayName,
+                  club: p.clubName ?? '',
+                  goals: p.goals,
+                },
+                element: (
                   <tr key={`${p.id}-${p.clubSlug}`}>
                     <td className="wide"><Link href={playerPath(p.slug, p.id)}>{p.displayName}</Link></td>
                     <td>
@@ -224,9 +244,9 @@ export default async function SeasonPage({
                     </td>
                     <td className="num">{formatNumber(p.goals)}</td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ),
+              }))}
+            />
           </div>
           </CollapsibleTable>
         </section>
@@ -247,27 +267,33 @@ export default async function SeasonPage({
           ) : (
             <CollapsibleTable title="Brownlow Medal" defaultOpen={false}>
             <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th scope="col">Player</th>
-                    <th scope="col" className="num">Votes</th>
-                    <th scope="col" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {brownlow.map((p) => (
+              <SortableTable
+                defaultSort="votes"
+                defaultDir="desc"
+                columns={[
+                  { key: 'player', label: 'Player', sortType: 'text' },
+                  { key: 'votes', label: 'Votes', sortType: 'number', className: 'num' },
+                  { key: 'status', label: '', sortType: 'text', sortable: false },
+                ]}
+                items={brownlow.map((p) => ({
+                  id: p.id,
+                  values: {
+                    player: p.displayName,
+                    votes: p.votes,
+                    status: (p.isWinner ? 'Winner' : '') + (p.isIneligible ? 'Ineligible' : ''),
+                  },
+                  element: (
                     <tr key={p.id}>
                       <td className="wide"><Link href={playerPath(p.slug, p.id)}>{p.displayName}</Link></td>
-                      <td className="num">{p.votes}</td>
+                      <td className="num">{formatNumber(p.votes)}</td>
                       <td>
                         {p.isWinner && <strong>Winner</strong>}
                         {p.isIneligible && <span className="badge badge-warn">Ineligible</span>}
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  ),
+                }))}
+              />
             </div>
             </CollapsibleTable>
           )}

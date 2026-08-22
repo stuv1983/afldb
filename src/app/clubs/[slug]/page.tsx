@@ -6,6 +6,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { JsonLd } from '@/components/JsonLd';
 import { ReorderableSections } from '@/components/ReorderableSections';
+import { SortableTable } from '@/components/SortableTable';
 import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import { getClubBestAndFairest, getClubCaptains } from '@/db/queries/awards';
 import {
@@ -126,22 +127,27 @@ export default async function ClubPage({
       <section className="section">
         <CollapsibleTable title="Games leaders">
         <div className="table-wrap">
-          <table>
-            <caption>
-              Most games for {clubRecordName}
-              {hasLineage && ', counting every era of the club'}
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col" className="num">#</th>
-                <th scope="col">Player</th>
-                <th scope="col" className="num">Seasons</th>
-                <th scope="col" className="num">Games</th>
-                <th scope="col" className="num">Goals</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leaders.map((p, i) => (
+          <SortableTable
+            defaultSort="rank"
+            defaultDir="asc"
+            caption={`Most games for ${clubRecordName}${hasLineage ? ', counting every era of the club' : ''}`}
+            columns={[
+              { key: 'rank', label: '#', sortType: 'number', className: 'num' },
+              { key: 'player', label: 'Player', sortType: 'text' },
+              { key: 'seasons', label: 'Seasons', sortType: 'text', className: 'num nowrap' },
+              { key: 'games', label: 'Games', sortType: 'number', className: 'num' },
+              { key: 'goals', label: 'Goals', sortType: 'number', className: 'num' },
+            ]}
+            items={leaders.map((p, i) => ({
+              id: String(p.id),
+              values: {
+                rank: i + 1,
+                player: p.displayName,
+                seasons: p.firstSeason ?? 0,
+                games: p.games,
+                goals: p.goals,
+              },
+              element: (
                 <tr key={p.id}>
                   <td className="num">{i + 1}</td>
                   <td className="wide"><Link href={playerPath(p.slug, p.id)}>{p.displayName}</Link></td>
@@ -149,9 +155,9 @@ export default async function ClubPage({
                   <td className="num">{formatNumber(p.games)}</td>
                   <td className="num">{formatNumber(p.goals)}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              ),
+            }))}
+          />
         </div>
         </CollapsibleTable>
       </section>
@@ -165,22 +171,27 @@ export default async function ClubPage({
       <section className="section">
         <CollapsibleTable title="Goalkicking leaders">
         <div className="table-wrap">
-          <table>
-            <caption>
-              Most goals for {clubRecordName}
-              {hasLineage && ', counting every era of the club'}
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col" className="num">#</th>
-                <th scope="col">Player</th>
-                <th scope="col" className="num">Seasons</th>
-                <th scope="col" className="num">Goals</th>
-                <th scope="col" className="num">Games</th>
-              </tr>
-            </thead>
-            <tbody>
-              {goalkickers.map((p, i) => (
+          <SortableTable
+            defaultSort="rank"
+            defaultDir="asc"
+            caption={`Most goals for ${clubRecordName}${hasLineage ? ', counting every era of the club' : ''}`}
+            columns={[
+              { key: 'rank', label: '#', sortType: 'number', className: 'num' },
+              { key: 'player', label: 'Player', sortType: 'text' },
+              { key: 'seasons', label: 'Seasons', sortType: 'text', className: 'num nowrap' },
+              { key: 'goals', label: 'Goals', sortType: 'number', className: 'num' },
+              { key: 'games', label: 'Games', sortType: 'number', className: 'num' },
+            ]}
+            items={goalkickers.map((p, i) => ({
+              id: String(p.id),
+              values: {
+                rank: i + 1,
+                player: p.displayName,
+                seasons: p.firstSeason ?? 0,
+                goals: p.goals,
+                games: p.games,
+              },
+              element: (
                 <tr key={p.id}>
                   <td className="num">{i + 1}</td>
                   <td className="wide"><Link href={playerPath(p.slug, p.id)}>{p.displayName}</Link></td>
@@ -188,9 +199,9 @@ export default async function ClubPage({
                   <td className="num">{formatNumber(p.goals)}</td>
                   <td className="num">{formatNumber(p.games)}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              ),
+            }))}
+          />
         </div>
         </CollapsibleTable>
       </section>
@@ -211,15 +222,20 @@ export default async function ClubPage({
           </p>
           <CollapsibleTable title="Best and fairest">
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Season</th>
-                  <th scope="col">Player</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bestAndFairest.map((b) => (
+            <SortableTable
+              defaultSort="season"
+              defaultDir="desc"
+              columns={[
+                { key: 'season', label: 'Season', sortType: 'number' },
+                { key: 'player', label: 'Player', sortType: 'text' },
+              ]}
+              items={bestAndFairest.map((b) => ({
+                id: `${b.season}-${b.playerName}`,
+                values: {
+                  season: b.season ?? 0,
+                  player: b.playerName,
+                },
+                element: (
                   <tr key={`${b.season}-${b.playerName}`}>
                     <td>{b.season ?? '—'}</td>
                     <td className="wide">
@@ -233,9 +249,9 @@ export default async function ClubPage({
                       )}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ),
+              }))}
+            />
           </div>
           </CollapsibleTable>
         </section>
@@ -255,16 +271,22 @@ export default async function ClubPage({
           </p>
           <CollapsibleTable title="Captains">
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Season</th>
-                  <th scope="col">Captain</th>
-                  {hasLineage && <th scope="col">Played as</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {captains.map((c) => (
+            <SortableTable
+              defaultSort="season"
+              defaultDir="desc"
+              columns={[
+                { key: 'season', label: 'Season', sortType: 'number' },
+                { key: 'captain', label: 'Captain', sortType: 'text' },
+                ...(hasLineage ? [{ key: 'played_as', label: 'Played as', sortType: 'text' as const }] : []),
+              ]}
+              items={captains.map((c) => ({
+                id: `${c.season}-${c.playerName}`,
+                values: {
+                  season: c.season,
+                  captain: c.playerName,
+                  ...(hasLineage ? { played_as: c.identityName } : {}),
+                },
+                element: (
                   <tr key={`${c.season}-${c.playerName}`}>
                     <td>{c.season}</td>
                     <td className="wide">
@@ -279,9 +301,9 @@ export default async function ClubPage({
                     </td>
                     {hasLineage && <td className="muted nowrap">{c.identityName}</td>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ),
+              }))}
+            />
           </div>
           </CollapsibleTable>
         </section>
@@ -314,24 +336,38 @@ export default async function ClubPage({
         )}
         <CollapsibleTable title="Season history">
         <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Season</th>
-                {hasLineage && isContinuing && <th scope="col">Played as</th>}
-                <th scope="col" className="num">P</th>
-                <th scope="col" className="num">W</th>
-                <th scope="col" className="num">L</th>
-                <th scope="col" className="num">D</th>
-                <th scope="col" className="num">For</th>
-                <th scope="col" className="num">Agst</th>
-                <th scope="col" className="num">%</th>
-                <th scope="col" className="num">Pos</th>
-                <th scope="col">Result</th>
-              </tr>
-            </thead>
-            <tbody>
-              {seasons.map((s) => (
+          <SortableTable
+            defaultSort="season"
+            defaultDir="desc"
+            columns={[
+              { key: 'season', label: 'Season', sortType: 'number' },
+              ...(hasLineage && isContinuing ? [{ key: 'played_as', label: 'Played as', sortType: 'text' as const }] : []),
+              { key: 'played', label: 'P', sortType: 'number', className: 'num' },
+              { key: 'wins', label: 'W', sortType: 'number', className: 'num' },
+              { key: 'losses', label: 'L', sortType: 'number', className: 'num' },
+              { key: 'draws', label: 'D', sortType: 'number', className: 'num' },
+              { key: 'for', label: 'For', sortType: 'number', className: 'num' },
+              { key: 'against', label: 'Agst', sortType: 'number', className: 'num' },
+              { key: 'percentage', label: '%', sortType: 'number', className: 'num' },
+              { key: 'rank', label: 'Pos', sortType: 'number', className: 'num' },
+              { key: 'result', label: 'Result', sortType: 'text' },
+            ]}
+            items={seasons.map((s) => ({
+              id: String(s.season),
+              values: {
+                season: s.season,
+                ...(hasLineage && isContinuing ? { played_as: s.identityName } : {}),
+                played: s.played,
+                wins: s.wins,
+                losses: s.losses,
+                draws: s.draws,
+                for: s.pointsFor,
+                against: s.pointsAgainst,
+                percentage: s.percentage,
+                rank: s.ladderRank ?? 999,
+                result: s.seasonStatus === 'in_progress' ? 'In progress' : (s.isPremier ? 'Premiers' : s.woodenSpoon ? 'Wooden spoon' : ''),
+              },
+              element: (
                 <tr key={s.season}>
                   <td><Link href={seasonPath(s.season)}>{s.season}</Link></td>
                   {hasLineage && isContinuing && (
@@ -352,9 +388,6 @@ export default async function ClubPage({
                   <td className="num">{formatPercentage(s.percentage)}</td>
                   <td className="num">{s.ladderRank ?? '—'}</td>
                   <td>
-                    {/* Honours are only shown once the season has been
-                        decided. A club leading, or last, in an unfinished
-                        season has a standing, not an honour. */}
                     {s.seasonStatus === 'in_progress' ? (
                       <span className="badge badge-warn" title={
                         s.dataThroughDate
@@ -371,9 +404,9 @@ export default async function ClubPage({
                     )}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              ),
+            }))}
+          />
         </div>
         </CollapsibleTable>
       </section>

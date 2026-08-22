@@ -6,6 +6,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
 import { JsonLd } from '@/components/JsonLd';
+import { SortableTable } from '@/components/SortableTable';
 import { TableFilters } from '@/components/TableFilters';
 import { getClubOptions } from '@/db/queries/advanced-search';
 import {
@@ -232,20 +233,29 @@ export default async function RecordCategoryPage({
           filters={filters}
         >
         <div className="table-wrap">
-          <table>
-            <caption>Top {careerRows.length} by career total</caption>
-            <thead>
-              <tr>
-                <th scope="col" className="num">#</th>
-                <th scope="col">Player</th>
-                <th scope="col">Clubs</th>
-                <th scope="col" className="num">Span</th>
-                <th scope="col" className="num">{definition.unit}</th>
-                <th scope="col" className="num">Games</th>
-              </tr>
-            </thead>
-            <tbody>
-              {careerRows.map((row) => (
+          <SortableTable
+            defaultSort="rank"
+            defaultDir="asc"
+            caption={`Top ${careerRows.length} by career total`}
+            columns={[
+              { key: 'rank', label: '#', sortType: 'number', className: 'num' },
+              { key: 'player', label: 'Player', sortType: 'text' },
+              { key: 'clubs', label: 'Clubs', sortType: 'text' },
+              { key: 'span', label: 'Span', sortType: 'text', className: 'num nowrap' },
+              { key: 'value', label: definition.unit, sortType: 'number', className: 'num' },
+              { key: 'games', label: 'Games', sortType: 'number', className: 'num' },
+            ]}
+            items={careerRows.map((row) => ({
+              id: String(row.playerId),
+              values: {
+                rank: row.rank,
+                player: row.displayName,
+                clubs: row.clubNames ?? '',
+                span: row.debutSeason ?? 0,
+                value: row.value,
+                games: row.games,
+              },
+              element: (
                 <tr key={row.playerId}>
                   <td className="num">{row.rank}</td>
                   <td className="wide">
@@ -258,9 +268,9 @@ export default async function RecordCategoryPage({
                   {valueCell(row.value)}
                   <td className="num">{formatNumber(row.games)}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              ),
+            }))}
+          />
         </div>
         </CollapsibleTable>
       )}
@@ -273,20 +283,29 @@ export default async function RecordCategoryPage({
           filters={filters}
         >
         <div className="table-wrap">
-          <table>
-            <caption>Top {matchRows.length} single-match performances</caption>
-            <thead>
-              <tr>
-                <th scope="col" className="num">#</th>
-                <th scope="col">Player</th>
-                <th scope="col" className="num">{definition.unit}</th>
-                <th scope="col">Club</th>
-                <th scope="col">Opponent</th>
-                <th scope="col">Match</th>
-              </tr>
-            </thead>
-            <tbody>
-              {matchRows.map((row) => (
+          <SortableTable
+            defaultSort="rank"
+            defaultDir="asc"
+            caption={`Top ${matchRows.length} single-match performances`}
+            columns={[
+              { key: 'rank', label: '#', sortType: 'number', className: 'num' },
+              { key: 'player', label: 'Player', sortType: 'text' },
+              { key: 'value', label: definition.unit, sortType: 'number', className: 'num' },
+              { key: 'club', label: 'Club', sortType: 'text' },
+              { key: 'opponent', label: 'Opponent', sortType: 'text' },
+              { key: 'match', label: 'Match', sortType: 'text', className: 'nowrap' },
+            ]}
+            items={matchRows.map((row) => ({
+              id: `${row.playerId}-${row.matchId}`,
+              values: {
+                rank: row.rank,
+                player: row.displayName,
+                value: row.value,
+                club: row.clubName,
+                opponent: row.opponentName,
+                match: row.matchDate.getTime(),
+              },
+              element: (
                 <tr key={`${row.playerId}-${row.matchId}`}>
                   <td className="num">{row.rank}</td>
                   <td className="wide">
@@ -303,9 +322,9 @@ export default async function RecordCategoryPage({
                     <span className="muted">{formatDate(row.matchDate)}</span>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              ),
+            }))}
+          />
         </div>
         </CollapsibleTable>
       )}
@@ -318,20 +337,29 @@ export default async function RecordCategoryPage({
           filters={filters}
         >
         <div className="table-wrap">
-          <table>
-            <caption>Top {seasonRows.length} single seasons</caption>
-            <thead>
-              <tr>
-                <th scope="col" className="num">#</th>
-                <th scope="col">Player</th>
-                <th scope="col" className="num">{definition.unit}</th>
-                <th scope="col">Club</th>
-                <th scope="col" className="num">Season</th>
-                <th scope="col" className="num">Games</th>
-              </tr>
-            </thead>
-            <tbody>
-              {seasonRows.map((row) => (
+          <SortableTable
+            defaultSort="rank"
+            defaultDir="asc"
+            caption={`Top ${seasonRows.length} single seasons`}
+            columns={[
+              { key: 'rank', label: '#', sortType: 'number', className: 'num' },
+              { key: 'player', label: 'Player', sortType: 'text' },
+              { key: 'value', label: definition.unit, sortType: 'number', className: 'num' },
+              { key: 'club', label: 'Club', sortType: 'text' },
+              { key: 'season', label: 'Season', sortType: 'number', className: 'num' },
+              { key: 'games', label: 'Games', sortType: 'number', className: 'num' },
+            ]}
+            items={seasonRows.map((row) => ({
+              id: `${row.playerId}-${row.season}-${row.clubSlug}`,
+              values: {
+                rank: row.rank,
+                player: row.displayName,
+                value: row.value,
+                club: row.clubName ?? '',
+                season: row.season,
+                games: row.games,
+              },
+              element: (
                 <tr key={`${row.playerId}-${row.season}-${row.clubSlug}`}>
                   <td className="num">{row.rank}</td>
                   <td className="wide">
@@ -348,9 +376,9 @@ export default async function RecordCategoryPage({
                   <td className="num"><Link href={seasonPath(row.season)}>{row.season}</Link></td>
                   <td className="num">{formatNumber(row.games)}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              ),
+            }))}
+          />
         </div>
         </CollapsibleTable>
       )}

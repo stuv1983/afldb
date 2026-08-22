@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
 import { ReorderableSections } from '@/components/ReorderableSections';
+import { SortableTable } from '@/components/SortableTable';
 import { TableFilters } from '@/components/TableFilters';
 import { getClubOptions } from '@/db/queries/advanced-search';
 import { getBrownlowCareerLeaders, getBrownlowWinners, getMultipleBrownlowWinners } from '@/db/queries/brownlow';
@@ -105,19 +106,27 @@ export default async function BrownlowPage({
             </div>
           ) : (
             <div className="table-wrap">
-              <table>
-                <caption>Most career Brownlow votes</caption>
-                <thead>
-                  <tr>
-                    <th scope="col" className="num">#</th>
-                    <th scope="col">Player</th>
-                    <th scope="col" className="num">Votes</th>
-                    <th scope="col" className="num">Medals</th>
-                    <th scope="col" className="num">Games</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leaders.rows.map((row) => (
+              <SortableTable
+                defaultSort="rank"
+                defaultDir="asc"
+                caption="Most career Brownlow votes"
+                columns={[
+                  { key: 'rank', label: '#', sortType: 'number', className: 'num' },
+                  { key: 'player', label: 'Player', sortType: 'text' },
+                  { key: 'votes', label: 'Votes', sortType: 'number', className: 'num' },
+                  { key: 'medals', label: 'Medals', sortType: 'number', className: 'num' },
+                  { key: 'games', label: 'Games', sortType: 'number', className: 'num' },
+                ]}
+                items={leaders.rows.map((row) => ({
+                  id: String(row.playerId),
+                  values: {
+                    rank: row.rank,
+                    player: row.displayName,
+                    votes: row.votes,
+                    medals: row.medals,
+                    games: row.games,
+                  },
+                  element: (
                     <tr key={row.playerId}>
                       <td className="num">{row.rank}</td>
                       <td className="wide">
@@ -127,9 +136,9 @@ export default async function BrownlowPage({
                       <td className="num">{row.medals > 0 ? row.medals : '—'}</td>
                       <td className="num">{formatNumber(row.games)}</td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  ),
+                }))}
+              />
             </div>
           )}
         </CollapsibleTable>
@@ -167,22 +176,25 @@ export default async function BrownlowPage({
             </div>
           ) : (
             <div className="table-wrap">
-              <table>
-                {/* Shared counts put more than one winner in a season, so these
-                    two numbers are genuinely different. */}
-                <caption>
-                  {winners.length} winners across {seasonCount} seasons
-                </caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Season</th>
-                    <th scope="col">Winner</th>
-                    <th scope="col">Club</th>
-                    <th scope="col" className="num">Votes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {winners.map((row) => (
+              <SortableTable
+                defaultSort="season"
+                defaultDir="desc"
+                caption={`${winners.length} winners across ${seasonCount} seasons`}
+                columns={[
+                  { key: 'season', label: 'Season', sortType: 'number' },
+                  { key: 'winner', label: 'Winner', sortType: 'text' },
+                  { key: 'club', label: 'Club', sortType: 'text' },
+                  { key: 'votes', label: 'Votes', sortType: 'number', className: 'num' },
+                ]}
+                items={winners.map((row) => ({
+                  id: `${row.season}-${row.playerId}`,
+                  values: {
+                    season: row.season,
+                    winner: row.displayName,
+                    club: row.clubName ?? '',
+                    votes: row.votes,
+                  },
+                  element: (
                     <tr key={`${row.season}-${row.playerId}`}>
                       <td><Link href={`/brownlow/${row.season}`}>{row.season}</Link></td>
                       <td className="wide">
@@ -197,9 +209,9 @@ export default async function BrownlowPage({
                       </td>
                       <td className="num">{row.votes}</td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  ),
+                }))}
+              />
             </div>
           )}
         </CollapsibleTable>
@@ -225,17 +237,23 @@ export default async function BrownlowPage({
               </div>
             ) : (
               <div className="table-wrap">
-                <table>
-                  <caption>Players with more than one Brownlow Medal</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Player</th>
-                      <th scope="col" className="num">Medals</th>
-                      <th scope="col">Seasons</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {multipleWinners.map((row) => (
+                <SortableTable
+                  defaultSort="medals"
+                  defaultDir="desc"
+                  caption="Players with more than one Brownlow Medal"
+                  columns={[
+                    { key: 'player', label: 'Player', sortType: 'text' },
+                    { key: 'medals', label: 'Medals', sortType: 'number', className: 'num' },
+                    { key: 'seasons', label: 'Seasons', sortType: 'text' },
+                  ]}
+                  items={multipleWinners.map((row) => ({
+                    id: String(row.playerId),
+                    values: {
+                      player: row.displayName,
+                      medals: row.medals,
+                      seasons: row.seasons.join(', '),
+                    },
+                    element: (
                       <tr key={row.playerId}>
                         <td className="wide">
                           <Link href={playerPath(row.slug, row.playerId)}>{row.displayName}</Link>
@@ -250,9 +268,9 @@ export default async function BrownlowPage({
                           ))}
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    ),
+                  }))}
+                />
               </div>
             )}
           </CollapsibleTable>

@@ -6,6 +6,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
 import { ReorderableSections } from '@/components/ReorderableSections';
+import { SortableTable } from '@/components/SortableTable';
 import { TableFilters } from '@/components/TableFilters';
 import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import {
@@ -141,16 +142,22 @@ export default async function AwardPage({
           </p>
           <CollapsibleTable title="Nominations by season">
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Season</th>
-                  <th scope="col" className="num">Nominations</th>
-                  <th scope="col">Winner</th>
-                </tr>
-              </thead>
-              <tbody>
-                {nominationSeasons.map((s) => (
+            <SortableTable
+              defaultSort="season"
+              defaultDir="desc"
+              columns={[
+                { key: 'season', label: 'Season', sortType: 'number' },
+                { key: 'nominations', label: 'Nominations', sortType: 'number', className: 'num' },
+                { key: 'winner', label: 'Winner', sortType: 'text' },
+              ]}
+              items={nominationSeasons.map((s) => ({
+                id: String(s.season),
+                values: {
+                  season: s.season,
+                  nominations: s.nominations,
+                  winner: s.winner ?? '',
+                },
+                element: (
                   <tr key={s.season}>
                     <td>
                       <Link href={awardSeasonPath(award.slug, s.season)}>{s.season}</Link>
@@ -158,9 +165,9 @@ export default async function AwardPage({
                     <td className="num">{s.nominations}</td>
                     <td className="wide">{s.winner ?? <span className="muted">—</span>}</td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ),
+              }))}
+            />
           </div>
           </CollapsibleTable>
         </section>
@@ -176,19 +183,25 @@ export default async function AwardPage({
         <section className="section">
           <CollapsibleTable title="Teams by season">
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Season</th>
-                  <th scope="col" className="num">Selected</th>
-                  <th scope="col">Captain</th>
-                </tr>
-              </thead>
-              <tbody>
-                {seasonsOfTeam.map((season) => {
-                  const members = winners.filter((w) => w.season === season);
-                  const captain = members.find((m) => m.isCaptain);
-                  return (
+            <SortableTable
+              defaultSort="season"
+              defaultDir="desc"
+              columns={[
+                { key: 'season', label: 'Season', sortType: 'number' },
+                { key: 'selected', label: 'Selected', sortType: 'number', className: 'num' },
+                { key: 'captain', label: 'Captain', sortType: 'text' },
+              ]}
+              items={seasonsOfTeam.map((season) => {
+                const members = winners.filter((w) => w.season === season);
+                const captain = members.find((m) => m.isCaptain);
+                return {
+                  id: String(season),
+                  values: {
+                    season,
+                    selected: members.length,
+                    captain: captain?.playerName ?? '',
+                  },
+                  element: (
                     <tr key={season}>
                       <td>
                         <Link href={awardSeasonPath(award.slug, season)}>{season}</Link>
@@ -206,10 +219,10 @@ export default async function AwardPage({
                           : <span className="muted">—</span>}
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  ),
+                };
+              })}
+            />
           </div>
           </CollapsibleTable>
         </section>
@@ -240,16 +253,22 @@ export default async function AwardPage({
           )}
           <CollapsibleTable title="Multiple winners">
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Player</th>
-                  <th scope="col" className="num">Wins</th>
-                  <th scope="col">Seasons</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaders.map((l) => (
+            <SortableTable
+              defaultSort="wins"
+              defaultDir="desc"
+              columns={[
+                { key: 'player', label: 'Player', sortType: 'text' },
+                { key: 'wins', label: 'Wins', sortType: 'number', className: 'num' },
+                { key: 'seasons', label: 'Seasons', sortType: 'text' },
+              ]}
+              items={leaders.map((l) => ({
+                id: l.playerId ? String(l.playerId) : l.displayName,
+                values: {
+                  player: l.displayName,
+                  wins: l.wins,
+                  seasons: l.seasons,
+                },
+                element: (
                   <tr key={l.playerId ?? l.displayName}>
                     <td className="wide">
                       {l.playerId !== null && l.slug !== null ? (
@@ -261,9 +280,9 @@ export default async function AwardPage({
                     <td className="num">{l.wins}</td>
                     <td className="wide muted">{l.seasons}</td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ),
+              }))}
+            />
           </div>
           </CollapsibleTable>
         </section>
@@ -283,24 +302,30 @@ export default async function AwardPage({
           </p>
           <CollapsibleTable title="Nominations by club">
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Club</th>
-                  <th scope="col" className="num">Nominations</th>
-                  <th scope="col" className="num">Winners</th>
-                </tr>
-              </thead>
-              <tbody>
-                {nominationClubs.map((c) => (
+            <SortableTable
+              defaultSort="nominations"
+              defaultDir="desc"
+              columns={[
+                { key: 'club', label: 'Club', sortType: 'text' },
+                { key: 'nominations', label: 'Nominations', sortType: 'number', className: 'num' },
+                { key: 'winners', label: 'Winners', sortType: 'number', className: 'num' },
+              ]}
+              items={nominationClubs.map((c) => ({
+                id: String(c.clubId),
+                values: {
+                  club: c.name,
+                  nominations: c.nominations,
+                  winners: c.winners,
+                },
+                element: (
                   <tr key={c.clubId}>
                     <td className="wide"><Link href={clubPath(c.slug)}>{c.name}</Link></td>
                     <td className="num">{c.nominations}</td>
                     <td className="num">{c.winners}</td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ),
+              }))}
+            />
           </div>
           </CollapsibleTable>
         </section>
@@ -341,19 +366,24 @@ export default async function AwardPage({
             </div>
           ) : (
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Season</th>
-                  <th scope="col">Player</th>
-                  <th scope="col">Club</th>
-                  {showVotes && (
-                    <th scope="col" className="num">Votes</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredWinners.map((w) => (
+            <SortableTable
+              defaultSort="season"
+              defaultDir="desc"
+              columns={[
+                { key: 'season', label: 'Season', sortType: 'number' },
+                { key: 'player', label: 'Player', sortType: 'text' },
+                { key: 'club', label: 'Club', sortType: 'text' },
+                ...(showVotes ? [{ key: 'votes', label: 'Votes', sortType: 'number' as const, className: 'num' }] : []),
+              ]}
+              items={filteredWinners.map((w) => ({
+                id: String(w.id),
+                values: {
+                  season: w.season,
+                  player: w.playerName,
+                  club: w.clubNameRaw ?? w.clubName ?? '',
+                  votes: w.votes,
+                },
+                element: (
                   <tr key={w.id}>
                     <td>
                       {w.season
@@ -383,9 +413,9 @@ export default async function AwardPage({
                       <td className="num">{w.votes ?? <span className="muted">—</span>}</td>
                     )}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ),
+              }))}
+            />
           </div>
           )}
           </CollapsibleTable>

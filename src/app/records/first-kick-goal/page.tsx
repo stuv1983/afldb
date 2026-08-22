@@ -5,6 +5,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
 import { ReorderableSections } from '@/components/ReorderableSections';
+import { SortableTable } from '@/components/SortableTable';
 import { TableFilters } from '@/components/TableFilters';
 import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
 import { listClubs } from '@/db/queries/clubs';
@@ -118,26 +119,36 @@ export default async function FirstKickGoalPage({
           }
         >
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Player</th>
-                  <th scope="col">Club</th>
-                  <th scope="col" className="num">Season</th>
-                  <th scope="col">Round</th>
-                  <th scope="col">Opponent</th>
-                  <th scope="col">Note</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
+            <SortableTable
+              defaultSort="season"
+              defaultDir="desc"
+              columns={[
+                { key: 'player', label: 'Player', sortType: 'text' },
+                { key: 'club', label: 'Club', sortType: 'text' },
+                { key: 'season', label: 'Season', sortType: 'number', className: 'num' },
+                { key: 'round', label: 'Round', sortType: 'text' },
+                { key: 'opponent', label: 'Opponent', sortType: 'text' },
+                { key: 'note', label: 'Note', sortType: 'text' },
+              ]}
+              items={rows.map((r) => ({
+                id: String(r.id),
+                values: {
+                  player: r.playerName,
+                  club: r.clubName ?? '',
+                  season: r.season,
+                  round: r.roundRaw,
+                  opponent: r.opponentName ?? '',
+                  note: [
+                    r.consecutiveGoalKicks > 1 ? 'z' : '',
+                    r.noFurtherCareerKicks ? 'z' : '',
+                  ].join(''), // Sort note by existence
+                },
+                element: (
                   <tr key={r.id}>
                     <td className="wide">
                       {r.playerId !== null && r.playerSlug
                         ? <Link href={playerPath(r.playerSlug, r.playerId)}>{r.playerName}</Link>
                         : r.playerName}
-                      {/* An unlinked row is still evidence; saying so is
-                          more honest than hiding it or implying a link. */}
                       {!isLinked(r.linkStatus) && (
                         <UnmatchedPlayer targetTable="player_achievements" targetId={r.id} />
                       )}
@@ -169,9 +180,9 @@ export default async function FirstKickGoalPage({
                       ].filter(Boolean).join(' · ') || '—'}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ),
+              }))}
+            />
           </div>
         </CollapsibleTable>
       </section>
@@ -189,26 +200,33 @@ export default async function FirstKickGoalPage({
           note="Counted by lineage, so Footscray rows count toward the Western Bulldogs"
         >
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Club</th>
-                  <th scope="col" className="num">Players</th>
-                  <th scope="col" className="num">First</th>
-                  <th scope="col" className="num">Most recent</th>
-                </tr>
-              </thead>
-              <tbody>
-                {byClub.map((c) => (
+            <SortableTable
+              defaultSort="club"
+              defaultDir="asc"
+              columns={[
+                { key: 'club', label: 'Club', sortType: 'text' },
+                { key: 'players', label: 'Players', sortType: 'number', className: 'num' },
+                { key: 'first', label: 'First', sortType: 'number', className: 'num' },
+                { key: 'last', label: 'Most recent', sortType: 'number', className: 'num' },
+              ]}
+              items={byClub.map((c) => ({
+                id: c.slug,
+                values: {
+                  club: c.name,
+                  players: c.players,
+                  first: c.earliest ?? 9999,
+                  last: c.latest ?? 0,
+                },
+                element: (
                   <tr key={c.slug}>
                     <td className="wide"><Link href={clubPath(c.slug)}>{c.name}</Link></td>
                     <td className="num">{formatNumber(c.players)}</td>
                     <td className="num">{c.earliest}</td>
                     <td className="num">{c.latest}</td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ),
+              }))}
+            />
           </div>
           {without.length > 0 && (
             <p className="muted">
@@ -234,22 +252,27 @@ export default async function FirstKickGoalPage({
       <section className="section">
         <CollapsibleTable id="by-decade" title="By decade">
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Decade</th>
-                  <th scope="col" className="num">Players</th>
-                </tr>
-              </thead>
-              <tbody>
-                {byDecade.map((d) => (
+            <SortableTable
+              defaultSort="decade"
+              defaultDir="desc"
+              columns={[
+                { key: 'decade', label: 'Decade', sortType: 'number' },
+                { key: 'players', label: 'Players', sortType: 'number', className: 'num' },
+              ]}
+              items={byDecade.map((d) => ({
+                id: String(d.decade),
+                values: {
+                  decade: d.decade,
+                  players: d.players,
+                },
+                element: (
                   <tr key={d.decade}>
                     <td className="wide">{d.decade}s</td>
                     <td className="num">{formatNumber(d.players)}</td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ),
+              }))}
+            />
           </div>
         </CollapsibleTable>
       </section>

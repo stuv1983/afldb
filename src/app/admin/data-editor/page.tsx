@@ -22,6 +22,7 @@ import { formatDate, formatRoundShort } from '@/lib/format';
 import { firstValue, parseSeason } from '@/lib/params';
 import { isEditableEntity } from '@/lib/edit/spec';
 import { MatchBrowser } from '@/app/admin/data-editor/MatchBrowser';
+import { RouteSortHeader } from '@/components/RouteSortHeader';
 
 export const metadata: Metadata = { title: 'Data editor', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -85,12 +86,17 @@ export default async function DataEditorPage(
       })
     : { rows: [], total: 0 };
 
+  const sort = firstValue(params.sort);
+  const dir = firstValue(params.dir);
+
   const draftResults = (draftQueryParam || draftYearParam)
     ? await listDraftPicks({
         year: draftYearParam ?? undefined,
         q: draftQueryParam || undefined,
         page: 1,
         pageSize: 50,
+        sort,
+        dir,
       })
     : null;
 
@@ -192,11 +198,11 @@ export default async function DataEditorPage(
               <thead>
                 <tr>
                   <th scope="col" className="num">ID</th>
-                  <th scope="col" className="num">Year</th>
-                  <th scope="col" className="num">Pick</th>
-                  <th scope="col">Player name</th>
-                  <th scope="col">Club</th>
-                  <th scope="col">Recruited from</th>
+                  <RouteSortHeader sortKey="year" defaultSort="pick" defaultDir="asc" className="num">Year</RouteSortHeader>
+                  <RouteSortHeader sortKey="pick" defaultSort="pick" defaultDir="asc" className="num">Pick</RouteSortHeader>
+                  <RouteSortHeader sortKey="player" defaultSort="pick" defaultDir="asc">Player name</RouteSortHeader>
+                  <RouteSortHeader sortKey="club" defaultSort="pick" defaultDir="asc">Club</RouteSortHeader>
+                  <RouteSortHeader sortKey="from" defaultSort="pick" defaultDir="asc">Recruited from</RouteSortHeader>
                   <th scope="col">Status</th>
                   <th scope="col" />
                 </tr>

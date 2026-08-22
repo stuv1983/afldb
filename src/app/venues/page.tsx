@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { FilterErrors } from '@/components/FilterErrors';
+import { SortableTable } from '@/components/SortableTable';
 import { TableFilters } from '@/components/TableFilters';
 import { getVenueStates, listVenues } from '@/db/queries/venues';
 import { formatNumber, formatSpan, venuePath } from '@/lib/format';
@@ -65,30 +66,36 @@ export default async function VenuesPage({
             <p>Try widening the name, state or match count.</p>
           </div>
         ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Venue</th>
-                  <th scope="col" className="num">Seasons</th>
-                  <th scope="col" className="num">Matches</th>
-                </tr>
-              </thead>
-              <tbody>
-                {venues.map((venue) => (
-                  <tr key={venue.id}>
-                    <td className="wide">
-                      <Link href={venuePath(venue.slug)}>{venue.canonicalName}</Link>
-                    </td>
-                    <td className="num nowrap">
-                      {formatSpan(venue.firstSeason, venue.lastSeason)}
-                    </td>
-                    <td className="num">{formatNumber(venue.matches)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            <div className="table-wrap">
+              <SortableTable
+                defaultSort="matches"
+                defaultDir="desc"
+                columns={[
+                  { key: 'name', label: 'Venue', sortType: 'text' },
+                  { key: 'seasons', label: 'Seasons', sortType: 'number', className: 'num' },
+                  { key: 'matches', label: 'Matches', sortType: 'number', className: 'num' },
+                ]}
+                items={venues.map((venue) => ({
+                  id: venue.id,
+                  values: {
+                    name: venue.canonicalName,
+                    seasons: venue.firstSeason,
+                    matches: venue.matches,
+                  },
+                  element: (
+                    <tr key={venue.id}>
+                      <td className="wide">
+                        <Link href={venuePath(venue.slug)}>{venue.canonicalName}</Link>
+                      </td>
+                      <td className="num nowrap">
+                        {formatSpan(venue.firstSeason, venue.lastSeason)}
+                      </td>
+                      <td className="num">{formatNumber(venue.matches)}</td>
+                    </tr>
+                  ),
+                }))}
+              />
+            </div>
         )}
       </CollapsibleTable>
     </>
