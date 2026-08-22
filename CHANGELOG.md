@@ -34,6 +34,8 @@ commit.
 - The suggested player carries career context (clubs, span, games, goals) and the evidence behind the score appears as plain chips in the row itself, so the drawer is for detail rather than for discovering why a score exists.
 - Repeated source names are grouped visually with a shared-suggestion summary, and a group whose records suggest different players is flagged and withheld from bulk approval. Grouping is presentation only: every record keeps its own identity, status, approval rules and audit trail.
 - `BULK-READY` explains the four criteria that earn it, so it reads as a separate judgement from the confidence score rather than a louder version of it.
+- A Hall of Fame career span that shares no season with a career AFLDB records in full is now treated as a contradiction — Bill Walker of Swan Districts (1961-1976) is no longer offered against Bill Walker of Fitzroy (1903-1914). Verified against all 228 confirmed Hall of Fame links with a stated span before being trusted: none would be contradicted, and it now flags 16 live queue rows.
+- Draft records appear once per `draft_person` rather than once per pick, so one person named in several drafts is one decision rather than several near-identical rows.
 
 ### Dynamic Column Sorting for Statistical Tables - 22 August 2026
 

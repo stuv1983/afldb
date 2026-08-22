@@ -21,7 +21,6 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-073` | Medium | Database | Four pre-066 foreign keys (`data_edits.admin_user_id`, `player_link_resolutions.admin_user_id`/`player_id`, `player_link_suggestions.resolved_by`) have no supporting index; `tests/integration/fk-indexes.test.ts` fails. | Add the partial indexes in a new migration (the 041 shape) or justify `DELETE_FREE_PARENTS` entries. |
 | `AFLDB-ISSUE-074` | Low | Tests | `tests/integration/email-intake.test.ts` assumes the first `auth_users` row is its fixture admin and fails against real dev-host admin data. | Make the test create/select its own fixture admin deterministically instead of `ORDER BY`-picking one. |
 | `AFLDB-ISSUE-076` | Medium | Performance | Grid Solver combinations using `won_final_at_venue` can exceed PostgreSQL's 5-second statement timeout and crash the page. | Capture and compare the generated SQL/EXPLAIN plan against `played_at_venue`, then optimise the `won_final_at_venue` query shape without raising the application timeout. |
-| `AFLDB-ISSUE-075` | Medium | Admin/Matching | Confidence-scored player-link suggestions are implemented and calibrated; review UI and browser validation in progress. | Finish the source-record-centric review UI, then complete the browser checklist and one reversible real approval. |
 
 ---
 
@@ -57,6 +56,51 @@ Removed every match-mutation write to `brownlow_season_votes`. Targeted player-s
 
 ### Validation
 The Brownlow source-contract regression test passed and type checking passed. Database integration was not run because `AFLDB_TEST_DATABASE_URL` is not configured.
+
+### Browser validation (dev, commit `a0cd23b`)
+
+Driven through the real UI as Super Admin. Page loads in 279 ms server-side and
+~1.3 s to network-idle in a browser; whole page data path 259 ms at 2,010 queue
+rows, of which the seven-table queue scan is ~180 ms.
+
+Confirmed: source type and context visible per row; suggested player with career
+context; evidence chips readable without opening the drawer; the drawer's
+itemised evidence sums exactly to the score (44+36+17 = 97 for Gary O'Donnell)
+with no family counted twice; alternatives in plain words; band and bulk counts
+reconciling exactly with the cache (54/11/32/103/44); repeated names grouped and
+distinguishable; agreement summarised ("Nicky Winmar — 5 unresolved records, 5/5
+independently suggest Nicky Winmar") and disagreement flagged ("Garry McIntosh —
+4 unresolved records, ⚠ suggestions disagree") with 0 of those rows offered for
+bulk; draft rows at `draft_person` grain showing their pick count; manual
+PlayerPicker, create-player and not-a-player paths unchanged; unauthenticated
+and invalid-cookie requests still 307 to `/admin/login`; no body overflow at
+1280/1024/900 px; no page errors.
+
+Three defects were found and fixed by this pass, none of which any test had
+caught: the cache wrote `evidence` with `JSON.stringify` into a jsonb column, so
+it read back as text and the page threw on every row; a sub-threshold candidate
+was still presented under "Suggested AFLDB player"; and the queue listed every
+draft pick rather than one row per `draft_person`, which also made the filter
+counts disagree with the cache.
+
+### Reversible real approval
+
+`award_winners#9357` — "Massimo D'Ambrosio", All-Australian 40-Man Squad 2024.
+
+Before: `player_id` NULL, status `unmatched`, no resolution rows, 75 resolutions
+globally, 210 unresolved awards. Suggested #12998 Massimo DAmbrosio, 97,
+`very_high`, no rival, `v1`.
+
+Approved through the real drawer. After: `player_id` 12998, status `resolved`,
+resolution #106 recording `action='linked'`, `previous_status='unmatched'`,
+`admin_user_id=4`, `match_method='suggested'`, `match_score=97` (server
+recomputed, never sent by the browser), `algorithm_version='v1'`; 76 resolutions,
+209 unresolved awards, and exactly one resolution written in the window.
+
+Restored in one transaction: target back to `player_id` NULL / `unmatched`, the
+audit row deleted, counts back to 75/210. The audit row was removed rather than
+kept because leaving it would have left the trail asserting a link that no
+longer exists.
 
 ### Follow-up
 Add a regression guard that prevents match mutation modules from writing `brownlow_season_votes`.
@@ -3262,11 +3306,11 @@ Runtime evidence only. The timeout is reproducible and correlated to the exact d
 
 ## AFLDB-ISSUE-075 — Confidence-scored suggestions for /admin/player-links
 
-- **Status:** Open — implementation and calibration complete; dev browser validation outstanding
+- **Status:** Resolved — calibrated, validated in the browser on dev, and one reversible real approval performed and restored
 - **Severity:** Medium
 - **Area:** Admin/Matching
 - **Found:** 2026-08-22
-- **Resolved:** Not yet resolved
+- **Resolved:** 2026-08-22 (dev; not deployed to production)
 
 ### Symptom
 
@@ -3357,6 +3401,70 @@ Tests: 44 unit (`tests/player-matching.test.ts`), 24 mutation/contract
 Migration 067 applied to `afldb_dev` and `afldb_test`; privileges reconciled and
 verified (`afldb_app` SELECT, `afldb_auth` full DML, `afldb_import` no read).
 
+### Source-specific bulk policy
+
+Aggregate bulk precision of 99.99% read as safe and was not: the whole of the
+error sat in one source class. Measured per logical source over the same 9,356
+confirmed links (draft counted at `draft_person` grain, never per pick):
+
+| Source | n | recall | top-1 | very_high | vh prec | vh FP | bulk | bulk prec | bulk FP | conflicts |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `award_winners` | 3,088 | 100% | 99.90% | 2,750 | 100% | 0 | 2,750 | 100% | 0 | 0 |
+| `draft_person` | 3,464 | 100% | 99.94% | 2,540 | 100% | 0 | 2,319 | 100% | 0 | 0 |
+| `award_nominations` | 766 | 99.61% | 99.48% | 702 | 100% | 0 | 702 | 100% | 0 | 1 |
+| `player_achievements` | 334 | 99.70% | 99.70% | 253 | 100% | 0 | 253 | 100% | 0 | 0 |
+| `captaincies` | 1,375 | 99.27% | 99.05% | 1,313 | 99.92% | 1 | **0** | n/a | 0 | 7 |
+| `hall_of_fame` | 240 | 99.58% | 98.33% | 0 | n/a | 0 | 0 | n/a | 0 | 0 |
+| `honour_team_members` | 89 | 100% | 97.75% | 0 | n/a | 0 | 0 | n/a | 0 | 0 |
+
+`captaincies` is excluded from unattended approval, and not merely because it
+held the single failure. A club's recorded captain for a season and the player
+who actually led the side can legitimately differ — suspension, injury, a
+mid-season handover, a co-captaincy — so the source name and the correct link
+disagree **by design**. That is a class-level false-positive mechanism, not one
+unlucky row, and the class also carries 7 of the 8 hard conflicts raised across
+the whole backtest. Those rows still appear as `very_high` suggestions with full
+evidence and may be approved individually; they may not pass unattended.
+
+`hall_of_fame` and `honour_team_members` are excluded for the opposite reason:
+carrying only name and career-span evidence they never reach the band, so they
+have **no measured bulk population at all**. No failures out of no rows is not
+evidence of safety.
+
+With the gate applied: **bulk-eligible 6,024, precision 100.00%, zero false
+positives**, `very_high` unchanged at 7,558/99.99%. Scoring weights and band
+thresholds were NOT altered to achieve this — top-1 remains 99.69%.
+
+### The Jobe Watson class, and why bulk survives it
+
+`captaincies#3230` names Jobe Watson as Essendon's 2016 captain; AFLDB
+deliberately links Brendon Goddard, who led the side while Watson was suspended
+for the season. It scores 97 with a gap of 82, and nothing available to the
+matcher separates it from a correct row. It is a human/editorial override that
+contradicts the literal source identity, and an unresolved record could carry
+the same class of correction. Rather than dismiss it as already-resolved, the
+whole source class it belongs to is barred from bulk approval.
+
+### Calibration lesson
+
+> Hard-conflict rules must only compare evidence that is known to represent the
+> same identity, competition and temporal semantics.
+
+The first backtest raised **617 hard conflicts, every one against a link AFLDB
+had already confirmed**; after typing the evidence by competition and context the
+same population raises **8, none against a correct link**. Every one of those 617
+came from comparing two things that were never the same kind of fact: a row
+against itself, a drafting club against a playing history, a WAFL season against
+a VFL career, an external source's own games count against AFLDB's.
+
+The same rule later ADDED a conflict rather than removing one. A Hall of Fame
+entry states a career span outright; when that span shares no season with a
+career AFLDB records in full, the two are different footballers. Verified
+against all 228 confirmed Hall of Fame links with a stated span before being
+trusted — 0 would be contradicted — and it now contradicts 16 live queue rows,
+including Bill Walker of Swan Districts (1961-1976) being offered against Bill
+Walker of Fitzroy (1903-1914).
+
 ### Safety model
 
 The cache is advice, never authority. Approving a suggestion locks the target,
@@ -3369,7 +3477,9 @@ another row.
 
 ### Follow-up
 
-- Dev browser validation and one reversible real approval — the remaining work.
+- Not deployed to production. This work is dev-only.
+- Bulk approval is available for four source classes; `captaincies` remains
+  suggestion-only. Revisit only with new measured evidence, not intuition.
 - 5 queue entities generate no candidate, and 15 confirmed links have their true
   player outside the candidate set: nickname variants (Robert → Bob Nash,
   William → Bill Thomas, John → Ivor Lawson). An alias-backed nickname table

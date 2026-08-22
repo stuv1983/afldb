@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-22  
-**Open issues:** 10
+**Open issues:** 9
 
 ## How Claude should use this file
 
