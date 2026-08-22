@@ -329,6 +329,28 @@ function findConflicts(source: SourceEvidence, candidate: CandidateEvidence): Ha
     });
   }
 
+  // A career span the source states explicitly, that shares no season at
+  // all with a career AFLDB has recorded in full, is two different
+  // footballers. Checked against every Hall of Fame link AFLDB has
+  // already confirmed: 0 of 228 would be contradicted by this rule,
+  // including Murray Weideman, whose "1968-1969, 1953-1963" parses to
+  // 1953-1969 and overlaps correctly.
+  const asserted = assertedRange(source.temporal);
+  const careerRangeForSpan = careerRange(candidate);
+  if (
+    asserted
+    && careerRangeForSpan
+    && careerIsComplete(candidate)
+    && (asserted.last < careerRangeForSpan.first || asserted.first > careerRangeForSpan.last)
+  ) {
+    conflicts.push({
+      reason: 'career_span_no_overlap',
+      detail:
+        `source career ${asserted.first}-${asserted.last} shares no season with `
+        + `${candidate.displayName}'s ${careerRangeForSpan.first}-${careerRangeForSpan.last}`,
+    });
+  }
+
   if (candidate.uniquenessConflict !== null) {
     conflicts.push({
       reason: 'uniqueness_collision',

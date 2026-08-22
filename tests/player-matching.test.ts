@@ -556,3 +556,38 @@ describe('bulk eligibility is decided per source class', () => {
     expect(assessMatch([nameOnly], 'award_winners').bulkEligible).toBe(false);
   });
 });
+
+describe('career span as contradiction', () => {
+  it('contradicts a stated span that shares no season with a complete career', () => {
+    // Bill Walker of Swan Districts (1961-1976) is not Bill Walker of
+    // Fitzroy (1903-1914), however exactly the names agree.
+    const scored = scoreCandidate(
+      source({ temporal: [{ kind: 'active_range', first: 1961, last: 1976 }] }),
+      candidate({ debutSeason: 1903, finalSeason: 1914, careerGames: 169 }),
+    );
+    expect(scored.conflicts.map((c) => c.reason)).toContain('career_span_no_overlap');
+    expect(assessMatch([scored], 'hall_of_fame').band).toBe('low');
+  });
+
+  it('accepts a span assembled from several fragments that does overlap', () => {
+    // Murray Weideman's "1968-1969, 1953-1963" parses to 1953-1969, and
+    // is the reason this rule reads the outer bounds rather than the
+    // first fragment it finds.
+    const span = parseCareerSpan('1968-1969, 1953-1963');
+    expect(span).toEqual({ first: 1953, last: 1969 });
+
+    const scored = scoreCandidate(
+      source({ temporal: [{ kind: 'active_range', first: span!.first, last: span!.last }] }),
+      candidate({ debutSeason: 1953, finalSeason: 1963, careerGames: 180 }),
+    );
+    expect(scored.hardConflict).toBe(false);
+  });
+
+  it('will not contradict when AFLDB does not know the career in full', () => {
+    const scored = scoreCandidate(
+      source({ temporal: [{ kind: 'active_range', first: 1961, last: 1976 }] }),
+      candidate({ debutSeason: 1903, finalSeason: 1914, careerGames: null }),
+    );
+    expect(scored.hardConflict).toBe(false);
+  });
+});

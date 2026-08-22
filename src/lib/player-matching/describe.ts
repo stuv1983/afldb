@@ -175,6 +175,7 @@ const CONFLICT_LABELS: Record<string, string> = {
   season_outside_career: 'Source season falls outside this player’s career',
   club_not_in_history: 'This player never played for that club',
   uniqueness_collision: 'This player already holds that place',
+  career_span_no_overlap: 'Career span does not overlap this player’s career',
 };
 
 export function evidenceLabel(signal: string): string {
