@@ -832,7 +832,16 @@ async function readAnswerShape(
 
   const summary = panel.locator('details summary').filter({ hasNotText: 'How was this calculated?' }).first();
   const tableTitle = await summary.count() > 0 ? (await summary.textContent())?.trim() ?? null : null;
-  const tableNote = await panel.locator('details .muted').first().textContent().catch(() => null);
+  /**
+   * count()-guarded, exactly like tableTitle above and the panel guard at
+   * the top of this function. NlAnswerSection's unanswerable branch renders
+   * no <details> at all, and an unguarded textContent() auto-waits for an
+   * element that can never attach -- unbounded, because Playwright Test's
+   * default actionTimeout is 0 and the only backstop is the 30-minute
+   * per-batch timeout, which discards the whole batch's observations.
+   */
+  const note = panel.locator('details .muted').first();
+  const tableNote = await note.count() > 0 ? await note.textContent().catch(() => null) : null;
   const columnHeaders = await panel.locator('table thead th').evaluateAll((nodes) => (
     nodes.map((node) => node.textContent?.trim() ?? '').filter(Boolean)
   ));
