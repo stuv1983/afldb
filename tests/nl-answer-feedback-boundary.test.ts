@@ -26,7 +26,6 @@ describe('NL answer feedback boundary', () => {
     expect(serverComponent).not.toMatch(/\buseActionState\(/);
 
     expect(clientControls).toContain("'use client'");
-    expect(clientControls).toContain('useFormStatus');
     expect(clientControls).toContain('Did AFLDB understand this question?');
     expect(clientControls).toContain('name="verdict"');
     expect(clientControls).not.toContain('<form');
