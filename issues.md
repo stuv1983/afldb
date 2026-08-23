@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 13
+**Open issues:** 16
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
@@ -21,10 +21,12 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-074` | Low | Tests | `tests/integration/email-intake.test.ts` assumes the first `auth_users` row is its fixture admin and fails against real dev-host admin data. | Make the test create/select its own fixture admin deterministically instead of `ORDER BY`-picking one. |
 | `AFLDB-ISSUE-076` | Medium | Performance | Grid Solver combinations using `won_final_at_venue` can exceed PostgreSQL's 5-second statement timeout and crash the page. | Capture and compare the generated SQL/EXPLAIN plan against `played_at_venue`, then optimise the `won_final_at_venue` query shape without raising the application timeout. |
 | `AFLDB-ISSUE-077` | Medium | UI/Settings | The super-admin-selected frontend theme is not stable within a browsing session; different pages can render different themes as the user navigates. | Trace every theme source (database setting, server render, cookie/local storage and client hydration), establish one authoritative theme value per request/session, and add navigation regression coverage. |
-| `AFLDB-ISSUE-079` | High | Data integrity | Destructive reloads run before `AFLDB-ISSUE-044` may have left `player_link_resolutions` rows pointing at target ids that no longer exist. `afldb_dev` audited clean (75 resolutions, 0 dangling); production not yet audited. | Run the documented read-only dangling-target audit against production, record the per-table counts and any affected rows, and change nothing. |
-| `AFLDB-ISSUE-080` | High | Data integrity | `import_hall_of_fame` and `import_honour_teams` reconcile their whole table, so admin-created rows (`source_id IS NULL`) are deleted by a legacy reload — or now abort it if they carry a manual link. | Settle the global `hall_of_fame_name_uq` collision policy, audit production for `source_id IS NULL` rows, then scope both loaders to their own `source_id`. |
 | `AFLDB-ISSUE-081` | Low | Tests | The honours reload integration suite mutates rows that `release-gates.test.ts` counts, with no lock between the two files; latent, not yet observed failing. | Give it the same `tests/integration/draft-lock.ts` treatment, or prove the two files never overlap. |
 | `AFLDB-ISSUE-082` | Medium | Admin | `confirmUnlinked` takes no lock and never re-reads its target, so a stale form can vet a row whose person was linked moments earlier. | Lock and re-check the target the way `resolveLink` does, and reject a decision that contradicts an applied link. |
+| `AFLDB-ISSUE-083` | Medium | Tests / Database privileges | Every database-backed importer test substitutes the owner DSN for `AFLDB_IMPORT_DATABASE_URL`, so a privilege the importer needs but does not hold is invisible; `AFLDB-ISSUE-078` shipped exactly that defect. | Add a restricted test DSN plus a shared helper that runs the importer as `afldb_import` while fixtures stay on the owner handle, and prove it on the first-kick-goal loader first. |
+| `AFLDB-ISSUE-084` | High | Deployment / Data integrity | Production (migration 057, checkout `a32a0a1`) lacks the ISSUE-044/078 player-link protections: all seven `LINK_TARGET_TABLES` families are still served by destructive loaders, so a production reload can create new dangling resolutions. ISSUE-079 audited the history clean; this owns the prospective rollout. | On explicit instruction: apply migrations 058–070 with `db:privileges` at the ISSUE-044/078-specified points, deploy the three corrected loaders (the ISSUE-080-corrected `import_awards.py` included), run the Profile-B ISSUE-080 audit before the first awards/honours reload, run the one-time production `--rekey`, then regenerate and re-run the ISSUE-079 audit against the migrated schema. |
+| `AFLDB-ISSUE-085` | Low | Data integrity / Import | `import_captaincies` reconciles the whole `captaincies` table with no ownership predicate — the ISSUE-080 defect class, latent because the importer is today the table's only writer. | Scope it to its own `source_id` by construction (the `reload_keyed` conjunction now exists) and decide the `captaincies_natural_uq` collision policy before a second writer ever exists. |
+| `AFLDB-ISSUE-086` | Needs triage | Admin / Data integrity | Data-editor edits to source-owned rows can be silently reverted by the owning source's next reload (durability/overwrite, not the ISSUE-080 deletion class); only `players`/`matches`/`draft_picks` are live editable entities today. | Answer the four triage questions in the entry (UI promise, affected fields/entities, intended durability, silence of reversion), then set severity on that evidence. |
 
 ---
 
@@ -4301,14 +4303,18 @@ audit row does not undo the link it already applied.
    read-only under `AFLDB-ISSUE-079`.
 5. `confirmUnlinked` remains lock-free (`AFLDB-ISSUE-082`); the honours
    suite's latent fixture race is `AFLDB-ISSUE-081`.
+6. The grant gap found in the final review was invisible because this suite —
+   like every database-backed importer test — connects as `afldb_owner` rather
+   than `afldb_import`. The catalogue assertion added here covers this importer
+   only; the general test-infrastructure gap is tracked as `AFLDB-ISSUE-083`.
 
 ## AFLDB-ISSUE-079 — Audit historical `player_link_resolutions` rows for dangling targets
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Data integrity
 - **Found:** 2026-08-22
-- **Resolved:** N/A
+- **Resolved:** 2026-08-23 (production audited at migration 057; ISSUE-044/078 loader repairs not yet deployed — see `AFLDB-ISSUE-084`)
 - **Files:** `src/db/queries/player-links.ts` (`LINK_TARGET_TABLES`),
   `tools/migration/import_awards.py`, `tools/migration/import_draft.py`,
   `tools/records/import-first-kick-goal.ts`
@@ -4356,26 +4362,102 @@ The mechanism is confirmed, reproduced against `afldb_test` under
 75 resolutions, none dangling. `award_nominations`, `captaincies` and
 `player_achievements` hold no resolutions on dev at all.
 
-**Production has not been audited.** That is the outstanding work.
+**Production audit completed 2026-08-23 — clean.** Full results under
+Validation below.
 
 ### First wrong layer
-Data integrity / operational history. No current code path creates new orphans
-in the honours family.
+Data integrity / operational history. The repaired repository/dev source no
+longer creates new orphans, but the deployed production checkout (`a32a0a1`,
+migration 057) still carries the destructive loaders — see the prospective
+protection statement under Validation and `AFLDB-ISSUE-084`.
 
 ### Root cause
-Historical: the pre-`AFLDB-ISSUE-044` destructive reloads. Nothing to fix in
-current honours-loader code; `AFLDB-ISSUE-078` covers the two loaders still
-carrying the defect.
+Historical: the pre-`AFLDB-ISSUE-044` destructive reloads. Nothing further is
+required in the current honours-loader code for the dangling-target mechanism
+audited by this issue; `AFLDB-ISSUE-078` covers the draft and first-kick-goal
+paths, while `AFLDB-ISSUE-080` separately tracks honours-loader ownership
+scoping for admin-created rows.
 
 ### Fix
 No remediation is authorised by this issue. It covers **diagnosis only**.
 
 ### Validation
-Not yet performed against production. **The clean `afldb_dev` result above does
-not close this issue and must not be read as completing the audit:** dev and
-production are separate databases with separate reload histories and separate
-admin activity. This issue stays Open until production has been audited and its
-counts recorded here.
+
+Both audits were executed on 2026-08-23 under the approved AFLDB-ISSUE-079
+rev. 8 runbook (`AFLDB-ISSUE-079.md`): read-only, one
+`REPEATABLE READ READ ONLY` snapshot each, identity gate passed, live schema
+gate passed, `psql exit status: 0`, `ssh/remote exit status: 0`, and an explicit
+final `ROLLBACK` with no `COMMIT`. All seven of the runbook's mandatory
+Outcome A evidence conditions were positively observed for each run.
+
+**Production — `afldb_prod`, snapshot 2026-08-23 06:57:52+10, migration 057
+(schema pins S16/S17 true; all seventeen assertions S01–S17 true).**
+Artifact: `artifacts/audits/issue-079-player-link-integrity-prod-20260823.txt`.
+
+| target_table | resolutions | dangling |
+|---|---|---|
+| `award_winners` | 0 | 0 |
+| `award_nominations` | 0 | 0 |
+| `hall_of_fame` | 0 | 0 |
+| `honour_team_members` | 6 | 0 |
+| `captaincies` | 0 | 0 |
+| `player_achievements` | 0 | 0 |
+| `draft_picks` | 0 | 0 |
+
+`player_link_resolutions`: 6 rows, all `honour_team_members` (3 `linked`,
+3 `confirmed_unlinked`), **0 dangling**. `player_link_suggestions`: 2 rows, both
+`honour_team_members`, 0 dangling. Unknown target vocabulary 0; NULL/non-positive
+target ids 0; dangling player references 0 of 3; dangling admin references 0 of
+6; targets with repeated resolutions 0.
+
+Supplementary query 13 (deployment/exposure context, **excluded from the closure
+criterion by design**): the production player-link audit trail began when
+`056_player_link_review.sql` was applied at 2026-08-19 17:42:14.800707+10 —
+the full window in which a dangling row could have arisen; zero mapped
+destructive loader runs are recorded in that window, and 13d contains only
+unrelated `player_birth_evidence` runs. This is contextual only and **must not
+be used as proof of safety**.
+
+**Development — `afldb_dev`, snapshot 2026-08-23 07:05:11+10, migration 070
+(schema pins S16dev/S17dev true; all twenty-two assertions S01dev–S22dev true).**
+Artifact: `artifacts/audits/issue-079-player-link-integrity-dev-20260823.txt`.
+
+`player_link_resolutions`: 75 rows — `award_winners` 63, `draft_picks` 6,
+`hall_of_fame` 5, `honour_team_members` 1, the other three tables 0
+(63 `linked`, 12 `confirmed_unlinked`), **0 dangling** — reproducing the
+2026-08-22 result of 75 / 0. `player_link_suggestions`: 0 rows. Unknown target
+vocabulary 0; bad target ids 0; dangling player references 0 of 63; dangling
+admin references 0 of 75; repeated-resolution targets 0.
+
+Dev supplemental diagnostics (technical run completeness only — no evidential
+weight per rev. 8): `player_link_match_candidates` holds 2,798 rows with 0 stale
+cache rows across the seven probed targets; `draft_person` (2,304 rows) was
+deliberately not entity-probed; query 13c was intentionally omitted (Phase 0c
+unclassifiable dev source drift); query 13d surfaced one
+`import_awards.py` / `under_22` run whose destructive semantics are unclassified
+— supplementary only.
+
+### Closure
+
+**Historical audit result.** At the ISSUE-079 production audit snapshot of
+2026-08-23 06:57:52+10, the production database at migration 057 held 6
+`player_link_resolutions` rows, of which **0** named a target id that no longer
+exists across all seven `LINK_TARGET_TABLES`. No historical dangling player-link
+resolution targets were found, and no remediation was required for the audited
+historical rows. `player_link_resolutions` has existed in production only since
+`056_player_link_review.sql` was applied at 2026-08-19 17:42:14.80+10, so that
+is the full window in which a dangling row could have arisen.
+
+**Prospective protection status — separate, and not established by this
+audit.** At that same snapshot, the prospective protections implemented under
+`AFLDB-ISSUE-044` and `AFLDB-ISSUE-078` were **not deployed in production**. The
+deployed production checkout (`a32a0a1`) still contained destructive reload
+behaviour affecting all seven current player-link target families, so a reload
+run in production before those repairs are deployed can create new dangling
+resolutions. ISSUE-079's clean historical result is evidence about the past, not
+protection for the future — it is **not** proof that a future production reload
+cannot create new dangling resolutions. That forward exposure is owned by
+`AFLDB-ISSUE-084`, not by this issue.
 
 ### The audit
 
@@ -4431,102 +4513,125 @@ SELECT r.id, r.target_table, r.target_id, r.action, r.player_id,
 should be counted the same way while the audit is being run.
 
 ### Follow-up
-1. Run both queries against production, and re-run against `afldb_dev`, keeping
-   the full output as an artifact. Record the counts here. **Only on explicit
-   instruction** — this touches production, read-only or not.
-2. **Relink or delete nothing automatically.** This issue authorises no writes.
-3. Where a dangling decision can be reconstructed safely — the source key and
-   `player_name_raw` recorded in the audit row still identify exactly one live
-   honours row, and the recorded `player_id` still exists — design that
-   remediation as its own issue and require explicit review before it runs. It
-   would be a re-application of a human decision, so it needs the same
-   `resolveLink` path and a fresh audit row, not a hand-edited old one.
-4. Where a decision cannot be reconstructed confidently, preserve the audit
-   evidence, leave the row untouched, and flag the target for manual review in
-   `/admin/player-links`.
-5. If production is clean, close this issue with the recorded counts. Do not
-   leave it open on the assumption that damage must exist.
+1. Done 2026-08-23: both audits ran read-only under the rev. 8 runbook, full
+   output preserved as the two artifacts named under Validation, counts recorded
+   here. Nothing was relinked or deleted; no writes occurred; both transactions
+   ended with `ROLLBACK`.
+2. Production was clean (Outcome A), so no historical-remediation issue is
+   created — there are no affected historical rows to remediate.
+3. The prospective exposure — migrations 058–070, `db:privileges`, the corrected
+   loaders, the one-time `--rekey`, and the post-deployment audit re-run — is
+   deployment work and is owned by **`AFLDB-ISSUE-084`**, not by this issue.
+4. The migration-057-pinned production audit SQL
+   (`artifacts/audits/issue-079-audit-prod-20260823.sql`) will correctly refuse
+   (S16/S17) once production migrates past 057; it must be regenerated, not
+   rerun — recorded in `AFLDB-ISSUE-084`.
 
-## AFLDB-ISSUE-080 — Legacy honours reloads delete admin-created Hall of Fame and honour-team rows
+## AFLDB-ISSUE-080 — Source reloads reconciled rows they do not own across five award/honours paths
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Data integrity
 - **Found:** 2026-08-22
-- **Resolved:** N/A
-- **Files:** `src/db/queries/awards-admin.ts` (`createHallOfFameEntry`,
-  `createHonourTeamMember`), `tools/migration/import_awards.py`
-  (`import_hall_of_fame`, `import_honour_teams`), `tools/migration/common.py`
-  (`reload_keyed`), `src/db/migrations/042_awards_natural_keys.sql`
+- **Resolved:** 2026-08-23 — code implemented and dev/test validation complete.
+  **Production still runs the old loaders:** rollout is owned by
+  `AFLDB-ISSUE-084`, and the corrected `common.py` / `import_awards.py` /
+  `awards-admin.ts` are a deployment prerequisite there.
+- **Runbook:** `AFLDB-ISSUE-080.md` (revision 5) — the approved investigation and
+  implementation plan; authoritative for the full evidence chain, collision
+  analysis and gates summarised here.
+- **Files:** `tools/migration/common.py` (`reload_keyed`, `_scope_clause`,
+  `ReloadOwnershipCollision`); `tools/migration/import_awards.py`
+  (`import_hall_of_fame`, `import_honour_teams`, `import_awards` legacy winners,
+  `import_all_australian`, `import_rising_star`, `require_source`,
+  `_refuse_honour_team_identity_collisions`); `src/db/queries/awards-admin.ts`
+  (`createHallOfFameInductee`, `createHonourTeamMember`);
+  `tests/awards-admin.test.ts`; `tests/integration/awards-reload-links.test.ts`
 
 ### Symptom
-A Hall of Fame inductee or honour-team member created through the admin UI is
-destroyed by the next legacy awards reload. Before `AFLDB-ISSUE-044` this
-happened silently; since that change the row is still deleted, and if it carries
-a manual player link the reload now aborts instead.
+A row created outside a loader's own source — through a shipped admin screen,
+by the ingest promotion pipeline, or with unknown provenance — was destroyed by
+that loader's next reload, because five reload paths reconciled a population
+defined by domain (award id) or by nothing at all (the whole table). Before
+`AFLDB-ISSUE-044` this happened silently; after it, such a row carrying a manual
+player-link decision aborted the entire reload instead, while one with no
+decision was still deleted silently.
 
-### Reproduction
-Create a Hall of Fame entry via the admin screen (or an honour-team member),
-then run `tools/migration/import_awards.py --groups hall_of_fame honour_teams`.
-The admin row is gone. Repeat with the row manually linked to a player and the
-reload aborts with `LinkDecisionLoss` instead of completing.
+### Scope — the eight reload paths in `import_awards.py`
+The issue was raised for the two honours loaders; the runbook investigation
+proved the same defect on three further paths (its ledger-premise correction):
 
-### Expected
-A source reload reconciles only the rows that source owns. Rows AFLDB created
-itself are not the legacy source's to delete, and must survive any reload.
+| Classification | Paths |
+|---|---|
+| Proven cross-owner loss — **fixed under this issue** | `import_hall_of_fame`, `import_honour_teams`, `import_awards` (legacy winners), `import_all_australian`, `import_rising_star` |
+| Structurally unsafe, no second owner proven — **not changed** | `import_captaincies` — hardening recommended as a separate issue (runbook G6; see Follow-up) |
+| Proven unaffected | `import_awards` (definitions — no `source_id` column, single writer); `import_under_22` (the positive precedent: domain AND provenance, conjoined) |
 
-### Actual
-Both loaders treat the whole table as theirs:
-
-- `import_hall_of_fame` reloads all of `hall_of_fame`, keyed on
-  `(name, inducted_year)`;
-- `import_honour_teams` reloads all of `honour_team_members`, keyed on
-  `(team_name, player_name_raw)`.
-
-Any row whose key is absent from the legacy source is deleted, and an
-admin-created row is by definition absent from it.
-
-### Evidence
-**Ownership is already expressible and is simply not used.** Both admin inserts
-omit `source_id` entirely, so admin rows carry `source_id IS NULL`, while the
-loaders stamp `sources.get('wikipedia')`. The distinction the fix needs is
-therefore already in the data:
-
-- `src/db/queries/awards-admin.ts:264` — `INSERT INTO hall_of_fame (name,
-  player_id, link_status_value, category, inducted_year, is_legend, legend_year,
-  club_name_raw, state, playing_career, notes)` — no `source_id`.
-- `src/db/queries/awards-admin.ts:331,351` — the two `INSERT INTO
-  honour_team_members (...)` branches — no `source_id`.
-
-The other four honours loaders are unaffected: `award_winners`,
-`award_nominations` and `captaincies` key on `(source_id, source_record_id)`, so
-a NULL-source row is already outside their reload key space, and `under_22`
-scopes itself to its own `source_id`.
-
-**No schema change is required for the ownership distinction itself.**
-`source_id` already exists on both tables and already separates the two
-populations; the loaders simply do not consult it. Any schema work that emerges
-belongs to the collision policy below, not to ownership.
-
-**Exposure on `afldb_dev`, 2026-08-22 (read-only):**
-
-| Table | Total rows | `source_id IS NULL` (admin-created) | Admin-created and linked |
-|---|---|---|---|
-| `hall_of_fame` | 343 | 0 | 0 |
-| `honour_team_members` | 113 | 0 | 0 |
-
-**This means the defect is latent on dev, not disproven.** The reload behaviour
-is unchanged and wrong; there simply happens to be nothing on dev for it to
-destroy today. The first admin-created inductee or honour-team member changes
-that immediately. **Production has not been checked.**
+Foreign owners proven at risk: `createAwardWinner` (`manual_admin_edit` rows in
+the legacy-winner domain), the ingest promotions (`sports_data_lab` rows under
+the All-Australian and Rising Star awards), the two honours admin creators
+(then-`source_id IS NULL` rows), and any provenance-unknown row.
 
 ### First wrong layer
-Import/ETL scoping — the loader's notion of which rows it owns.
+Import/ETL ownership scoping — a loader reconciled rows it does not own.
 
 ### Root cause
-The two loaders that have no `source_record_id` fall back to a natural key and,
-with it, to reconciling the entire table. Table-wide reconciliation conflates
-"row this source did not supply" with "row this source deleted".
+`(source_id, source_record_id)` identifies a row; it does **not** define which
+existing rows a reload owns. Ownership is established only by constraining the
+reconciliation population — `reload_keyed`'s scope predicate — not by the shape
+of the key: a row whose key the incoming extract can never produce is not
+thereby protected, it is precisely the row the DELETE step classifies as
+vanished. The two natural-key honours loaders additionally reconciled their
+entire tables, conflating "row this source did not supply" with "row this
+source deleted".
+
+### Production exposure audit — gate G1, executed 2026-08-23, PASSED
+Read-only Profile-A (migration 057) audit run by the operator; Claude never
+connected to production. Evidence artifacts (preserved, not to be modified):
+
+- **Plane A (production):** `scratchpad/issue-080-planea-prod-20260823.txt`,
+  SHA-256 `0E2BF6BCF6B938CC1AE6FF31A26AD9785E0ECA9A0B304A7189DD9B792D456E78`.
+  Production identity gate and Profile-A schema/reference-data gate passed;
+  REPEATABLE READ READ ONLY transaction with explicit ROLLBACK; exit 0.
+- **Plane B (normalised incoming keysets):**
+  `scratchpad/issue-080-planeb-dev-20260823-v2.json`, SHA-256
+  `5AA44FC08C6A381FD049C7CD911B721B6A78EBDFC2CF7F4DF3D28146AF46128E`.
+  The complete Plane-B baseline, recorded here so `AFLDB-ISSUE-084` never
+  depends on opening that untracked scratchpad JSON:
+  - Legacy SQLite artifact SHA-256:
+    `a56fef4e79f3583a5dfa773190412abd4b4a3eca347a8ec95de6d1b960eac547`.
+  - Plane-B code HEAD: `9b628612cac7ac185be347314b270795a5ce1543`
+    (**pre-fix** — a reproducibility/provenance pin, not an equality
+    requirement; ISSUE-080 itself changes the files below), with baseline
+    blobs `common.py` `579e129b20ebf1cb6ae74f7c4e938e4168aaf2f3`
+    and `import_awards.py` `b19ea80af85e4b9be1724db4b579281aba1537e1`.
+  - Hall of Fame: read 343, skipped 0, emitted 343, distinct 343,
+    duplicate keys 0, fingerprint
+    `bcb0c3d609eb9d6251d22488d63ca86fb9f0e998ddec42d076e7e713a3e6bcc7`.
+  - Honour teams: read 113, skipped 0, emitted 113, distinct 113,
+    duplicate keys 0, fingerprint
+    `4a9710b29118f62bd8fb78178e7698513c0a44e5686016be088d04f784777110`.
+- **Findings:** hall_of_fame 343 rows and honour_team_members 113 rows, all
+  Wikipedia-owned; legacy-winner domain 1,810 rows, All-Australian 1,158,
+  Rising Star 766 — **zero foreign-owned, zero NULL-source, zero
+  foreign+linked rows anywhere**, and every stored-state collision set empty
+  (HoF `(name, inducted_year)`, honour-team raw-name and `(team_name,
+  player_id)`, award cross-owner `(award_id, source_record_id)`). Latest
+  awards/honours import batches were 2026-08-15; none occurred after Plane B.
+- **Profile-A correction:** `22-under-22` does not exist in the deployed
+  production revision `a32a0a1` (its `import_awards.py` contains no
+  `22-under-22` / `UNDER_22_SLUG` / `wikipedia_22under22`), so it is
+  evidence-only under Profile A and not a production reference-data gate; this
+  changed no implementation scope.
+- Earlier failed-audit artifacts preserved:
+  `…-transport-failed.txt` (SHA-256
+  `FE7EF5D1517FACACA4F6907D7FA543348B4E3F06D69181714D721B437FE1FF17`) and
+  `…-a15-profile-mismatch.txt` (SHA-256
+  `A9FE6DD792715E33586EA44CC414FBEA1FC04E4E3232845F64ECD9B9FB1EE346`).
+
+The audit classified as **No exposure** (§7.4), so implementation proceeded
+with no production remediation required. Earlier `afldb_dev` evidence
+(2026-08-22): 343 / 113 rows, 0 admin-created — latent there, not disproven.
 
 ### Interaction with AFLDB-ISSUE-044
 `AFLDB-ISSUE-044` did not introduce the deletion and did not fix it; it changed
@@ -4552,125 +4657,172 @@ converts a correct fail-closed stop into the silent data loss this issue exists
 to end. The row must stop being in the reload's scope at all.
 
 ### Fix
-Not fixed. Do not implement yet.
+Implemented 2026-08-23, per the approved runbook (`AFLDB-ISSUE-080.md` §8).
+Code-only: **no migration, no backfill, no privilege change** — the no-privilege
+conclusion proven rather than assumed (see Validation).
 
-The intended outcome is **source-scoped reconciliation**: an importer may only
-UPDATE, INSERT and DELETE rows it owns, and a row it does not own is neither
-read as a candidate nor deleted as a stranger. Concretely, scope
-`import_hall_of_fame` and `import_honour_teams` to their own `source_id` via
-`reload_keyed`'s existing `scope_column`/`scope_values` parameters, the way
-`under_22` already does. Admin-created rows (`source_id IS NULL`) then fall
-outside every one of the three write steps, and survive any reload untouched
-whether or not they carry a player-link decision.
+- **`reload_keyed` (`tools/migration/common.py`):** `_scope_clause` generalised
+  to an AND-joined conjunction (`scopes=[(column, values, exclude), …]`) so a
+  domain predicate and a provenance predicate compose instead of replacing each
+  other; the single-predicate shorthand and its empty-list semantics are
+  unchanged, so `import_draft.py` needed no edit. New **opt-in**
+  `refuse_out_of_scope_key` preflight refuses, before any write, an incoming
+  reload key already held by an out-of-scope row — compared with `_key_match`'s
+  own `IS NOT DISTINCT FROM` semantics, and matched against the scope's exact
+  complement `(scope) IS NOT TRUE` so NULL-provenance rows are seen (a NULL
+  `source_id` makes `= ANY` evaluate NULL, not FALSE). It raises the new
+  dedicated `ReloadOwnershipCollision`, naming row id, owning source and key;
+  `main()` reports it like `LinkDecisionLoss` (itemised warning, exit 1,
+  nothing written).
+- **Loader ownership scopes (`import_awards.py`):** hall_of_fame and
+  honour_teams add `source_id = ANY([wikipedia])`; legacy winners keeps its
+  award-family exclusion **and** adds `source_id = ANY([draftguru])`;
+  All-Australian adds `source_id = ANY([draftguru, wikipedia])`; Rising Star
+  adds `source_id = ANY([footywire])`. Every newly scoped loader resolves its
+  sources through the fail-closed `require_source` guard (a `sources.get` miss
+  would otherwise make the scope never-true and INSERT rows with NULL
+  provenance). Check 1 is enabled **only** for hall_of_fame, whose
+  `(name, inducted_year)` is a total globally unique identity backed by
+  `hall_of_fame_name_uq` — the runbook settled the old open question as
+  fail-closed refusal, never adoption, never re-scoping the constraint.
+- **Honour-team identity (§4.3/§4.4):** `import_honour_teams` instead runs a
+  loader-local preflight implementing the five-case raw-name matrix — refuse
+  when identity is unknown or asserted twice on either side, but **allow
+  linked P / linked Q coexistence** under one display name (the
+  ISSUE-025/migration-059 capability) — plus the unconditional
+  `(team_name, player_id)` refusal.
+- **Concurrency (§5.3):** the two mixed linked/unlinked collisions have no
+  unique-index backstop after migration 059, so both honour-team identity
+  writers serialise on the frozen transaction-scoped advisory lock
+  **`(717275, 1)`** (`717275 = 0xAF1DB`): blocking `pg_advisory_xact_lock` in
+  the importer, `pg_try_advisory_xact_lock` in the admin path with a bounded
+  "An honours reload is in progress; try again shortly." failure. Identical
+  literal constants in both languages, enforced by a cross-language contract
+  test; no session-scoped locks; released on commit and rollback alike.
+- **Admin creators (`awards-admin.ts`):** `createHallOfFameInductee` and
+  `createHonourTeamMember` stamp `manual_admin_edit`, resolved and required in
+  the same transaction exactly as `createAwardWinner` does.
+  `createHonourTeamMember` is now create-only/fail-closed: both
+  `ON CONFLICT … DO UPDATE` branches removed, both identity axes checked for
+  every ownership class before insert, refusals name the existing entry (and
+  point at no non-existent editor), no `data_edits` read on the mutation path —
+  and the linked-P/linked-Q same-name create still succeeds. Historical
+  `source_id IS NULL` rows are **not** backfilled; they keep meaning
+  "provenance unknown".
+- `import_captaincies`, `import_under_22`, the awards-definitions reload, the
+  data editor and `applyLockedLink` are untouched (writer inventory, runbook
+  §2.4b).
 
-### The constraint that must be considered first
-`hall_of_fame_name_uq` is a **global** `UNIQUE NULLS NOT DISTINCT (name,
-inducted_year)` (migration 042) — it is not scoped by `source_id`. Today the
-table-wide reload deletes a colliding admin row before inserting the source row,
-so a duplicate can never surface. Once the reload is scoped, an admin row
-duplicating a source key stops being silently overwritten and becomes a
-constraint violation that aborts the reload.
+### Validation (2026-08-23 — all §10 gates passed)
+1. `tests/awards-admin.test.ts`: **33/33** (Windows) — provenance stamping,
+   missing-source failure for both creators, lock taken first with the literal
+   `(717275, 1)` identity, bounded lock-contention error, create-only /
+   no-`ON CONFLICT` contract, the full §4.3/§4.4 refusal matrix including the
+   ISSUE-025 positive create, no audit write or `data_edits` read on the
+   refusal path, and the cross-language lock-constant contract.
+2. `tests/under-22-importer.test.ts`: **8/8** on the dev host under
+   Node v22.23.2 — the source contracts over `import_awards.py` are intact,
+   including the unchanged legacy-winner scope line.
+3. `npm run db:status`: 70 applied, **0 pending** — no migration attributable
+   to this work.
+4. `tests/integration/awards-reload-links.test.ts` run **isolated** on the dev
+   host against `afldb_test` (owner + `afldb_import` roles): **21/21, 0
+   skipped** (137.3 s; the amended suite rerun 2026-08-23 after the M2
+   review disposition added the real-database §4.4 axis-2 admin test — the
+   original pre-amendment run was 20/20 in 139.7 s) — admin/foreign-owned
+   rows survive all five reload paths (linked, decided and undecided, ids and
+   provenance intact, no `LinkDecisionLoss`); the HoF out-of-scope
+   incoming-key collision fails closed; the complete honour-team collision
+   matrix refuses with every table untouched; `createHonourTeamMember`'s
+   §4.4 axis-2 `player_id` disjunct refuses the same linked player under a
+   different display name against real PostgreSQL, writing nothing;
+   linked-P/linked-Q same-name coexistence succeeds through a real
+   reload (proving check 1 is not enabled there); double-reload idempotency;
+   and the §9.4b lock proofs — commit and rollback both release, the admin try
+   form fails fast rather than hanging, and the real `afldb_import` role takes
+   both lock forms and contends across roles via
+   `AFLDB_TEST_IMPORT_DATABASE_URL`. All six pre-existing ISSUE-044 cases
+   unchanged and green (§9.6).
+5. Read-only `afldb_dev` inventory (owner role, connection-level +
+   transaction-level READ ONLY, REPEATABLE READ, fail-closed database/source/
+   award gates, explicit ROLLBACK): honours provenance **wikipedia-only
+   (343 / 113)**, all ten ISSUE-080 domain-scoped foreign/NULL counts **0**,
+   all five stored-state duplicate counts **0**.
+6. `npm run typecheck`: clean (exit 0).
+7. `tests/integration/privileges.test.ts`: **24/24 unchanged** — role
+   confinement untouched; with the restricted-role lock proof in item 4 this
+   holds §8.4's no-privilege-change conclusion and closes gate **G8** (the
+   advisory lock serialises both writers on the existing schema, so the
+   no-migration conclusion stands).
 
-That is a deliberate design decision, not an incidental detail, and it must be
-settled before the scoping change lands. Options, in the order they should be
-weighed:
+### Independent review dispositions (2026-08-23)
+An independent read-only review of the completed implementation reported **no
+blocking correctness findings** and independently verified the design
+(conjunctive ownership scopes, NULL/empty-scope semantics, the `(scope) IS NOT
+TRUE` complement, the five modified loaders, the §4.3/§4.4 matrix, the
+advisory-lock protocol, and the create-only admin path). Four bounded
+dispositions were applied: the corrected Profile-B staleness rule with the
+full Plane-B baseline recorded above and in `AFLDB-ISSUE-080.md` (H1); the
+load-bearing migration-059 prerequisite recorded in the `AFLDB-ISSUE-084`
+handoff (M4); the runbook status header corrected to describe the resolved
+implementation (L5); and one new real-database integration test in
+`tests/integration/awards-reload-links.test.ts` proving `createHonourTeamMember`'s
+§4.4 axis-2 `player_id` SQL disjunct against PostgreSQL, which the unit suite
+only mocks (M2). The amended suite was rerun authoritatively on the dev host
+(Node v22.23.2, `afldb_test`) on 2026-08-23: **21/21, 0 skipped** (137.3 s),
+the new axis-2 test included — recorded in Validation item 4 above. Accepted
+residual operational
+risk (M3): there is no in-app remedy for an admin/source honour-team
+collision; fail-closed refusal pending curator/operator resolution is the
+intended behaviour.
 
-1. Detect the collision during `reload_keyed`'s pre-write analysis and report it
-   with both row ids, so it fails before touching anything and names the rows a
-   human must merge.
-2. Treat an admin row that exactly matches a source key as the same fact and
-   adopt it into the source's ownership, stamping `source_id` on it. This
-   silently changes ownership, so it needs explicit sign-off.
-3. Re-scope the constraint itself. Least attractive: the key exists to stop the
-   same inductee being loaded twice regardless of provenance, and per-source
-   uniqueness would weaken exactly the guarantee migration 042 was written for.
-
-`honour_team_members` has no equivalent problem: migration 059 already replaced
-its table-wide constraint with two partial unique indexes.
-
-### Required production exposure audit (read-only, must run before implementation)
-
-Not yet run, and **must not be run without explicit instruction.** It performs
-no writes: `SELECT` only, no `INSERT`/`UPDATE`/`DELETE`/`DDL`, no temporary
-tables. Run it as `AFLDB_OWNER_DATABASE_URL` — `afldb_app` cannot read
-`player_link_resolutions`, which report 3 needs.
-
-It must report four things:
-
-**1 + 2. Admin-created rows in both tables, with counts and full detail.**
-
-```sql
-SELECT 'hall_of_fame' AS tbl, count(*) AS total,
-       count(*) FILTER (WHERE source_id IS NULL) AS admin_created
-  FROM hall_of_fame
-UNION ALL
-SELECT 'honour_team_members', count(*),
-       count(*) FILTER (WHERE source_id IS NULL)
-  FROM honour_team_members
-ORDER BY 1;
-
-SELECT id, name, inducted_year, category, player_id,
-       link_status_value::text AS link_status, club_name_raw, import_batch_id
-  FROM hall_of_fame WHERE source_id IS NULL ORDER BY id;
-
-SELECT id, team_name, player_name_raw, position, player_id,
-       link_status_value::text AS link_status, sort_order, import_batch_id
-  FROM honour_team_members WHERE source_id IS NULL ORDER BY id;
-```
-
-**3. Whether any admin-created row carries a player-link decision** — these are
-the rows that would abort a reload today rather than vanish from it.
-
-```sql
-SELECT r.target_table, r.target_id, r.action, r.player_id, r.previous_status,
-       r.created_at, r.admin_user_id, r.match_method
-  FROM player_link_resolutions r
- WHERE (r.target_table = 'hall_of_fame'
-        AND r.target_id IN (SELECT id FROM hall_of_fame WHERE source_id IS NULL))
-    OR (r.target_table = 'honour_team_members'
-        AND r.target_id IN (SELECT id FROM honour_team_members WHERE source_id IS NULL))
- ORDER BY r.target_table, r.target_id, r.created_at;
-```
-
-**4. Whether any admin-created Hall of Fame row collides on
-`(name, inducted_year)` with an importer-owned row.** This is the set that
-decides the collision policy: today the table-wide delete hides these, and
-source-scoping turns each one into a `hall_of_fame_name_uq` violation.
-
-```sql
-SELECT a.id AS admin_id, a.name, a.inducted_year,
-       s.id AS source_id_row, s.source_id AS owning_source,
-       a.player_id AS admin_player, s.player_id AS source_player
-  FROM hall_of_fame a
-  JOIN hall_of_fame s
-    ON s.source_id IS NOT NULL
-   AND s.name IS NOT DISTINCT FROM a.name
-   AND s.inducted_year IS NOT DISTINCT FROM a.inducted_year
- WHERE a.source_id IS NULL
- ORDER BY a.name;
-```
-
-A collision against the *incoming legacy source* rather than the currently
-stored rows is the stricter question, and needs the loader's own extract; the
-query above is the safe stored-state approximation and is sufficient to decide
-whether the collision set is empty.
-
-Record the results here. The scoping change is only safe once the collision set
-is known to be empty or has been deliberately resolved.
-
-### Validation
-Not yet performed.
+### Deferred validation (deliberate, not skipped)
+1. The combined `awards-reload-links.test.ts` + `release-gates.test.ts` run
+   waits until `AFLDB-ISSUE-081` supplies the shared test advisory lock
+   (runbook §9.7 / G3). The new fixtures widen that latent race; the isolated
+   run above is the required §10 step-3 proof.
+2. The **Profile-B production audit repeat** runs inside `AFLDB-ISSUE-084`'s
+   deployment sequence: after migrations 058–070 (059 included) and the
+   068 + `db:privileges` step, after the corrected loaders are deployed, and
+   **before the first awards/honours reload** under the migrated schema.
+   **Corrected staleness rule (2026-08-23, independent review, H1):** Plane B
+   must be rerun from the **exact deployment-candidate code** and the **exact
+   canonical SQLite artifact selected for the production reload**, recording
+   its own code HEAD/revision, relevant code blob IDs, artifact SHA-256,
+   read/skipped/emitted/distinct counts, duplicate-key result and both key
+   fingerprints. The pre-fix HEAD/blob IDs recorded above are historical
+   provenance only — a changed whole-file `common.py` or `import_awards.py`
+   blob does **not** by itself invalidate Profile B, because ISSUE-080 itself
+   necessarily changes those files. The operative comparison is (a) canonical
+   legacy artifact identity and (b) the regenerated incoming natural-key
+   counts/fingerprints: if the artifact SHA-256 changes, **STOP** and redo the
+   Plane-A × Plane-B classification; if incoming counts or fingerprints
+   change, **STOP** and redo the classification; if normalisation, skip rules
+   or natural-key derivation themselves changed, the newly generated Plane-B
+   keyset is authoritative and the classification is redone rather than
+   waived. Do not informally approve a mismatch (runbook §7.1/§7.2 and its
+   post-implementation corrections section).
 
 ### Follow-up
-1. Decide the `hall_of_fame_name_uq` collision policy above before writing code.
-2. Run the read-only production exposure audit above and record its output —
-   only on explicit instruction.
-3. Scope the two loaders to their own `source_id`, then extend
-   `tests/integration/awards-reload-links.test.ts` with an admin-created row
-   (linked and unlinked) that survives a full reload untouched.
-4. Consider whether `createHallOfFameEntry` and `createHonourTeamMember` should
-   stamp an explicit `manual_admin_edit` source rather than leaving `source_id`
-   NULL, so ownership is asserted positively instead of inferred from absence.
+1. **`AFLDB-ISSUE-084` deploys this fix.** The corrected `common.py`,
+   `import_awards.py` and `awards-admin.ts` are a deployment prerequisite
+   there: shipping the ISSUE-044 protections without this scoping would fail
+   closed on decided admin rows and still silently delete undecided ones.
+   Production remains exposed to this defect until ISSUE-084 completes.
+2. Raised as **`AFLDB-ISSUE-085`** (runbook G6): `import_captaincies` unscoped
+   reconciliation hardening — no ownership predicate and no proven second
+   writer today; scope it by construction as ISSUE-078 did for `draft_persons`
+   and settle the `captaincies_natural_uq` collision policy.
+3. Raised as **`AFLDB-ISSUE-086`** (runbook G5): data-editor edit durability on
+   source-owned rows — overwrite-on-reload rather than ownership deletion, with
+   no live reversion path in the honours tables today (`EDITABLE_ENTITIES`
+   registers only `players`, `matches`, `draft_picks`). Severity deliberately
+   left to triage on its own evidence.
+4. Forward constraint recorded on `AFLDB-ISSUE-082`: if its fix ever makes
+   `confirmUnlinked` (or any successor) write `player_id = NULL` back to
+   `honour_team_members`, that path creates the migration-059 unbacked mixed
+   collision and must join the §4.3 matrix and the `(717275, 1)` advisory-lock
+   protocol.
 
 ## AFLDB-ISSUE-081 — Honours reload suite races the release gates over shared rows
 
@@ -4721,6 +4873,13 @@ Either give the honours pair the same advisory-lock treatment as
 `tests/integration/draft-lock.ts`, or establish that the gate's honours
 assertions cannot overlap that suite's fixtures and record why. Do not serialise
 the whole test run: file parallelism is worth keeping.
+
+**Widened by `AFLDB-ISSUE-080` (2026-08-23):** its resolution added fixtures to
+`hall_of_fame`, `honour_team_members`, `award_winners` and `award_nominations`
+in `awards-reload-links.test.ts`, all of which `release-gates.test.ts` counts.
+The combined run of those two files is deliberately deferred to this issue
+(ISSUE-080 was validated with the suite run isolated, which removes the race
+entirely); once this issue lands its lock, run them together.
 
 ## AFLDB-ISSUE-082 — `confirmUnlinked` can record a decision contradicting an applied link
 
@@ -4777,3 +4936,437 @@ confirmation whose target — or, for a draft pick, whose draft person — is
 already resolved. Extend `tests/player-link-mutations.test.ts`, which already
 owns the draft identity-resolution cases.
 
+**Forward constraint from `AFLDB-ISSUE-080` (2026-08-23):** ISSUE-080's
+honour-team writer inventory holds only because no admin path moves an
+honour-team row linked → unlinked (`confirmUnlinked` is audit-only and writes
+nothing to the target). If this issue's fix ever makes `confirmUnlinked` — or
+any successor — write `player_id = NULL` back to `honour_team_members`, that
+writer creates the migration-059 unbacked mixed linked/unlinked collision and
+must join ISSUE-080's §4.3 identity matrix and the transaction-scoped advisory
+lock `(717275, 1)` shared by `createHonourTeamMember` and
+`import_honour_teams`.
+
+
+## AFLDB-ISSUE-083 — Importers are tested as `afldb_owner`, so missing-grant defects are invisible
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Tests / Database privileges
+- **Found:** 2026-08-22
+- **Resolved:** N/A
+- **Files:** `tests/integration/awards-reload-links.test.ts`,
+  `tests/integration/draft-reload-links.test.ts`,
+  `tests/integration/first-kick-goal-reload-links.test.ts`,
+  `tests/integration/data-editor.test.ts`, `tests/integration/privileges.test.ts`,
+  `tests/integration/guard.ts`, `tests/setup.ts`, `.env.example`,
+  `tools/migration/common.py`, `tools/records/import-first-kick-goal.ts`,
+  `tools/maintenance/privileges.sql`
+
+### Symptom
+Every database-backed test of a production importer runs the importer as
+`afldb_owner`. The importer runs as `afldb_import` in every real environment.
+A privilege the importer requires but does not hold is therefore invisible to
+the whole test suite: the run is green and the first production execution fails
+with `permission denied`.
+
+### Reproduction
+The integration suites do not merely inherit the owner connection — they assign
+it deliberately:
+
+    process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
+
+That line appears verbatim in `awards-reload-links.test.ts:35`,
+`draft-reload-links.test.ts:48`, `first-kick-goal-reload-links.test.ts:46` and
+`data-editor.test.ts:9`, and is repeated in the `spawnSync` env of each suite
+that shells out to the real loader. `.env.example:60` sets
+`AFLDB_TEST_DATABASE_URL` to an `afldb_owner` DSN, so the substitution silently
+promotes the importer to owner privileges for the whole run.
+
+### Expected
+A production importer's database-backed test proves that the operations the
+importer performs succeed **under `afldb_import`**, and that operations it must
+never perform remain denied.
+
+### Actual
+It proves only that they succeed as the table owner, for whom no grant can ever
+be missing.
+
+### Evidence
+
+**The defect this class already produced (`AFLDB-ISSUE-078`).** The
+first-kick-goal retirement preflight reads `player_link_suggestions` and
+`player_link_match_candidates` before deleting a source fact, so it can refuse
+to strand a durable non-FK reference. `afldb_import` held **no privilege of any
+kind** on either table. All 13 integration tests passed. Running the same
+importer as `afldb_import` against `afldb_test` failed immediately on the read.
+Fixed for that importer by migration `070_import_reads_link_suggestions.sql`, a
+matching `tools/maintenance/privileges.sql` block, and a hand-written catalogue
+assertion in the first-kick-goal suite. That assertion is a spot fix naming four
+tables for one importer; it is not a mechanism, and nothing generalises it to the
+others.
+
+**The same class, one issue earlier.** `AFLDB-ISSUE-027` needed migration 066 to
+give `afldb_import` INSERT on `data_edits` and `player_link_resolutions` so the
+audit row could commit inside the mutation transaction. Its behavioural proof,
+`tests/integration/data-editor.test.ts`, also runs as owner and would have passed
+without migration 066 at all. Only the catalogue assertions in
+`privileges.test.ts` caught the requirement, and only because someone thought to
+write them by hand. The ledger already records the resulting operational hazard:
+migration 066 plus `npm run db:privileges` must be deployed **before** the code,
+or admin mutations fail closed. Migration 070 has now inherited exactly the same
+deployment dependency.
+
+**Why `privileges.test.ts` does not close this.** That suite is deliberately a
+*confinement* test — it interrogates `has_table_privilege` from the owner
+connection and asserts the roles hold **no more** than intended. Its own header
+says so: "The integration suite connects as afldb_owner". It has no model of what
+each importer **requires**. Its central import assertion, "writes exactly the
+tables the registry allows, and no others", probes `INSERT` against
+`afldb_meta.import_writable_tables`, so a SELECT-only requirement such as
+`player_link_suggestions` is outside its reach by construction. Confinement and
+sufficiency are different properties, and only confinement is currently tested.
+
+**Excessive-grant defects are covered; missing-grant defects are not.** The
+registry drift test does catch a table that became writable without being
+registered. Nothing catches the inverse.
+
+### Investigation findings by importer and test
+
+| Production code executing as `afldb_import` | Database-backed test | Role the test actually uses |
+|---|---|---|
+| `tools/migration/import_awards.py` (via `common.py:82`) | `tests/integration/awards-reload-links.test.ts` | `afldb_owner`, explicit substitution |
+| `tools/migration/import_draft.py` | `tests/integration/draft-reload-links.test.ts` | `afldb_owner`, explicit substitution |
+| `tools/records/import-first-kick-goal.ts` | `tests/integration/first-kick-goal-reload-links.test.ts` | `afldb_owner`, explicit substitution, plus one hand-written catalogue assertion |
+| `src/db/queries/player-links.ts`, `awards-admin.ts`, `match-admin.ts`, `match-sheet.ts`, `data-edits.ts`, `players.ts`, `src/lib/ingest/pipeline.ts` | `tests/integration/data-editor.test.ts` | `afldb_owner`, explicit substitution |
+| `tools/migration/import_legacy_afl.py` | none | — |
+| `tools/migration/enrich_birth_dates.py`, `enrich_birth_dates_from_club_lists.py` | none | — |
+| `tools/migration/rebuild_derived.py` | none | — |
+| `tools/aflw/load_staging.py` (`staging_aflw` grants) | none | — |
+| `src/lib/external-afl/current-season-import.ts` | `tests/current-season-import.test.ts`, source-contract only | no database |
+| `tools/matching/backtest.ts` | `tests/player-matching.test.ts` | no database |
+
+The mocked admin suites (`tests/awards-admin.test.ts`,
+`tests/player-link-mutations.test.ts`, `tests/admin-match-mutations.test.ts`)
+stub `AFLDB_IMPORT_DATABASE_URL` with a fake DSN, so they assert that the
+mutation path *reaches* for the import role without ever connecting as it.
+
+No test anywhere in the repository opens a connection as `afldb_import`,
+`afldb_app` or `afldb_auth`. There is no environment variable for a restricted
+test DSN; `.env.example` defines only `AFLDB_TEST_DATABASE_URL`, and
+`tests/setup.ts` and `tests/integration/guard.ts` know about that one alone.
+
+### First wrong layer
+Test harness role selection. The importers, the migrations and `privileges.sql`
+are each internally consistent; nothing verifies that the privileges granted are
+the privileges the code requires.
+
+### Root cause
+Two properties were conflated. `AFLDB_TEST_DATABASE_URL` is an owner DSN because
+integration fixtures legitimately need owner privileges — TRUNCATE, sequence
+resets, direct writes to tables the app role cannot touch. Rather than separate
+privileged fixture setup from the execution of the process under test, each suite
+assigns that same DSN to `AFLDB_IMPORT_DATABASE_URL`, so the process under test
+loses the only constraint that distinguishes it from the harness around it.
+
+### Current exposure
+Any importer change that begins reading or writing a table the ETL role does not
+already hold ships green and fails on first production execution. The blast
+radius is not uniform:
+
+- A **read** added to a preflight — the `AFLDB-ISSUE-078` shape — turns a
+  protective check into a hard abort, so the safe path becomes the broken one.
+- A **write** to a table absent from `afldb_meta.import_writable_tables` fails
+  mid-reload; the transactional loaders roll back cleanly, but the run is lost
+  and the cause is opaque.
+- The `privileges.sql` import block **revokes** anything it does not re-grant, so
+  a migration-only grant that is not mirrored there is silently stripped by the
+  next reconciliation — a defect that would surface long after the test run that
+  approved it.
+
+Not currently believed to be causing production failures: migrations 066, 068 and
+070 have each been reconciled, and the three keyed reload paths are exercised on
+`afldb_test`. This is a latent-defect and future-regression exposure.
+
+### Fix
+Not yet fixed. Deliberately not implemented in this pass.
+
+### Proposed acceptance criteria
+1. A restricted test DSN exists (for example `AFLDB_TEST_IMPORT_DATABASE_URL`),
+   documented in `.env.example`, subject to the same `_test`-database assertion
+   `tests/setup.ts` already applies, and **skipped with a clear message rather
+   than failed** when absent, so a checkout without the second credential still
+   runs the suite.
+2. A shared helper — the natural home is alongside `tests/integration/guard.ts` —
+   runs a named importer as a child process under that DSN while fixture setup and
+   assertions continue on the owner `sql` handle. The three reload suites already
+   spawn the loader with an explicit `env`, so the seam exists and only the DSN
+   changes.
+3. Every production importer that executes as `afldb_import` has at least one
+   role-parity path: a representative run that must succeed under the restricted
+   role, and at least one operation that must remain denied.
+4. The denial half is real. A test that only proves success cannot distinguish a
+   correct grant from a role that was quietly widened.
+5. `player_link_suggestions` and the migration-066 audit-table grants are covered
+   by the general mechanism, and the hand-written catalogue assertion in
+   `first-kick-goal-reload-links.test.ts` is either folded into it or explicitly
+   kept as that importer's requirement declaration.
+6. A grant present in a migration but missing from
+   `tools/maintenance/privileges.sql` is detected, since the reconciler strips it.
+   Running `db:privileges:test` before the parity path is the cheapest form of
+   this.
+7. The suite still passes on a checkout that has never run `npm run db:privileges`,
+   or fails with a sentence naming that command — not a bare `permission denied`.
+
+### Explicit non-goals
+- **Do not** re-run the existing integration suite as `afldb_import`. Those tests
+  legitimately need owner privileges for fixtures; demoting them would break them
+  for reasons unrelated to the invariant being tested.
+- **Do not** convert `privileges.test.ts` into a requirements test. Confinement is
+  the property it asserts well, and it should keep asserting exactly that.
+- **Do not** widen any grant to make a test pass. A parity failure is evidence of
+  a missing migration, not of an over-strict role.
+- **Do not** rework the importers, their reconciliation keys, or the role model.
+  This is test infrastructure.
+- **Do not** add a second test database or a second CI job.
+- Not in scope: `AFLDB-ISSUE-081`, `AFLDB-ISSUE-082`, and general importer cleanup.
+
+### Relationship to migration grants and `privileges.sql`
+Importer privileges have two authorities that must agree. Migrations (`045`,
+`066`, `068`, `070`) establish grants at a point in time;
+`tools/maintenance/privileges.sql` is the reconciler that re-derives the whole set
+from `afldb_meta.import_writable_tables` plus a hand-written block of narrow
+exceptions, and revokes everything else. A grant that exists in only one of the
+two is a live defect in one direction or the other, and both directions are
+deployment-order sensitive: as recorded for `AFLDB-ISSUE-027` and again for
+migration 070, the migration and `npm run db:privileges` must run before the code
+that depends on the grant. Role-parity tests are the missing third leg — they
+check the grants against what the code actually asks for, which neither authority
+can do on its own.
+
+### Validation
+Not yet performed. Investigation only; no code, schema, grant or test was changed
+by this entry.
+
+## AFLDB-ISSUE-084 — Deploy the ISSUE-044/078 player-link protections to production
+
+- **Status:** Open
+- **Severity:** High
+- **Area:** Deployment / Data integrity
+- **Found:** 2026-08-23
+- **Resolved:** N/A
+- **Files:** `src/db/migrations/058`–`070` (production-pending),
+  `tools/maintenance/privileges.sql`, `tools/migration/import_awards.py`,
+  `tools/migration/import_draft.py`, `tools/records/import-first-kick-goal.ts`,
+  `artifacts/audits/issue-079-audit-prod-20260823.sql` (to be regenerated
+  post-migration)
+
+### Symptom
+Production (checkout `a32a0a1`, database `afldb_prod` at migration 057 as at the
+2026-08-23 06:57:52+10 ISSUE-079 audit snapshot) does not carry the prospective
+player-link protections implemented under `AFLDB-ISSUE-044` and
+`AFLDB-ISSUE-078`. The deployed loaders still contain destructive reload
+behaviour affecting **all seven** current `LINK_TARGET_TABLES` families:
+`import_awards.py` truncates `award_winners`, `award_nominations`,
+`hall_of_fame`, `honour_team_members` and `captaincies`; `import_draft.py`
+truncates `draft_picks`/`draft_persons`; `import-first-kick-goal.ts` deletes its
+`player_achievements` rows. A reload run in production before deployment can
+create new dangling `player_link_resolutions` targets.
+
+### Scope
+**This is deployment work, not historical remediation.** The `AFLDB-ISSUE-079`
+production audit found **no historical dangling targets** (6 resolutions, 0
+dangling at the snapshot above), so there is nothing to repair in existing data.
+Production remains **prospectively exposed** until this issue is completed.
+
+This issue owns, in order:
+
+1. Apply migrations **058–070** to production.
+2. Run `npm run db:privileges` at the points `AFLDB-ISSUE-044` and
+   `AFLDB-ISSUE-078` require: migration `068` plus `db:privileges` **before**
+   the new honours importer code (or the honours loaders fail closed on the
+   resolution read); migration `069` before the new `import_draft.py`;
+   migration `070` plus `db:privileges` before the new first-kick-goal importer.
+3. Deploy the corrected `import_awards.py`.
+4. Deploy the corrected `import_draft.py`.
+5. Deploy the corrected `import-first-kick-goal.ts`.
+6. Run the one-time `--rekey` per target database as the existing
+   `AFLDB-ISSUE-078` Follow-up instructions specify (dev is done; production is
+   not).
+7. **Regenerate and re-run the ISSUE-079 audit post-deployment.** The existing
+   production audit SQL is pinned to migration 057 (assertions S16/S17) and will
+   correctly refuse to run once production has migrated past 057; it must be
+   regenerated against the post-migration schema, not rerun.
+
+### Expected
+Production runs the same keyed, link-preserving reload paths as the repository
+and `afldb_dev`, with grants reconciled, and a fresh clean post-deployment audit
+recorded.
+
+### Actual
+Not yet deployed. Migrations 058–070 unapplied in `afldb_prod`; all three
+corrected loaders undeployed; production `--rekey` not run.
+
+### Evidence
+`AFLDB-ISSUE-079.md` Phase 0a/0b (production at migration 057, checkout
+`a32a0a1`, 84 commits behind local; destructive loader call sites enumerated in
+Phase 5) and the audit artifact
+`artifacts/audits/issue-079-player-link-integrity-prod-20260823.txt`.
+Deployment-order hazards are already recorded in the `AFLDB-ISSUE-044` and
+`AFLDB-ISSUE-078` Follow-up sections and in `AFLDB-ISSUE-083` (migration +
+`db:privileges` before code).
+
+### Fix
+Not yet performed. Deployment only on explicit instruction, following the
+existing dev-before-prod convention.
+
+### Validation
+Not yet performed. Completion requires the post-deployment regenerated ISSUE-079
+audit (step 7) to run clean against the migrated production schema.
+
+### Follow-up (from `AFLDB-ISSUE-080`, resolved 2026-08-23)
+The deployed `import_awards.py` in step 3 **must be the ISSUE-080-corrected
+version** (with the matching `common.py` and `awards-admin.ts`): deploying the
+ISSUE-044 protections without ISSUE-080's ownership scoping ships a loader that
+fails closed on decided admin rows and still silently deletes undecided ones.
+ISSUE-080 adds no migration and no privilege step. One gate is added inside
+this issue's sequence: the **Profile-B ISSUE-080 audit** — regenerated for the
+migrated schema, with Plane B rerun from the exact deployment-candidate code
+and the exact canonical SQLite artifact selected for the production reload —
+runs after the migrations, privileges and corrected loaders are in place and
+**before the first awards/honours reload** (step 6/7 territory; full ordering
+in `AFLDB-ISSUE-080.md` §7.2 and its ISSUE-084 handoff table). The comparison
+against the ISSUE-080 entry's recorded Plane-B baseline uses the **corrected
+staleness rule** (2026-08-23): the operative comparison is the canonical
+artifact SHA-256 plus the regenerated incoming natural-key counts/fingerprints
+— the pre-fix code HEAD/blob IDs are historical provenance only, since
+ISSUE-080 itself changes `common.py`/`import_awards.py`. If the artifact
+SHA-256, either count or either fingerprint differs, **STOP** and redo the
+Plane-A × Plane-B classification; if normalisation/skip/key-derivation code
+changed, the new keyset is authoritative and the classification is redone,
+never waived; never informally approve a mismatch.
+
+**Load-bearing ordering constraint (2026-08-23, M4): migration
+`059_honour_team_member_identity.sql` must already be applied before the
+corrected `import_honour_teams` loader runs.** The honour-team raw-input
+preflight intentionally classifies using the incoming `player_id` **before**
+any player-link decision replay, and replay can later change an in-scope row's
+`player_id`; `honour_team_linked_player_uq` (a migration-059 object) is the
+final fail-closed backstop if replay would create duplicate
+`(team_name, player_id)` identity. If migration 059 is absent, **STOP** — do
+not run the corrected production honour-team reload on a pre-059 schema.
+Within this issue's existing sequence (migrations before loaders) the
+constraint is automatically satisfied, but it must hold even if the sequence
+is ever re-ordered.
+
+### Follow-up
+Design the helper first and prove it on the first-kick-goal importer, whose
+requirements are already known precisely from the `AFLDB-ISSUE-078` review:
+SELECT on `player_achievements`, `data_issues`, `player_link_resolutions` and
+`player_link_suggestions`; INSERT-only on the two human-contributed tables; no
+UPDATE or DELETE on either. Extend to the draft and awards loaders, then decide
+per importer whether the untested Python jobs justify their own parity paths or a
+single shared smoke path.
+
+## AFLDB-ISSUE-085 — `import_captaincies` reconciles an unscoped population with no ownership predicate
+
+- **Status:** Open
+- **Severity:** Low (latent — no second writer exists today)
+- **Area:** Data integrity / Import
+- **Found:** 2026-08-23 (during the `AFLDB-ISSUE-080` investigation; runbook
+  `AFLDB-ISSUE-080.md` §2.2, §4.6, §6, gate G6)
+- **Resolved:** N/A
+- **Files:** `tools/migration/import_awards.py` (`import_captaincies`),
+  `tools/migration/common.py` (`reload_keyed`),
+  `src/db/migrations/042_awards_natural_keys.sql` (`captaincies_natural_uq`)
+
+### Symptom
+Latent, structural. `import_captaincies` passes no scope to `reload_keyed`, so
+its reconciliation population is the **entire** `captaincies` table — the same
+ownership-scoping class `AFLDB-ISSUE-080` fixed on five other paths. No loss is
+currently possible, which is why ISSUE-080 deliberately did not modify it: the
+issue's evidence threshold required a proven second legitimate owner, and none
+exists.
+
+### Evidence
+Verified during the ISSUE-080 investigation: the importer is the only writer of
+`captaincies` in the tree — the table is absent from the `data_edits` allowlist
+(migration 058), absent from `src/lib/ingest/datasets.ts`, and has no admin
+mutation in `src/db/queries/`. The day a second writer exists (an admin screen,
+an ingest dataset), its rows are classified as vanished and deleted by the next
+reload — or abort it if they carry a link decision. `captaincies_natural_uq
+UNIQUE (season, club_id, player_name_raw, role)` binds the fact and is
+source-blind by design (migration 042), so scoping will also need a collision
+policy for it.
+
+### Expected
+The reload is scoped by construction — domain plus `source_id`, the way
+`AFLDB-ISSUE-078` scoped `draft_persons` and ISSUE-080 scoped the five affected
+paths — before a second writer ever exists, rather than after one loses data.
+The `reload_keyed` conjunction machinery and the fail-closed `require_source`
+guard ISSUE-080 added make this a small change.
+
+### Fix
+Not yet fixed. Deliberately excluded from `AFLDB-ISSUE-080` (no proven second
+owner). Severity is set on this issue's own evidence — latent, no reachable
+loss today — not inherited from ISSUE-080.
+
+### Validation
+Not yet performed.
+
+### Follow-up
+Scope `import_captaincies` to `source_id = ANY([wikipedia])` via `reload_keyed`,
+with the `require_source` guard; decide the `captaincies_natural_uq` collision
+policy (declare it to an ISSUE-080-style preflight or document the raw
+constraint failure as acceptable); cover it in
+`tests/integration/awards-reload-links.test.ts`.
+
+## AFLDB-ISSUE-086 — Data-editor edits to source-owned rows can be reverted by the next source reload
+
+- **Status:** Open
+- **Severity:** Needs triage — deliberately not pre-classified; see below
+- **Area:** Admin / Data integrity
+- **Found:** 2026-08-23 (during the `AFLDB-ISSUE-080` investigation; runbook
+  `AFLDB-ISSUE-080.md` §6, §2.4b, gate G5)
+- **Resolved:** N/A
+- **Files:** `src/lib/edit/spec.ts` (`EDITABLE_ENTITIES`),
+  `src/db/queries/data-edits.ts` (`applyDataEdit`), the source importers for
+  whichever entities investigation implicates
+
+### Symptom
+A data-editor UPDATE to a **source-owned** row edits columns the owning
+source's next reload rewrites from its extract, so the admin's correction is
+silently reverted. This is edit **durability** (overwrite-on-reload), not the
+ownership **deletion** ISSUE-080 fixed: the row survives with its id and links
+intact, but the edited field values do not.
+
+### Evidence
+Observed structurally during ISSUE-080; no live reversion has been reproduced.
+The ISSUE-080 writer inventory (runbook §2.4b) narrows the present surface:
+`EDITABLE_ENTITIES` registers only `players`, `matches` and `draft_picks`, so
+`hall_of_fame` and `honour_team_members` have **no** editor path to revert
+today, and `award_winners` is registered in the `data_edits` allowlist
+(migration 058) without being an editable entity. The concern is therefore the
+pattern itself — the three live editable entities against their own importers —
+and any entity registered later. That framing must be confirmed, not assumed.
+
+### Severity — needs triage
+The runbook explicitly forbids pre-classifying this. Severity is decided by:
+
+1. what the admin UI promises about the durability of an edit;
+2. which fields and entities are actually affected (editable entities vs their
+   importers' reconciled columns);
+3. whether the edits are intended as durable corrections;
+4. whether the reversion is silent.
+
+### Fix
+Not yet investigated.
+
+### Validation
+Not yet performed.
+
+### Follow-up
+Answer the four triage questions above against the three live editable
+entities, set the severity on that evidence, then design the durability
+mechanism (or document the reversion as intended) as its own piece of work. It
+does not block anything in ISSUE-080 or ISSUE-084 unless investigation shows
+the ownership-deletion mechanism rather than overwrite-on-reload.
