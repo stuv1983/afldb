@@ -49,6 +49,7 @@ import psycopg  # noqa: E402
 
 from common import (  # noqa: E402
     LinkDecisionLoss,
+    ReloadOwnershipCollision,
     Reporter,
     analyze,
     clean_text,
@@ -243,6 +244,36 @@ RISING_STAR_SLUG = "rising-star"
 UNDER_22_SLUG = "22-under-22"
 UNDER_22_SOURCE_KEY = "wikipedia_22under22"
 
+# Transaction-scoped advisory lock serialising every writer that can change
+# honour_team_members identity (AFLDB-ISSUE-080 §5.3). Migration 059's partial
+# unique indexes leave the two mixed linked/unlinked same-name collisions with
+# no database backstop, so the collision preflight and the write must share one
+# protected transaction. The two constants are the frozen cross-language lock
+# identity: they must remain byte-identical to HONOUR_TEAM_LOCK_NAMESPACE /
+# HONOUR_TEAM_LOCK_KEY in src/db/queries/awards-admin.ts. Never derive them by
+# hashing a string — the two implementations must contend on identical
+# literals. The importer uses the blocking form (a batch job may wait); the
+# admin path uses the try form.
+HONOUR_TEAM_LOCK_NAMESPACE = 717275  # 0xAF1DB — AFLDB advisory-lock namespace
+HONOUR_TEAM_LOCK_KEY = 1             # honour_team_members identity writers
+
+
+def require_source(sources: dict[str, int], key: str) -> int:
+    """Resolve a source id, failing closed when it is not configured.
+
+    A ``sources.get(...)`` miss would make a provenance scope
+    ``source_id = ANY(ARRAY[NULL])`` — a predicate that is never true — so the
+    loader would reconcile nothing and INSERT every incoming row with NULL
+    provenance (AFLDB-ISSUE-080 §8.1d). Raise with the source's name instead.
+    """
+    source_id = sources.get(key)
+    if source_id is None:
+        raise RuntimeError(
+            f"source {key!r} is missing from the sources table; this loader "
+            f"cannot establish its ownership scope without it"
+        )
+    return source_id
+
 
 def slugify(value: str) -> str:
     text = re.sub(r"[^a-z0-9]+", "-", (value or "").lower()).strip("-")
@@ -380,7 +411,7 @@ def import_awards(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
         award_ids = dict(cur.fetchall())
 
     # 2. Winners.
-    source_id = sources.get("draftguru")
+    source_id = require_source(sources, "draftguru")
     # Winners owned by another group: 22 Under 22 upserts its own rows, and the
     # All-Australian team is loaded from its own two sources immediately after.
     other_group_awards = [
@@ -439,6 +470,10 @@ def import_awards(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
         build_winners(), batch,
         target_table="award_winners",
         scope_column="award_id", scope_values=other_group_awards, scope_exclude=True,
+        # Ownership is domain AND provenance (AFLDB-ISSUE-080): the award-family
+        # exclusion alone would still delete manual_admin_edit and
+        # sports_data_lab rows whose keys this extract can never produce.
+        scopes=[("source_id", [source_id], False)],
         allow_link_loss=allow_link_loss,
     )
     pg.commit()
@@ -487,6 +522,9 @@ def import_all_australian(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
              FROM all_australian_history ORDER BY season, player_source"""
     ).fetchall()
 
+    draftguru_id = require_source(sources, "draftguru")
+    wikipedia_id = require_source(sources, "wikipedia")
+
     def build():
         # Source record ids are namespaced per source: draftguru's
         # source_row repeats across seasons, so it cannot stand alone.
@@ -507,7 +545,7 @@ def import_all_australian(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
                 clean_text(r["position"]),
                 bool(r["is_captain"]), bool(r["is_vice_captain"]),
                 f"{times} time All-Australian" if times else None,
-                sources.get("draftguru"), f"aa:{r['season']}:{row_no}", batch.id,
+                draftguru_id, f"aa:{r['season']}:{row_no}", batch.id,
             )
 
         for r in history:
@@ -529,12 +567,14 @@ def import_all_australian(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
                 to_int(r["candidate_count"]) or 0,
                 club_id, club_raw, None,
                 None, False, False, None,
-                sources.get("wikipedia"),
+                wikipedia_id,
                 f"aah:{r['season']}:{r['player_source']}:{r['club_source'] or ''}", batch.id,
             )
 
-    # Scoped to this one award: both All-Australian sources live here, and the
-    # legacy awards group above deliberately leaves them alone.
+    # Scoped to this one award AND to the two legacy sources that supply it:
+    # the legacy awards group above deliberately leaves the award alone, and
+    # rows the ingest pipeline promoted under sports_data_lab are not this
+    # loader's to reconcile (AFLDB-ISSUE-080).
     stats = reload_keyed(
         pg, "award_winners", ["source_id", "source_record_id"],
         ["award_id", "season", "player_id", "player_name_raw", "link_status_value",
@@ -544,6 +584,7 @@ def import_all_australian(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
         build(), batch,
         target_table="award_winners",
         scope_column="award_id", scope_values=[award_id],
+        scopes=[("source_id", [draftguru_id, wikipedia_id], False)],
         allow_link_loss=allow_link_loss,
     )
     report_reload(rep, "all_australian", stats)
@@ -889,7 +930,7 @@ def import_rising_star(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
             ORDER BY season, round_number, player"""
     ).fetchall()
 
-    source_id = sources.get("footywire")
+    source_id = require_source(sources, "footywire")
 
     def build():
         for r in rows:
@@ -932,6 +973,10 @@ def import_rising_star(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
         build(), batch,
         target_table="award_nominations",
         scope_column="award_id", scope_values=[award_id],
+        # Domain AND provenance: rising_star rows the ingest pipeline promoted
+        # under sports_data_lab share this award and must survive this reload
+        # (AFLDB-ISSUE-080).
+        scopes=[("source_id", [source_id], False)],
         allow_link_loss=allow_link_loss,
     )
     pg.commit()
@@ -957,6 +1002,8 @@ def import_hall_of_fame(pg, lite, rep: Reporter, batch, sources: dict[str, int],
              FROM hall_of_fame ORDER BY inducted_year, name"""
     ).fetchall()
 
+    source_id = require_source(sources, "wikipedia")
+
     def build():
         for r in rows:
             batch.records_read += 1
@@ -972,13 +1019,19 @@ def import_hall_of_fame(pg, lite, rep: Reporter, batch, sources: dict[str, int],
                 clean_text(r["club"]), clean_text(r["state"]),
                 clean_text(r["playing_career"]), to_int(r["removed_year"]),
                 " · ".join(n for n in notes if n) or None,
-                sources.get("wikipedia"), batch.id,
+                source_id, batch.id,
             )
 
     # This source carries no record id of its own, so migration 042's natural
     # key does the work. The name is therefore part of the key: a renamed
     # inductee reads as "old key gone, new key arrived", which is exactly the
     # case that must stop rather than quietly delete and reinsert a decided row.
+    #
+    # The reload reconciles only rows this source owns (AFLDB-ISSUE-080):
+    # admin-created rows are not its to delete. (name, inducted_year) is a
+    # total, globally unique natural key (hall_of_fame_name_uq), so an incoming
+    # key held by a foreign-owned row is a genuine collision and the opt-in
+    # out-of-scope preflight refuses it with both row identities.
     stats = reload_keyed(
         pg, "hall_of_fame", ["name", "inducted_year"],
         ["name", "player_id", "link_status_value", "category", "inducted_year",
@@ -986,6 +1039,8 @@ def import_hall_of_fame(pg, lite, rep: Reporter, batch, sources: dict[str, int],
          "removed_year", "notes", "source_id", "import_batch_id"],
         build(), batch,
         target_table="hall_of_fame", name_column="name",
+        scope_column="source_id", scope_values=[source_id],
+        refuse_out_of_scope_key=True,
         allow_link_loss=allow_link_loss,
     )
     pg.commit()
@@ -999,6 +1054,92 @@ def import_hall_of_fame(pg, lite, rep: Reporter, batch, sources: dict[str, int],
 # ---------------------------------------------------------------------------
 # Group: honour teams
 # ---------------------------------------------------------------------------
+def _refuse_honour_team_identity_collisions(
+    pg, incoming: list[tuple], source_id: int,
+) -> None:
+    """AFLDB-ISSUE-080 check 2: the §4.3 matrix and the §4.4 identity rule.
+
+    A raw-name match is not automatically a collision: migration 059 stopped
+    treating ``player_name_raw`` as identity (AFLDB-ISSUE-025), so two rows
+    positively linked to *different* players may share a display name in one
+    team. Every other same-name case is ambiguous or duplicated identity and
+    refuses — and the two mixed linked/unlinked cases have no unique-index
+    backstop after 059, which is why this check runs under the §5.3 advisory
+    lock and inside the reload transaction.
+
+    ``incoming`` rows are the loader's prepared tuples, whose first three
+    fields are (team_name, player_id, player_name_raw); classification uses the
+    raw incoming ``player_id``, because a decision replay only alters rows that
+    matched an in-scope row, and those are UPDATEs that never reach this
+    collision surface.
+    """
+    with pg.cursor() as cur:
+        # IS NOT TRUE is the ownership scope's exact complement: a NULL
+        # source_id makes ``= ANY`` evaluate NULL, and NULL-provenance rows
+        # are precisely the foreign rows this check must see.
+        cur.execute(
+            """SELECT id, team_name, player_name_raw, player_id, source_id
+                 FROM honour_team_members
+                WHERE (source_id = ANY(%s)) IS NOT TRUE""",
+            ([source_id],),
+        )
+        foreign = cur.fetchall()
+    if not foreign:
+        return
+
+    by_name: dict[tuple[str, str], list[tuple]] = {}
+    by_player: dict[tuple[str, int], list[tuple]] = {}
+    for row_id, team, name, player_id, owner in foreign:
+        by_name.setdefault((team, name), []).append((row_id, player_id, owner))
+        if player_id is not None:
+            by_player.setdefault((team, player_id), []).append((row_id, name, owner))
+
+    problems: list[str] = []
+    for row in incoming:
+        team, player_id, name = row[0], row[1], row[2]
+        # §4.4 — same (team_name, player_id), any raw name: always refuse.
+        # Mirrors honour_team_linked_player_uq: both sides non-NULL, plain
+        # equality.
+        if player_id is not None:
+            for row_id, existing_name, owner in by_player.get((team, player_id), []):
+                problems.append(
+                    f"row id={row_id} source_id={owner} team={team!r} already "
+                    f"records player {player_id} as {existing_name!r}; the "
+                    f"incoming row asserts the same player as {name!r}"
+                )
+        # §4.3 — the raw-name matrix.
+        for row_id, existing_player, owner in by_name.get((team, name), []):
+            if existing_player is not None and player_id is not None:
+                # Identity positively known on both sides: distinct players
+                # coexist by design (migration 059), and the same player is
+                # already refused by the §4.4 axis above.
+                continue
+            if existing_player is None and player_id is None:
+                why = "identity is unknown on both sides"
+            elif existing_player is None:
+                why = (f"the existing row is unlinked and the incoming row is "
+                       f"linked to player {player_id}; review whether they are "
+                       f"the same person")
+            else:
+                why = (f"the existing row is linked to player "
+                       f"{existing_player} and the incoming row is unlinked; "
+                       f"review whether they are the same person")
+            problems.append(
+                f"row id={row_id} source_id={owner} team={team!r} "
+                f"name={name!r}: {why}"
+            )
+
+    if problems:
+        shown = "\n  ".join(problems[:5])
+        more = f"\n  (+{len(problems) - 5} more)" if len(problems) > 5 else ""
+        raise ReloadOwnershipCollision(
+            f"honour_team_members: the incoming source collides with row(s) "
+            f"this loader does not own:\n  {shown}{more}\n"
+            f"Nothing has been written. A curator must reconcile each pair "
+            f"before this reload can run."
+        )
+
+
 def import_honour_teams(pg, lite, rep: Reporter, batch, sources: dict[str, int],
                         allow_link_loss: bool = False) -> None:
     rows = lite.execute(
@@ -1007,34 +1148,56 @@ def import_honour_teams(pg, lite, rep: Reporter, batch, sources: dict[str, int],
              FROM team_selections ORDER BY team_name, sort_order, name"""
     ).fetchall()
 
-    def build():
-        for r in rows:
-            batch.records_read += 1
-            name = clean_text(r["name"])
-            team = clean_text(r["team_name"])
-            if not name or not team:
-                continue
-            status = link_status(r["match_status"], r["player_id"])
-            notes = [clean_text(r["note"]), clean_text(r["notes"])]
-            yield (
-                team, r["player_id"], name, status,
-                clean_text(r["position"]), clean_text(r["role"]),
-                clean_text(r["club"]), to_int(r["sort_order"]) or 0,
-                " · ".join(n for n in notes if n) or None,
-                sources.get("wikipedia"), batch.id,
-            )
+    source_id = require_source(sources, "wikipedia")
+
+    prepared: list[tuple] = []
+    for r in rows:
+        batch.records_read += 1
+        name = clean_text(r["name"])
+        team = clean_text(r["team_name"])
+        if not name or not team:
+            continue
+        status = link_status(r["match_status"], r["player_id"])
+        notes = [clean_text(r["note"]), clean_text(r["notes"])]
+        prepared.append((
+            team, r["player_id"], name, status,
+            clean_text(r["position"]), clean_text(r["role"]),
+            clean_text(r["club"]), to_int(r["sort_order"]) or 0,
+            " · ".join(n for n in notes if n) or None,
+            source_id, batch.id,
+        ))
+
+    # §5.3 (AFLDB-ISSUE-080): serialise every honour_team_members identity
+    # writer before reading. The blocking transaction-scoped form is correct
+    # for a batch job; commit or rollback releases it. Taken before the
+    # collision preflight so no writer can slip between check and write.
+    with pg.cursor() as cur:
+        cur.execute(
+            "SELECT pg_advisory_xact_lock(%s, %s)",
+            (HONOUR_TEAM_LOCK_NAMESPACE, HONOUR_TEAM_LOCK_KEY),
+        )
+
+    _refuse_honour_team_identity_collisions(pg, prepared, source_id)
 
     # No source record id here either. (team_name, player_name_raw) was this
     # table's original uniqueness rule and is still the only key the source
     # supplies, so — as for the Hall of Fame — a source rename cannot be
     # separated from a deletion and must stop a decided row from being lost.
+    #
+    # The reload reconciles only rows this source owns (AFLDB-ISSUE-080). The
+    # generic out-of-scope key refusal is deliberately NOT enabled here: the
+    # reload key contains player_name_raw, which is not identity (migration
+    # 059), and a blanket key refusal would collapse two distinct linked
+    # players sharing a display name. The §4.3/§4.4 preflight above applies
+    # the correct case-by-case policy instead.
     stats = reload_keyed(
         pg, "honour_team_members", ["team_name", "player_name_raw"],
         ["team_name", "player_id", "player_name_raw", "link_status_value",
          "position", "role", "club_name_raw", "sort_order", "note",
          "source_id", "import_batch_id"],
-        build(), batch,
+        iter(prepared), batch,
         target_table="honour_team_members",
+        scope_column="source_id", scope_values=[source_id],
         allow_link_loss=allow_link_loss,
     )
     pg.commit()
@@ -1325,7 +1488,7 @@ def main() -> int:
                 f"(kept as club_name_raw): "
                 + ", ".join(f"{name} x{count}" for name, count in top)
             )
-    except LinkDecisionLoss as loss:
+    except (LinkDecisionLoss, ReloadOwnershipCollision) as loss:
         # Raised during analysis, before the group wrote anything; import_batch
         # has already rolled its transaction back, so the targets are untouched.
         rep.warn(str(loss))

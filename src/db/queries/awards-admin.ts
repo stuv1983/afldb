@@ -7,6 +7,19 @@ import { recordDataEdit } from '@/db/queries/audit-log';
 
 const MANUAL_ADMIN_SOURCE_KEY = 'manual_admin_edit';
 const BROWNLOW_AWARD_SLUG = 'brownlow-medal';
+
+// Transaction-scoped advisory lock serialising every writer that can change
+// honour_team_members identity (AFLDB-ISSUE-080 §5.3). Migration 059's partial
+// unique indexes leave the two mixed linked/unlinked same-name collisions with
+// no database backstop, so the collision check and the INSERT must share one
+// protected transaction. The two constants are the frozen cross-language lock
+// identity: they must remain byte-identical to HONOUR_TEAM_LOCK_NAMESPACE /
+// HONOUR_TEAM_LOCK_KEY in tools/migration/import_awards.py. Never derive them
+// by hashing a string — the two implementations must contend on identical
+// literals. The admin path uses the try form (a web request must not block
+// behind a multi-minute reload); the importer uses the blocking form.
+const HONOUR_TEAM_LOCK_NAMESPACE = 717275; // 0xAF1DB — AFLDB advisory-lock namespace
+const HONOUR_TEAM_LOCK_KEY = 1; // honour_team_members identity writers
 const HALL_OF_FAME_CATEGORIES = new Set([
   'Player',
   'Coach',
@@ -251,6 +264,15 @@ export async function createHallOfFameInductee(
 
   try {
     const created = await importSql.begin(async (tx) => {
+      // Admin-created rows assert their provenance so a scoped source reload
+      // can never claim them (AFLDB-ISSUE-080).
+      const [manualSource] = await tx<{ id: number }[]>`
+        SELECT id FROM sources WHERE key = ${MANUAL_ADMIN_SOURCE_KEY}
+      `;
+      if (!manualSource) {
+        throw new Error(`Required source '${MANUAL_ADMIN_SOURCE_KEY}' is not configured.`);
+      }
+
       let name = input.name.trim();
       if (input.playerId) {
         const [p] = await tx<{ displayName: string }[]>`SELECT display_name AS "displayName" FROM players WHERE id = ${input.playerId}`;
@@ -264,13 +286,14 @@ export async function createHallOfFameInductee(
         INSERT INTO hall_of_fame (
           name, player_id, link_status_value, category, inducted_year,
           is_legend, legend_year, club_name_raw, state, playing_career,
-          notes
+          notes, source_id
         ) VALUES (
           ${name}, ${input.playerId ?? null}, ${linkStatus}::link_status,
           ${category}, ${input.inductedYear},
           ${input.isLegend ?? false}, ${input.legendYear ?? null},
           ${input.clubNameRaw?.trim() || null}, ${input.state?.trim() || null},
-          ${input.playingCareer?.trim() || null}, ${input.notes?.trim() || null}
+          ${input.playingCareer?.trim() || null}, ${input.notes?.trim() || null},
+          ${manualSource.id}
         )
         RETURNING id
       `;
@@ -313,6 +336,30 @@ export async function createHonourTeamMember(
 
   try {
     const created = await importSql.begin(async (tx) => {
+      // AFLDB-ISSUE-080 §5.3: the two mixed linked/unlinked same-name
+      // collisions have no unique-index backstop after migration 059, so the
+      // identity check below and the INSERT must be serialised against every
+      // other honour_team_members identity writer. The try form fails fast
+      // rather than parking a web request behind a multi-minute reload; the
+      // transaction scope releases the lock on commit and rollback alike.
+      const [lock] = await tx<{ locked: boolean }[]>`
+        SELECT pg_try_advisory_xact_lock(
+          ${HONOUR_TEAM_LOCK_NAMESPACE}, ${HONOUR_TEAM_LOCK_KEY}
+        ) AS locked
+      `;
+      if (!lock?.locked) {
+        throw new Error('An honours reload is in progress; try again shortly.');
+      }
+
+      // Admin-created rows assert their provenance so a scoped source reload
+      // can never claim them (AFLDB-ISSUE-080).
+      const [manualSource] = await tx<{ id: number }[]>`
+        SELECT id FROM sources WHERE key = ${MANUAL_ADMIN_SOURCE_KEY}
+      `;
+      if (!manualSource) {
+        throw new Error(`Required source '${MANUAL_ADMIN_SOURCE_KEY}' is not configured.`);
+      }
+
       let playerName = input.playerNameRaw?.trim() || '';
       if (input.playerId) {
         const [p] = await tx<{ displayName: string }[]>`SELECT display_name AS "displayName" FROM players WHERE id = ${input.playerId}`;
@@ -323,49 +370,67 @@ export async function createHonourTeamMember(
       const teamName = input.teamName.trim();
       if (!teamName) throw new Error('Team name is required.');
 
+      // Create means create: if the fact already exists — under any ownership,
+      // manual, source-loaded or unknown — refuse rather than adopt, overwrite
+      // or duplicate it (AFLDB-ISSUE-080 §5.2). Two identity axes apply. On
+      // (team_name, player_id) an existing row for the same linked player
+      // always refuses, whatever its display name. On (team_name,
+      // player_name_raw) a raw-name match is only a conflict while identity is
+      // ambiguous or asserted twice: migration 059 stopped treating raw name
+      // as identity (AFLDB-ISSUE-025), so a second player positively linked to
+      // a different id may share a display name and must stay creatable.
+      const proposedPlayerId = input.playerId ?? null;
+      const existing = await tx<{
+        id: number;
+        playerNameRaw: string;
+        playerId: number | null;
+      }[]>`
+        SELECT id, player_name_raw AS "playerNameRaw", player_id AS "playerId"
+          FROM honour_team_members
+         WHERE team_name = ${teamName}
+           AND (player_name_raw = ${playerName}
+                OR (${proposedPlayerId}::integer IS NOT NULL
+                    AND player_id = ${proposedPlayerId}::integer))
+         ORDER BY id
+      `;
+      for (const row of existing) {
+        if (proposedPlayerId !== null && row.playerId === proposedPlayerId) {
+          throw new Error(
+            `'${teamName}' already records this player as '${row.playerNameRaw}' `
+            + `(entry #${row.id}, linked to player #${row.playerId}). `
+            + 'It cannot be added again.',
+          );
+        }
+        if (row.playerNameRaw !== playerName) continue;
+        if (row.playerId !== null && proposedPlayerId !== null) continue;
+        const existingIdentity = row.playerId === null
+          ? 'not linked to a player'
+          : `linked to player #${row.playerId}`;
+        const proposedIdentity = proposedPlayerId === null
+          ? 'not linked to a player'
+          : `linked to player #${proposedPlayerId}`;
+        throw new Error(
+          `'${teamName}' already has an entry named '${row.playerNameRaw}' `
+          + `(entry #${row.id}, ${existingIdentity}); the new entry is ${proposedIdentity}. `
+          + 'Review whether they are the same person before creating it.',
+        );
+      }
+
       const linkStatus = input.playerId ? 'resolved' : 'unmatched';
       const sortOrder = Number.isInteger(input.sortOrder) ? Number(input.sortOrder) : 0;
 
-      const [row] = input.playerId
-        ? await tx<{ id: number }[]>`
-            INSERT INTO honour_team_members (
-              team_name, player_id, player_name_raw, link_status_value,
-              position, role, club_name_raw, sort_order, note
-            ) VALUES (
-              ${teamName}, ${input.playerId}, ${playerName}, ${linkStatus}::link_status,
-              ${input.position?.trim() || null}, ${input.role?.trim() || null},
-              ${input.clubNameRaw?.trim() || null}, ${sortOrder},
-              ${input.note?.trim() || null}
-            )
-            ON CONFLICT (team_name, player_id) WHERE player_id IS NOT NULL DO UPDATE SET
-              player_name_raw = EXCLUDED.player_name_raw,
-              link_status_value = EXCLUDED.link_status_value,
-              position = EXCLUDED.position,
-              role = EXCLUDED.role,
-              club_name_raw = EXCLUDED.club_name_raw,
-              sort_order = EXCLUDED.sort_order,
-              note = EXCLUDED.note
-            RETURNING id
-          `
-        : await tx<{ id: number }[]>`
-            INSERT INTO honour_team_members (
-              team_name, player_id, player_name_raw, link_status_value,
-              position, role, club_name_raw, sort_order, note
-            ) VALUES (
-              ${teamName}, NULL, ${playerName}, ${linkStatus}::link_status,
-              ${input.position?.trim() || null}, ${input.role?.trim() || null},
-              ${input.clubNameRaw?.trim() || null}, ${sortOrder},
-              ${input.note?.trim() || null}
-            )
-            ON CONFLICT (team_name, player_name_raw) WHERE player_id IS NULL DO UPDATE SET
-              link_status_value = EXCLUDED.link_status_value,
-              position = EXCLUDED.position,
-              role = EXCLUDED.role,
-              club_name_raw = EXCLUDED.club_name_raw,
-              sort_order = EXCLUDED.sort_order,
-              note = EXCLUDED.note
-            RETURNING id
-          `;
+      const [row] = await tx<{ id: number }[]>`
+        INSERT INTO honour_team_members (
+          team_name, player_id, player_name_raw, link_status_value,
+          position, role, club_name_raw, sort_order, note, source_id
+        ) VALUES (
+          ${teamName}, ${proposedPlayerId}, ${playerName}, ${linkStatus}::link_status,
+          ${input.position?.trim() || null}, ${input.role?.trim() || null},
+          ${input.clubNameRaw?.trim() || null}, ${sortOrder},
+          ${input.note?.trim() || null}, ${manualSource.id}
+        )
+        RETURNING id
+      `;
 
       // Required audit, same transaction: a failed insert rolls the
       // honour-team entry back (AFLDB-ISSUE-027).

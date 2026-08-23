@@ -255,6 +255,17 @@ class LinkDecisionLoss(RuntimeError):
     """A reload would discard or reattribute a human identity decision."""
 
 
+class ReloadOwnershipCollision(RuntimeError):
+    """An incoming reload key is already held by a row this loader does not own.
+
+    A scoped reload's INSERT suppression test only sees in-scope rows, so an
+    incoming key held by an out-of-scope row would reach INSERT and fail a
+    unique constraint — or, on a table without a total constraint, silently
+    duplicate the fact (AFLDB-ISSUE-080). Refusing before any write names the
+    colliding rows instead of leaving a raw constraint error.
+    """
+
+
 @dataclass
 class DiscardedDecision:
     """One human decision a reload cannot carry across, and why."""
@@ -293,22 +304,29 @@ _DECISIONS = "_afldb_decisions"
 
 def _scope_clause(
     alias: str,
-    scope_column: str | None,
-    scope_values: Sequence[Any],
-    scope_exclude: bool,
-) -> str:
-    """Predicate limiting a reload to the rows this loader owns.
+    scopes: Sequence[tuple[str, Sequence[Any], bool]],
+) -> tuple[str, list[Any]]:
+    """Conjunction of predicates limiting a reload to the rows this loader owns.
 
-    An empty value list is resolved here rather than sent to PostgreSQL: an
-    empty Python list adapts to an untyped ``'{}'``, which cannot be compared
-    with an integer column.
+    Each ``(column, values, exclude)`` entry becomes one predicate; entries are
+    AND-joined so a domain predicate and a provenance predicate compose rather
+    than replace each other (AFLDB-ISSUE-080). An empty value list is resolved
+    here rather than sent to PostgreSQL: an empty Python list adapts to an
+    untyped ``'{}'``, which cannot be compared with an integer column.
     """
-    if scope_column is None:
-        return "TRUE"
-    if not scope_values:
-        return "TRUE" if scope_exclude else "FALSE"
-    operator = "<> ALL" if scope_exclude else "= ANY"
-    return f"{alias}.{scope_column} {operator}(%s)"
+    parts: list[str] = []
+    params: list[Any] = []
+    for column, values, exclude in scopes:
+        values = list(values)
+        if not values:
+            parts.append("TRUE" if exclude else "FALSE")
+            continue
+        operator = "<> ALL" if exclude else "= ANY"
+        parts.append(f"{alias}.{column} {operator}(%s)")
+        params.append(values)
+    if not parts:
+        return "TRUE", []
+    return " AND ".join(parts), params
 
 
 def _key_match(left: str, right: str, key_columns: Sequence[str]) -> str:
@@ -332,6 +350,8 @@ def reload_keyed(
     scope_column: str | None = None,
     scope_values: Sequence[Any] = (),
     scope_exclude: bool = False,
+    scopes: Sequence[tuple[str, Sequence[Any], bool]] = (),
+    refuse_out_of_scope_key: bool = False,
     allow_link_loss: bool = False,
     delete_missing: bool = True,
 ) -> ReloadStats:
@@ -341,6 +361,19 @@ def reload_keyed(
     table. Passing ``link_columns=None`` — as ``awards`` does — means the table
     bears no player link at all: no resolution is read and no link column is
     referenced, so the helper is usable for plain reference data too.
+
+    ``scope_column``/``scope_values``/``scope_exclude`` is the single-predicate
+    shorthand; ``scopes`` adds further ``(column, values, exclude)`` predicates,
+    AND-joined with it, for loaders whose ownership is a conjunction of domain
+    and provenance (AFLDB-ISSUE-080).
+
+    ``refuse_out_of_scope_key=True`` (opt-in) refuses before any write when an
+    incoming reload key is already held by an out-of-scope row, which the
+    scoped INSERT suppression test cannot see. Only opt in where the reload key
+    really is globally unique real-world identity — hall_of_fame's
+    (name, inducted_year) qualifies; honour_team_members' raw name does not
+    (migration 059 stopped treating raw name as identity). The check reads the
+    table's ``source_id`` column to name the colliding row's owner.
 
     ``delete_missing=False`` upserts without removing vanished keys. A parent
     whose children are reconciled by a later call needs this: draft_persons is
@@ -358,9 +391,11 @@ def reload_keyed(
     if missing:
         raise ValueError(f"{table}: key/link columns not loaded: {', '.join(missing)}")
 
-    scope_values = list(scope_values)
-    scope_e = _scope_clause("e", scope_column, scope_values, scope_exclude)
-    scope_params = [scope_values] if "%s" in scope_e else []
+    all_scopes: list[tuple[str, Sequence[Any], bool]] = []
+    if scope_column is not None:
+        all_scopes.append((scope_column, list(scope_values), scope_exclude))
+    all_scopes.extend(scopes)
+    scope_e, scope_params = _scope_clause("e", all_scopes)
     collist = ", ".join(columns)
     stats = ReloadStats()
 
@@ -396,6 +431,42 @@ def reload_keyed(
                 f"{table}: the source supplied duplicate reload keys "
                 f"({', '.join(key_columns)}): {listed}. Nothing has been written."
             )
+
+        if refuse_out_of_scope_key:
+            # AFLDB-ISSUE-080 check 1: an incoming key held by a row outside
+            # the ownership scope would reach the scoped INSERT below and fail
+            # its unique constraint with a raw error naming neither row. Key
+            # equality is _key_match's, so this cannot disagree with the
+            # UPDATE/INSERT/DELETE steps about what "the same key" means.
+            # ``IS NOT TRUE`` is the scope's exact complement: a NULL-source
+            # row makes ``source_id = ANY(...)`` evaluate NULL, not FALSE, and
+            # such rows are precisely the ones this check exists to find.
+            cur.execute(
+                f"""SELECT e.id, e.source_id,
+                           {', '.join(f'i.{c}::text' for c in key_columns)}
+                      FROM {_INCOMING} i
+                      JOIN public.{table} e
+                        ON {_key_match('e', 'i', key_columns)}
+                     WHERE ({scope_e}) IS NOT TRUE
+                     ORDER BY e.id
+                     LIMIT 5""",
+                tuple(scope_params),
+            )
+            collisions = cur.fetchall()
+            if collisions:
+                listed = "; ".join(
+                    f"row id={row[0]} source_id={row[1]} "
+                    f"key=[{' | '.join(str(v) for v in row[2:])}]"
+                    for row in collisions
+                )
+                raise ReloadOwnershipCollision(
+                    f"{table}: the incoming source supplies reload key(s) "
+                    f"({', '.join(key_columns)}) already held by row(s) this "
+                    f"loader does not own: {listed}. Nothing has been written. "
+                    f"A curator must reconcile each pair — merge the records "
+                    f"or correct the existing row's provenance — before this "
+                    f"reload can run."
+                )
 
         if target_table is not None:
             cur.execute(f"DROP TABLE IF EXISTS {_DECISIONS}")

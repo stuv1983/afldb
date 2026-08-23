@@ -58,6 +58,12 @@ describe('awards admin mutation contracts', () => {
     seasonClubName: string | null;
   } | null;
   let sourceAvailable: boolean;
+  let lockAvailable: boolean;
+  let existingHonourTeamRows: Array<{
+    id: number;
+    playerNameRaw: string;
+    playerId: number | null;
+  }>;
   let nextId: number;
   let importQueries: CapturedQuery[];
   let authQueries: CapturedQuery[];
@@ -80,6 +86,8 @@ describe('awards admin mutation contracts', () => {
     };
     selectedClubIdentity = null;
     sourceAvailable = true;
+    lockAvailable = true;
+    existingHonourTeamRows = [];
     nextId = 100;
     importQueries = [];
     authQueries = [];
@@ -93,8 +101,14 @@ describe('awards admin mutation contracts', () => {
       if (text.includes('FROM awards a')) {
         return [awardDefinition];
       }
+      if (text.includes('pg_try_advisory_xact_lock')) {
+        return [{ locked: lockAvailable }];
+      }
       if (text.includes('SELECT id FROM sources')) {
         return sourceAvailable ? [{ id: 57 }] : [];
+      }
+      if (text.includes('FROM honour_team_members')) {
+        return existingHonourTeamRows;
       }
       if (text.includes('SELECT display_name AS "displayName" FROM players')) {
         return [{ displayName: 'Same Name' }];
@@ -349,28 +363,122 @@ describe('awards admin mutation contracts', () => {
     expect(mocks.authSql).not.toHaveBeenCalled();
   });
 
-  it('keys linked honour-team upserts by stable player identity, not display name', async () => {
-    await createHonourTeamMember({ ...honourTeamInput, playerId: 101 });
-    await createHonourTeamMember({ ...honourTeamInput, playerId: 202 });
-
-    const inserts = importQueries.filter((query) => query.text.includes('INSERT INTO honour_team_members'));
-    expect(inserts).toHaveLength(2);
-    expect(inserts.every((query) => (
-      query.text.includes('ON CONFLICT (team_name, player_id) WHERE player_id IS NOT NULL')
-    ))).toBe(true);
-    expect(inserts[0].values).toContain(101);
-    expect(inserts[1].values).toContain(202);
-    expect(inserts.every((query) => query.values.includes('Same Name'))).toBe(true);
-  });
-
-  it('retains name-based duplicate protection only for unlinked honour-team rows', async () => {
+  it('stamps manual_admin_edit provenance on both honours creators (AFLDB-ISSUE-080)', async () => {
+    await createHallOfFameInductee(hallOfFameInput);
     await createHonourTeamMember(honourTeamInput);
 
-    const insert = importQueries.find((query) => query.text.includes('INSERT INTO honour_team_members'));
-    expect(insert?.text).toContain(
-      'ON CONFLICT (team_name, player_name_raw) WHERE player_id IS NULL',
+    const sourceLookups = importQueries.filter((query) => query.text.includes('SELECT id FROM sources'));
+    expect(sourceLookups).toHaveLength(2);
+    expect(sourceLookups.every((query) => query.values[0] === 'manual_admin_edit')).toBe(true);
+
+    const hofInsert = importQueries.find((query) => query.text.includes('INSERT INTO hall_of_fame'));
+    expect(hofInsert?.text).toContain('source_id');
+    expect(hofInsert?.values).toContain(57);
+
+    const memberInsert = importQueries.find((query) => query.text.includes('INSERT INTO honour_team_members'));
+    expect(memberInsert?.text).toContain('source_id');
+    expect(memberInsert?.values).toContain(57);
+  });
+
+  it.each([
+    ['Hall of Fame inductee', () => createHallOfFameInductee(hallOfFameInput)],
+    ['honour team member', () => createHonourTeamMember(honourTeamInput)],
+  ])('fails a %s before insertion when the required manual source is missing', async (_label, create) => {
+    sourceAvailable = false;
+
+    await expect(create()).rejects.toThrow(
+      "Required source 'manual_admin_edit' is not configured.",
     );
-    expect(insert?.text).not.toContain('ON CONFLICT (team_name, player_id)');
+
+    expect(importQueries.some((query) => query.text.includes('INSERT INTO'))).toBe(false);
+  });
+
+  it('serialises honour-team creation behind the shared identity advisory lock', async () => {
+    await createHonourTeamMember(honourTeamInput);
+
+    // The frozen §5.3 lock identity, taken transaction-scoped and first, so
+    // the collision read and the INSERT share one protected window with
+    // tools/migration/import_awards.py.
+    const lockQuery = importQueries[0];
+    expect(lockQuery.text).toContain('pg_try_advisory_xact_lock');
+    expect(lockQuery.values).toEqual([717275, 1]);
+    expect(importQueries.some((query) => query.text.includes('pg_advisory_lock'))).toBe(false);
+  });
+
+  it('fails fast with a bounded error while an honours reload holds the lock', async () => {
+    lockAvailable = false;
+
+    await expect(createHonourTeamMember(honourTeamInput)).rejects.toThrow(
+      'An honours reload is in progress; try again shortly.',
+    );
+
+    expect(importQueries.some((query) => query.text.includes('INSERT INTO'))).toBe(false);
+    expect(importQueries.some((query) => query.text.includes('FROM honour_team_members'))).toBe(false);
+  });
+
+  describe('honour-team create-only conflict policy (AFLDB-ISSUE-080 §4.3/§4.4)', () => {
+    it('never upserts: the insert carries no ON CONFLICT clause in either shape', async () => {
+      await createHonourTeamMember(honourTeamInput);
+      await createHonourTeamMember({ ...honourTeamInput, playerId: 101 });
+
+      const inserts = importQueries.filter((query) => query.text.includes('INSERT INTO honour_team_members'));
+      expect(inserts).toHaveLength(2);
+      expect(inserts.every((query) => !query.text.includes('ON CONFLICT'))).toBe(true);
+    });
+
+    it('refuses an unlinked duplicate of an existing unlinked entry', async () => {
+      existingHonourTeamRows = [{ id: 7, playerNameRaw: 'Test Member', playerId: null }];
+
+      await expect(createHonourTeamMember(honourTeamInput)).rejects.toThrow(
+        /already has an entry named 'Test Member' \(entry #7, not linked to a player\)/,
+      );
+    });
+
+    it('refuses a linked create over an existing unlinked entry with the same name', async () => {
+      // One of the two mixed cases with no database backstop after
+      // migration 059: the application check is the only guard.
+      existingHonourTeamRows = [{ id: 8, playerNameRaw: 'Same Name', playerId: null }];
+
+      await expect(createHonourTeamMember({ ...honourTeamInput, playerId: 101 }))
+        .rejects.toThrow(/entry #8, not linked to a player.*linked to player #101/);
+    });
+
+    it('refuses an unlinked create over an existing linked entry with the same name', async () => {
+      existingHonourTeamRows = [{ id: 9, playerNameRaw: 'Test Member', playerId: 303 }];
+
+      await expect(createHonourTeamMember(honourTeamInput)).rejects.toThrow(
+        /entry #9, linked to player #303.*not linked to a player/,
+      );
+    });
+
+    it('refuses the same linked player even under a different display name (§4.4)', async () => {
+      existingHonourTeamRows = [{ id: 11, playerNameRaw: 'Other Spelling', playerId: 101 }];
+
+      await expect(createHonourTeamMember({ ...honourTeamInput, playerId: 101 }))
+        .rejects.toThrow(/already records this player as 'Other Spelling' \(entry #11/);
+    });
+
+    it('still creates a second, differently-linked player sharing a display name (AFLDB-ISSUE-025)', async () => {
+      // The §4.3 matrix's positive case: identity is positively known on both
+      // sides and known to differ, so raw-name equality must not collapse it.
+      existingHonourTeamRows = [{ id: 12, playerNameRaw: 'Same Name', playerId: 303 }];
+
+      const result = await createHonourTeamMember({ ...honourTeamInput, playerId: 101 });
+
+      expect(result).toEqual({ id: 100 });
+      const insert = importQueries.find((query) => query.text.includes('INSERT INTO honour_team_members'));
+      expect(insert?.values).toContain(101);
+    });
+
+    it('writes no audit row and reads no data_edits on the refusal path', async () => {
+      existingHonourTeamRows = [{ id: 7, playerNameRaw: 'Test Member', playerId: null }];
+
+      await expect(createHonourTeamMember(honourTeamInput)).rejects.toThrow();
+
+      expect(importQueries.some((query) => query.text.includes('INSERT INTO'))).toBe(false);
+      expect(importQueries.some((query) => query.text.includes('data_edits'))).toBe(false);
+      expect(mocks.authSql).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -445,6 +553,36 @@ describe('honour-team identity migration contract', () => {
     );
     expect(migration).toContain('HAVING count(*) > 1');
     expect(migration).not.toMatch(/\bDELETE\b/);
+  });
+});
+
+describe('honour-team advisory-lock identity contract (AFLDB-ISSUE-080 §5.3)', () => {
+  // The two writers must contend on an identical literal lock identity.
+  // Deriving the key twice — hashtext, language-level hashing, anything
+  // computed — is exactly what this contract forbids, so the constants are
+  // asserted as literals in both languages.
+  it('freezes the same two integer constants in the importer and the admin path', () => {
+    const importer = readFileSync(
+      join(process.cwd(), 'tools', 'migration', 'import_awards.py'),
+      'utf8',
+    );
+    const admin = readFileSync(
+      join(process.cwd(), 'src', 'db', 'queries', 'awards-admin.ts'),
+      'utf8',
+    );
+
+    expect(importer).toContain('HONOUR_TEAM_LOCK_NAMESPACE = 717275');
+    expect(importer).toContain('HONOUR_TEAM_LOCK_KEY = 1');
+    expect(admin).toContain('const HONOUR_TEAM_LOCK_NAMESPACE = 717275');
+    expect(admin).toContain('const HONOUR_TEAM_LOCK_KEY = 1');
+
+    // Transaction scope only: session locks would strand on a crashed
+    // request, and a hashed identity could silently diverge between the
+    // two languages.
+    expect(importer).toContain('pg_advisory_xact_lock');
+    expect(admin).toContain('pg_try_advisory_xact_lock');
+    expect(importer).not.toContain('hashtext');
+    expect(admin).not.toContain('hashtext');
   });
 });
 

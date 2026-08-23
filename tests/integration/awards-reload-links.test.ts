@@ -6,7 +6,10 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import postgres from 'postgres';
+
 import { sql } from '@/db/client';
+import { createHonourTeamMember } from '@/db/queries/awards-admin';
 import {
   confirmUnlinked,
   listConfirmedUnlinked,
@@ -57,6 +60,11 @@ function hasPsycopg(): boolean {
 const canRunImporter = Boolean(legacySqlite)
   && existsSync(legacySqlite as string)
   && hasPsycopg();
+
+// One connection pool for the whole file: both describe blocks share `sql`.
+afterAll(async () => {
+  await sql.end();
+});
 
 function runImporter(groups: string[], extra: string[] = []) {
   return spawnSync(
@@ -164,7 +172,6 @@ describe.skipIf(!canRunImporter)(
         DELETE FROM player_link_resolutions WHERE admin_user_id = ${adminUserId}
       `;
       await sql`DELETE FROM auth_users WHERE id = ${adminUserId}`;
-      await sql.end();
     });
 
     it('keeps a resolved Hall of Fame link, and its row id, across a reload', async () => {
@@ -434,5 +441,697 @@ describe.skipIf(!canRunImporter)(
       },
       300_000,
     );
+  },
+);
+
+/**
+ * A source reload reconciles only the rows its own source supplies
+ * (AFLDB-ISSUE-080). Rows created by an administrator, promoted from the
+ * ingest pipeline, or of unknown provenance are outside every reload's
+ * UPDATE/INSERT/DELETE population, and a collision between an incoming key
+ * and a foreign-owned row fails closed before any write.
+ */
+const HONOUR_TEAM_LOCK_NAMESPACE = 717275;
+const HONOUR_TEAM_LOCK_KEY = 1;
+const NOTE_080 = 'AFLDB-ISSUE-080 ownership survival';
+const FIXTURE_EMAIL_080 = 'issue-080-reload@example.test';
+
+type MemberRow = {
+  id: number;
+  teamName: string;
+  name: string;
+  playerId: number | null;
+  status: string;
+};
+
+describe.skipIf(!canRunImporter)(
+  'honours reloads reconcile only rows they own (AFLDB-ISSUE-080)',
+  () => {
+    let adminUserId = 0;
+    let wikipediaId = 0;
+    let manualId = 0;
+    let sportsDataLabId = 0;
+    let playerA = 0;
+    let playerB = 0;
+    /** Fixture rows to remove, run in reverse order. */
+    const cleanup: Array<() => Promise<void>> = [];
+
+    async function sourceMember(linked: boolean): Promise<MemberRow> {
+      const rows = await sql<MemberRow[]>`
+        SELECT id, team_name AS "teamName", player_name_raw AS "name",
+               player_id AS "playerId", link_status_value::text AS status
+          FROM honour_team_members
+         WHERE source_id = ${wikipediaId}
+           AND ${linked
+             ? sql`player_id IS NOT NULL AND link_status_value::text = 'unique'`
+             : sql`player_id IS NULL AND link_status_value::text IN ('ambiguous', 'unmatched', 'implausible')`}
+         ORDER BY id
+         LIMIT 1
+      `;
+      expect(rows[0], `afldb_test needs a ${linked ? 'linked' : 'unlinked'} wikipedia honour-team row`).toBeDefined();
+      return rows[0];
+    }
+
+    async function playerNotInTeam(teamName: string): Promise<number> {
+      const [p] = await sql<{ id: number }[]>`
+        SELECT p.id FROM players p
+         WHERE NOT EXISTS (
+                 SELECT 1 FROM honour_team_members m
+                  WHERE m.team_name = ${teamName} AND m.player_id = p.id)
+         ORDER BY p.id
+         LIMIT 1
+      `;
+      return p.id;
+    }
+
+    async function honoursFingerprint(): Promise<string[]> {
+      const [hof] = await sql<{ fp: string }[]>`
+        SELECT md5(string_agg(id || ':' || name || ':' || coalesce(player_id::text, '-'), ',' ORDER BY id)) AS fp
+          FROM hall_of_fame
+      `;
+      const [members] = await sql<{ fp: string }[]>`
+        SELECT md5(string_agg(id || ':' || team_name || ':' || player_name_raw || ':' || coalesce(player_id::text, '-'), ',' ORDER BY id)) AS fp
+          FROM honour_team_members
+      `;
+      return [hof.fp, members.fp];
+    }
+
+    beforeAll(async () => {
+      const [admin] = await sql<{ id: number }[]>`
+        INSERT INTO auth_users (email, role)
+        VALUES (${FIXTURE_EMAIL_080}, 'admin')
+        ON CONFLICT (email) DO UPDATE SET role = 'admin'
+        RETURNING id
+      `;
+      adminUserId = admin.id;
+
+      const sourceRows = await sql<{ key: string; id: number }[]>`
+        SELECT key, id FROM sources
+         WHERE key IN ('wikipedia', 'manual_admin_edit', 'sports_data_lab')
+      `;
+      const byKey = new Map(sourceRows.map((row) => [row.key, row.id]));
+      wikipediaId = byKey.get('wikipedia') ?? 0;
+      manualId = byKey.get('manual_admin_edit') ?? 0;
+      sportsDataLabId = byKey.get('sports_data_lab') ?? 0;
+      expect(wikipediaId, 'wikipedia source must exist').toBeGreaterThan(0);
+      expect(manualId, 'manual_admin_edit source must exist').toBeGreaterThan(0);
+      expect(sportsDataLabId, 'sports_data_lab source must exist').toBeGreaterThan(0);
+
+      const players = await sql<{ id: number }[]>`
+        SELECT id FROM players ORDER BY id LIMIT 2
+      `;
+      playerA = players[0].id;
+      playerB = players[1].id;
+    });
+
+    afterAll(async () => {
+      for (const undo of cleanup.reverse()) {
+        try {
+          await undo();
+        } catch {
+          // Keep unwinding: one failed cleanup must not strand the rest.
+        }
+      }
+      await sql`
+        DELETE FROM player_link_resolutions WHERE admin_user_id = ${adminUserId}
+      `;
+      await sql`
+        DELETE FROM data_edits WHERE admin_user_id = ${adminUserId}
+      `;
+      await sql`DELETE FROM auth_users WHERE id = ${adminUserId}`;
+    });
+
+    it('keeps admin-created honours rows across a reload, linked, decided or not', async () => {
+      // NULL provenance (a historical admin row) and manual_admin_edit (a new
+      // one): both are outside the wikipedia scope and both must survive.
+      const [hofNull] = await sql<{ id: number }[]>`
+        INSERT INTO hall_of_fame (name, link_status_value, category, inducted_year)
+        VALUES ('AFLDB-ISSUE-080 Null Provenance', 'unmatched', 'Player', 2099)
+        RETURNING id
+      `;
+      const [hofManual] = await sql<{ id: number }[]>`
+        INSERT INTO hall_of_fame (name, link_status_value, category, inducted_year, source_id)
+        VALUES ('AFLDB-ISSUE-080 Manual Provenance', 'unmatched', 'Player', 2098, ${manualId})
+        RETURNING id
+      `;
+      const [memberNull] = await sql<{ id: number }[]>`
+        INSERT INTO honour_team_members (team_name, player_name_raw, link_status_value)
+        VALUES ('AFLDB-ISSUE-080 Team', 'AFLDB-ISSUE-080 Unlinked Member', 'unmatched')
+        RETURNING id
+      `;
+      const [memberManual] = await sql<{ id: number }[]>`
+        INSERT INTO honour_team_members (team_name, player_name_raw, link_status_value, source_id)
+        VALUES ('AFLDB-ISSUE-080 Team', 'AFLDB-ISSUE-080 Linked Member', 'unmatched', ${manualId})
+        RETURNING id
+      `;
+      cleanup.push(async () => {
+        await sql`DELETE FROM hall_of_fame WHERE id IN (${hofNull.id}, ${hofManual.id})`;
+        await sql`DELETE FROM honour_team_members WHERE id IN (${memberNull.id}, ${memberManual.id})`;
+      });
+
+      // One of each carries a manual decision: before scoping, that decision
+      // aborted the whole reload with LinkDecisionLoss; the undecided ones
+      // were deleted silently.
+      expect(await resolveLink({
+        targetTable: 'hall_of_fame',
+        targetId: hofManual.id,
+        playerId: playerA,
+        adminUserId,
+        note: NOTE_080,
+      })).toEqual({ ok: true });
+      expect(await resolveLink({
+        targetTable: 'honour_team_members',
+        targetId: memberManual.id,
+        playerId: playerB,
+        adminUserId,
+        note: NOTE_080,
+      })).toEqual({ ok: true });
+
+      const hofBefore = await countRows('hall_of_fame');
+      const membersBefore = await countRows('honour_team_members');
+
+      const run = runImporter(['hall_of_fame', 'honour_teams']);
+      expect(run.status, run.stdout + run.stderr).toBe(0);
+      expect(run.stdout).not.toContain('cannot survive');
+
+      const survivors = await sql<{
+        id: number; name: string; playerId: number | null; sourceId: number | null;
+      }[]>`
+        SELECT id, name, player_id AS "playerId", source_id AS "sourceId"
+          FROM hall_of_fame WHERE id IN (${hofNull.id}, ${hofManual.id})
+         ORDER BY id
+      `;
+      expect(survivors).toEqual([
+        { id: hofNull.id, name: 'AFLDB-ISSUE-080 Null Provenance', playerId: null, sourceId: null },
+        { id: hofManual.id, name: 'AFLDB-ISSUE-080 Manual Provenance', playerId: playerA, sourceId: manualId },
+      ]);
+
+      const memberSurvivors = await sql<{
+        id: number; name: string; playerId: number | null; sourceId: number | null;
+      }[]>`
+        SELECT id, player_name_raw AS name, player_id AS "playerId", source_id AS "sourceId"
+          FROM honour_team_members WHERE id IN (${memberNull.id}, ${memberManual.id})
+         ORDER BY id
+      `;
+      expect(memberSurvivors).toEqual([
+        { id: memberNull.id, name: 'AFLDB-ISSUE-080 Unlinked Member', playerId: null, sourceId: null },
+        { id: memberManual.id, name: 'AFLDB-ISSUE-080 Linked Member', playerId: playerB, sourceId: manualId },
+      ]);
+
+      expect(await countRows('hall_of_fame')).toBe(hofBefore);
+      expect(await countRows('honour_team_members')).toBe(membersBefore);
+    });
+
+    it(
+      'keeps foreign-owned award rows across the full legacy awards reload',
+      async () => {
+        const [legacyAward] = await sql<{ id: number }[]>`
+          SELECT id FROM awards
+           WHERE slug NOT IN ('22-under-22', 'all-australian')
+           ORDER BY id LIMIT 1
+        `;
+        const [aaAward] = await sql<{ id: number }[]>`
+          SELECT id FROM awards WHERE slug = 'all-australian'
+        `;
+        const [rsAward] = await sql<{ id: number }[]>`
+          SELECT id FROM awards WHERE slug = 'rising-star'
+        `;
+        const [{ year }] = await sql<{ year: number }[]>`
+          SELECT max(year)::int AS year FROM seasons
+        `;
+
+        // A manual admin winner inside the legacy domain scope, an ingest-
+        // promoted All-Australian row and an ingest-promoted Rising Star
+        // nomination: three foreign owners the reloads used to delete.
+        const [manualWinner] = await sql<{ id: number }[]>`
+          INSERT INTO award_winners
+            (award_id, season, player_name_raw, link_status_value, source_id, source_record_id)
+          VALUES (${legacyAward.id}, ${year}, 'AFLDB-ISSUE-080 Manual Winner', 'unmatched',
+                  ${manualId}, 'award_winner:issue-080-fixture')
+          RETURNING id
+        `;
+        const [promotedAa] = await sql<{ id: number }[]>`
+          INSERT INTO award_winners
+            (award_id, season, player_name_raw, link_status_value, player_id, source_id, source_record_id)
+          VALUES (${aaAward.id}, ${year}, 'AFLDB-ISSUE-080 Promoted AA', 'resolved',
+                  ${playerA}, ${sportsDataLabId}, 'issue-080:aa-fixture')
+          RETURNING id
+        `;
+        const [promotedNominee] = await sql<{ id: number }[]>`
+          INSERT INTO award_nominations
+            (award_id, season, round_number, player_name_raw, link_status_value, player_id, source_id, source_record_id)
+          VALUES (${rsAward.id}, ${year}, 1, 'AFLDB-ISSUE-080 Promoted Nominee', 'resolved',
+                  ${playerB}, ${sportsDataLabId}, 'issue-080:rs-fixture')
+          RETURNING id
+        `;
+        cleanup.push(async () => {
+          await sql`DELETE FROM award_winners WHERE id IN (${manualWinner.id}, ${promotedAa.id})`;
+          await sql`DELETE FROM award_nominations WHERE id = ${promotedNominee.id}`;
+        });
+
+        // The manual winner also carries a decision, the double failure mode:
+        // before scoping this aborted the reload; without it the row vanished.
+        expect(await resolveLink({
+          targetTable: 'award_winners',
+          targetId: manualWinner.id,
+          playerId: playerB,
+          adminUserId,
+          note: NOTE_080,
+        })).toEqual({ ok: true });
+
+        const winnersBefore = await countRows('award_winners');
+        const nominationsBefore = await countRows('award_nominations');
+
+        const run = runImporter(['awards']);
+        expect(run.status, run.stdout + run.stderr).toBe(0);
+        expect(run.stdout).not.toContain('cannot survive');
+
+        const winnerSurvivors = await sql<{
+          id: number; name: string; playerId: number | null; sourceId: number | null; recordId: string;
+        }[]>`
+          SELECT id, player_name_raw AS name, player_id AS "playerId",
+                 source_id AS "sourceId", source_record_id AS "recordId"
+            FROM award_winners WHERE id IN (${manualWinner.id}, ${promotedAa.id})
+           ORDER BY id
+        `;
+        expect(winnerSurvivors).toEqual([
+          {
+            id: manualWinner.id,
+            name: 'AFLDB-ISSUE-080 Manual Winner',
+            playerId: playerB,
+            sourceId: manualId,
+            recordId: 'award_winner:issue-080-fixture',
+          },
+          {
+            id: promotedAa.id,
+            name: 'AFLDB-ISSUE-080 Promoted AA',
+            playerId: playerA,
+            sourceId: sportsDataLabId,
+            recordId: 'issue-080:aa-fixture',
+          },
+        ]);
+
+        const [nomineeSurvivor] = await sql<{
+          id: number; playerId: number | null; sourceId: number | null;
+        }[]>`
+          SELECT id, player_id AS "playerId", source_id AS "sourceId"
+            FROM award_nominations WHERE id = ${promotedNominee.id}
+        `;
+        expect(nomineeSurvivor).toEqual({
+          id: promotedNominee.id,
+          playerId: playerB,
+          sourceId: sportsDataLabId,
+        });
+
+        expect(await countRows('award_winners')).toBe(winnersBefore);
+        expect(await countRows('award_nominations')).toBe(nominationsBefore);
+      },
+      300_000,
+    );
+
+    it('refuses the Hall of Fame reload when a foreign row occupies an incoming key', async () => {
+      // The dangerous shape check 1 exists for: a foreign-owned row holds a
+      // key the extract still carries. Manufactured by disowning a source row.
+      const [row] = await sql<{ id: number }[]>`
+        SELECT id FROM hall_of_fame
+         WHERE source_id = ${wikipediaId}
+         ORDER BY id LIMIT 1
+      `;
+      await sql`UPDATE hall_of_fame SET source_id = NULL WHERE id = ${row.id}`;
+      try {
+        const before = await countRows('hall_of_fame');
+
+        const run = runImporter(['hall_of_fame']);
+        expect(run.status, 'the reload must fail closed').toBe(1);
+        expect(run.stdout).toContain('does not own');
+        expect(run.stdout).toContain(`id=${row.id}`);
+
+        expect(await countRows('hall_of_fame')).toBe(before);
+        const [after] = await sql<{ sourceId: number | null }[]>`
+          SELECT source_id AS "sourceId" FROM hall_of_fame WHERE id = ${row.id}
+        `;
+        expect(after.sourceId, 'the foreign row is untouched').toBeNull();
+      } finally {
+        await sql`UPDATE hall_of_fame SET source_id = ${wikipediaId} WHERE id = ${row.id}`;
+      }
+    });
+
+    it('refuses an honour-team reload over a foreign unlinked row with an incoming unlinked name', async () => {
+      const row = await sourceMember(false);
+      await sql`UPDATE honour_team_members SET source_id = NULL WHERE id = ${row.id}`;
+      try {
+        const before = await countRows('honour_team_members');
+        const run = runImporter(['honour_teams']);
+        expect(run.status, 'the reload must fail closed').toBe(1);
+        expect(run.stdout).toContain('identity is unknown on both sides');
+        expect(run.stdout).toContain(`id=${row.id}`);
+        expect(await countRows('honour_team_members')).toBe(before);
+      } finally {
+        await sql`UPDATE honour_team_members SET source_id = ${wikipediaId} WHERE id = ${row.id}`;
+      }
+    });
+
+    it('refuses when a foreign unlinked row meets the same name incoming linked', async () => {
+      const row = await sourceMember(true);
+      await sql`
+        UPDATE honour_team_members
+           SET source_id = NULL, player_id = NULL, link_status_value = 'unmatched'
+         WHERE id = ${row.id}
+      `;
+      try {
+        const before = await countRows('honour_team_members');
+        const run = runImporter(['honour_teams']);
+        expect(run.status, 'the reload must fail closed').toBe(1);
+        expect(run.stdout).toContain('review whether they are the same person');
+        expect(run.stdout).toContain(`id=${row.id}`);
+        expect(await countRows('honour_team_members')).toBe(before);
+      } finally {
+        await sql`
+          UPDATE honour_team_members
+             SET source_id = ${wikipediaId}, player_id = ${row.playerId},
+                 link_status_value = ${row.status}::link_status
+           WHERE id = ${row.id}
+        `;
+      }
+    });
+
+    it('refuses when a foreign linked row meets the same name incoming unlinked, creating no duplicate', async () => {
+      // One of the two collision shapes with no unique-index backstop after
+      // migration 059: only the preflight stands between this and a silent
+      // duplicate person.
+      const row = await sourceMember(false);
+      const foreignPlayer = await playerNotInTeam(row.teamName);
+      await sql`
+        UPDATE honour_team_members
+           SET source_id = NULL, player_id = ${foreignPlayer},
+               link_status_value = 'resolved'
+         WHERE id = ${row.id}
+      `;
+      try {
+        const before = await countRows('honour_team_members');
+        const run = runImporter(['honour_teams']);
+        expect(run.status, 'the reload must fail closed').toBe(1);
+        expect(run.stdout).toContain('review whether they are the same person');
+        expect(run.stdout).toContain(`id=${row.id}`);
+        expect(await countRows('honour_team_members'), 'no silent duplicate').toBe(before);
+        const twins = await sql<{ n: number }[]>`
+          SELECT count(*)::int AS n FROM honour_team_members
+           WHERE team_name = ${row.teamName} AND player_name_raw = ${row.name}
+        `;
+        expect(twins[0].n).toBe(1);
+      } finally {
+        await sql`
+          UPDATE honour_team_members
+             SET source_id = ${wikipediaId}, player_id = NULL,
+                 link_status_value = ${row.status}::link_status
+           WHERE id = ${row.id}
+        `;
+      }
+    });
+
+    it('refuses when a foreign row and the incoming row assert the same linked player', async () => {
+      const row = await sourceMember(true);
+      await sql`UPDATE honour_team_members SET source_id = NULL WHERE id = ${row.id}`;
+      try {
+        const before = await countRows('honour_team_members');
+        const run = runImporter(['honour_teams']);
+        expect(run.status, 'the reload must fail closed').toBe(1);
+        expect(run.stdout).toContain(`already records player ${row.playerId}`);
+        expect(await countRows('honour_team_members')).toBe(before);
+      } finally {
+        await sql`UPDATE honour_team_members SET source_id = ${wikipediaId} WHERE id = ${row.id}`;
+      }
+    });
+
+    it('refuses the same linked player recorded under a different raw name (§4.4)', async () => {
+      const row = await sourceMember(true);
+      await sql`
+        UPDATE honour_team_members
+           SET source_id = NULL, player_name_raw = ${`${row.name} (variant)`}
+         WHERE id = ${row.id}
+      `;
+      try {
+        const before = await countRows('honour_team_members');
+        const run = runImporter(['honour_teams']);
+        expect(run.status, 'the reload must fail closed').toBe(1);
+        // The names differ, so only the (team_name, player_id) axis can fire.
+        expect(run.stdout).toContain(`already records player ${row.playerId}`);
+        expect(run.stdout).toContain('(variant)');
+        expect(await countRows('honour_team_members')).toBe(before);
+      } finally {
+        await sql`
+          UPDATE honour_team_members
+             SET source_id = ${wikipediaId}, player_name_raw = ${row.name}
+           WHERE id = ${row.id}
+        `;
+      }
+    });
+
+    it('createHonourTeamMember refuses the same linked player under a different display name (§4.4 axis 2, real database)', async () => {
+      // The unit suite mocks this mutation's SQL, so only a real database can
+      // prove that the player_id disjunct of the identity SELECT — same
+      // team_name OR same non-NULL player_id — actually matches in
+      // PostgreSQL. The fixture's raw name is guaranteed to differ from the
+      // player's display name (which the mutation substitutes when playerId
+      // is supplied), so the raw-name disjunct cannot fire: only
+      // (team_name, player_id) can select the existing row.
+      const teamName = 'AFLDB-ISSUE-080 Axis2 Team';
+      const variantName = 'AFLDB-ISSUE-080 Axis2 Variant';
+      const [display] = await sql<{ name: string }[]>`
+        SELECT display_name AS name FROM players WHERE id = ${playerA}
+      `;
+      expect(display.name).not.toBe(variantName);
+
+      const [fixture] = await sql<{ id: number }[]>`
+        INSERT INTO honour_team_members
+          (team_name, player_name_raw, player_id, link_status_value, source_id)
+        VALUES (${teamName}, ${variantName}, ${playerA}, 'resolved', ${manualId})
+        RETURNING id
+      `;
+      cleanup.push(async () => {
+        await sql`DELETE FROM honour_team_members WHERE id = ${fixture.id}`;
+      });
+
+      const countAudits = async () => {
+        const [r] = await sql<{ n: number }[]>`
+          SELECT count(*)::int AS n FROM data_edits
+           WHERE admin_user_id = ${adminUserId}
+             AND table_name = 'honour_team_members'
+        `;
+        return r.n;
+      };
+      const auditsBefore = await countAudits();
+
+      await expect(createHonourTeamMember({
+        teamName,
+        playerId: playerA,
+        adminUserId,
+      })).rejects.toThrow(/already records this player as 'AFLDB-ISSUE-080 Axis2 Variant'/);
+
+      // The refused create wrote nothing: no second row for the identity, the
+      // existing row byte-identical, and no mutation-audit row.
+      const rows = await sql<{
+        id: number; name: string; playerId: number | null;
+        sourceId: number | null; status: string;
+      }[]>`
+        SELECT id, player_name_raw AS name, player_id AS "playerId",
+               source_id AS "sourceId", link_status_value::text AS status
+          FROM honour_team_members
+         WHERE team_name = ${teamName}
+      `;
+      expect(rows).toEqual([{
+        id: fixture.id,
+        name: variantName,
+        playerId: playerA,
+        sourceId: manualId,
+        status: 'resolved',
+      }]);
+      expect(await countAudits()).toBe(auditsBefore);
+    });
+
+    it('lets two distinct linked players share a display name in one team (AFLDB-ISSUE-025)', async () => {
+      // The §4.3 matrix's positive case, and the proof that the generic
+      // out-of-scope key refusal is NOT enabled for honour teams: a blanket
+      // reload-key refusal would fail this reload.
+      const row = await sourceMember(true);
+      const foreignPlayer = await playerNotInTeam(row.teamName);
+      expect(foreignPlayer).not.toBe(row.playerId);
+      await sql`
+        UPDATE honour_team_members
+           SET source_id = NULL, player_id = ${foreignPlayer},
+               link_status_value = 'resolved'
+         WHERE id = ${row.id}
+      `;
+      let insertedId: number | null = null;
+      try {
+        const before = await countRows('honour_team_members');
+        const run = runImporter(['honour_teams']);
+        expect(run.status, run.stdout + run.stderr).toBe(0);
+
+        // The incoming row was inserted alongside the foreign row: two rows,
+        // one display name, two positively different people.
+        expect(await countRows('honour_team_members')).toBe(before + 1);
+        const twins = await sql<{ id: number; playerId: number | null; sourceId: number | null }[]>`
+          SELECT id, player_id AS "playerId", source_id AS "sourceId"
+            FROM honour_team_members
+           WHERE team_name = ${row.teamName} AND player_name_raw = ${row.name}
+           ORDER BY id
+        `;
+        expect(twins).toHaveLength(2);
+        expect(twins[0]).toEqual({ id: row.id, playerId: foreignPlayer, sourceId: null });
+        expect(twins[1].playerId).toBe(row.playerId);
+        expect(twins[1].sourceId).toBe(wikipediaId);
+        insertedId = twins[1].id;
+      } finally {
+        if (insertedId !== null) {
+          await sql`DELETE FROM honour_team_members WHERE id = ${insertedId}`;
+        }
+        await sql`
+          UPDATE honour_team_members
+             SET source_id = ${wikipediaId}, player_id = ${row.playerId},
+                 link_status_value = ${row.status}::link_status
+           WHERE id = ${row.id}
+        `;
+      }
+    });
+
+    it('reloads idempotently: a second identical run changes nothing', async () => {
+      const first = runImporter(['hall_of_fame', 'honour_teams']);
+      expect(first.status, first.stdout + first.stderr).toBe(0);
+      const before = await honoursFingerprint();
+
+      const second = runImporter(['hall_of_fame', 'honour_teams']);
+      expect(second.status, second.stdout + second.stderr).toBe(0);
+      expect(await honoursFingerprint()).toEqual(before);
+    });
+
+    describe('honour-team identity advisory lock (AFLDB-ISSUE-080 §5.3)', () => {
+      const dsn = process.env.AFLDB_TEST_DATABASE_URL as string;
+
+      it('serialises both writers over one identity and releases on commit and rollback', async () => {
+        const holder = postgres(dsn, { max: 1, onnotice: () => {} });
+        const rival = postgres(dsn, { max: 1, onnotice: () => {} });
+        const tryLock = () => rival.begin(async (tx) => {
+          const [r] = await tx<{ locked: boolean }[]>`
+            SELECT pg_try_advisory_xact_lock(
+              ${HONOUR_TEAM_LOCK_NAMESPACE}, ${HONOUR_TEAM_LOCK_KEY}
+            ) AS locked
+          `;
+          return r.locked;
+        });
+        try {
+          // Held by the blocking form (the importer's shape): the try form
+          // (the admin path's shape) returns false rather than hanging.
+          await holder.begin(async (tx) => {
+            await tx`SELECT pg_advisory_xact_lock(${HONOUR_TEAM_LOCK_NAMESPACE}, ${HONOUR_TEAM_LOCK_KEY})`;
+            expect(await tryLock(), 'contended while held').toBe(false);
+          });
+          expect(await tryLock(), 'commit releases the lock').toBe(true);
+
+          await holder.begin(async (tx) => {
+            await tx`SELECT pg_advisory_xact_lock(${HONOUR_TEAM_LOCK_NAMESPACE}, ${HONOUR_TEAM_LOCK_KEY})`;
+            throw new Error('deliberate rollback');
+          }).catch((error: Error) => {
+            if (!/deliberate rollback/.test(String(error))) throw error;
+          });
+          expect(await tryLock(), 'rollback releases the lock').toBe(true);
+        } finally {
+          await holder.end({ timeout: 5 });
+          await rival.end({ timeout: 5 });
+        }
+      });
+
+      it('createHonourTeamMember fails fast while the reload lock is held, then succeeds', async () => {
+        const holder = postgres(dsn, { max: 1, onnotice: () => {} });
+        let releaseLock!: () => void;
+        const gate = new Promise<void>((resolve) => { releaseLock = resolve; });
+        let lockAcquired!: () => void;
+        const acquired = new Promise<void>((resolve) => { lockAcquired = resolve; });
+        const holding = holder.begin(async (tx) => {
+          await tx`SELECT pg_advisory_xact_lock(${HONOUR_TEAM_LOCK_NAMESPACE}, ${HONOUR_TEAM_LOCK_KEY})`;
+          lockAcquired();
+          await gate;
+        });
+        try {
+          await acquired;
+          await expect(createHonourTeamMember({
+            teamName: 'AFLDB-ISSUE-080 Lock Team',
+            playerNameRaw: 'AFLDB-ISSUE-080 Lock Member',
+            adminUserId,
+          })).rejects.toThrow('An honours reload is in progress; try again shortly.');
+        } finally {
+          releaseLock();
+          await holding;
+          await holder.end({ timeout: 5 });
+        }
+
+        // Released, the identical create goes through and stamps provenance.
+        const created = await createHonourTeamMember({
+          teamName: 'AFLDB-ISSUE-080 Lock Team',
+          playerNameRaw: 'AFLDB-ISSUE-080 Lock Member',
+          adminUserId,
+        });
+        cleanup.push(async () => {
+          await sql`DELETE FROM honour_team_members WHERE id = ${created.id}`;
+        });
+        const [row] = await sql<{ sourceId: number | null }[]>`
+          SELECT source_id AS "sourceId" FROM honour_team_members WHERE id = ${created.id}
+        `;
+        expect(row.sourceId).toBe(manualId);
+      });
+
+      it('create-refusal is provenance-independent: a wikipedia-owned entry also refuses', async () => {
+        const row = await sourceMember(false);
+        await expect(createHonourTeamMember({
+          teamName: row.teamName,
+          playerNameRaw: row.name,
+          adminUserId,
+        })).rejects.toThrow(/already has an entry named/);
+
+        const [unchanged] = await sql<{ playerId: number | null; sourceId: number | null }[]>`
+          SELECT player_id AS "playerId", source_id AS "sourceId"
+            FROM honour_team_members WHERE id = ${row.id}
+        `;
+        expect(unchanged, 'the existing row is untouched — no adopt, no overwrite')
+          .toEqual({ playerId: null, sourceId: wikipediaId });
+      });
+
+      const restrictedDsn = process.env.AFLDB_TEST_IMPORT_DATABASE_URL;
+      it.skipIf(!restrictedDsn)(
+        'the real runtime role can take both lock forms and contend across roles (§9.4b)',
+        async () => {
+          const restricted = postgres(restrictedDsn as string, { max: 1, onnotice: () => {} });
+          const owner = postgres(dsn, { max: 1, onnotice: () => {} });
+          try {
+            const roleName = await restricted.begin(async (tx) => {
+              const [who] = await tx<{ role: string }[]>`SELECT current_user AS role`;
+              await tx`SELECT pg_advisory_xact_lock(${HONOUR_TEAM_LOCK_NAMESPACE}, ${HONOUR_TEAM_LOCK_KEY})`;
+              return who.role;
+            });
+            expect(roleName).toBe('afldb_import');
+
+            // Cross-role contention on the same literal identity.
+            await owner.begin(async (tx) => {
+              await tx`SELECT pg_advisory_xact_lock(${HONOUR_TEAM_LOCK_NAMESPACE}, ${HONOUR_TEAM_LOCK_KEY})`;
+              const [r] = await restricted.begin(async (rtx) => rtx<{ locked: boolean }[]>`
+                SELECT pg_try_advisory_xact_lock(
+                  ${HONOUR_TEAM_LOCK_NAMESPACE}, ${HONOUR_TEAM_LOCK_KEY}
+                ) AS locked
+              `);
+              expect(r.locked, 'the try form fails rather than hangs across roles').toBe(false);
+            });
+            const [after] = await restricted.begin(async (rtx) => rtx<{ locked: boolean }[]>`
+              SELECT pg_try_advisory_xact_lock(
+                ${HONOUR_TEAM_LOCK_NAMESPACE}, ${HONOUR_TEAM_LOCK_KEY}
+              ) AS locked
+            `);
+            expect(after.locked, 'released once the owner transaction ends').toBe(true);
+          } finally {
+            await restricted.end({ timeout: 5 });
+            await owner.end({ timeout: 5 });
+          }
+        },
+      );
+    });
   },
 );
