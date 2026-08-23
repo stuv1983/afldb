@@ -100,7 +100,15 @@ test('a player page carries valid Person and BreadcrumbList data', async ({ page
 
 test('a match page carries valid SportsEvent data', async ({ page }) => {
   await page.goto('/seasons/1989');
-  await page.locator('a[href^="/matches/"]').first().click();
+  // The season page ships its rounds collapsed. A reader opens a round and
+  // picks a match, so do the same: open a <details> specifically because it
+  // holds match links, then follow the first link that becomes visible.
+  const round = page
+    .locator('details')
+    .filter({ has: page.locator('a[href^="/matches/"]') })
+    .first();
+  await round.locator('summary').click();
+  await round.locator('a[href^="/matches/"]').first().click();
   await expect(page).toHaveURL(/\/matches\/\d+/);
 
   const event = (await jsonLd(page)).find((b) => b['@type'] === 'SportsEvent') as

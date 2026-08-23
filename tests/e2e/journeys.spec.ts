@@ -37,7 +37,9 @@ test('players → sort → player profile', async ({ page }) => {
 test('season → match', async ({ page }) => {
   await page.goto('/seasons/1989');
   await expect(page.getByRole('heading', { name: /1989 VFL Season/ })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Ladder' })).toBeVisible();
+  // Exact: the per-round tables are headed "Ladder after Round N", and role
+  // name matching is substring by default — 'Ladder' alone matches them all.
+  await expect(page.getByRole('heading', { name: 'Ladder', exact: true })).toBeVisible();
 
   // The 1989 Grand Final is the most famous match in the database.
   await page.getByRole('heading', { name: 'Grand Final' }).scrollIntoViewIfNeeded();
@@ -183,9 +185,19 @@ test('robots.txt matches the deployment it is serving', async ({ request }) => {
 });
 
 test('the sitemap index resolves to segments that have URLs in them', async ({ request }) => {
+  // The sitemap follows the same fail-closed gate robots.txt answers from
+  // (src/app/sitemap.ts): a deployment that says "Disallow: /" must not
+  // publish a map of itself either, so there the index has to 404. The
+  // robots response, not a rebuilt env rule, decides which contract applies.
+  const robots = await (await request.get('/robots.txt')).text();
+  const index = await request.get('/sitemap.xml');
+  if (/^Disallow: \/$/m.test(robots)) {
+    expect(index.status()).toBe(404);
+    return;
+  }
+
   // /sitemap.xml returned 404 while the segments existed, so nothing
   // published pointed at any of them.
-  const index = await request.get('/sitemap.xml');
   expect(index.status()).toBe(200);
 
   const body = await index.text();
@@ -241,7 +253,7 @@ test('match search is reachable from the primary navigation', async ({ page, isM
   await expect(page).toHaveURL(/\/match-search/);
 });
 
-test('the AFLW placeholder is reachable from site navigation', async ({ page, isMobile }) => {
+test('the AFLW landing is reachable from site navigation', async ({ page, isMobile }) => {
   // Start on a static route so this UI-only check does not depend on the database.
   await page.goto('/not-a-real-page');
 
@@ -251,8 +263,10 @@ test('the AFLW placeholder is reachable from site navigation', async ({ page, is
   await navigation.getByRole('link', { name: 'AFLW' }).click();
 
   await expect(page).toHaveURL(/\/aflw$/);
-  await expect(page.getByRole('heading', { name: 'AFLW is coming to AFLDB' })).toBeVisible();
-  await expect(page.getByText('Coming soon')).toHaveCount(5);
+  await expect(
+    page.getByRole('heading', { name: /Every player\. Every game\. Since \d{4}\./ }),
+  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Browse the record' })).toBeVisible();
 });
 
 test('a drawn match reads as a draw, not as a defeat', async ({ page }) => {
@@ -284,21 +298,31 @@ test('a shared Brownlow names every winner', async ({ page }) => {
   await expect(subtitle).toContainText('Mark Ricciuto');
 });
 
-test('a merged club names its successor in the clubs index', async ({ page }) => {
-  await page.goto('/clubs');
-  const fitzroy = page.getByRole('row').filter({ hasText: 'Fitzroy' }).first();
-  // "Continues as —" told the reader nothing about where Fitzroy went.
-  await expect(fitzroy).toContainText('Brisbane Lions');
+test('a merged club is discoverable by outcome and names its successor', async ({ page }) => {
+  // The index presents clubs as cards with an "Outcome" filter: succession
+  // is asked for by filtering, and the merger's destination is spelled out
+  // on the club's own page rather than on the card.
+  await page.goto('/clubs?succession=merged');
+  const fitzroy = page.getByRole('link', { name: /Fitzroy/ }).first();
+  await expect(fitzroy).toBeVisible();
+  // University folded with no successor — it must not appear as a merger.
+  await expect(page.getByRole('link', { name: /University/ })).toHaveCount(0);
 
-  const university = page.getByRole('row').filter({ hasText: 'University' }).first();
-  await expect(university).toContainText('no successor');
+  await fitzroy.click();
+  await expect(page).toHaveURL(/\/clubs\/fitzroy/);
+  // "counted towards" is unique to the merger notice; it must still name
+  // where Fitzroy's record went.
+  const notice = page.locator('.notice').filter({ hasText: 'counted towards' });
+  await expect(notice).toContainText('Brisbane Lions');
 });
 
 test('a page past the last one lands on a page that exists', async ({ page }) => {
   await page.goto('/players?page=999');
-  // Previously reported "0 players" while claiming 13,361 in the same view.
+  // Previously reported "0 players" while claiming the full total in the
+  // same view. A formatted, non-zero total keeps that regression caught
+  // without pinning the count to a moving dev-database datum.
   await expect(page).toHaveURL(/page=\d+/);
-  await expect(page.locator('.subtitle')).toContainText('13,361 players');
+  await expect(page.locator('.subtitle')).toContainText(/\b[1-9]\d{0,2}(?:,\d{3})+ players\b/);
   await expect(page.getByRole('row').nth(1)).toBeVisible();
 });
 

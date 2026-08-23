@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('Grid Solver Validation', async ({ page }) => {
-  await page.goto('http://localhost:3100/grid-solver');
+  await page.goto('/grid-solver');
   
   // 1. Board loading
   await expect(page.locator('h1')).toHaveText('Grid solver');

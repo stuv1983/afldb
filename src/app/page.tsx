@@ -33,11 +33,18 @@ const HOME_DESCRIPTION =
  * page with no canonical at all. Everything else here is what the layout
  * already said; the canonical and the og:url are the additions.
  */
-export const metadata: Metadata = pageMetadata({
-  title: 'AFL & VFL Statistics, Records and Match History',
-  description: HOME_DESCRIPTION,
-  path: '/',
-});
+export const metadata: Metadata = {
+  ...pageMetadata({
+    title: 'AFL & VFL Statistics, Records and Match History',
+    description: HOME_DESCRIPTION,
+    path: '/',
+  }),
+  // Next applies a layout's `title.template` only to CHILD segments, and this
+  // page shares the root segment with the layout that declares it — so the
+  // plain title above would render with no "| AFLDB" suffix. Spell the full
+  // title out absolutely; og:title already carries its own absolute suffix.
+  title: { absolute: 'AFL & VFL Statistics, Records and Match History | AFLDB' },
+};
 
 async function getOverview() {
   const [row] = await sql<{
