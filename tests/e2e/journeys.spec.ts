@@ -41,10 +41,14 @@ test('season → match', async ({ page }) => {
   // name matching is substring by default — 'Ladder' alone matches them all.
   await expect(page.getByRole('heading', { name: 'Ladder', exact: true })).toBeVisible();
 
-  // The 1989 Grand Final is the most famous match in the database.
-  await page.getByRole('heading', { name: 'Grand Final' }).scrollIntoViewIfNeeded();
-  const gfTable = page.locator('h3', { hasText: 'Grand Final' }).locator('..');
-  await gfTable.getByRole('link').first().click();
+  // The 1989 Grand Final is the most famous match in the database. Rounds
+  // ship as collapsed <details> whose <summary> holds the round heading, so
+  // open the Grand Final section and follow its match link.
+  const gf = page.locator('details').filter({
+    has: page.getByRole('heading', { name: 'Grand Final' }),
+  });
+  await gf.locator('summary').click();
+  await gf.locator('a[href^="/matches/"]').first().click();
 
   await expect(page).toHaveURL(/\/matches\/\d+/);
   await expect(page.getByRole('heading', { name: 'Quarter by quarter' })).toBeVisible();

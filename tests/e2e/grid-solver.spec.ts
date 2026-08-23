@@ -19,7 +19,7 @@ test('Grid Solver Validation', async ({ page }) => {
   await page.locator('legend:has-text("Row 2")').locator('..').locator('select').nth(1).selectOption({ label: 'Teammate of…' });
   
   // Find player input
-  const playerInput = page.locator('legend:has-text("Row 2")').locator('..').locator('input[type="text"]').first();
+  const playerInput = page.locator('legend:has-text("Row 2")').locator('..').locator('input[type="search"]').first();
   await playerInput.fill('Archie Roberts');
   
   // Wait for dropdown
