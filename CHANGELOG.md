@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### Production Deployment of Player-Link Protections (Schema 070) - 24 August 2026
+
+- `AFLDB-ISSUE-084` (resolved) successfully rolled out the ISSUE-044/078/080 link-preserving loaders across all seven `LINK_TARGET_TABLES` families to the production database (`afldb_prod`). Production schema advanced from 057 to 070.
+- Production role privileges were reconciled, stripping invalid legacy grants and enforcing explicit `afldb_import` restrictions on audit and link-decision tables.
+- The one-time production first-kick-goal `--rekey` completed successfully (334 rows migrated in place, surrogate IDs preserved unchanged).
+- Both the Profile-B reload-safety audit and the clean post-migration player-link integrity audit passed without collisions, exposed rows, or dangling identities.
+
 ### Validated Release Candidate Promoted to `main` - 24 August 2026
 
 - `origin/main` was fast-forwarded (non-force) from `9be7f26` (migration 061) to the fully validated release candidate `0da44f9` (migration 070) under `AFLDB-ISSUE-087` (resolved). This promotes the accumulated, previously dev-only release state through migration 070 to `main`; ISSUE-087 itself was a release-validation and promotion gate, not the implementation issue for the individual features contained in that candidate.

@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-24
-**Open issues:** 18
+**Open issues:** 17
 
 ## How Claude should use this file
 
@@ -37,7 +37,6 @@
 | `AFLDB-ISSUE-082` | Medium | Admin | `confirmUnlinked` takes no lock and never re-reads its target, so a stale form can contradict an applied link. |
 | `AFLDB-ISSUE-077` | Medium | UI/Settings | The saved super-admin frontend theme can change between pages during the same browsing session. |
 | `AFLDB-ISSUE-083` | Medium | Tests / Database privileges | Importers are tested as `afldb_owner` but run as `afldb_import`, so missing-grant defects pass CI and fail in production. |
-| `AFLDB-ISSUE-084` | High | Deployment / Data integrity | Production (migration 057) lacks the ISSUE-044/078 player-link protections; all seven link-target families are still served by destructive loaders, so a reload can create new dangling resolutions. |
 | `AFLDB-ISSUE-085` | Low | Data integrity / Import | `import_captaincies` reconciles its whole table with no ownership predicate — the ISSUE-080 defect class, latent because the importer is today the only writer. |
 | `AFLDB-ISSUE-086` | Needs triage | Admin / Data integrity | Data-editor edits to source-owned rows can be silently reverted by the owning source's next reload; severity awaits the four-question triage recorded in the entry. |
 | `AFLDB-ISSUE-088` | Low | Tests / Tooling | NL-UI stress harness has no `actionTimeout`/`globalTimeout` policy and retains latent unbounded auto-wait sites; hardening deliberately deferred until the D4 timing evidence can set values. |
@@ -205,33 +204,6 @@
   fixture setup stays on the owner `sql` handle; prove it on the first-kick-goal
   loader, whose exact requirements are already known. Do not re-run the existing
   integration suite as `afldb_import`.
-
-## AFLDB-ISSUE-084 — Deploy the ISSUE-044/078 player-link protections to production
-
-- **Severity:** High
-- **Area:** Deployment / Data integrity
-- **Key files:** `src/db/migrations/058`–`070`,
-  `tools/maintenance/privileges.sql`, `tools/migration/import_awards.py`,
-  `tools/migration/import_draft.py`, `tools/records/import-first-kick-goal.ts`
-- **Current state:** Deployment work, not historical remediation. The
-  `AFLDB-ISSUE-079` production audit (2026-08-23, migration 057) found **no
-  historical dangling targets**, but the deployed production checkout
-  (`a32a0a1`) still carries destructive reload behaviour across all seven
-  `LINK_TARGET_TABLES` families — the ISSUE-044/078 repairs, migrations 058–070
-  and the production `--rekey` are all undeployed. Production remains
-  prospectively exposed until this issue is completed.
-- **Next action:** **Only on explicit instruction:** apply migrations 058–070
-  with `npm run db:privileges` at the points ISSUE-044/078 require (068 +
-  privileges before the honours importer, 069 before `import_draft.py`, 070 +
-  privileges before the first-kick-goal importer); deploy the three corrected
-  loaders — `import_awards.py` **must** be the resolved `AFLDB-ISSUE-080`
-  version with its matching `common.py`/`awards-admin.ts` (no extra migration
-  or privilege step); run the regenerated **Profile-B ISSUE-080 audit** with
-  Plane B re-derived and compared against the recorded fingerprints **before
-  the first awards/honours reload**; run the one-time production `--rekey` per
-  the ISSUE-078 Follow-up; then regenerate and re-run the ISSUE-079 audit — the
-  migration-057-pinned SQL (S16/S17) will correctly refuse after migration and
-  must not be rerun as-is.
 
 ## AFLDB-ISSUE-085 — `import_captaincies` reconciles an unscoped population with no ownership predicate
 

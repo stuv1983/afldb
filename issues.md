@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 18
+**Open issues:** 17
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
@@ -24,7 +24,6 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-081` | Low | Tests | The honours reload integration suite mutates rows that `release-gates.test.ts` counts, with no lock between the two files; latent, not yet observed failing. | Give it the same `tests/integration/draft-lock.ts` treatment, or prove the two files never overlap. |
 | `AFLDB-ISSUE-082` | Medium | Admin | `confirmUnlinked` takes no lock and never re-reads its target, so a stale form can vet a row whose person was linked moments earlier. | Lock and re-check the target the way `resolveLink` does, and reject a decision that contradicts an applied link. |
 | `AFLDB-ISSUE-083` | Medium | Tests / Database privileges | Every database-backed importer test substitutes the owner DSN for `AFLDB_IMPORT_DATABASE_URL`, so a privilege the importer needs but does not hold is invisible; `AFLDB-ISSUE-078` shipped exactly that defect. | Add a restricted test DSN plus a shared helper that runs the importer as `afldb_import` while fixtures stay on the owner handle, and prove it on the first-kick-goal loader first. |
-| `AFLDB-ISSUE-084` | High | Deployment / Data integrity | Production (migration 057, checkout `a32a0a1`) lacks the ISSUE-044/078 player-link protections: all seven `LINK_TARGET_TABLES` families are still served by destructive loaders, so a production reload can create new dangling resolutions. ISSUE-079 audited the history clean; this owns the prospective rollout. | On explicit instruction: apply migrations 058–070 with `db:privileges` at the ISSUE-044/078-specified points, deploy the three corrected loaders (the ISSUE-080-corrected `import_awards.py` included), run the Profile-B ISSUE-080 audit before the first awards/honours reload, run the one-time production `--rekey`, then regenerate and re-run the ISSUE-079 audit against the migrated schema. |
 | `AFLDB-ISSUE-085` | Low | Data integrity / Import | `import_captaincies` reconciles the whole `captaincies` table with no ownership predicate — the ISSUE-080 defect class, latent because the importer is today the table's only writer. | Scope it to its own `source_id` by construction (the `reload_keyed` conjunction now exists) and decide the `captaincies_natural_uq` collision policy before a second writer ever exists. |
 | `AFLDB-ISSUE-086` | Needs triage | Admin / Data integrity | Data-editor edits to source-owned rows can be silently reverted by the owning source's next reload (durability/overwrite, not the ISSUE-080 deletion class); only `players`/`matches`/`draft_picks` are live editable entities today. | Answer the four triage questions in the entry (UI promise, affected fields/entities, intended durability, silence of reversion), then set severity on that evidence. |
 | `AFLDB-ISSUE-088` | Low | Tests / Tooling | The NL-UI stress harness has no `actionTimeout`/`globalTimeout` policy and retains latent unbounded auto-wait sites (`nl-stress.spec.ts` `:554`, `:577`, `:580`, `:945`); the `:835` instance stalled successor-3's D4 for 30 minutes per parked batch before its successor-4 repair. | After ISSUE-087 closes, derive timeout values from the successor-4 D4 `elapsedMs`/`timingSummary` distribution, then add the config timeouts and guard the latent sites outside any release gate. |
@@ -4857,6 +4856,14 @@ intended behaviour.
    collision and must join the §4.3 matrix and the `(717275, 1)` advisory-lock
    protocol.
 
+
+### Profile-B Pre-Reload Standing Gate
+**Profile-B Schema Gate: PASS** (Run Date: 2026-08-24)
+- **Artifact:** `artifacts/audits/issue-080-planeb-dev-20260824-profileB.json` (SHA256: `92516054809b3ad1a9084d06d8f0b91a713c7550f7b641f893e48ba3c19432df`)
+- **Plane-A Artifact:** `artifacts/audits/issue-080-planea-prod-20260824-profileB.txt` (SHA256: `1ba4d792a3e1d52c7a2436996e900dd5427f93ff480b27b3e9ee5c3a070263ee`)
+- **Verification:** 343 `hall_of_fame` and 113 `honour_team_members` rows safely emitted with 0 duplicates. Fingerprints matched Production Plane-A precisely. No collisions or foreign/exposed rows found.
+- **Standing Gate Requirement:** No production awards/honours reload via `import_awards.py` may be executed without rerunning and passing this Profile-B fail-closed gate using the exact deployment candidate and target dataset.
+
 ## AFLDB-ISSUE-081 — Honours reload suite races the release gates over shared rows
 
 - **Status:** Open
@@ -5182,11 +5189,11 @@ by this entry.
 
 ## AFLDB-ISSUE-084 — Deploy the ISSUE-044/078 player-link protections to production
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** High
 - **Area:** Deployment / Data integrity
 - **Found:** 2026-08-23
-- **Resolved:** N/A
+- **Resolved:** 2026-08-24
 - **Files:** `src/db/migrations/058`–`070` (production-pending),
   `tools/maintenance/privileges.sql`, `tools/migration/import_awards.py`,
   `tools/migration/import_draft.py`, `tools/records/import-first-kick-goal.ts`,
@@ -5299,6 +5306,28 @@ SELECT on `player_achievements`, `data_issues`, `player_link_resolutions` and
 UPDATE or DELETE on either. Extend to the draft and awards loaders, then decide
 per importer whether the untested Python jobs justify their own parity paths or a
 single shared smoke path.
+
+
+### Resolution / Phase 12 Evidence
+- **Code Activation:** Target SHA `0da44f9dd71398d2b72fe33f42867861d7eab6e7` deployed and activated at `2026-08-24T20:41:34+10:00`.
+- **Migrations:** Applied 058 through 070 (High-water: `070_import_reads_link_suggestions.sql`).
+- **Backup:** Gate G1 `afldb_prod-20260824-202119.dump` (SHA256: `d09d7986b7ad35a61b3e1f76f9a86c71f1bbd458ba919d76444e7d2aefeff948`).
+- **Privileges:** Phase 6 reconciliation successfully revoked extraneous relations and enforced `afldb_import` explicit grants (INSERT only on data_edits; INSERT+SELECT on player_link_resolutions; SELECT only on player_link_suggestions).
+- **Integrity Validation:**
+  - ISSUE-080 Profile-B Audit PASSED (no collisions or exposed rows).
+  - Phase 9 first-kick-goal `--rekey` PASSED (334 rows mapped, 0 unmatched, 0 duplicates, all surrogate IDs survived unchanged).
+  - Phase 10 / Gate G4 Post-070 Audit PASSED (22/22 schema assertions true, all 6 baseline resolutions and 2 baseline suggestions confirmed present, identities unchanged, and targets live).
+  - Loader hashes explicitly recorded and preserved in Phase 10 artifacts.
+- **Application Health:** Loopback and beta endpoints responsive (HTTP 200). CSP/HSTS headers active on beta proxy.
+- **Residual Rollback Limitation:**
+  - Gate G1 dump was successfully restored into the disposable dev-host `afldb_restore_test` database.
+  - The nine authoritative restored values matched the production Phase-2 comparands.
+  - The dump was NOT restore-rehearsed into `afldb_prod` itself because production has no disposable restore-test database.
+  - The repository-supported production recovery remains the frozen §3.4 `pg_restore --clean --if-exists` procedure followed by the migration-057 checkout's privilege reconciliation/build.
+  - Since Phase 11.1 reopened production writes, the G1 dump must no longer be described as a lossless rollback for activity occurring after service restart.
+
+### Post-Deployment Topology Variance
+The `afldb-email-intake.timer` and `afldb-email-intake.service` systemd units are present in the repository (`deploy/`) but were found uninstalled on the production host (neither before nor after this rollout). Nothing was installed as part of ISSUE-084. This variance has been recorded but does not reopen or block the data-integrity rollout of ISSUE-084.
 
 ## AFLDB-ISSUE-085 — `import_captaincies` reconciles an unscoped population with no ownership predicate
 
