@@ -6,8 +6,8 @@
 > `issues.md` disagree, trust `issues.md` and immediately synchronize this file
 > and the Open Issues table at the top of `issues.md`.
 
-**Last updated:** 2026-08-23
-**Open issues:** 16
+**Last updated:** 2026-08-24
+**Open issues:** 19
 
 ## How Claude should use this file
 
@@ -29,9 +29,9 @@
 | `AFLDB-ISSUE-059` | Low | Search | Grouped qualifying-match counts are plain text because current Match Search cannot replay every grouped predicate. |
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | React #418 remains intermittent under production-style NL search hydration; narrow H7 diagnostic is awaiting authoritative live-build validation. |
 | `AFLDB-ISSUE-071` | Low | Audit | V2 residual failures require generator/oracle re-baselining before any remaining parser defect is promoted. |
-| `AFLDB-ISSUE-072` | Low | Tests | `tests/site-settings.test.ts` default-shape expectation is stale after the `frontendTheme` settings landed. |
+| `AFLDB-ISSUE-072` | Low | Tests | `tests/site-settings.test.ts` default-shape expectation is stale after the `frontendTheme` settings landed; the `pageIntros` defaults are missing from the expected object too. |
 | `AFLDB-ISSUE-073` | Medium | Database | Four migration-056/057 foreign keys lack supporting indexes; `fk-indexes.test.ts` fails. |
-| `AFLDB-ISSUE-074` | Low | Tests | email-intake integration test picks a real dev admin instead of its fixture and leaves a staged row behind. |
+| `AFLDB-ISSUE-074` | Low | Tests | email-intake integration test picks a real dev admin instead of its fixture and leaves staged rows behind; widened 2026-08-24 — fixed payload bytes plus global dedup make it history-dependent. |
 | `AFLDB-ISSUE-076` | Medium | Performance | `won_final_at_venue` Grid Solver combinations can exceed the 5-second PostgreSQL statement timeout and crash the rendered page. |
 | `AFLDB-ISSUE-081` | Low | Tests | Honours reload suite mutates rows the release gates count, with no lock between the files. Latent. |
 | `AFLDB-ISSUE-082` | Medium | Admin | `confirmUnlinked` takes no lock and never re-reads its target, so a stale form can contradict an applied link. |
@@ -40,6 +40,9 @@
 | `AFLDB-ISSUE-084` | High | Deployment / Data integrity | Production (migration 057) lacks the ISSUE-044/078 player-link protections; all seven link-target families are still served by destructive loaders, so a reload can create new dangling resolutions. |
 | `AFLDB-ISSUE-085` | Low | Data integrity / Import | `import_captaincies` reconciles its whole table with no ownership predicate — the ISSUE-080 defect class, latent because the importer is today the only writer. |
 | `AFLDB-ISSUE-086` | Needs triage | Admin / Data integrity | Data-editor edits to source-owned rows can be silently reverted by the owning source's next reload; severity awaits the four-question triage recorded in the entry. |
+| `AFLDB-ISSUE-087` | High | Deployment / Release management | Successor-4 candidate `0da44f9` validated through S4-11 (D4 complete 1440/1440, hydration 8 = 0.56% PASS); at S4-12 — R8 topology re-proof/cleanup, then explicit R9 approval before any `main` push. |
+| `AFLDB-ISSUE-088` | Low | Tests / Tooling | NL-UI stress harness has no `actionTimeout`/`globalTimeout` policy and retains latent unbounded auto-wait sites; hardening deliberately deferred until the D4 timing evidence can set values. |
+| `AFLDB-ISSUE-089` | Low | Tests / Tooling | NL-UI stress harness persists observations once per batch, so a parked/timed-out batch loses ~100 observations whose telemetry rows exist. |
 
 ---
 
@@ -58,8 +61,9 @@
 - **Key files:** `tests/under-22-importer.test.ts`
 - **Current state:** Root cause confirmed 2026-08-22: a line-ending mismatch, not
   marker drift. The markers begin with three newlines; a Windows checkout holds
-  `import_awards.py` with CRLF, so `indexOf` returns -1. An untouched `HEAD`
-  tree is 7/7 green on the Linux dev host and 4/7 red on Windows.
+  `import_awards.py` with CRLF, so `indexOf` returns -1. The current file runs
+  8 tests (not 7 — ISSUE-044 added one): all 8 green on Linux at every
+  ISSUE-087 successor candidate's R4, 4 failures on Windows.
 - **Next action:** Normalise CRLF to LF where the source-contract tests read
   a file (`between()` and its `readFileSync` callers). Do not edit the importer,
   and do not weaken the behavioural assertions.
@@ -78,7 +82,7 @@
 - **Area:** UI/Hydration
 - **Key files:** `tests/nl-ui/nl-stress.spec.ts` plus the current feedback/search hydration implementation and captured `artifacts/hydration/*` / `artifacts/nl-ui/*` evidence.
 - **First wrong layer:** UI/runtime.
-- **Current state:** React #418 remains intermittent under production-style standalone load. Navigation prefetch reduction helped but did not eliminate it. The server-owned feedback-form change also did not fully resolve it. The current narrow H7 experiment removes only `useFormStatus`/pending-derived button disabling from `NlAnswerFeedbackControls`; typecheck/build passed. The ledger's last handover says the service had just been restarted but port 3100 initially refused connections, so the diagnostic build was not yet proven live.
+- **Current state:** React #418 remains intermittent under production-style standalone load. Navigation prefetch reduction helped but did not eliminate it. The server-owned feedback-form change also did not fully resolve it. The current narrow H7 experiment removes only `useFormStatus`/pending-derived button disabling from `NlAnswerFeedbackControls`; typecheck/build passed. The ledger's last handover says the service had just been restarted but port 3100 initially refused connections, so the diagnostic build was not yet proven live. Latest measurement (2026-08-24, ISSUE-087 successor-4 D4, 1,440 questions): authoritative `totalHydrationErrors = 8` (0.56%) — release-gate PASS, H7 still unvalidated.
 - **Expected diagnostic build:** `0aYQumjOtVYcrJKPCj0_a`
 - **Exact next action:**
   1. **Do not rebuild first.**
@@ -105,8 +109,8 @@
 - **Severity:** Low
 - **Area:** Tests
 - **Key files:** `tests/site-settings.test.ts`, `src/db/queries/site-settings.ts`
-- **Current state:** `supplies every default from an empty table` fails because commit `d5243ba` added `frontendTheme` (and sibling defaults) without extending the test's expected object. Observed during AFLDB-ISSUE-027 work; unrelated to that change.
-- **Next action:** Extend the expected defaults object to the current `parseSiteSettings` output and re-run `tests/site-settings.test.ts`.
+- **Current state:** `supplies every default from an empty table` fails because commit `d5243ba` added `frontendTheme` (and sibling defaults) without extending the test's expected object. Observed during AFLDB-ISSUE-027 work; unrelated to that change. ISSUE-087 R4-isolated reproductions (2026-08-24) show the received-only differences are `frontendTheme: "classic"` **plus** the `pageIntros` defaults (brownlow/clubs/draft/records).
+- **Next action:** Extend the expected defaults object (including `pageIntros`) to the current `parseSiteSettings` output and re-run `tests/site-settings.test.ts`.
 
 ## AFLDB-ISSUE-073 — Four audit/link foreign keys have no supporting index
 
@@ -121,8 +125,8 @@
 - **Severity:** Low
 - **Area:** Tests
 - **Key files:** `tests/integration/email-intake.test.ts`
-- **Current state:** The end-to-end CSV test picks an admin by query ordering and fails on the dev host where real admins sort first; it also leaves a staged `data_submissions` row behind (one artifact row left in `afldb_dev` on 2026-08-22).
-- **Next action:** Provision or deterministically select a dedicated fixture admin inside the test and clean up the staged row.
+- **Current state:** The end-to-end CSV test picks an admin by query ordering and fails on the dev host where real admins sort first; it also leaves a staged `data_submissions` row behind (one artifact row left in `afldb_dev` on 2026-08-22). Widened 2026-08-24: fixed payload bytes + unordered `LIMIT 1` + persistent auth-DB state + global dedup make the test history-dependent; a bounded approved cleanup of 15 residue rows was performed in `afldb_dev` during ISSUE-087 successor-1 validation.
+- **Next action:** Provision or deterministically select a dedicated fixture admin inside the test, use per-run-unique payloads, and clean up the staged rows.
 
 ## AFLDB-ISSUE-076 — Grid Solver `won_final_at_venue` queries can hit statement timeout
 
@@ -262,3 +266,62 @@
 - **Next action:** Answer the entry's four triage questions (UI promise,
   affected fields/entities, intended durability, silence of reversion) against
   the three live editable entities, then set severity on that evidence.
+
+## AFLDB-ISSUE-087 — Validate the release candidate and promote `origin/main`
+
+- **Severity:** High
+- **Area:** Deployment / Release management
+- **Key files:** `AFLDB-ISSUE-087.md` (frozen contract),
+  `AFLDB-ISSUE-087-S4.md` (approved successor-4 runbook), plus the
+  R6/S4-RESUME handoffs; validation covers the whole candidate tree plus
+  read-only production Caddyfile and `afldb_prod` evidence.
+- **Candidate:** successor-4
+  `CANDIDATE_SHA = 0da44f9dd71398d2b72fe33f42867861d7eab6e7` (tree
+  `bb12cc39…`), lineage `0a86255` → `9255196` → `38ed6af` → `63eb9d2` →
+  `0da44f9` — every supersession a tracked-test defect, never candidate
+  source/runtime. `origin/main` is `9be7f26` at migration 061; the candidate
+  carries 070.
+- **Current state:** Validated through **S4-11**: R2–R5 restarted and closed
+  PASS in full (exact ISSUE-072/073 signatures, single expected awards skip),
+  fresh build, R6.3–R6.5 PASS, S4-9 liveness probe PASS, D4 rerun complete and
+  adjudicable (1440/1440, exit 0), authoritative
+  `hydration.totalHydrationErrors = 8` (0.56%) — PASS under the frozen 0–71
+  band. ISSUE-068/H7 remains open. At **S4-12**: pre-R9 ledger sync recorded;
+  R8 topology re-proof and cleanup in progress.
+- **Depends on:** `AFLDB-ISSUE-084`, which is **HALTed at P0.2** and is **not
+  advanced** by this issue. After promotion, ISSUE-084 restarts with fresh
+  P0.1/P0.2 evidence and sets `<TARGET_SHA>` on its own terms.
+- **Next action:** Complete R8 (six topology proofs; evidence harvest to
+  `/tmp/afldb-issue087-evidence-0da44f9`; retire the posture-2 runtime, both
+  validation worktrees and the staged beta secret — no `--force`), then STOP
+  and display the R9 prerequisites for explicit user approval before the
+  normal fast-forward push of exactly `0da44f9` to `main`. No force push; no
+  production deployment; never delete run-tag telemetry.
+
+## AFLDB-ISSUE-088 — NL-UI stress harness has no timeout policy and retains latent unbounded waits
+
+- **Severity:** Low
+- **Area:** Tests / Tooling
+- **Key files:** `tests/nl-ui/nl-stress.spec.ts`,
+  `playwright.nl-stress.config.ts`
+- **Current state:** No `actionTimeout`/`globalTimeout` (Playwright default 0 ⇒
+  unbounded auto-waits, capped only by the 30-minute per-batch timeout). The
+  `:835` instance that parked successor-3's D4 was repaired in `0da44f9`;
+  latent unbounded sites remain at `:554`, `:577`, `:580`, `:945`. Hardening
+  was deliberately deferred out of the ISSUE-087 release gate.
+- **Next action:** After ISSUE-087 closes, derive timeout values from the
+  successor-4 D4 `elapsedMs`/`timingSummary` distribution, add them to the
+  config, and guard the latent sites with the count()-guarded idiom.
+
+## AFLDB-ISSUE-089 — NL-UI stress harness loses a batch's observations when the batch does not complete
+
+- **Severity:** Low
+- **Area:** Tests / Tooling
+- **Key files:** `tests/nl-ui/nl-stress.spec.ts` (post-loop `appendFileSync`,
+  `:1099-1103`)
+- **Current state:** Observations are persisted once per batch, so a parked or
+  timed-out batch loses ~100 observations whose telemetry rows exist — proven
+  by successor-3 D4 partial batches 003/009, which required telemetry
+  correlation to reconstruct.
+- **Next action:** Flush each observation as it is produced, keeping the JSONL
+  row shape and report semantics unchanged.

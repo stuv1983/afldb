@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 16
+**Open issues:** 19
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
@@ -16,9 +16,9 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-059` | Low | Search | Grouped `Qualifying matches` counts have no safe drill-down to the exact matching fixtures. | Extend Match Search or add a dedicated NL drill-down route that can faithfully replay the grouped row predicates. |
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
 | `AFLDB-ISSUE-071` | Low | Audit | Parser-v25 V2 residual failures still mix corpus/oracle debt with possible smaller parser follow-up. | Re-baseline V2 generator/oracles first; promote a product defect only after the oracle layer is reconciled. |
-| `AFLDB-ISSUE-072` | Low | Tests | `tests/site-settings.test.ts` default-shape expectation predates the `frontendTheme` settings added in `d5243ba`. | Extend the expected defaults object to the current `parseSiteSettings` output and re-run the suite. |
+| `AFLDB-ISSUE-072` | Low | Tests | `tests/site-settings.test.ts` default-shape expectation predates the `frontendTheme` settings added in `d5243ba`; ISSUE-087 R4 reproduction shows the `pageIntros` defaults are missing from the expected object too. | Extend the expected defaults object (including `pageIntros`) to the current `parseSiteSettings` output and re-run the suite. |
 | `AFLDB-ISSUE-073` | Medium | Database | Four pre-066 foreign keys (`data_edits.admin_user_id`, `player_link_resolutions.admin_user_id`/`player_id`, `player_link_suggestions.resolved_by`) have no supporting index; `tests/integration/fk-indexes.test.ts` fails. | Add the partial indexes in a new migration (the 041 shape) or justify `DELETE_FREE_PARENTS` entries. |
-| `AFLDB-ISSUE-074` | Low | Tests | `tests/integration/email-intake.test.ts` assumes the first `auth_users` row is its fixture admin and fails against real dev-host admin data. | Make the test create/select its own fixture admin deterministically instead of `ORDER BY`-picking one. |
+| `AFLDB-ISSUE-074` | Low | Tests | `tests/integration/email-intake.test.ts` assumes the first `auth_users` row is its fixture admin and fails against real dev-host admin data; widened 2026-08-24 — fixed payload bytes, an unordered `LIMIT 1` pick, persistent auth-DB state and global dedup make the test history-dependent. | Make the test create/select its own fixture admin deterministically, use per-run-unique payloads, and clean up its staged rows. |
 | `AFLDB-ISSUE-076` | Medium | Performance | Grid Solver combinations using `won_final_at_venue` can exceed PostgreSQL's 5-second statement timeout and crash the page. | Capture and compare the generated SQL/EXPLAIN plan against `played_at_venue`, then optimise the `won_final_at_venue` query shape without raising the application timeout. |
 | `AFLDB-ISSUE-077` | Medium | UI/Settings | The super-admin-selected frontend theme is not stable within a browsing session; different pages can render different themes as the user navigates. | Trace every theme source (database setting, server render, cookie/local storage and client hydration), establish one authoritative theme value per request/session, and add navigation regression coverage. |
 | `AFLDB-ISSUE-081` | Low | Tests | The honours reload integration suite mutates rows that `release-gates.test.ts` counts, with no lock between the two files; latent, not yet observed failing. | Give it the same `tests/integration/draft-lock.ts` treatment, or prove the two files never overlap. |
@@ -27,6 +27,9 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-084` | High | Deployment / Data integrity | Production (migration 057, checkout `a32a0a1`) lacks the ISSUE-044/078 player-link protections: all seven `LINK_TARGET_TABLES` families are still served by destructive loaders, so a production reload can create new dangling resolutions. ISSUE-079 audited the history clean; this owns the prospective rollout. | On explicit instruction: apply migrations 058–070 with `db:privileges` at the ISSUE-044/078-specified points, deploy the three corrected loaders (the ISSUE-080-corrected `import_awards.py` included), run the Profile-B ISSUE-080 audit before the first awards/honours reload, run the one-time production `--rekey`, then regenerate and re-run the ISSUE-079 audit against the migrated schema. |
 | `AFLDB-ISSUE-085` | Low | Data integrity / Import | `import_captaincies` reconciles the whole `captaincies` table with no ownership predicate — the ISSUE-080 defect class, latent because the importer is today the table's only writer. | Scope it to its own `source_id` by construction (the `reload_keyed` conjunction now exists) and decide the `captaincies_natural_uq` collision policy before a second writer ever exists. |
 | `AFLDB-ISSUE-086` | Needs triage | Admin / Data integrity | Data-editor edits to source-owned rows can be silently reverted by the owning source's next reload (durability/overwrite, not the ISSUE-080 deletion class); only `players`/`matches`/`draft_picks` are live editable entities today. | Answer the four triage questions in the entry (UI promise, affected fields/entities, intended durability, silence of reversion), then set severity on that evidence. |
+| `AFLDB-ISSUE-087` | High | Deployment / Release management | Successor-4 candidate `0da44f9` (lineage `0a86255` → `9255196` → `38ed6af` → `63eb9d2` → `0da44f9`) has passed the full gate sequence through S4-11: R2–R5 exact, fresh build, R6.3–R6.5, and a complete adjudicable D4 (1440/1440, hydration 8 = 0.56%, PASS under the frozen 0–71 band). | Complete S4-12: R8 topology re-proof and cleanup, then STOP for explicit R9 approval before the fast-forward `main` push of exactly `0da44f9`. No force push; no production deployment; ISSUE-084 stays HALTed. |
+| `AFLDB-ISSUE-088` | Low | Tests / Tooling | The NL-UI stress harness has no `actionTimeout`/`globalTimeout` policy and retains latent unbounded auto-wait sites (`nl-stress.spec.ts` `:554`, `:577`, `:580`, `:945`); the `:835` instance stalled successor-3's D4 for 30 minutes per parked batch before its successor-4 repair. | After ISSUE-087 closes, derive timeout values from the successor-4 D4 `elapsedMs`/`timingSummary` distribution, then add the config timeouts and guard the latent sites outside any release gate. |
+| `AFLDB-ISSUE-089` | Low | Tests / Tooling | The NL-UI stress harness persists a batch's observations in a single post-loop `appendFileSync`, so a parked or timed-out batch loses ~100 observations whose telemetry rows exist — proven by successor-3 D4 partial batches 003/009. | Flush each observation as it is produced (or write incrementally per question), keeping report semantics unchanged. |
 
 ---
 
@@ -2204,6 +2207,12 @@ Current review on 2026-08-21 reproduced the issue unchanged: `npm.cmd test -- te
 `AFLDB-ISSUE-044` added a test to this file) and shown green on Linux for both
 the pristine `HEAD` tree (7/7) and the updated tree (8/8).
 
+2026-08-24 (`AFLDB-ISSUE-087` validation, count note): the file runs **8**
+tests, not 7 — the ISSUE-087 contract's §4 "Linux 7/7 green" expected-signature
+wording predates the ISSUE-044-added test. Observed green on Linux at every
+successor candidate's R4; the Windows failure signature (4 failures, CRLF
+`between()` cause) is unchanged.
+
 ### Follow-up
 Normalise line endings when the source-contract tests read a file — for example
 `readFileSync(...).replace(/\r\n/g, '\n')` — rather than editing the importer.
@@ -3125,6 +3134,16 @@ Project status:
 - Do not mark it resolved.
 - Do not update `CHANGELOG.md` for this end-of-day status entry.
 
+2026-08-24 — `AFLDB-ISSUE-087` successor-4 D4 measurement (production-style
+posture-2 standalone runtime, candidate `0da44f9`, 1,440-question corpus, 4
+workers): authoritative `report.hydration.totalHydrationErrors = 8` (0.56% of
+1,440), with 8 error-carrying observation rows and 8 complete
+`artifacts/hydration/*` incident directories (all 8 files including
+`metadata.json`). This is well below the frozen 5.0% release threshold and
+PASSed the release gate, but it confirms React #418 remains intermittent under
+production-style load. It does **not** validate H7, which is still awaiting its
+own discriminator run. Issue remains open.
+
 ## AFLDB-ISSUE-069 - Expanded UI corpus expects unsupported debut-season leaderboards to answer
 
 - **Status:** Resolved
@@ -3303,6 +3322,13 @@ The themeable-frontend work (commit `d5243ba`) added new settings defaults witho
 ### Evidence
 AssertionError diff shows `frontendTheme: "classic"` present in received, absent in expected.
 
+2026-08-24 (`AFLDB-ISSUE-087` R4-isolated runs at the successor candidates):
+reproduced as the accepted release signature — 31 total / 30 passed / exactly
+1 failed (`supplies every default from an empty table`), with received-only
+differences `frontendTheme: "classic"` **plus** the `pageIntros` defaults
+(brownlow/clubs/draft/records). The expected object is therefore stale for
+`pageIntros` as well, not only `frontendTheme`.
+
 ### First wrong layer
 Test expectation.
 
@@ -3380,6 +3406,14 @@ It picks an admin by query ordering, so whichever row sorts first on the host un
 
 ### Evidence
 Assertion diff at `tests/integration/email-intake.test.ts:94` during the ISSUE-027 validation run; the ISSUE-027 change touches nothing in email intake.
+
+**Widened 2026-08-24 (recorded at the `AFLDB-ISSUE-087` pre-R9 ledger sync,
+from successor-1 validation):** the fragility is broader than admin ordering.
+The test combines fixed payload bytes, an unordered `LIMIT 1` selection,
+persistent auth-database state and global dedup, so it is history-dependent:
+a host that has previously seen the payload can dedup-skip or select different
+rows on rerun. A bounded, explicitly approved cleanup of 15 residue rows was
+performed in `afldb_dev` during successor-1 validation.
 
 ### First wrong layer
 Test fixture assumption.
@@ -5370,3 +5404,305 @@ entities, set the severity on that evidence, then design the durability
 mechanism (or document the reversion as intended) as its own piece of work. It
 does not block anything in ISSUE-080 or ISSUE-084 unless investigation shows
 the ownership-deletion mechanism rather than overwrite-on-reload.
+
+## AFLDB-ISSUE-087 — Validate release candidate `0a86255` and promote `origin/main`
+
+- **Status:** Open — successor-4 candidate **validated through S4-11**; at
+  S4-12 (R8 topology re-proof and cleanup); R9 `main` promotion awaits explicit
+  user approval
+- **Severity:** High
+- **Area:** Deployment / Release management
+- **Found:** 2026-08-23 (planning session; supersedes the planning handoff
+  `AFLDB-ISSUE-087-PLANNING-HANDOFF.md`)
+- **Resolved:** N/A
+- **Runbook:** `AFLDB-ISSUE-087.md` — the authoritative execution contract
+  (frozen); successor-4 execution per `AFLDB-ISSUE-087-S4.md` (approved),
+  with `AFLDB-ISSUE-087-R6-HANDOFF.md` and `AFLDB-ISSUE-087-S4-RESUME.md`
+  recording intermediate verified state
+- **Original candidate:** `0a862557bad9ad1a6abc2522a90038a779847fed`
+  (short `0a86255`, `fix(import): scope award and honours reload ownership`)
+- **Current candidate (successor-4):**
+  `CANDIDATE_SHA = 0da44f9dd71398d2b72fe33f42867861d7eab6e7` (short `0da44f9`,
+  `test: guard nl-stress tableNote read against absent details element`, tree
+  `bb12cc390547f7f2c41dd4147b6559bc9ac94a6c`)
+- **Files:** `AFLDB-ISSUE-087.md`; validation touches the whole candidate tree
+  and, read-only, the production Caddyfile and `afldb_prod`
+
+### Symptom
+`origin/main` (`9be7f26`, migration 061) cannot be promoted to the candidate
+without validation. The deployment delta `a32a0a1..0a86255` is **87 commits**
+(Range A 32 undeployed-on-main + Range B 55 promotion delta), and the candidate
+is a *prefix carrying a large ride-along set*: ~24 rewritten public routes, the
+NL parser moving PARSER_VERSION 13 → 25, a new admin data-editor, a new
+confidence-matching subsystem, current-season ingestion with outbound network
+calls, a themeable frontend, and six scratch `.ts` files sitting inside
+`tsc --noEmit` scope. None of it has route-level, production-configuration or
+candidate-build validation.
+
+### Evidence
+Established during the planning investigation and recorded in full in the
+runbook and the planning handoff:
+
+- complete 87-commit two-axis classification, no omissions;
+- migration provenance 058–070 complete, none UNKNOWN;
+- `9be7f26` and `a32a0a1` are both ancestors of the candidate;
+- net `package.json` delta is two npm script entries; `package-lock.json`
+  unchanged end-to-end;
+- `0a86255..origin/dev` differs only in `IssuesIndex.md` and `issues.md`;
+- **F1** six root scratch `.ts` files are inside `tsc` scope
+  (`tsconfig.json:21-22`);
+- **F2** `/grid-solver` is a public route gated by `requireAudience`, so
+  ISSUE-076 exposure is a **runtime setting**, not a code property;
+- **F3** `577a21b` did not introduce the anonymous suggestion write path;
+- **F4** `924ad69` matches the ISSUE-068 H7 experiment on component, hook and
+  behaviour, but the expected diagnostic build was **never proven live** and H7
+  was **never validated**.
+
+### Fix
+Not a code fix. Execute the fifteen gates D1–D15 through phases R0–R9 in
+`AFLDB-ISSUE-087.md`, then — only on explicit user approval at the R9
+checkpoint — fast-forward `origin/main` to `CANDIDATE_SHA` with a normal
+(never forced) push.
+
+Contract properties that must not be weakened:
+
+- **HALT-first failure semantics.** An unexpected failure halts, preserves
+  evidence, changes no tracked source, and is classified as a candidate
+  source defect, a candidate test defect, an environment problem, or
+  unexplained. Only the first two force a successor candidate.
+- **D6 `npm run typecheck` is the first substantive candidate-source gate**,
+  after provenance, environment, DSN identity and `npm ci`.
+- **ISSUE-081 isolation is by invocation:** `awards-reload-links`,
+  `draft-reload-links` and `first-kick-goal-reload-links` each run in their own
+  `npm test` invocation, and `release-gates` in a fourth.
+- **No production mutation**, no `main` push before R9, and no deletion of
+  historical `nl_search_log` telemetry.
+
+### Successor lineage (recorded 2026-08-24 at the pre-R9 ledger sync)
+
+Every rejection below is a **candidate tracked-test defect** classification —
+no successor was forced by a candidate source/runtime defect, and validation
+data was never implicated:
+
+1. `0a86255` — original approved candidate. Superseded after a tracked-test
+   defect in the NL feedback boundary suite (repaired by successor-1,
+   `test: unpin useFormStatus from NL feedback boundary suite`).
+2. **Successor-1** `9255196d8acb82edf3f33184489c9a1fafe087bf` — rejected
+   (tracked-test defect lineage: stale release E2E coverage/home metadata,
+   repaired by successor-2); superseded.
+3. **Successor-2** `38ed6afb6de764f038532d336254c66ea362ceff` — **REJECTED at
+   R6.3**: two stale tracked E2E locators (`Grid Solver Validation` used
+   `input[type="text"]` where PlayerPicker renders `input[type="search"]`;
+   `season → match` used a stale h3 Grand Final locator where the UI renders
+   `details > summary > h2`). Evidence preserved at
+   `/tmp/afldb-issue087-evidence-38ed6af`.
+4. **Successor-3** `63eb9d2dc8fe24bfa4e54a31bc5a31ac7f541906` (tree
+   `d8dece21…`, `test: repair release e2e locators`) — **NOT rejected by its
+   observed D4 failure.** D4 HALTed (`D4_EXIT=143`, 840/1440 observed) and was
+   adjudicated a **tracked harness defect**: `readAnswerShape`'s unguarded
+   `details .muted` `textContent()` auto-waits unboundedly on the
+   `unanswerable` panel shape, which renders no `<details>`. D4 was therefore
+   unadjudicable at successor-3, and successor-4 exists solely to make D4
+   completable. Evidence preserved at `/tmp/afldb-issue087-evidence-63eb9d2`
+   (21 files, SHA-verified) and under run tag
+   `issue-087-63eb9d2-20260823T130728Z` (telemetry retained — never delete).
+5. **Successor-4** `0da44f9dd71398d2b72fe33f42867861d7eab6e7` — current
+   candidate. Delta from successor-3: exactly
+   `tests/nl-ui/nl-stress.spec.ts` (+10/−1), the count()-guarded `tableNote`
+   read. Follow-ups `AFLDB-ISSUE-088` (harness timeout policy) and
+   `AFLDB-ISSUE-089` (per-batch observation durability) record the deliberately
+   unrepaired remainder of the harness-defect class.
+
+### Validation
+**Updated 2026-08-24 (successor-4 `0da44f9`).** The original
+"none performed" planning state is historical. At successor-4, per the
+S4 runbook every candidate-bound gate restarted in full:
+
+- **S4-2 / R2** — CLOSED PASS IN FULL: provenance/ancestry exact (parent
+  `63eb9d2`; `9be7f26` and `a32a0a1` proven ancestors), delta allowlist exact,
+  all nine frozen sensitive/config blobs matched, 66-file `.test.ts` manifest
+  byte-identical, migration series 70 files ending `070`, frozen validation
+  `.env` SHA `44d19e42…a3eb`, DSN inventory exact and all four
+  identity/read-only probes PASS.
+- **S4-3 / R3** — `npm ci` clean (0 vulnerabilities); `db:status` both targets
+  70/70, high-water 070, no drift; typecheck exit 0, zero diagnostics.
+- **S4-4 / R4** — 28 files / 843 tests all green; isolated
+  `tests/site-settings.test.ts` reproduced the exact accepted ISSUE-072
+  signature (now including the `pageIntros` observation, recorded there).
+- **S4-5 / R5 a–g** — PASS with exactly the expected ISSUE-073 four-FK
+  signature and the single expected §9.4b awards skip;
+  `AFLDB_TEST_IMPORT_DATABASE_URL` proven unset.
+- **S4-6..S4-8** — successor-3 runtime retired; fresh build with new
+  fingerprints (successor-3's are historical only); posture-1 R6.3 (92-test
+  E2E shape, both repaired locators passing desktop + mobile), R6.4 nine-route
+  matrix and R6.5 wiring PASS; posture-2 recreated with BUILD_ID and
+  `server.js` SHA proven identical across the switch.
+- **S4-9** — focused 3-row liveness probe PASS: exit 0, both known
+  `unanswerable` fixtures returned promptly with `tableNote === null`; the
+  answered row's shape unchanged.
+- **S4-10 / D4 rerun — COMPLETE and adjudicable:** `observed === total ===
+  1440`, harness exit 0, previously-parked batches 003 and 009 ran to
+  completion, 1,368 telemetry rows under the unique successor-4 run tag
+  (`issue-087-0da44f9-*`, preserved), literal `accept` baseline and end state
+  0 rows.
+- **S4-11 / authoritative hydration extraction — PASS:**
+  `report.hydration.totalHydrationErrors = 8` (0.56% of 1,440), inside the
+  frozen 0–71 PASS band (≥72 HALT). 8 error-carrying observation rows and 8
+  complete hydration incident directories (8/8 files each, `metadata.json`
+  present) cross-check. ISSUE-068/H7 remains open — a green D4 does not
+  resolve it.
+- **S4-12** — pre-R9 ledger sync (this update); R8 topology re-proof and
+  cleanup in progress. **`main` is not pushed without explicit R9 approval.**
+
+### Retained validation-bootstrap notes (for any future candidate validation)
+
+- All three role passwords (owner, auth, app) required splicing into the
+  validation `.env` from the authoritative dev configuration.
+- Three untracked inputs must be provisioned into a validation worktree: the
+  legacy SQLite path, a psycopg-capable python, and the ignored
+  first-kick-goal extract (SHA/size per the frozen runbook).
+- Non-interactive SSH needs explicit NVM PATH pinning (node `v22.23.2` /
+  npm `10.9.8`).
+- Strip ANSI escape sequences into a temporary representation before any regex
+  parsing of Vitest summaries; never gate on raw coloured output (two
+  session-authored wrapper false negatives occurred: R6.4 row-8 regex, R4 ANSI
+  grep).
+
+### Ledger sequencing (resolution of the R6-handoff question)
+
+Uncommitted `IssuesIndex.md`/`issues.md` changes are never swept into a
+candidate: the candidate is frozen at `0da44f9`, ledger updates are committed
+to `dev` as path-limited docs-only commits **after** the candidate, and R9
+promotes `main` by fast-forwarding to exactly the candidate SHA — post-candidate
+ledger commits on `dev` therefore never reach `main` through R9. The R8
+topology proof adjudicates the post-candidate delta against the docs-only
+allowlist.
+
+### Dependency on AFLDB-ISSUE-084
+`AFLDB-ISSUE-084` is **HALTed at P0.2** and is **not advanced by this issue**.
+P0.2 failed because `origin/main` does not contain the approved schema/code
+state — main carries migrations only through 061 while the frozen ISSUE-084
+runbook is pinned to 070. ISSUE-087 exists to close that gap on `main`.
+
+ISSUE-087 may **reuse** an ISSUE-084 reviewed command, SQL envelope or
+transport as a safe mechanism; that is transport reuse only. It never executes
+or advances an ISSUE-084 phase, and every production read-only result belongs
+to ISSUE-087. `AFLDB-ISSUE-084.md` is frozen and unmodified, and no
+`<TARGET_SHA>` is fixed inside it.
+
+After a successful `main` promotion, ISSUE-084 restarts from its required
+re-entry point with fresh P0.1/P0.2 evidence and establishes `<TARGET_SHA>` on
+its own terms. Production deployment never occurs inside ISSUE-087.
+
+### Follow-up
+- **Suspected, non-blocking:** `src/app/admin/current-season/actions.ts`
+  (~L75-80) calls `revalidatePath` inside a server action, and prior-session
+  evidence reported a Next 15.5 client hang involving `revalidatePath`-in-action.
+  It is **not** established that this exact action is reproducibly affected at
+  `CANDIDATE_SHA`. **No separate issue is created from prior-session memory
+  alone**; one may be proposed only on targeted current-candidate evidence or an
+  existing authoritative issue covering this exact path.
+- A `player_match`-grain regression for the `plan.ts:911-913` period-split
+  decline would strengthen D11, but writing it modifies tracked source and would
+  force a successor SHA. Deferred to a future candidate.
+- Standing prohibitions that outlive this issue if the candidate ships: do not
+  set a `frontendTheme` other than `classic` (ISSUE-077); do not widen
+  `grid_solver.audience` to `public` (ISSUE-076); do not use admin bulk approve
+  (ISSUE-082); do not execute the 22 Under 22 importer (out of ISSUE-084 scope).
+- **Recorded 2026-08-24:** `AFLDB-ISSUE-088` (NL-UI harness timeout policy and
+  latent unbounded waits) and `AFLDB-ISSUE-089` (per-batch observation
+  durability) carry the deliberately deferred harness hardening — deferred so
+  the release gate would not be re-proved against a larger delta and so timeout
+  values can be chosen from the completed D4 timing evidence rather than
+  guessed.
+
+## AFLDB-ISSUE-088 — NL-UI stress harness has no timeout policy and retains latent unbounded waits
+
+- **Status:** Open
+- **Severity:** Low
+- **Area:** Tests / Tooling
+- **Found:** 2026-08-24 (adjudication of the `AFLDB-ISSUE-087` successor-3 D4
+  HALT; recorded at the pre-R9 ledger sync per `AFLDB-ISSUE-087-S4.md` §3)
+- **Resolved:** N/A
+- **Files:** `tests/nl-ui/nl-stress.spec.ts`,
+  `playwright.nl-stress.config.ts`
+
+### Symptom
+`playwright.nl-stress.config.ts` sets no `actionTimeout` or `globalTimeout`;
+Playwright Test's default `actionTimeout` is `0`, so any auto-waiting locator
+action in the harness is unbounded, capped only by the 30-minute per-batch
+`timeout`. One reachable instance (`readAnswerShape`'s unguarded
+`details .muted` `textContent()` on the `unanswerable` panel shape, `:835`)
+deterministically parked successor-3's D4 batches for 30 minutes each and made
+the release gate unadjudicable.
+
+### Current state
+The `:835` instance was repaired in ISSUE-087 successor-4 (`0da44f9`,
+count()-guarded read). Latent unbounded sites remain, none evidenced as having
+fired:
+
+- `:554` `panel.locator('h2').first().textContent()` — safe today only because
+  both application branches render an `h2` (guarded by an application
+  invariant, not by the harness);
+- `:577` `await doc.serverHtmlPromise`;
+- `:580` `readHydrationProbe`;
+- `:945` `page.screenshot({ fullPage: true })`.
+
+Timeout hardening was **deliberately excluded** from successor-4 (S4 runbook
+§3): an evidence-free `actionTimeout` can convert slow-but-successful actions
+under 4-worker load into `page_error` batch failures — a harness measuring
+itself — and no per-action duration distribution existed to choose values.
+
+### Evidence
+Successor-3 D4 (`D4_EXIT=143`, 840/1440 observed, batches 003/009 parked at
+their first `unanswerable` question, 004/010/011/012 never started) plus the
+source proof recorded in `AFLDB-ISSUE-087-S4.md` §1. The completed successor-4
+D4 now provides `elapsedMs`/`timingSummary` for all 1,440 observations — the
+evidence base for choosing values.
+
+### Fix
+Not yet fixed (policy work deferred until after ISSUE-087 closes).
+
+### Validation
+Not yet run.
+
+### Follow-up
+Derive `actionTimeout`/`globalTimeout` values from the successor-4 D4 timing
+distribution, add them to `playwright.nl-stress.config.ts`, and guard the four
+latent sites with the same count()-guarded idiom — outside any release gate,
+as an ordinary reviewed harness change.
+
+## AFLDB-ISSUE-089 — NL-UI stress harness loses a batch's observations when the batch does not complete
+
+- **Status:** Open
+- **Severity:** Low
+- **Area:** Tests / Tooling
+- **Found:** 2026-08-24 (adjudication of the `AFLDB-ISSUE-087` successor-3 D4
+  HALT; recorded at the pre-R9 ledger sync per `AFLDB-ISSUE-087-S4.md` §3)
+- **Resolved:** N/A
+- **Files:** `tests/nl-ui/nl-stress.spec.ts` (single post-loop
+  `appendFileSync`, `:1099-1103`)
+
+### Symptom
+A batch's observations are persisted by one `appendFileSync` after the batch
+loop finishes, so a parked or timed-out batch loses all (~100) of its
+observations even though the corresponding `nl_search_log` telemetry rows
+exist.
+
+### Evidence
+Proven in the successor-3 D4 HALT: partial batches 003 (`user_0201`–`user_0242`)
+and 009 (`user_0801`–`user_0803`) were invisible in `nl-ui-out`, and a
+telemetry correlation (887 rows / 885 distinct questions reconciling exactly
+against 840 persisted observations) was required to establish what actually
+ran. Secondary defect recorded in `AFLDB-ISSUE-087-S4.md` §1.
+
+### Fix
+Not yet fixed.
+
+### Validation
+Not yet run.
+
+### Follow-up
+Flush each observation as it is produced (append per question rather than per
+batch), keeping the JSONL row shape and report semantics unchanged, so a
+failed batch still leaves a truthful partial record.
