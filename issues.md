@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 19
+**Open issues:** 18
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
@@ -27,7 +27,6 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-084` | High | Deployment / Data integrity | Production (migration 057, checkout `a32a0a1`) lacks the ISSUE-044/078 player-link protections: all seven `LINK_TARGET_TABLES` families are still served by destructive loaders, so a production reload can create new dangling resolutions. ISSUE-079 audited the history clean; this owns the prospective rollout. | On explicit instruction: apply migrations 058–070 with `db:privileges` at the ISSUE-044/078-specified points, deploy the three corrected loaders (the ISSUE-080-corrected `import_awards.py` included), run the Profile-B ISSUE-080 audit before the first awards/honours reload, run the one-time production `--rekey`, then regenerate and re-run the ISSUE-079 audit against the migrated schema. |
 | `AFLDB-ISSUE-085` | Low | Data integrity / Import | `import_captaincies` reconciles the whole `captaincies` table with no ownership predicate — the ISSUE-080 defect class, latent because the importer is today the table's only writer. | Scope it to its own `source_id` by construction (the `reload_keyed` conjunction now exists) and decide the `captaincies_natural_uq` collision policy before a second writer ever exists. |
 | `AFLDB-ISSUE-086` | Needs triage | Admin / Data integrity | Data-editor edits to source-owned rows can be silently reverted by the owning source's next reload (durability/overwrite, not the ISSUE-080 deletion class); only `players`/`matches`/`draft_picks` are live editable entities today. | Answer the four triage questions in the entry (UI promise, affected fields/entities, intended durability, silence of reversion), then set severity on that evidence. |
-| `AFLDB-ISSUE-087` | High | Deployment / Release management | Successor-4 candidate `0da44f9` (lineage `0a86255` → `9255196` → `38ed6af` → `63eb9d2` → `0da44f9`) has passed the full gate sequence through S4-11: R2–R5 exact, fresh build, R6.3–R6.5, and a complete adjudicable D4 (1440/1440, hydration 8 = 0.56%, PASS under the frozen 0–71 band). | Complete S4-12: R8 topology re-proof and cleanup, then STOP for explicit R9 approval before the fast-forward `main` push of exactly `0da44f9`. No force push; no production deployment; ISSUE-084 stays HALTed. |
 | `AFLDB-ISSUE-088` | Low | Tests / Tooling | The NL-UI stress harness has no `actionTimeout`/`globalTimeout` policy and retains latent unbounded auto-wait sites (`nl-stress.spec.ts` `:554`, `:577`, `:580`, `:945`); the `:835` instance stalled successor-3's D4 for 30 minutes per parked batch before its successor-4 repair. | After ISSUE-087 closes, derive timeout values from the successor-4 D4 `elapsedMs`/`timingSummary` distribution, then add the config timeouts and guard the latent sites outside any release gate. |
 | `AFLDB-ISSUE-089` | Low | Tests / Tooling | The NL-UI stress harness persists a batch's observations in a single post-loop `appendFileSync`, so a parked or timed-out batch loses ~100 observations whose telemetry rows exist — proven by successor-3 D4 partial batches 003/009. | Flush each observation as it is produced (or write incrementally per question), keeping report semantics unchanged. |
 
@@ -5405,16 +5404,16 @@ mechanism (or document the reversion as intended) as its own piece of work. It
 does not block anything in ISSUE-080 or ISSUE-084 unless investigation shows
 the ownership-deletion mechanism rather than overwrite-on-reload.
 
-## AFLDB-ISSUE-087 — Validate release candidate `0a86255` and promote `origin/main`
+## AFLDB-ISSUE-087 — Validate the release candidate and promote `origin/main`
 
-- **Status:** Open — successor-4 candidate **validated through S4-11**; at
-  S4-12 (R8 topology re-proof and cleanup); R9 `main` promotion awaits explicit
-  user approval
+- **Status:** Resolved — successor-4 candidate `0da44f9` validated in full,
+  R8 PASS, and promoted to `origin/main` at R9 (non-force fast-forward,
+  2026-08-24); **no production deployment occurred in this issue**
 - **Severity:** High
 - **Area:** Deployment / Release management
 - **Found:** 2026-08-23 (planning session; supersedes the planning handoff
   `AFLDB-ISSUE-087-PLANNING-HANDOFF.md`)
-- **Resolved:** N/A
+- **Resolved:** 2026-08-24
 - **Runbook:** `AFLDB-ISSUE-087.md` — the authoritative execution contract
   (frozen); successor-4 execution per `AFLDB-ISSUE-087-S4.md` (approved),
   with `AFLDB-ISSUE-087-R6-HANDOFF.md` and `AFLDB-ISSUE-087-S4-RESUME.md`
@@ -5551,8 +5550,50 @@ S4 runbook every candidate-bound gate restarted in full:
   complete hydration incident directories (8/8 files each, `metadata.json`
   present) cross-check. ISSUE-068/H7 remains open — a green D4 does not
   resolve it.
-- **S4-12** — pre-R9 ledger sync (this update); R8 topology re-proof and
-  cleanup in progress. **`main` is not pushed without explicit R9 approval.**
+- **S4-12 — COMPLETE:** pre-R9 ledger sync recorded, then R8 and R9 executed
+  and adjudicated PASS — see Resolution below.
+
+### Resolution (2026-08-24)
+
+Root cause: a release-management gap, not a code defect — `origin/main`
+(`9be7f26`, migration 061) was materially behind the intended deployment
+state, and the candidate prefix carried a large unvalidated ride-along set.
+The retained fix is the executed contract itself: full D1–D15 / R0–R9
+validation of successor-4, then promotion of exactly the validated SHA.
+
+- **R8 topology re-proof — PASS (all six proofs):** candidate
+  `0da44f9dd71398d2b72fe33f42867861d7eab6e7` unchanged (tree
+  `bb12cc390547f7f2c41dd4147b6559bc9ac94a6c`); `origin/main` `9be7f26…` and
+  production `a32a0a1…` both proven ancestors; post-candidate delta
+  `0da44f9..origin/dev` exactly one docs-only commit (`18d2180`, ledger paths
+  only, inside the allowlist).
+- **R8 cleanup — PASS, without `--force`:** successor-4 harvest re-verified
+  against its canonical manifest (70/70 SHA-exact) before teardown; posture-2
+  runtime retired gracefully with port 3190 proven free; staged beta-secret
+  file securely removed (`beta_access_codes` rows untouched — revocation was
+  never approved); both validation worktrees (`/tmp/afldb-release-0da44f9`,
+  `/tmp/afldb-release-63eb9d2`) removed via `git worktree remove` without
+  `--force`; evidence preserved at
+  `/tmp/afldb-issue087-evidence-{0da44f9,63eb9d2,38ed6af}` plus all run-tag
+  telemetry; the repo `data/records/first-kick-goal.csv` source proven
+  unchanged; dev 3100 untouched and healthy.
+- **R0 re-confirmed immediately pre-push:** GitHub webhooks empty, zero
+  workflows, no writing integrations/deploy keys, `main` rules unchanged;
+  droplet timers and cron carry no pull/deploy automation.
+- **R9 promotion — PASS:** on fresh explicit approval, non-force fast-forward
+  `9be7f26d37579104d633e1f0af647cb635ff100e` →
+  `0da44f9dd71398d2b72fe33f42867861d7eab6e7`; remote (`git ls-remote`) and
+  local `origin/main` verified at the candidate; `origin/dev` remains
+  `18d2180` and the docs-only dev tip was **not** promoted.
+- **Post-push signals clear:** no Actions run and no integration/deployment
+  activity triggered; production HEAD remained `a32a0a1` with `afldb.service`
+  active — the push did not auto-deploy production.
+
+**ISSUE-087 deployed nothing to production.** `main` now carries migration
+070 and the validated feature set, so the ISSUE-084 P0.2 promotion
+prerequisite is satisfied; ISSUE-084 itself remains a separate production
+runbook, HALTed at P0.2, and must restart with fresh P0.1/P0.2 evidence and
+its own `<TARGET_SHA>`.
 
 ### Retained validation-bootstrap notes (for any future candidate validation)
 

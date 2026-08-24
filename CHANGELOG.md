@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### Validated Release Candidate Promoted to `main` - 24 August 2026
+
+- `origin/main` was fast-forwarded (non-force) from `9be7f26` (migration 061) to the fully validated release candidate `0da44f9` (migration 070) under `AFLDB-ISSUE-087` (resolved). This promotes the accumulated, previously dev-only release state through migration 070 to `main`; ISSUE-087 itself was a release-validation and promotion gate, not the implementation issue for the individual features contained in that candidate.
+- The promoted SHA was validated end-to-end on Linux before the push: provenance/topology proofs, full unit and integration gates with only the exact expected known-issue signatures, a fresh production-style standalone build, full E2E plus the nine-route matrix, and a complete 1,440-question NL UI acceptance sweep (hydration errors 8 = 0.56%, inside the frozen release band). Only the exact candidate SHA was promoted; the docs-only `dev` tip was not.
+- **No production deployment occurred:** production remains at checkout `a32a0a1` (migration 057) and was verified undisturbed after the push. Deploying this state to production is owned by `AFLDB-ISSUE-084` (still HALTed at P0.2), whose `main`-promotion prerequisite is now satisfied.
+
 ### Award and Honours Reloads Reconcile Only Rows They Own - 23 August 2026
 
 - Five reload paths in `tools/migration/import_awards.py` no longer delete rows they did not supply (`AFLDB-ISSUE-080`, resolved). Hall of Fame and honour-team reloads previously reconciled their **entire** table; the legacy-winner, All-Australian and Rising Star reloads reconciled by award domain alone. Any row inside those populations whose key the incoming extract could not produce — an admin-created `award_winners` row from the shipped `createAwardWinner` screen, an ingest-promoted `sports_data_lab` row, an admin honours row, or any provenance-unknown row — was classified as vanished and deleted (or, if it carried a manual player link, aborted the whole reload since `AFLDB-ISSUE-044`).

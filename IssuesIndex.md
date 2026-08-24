@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-24
-**Open issues:** 19
+**Open issues:** 18
 
 ## How Claude should use this file
 
@@ -40,7 +40,6 @@
 | `AFLDB-ISSUE-084` | High | Deployment / Data integrity | Production (migration 057) lacks the ISSUE-044/078 player-link protections; all seven link-target families are still served by destructive loaders, so a reload can create new dangling resolutions. |
 | `AFLDB-ISSUE-085` | Low | Data integrity / Import | `import_captaincies` reconciles its whole table with no ownership predicate — the ISSUE-080 defect class, latent because the importer is today the only writer. |
 | `AFLDB-ISSUE-086` | Needs triage | Admin / Data integrity | Data-editor edits to source-owned rows can be silently reverted by the owning source's next reload; severity awaits the four-question triage recorded in the entry. |
-| `AFLDB-ISSUE-087` | High | Deployment / Release management | Successor-4 candidate `0da44f9` validated through S4-11 (D4 complete 1440/1440, hydration 8 = 0.56% PASS); at S4-12 — R8 topology re-proof/cleanup, then explicit R9 approval before any `main` push. |
 | `AFLDB-ISSUE-088` | Low | Tests / Tooling | NL-UI stress harness has no `actionTimeout`/`globalTimeout` policy and retains latent unbounded auto-wait sites; hardening deliberately deferred until the D4 timing evidence can set values. |
 | `AFLDB-ISSUE-089` | Low | Tests / Tooling | NL-UI stress harness persists observations once per batch, so a parked/timed-out batch loses ~100 observations whose telemetry rows exist. |
 
@@ -266,37 +265,6 @@
 - **Next action:** Answer the entry's four triage questions (UI promise,
   affected fields/entities, intended durability, silence of reversion) against
   the three live editable entities, then set severity on that evidence.
-
-## AFLDB-ISSUE-087 — Validate the release candidate and promote `origin/main`
-
-- **Severity:** High
-- **Area:** Deployment / Release management
-- **Key files:** `AFLDB-ISSUE-087.md` (frozen contract),
-  `AFLDB-ISSUE-087-S4.md` (approved successor-4 runbook), plus the
-  R6/S4-RESUME handoffs; validation covers the whole candidate tree plus
-  read-only production Caddyfile and `afldb_prod` evidence.
-- **Candidate:** successor-4
-  `CANDIDATE_SHA = 0da44f9dd71398d2b72fe33f42867861d7eab6e7` (tree
-  `bb12cc39…`), lineage `0a86255` → `9255196` → `38ed6af` → `63eb9d2` →
-  `0da44f9` — every supersession a tracked-test defect, never candidate
-  source/runtime. `origin/main` is `9be7f26` at migration 061; the candidate
-  carries 070.
-- **Current state:** Validated through **S4-11**: R2–R5 restarted and closed
-  PASS in full (exact ISSUE-072/073 signatures, single expected awards skip),
-  fresh build, R6.3–R6.5 PASS, S4-9 liveness probe PASS, D4 rerun complete and
-  adjudicable (1440/1440, exit 0), authoritative
-  `hydration.totalHydrationErrors = 8` (0.56%) — PASS under the frozen 0–71
-  band. ISSUE-068/H7 remains open. At **S4-12**: pre-R9 ledger sync recorded;
-  R8 topology re-proof and cleanup in progress.
-- **Depends on:** `AFLDB-ISSUE-084`, which is **HALTed at P0.2** and is **not
-  advanced** by this issue. After promotion, ISSUE-084 restarts with fresh
-  P0.1/P0.2 evidence and sets `<TARGET_SHA>` on its own terms.
-- **Next action:** Complete R8 (six topology proofs; evidence harvest to
-  `/tmp/afldb-issue087-evidence-0da44f9`; retire the posture-2 runtime, both
-  validation worktrees and the staged beta secret — no `--force`), then STOP
-  and display the R9 prerequisites for explicit user approval before the
-  normal fast-forward push of exactly `0da44f9` to `main`. No force push; no
-  production deployment; never delete run-tag telemetry.
 
 ## AFLDB-ISSUE-088 — NL-UI stress harness has no timeout policy and retains latent unbounded waits
 
