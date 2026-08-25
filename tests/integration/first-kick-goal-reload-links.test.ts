@@ -51,7 +51,12 @@ const FIXTURE_EMAIL = 'issue-078-fkg-reload@example.test';
 const NOTE = 'AFLDB-ISSUE-078 first-kick-goal reload survival';
 const REAL_CSV = join(root, 'data', 'records', 'first-kick-goal.csv');
 
-const tsx = join(root, 'node_modules', '.bin', 'tsx');
+const tsx = join(
+  root,
+  'node_modules',
+  '.bin',
+  process.platform === 'win32' ? 'tsx.cmd' : 'tsx'
+);
 const canRunImporter = existsSync(REAL_CSV) && existsSync(tsx);
 
 // Temp copies the whole suite works on; created in beforeAll.
@@ -67,6 +72,7 @@ function runTool(args: string[]) {
     {
       cwd: root,
       encoding: 'utf8',
+      shell: process.platform === 'win32',
       env: {
         ...process.env,
         AFLDB_IMPORT_DATABASE_URL: process.env.AFLDB_TEST_DATABASE_URL,
@@ -79,8 +85,11 @@ function runTool(args: string[]) {
 
 const runImporter = (extra: string[] = []) => runTool(['--apply', ...extra]);
 
-function output(run: { stdout: unknown; stderr: unknown }): string {
-  return String(run.stdout ?? '') + String(run.stderr ?? '');
+function output(run: { stdout: unknown; stderr: unknown; error?: Error; signal?: string | null }): string {
+  let out = String(run.stdout ?? '') + String(run.stderr ?? '');
+  if (run.error) out += `\nError: ${run.error.message}`;
+  if (run.signal) out += `\nSignal: ${run.signal}`;
+  return out;
 }
 
 function editFile(path: string, from: string, to: string): void {
@@ -391,11 +400,11 @@ describe.skipIf(!canRunImporter)(
 
     it('keeps a confirmed-unlinked decision, with its audit target alive', async () => {
       const row = await takeSourceLinked(used);
+      await returnToQueue(row.id);
 
       const confirmed = await confirmUnlinked({
         targetTable: 'player_achievements',
         targetId: row.id,
-        previousStatus: 'ambiguous',
         adminUserId,
         note: NOTE,
       });
@@ -652,10 +661,11 @@ describe.skipIf(!canRunImporter)(
 
     it('a decided retirement is a decision loss, gated by --allow-link-loss alone', async () => {
       const row = await takeSourceLinked(used);
+      await returnToQueue(row.id);
+
       const confirmed = await confirmUnlinked({
         targetTable: 'player_achievements',
         targetId: row.id,
-        previousStatus: 'ambiguous',
         adminUserId,
         note: NOTE,
       });

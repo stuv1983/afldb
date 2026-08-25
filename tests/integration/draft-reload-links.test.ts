@@ -331,7 +331,6 @@ describe.skipIf(!canRunImporter)(
       const confirmed = await confirmUnlinked({
         targetTable: 'draft_picks',
         targetId: decidedPick.id,
-        previousStatus: decidedPick.status,
         adminUserId,
         note: NOTE,
       });
@@ -469,7 +468,6 @@ describe.skipIf(!canRunImporter)(
       const confirmed = await confirmUnlinked({
         targetTable: 'draft_picks',
         targetId: picks[1].id,
-        previousStatus: picks[1].status,
         adminUserId,
         note: NOTE,
       });

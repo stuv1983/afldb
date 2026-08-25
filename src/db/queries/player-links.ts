@@ -297,6 +297,59 @@ async function lockUnresolvedTarget(
   return { previousStatus: row.status, draftPersonId: null };
 }
 
+type LogicalDecision =
+  | { type: 'none' }
+  | { type: 'linked'; playerId: number }
+  | { type: 'confirmed_unlinked' }
+  | { type: 'contradictory' };
+
+async function classifyLogicalDecision(
+  tx: Tx,
+  targetTable: LinkTargetTable,
+  targetId: number,
+  draftPersonId: number | null,
+): Promise<LogicalDecision> {
+  if (targetTable === 'draft_picks' && draftPersonId) {
+    const rows = await tx<{ action: string; playerId: number | null }[]>`
+      SELECT DISTINCT ON (r.target_id)
+             r.action, r.player_id AS "playerId"
+        FROM player_link_resolutions r
+        JOIN draft_picks p ON p.id = r.target_id
+       WHERE p.draft_person_id = ${draftPersonId}
+         AND r.target_table = 'draft_picks'
+       ORDER BY r.target_id, r.created_at DESC, r.id DESC
+    `;
+    if (rows.length === 0) return { type: 'none' };
+
+    const actions = new Set(rows.map((r) => r.action));
+    const linkedPlayers = new Set(
+      rows.filter((r) => r.action === 'linked').map((r) => r.playerId)
+    );
+
+    if (actions.size > 1 || linkedPlayers.size > 1) {
+      return { type: 'contradictory' };
+    }
+
+    if (actions.has('linked')) {
+      return { type: 'linked', playerId: [...linkedPlayers][0]! };
+    }
+
+    return { type: 'confirmed_unlinked' };
+  }
+
+  const [row] = await tx<{ action: string; playerId: number | null }[]>`
+    SELECT action, player_id AS "playerId"
+      FROM player_link_resolutions
+     WHERE target_table = ${targetTable}
+       AND target_id = ${targetId}
+     ORDER BY created_at DESC, id DESC
+     LIMIT 1
+  `;
+  if (!row) return { type: 'none' };
+  if (row.action === 'linked') return { type: 'linked', playerId: row.playerId! };
+  return { type: 'confirmed_unlinked' };
+}
+
 /** Apply the trusted link to the target already locked above. */
 async function applyLockedLink(
   tx: Tx,
@@ -380,6 +433,44 @@ async function recordLinkedResolution(tx: Tx, input: {
  * link rolls back with it, so a link can never exist without its
  * resolution row.
  */
+export async function resolveLockedLink(
+  tx: Tx,
+  input: {
+    targetTable: LinkTargetTable;
+    targetId: number;
+    playerId: number;
+    adminUserId: number;
+    note?: string | null;
+    matchMethod?: 'manual' | 'suggested' | 'bulk_suggested';
+    matchScore?: number | null;
+    algorithmVersion?: string | null;
+  }
+): Promise<ResolveResult> {
+  const target = await lockUnresolvedTarget(tx, input.targetTable, input.targetId);
+  if (!target) {
+    return { ok: false, error: 'No unresolved row with that id — it may already be linked.' };
+  }
+
+  const decision = await classifyLogicalDecision(
+    tx, input.targetTable, input.targetId, target.draftPersonId
+  );
+  if (decision.type === 'contradictory') {
+    return { ok: false, error: 'This draft identity has conflicting existing link decisions and cannot be changed until reviewed.' };
+  }
+  if (decision.type === 'confirmed_unlinked') {
+    return { ok: false, error: 'This target was already confirmed unlinked and cannot be linked from a stale form.' };
+  }
+  if (decision.type === 'linked') {
+    return { ok: false, error: 'This target was already linked by another admin.' };
+  }
+
+  await applyLockedLink(
+    tx, input.targetTable, input.targetId, input.playerId, target.draftPersonId
+  );
+  await recordLinkedResolution(tx, { ...input, previousStatus: target.previousStatus });
+  return { ok: true };
+}
+
 export async function resolveLink(input: {
   targetTable: LinkTargetTable;
   targetId: number;
@@ -392,26 +483,7 @@ export async function resolveLink(input: {
 
   const importSql = postgres(importUrl, { max: 1, onnotice: () => {} });
   try {
-    const applied = await importSql.begin(async (tx) => {
-      const target = await lockUnresolvedTarget(tx, input.targetTable, input.targetId);
-      if (!target) return false;
-      await applyLockedLink(
-        tx,
-        input.targetTable,
-        input.targetId,
-        input.playerId,
-        target.draftPersonId,
-      );
-      await recordLinkedResolution(tx, { ...input, previousStatus: target.previousStatus });
-      return true;
-    }) as boolean;
-    if (!applied) {
-      return {
-        ok: false,
-        error: 'No unresolved row with that id — it may already be linked.',
-      };
-    }
-    return { ok: true };
+    return await importSql.begin((tx) => resolveLockedLink(tx, input));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, error: `The link could not be applied: ${message}` };
@@ -441,9 +513,16 @@ export async function createPlayerAndResolveLink(input: {
 
   const importSql = postgres(importUrl, { max: 1, onnotice: () => {} });
   try {
-    const applied = await importSql.begin(async (tx) => {
+    const result = await importSql.begin(async (tx) => {
       const target = await lockUnresolvedTarget(tx, input.targetTable, input.targetId);
-      if (!target) return null;
+      if (!target) return 'already_resolved';
+
+      const decision = await classifyLogicalDecision(
+        tx, input.targetTable, input.targetId, target.draftPersonId
+      );
+      if (decision.type === 'contradictory') return 'contradictory';
+      if (decision.type === 'confirmed_unlinked') return 'stale_unlinked';
+      if (decision.type === 'linked') return 'already_resolved';
 
       const player = await createPlayerInTransaction(tx, input.player);
       await applyLockedLink(
@@ -464,21 +543,59 @@ export async function createPlayerAndResolveLink(input: {
         note: input.note?.trim()
           || `Created player ${player.displayName} and linked to ${input.targetTable} #${input.targetId}`,
       });
-      return { player };
-    }) as { player: CreatedPlayer } | null;
-    if (applied === null) {
-      return {
-        ok: false,
-        error: 'No unresolved row with that id — it may already be linked.',
-      };
+      return { ok: true as const, player };
+    });
+
+    if (result === 'already_resolved') {
+      return { ok: false, error: 'No unresolved row with that id — it may already be linked.' };
     }
-    return { ok: true, player: applied.player };
+    if (result === 'contradictory') {
+      return { ok: false, error: 'This draft identity has conflicting existing link decisions and cannot be changed until reviewed.' };
+    }
+    if (result === 'stale_unlinked') {
+      return { ok: false, error: 'This target was already confirmed unlinked and cannot be linked from a stale form.' };
+    }
+    return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, error: `The player and link could not be created: ${message}` };
   } finally {
     await importSql.end({ timeout: 5 });
   }
+}
+
+export async function confirmLockedUnlinked(
+  tx: Tx,
+  targetTable: LinkTargetTable,
+  targetId: number,
+  adminUserId: number,
+  note?: string | null,
+): Promise<ResolveResult> {
+  const target = await lockUnresolvedTarget(tx, targetTable, targetId);
+  if (!target) return { ok: false, error: 'No unresolved row with that id — it may already be linked.' };
+
+  const decision = await classifyLogicalDecision(
+    tx, targetTable, targetId, target.draftPersonId
+  );
+  if (decision.type === 'contradictory') {
+    return { ok: false, error: 'This draft identity has conflicting existing link decisions and cannot be changed until reviewed.' };
+  }
+  if (decision.type === 'confirmed_unlinked') {
+    return { ok: false, error: 'This target was already confirmed unlinked by another admin.' };
+  }
+  if (decision.type === 'linked') {
+    return { ok: false, error: 'This target was already linked by another admin.' };
+  }
+
+  await tx`
+    INSERT INTO player_link_resolutions
+          (target_table, target_id, action, player_id, previous_status,
+           admin_user_id, note)
+    VALUES (${targetTable}, ${targetId}, 'confirmed_unlinked', NULL,
+            ${target.previousStatus}::link_status, ${adminUserId},
+            ${(note ?? '').trim().slice(0, 2000) || null})
+  `;
+  return { ok: true };
 }
 
 /**
@@ -489,23 +606,22 @@ export async function createPlayerAndResolveLink(input: {
 export async function confirmUnlinked(input: {
   targetTable: LinkTargetTable;
   targetId: number;
-  previousStatus: string;
   adminUserId: number;
   note?: string | null;
 }): Promise<ResolveResult> {
+  const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
+  if (!importUrl) return { ok: false, error: 'AFLDB_IMPORT_DATABASE_URL is not configured.' };
+
+  const importSql = postgres(importUrl, { max: 1, onnotice: () => {} });
   try {
-    await authSql`
-      INSERT INTO player_link_resolutions
-            (target_table, target_id, action, player_id, previous_status,
-             admin_user_id, note)
-      VALUES (${input.targetTable}, ${input.targetId}, 'confirmed_unlinked', NULL,
-              ${input.previousStatus}::link_status, ${input.adminUserId},
-              ${(input.note ?? '').trim().slice(0, 2000) || null})
-    `;
-    return { ok: true };
+    return await importSql.begin((tx) =>
+      confirmLockedUnlinked(tx, input.targetTable, input.targetId, input.adminUserId, input.note)
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, error: `The confirmation could not be recorded: ${message}` };
+  } finally {
+    await importSql.end({ timeout: 5 });
   }
 }
 

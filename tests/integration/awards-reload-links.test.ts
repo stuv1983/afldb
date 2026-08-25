@@ -211,7 +211,6 @@ describe.skipIf(!canRunImporter)(
       const confirmed = await confirmUnlinked({
         targetTable: 'hall_of_fame',
         targetId: row.id,
-        previousStatus: row.status,
         adminUserId,
         note: NOTE,
       });

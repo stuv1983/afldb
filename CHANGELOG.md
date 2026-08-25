@@ -14,6 +14,14 @@ commit.
 ---
 
 ## [Unreleased]
+### AFLDB-ISSUE-082 - 25 August 2026
+- `confirmUnlinked` admin mutation now uses the `import`-role transaction and takes an authoritative row lock before writing.
+- `previous_status` is derived securely from the locked database row, completely ignoring the form-supplied state.
+- Draft sibling decisions are classified at the draft-person grain, mirroring the importer's effective latest-resolution-per-pick classification (`DISTINCT ON (target_id) ... ORDER BY created_at DESC, id DESC`).
+- Stale resolve/confirm races, identical duplicate `confirmUnlinked` submissions, and consistent existing decisions are strictly rejected as stale state.
+- Contradictory decisions (where effective sibling actions differ or point to different players) fail closed.
+- `confirmUnlinked` remains an audit-only operation and does not participate in the ISSUE-080 honour-team advisory-lock protocol.
+- A deterministic, database-backed PostgreSQL concurrency regression test (via `pg_blocking_pids`) covering all three interleavings has been permanently added to the integration suite.
 
 ### Production Deployment of Player-Link Protections (Schema 070) - 24 August 2026
 

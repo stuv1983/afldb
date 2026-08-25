@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 17
+**Open issues:** 16
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
@@ -22,7 +22,6 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-076` | Medium | Performance | Grid Solver combinations using `won_final_at_venue` can exceed PostgreSQL's 5-second statement timeout and crash the page. | Capture and compare the generated SQL/EXPLAIN plan against `played_at_venue`, then optimise the `won_final_at_venue` query shape without raising the application timeout. |
 | `AFLDB-ISSUE-077` | Medium | UI/Settings | The super-admin-selected frontend theme is not stable within a browsing session; different pages can render different themes as the user navigates. | Trace every theme source (database setting, server render, cookie/local storage and client hydration), establish one authoritative theme value per request/session, and add navigation regression coverage. |
 | `AFLDB-ISSUE-081` | Low | Tests | The honours reload integration suite mutates rows that `release-gates.test.ts` counts, with no lock between the two files; latent, not yet observed failing. | Give it the same `tests/integration/draft-lock.ts` treatment, or prove the two files never overlap. |
-| `AFLDB-ISSUE-082` | Medium | Admin | `confirmUnlinked` takes no lock and never re-reads its target, so a stale form can vet a row whose person was linked moments earlier. | Lock and re-check the target the way `resolveLink` does, and reject a decision that contradicts an applied link. |
 | `AFLDB-ISSUE-083` | Medium | Tests / Database privileges | Every database-backed importer test substitutes the owner DSN for `AFLDB_IMPORT_DATABASE_URL`, so a privilege the importer needs but does not hold is invisible; `AFLDB-ISSUE-078` shipped exactly that defect. | Add a restricted test DSN plus a shared helper that runs the importer as `afldb_import` while fixtures stay on the owner handle, and prove it on the first-kick-goal loader first. |
 | `AFLDB-ISSUE-085` | Low | Data integrity / Import | `import_captaincies` reconciles the whole `captaincies` table with no ownership predicate — the ISSUE-080 defect class, latent because the importer is today the table's only writer. | Scope it to its own `source_id` by construction (the `reload_keyed` conjunction now exists) and decide the `captaincies_natural_uq` collision policy before a second writer ever exists. |
 | `AFLDB-ISSUE-086` | Needs triage | Admin / Data integrity | Data-editor edits to source-owned rows can be silently reverted by the owning source's next reload (durability/overwrite, not the ISSUE-080 deletion class); only `players`/`matches`/`draft_picks` are live editable entities today. | Answer the four triage questions in the entry (UI promise, affected fields/entities, intended durability, silence of reversion), then set severity on that evidence. |
@@ -4923,11 +4922,11 @@ entirely); once this issue lands its lock, run them together.
 
 ## AFLDB-ISSUE-082 — `confirmUnlinked` can record a decision contradicting an applied link
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Admin
 - **Found:** 2026-08-22
-- **Resolved:** N/A
+- **Resolved:** 2026-08-25
 - **Files:** `src/db/queries/player-links.ts` (`confirmUnlinked`)
 
 ### Symptom
@@ -4965,26 +4964,25 @@ person-grained in effect for draft picks, and it can contradict a link applied
 between the page render and the submit.
 
 ### Fix
-Not yet fixed.
+* `confirmUnlinked` moved to the import-role transaction.
+* `confirmUnlinked` now uses `lockUnresolvedTarget` to lock the authoritative target and derive `previous_status` from the database rather than accepting it from form input.
+* Draft logical decisions are classified at the draft-person grain by mirroring the importer's effective latest-resolution-per-pick classification: `DISTINCT ON (target_id) ... ORDER BY created_at DESC, id DESC`.
+* A contradiction is defined precisely: effective sibling actions differ, or linked decisions point to different players.
+* A consistent existing linked or confirmed-unlinked decision is rejected safely as stale state, not described as a contradiction.
+* Identical duplicate `confirmUnlinked` actions are safely rejected with a stale-form error.
+* `confirmUnlinked` remains audit-only and does not participate in the ISSUE-080 honour-team advisory-lock protocol.
+* No database migration was required.
+* Implemented deterministic, database-backed concurrency regression using `pg_blocking_pids` covering all three interleavings (resolve-first, confirm-first, confirm-duplicate).
 
 ### Validation
-Not yet performed.
+* `tests/player-link-mutations.test.ts`: 34/34 passed
+* `tests/integration/player-link-concurrency.test.ts`: 3/3 passed
+* Targeted ISSUE-078 first-kick-goal compatibility validation: 2 passed / 12 skipped, exit 0 (used a one-off `--testTimeout=120000` because that existing importer-heavy test lacks the explicit timeout used by nearby tests)
+* `npx tsc --noEmit`: passed
+* `npm run build`: passed, 1499/1499 static pages
 
 ### Follow-up
-Lock and re-check the target the way `lockUnresolvedTarget` does, and reject a
-confirmation whose target — or, for a draft pick, whose draft person — is
-already resolved. Extend `tests/player-link-mutations.test.ts`, which already
-owns the draft identity-resolution cases.
-
-**Forward constraint from `AFLDB-ISSUE-080` (2026-08-23):** ISSUE-080's
-honour-team writer inventory holds only because no admin path moves an
-honour-team row linked → unlinked (`confirmUnlinked` is audit-only and writes
-nothing to the target). If this issue's fix ever makes `confirmUnlinked` — or
-any successor — write `player_id = NULL` back to `honour_team_members`, that
-writer creates the migration-059 unbacked mixed linked/unlinked collision and
-must join ISSUE-080's §4.3 identity matrix and the transaction-scoped advisory
-lock `(717275, 1)` shared by `createHonourTeamMember` and
-`import_honour_teams`.
+None required for AFLDB-ISSUE-082. AFLDB-ISSUE-083 remains the separate test-role parity issue.
 
 
 ## AFLDB-ISSUE-083 — Importers are tested as `afldb_owner`, so missing-grant defects are invisible

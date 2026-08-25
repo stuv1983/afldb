@@ -104,13 +104,9 @@ export async function confirmUnlinked(
   const note = String(formData.get('note') ?? '').trim();
   if (note.length > 2000) return { error: 'Notes are limited to 2000 characters.' };
 
-  for (const { targetTable, targetId, previousStatus } of targets) {
-    if (!previousStatus || !['ambiguous', 'unmatched', 'implausible'].includes(previousStatus)) {
-      return { error: `Unknown link status for target ${targetTable}:${targetId}.` };
-    }
-
+  for (const { targetTable, targetId } of targets) {
     const result = await confirmUnlinkedQuery({
-      targetTable, targetId, previousStatus, adminUserId: admin.id, note,
+      targetTable, targetId, adminUserId: admin.id, note,
     });
     if (!result.ok) return { error: `Error on ${targetTable}:${targetId}: ${result.error}` };
 

@@ -29,7 +29,9 @@ vi.mock('@/db/queries/player-match-candidates', () => ({
 }));
 
 import { createPlayerAction } from '@/app/admin/data-editor/actions';
+import { confirmUnlinked as confirmUnlinkedAction } from '@/app/admin/player-links/actions';
 import {
+  confirmUnlinked,
   createPlayerAndResolveLink,
   listUnresolvedLinks,
   resolveLink,
@@ -268,6 +270,116 @@ describe('draft identity resolution', () => {
     expect(playerInsert).toBeGreaterThan(targetLock);
     expect(seen.findIndex((query) => query.text.startsWith('UPDATE draft_picks')))
       .toBeGreaterThan(playerInsert);
+  });
+});
+
+describe('confirmUnlinked resolution', () => {
+  it('uses AFLDB_IMPORT_DATABASE_URL and ignores form-supplied previousStatus', async () => {
+    const { tx, seen } = fakeTransaction((text) => {
+      if (text.startsWith('SELECT link_status_value::text')) {
+        return [{ status: 'ambiguous' }];
+      }
+      return [];
+    });
+    const client = installImportClient(tx);
+
+    const result = await confirmUnlinked({
+      targetTable: 'award_winners',
+      targetId: 412,
+      adminUserId: 5,
+      note: 'Definitely not the AFL player',
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(client.begin).toHaveBeenCalledOnce();
+    expect(mocks.authSql).not.toHaveBeenCalled();
+
+    const auditInsert = seen.find((query) => (
+      query.text.startsWith('INSERT INTO player_link_resolutions')
+    ));
+    // The previous_status must be 'ambiguous' (from lock), not 'unmatched'.
+    expect(auditInsert?.values).toEqual([
+      'award_winners', 412, 'ambiguous', 5, 'Definitely not the AFL player',
+    ]);
+    expect(auditInsert?.text).toContain("'confirmed_unlinked', NULL");
+  });
+
+  it('rejects duplicate stale confirmations without inserting anything', async () => {
+    const { tx, seen } = fakeTransaction((text) => {
+      if (text.startsWith('SELECT link_status_value::text')) return [{ status: 'unmatched' }];
+      if (text.startsWith('SELECT action')) return [{ action: 'confirmed_unlinked', playerId: null }];
+      return [];
+    });
+    installImportClient(tx);
+
+    const result = await confirmUnlinked({
+      targetTable: 'award_winners',
+      targetId: 412,
+      adminUserId: 5,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'This target was already confirmed unlinked by another admin.',
+    });
+    expect(seen.some((query) => query.text.startsWith('INSERT INTO'))).toBe(false);
+  });
+
+  it('fails closed for a draft identity with contradictory sibling decisions', async () => {
+    const { tx, seen } = fakeTransaction((text) => {
+      if (text.startsWith('SELECT draft_person_id AS')) return [{ draftPersonId: 901 }];
+      if (text.startsWith('SELECT link_status::text')) return [{ status: 'unmatched', playerId: null }];
+      if (text.startsWith('SELECT link_status_value::text')) return [{ status: 'ambiguous', draftPersonId: 901 }];
+      if (text.startsWith('SELECT DISTINCT ON')) {
+        // Return contradictory siblings
+        return [
+          { action: 'linked', playerId: 100 },
+          { action: 'confirmed_unlinked', playerId: null },
+        ];
+      }
+      return [];
+    });
+    installImportClient(tx);
+
+    const result = await confirmUnlinked({
+      targetTable: 'draft_picks',
+      targetId: 41,
+      adminUserId: 5,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'This draft identity has conflicting existing link decisions and cannot be changed until reviewed.',
+    });
+    expect(seen.some((query) => query.text.startsWith('INSERT INTO'))).toBe(false);
+  });
+
+  it('server action ignores form-supplied previousStatus and forwards only target details', async () => {
+    mocks.requireSuperAdmin.mockResolvedValueOnce({ id: 5, email: 'admin@example.test' });
+    const { tx, seen } = fakeTransaction((text) => {
+      if (text.startsWith('SELECT link_status_value::text')) return [{ status: 'unmatched' }];
+      return [];
+    });
+    installImportClient(tx);
+
+    const formData = new FormData();
+    // Use target identifier 412, missing previousStatus segment from the real wire format
+    formData.set('targets', 'award_winners:412');
+    formData.set('note', 'Verified not a player');
+
+    const result = await confirmUnlinkedAction({}, formData);
+
+    expect(result).toEqual({ message: expect.stringContaining('Recorded 1 record(s)') });
+    expect(mocks.requireSuperAdmin).toHaveBeenCalledOnce();
+
+    const auditInsert = seen.find((query) => (
+      query.text.startsWith('INSERT INTO player_link_resolutions')
+    ));
+
+    // The previous_status must be 'unmatched' (from lock inside the query), not the form's 'bogus_value...'
+    expect(auditInsert?.values).toEqual([
+      'award_winners', 412, 'unmatched', 5, 'Verified not a player',
+    ]);
   });
 });
 

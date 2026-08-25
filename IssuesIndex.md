@@ -6,8 +6,8 @@
 > `issues.md` disagree, trust `issues.md` and immediately synchronize this file
 > and the Open Issues table at the top of `issues.md`.
 
-**Last updated:** 2026-08-24
-**Open issues:** 17
+**Last updated:** 2026-08-25
+**Open issues:** 16
 
 ## How Claude should use this file
 
@@ -34,7 +34,6 @@
 | `AFLDB-ISSUE-074` | Low | Tests | email-intake integration test picks a real dev admin instead of its fixture and leaves staged rows behind; widened 2026-08-24 — fixed payload bytes plus global dedup make it history-dependent. |
 | `AFLDB-ISSUE-076` | Medium | Performance | `won_final_at_venue` Grid Solver combinations can exceed the 5-second PostgreSQL statement timeout and crash the rendered page. |
 | `AFLDB-ISSUE-081` | Low | Tests | Honours reload suite mutates rows the release gates count, with no lock between the files. Latent. |
-| `AFLDB-ISSUE-082` | Medium | Admin | `confirmUnlinked` takes no lock and never re-reads its target, so a stale form can contradict an applied link. |
 | `AFLDB-ISSUE-077` | Medium | UI/Settings | The saved super-admin frontend theme can change between pages during the same browsing session. |
 | `AFLDB-ISSUE-083` | Medium | Tests / Database privileges | Importers are tested as `afldb_owner` but run as `afldb_import`, so missing-grant defects pass CI and fail in production. |
 | `AFLDB-ISSUE-085` | Low | Data integrity / Import | `import_captaincies` reconciles its whole table with no ownership predicate — the ISSUE-080 defect class, latent because the importer is today the only writer. |
@@ -164,25 +163,6 @@
   test run. Once the lock lands, run `awards-reload-links.test.ts` together with
   `release-gates.test.ts` (the run ISSUE-080 deferred).
 
-## AFLDB-ISSUE-082 — `confirmUnlinked` can record a decision contradicting an applied link
-
-- **Severity:** Medium
-- **Area:** Admin
-- **Key files:** `src/db/queries/player-links.ts:489`
-- **First wrong layer:** Admin mutation path.
-- **Current state:** `confirmUnlinked` takes no lock, does not re-read its
-  target and runs on `authSql` rather than the import transaction, taking
-  `previousStatus` straight from the form. A stale form can therefore vet a row
-  whose draft person was linked moments earlier. `resolveLink` locks and
-  re-checks; this does not. The `AFLDB-ISSUE-078` draft reload now aborts on the
-  resulting contradiction, which is a backstop, not a fix.
-- **Next action:** Lock and re-check the target the way `lockUnresolvedTarget`
-  does, reject a confirmation whose target (or draft person) is already
-  resolved, and extend `tests/player-link-mutations.test.ts`.
-  **Forward constraint (`AFLDB-ISSUE-080`, 2026-08-23):** if the fix ever makes
-  `confirmUnlinked` write `player_id = NULL` back to `honour_team_members`, that
-  writer must join ISSUE-080's §4.3 identity matrix and its `(717275, 1)`
-  transaction-scoped advisory lock — see the ledger entry.
 
 ## AFLDB-ISSUE-083 — Importers are tested as `afldb_owner`, so missing-grant defects are invisible
 
