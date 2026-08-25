@@ -24,13 +24,28 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
 
-import { lockDraftTables, unlockDraftTables } from './draft-lock';
+import {
+  lockDraftTables, unlockDraftTables,
+  lockHonoursTables, unlockHonoursTables,
+  lockBirthDateEnrichment, unlockBirthDateEnrichment,
+} from './draft-lock';
 import { runAdvancedSearch } from '@/db/queries/advanced-search';
 import { runMatchSearch } from '@/db/queries/match-search';
 import { parseAdvancedQuery } from '@/search/advanced-spec';
 import { parseMatchSearchQuery } from '@/search/match-spec';
 
+const integrationDsn = process.env.AFLDB_TEST_DATABASE_URL as string;
+
+// AFLDB-ISSUE-090: `gate: birth dates` reads dob_conflict/dob_internal_conflict
+// and players.dob_disputed, which tests/integration/dob-enrichment-issues.test.ts
+// also writes. File-level, beside the honours lock, so the whole read/write
+// window is covered rather than just one describe block. Acquisition order
+// (documented in draft-lock.ts): honours -> birth dates -> draft.
+beforeAll(() => lockHonoursTables(integrationDsn), 300_000);
+beforeAll(() => lockBirthDateEnrichment(integrationDsn), 300_000);
 afterAll(async () => {
+  await unlockBirthDateEnrichment();
+  await unlockHonoursTables();
   await sql.end();
 });
 
@@ -386,7 +401,7 @@ describe('gate: draft links', () => {
   // draft-reload-links.test.ts deliberately links real draft people to
   // fixture players while it runs. Wait it out rather than read a moving
   // target; the assertions below are unchanged.
-  beforeAll(lockDraftTables, 300_000);
+  beforeAll(() => lockDraftTables(integrationDsn), 300_000);
   afterAll(unlockDraftTables);
 
   it('retains all 6,810 rows, including unresolved ones', async () => {

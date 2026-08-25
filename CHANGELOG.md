@@ -14,6 +14,21 @@ commit.
 ---
 
 ## [Unreleased]
+
+### AFLDB-ISSUE-091 — Migration checksums are deterministic across LF/CRLF checkouts - 25 August 2026
+
+- `tools/db/migrate.ts` checksum computation and drift comparison now use a new pure module (`tools/db/migration-checksum.ts`) that derives three bounded representations of a migration file's content — raw bytes, canonical all-LF, canonical all-CRLF — and accepts a stored ledger checksum matching any one of them.
+- Fixes a false-positive "modified since they ran" refusal that blocked `db:migrate`/`db:status` from applying any pending migration whenever a Windows CRLF checkout materialized different bytes than the LF-based checksum recorded in `afldb_meta.schema_migrations`.
+- A newly applied migration now always stores the canonical all-LF checksum, regardless of which platform applied it, so this checkout-dependence cannot recur going forward.
+- No historical migration file or `afldb_meta.schema_migrations` row was modified; migration execution SQL is unchanged. Real content edits to an already-applied migration are still detected and refused.
+
+### AFLDB-ISSUE-073 — FK-index gate now passes (migration 071) - 25 August 2026
+
+- Four audit/link foreign keys introduced by migrations 056 and 057 now have supporting indexes (`src/db/migrations/071_audit_link_fk_indexes.sql`).
+- `ix_data_edits_admin_user_id` and `ix_plr_admin_user_id` are unconditional indexes on `NOT NULL` columns; `ix_plr_player_id` and `ix_pls_resolved_by` use `WHERE col IS NOT NULL` partial indexes on nullable columns, following the migration-041/050 convention.
+- No `DELETE_FREE_PARENTS` exemption was added; `auth_users` and `players` are both genuinely deletable parents.
+- `tests/integration/fk-indexes.test.ts` (2 tests) now passes green.
+
 ### AFLDB-ISSUE-082 - 25 August 2026
 - `confirmUnlinked` admin mutation now uses the `import`-role transaction and takes an authoritative row lock before writing.
 - `previous_status` is derived securely from the locked database row, completely ignoring the form-supplied state.

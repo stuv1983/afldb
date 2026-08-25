@@ -1093,6 +1093,12 @@ for (const [index, batch] of batches.entries()) {
         question: observation.question,
         answerShape: observation.answerShape ?? null,
       };
+
+      appendFileSync(
+        resolve(OUT_DIR, `observations-w${info.workerIndex}.jsonl`),
+        JSON.stringify(observation) + '\n',
+        'utf8',
+      );
     }
 
     /**
@@ -1105,11 +1111,6 @@ for (const [index, batch] of batches.entries()) {
      * parse. Losing a run's report to a torn write after an hour of
      * browsing is not a risk worth taking to save a merge step.
      */
-    appendFileSync(
-      resolve(OUT_DIR, `observations-w${info.workerIndex}.jsonl`),
-      observations.map((o) => JSON.stringify(o)).join('\n') + '\n',
-      'utf8',
-    );
 
     /**
      * The batch fails only on crashes, and reports semantic mismatches

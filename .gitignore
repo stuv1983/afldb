@@ -41,6 +41,11 @@ next-env.d.ts
 !/data/records/
 /data/records/*
 !/data/records/first-kick-goal-ids.csv
+# ISSUE-093 Phase-1 canonical reference datasets: curated, reviewable, tracked.
+# Only JSON opts in; raw/large data under data/ (incl. data/sources/) stays ignored.
+!/data/reference/
+/data/reference/*
+!/data/reference/*.json
 *.db
 *.db-journal
 *.db-wal

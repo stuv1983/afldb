@@ -1,0 +1,43 @@
+{
+  "$comment": "AFLDB-ISSUE-093 Phase 2 — fitzRoy acquisition contract. `pinned_version` is the approved fitzRoy version (§5 of AFLDB-ISSUE-093.md); acquire_core.R fails closed on any other installed version unless --allow-version-mismatch is passed, and every probe/manifest records the version actually used. Field `status` values: SUPPORTED, SUPPORTED_WITH_COVERAGE_LIMITATION, WRONG_GRAIN, MISSING, UNVERIFIED. All statuses start UNVERIFIED and are only promoted on probe/acquisition evidence — never on assumption.",
+  "contract_version": 1,
+  "pinned_version": "1.8.0",
+  "pinned_version_evidence": "CRAN fitzRoy index page, checked 2026-08-25 (published 2026-08-23)",
+  "datasets": {
+    "player_stats": {
+      "fitzroy_function": "fetch_player_stats_afltables",
+      "grain": "player-match",
+      "probe_note": "Probe run 1 (2026-08-25) failed with \"object 'dictionary_afltables' not found\" when called via fitzRoy:: without attaching the package; probe run 2 (same day, after library(fitzRoy) attach in acquire_core.R) SUCCEEDED: 9,936 rows for season 2024, 78 columns. Statuses below are from probe run 2 evidence. Historical-era coverage is still to be measured at acquisition — a single 2024 probe cannot prove completeness.",
+      "fields": [
+        { "target": "player identity (stable AFL Tables ID)", "candidate_columns": ["ID"], "status": "SUPPORTED", "note": "Probe run 2: integer ID, 0 NA" },
+        { "target": "player name", "candidate_columns": ["First.name", "Surname", "Player"], "status": "SUPPORTED", "note": "Probe run 2: First.name, Surname and combined Player all present, 0 NA" },
+        { "target": "player DOB", "candidate_columns": ["DOB", "Date.of.birth"], "status": "SUPPORTED_WITH_COVERAGE_LIMITATION", "note": "Probe run 2: DOB present as character, 0 NA in 2024. Format and historical coverage still to verify at acquisition" },
+        { "target": "AFL Tables profile URL", "candidate_columns": ["Player.url", "url"], "status": "SUPPORTED", "note": "Probe run 2: url present, 0 NA" },
+        { "target": "per-match statistics (kicks, marks, handballs, goals, behinds, hitouts, tackles, rebounds, inside 50s, clearances, clangers, frees, contested/uncontested possessions, contested marks, marks inside 50, one percenters, bounces, goal assists, time on ground)", "candidate_columns": ["Kicks", "Marks", "Handballs", "Goals", "Behinds", "Hit.Outs", "Tackles", "Rebounds", "Inside.50s", "Clearances", "Clangers", "Frees.For", "Frees.Against", "Contested.Possessions", "Uncontested.Possessions", "Contested.Marks", "Marks.Inside.50", "One.Percenters", "Bounces", "Goal.Assists", "Time.on.Ground"], "status": "SUPPORTED_WITH_COVERAGE_LIMITATION", "note": "Probe run 2: all 21 columns present (actual name is Time.on.Ground, not Time.on.Ground..; Disposals also present as a derived extra). Era coverage limitations remain per data/reference/stat-availability.json; absent-era values must remain NA/NULL, never coerced to 0" },
+        { "target": "Brownlow match votes (brownlow_round_votes grain)", "candidate_columns": ["Brownlow.Votes"], "status": "SUPPORTED_WITH_COVERAGE_LIMITATION", "note": "Probe run 2: integer per-player-per-match, 414/9,936 NA in 2024 (votes not applicable e.g. finals stay NA, not 0) — correct grain for brownlow_round_votes; season/career totals derivable. Historical coverage (1897–1923/1942–1945 not_applicable, 1935–1983 gap) still to verify at acquisition. fetch_awards_brownlow() (FootyWire) remains the independent cross-check only, not acquired in Phase 2" },
+        { "target": "match linkage (season, round, date, venue, teams)", "candidate_columns": ["Season", "Round", "Date", "Venue", "Home.team", "Away.team", "Playing.for"], "status": "SUPPORTED", "note": "Probe run 2: all present, 0 NA; plus Local.start.time, Home.Away, quarter-by-quarter TEAM scores (HQ1G..AQ4P; ET columns NA when no extra time)" },
+        { "target": "attendance", "candidate_columns": ["Attendance"], "status": "SUPPORTED_WITH_COVERAGE_LIMITATION", "note": "Probe run 2: integer Attendance, 0 NA in 2024, carried at player-match grain (repeated per match row — dedupe by match at import). Absent from fetch_results_afltables entirely. Historical coverage still to verify; absent must remain NA/NULL, not 0" },
+        { "target": "player match period (quarter-by-quarter) stats", "candidate_columns": [], "status": "MISSING", "note": "No fitzRoy AFL Tables interface documents per-quarter per-player stats; recorded MISSING / later investigation per runbook §12.2 — deliberately not investigated in Phase 2" }
+      ]
+    },
+    "player_details": {
+      "fitzroy_function": "fetch_player_details_afltables",
+      "grain": "player",
+      "fields": [
+        { "target": "player identity/name", "candidate_columns": ["Player", "ID"], "status": "SUPPORTED_WITH_COVERAGE_LIMITATION", "note": "Probe 2026-08-25 (16,731 rows): `Player` name present; NO stable AFL Tables ID column in this dataset — identity is name+Team+Cap grain only. Stable-ID reconciliation must come from player_stats" },
+        { "target": "player DOB", "candidate_columns": ["DOB", "Date.of.birth"], "status": "MISSING", "note": "Probe 2026-08-25: no DOB column returned (columns: Player, Team, Cap, #, HT, WT, Games, Wins, Draws, Losses, Goals, Seasons, Debut, Last, date_accessed)" },
+        { "target": "debut/career span", "candidate_columns": ["Debut", "Seasons", "Games"], "status": "SUPPORTED", "note": "Probe 2026-08-25: Debut, Seasons, Games all returned, 0 NA" }
+      ]
+    },
+    "results": {
+      "fitzroy_function": "fetch_results_afltables",
+      "grain": "match",
+      "fields": [
+        { "target": "match identity (season + round + teams + date)", "candidate_columns": ["Season", "Round", "Round.Number", "Date", "Home.Team", "Away.Team", "Game"], "status": "SUPPORTED", "note": "Probe 2026-08-25 (season 2024, 216 rows): all seven candidates returned, 0 NA; Round.Type also present" },
+        { "target": "scores/results (goals/behinds/points per side, margin)", "candidate_columns": ["Home.Goals", "Home.Behinds", "Home.Points", "Away.Goals", "Away.Behinds", "Away.Points", "Margin"], "status": "SUPPORTED", "note": "Probe 2026-08-25: all seven candidates returned, 0 NA" },
+        { "target": "venue", "candidate_columns": ["Venue"], "status": "SUPPORTED", "note": "Probe 2026-08-25: Venue returned, 0 NA" },
+        { "target": "attendance", "candidate_columns": ["Attendance"], "status": "MISSING", "note": "Probe runs 1+2 2026-08-25: fetch_results_afltables returns NO Attendance column. Attendance is instead SUPPORTED (with coverage limitation) on the player_stats dataset — see that entry" }
+      ]
+    }
+  }
+}

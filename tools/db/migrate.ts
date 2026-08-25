@@ -13,12 +13,17 @@
  * SHA-256 checksum. Editing an already-applied migration is refused: schema
  * changes must be made by adding a new migration.
  */
-import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import postgres from 'postgres';
+
+import {
+  computeChecksumRepresentations,
+  matchesStoredChecksum,
+  type MigrationChecksumRepresentations,
+} from './migration-checksum';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -98,7 +103,7 @@ function safeTarget(url: string): string {
   }
 }
 
-type Migration = { name: string; sql: string; checksum: string };
+type Migration = { name: string; sql: string; reps: MigrationChecksumRepresentations };
 
 function loadMigrations(): Migration[] {
   let files: string[];
@@ -112,7 +117,7 @@ function loadMigrations(): Migration[] {
     .sort()
     .map((name) => {
       const sql = readFileSync(join(MIGRATIONS_DIR, name), 'utf8');
-      return { name, sql, checksum: createHash('sha256').update(sql).digest('hex') };
+      return { name, sql, reps: computeChecksumRepresentations(sql) };
     });
 }
 
@@ -141,7 +146,7 @@ async function main() {
 
     // Refuse to run if an already-applied migration has been edited.
     const drifted = migrations.filter(
-      (m) => appliedByName.has(m.name) && appliedByName.get(m.name) !== m.checksum,
+      (m) => appliedByName.has(m.name) && !matchesStoredChecksum(appliedByName.get(m.name)!, m.reps),
     );
     if (drifted.length > 0) {
       console.error('ERROR: these applied migrations have been modified since they ran:');
@@ -174,7 +179,7 @@ async function main() {
           await tx.unsafe(m.sql);
           await tx`
             INSERT INTO afldb_meta.schema_migrations (name, checksum, duration_ms)
-            VALUES (${m.name}, ${m.checksum}, ${Date.now() - started})
+            VALUES (${m.name}, ${m.reps.canonicalLf}, ${Date.now() - started})
           `;
         });
         console.log(`ok (${Date.now() - started} ms)`);

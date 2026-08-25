@@ -60,6 +60,7 @@ import re
 import sys
 import time
 import unicodedata
+from collections import defaultdict
 from datetime import date
 from pathlib import Path
 
@@ -93,10 +94,237 @@ FILE_ORGS = {
     "University_-_All_Time_Player_List.csv": "University",
 }
 
+# AFLDB-ISSUE-093 Sec 4: the canonical source directory for the five
+# club-list CSVs. When --csv-dir is omitted, this directory is used and
+# all five expected files are required (fail closed on any missing file);
+# an explicit --csv-dir keeps the partial/test semantics AFLDB-ISSUE-090's
+# suite relies on unless --require-complete is passed.
+CANONICAL_CSV_DIR = Path(__file__).resolve().parents[2] / "data" / "sources" / "afltables" / "club_lists"
+
+# Every column the importer reads. A file missing any of these is a
+# malformed capture, not a partial source: fail closed before any write.
+REQUIRED_HEADERS = ("Cap", "Player", "DOB", "Games (W-D-L)", "Goals", "Seasons")
+
 # How far apart the list's club games/goals may sit from player_clubs
 # and still count as "the same career". Zero would be ideal, but the
 # list and the stats table were captured at different times.
 FACT_TOLERANCE = 2
+
+# AFLDB-ISSUE-090: shared shape for the versioned dob_conflict payload.
+# The club-list pass owns the 'club_list' key of disputed_by; the register
+# pass (enrich_birth_dates.py) owns 'register'. Neither pass ever writes
+# the other's key, and both read resolved history to avoid refiling an
+# adjudicated finding (D1). Kept duplicated rather than shared via
+# common.py: see AFLDB-ISSUE-090.md Sec 20 for the approved file list.
+CLUB_EXTERNAL_ID_RE = re.compile(r"^club-list:([a-z0-9-]+):")
+
+
+def _club_list_fp(club: str | None, external_id: str | None, asserted, existing) -> tuple:
+    return ("club_list", club, external_id, str(asserted), str(existing))
+
+
+def _register_fp(external_id: str | None, asserted, existing) -> tuple:
+    return ("register", external_id, str(asserted), str(existing))
+
+
+def _expand_resolved_fingerprints(
+    rows,
+) -> tuple[dict[int, set[tuple]], dict[int, set[tuple]]]:
+    """Resolved dob_conflict rows -> per-player fingerprint sets (D1, Sec 6.2).
+
+    Handles all three resolved-history shapes: legacy register (A), legacy
+    club-list (B, lossless), and v2 aggregate (C). Returns (full, where a
+    shape-A row cannot contribute because it has no external_id -- the
+    documented reader asymmetry that ignores external_id on both sides
+    when comparing against a shape-A row.
+    """
+    full: dict[int, set[tuple]] = defaultdict(set)
+    register_partial: dict[int, set[tuple]] = defaultdict(set)
+    for entity_id, details in rows:
+        if not isinstance(details, dict):
+            continue
+        disputed_by = details.get("disputed_by")
+        if isinstance(disputed_by, dict):
+            for pass_key, assertions in disputed_by.items():
+                if not isinstance(assertions, list):
+                    continue
+                for a in assertions:
+                    if not isinstance(a, dict):
+                        continue
+                    if "asserted" not in a or "existing_at_detection" not in a:
+                        continue
+                    if pass_key == "club_list":
+                        full[entity_id].add(_club_list_fp(
+                            a.get("club"), a.get("external_id"),
+                            a["asserted"], a["existing_at_detection"]))
+                    elif pass_key == "register":
+                        full[entity_id].add(_register_fp(
+                            a.get("external_id"), a["asserted"], a["existing_at_detection"]))
+        elif "club_list" in details:
+            ext = details.get("external_id")
+            match = CLUB_EXTERNAL_ID_RE.match(ext or "")
+            club = match.group(1) if match else None
+            full[entity_id].add(_club_list_fp(club, ext, details.get("club_list"), details.get("existing")))
+        elif "register" in details:
+            register_partial[entity_id].add((str(details.get("register")), str(details.get("existing"))))
+    return full, register_partial
+
+
+def _assertion_sort_key(a: dict) -> tuple:
+    return (a.get("club") or "", a["external_id"], a["asserted"])
+
+
+def _build_v2_payload(disputed_by: dict) -> str:
+    """Deterministic JSON: sorted assertion arrays, sorted keys (Sec 5.1)."""
+    cleaned = {}
+    for pass_key in ("club_list", "register"):
+        assertions = disputed_by.get(pass_key) or []
+        if assertions:
+            cleaned[pass_key] = sorted(assertions, key=_assertion_sort_key)
+    payload = {"version": 2, "disputed_by": cleaned, "resolution": "manual review required"}
+    return json.dumps(payload, sort_keys=True)
+
+
+def _describe_dob_conflict(existing_dob, disputed_by: dict) -> str:
+    parts = []
+    for a in disputed_by.get("club_list") or []:
+        parts.append(f"the {a['club']} all-time club list ({a['external_id']}) reports {a['asserted']}")
+    for a in disputed_by.get("register") or []:
+        parts.append(f"the AFL Tables club register ({a['external_id']}) reports {a['asserted']}")
+    existing_text = str(existing_dob) if existing_dob is not None else "no recorded date"
+    return (
+        f"Existing date of birth {existing_text} disagrees with "
+        + "; ".join(parts)
+        + ". The existing value has been retained pending adjudication."
+    )
+
+
+def reconcile_club_list_conflicts(
+    pg, processed_file_keys: set[str],
+    source_conflicts: list[tuple[int, date, date, str]],
+    agreements: list[tuple[int, date, str]],
+    to_fill: list[tuple[int, date, str]],
+    rejections: list[tuple[str, str, dict]],
+) -> set[int]:
+    """Sec 10 reconciliation, scoped to this run's processed club files.
+
+    Runs inside the caller's already-open transaction (import_batch). Returns
+    the set of player ids whose dob_conflict state changed, for the D5
+    dob_disputed recompute -- never a global sweep (Sec 13).
+    """
+    def file_key_of(ext: str) -> str | None:
+        parts = ext.split(":", 2)
+        return parts[1] if len(parts) > 1 else None
+
+    conflicts_by_file: dict[str, set[str]] = defaultdict(set)
+    agreements_by_file: dict[str, set[str]] = defaultdict(set)
+    fills_by_file: dict[str, set[str]] = defaultdict(set)
+    rejected_by_file: dict[str, set[str]] = defaultdict(set)
+    for pid, existing, asserted, ext in source_conflicts:
+        conflicts_by_file[file_key_of(ext)].add(ext)
+    for pid, dob, ext in agreements:
+        agreements_by_file[file_key_of(ext)].add(ext)
+    for pid, dob, ext in to_fill:
+        fills_by_file[file_key_of(ext)].add(ext)
+    for ext, reason, payload in rejections:
+        rejected_by_file[file_key_of(ext)].add(ext)
+
+    with pg.cursor() as cur:
+        cur.execute(
+            """SELECT entity_id, details FROM data_issues
+                WHERE entity_type = 'player' AND issue_type = 'dob_conflict'
+                  AND resolved_at IS NOT NULL"""
+        )
+        resolved_rows = cur.fetchall()
+    r_full, _r_register_partial = _expand_resolved_fingerprints(resolved_rows)
+
+    # D1: an identical previously-adjudicated assertion is not refiled.
+    mine: dict[int, list[dict]] = defaultdict(list)
+    for pid, existing, asserted, ext in source_conflicts:
+        club = file_key_of(ext)
+        fp = _club_list_fp(club, ext, asserted, existing)
+        if fp in r_full.get(pid, set()):
+            continue
+        mine[pid].append({
+            "source": SOURCE_KEY, "club": club, "external_id": ext,
+            "asserted": str(asserted), "existing_at_detection": str(existing),
+        })
+
+    with pg.cursor() as cur:
+        cur.execute(
+            """SELECT id, entity_id, details FROM data_issues
+                WHERE entity_type = 'player' AND issue_type = 'dob_conflict'
+                  AND resolved_at IS NULL
+                FOR UPDATE"""
+        )
+        existing_rows = cur.fetchall()
+    by_player = {entity_id: (issue_id, details) for issue_id, entity_id, details in existing_rows}
+
+    # Owned population: fresh evidence this run, plus any existing row
+    # carrying a club_list assertion under a file this run processed.
+    touched: set[int] = set(mine)
+    for entity_id, (_issue_id, details) in by_player.items():
+        for a in (details.get("disputed_by") or {}).get("club_list") or []:
+            if a.get("club") in processed_file_keys:
+                touched.add(entity_id)
+                break
+    if not touched:
+        return set()
+
+    with pg.cursor() as cur:
+        cur.execute("SELECT id, dob FROM players WHERE id = ANY(%s)", (list(touched),))
+        current_dob = {pid: dob for pid, dob in cur.fetchall()}
+
+    affected: set[int] = set()
+    with pg.cursor() as cur:
+        for entity_id in touched:
+            issue_id, details = by_player.get(entity_id, (None, None))
+            disputed_by = (details or {}).get("disputed_by") or {}
+            register_assertions = disputed_by.get("register") or []
+
+            new_club_list = []
+            for a in disputed_by.get("club_list") or []:
+                club = a.get("club")
+                ext = a.get("external_id")
+                if club not in processed_file_keys:
+                    new_club_list.append(a)                       # unprocessed file: no evidence
+                elif ext in conflicts_by_file.get(club, set()):
+                    continue                                      # superseded by a fresh 'mine' entry
+                elif ext in rejected_by_file.get(club, set()):
+                    new_club_list.append(a)                       # present but unmatchable: retain
+                else:
+                    continue                                      # agreed, filled, or vanished: delete
+            new_club_list.extend(mine.get(entity_id, []))
+
+            new_disputed_by = {}
+            if new_club_list:
+                new_disputed_by["club_list"] = new_club_list
+            if register_assertions:
+                new_disputed_by["register"] = register_assertions
+
+            if not new_disputed_by:
+                if issue_id is not None:
+                    cur.execute("DELETE FROM data_issues WHERE id = %s", (issue_id,))
+                affected.add(entity_id)
+                continue
+
+            description = _describe_dob_conflict(current_dob.get(entity_id), new_disputed_by)
+            payload = _build_v2_payload(new_disputed_by)
+            if issue_id is not None:
+                cur.execute(
+                    "UPDATE data_issues SET details = %s, description = %s WHERE id = %s",
+                    (payload, description, issue_id),
+                )
+            else:
+                cur.execute(
+                    """INSERT INTO data_issues
+                         (entity_type, entity_id, issue_type, severity, description, details)
+                       VALUES ('player', %s, 'dob_conflict', 'warning', %s, %s)""",
+                    (entity_id, description, payload),
+                )
+            affected.add(entity_id)
+
+    return affected
 
 
 def normalise_name(text: str) -> str:
@@ -160,12 +388,45 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Recover player birth dates from all-time club player list CSVs."
     )
-    parser.add_argument("--csv-dir", required=True, type=Path,
-                        help="Directory holding the *_All_Time_Player_List.csv files.")
+    parser.add_argument("--csv-dir", type=Path, default=None,
+                        help="Directory holding the *_All_Time_Player_List.csv files "
+                             f"(default: the canonical {CANONICAL_CSV_DIR}, which "
+                             "requires all five expected files).")
+    parser.add_argument("--require-complete", action="store_true",
+                        help="Fail if any of the five expected club-list files is "
+                             "missing (always on for the canonical directory).")
     parser.add_argument("--dry-run", action="store_true",
                         help="Report what would change without writing.")
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args()
+
+    # AFLDB-ISSUE-093 Sec 13.4: canonical mode is complete-or-refuse; no
+    # file is ever silently substituted or downloaded. Source validation
+    # runs before any environment/database access so a bad source set can
+    # never reach a write path.
+    csv_dir: Path = args.csv_dir if args.csv_dir is not None else CANONICAL_CSV_DIR
+    require_complete = args.require_complete or args.csv_dir is None
+
+    if not csv_dir.is_dir():
+        sys.exit(f"ERROR: club-list source directory not found: {csv_dir}")
+    files = [p for p in sorted(csv_dir.iterdir()) if p.name in FILE_ORGS]
+    missing = sorted(set(FILE_ORGS) - {p.name for p in files})
+    if missing and require_complete:
+        sys.exit(
+            "ERROR: expected club-list files missing from "
+            f"{csv_dir}: {', '.join(missing)}"
+        )
+    if not files:
+        sys.exit("ERROR: no recognised club list CSVs in that directory.")
+    for path in files:
+        with path.open(newline="", encoding="utf-8-sig") as fh:
+            headers = csv.DictReader(fh).fieldnames or []
+        bad = [h for h in REQUIRED_HEADERS if h not in headers]
+        if bad:
+            sys.exit(
+                f"ERROR: {path.name} is missing required column(s): "
+                f"{', '.join(bad)}"
+            )
 
     load_env()
     rep = Reporter(verbose=not args.quiet)
@@ -173,17 +434,13 @@ def main() -> int:
 
     print("AFLDB birth-date enrichment (all-time club lists)")
     print(f"  target: {safe_dsn(dsn)}")
-    print(f"  csvs:   {args.csv_dir}")
+    print(f"  csvs:   {csv_dir}")
     if args.dry_run:
         print("  DRY RUN - nothing will be written")
     print()
 
-    files = [p for p in sorted(args.csv_dir.iterdir()) if p.name in FILE_ORGS]
-    missing = sorted(set(FILE_ORGS) - {p.name for p in files})
     if missing:
         rep.warn(f"expected files not found: {', '.join(missing)}")
-    if not files:
-        sys.exit("ERROR: no recognised club list CSVs in that directory.")
 
     pg = connect_pg(dsn)
     started = time.time()
@@ -201,7 +458,8 @@ def main() -> int:
     evidence_rows: list[tuple[int, date, str]] = []
     source_conflicts: list[tuple[int, date, date, str]] = []  # pid, existing, asserted, ext
     rejections: list[tuple[str, str, dict]] = []  # external_id, reason, payload
-    agreements = 0
+    agreements: list[tuple[int, date, str]] = []  # pid, dob, external_id
+    processed_file_keys: set[str] = set()  # AFLDB-ISSUE-090 Sec 7 owned population
     rows_read = 0
 
     for path in files:
@@ -238,6 +496,7 @@ def main() -> int:
                     by_name.setdefault(name, []).append(row)
 
         file_key = org_name.lower().replace(" ", "-")
+        processed_file_keys.add(file_key)
         file_filled = 0
         file_rows = 0
 
@@ -330,7 +589,7 @@ def main() -> int:
                     to_fill.append((pid, dob, external_id))
                     file_filled += 1
                 elif existing == dob:
-                    agreements += 1
+                    agreements.append((pid, dob, external_id))
                 else:
                     source_conflicts.append((pid, existing, dob, external_id))
 
@@ -338,7 +597,7 @@ def main() -> int:
 
     rep.result("rows read", rows_read)
     rep.result("dates to fill", len(to_fill))
-    rep.result("agreements with existing data", agreements)
+    rep.result("agreements with existing data", len(agreements))
     rep.result("rows rejected", len(rejections))
     if source_conflicts:
         rep.warn(f"{len(source_conflicts)} players conflict with an existing AFLDB date")
@@ -402,34 +661,27 @@ def main() -> int:
             )
             batch.records_updated = cur.rowcount if cur.rowcount > 0 else len(to_fill)
 
-            # 3. Flag disagreements rather than resolving them -- same
-            #    shape as enrich_birth_dates.py, distinct issue payload.
-            if source_conflicts:
-                cur.execute(
-                    "UPDATE players SET dob_disputed = true WHERE id = ANY(%s)",
-                    ([pid for pid, _, _, _ in source_conflicts],),
-                )
-            cur.executemany(
-                """INSERT INTO data_issues
-                     (entity_type, entity_id, issue_type, severity, description, details)
-                   VALUES ('player', %s, 'dob_conflict', 'warning', %s, %s)""",
-                [
-                    (
-                        pid,
-                        f"Existing date of birth {existing} disagrees with the all-time "
-                        f"club player list, which reports {asserted}. The existing value "
-                        f"has been retained pending adjudication.",
-                        json.dumps({
-                            "existing": str(existing),
-                            "club_list": str(asserted),
-                            "external_id": ext,
-                            "source": SOURCE_KEY,
-                            "resolution": "manual review required",
-                        }),
-                    )
-                    for pid, existing, asserted, ext in source_conflicts
-                ],
+            # 3. Reconcile dob_conflict against this run's processed club
+            #    files, scoped and idempotent (AFLDB-ISSUE-090 Sec 7/10).
+            #    Replaces the prior unconditional INSERT, which stacked a
+            #    duplicate row on every rerun.
+            affected = reconcile_club_list_conflicts(
+                pg, processed_file_keys, source_conflicts, agreements, to_fill, rejections,
             )
+
+            # D5: recompute dob_disputed only for players this run's
+            # reconciliation actually touched -- never a global sweep.
+            if affected:
+                cur.execute(
+                    """UPDATE players p
+                          SET dob_disputed = EXISTS (
+                                SELECT 1 FROM data_issues d
+                                 WHERE d.entity_type = 'player' AND d.entity_id = p.id
+                                   AND d.issue_type IN ('dob_conflict', 'dob_internal_conflict')
+                                   AND d.resolved_at IS NULL)
+                        WHERE p.id = ANY(%s)""",
+                    (list(affected),),
+                )
 
         pg.commit()
 

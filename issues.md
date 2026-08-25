@@ -7,26 +7,23 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 16
+**Open issues:** 13
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
 | `AFLDB-ISSUE-040` | Low | Tooling | The lint script invokes deprecated `next lint` without a checked-in ESLint setup and becomes interactive. | Add a reviewed ESLint flat configuration and compatible dependencies, then replace `next lint` with the ESLint CLI. |
-| `AFLDB-ISSUE-054` | Low | Tests | Four Under-22 importer contract tests fail only on a Windows checkout: `between()` matches `\n\n\n` against a CRLF working copy. The same tests pass on Linux. | Make the source-contract `between()` helper newline-agnostic (normalise CRLF on read) so the suite is not platform-dependent. |
 | `AFLDB-ISSUE-059` | Low | Search | Grouped `Qualifying matches` counts have no safe drill-down to the exact matching fixtures. | Extend Match Search or add a dedicated NL drill-down route that can faithfully replay the grouped row predicates. |
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
 | `AFLDB-ISSUE-071` | Low | Audit | Parser-v25 V2 residual failures still mix corpus/oracle debt with possible smaller parser follow-up. | Re-baseline V2 generator/oracles first; promote a product defect only after the oracle layer is reconciled. |
-| `AFLDB-ISSUE-072` | Low | Tests | `tests/site-settings.test.ts` default-shape expectation predates the `frontendTheme` settings added in `d5243ba`; ISSUE-087 R4 reproduction shows the `pageIntros` defaults are missing from the expected object too. | Extend the expected defaults object (including `pageIntros`) to the current `parseSiteSettings` output and re-run the suite. |
-| `AFLDB-ISSUE-073` | Medium | Database | Four pre-066 foreign keys (`data_edits.admin_user_id`, `player_link_resolutions.admin_user_id`/`player_id`, `player_link_suggestions.resolved_by`) have no supporting index; `tests/integration/fk-indexes.test.ts` fails. | Add the partial indexes in a new migration (the 041 shape) or justify `DELETE_FREE_PARENTS` entries. |
-| `AFLDB-ISSUE-074` | Low | Tests | `tests/integration/email-intake.test.ts` assumes the first `auth_users` row is its fixture admin and fails against real dev-host admin data; widened 2026-08-24 — fixed payload bytes, an unordered `LIMIT 1` pick, persistent auth-DB state and global dedup make the test history-dependent. | Make the test create/select its own fixture admin deterministically, use per-run-unique payloads, and clean up its staged rows. |
 | `AFLDB-ISSUE-076` | Medium | Performance | Grid Solver combinations using `won_final_at_venue` can exceed PostgreSQL's 5-second statement timeout and crash the page. | Capture and compare the generated SQL/EXPLAIN plan against `played_at_venue`, then optimise the `won_final_at_venue` query shape without raising the application timeout. |
 | `AFLDB-ISSUE-077` | Medium | UI/Settings | The super-admin-selected frontend theme is not stable within a browsing session; different pages can render different themes as the user navigates. | Trace every theme source (database setting, server render, cookie/local storage and client hydration), establish one authoritative theme value per request/session, and add navigation regression coverage. |
-| `AFLDB-ISSUE-081` | Low | Tests | The honours reload integration suite mutates rows that `release-gates.test.ts` counts, with no lock between the two files; latent, not yet observed failing. | Give it the same `tests/integration/draft-lock.ts` treatment, or prove the two files never overlap. |
 | `AFLDB-ISSUE-083` | Medium | Tests / Database privileges | Every database-backed importer test substitutes the owner DSN for `AFLDB_IMPORT_DATABASE_URL`, so a privilege the importer needs but does not hold is invisible; `AFLDB-ISSUE-078` shipped exactly that defect. | Add a restricted test DSN plus a shared helper that runs the importer as `afldb_import` while fixtures stay on the owner handle, and prove it on the first-kick-goal loader first. |
 | `AFLDB-ISSUE-085` | Low | Data integrity / Import | `import_captaincies` reconciles the whole `captaincies` table with no ownership predicate — the ISSUE-080 defect class, latent because the importer is today the table's only writer. | Scope it to its own `source_id` by construction (the `reload_keyed` conjunction now exists) and decide the `captaincies_natural_uq` collision policy before a second writer ever exists. |
 | `AFLDB-ISSUE-086` | Needs triage | Admin / Data integrity | Data-editor edits to source-owned rows can be silently reverted by the owning source's next reload (durability/overwrite, not the ISSUE-080 deletion class); only `players`/`matches`/`draft_picks` are live editable entities today. | Answer the four triage questions in the entry (UI promise, affected fields/entities, intended durability, silence of reversion), then set severity on that evidence. |
 | `AFLDB-ISSUE-088` | Low | Tests / Tooling | The NL-UI stress harness has no `actionTimeout`/`globalTimeout` policy and retains latent unbounded auto-wait sites (`nl-stress.spec.ts` `:554`, `:577`, `:580`, `:945`); the `:835` instance stalled successor-3's D4 for 30 minutes per parked batch before its successor-4 repair. | After ISSUE-087 closes, derive timeout values from the successor-4 D4 `elapsedMs`/`timingSummary` distribution, then add the config timeouts and guard the latent sites outside any release gate. |
-| `AFLDB-ISSUE-089` | Low | Tests / Tooling | The NL-UI stress harness persists a batch's observations in a single post-loop `appendFileSync`, so a parked or timed-out batch loses ~100 observations whose telemetry rows exist — proven by successor-3 D4 partial batches 003/009. | Flush each observation as it is produced (or write incrementally per question), keeping report semantics unchanged. |
+| `AFLDB-ISSUE-090` | Medium | Data integrity / Import | The two DOB enrichment passes have contradictory `dob_conflict` lifecycles: the club-list pass stacks a duplicate unresolved row on every rerun (proven — entity 4347 holds three copies of one logical conflict), and the register pass deletes unresolved DOB conflicts it does not own. Both use `SOURCE_KEY='afltables'`, so `details->>'source'` cannot express pass ownership. | Migration 072 APPLIED to `afldb_test`; the fixed reconciliation is validated (23/23). `release-gates.test.ts` validation is HALTED and blocked by `AFLDB-ISSUE-092` (an unrelated importer defect this issue's own regression suite exposed, emptying `afldb_test.external_identities`; migration 072 is conclusively not implicated). Resume `release-gates.test.ts`/`privileges.test.ts` only after `AFLDB-ISSUE-092` is implemented and recovery is validated. |
+| `AFLDB-ISSUE-092` | Medium | Data integrity / Tooling safety | `enrich_birth_dates.py`'s `external_identities` reconciliation deletes any row absent from the run's asserted population with no proof that population is complete. `dob-enrichment-issues.test.ts` test 5 ran the real importer against shared `afldb_test` with a tiny synthetic register, wiping the entire real 12,472-row AFL-Tables profile-identity population. | Planning complete in `AFLDB-ISSUE-092.md`, not yet approved/implemented: (A) fail-closed population-sanity gate in the importer for any caller, with an explicit override flag; (B) fixture-scoped `source_id` so the test's real register-pass invocation can never intersect real data; then recover `afldb_test.external_identities` via the fixed importer and the complete legacy source. No schema change. Blocks `AFLDB-ISSUE-090`. |
+| `AFLDB-ISSUE-093` | Medium | Tooling / Data integrity / Import architecture | AFLDB has no deterministic source-to-PostgreSQL rebuild path of its own; the historical/core rebuild currently routes through one hand-built intermediate SQLite aggregation (`AFLDB_LEGACY_SQLITE`) with no provenance or versioning. | Phases 1–3 COMPLETE/implemented (2026-08-25): reference datasets + loader (12/12), fitzRoy 1.8.0 acquisition + `trial-2024` manifest (13/13), club-list wiring + ISSUE-092 gate (static 33/33). Phase 4a IMPLEMENTED (2026-08-25, §18): `tools/migration/import_fitzroy_core.py` — canonical snapshot → core tables (players/venues/matches/stats/Brownlow round votes), zero legacy dependency. Next: run `tests/fitzroy-core-import.test.ts` (non-DB gate), then `--validate-only` on `trial-2024`; DraftGuru follows. |
 
 ---
 
@@ -2151,11 +2148,11 @@ Run the lineage test and all six required streak queries through development `/s
 
 ## AFLDB-ISSUE-054 — Under-22 importer contract tests cannot find their source boundaries
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Low
 - **Area:** Tests
 - **Found:** 2026-08-20
-- **Resolved:** N/A
+- **Resolved:** 2026-08-25
 - **Files:** `tests/under-22-importer.test.ts`, `tools/migration/import_awards.py`
 
 ### Symptom
@@ -2191,9 +2188,7 @@ Severity lowered from Medium to Low: this never affected Linux, which is the
 supported runtime and the release-gate environment.
 
 ### Fix
-Not yet fixed. The repair is in the test helper, not the importer: `between()`
-(and the files it reads) should normalise `\r\n` to `\n` on read so the suite is
-platform-independent.
+Normalised CRLF to LF at the test source-read boundary in `tests/under-22-importer.test.ts`, leaving the importer and behavioural assertions unchanged.
 
 ### Validation
 With integration suites and this known failing file excluded, all 983 remaining safe non-integration assertions pass.
@@ -2209,6 +2204,8 @@ tests, not 7 — the ISSUE-087 contract's §4 "Linux 7/7 green" expected-signatu
 wording predates the ISSUE-044-added test. Observed green on Linux at every
 successor candidate's R4; the Windows failure signature (4 failures, CRLF
 `between()` cause) is unchanged.
+
+2026-08-25 focused Windows run: `npm run test -- tests/under-22-importer.test.ts` — 8/8 tests passed.
 
 ### Follow-up
 Normalise line endings when the source-contract tests read a file — for example
@@ -3297,11 +3294,11 @@ Review and re-baseline the V2 generator/oracles for season-range sum expectation
 
 ## AFLDB-ISSUE-072 — site-settings default-shape test is stale after frontendTheme
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Low
 - **Area:** Tests
 - **Found:** 2026-08-22
-- **Resolved:** N/A
+- **Resolved:** 2026-08-25
 - **Files:** `tests/site-settings.test.ts`, `src/db/queries/site-settings.ts`
 
 ### Symptom
@@ -3330,25 +3327,22 @@ differences `frontendTheme: "classic"` **plus** the `pageIntros` defaults
 Test expectation.
 
 ### Root cause
-Not yet confirmed beyond the stale expectation; likely the d5243ba settings additions were not mirrored into the default-shape test.
+The `d5243ba` settings additions (`frontendTheme` and `pageIntros`) were not mirrored into the default-shape test expectation.
 
 ### Fix
-Not yet fixed.
+The stale test expectation was updated to include the current `pageIntros` and `frontendTheme` defaults using the canonical `DEFAULT_PAGE_INTROS` and `DEFAULT_SITE_THEME` exports.
 
 ### Validation
-Not yet run.
-
-### Follow-up
-Extend the expected defaults object in `tests/site-settings.test.ts` to the current `parseSiteSettings` output and re-run the suite.
+`npx vitest run tests/site-settings.test.ts` — 31/31 tests passed.
 
 ## AFLDB-ISSUE-073 — Four audit/link foreign keys have no supporting index
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Database
 - **Found:** 2026-08-22
-- **Resolved:** N/A
-- **Files:** `src/db/migrations/056_player_link_review.sql`, `src/db/migrations/057_data_edits.sql`, `tests/integration/fk-indexes.test.ts`
+- **Resolved:** 2026-08-25
+- **Files:** `src/db/migrations/056_player_link_review.sql`, `src/db/migrations/057_data_edits.sql`, `src/db/migrations/071_audit_link_fk_indexes.sql`, `tests/integration/fk-indexes.test.ts`
 
 ### Symptom
 `tests/integration/fk-indexes.test.ts` › `indexes every foreign key whose parent can be deleted from` fails, listing: `data_edits(admin_user_id) -> auth_users`, `player_link_resolutions(admin_user_id) -> auth_users`, `player_link_resolutions(player_id) -> players`, `player_link_suggestions(resolved_by) -> auth_users`.
@@ -3369,24 +3363,34 @@ Reproduced identically 2026-08-22 on the untouched dev checkout at `d5243ba` (pr
 Schema (missing indexes) — migrations 056/057 declared the FKs without the migration-041-shape partial indexes.
 
 ### Root cause
-Not yet confirmed beyond the missing indexes themselves.
+Migrations 056 (`player_link_suggestions`, `player_link_resolutions`) and 057 (`data_edits`) each introduced foreign key columns but did not add the supporting indexes that migration 041 established as the convention. The FK-index integration test (`fk-indexes.test.ts`) only began catching these once `afldb_test` was migrated past 056, so the gap had been latent since those migrations were first applied.
 
 ### Fix
-Not yet fixed.
+Added `src/db/migrations/071_audit_link_fk_indexes.sql` with four `CREATE INDEX IF NOT EXISTS` statements following the migration-041/050 convention exactly:
+
+- `ix_data_edits_admin_user_id` — `ON data_edits (admin_user_id)` unconditional; column is `NOT NULL`.
+- `ix_plr_admin_user_id` — `ON player_link_resolutions (admin_user_id)` unconditional; column is `NOT NULL`.
+- `ix_plr_player_id` — `ON player_link_resolutions (player_id) WHERE player_id IS NOT NULL`; column is nullable (NULL when `action = 'confirmed_unlinked'`, per `plr_action_player_ck`).
+- `ix_pls_resolved_by` — `ON player_link_suggestions (resolved_by) WHERE resolved_by IS NOT NULL`; column is nullable (NULL while suggestion is `open`).
+
+No `DELETE_FREE_PARENTS` exemptions were added — `auth_users` is explicitly deletable (the test argues this directly) and `players` reloads via `TRUNCATE … CASCADE`. Migrations 056 and 057 were not modified retrospectively.
 
 ### Validation
-Not yet run.
+**Linux/PostgreSQL run, 2026-08-25 (dev host, against `afldb_test`):**
+- `npm run db:migrate:test`: 71 migration file(s), 70 already applied; applied `071_audit_link_fk_indexes.sql` cleanly (27 ms).
+- `npx vitest run tests/integration/fk-indexes.test.ts`: 2/2 passed — `indexes every foreign key whose parent can be deleted from` ✓ and `keeps the exemption list free of entries that no longer apply` ✓.
 
 ### Follow-up
-Add the four partial indexes in a new migration (the `CREATE INDEX ... WHERE col IS NOT NULL` shape from migration 041), or add `auth_users`/`players` justifications to `DELETE_FREE_PARENTS` — note `fk-indexes.test.ts` explicitly argues `auth_users` is deletable, so indexes are the likely answer.
+None. The FK-index gate is green; no related unindexed FKs were identified.
+
 
 ## AFLDB-ISSUE-074 — email-intake integration test assumes a fixture admin ordering
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Low
 - **Area:** Tests
 - **Found:** 2026-08-22
-- **Resolved:** N/A
+- **Resolved:** 2026-08-25
 - **Files:** `tests/integration/email-intake.test.ts`
 
 ### Symptom
@@ -3416,16 +3420,44 @@ performed in `afldb_dev` during successor-1 validation.
 Test fixture assumption.
 
 ### Root cause
-Not yet confirmed in detail.
+Four independent mechanisms combined to make the test history-dependent:
+
+1. **Wrong database:** `AFLDB_AUTH_DATABASE_URL` was not redirected to `AFLDB_TEST_DATABASE_URL` by the test. On the dev host it pointed `authSql` at `afldb_dev`, exposing persistent real/shared auth state — real admin rows were visible and staged rows were left behind in the development database rather than the test database.
+2. **Arbitrary admin selection:** the test selected an admin with `WHERE role = 'super_admin' AND disabled_at IS NULL LIMIT 1` — no ordering, so the planner chose whichever row it found first. On a dev host with real admins that row was not the fixture.
+3. **Fixed payload bytes:** the CSV content was a compile-time constant, so its `sha256` never changed between runs. `stageSubmission` deduplicates on `(dataset, content_sha256)` for submissions in `staged`/`validated` state. Any prior run that left such a row (because cleanup was absent) would cause subsequent runs to return the old submission ID via the duplicate branch instead of staging afresh.
+4. **No cleanup:** the test had no cleanup implementation; staged `data_submissions` rows therefore persisted between runs. The repair introduced a test-local owner-level connection (`ownerSql`) that deletes only the exact submission IDs created by the current run.
 
 ### Fix
-Not yet fixed.
+`tests/integration/email-intake.test.ts` only — no production files changed.
+
+- **Database routing:** `process.env.AFLDB_AUTH_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL` set unconditionally at module top-level, before any query. Safe because `authSql` is a Proxy whose `createClient()` reads the env var lazily on the first query — not at ESM import time.
+- **Durable fixture admin:** `beforeAll` provisions the row `email-intake-test-fixture@afldb.test` (role `super_admin`) using `INSERT … ON CONFLICT (email) DO NOTHING` (the `email UNIQUE` constraint from migration 023 makes this concurrency-safe), then SELECTs it back with `AND role = 'super_admin' AND disabled_at IS NULL`. If the row exists but is not an enabled super-admin, `beforeAll` throws with an actionable message. The fixture is intentionally **retained** in the `_test` database between runs; deleting it in `afterAll` would race with concurrent invocations.
+- **Per-run unique payloads:** `crypto.randomUUID()` is embedded in the CSV player-name field for each test that stages a submission. This guarantees a unique `content_sha256` on every run, preventing the global deduplication check from returning a prior run's submission. The resend test deliberately posts the **same** generated payload twice to keep the idempotency assertion real.
+- **Exact-ID cleanup:** a module-level `runSubmissionIds: Set<number>` collects the `data_submissions.id` of every row created during the current run, registered immediately after each `POST` response and before any assertion that could throw. `afterAll` deletes only those exact IDs via a short-lived owner-level pool (`ownerSql` on `AFLDB_TEST_DATABASE_URL`), relying on the `ON DELETE CASCADE` to remove `data_submission_rows` automatically. The predicate is `id = ANY(ids::int[])` — never `uploaded_by` alone — so concurrent runs and prior-run residue are unaffected.
 
 ### Validation
-Not yet run.
+Two consecutive focused runs on the Linux dev host (`streamanator`) against `afldb_test`, with no manual cleanup between runs:
+
+**Run 1:**
+```
+Test Files  1 passed (1)
+Tests       9 passed (9)
+Skipped     0
+```
+
+**Run 2:**
+```
+Test Files  1 passed (1)
+Tests       9 passed (9)
+Skipped     0
+```
+
+Both runs exercised: unknown/disabled-admin rejection; real-admin CSV staging and validation end to end; identical resend/global deduplication behaviour; malformed, invalid-base64, and oversized-payload guards. The second consecutive clean run confirms the history-dependence defect is resolved.
+
+Command: `npx vitest run tests/integration/email-intake.test.ts`
 
 ### Follow-up
-Create (or select by exact fixture email) a dedicated test admin inside the test, and clean up the staged submission row.
+None. No production files changed; no follow-up defect identified.
 
 ## AFLDB-ISSUE-076 — Grid Solver `won_final_at_venue` queries can hit statement timeout
 
@@ -4865,11 +4897,11 @@ intended behaviour.
 
 ## AFLDB-ISSUE-081 — Honours reload suite races the release gates over shared rows
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Low
 - **Area:** Tests
 - **Found:** 2026-08-22
-- **Resolved:** N/A
+- **Resolved:** 2026-08-25
 - **Files:** `tests/integration/awards-reload-links.test.ts`,
   `tests/integration/release-gates.test.ts`, `tests/integration/draft-lock.ts`
 
@@ -4889,7 +4921,7 @@ A release gate counts a quiescent dataset, or is serialised against whatever is
 mutating it.
 
 ### Actual
-Nothing serialises the two files. The honours case has not bitten, most likely
+Nothing serialised the two files. The honours case had not bitten, most likely
 because its per-test `restore` callbacks put rows back sooner than the draft
 suite could, and because the gate's honours assertions overlap its fixtures less
 directly.
@@ -4898,27 +4930,21 @@ directly.
 Test harness.
 
 ### Root cause
-Not confirmed. Presumed identical to the draft case: file-level parallelism over
-shared database fixtures with no mutex.
+File-level parallelism over shared database fixtures with no mutex.
 
 ### Fix
-Not yet fixed.
+The existing advisory-lock helper in `draft-lock.ts` was extended with a separate `HONOURS_RELOAD_LOCK`. `awards-reload-links.test.ts` and `release-gates.test.ts` now serialise only over the shared honours population.
+
+**DSN hardening:** The lock helpers were hardened to receive the exact module-captured guarded test DSN rather than consulting mutable environment state. Both integration files capture `process.env.AFLDB_TEST_DATABASE_URL` during module evaluation and pass it down, guaranteeing the lock hook respects the same configuration state that determined the file's activation.
 
 ### Validation
-Not yet performed.
+A paired Linux validation and standalone baseline comparison were run.
+The paired run (`awards-reload-links.test.ts` + `release-gates.test.ts`) executed with 52 passed, 12 failed assertions in the release gates, and no advisory-lock timeouts or deadlocks.
+The standalone run of `release-gates.test.ts` identically reproduced the 52 passed, 12 failed assertions.
+Therefore, the paired run introduced **zero** additional release-gate failures. The 12 baseline failures are unrelated existing snapshot/data drift outside AFLDB-ISSUE-081, not successful assertions and not ISSUE-081 defects. No release-gate expected values were altered.
 
 ### Follow-up
-Either give the honours pair the same advisory-lock treatment as
-`tests/integration/draft-lock.ts`, or establish that the gate's honours
-assertions cannot overlap that suite's fixtures and record why. Do not serialise
-the whole test run: file parallelism is worth keeping.
-
-**Widened by `AFLDB-ISSUE-080` (2026-08-23):** its resolution added fixtures to
-`hall_of_fame`, `honour_team_members`, `award_winners` and `award_nominations`
-in `awards-reload-links.test.ts`, all of which `release-gates.test.ts` counts.
-The combined run of those two files is deliberately deferred to this issue
-(ISSUE-080 was validated with the suite run isolated, which removes the race
-entirely); once this issue lands its lock, run them together.
+Ensure any newly added shared integration fixtures consider cross-file locks if asserted by the release gates.
 
 ## AFLDB-ISSUE-082 — `confirmUnlinked` can record a decision contradicting an applied link
 
@@ -5742,12 +5768,12 @@ as an ordinary reviewed harness change.
 
 ## AFLDB-ISSUE-089 — NL-UI stress harness loses a batch's observations when the batch does not complete
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Low
 - **Area:** Tests / Tooling
 - **Found:** 2026-08-24 (adjudication of the `AFLDB-ISSUE-087` successor-3 D4
   HALT; recorded at the pre-R9 ledger sync per `AFLDB-ISSUE-087-S4.md` §3)
-- **Resolved:** N/A
+- **Resolved:** 2026-08-25
 - **Files:** `tests/nl-ui/nl-stress.spec.ts` (single post-loop
   `appendFileSync`, `:1099-1103`)
 
@@ -5765,12 +5791,420 @@ against 840 persisted observations) was required to establish what actually
 ran. Secondary defect recorded in `AFLDB-ISSUE-087-S4.md` §1.
 
 ### Fix
-Not yet fixed.
+Moved the `appendFileSync` call into the batch loop in `tests/nl-ui/nl-stress.spec.ts`. Each completed observation is appended to the worker JSONL file immediately after `observe()` returns. The in-memory `observations.push(observation)` was preserved for downstream batch crash reporting, and the old post-loop bulk append was removed.
 
 ### Validation
-Not yet run.
+- **Focused Regression:** A new source-contract regression was added to `tests/nl-ui-corpus.test.ts` to assert that incremental persistence exists and post-loop bulk append does not. The suite passed 30/30.
+- **Supplemental Smoke:** A 3-question Playwright smoke was not executed past setup because `AFLDB_E2E_BETA_CODE` was absent. This is an environment prerequisite block, not a test failure of the implementation.
 
 ### Follow-up
-Flush each observation as it is produced (append per question rather than per
-batch), keeping the JSONL row shape and report semantics unchanged, so a
-failed batch still leaves a truthful partial record.
+None.
+
+## AFLDB-ISSUE-090 — DOB enrichment conflict writes are not pass-scoped or idempotent
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Data integrity / Import
+- **Found:** 2026-08-25 (first routine post-`AFLDB-ISSUE-084` release validation; the
+  frozen `release-gates.test.ts` duplicate-issue gate)
+- **Resolved:** N/A
+- **Runbook:** `AFLDB-ISSUE-090.md` — the approved plan, authoritative for the full
+  evidence chain, the D1-D5 decisions, the migration design and the HALT conditions.
+  Planning is COMPLETE/APPROVED; implementation IN PROGRESS. `AFLDB-ISSUE-091`'s
+  migration-checksum blocker is Resolved. Migration 072 is APPLIED to `afldb_test`
+  (2026-08-25; `db:status` 72/72, 0 pending) and the fixed `dob_conflict` reconciliation is
+  validated GREEN (23/23). `release-gates.test.ts` validation is now HALTED and blocked by
+  `AFLDB-ISSUE-092` — see that issue's entry below. Production NOT TOUCHED throughout.
+- **Files:** `tools/migration/enrich_birth_dates_from_club_lists.py` (`:412-432`),
+  `tools/migration/enrich_birth_dates.py` (`:407-412`, `:414-446`),
+  `src/db/migrations/072_dob_conflict_ownership.sql` (new),
+  `tests/integration/dob-enrichment-issues.test.ts` (new),
+  `tests/integration/draft-lock.ts`, `tests/integration/release-gates.test.ts`
+
+### Symptom
+Rerunning the club-list DOB enrichment pass appends another unresolved `dob_conflict`
+row for a conflict it has already recorded, so repeated execution accumulates duplicate
+copies of one logical source disagreement. Separately, the register pass deletes every
+unresolved `dob_conflict` / `dob_internal_conflict` row regardless of which pass created
+it, so run order decides which unresolved findings survive.
+
+### Evidence
+The frozen release gate `gate: draft links` → *"does not stack duplicate issues when a
+pass is re-run"* returned `[{ issueType: 'dob_conflict', n: 1 }]` against `afldb_test`
+where `[]` is required. A read-only query showed entity `4347` holding rows `441`, `442`
+and `443` with identical `source`, `existing` (1868-02-18), `asserted` (1868-02-20) and
+`external_id` (`club-list:fitzroy:cap27`) but three distinct `detected_at` values
+(2026-08-19 14:53, 14:55, 18:04) — three executions of one logical conflict, not three
+disagreements. Entities `12949` and `13248` hold one register-origin row each. Three
+disputed players, five rows, three logical conflicts.
+
+The re-sourced AFL Tables *Fitzroy — All Time Player List* corroborates the assertion
+from the source side: Cap 27, "Cleary, Bill", DOB 1868-02-20, 21 games, 1897-1899.
+
+The register rows are dated 2026-08-15, before all three club-list runs, which proves the
+register pass has not run since and therefore did **not** cause the duplicates. Its
+unscoped delete is a related, latent cross-pass hazard of the `AFLDB-ISSUE-080` class.
+
+### Root cause
+`enrich_birth_dates_from_club_lists.py:412-432` inserts `dob_conflict` rows with an
+unconditional `executemany`: no delete, no `ON CONFLICT`, no ownership predicate. This
+caused the duplicates. `enrich_birth_dates.py:407-412` deletes unresolved DOB issues with
+no ownership or population predicate. Both passes set `SOURCE_KEY = 'afltables'`, so
+`details->>'source'` cannot distinguish them and ownership is pass-grained rather than
+source-grained. `data_issues` has no unique constraint
+(`001_foundations.sql:91-104`), so nothing structurally prevented the accumulation.
+
+### Risk
+Duplicate unresolved rows in the internal data-quality queue, and a latent path by which
+one enrichment pass silently erases the other's unresolved findings. `players.dob_disputed`
+is public — it drives a marker on `players/[slug]` and suppresses `birthDate` in the
+schema.org JSON-LD — so issue state and public dispute state must stay consistent. No
+foreign key references `data_issues.id`, and no public-facing corruption or production
+impact has been established.
+
+### Scope
+The `dob_conflict` lifecycle across both DOB enrichment passes, the `dob_internal_conflict`
+handling that is inseparable from it, migration 072 (data repair plus a targeted partial
+unique index), and the `players.dob_disputed` recompute contract. Explicitly excluded:
+`external_identity_conflict` (follow-up), `player_birth_evidence` (already idempotent by
+unique-key upsert), the other eleven release-gate failures, and importer-side locking.
+
+### Fix
+Not yet implemented. Approved design in `AFLDB-ISSUE-090.md`: one unresolved `dob_conflict`
+row per player carrying a versioned `disputed_by` map with explicit per-pass assertion
+provenance; evidence-based owned populations (club-list scoped by processed source file,
+register scoped to its resolved population); assertion-specific suppression of identical
+previously adjudicated conflicts; migration 072 with fail-closed preconditions, lossless
+merge and a partial unique index; and a deterministic regression suite with self-contained
+CSV and SQLite fixtures.
+
+### Validation
+Not yet performed. Step 0 (read-only shape proof against `afldb_test`) has not been run.
+
+### Follow-up
+`enrich_birth_dates.py:347-367` writes `external_identity_conflict` by unconditional
+`executemany` with no clearing step — the same defect class, latent at zero rows, with
+different entity semantics and a single writer. Deliberately excluded from ISSUE-090; no ID
+allocated. Decide at resolution whether it qualifies as a Low tracked issue.
+
+Also recorded: `player_birth_evidence` cannot encode pass ownership because both passes
+share `source_id = afltables`, so identical agreeing evidence collapses onto one row; and
+`data_issues` has no accepted/ignored adjudication vocabulary, which is what forces D1's
+all-or-nothing suppression.
+
+**Blocked by `AFLDB-ISSUE-092` (2026-08-25):** post-migration `release-gates.test.ts`
+validation surfaced two previously-green `gate: birth dates` failures
+(`external_identities` `match_method='afltables_profile_url'` population, expected 12,472,
+found 0). Root-caused to a pre-existing, unrelated `enrich_birth_dates.py` defect —
+conclusively not migration 072 (a pre-072 `afldb_test` backup already shows the table
+empty) — that this issue's own new regression suite (test 5, real register-pass
+invocation) exposed by running the real importer against shared `afldb_test` with a tiny
+synthetic source. Tracked and designed separately as `AFLDB-ISSUE-092`; `AFLDB-ISSUE-090`
+cannot resume `release-gates.test.ts`/`privileges.test.ts` validation until that issue is
+implemented and `afldb_test.external_identities` is recovered.
+
+## AFLDB-ISSUE-092 — `external_identities` reconciliation trusts an unproven-complete source population
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Data integrity / Tooling safety
+- **Found:** 2026-08-25 (post-migration-072 `release-gates.test.ts` validation for
+  `AFLDB-ISSUE-090`)
+- **Resolved:** N/A
+- **Runbook:** `AFLDB-ISSUE-092.md` — the approved-pending plan, authoritative for the full
+  evidence chain, the safety-contract design, the test-containment design and the recovery
+  design. §4/§5 **implemented 2026-08-25** (ISSUE-093 Phase-3 session); database
+  validation pending; §6 recovery obsolete for the rebuild path.
+- **Files:** `tools/migration/enrich_birth_dates.py` (`:500-539`),
+  `tests/integration/dob-enrichment-issues.test.ts` (test 5, `:216-224`, `:529-556`)
+
+### Symptom
+`afldb_test.external_identities` is completely empty. Two `release-gates.test.ts` `gate:
+birth dates` checks that were green before `AFLDB-ISSUE-090`'s migration 072 are now red:
+`match_method='afltables_profile_url' AND status='unique'` expected 12,472 found 0; total
+`afltables_profile_url` rows expected >0 found 0.
+
+### Evidence
+`enrich_birth_dates.py:519-525` deletes every `external_identities` row for
+`(source_id, match_method='afltables_profile_url')` not present in the current run's
+asserted set — correct only if the supplied register is the complete population, which the
+importer never verifies. `dob-enrichment-issues.test.ts` test 5 invokes this importer for
+real (`runRegister()`, no `--dry-run`) against the shared `afldb_test` database with a
+one-row synthetic SQLite register, so the DELETE removed the entire real population. A
+repository-wide search confirms `enrich_birth_dates.py` is `external_identities`'s sole
+writer today (DraftGuru's bridge into this table is listed PLANNED, not implemented, in
+`docs/migration-inventory.md`; DraftGuru identity resolution actually flows through
+`draft_persons`/`award_winners` directly) and that this is the only test-suite call site of
+this importer. A pre-072 `afldb_test` backup (`.deploy-backups/issue-090-afldb_test-pre-072-20260825-194528.dump`)
+already shows the table empty, so the loss predates and is independent of migration 072.
+
+### Root cause
+`enrich_birth_dates.py` has no fail-closed contract proving its supplied source population
+is complete before performing an authoritative deletion, and no partial-population mode
+(unlike `enrich_birth_dates_from_club_lists.py`'s `--csv-dir` scoping). This is the
+`AFLDB-ISSUE-080` defect class — an unscoped write trusting its input as the authoritative
+full set — already fixed elsewhere in this same file for `dob_conflict`/
+`dob_internal_conflict` by `AFLDB-ISSUE-090`, but never applied to this older
+`external_identities` block. Independently, the test suite has no isolation preventing a
+real, full-population-authoritative importer invocation from touching shared,
+non-fixture-scoped data.
+
+### Risk
+Silent, total loss of a third-party identity population in any environment where this
+importer runs against an incomplete/wrong/truncated `AFLDB_LEGACY_SQLITE`, including
+production. Currently manifested only in `afldb_test`; production not touched.
+
+### Scope
+`enrich_birth_dates.py`'s `external_identities` reconciliation and the
+`dob-enrichment-issues.test.ts` test that exercises it. Explicitly excludes migration 072
+(not implicated), `player_birth_evidence` (already safe, upsert-only), and a
+repository-wide sanity-gate retrofit onto other importers.
+
+### Fix
+IMPLEMENTED 2026-08-25 (ISSUE-093 Phase-3 session; validation pending — see below).
+Per the approved design in `AFLDB-ISSUE-092.md`: (A) a fail-closed
+population-sanity gate in the importer — refuses an authoritative deletion when the
+asserted population is zero against existing rows, or when it would remove more than a
+configurable threshold of the stored population, bypassable only via an explicit
+`--acknowledge-population-drop` flag, applied identically to every caller; (B) a dedicated
+fixture `source_id` (`--source-key` override) so the test's real register-pass invocation
+is structurally scoped away from real data regardless of population size. No schema/
+migration change. Implementation detail: reusable `check_population_drop()` /
+`PopulationDropRefused` / `POPULATION_DROP_THRESHOLD = 0.10` in
+`tools/migration/common.py` (shared with the future fitzRoy importer per ISSUE-093 §9),
+wired into `enrich_birth_dates.py` before the DELETE; check 1 (empty asserted population)
+is not bypassable, check 2 (>10% drop) only via per-invocation
+`--acknowledge-population-drop` (logged via `Reporter.warn`). Fixture source
+`afltables_issue090_fixture`; new tests 24–27 in `dob-enrichment-issues.test.ts`.
+
+### Validation
+Pending. The §11 database tests need a live test database and there is currently no
+`afldb_test` (ISSUE-093 rebuild). The Phase-3 static gate (33/33, user-run 2026-08-25)
+proves no static regression but does not exercise this issue's database tests. §6
+recovery of the old database is obsolete for the rebuild path.
+
+### Follow-up
+None yet. `AFLDB-ISSUE-090` is blocked by this issue until it is implemented and
+`afldb_test.external_identities` is recovered and reverified via `release-gates.test.ts`.
+
+## AFLDB-ISSUE-093 — Deterministic afldb_test rebuild from authoritative sources
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Tooling / Data integrity / Import architecture
+- **Found:** 2026-08-25 (architecture planning session, prompted by the ISSUE-090/092
+  investigation into `afldb_test`'s fragility)
+- **Resolved:** N/A
+- **Runbook:** `AFLDB-ISSUE-093.md` — the approved architecture, authoritative for the full
+  source-to-schema matrix, fitzRoy/non-fitzRoy classification, canonical snapshot/archive
+  policy, preflight-before-destruction rebuild order, safety contract, release-gate
+  Class A/B policy, missing-source backlog and implementation phases. Planning complete and
+  **approved for implementation planning**.
+- **Files:** Phase 1 (2026-08-25): `data/reference/sources.json`, `seasons.json`,
+  `clubs.json`, `stat-definitions.json`, `stat-availability.json`, `venue-canonical.json`
+  (new tracked datasets); `tools/migration/load_reference_data.py` (new standalone
+  loader); `tests/reference-data.test.ts` (new); `AFLDB-ISSUE-093.md` §15;
+  `AFLDB-ISSUE-093-PHASE-2-HANDOFF.md` (new). Phase 2 (2026-08-25):
+  `tools/rebuild/fitzroy/fitzroy-contract.json`, `tools/rebuild/fitzroy/acquire_core.R`,
+  `tests/fitzroy-acquisition.test.ts`,
+  `docs/rebuild-manifests/afltables_fitzroy_core/trial-2024.json` (all new); `.gitignore`
+  (data/reference opt-in); `AFLDB-ISSUE-093.md` §16; `AFLDB-ISSUE-093-PHASE-3-HANDOFF.md`
+  (new). `import_legacy_afl.py` unchanged. Phase 4a (2026-08-25):
+  `tools/migration/import_fitzroy_core.py`, `tests/fitzroy-core-import.test.ts` (both
+  new); `AFLDB-ISSUE-093.md` §18. Later phases: DraftGuru, awards/honours, and eventually
+  a new `db:test:rebuild` orchestrator
+
+### Problem
+AFLDB's major historical/core rebuild path (`import_legacy_afl.py`, `import_draft.py`, most
+of `import_awards.py`, `enrich_birth_dates.py`'s main-register pass) depends entirely on
+`AFLDB_LEGACY_SQLITE`, a single-developer-owned intermediate aggregation database with no
+provenance, checksum, or version tracking of its own. `AFLDB-ISSUE-090` and `AFLDB-ISSUE-092`
+both surfaced defects while working against this fragile setup — `afldb_test` is not
+genuinely disposable. `AFLDB_LEGACY_SQLITE` is itself an aggregation of upstream sources
+(fitzRoy/AFL Tables, DraftGuru, Wikipedia, FootyWire), not a primary source — AFLDB simply
+has no rebuild path that acquires from those upstream sources directly.
+
+### Decision
+Design (not yet implement) a rebuild architecture for `afldb_test` that acquires from
+upstream authoritative sources directly, with zero dependency on `AFLDB_LEGACY_SQLITE`,
+explicitly tracks which domains are IMPLEMENTED/DERIVED/STATIC/MISSING, and fails closed on
+any required domain that is still missing rather than silently falling back to the legacy
+source. Full detail (source-to-schema matrix, fitzRoy coverage split, canonical snapshot
+layout, phase order, safety contract, release-gate policy, backlog) is in
+`AFLDB-ISSUE-093.md`.
+
+### Scope
+Architecture and tracking only in this pass. No importer, adapter, orchestrator script, or
+database/schema change is implemented. Explicitly excludes `AFLDB-ISSUE-092`'s recovery of
+the *current* `afldb_test.external_identities` data (orthogonal — that issue's §6 recovers
+today's database; this issue rebuilds a database from scratch).
+
+### Fix
+**Phase 4a IMPLEMENTED (2026-08-25, non-DB validation pending — `AFLDB-ISSUE-093.md`
+§18)** — §13.4a historical/core PostgreSQL importer:
+`tools/migration/import_fitzroy_core.py` (new) consumes a canonical snapshot + manifest
+(never live fitzRoy) into venues, players (+ `player_birth_evidence` under the distinct
+`fitzroy_afldata`/`fitzroy_player_stats` evidence source, fill-if-missing DOB), AFL Tables
+`external_identities` (ISSUE-092 §4 gate + §5 `--source-key` reused from `common.py`),
+matches/period scores/attendance (results.csv canonical, player_stats supplements
+deduplicated by match, conflicts fail closed, migration-020 provenance),
+`player_match_stats` (explicit 22-pair STAT_MAP, NULL ≠ 0) and derived
+`brownlow_round_votes` (H&A non-NA votes only, seasons gated by
+`stat-availability.json`; `brownlow_season_votes` deliberately NOT written — its
+authoritative fields are not derivable from this snapshot). Player identity = profile-URL
+path via `external_identities` (fitzRoy `ID` in-run only, 1:1 enforced); match identity =
+`match_key` in the current-season-import convention; club strings era-remapped within
+one organization, fail-closed otherwise. Fail-closed manifest/SHA-256/row-count/column/
+version validation runs before any DB access (`--validate-only` needs no psycopg at all).
+Keyed upserts + snapshot-scoped delete-then-COPY make every group retry-safe without
+touching other writers' rows. New static/spawn suite `tests/fitzroy-core-import.test.ts`.
+
+**Phase 3 IMPLEMENTED (2026-08-25, validation partially pending — `AFLDB-ISSUE-093.md`
+§17)** — §13.4: club-list DOB enrichment wired to the canonical
+`data/sources/afltables/club_lists/` directory (`--csv-dir` now optional; canonical mode
+is complete-or-refuse across the five expected `FILE_ORGS` files, with fail-closed header
+and directory validation before any environment/database access; `--require-complete`;
+ISSUE-090 partial/test semantics preserved under an explicit `--csv-dir`; club-list
+evidence stays a separate layer from the fitzRoy DOB source; CSVs stay uncommitted). Plus
+the ISSUE-092 §4 fail-closed `external_identities` gate and §5 `--source-key` containment
+(reusable `check_population_drop()` in `tools/migration/common.py` — recorded under
+`AFLDB-ISSUE-092`). New static suite `tests/club-list-sources.test.ts` (8 tests); new
+integration tests 24–27 in `dob-enrichment-issues.test.ts` await a test database.
+
+**Phase 2 COMPLETE (2026-08-25)** — fitzRoy core source acquisition. fitzRoy pinned at
+1.8.0 (CRAN stable, verified) in `tools/rebuild/fitzroy/fitzroy-contract.json`;
+`tools/rebuild/fitzroy/acquire_core.R` is the canonical acquisition adapter (probe +
+acquire modes, fail-closed version gate, `library(fitzRoy)` attach required — namespace-only
+invocation breaks `dictionary_afltables`). Two real probes + a real bounded acquisition
+(`trial-2024`: 9,936 player_stats / 16,731 player_details / 216 results rows) proved the
+snapshot → manifest → SHA-256 path end-to-end (tracked manifest
+`docs/rebuild-manifests/afltables_fitzroy_core/trial-2024.json`; raw CSVs gitignored under
+`data/sources/afltables/fitzroy_core/`). Evidence-backed matrix: stable ID, name, AFL Tables
+URL, match identity/scores/venue SUPPORTED; DOB, the 21 match stats, Brownlow match votes
+(correct per-player-per-match grain, NA ≠ 0), attendance (player_stats only, dedupe by
+match) SUPPORTED WITH COVERAGE LIMITATION (historical coverage unmeasured);
+`player_match_period_stats` MISSING (deferred §13.7). One canonical acquisition covers all
+five player sub-domains (§8 confirmed). Zero PostgreSQL and zero `AFLDB_LEGACY_SQLITE`
+dependency, pinned by `tests/fitzroy-acquisition.test.ts` (13/13). Also fixed during Phase
+2: `.gitignore` was silently ignoring the Phase-1 `data/reference/*.json` datasets —
+narrow opt-in added and user-verified.
+
+**Phase 1 COMPLETE (2026-08-25)** — static/reference data (sources, seasons, clubs +
+aliases + organizations + relations, stat definitions, stat availability) ported out of
+`import_legacy_afl.py` into tracked JSON datasets under `data/reference/` plus a
+standalone deterministic/idempotent loader (`tools/migration/load_reference_data.py`,
+fail-closed cascade guard, zero `AFLDB_LEGACY_SQLITE` dependency). The old legacy-built
+test DB was preserved as `afldb_test_pre_rebuild_20260825`; a guarded one-time read-only
+extraction (verified `current_database()` + `transaction_read_only=on`) baked the
+known-good baseline into the datasets (88 coverage ranges = 24 stat keys × 130 seasons =
+3,120 cells; all 24 club era spans confirmed; `wikipedia_url`/`afltables_slug` captured;
+AFL Tables slugs preserved verbatim; 1942–1945 Brownlow `not_applicable` war-year
+semantics; `legacy_club_key` deliberately excluded; `sources.key` is the durable identity
+contract, numeric `sources.id` database-local). The baseline was returned to
+`ALLOW_CONNECTIONS=false` and is reference-only. Full detail: `AFLDB-ISSUE-093.md` §15.
+Remaining phases (2–9) not yet implemented.
+
+### Validation
+Phase 1: `npx vitest run tests/reference-data.test.ts` — 12/12 PASS (user-run
+2026-08-25). Phase 2: `npx vitest run tests/fitzroy-acquisition.test.ts` — 13/13 PASS +
+real probe pair + real `trial-2024` acquisition with verified manifest (all user-run
+2026-08-25). Phase 3: static gate
+`npx vitest run tests/club-list-sources.test.ts tests/fitzroy-acquisition.test.ts
+tests/reference-data.test.ts` — **33/33 PASS** (user-run 2026-08-25: 12/12 + 13/13 +
+8/8); the ISSUE-092 database-side tests (24–27) await a live test database. Phase 4a:
+`npx vitest run tests/fitzroy-core-import.test.ts` — PENDING (user-run; static pins +
+fail-closed `--validate-only` spawn tests, no PostgreSQL/psycopg/network). No database
+load has been executed anywhere yet — first real execution belongs to the later
+orchestrator phase.
+
+### Follow-up
+Each implementation phase in `AFLDB-ISSUE-093.md` §13 is its own bounded future session.
+**Next: run the Phase-4a non-DB gate (`tests/fitzroy-core-import.test.ts`), then
+`--validate-only` against the real `trial-2024` snapshot; a fresh `afldb_test`
+creation step follows only after that gate is green.** DraftGuru (§13.5) follows the
+core importer; run ISSUE-092's §11 database tests when a test database exists.
+(Phase 3 implemented 2026-08-25 per §17; §13.3 collapsed to a no-op — no structural
+source gap found; Phase 4a implemented 2026-08-25 per §18.)
+`AFLDB-ISSUE-092` §4 (the fail-closed `external_identities` gate) must land in whatever
+importer ends up owning that reconciliation before it is ever run against `afldb_test`,
+rebuilt path or not.
+
+## AFLDB-ISSUE-091 — Migration checksum comparison is line-ending sensitive, causing false drift on a Windows checkout
+
+- **Status:** Resolved
+- **Severity:** Low
+- **Area:** Tooling / Database migrations
+- **Found:** 2026-08-25 (discovered while validating `AFLDB-ISSUE-090`'s migration 072
+  application against `afldb_test`)
+- **Resolved:** 2026-08-25
+- **Files:** `tools/db/migration-checksum.ts` (new), `tools/db/migrate.ts` (`:113-116`
+  checksum computation, `:142-151` drift check — now delegated to the new module),
+  `tests/migration-checksum.test.ts` (new)
+- **Runbook:** `AFLDB-ISSUE-091.md` — complete, implementation-ready plan drafted 2026-08-25,
+  revised the same day after user review found the original raw+LF-only compatibility design
+  was asymmetric (missed a stored-CRLF/current-LF false positive — the exact mirror of the
+  bug this issue fixes). Revised design uses three bounded representations (raw, canonical-LF,
+  canonical-CRLF) and a full 10-row compatibility matrix. Approved, implemented, and validated
+  exactly as designed; see §13 of the runbook for full evidence.
+
+### Symptom
+`npm run db:status` / `npm run db:migrate` (`AFLDB_MIGRATE_TARGET=test`) report six
+already-applied migrations as modified since they ran — `026_aflw_read_model.sql`,
+`053_player_achievements.sql`, `058_data_edits_editor_entities.sql`,
+`059_honour_team_member_identity.sql`, `060_wikipedia_22_under_22_source.sql`,
+`061_award_winner_sort_order.sql` — and the runner refuses to apply **any** pending
+migration while the drift exists, blocking migration application generally, not just for
+the six flagged files.
+
+### Evidence
+1. `git status --porcelain`, scoped to the six files, printed nothing — no uncommitted
+   Git-visible edit.
+2. Raw worktree SHA-256 (Windows checkout, CRLF) differed from the HEAD blob SHA-256 for
+   all six.
+3. Stripping CR bytes from the worktree content made the SHA-256 match the HEAD blob
+   exactly for all six.
+4. A read-only query against `afldb_test`'s `afldb_meta.schema_migrations.checksum` for
+   the six returned a value that exactly equals the HEAD/LF hash from step 3, for all six.
+
+Together this is conclusive: `migrate.ts:113-116` computes `sha256(readFileSync(path,
+'utf8'))` with no line-ending normalization, hashing whatever raw bytes the current
+checkout materializes. The `afldb_test` ledger was populated from LF bytes (i.e. these six
+migrations were originally applied from a non-CRLF checkout). A Windows checkout of the
+same, unmodified, committed content can materialize CRLF line endings, producing a
+different checksum for identical logical content — a false-positive drift report, not a
+real content change, ledger corruption, or tamper.
+
+### Root cause
+The checksum function hashes raw file bytes as read from disk with no line-ending
+normalization step, either at apply time or at drift-check time, so checksum identity is
+not deterministic across platforms/checkout configurations that may legitimately produce
+CRLF vs LF for the same committed blob.
+
+### Fix
+Implemented exactly per the approved, revised `AFLDB-ISSUE-091.md`: checksum logic extracted
+into a new pure module `tools/db/migration-checksum.ts` computing three bounded
+representations of the current file content — raw bytes, canonical all-LF, canonical
+all-CRLF — and `migrate.ts`'s drift check accepts a stored ledger checksum that matches any
+one of them. Only the canonical all-LF representation is ever written for a newly applied
+migration. An earlier version of this plan accepted only raw-bytes-or-canonical-LF and was
+found during review to be asymmetric (a migration whose ledger checksum was historically
+CRLF-recorded would false-positive the next time it was validated from a genuine LF
+checkout — the mirror image of the bug this issue fixes); the third representation closes
+that gap. Real migration-tamper detection is preserved (an actual content edit to an applied
+migration is still caught — proven by the rejected-edit/whitespace/final-newline/lone-CR
+tests). Migration *execution* (`tx.unsafe(m.sql)`) is unchanged — only checksum computation
+and comparison changed. No historical applied migration and no recorded `schema_migrations`
+checksum was rewritten.
+
+### Validation
+All three gates green (2026-08-25), full evidence in `AFLDB-ISSUE-091.md` §13:
+- `npm test -- tests/migration-checksum.test.ts` — 12/12 passed, 0 failures.
+- `npm run typecheck` — PASS.
+- `AFLDB_MIGRATE_TARGET=test npm run db:status` — `72 migration file(s), 71 already applied`,
+  all six previously-drifted migrations now report `applied` with no `"modified since they
+  ran"` error, `072_dob_conflict_ownership.sql` correctly reported as the sole pending
+  migration. `--status` performs no write; no ledger row or migration file was mutated.
+
+### Follow-up
+None. `AFLDB-ISSUE-090` is unblocked with respect to this issue — migration 072 remains
+CREATED, NOT APPLIED, and applying it is ISSUE-090's own next action.

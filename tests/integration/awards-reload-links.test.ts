@@ -15,6 +15,7 @@ import {
   listConfirmedUnlinked,
   resolveLink,
 } from '@/db/queries/player-links';
+import { lockHonoursTables, unlockHonoursTables } from './draft-lock';
 
 /**
  * A full honours reload must not discard a human identity decision
@@ -61,8 +62,12 @@ const canRunImporter = Boolean(legacySqlite)
   && existsSync(legacySqlite as string)
   && hasPsycopg();
 
+const integrationDsn = process.env.AFLDB_TEST_DATABASE_URL as string;
+
 // One connection pool for the whole file: both describe blocks share `sql`.
+beforeAll(() => lockHonoursTables(integrationDsn), 300_000);
 afterAll(async () => {
+  await unlockHonoursTables();
   await sql.end();
 });
 

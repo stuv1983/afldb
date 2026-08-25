@@ -4,24 +4,16 @@ import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 const root = process.cwd();
-const importer = readFileSync(join(root, 'tools', 'migration', 'import_awards.py'), 'utf8');
-const coreImporter = readFileSync(join(root, 'tools', 'migration', 'import_legacy_afl.py'), 'utf8');
-const migration = readFileSync(
-  join(root, 'src', 'db', 'migrations', '060_wikipedia_22_under_22_source.sql'),
-  'utf8',
-);
-const orderingMigration = readFileSync(
-  join(root, 'src', 'db', 'migrations', '061_award_winner_sort_order.sql'),
-  'utf8',
-);
-const awardQueries = readFileSync(join(root, 'src', 'db', 'queries', 'awards.ts'), 'utf8');
-const coreCommon = readFileSync(join(root, 'tools', 'migration', 'common.py'), 'utf8');
-const linkResolutionGrant = readFileSync(
-  join(root, 'src', 'db', 'migrations', '068_import_reads_link_resolutions.sql'),
-  'utf8',
-);
-const privileges = readFileSync(join(root, 'tools', 'maintenance', 'privileges.sql'), 'utf8');
-const ignoreRules = readFileSync(join(root, '.gitignore'), 'utf8');
+const readNormalized = (...parts: string[]) => readFileSync(join(root, ...parts), 'utf8').replace(/\r\n/g, '\n');
+const importer = readNormalized('tools', 'migration', 'import_awards.py');
+const coreImporter = readNormalized('tools', 'migration', 'import_legacy_afl.py');
+const migration = readNormalized('src', 'db', 'migrations', '060_wikipedia_22_under_22_source.sql');
+const orderingMigration = readNormalized('src', 'db', 'migrations', '061_award_winner_sort_order.sql');
+const awardQueries = readNormalized('src', 'db', 'queries', 'awards.ts');
+const coreCommon = readNormalized('tools', 'migration', 'common.py');
+const linkResolutionGrant = readNormalized('src', 'db', 'migrations', '068_import_reads_link_resolutions.sql');
+const privileges = readNormalized('tools', 'maintenance', 'privileges.sql');
+const ignoreRules = readNormalized('.gitignore');
 const python = process.env.PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3');
 
 function expandGroups(...groups: string[]): string[] {

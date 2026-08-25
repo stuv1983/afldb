@@ -14,6 +14,8 @@ import {
 } from '@/db/queries/player-links';
 import { createPlayer } from '@/db/queries/players';
 
+const integrationDsn = process.env.AFLDB_TEST_DATABASE_URL as string;
+
 import { lockDraftTables, unlockDraftTables } from './draft-lock';
 
 /**
@@ -227,7 +229,7 @@ describe.skipIf(!canRunImporter)(
     beforeAll(async () => {
       // Held for the whole file: every test here links real draft people to
       // fixture players, which is exactly what release-gates.test.ts counts.
-      await lockDraftTables();
+      await lockDraftTables(integrationDsn);
 
       // A dedicated fixture admin. Picking the first real admin by id is the
       // trap AFLDB-ISSUE-074 records against the email-intake suite.

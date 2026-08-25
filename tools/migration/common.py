@@ -114,6 +114,77 @@ def clean_text(value: Any) -> str | None:
 
 
 # --------------------------------------------------------------------------
+# Population reconciliation safety (AFLDB-ISSUE-092 Sec 4)
+# --------------------------------------------------------------------------
+
+# Legitimate run-to-run turnover of an effectively append-only external
+# population (the AFL Tables register) should be far below this.
+POPULATION_DROP_THRESHOLD = 0.10
+
+
+class PopulationDropRefused(RuntimeError):
+    """An authoritative reconciliation delete was refused fail-closed."""
+
+
+def check_population_drop(
+    *,
+    stored_count: int,
+    asserted_count: int,
+    candidate_delete_count: int,
+    label: str,
+    acknowledged: bool = False,
+    reporter: Any = None,
+    threshold: float = POPULATION_DROP_THRESHOLD,
+) -> None:
+    """Fail-closed population-sanity gate for authoritative reconciliation
+    deletes (AFLDB-ISSUE-092 Sec 4).
+
+    A reconciliation pass that deletes stored rows absent from its input is
+    correct only if that input is the complete current population. Callers
+    must invoke this before the delete, with counts read before this run's
+    writes:
+
+    * stored_count            existing rows in the owned population
+    * asserted_count          rows this run asserts as the population
+    * candidate_delete_count  stored rows the delete would remove
+
+    Check 1: asserting an empty population against existing rows is never
+    legitimate and is refused unconditionally (not bypassable). Check 2: a
+    drop of more than ``threshold`` of the stored population is refused
+    unless ``acknowledged`` (the caller's explicit per-invocation
+    ``--acknowledge-population-drop``), in which case the drop is reported
+    via ``reporter.warn`` so its use is visible in run output.
+    """
+    if stored_count <= 0:
+        return
+    if asserted_count == 0:
+        raise PopulationDropRefused(
+            f"{label}: this run asserts an EMPTY population against "
+            f"{stored_count} stored rows. Refusing the authoritative delete: "
+            "the supplied source cannot be the complete population. "
+            "This check is not bypassable."
+        )
+    if candidate_delete_count / stored_count > threshold:
+        if not acknowledged:
+            raise PopulationDropRefused(
+                f"{label}: this run would delete {candidate_delete_count} of "
+                f"{stored_count} stored rows "
+                f"({candidate_delete_count / stored_count:.1%}), above the "
+                f"{threshold:.0%} population-drop threshold. Refusing: the "
+                "supplied source is not proven complete. Re-run with "
+                "--acknowledge-population-drop only if this drop is genuinely "
+                "intended."
+            )
+        if reporter is not None:
+            reporter.warn(
+                f"{label}: acknowledged population drop of "
+                f"{candidate_delete_count} of {stored_count} stored rows "
+                f"({candidate_delete_count / stored_count:.1%}) via "
+                "--acknowledge-population-drop"
+            )
+
+
+# --------------------------------------------------------------------------
 # Import batch tracking
 # --------------------------------------------------------------------------
 
