@@ -110,7 +110,7 @@ export const IN_ONE_SEASON = /\bin (?:a|one|any|(?:a )?single|the same) season\b
 export const IN_ONE_GAME = /\bin (?:a|one|any|(?:a )?single|the same) (?:game|match)\b/;
 export const IN_A_FINAL = /\bin (?:a|one|any) final\b/;
 export const IN_A_GRAND_FINAL = /\bin (?:a|one|any) grand final\b/;
-export const OVER_CAREER = /\b(?:career|all[ -]time|ever|in (?:his|their|a) career)\b/;
+export const OVER_CAREER = /\b(?:career|all[ -]time|ever|in (?:his|their|a) career|who has played the most)\b/;
 
 /**
  * "dusty TOTAL goals against Carlton" -- an explicit cue that a named
@@ -325,7 +325,6 @@ export const METRIC_WORDS: [RegExp, string][] = [
   // need its own entry rather than another spacing variant.
   [/\b(?:i50s?|inside[- ]?(?:fifties|50s?))\b/, 'inside_50s'],
   [/\bforward entr(?:y|ies)\b/, 'inside_50s'],
-  [/\b(?:r50s?|rebound[- ]?(?:fifties|50s?))\b/, 'rebounds'],
   [/\bbrownlow votes?\b/, 'brownlow_votes'],
   [/\bbiggest bags?\b/, 'goals'],
   // "bag of goals" / "bags of goals" as one phrase, BEFORE the bare
@@ -472,6 +471,8 @@ export const RIVALRY_WORDS: [RegExp, [string, string]][] = [
  * since the operator there is attached to the digits themselves.
  */
 export const COMPARE_OP_WORDS: [RegExp, NlCompareOp][] = [
+  [/\bno more than\b/, 'lte'],
+  [/\bno fewer than\b/, 'gte'],
   [/\bat least\b/, 'gte'],
   [/\bat most\b/, 'lte'],
   [/\bmore than\b/, 'gt'],
@@ -521,7 +522,6 @@ export const STAT_GAMES_IDIOM_WORDS: [RegExp, string][] = [
   [/\bcontested possessions? games?\b/, 'contested'],
   [/\buncontested possessions? games?\b/, 'uncontested'],
   [/\binside[- ]?(?:fifties|50s?) games?\b/, 'inside_50s'],
-  [/\brebound[- ]?(?:fifties|50s?) games?\b/, 'rebounds'],
   [/\bbrownlow votes? games?\b/, 'brownlow_votes'],
   [/\bpossies games?\b/, 'disposals'],
   [/\bsnags? games?\b/, 'goals'],
@@ -854,6 +854,11 @@ export type UnanswerableTopic = { re: RegExp; topic: string; reason: string };
  * commit is based on.
  */
 export const UNANSWERABLE_TOPICS: UnanswerableTopic[] = [
+  {
+    re: /\b(?:r50s?|rebound[- ]?(?:fifties|50s?))\b/,
+    topic: 'rebound 50s',
+    reason: 'Rebound 50s are not tracked as a supported AFLDB natural-language statistic.',
+  },
   {
     re: /\bcoach(?:es|ed|ing)?\b/,
     topic: 'coaching',

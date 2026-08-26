@@ -85,6 +85,12 @@ describe('readUiCorpus', () => {
     const path = corpusFile('id,category,question,expected_status,tags\nui_1,c,q,plan,t\n');
     expect(readUiCorpus(path)).toHaveLength(1);
   });
+
+  it('keeps the realistic product corpus free of impossible per-game games questions', () => {
+    const cases = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-1440-real-user-v3-20260822.csv');
+    expect(cases).toHaveLength(1435);
+    expect(cases.filter((row) => /\bmost games in a game\b/i.test(row.question))).toEqual([]);
+  });
 });
 
 // -------------------------------------------------------------------- cores

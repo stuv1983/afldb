@@ -2,6 +2,7 @@ import 'server-only';
 
 import { answerAchievementSummary } from '@/db/queries/nl/achievement-summary';
 import { answerClubSeason } from '@/db/queries/nl/club-season';
+import { answerHeadToHead } from '@/db/queries/nl/head-to-head';
 import { answerPlayerCareer } from '@/db/queries/nl/player-career';
 import { answerPlayerGame } from '@/db/queries/nl/player-game';
 import { answerPlayerSeason } from '@/db/queries/nl/player-season';
@@ -30,6 +31,8 @@ export async function executePlan(plan: NlQueryPlan): Promise<NlAnswerPayload> {
       return answerPlayerSeason(plan, cappedLimit);
     case 'team_match':
       return answerTeamMatch(plan, cappedLimit);
+    case 'head_to_head':
+      return answerHeadToHead(plan);
     case 'team_streak':
       return answerTeamStreak(plan, cappedLimit);
     case 'club_season':

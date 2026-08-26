@@ -30,7 +30,9 @@ const COMPARE_SQL: Record<NlCompareOp, string> = {
  * proves out for the grid catalogue -- or a count of linked
  * award_winners rows for an award_count metric (NL_AWARDS).
  */
-function metricValueExpr(metric: string, periodSplit?: string): SqlFragment {
+function metricValueExpr(plan: NlQueryPlan): SqlFragment {
+  const metric = plan.metric!;
+  const periodSplit = plan.periodSplit;
   const def = NL_METRICS.player_career[metric];
   if (def.kind === 'award_count') {
     // count(*) is bigint in Postgres regardless of how small the count
@@ -55,6 +57,21 @@ function metricValueExpr(metric: string, periodSplit?: string): SqlFragment {
     }
     const col = def.statKey ? sql.unsafe(def.statKey) : (def.kind === 'column' ? sql.unsafe(def.column) : sql.unsafe('0'));
     return sql`(SELECT sum(${col})::int FROM player_match_period_stats WHERE player_id = p.id AND ${periodCondition})`;
+  }
+  if (plan.scope.clubFor) {
+    const organizationId = plan.scope.clubFor.organizationId;
+    if (metric === 'games') {
+      return sql`(SELECT count(DISTINCT pms.match_id)::int
+                    FROM player_match_stats pms
+                    JOIN clubs pcl ON pcl.id = pms.club_id
+                   WHERE pms.player_id = p.id AND pcl.organization_id = ${organizationId})`;
+    }
+    if (def.statKey) {
+      return sql`(SELECT sum(pms.${sql.unsafe(def.statKey)})::int
+                    FROM player_match_stats pms
+                    JOIN clubs pcl ON pcl.id = pms.club_id
+                   WHERE pms.player_id = p.id AND pcl.organization_id = ${organizationId})`;
+    }
   }
   if (def.statKey && GRID_STATS[def.statKey].grain === 'live_only') {
     // sum() over a smallint column is bigint too, same reason.
@@ -118,6 +135,13 @@ function conditionsWhere(plan: NlQueryPlan): SqlFragment[] {
   // An ambiguous surname ("Ablett most goals") -- ranks across every
   // plausible candidate instead of declining. See NlMatchScope.playerIdIn.
   if (plan.scope.playerIdIn) clauses.push(sql`p.id = ANY(${plan.scope.playerIdIn})`);
+  if (plan.scope.clubFor && plan.careerPredicates.length === 0) {
+    clauses.push(sql`EXISTS (
+      SELECT 1 FROM player_match_stats pms
+      JOIN clubs pcl ON pcl.id = pms.club_id
+      WHERE pms.player_id = p.id AND pcl.organization_id = ${plan.scope.clubFor.organizationId}
+    )`);
+  }
   return clauses;
 }
 
@@ -184,7 +208,7 @@ async function answerRanked(
   extraWhere: SqlFragment,
   limit: number,
 ): Promise<NlAnswerPayload> {
-  const value = metricValueExpr(plan.metric!, plan.periodSplit);
+  const value = metricValueExpr(plan);
   const direction = plan.agg.kind === 'min' ? sql.unsafe('ASC') : sql.unsafe('DESC');
   const n = rankCutoff(plan.agg);
 

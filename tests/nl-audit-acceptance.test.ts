@@ -84,6 +84,11 @@ describe('NL full-audit acceptance corpus', () => {
     const plans = new Map<string, NlQueryPlan>();
     for (const question of questions) {
       const parsed = await parseNlQuestion(question, ctx);
+      if (question === 'most rebound 50s in a final') {
+        expect(parsed.status, question).toBe('unanswerable');
+        if (parsed.status === 'unanswerable') expect(parsed.topic).toBe('rebound 50s');
+        continue;
+      }
       expect(parsed.status, question).toBe('plan');
       if (parsed.status !== 'plan') continue;
       plans.set(question, parsed.plan);

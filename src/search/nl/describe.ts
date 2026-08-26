@@ -85,6 +85,9 @@ export function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { h
   if (payload.kind === 'team_aggregate') {
     return describeTeamAggregateAnswer(plan, payload.rows, payload.total);
   }
+  if (payload.kind === 'head_to_head') {
+    return describeHeadToHeadAnswer(plan, payload.row);
+  }
   if (payload.kind === 'team_streak') {
     return describeTeamStreakAnswer(plan, payload.lead, payload.rows);
   }
@@ -100,6 +103,46 @@ export function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { h
 const COMPARE_WORDS = {
   gte: 'at least', lte: 'at most', gt: 'more than', lt: 'fewer than', eq: 'exactly',
 } as const;
+
+function describeHeadToHeadAnswer(
+  plan: NlQueryPlan,
+  row: Extract<NlAnswerPayload, { kind: 'head_to_head' }>['row'],
+): { headline: string; interpretation: string } {
+  if (!row) return { headline: 'No matching clubs found', interpretation: '' };
+  const matchup = `${row.clubAName} v ${row.clubBName}`;
+  const kind = plan.headToHead!.kind;
+  if (kind === 'draw_count') {
+    return {
+      headline: `${row.draws.toLocaleString('en-AU')} ${row.draws === 1 ? 'draw' : 'draws'}`,
+      interpretation: `${matchup}, across ${row.total.toLocaleString('en-AU')} matches.`,
+    };
+  }
+  if (kind === 'last_draw') {
+    if (row.lastDrawMatchId === null) {
+      return { headline: 'No drawn match found', interpretation: matchup };
+    }
+    const round = row.lastDrawRoundType
+      ? ` ${row.lastDrawRoundType.replace(/_/g, ' ')}${row.lastDrawRoundNumber ? ` ${row.lastDrawRoundNumber}` : ''}`
+      : '';
+    return {
+      headline: `Last draw: ${matchup}`,
+      interpretation: `${row.lastDrawSeason ?? 'Season not recorded'}${round}.`,
+    };
+  }
+  if (kind === 'compare_wins') {
+    const leader = row.clubAWins === row.clubBWins
+      ? `${row.clubAName} and ${row.clubBName} are level`
+      : `${row.clubAWins > row.clubBWins ? row.clubAName : row.clubBName} has won more`;
+    return {
+      headline: `${leader} — ${row.clubAWins.toLocaleString('en-AU')} to ${row.clubBWins.toLocaleString('en-AU')}`,
+      interpretation: `${row.clubAName} wins first; ${row.draws.toLocaleString('en-AU')} draws from ${row.total.toLocaleString('en-AU')} matches.`,
+    };
+  }
+  return {
+    headline: `${row.clubAName} ${row.clubAWins.toLocaleString('en-AU')}–${row.clubBWins.toLocaleString('en-AU')} ${row.clubBName}`,
+    interpretation: `${row.draws.toLocaleString('en-AU')} draws; ${row.total.toLocaleString('en-AU')} matches.`,
+  };
+}
 
 function rankWord(plan: NlQueryPlan): 'Highest' | 'Lowest' {
   return plan.agg.kind === 'min' ? 'Lowest' : 'Highest';

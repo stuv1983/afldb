@@ -733,9 +733,10 @@ describe('vocabulary: commentary and slang terms map to their real stat', () => 
   it.each([
     'dusty most rebound 50s',
     'dusty most rebound-50s',
-  ])('%s -> rebounds', async (question) => {
-    const p = await plan(question);
-    expect(p.metric).toBe('rebounds');
+  ])('%s declines as an unsupported NL statistic', async (question) => {
+    const result = await parse(question);
+    expect(result.status).toBe('unanswerable');
+    if (result.status === 'unanswerable') expect(result.topic).toBe('rebound 50s');
   });
 
   it('"most goals in the big dance" reads as a grand_final match type', async () => {

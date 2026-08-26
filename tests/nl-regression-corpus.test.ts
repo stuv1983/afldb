@@ -1195,7 +1195,6 @@ describe('NL-027: slang and multi-word stat-game idioms resolve', () => {
     ['dusty most uncontested possessions game against Carlton', 'uncontested'],
     ['dusty most contested possessions game against Carlton', 'contested'],
     ['dusty record inside-fifties game against Carlton', 'inside_50s'],
-    ['dusty record rebound-fifties game against Carlton', 'rebounds'],
   ])('%s -> %s, with no leftover "game"', async (question, metric) => {
     const result = await parseNlQuestion(question, ctx);
     expect(result.status).toBe('plan');
@@ -1203,6 +1202,12 @@ describe('NL-027: slang and multi-word stat-game idioms resolve', () => {
     const p = (result as Extract<NlParse, { status: 'plan' }>).plan;
     expect(p.metric).toBe(metric);
     expect(p.mode).toBe('single');
+  });
+
+  it('declines rebound-fifties rather than substituting a different metric', async () => {
+    const result = await parseNlQuestion('dusty record rebound-fifties game against Carlton', ctx);
+    expect(result.status).toBe('unanswerable');
+    if (result.status === 'unanswerable') expect(result.topic).toBe('rebound 50s');
   });
 
   // "contested possessions" must not be shadowed by the bare

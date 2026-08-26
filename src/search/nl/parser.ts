@@ -41,6 +41,7 @@ import {
   type NlQueryPlan,
 } from '@/search/nl/plan';
 import type { GridAxisState } from '@/search/grid-solver-spec';
+import { extractHeadToHeadCue } from '@/search/nl/semantic-intents';
 import {
   findClub, findVenue, stripMatch,
   type NlClubDirectoryEntry, type NlEntityMatch, type NlVenueDirectoryEntry,
@@ -972,15 +973,19 @@ function extractHavingClause(text: string): {
       }
       
       if (value !== null) {
-        if (/\bat least\b/.test(window)) op = 'gte';
-        else if (/\bat most\b/.test(window)) op = 'lte';
-        else if (/\bmore than\b/.test(window)) op = 'gt';
-        else if (/\bless than\b/.test(window)) op = 'lt';
-        else if (/\bexactly\b/.test(window)) op = 'eq';
-        
-        let consumed = [match[0], countStr];
+        let matchedOperator: string | null = null;
+        for (const [operatorPattern, parsedOp] of COMPARE_OP_WORDS) {
+          const operatorMatch = operatorPattern.exec(window);
+          if (!operatorMatch) continue;
+          op = parsedOp;
+          matchedOperator = operatorMatch[0];
+          break;
+        }
+
+        const consumed = [match[0], countStr, ...(matchedOperator ? [matchedOperator] : [])];
         working = stripMatch(working, match[0]);
         working = stripMatch(working, countStr);
+        if (matchedOperator) working = stripMatch(working, matchedOperator);
         return { text: working, havingClause: { metric, op, value }, consumed };
       }
     }
@@ -1049,6 +1054,13 @@ function candidatePlayerSpan(text: string): string | null {
   const alphaRun = tokens.filter((t) => /^[a-z]+$/.test(t) && !STOPWORDS.has(t));
   if (alphaRun.length === 0) return null;
   return alphaRun.slice(0, 4).join(' ');
+}
+
+/** Player suffix spelling is part of identity, but common variants are equivalent for lookup. */
+function normalisePlayerSuffixes(name: string): string {
+  return name
+    .replace(/\b(?:jr|junior)\b/g, 'jnr')
+    .replace(/\b(?:sr|senior)\b/g, 'snr');
 }
 
 // -------------------------------------------------------------- main entry
@@ -1121,12 +1133,36 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   consumedTokens.push(...byClubPlayer.consumed);
 
   // 4. Club extraction (roles resolved by governing preposition).
-  const clubExtraction = extractClubs(text, ctx.clubs);
+  // Peek at a relationship cue first so the "to" inside "head to head"
+  // cannot govern a later club as though the reader wrote "lost to".
+  // The cue is committed only after two real clubs resolve.
+  const headToHeadResult = extractHeadToHeadCue(text);
+  const clubExtraction = extractClubs(headToHeadResult.cue ? headToHeadResult.text : text, ctx.clubs);
   text = clubExtraction.text;
   consumedTokens.push(...clubExtraction.consumed);
-  const clubFor = byClubPlayer.clubFor ?? clubExtraction.clubFor;
-  const clubAgainst = clubExtraction.clubAgainst;
-  const matchup = byClubPlayer.clubFor ? undefined : clubExtraction.matchup;
+  let clubFor = byClubPlayer.clubFor ?? clubExtraction.clubFor;
+  let clubAgainst = clubExtraction.clubAgainst;
+  let matchup = byClubPlayer.clubFor ? undefined : clubExtraction.matchup;
+
+  // Relationship-level language needs both real directory entities before
+  // it can become a plan. Once the pair is proven, normalize role-based
+  // extraction ("A record against B", "draws between A and B") to the same
+  // unordered matchup scope used by a literal "A v B".
+  let headToHead: NlQueryPlan['headToHead'];
+  if (headToHeadResult.cue && (matchup || (clubFor && clubAgainst))) {
+    if (!matchup && clubFor && clubAgainst) {
+      matchup = { clubA: clubFor, clubB: clubAgainst };
+    }
+    clubFor = undefined;
+    clubAgainst = undefined;
+    headToHead = { kind: headToHeadResult.cue.kind };
+    consumedTokens.push(...headToHeadResult.consumed);
+  } else if (headToHeadResult.cue) {
+    // One or zero clubs: restore the relationship words as meaningful
+    // leftovers so the confidence gate declines instead of answering a
+    // narrower question that silently discarded the missing participant.
+    text = `${text} ${headToHeadResult.cue.matchedText}`.trim();
+  }
   if (clubFor) report.entityResolution.push({ mention: clubFor.matchedText, resolvedTo: clubFor.entity.name, certainty: 1 });
   if (clubAgainst) report.entityResolution.push({ mention: clubAgainst.matchedText, resolvedTo: clubAgainst.entity.name, certainty: 1 });
   if (matchup) {
@@ -1415,7 +1451,9 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     const nicknameKey = Object.hasOwn(PLAYER_NICKNAMES, candidateRaw)
       ? candidateRaw
       : Object.hasOwn(PLAYER_NICKNAMES, firstWord) ? firstWord : null;
-    const lookupName = nicknameKey !== null ? PLAYER_NICKNAMES[nicknameKey] : candidateRaw;
+    const lookupName = normalisePlayerSuffixes(
+      nicknameKey !== null ? PLAYER_NICKNAMES[nicknameKey] : candidateRaw,
+    );
     const candidates = await ctx.resolvePlayer(lookupName);
     const top = candidates[0];
     if (top && top.score >= PLAYER_ACCEPT_SCORE) {
@@ -1429,11 +1467,11 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       // consumed too, and answered at full confidence as though the
       // nonsense had never been typed. Now "banana" stays in the text as
       // a leftover, and the gate at the end declines rather than guesses.
-      const nameWords = top.ref.name.toLowerCase().split(/\s+/);
+      const nameWords = normalisePlayerSuffixes(top.ref.name.toLowerCase()).split(/\s+/);
       const nicknameTokens = new Set(nicknameKey !== null ? nicknameKey.split(' ') : []);
       const spanTokens = candidateRaw.split(' ');
       const justified = spanTokens.filter(
-        (t) => nicknameTokens.has(t) || nameWords.some((w) => w.startsWith(t)),
+        (t) => nicknameTokens.has(t) || nameWords.some((w) => w.startsWith(normalisePlayerSuffixes(t))),
       );
       const mention = justified.length > 0 ? justified.join(' ') : candidateRaw;
 
@@ -1448,8 +1486,8 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       // specific player by construction.
       const mentionTokens = justified.length > 0 ? justified : spanTokens;
       const nameMatches = nicknameKey !== null ? 1 : candidates.filter((c) => {
-        const words = c.ref.name.toLowerCase().split(/\s+/);
-        return mentionTokens.every((t) => words.some((w) => w.startsWith(t)));
+        const words = normalisePlayerSuffixes(c.ref.name.toLowerCase()).split(/\s+/);
+        return mentionTokens.every((t) => words.some((w) => w.startsWith(normalisePlayerSuffixes(t))));
       }).length;
 
       const second = candidates[1];
@@ -1478,7 +1516,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       // casting a wide net, not competing readings of the question.
       const lookupTokens = lookupName.split(' ');
       const plausible = candidates.filter((c) => {
-        const words = c.ref.name.toLowerCase().split(/\s+/);
+        const words = normalisePlayerSuffixes(c.ref.name.toLowerCase()).split(/\s+/);
         return lookupTokens.every((t) => words.some((w) => w.startsWith(t)));
       });
       if (plausible.length >= 2 && plausible.length <= NL_LIMITS.maxPlayerCandidates) {
@@ -1533,6 +1571,8 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     // Checked first: the summary cue only exists because the achievement
     // phrase matched, so nothing else can be competing for this question.
     grain = 'achievement_summary';
+  } else if (headToHead) {
+    grain = 'head_to_head';
   } else if (achievementResult.achievementKey) {
     grain = 'player_career';
   } else if (streakResult.streakDefinition) {
@@ -1562,6 +1602,15 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     } else if (inOneSeason) {
       grain = 'player_season';
       metric = playerMetricResult.metric;
+    } else if (
+      overCareer && clubFor && !venue && !clubAgainst && !matchup && !matchTypeResult.matchType
+      && playerMetricResult.metric === 'games'
+    ) {
+      // A career games leader FOR one club counts appearances for that
+      // organization lineage, not the player's whole-career total and not
+      // a fictitious per-game "games" statistic.
+      grain = 'player_career';
+      metric = 'games';
     } else if (overCareer && !scoped) {
       grain = 'player_career';
       metric = playerMetricResult.metric;
@@ -1774,14 +1823,16 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // list where the reader asked for all of them.
   const resolvedAgg = resolvePolarity(aggResult.agg, metric, aggResult.polarity);
   const structureOnly = careerConditions.length > 0 || careerPredicates.length > 0
-    || clubSeasonConditions.length > 0 || !!boundary || !!havingResult.havingClause;
+    || clubSeasonConditions.length > 0 || !!boundary || !!havingResult.havingClause || !!headToHead;
   // A max/min with NO metric and structure present is not a ranking at
   // all -- there is nothing to rank by, and the answer path already
   // degrades it to a list, only capped at maxTiedRows(25) instead of
   // maxListRows(100). "players WHO PLAYED on anzac day" is the shape:
   // AGG_WORDS reads "who played" as the "who played the most..." idiom,
   // but with no stat named the honest reading is the full list.
-  const agg: NlAggregation = havingResult.havingClause
+  const agg: NlAggregation = headToHead
+    ? { kind: 'count' }
+    : havingResult.havingClause
     ? { kind: 'list' }
     : resolvedAgg && (resolvedAgg.kind === 'max' || resolvedAgg.kind === 'min')
       && metric === null && structureOnly
@@ -1802,6 +1853,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     ...(grain === 'achievement_summary' && achievementResult.achievementKey && achievementResult.summaryKind
       ? { achievementSummary: { achievementKey: achievementResult.achievementKey, kind: achievementResult.summaryKind } }
       : {}),
+    ...(headToHead ? { headToHead } : {}),
     ...(streakResult.streakDefinition ? { streakDefinition: streakResult.streakDefinition } : {}),
     ...(periodSplitResult.periodSplit ? { periodSplit: periodSplitResult.periodSplit } : {}),
     ...(scoreCheckpointResult.scoreCheckpoint ? { scoreCheckpoint: scoreCheckpointResult.scoreCheckpoint } : {}),
@@ -1827,7 +1879,8 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // correct in every other respect -- was declined as unrecognised.
   // An achievement_summary always carries its own descriptor, which
   // validatePlan requires, so reaching this point is itself the structure.
-  const structuralOk = grain === 'team_match' ? !!metric || !!havingResult.havingClause
+  const structuralOk = grain === 'head_to_head' ? !!headToHead && !!scope.matchup
+    : grain === 'team_match' ? !!metric || !!havingResult.havingClause
     : grain === 'team_streak' ? !!streakResult.streakDefinition
     : grain === 'club_season' ? clubSeasonCuePresent
     : grain === 'achievement_summary' ? true

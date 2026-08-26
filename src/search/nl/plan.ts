@@ -231,13 +231,19 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    games" decline instead of being accepted as a threshold condition.
  *    "At most 10 games" remains the supported upper-bound operator and
  *    "most games" remains the career leaderboard.
+ * 26: comparison phrases are consumed atomically; two-club records, win
+ *    comparisons, draw counts and last draws use a typed head_to_head
+ *    plan/answer path; club-scoped career games are explicit; player
+ *    suffix variants resolve without losing identity; rebound 50s decline
+ *    as an unsupported NL metric.
  */
-export const PARSER_VERSION = 25;
+export const PARSER_VERSION = 26;
 
 // ------------------------------------------------------------------ grain
 
 export type NlGrain =
   | 'player_career' | 'player_game' | 'player_season' | 'team_match' | 'club_season' | 'team_streak'
+  | 'head_to_head'
   /**
    * Summaries OF an achievement rather than a list of players who hold it
    * ("which club has had the most players kick a goal with their first
@@ -288,6 +294,12 @@ const NL_ACHIEVEMENT_SUMMARY_KINDS: readonly NlAchievementSummaryKind[] = [
 export type NlAchievementSummary = {
   achievementKey: NlAchievementKey;
   kind: NlAchievementSummaryKind;
+};
+
+export type NlHeadToHeadKind = 'record' | 'compare_wins' | 'draw_count' | 'last_draw';
+
+export type NlHeadToHead = {
+  kind: NlHeadToHeadKind;
 };
 
 // ---------------------------------------------------------------- entities
@@ -453,7 +465,7 @@ function columnMetric(key: string, label: string, column: string, statKey?: Grid
 }
 
 const PLAYER_STAT_METRICS: Record<string, NlMetricDef> = Object.fromEntries(
-  (Object.keys(GRID_STATS) as GridStatKey[]).map((key) => [
+  (Object.keys(GRID_STATS) as GridStatKey[]).filter((key) => key !== 'rebounds').map((key) => [
     key,
     columnMetric(key, GRID_STATS[key].label, key, key),
   ]),
@@ -464,6 +476,7 @@ export const NL_METRICS: Record<NlGrain, Record<string, NlMetricDef>> = {
   // so it has no metric vocabulary at all -- validatePlan requires its
   // metric to be null.
   achievement_summary: {},
+  head_to_head: {},
   player_game: {
     ...PLAYER_STAT_METRICS,
     brownlow_votes: columnMetric('brownlow_votes', 'Brownlow votes', 'brownlow_votes'),
@@ -508,7 +521,6 @@ export const NL_METRICS: Record<NlGrain, Record<string, NlMetricDef>> = {
     // player_match_stats instead (careerStatValueExpr in grid-solver.ts
     // already does exactly this for the grid catalogue) -- column here
     // is the bare stat name, a marker for the compiler, not literal SQL.
-    rebounds: columnMetric('rebounds', 'Rebound 50s', 'rebounds', 'rebounds'),
     inside_50s: columnMetric('inside_50s', 'Inside 50s', 'inside_50s', 'inside_50s'),
     clearances: columnMetric('clearances', 'Clearances', 'clearances', 'clearances'),
     clangers: columnMetric('clangers', 'Clangers', 'clangers', 'clangers'),
@@ -588,7 +600,6 @@ export const NL_COVERAGE: Partial<Record<string, NlCoverage>> = {
   clangers: { firstSeason: 1998, note: 'Clangers were not recorded before 1998.' },
   clearances: { firstSeason: 1998, note: 'Clearances were not recorded before 1998.' },
   inside_50s: { firstSeason: 1998, note: 'Inside 50s were not recorded before 1998.' },
-  rebounds: { firstSeason: 1998, note: 'Rebound 50s were not recorded before 1998.' },
   contested: { firstSeason: 1999, note: 'Contested possessions were not recorded before 1999.' },
   uncontested: { firstSeason: 1999, note: 'Uncontested possessions were not recorded before 1999.' },
   bounces: { firstSeason: 1999, note: 'Bounces were not recorded before 1999.' },
@@ -718,6 +729,8 @@ export type NlQueryPlan = {
   clubSeasonConditions: NlClubSeasonCondition[];
   /** achievement_summary only: which achievement, summarised which way. */
   achievementSummary?: NlAchievementSummary;
+  /** head_to_head only: the relationship answer requested for scope.matchup. */
+  headToHead?: NlHeadToHead;
   /** team_streak only: whether the streak is of wins or losses. */
   streakDefinition?: { kind: 'win' | 'loss' | 'unbeaten' };
   periodSplit?: 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'H1' | 'H2' | 'FULL_MATCH';
@@ -822,8 +835,29 @@ function validateCondition(cond: NlCareerCondition): NlValidationError | null {
 export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError {
   if (raw.v !== 1) return { error: 'Unrecognised plan version.' };
 
-  const grains: NlGrain[] = ['player_career', 'player_game', 'player_season', 'team_match', 'club_season', 'team_streak', 'achievement_summary'];
+  const grains: NlGrain[] = ['player_career', 'player_game', 'player_season', 'team_match', 'club_season', 'team_streak', 'achievement_summary', 'head_to_head'];
   if (!grains.includes(raw.grain)) return { error: `Unknown grain "${raw.grain}".` };
+
+  if (raw.grain === 'head_to_head') {
+    if (!raw.headToHead || !['record', 'compare_wins', 'draw_count', 'last_draw'].includes(raw.headToHead.kind)) {
+      return { error: 'A head-to-head question must define a recognised record kind.' };
+    }
+    if (raw.metric !== null || raw.agg.kind !== 'count') {
+      return { error: 'A head-to-head question uses its typed record kind, not a ranked metric.' };
+    }
+    if (!raw.scope.matchup) return { error: 'A head-to-head question needs exactly two clubs.' };
+    if (
+      raw.player || raw.scope.playerIdIn || raw.scope.clubFor || raw.scope.clubAgainst
+      || raw.careerConditions.length > 0 || raw.careerPredicates.length > 0
+      || raw.clubSeasonConditions.length > 0 || raw.streakDefinition
+      || raw.achievementSummary || raw.boundary || raw.havingClause || raw.matchFilter
+      || raw.periodSplit || raw.scoreCheckpoint || raw.resultFilter || raw.debutGame
+    ) {
+      return { error: 'A head-to-head question contains fields its compiler cannot honour.' };
+    }
+  } else if (raw.headToHead) {
+    return { error: 'A head-to-head descriptor only applies to a head-to-head question.' };
+  }
 
   // An achievement summary counts rows; it never ranks by a statistic, so
   // it carries its own descriptor instead of a metric.
@@ -1020,6 +1054,18 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   if (forErr) return forErr;
   const againstErr = validateRef(raw.scope.clubAgainst, 'organizationId', 'Opponent club');
   if (againstErr) return againstErr;
+  if (raw.grain === 'player_career' && raw.scope.clubFor && raw.careerPredicates.length === 0) {
+    const def = raw.metric ? NL_METRICS.player_career[raw.metric] : undefined;
+    if (!raw.metric || (raw.metric !== 'games' && !(def?.kind === 'column' && def.statKey))) {
+      return { error: 'This career statistic cannot currently be totalled for one club.' };
+    }
+    if (
+      raw.scope.clubAgainst || raw.scope.matchup || raw.scope.venue || raw.scope.matchType
+      || raw.scope.roundNumber || raw.scope.seasonMin !== undefined || raw.scope.seasonMax !== undefined
+    ) {
+      return { error: 'A club-scoped career total cannot also use match or season scope.' };
+    }
+  }
   if (raw.scope.matchup !== undefined) {
     if (typeof raw.scope.matchup !== 'object' || raw.scope.matchup === null) {
       return { error: 'Matchup scope is malformed.' };
@@ -1034,7 +1080,7 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
     if (raw.scope.clubFor || raw.scope.clubAgainst) {
       return { error: 'A matchup scope cannot also name a subject or opponent club.' };
     }
-    if (raw.grain !== 'player_game' && raw.grain !== 'team_match') {
+    if (raw.grain !== 'player_game' && raw.grain !== 'team_match' && raw.grain !== 'head_to_head') {
       return { error: 'A two-club matchup scope only applies to match-level questions.' };
     }
   }
@@ -1111,6 +1157,7 @@ const GRAIN_LABEL: Record<NlGrain, string> = {
   club_season: 'club season',
   team_streak: 'streak',
   achievement_summary: 'achievement',
+  head_to_head: 'head-to-head',
 };
 
 /** The subject noun for a grain with no ranked metric ("every matching <noun>"). */
@@ -1122,6 +1169,7 @@ const GRAIN_SUBJECT: Record<NlGrain, string> = {
   club_season: 'club season',
   team_streak: 'streak',
   achievement_summary: 'group',
+  head_to_head: 'matchup',
 };
 
 const TIE_ENTITY: Record<NlGrain, string> = {
@@ -1132,6 +1180,7 @@ const TIE_ENTITY: Record<NlGrain, string> = {
   club_season: 'club season',
   team_streak: 'streak',
   achievement_summary: 'group',
+  head_to_head: 'matchup',
 };
 
 const OP_WORDS: Record<NlCompareOp, string> = {
@@ -1160,7 +1209,10 @@ export function describePlan(plan: NlQueryPlan): string[] {
 
   const metricLabel = metricLabelOf(plan.grain, plan.metric);
   const aggWord = AGG_WORDS[plan.agg.kind];
-  if (plan.havingClause) {
+  if (plan.headToHead) {
+    const kind = plan.headToHead.kind.replace(/_/g, ' ');
+    lines.push(`Head-to-head calculation: ${kind}.`);
+  } else if (plan.havingClause) {
     const { metric, op, value } = plan.havingClause;
     lines.push(`Grouped clubs by ${metric} and kept counts ${OP_WORDS[op]} ${value}.`);
     if (plan.matchFilter) {
