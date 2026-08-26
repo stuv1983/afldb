@@ -1,7 +1,8 @@
 import './guard';
 
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -63,16 +64,17 @@ function hasPsycopg(): boolean {
 }
 
 const canSpawnPython = hasPsycopg();
-const canSpawnImporter = Boolean(legacySqlite)
-  && existsSync(legacySqlite as string)
-  && canSpawnPython;
 
 const integrationDsn = process.env.AFLDB_TEST_DATABASE_URL as string;
 const importRole = createImportRoleParityHarness(
   integrationDsn,
   process.env.AFLDB_TEST_IMPORT_DATABASE_URL,
 );
-const canRunImporter = canSpawnImporter && importRole.isConfigured;
+
+const canRunFixtureImporter = canSpawnPython && importRole.isConfigured;
+const canRunImporter = Boolean(legacySqlite)
+  && existsSync(legacySqlite as string)
+  && canRunFixtureImporter;
 const canRunUnder22Importer = canSpawnPython
   && existsSync(UNDER_22_CSV)
   && importRole.isConfigured;
@@ -80,7 +82,7 @@ const roleParitySuffix = importRole.isConfigured ? '' : ` — ${importRole.skipM
 
 // One connection pool for the whole file: both describe blocks share `sql`.
 beforeAll(async () => {
-  if (canRunImporter || canRunUnder22Importer) await importRole.validate();
+  if (canRunFixtureImporter || canRunUnder22Importer) await importRole.validate();
 });
 beforeAll(() => lockHonoursTables(integrationDsn), 300_000);
 afterAll(async () => {
@@ -88,12 +90,19 @@ afterAll(async () => {
   await sql.end();
 });
 
-function runImporter(groups: string[], extra: string[] = []) {
+function runImporter(
+  groups: string[],
+  extra: string[] = [],
+  sqlitePath: string | undefined = legacySqlite,
+) {
   return importRole.spawn(
     python,
     ['tools/migration/import_awards.py', '--groups', ...groups, ...extra],
     {
       cwd: root,
+      env: {
+        AFLDB_LEGACY_SQLITE: sqlitePath,
+      },
     },
   );
 }
@@ -1191,6 +1200,204 @@ describe.skipIf(!canRunImporter)(
           }
         },
       );
+    });
+  },
+);
+
+type CaptaincyRow = {
+  id: number;
+  season: number;
+  clubId: number;
+  playerId: number | null;
+  name: string;
+  status: string;
+  role: string;
+  period: string | null;
+  notes: string | null;
+  sourceId: number | null;
+  recordId: string | null;
+};
+
+const CAPTAINCY_FIXTURE_NAME = 'AFLDB-ISSUE-085 Fixture Captain';
+const CAPTAINCY_FIXTURE_RECORD_ID = 'issue-085:owned-captaincy';
+
+function buildCaptaincyFixtureDb(
+  path: string,
+  row: { season: number; club: string },
+): void {
+  const script = [
+    'import json, sqlite3',
+    `con = sqlite3.connect(${JSON.stringify(path)})`,
+    'cur = con.cursor()',
+    'cur.execute("""CREATE TABLE person_links (dg_person_id INTEGER, player_id INTEGER, match_status TEXT, candidate_count INTEGER)""")',
+    'cur.execute("""CREATE TABLE captaincies (source_row_id TEXT, season INTEGER, club TEXT, player TEXT, role TEXT, source_period TEXT, source_notes TEXT, player_id INTEGER, match_status TEXT, candidate_count INTEGER, source_url TEXT)""")',
+    `row = json.loads(${JSON.stringify(JSON.stringify(row))})`,
+    'cur.execute("""INSERT INTO captaincies VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",',
+    `    (${JSON.stringify(CAPTAINCY_FIXTURE_RECORD_ID)}, row["season"], row["club"],`,
+    `     ${JSON.stringify(CAPTAINCY_FIXTURE_NAME)}, "Captain", "fixture period",`,
+    '     "fixture source notes", None, "unmatched", 0, "https://example.test/issue-085"))',
+    'con.commit()',
+    'con.close()',
+  ].join('\n');
+  const result = spawnSync(python, ['-c', script], { encoding: 'utf8' });
+  if (result.status !== 0) {
+    throw new Error(`failed to build ISSUE-085 SQLite fixture: ${result.stderr}`);
+  }
+}
+
+describe.skipIf(!canRunFixtureImporter)(
+  'captaincies reload reconciles only wikipedia-owned rows (AFLDB-ISSUE-085)',
+  () => {
+    let wikipediaId = 0;
+    let manualId = 0;
+    let season = 0;
+    let clubId = 0;
+    let clubName = '';
+    let ownedId = 0;
+    let fixtureDirectory = '';
+    let fixtureSqlite = '';
+
+    async function readCaptaincy(id: number): Promise<CaptaincyRow | undefined> {
+      const [row] = await sql<CaptaincyRow[]>`
+        SELECT id, season, club_id AS "clubId", player_id AS "playerId",
+               player_name_raw AS name, link_status_value::text AS status,
+               role, period, notes, source_id AS "sourceId",
+               source_record_id AS "recordId"
+          FROM captaincies
+         WHERE id = ${id}
+      `;
+      return row;
+    }
+
+    beforeAll(async () => {
+      const sources = await sql<{ key: string; id: number }[]>`
+        SELECT key, id FROM sources
+         WHERE key IN ('wikipedia', 'manual_admin_edit')
+      `;
+      const byKey = new Map(sources.map((row) => [row.key, row.id]));
+      wikipediaId = byKey.get('wikipedia') ?? 0;
+      manualId = byKey.get('manual_admin_edit') ?? 0;
+      expect(wikipediaId, 'wikipedia source must exist').toBeGreaterThan(0);
+      expect(manualId, 'manual_admin_edit source must exist').toBeGreaterThan(0);
+
+      const [reference] = await sql<{
+        season: number; clubId: number; clubName: string;
+      }[]>`
+        SELECT s.year::int AS season, c.id AS "clubId", c.name AS "clubName"
+          FROM clubs c
+          JOIN seasons s
+            ON (c.first_season IS NULL OR s.year >= c.first_season)
+           AND (c.last_season IS NULL OR s.year <= c.last_season)
+         WHERE c.slug = 'adelaide'
+         ORDER BY s.year DESC
+         LIMIT 1
+      `;
+      expect(reference, 'afldb_test needs the reference Adelaide club and one valid season')
+        .toBeDefined();
+      season = reference.season;
+      clubId = reference.clubId;
+      clubName = reference.clubName;
+
+      fixtureDirectory = mkdtempSync(join(tmpdir(), 'afldb-issue085-'));
+      fixtureSqlite = join(fixtureDirectory, 'captaincies.sqlite');
+      buildCaptaincyFixtureDb(fixtureSqlite, { season, club: clubName });
+
+      const [owned] = await sql<{ id: number }[]>`
+        INSERT INTO captaincies
+          (season, club_id, player_name_raw, link_status_value, role, period,
+           notes, source_id, source_record_id)
+        VALUES
+          (${season}, ${clubId}, ${CAPTAINCY_FIXTURE_NAME}, 'unmatched',
+           'Captain', 'stale stored period', 'stale stored notes',
+           ${wikipediaId}, ${CAPTAINCY_FIXTURE_RECORD_ID})
+        RETURNING id
+      `;
+      ownedId = owned.id;
+    });
+
+    afterAll(async () => {
+      if (ownedId > 0) {
+        await sql`DELETE FROM captaincies WHERE id = ${ownedId}`;
+      }
+      if (fixtureDirectory) {
+        rmSync(fixtureDirectory, { recursive: true, force: true });
+      }
+    });
+
+    it('reconciles its own row, preserves a foreign row, and remains idempotent', async () => {
+      const countBefore = await countRows('captaincies');
+      const [foreign] = await sql<{ id: number }[]>`
+        INSERT INTO captaincies
+          (season, club_id, player_name_raw, link_status_value, role, period,
+           notes, source_id, source_record_id)
+        VALUES
+          (${season}, ${clubId}, 'AFLDB-ISSUE-085 Foreign Captaincy',
+           'unmatched', 'Captain', 'fixture period', 'foreign row unchanged',
+           ${manualId}, 'issue-085:foreign-captaincy')
+        RETURNING id
+      `;
+
+      try {
+        const first = runImporter(['captaincies'], [], fixtureSqlite);
+        expect(first.status, first.stdout + first.stderr).toBe(0);
+        const expectedOwned: CaptaincyRow = {
+          id: ownedId,
+          season,
+          clubId,
+          playerId: null,
+          name: CAPTAINCY_FIXTURE_NAME,
+          status: 'unmatched',
+          role: 'Captain',
+          period: 'fixture period',
+          notes: 'fixture source notes',
+          sourceId: wikipediaId,
+          recordId: CAPTAINCY_FIXTURE_RECORD_ID,
+        };
+        const expectedForeign: CaptaincyRow = {
+          id: foreign.id,
+          season,
+          clubId,
+          playerId: null,
+          name: 'AFLDB-ISSUE-085 Foreign Captaincy',
+          status: 'unmatched',
+          role: 'Captain',
+          period: 'fixture period',
+          notes: 'foreign row unchanged',
+          sourceId: manualId,
+          recordId: 'issue-085:foreign-captaincy',
+        };
+        expect(await readCaptaincy(ownedId), 'owned row is refreshed under the same id')
+          .toEqual(expectedOwned);
+        expect(await readCaptaincy(foreign.id), 'foreign row is neither adopted nor mutated')
+          .toEqual(expectedForeign);
+        expect(await countRows('captaincies')).toBe(countBefore + 1);
+
+        const second = runImporter(['captaincies'], [], fixtureSqlite);
+        expect(second.status, second.stdout + second.stderr).toBe(0);
+        expect(await readCaptaincy(ownedId)).toEqual(expectedOwned);
+        expect(await readCaptaincy(foreign.id)).toEqual(expectedForeign);
+        expect(await countRows('captaincies')).toBe(countBefore + 1);
+      } finally {
+        await sql`DELETE FROM captaincies WHERE id = ${foreign.id}`;
+      }
+    }, 300_000);
+
+    it('refuses a foreign-owned row occupying an incoming natural key', async () => {
+      await sql`UPDATE captaincies SET source_id = ${manualId} WHERE id = ${ownedId}`;
+      try {
+        const before = await countRows('captaincies');
+        const beforeRow = await readCaptaincy(ownedId);
+        const run = runImporter(['captaincies'], [], fixtureSqlite);
+        expect(run.status, 'the reload must fail closed').toBe(1);
+        expect(run.stdout).toContain('natural key(s)');
+        expect(run.stdout).toContain('does not own');
+        expect(run.stdout).toContain(`id=${ownedId}`);
+        expect(await countRows('captaincies')).toBe(before);
+        expect(await readCaptaincy(ownedId), 'the colliding foreign row is untouched')
+          .toEqual(beforeRow);
+      } finally {
+        await sql`UPDATE captaincies SET source_id = ${wikipediaId} WHERE id = ${ownedId}`;
+      }
     });
   },
 );

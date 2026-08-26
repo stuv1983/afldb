@@ -1210,6 +1210,57 @@ def import_honour_teams(pg, lite, rep: Reporter, batch, sources: dict[str, int],
 # ---------------------------------------------------------------------------
 # Group: captaincies
 # ---------------------------------------------------------------------------
+def _refuse_captaincy_natural_key_collisions(
+    pg, incoming: list[tuple], source_id: int,
+) -> None:
+    """Refuse a source-blind fact collision before the scoped reload writes.
+
+    ``captaincies_natural_uq`` makes (season, club, raw player name, role) a
+    globally unique fact even though ``reload_keyed`` preserves rows by their
+    stable source key. Once reconciliation is ownership-scoped, an incoming
+    fact held by a foreign- or NULL-provenance row would otherwise reach INSERT
+    and expose a raw uniqueness error. ISSUE-080's convention is to identify
+    and refuse that collision without adopting or mutating the foreign row.
+    """
+    if not incoming:
+        return
+
+    seasons = [row[0] for row in incoming]
+    club_ids = [row[1] for row in incoming]
+    names = [row[3] for row in incoming]
+    roles = [row[5] for row in incoming]
+    with pg.cursor() as cur:
+        cur.execute(
+            """SELECT e.id, e.source_id, e.season, e.club_id,
+                      e.player_name_raw, e.role
+                 FROM unnest(%s::smallint[], %s::integer[], %s::text[], %s::text[])
+                      AS i(season, club_id, player_name_raw, role)
+                 JOIN captaincies e
+                   ON e.season = i.season
+                  AND e.club_id = i.club_id
+                  AND e.player_name_raw = i.player_name_raw
+                  AND e.role = i.role
+                WHERE e.source_id IS DISTINCT FROM %s
+                ORDER BY e.id
+                LIMIT 5""",
+            (seasons, club_ids, names, roles, source_id),
+        )
+        collisions = cur.fetchall()
+
+    if collisions:
+        listed = "; ".join(
+            f"row id={row[0]} source_id={row[1]} "
+            f"key=[{row[2]} | {row[3]} | {row[4]} | {row[5]}]"
+            for row in collisions
+        )
+        raise ReloadOwnershipCollision(
+            "captaincies: the incoming source supplies natural key(s) "
+            "(season, club_id, player_name_raw, role) already held by row(s) "
+            f"this loader does not own: {listed}. Nothing has been written. "
+            "A curator must reconcile each pair before this reload can run."
+        )
+
+
 def import_captaincies(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
                        sources: dict[str, int], allow_link_loss: bool = False) -> None:
     with pg.cursor() as cur:
@@ -1222,34 +1273,38 @@ def import_captaincies(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
              FROM captaincies ORDER BY club, season, player"""
     ).fetchall()
 
-    def build():
-        for r in rows:
-            batch.records_read += 1
-            player = clean_text(r["player"])
-            if not player or r["season"] not in valid_seasons:
-                batch.reject(r["source_row_id"], "missing player or unknown season", dict(r))
-                continue
-            # club_id is NOT NULL here: a captaincy with no club is not a
-            # fact AFLDB can state, so it is rejected rather than guessed.
-            club_id, club_raw = clubs.resolve(r["club"], r["season"])
-            if club_id is None:
-                batch.reject(r["source_row_id"], f"club not resolved: {club_raw!r}", dict(r))
-                continue
-            status = link_status(r["match_status"], r["player_id"])
-            yield (
-                r["season"], club_id, r["player_id"], player, status,
-                clean_text(r["role"]) or "Captain",
-                clean_text(r["source_period"]),
-                clean_text(r["source_notes"]),
-                sources.get("wikipedia"), r["source_row_id"], batch.id,
-            )
+    source_id = require_source(sources, "wikipedia")
+    prepared: list[tuple] = []
+    for r in rows:
+        batch.records_read += 1
+        player = clean_text(r["player"])
+        if not player or r["season"] not in valid_seasons:
+            batch.reject(r["source_row_id"], "missing player or unknown season", dict(r))
+            continue
+        # club_id is NOT NULL here: a captaincy with no club is not a
+        # fact AFLDB can state, so it is rejected rather than guessed.
+        club_id, club_raw = clubs.resolve(r["club"], r["season"])
+        if club_id is None:
+            batch.reject(r["source_row_id"], f"club not resolved: {club_raw!r}", dict(r))
+            continue
+        status = link_status(r["match_status"], r["player_id"])
+        prepared.append((
+            r["season"], club_id, r["player_id"], player, status,
+            clean_text(r["role"]) or "Captain",
+            clean_text(r["source_period"]),
+            clean_text(r["source_notes"]),
+            source_id, r["source_row_id"], batch.id,
+        ))
+
+    _refuse_captaincy_natural_key_collisions(pg, prepared, source_id)
 
     stats = reload_keyed(
         pg, "captaincies", ["source_id", "source_record_id"],
         ["season", "club_id", "player_id", "player_name_raw", "link_status_value",
          "role", "period", "notes", "source_id", "source_record_id", "import_batch_id"],
-        build(), batch,
+        iter(prepared), batch,
         target_table="captaincies",
+        scope_column="source_id", scope_values=[source_id],
         allow_link_loss=allow_link_loss,
     )
     pg.commit()
