@@ -131,10 +131,7 @@ export async function saveSiteSettings(
     frontendTheme,
   }, { userId: admin.id, label: admin.email });
 
-  revalidatePath('/');
-  revalidatePath('/aflw');
-  revalidatePath('/search');
-  revalidatePath('/admin/settings');
+  revalidatePath('/', 'layout');
 
   return { message: 'Saved. Settings have been updated.' };
 }

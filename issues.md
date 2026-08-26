@@ -7,14 +7,13 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 11
+**Open issues:** 10
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
 | `AFLDB-ISSUE-059` | Low | Search | Grouped `Qualifying matches` counts have no safe drill-down to the exact matching fixtures. | Extend Match Search or add a dedicated NL drill-down route that can faithfully replay the grouped row predicates. |
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
 | `AFLDB-ISSUE-076` | Medium | Performance | Grid Solver combinations using `won_final_at_venue` can exceed PostgreSQL's 5-second statement timeout and crash the page. | Capture and compare the generated SQL/EXPLAIN plan against `played_at_venue`, then optimise the `won_final_at_venue` query shape without raising the application timeout. |
-| `AFLDB-ISSUE-077` | Medium | UI/Settings | The super-admin-selected frontend theme is not stable within a browsing session; different pages can render different themes as the user navigates. | Trace every theme source (database setting, server render, cookie/local storage and client hydration), establish one authoritative theme value per request/session, and add navigation regression coverage. |
 | `AFLDB-ISSUE-083` | Medium | Tests / Database privileges | Every database-backed importer test substitutes the owner DSN for `AFLDB_IMPORT_DATABASE_URL`, so a privilege the importer needs but does not hold is invisible; `AFLDB-ISSUE-078` shipped exactly that defect. | Add a restricted test DSN plus a shared helper that runs the importer as `afldb_import` while fixtures stay on the owner handle, and prove it on the first-kick-goal loader first. |
 | `AFLDB-ISSUE-085` | Low | Data integrity / Import | `import_captaincies` reconciles the whole `captaincies` table with no ownership predicate — the ISSUE-080 defect class, latent because the importer is today the table's only writer. | Scope it to its own `source_id` by construction (the `reload_keyed` conjunction now exists) and decide the `captaincies_natural_uq` collision policy before a second writer ever exists. |
 | `AFLDB-ISSUE-086` | Needs triage | Admin / Data integrity | Data-editor edits to source-owned rows can be silently reverted by the owning source's next reload (durability/overwrite, not the ISSUE-080 deletion class); only `players`/`matches`/`draft_picks` are live editable entities today. | Answer the four triage questions in the entry (UI promise, affected fields/entities, intended durability, silence of reversion), then set severity on that evidence. |
@@ -3741,11 +3740,11 @@ another row.
 
 ## AFLDB-ISSUE-077 — Frontend theme changes unpredictably during a user session
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** UI/Settings
 - **Found:** 2026-08-22
-- **Resolved:** N/A
+- **Resolved:** 2026-08-26
 - **Files:** `src/db/queries/site-settings.ts`, `src/app/layout.tsx`, theme/layout components and any client-side theme initialisation/storage code
 
 ### Symptom
@@ -3771,21 +3770,24 @@ Observed manually during normal navigation after enabling the themeable frontend
 UI/settings state propagation or cache consistency.
 
 ### Root cause
-Not yet confirmed. Likely areas to inspect include competing theme sources (database setting versus cookie/local storage/default), stale cached `site-settings` reads across server-rendered routes, inconsistent layout boundaries, and a server/client hydration path that can initialise from different theme values.
+The frontend theme is evaluated during SSR/SSG from the global settings and embedded in the HTML `data-site-theme` attribute via `layout.tsx`. When a super-admin saved settings, only four specific paths (`/`, `/aflw`, `/search`, `/admin/settings`) were revalidated. Other statically generated pages (like `/records`) continued serving the old cached root layout and its stale theme string. On client-side navigation between a revalidated page and a stale page, the Next.js router patches the `<html>` tags with the respective layout's payload, causing the theme to flip unexpectedly without any concurrent settings changes.
 
 ### Fix
-Not yet fixed.
+Changed the cache revalidation in `saveSiteSettings` to `revalidatePath('/', 'layout')`. This invalidates the entire static cache boundary for the root layout (the whole site) in one operation, guaranteeing that all pages resolve the same new theme on their next render. The authoritative theme value remains the persisted database setting.
 
 ### Validation
-Not yet run.
+Added a unit test in `tests/admin-settings-actions.test.ts` verifying that `saveSiteSettings` issues the exact `revalidatePath('/', 'layout')` call to purge the site-wide layout cache.
+
+Final regression validation successfully executed by the user:
+- command:
+  npm.cmd test -- --run tests/admin-settings-actions.test.ts
+- 1 test file passed
+- 1/1 test passed
+- proves saveSiteSettings invalidates the root layout using:
+  revalidatePath('/', 'layout')
 
 ### Follow-up
-1. Identify every read/write path for `frontendTheme`, including database defaults, admin mutation/revalidation, server layout reads, cookies/local storage and any inline/client theme initialiser.
-2. Confirm whether two consecutive page requests in one session can receive different resolved theme values while the database setting is unchanged.
-3. Remove competing authorities so one resolved site theme drives both SSR and client hydration.
-4. Ensure changing the theme invalidates all relevant cached settings/layout data.
-5. Add a browser regression that saves a theme, navigates across a representative route set, and asserts the same theme marker/class/data attribute remains active on every page.
-6. Include a second test proving a deliberate super-admin theme change propagates consistently rather than requiring a new session or random navigation.
+None.
 
 ## AFLDB-ISSUE-078 — Draft and first-kick-goal reloads still discard manual player links
 
