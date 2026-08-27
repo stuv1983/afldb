@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-28
-**Open issues:** 6
+**Open issues:** 5
 
 ## How Claude should use this file
 
@@ -26,7 +26,6 @@
 |---|---|---|---|
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | React #418 remains intermittent under production-style NL search hydration; narrow H7 diagnostic is awaiting authoritative live-build validation. |
 | `AFLDB-ISSUE-076` | Medium | Performance | `won_final_at_venue` Grid Solver combinations can exceed the 5-second PostgreSQL statement timeout and crash the rendered page. |
-| `AFLDB-ISSUE-086` | Needs triage | Admin / Data integrity | Data-editor edits to source-owned rows can be silently reverted by the owning source's next reload; severity awaits the four-question triage recorded in the entry. |
 | `AFLDB-ISSUE-090` | Medium | Data integrity / Import | Confirmed release blocker: club-list DOB enrichment stacks duplicate unresolved `dob_conflict` rows on rerun, and the register pass deletes conflicts it does not own. Migration 072 APPLIED to `afldb_test`; dob-enrichment suite GREEN 23/23; release-gates validation HALTED, blocked by `AFLDB-ISSUE-092`. |
 | `AFLDB-ISSUE-092` | Medium | Data integrity / Tooling safety | §4 fail-closed gate + §5 `--source-key` containment IMPLEMENTED (2026-08-25, ISSUE-093 Phase 3; reusable `check_population_drop()` in `common.py`). Database validation (§11 tests 24–27) still pending, but **no longer blocked on a database**: `afldb_test` was rebuilt and validated on 2026-08-27 by `AFLDB-ISSUE-093` (Resolved). §6 recovery obsolete for the rebuild path. Blocks `AFLDB-ISSUE-090`. |
 | `AFLDB-ISSUE-095` | Medium | Data acquisition / Import architecture / Data integrity | `club_seasons` has no canonical, legacy-free acquisition path — `rebuild_derived.py` builds it only from `staging.team_seasons`, whose sole writer is `import_legacy_afl.py` under `AFLDB_LEGACY_SQLITE`. A clean canonical rebuild therefore correctly yields `club_seasons = 0`. Runbook `AFLDB-ISSUE-095.md`; decisions D1–D7 open. Stage 9 must NOT gate `club_seasons` until this lands. |
@@ -81,22 +80,6 @@
 - **Next action:** Trace every `frontendTheme` authority and cache boundary (database, admin mutation/revalidation, SSR layout, cookie/local storage, hydration), reduce them to one authoritative resolved theme, then add browser coverage that navigates across multiple routes and proves the theme remains unchanged until a super admin deliberately changes it.
 
 
-
-## AFLDB-ISSUE-086 — Data-editor edits to source-owned rows can be reverted by the next source reload
-
-- **Severity:** Needs triage (deliberately not pre-classified — runbook G5)
-- **Area:** Admin / Data integrity
-- **Key files:** `src/lib/edit/spec.ts` (`EDITABLE_ENTITIES`),
-  `src/db/queries/data-edits.ts`, the importers for implicated entities
-- **Current state:** Structural finding from the `AFLDB-ISSUE-080` runbook
-  (G5): a data-editor UPDATE to a source-owned row is silently rewritten by
-  that source's next reload — durability/overwrite, not the ISSUE-080
-  ownership-deletion class. Present surface is narrow: only `players`,
-  `matches` and `draft_picks` are editable entities, so the honours tables have
-  no reversion path today. Not reproduced live.
-- **Next action:** Answer the entry's four triage questions (UI promise,
-  affected fields/entities, intended durability, silence of reversion) against
-  the three live editable entities, then set severity on that evidence.
 
 ## AFLDB-ISSUE-090 — DOB enrichment conflict writes are not pass-scoped or idempotent
 

@@ -889,3 +889,145 @@ class Reporter:
 
     def warn(self, message: str) -> None:
         print(f"    WARNING: {message}", flush=True)
+
+def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
+    """Replay durable admin overrides for the given table over newly imported rows.
+    
+    For DraftGuru integration (AFLDB-ISSUE-093), this helper can be called
+    directly by the new draft importer without redesign. The canonical DraftGuru importer
+    usage here is retained for historical compatibility on this branch.
+    """
+    with conn.cursor() as cur:
+        if table == "players":
+            # display_name is NOT NULL (explicit NULL forbidden), so COALESCE is safe.
+            # given_name, surname, dob, height_cm, weight_kg, notes are nullable (explicit NULL permitted),
+            # so they must use jsonb_exists to distinguish absent vs explicit JSON null.
+            cur.execute("""
+                WITH active_overrides AS (
+                    SELECT e.player_id, o.override_values
+                      FROM data_overrides o
+                      JOIN sources s ON s.key = split_part(o.entity_key, ':', 1)
+                      JOIN external_identities e ON e.external_id = substring(o.entity_key from position(':' in o.entity_key) + 1)
+                                                AND e.source_id = s.id
+                                                AND e.status IN ('unique', 'resolved')
+                     WHERE o.entity_type = 'players' AND o.is_active = true
+                )
+                UPDATE players p
+                   SET display_name = COALESCE(o.override_values->>'display_name', p.display_name),
+                       given_name = CASE WHEN jsonb_exists(o.override_values, 'given_name') THEN o.override_values->>'given_name' ELSE p.given_name END,
+                       surname = CASE WHEN jsonb_exists(o.override_values, 'surname') THEN o.override_values->>'surname' ELSE p.surname END,
+                       dob = CASE WHEN jsonb_exists(o.override_values, 'dob') THEN (o.override_values->>'dob')::date ELSE p.dob END,
+                       dob_confidence = COALESCE((o.override_values->>'dob_confidence')::value_confidence, p.dob_confidence),
+                       birth_year = CASE WHEN jsonb_exists(o.override_values, 'birth_year') THEN (o.override_values->>'birth_year')::smallint ELSE p.birth_year END,
+                       birth_year_min = CASE WHEN jsonb_exists(o.override_values, 'birth_year_min') THEN (o.override_values->>'birth_year_min')::smallint ELSE p.birth_year_min END,
+                       birth_year_max = CASE WHEN jsonb_exists(o.override_values, 'birth_year_max') THEN (o.override_values->>'birth_year_max')::smallint ELSE p.birth_year_max END,
+                       birth_year_confidence = COALESCE((o.override_values->>'birth_year_confidence')::value_confidence, p.birth_year_confidence),
+                       height_cm = CASE WHEN jsonb_exists(o.override_values, 'height_cm') THEN (o.override_values->>'height_cm')::smallint ELSE p.height_cm END,
+                       weight_kg = CASE WHEN jsonb_exists(o.override_values, 'weight_kg') THEN (o.override_values->>'weight_kg')::smallint ELSE p.weight_kg END,
+                       notes = CASE WHEN jsonb_exists(o.override_values, 'notes') THEN o.override_values->>'notes' ELSE p.notes END
+                  FROM active_overrides o
+                 WHERE p.id = o.player_id
+            """)
+            cur.execute("""
+                UPDATE players
+                   SET search_name = afldb_normalise_name(display_name),
+                       sort_name = CASE
+                           WHEN surname IS NULL THEN display_name
+                           WHEN given_name IS NULL THEN surname
+                           ELSE surname || ', ' || given_name
+                       END
+                 WHERE id IN (
+                    SELECT e.player_id
+                      FROM data_overrides o
+                      JOIN sources s ON s.key = split_part(o.entity_key, ':', 1)
+                      JOIN external_identities e ON e.external_id = substring(o.entity_key from position(':' in o.entity_key) + 1)
+                                                AND e.source_id = s.id
+                                                AND e.status IN ('unique', 'resolved')
+                     WHERE o.entity_type = 'players' AND o.is_active = true
+                 )
+            """)
+
+        elif table == "matches":
+            # home_goals, away_goals are NOT NULL. attendance is nullable.
+            cur.execute("""
+                UPDATE matches m
+                   SET attendance = CASE WHEN jsonb_exists(o.override_values, 'attendance') THEN (o.override_values->>'attendance')::integer ELSE m.attendance END,
+                       attendance_status = CASE 
+                           WHEN jsonb_exists(o.override_values, 'attendance') THEN
+                               CASE WHEN (o.override_values->>'attendance') IS NULL THEN 'not_collected'::coverage_status ELSE 'complete'::coverage_status END
+                           ELSE m.attendance_status 
+                       END,
+                       attendance_source_id = CASE
+                           WHEN jsonb_exists(o.override_values, 'attendance') THEN
+                               CASE WHEN (o.override_values->>'attendance') IS NULL THEN NULL ELSE (SELECT id FROM sources WHERE key = 'manual_admin_edit') END
+                           ELSE m.attendance_source_id
+                       END,
+                       match_time = CASE WHEN jsonb_exists(o.override_values, 'match_time') THEN o.override_values->>'match_time' ELSE m.match_time END,
+                       match_event = CASE WHEN jsonb_exists(o.override_values, 'match_event') THEN o.override_values->>'match_event' ELSE m.match_event END,
+                       notes = CASE WHEN jsonb_exists(o.override_values, 'notes') THEN o.override_values->>'notes' ELSE m.notes END,
+                       home_goals = COALESCE((o.override_values->>'home_goals')::smallint, m.home_goals),
+                       home_behinds = COALESCE((o.override_values->>'home_behinds')::smallint, m.home_behinds),
+                       away_goals = COALESCE((o.override_values->>'away_goals')::smallint, m.away_goals),
+                       away_behinds = COALESCE((o.override_values->>'away_behinds')::smallint, m.away_behinds)
+                  FROM data_overrides o
+                 WHERE o.entity_type = 'matches' AND o.entity_key = m.match_key AND o.is_active = true
+            """)
+            # Recalculate derived score fields for overridden matches
+            cur.execute("""
+                UPDATE matches m
+                   SET home_score = (home_goals * 6 + home_behinds)::smallint,
+                       away_score = (away_goals * 6 + away_behinds)::smallint,
+                       margin = abs((home_goals * 6 + home_behinds) - (away_goals * 6 + away_behinds))::smallint,
+                       result = CASE
+                           WHEN (home_goals * 6 + home_behinds) > (away_goals * 6 + away_behinds) THEN 'home_win'::match_result
+                           WHEN (home_goals * 6 + home_behinds) < (away_goals * 6 + away_behinds) THEN 'away_win'::match_result
+                           ELSE 'draw'::match_result
+                       END,
+                       winner_club_id = CASE
+                           WHEN (home_goals * 6 + home_behinds) > (away_goals * 6 + away_behinds) THEN home_club_id
+                           WHEN (home_goals * 6 + home_behinds) < (away_goals * 6 + away_behinds) THEN away_club_id
+                           ELSE NULL
+                       END
+                 WHERE m.match_key IN (
+                     SELECT entity_key FROM data_overrides
+                      WHERE entity_type = 'matches' AND field_group = 'score' AND is_active = true
+                 )
+            """)
+            # Period scores injection for score overrides
+            cur.execute("""
+                WITH overrides AS (
+                    SELECT m.id AS match_id, m.home_club_id, m.away_club_id,
+                           (o.override_values->>'home_goals')::int AS hg,
+                           (o.override_values->>'home_behinds')::int AS hb,
+                           (o.override_values->>'away_goals')::int AS ag,
+                           (o.override_values->>'away_behinds')::int AS ab,
+                           (SELECT GREATEST(COALESCE(max(period), 4), 4)::int FROM match_period_scores WHERE match_id = m.id) AS final_period
+                      FROM data_overrides o
+                      JOIN matches m ON m.match_key = o.entity_key
+                     WHERE o.entity_type = 'matches' AND o.field_group = 'score' AND o.is_active = true
+                )
+                INSERT INTO match_period_scores (match_id, club_id, period, goals, behinds, points)
+                SELECT match_id, home_club_id, final_period, hg, hb, (hg * 6 + hb) FROM overrides
+                UNION ALL
+                SELECT match_id, away_club_id, final_period, ag, ab, (ag * 6 + ab) FROM overrides
+                ON CONFLICT (match_id, club_id, period) DO UPDATE SET
+                  goals = EXCLUDED.goals,
+                  behinds = EXCLUDED.behinds,
+                  points = EXCLUDED.points
+            """)
+
+        elif table == "draft_picks":
+            cur.execute("""
+                UPDATE draft_picks d
+                   SET player_name_raw = COALESCE(o.override_values->>'player_name_raw', d.player_name_raw),
+                       original_club_raw = CASE WHEN jsonb_exists(o.override_values, 'original_club_raw') THEN o.override_values->>'original_club_raw' ELSE d.original_club_raw END,
+                       draft_age = CASE WHEN jsonb_exists(o.override_values, 'draft_age') THEN (o.override_values->>'draft_age')::integer ELSE d.draft_age END,
+                       height_cm = CASE WHEN jsonb_exists(o.override_values, 'height_cm') THEN (o.override_values->>'height_cm')::integer ELSE d.height_cm END,
+                       weight_kg = CASE WHEN jsonb_exists(o.override_values, 'weight_kg') THEN (o.override_values->>'weight_kg')::integer ELSE d.weight_kg END,
+                       pick_note = CASE WHEN jsonb_exists(o.override_values, 'pick_note') THEN o.override_values->>'pick_note' ELSE d.pick_note END,
+                       detail = CASE WHEN jsonb_exists(o.override_values, 'detail') THEN o.override_values->>'detail' ELSE d.detail END
+                  FROM data_overrides o
+                 WHERE o.entity_type = 'draft_picks'
+                   AND o.entity_key = d.source_id::text || '|' || d.player_url || '|' || d.draft_year::text || '|' || d.draft_kind
+                   AND o.is_active = true
+            """)

@@ -766,8 +766,8 @@ def validate(args) -> dict:
 
 
 def run_import(args, prepared: dict, rep) -> int:
-    from common import (analyze, connect_pg, import_batch, reload_keyed, report_reload,
-                        require_env, safe_dsn)
+    from common import (analyze, connect_pg, import_batch, reload_keyed,
+                        replay_admin_overrides, report_reload, require_env, safe_dsn)
 
     persons: dict[str, dict] = prepared["persons"]
     picks: list[dict] = prepared["picks"]
@@ -875,6 +875,8 @@ def run_import(args, prepared: dict, rep) -> int:
 
             reconcile_draftguru_identities(
                 cur, rep, persons, source_id, args.label, args.acknowledge_population_drop)
+
+        replay_admin_overrides(pg, "draft_picks")
 
         report_reload(rep, "draft_persons", person_stats)
         report_reload(rep, "draft_picks", pick_stats)

@@ -775,6 +775,109 @@ describe.skipIf(!canRun)(
       const restored = runImporter();
       expect(restored.status).toBe(0);
     }, 900_000);
+
+    it('replays a durable admin override after a destructive DraftGuru reload', async () => {
+      const OVERRIDE_NOTE = 'ISSUE-086-DURABLE-OVERRIDE';
+
+      const [victim] = await sql<{
+        id: number;
+        sourceId: number;
+        playerUrl: string;
+        draftYear: number;
+        draftKind: string;
+      }[]>`
+        SELECT id,
+               source_id AS "sourceId",
+               player_url AS "playerUrl",
+               draft_year AS "draftYear",
+               draft_kind AS "draftKind"
+          FROM draft_picks
+         WHERE source_id = ${draftguruSourceId}
+         ORDER BY id
+         LIMIT 1`;
+      expect(victim, 'need a DraftGuru-owned pick').toBeDefined();
+
+      const entityKey =
+        `${victim.sourceId}|${victim.playerUrl}|${victim.draftYear}|${victim.draftKind}`;
+
+      const [admin] = await sql<{ id: number }[]>`
+        INSERT INTO auth_users (email, role)
+        VALUES ('issue-086-durable-override@example.invalid', 'super_admin')
+        ON CONFLICT (email) DO UPDATE SET role = EXCLUDED.role
+        RETURNING id`;
+
+      try {
+        await sql`
+          DELETE FROM data_overrides
+           WHERE entity_type = 'draft_picks'
+             AND entity_key = ${entityKey}
+             AND field_group = 'notes'`;
+
+        await sql`
+          INSERT INTO data_overrides
+            (entity_type, entity_key, field_group, override_values, is_active, admin_user_id)
+          VALUES
+            ('draft_picks', ${entityKey}, 'notes',
+             ${sql.json({ pick_note: OVERRIDE_NOTE })},
+             true, ${admin.id})`;
+
+        // Model the already-applied admin edit. The real acceptance condition is that
+        // the source reload below cannot silently revert it.
+        await sql`
+          UPDATE draft_picks
+             SET pick_note = ${OVERRIDE_NOTE}
+           WHERE id = ${victim.id}`;
+
+        const run = runImporter();
+        expect(run.status).toBe(0);
+
+        const [after] = await sql<{ note: string | null }[]>`
+          SELECT pick_note AS note
+            FROM draft_picks
+           WHERE source_id = ${victim.sourceId}
+             AND player_url = ${victim.playerUrl}
+             AND draft_year = ${victim.draftYear}
+             AND draft_kind = ${victim.draftKind}`;
+
+        expect(
+          after.note,
+          'source reload must replay the durable admin override before commit',
+        ).toBe(OVERRIDE_NOTE);
+
+        const [override] = await sql<{ active: boolean; note: string | null }[]>`
+          SELECT is_active AS active,
+                 override_values->>'pick_note' AS note
+            FROM data_overrides
+           WHERE entity_type = 'draft_picks'
+             AND entity_key = ${entityKey}
+             AND field_group = 'notes'`;
+
+        expect(override.active).toBe(true);
+        expect(override.note).toBe(OVERRIDE_NOTE);
+      } finally {
+        await sql`
+          DELETE FROM data_overrides
+           WHERE entity_type = 'draft_picks'
+             AND entity_key = ${entityKey}
+             AND field_group = 'notes'`;
+
+        await sql`DELETE FROM auth_users WHERE id = ${admin.id}`;
+      }
+
+      // With the durable override removed, the real source is authoritative again.
+      const restored = runImporter();
+      expect(restored.status).toBe(0);
+
+      const [reset] = await sql<{ note: string | null }[]>`
+        SELECT pick_note AS note
+          FROM draft_picks
+         WHERE source_id = ${victim.sourceId}
+           AND player_url = ${victim.playerUrl}
+           AND draft_year = ${victim.draftYear}
+           AND draft_kind = ${victim.draftKind}`;
+
+      expect(reset.note).not.toBe(OVERRIDE_NOTE);
+    }, 900_000);
   });
 
   // -----------------------------------------------------------------------

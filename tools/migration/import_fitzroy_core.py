@@ -1893,8 +1893,11 @@ def main() -> int:
             import_venues(pg, rep, matches, refs)
         elif group == "players":
             import_players(pg, rep, players, args, refs)
+            from common import replay_admin_overrides
+            replay_admin_overrides(pg, "players")
         elif group == "matches":
             import_matches(pg, rep, matches, clubs, refs)
+            replay_admin_overrides(pg, "matches")
         elif group == "stats":
             # `corrections` is threaded explicitly, never read from module scope:
             # both of these functions call iter_player_stats(files, corrections) and

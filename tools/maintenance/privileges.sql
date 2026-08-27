@@ -290,6 +290,15 @@ BEGIN
     GRANT INSERT ON data_edits TO afldb_import;
     GRANT USAGE ON SEQUENCE data_edits_id_seq TO afldb_import;
   END IF;
+
+  -- Migration 073 (AFLDB-ISSUE-086): destructive source reloads must
+  -- read durable admin override authority and replay it before commit.
+  -- Read only: human overrides are not importer-owned and deliberately
+  -- remain outside afldb_meta.import_writable_tables.
+  IF to_regclass('public.data_overrides') IS NOT NULL THEN
+    GRANT SELECT ON data_overrides TO afldb_import;
+  END IF;
+
   IF to_regclass('public.player_link_resolutions') IS NOT NULL THEN
     GRANT INSERT ON player_link_resolutions TO afldb_import;
     GRANT USAGE ON SEQUENCE player_link_resolutions_id_seq TO afldb_import;

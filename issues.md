@@ -13,7 +13,6 @@ created, reopened, resolved, or materially reclassified.
 |---|---|---|---|---|
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
 | `AFLDB-ISSUE-076` | Medium | Performance | Grid Solver combinations using `won_final_at_venue` can exceed PostgreSQL's 5-second statement timeout and crash the page. | Capture and compare the generated SQL/EXPLAIN plan against `played_at_venue`, then optimise the `won_final_at_venue` query shape without raising the application timeout. |
-| `AFLDB-ISSUE-086` | Needs triage | Admin / Data integrity | Data-editor edits to source-owned rows can be silently reverted by the owning source's next reload (durability/overwrite, not the ISSUE-080 deletion class); only `players`/`matches`/`draft_picks` are live editable entities today. | Answer the four triage questions in the entry (UI promise, affected fields/entities, intended durability, silence of reversion), then set severity on that evidence. |
 | `AFLDB-ISSUE-090` | Medium | Data integrity / Import | The two DOB enrichment passes have contradictory `dob_conflict` lifecycles: the club-list pass stacks a duplicate unresolved row on every rerun (proven — entity 4347 holds three copies of one logical conflict), and the register pass deletes unresolved DOB conflicts it does not own. Both use `SOURCE_KEY='afltables'`, so `details->>'source'` cannot express pass ownership. | Migration 072 APPLIED to `afldb_test`; the fixed reconciliation is validated (23/23). `release-gates.test.ts` validation is HALTED and blocked by `AFLDB-ISSUE-092` (an unrelated importer defect this issue's own regression suite exposed, emptying `afldb_test.external_identities`; migration 072 is conclusively not implicated). Resume `release-gates.test.ts`/`privileges.test.ts` only after `AFLDB-ISSUE-092` is implemented and recovery is validated. |
 | `AFLDB-ISSUE-092` | Medium | Data integrity / Tooling safety | `enrich_birth_dates.py`'s `external_identities` reconciliation deletes any row absent from the run's asserted population with no proof that population is complete. `dob-enrichment-issues.test.ts` test 5 ran the real importer against shared `afldb_test` with a tiny synthetic register, wiping the entire real 12,472-row AFL-Tables profile-identity population. | Planning complete in `AFLDB-ISSUE-092.md`, not yet approved/implemented: (A) fail-closed population-sanity gate in the importer for any caller, with an explicit override flag; (B) fixture-scoped `source_id` so the test's real register-pass invocation can never intersect real data; then recover `afldb_test.external_identities` via the fixed importer and the complete legacy source. No schema change. Blocks `AFLDB-ISSUE-090`. |
 | `AFLDB-ISSUE-095` | Medium | Data acquisition / Import architecture / Data integrity | `club_seasons` has no canonical acquisition path: `rebuild_derived.py` builds it only from `staging.team_seasons`, whose only writer is the legacy importer under `AFLDB_LEGACY_SQLITE`. A legacy-free canonical rebuild therefore correctly produces `club_seasons = 0`, leaving ladders, premiership/wooden-spoon flags, finals counts and club-season NL answers unavailable. | Plan D1–D7 in `AFLDB-ISSUE-095.md` (authoritative source; per-field reconstructed-vs-sourced split; historical premiership-points/byes/forfeits/published-rank handling; provenance `source_id`; club-identity re-pointing; new rebuild stage vs existing stage; Stage-9 gate) before writing any importer. Zero supported `AFLDB_LEGACY_SQLITE` dependency. Do NOT add a `club_seasons` Stage-9 gate until this lands. Links `AFLDB-ISSUE-015` (not absorbed) and `AFLDB-ISSUE-093`. |
@@ -5578,54 +5577,68 @@ the full-file diagnostic run remain outside ISSUE-085 and were not changed.
 
 ## AFLDB-ISSUE-086 — Data-editor edits to source-owned rows can be reverted by the next source reload
 
-- **Status:** Open
-- **Severity:** Needs triage — deliberately not pre-classified; see below
+- **Status:** Resolved
+- **Severity:** Medium
 - **Area:** Admin / Data integrity
 - **Found:** 2026-08-23 (during the `AFLDB-ISSUE-080` investigation; runbook
   `AFLDB-ISSUE-080.md` §6, §2.4b, gate G5)
-- **Resolved:** N/A
-- **Files:** `src/lib/edit/spec.ts` (`EDITABLE_ENTITIES`),
-  `src/db/queries/data-edits.ts` (`applyDataEdit`), the source importers for
-  whichever entities investigation implicates
+- **Resolved:** 2026-08-28
+- **Runbook:** `AFLDB-ISSUE-086.md`
+- **Files:** `src/db/queries/data-edits.ts`,
+  `src/db/migrations/073_data_overrides.sql`,
+  `tools/migration/common.py`,
+  `tools/migration/import_fitzroy_core.py`,
+  `tools/rebuild/draftguru/import_draftguru.py`,
+  `tools/maintenance/privileges.sql`,
+  `tests/data-overrides-source-contract.test.ts`,
+  `tests/integration/draftguru-import.test.ts`
 
 ### Symptom
-A data-editor UPDATE to a **source-owned** row edits columns the owning
-source's next reload rewrites from its extract, so the admin's correction is
-silently reverted. This is edit **durability** (overwrite-on-reload), not the
-ownership **deletion** ISSUE-080 fixed: the row survives with its id and links
-intact, but the edited field values do not.
+A data-editor UPDATE to a **source-owned** row could edit columns that the
+owning source's next reload rewrote from its extract, silently reverting the
+admin correction. This was edit **durability** (overwrite-on-reload), not the
+ownership **deletion** class fixed by ISSUE-080.
 
 ### Evidence
-Observed structurally during ISSUE-080; no live reversion has been reproduced.
-The ISSUE-080 writer inventory (runbook §2.4b) narrows the present surface:
-`EDITABLE_ENTITIES` registers only `players`, `matches` and `draft_picks`, so
-`hall_of_fame` and `honour_team_members` have **no** editor path to revert
-today, and `award_winners` is registered in the `data_edits` allowlist
-(migration 058) without being an editable entity. The concern is therefore the
-pattern itself — the three live editable entities against their own importers —
-and any entity registered later. That framing must be confirmed, not assumed.
-
-### Severity — needs triage
-The runbook explicitly forbids pre-classifying this. Severity is decided by:
-
-1. what the admin UI promises about the durability of an edit;
-2. which fields and entities are actually affected (editable entities vs their
-   importers' reconciled columns);
-3. whether the edits are intended as durable corrections;
-4. whether the reversion is silent.
+The live editable surface is `players`, `matches` and `draft_picks`. Admin
+edits are intended corrections, and silently reverting them on the next source
+reload violates that durability expectation. The original structural finding
+was therefore confirmed as a real data-integrity defect rather than documented
+as intended behaviour.
 
 ### Fix
-Not yet investigated.
+Migration 073 introduces `data_overrides`, a durable human-authority layer
+keyed by stable entity natural key plus field group. `saveEdit` persists only
+the fields actually changed by the admin, preserving absent-vs-explicit-NULL
+semantics and avoiding accidental freezing of sibling source fields.
+
+`replay_admin_overrides()` reapplies active overrides inside the importer's
+existing transaction after source reconciliation. Player durability uses the
+stable AFL Tables external identity rather than `players.id`; DraftGuru picks
+use `source_id|player_url|draft_year|draft_kind`.
+
+The canonical fitzRoy and DraftGuru import paths replay these overrides before
+their transactions complete. `afldb_import` receives SELECT-only access to
+`data_overrides`; the table remains outside
+`afldb_meta.import_writable_tables`, so importers cannot create, alter or
+delete human override authority. `tools/maintenance/privileges.sql` preserves
+that narrow grant during privilege reconciliation.
 
 ### Validation
-Not yet performed.
+- `tests/data-overrides-source-contract.test.ts`: **6/6 passed**.
+- Migration `073_data_overrides.sql` applied successfully to `afldb_test`.
+- Direct restricted-role replay proof succeeded using `afldb_import`.
+- Canonical DraftGuru destructive-reload acceptance test passed cleanly after
+  diagnostics were removed:
+  `replays a durable admin override after a destructive DraftGuru reload`
+  — **1/1 targeted test passed**.
+- The acceptance run proved an admin `pick_note` override survives the real
+  destructive DraftGuru source reload.
 
 ### Follow-up
-Answer the four triage questions above against the three live editable
-entities, set the severity on that evidence, then design the durability
-mechanism (or document the reversion as intended) as its own piece of work. It
-does not block anything in ISSUE-080 or ISSUE-084 unless investigation shows
-the ownership-deletion mechanism rather than overwrite-on-reload.
+None for ISSUE-086. Future editable source-owned entities must participate in
+the same durable natural-key override/replay contract rather than relying on
+surrogate row IDs or importer ownership.
 
 ## AFLDB-ISSUE-087 — Validate the release candidate and promote `origin/main`
 
