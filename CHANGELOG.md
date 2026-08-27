@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-059 — Safe qualifying-match drill-down - 28 August 2026
+
+- Grouped NL `Qualifying matches` counts can now open a dedicated drill-down that faithfully replays the supported grouped predicates instead of approximating them through Match Search.
+- The UI links only when the plan passes the qualifying-match safety gate and otherwise retains its plain-text fallback; the integration also preserves current head-to-head rendering.
+- Focused validation passed, including the new PostgreSQL exact-set regression. Three unrelated `club_season` failures remain owned by `AFLDB-ISSUE-095`.
+
+
 ### AFLDB-ISSUE-094 — Typed real-user NL semantic mappings - 26 August 2026
 
 - Parser version 26 adds first-class head-to-head record, win-comparison, draw-count and

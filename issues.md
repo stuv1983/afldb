@@ -7,11 +7,10 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 7
+**Open issues:** 6
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
-| `AFLDB-ISSUE-059` | Low | Search | Grouped `Qualifying matches` counts have no safe drill-down to the exact matching fixtures. | Extend Match Search or add a dedicated NL drill-down route that can faithfully replay the grouped row predicates. |
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
 | `AFLDB-ISSUE-076` | Medium | Performance | Grid Solver combinations using `won_final_at_venue` can exceed PostgreSQL's 5-second statement timeout and crash the page. | Capture and compare the generated SQL/EXPLAIN plan against `played_at_venue`, then optimise the `won_final_at_venue` query shape without raising the application timeout. |
 | `AFLDB-ISSUE-086` | Needs triage | Admin / Data integrity | Data-editor edits to source-owned rows can be silently reverted by the owning source's next reload (durability/overwrite, not the ISSUE-080 deletion class); only `players`/`matches`/`draft_picks` are live editable entities today. | Answer the four triage questions in the entry (UI promise, affected fields/entities, intended durability, silence of reversion), then set severity on that evidence. |
@@ -2366,41 +2365,30 @@ Run `/search` UI checks after deployment.
 
 ## AFLDB-ISSUE-059 — Grouped qualifying counts have no drill-down link
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Low
 - **Area:** Search
 - **Found:** 2026-08-20
-- **Resolved:** N/A
-- **Files:** `src/components/NlAnswerSection.tsx`, `src/search/match-spec.ts`, `src/db/queries/nl/team-match.ts`
-
-### Symptom
-Grouped answers with a `Qualifying matches` count should let a reader click the count and see the matches that make up that count.
-
-### Reproduction
-Ask `teams with at least 10 wins at the SCG` or `teams with more than 3 wins against the Lions`, then try to open the qualifying count for one row.
-
-### Expected
-The count opens the exact set of qualifying matches for that row.
-
-### Actual
-The count is plain text.
-
-### Evidence
-`TeamAggregateTable` renders `{formatNumber(r.value)}` without a link.
+- **Resolved:** 2026-08-28
+- **Files:** `src/app/search/qualifying-matches/page.tsx`, `src/components/NlAnswerSection.tsx`, `src/db/queries/nl/team-match.ts`, `src/search/nl/qualifying-matches-gate.ts`, `src/search/nl/qualifying-matches-href.ts`
 
 ### Root cause
-Current `match-search` URL filters do not yet express the full grouped-result predicate set: team perspective, opponent, venue, season range, win/loss/draw result, and optional per-match margin filter.
+Match Search could not faithfully encode the complete grouped `team_aggregate` predicate set, so linking the count through an approximate Match Search URL would have been unsafe.
 
 ### Fix
-Not yet fixed.
+Added a dedicated `/search/qualifying-matches` drill-down backed by the NL plan token. The qualifying-match gate links only safely replayable plans; otherwise the UI retains the plain-text fallback. Integration preserved the newer `head_to_head` rendering already present on `dev`.
 
 ### Validation
-Not yet run.
+Validated 2026-08-28 against the rebuilt `afldb_test`.
 
-Current review on 2026-08-21 confirmed this remains an intentionally open product gap: `TeamAggregateTable` still renders `Qualifying matches` as plain numeric text, and existing Match Search filters still do not encode every grouped predicate needed to link a row safely.
+- The single PostgreSQL integration regression added by ISSUE-059, `drilldown preserves and executes a combined complex predicate exact set`, passed.
+- The integration file was 15/18 overall; its three failures are pre-existing `club_season` tests caused by the expected `club_seasons = 0` state owned by `AFLDB-ISSUE-095`, not ISSUE-059.
+- `tests/unit/qualifying-matches-gate.test.ts` plus `tests/unit/NlAnswerSection.test.ts`: 5/5 passed.
+- After the merge resolution, `tests/unit/NlAnswerSection.test.ts`: 2/2 passed.
+- Integrated on `dev` as `5ec6bd2` (`feat: add qualifying match drilldown`).
 
 ### Follow-up
-Extend Match Search or add a dedicated NL drill-down route that can faithfully replay a `team_aggregate` row's predicates before linking counts.
+None. The separate club-season data gap remains `AFLDB-ISSUE-095`.
 
 ## AFLDB-ISSUE-060 - Current-season results depend on a stale manual snapshot
 
