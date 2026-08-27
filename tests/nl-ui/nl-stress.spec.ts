@@ -9,6 +9,7 @@ import {
   type UiHydrationProbe, type UiRscSummary,
 } from '../../tools/nl/ui-corpus';
 import { buildReport, formatSummary } from '../../tools/nl/ui-summary';
+import { NL_UI_OPERATION_TIMEOUT_MS, withDeadline } from './timeout-policy';
 
 /**
  * The 12,000-question UI sweep. Run with playwright.nl-stress.config.ts,
@@ -48,7 +49,6 @@ const CORPUS_PATH = resolve(
 );
 const OUT_DIR = resolve('nl-ui-out');
 const BATCH_SIZE = Number(process.env.NL_UI_BATCH ?? 100);
-const NAV_TIMEOUT_MS = Number(process.env.NL_UI_TIMEOUT_MS ?? 15_000);
 const RUN_TAG = process.env.NL_UI_RUN_TAG ?? '';
 /**
  * Forensic capture for a hydration-error incident: raw server HTML,
@@ -524,7 +524,7 @@ async function observe(
   try {
     const response = await page.goto(
       `/search?q=${encodeURIComponent(test_.question)}`,
-      { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS },
+      { waitUntil: 'domcontentloaded', timeout: NL_UI_OPERATION_TIMEOUT_MS },
     );
     httpStatus = response?.status() ?? null;
     const headers = response?.headers() ?? {};
@@ -551,7 +551,8 @@ async function observe(
         outcome = 'absent';
       } else {
         firstVisibleResultAtMs = Date.now() - started;
-        headline = (await panel.locator('h2').first().textContent())?.trim() ?? null;
+        const heading = panel.locator('h2').first();
+        headline = await heading.count() > 0 ? (await heading.textContent())?.trim() ?? null : null;
         const answered = await panel.getByText('How was this calculated?').count() > 0;
         outcome = answered ? 'answered' : 'unanswerable';
         if (answered) {
@@ -574,10 +575,21 @@ async function observe(
     page.off('requestfailed', onRequestFailed);
   }
 
-  const serverHtml = doc.serverHtmlPromise ? await doc.serverHtmlPromise.catch(() => null) : null;
+  const serverHtml = doc.serverHtmlPromise
+    ? await withDeadline('raw document response body', doc.serverHtmlPromise).catch((error) => {
+      errors.push(`capture: ${(error as Error).message}`);
+      return null;
+    })
+    : null;
   const hydrationErrorAtMs = clientEvents.find((event) => isHydrationError(event.text))?.atMs ?? null;
-  const answerShape = await readAnswerShape(page, outcome, headline, interpretation).catch(() => null);
-  const hydrationProbe = await readHydrationProbe(page).catch(() => null);
+  const answerShape = await readAnswerShape(page, outcome, headline, interpretation).catch((error) => {
+    errors.push(`answer-shape capture: ${(error as Error).message}`);
+    return null;
+  });
+  const hydrationProbe = await withDeadline('hydration probe', readHydrationProbe(page)).catch((error) => {
+    errors.push(`capture: ${(error as Error).message}`);
+    return null;
+  });
   const timingSummary = summarizeTiming(network, rscRequests, hydrationProbe, hydrationErrorAtMs, firstVisibleResultAtMs);
   const rscSummary = summarizeRscRequests(
     rscRequests,
@@ -836,9 +848,9 @@ async function readAnswerShape(
    * count()-guarded, exactly like tableTitle above and the panel guard at
    * the top of this function. NlAnswerSection's unanswerable branch renders
    * no <details> at all, and an unguarded textContent() auto-waits for an
-   * element that can never attach -- unbounded, because Playwright Test's
-   * default actionTimeout is 0 and the only backstop is the 30-minute
-   * per-batch timeout, which discards the whole batch's observations.
+   * element that can never attach. The guard records the optional shape
+   * immediately instead of spending the finite action budget on an element
+   * the application contract says is absent.
    */
   const note = panel.locator('details .muted').first();
   const tableNote = await note.count() > 0 ? await note.textContent().catch(() => null) : null;
@@ -950,8 +962,17 @@ async function captureHydrationIncident(
   const dir = resolve(HYDRATION_ARTIFACTS_DIR, test_.id);
   mkdirSync(dir, { recursive: true });
 
-  const domHtml = await page.content().catch(() => null);
-  const screenshot = await page.screenshot({ fullPage: true }).catch(() => null);
+  const domHtml = await withDeadline('failing DOM snapshot', page.content()).catch((error) => {
+    console.error(`[hydration-capture] ${test_.id}: ${(error as Error).message}`);
+    return null;
+  });
+  const screenshot = await page.screenshot({
+    fullPage: true,
+    timeout: NL_UI_OPERATION_TIMEOUT_MS,
+  }).catch((error) => {
+    console.error(`[hydration-capture] ${test_.id}: failing screenshot: ${(error as Error).message}`);
+    return null;
+  });
 
   if (serverHtml !== null) writeFileSync(resolve(dir, 'failing-server.html'), serverHtml, 'utf8');
   if (domHtml !== null) writeFileSync(resolve(dir, 'failing-dom.html'), domHtml, 'utf8');
@@ -1031,9 +1052,20 @@ async function captureCleanControl(
       };
     }
 
-    const domHtml = await retryPage.content().catch(() => null);
-    const screenshot = await retryPage.screenshot({ fullPage: true }).catch(() => null);
-    await retryPage.close();
+    const domHtml = await withDeadline('clean-control DOM snapshot', retryPage.content()).catch((error) => {
+      console.error(`[hydration-clean-capture] ${test_.id}: ${(error as Error).message}`);
+      return null;
+    });
+    const screenshot = await retryPage.screenshot({
+      fullPage: true,
+      timeout: NL_UI_OPERATION_TIMEOUT_MS,
+    }).catch((error) => {
+      console.error(`[hydration-clean-capture] ${test_.id}: screenshot: ${(error as Error).message}`);
+      return null;
+    });
+    await withDeadline('clean-control page close', retryPage.close()).catch((error) => {
+      console.error(`[hydration-clean-capture] ${test_.id}: ${(error as Error).message}`);
+    });
 
     const hydro = observation.errors.some(isHydrationError);
     if (!hydro || attempt === 3) {
