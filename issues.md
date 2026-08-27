@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 6
+**Open issues:** 13
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
@@ -16,6 +16,13 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-090` | Medium | Data integrity / Import | The two DOB enrichment passes have contradictory `dob_conflict` lifecycles: the club-list pass stacks a duplicate unresolved row on every rerun (proven — entity 4347 holds three copies of one logical conflict), and the register pass deletes unresolved DOB conflicts it does not own. Both use `SOURCE_KEY='afltables'`, so `details->>'source'` cannot express pass ownership. | Migration 072 APPLIED to `afldb_test`; the fixed reconciliation is validated (23/23). `release-gates.test.ts` validation is HALTED and blocked by `AFLDB-ISSUE-092` (an unrelated importer defect this issue's own regression suite exposed, emptying `afldb_test.external_identities`; migration 072 is conclusively not implicated). Resume `release-gates.test.ts`/`privileges.test.ts` only after `AFLDB-ISSUE-092` is implemented and recovery is validated. |
 | `AFLDB-ISSUE-092` | Medium | Data integrity / Tooling safety | `enrich_birth_dates.py`'s `external_identities` reconciliation deletes any row absent from the run's asserted population with no proof that population is complete. `dob-enrichment-issues.test.ts` test 5 ran the real importer against shared `afldb_test` with a tiny synthetic register, wiping the entire real 12,472-row AFL-Tables profile-identity population. | Planning complete in `AFLDB-ISSUE-092.md`, not yet approved/implemented: (A) fail-closed population-sanity gate in the importer for any caller, with an explicit override flag; (B) fixture-scoped `source_id` so the test's real register-pass invocation can never intersect real data; then recover `afldb_test.external_identities` via the fixed importer and the complete legacy source. No schema change. Blocks `AFLDB-ISSUE-090`. |
 | `AFLDB-ISSUE-095` | Medium | Data acquisition / Import architecture / Data integrity | `club_seasons` has no canonical acquisition path: `rebuild_derived.py` builds it only from `staging.team_seasons`, whose only writer is the legacy importer under `AFLDB_LEGACY_SQLITE`. A legacy-free canonical rebuild therefore correctly produces `club_seasons = 0`, leaving ladders, premiership/wooden-spoon flags, finals counts and club-season NL answers unavailable. | Plan D1–D7 in `AFLDB-ISSUE-095.md` (authoritative source; per-field reconstructed-vs-sourced split; historical premiership-points/byes/forfeits/published-rank handling; provenance `source_id`; club-identity re-pointing; new rebuild stage vs existing stage; Stage-9 gate) before writing any importer. Zero supported `AFLDB_LEGACY_SQLITE` dependency. Do NOT add a `club_seasons` Stage-9 gate until this lands. Links `AFLDB-ISSUE-015` (not absorbed) and `AFLDB-ISSUE-093`. |
+| `AFLDB-ISSUE-096` | Medium | Data acquisition / Import architecture | Parent architecture/contract issue for 2026+ API-first acquisition: AFLDB has no standing contract for how a current/future season is acquired, so every new data family would repeat the shipped path's choices (overwrite snapshots, no correction-vs-deletion distinction, no ownership predicate). | **HALT LIFTED 2026-08-28** — decisions A–H and the §12 list approved (`AFLDB-ISSUE-096.md` §14). Evidence baseline: **P3/P4/P5/P6 PASS**; **P1/P2 re-run 2026-08-28 with the supplied Kali key — both PASS** (P1 falsified an S1 declaration: `/matches` is NOT a Squiggle proxy, so match witnesses are two); **P7 still BLOCKED** (no database queried). **S1 COMPLETE and GREEN** (34/34). **S2 COMPLETE and GREEN 2026-08-28 — 61/61, 0 failures, 303 ms** on the final post-hygiene run; the earlier 59/61 was two raw-text source-contract regexes false-positive matching explanatory SQL comments, repaired to inspect executable statements without weakening the append-only or A→B→A invariants. Migration **`074_source_observation_spine.sql`** is the correct spine migration and is **UNAPPLIED**; no CHANGELOG entry at this checkpoint. **Next action: S3 in a fresh session — reconciliation verb set, ownership predicate and the ISSUE-086 authority interface as a typed module with DB-free tests (entry point §16.7).** **No family-specific importer implementation** — those are `AFLDB-ISSUE-099` and `AFLDB-ISSUE-100`, whose blockers stay theirs. Manual-authority *mechanism* stays with `AFLDB-ISSUE-086`; coordinates with `AFLDB-ISSUE-095`; neither duplicated. |
+| `AFLDB-ISSUE-097` | Medium | Data acquisition / Data integrity | Proven by live probe: Kali `/v1/fixture` returns Squiggle's schema with Squiggle's own game ids and `updated` timestamps (id `38494`, `updated "2026-03-05 22:16:49"`), so the two configured sources are not independent witnesses for fixtures and `sourceDisagreements` can report self-agreement as corroboration. | Run evidence probe **P1** to determine whether the proxying extends to the authenticated `/matches` endpoint AFLDB actually consumes — currently **UNKNOWN** — then update `sourceDisagreements` and `--source all` corroboration semantics on that evidence. |
+| `AFLDB-ISSUE-098` | Medium | Data integrity / Import | Four source-verified defects in the shipped current-season importer: fabricated `venue_raw = 'Unknown'` (`:619`); canonical inserts creating half-matches with no attendance, period scores or player participation (`:607-629`); staging `ON CONFLICT DO UPDATE` making a source correction indistinguishable from a deletion (`:420-439`); and incoherent counters that can go negative and conflate staging with canonical rows (`:633`, `:657`). | Contain the four defects. Independently actionable — **not dependent on `AFLDB-ISSUE-096` or `AFLDB-ISSUE-097`**; probe **P7** recommended to size live impact but not required to start. References `AFLDB-ISSUE-086` for the unrestricted canonical score overwrite (`:567-590`) and does **not** duplicate it. |
+| `AFLDB-ISSUE-099` | Medium | Data acquisition / Import architecture | 2026 has no player-match statistics, period scores, attendance or Brownlow votes, because Squiggle/Kali carry none of them. AFL Tables — already the frozen canonical historical source — was confirmed by live probe to carry 2026 through Round 25 including per-match player statistics, venue, attendance and a ladder. | Build a nightly in-season settle pass: partial fitzRoy acquisition (`acquire_core.R --from/--to`) + SHA-256 manifest, then **reviewed** promotion of matches, period scores, attendance, player stats and Brownlow votes, reusing the ISSUE-093 machinery. Depends on `AFLDB-ISSUE-096`; implementation gated on probe **P5** (stop condition if stable `ID`/`url` are absent for 2026). |
+| `AFLDB-ISSUE-100` | Medium | Data acquisition / Import architecture | AFLDB has no model for announced teams, jumper numbers, substitutions or late changes; canonical participation is the played match sheet, which exists only after a match. `fetch_lineup_afl` is the only free source found that supplies lineups at all. | Add a new `staging.external_lineups` table fed by `fetch_lineup_afl`, for admin visibility and reconciliation only. **Lineups are staging-only and never become canonical participation**; no public surface. Depends on `AFLDB-ISSUE-096`; implementation gated on probe **P3**, which must supply the still-UNKNOWN column set. |
+| `AFLDB-ISSUE-101` | Medium | Data acquisition / Import architecture / Data integrity | The approved historical boundary gives the API pipeline only the in-progress season, but nothing performs the transition when a season completes, so in-season provenance would become permanent and the Stage-9 gate would drift. | Implement the rollover: extend `fitzroy-accepted-baselines.json` to the completed season, supersede in-season provenance, advance `seasons.json.in_progress_seasons`, re-point the Stage-9 `matches_after_accepted_last_season` gate. **Must not redefine completed-season `club_seasons` ownership — that stays with `AFLDB-ISSUE-095`.** Depends on `AFLDB-ISSUE-099` plus coordination/completion of the relevant ISSUE-095 path. |
+| `AFLDB-ISSUE-102` | Medium | Data acquisition / Import architecture | `tools/migration/import_awards.py:1408` still requires `AFLDB_LEGACY_SQLITE`, so the awards/honours domain has the same legacy dependency `AFLDB-ISSUE-095` records for `club_seasons`, previously untracked. No free API covers Coleman, Rising Star, All-Australian, AFLCA, AFLPA or club best-and-fairest; Brownlow is the exception via the AFL Tables path. | **Record only.** Do not design the replacement under this investigation — no source selection, no per-award provenance decision, no importer work is authorised by this entry. Links `AFLDB-ISSUE-095` as the direct sibling gap; not absorbed. |
 
 ---
 
@@ -7056,3 +7063,760 @@ None yet — nothing implemented.
 Whatever D1/D2/D4 decide, `recomputeClubSeasons` must be brought back into lockstep with the
 new canonical definition as part of this issue's implementation. That does not reopen
 `AFLDB-ISSUE-015`.
+
+## AFLDB-ISSUE-096 — 2026+ API-first acquisition architecture and contract
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Data acquisition / Import architecture
+- **Found:** 2026-08-28 (2026+ API acquisition investigation)
+- **Resolved:** N/A
+- **Runbook:** `AFLDB-ISSUE-096.md` — **durable source of truth for this issue** (scope,
+  evidence summary, decisions A–H, schema concepts, boundaries, validation, HALT).
+  `AFLDB-2026-API-ACQUISITION.md` remains the parent investigation runbook; this entry is its
+  §9 row A, and its §13 holds the dated P1–P7 probe results.
+- **Files changed (S1, 2026-08-28):** `data/reference/source-families.json` (new),
+  `src/lib/acquisition/source-families.ts` (new), `tests/reference-data.test.ts` (extended)
+- **Files changed (S2, 2026-08-28):** `src/db/migrations/074_source_observation_spine.sql`
+  (new, **unapplied**), `src/lib/acquisition/observations.ts` (new),
+  `tools/maintenance/privileges.sql` (afldb_auth spec + column-scoped UPDATE),
+  `tests/current-season-import.test.ts` (extended)
+- **Files changed (S3, 2026-08-28 — COMPLETE and GREEN 84/84):**
+  `src/lib/acquisition/reconciliation.ts` (new), `tests/current-season-import.test.ts` (extended
+  again). No migration, no schema change, no change to `observations.ts` or
+  `current-season-import.ts`.
+- **Files (orientation only — unchanged):**
+  `src/lib/external-afl/current-season-import.ts`,
+  `src/db/migrations/063_external_current_match_sources.sql`,
+  `src/db/migrations/064_matches_external_provenance.sql`
+- **Related:** `AFLDB-ISSUE-086` (unrestricted canonical overwrite — referenced by rules 5/6,
+  **not duplicated**), `AFLDB-ISSUE-092` (`--source-key` containment pattern reused),
+  `AFLDB-ISSUE-095` (ladder/team-season — coordinated, **not absorbed**),
+  `AFLDB-ISSUE-078`/`080`/`085` (destructive-reload lessons)
+
+### Problem
+AFLDB has no standing contract for how a 2026-and-later season is acquired. The one shipped
+path covers matches only, snapshots by overwrite, cannot distinguish a source correction from
+a deletion, and can write canonical rows without an ownership predicate. Every additional data
+family would otherwise repeat those choices independently.
+
+### Scope
+**Design and contract only. No family-specific importer implementation** — those belong to
+`AFLDB-ISSUE-099` (settle stage) and `AFLDB-ISSUE-100` (lineups).
+
+Agree and record:
+
+- the immutable/generalised staging contract (append-only observation keyed
+  `(source_id, external_record_id, payload_hash)`, or a superseded-row archive);
+- the reconciliation/diff model;
+- the reviewed-promotion queue;
+- the provenance, ownership, absence and idempotence rules — the ten standing rules in
+  `AFLDB-2026-API-ACQUISITION.md` §4.
+
+### Approved standing policy carried into this issue
+Free/hobby sources only; fetch/staging/diff may run automatically; canonical promotion is
+reviewed by default; lineups are staging-only; only the in-progress season belongs to this
+pipeline; a completed season is re-acquired through the standard full-history fitzRoy path and
+supersedes the in-season provenance.
+
+### Exclusions
+Do not create a Champion Data licensing issue. Do not open a `player_match_period_stats` issue
+while no free source exists. Do not duplicate `AFLDB-ISSUE-086` or `AFLDB-ISSUE-095`.
+
+### Evidence baseline — P1–P7, run 2026-08-28
+Full record in `AFLDB-2026-API-ACQUISITION.md` §13; summary in `AFLDB-ISSUE-096.md` §4.
+
+- **P3 PASS** — AFL API lineup identity adequate (`CD_M…`/`CD_T…`/`CD_I…`); **column set differs
+  between rounds (19 vs 20)**; **no substitute field**.
+- **P4 PASS** — `providerId` stable and **proven** identical to the lineup player id (26/26);
+  **`weightInKg` = 0 for 46/46 rows** ⇒ zero-as-missing must map to NULL.
+- **P5 PASS — stop condition NOT triggered.** 9,522 × 81, 2026-03-05 → 2026-08-23. `url` **0 NA**
+  and 1:1 with `ID` (663 ↔ 663), but **`ID` is 82 NA across 5 players**. **Contradicts the earlier
+  "0 NA" assumption, which was measured on completed seasons: the settle path must key on `url`.**
+  Round vocabularies diverge across AFL Tables / Squiggle / AFL API ⇒ a declared per-source round
+  mapping is required. `Substitute` is NA for all 9,522 rows.
+- **P6 PASS** — `fetch_ladder_afltables(2026)` = 18 × 8. **ISSUE-095 evidence only; no D1–D7
+  decision made or altered.**
+- **P1 PASS — re-run 2026-08-28** once the key was supplied (previously BLOCKED). Kali
+  `/matches` is **NOT a Squiggle proxy**: a real value disagreement on a completed match
+  (Essendon v Port Adelaide 2026-08-23, Kali 95–105 vs Squiggle 95–104 at `complete=100`),
+  `crowd` on 80 of 204 rows where Squiggle publishes no attendance at all, disjoint id spaces
+  (0 shared), a different venue vocabulary on 80 of 160 joined games, and no goals/behinds.
+  **Squiggle + Kali are now TWO witnesses for matches**; `/fixture` remains a proven proxy and
+  stays in the Squiggle group. Residual: pairwise derivation is disproven, a **common ultimate
+  upstream is not**, so disagreement stays a review signal.
+- **P2 PASS — re-run 2026-08-28** (previously BLOCKED). **No player id on the Kali stat
+  grain**: `/player-stats` and `/player-stats-advanced` project `matchId`, `playerName`,
+  `teamId` only. `/players` has stable `id`/`onlineId` (2,865 distinct, 0 null) and the
+  `player_id` filter works on the numeric id, so Kali holds it internally and withholds it.
+  Identity therefore stays **fail-closed**; name+team is a heuristic (two Alwyn Daveys, both
+  `essendon`; `currentTeamId` is not the team at match time).
+- **P7 BLOCKED** — `ssh arm@10.0.40.100` refused non-interactively. **Database identity was never
+  proven and no database was queried.** Not required by this contract.
+
+### Dependencies and gates
+Depends on nothing. Not gated on any probe. Two consequences recorded, not new policy:
+`AFLDB-ISSUE-099` and `AFLDB-ISSUE-100` are **no longer probe-blocked** (P5/P3 passed), and
+promotion of `corrected`/`update` candidates onto existing canonical rows cannot be implemented
+until **`AFLDB-ISSUE-086`'s** override-authority contract lands — until then every such promotion is
+authority-indeterminate and must refuse.
+
+### Manual-authority boundary
+`AFLDB-ISSUE-096` defines only the **invariant** (a promotion must never overwrite an active
+human/admin authority decision, and must fail closed when that state cannot be determined) and the
+**fail-closed interface** it needs. The **mechanism and storage** — including the `data_overrides`
+work — belong to **`AFLDB-ISSUE-086`** and are not pre-empted here. `data_edits` is audit evidence
+and participates only if ISSUE-086's final contract says so. No second authority model is invented.
+
+### Approval and implementation state — 2026-08-28
+The **§13 HALT is LIFTED**. The user approved the amended decisions; the approvals are recorded
+verbatim in `AFLDB-ISSUE-096.md` §14 and convert this issue from design-only to **foundation
+implementation across stages S1–S4** (family importers still excluded). Approved: the three-grain
+observation model; retaining `staging.external_current_matches`; **no automatic canonical
+promotion in v1**; the ISSUE-086 authority boundary (interface and invariant only); Kali inside the
+Squiggle independence group; and **not** retrying P1/P2/P7 — those stay BLOCKED and no local
+database may substitute for P7.
+
+**Two of those approvals were superseded the same day, by the user and by evidence.** The user
+supplied `KALI_AFL_API_KEY` and explicitly authorised retrying **P1 and P2 only**; both PASSED,
+and P1 **disproved** the Squiggle-derived assumption, so approval 5's own escape clause
+("unless P1 later proves independence") fired and the registry was corrected. **P7 remains
+BLOCKED and no local database may substitute for it.**
+
+**S1 IMPLEMENTED, then AMENDED by the P1/P2 re-run** (`AFLDB-ISSUE-096.md` §15): the
+tracked source-family registry
+`data/reference/source-families.json` plus a pure, fail-closed typed parser
+`src/lib/acquisition/source-families.ts` and nine DB-free contract tests extending
+`tests/reference-data.test.ts`. **Seven** families over four sources; **no family is
+promotable**; **Squiggle and Kali are two independence groups for `match` and one for
+`fixture`**; the AFL API lineup column set is deliberately `incomplete` so a round-20 payload
+refuses; `afltables.player_match_stats` and the new `kali_afl_stats.player_stats` are
+`identity_only` and cannot be projected. No migration, no importer, no change to
+`sources.json`, `seasons.json` or `current-season-import.ts`.
+
+**S1 amended 2026-08-28 by P1/P2** (`AFLDB-ISSUE-096.md` §15.1–§15.2):
+`kali_afl_stats.match` moved from the `squiggle` group (`assumed_derived_pending_probe`) to its
+own `kali` group (`proven_independent`), and from `identity_only` to a fully declared 14-column
+shape with `sourcedAt` as `source_updated_at` and a new `kali_2026` round vocabulary; a new
+`kali_afl_stats.player_stats` family records the proven identity gap. The affected tests were
+amended with it.
+**S2 IMPLEMENTED 2026-08-28** (`AFLDB-ISSUE-096.md` §15, S2 section): migration
+`074_source_observation_spine.sql` — `staging.source_payloads` (immutable, content-addressed,
+storing the `hash_recipe` that produced each hash), `staging.source_record_versions` (ordered by
+`version_seq`, valid-time intervals, one open version per key, and **deliberately no uniqueness on
+`payload_hash`**, which is what keeps A→B→A three states), `staging.source_records`
+(current head, `scope_key`, `absent_since`), plus `promotion_candidates` and the append-only
+`promotion_decisions` ledger. Semantics live in `src/lib/acquisition/observations.ts`, which is
+pure — no database, filesystem, network or clock. Acceptance re-reads everything and fails
+closed in order: not-pending → verb-not-promotable → stale source version → stale
+canonical baseline → season-not-in-progress → foreign ownership → manual authority,
+where **`indeterminate` refuses exactly as `conflict` does** and the shipped provider always answers
+`indeterminate` until ISSUE-086 lands. 28 DB-free tests.
+
+**Grant defect caught and rejected before it landed:** the first draft made the decision ledger
+append-only with `grant_import_write()` + `REVOKE UPDATE, DELETE`. `privileges.sql` regenerates the
+whole write set from that registry, so the REVOKE would have been silently undone at the next
+reconcile. Replaced by the `data_edits` (057) pattern — `afldb_auth` with `SELECT, INSERT`,
+listed in the subtractive `afldb_auth` spec, plus a column-scoped workflow UPDATE on candidates.
+
+**S2 IS COMPLETE AND GREEN — 61/61, 0 failures, 303 ms, on the final 2026-08-28 run.** Three runs
+of `npm test -- tests/current-season-import.test.ts` that day. Run 1: **61 tests, 59 passed,
+2 failed, test file FAILED (~308 ms)**. Every behavioural test passed —
+A→B→A over two payloads, idempotence, absence/reappearance, all acceptance gates,
+authority-indeterminate refusal, provider independence, witness-groups-are-reporting-only. The
+two failures are **source-contract assertions that scan raw migration text** (`:653` append-only
+grants, `:668` history uniqueness); both regexes use `[^;]*`, which is not a statement boundary
+in SQL containing comments and `DO $$ … $$` blocks.
+
+**Diagnosis CONFIRMED 2026-08-28 — both are false-positive tests, not defects.** `:653` matched
+from the comment `-- grant_import_write() hands out UPDATE, DELETE and TRUNCATE, and` (migration
+line 297, supplying a case-insensitive `GRANT` and the `UPDATE`) across eleven semicolon-free
+lines of comment, `DO $$`, `BEGIN` and `IF EXISTS (…) THEN` to the legitimate
+`GRANT SELECT, INSERT ON promotion_decisions` (line 308). `:668` matched from the
+`-- DELIBERATELY NOT UNIQUE on (source_id, family, external_record_id,` header comment (line 61)
+through `CREATE TABLE staging.source_record_versions (` (line 65) to the `payload_hash` column
+(line 70) — a `CREATE TABLE` body has commas but no semicolon. The migration grants
+`promotion_decisions` only `SELECT, INSERT` and holds no uniqueness rule mentioning `payload_hash`
+on the history table. **Only the tests were repaired** (`tests/current-season-import.test.ts`: a
+`sqlStatements()` helper strips `--` comments and splits on `;`; the ledger assertion now pins the
+complete set of executable GRANTs on `promotion_decisions`, which also catches TRUNCATE/ALL, and
+the history assertion pins the single `UNIQUE` statement on the versions table and proves it omits
+`payload_hash`). The migration was not changed and no invariant was weakened. `AFLDB-ISSUE-096.md`
+§16.3. **The user then reran the focused suite: 61/61, 1 test file PASSED, no failures.** The
+repaired assertions are stricter than the ones they replaced and pass against an unchanged
+migration — the outcome that separates a false-positive test from a real defect.
+
+**Both source-file defects are now FIXED (2026-08-28), after the green rerun.**
+`src/lib/acquisition/observations.ts` held **two literal NUL bytes** at line 499 in
+`observationKey()`; they are now written as `U+0000` escapes. **The separator character is
+unchanged, so keys are byte-identical and no runtime behaviour moved** — only the file's encoding,
+which had made `file` report the source as `data` and `grep` skip it as binary. The handoff's
+suggested repair to "a plain space" was assessed and **rejected**: it would change runtime
+semantics and make the key ambiguous, since a space can occur inside a family or external record
+id while U+0000 cannot. Live design question deferred to S3/S4, not an S2 defect: if this key is
+ever persisted to a PostgreSQL `text` column the separator must change, because PostgreSQL cannot
+store U+0000 in `text`; `observationKey()` currently has no caller outside its own module and the
+focused suite. The stale header now reads "migration 074". `AFLDB-ISSUE-096.md` §16.4.
+
+**Final post-hygiene run — 2026-08-28: `61/61`, 1 test file passed, 0 failures, 303 ms.** That run
+covers the repaired assertions and the hygiene edits together and **closes the S2 checkpoint**. S1
+remains approved and green (34/34). Migration **074 remains UNAPPLIED** — the focused suite is
+DB-free and proves the semantics module plus the migration's source contract, not PostgreSQL
+behaviour. **No CHANGELOG entry, correctly:** the runbook requires none at this checkpoint,
+nothing user-visible has changed and no migration has run. *(At the time of writing, S3 had not
+started; it has since been implemented and validated green — see the S3 record below.)*
+ISSUE-100's blockers remain ISSUE-100's and are not absorbed here.
+
+**Workflow note, recorded factually:** command execution belongs to the user (CLAUDE.md §9/§12),
+but during the hygiene repair the assistant ran `sed -i`, `grep`, `wc`, `tr` and a short `node`
+script over repository files to locate and remove the NUL bytes. No test, build, Git, SQL, SSH,
+deployment or package-manager command was run, and every validation run stayed user-executed. One
+`sed -i` edit was silently reverted when a later file-editing call wrote back a stale snapshot, so
+byte counts were re-checked after each edit; `AFLDB-ISSUE-096.md` §16.7a.
+
+**Observed, not investigated:** `src/db/migrations/073_data_overrides.sql` now exists and
+`privileges.sql:294` references it as `AFLDB-ISSUE-086`'s. That is the authority mechanism
+§7 depends on, so `UNAVAILABLE_MANUAL_AUTHORITY` may become replaceable — **only against
+ISSUE-086's own confirmed contract**, never inferred from the migration. Not S2 work.
+
+**S3 COMPLETE and GREEN 2026-08-28 — user-run `npm test -- tests/current-season-import.test.ts`:
+1 test file passed, `84/84` tests passed, 0 failures, 316 ms.** New module
+`src/lib/acquisition/reconciliation.ts` computes the reconciliation verb for one live source
+record against the stored open observation. The vocabulary is exactly Decision C's ten verbs,
+frozen in `RECONCILIATION_VERBS` with a runtime `assertReconciliationVerb` guard, and the decision
+order is exported as `VERB_PRECEDENCE`: `stale_review` → `absent` → `unchanged` →
+`unresolved_identity` → `foreign_owned_collision` → `source_disagreement` →
+`manual_authority_conflict` → `new` / `rescheduled` / `corrected`. Two principles fix that order —
+structural facts (stale evidence, an absent key, an unchanged payload) come before content, and a
+refusal gate runs **only when a canonical write is actually proposed**, so an unchanged poll cannot
+fill the review queue with refusals. `unchanged` is decided by `decideObservation` under the
+family's hash contract alone; `rescheduled` requires schedule-only movement on an **unplayed**
+record, so a score change can never be reported as a reschedule; `absent` reuses S2's enumerated
+scope rule and returns `canonicalChange: 'none'`.
+
+Ownership and authority are **extended, not redesigned**. `evaluateTargetOwnership` reads S2's
+`evaluateOwnership` through three states and keeps a **declared** NULL owner (adoptable under
+Decision E) distinct from an **unreadable** owner, which refuses as `foreign_owned_collision` with
+detail `ownership_indeterminate` — a matching natural key never justifies adopting a row nobody can
+attribute. Authority is asked as `{entity, opaque targetKey, changed fields}`, only where a
+promotion would overwrite an existing canonical row (§7's invariant is about overwriting an active
+human decision; a row that does not exist carries none), and **every non-`clear` answer refuses**,
+`indeterminate` identically to `conflict`. `evaluateAcceptance` still asks unconditionally inside
+the accept transaction, so a `new` candidate also cannot be written while authority is unavailable.
+Corroboration counts **independence groups**, never source rows: a conflicting group blocks with
+`source_disagreement`, a same-group proxy conflict is reported and can never raise the verb, and
+agreement is recorded and authorises nothing. No force flag, no override, no consensus shortcut, no
+write path — the module imports only `./observations` and `./source-families`.
+
+**`history_only` — a settled S3 design outcome.** A changed source payload that advances
+observation history but changes **none of the family's projected canonical fact fields** returns
+`history_only`; Squiggle metadata such as completion moving `90 → 100` while no projected fact
+changes is the retained example. It is **not** an eleventh reconciliation verb, is **not** permitted
+in `RECONCILIATION_VERBS`, is **not** a promotion-candidate verb and is **not** a canonical change:
+it is an observation-layer outcome meaning the source state changed and history must advance while
+there is no fact-level proposal to review. It avoids both wrong alternatives — `unchanged` would
+erase a genuine source-state transition, `corrected` would create a candidate proposing no changed
+fields. The `84/84` green run validates the distinction. **Do not redesign it unless later S4
+integration evidence contradicts it.**
+
+**23 DB-free S3 tests** were added to `tests/current-season-import.test.ts` in five new describes,
+against a stubbed authority provider, taking the focused suite to **84**. The user-run `84/84` pass
+covers: the exact frozen verb vocabulary; runtime rejection of an unrecognised verb; `unchanged`;
+`new`; `corrected`; `rescheduled`; the history-only observation; projected-field diffing;
+A → B → A preserved through reconciliation; absence; the unenumerated-scope refusal; unresolved
+identity; foreign **and** indeterminate ownership; ownership-before-authority ordering;
+independence-group disagreement; provider agreement not substituting for authority; manual
+authority conflict; unavailable/indeterminate authority; the opaque authority query shape; stale
+review; no write/force/override/consensus path; no external side-effect dependencies; the mandatory
+authority provider; and only candidate outcomes carrying proposals.
+
+**Established S3 semantics, durable:** structural evidence is resolved before content
+classification; refusal gates run only when a canonical change is actually proposed; `unchanged`
+comes only from the family hash contract; `rescheduled` stays distinct from `corrected`; `absent` is
+observation/review state only and never canonical deletion; unresolved identity guesses nothing;
+`source_disagreement` requires disagreement between **independence groups**, not merely two source
+rows; foreign or unreadable ownership fails closed **before** manual authority is asked; provider
+agreement cannot substitute for manual authority; authority `conflict` and
+indeterminate/unavailable authority both fail closed; stale review is distinct from source
+correction; the module holds no database, network, filesystem, clock or write path; and no force,
+override or consensus shortcut exists.
+
+**Ownership states distinguished:** no canonical target → potentially `new`; matching source owner
+→ source-owned; **declared** NULL owner per Decision E → adoptable under the approved rule; foreign
+owner → `foreign_owned_collision`; owner undeterminable → fail closed as an
+ownership-indeterminate collision. **A matching natural key alone never permits adoption of foreign
+or indeterminate provenance.**
+
+**S4 COMPLETE and GREEN 2026-08-28 — user-run
+`npm test -- tests/current-season-import.test.ts`: 1 test file passed, `105/105`, 0 failures,
+357 ms on the final post-hygiene run** (an earlier implementation run was also `105/105`). New pure
+module
+`src/lib/acquisition/promotion-review.ts` states the promotion-review contract: the
+`promotion_candidates` record with migration 074's CHECK constraints enforced in TypeScript
+(`assertCandidateShape`), the **baseline canonical hash**, the review item, the accept-time
+recheck, the requeue/supersede rule and the decision drafts. It is pure — `node:crypto`,
+`./observations`, `./reconciliation`, `./source-families` and nothing else.
+
+**Baseline canonical hash — exactly the fields the promotion would write.**
+`baselineCanonicalHash(fields, values)` hashes `sha256/v1(canonical-fields)` (S2's algorithm and
+version, with **no** exclusion list) followed by the canonical JSON of **only the named fields**,
+names sorted and object keys sorted at every depth. Field order and property order cannot change
+it; a canonical column the promotion does not touch is never projected in and therefore **cannot**
+stale a review; a field the promotion *would* write moving **does**; array order is content and is
+not normalised; the digest is 64 hex characters, matching `baseline_canonical_hash char(64)`. It is
+**null** exactly where there is no target row — the `new` case `promotion_candidates_target_ck`
+describes — and a named field missing from the re-read **refuses**, because an absent key and a
+NULL value are different facts.
+
+**One additive change to `observations.ts`, behaviour-preserving:** the canonicaliser inside
+`canonicalisePayload` was hoisted and re-exported as `canonicalJson(value)`; `canonicalisePayload`
+now delegates to it with the family's exclusion list and produces byte-identical output. Reusing
+`canonicalisePayload` directly would have been **wrong**, not merely inelegant: `hash_exclusions`
+are declared against *source payload* columns, so applying them to canonical AFLDB values would
+silently drop a canonical column sharing a name (`data_accessed` is the live example).
+
+**Render and accept ask the same question.** `runPromotionGates` recomputes the baseline from
+freshly re-read canonical values and then delegates to **S2's `evaluateAcceptance`**, so the review
+screen can never offer an accept the transaction would refuse, and S2's gate order is unchanged and
+authoritative: `not_pending` → `verb_not_promotable` → `stale_review` (source version moved) →
+`stale_canonical_target` (baseline moved) → `season_not_in_progress` → `foreign_owned_collision` →
+manual authority. Every gate fails closed, so ordering decides only which true reason is reported
+first. Ownership runs through S3's three-state `evaluateTargetOwnership`, so an **unreadable** owner
+refuses with detail `ownership_indeterminate` while S2's ordering is preserved.
+
+**Requeue and supersede are not interchangeable.** `stale_canonical_target` means the reviewed
+evidence is still the open version and only the baseline moved ⇒ **re-render in place**, candidate
+stays `pending`. `stale_review` means the source moved on ⇒ **supersede**, so reconciliation can
+insert the replacement — which `ux_promotion_candidates_pending` requires anyway. Authority
+conflict/indeterminate ⇒ re-render in place, queued for review exactly as §7 says.
+
+**§7's implementation gate is intact by construction.** `PromotionDecisionDraft` has **no
+`'accept'` decision member** and typed-`null` value columns, so S4 cannot represent an acceptance;
+a cleared evaluation returns `{ verdict: 'gates_cleared', canonicalChange: 'none', write: {
+implemented: false, blockedBy: 'canonical_write_unimplemented' }, decision: null }`. Under the
+shipped `UNAVAILABLE_MANUAL_AUTHORITY` that branch is unreachable — every promotable verb, `new`
+included, refuses. The authority question stays `{entity, opaque targetKey, touched fields}`; the
+surrogate `target_id` never appears in it and the module never names `data_overrides`. Two agreeing
+independence groups authorise nothing (§15.3). **Blocked pending ISSUE-086:** the production
+canonical acceptance transaction — the write, its provenance quartet and the `accept` decision row
+carrying real `previous_values`/`new_values` — for `corrected`/`rescheduled` candidates onto an
+existing canonical row.
+
+**Reject semantics.** A rejection writes the decision row and nothing else: `decision: 'reject'`,
+no refusal reason, both value columns null, `canonicalChange: 'none'`, and the candidate transition
+`{status: 'rejected', setsResolution: true}` — `promotion_candidates`'s
+`(status = 'pending') = (resolved_at IS NULL) = (resolved_decision_id IS NULL)` rule is asserted in
+code rather than left to the INSERT. The draft carries no payload, version, absence or target
+field, so a reject cannot drift into a source or canonical deletion. `RECORDABLE_REFUSALS` is
+exactly the intersection of S2's `RefusalReason` and `promotion_decisions_reason_ck`:
+`not_pending` and `verb_not_promotable` are absent by design and produce **no** ledger row rather
+than one with an invented reason, and `season_not_in_progress` is recordable but does not requeue.
+
+**20 DB-free S4 tests** were added to `tests/current-season-import.test.ts` in four new describes:
+baseline coverage/determinism/ordering-independence/null-and-refusal cases; the review item's
+evidence built from a real S3 outcome; unrelated-field change staying current; both stale paths and
+their distinct requeue actions; not-pending, unpromotable-verb, foreign and indeterminate
+ownership, authority conflict, authority unavailable, provider agreement not satisfying authority,
+and season-not-owned refusals; the opaque authority query; no acceptance result under the shipped
+provider; no force/override/bypass/consensus export and no external imports; rejection implying no
+canonical change; the requeue/supersede transition rule; and the candidate shape against 074's
+CHECK lists, read statement-aware rather than by raw-text regex.
+
+**Not done in S4 (correctly):** no canonical write or promotion transaction; no admin route,
+component or React code; no migration and no change to 074; no change to `current-season-import.ts`,
+`staging.external_current_matches` or `reconciliation.ts`; no family importer; no ISSUE-086
+implementation and no worktree access; no CHANGELOG entry.
+
+**NUL-byte hygiene — RESOLVED 2026-08-28 (`AFLDB-ISSUE-096.md` §16.11).** Two source files carried
+the same artefact: a raw `0x00` written where the intended runtime value is U+0000.
+`src/lib/acquisition/observations.ts` was repaired earlier (§16.4). `source-families.ts` carried it
+in `parseSourceFamilyRegistry`'s duplicate-declaration **machine key** — deliberately unlike the
+human-readable `/` used by `label` on the line above. The assistant located it and wrote the
+explanatory comment but **could not perform the byte-level repair**, because it cannot emit a raw
+U+0000 reproducibly and its reader renders a NUL and a space identically; it stopped and asked for
+evidence rather than guessing. **The user then verified and repaired it:** `git diff … | cat -A`
+showed the separator as `^@` (a genuine raw NUL, and proof the assistant's comment edit had **not**
+turned it into a space); the user replaced the single `0x00` with the six-character source escape;
+`grep -naP '\x00' src/lib/acquisition/source-families.ts` afterwards returned **no matches**; and the
+final suite stayed green at `105/105`. **Runtime semantics did not change** — the escape still
+evaluates to U+0000, so the collision-resistant in-memory separator is byte-identical and only the
+source stopped being binary to `file`, `grep` and diff tools. Both source files are now confirmed
+NUL-free. **Forward concern retained, not redesigned:** PostgreSQL `text` cannot store U+0000;
+neither `observationKey()` nor `identity` is persisted today, and if a later stage proposes
+persisting one of these composite machine keys, that is where it must be addressed.
+
+### Validation
+Evidence validation: P1–P7 executed 2026-08-28 read-only; P1/P2 re-run the same day with the
+supplied key, still read-only — no production access, no canonical write, no schema change,
+no Git operation, and the key was never printed or persisted.
+
+**Code validation, all user-run, all DB-free:**
+
+- **S1 — `npm test -- tests/reference-data.test.ts`: GREEN.** `33/33` before the P1/P2 amendment,
+  then **`34/34`** on the post-amendment run. S1 is approved and green.
+- **S2 — `npm test -- tests/current-season-import.test.ts`: `61/61`, 0 failures** on the final
+  post-hygiene run (first run `59/61`; the two red assertions were confirmed false positives and
+  the **tests** were repaired, not the migration).
+- **S3 — `npm test -- tests/current-season-import.test.ts`: `84/84`, 1 test file passed, 0
+  failures, 316 ms.** S3 is complete and green.
+- **S4 — `npm test -- tests/current-season-import.test.ts`: `105/105`, 1 test file passed, 0
+  failures, `357 ms` on the final post-hygiene run.** **S4 is complete and green.** The 105 tests
+  establish: the review item carries the approved candidate evidence; the baseline hash covers
+  **exactly** the proposed/touched fields; it is deterministic and ordering-independent; an
+  unrelated canonical change does **not** stale a review and a proposed-field change **does**; moved
+  source evidence and a moved canonical baseline keep their **distinct** stale outcomes; every
+  acceptance gate re-runs fail-closed; provider agreement never substitutes for authority; foreign
+  **and unreadable** ownership refuse; authority conflict and indeterminate/unavailable authority
+  refuse; season ownership is enforced; a rejection mutates no canonical fact and no observation;
+  and no force/override/bypass/consensus path exists. The canonical acceptance/write transaction
+  remains **deliberately unimplemented** behind ISSUE-086's authority gate.
+
+These suites are DB-free by design: they prove the reference-data contract, the semantics modules
+and the migration's **source** contract — not PostgreSQL behaviour. **Migration 074 is UNAPPLIED**,
+so nothing in ISSUE-096 is database-validated; any PostgreSQL validation is `afldb_test` only.
+
+### Follow-up
+Retry **P1/P2** when a `KALI_AFL_API_KEY` is available, and **P7** when interactive SSH/database
+access is available (exact commands in `AFLDB-2026-API-ACQUISITION.md` §13.7). Neither blocks the
+contract.
+
+### Exact next action
+**None inside ISSUE-096 as approved — all four authorised stages are complete.** §11's
+decomposition is S1–S4 and stops there, and §14's approval authorised implementation "through
+stages S1–S4" only, so **there is no approved S5**: any next stage is a fresh approval decision,
+not a continuation (`AFLDB-ISSUE-096.md` §16.12). The three unbuilt pieces and their blockers:
+
+1. **The canonical acceptance/write transaction** (write + provenance quartet + real `accept`
+   decision row) — **BLOCKED on `AFLDB-ISSUE-086`** by §7's implementation gate. Replacing
+   `UNAVAILABLE_MANUAL_AUTHORITY` is permitted only against ISSUE-086's own confirmed contract,
+   never inferred from `073_data_overrides.sql`, whose worktrees stay off limits.
+2. **Applying migration 074 and the §5.H PostgreSQL integration tests** — **not** blocked by
+   ISSUE-086, but a separate explicitly authorised step: **`afldb_test` only**, never `afldb_dev`,
+   never production, with `grant_app_read()` / `privileges.sql` treatment for every new table.
+3. **The admin review screen** — an explicit §2 **non-goal** of ISSUE-096. S4 delivered the domain
+   contract it would render; building the route and components is not this issue's approved work.
+
+**Checkpoint 2026-08-28:** S1 approved and green `34/34`; S2 complete and green `61/61`; S3
+complete and green `84/84`; **S4 complete and green `105/105`**; the **canonical acceptance/write
+transaction remains deliberately unimplemented** behind ISSUE-086's authority gate — and the S4
+type/state model must **not** be read as evidence that those writes exist, since
+`PromotionDecisionDraft` cannot represent an acceptance and a fully cleared gate still reports the
+canonical write as unimplemented; `history_only` remains settled as an observation-layer outcome
+only; migration **074 UNAPPLIED** with no production or `afldb_dev` work at any point; the
+`source-families.ts` NUL hygiene item **RESOLVED**; **S5 not started**; `AFLDB-ISSUE-100` remains
+separate and does **not** block it. **No CHANGELOG entry** — the runbook requires none at this
+milestone: nothing has landed behaviour.
+
+**S4 prerequisites/stop conditions already recorded:** §7's implementation gate — `corrected`/update
+promotion onto existing rows cannot be implemented until ISSUE-086's authority contract lands, and
+`UNAVAILABLE_MANUAL_AUTHORITY` enforces that by construction; §16.5 — `073_data_overrides.sql` is
+ISSUE-086's, verify against its own confirmed contract and do not access its worktrees; approval 3
+and §15.3 — no automatic canonical promotion, and separate independence groups are not evidence for
+one; migration **074 remains UNAPPLIED** and any PostgreSQL validation is `afldb_test` only, never
+`afldb_dev`, never production; §16.8's invariants stand; no family importer, no ISSUE-095
+`club_seasons` work, no change to `current-season-import.ts` or
+`staging.external_current_matches`.
+
+**Superseded next actions (2026-08-28, both completed):** the S2 forensics — confirm what the two
+`[^;]*` regexes matched, repair the **tests** not the migration, then fix the two §16.4
+`observations.ts` defects (done; post-hygiene rerun `61/61`); and the S3 validation run (done;
+`84/84`).
+
+Migration **074** is written but **UNAPPLIED**: any PostgreSQL validation is `afldb_test` only,
+never `afldb_dev`, never production. Retained follow-ups owned elsewhere: an `afl_api` `sources`
+row and the 20th AFL API lineup column, both `AFLDB-ISSUE-100`'s; **P7 remains BLOCKED**.
+
+**Superseded next action (2026-08-28):** "HALT for user review — approve or amend decisions A–H
+and the six unresolved items in §12." That approval was given; see §14 of the runbook.
+
+## AFLDB-ISSUE-097 — Squiggle/Kali source independence: `/v1/fixture` is a verbatim Squiggle proxy
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Data acquisition / Data integrity
+- **Found:** 2026-08-28 (2026+ API acquisition investigation, live probe)
+- **Resolved:** N/A
+- **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §2.1 and §9 row B.
+- **Files:** `src/lib/external-afl/current-matches.ts`,
+  `src/lib/external-afl/current-season-import.ts` (`sourceDisagreements`)
+- **Related:** `AFLDB-ISSUE-096` (architecture rule 9, compare before promoting)
+
+### Problem
+Proven by live probe on 2026-08-28: `GET https://kaliaflstats.com/api/afl/v1/fixture` returns
+Squiggle's `games` schema carrying Squiggle's own game ids and `updated` timestamps — id
+`38494`, Sydney 132 v Carlton 69, Opening Round, `complete` 100,
+`updated "2026-03-05 22:16:49"` — byte-for-byte the same values Squiggle's own
+`?q=games&year=2026&round=0` returns. For the fixture/score family the two configured sources
+are therefore **not independent witnesses**, so `sourceDisagreements` and `--source all` can
+report self-agreement as corroboration.
+
+### Established vs unknown — **updated 2026-08-28, P1 has now run**
+- **Established:** the proxying, for Kali `/v1/fixture`.
+- **Established (P1, re-run once `KALI_AFL_API_KEY` was supplied): `/matches` is NOT a proxy.**
+  Five independent proofs, in `AFLDB-2026-API-ACQUISITION.md` §13.1 — (a) a genuine value
+  disagreement on a completed match: Essendon v Port Adelaide 2026-08-23, Kali **95–105** vs
+  Squiggle **95–104** with Squiggle `complete = 100`; (b) `crowd` populated on 80 of 204 rows
+  where Squiggle publishes no attendance field at all; (c) disjoint id spaces, 11405–11611 vs
+  38494–38729, **0 shared**; (d) a different venue vocabulary on 80 of 160 jointly observed
+  games (`Marvel Stadium`/`Docklands`, `GMHBA Stadium`/`Kardinia Park`); (e) no goals/behinds,
+  which Squiggle carries. Kali's `sourcedAt` is a stored per-record timestamp, measured stable
+  across a repeat fetch.
+- **Consequence:** the same two sources are **one** witness for fixtures and **two** for matches,
+  so corroboration must be counted **per family**. `AFLDB-ISSUE-096`'s registry
+  (`data/reference/source-families.json`) already encodes both, so consume it rather than
+  re-deriving independence here.
+- **STILL UNKNOWN — do not overstate P1:** it disproves **pairwise** derivation, not a
+  **common ultimate upstream** (both could read AFL.com.au). Two groups here are weaker than two
+  fully independent witnesses, so a disagreement stays a **review** signal and must never
+  auto-resolve.
+- **P2, same run:** Kali projects **no player id** on the stat grain (`matchId`, `playerName`,
+  `teamId` only), so it cannot corroborate at player grain at all, whatever the match-grain
+  result. Recorded under `AFLDB-ISSUE-096` §15.2.
+
+### Scope
+Track the proven `/fixture` proxying as a corroboration risk; **P1 has now settled the
+`/matches` half — Kali IS a second match witness**; rewrite `sourceDisagreements` and
+`--source all` to count **independence groups** rather than source rows.
+
+### Dependencies and gates
+Depends on nothing. **The P1 gate is CLEARED (2026-08-28).** The implementation consumes
+`AFLDB-ISSUE-096`'s independence-group semantics and its registry; it does not redefine them.
+
+### Validation
+Evidence only, read-only, 2026-08-28: P1 and P2 executed against the live Kali API with the
+supplied key (never printed or persisted), plus Squiggle `q=games&year=2026`. No write, no
+schema change, no code change under this issue yet.
+
+### Exact next action
+Rewrite `sourceDisagreements` and `--source all` against independence groups from
+`data/reference/source-families.json`, and surface the Essendon v Port Adelaide
+**95–105 / 95–104** case as the first real disagreement — under the old one-group
+model it was invisible, because the two sources were assumed to be one witness.
+
+### Follow-up
+**Superseded (2026-08-28):** "if P1 shows `/matches` is also a proxy, Kali drops to a
+statistics-only source and this issue's scope widens." P1 showed the opposite, so that branch
+is closed. The live follow-up is the reverse risk: two groups that may still share an ultimate
+upstream must not be presented to a reviewer as full corroboration.
+
+## AFLDB-ISSUE-098 — Shipped current-season importer defects
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Data integrity / Import
+- **Found:** 2026-08-28 (2026+ API acquisition investigation, source-verified)
+- **Resolved:** N/A
+- **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §1.1 and §9 row C.
+- **Files:** `src/lib/external-afl/current-season-import.ts` (`:607-629`, `:619`, `:420-439`,
+  `:633`, `:657`, `:219-225`)
+- **Related:** `AFLDB-ISSUE-086` — the unrestricted canonical score overwrite at
+  `current-season-import.ts:567-590` is **that issue's behaviour class, referenced here and
+  deliberately not duplicated**. ISSUE-086 retains ownership and its severity triage.
+
+### Problem
+Four defects proven by reading the shipped importer:
+
+1. **Fabricated venue.** `:619` inserts `venue_raw = ${match.venueRaw ?? 'Unknown'}`.
+   `matches.venue_raw` is NOT NULL and `venue_id` is left NULL, so a promoted row can carry the
+   literal string `Unknown` permanently.
+2. **Half-matches.** The same INSERT (`:607-629`) writes `attendance = NULL,
+   attendance_status = 'not_collected'` and never writes `match_period_scores` or
+   `player_match_stats` — canonical matches with no quarter scores, no attendance and no player
+   participation.
+3. **Correction indistinguishable from deletion.** The staging write is
+   `ON CONFLICT … DO UPDATE` (`:420-439`), so a retrospectively changed payload silently
+   replaces the previous one. `last_seen_at` is written but never read, so a disappeared fixture
+   looks identical to an unrefreshed one.
+4. **Incoherent counters.** `unresolved -= candidates.length` (`:633`) has no floor and can go
+   negative; `records_inserted = staged + inserted` (`:657`) sums staging rows and canonical
+   rows under one name — the reporting incoherence recorded in
+   `.agents/skills/afldb-api-data-debug/SKILL.md`.
+
+Also recorded, not yet a defect: the Opening Round heuristic at `:219-225` appends
+`roundNumber + 1` for `season >= 2024`, embedding a source-numbering guess in the resolver.
+
+### Scope
+Independently actionable containment of the four defects above. **Kept separate from
+`AFLDB-ISSUE-096` and not folded into it.**
+
+### Dependencies and gates
+Depends on nothing — **not dependent on `AFLDB-ISSUE-096` or `AFLDB-ISSUE-097`**. Evidence
+probe **P7** is recommended to size the live impact but is not required to start.
+
+### Validation
+None yet — nothing implemented. Planned home is `tests/current-season-import.test.ts` with
+deterministic fixtures.
+
+### Follow-up
+None recorded yet.
+
+## AFLDB-ISSUE-099 — In-season AFL Tables settle stage
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Data acquisition / Import architecture
+- **Found:** 2026-08-28 (2026+ API acquisition investigation)
+- **Resolved:** N/A
+- **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §2.4, §5 and §9 row D.
+- **Files (today, for orientation only — none changed yet):**
+  `tools/rebuild/fitzroy/acquire_core.R`, `tools/rebuild/fitzroy/fitzroy-contract.json`,
+  `tools/migration/import_fitzroy_core.py`
+- **Related:** `AFLDB-ISSUE-093` (Resolved — supplies the acquisition/manifest machinery being
+  reused), `AFLDB-ISSUE-096` (parent contract)
+
+### Problem
+2026 has no player-match statistics, period scores, attendance or Brownlow votes at all,
+because the only current-season path stages matches from Squiggle/Kali and neither source
+carries them. AFL Tables — already AFLDB's frozen canonical historical source — was confirmed
+by live probe on 2026-08-28 to carry the 2026 season through Round 25 (completed 2026-08-23),
+including per-match player statistics, venue, attendance and a ladder. The historical source is
+also a current-season source, and the existing architecture does not exploit that.
+
+### Scope
+A nightly in-season settle pass: partial fitzRoy acquisition via `acquire_core.R --from/--to`
+producing a snapshot plus SHA-256 manifest, then **reviewed** promotion of `matches`,
+`match_period_scores`, `attendance`, `player_match_stats` and `brownlow_round_votes`. Reuses
+the ISSUE-093 machinery rather than introducing a second importer.
+
+Note the existing boundary: a narrowed range is labelled `partial` and normal rebuild mode
+correctly refuses it, so an in-season consumer must opt in explicitly.
+
+### Dependencies and gates
+Depends on **`AFLDB-ISSUE-096`**. Implementation is gated on evidence probe **P5**.
+If P5 shows AFL Tables lacks stable `ID`/`url` for 2026, implementation is blocked and the
+in-season plan reverts to Squiggle-provisional-only — see the §8 stop conditions; do not
+proceed past that point without a fresh decision.
+
+### Validation
+None yet — nothing implemented.
+
+### Follow-up
+None recorded yet.
+
+## AFLDB-ISSUE-100 — Staging-only lineup / team-announcement domain
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Data acquisition / Import architecture
+- **Found:** 2026-08-28 (2026+ API acquisition investigation)
+- **Resolved:** N/A
+- **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §2.5 and §9 row E.
+- **Files (today, for orientation only — none changed yet):** new
+  `staging.external_lineups` (migration not yet written)
+- **Related:** `AFLDB-ISSUE-096` (parent contract)
+
+### Problem
+AFLDB has no model for announced teams, jumper numbers, substitutions or late changes.
+Canonical participation is the played match sheet (`player_match_stats`), which exists only
+after a match. `fetch_lineup_afl` (fitzRoy → AFL.com.au API, no key required) is the only free
+source found in the investigation that supplies lineups at all; footywire and squiggle
+explicitly do not.
+
+### Approved rule — retained explicitly
+**Lineups are staging-only and never become canonical participation.** Canonical participation
+remains the played match sheet. No public surface.
+
+### Scope
+A new `staging.external_lineups` table fed by `fetch_lineup_afl`, for admin visibility and
+reconciliation only.
+
+### Established vs unknown
+- **Established:** the source exists, requires no API key, and covers AFLM/AFLW and several
+  state leagues.
+- **UNKNOWN:** the returned column set, and whether AFL provider ids are exposed and stable.
+  The staging schema cannot be designed until P3 supplies the shape.
+- **Recorded risk:** this reads the AFL's own website API through a third-party package. Free
+  and unauthenticated today, but not a published contract with AFLDB, and revocable without
+  notice — which is part of why it is staging-only.
+
+### Dependencies and gates
+Depends on **`AFLDB-ISSUE-096`**. Implementation is gated on evidence probe **P3**, which must
+supply the source shape.
+
+### Validation
+None yet — nothing implemented.
+
+### Follow-up
+None recorded yet.
+
+## AFLDB-ISSUE-101 — End-of-season promotion / baseline rollover
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Data acquisition / Import architecture / Data integrity
+- **Found:** 2026-08-28 (2026+ API acquisition investigation)
+- **Resolved:** N/A
+- **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §5 (rollover row) and §9 row F.
+- **Files (today, for orientation only — none changed yet):**
+  `data/reference/fitzroy-accepted-baselines.json`, `data/reference/seasons.json`,
+  `tools/db/rebuild-test.ts` (Stage 9 `matches_after_accepted_last_season`)
+- **Related:** `AFLDB-ISSUE-099` (settle stage — prerequisite), `AFLDB-ISSUE-093` (Resolved —
+  accepted-baseline register), `AFLDB-ISSUE-095` (ladder/team-season — **coordinated, not
+  absorbed, and not redefined here**)
+
+### Problem
+The approved historical boundary is that only the in-progress season belongs to the API
+pipeline. Nothing currently performs the transition: when a season completes, its in-season
+API-provenance rows must be superseded by a standard full-history fitzRoy re-acquisition, and
+the surrounding registers must advance in step. Without this, in-season provenance would become
+permanent and the Stage-9 gate would drift.
+
+### Scope
+The rollover operation: extend `data/reference/fitzroy-accepted-baselines.json` to include the
+completed season, supersede the in-season provenance, advance
+`seasons.json.in_progress_seasons`, and re-point the Stage-9
+`matches_after_accepted_last_season` gate.
+
+### Boundary — `club_seasons` ownership
+**This issue must not independently redefine completed-season `club_seasons` ownership.** That
+remains with `AFLDB-ISSUE-095`, whose D1–D7 decisions are open and are not pre-empted here. Do
+not add a `club_seasons` Stage-9 gate under this issue.
+
+### Dependencies and gates
+Depends on **`AFLDB-ISSUE-099`**, and on coordination/completion of the relevant
+`AFLDB-ISSUE-095` canonical ladder/team-season path. Not gated on any probe.
+
+### Validation
+None yet — nothing implemented.
+
+### Follow-up
+Schedule before the 2026 season closes.
+
+## AFLDB-ISSUE-102 — Awards have no canonical legacy-free acquisition path
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Data acquisition / Import architecture
+- **Found:** 2026-08-28 (2026+ API acquisition investigation, source-verified)
+- **Resolved:** N/A
+- **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §2.7 and §9 row G.
+- **Files:** `tools/migration/import_awards.py` (`:1408`)
+- **Related:** `AFLDB-ISSUE-095` — the direct sibling of this gap for the ladder/team-season
+  domain. Linked, **not absorbed**; ISSUE-095's status and decisions are unchanged.
+
+### Problem
+`tools/migration/import_awards.py:1408` still calls `require_env("AFLDB_LEGACY_SQLITE")`. The
+awards/honours domain therefore has the same legacy dependency `AFLDB-ISSUE-095` records for
+`club_seasons`, and it was not tracked anywhere before this entry.
+
+The 2026+ investigation additionally established that **no API on any investigated free source
+covers Coleman, Rising Star, All-Australian, AFLCA, AFLPA or club best-and-fairest**. Brownlow
+is the exception: per-match votes already arrive through the AFL Tables path
+(`Brownlow.Votes`), and Coleman is derivable from `player_match_stats.goals`.
+
+### Scope — record only
+**This issue is deliberately record-only.** It records the legacy dependency and identifies it
+as the legacy-free acquisition gap for the awards domain.
+
+**Do not design the replacement under this investigation.** No source selection, no per-award
+provenance decision and no importer work is authorised by this entry.
+
+### Dependencies and gates
+Depends on nothing. Not gated on any probe.
+
+### Validation
+None — record-only.
+
+### Follow-up
+A future issue may take up the design once it is scheduled deliberately. Nothing is decided
+here.

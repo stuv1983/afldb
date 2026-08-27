@@ -1,0 +1,350 @@
+{
+  "$comment": "AFLDB source-family acquisition registry (AFLDB-ISSUE-096 stage S1). Declares, per (source_key, family), the external key shape, the payload-hash exclusion list, the required/known column subset, the round vocabulary and the independence group. Keyed by STABLE SOURCE KEY only: no database-local numeric sources.id ever appears in a tracked contract. This file declares; it does not import. Family importers belong to AFLDB-ISSUE-099 (settle), AFLDB-ISSUE-100 (lineups) and AFLDB-ISSUE-095 (ladder, deliberately absent here). Evidence citations P3/P4/P5 refer to AFLDB-2026-API-ACQUISITION.md section 13, run 2026-08-28.",
+  "contract_version": 1,
+  "sources": {
+    "afltables": {
+      "registered_by": "reference_dataset",
+      "registered_in": "data/reference/sources.json",
+      "registration_owner": null,
+      "notes": [
+        "Accessed through fitzRoy 1.8.0, the pinned AFLDB-ISSUE-093 contract version."
+      ]
+    },
+    "squiggle_api": {
+      "registered_by": "migration",
+      "registered_in": "src/db/migrations/063_external_current_match_sources.sql",
+      "registration_owner": null,
+      "notes": [
+        "Registered by migration 063 rather than by data/reference/sources.json, so the tracked reference dataset does not list it. Recorded drift; reconciling the two registries is not AFLDB-ISSUE-096 work."
+      ]
+    },
+    "kali_afl_stats": {
+      "registered_by": "migration",
+      "registered_in": "src/db/migrations/063_external_current_match_sources.sql",
+      "registration_owner": null,
+      "notes": [
+        "Same registration drift as squiggle_api."
+      ]
+    },
+    "afl_api": {
+      "registered_by": "unregistered",
+      "registered_in": null,
+      "registration_owner": "AFLDB-ISSUE-100",
+      "notes": [
+        "The AFL.com.au API reached through fitzRoy fetch_lineup_afl / fetch_player_details_afl has NO sources row anywhere today. Declared here so its families carry their proven shape and independence group; registering the row belongs to the family issue that first needs provenance. Until then no family of this source may carry promotion_policy 'reviewed' - enforced by the registry validator."
+      ]
+    }
+  },
+  "round_vocabularies": {
+    "afltables_2026": {
+      "description": "AFL Tables in-season round numbering for 2026.",
+      "mapping_status": "anchors_only",
+      "mapping_owner": "AFLDB-ISSUE-099",
+      "anchors": [
+        {
+          "round_number": 1,
+          "meaning": "Opening Round, 2026-03-05 (Sydney v Carlton, S.C.G.)",
+          "evidence": "P5"
+        },
+        {
+          "round_number": 25,
+          "meaning": "last home-and-away round, completed 2026-08-23",
+          "evidence": "P5"
+        }
+      ]
+    },
+    "squiggle_2026": {
+      "description": "Squiggle round numbering. Preseason / Opening Round is round 0, one lower than AFL Tables from 2024 onward.",
+      "mapping_status": "anchors_only",
+      "mapping_owner": "AFLDB-ISSUE-097",
+      "anchors": [
+        {
+          "round_number": 0,
+          "meaning": "Opening Round, 2026-03-05 (same match AFL Tables numbers 1)",
+          "evidence": "P5"
+        }
+      ]
+    },
+    "kali_2026": {
+      "description": "Kali /matches round numbering. Opening Round is round 0. Declared as its own vocabulary even though it agreed with squiggle_2026 on every jointly observed 2026 game (P1): a per-source declaration is the contract, and agreement is evidence, not identity.",
+      "mapping_status": "anchors_only",
+      "mapping_owner": "AFLDB-ISSUE-097",
+      "anchors": [
+        {
+          "round_number": 0,
+          "meaning": "Opening Round, 2026-03-05 to 2026-03-08 (ids 11405-11409), the same games AFL Tables numbers 1",
+          "evidence": "P1"
+        },
+        {
+          "round_number": 24,
+          "meaning": "last home-and-away round, completed 2026-08-23 (AFL Tables numbers it 25)",
+          "evidence": "P1"
+        }
+      ]
+    },
+    "afl_api_2026": {
+      "description": "AFL API round.roundNumber. Finals share the numeric home-and-away sequence, so the same integer denotes a different round than in the other two vocabularies.",
+      "mapping_status": "anchors_only",
+      "mapping_owner": "AFLDB-ISSUE-100",
+      "anchors": [
+        {
+          "round_number": 25,
+          "meaning": "Wildcard Finals (round.name), NOT the last home-and-away round",
+          "evidence": "P3"
+        }
+      ]
+    }
+  },
+  "families": [
+    {
+      "source_key": "squiggle_api",
+      "family": "match",
+      "endpoint": "https://api.squiggle.com.au/?q=games",
+      "status": "declared",
+      "external_key": ["id"],
+      "required_columns": [
+        "id", "year", "round", "date", "hteam", "ateam",
+        "hscore", "ascore", "complete", "updated"
+      ],
+      "known_columns": [
+        "id", "year", "round", "roundname", "date", "localtime", "unixtime", "tz",
+        "venue", "hteam", "hteamid", "ateam", "ateamid", "hgoals", "hbehinds", "hscore",
+        "agoals", "abehinds", "ascore", "winner", "winnerteamid", "complete", "is_final",
+        "is_grand_final", "timestr", "updated"
+      ],
+      "known_columns_status": "complete",
+      "hash_exclusions": [],
+      "source_updated_at_field": "updated",
+      "zero_is_missing_columns": [],
+      "round_vocabulary": "squiggle_2026",
+      "independence": {
+        "derives_from": null,
+        "group": "squiggle",
+        "evidence": "proven_independent"
+      },
+      "promotion_policy": "never",
+      "promotion_owner": null,
+      "evidence": [
+        "Documented games field list, probed 2026-08-28 (AFLDB-2026-API-ACQUISITION.md section 2.2)."
+      ],
+      "notes": [
+        "Squiggle is the completion/latency TRIGGER for the settle pass, never the authority for a fact AFL Tables also carries, so promotion_policy is 'never' by standing decision.",
+        "`updated` is a genuine upstream mutation timestamp and is therefore the one proven source_updated_at value in this registry. It stays IN the hash: it is content, not a volatile response field.",
+        "Correction/mutability policy is undocumented, so the payload hash remains the change oracle."
+      ]
+    },
+    {
+      "source_key": "kali_afl_stats",
+      "family": "match",
+      "endpoint": "https://kaliaflstats.com/api/afl/v1/matches",
+      "status": "declared",
+      "external_key": ["id"],
+      "required_columns": [
+        "id", "round", "year", "homeTeam", "awayTeam",
+        "homeScore", "awayScore", "date", "sourcedAt"
+      ],
+      "known_columns": [
+        "id", "round", "year", "homeTeam", "homeShortName", "awayTeam", "awayShortName",
+        "homeScore", "awayScore", "venue", "date", "startDatetime", "crowd", "sourcedAt"
+      ],
+      "known_columns_status": "complete",
+      "hash_exclusions": [],
+      "source_updated_at_field": "sourcedAt",
+      "round_vocabulary": "kali_2026",
+      "zero_is_missing_columns": [],
+      "independence": {
+        "derives_from": null,
+        "group": "kali",
+        "evidence": "proven_independent"
+      },
+      "promotion_policy": "never",
+      "promotion_owner": null,
+      "evidence": [
+        "P1 PASS 2026-08-28 (re-run once the key became available; previously BLOCKED). 204 matches for 2026, ids 11405-11611, 14 columns.",
+        "NOT a Squiggle proxy - five independent proofs: (a) a real VALUE disagreement on a completed match, Essendon v Port Adelaide 2026-08-23, Kali 95-105 vs Squiggle 95-104 with Squiggle complete=100; (b) `crowd` populated for 80 of 204 rows while Squiggle publishes no attendance field at all; (c) disjoint id spaces, 0 shared ids against Squiggle's 38494-38729; (d) a different venue vocabulary on 80 of 160 jointly observed games (Marvel Stadium vs Docklands, GMHBA Stadium vs Kardinia Park); (e) no goals/behinds, which Squiggle does carry.",
+        "`sourcedAt` is a stored per-record timestamp, not fetch time: two fetches 1.5s apart returned byte-identical payloads, and the five most recent rows carried five distinct values spread across 2026-08-21 to 2026-08-23."
+      ],
+      "notes": [
+        "AMENDED 2026-08-28 by P1. This family previously sat in the 'squiggle' group as `assumed_derived_pending_probe` - the fail-closed default while P1 was blocked. P1 has now run and DISPROVED derivation, so Kali is its own independence group and Squiggle + Kali are TWO witnesses for matches.",
+        "RESIDUAL UNKNOWN, recorded rather than assumed away: P1 disproves PAIRWISE derivation, which is what this contract's independence definition tests. It does NOT exclude a COMMON ultimate upstream (both could read AFL.com.au). Corroboration by these two groups is therefore weaker than two fully independent witnesses, and a disagreement between them is a review signal, never an auto-resolution.",
+        "Kali's round vocabulary agreed with Squiggle's on all 160 jointly observed games and Opening Round is round 0 in both - a shared convention, not proof of a shared dataset. It is still declared as its own vocabulary (kali_2026).",
+        "`crowd` is null for 124 of 204 rows and `startDatetime` for 142 of 204: these are genuine NULLs, not zeros, and must never be read as zero attendance. AFL Tables remains the attendance authority (P5: `Attendance` 0 NA).",
+        "promotion_policy stays 'never': AFL Tables is the authority for any fact it also carries. Kali is now a genuine corroborating witness, which is ISSUE-097's to exploit - it does not make Kali promotable."
+      ]
+    },
+    {
+      "source_key": "kali_afl_stats",
+      "family": "player_stats",
+      "endpoint": "https://kaliaflstats.com/api/afl/v1/player-stats and /player-stats-advanced",
+      "status": "identity_only",
+      "external_key": null,
+      "required_columns": null,
+      "known_columns": null,
+      "known_columns_status": "undeclared",
+      "hash_exclusions": [],
+      "source_updated_at_field": null,
+      "round_vocabulary": null,
+      "zero_is_missing_columns": [],
+      "independence": {
+        "derives_from": null,
+        "group": "kali",
+        "evidence": "proven_independent"
+      },
+      "promotion_policy": "not_yet_declared",
+      "promotion_owner": null,
+      "evidence": [
+        "P2 PASS 2026-08-28 (re-run once the key became available; previously BLOCKED). /player-stats rows carry matchId, playerName, teamId and 17 statistics; /player-stats-advanced carries matchId, playerName, teamId and 17 more. NEITHER PROJECTS A PLAYER ID.",
+        "/players holds 2,865 players with a stable numeric `id` (2,865 distinct, 0 null) and a stable slug `onlineId` (2,865 distinct, 0 null), but 19 names are shared by 38 players.",
+        "The documented `player_id` filter WORKS against the numeric id (player_id=301 returned 17 rows, all Nasiah Wanganeen-Milera); the slug is rejected with HTTP 400. So Kali holds the player id internally on stat rows and simply does not project it."
+      ],
+      "notes": [
+        "FAIL CLOSED - THE GAP, RECORDED: there is no stable provider player identifier on the player-stat grain, so a Kali stat row cannot be given a durable source identity. This family stays identity_only and may never be projected or promoted. AFL Tables profile `url` remains the sole proven player-match identity for 2026 (P5).",
+        "Name + team context is a HEURISTIC and must not be promoted to an identity. It resolved 200 of 200 sampled round-20 rows (2 ambiguous by name, 0 after applying teamId), but the population contains same-name players on the SAME team (two Alwyn Daveys, both currentTeamId 'essendon'), and `currentTeamId` is the player's CURRENT team, not the team at match time - so the heuristic degrades exactly where history matters.",
+        "The one viable identity path is enumeration: page /players (2,865 rows) and fetch /player-stats per player_id. At the free tier's 1,000 requests/day that is a multi-day crawl for one season, which is a real design constraint, not a detail.",
+        "Kali covers 19 of AFLDB's 21 player_match_stats columns, so it stays a useful statistics corroborator IF the identity gap is ever closed. Closing it is not ISSUE-096 work."
+      ]
+    },
+    {
+      "source_key": "kali_afl_stats",
+      "family": "fixture",
+      "endpoint": "https://kaliaflstats.com/api/afl/v1/fixture",
+      "status": "declared",
+      "external_key": ["id"],
+      "required_columns": [
+        "id", "year", "round", "date", "hteam", "ateam",
+        "hscore", "ascore", "complete", "updated"
+      ],
+      "known_columns": [
+        "id", "year", "round", "roundname", "date", "localtime", "unixtime", "tz",
+        "venue", "hteam", "hteamid", "ateam", "ateamid", "hgoals", "hbehinds", "hscore",
+        "agoals", "abehinds", "ascore", "winner", "winnerteamid", "complete", "is_final",
+        "is_grand_final", "timestr", "updated"
+      ],
+      "known_columns_status": "complete",
+      "hash_exclusions": [],
+      "source_updated_at_field": "updated",
+      "zero_is_missing_columns": [],
+      "round_vocabulary": "squiggle_2026",
+      "independence": {
+        "derives_from": "squiggle_api",
+        "group": "squiggle",
+        "evidence": "proven_derived"
+      },
+      "promotion_policy": "never",
+      "promotion_owner": null,
+      "evidence": [
+        "Probed 2026-08-28: the public /fixture endpoint returned Squiggle's games schema with Squiggle's own id 38494 and the identical `updated` string \"2026-03-05 22:16:49\" - a verbatim proxy."
+      ],
+      "notes": [
+        "Recorded because a derived source is represented by an explicit derives_from edge, never by being quietly omitted: it remains a useful availability and latency signal even though it is not a second witness.",
+        "AFLDB does not consume this endpoint; it consumes /matches above."
+      ]
+    },
+    {
+      "source_key": "afltables",
+      "family": "player_match_stats",
+      "endpoint": "fitzRoy fetch_player_stats_afltables(season)",
+      "status": "identity_only",
+      "external_key": null,
+      "required_columns": null,
+      "known_columns": null,
+      "known_columns_status": "undeclared",
+      "hash_exclusions": [],
+      "source_updated_at_field": null,
+      "zero_is_missing_columns": [],
+      "round_vocabulary": "afltables_2026",
+      "independence": {
+        "derives_from": null,
+        "group": "afltables",
+        "evidence": "proven_independent"
+      },
+      "promotion_policy": "not_yet_declared",
+      "promotion_owner": "AFLDB-ISSUE-099",
+      "evidence": [
+        "P5 PASS 2026-08-28: 9,522 x 81, 2026-03-05 to 2026-08-23, 207 distinct matches, rounds 1-25 with no finals rows yet."
+      ],
+      "notes": [
+        "BINDING: the in-season identity keys on profile `url` (0 NA across 9,522 rows). `ID` is 82 NA across 5 distinct urls, none of which carries an `ID` anywhere in 2026, so `ID` is an enrichment field and must NEVER be required.",
+        "A row whose `url` is unknown to AFLDB is `unresolved_identity` and goes to a human. A debutant can arrive with NA `Player` and NA `DOB`, which is itself an argument for reviewed promotion.",
+        "`Substitute` is NA for all 9,522 rows: the column exists and carries nothing.",
+        "The 81-column set and the composition of external_record_id (player url x match identity) are AFLDB-ISSUE-099's to declare with its own evidence. Until then this family cannot be projected or promoted."
+      ]
+    },
+    {
+      "source_key": "afl_api",
+      "family": "lineup",
+      "endpoint": "fitzRoy fetch_lineup_afl(season, round_number)",
+      "status": "declared",
+      "external_key": ["providerId", "teamId", "player.playerId"],
+      "required_columns": [
+        "providerId", "teamId", "player.playerId", "status", "teamStatus"
+      ],
+      "known_columns": [
+        "providerId", "utcStartTime", "status", "compSeason.shortName", "round.name",
+        "round.roundNumber", "venue.name", "teamAbbr", "teamName", "teamNickname",
+        "teamId", "position", "player.playerId", "player.captain",
+        "player.playerJumperNumber", "player.playerName.givenName",
+        "player.playerName.surname", "teamStatus", "teamType"
+      ],
+      "known_columns_status": "incomplete",
+      "hash_exclusions": [],
+      "source_updated_at_field": null,
+      "zero_is_missing_columns": [],
+      "round_vocabulary": "afl_api_2026",
+      "independence": {
+        "derives_from": null,
+        "group": "afl_api",
+        "evidence": "proven_independent"
+      },
+      "promotion_policy": "never",
+      "promotion_owner": null,
+      "evidence": [
+        "P3 PASS 2026-08-28: round 25 = 104 x 19 (status UNCONFIRMED_TEAMS / PROVISIONAL_TEAM), round 20 = 468 x 20 (CONCLUDED / FINAL_TEAM, 18 teams x 26 named players). Match CD_M20260142502, team CD_T140/CD_T30, player CD_I1020621."
+      ],
+      "notes": [
+        "STANDING DECISION: lineups are staging-only and never become canonical participation. promotion_policy is 'never' and is not negotiable by a later family issue.",
+        "known_columns_status is 'incomplete' ON PURPOSE. The 19 listed columns are the round-25 set; round 20 returned 20 columns and the extra one was never enumerated. A projection that refuses unexpected columns will therefore REFUSE a round-20 fetch. That refusal is the correct fail-closed behaviour and is the signal for AFLDB-ISSUE-100 to enumerate the missing column before building the staging projection.",
+        "There is NO substitute field. EMERG and INT are positions within the 20-value position vocabulary, not a medical-sub marker.",
+        "utcStartTime is the scheduled event start time and is a typed projection field. It is NOT an upstream mutation timestamp and must never populate source_updated_at.",
+        "player.captain was FALSE for all 468 round-20 rows: observed, not diagnosed."
+      ]
+    },
+    {
+      "source_key": "afl_api",
+      "family": "roster",
+      "endpoint": "fitzRoy fetch_player_details_afl(team, season, current)",
+      "status": "declared",
+      "external_key": ["providerId", "season", "team"],
+      "required_columns": [
+        "providerId", "firstName", "surname", "season", "team"
+      ],
+      "known_columns": [
+        "firstName", "surname", "id", "team", "season", "jumperNumber", "position",
+        "providerId", "dateOfBirth", "draftYear", "heightInCm", "weightInKg",
+        "recruitedFrom", "debutYear", "draftType", "draftPosition", "data_accessed"
+      ],
+      "known_columns_status": "complete",
+      "hash_exclusions": ["data_accessed"],
+      "source_updated_at_field": null,
+      "zero_is_missing_columns": ["weightInKg"],
+      "round_vocabulary": null,
+      "independence": {
+        "derives_from": null,
+        "group": "afl_api",
+        "evidence": "proven_independent"
+      },
+      "promotion_policy": "not_yet_declared",
+      "promotion_owner": null,
+      "evidence": [
+        "P4 PASS 2026-08-28: Carlton 2026 = 46 x 17. providerId CD_I1000953 alongside a separate numeric id 692. All 26 of 26 distinct round-20 Carlton lineup player.playerId values were found as providerId here - a measured join, not a shared-prefix inference.",
+        "P4: dateOfBirth 0 NA across 46 rows; weightInKg = 0 for 46 of 46 rows."
+      ],
+      "notes": [
+        "`data_accessed` is AFLDB's own fetch date, not an upstream timestamp. It is the proven case for the hash exclusion list: without excluding it every fetch would look like a correction and idempotence would fail. It must never populate source_updated_at either.",
+        "BINDING: weightInKg = 0 is systematic zero-as-missing across every row and maps to NULL. Promoting it as a fact would write 0 kg for every player.",
+        "This source does NOT displace AFL Tables `url` as primary player identity. providerId is a SECONDARY external_identities row and routes through the AFLDB-ISSUE-092 population-drop gate. A new player remains a human decision.",
+        "promotion_policy stays 'not_yet_declared': the roster family has no successor issue and the afl_api source has no sources row, so no promotion may occur. The registry validator enforces both."
+      ]
+    }
+  ]
+}

@@ -15,6 +15,18 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import {
+  assertProjectableColumns,
+  countIndependentWitnesses,
+  getSourceFamily,
+  independenceGroups,
+  isPromotable,
+  parseSourceFamilyRegistry,
+  roundKey,
+  roundKeysEqual,
+  translateRound,
+} from '@/lib/acquisition/source-families';
+
 const root = join(__dirname, '..');
 const refDir = join(root, 'data', 'reference');
 
@@ -28,6 +40,7 @@ const clubs = readJson('clubs.json');
 const statDefs = readJson('stat-definitions.json');
 const statAvail = readJson('stat-availability.json');
 const venueCanonical = readJson('venue-canonical.json');
+const sourceFamiliesRaw = readJson('source-families.json');
 
 describe('sources dataset', () => {
   it('carries the seven registry rows with unique keys and valid kinds', () => {
@@ -403,4 +416,209 @@ describe('load_reference_data.py', () => {
         expect(run.stdout).toContain(`PASS  ${scenario}`);
       }
     });
+});
+
+/*
+ * AFLDB-ISSUE-096 S1 — the source-family acquisition contract.
+ *
+ * data/reference/source-families.json declares, per (source key, family), the
+ * external key shape, hash exclusions, required/known columns, round vocabulary
+ * and independence group; src/lib/acquisition/source-families.ts parses it
+ * fail-closed. These tests pin the parts of the contract that a later family
+ * issue must not quietly relax: Kali and Squiggle stay ONE match witness,
+ * lineups are never promotable, zero is not a weight, and round integers are
+ * not comparable across sources. No database.
+ */
+describe('source families dataset (AFLDB-ISSUE-096 S1)', () => {
+  const registry = parseSourceFamilyRegistry(sourceFamiliesRaw);
+
+  const clone = (): any => JSON.parse(JSON.stringify(sourceFamiliesRaw));
+  const familyIn = (data: any, sourceKey: string, family: string): any =>
+    data.families.find((f: any) => f.source_key === sourceKey && f.family === family);
+  const refuses = (mutate: (data: any) => void): void => {
+    const data = clone();
+    mutate(data);
+    expect(() => parseSourceFamilyRegistry(data)).toThrow();
+  };
+
+  it('declares the four 2026 acquisition sources by stable key only', () => {
+    expect([...registry.sources.keys()].sort()).toEqual([
+      'afl_api', 'afltables', 'kali_afl_stats', 'squiggle_api',
+    ]);
+    // A database-local sources.id must never appear in a tracked contract.
+    expect(JSON.stringify(sourceFamiliesRaw)).not.toContain('source_id');
+
+    // Each declared key must exist where the registration says it does.
+    expect(sources.sources.map((s: any) => s.key)).toContain('afltables');
+    const migration063 = readFileSync(
+      join(root, 'src', 'db', 'migrations', '063_external_current_match_sources.sql'), 'utf8');
+    for (const key of ['squiggle_api', 'kali_afl_stats']) {
+      expect(registry.sources.get(key)!.registeredBy).toBe('migration');
+      expect(migration063).toContain(`('${key}'`);
+    }
+    // The AFL API has no sources row anywhere yet; that is recorded, not assumed away.
+    expect(registry.sources.get('afl_api')!.registeredBy).toBe('unregistered');
+    expect(registry.sources.get('afl_api')!.registrationOwner).toBe('AFLDB-ISSUE-100');
+  });
+
+  /*
+   * AMENDED 2026-08-28 by probe P1, which ran once the Kali key became
+   * available. The registry previously placed Kali /matches in the `squiggle`
+   * group as the fail-closed default while P1 was blocked; P1 disproved
+   * derivation, so the two are now two witnesses. The /fixture endpoint stays
+   * a proven verbatim proxy, so the derived-group rule is pinned there.
+   */
+  it('counts Squiggle and Kali as TWO match witnesses now that P1 has run', () => {
+    const both = ['squiggle_api', 'kali_afl_stats'];
+    expect(independenceGroups(registry, 'match', both)).toEqual(['kali', 'squiggle']);
+    expect(countIndependentWitnesses(registry, 'match', both)).toBe(2);
+    expect(getSourceFamily(registry, 'kali_afl_stats', 'match').independence).toMatchObject({
+      derivesFrom: null,
+      group: 'kali',
+      evidence: 'proven_independent',
+    });
+    // The proven /fixture proxy is still recorded explicitly rather than
+    // omitted: a derived endpoint stays in its upstream's group.
+    expect(getSourceFamily(registry, 'kali_afl_stats', 'fixture').independence).toMatchObject({
+      derivesFrom: 'squiggle_api',
+      group: 'squiggle',
+      evidence: 'proven_derived',
+    });
+    expect(independenceGroups(registry, 'fixture', ['kali_afl_stats'])).toEqual(['squiggle']);
+    // A derived source may not invent its own group and become a second witness.
+    refuses((data) => { familyIn(data, 'kali_afl_stats', 'fixture').independence.group = 'kali'; });
+    refuses((data) => {
+      familyIn(data, 'kali_afl_stats', 'fixture').independence.derives_from = null;
+    });
+  });
+
+  /*
+   * P2 ran at the same time and found NO player id on the Kali stat grain,
+   * so the player_stats family must stay unprojectable. This pins the gap: if
+   * someone later declares a column contract for it, they must also declare an
+   * identity, and this test is where that decision surfaces.
+   */
+  it('keeps the Kali player grain fail-closed after P2', () => {
+    const stats = getSourceFamily(registry, 'kali_afl_stats', 'player_stats');
+    expect(stats.status).toBe('identity_only');
+    expect(stats.externalKey).toBeNull();
+    expect(isPromotable(stats)).toBe(false);
+    expect(() => assertProjectableColumns(stats, ['matchId', 'playerName', 'teamId']))
+      .toThrow(/no column contract/);
+    // Name + team is a heuristic, and the notes must keep saying so.
+    expect(stats.notes.join(' ').toLowerCase()).toContain('heuristic');
+  });
+
+  it('promotes nothing in v1, and lineups never at all', () => {
+    expect(registry.families.filter(isPromotable)).toEqual([]);
+    expect(getSourceFamily(registry, 'afl_api', 'lineup').promotionPolicy).toBe('never');
+    expect(getSourceFamily(registry, 'squiggle_api', 'match').promotionPolicy).toBe('never');
+    // Reviewed promotion cannot be declared for a source with no sources row.
+    refuses((data) => { familyIn(data, 'afl_api', 'roster').promotion_policy = 'reviewed'; });
+    // ...nor for a family whose column contract was never proven.
+    refuses((data) => {
+      familyIn(data, 'afltables', 'player_match_stats').promotion_policy = 'reviewed';
+    });
+  });
+
+  it('keeps AFL API zero-as-missing and the fetch date out of the change oracle', () => {
+    const roster = getSourceFamily(registry, 'afl_api', 'roster');
+    expect(roster.zeroIsMissingColumns).toEqual(['weightInKg']);
+    expect(roster.hashExclusions).toEqual(['data_accessed']);
+    // data_accessed is AFLDB's own fetch date: excluded from the hash, and never
+    // an upstream mutation timestamp.
+    expect(roster.sourceUpdatedAtField).toBeNull();
+    refuses((data) => {
+      familyIn(data, 'afl_api', 'roster').source_updated_at_field = 'data_accessed';
+    });
+    // utcStartTime is a scheduled start time, so the lineup family declares none.
+    const lineup = getSourceFamily(registry, 'afl_api', 'lineup');
+    expect(lineup.sourceUpdatedAtField).toBeNull();
+    expect(lineup.knownColumns).toContain('utcStartTime');
+  });
+
+  it('treats Squiggle `updated` as the one genuine upstream mutation timestamp', () => {
+    const squiggle = getSourceFamily(registry, 'squiggle_api', 'match');
+    expect(squiggle.sourceUpdatedAtField).toBe('updated');
+    // It is content, not volatile response noise: it stays inside the hash.
+    expect(squiggle.hashExclusions).toEqual([]);
+    const withUpdatedAt = registry.families.filter((f) => f.sourceUpdatedAtField !== null);
+    expect(withUpdatedAt.map((f) => `${f.sourceKey}/${f.family}`).sort()).toEqual([
+      'kali_afl_stats/fixture', 'kali_afl_stats/match', 'squiggle_api/match',
+    ]);
+  });
+
+  it('refuses to project a family whose shape was never proven', () => {
+    const stats = getSourceFamily(registry, 'afltables', 'player_match_stats');
+    expect(stats.status).toBe('identity_only');
+    expect(stats.requiredColumns).toBeNull();
+    expect(() => assertProjectableColumns(stats, ['url', 'ID'])).toThrow(/no column contract/);
+    // P5: `ID` is 82 NA in-season, so it must never become a required column.
+    expect(stats.notes.join(' ').toLowerCase()).toContain('never be required');
+    expect(() => assertProjectableColumns(
+      getSourceFamily(registry, 'kali_afl_stats', 'player_stats'), ['matchId'])).toThrow();
+  });
+
+  it('accepts the proven lineup columns and refuses drift in either direction', () => {
+    const lineup = getSourceFamily(registry, 'afl_api', 'lineup');
+    const r25 = [...lineup.knownColumns!];
+    expect(r25).toHaveLength(19);
+    expect(() => assertProjectableColumns(lineup, r25)).not.toThrow();
+
+    // A missing required column is a refusal, not a silent NULL.
+    expect(() => assertProjectableColumns(lineup, r25.filter((c) => c !== 'teamStatus')))
+      .toThrow(/missing required column\(s\): teamStatus/);
+
+    // P3 measured 20 columns at round 20 and never enumerated the extra one, so
+    // known_columns is deliberately incomplete and a round-20 payload refuses.
+    // That refusal is AFLDB-ISSUE-100's signal to enumerate it.
+    expect(lineup.knownColumnsStatus).toBe('incomplete');
+    expect(() => assertProjectableColumns(lineup, [...r25, 'someUnenumeratedColumn']))
+      .toThrow(/undeclared column\(s\): someUnenumeratedColumn/);
+  });
+
+  it('keeps round integers inside their own vocabulary', () => {
+    const afltables = getSourceFamily(registry, 'afltables', 'player_match_stats');
+    const squiggle = getSourceFamily(registry, 'squiggle_api', 'match');
+    // Opening Round 2026 is round 1 to AFL Tables and round 0 to Squiggle.
+    const openingAfltables = roundKey(afltables, 1, null);
+    const openingSquiggle = roundKey(squiggle, 0, null);
+    expect(roundKeysEqual(openingAfltables, roundKey(afltables, 1, null))).toBe(true);
+    expect(roundKeysEqual(openingAfltables, roundKey(afltables, 25, null))).toBe(false);
+    expect(() => roundKeysEqual(openingAfltables, openingSquiggle))
+      .toThrow(/different vocabularies/);
+
+    // Every declared mapping is anchors-only, so translation stays refused.
+    for (const vocabulary of registry.roundVocabularies.values()) {
+      expect(vocabulary.mappingStatus).toBe('anchors_only');
+    }
+    expect(() => translateRound(registry, openingSquiggle, 'afltables_2026'))
+      .toThrow(/anchors_only/);
+    expect(translateRound(registry, openingSquiggle, 'squiggle_2026')).toBe(openingSquiggle);
+    // A family with no proven round vocabulary cannot produce a round key at all.
+    expect(() => roundKey(getSourceFamily(registry, 'afl_api', 'roster'), 1, null))
+      .toThrow(/no round vocabulary/);
+    // Kali agrees with Squiggle on every jointly observed round, but the
+    // vocabularies stay separate declarations, so the integers stay uncomparable.
+    expect(() => roundKeysEqual(
+      roundKey(getSourceFamily(registry, 'kali_afl_stats', 'match'), 0, null),
+      roundKey(squiggle, 0, null),
+    )).toThrow(/different vocabularies/);
+  });
+
+  it('fails closed on registry drift', () => {
+    refuses((data) => { data.contract_version = 2; });
+    refuses((data) => { data.families.push(familyIn(data, 'squiggle_api', 'match')); });
+    refuses((data) => { familyIn(data, 'squiggle_api', 'match').source_key = 'not_a_source'; });
+    refuses((data) => { familyIn(data, 'squiggle_api', 'match').round_vocabulary = 'not_declared'; });
+    refuses((data) => { familyIn(data, 'squiggle_api', 'match').hash_exclusions = ['not_a_column']; });
+    refuses((data) => { familyIn(data, 'squiggle_api', 'match').required_columns = ['not_a_column']; });
+    refuses((data) => { familyIn(data, 'squiggle_api', 'match').surprise = true; });
+    // An identity_only family may not smuggle in a column contract.
+    refuses((data) => {
+      familyIn(data, 'kali_afl_stats', 'player_stats').required_columns = ['matchId'];
+    });
+    // ...and a declared one may not drop it.
+    refuses((data) => { familyIn(data, 'afl_api', 'roster').known_columns = null; });
+  });
 });
