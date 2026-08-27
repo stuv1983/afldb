@@ -21,7 +21,7 @@ import {
  * renamed player (AFLDB-ISSUE-078, first-kick-goal half).
  *
  * Its own file rather than an addition to awards-reload-links.test.ts or
- * draft-reload-links.test.ts: both of those drive a PYTHON importer through
+ * draftguru-import.test.ts: both of those drive a PYTHON importer through
  * the repo virtualenv and are scoped in their own docstrings to the honours
  * and draft ETL boundaries. This one drives a TypeScript importer through
  * tsx, against a different table, with fixtures — candidate extracts, a

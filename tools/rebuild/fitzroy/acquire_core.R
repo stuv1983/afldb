@@ -209,6 +209,11 @@ run_acquire <- function() {
     )
   }
 
+  # Identity coverage is MEASURED during acquisition so the manifest records what the
+  # source actually supplied, rather than leaving it to be discovered at import time.
+  identity_obs <- list(rows = 0, rows_without_id = 0, rows_without_url = 0,
+                       seasons_with_missing_id = list())
+
   if ("player_stats" %in% datasets) {
     # One canonical acquisition (runbook §8): identity/name, DOB, profile URL,
     # match stats and Brownlow.Votes all ride this dataset if the probe
@@ -218,7 +223,18 @@ run_acquire <- function() {
                      function() fitzRoy::fetch_player_stats_afltables(season = s))
       if (!r$ok) stop("player_stats season ", s, " failed: ", r$error,
                       " (no partial manifest is written; rerun under the same label after fixing)")
-      add_file("player_stats", as.data.frame(r$data), sprintf("player_stats_%d.csv", s))
+      df <- as.data.frame(r$data)
+      blank <- function(v) is.na(v) | trimws(as.character(v)) == ""
+      n_no_id <- if ("ID" %in% names(df)) sum(blank(df$ID)) else nrow(df)
+      n_no_url <- if ("url" %in% names(df)) sum(blank(df$url)) else nrow(df)
+      identity_obs$rows <- identity_obs$rows + nrow(df)
+      identity_obs$rows_without_id <- identity_obs$rows_without_id + n_no_id
+      identity_obs$rows_without_url <- identity_obs$rows_without_url + n_no_url
+      if (n_no_id > 0) {
+        identity_obs$seasons_with_missing_id[[length(
+          identity_obs$seasons_with_missing_id) + 1]] <- list(season = s, rows = n_no_id)
+      }
+      add_file("player_stats", df, sprintf("player_stats_%d.csv", s))
     }
   }
   if ("player_details" %in% datasets) {
@@ -232,6 +248,59 @@ run_acquire <- function() {
     add_file("results", as.data.frame(r$data), "results.csv")
   }
 
+  # --- completeness accounting (AFLDB-ISSUE-093 full-history contract) -----
+  # Measured facts only. `full_history` is COMPUTED from the contract's gates and
+  # is never a label or an operator assertion; a snapshot that misses one required
+  # season, dataset or row is `partial`, and the offline validator re-proves the
+  # claim against the raw artefacts before any import may consume it.
+  fh <- contract$full_history
+  seasons_requested <- if (from <= to) from:to else integer(0)
+  season_of <- function(f) {
+    m <- regmatches(f$filename, regexpr("[0-9]{4}", f$filename))
+    if (length(m) == 1) as.integer(m) else NA_integer_
+  }
+  ps_files <- Filter(function(f) f$dataset == "player_stats", files)
+  seasons_acquired <- sort(unique(stats::na.omit(vapply(ps_files, season_of, integer(1)))))
+  approved_gaps <- as.integer(unlist(fh$approved_source_gaps$seasons))
+  if (length(approved_gaps) == 0) approved_gaps <- integer(0)
+
+  required_first <- as.integer(fh$season_range$first_season)
+  required_last <- as.integer(fh$season_range$last_season)
+  required_seasons <- setdiff(required_first:required_last, approved_gaps)
+  required_datasets <- unlist(fh$required_datasets)
+
+  duplicate_seasons <- seasons_acquired[duplicated(
+    vapply(ps_files, season_of, integer(1)))]
+  missing_seasons <- setdiff(required_seasons, seasons_acquired)
+  extra_seasons <- setdiff(seasons_acquired, required_first:required_last)
+  missing_datasets <- setdiff(required_datasets, unique(vapply(
+    files, function(f) f$dataset, character(1))))
+  empty_files <- Filter(function(f) f$row_count <= 0, files)
+
+  range_matches <- (from == required_first && to == required_last)
+
+  # MEASURED FACTS, NOT A VERDICT (AFLDB-ISSUE-093).
+  #
+  # The first full-history acquisition published `full_history: true` while the
+  # independent validator rejected the snapshot, because this script implemented a
+  # SMALLER gate set than the contract declares — identity completeness was never among
+  # its checks. Two implementations of one contract drifted, which is exactly what the
+  # single-source rule forbids.
+  #
+  # The acquirer therefore no longer adjudicates. It records what it measured and leaves
+  # the verdict to the one adjudicator, `import_fitzroy_core.py --require-full-history`,
+  # which re-derives every gate from the contract and the raw artefacts. A snapshot that
+  # the validator would reject can no longer describe itself as complete.
+  observed <- list(
+    datasets_complete = length(missing_datasets) == 0,
+    seasons_complete = length(missing_seasons) == 0,
+    no_duplicate_seasons = length(duplicate_seasons) == 0,
+    no_seasons_outside_range = length(extra_seasons) == 0,
+    all_rows_non_zero = length(empty_files) == 0,
+    version_pinned = isTRUE(version_ok),
+    requested_range_matches_contract = range_matches
+  )
+
   manifest <- meta_common()
   manifest$mode <- "acquire"
   manifest$snapshot_label <- label
@@ -239,7 +308,32 @@ run_acquire <- function() {
   manifest$datasets_requested <- as.list(datasets)
   manifest$working_directory <- out_dir
   manifest$files <- files
+  manifest$contract_full_history_version <- fh$contract_full_history_version
+  manifest$seasons_requested <- as.list(seasons_requested)
+  manifest$seasons_acquired <- as.list(seasons_acquired)
+  manifest$intentional_gaps <- as.list(approved_gaps)
+  manifest$missing_seasons <- as.list(missing_seasons)
+  manifest$acquisition_observations <- observed
+  manifest$identity_observations <- identity_obs
+  # Never a verdict: only the validator may confer full-history status.
+  manifest$completeness <- "unvalidated"
+  manifest$full_history <- FALSE
+  manifest$verdict_authority <-
+    "tools/migration/import_fitzroy_core.py --validate-only --require-full-history"
+
+  # The manifest is written LAST, after every raw artefact exists and is hashed.
   write_json(manifest, manifest_path)
+  cat("\ncompleteness: unvalidated (the acquirer does not adjudicate)\n")
+  not_observed <- names(observed)[!unlist(observed)]
+  if (length(not_observed)) {
+    cat("  observations not satisfied:", paste(not_observed, collapse = ", "), "\n")
+  }
+  cat("  player_stats rows:", identity_obs$rows,
+      "| rows without an ID:", identity_obs$rows_without_id,
+      "| rows without a profile URL:", identity_obs$rows_without_url, "\n")
+  cat("\nNow validate independently:\n",
+      " .venv/bin/python tools/migration/import_fitzroy_core.py --label", label,
+      "--validate-only --require-full-history\n")
   cat("\nAcquisition complete:", length(files), "file(s);",
       sum(vapply(files, function(f) f$row_count, integer(1))), "total rows.\n",
       "Manifest:", manifest_path, "\n",

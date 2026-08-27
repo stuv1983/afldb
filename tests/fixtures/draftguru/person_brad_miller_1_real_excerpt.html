@@ -1,0 +1,124 @@
+<!--
+  AFLDB-ISSUE-093 Stage B1 — TRIMMED REAL-SOURCE FIXTURE (not synthetic).
+
+  Every element below is copied verbatim from bytes acquired live on 2026-08-26 by the
+  approved two-page probe. Nothing here is invented: intervening markup (site chrome,
+  scripts, stylesheets, the remaining statistics rows) was REMOVED, and nothing was
+  added, reordered or reformatted.
+
+  Provenance:
+    player_url  https://www.draftguru.com.au/players/brad_miller/1
+    snapshot    person-html-20260826  (raw/persons/brad_miller__1.html)
+    byte size   20816
+    sha256      1296a83bbc6ba8f7bff8fc18138a3a3e7c1e95e1fcbfcb484cb97973bf7e974d
+    fetched_at  2026-08-26T08:52:21Z   http 200, no redirect
+
+  What this fixture exists to prove about the REAL page shape:
+    * the display name is carried by <title> and <h2 class="heading"> — there is NO <h1>;
+    * exactly ONE AFL Tables href is present, on the bare `afltables.com` host over http,
+      so it reduces under the existing normalise_profile_url() canonicaliser;
+    * the "More details" area also carries Footywire and Wikipedia links, which are
+      vocabulary/evidence only and are NEVER an identity source;
+    * a statistics table with many <th>/<td> cells does not confuse link extraction.
+
+  The page's own <link rel="canonical"> uses the http scheme and is retained verbatim as
+  evidence; AFLDB identity remains the https player_url and is never taken from a page.
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Brad Miller (born 1983) - Draftguru</title>
+
+    <link rel="canonical" href="http://www.draftguru.com.au/players/brad_miller/1" />
+  </head>
+  <body>
+
+      <div class="page-headings">
+
+
+          <h2 class="heading">Brad Miller</h2>
+
+      </div>
+
+    <div class="main-container">
+
+
+<div class="player-show-page">
+  <div class="player-show-page-container">
+    <div class="player-bits">
+
+
+  <p class="top-bump"><em>Born: </em>06 Jul 1983 (43 years old)</p>
+  <p><em>Height: </em>194cm</p>
+
+    <p class=top-bump>
+      <em>First drafted: </em>2001
+        (18 years old)
+    </p>
+    <p><em>Originally from: </em><a href="/from/mount_gravatt_vultures">Mount Gravatt</a></p>
+
+      <div class=top-bump style="display: flex; flex-direction: column; line-height: 1.5; margin-bottom: 0.6em">
+        <span><em>Career Games: </em>157</span>
+      </div>
+
+        <p style="margin-top: 0.6em">
+          <em>Highest Grade: </em>B
+        </p>
+
+    <p class="top-bump smaller-text"><em>More details: </em>
+      <a href="http://afltables.com/afl/stats/players/B/Brad_Miller.html">AFL Tables</a> or <a href="http://www.footywire.com/afl/footy/pp-richmond-tigers--brad-miller">Footywire</a> or <a href="http://en.wikipedia.org/wiki/Brad_Miller_(footballer)">Wikipedia</a>
+    </p>
+</div>
+
+
+      <div class="table-scroll-container">
+        <table class="general individual-player">
+          <thead>
+            <tr class="category-header" style="display: none">
+              <th></th>
+              <th></th>
+              <th class="afl-columns" colspan="9">AFL Career</th>
+              <th class="afl-state-separator" style="display: none"></th>
+              <th class="state-columns" colspan="5" style="display: none">State Leagues</th>
+            </tr>
+            <tr class="column-header">
+              <th class="year">Year</th>
+              <th class="age">Age</th>
+              <th class="afl-club">Club</th>
+              <th class="afl-number">#</th>
+              <th class="afl-list">List</th>
+                <th class="afl-rating">Grade</th>
+              <th class="afl-games">Games</th>
+              <th class="afl-goals">Goals</th>
+              <th class="afl-votes">Coaches</th>
+            </tr>
+          </thead>
+          <tbody>
+              <tr class="year-row even">
+
+
+                <td rowspan=1 class="year">2001</td>
+                <td rowspan=1 class="age">17</td>
+
+                  <td rowspan="1" class="afl-club"></td>
+  <td rowspan="1" class="afl-number"></td>
+  <td rowspan="1" class="afl-list"></td>
+    <td rowspan="1" class="afl-rating"></td>
+  <td rowspan="1" class="afl-games"></td>
+  <td rowspan="1" class="afl-goals"></td>
+
+
+                <td rowspan=1 class="afl-votes"></td>
+
+              </tr>
+          </tbody>
+        </table>
+      </div>
+  </div>
+</div>
+    </div>
+  </body>
+</html>

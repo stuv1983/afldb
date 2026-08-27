@@ -23,6 +23,11 @@ python tools/migration/rebuild_derived.py       # derived summaries
 python tools/validation/validate_migration.py   # 93 parity checks
 ```
 
+> **Historical.** This block reproduces the 2026-08-15 legacy migration, not the supported
+> rebuild. `tools/migration/import_draft.py` was retired by AFLDB-ISSUE-093 Stage B2-7 and now
+> fails fast; the supported DraftGuru importer is
+> `tools/rebuild/draftguru/import_draftguru.py`. See §"Not yet migrated" below.
+
 The whole pipeline was re-run from an empty schema after the corrections below, so every figure here comes from a clean load rather than from incremental patching.
 
 ---
@@ -232,5 +237,10 @@ Awards, All-Australian, Hall of Fame, honour teams, captaincies, draft picks and
 This section is a dated result, not the current loader inventory. The later
 Phase 3b tooling in `tools/migration/import_awards.py` now loads awards,
 All-Australian, AFLPA 22 Under 22, Hall of Fame, honour teams and captaincies;
-`tools/migration/import_draft.py` loads draft history. Player relationships
-remain separately deferred as described in the current README.
+`tools/migration/import_draft.py` loaded draft history at the time of this report; it was
+**retired by AFLDB-ISSUE-093 Stage B2-7** and replaced by
+`tools/rebuild/draftguru/import_draftguru.py`, which loads the same 5,057 persons / 6,810
+picks from the accepted DraftGuru Stage A snapshot with no `AFLDB_LEGACY_SQLITE` dependency.
+The commands in this report reproduce the *historical* legacy migration and are not the
+supported rebuild path. Player relationships remain separately deferred as described in the
+current README.

@@ -142,6 +142,55 @@ curl http://10.0.40.100:8090/api/health   # through the proxy
 
 Returns `{"status":"ok","database":"ok","latencyMs":N}`, or HTTP 503 with `"database":"unreachable"`. It deliberately reveals no version, hostname or connection detail. Caddy polls it every 30 s.
 
+## 6a. Clean test rebuild (`afldb_test`)
+
+The canonical clean rebuild of the **test** database is one command:
+
+```bash
+npm run db:test:rebuild -- --fitzroy-label <full-history-label> \
+                           --acknowledge-destroy afldb_test
+```
+
+Add `--plan` to print the stage graph and exit without touching anything.
+
+**It is destructive.** It drops every table, non-public schema, routine and type in
+`afldb_test` — a genuine clean slate, not a truncation — while preserving the `pg_trgm` and
+`unaccent` extensions, which are owned by another role. It refuses any target whose name is
+not exactly `afldb_test`, rejects `afldb_dev` and production by name, and requires you to
+name the database in `--acknowledge-destroy`.
+
+**Preflight runs before any destruction.** Every tracked DraftGuru input is checked and
+`import_draftguru.py --validate-only` must report 42 sha256-verified year pages, 5,057
+persons and 6,810 picks. A missing input fails while the database is still intact.
+
+Stage order (fixed):
+
+| # | Stage | Credential |
+|---|---|---|
+| 1 | preflight | none — no database contact |
+| 2 | database reset | `AFLDB_TEST_DATABASE_URL` (owner) |
+| 3 | migrations (`db:migrate:test`) | `AFLDB_TEST_DATABASE_URL` |
+| 4 | privileges (`db:privileges:test`) | `AFLDB_TEST_DATABASE_URL` |
+| 5 | reference data | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 6 | fitzRoy / AFL Tables core | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 7 | **DraftGuru** | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 8 | derived summaries | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 9 | fingerprints / row counts | `AFLDB_TEST_DATABASE_URL` |
+
+Data stages need `AFLDB_TEST_IMPORT_DATABASE_URL` — a restricted `afldb_import` DSN for the
+test database. The runner **fails closed** without it and never inherits the development
+`AFLDB_IMPORT_DATABASE_URL`, which points at `afldb_dev`. `--allow-owner-import-dsn` runs the
+data stages as owner deliberately, at the cost of the AFLDB-ISSUE-083 blind spot.
+
+`--fitzroy-label` is required and must name a manifest declaring `full_history`.
+`trial-2024` is a trial snapshot and can never satisfy full-history mode; use
+`--acknowledge-partial-fitzroy` to rebuild from partial core data on purpose.
+
+DraftGuru's canonical source is the accepted Stage A snapshot plus the tracked event/club
+contracts and the explicit-decision ledger. **It has no `AFLDB_LEGACY_SQLITE` dependency**,
+and the retired `tools/migration/import_draft.py` is never invoked. A Stage B3 person-page
+bridge is optional and absent by default; unbridged persons stay `unmatched`.
+
 ## 7. Data refresh
 
 Run in this order. Each step is idempotent and safe to repeat.
@@ -152,13 +201,19 @@ source .venv/bin/activate    # or use ./.venv/bin/python directly
 
 ./.venv/bin/python tools/migration/import_legacy_afl.py       # ~114s  core reload
 ./.venv/bin/python tools/migration/enrich_birth_dates.py      # ~6s    DOB recovery
-./.venv/bin/python tools/migration/import_draft.py            # ~2s    draft links
+./.venv/bin/python tools/rebuild/draftguru/import_draftguru.py  # draft rows and people
 ./.venv/bin/python tools/migration/import_awards.py           # awards and representative teams
 ./.venv/bin/python tools/migration/rebuild_derived.py         # ~30s   summaries
 ./.venv/bin/python tools/validation/validate_migration.py     # every check must pass
 
 npm run build && sudo systemctl restart afldb                 # refresh cached pages
 ```
+
+`import_draftguru.py` is the supported DraftGuru importer (AFLDB-ISSUE-093 Stage B2). It reads
+the accepted Stage A snapshot and the tracked reference/decision artefacts, and has **no**
+`AFLDB_LEGACY_SQLITE` dependency. `tools/migration/import_draft.py` is **retired** and now
+fails fast if invoked. Add `--validate-only` to check every input without touching the
+database, or `--dry-run` to run the whole transaction and roll it back.
 
 The order matters. `rebuild_derived.py` must run last: it reads the tables the earlier steps write, and its first target, `season_metadata`, decides whether a season is still in progress — which in turn decides whether that season's Brownlow reads as a zero or as "not yet awarded".
 

@@ -771,6 +771,43 @@ def cascade_dependents(conn: psycopg.Connection, tables: Sequence[str]) -> set[s
         return {normalise_table(r[0]) for r in cur.fetchall()}
 
 
+def selectable(conn: psycopg.Connection, tables: Sequence[str]) -> set[str]:
+    """Of `tables`, the ones the CURRENT role may SELECT.
+
+    AFLDB-ISSUE-093 §H12. Asked of the catalogue, not of the tables:
+    has_table_privilege() needs no privilege on its argument, so this can
+    classify a relation the caller is forbidden to read without provoking
+    the InsufficientPrivilege error it exists to avoid. One round trip,
+    whatever the size of the list.
+
+    A caller that instead probed each table with `SELECT count(*)` would
+    fail on the first revoked relation -- which is precisely how the first
+    clean rebuild died at the REFERENCE stage.
+    """
+    if not tables:
+        return set()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT t FROM unnest(%s::text[]) AS t WHERE has_table_privilege(t, 'SELECT')",
+            (list(tables),),
+        )
+        return {normalise_table(r[0]) for r in cur.fetchall()}
+
+
+def any_rows(conn: psycopg.Connection, tables: Sequence[str]) -> list[str]:
+    """Of `tables`, the ones that currently hold at least one row.
+
+    EXISTS, not count(*): the question is only ever "is this empty", and on
+    a large table the count is wasted work. The caller must have SELECT on
+    every table it passes -- use selectable() first.
+    """
+    populated: list[str] = []
+    for table in tables:
+        if scalar(conn, f"SELECT EXISTS (SELECT 1 FROM {table})"):
+            populated.append(table)
+    return populated
+
+
 def truncate(conn: psycopg.Connection, *tables: str) -> None:
     """Truncate tables, making reruns idempotent.
 

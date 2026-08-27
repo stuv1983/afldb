@@ -75,6 +75,9 @@ CONTRACT_PATH = REPO_ROOT / "tools" / "rebuild" / "fitzroy" / "fitzroy-contract.
 SNAPSHOT_ROOT = REPO_ROOT / "data" / "sources" / "afltables" / "fitzroy_core"
 MANIFEST_ROOT = REPO_ROOT / "docs" / "rebuild-manifests" / "afltables_fitzroy_core"
 CLUBS_JSON = REPO_ROOT / "data" / "reference" / "clubs.json"
+# The acceptance/promotion register (AFLDB-ISSUE-093). Binds an accepted acquisition to its
+# hashes, contract version and measured fingerprint; never a substitute for the gates.
+ACCEPTED_BASELINES_PATH = REPO_ROOT / "data" / "reference" / "fitzroy-accepted-baselines.json"
 VENUES_JSON = REPO_ROOT / "data" / "reference" / "venue-canonical.json"
 AVAILABILITY_JSON = REPO_ROOT / "data" / "reference" / "stat-availability.json"
 
@@ -95,6 +98,9 @@ SOURCE_KEY_FITZROY = "fitzroy_afldata"
 DOB_EVIDENCE_TYPE = "fitzroy_player_stats"
 
 MATCH_METHOD = "afltables_profile_url"
+
+#: The fitzRoy datasets a source-normalisation rule may name.
+KNOWN_DATASETS = ("player_stats", "player_details", "results")
 
 EARLIEST_PLAUSIBLE_DOB = date(1850, 1, 1)
 
@@ -279,9 +285,14 @@ class ClubResolver:
     than one, fails closed.
     """
 
-    def __init__(self, dataset: dict) -> None:
+    def __init__(self, dataset: dict, source_rules: list[dict] | None = None) -> None:
         self.identities: dict[str, ClubIdentity] = {}
         self.alias_to_hist: dict[str, str] = {}
+        #: Source-scoped era normalisation, from the fitzRoy contract. Deliberately NOT an
+        #: alias: these never enter alias_to_hist, so the identities they name stay
+        #: non-interchangeable everywhere else. See fitzroy-contract.json
+        #: source_club_normalisation.
+        self.source_rules: list[dict] = list(source_rules or [])
         for row in dataset["identities"]:
             ident = ClubIdentity(
                 hist=row["hist"], name=row["name"],
@@ -299,7 +310,47 @@ class ClubResolver:
         self.org_members: dict[str, list[str]] = defaultdict(list)
         for hist in self.identities:
             self.org_members[self._terminal(hist)].append(hist)
-        self._cache: dict[tuple[str, int], str] = {}
+        self._cache: dict[tuple[str, int, str | None], str] = {}
+
+        # A tracked rule that does not describe a real identity, names a season range
+        # outside that identity's own era, names an unknown dataset, or overlaps another
+        # rule, is a defect in the contract rather than in the data — refuse it here
+        # rather than let it mis-resolve silently.
+        for rule in self.source_rules:
+            target = rule.get("resolves_to_hist")
+            if target not in self.identities:
+                raise SnapshotValidationError(
+                    f"source_club_normalisation names unknown identity {target!r}")
+            dataset = rule.get("dataset")
+            if dataset is not None and dataset not in KNOWN_DATASETS:
+                raise SnapshotValidationError(
+                    f"source_club_normalisation rule for {rule.get('raw')!r} names "
+                    f"unknown dataset {dataset!r}")
+            ident = self.identities[target]
+            last = ident.last_season if ident.last_season is not None else 9999
+            if not (ident.first_season <= rule["first_season"]
+                    and rule["last_season"] <= last):
+                raise SnapshotValidationError(
+                    f"source_club_normalisation rule for {rule.get('raw')!r} covers "
+                    f"{rule['first_season']}-{rule['last_season']}, outside "
+                    f"{target!r}'s own era {ident.first_season}-{last}")
+
+        for i, first in enumerate(self.source_rules):
+            for second in self.source_rules[i + 1:]:
+                if first["raw"] != second["raw"]:
+                    continue
+                # Two rules collide when they could both fire: same raw string, ranges
+                # overlap, and their dataset scopes are not disjoint.
+                scopes_disjoint = (first.get("dataset") is not None
+                                   and second.get("dataset") is not None
+                                   and first["dataset"] != second["dataset"])
+                overlaps = (first["first_season"] <= second["last_season"]
+                            and second["first_season"] <= first["last_season"])
+                if overlaps and not scopes_disjoint:
+                    raise SnapshotValidationError(
+                        f"source_club_normalisation has conflicting rules for "
+                        f"{first['raw']!r}: overlapping season ranges with compatible "
+                        f"dataset scope")
 
     def _terminal(self, hist: str) -> str:
         seen = set()
@@ -317,11 +368,24 @@ class ClubResolver:
         last = ident.last_season if ident.last_season is not None else 9999
         return ident.first_season <= season <= last
 
-    def resolve(self, raw: str, season: int) -> str:
-        key = (raw, season)
+    def resolve(self, raw: str, season: int, dataset: str | None = None) -> str:
+        # The dataset is part of the cache key: a results-scoped correction must never
+        # answer a player_stats lookup for the same string and season.
+        key = (raw, season, dataset)
         cached = self._cache.get(key)
         if cached is not None:
             return cached
+        # Source-scoped era normalisation first, and ONLY for an exact raw string inside
+        # an exact season range. Everything else falls through to the ordinary era rule
+        # and still fails closed if that cannot name exactly one identity.
+        for rule in self.source_rules:
+            scope = rule.get("dataset")
+            if scope is not None and scope != dataset:
+                continue          # a dataset-scoped rule never leaves its dataset
+            if raw == rule["raw"] and rule["first_season"] <= season <= rule["last_season"]:
+                self._cache[key] = rule["resolves_to_hist"]
+                return rule["resolves_to_hist"]
+
         hist = self.alias_to_hist.get(raw)
         if hist is None:
             raise MatchIdentityError(
@@ -381,6 +445,272 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: fh.read(1 << 20), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def artefact_set_digest(manifest: dict) -> str:
+    """The acceptance register's second binding to the artefact set.
+
+    Independently recomputable from the manifest's file list, so it survives insignificant
+    reformatting of the manifest while still pinning every filename, content hash and row
+    count. See data/reference/fitzroy-accepted-baselines.json `digest_rule`.
+    """
+    lines = sorted(f"{f['filename']} {f['sha256']} {f['row_count']}"
+                   for f in manifest.get("files", []))
+    return hashlib.sha256(("\n".join(lines) + "\n").encode("utf-8")).hexdigest()
+
+
+def select_accepted_baseline(register: dict, label: str) -> dict:
+    """Select THE accepted baseline. Zero and many are both refusals.
+
+    There is no 'latest label', filename-ordering or date tiebreak: deterministic selection
+    among several accepted baselines is not tracked policy, so this fails closed instead.
+    """
+    if register.get("contract") != "afldb.fitzroy.accepted_baselines":
+        raise SnapshotValidationError(
+            "acceptance register is not an afldb.fitzroy.accepted_baselines document")
+    policy = (register.get("selection_policy") or {}).get("rule")
+    if policy != "exactly_one_accepted":
+        raise SnapshotValidationError(
+            f"acceptance register declares selection policy {policy!r}, but the only "
+            "policy this rebuild implements is 'exactly_one_accepted'")
+    accepted = [b for b in register.get("baselines", [])
+                if b.get("acceptance_status") == "accepted"]
+    if not accepted:
+        raise SnapshotValidationError(
+            "no fitzRoy baseline is marked accepted — the rebuild has no canonical core "
+            "source and will not choose one for you")
+    if len(accepted) > 1:
+        names = ", ".join(sorted(str(b.get("snapshot_label")) for b in accepted))
+        raise SnapshotValidationError(
+            f"{len(accepted)} fitzRoy baselines are marked accepted ({names}). Deterministic "
+            "selection among several accepted baselines is not defined policy; mark exactly "
+            "one accepted.")
+    baseline = accepted[0]
+    if baseline.get("snapshot_label") != label:
+        raise SnapshotValidationError(
+            f"snapshot label {label!r} is not the accepted baseline "
+            f"({baseline.get('snapshot_label')!r}). The accepted baseline is not selected by "
+            "the label passed on the command line.")
+    return baseline
+
+
+def verify_accepted_binding(baseline: dict, manifest_path: Path, manifest: dict,
+                            contract: dict) -> dict:
+    """Prove the acceptance record still points at THESE bytes under THIS contract.
+
+    This is binding, not a verdict. It cannot make a snapshot acceptable: full-history
+    enforcement is always applied alongside it, re-derived from the artefacts, and every
+    artefact SHA-256 is re-verified against the manifest by validate_snapshot(). What this
+    adds is that the accepted acquisition, its manifest, and the contract version the
+    acceptance was granted under have not since drifted.
+    """
+    def refuse(what: str, expected, actual) -> None:
+        raise SnapshotValidationError(
+            f"accepted baseline {baseline.get('snapshot_label')!r}: {what} no longer matches "
+            f"the acceptance record (accepted {expected!r}, found {actual!r}). Re-validate "
+            "and re-accept deliberately; do not edit the acceptance record to fit.")
+
+    acq = baseline.get("acquisition") or {}
+    actual_manifest_sha = sha256_file(manifest_path)
+    if actual_manifest_sha != acq.get("manifest_sha256"):
+        refuse("the acquisition manifest's SHA-256", acq.get("manifest_sha256"),
+               actual_manifest_sha)
+
+    raw = baseline.get("raw_artefacts") or {}
+    actual_digest = artefact_set_digest(manifest)
+    if actual_digest != raw.get("artefact_set_sha256"):
+        refuse("the artefact-set digest", raw.get("artefact_set_sha256"), actual_digest)
+    entries = manifest.get("files", [])
+    if len(entries) != raw.get("file_count"):
+        refuse("the raw artefact count", raw.get("file_count"), len(entries))
+    total_rows = sum(int(f.get("row_count") or 0) for f in entries)
+    if total_rows != raw.get("total_rows"):
+        refuse("the total acquired row count", raw.get("total_rows"), total_rows)
+
+    binding = baseline.get("contract_binding") or {}
+    fh = contract.get("full_history") or {}
+    if binding.get("contract_version") != contract.get("contract_version"):
+        refuse("the fitzRoy contract version", binding.get("contract_version"),
+               contract.get("contract_version"))
+    if binding.get("contract_full_history_version") != fh.get("contract_full_history_version"):
+        refuse("the full-history contract version",
+               binding.get("contract_full_history_version"),
+               fh.get("contract_full_history_version"))
+    rng = binding.get("required_range") or {}
+    span = (int(fh["season_range"]["first_season"]), int(fh["season_range"]["last_season"]))
+    if (rng.get("first_season"), rng.get("last_season")) != span:
+        refuse("the required season range",
+               (rng.get("first_season"), rng.get("last_season")), span)
+    if list(binding.get("required_datasets") or []) != list(fh.get("required_datasets") or []):
+        refuse("the required datasets", binding.get("required_datasets"),
+               fh.get("required_datasets"))
+    if acq.get("fitzroy_version_pinned") != contract.get("pinned_version"):
+        refuse("the pinned fitzRoy version", acq.get("fitzroy_version_pinned"),
+               contract.get("pinned_version"))
+    return {
+        "accepted_label": baseline.get("snapshot_label"),
+        "manifest_sha256": actual_manifest_sha,
+        "artefact_set_sha256": actual_digest,
+        "raw_artefacts": len(entries),
+        "acquired_rows": total_rows,
+        "contract_version": contract.get("contract_version"),
+    }
+
+
+def enforce_accepted_fingerprint(baseline: dict, summary: dict, coverage: dict) -> None:
+    """Compare the freshly measured snapshot against the accepted drift gates.
+
+    Every value here was re-derived from the artefacts on this run; the acceptance record
+    only says what it must equal. A mismatch means the accepted snapshot, the contract or
+    the importer's transformations have changed, and acceptance no longer covers the result.
+    """
+    first, _, last = str(summary.get("seasons", "")).partition("-")
+    observed = {
+        "matches": summary.get("matches"),
+        "matches_with_player_rows": summary.get("matches_with_player_rows"),
+        "seasons_first": int(first) if first.isdigit() else None,
+        "seasons_last": int(last) if last.isdigit() else None,
+        "venues": summary.get("venues"),
+        "attendance_known": summary.get("attendance_known"),
+        "club_identities": len([c for c in str(summary.get("club_identities", "")).split(", ")
+                                if c]),
+        "players": summary.get("players"),
+        "players_with_dob": summary.get("players_with_dob"),
+        "players_with_dob_conflict": summary.get("players_with_dob_conflict"),
+        "player_match_rows": summary.get("player_match_rows"),
+        "brownlow_round_vote_rows": summary.get("brownlow_round_vote_rows"),
+    }
+    observed.update({k: coverage.get(k) for k in
+                     ("rows", "missing_id", "missing_url", "malformed_url",
+                      "distinct_ids", "distinct_urls")})
+    expected = dict(baseline.get("measured") or {})
+    expected.pop("$comment", None)
+    scan = dict(baseline.get("identity_scan") or {})
+    scan.pop("$comment", None)
+    expected.update(scan)
+
+    drift = [(k, v, observed.get(k)) for k, v in expected.items() if observed.get(k) != v]
+    if drift:
+        detail = "; ".join(f"{k}: accepted {exp}, measured {act}" for k, exp, act in drift)
+        raise SnapshotValidationError(
+            f"accepted baseline {baseline.get('snapshot_label')!r} has drifted from its "
+            f"measured fingerprint ({detail}). The snapshot, contract or importer changed "
+            "since acceptance; re-validate and re-accept deliberately.")
+
+
+def enforce_full_history(manifest: dict, snapshot_dir: Path, contract: dict) -> dict:
+    """Prove a snapshot has EARNED `full_history: true` (AFLDB-ISSUE-093).
+
+    The manifest's own claim is never taken on trust: every gate is re-derived here from
+    the contract and the artefacts, so a hand-edited flag, a renamed label or a partial
+    acquisition cannot pass. `full_history` is a measured conclusion, not an assertion.
+
+    Returns the measured identity coverage so the caller can report it.
+    """
+    fh = contract.get("full_history")
+    if not fh:
+        raise SnapshotValidationError(
+            "the fitzRoy contract carries no full_history block, so no snapshot can be "
+            "validated as full history")
+
+    # The manifest's own `full_history` field is NOT consulted as a verdict. The first
+    # full-history acquisition published `full_history: true` while this validator
+    # rejected the snapshot, because the acquirer implemented a smaller gate set. There is
+    # now one adjudicator — this function — and it re-derives every gate below.
+    if manifest.get("snapshot_label") in (fh.get("known_trial_labels") or []):
+        raise SnapshotValidationError(
+            f"{manifest.get('snapshot_label')!r} is a known trial label and can never "
+            "satisfy full-history mode, whatever its manifest claims.")
+
+    first = int(fh["season_range"]["first_season"])
+    last = int(fh["season_range"]["last_season"])
+    gaps = {int(s) for s in (fh.get("approved_source_gaps", {}).get("seasons") or [])}
+    required_seasons = {s for s in range(first, last + 1) if s not in gaps}
+
+    rng = manifest.get("requested_range") or {}
+    if rng.get("from") != first or rng.get("to") != last:
+        raise SnapshotValidationError(
+            f"requested_range {rng.get('from')}-{rng.get('to')} does not equal the "
+            f"contract's required range {first}-{last}")
+
+    entries = manifest.get("files", [])
+    datasets_present = {e.get("dataset") for e in entries}
+    missing_datasets = [d for d in fh["required_datasets"] if d not in datasets_present]
+    if missing_datasets:
+        raise SnapshotValidationError(
+            f"missing required dataset(s): {', '.join(missing_datasets)}")
+
+    seasons: list[int] = []
+    for entry in entries:
+        if entry.get("dataset") != "player_stats":
+            continue
+        match = PLAYER_STATS_FILE.match(entry.get("filename", ""))
+        if match:
+            seasons.append(int(match.group(1)))
+    duplicates = sorted({s for s in seasons if seasons.count(s) > 1})
+    if duplicates:
+        raise SnapshotValidationError(
+            f"duplicate player_stats artefact(s) for season(s): "
+            f"{', '.join(str(s) for s in duplicates[:10])}")
+
+    missing = sorted(required_seasons - set(seasons))
+    if missing:
+        raise SnapshotValidationError(
+            f"{len(missing)} required season(s) absent from the snapshot, and none is an "
+            f"approved source gap (first missing: {missing[0]}). A source failure is "
+            "terminal, never an absence.")
+    outside = sorted(s for s in seasons if not first <= s <= last)
+    if outside:
+        raise SnapshotValidationError(
+            f"season(s) outside the required range: {', '.join(str(s) for s in outside[:10])}")
+
+    empty = [e.get("filename") for e in entries if not e.get("row_count")]
+    if empty:
+        raise SnapshotValidationError(
+            f"artefact(s) with zero rows: {', '.join(str(f) for f in empty[:5])}")
+
+    # Identity coverage. import_fitzroy_core builds players ONLY from player_stats and
+    # fails closed on a row with no ID/url, so this is measured BEFORE any import runs
+    # rather than discovered part-way through one. Names are never consulted.
+    id_rule = fh.get("identity_requirement", {})
+    url_shape = re.compile(id_rule.get("profile_url_shape", r"^https?://\S+$"))
+    coverage = {"rows": 0, "missing_id": 0, "missing_url": 0, "malformed_url": 0,
+                "distinct_ids": 0, "distinct_urls": 0}
+    ids: set[str] = set()
+    urls: set[str] = set()
+    for entry in entries:
+        if entry.get("dataset") != "player_stats":
+            continue
+        path = snapshot_dir / entry["filename"]
+        with path.open(newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                coverage["rows"] += 1
+                player_id = (row.get("ID") or "").strip()
+                url = (row.get("url") or "").strip()
+                if not player_id:
+                    coverage["missing_id"] += 1
+                else:
+                    ids.add(player_id)
+                if not url:
+                    coverage["missing_url"] += 1
+                else:
+                    urls.add(url)
+                    if not url_shape.match(url):
+                        coverage["malformed_url"] += 1
+    coverage["distinct_ids"] = len(ids)
+    coverage["distinct_urls"] = len(urls)
+
+    # The canonical durable identity is the AFL Tables profile URL — that is what
+    # external_identities stores and what players are resolved by. The fitzRoy numeric ID
+    # never reaches a database column, so its ABSENCE is tolerated; a malformed or missing
+    # URL is not, and a name is never a fallback.
+    if coverage["missing_url"] or coverage["malformed_url"]:
+        raise SnapshotValidationError(
+            f"identity incomplete: {coverage['missing_url']} row(s) without a profile URL "
+            f"and {coverage['malformed_url']} with a non-canonical one. The profile URL is "
+            "the durable identity and is never inferred from a name.")
+
+    return coverage
 
 
 def validate_snapshot(snapshot_dir: Path, manifest_path: Path,
@@ -515,7 +845,11 @@ class MatchFact:
 
 @dataclass
 class PlayerFact:
-    afl_id: str
+    #: The fitzRoy numeric id. Grouping/provenance ONLY — never written to any column,
+    #: and legitimately absent for a handful of recent players (see scan_player_stats).
+    afl_id: str | None
+    #: The durable canonical identity: the normalised AFL Tables profile path.
+    url: str = ""
     given_name: str | None = None
     surname: str | None = None
     display_name: str | None = None
@@ -566,8 +900,8 @@ def scan_results(path: Path, clubs: ClubResolver) -> dict[tuple, MatchFact]:
                         f"{context}: Round {row['Round']!r} disagrees with "
                         f"Round.Number {row['Round.Number']!r}")
 
-            home_hist = clubs.resolve(row["Home.Team"], season)
-            away_hist = clubs.resolve(row["Away.Team"], season)
+            home_hist = clubs.resolve(row["Home.Team"], season, "results")
+            away_hist = clubs.resolve(row["Away.Team"], season, "results")
             if home_hist == away_hist:
                 raise MatchIdentityError(f"{context}: home and away resolve to "
                                          f"the same identity {home_hist!r}")
@@ -606,13 +940,61 @@ def scan_results(path: Path, clubs: ClubResolver) -> dict[tuple, MatchFact]:
     return matches
 
 
-def iter_player_stats(files: list[SnapshotFile]):
-    """Yield (context, season, row) across every player_stats file in order."""
+def load_row_corrections() -> list[dict]:
+    """Tracked per-row source corrections from the fitzRoy contract (may be empty)."""
+    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    return list(contract.get("source_row_corrections", {}).get("rules", []))
+
+
+def iter_player_stats(files: list[SnapshotFile], corrections: list[dict] | None = None):
+    """Yield (context, season, row) across every player_stats file in order.
+
+    Applies the tracked `source_row_corrections` (AFLDB-ISSUE-093). A rule names one
+    artefact, one exact set of field values and how many rows must match; a matching row
+    is dropped and nothing else is touched. Every rule must match EXACTLY its
+    ``expect_rows``, so if a later fitzRoy release fixes the defect upstream — or the
+    acquisition differs in any way — the count is wrong and the import fails visibly
+    instead of silently double-correcting or silently doing nothing. Identity is never
+    inferred here: a rule matches raw field values, never a name.
+    """
+    # A rule is IN SCOPE only when the artefact it names is part of this snapshot. A
+    # snapshot that does not contain that file is simply not the one the correction was
+    # written against — a trial covering 2024 must not be refused because a 1909
+    # correction found nothing to do.
+    present = {f.path.name for f in files if f.dataset == "player_stats"}
+    rules = [r for r in (corrections or []) if r.get("file") in present]
+    applied: dict[str, int] = {rule["id"]: 0 for rule in rules}
+
     for f in sorted((f for f in files if f.dataset == "player_stats"),
                     key=lambda f: f.season):
+        file_rules = [r for r in rules
+                      if r.get("dataset") == "player_stats"
+                      and r.get("file") == f.path.name]
         with f.path.open(newline="", encoding="utf-8") as fh:
             for i, row in enumerate(csv.DictReader(fh), start=2):
-                yield f"{f.path.name} line {i}", f.season, row
+                dropped = False
+                for rule in file_rules:
+                    if all(row.get(k) == v for k, v in rule["fingerprint"].items()):
+                        if rule.get("action") != "drop_row":
+                            raise SnapshotValidationError(
+                                f"unknown source_row_corrections action "
+                                f"{rule.get('action')!r} in rule {rule['id']!r}")
+                        applied[rule["id"]] += 1
+                        dropped = True
+                        break
+                if not dropped:
+                    yield f"{f.path.name} line {i}", f.season, row
+
+    for rule in rules:
+        expected = rule.get("expect_rows")
+        actual = applied[rule["id"]]
+        if actual != expected:
+            raise SnapshotValidationError(
+                f"source_row_corrections rule {rule['id']!r} expected to match "
+                f"{expected} row(s) but matched {actual}. The acquired bytes no longer "
+                f"match the evidence this correction was written against — if the source "
+                f"has been fixed upstream, remove the rule deliberately; do not let a "
+                f"correction apply to data it was not reviewed for.")
 
 
 def scan_player_stats(
@@ -620,6 +1002,7 @@ def scan_player_stats(
     matches: dict[tuple, MatchFact],
     clubs: ClubResolver,
     round_vote_seasons: set[int],
+    corrections: list[dict] | None = None,
 ) -> tuple[dict[str, PlayerFact], int, int]:
     """First streaming pass: player identity + match-grain supplements.
 
@@ -637,15 +1020,15 @@ def scan_player_stats(
     rows_read = 0
     round_vote_rows = 0
 
-    for context, file_season, row in iter_player_stats(files):
+    for context, file_season, row in iter_player_stats(files, corrections):
         rows_read += 1
         season = int(row["Season"])
         if season != file_season:
             raise SnapshotValidationError(
                 f"{context}: row season {season} does not match the file season")
         match_date = parse_iso_date(row["Date"], context)
-        home_hist = clubs.resolve(row["Home.team"], season)
-        away_hist = clubs.resolve(row["Away.team"], season)
+        home_hist = clubs.resolve(row["Home.team"], season, "player_stats")
+        away_hist = clubs.resolve(row["Away.team"], season, "player_stats")
         key = (match_date, home_hist, away_hist)
         match = matches.get(key)
         if match is None:
@@ -670,7 +1053,7 @@ def scan_player_stats(
                 f"{context}: venue {venue!r} disagrees with results.csv "
                 f"{match.venue_raw!r}")
 
-        playing_for = clubs.resolve(row["Playing.for"], season)
+        playing_for = clubs.resolve(row["Playing.for"], season, "player_stats")
         if playing_for not in (home_hist, away_hist):
             raise MatchIdentityError(
                 f"{context}: Playing.for {row['Playing.for']!r} is neither "
@@ -708,29 +1091,54 @@ def scan_player_stats(
         match.has_player_rows = True
 
         # Player identity.
+        #
+        # The AFL Tables profile URL is the durable canonical identity: it is what
+        # external_identities stores and what players are resolved by. The fitzRoy numeric
+        # `ID` never reaches a database column at all — it is grouping/provenance only —
+        # so identity is keyed on the URL and `ID` is optional.
+        #
+        # Measured on the 1897-2025 acquisition (685,473 rows): 83 rows across 5 players,
+        # all in 2025, carry a canonical URL and NO ID, and there is not one URL with two
+        # IDs or one ID with two URLs anywhere in the source. Requiring both would discard
+        # five real players and their matches for a column the schema never keeps.
         afl_id = clean(row["ID"])
         url_path = normalise_profile_url(row["url"])
-        if afl_id is None or url_path is None:
+        if url_path is None:
             raise PlayerIdentityError(
-                f"{context}: player row has no stable ID/profile URL — "
-                f"identity cannot be registered deterministically")
-        pm_key = (afl_id, key)
+                f"{context}: player row has no profile URL — identity cannot be "
+                f"registered deterministically, and a name is never identity")
+        pm_key = (url_path, key)
         if pm_key in seen_player_match:
             raise MatchIdentityError(
-                f"{context}: duplicate player-match row for ID {afl_id}")
+                f"{context}: duplicate player-match row for {url_path}")
         seen_player_match.add(pm_key)
 
-        fact = players.get(afl_id)
+        fact = players.get(url_path)
         if fact is None:
-            fact = players[afl_id] = PlayerFact(afl_id=afl_id)
+            fact = players[url_path] = PlayerFact(afl_id=afl_id, url=url_path)
+        # A populated ID is still held to 1:1 with the URL; only its ABSENCE is tolerated.
+        if afl_id is not None:
+            if fact.afl_id is None:
+                fact.afl_id = afl_id
+            elif fact.afl_id != afl_id:
+                raise PlayerIdentityError(
+                    f"{context}: profile URL {url_path} carries conflicting IDs "
+                    f"{fact.afl_id} and {afl_id} — refusing to guess which player this is")
         fact.urls.add(url_path)
-        if len(fact.urls) > 1:
-            raise PlayerIdentityError(
-                f"{context}: ID {afl_id} carries multiple profile URLs "
-                f"{sorted(fact.urls)!r}")
         fact.given_name = clean(row["First.name"]) or fact.given_name
         fact.surname = clean(row["Surname"]) or fact.surname
-        fact.display_name = clean(row["Player"]) or fact.display_name
+        # `Player` is the source's own convenience concatenation of First.name and
+        # Surname, and fitzRoy leaves it blank for a handful of recent players whose
+        # structured name fields ARE present (measured: 79 rows, 4 players, all 2025).
+        # Rebuilding it from those fields uses only data already read on this row — no
+        # inference, no name matching, no second naming policy — and a non-blank `Player`
+        # always wins. If both components are absent the row still fails closed below.
+        display = clean(row["Player"])
+        if display is None:
+            first, last = clean(row["First.name"]), clean(row["Surname"])
+            if first and last:
+                display = f"{first} {last}"
+        fact.display_name = display or fact.display_name
         raw_dob = clean(row["DOB"])
         if raw_dob is not None:
             dob = parse_dob(raw_dob)
@@ -747,18 +1155,23 @@ def scan_player_stats(
                 and to_int(row["Brownlow.Votes"]) is not None):
             round_vote_rows += 1
 
-    # A profile URL must belong to exactly one ID.
-    by_url: dict[str, str] = {}
-    for fact in players.values():
-        url = next(iter(fact.urls))
-        other = by_url.get(url)
-        if other is not None:
-            raise PlayerIdentityError(
-                f"profile URL {url!r} is claimed by IDs {other} and "
-                f"{fact.afl_id} — refusing to collapse two players")
-        by_url[url] = fact.afl_id
+    # Identity is now keyed on the URL, so one URL cannot reach two players by
+    # construction. The remaining contradiction to catch is the other direction: one
+    # fitzRoy ID appearing under two different profile URLs, which would mean the source
+    # disagrees with itself about who someone is.
+    by_id: dict[str, str] = {}
+    for url, fact in players.items():
+        if fact.afl_id is not None:
+            other = by_id.get(fact.afl_id)
+            if other is not None:
+                raise PlayerIdentityError(
+                    f"fitzRoy ID {fact.afl_id} is claimed by profile URLs {other!r} and "
+                    f"{url!r} — refusing to collapse two players")
+            by_id[fact.afl_id] = url
         if fact.display_name is None or fact.surname is None:
-            raise PlayerIdentityError(f"ID {fact.afl_id} has no usable name")
+            # Names are display payload, never identity — but a player row with no name
+            # at all means the source row was not what it claimed to be.
+            raise PlayerIdentityError(f"{url} has no usable name")
     return players, rows_read, round_vote_rows
 
 
@@ -911,7 +1324,7 @@ def import_players(pg, rep, players: dict[str, PlayerFact], args, refs: dict) ->
 
             player_ids: dict[str, int] = {}   # url path -> players.id
             touched: list[int] = []
-            for fact in sorted(players.values(), key=lambda f: int(f.afl_id)):
+            for fact in sorted(players.values(), key=lambda f: f.url):
                 batch.records_read += 1
                 url = next(iter(fact.urls))
                 sort_name = (f"{fact.surname}, {fact.given_name}"
@@ -1027,7 +1440,7 @@ def import_players(pg, rep, players: dict[str, PlayerFact], args, refs: dict) ->
             #    abort before any reconciliation delete or upsert. No
             #    heuristic choice, no name merge, no warn-and-continue.
             identity_rows = []
-            for fact in sorted(players.values(), key=lambda f: int(f.afl_id)):
+            for fact in sorted(players.values(), key=lambda f: f.url):
                 url = next(iter(fact.urls))
                 identity_rows.append(
                     (afltables_id, url, f"https://afltables.com/afl/stats/{url}",
@@ -1229,7 +1642,8 @@ def load_match_map(pg, matches: dict[tuple, MatchFact],
 
 def import_player_match_stats(pg, rep, files: list[SnapshotFile],
                               matches: dict[tuple, MatchFact],
-                              clubs: ClubResolver, args, refs: dict) -> None:
+                              clubs: ClubResolver, args, refs: dict,
+                              corrections: list[dict]) -> None:
     """Second streaming pass: the fact table, with the explicit STAT_MAP.
 
     Scoped delete-then-COPY: only rows belonging to this snapshot's
@@ -1253,12 +1667,12 @@ def import_player_match_stats(pg, rep, files: list[SnapshotFile],
                         (list(match_map.values()),))
 
         def build():
-            for context, _season, row in iter_player_stats(files):
+            for context, _season, row in iter_player_stats(files, corrections):
                 batch.records_read += 1
                 season = int(row["Season"])
                 match_date = parse_iso_date(row["Date"], context)
-                key = (match_date, clubs.resolve(row["Home.team"], season),
-                       clubs.resolve(row["Away.team"], season))
+                key = (match_date, clubs.resolve(row["Home.team"], season, "player_stats"),
+                       clubs.resolve(row["Away.team"], season, "player_stats"))
                 url = normalise_profile_url(row["url"])
                 player_id = player_map.get(url)
                 if player_id is None:
@@ -1269,7 +1683,7 @@ def import_player_match_stats(pg, rep, files: list[SnapshotFile],
                         "run the players group first")
                 yield (
                     player_id, match_map[key],
-                    club_ids[clubs.resolve(row["Playing.for"], season)],
+                    club_ids[clubs.resolve(row["Playing.for"], season, "player_stats")],
                     to_int(row["Career.Games"]), clean(row["Jumper.No."]),
                     *(to_int(row[src]) for src, _ in STAT_MAP),
                     fitzroy_id, batch.id,
@@ -1288,7 +1702,8 @@ def import_player_match_stats(pg, rep, files: list[SnapshotFile],
 
 
 def import_brownlow_round_votes(pg, rep, files: list[SnapshotFile],
-                                matches: dict[tuple, MatchFact], args) -> None:
+                                matches: dict[tuple, MatchFact], args,
+                                corrections: list[dict]) -> None:
     """Derive brownlow_round_votes from the player-per-match votes.
 
     Home-and-away rounds only (a player plays one match per round, so
@@ -1307,7 +1722,7 @@ def import_brownlow_round_votes(pg, rep, files: list[SnapshotFile],
                       "brownlow_round_votes") as batch:
         rows = []
         seen: set = set()
-        for context, _season, row in iter_player_stats(files):
+        for context, _season, row in iter_player_stats(files, corrections):
             batch.records_read += 1
             season = int(row["Season"])
             if season not in gated_seasons:
@@ -1360,6 +1775,18 @@ def main() -> int:
                         help="override the snapshot directory (tests)")
     parser.add_argument("--manifest",
                         help="override the manifest path (tests)")
+    parser.add_argument("--accepted-baselines",
+                        help="override the acceptance register path (tests)")
+    parser.add_argument("--require-full-history", action="store_true",
+                        help="refuse unless the snapshot has EARNED full_history under the "
+                             "contract's completeness gates; re-derives every gate from the "
+                             "artefacts rather than trusting the manifest's claim")
+    parser.add_argument("--require-accepted-baseline", action="store_true",
+                        help="refuse unless --label is THE accepted canonical baseline in "
+                             "data/reference/fitzroy-accepted-baselines.json, its hash "
+                             "bindings still hold and its measured fingerprint has not "
+                             "drifted. IMPLIES --require-full-history: the acceptance record "
+                             "binds, it never blesses")
     parser.add_argument("--validate-only", action="store_true",
                         help="validate manifest/snapshot and print the plan; "
                              "no database connection at all")
@@ -1381,15 +1808,40 @@ def main() -> int:
     manifest_path = Path(args.manifest) if args.manifest \
         else MANIFEST_ROOT / f"{args.label}.json"
 
+    # Acceptance implies full history: a hand-edited acceptance record must never be able
+    # to bypass the gates it claims were passed.
+    require_full_history = args.require_full_history or args.require_accepted_baseline
+
     started = time.time()
+    full_history_coverage: dict | None = None
+    accepted_baseline: dict | None = None
+    acceptance_binding: dict | None = None
     try:
         files = validate_snapshot(snapshot_dir, manifest_path, args.label)
-        clubs = ClubResolver(json.loads(CLUBS_JSON.read_text(encoding="utf-8")))
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+        if args.require_accepted_baseline:
+            register_path = Path(args.accepted_baselines) if args.accepted_baselines                 else ACCEPTED_BASELINES_PATH
+            if not register_path.exists():
+                raise SnapshotValidationError(
+                    f"acceptance register not found: {register_path}")
+            accepted_baseline = select_accepted_baseline(
+                json.loads(register_path.read_text(encoding="utf-8")), args.label)
+            acceptance_binding = verify_accepted_binding(
+                accepted_baseline, manifest_path, manifest, contract)
+        if require_full_history:
+            full_history_coverage = enforce_full_history(manifest, snapshot_dir, contract)
+        corrections = load_row_corrections()
+        clubs = ClubResolver(
+            json.loads(CLUBS_JSON.read_text(encoding="utf-8")),
+            (json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+             .get("source_club_normalisation", {}).get("rules", [])),
+        )
         round_vote_seasons = load_round_vote_seasons()
         results_file = next(f for f in files if f.dataset == "results")
         matches = scan_results(results_file.path, clubs)
         players, rows_read, round_vote_rows = scan_player_stats(
-            files, matches, clubs, round_vote_seasons)
+            files, matches, clubs, round_vote_seasons, corrections)
     except (SnapshotValidationError, MatchIdentityError, PlayerIdentityError) as exc:
         raise fail(str(exc))
 
@@ -1397,6 +1849,20 @@ def main() -> int:
     if not args.quiet or args.validate_only:
         print("snapshot scan summary")
         for k, v in summary.items():
+            print(f"  {k:<28} {v}")
+    if full_history_coverage is not None:
+        print("full-history gates PASSED — identity coverage")
+        for k, v in full_history_coverage.items():
+            print(f"  {k:<28} {v}")
+
+    if accepted_baseline is not None:
+        try:
+            enforce_accepted_fingerprint(
+                accepted_baseline, summary, full_history_coverage or {})
+        except SnapshotValidationError as exc:
+            raise fail(str(exc))
+        print("accepted canonical baseline VERIFIED")
+        for k, v in (acceptance_binding or {}).items():
             print(f"  {k:<28} {v}")
 
     if args.validate_only:
@@ -1430,9 +1896,17 @@ def main() -> int:
         elif group == "matches":
             import_matches(pg, rep, matches, clubs, refs)
         elif group == "stats":
-            import_player_match_stats(pg, rep, files, matches, clubs, args, refs)
+            # `corrections` is threaded explicitly, never read from module scope:
+            # both of these functions call iter_player_stats(files, corrections) and
+            # both lost the parameter in an earlier refactor, so the name resolved to
+            # nothing and the stage died with NameError after 16,838 matches had been
+            # imported (AFLDB-ISSUE-093 §H14). It is REQUIRED rather than defaulted to
+            # None, so a caller that forgets it fails immediately instead of silently
+            # importing the source uncorrected.
+            import_player_match_stats(pg, rep, files, matches, clubs, args, refs,
+                                      corrections)
         elif group == "brownlow":
-            import_brownlow_round_votes(pg, rep, files, matches, args)
+            import_brownlow_round_votes(pg, rep, files, matches, args, corrections)
 
     print(f"\nCompleted in {time.time() - started:.1f}s")
     pg.close()

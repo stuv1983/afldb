@@ -157,7 +157,7 @@ AFLDB_PROD_DATABASE_URL=<prod-owner-dsn> AFLDB_MIGRATE_TARGET=prod npm run db:mi
 
 AFLDB_IMPORT_DATABASE_URL=<prod-import-dsn> python tools/migration/import_legacy_afl.py
 AFLDB_IMPORT_DATABASE_URL=<prod-import-dsn> python tools/migration/enrich_birth_dates.py
-AFLDB_IMPORT_DATABASE_URL=<prod-import-dsn> python tools/migration/import_draft.py
+AFLDB_IMPORT_DATABASE_URL=<prod-import-dsn> python tools/rebuild/draftguru/import_draftguru.py
 AFLDB_IMPORT_DATABASE_URL=<prod-import-dsn> python tools/migration/rebuild_derived.py
 DATABASE_URL=<prod-dsn> python tools/validation/validate_migration.py
 ```
@@ -165,6 +165,14 @@ DATABASE_URL=<prod-dsn> python tools/validation/validate_migration.py
 Do not proceed unless **every** validation check passes. Confirm the printed
 failure count is zero rather than matching a number written here: the check
 count grows as the schema gains guarantees.
+
+> **Rebuild path note (AFLDB-ISSUE-093).** The sequence above is the *legacy* load. The
+> canonical clean rebuild is `npm run db:test:rebuild` (see `docs/deployment.md` §6a), which
+> targets `afldb_test` only and refuses production and `afldb_dev` by name. DraftGuru is
+> imported by `tools/rebuild/draftguru/import_draftguru.py` from its accepted Stage A
+> snapshot, with no `AFLDB_LEGACY_SQLITE` dependency; the retired
+> `tools/migration/import_draft.py` is never invoked. There is deliberately **no** production
+> rebuild entry point.
 
 ### Step 2 — Production roles and secrets
 

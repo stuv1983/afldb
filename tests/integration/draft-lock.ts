@@ -6,7 +6,7 @@ import postgres from 'postgres';
  * Vitest runs test FILES in parallel, and two of them care about the same
  * rows in opposite ways:
  *
- *   draft-reload-links.test.ts  links real draft people to fixture players
+ *   draftguru-import.test.ts    links real draft people to fixture players
  *                               and reloads the draft repeatedly, for over
  *                               two minutes.
  *   release-gates.test.ts       asserts the exact number of draft people

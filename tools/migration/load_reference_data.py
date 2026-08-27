@@ -16,6 +16,14 @@ idempotent: sources upserts by key; every other group truncates its targets
 and reloads. Truncation fails closed: if TRUNCATE ... CASCADE would empty a
 table outside this loader's own set that currently holds rows, the run
 refuses before touching the database unless --allow-cascade is given.
+
+It runs as afldb_import and holds exactly that role's privileges (§H12).
+The FK graph reaches admin and link-review relations the import role is
+deliberately denied, so the cascade guard classifies dependents through the
+catalogue rather than by reading them, and refuses on any it cannot prove
+empty. A truncate whose targets are already empty is skipped outright: it
+would remove nothing, and TRUNCATE ... CASCADE requires privileges on the
+whole cascade set, not merely on the tables named.
 """
 
 from __future__ import annotations
@@ -31,6 +39,7 @@ import psycopg  # noqa: E402
 
 from common import (  # noqa: E402
     Reporter,
+    any_rows,
     cascade_dependents,
     connect_pg,
     copy_rows,
@@ -39,6 +48,7 @@ from common import (  # noqa: E402
     require_env,
     safe_dsn,
     scalar,
+    selectable,
     truncate,
 )
 
@@ -70,6 +80,18 @@ GROUP_REBUILDS = {
               "club_organizations", "club_organization_relations"),
     "coverage": ("stat_definitions", "stat_availability"),
 }
+
+# The truncate roots guard_cascade() adjudicated, and the ONLY ones
+# reload_truncate() may act on. None means the guard has not run yet, which is
+# itself a refusal. Mirrors common._reload_scope's module-level shape.
+_cleared_roots: set[str] | None = None
+
+
+def reset_cascade_state() -> None:
+    """Forget the guard's decision. For tests that run several scenarios."""
+    global _cleared_roots
+    _cleared_roots = None
+
 
 VALID_SUCCESSIONS = {"current", "renamed", "relocated", "merged", "defunct"}
 VALID_COVERAGE = {"complete", "partial", "not_collected", "not_applicable", "pending"}
@@ -206,7 +228,7 @@ def load_seasons(pg: psycopg.Connection, data: dict, rep: Reporter) -> None:
     in_progress = set(ds["in_progress_seasons"])
     notes = {int(k): v for k, v in ds.get("season_notes", {}).items()}
 
-    truncate(pg, "seasons")
+    reload_truncate(pg, "seasons")
     # Measured columns (match dates/counts, data_through_date) belong to the
     # later match-import and season_metadata phases and stay NULL here.
     copy_rows(pg, "seasons", ["year", "league", "status", "notes"],
@@ -223,7 +245,7 @@ def load_clubs(pg: psycopg.Connection, data: dict, rep: Reporter) -> None:
     ds = data["clubs"]
     last_season = data["seasons"]["last_season"]
 
-    truncate(pg, "clubs", "club_aliases")
+    reload_truncate(pg, "clubs", "club_aliases")
     ids: dict[str, int] = {}
     with pg.cursor() as cur:
         # The first club inserted has no valid identity to point at yet, so
@@ -328,7 +350,7 @@ def load_coverage(pg: psycopg.Connection, data: dict, rep: Reporter) -> None:
                  f"{data['stat_availability']['status']!r}, not READY. The coverage "
                  "grid has not been baked in yet; refusing to load an empty grid.")
 
-    truncate(pg, "stat_definitions", "stat_availability")
+    reload_truncate(pg, "stat_definitions", "stat_availability")
     with pg.cursor() as cur:
         for d in data["stat_definitions"]["definitions"]:
             cur.execute(
@@ -363,13 +385,54 @@ def guard_cascade(pg: psycopg.Connection, groups: list[str], rep: Reporter,
     table loses nothing, so the refusal is limited to out-of-scope dependents
     that currently hold rows.
     """
+    global _cleared_roots
+    _cleared_roots = set()
+
     to_truncate = {normalise_table(t) for g in groups for t in GROUP_TRUNCATES[g]}
     if not to_truncate:
         return
+
+    # AFLDB-ISSUE-093 §H13. Only a root that HOLDS ROWS is actually truncated --
+    # reload_truncate() skips the rest -- and a truncate that never runs cascades
+    # into nothing. So the cascade closure must be taken from the POPULATED roots,
+    # not from the union of every group's targets.
+    #
+    # Taking it from the union was the §H12 defect. Migrations 015 and 016 SEED
+    # stat_definitions and stat_availability, so a freshly migrated database is
+    # never fully empty: those two roots hold rows, the whole-union short circuit
+    # could not fire, and the closure of the EMPTY clubs/seasons roots -- which
+    # reaches player_link_match_candidates and player_match_period_stats -- was
+    # adjudicated anyway. The guard then refused over a cascade that was never
+    # going to happen.
+    populated_roots = any_rows(pg, sorted(to_truncate))
+    _cleared_roots = set(populated_roots)
+    if not populated_roots:
+        return
+
     rebuilt = {normalise_table(t) for g in groups for t in GROUP_REBUILDS[g]}
-    dependents = cascade_dependents(pg, sorted(to_truncate))
+    dependents = cascade_dependents(pg, populated_roots)
     outside = sorted(dependents - rebuilt)
-    populated = [t for t in outside if scalar(pg, f"SELECT count(*) FROM {t}")]
+
+    # AFLDB-ISSUE-093 §H12. cascade_dependents() is FK-graph based, so `outside`
+    # names every table that transitively references clubs/seasons -- including
+    # admin and link-review relations that afldb_import is DELIBERATELY denied
+    # (migration 067's candidate cache is app-readable and import-revoked by
+    # design). Counting rows in those raised InsufficientPrivilege and killed the
+    # run. The privilege split is asked of the catalogue, so it never touches them.
+    readable = selectable(pg, outside)
+    unreadable = [t for t in outside if t not in readable]
+    populated = any_rows(pg, [t for t in outside if t in readable])
+
+    # An unreadable dependent cannot be PROVEN empty, and this guard exists to
+    # refuse exactly when it cannot prove that. It fails closed rather than
+    # assuming, and rather than asking for a privilege it should not hold.
+    if unreadable and not allow_cascade:
+        sys.exit("ERROR: refusing to load reference data: TRUNCATE ... CASCADE "
+                 "would reach " + ", ".join(unreadable)
+                 + ", which this role may not read, so they cannot be shown to be "
+                 "empty. This loader does not rebuild them. Run against a freshly "
+                 "migrated database, or pass --allow-cascade if emptying them is "
+                 "genuinely intended.")
     if populated:
         if allow_cascade:
             rep.warn("--allow-cascade: emptying populated out-of-scope tables: "
@@ -380,6 +443,47 @@ def guard_cascade(pg: psycopg.Connection, groups: list[str], rep: Reporter,
                  + ", which hold data this loader does not rebuild. Run against "
                  "a freshly migrated database, or pass --allow-cascade if "
                  "emptying them is genuinely intended.")
+    if unreadable and allow_cascade:
+        rep.warn("--allow-cascade: cascading into unreadable out-of-scope tables: "
+                 + ", ".join(unreadable))
+
+
+def reload_truncate(pg: psycopg.Connection, *tables: str) -> None:
+    """TRUNCATE the group's targets, unless they are already empty.
+
+    AFLDB-ISSUE-093 §H12. `TRUNCATE a, b CASCADE` requires TRUNCATE privilege on
+    every table the cascade reaches, not merely on the ones named -- and the
+    cascade from `clubs` reaches relations `afldb_import` is deliberately denied.
+    Skipping the statement when every named table is already empty is exactly
+    equivalent (truncating an empty table removes nothing) and asks for no
+    privilege the role is not meant to have.
+
+    This is not a way around the guard. guard_cascade() has already run, and it
+    refuses whenever any of these tables holds a row and the cascade set cannot
+    be shown to be safe -- so reaching this function with a populated target
+    means the cascade was already established as in-scope.
+    """
+    if not tables:
+        return
+    populated = any_rows(pg, [normalise_table(t) for t in tables])
+    if not populated:
+        return
+
+    # AFLDB-ISSUE-093 §H13. The guard and the truncate must not be able to disagree
+    # about which roots are in play -- that disagreement IS the defect this pair of
+    # functions exists to close. guard_cascade() records exactly the roots whose
+    # cascade it adjudicated; anything else reaching here is unadjudicated, and is
+    # refused rather than truncated.
+    if _cleared_roots is None:
+        sys.exit("ERROR: internal: reload_truncate() reached before guard_cascade(). "
+                 "No TRUNCATE may run without an adjudicated cascade.")
+    unadjudicated = sorted(set(populated) - _cleared_roots)
+    if unadjudicated:
+        sys.exit("ERROR: refusing to TRUNCATE " + ", ".join(unadjudicated)
+                 + ": these tables hold rows now but were empty when the cascade "
+                 "guard ran, so the cascade from them has not been adjudicated.")
+
+    truncate(pg, *tables)
 
 
 # ---------------------------------------------------------------------------

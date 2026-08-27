@@ -10,7 +10,7 @@ import { POST } from '@/app/api/admin/email-intake/route';
 // Redirect the auth pool to the test database so authSql never opens a
 // connection to afldb_dev (or any other ambient database). The same
 // technique is used by data-editor.test.ts, awards-reload-links.test.ts,
-// draft-reload-links.test.ts, and first-kick-goal-reload-links.test.ts.
+// draftguru-import.test.ts, and first-kick-goal-reload-links.test.ts.
 //
 // Timing safety: authSql is a Proxy (src/db/authClient.ts). Its apply/get
 // traps call getClient() -> createClient(), which reads AFLDB_AUTH_DATABASE_URL

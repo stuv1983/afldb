@@ -398,7 +398,7 @@ describe('gate: club organizations and identities', () => {
 // ---------------------------------------------------------------------
 describe('gate: draft links', () => {
   // These counts are only meaningful over a quiescent draft dataset, and
-  // draft-reload-links.test.ts deliberately links real draft people to
+  // draftguru-import.test.ts deliberately links real draft people to
   // fixture players while it runs. Wait it out rather than read a moving
   // target; the assertions below are unchanged.
   beforeAll(() => lockDraftTables(integrationDsn), 300_000);

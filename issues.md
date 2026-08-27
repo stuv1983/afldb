@@ -23,7 +23,7 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-088` | Low | Tests / Tooling | The NL-UI stress harness has no `actionTimeout`/`globalTimeout` policy and retains latent unbounded auto-wait sites (`nl-stress.spec.ts` `:554`, `:577`, `:580`, `:945`); the `:835` instance stalled successor-3's D4 for 30 minutes per parked batch before its successor-4 repair. | After ISSUE-087 closes, derive timeout values from the successor-4 D4 `elapsedMs`/`timingSummary` distribution, then add the config timeouts and guard the latent sites outside any release gate. |
 | `AFLDB-ISSUE-090` | Medium | Data integrity / Import | The two DOB enrichment passes have contradictory `dob_conflict` lifecycles: the club-list pass stacks a duplicate unresolved row on every rerun (proven — entity 4347 holds three copies of one logical conflict), and the register pass deletes unresolved DOB conflicts it does not own. Both use `SOURCE_KEY='afltables'`, so `details->>'source'` cannot express pass ownership. | Migration 072 APPLIED to `afldb_test`; the fixed reconciliation is validated (23/23). `release-gates.test.ts` validation is HALTED and blocked by `AFLDB-ISSUE-092` (an unrelated importer defect this issue's own regression suite exposed, emptying `afldb_test.external_identities`; migration 072 is conclusively not implicated). Resume `release-gates.test.ts`/`privileges.test.ts` only after `AFLDB-ISSUE-092` is implemented and recovery is validated. |
 | `AFLDB-ISSUE-092` | Medium | Data integrity / Tooling safety | `enrich_birth_dates.py`'s `external_identities` reconciliation deletes any row absent from the run's asserted population with no proof that population is complete. `dob-enrichment-issues.test.ts` test 5 ran the real importer against shared `afldb_test` with a tiny synthetic register, wiping the entire real 12,472-row AFL-Tables profile-identity population. | Planning complete in `AFLDB-ISSUE-092.md`, not yet approved/implemented: (A) fail-closed population-sanity gate in the importer for any caller, with an explicit override flag; (B) fixture-scoped `source_id` so the test's real register-pass invocation can never intersect real data; then recover `afldb_test.external_identities` via the fixed importer and the complete legacy source. No schema change. Blocks `AFLDB-ISSUE-090`. |
-| `AFLDB-ISSUE-093` | Medium | Tooling / Data integrity / Import architecture | AFLDB has no deterministic source-to-PostgreSQL rebuild path of its own; the historical/core rebuild currently routes through one hand-built intermediate SQLite aggregation (`AFLDB_LEGACY_SQLITE`) with no provenance or versioning. | Phases 1–3 COMPLETE/implemented (2026-08-25): reference datasets + loader (12/12), fitzRoy 1.8.0 acquisition + `trial-2024` manifest (13/13), club-list wiring + ISSUE-092 gate (static 33/33). Phase 4a IMPLEMENTED (2026-08-25, §18): `tools/migration/import_fitzroy_core.py` — canonical snapshot → core tables (players/venues/matches/stats/Brownlow round votes), zero legacy dependency. Next: run `tests/fitzroy-core-import.test.ts` (non-DB gate), then `--validate-only` on `trial-2024`; DraftGuru follows. |
+| `AFLDB-ISSUE-095` | Medium | Data acquisition / Import architecture / Data integrity | `club_seasons` has no canonical acquisition path: `rebuild_derived.py` builds it only from `staging.team_seasons`, whose only writer is the legacy importer under `AFLDB_LEGACY_SQLITE`. A legacy-free canonical rebuild therefore correctly produces `club_seasons = 0`, leaving ladders, premiership/wooden-spoon flags, finals counts and club-season NL answers unavailable. | Plan D1–D7 in `AFLDB-ISSUE-095.md` (authoritative source; per-field reconstructed-vs-sourced split; historical premiership-points/byes/forfeits/published-rank handling; provenance `source_id`; club-identity re-pointing; new rebuild stage vs existing stage; Stage-9 gate) before writing any importer. Zero supported `AFLDB_LEGACY_SQLITE` dependency. Do NOT add a `club_seasons` Stage-9 gate until this lands. Links `AFLDB-ISSUE-015` (not absorbed) and `AFLDB-ISSUE-093`. |
 
 ---
 
@@ -5978,10 +5978,11 @@ is not bypassable, check 2 (>10% drop) only via per-invocation
 `afltables_issue090_fixture`; new tests 24–27 in `dob-enrichment-issues.test.ts`.
 
 ### Validation
-Pending. The §11 database tests need a live test database and there is currently no
-`afldb_test` (ISSUE-093 rebuild). The Phase-3 static gate (33/33, user-run 2026-08-25)
-proves no static regression but does not exercise this issue's database tests. §6
-recovery of the old database is obsolete for the rebuild path.
+Pending, but **no longer blocked on a database**: `afldb_test` was rebuilt and validated on
+2026-08-27 by `AFLDB-ISSUE-093` (Resolved), so the §11 database tests can now be run against
+it. The Phase-3 static gate (33/33, user-run 2026-08-25) proves no static regression but does
+not exercise this issue's database tests. §6 recovery of the old database is obsolete for the
+rebuild path.
 
 ### Follow-up
 None yet. `AFLDB-ISSUE-090` is blocked by this issue until it is implemented and
@@ -5989,12 +5990,18 @@ None yet. `AFLDB-ISSUE-090` is blocked by this issue until it is implemented and
 
 ## AFLDB-ISSUE-093 — Deterministic afldb_test rebuild from authoritative sources
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Tooling / Data integrity / Import architecture
 - **Found:** 2026-08-25 (architecture planning session, prompted by the ISSUE-090/092
   investigation into `afldb_test`'s fragility)
-- **Resolved:** N/A
+- **Resolved:** 2026-08-27 — the first complete canonical clean rebuild of `afldb_test` ran
+  end to end and passed all nine stages, with `AFLDB-FINAL-VALIDATION PASSED: 13 checks`.
+  See **Resolution** below.
+- **Current state:** **RESOLVED 2026-08-27.** `AFLDB-ISSUE-093.md` §H15 is the authoritative
+  record of the passing rebuild; §19 remains the authoritative record of the frozen canonical
+  source. Where §19 and earlier sections disagree, §19 wins; where §H15 and §19 disagree about
+  execution state, §H15 wins.
 - **Runbook:** `AFLDB-ISSUE-093.md` — the approved architecture, authoritative for the full
   source-to-schema matrix, fitzRoy/non-fitzRoy classification, canonical snapshot/archive
   policy, preflight-before-destruction rebuild order, safety contract, release-gate
@@ -6040,8 +6047,225 @@ the *current* `afldb_test.external_identities` data (orthogonal — that issue's
 today's database; this issue rebuilds a database from scratch).
 
 ### Fix
-**Phase 4a IMPLEMENTED (2026-08-25, non-DB validation pending — `AFLDB-ISSUE-093.md`
-§18)** — §13.4a historical/core PostgreSQL importer:
+**CHECKPOINT 2026-08-27 — CANONICAL FULL-HISTORY FITZROY SOURCE FROZEN.** The
+authoritative current-state record is **`AFLDB-ISSUE-093.md` §19**; detailed evidence is in
+`AFLDB-ISSUE-093-DRAFTGURU-B2-HANDOFF.md` (PART I–XV DraftGuru Stage B2, PART XVI–XVIII
+full-history fitzRoy). Summary of what this checkpoint settled:
+
+- **Accepted canonical baseline `full-history-20260827`** — VFL/AFL men's senior
+  competition, **1897–2025** inclusive (2026 excluded because current-season ingestion owns
+  it; AFLW remains separate), **131 immutable artefacts, 719,042 acquired rows**. Bound by
+  manifest SHA-256 `cc8aaf0946fc59003dc4e5d6803410383db975e2f5bf58e9d510c31dc781e3b6` and
+  artefact-set SHA-256
+  `8e14ce6198685b9fec568ab3c680cab34783e8e202ab0c7e93f45773d96f4125`.
+- **Acceptance register** `data/reference/fitzroy-accepted-baselines.json`, policy
+  `exactly_one_accepted`: zero accepted fails closed, more than one fails closed, and there
+  is no latest-label/date/filename fallback anywhere. The register **binds; it never
+  blesses** — `--require-accepted-baseline` implies `--require-full-history`, every artefact
+  is re-hashed, and every gate and measured count is re-derived from the artefacts, so a
+  hand-edited record cannot bless arbitrary bytes. The original acquisition manifest is
+  preserved **byte-for-byte** and keeps its historically incorrect self-declared
+  `full_history`/`completeness`; those acquisition verdict fields are **inert**, and
+  acceptance is a separate tracked decision.
+- **Accepted measurements** — matches 16838 (16838 with player rows), seasons 1897-2025,
+  venues 52, attendance_known 15187, club_identities 24, players 13275,
+  brownlow_round_vote_rows 320861, players_with_dob 855, players_with_dob_conflict 0,
+  player_match_rows 685471. Identity scan: 685473 source rows, missing_id 83, missing_url 0,
+  malformed_url 0, distinct_ids 13270, distinct_urls 13275. Independent accepted-baseline
+  validation **passed with no PostgreSQL access**.
+- **Settled fitzRoy semantics (CLOSED):** (1) canonical AFL Tables profile URL is the
+  durable player identity and the fitzRoy ID is optional, never persisted as canonical
+  identity; (2) source-era normalisation raw "Brisbane Lions" 1987–1996 → Brisbane Bears;
+  (3) dataset-specific source-era normalisation, dataset `results`, raw "North Melbourne"
+  1999–2007 → Kangaroos; (4) the 1909 Jim Stewart corruption drops exactly two spurious
+  Cartesian-product rows under tracked fingerprints while the two genuine appearances stay
+  distinct; (5) blank `Player` builds `display_name` from the already-present
+  `First.name` + `Surname`, and never participates in identity matching.
+- **DraftGuru** — supported importer complete; Stage A `annual-html-20260826` (42 annual
+  pages, 6,810 rows, 5,057 distinct persons); explicit human decision ledger tracked at
+  `data/reference/draftguru-link-decisions.json`; legacy `tools/migration/import_draft.py`
+  retired/tombstoned out of the canonical rebuild architecture. **Stage B3 is optional, NOT
+  started, and NOT a blocker for the clean rebuild.**
+- **Orchestrator** — `npm run db:test:rebuild` implemented in `tools/db/rebuild-test.ts`,
+  stage order PRECHECK → DATABASE RESET → MIGRATIONS → PRIVILEGES → REFERENCE → FITZROY →
+  DRAFTGURU → DERIVED → FINAL VALIDATION/FINGERPRINTS. Normal mode selects the accepted
+  full-history baseline automatically and runs the accepted/full-history validator **before
+  any destructive stage**; `trial-2024` is partial/testing only under explicit opt-in.
+- **New/changed tracked files at this checkpoint:**
+  `data/reference/fitzroy-accepted-baselines.json` (new),
+  `tools/rebuild/fitzroy/fitzroy-contract.json` (full_history, source_club_normalisation,
+  source_row_corrections), `tools/migration/import_fitzroy_core.py`,
+  `tools/db/rebuild-test.ts`, `tests/db-test-rebuild.test.ts`,
+  `tests/fitzroy-core-import.test.ts`, plus the DraftGuru Stage B2 files recorded in the B2
+  handoff.
+
+**NOT COMPLETE.** No clean rebuild has ever been executed, and `RESET_SQL` has never run
+against live PostgreSQL. Everything above is proven offline only.
+
+**RESET_SQL PROOF IMPLEMENTED — awaiting execution (2026-08-27, `AFLDB-ISSUE-093.md` §20).**
+Blocker 2 of §19.9. Inspecting `RESET_SQL` before designing the proof found **two real
+defects, both now fixed**:
+
+- **The reset was never sent to PostgreSQL.** `runSql` was `void client.unsafe(sql)`; a
+  postgres.js `Query` executes only when `.then`/`.catch`/`.finally`/`.execute()`/
+  `.forEach()` is called, so no bytes reached the server, the surrounding `try/catch` could
+  never fail, and DATABASE RESET would have reported success against an untouched database —
+  after which MIGRATIONS would have found every migration already applied and every data
+  stage would have loaded on top of the old data. Now run through
+  `psql -v ON_ERROR_STOP=1 --single-transaction -f -` under `spawnSync`, which is
+  synchronous (the stage graph is), returns a real exit code, and makes the reset
+  all-or-nothing.
+- **The `pg_` internal-schema exclusion excluded nothing.** `NOT LIKE 'pg\\_%'` inside a JS
+  template literal reaches the server as `'pg\\_%'`, a pattern matching only names beginning
+  `pg\`. `pg_toast` exists in every database and passes the `NOT IN` list, so the first loop
+  would have issued `DROP SCHEMA IF EXISTS pg_toast CASCADE` and aborted on a pinned system
+  schema. Replaced with `!~ '^pg_'`, which has no escape to lose.
+
+Also hardened: extension-membership (`pg_depend.deptype = 'e'`) guards added to the schema,
+table and view loops — previously only routines and types had them — and a new loop for
+standalone sequences and foreign tables.
+
+**Execution-path parity (review correction).** The first design ran `RESET_SQL` through
+postgres.js while the real rebuild ran it through psql, so a passing proof would have proven
+the SQL and left the mechanism — the thing just found broken twice — untested. Corrected: a
+single shared execution helper, `tools/db/psql.ts`, gives both paths the same binary and the
+same argv (`psql <dsn> -v ON_ERROR_STOP=1 --single-transaction -q -f -`). The only difference
+is the stream: the real reset ends normally so psql commits; the proof's stream always ends
+in `RAISE EXCEPTION`, so it cannot. Two independent guarantees back that — psql does not
+commit an errored stream under `ON_ERROR_STOP`, and PostgreSQL rolls back an already-aborted
+transaction even if `COMMIT` were sent — so the proof treats **exit status 0 as a failure**.
+
+The proof is `tools/db/prove-reset.ts` / `npm run db:test:prove-reset`: a separate entry
+point with no stage graph. It refuses before the reset on a wrong database, a wrong role or
+any other client session on `afldb_test`; probes psql through the reset's own argv so a
+missing or unusable psql fails closed before anything is attempted; snapshots the extensions
+and every extension-owned object into temp tables inside the transaction and requires them
+member-for-member afterwards; asserts a clean slate in SQL and re-asserts it in Node; and
+requires the post-rollback catalog fingerprint to equal the pre-reset one exactly.
+
+**Owner/superuser policy settled as a refusal, not a warning:** `current_database()` must be
+`afldb_test`, and `current_user` **and** `session_user` must both be exactly `afldb_owner`
+with `pg_roles.rolsuper` false for each. `afldb_owner` is created `LOGIN NOSUPERUSER`
+(00_install_postgres.sh:57) and no `SET ROLE` exists anywhere in the repository, so a
+superuser session — direct or via `SET ROLE` — is refused rather than tolerated: it would
+bypass exactly the ownership rules the real reset depends on.
+
+It needs only the owner DSN, so ISSUE-083 does not gate it, and it loads no data, so the
+fitzRoy acceptance register is irrelevant to it. DB-free suite **417/417**; `npx tsc --noEmit`
+clean for every file changed.
+
+**FIRST LIVE ATTEMPT 2026-08-27 — FAILED. Blocker 2 remains OPEN (§20.9a).** The target,
+role (`current_user`/`session_user`/both `rolsuper`), exclusive-session and psql-availability
+gates all passed, and the pre-proof fingerprint was
+`0229d62cf768f986416e1eea222801391d793039070889d8af5294346b65cbd9`. psql then exited **0**
+instead of performing the deliberate abort. Tracing the call graph proves the SQL *is* handed
+to `spawnSync` as `input` and that `-f -` is present exactly once, so a discarded SQL argument
+is excluded; the failure is at the psql process boundary, and the refusal discarded psql's
+stdout/stderr, so the cause cannot yet be named. Two defects made it uninterpretable: the
+availability probe ran `SELECT 1` and accepted exit 0 — which an undelivered stdin also gives
+— and the parity test recorded the stdin payload but only asserted the two callers' payloads
+*differed*, never their content.
+
+**Database state is NOT established.** Of the four hypotheses, "no SQL sent" and "whole stream
+ran but ON_ERROR_STOP was not in force" are both safe, but a **truncated** stream cut after
+`RESET_SQL` would have reached EOF and been COMMITTED by `--single-transaction`. That cannot
+be excluded by inspection, so the earlier "nothing was committed" claim is withdrawn pending
+verification.
+
+**Fixed since:** a **server-side commit trap** armed before the reset (a `DEFERRABLE INITIALLY
+DEFERRED` unique violation in a temp table, checked at COMMIT, so no truncation can commit
+whatever psql does); a delivery marker as the stream's first statement; a probe that proves
+stdin delivery, `ON_ERROR_STOP` and diagnostic propagation, each with its own refusal; psql's
+output always reported; and DB-free tests that assert the actual stdin bytes.
+
+**INCIDENT CONFIRMED 2026-08-27 — THE ROLLBACK PROOF COMMITTED THE RESET (§20.12).** The
+read-only verification returned **MISMATCH**: pre-proof
+`0229d62cf768f986416e1eea222801391d793039070889d8af5294346b65cbd9` →
+`f46ce34c5689818fe149133a812bed2ea3d28f115bd48ca19214eb7b32c01881`, with schemas 1 (`public`
+only), relations 0, columns/indexes/constraints/enum_values/sequences 0, routines 35,
+types 2, extensions 3, extension-owned objects 56, `afldb_meta.schema_migrations` absent.
+
+**That is precisely the intended post-RESET clean slate, so `RESET_SQL` is now empirically
+CORRECT against live PostgreSQL — extension preservation included. The rollback containment
+is what failed.** Blocker 2 stays OPEN.
+
+**Reconciliation.** The stream was not truncated by its own content: dumped and inspected,
+13,908 bytes, 0 CR, 0 backslashes, 0 NUL, 0 Ctrl-Z, no psql meta-command line, balanced
+dollar tags, valid UTF-8. The sentinel was **syntactically valid** — a well-formed
+`DO $afldb_proof$ BEGIN RAISE EXCEPTION '…'; END $afldb_proof$;`, not a bare top-level
+`RAISE` (which would be a syntax error, `RAISE` being PL/pgSQL rather than SQL). `input` is
+supplied to `spawnSync` and `-f -` is present. The only hypothesis fitting every observation
+is that **psql did not apply its options**: with no `--single-transaction` each statement
+autocommits, so `RESET_SQL` committed as it ran, the later assertions passed trivially against
+the emptied database, the sentinel raised — and without `ON_ERROR_STOP` psql still exited 0.
+**Leading cause: the argv led with the DSN**, and PostgreSQL's own `src/port/getopt_long.c`
+(built on Windows and anywhere the system getopt_long is absent) stops at the first
+non-option argument without permuting, so the flags after it can be taken as operands, with
+only a warning — to the stderr the refusal discarded. Stated as leading, not confirmed: the
+decisive output was destroyed, and none of the fixes depend on it being right.
+
+**Impact.** `afldb_test` only; production and `afldb_dev` were never contacted. Loss was
+schema and privileges — no fitzRoy import had ever been performed, so no data existed to
+lose, and `afldb_test` was always destined for destructive rebuild. **Loss severity low;
+safety-proof severity high.** **AFLDB-ISSUE-083 is disrupted** — Codex is establishing
+restricted `afldb_import` parity against `afldb_test`, whose schema and per-object grants are
+gone; it must be told before it runs anything there. Every DB-backed suite is blocked until
+schema exists. Restoration is neither necessary nor supported
+(`afldb_test_pre_rebuild_20260825` is read-only reference, §19.10); the empty database should
+be treated as the rebuild's starting state.
+
+**Fixes.** (1) the DSN is passed as `-d`, never as a positional operand, so a non-permuting
+getopt has nothing to stop at — and `db:privileges`/`db:privileges:test` were moved off the
+same shape; (2) the psql probe now deliberately raises and requires the stdin token, a
+**non-zero exit** and the error text, so a psql ignoring `ON_ERROR_STOP` fails before the
+reset; (3) a `DEFERRABLE INITIALLY DEFERRED` commit trap armed before the reset turns any
+COMMIT into a server-side error at any truncation point; (4) the trap doubles as an
+**autocommit detector** — in autocommit its duplicate INSERT fails immediately, and a new
+assertion stops the stream **before the first destructive statement**; (5) psql's output is
+always relayed, with connection strings and passwords redacted.
+
+**SELF-COLLISION 2026-08-27, reproduced twice (§20.14).** The hardened proof refused with
+`AFLDB-PROOF sessions: 1 other client session(s) connected to afldb_test` although a
+standalone `pg_stat_activity` check moments earlier returned 0 rows and the phantom session
+vanished when the proof exited. Confirmed from the connection lifecycle: the CLI opened one
+postgres.js client before `runResetProof` and closed it only in a `finally` afterwards, so it
+was live while psql ran its own in-stream exclusivity check. The Node-side gate excludes only
+itself (`pid <> pg_backend_pid()`) and so could never see it; psql, a separate backend, could.
+**The gate was correct and is unchanged — the harness was the second session.** Fixed by
+restructuring into three phases: (1) `withSession` for identity, exclusivity and the
+pre-reset fingerprint, closed before anything else; (2) psql only, with no postgres.js client
+open — both spawns are synchronous, so the probe's process has fully exited before the proof
+stream is sent; (3) a fresh `withSession` for the post-rollback fingerprint and health.
+`ProofDeps` now exposes a scoped `withSession` instead of a `query` handle, so no connection
+can be held across phases, including on refusal paths. **No application_name, PID or role
+exemption was added** — that would have hidden this class of bug; a test asserts none exists.
+
+**RESET BLOCKER 2 CLOSED 2026-08-27 — the live rollback-only proof PASSED.** `afldb_test` was
+reconstructed after the incident (migrations **001–072** applied, privileges reconciled,
+PostgreSQL 16.15, `afldb_owner` non-superuser) and the proof re-run against a database with a
+real schema to lose:
+
+```
+pre-reset  a8a2a899e431ced96afe2d80b4ec258b31533ae27c58791b5e8bf05e0bd0e1d7
+post-roll  a8a2a899e431ced96afe2d80b4ec258b31533ae27c58791b5e8bf05e0bd0e1d7   EXACT equality
+health     950 relations, 3 extensions      psql exit 3 (deliberate abort)     1498 ms
+inside the aborted transaction: application schemas 0, tables 0, views 0, sequences 0,
+routines 0, types 0, foreign tables 0; public schema, 3 extensions and 56 extension-owned
+objects all preserved.
+```
+
+The incident lineage above is retained in full and is **not** rewritten: the runner that never
+sent its query, the mis-escaped `pg_` exclusion, the committed reset that wiped `afldb_test`,
+the DSN-first execution-path hypothesis (leading but never forensically confirmed, because the
+refusal discarded the decisive stderr), the psql hardening, the commit/autocommit trap, and
+the observer self-collision. Full chain in `AFLDB-ISSUE-093.md` §H3.
+
+*Superseded next action, kept as history: "the FIRST ACTUAL CLEAN REBUILD, owned by a fresh
+session" per the FIRST CLEAN REBUILD HANDOFF (`AFLDB-ISSUE-093.md` §H1–§H10). That rebuild has
+since been executed and passed — see **Resolution** below and §H15.*
+
+**Phase 4a IMPLEMENTED (2026-08-25, subsequently validated — `AFLDB-ISSUE-093.md`
+§18, §19)** — §13.4a historical/core PostgreSQL importer:
 `tools/migration/import_fitzroy_core.py` (new) consumes a canonical snapshot + manifest
 (never live fitzRoy) into venues, players (+ `player_birth_evidence` under the distinct
 `fitzroy_afldata`/`fitzroy_player_stats` evidence source, fill-if-missing DOB), AFL Tables
@@ -6052,7 +6276,10 @@ deduplicated by match, conflicts fail closed, migration-020 provenance),
 `brownlow_round_votes` (H&A non-NA votes only, seasons gated by
 `stat-availability.json`; `brownlow_season_votes` deliberately NOT written — its
 authoritative fields are not derivable from this snapshot). Player identity = profile-URL
-path via `external_identities` (fitzRoy `ID` in-run only, 1:1 enforced); match identity =
+path via `external_identities` (fitzRoy `ID` in-run only; **the original 1:1 ID rule was
+REMOVED on 2026-08-27** — the 1897-2025 evidence shows the fitzRoy ID is optional, so the
+URL is mandatory and the ID is not canonical identity; see `AFLDB-ISSUE-093.md` §19.5);
+match identity =
 `match_key` in the current-season-import convention; club strings era-remapped within
 one organization, fail-closed otherwise. Fail-closed manifest/SHA-256/row-count/column/
 version validation runs before any DB access (`--validate-only` needs no psycopg at all).
@@ -6104,6 +6331,39 @@ contract, numeric `sources.id` database-local). The baseline was returned to
 `ALLOW_CONNECTIONS=false` and is reference-only. Full detail: `AFLDB-ISSUE-093.md` §15.
 Remaining phases (2–9) not yet implemented.
 
+### Resolution — 2026-08-27
+**RESOLVED.** The objective this issue was opened for is achieved and proven by execution, not
+by inspection. Authoritative evidence: `AFLDB-ISSUE-093.md` §H15 (§H15.1–§H15.7). Basis:
+
+1. A tracked canonical clean rebuild of `afldb_test` completed from scratch —
+   `npm run db:test:rebuild -- --acknowledge-destroy afldb_test`.
+2. The supported rebuild path has **zero `AFLDB_LEGACY_SQLITE` dependency**.
+3. The accepted fitzRoy baseline is **hash-bound** — `full-history-20260827`, 1897–2025,
+   131 artefacts, 719,042 rows, manifest SHA-256 `cc8aaf09…`, artefact-set SHA-256
+   `8e14ce61…`, under `exactly_one_accepted` with no latest-label fallback.
+4. The DraftGuru canonical snapshot imported successfully (`annual-html-20260826`: 5,057
+   persons, 6,810 picks, 6 ledger decisions).
+5. Every data stage ran under the **restricted `afldb_import` role** — no
+   `--allow-owner-import-dsn`, no owner fallback, so grant sufficiency is proven rather than
+   assumed.
+6. **All nine rebuild stages passed**: PRECHECK, DATABASE RESET, MIGRATIONS, PRIVILEGES,
+   REFERENCE DATA, FITZROY CORE, DRAFTGURU, DERIVED, FINAL VALIDATION.
+7. Migrations **72/72**.
+8. **`AFLDB-FINAL-VALIDATION PASSED: 13 checks`**, including
+   `matches_after_accepted_last_season = 0` (2026 correctly excluded).
+9. The reference-loader cascade defect that only real execution under the restricted role
+   could expose was repaired and live-proven (§H12/§H13) — `tools/maintenance/privileges.sql`
+   unchanged, no grant added.
+10. The fitzRoy `corrections` threading defects in **both** the stats and Brownlow phases were
+    repaired and live-proven (§H14).
+11. `club_seasons = 0` was investigated and **proven to belong to the separately tracked
+    ladder/team-season acquisition domain** (`AFLDB-ISSUE-095`) rather than invalidating the
+    canonical rebuild — `staging.team_seasons` has no non-legacy writer, so zero is the
+    expected outcome of a legacy-free rebuild under the current contract (§H15.5).
+
+The full execution history above, the incident lineage, and the §H15 validation evidence are
+retained unrewritten.
+
 ### Validation
 Phase 1: `npx vitest run tests/reference-data.test.ts` — 12/12 PASS (user-run
 2026-08-25). Phase 2: `npx vitest run tests/fitzroy-acquisition.test.ts` — 13/13 PASS +
@@ -6117,12 +6377,49 @@ fail-closed `--validate-only` spawn tests, no PostgreSQL/psycopg/network). No da
 load has been executed anywhere yet — first real execution belongs to the later
 orchestrator phase.
 
+**Checkpoint 2026-08-27 — 321/321 DB-free tests PASS**, nothing skipped:
+`npx vitest run tests/fitzroy-core-import.test.ts tests/db-test-rebuild.test.ts
+tests/draftguru-import.test.ts tests/draftguru-acquisition.test.ts
+tests/fitzroy-acquisition.test.ts tests/reference-data.test.ts`
+(fitzroy-core-import 68, db-test-rebuild 70, draftguru-import 36, draftguru-acquisition 122,
+plus fitzroy-acquisition and reference-data). Plus the accepted-baseline offline validator:
+`import_fitzroy_core.py --label full-history-20260827 --validate-only
+--require-accepted-baseline` — **PASSED, no PostgreSQL access**.
+
+That is the whole of the current green evidence. **Still unproven:**
+`tests/integration/draftguru-import.test.ts` (18 DB-backed proofs) needs a live test
+database and is not part of the 321; the suites run importers as `afldb_owner`, so
+`afldb_import` grants are not proven at runtime (ISSUE-083); `RESET_SQL` has never executed;
+and no clean `afldb_test` rebuild has ever run.
+
 ### Follow-up
-Each implementation phase in `AFLDB-ISSUE-093.md` §13 is its own bounded future session.
-**Next: run the Phase-4a non-DB gate (`tests/fitzroy-core-import.test.ts`), then
-`--validate-only` against the real `trial-2024` snapshot; a fresh `afldb_test`
-creation step follows only after that gate is green.** DraftGuru (§13.5) follows the
-core importer; run ISSUE-092's §11 database tests when a test database exists.
+Tracked separately; none of these reopen this issue.
+
+1. **`AFLDB-ISSUE-095` — canonical legacy-free ladder / team-season acquisition (OPEN).**
+   `club_seasons` has no non-legacy acquisition path, so a canonical rebuild correctly yields
+   zero rows. Runbook `AFLDB-ISSUE-095.md`. **Stage 9 must NOT gate `club_seasons` until that
+   issue lands.** It links `AFLDB-ISSUE-015` (per-season `recomputeClubSeasons` parity) but
+   does not absorb it.
+2. **`AFLDB-ISSUE-083`** — restricted `afldb_import` test-role parity/closeout, handled
+   separately (parked at `fa035ed`). Not absorbed here. The rebuild itself already ran its
+   data stages under `afldb_import`.
+3. **`AFLDB-ISSUE-092` §11 tests 24–27** — now runnable against the rebuilt `afldb_test`.
+   `AFLDB-ISSUE-090`'s release-gate validation resumes from there.
+4. **`AFLDB-ISSUE-059` (`4444d76`) and `AFLDB-ISSUE-073` (`0885129`) are UNBLOCKED** for their
+   own focused DB-backed validation against the rebuilt database, as separate work.
+
+DraftGuru Stage B3 (the 5,057-person person-page crawl) remains **optional and NOT started**;
+it was never a blocker. Do not merge the parked branches as part of this issue.
+
+*Superseded 2026-08-27 blocker list, kept as history: (1) ISSUE-083 integration, (2)
+`RESET_SQL` never proven against live PostgreSQL, (3) the first clean rebuild never executed.
+Blocker 2 closed with the passing rollback proof (§20/§H2); blocker 3 closed by the passing
+rebuild (§H15); ISSUE-083 stayed separate and the rebuild ran under the restricted role
+regardless.*
+
+*Superseded 2026-08-25 next-step, kept as history: "run the Phase-4a non-DB gate
+(`tests/fitzroy-core-import.test.ts`), then `--validate-only` against the real `trial-2024`
+snapshot" — both were done, and `trial-2024` is now partial/testing-only.*
 (Phase 3 implemented 2026-08-25 per §17; §13.3 collapsed to a no-op — no structural
 source gap found; Phase 4a implemented 2026-08-25 per §18.)
 `AFLDB-ISSUE-092` §4 (the fail-closed `external_identities` gate) must land in whatever
@@ -6208,3 +6505,99 @@ All three gates green (2026-08-25), full evidence in `AFLDB-ISSUE-091.md` §13:
 ### Follow-up
 None. `AFLDB-ISSUE-090` is unblocked with respect to this issue — migration 072 remains
 CREATED, NOT APPLIED, and applying it is ISSUE-090's own next action.
+
+## AFLDB-ISSUE-095 — Canonical legacy-free ladder / team-season acquisition
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Data acquisition / Import architecture / Data integrity
+- **Found:** 2026-08-27 (proven during `AFLDB-ISSUE-093`'s first complete canonical clean
+  rebuild of `afldb_test` — see `AFLDB-ISSUE-093.md` §H15.5)
+- **Resolved:** N/A
+- **Runbook:** `AFLDB-ISSUE-095.md` — durable source of truth. Contains the proven source
+  chain, the per-field table, the fitzRoy capability split, and decisions D1–D7. Nothing is
+  pre-decided; no code has been written for this issue.
+- **Files (today, for orientation only — none changed yet):**
+  `tools/migration/rebuild_derived.py` (`REBUILDS["club_seasons"]`, `:312`),
+  `tools/migration/import_legacy_afl.py` (`:767`, `:776`, `:795`, `:996`, `:1021`),
+  `src/db/migrations/006_draft_relationships.sql` (`:55-80`),
+  `src/db/queries/player-derived.ts` (`recomputeClubSeasons`, `:402-411`),
+  `tools/db/rebuild-test.ts` (Stage 9 FINAL VALIDATION),
+  `data/reference/sources.json`
+- **Related:** `AFLDB-ISSUE-093` (canonical clean rebuild, Resolved 2026-08-27) —
+  this issue is its recorded follow-up. `AFLDB-ISSUE-015` (Resolved 2026-08-22) holds the
+  existing per-season `recomputeClubSeasons` parity work and is **linked, not absorbed**; its
+  status is unchanged by this issue.
+
+### Problem
+`club_seasons` — AFLDB's club/season ladder table — has no canonical, legacy-free acquisition
+path. Proven chain (source-verified 2026-08-27, do not re-investigate):
+
+1. `rebuild_derived.py`'s `REBUILDS["club_seasons"]` (`:312`) builds the table **only** from
+   `staging.team_seasons`.
+2. `staging.team_seasons` is written **only** by `import_legacy_afl.py` (`:767`, `:776`,
+   `:795`; group key `"ladders"` at `:996`). The only other references are
+   `rebuild_derived.py`, which reads it, and `validate_migration.py`, the legacy parity
+   checker.
+3. That loader requires `AFLDB_LEGACY_SQLITE` (`:1021`).
+4. The ISSUE-093 canonical rebuild deliberately has **no legacy staging-load stage** — its
+   data stages are reference → fitzRoy core → DraftGuru → derived-from-those, and ladder
+   tallies were never in that contract.
+
+So a clean canonical rebuild correctly produces `club_seasons = 0`. That is the **expected**
+outcome of a legacy-free rebuild under the current contract, not a defect in it.
+
+### Impact
+Genuine, not cosmetic. `club_seasons` is read by `src/db/queries/clubs.ts`, `seasons.ts`,
+`rounds.ts`, `grid-solver.ts`, `search.ts`, `db-health.ts`, `player-derived.ts`,
+`nl/club-season.ts`, by NL search `parser.ts`/`plan.ts`/`vocab.ts`, and by
+`src/lib/edit/spec.ts`. Ladders, premiership and wooden-spoon flags, finals counts and
+club-season NL answers are unavailable while it is empty.
+
+Operational consequence carried over from `AFLDB-ISSUE-015`: `recomputeClubSeasons`
+(`player-derived.ts:402-411`) **fails closed** when `staging.team_seasons` has no rows for the
+season, and it is wired into `createMatch`, `deleteMatch` and the `applyMatchEdit` score case.
+On a canonically rebuilt database every match create/delete/score-edit therefore throws for
+every season — the guard behaving as designed, not a new defect.
+
+### Scope
+Give the ladder/team-season domain a canonical, legacy-free acquisition and load path:
+
+- replace the legacy-only `staging.team_seasons` source path;
+- choose and document the authoritative non-legacy source;
+- decide, per field, what is reconstructed from canonical match facts versus externally
+  sourced, preserving historical semantics for `played`, `wins`, `draws`, `losses`,
+  `points_for`, `points_against`, `percentage`, `premiership_points`, `ladder_rank`,
+  `wooden_spoon`, `is_premier`, `finals_played`;
+- handle historical premiership-points rules, byes, forfeits and *published* ladder rankings
+  correctly (prefer NULL over an invented value — `premiership_points`, `percentage` and
+  `ladder_rank` are nullable);
+- determine authoritative provenance/`source_id` — the current SQL hardcodes
+  `sports_data_lab`, which match-derived rows must not inherit;
+- preserve the `afldb_identity_for_season` club-identity re-pointing;
+- decide whether this becomes a new canonical rebuild stage or part of an existing one;
+- once implemented, add an appropriate Stage-9 validation gate;
+- **preserve ZERO supported `AFLDB_LEGACY_SQLITE` dependency**, including as a fallback.
+
+Full decision list D1–D7 is in `AFLDB-ISSUE-095.md` §5. The source/provenance design decision
+is deliberately **not** made in this entry.
+
+### fitzRoy capability split (established, ISSUE-093 §H15.5)
+Deterministically reconstructable from the accepted match facts: `played`, `wins`, `draws`,
+`losses`, `points_for`, `points_against`, `percentage` — plus `is_premier` and `finals_played`,
+which the existing SQL already derives from Grand Final `winner_club_id` and `matches.is_final`.
+**Not** proven by fitzRoy alone: the officially published `ladder_rank`, and
+`premiership_points` semantics across changing competition rules.
+
+### Stage-9 policy until this lands
+**Do NOT add a `club_seasons` non-zero gate** to the rebuild's FINAL VALIDATION stage until
+this domain has an accepted canonical source and contract. A non-zero requirement would fail
+every canonical rebuild over a known, deliberate gap.
+
+### Validation
+None yet — nothing implemented.
+
+### Follow-up
+Whatever D1/D2/D4 decide, `recomputeClubSeasons` must be brought back into lockstep with the
+new canonical definition as part of this issue's implementation. That does not reopen
+`AFLDB-ISSUE-015`.

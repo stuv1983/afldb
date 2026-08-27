@@ -1,0 +1,164 @@
+{
+  "$comment": [
+    "AFLDB-ISSUE-093 — canonical acceptance/promotion register for fitzRoy core snapshots.",
+    "",
+    "This file records that a specific set of IMMUTABLE raw artefacts, under a specific",
+    "importer/contract version, passed INDEPENDENT full-history validation and is accepted",
+    "as the rebuild's canonical core source. It is a promotion record, not evidence: the",
+    "acquisition manifests under docs/rebuild-manifests/afltables_fitzroy_core/ remain",
+    "untouched historical evidence and are never rewritten to reflect an acceptance.",
+    "",
+    "This file is NOT sufficient to bless bytes. Hand-editing it cannot make a snapshot",
+    "acceptable, because tools/migration/import_fitzroy_core.py re-derives every",
+    "full-history gate from the contract and the artefacts on disk, re-verifies every",
+    "artefact SHA-256 against the acquisition manifest, and remains the sole verdict",
+    "authority. What this file adds is BINDING: it pins which acquisition is accepted, and",
+    "the hashes and measured fingerprints that must still hold for it to stay accepted.",
+    "",
+    "The acquisition manifest's own `full_history` and `completeness` fields are INERT.",
+    "full-history-20260827 self-declared full_history=true while the independent validator",
+    "rejected it (the acquirer implemented a smaller gate set than the contract declares).",
+    "That manifest is preserved byte-for-byte as the record of that mistake."
+  ],
+  "contract": "afldb.fitzroy.accepted_baselines",
+  "schema_version": 1,
+  "selection_policy": {
+    "rule": "exactly_one_accepted",
+    "$comment": [
+      "The rebuild resolves its default core source by selecting the single entry whose",
+      "acceptance_status is 'accepted'. Zero accepted entries and more than one accepted",
+      "entry are BOTH refusals. There is no 'latest label', filename-ordering or date",
+      "tiebreak: deterministic selection among multiple baselines is not defined policy,",
+      "so the rebuild fails closed and a human must decide."
+    ]
+  },
+  "inert_acquisition_fields": {
+    "fields": ["full_history", "completeness", "completeness_gates"],
+    "$comment": [
+      "Never read as a verdict by any part of the supported rebuild path. They are the",
+      "acquirer's self-assessment, preserved for audit only."
+    ]
+  },
+  "baselines": [
+    {
+      "snapshot_label": "full-history-20260827",
+      "acceptance_status": "accepted",
+      "accepted_on": "2026-08-27",
+      "issue": "AFLDB-ISSUE-093",
+      "competition": "VFL/AFL men's senior competition",
+      "snapshot_dir": "data/sources/afltables/fitzroy_core/full-history-20260827",
+
+      "acquisition": {
+        "manifest_path": "docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260827.json",
+        "manifest_sha256": "cc8aaf0946fc59003dc4e5d6803410383db975e2f5bf58e9d510c31dc781e3b6",
+        "immutable": true,
+        "adapter": "tools/rebuild/fitzroy/acquire_core.R",
+        "adapter_schema_version": 1,
+        "extraction_timestamp_utc": "2026-08-27T01:54:19Z",
+        "fitzroy_version_pinned": "1.8.0",
+        "$comment": [
+          "manifest_sha256 covers the acquisition manifest byte-for-byte, so the artefact",
+          "hash list inside it cannot be edited to cover for a tampered artefact without",
+          "breaking this binding."
+        ]
+      },
+
+      "raw_artefacts": {
+        "file_count": 131,
+        "total_rows": 719042,
+        "artefact_set_sha256": "8e14ce6198685b9fec568ab3c680cab34783e8e202ab0c7e93f45773d96f4125",
+        "digest_rule": "sha256 over sorted lines '<filename> <sha256> <row_count>\\n' from the acquisition manifest's files[]",
+        "$comment": [
+          "A second, independently recomputable binding to the same artefact set. It survives",
+          "insignificant reformatting of the manifest while still pinning every filename,",
+          "content hash and row count."
+        ]
+      },
+
+      "contract_binding": {
+        "fitzroy_contract": "tools/rebuild/fitzroy/fitzroy-contract.json",
+        "contract_version": 1,
+        "contract_full_history_version": 1,
+        "required_range": { "first_season": 1897, "last_season": 2025 },
+        "required_datasets": ["player_stats", "player_details", "results"]
+      },
+
+      "validation": {
+        "authority": "tools/migration/import_fitzroy_core.py",
+        "command": "import_fitzroy_core.py --label full-history-20260827 --validate-only --require-full-history",
+        "verdict": "PASSED",
+        "validated_on": "2026-08-27",
+        "database_accessed": false,
+        "$comment": [
+          "The verdict recorded here is history. Every normal rebuild re-runs this exact",
+          "command in PRECHECK, before any destructive stage, and uses that live result."
+        ]
+      },
+
+      "measured": {
+        "$comment": "Drift gates. Re-derived from the snapshot on every validate and compared exactly.",
+        "matches": 16838,
+        "matches_with_player_rows": 16838,
+        "seasons_first": 1897,
+        "seasons_last": 2025,
+        "venues": 52,
+        "attendance_known": 15187,
+        "club_identities": 24,
+        "players": 13275,
+        "players_with_dob": 855,
+        "players_with_dob_conflict": 0,
+        "player_match_rows": 685471,
+        "brownlow_round_vote_rows": 320861
+      },
+
+      "identity_scan": {
+        "$comment": [
+          "Canonical identity is the AFL Tables profile URL. The fitzRoy numeric ID is",
+          "optional: 83 recent-2025 rows carry none, and distinct_urls - distinct_ids = 5",
+          "is exactly the five players who have no ID anywhere in the snapshot."
+        ],
+        "rows": 685473,
+        "missing_id": 83,
+        "missing_url": 0,
+        "malformed_url": 0,
+        "distinct_ids": 13270,
+        "distinct_urls": 13275
+      },
+
+      "accepted_corrections": {
+        "$comment": [
+          "Settled under contract_version 1. Each is tracked in fitzroy-contract.json or",
+          "pinned in the importer; this list states what the acceptance covers, and a change",
+          "to any of them is a new acceptance decision, not an edit to this one."
+        ],
+        "source_normalisation": [
+          {
+            "kind": "source_club_normalisation",
+            "rule": "Brisbane Lions 1987-1996 -> Brisbane Bears",
+            "dataset_scope": "all datasets"
+          },
+          {
+            "kind": "source_club_normalisation",
+            "rule": "North Melbourne 1999-2007 -> Kangaroos",
+            "dataset_scope": "results"
+          }
+        ],
+        "source_data": [
+          {
+            "kind": "source_row_corrections",
+            "rule": "two spurious 1909 Jim Stewart Cartesian-product rows dropped under tracked row fingerprints",
+            "rows_dropped": 2
+          }
+        ],
+        "import_transformation": [
+          {
+            "kind": "display_name_fallback",
+            "rule": "blank Player falls back to First.name + ' ' + Surname only when both are present; a non-blank Player always wins; neither present still fails closed",
+            "rows_affected": 79,
+            "players_affected": 4
+          }
+        ]
+      }
+    }
+  ]
+}

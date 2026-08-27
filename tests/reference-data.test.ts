@@ -10,7 +10,7 @@
  * here is --print-plan only, which validates and counts without connecting.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -187,6 +187,160 @@ describe('load_reference_data.py', () => {
   const loaderSource = readFileSync(
     join(root, 'tools', 'migration', 'load_reference_data.py'), 'utf8');
 
+  const commonSource = readFileSync(
+    join(root, 'tools', 'migration', 'common.py'), 'utf8');
+
+  /*
+   * AFLDB-ISSUE-093 §H12 — the REFERENCE stage of the first clean rebuild died here.
+   *
+   * guard_cascade() probed every transitive FK dependent of its truncate roots with
+   * `SELECT count(*)`. That closure reaches admin and link-review relations the
+   * afldb_import role is deliberately denied, so the run ended in
+   * InsufficientPrivilege on player_link_match_candidates — after the destructive
+   * reset had already emptied the database. Granting that one table would only have
+   * moved the failure to player_match_period_stats, the next unregistered relation
+   * in the same closure.
+   *
+   * These tests are the reason another destructive rebuild does not have to be the
+   * thing that discovers the next one.
+   */
+  describe('cascade guard under the restricted import role (§H12)', () => {
+    it('never probes a dependent with an unguarded count', () => {
+      // The exact shape that failed: a count over a table named by the FK closure.
+      expect(loaderSource).not.toMatch(/scalar\(pg,\s*f?["']SELECT count\(\*\) FROM \{/);
+    });
+
+    it('classifies dependents through the catalogue, not by reading them', () => {
+      expect(loaderSource).toContain('selectable(pg, outside)');
+      expect(commonSource).toContain('has_table_privilege');
+      // has_table_privilege() needs no privilege on its argument; that is the point.
+      expect(commonSource).toMatch(/def selectable\(/);
+    });
+
+    it('counts rows only in dependents it has proven readable', () => {
+      expect(loaderSource).toContain('any_rows(pg, [t for t in outside if t in readable])');
+    });
+
+    it('refuses, rather than assuming, when a dependent cannot be read', () => {
+      expect(loaderSource).toContain('unreadable = [t for t in outside if t not in readable]');
+      expect(loaderSource).toMatch(/if unreadable and not allow_cascade:[\s\S]{0,400}sys\.exit/);
+      expect(loaderSource).toContain('cannot be shown to be');
+    });
+
+    it('keeps the populated-dependent refusal it always had', () => {
+      expect(loaderSource).toMatch(/if populated:[\s\S]{0,400}sys\.exit/);
+      expect(loaderSource).toContain('which hold data this loader does not rebuild');
+    });
+
+    it('takes the cascade closure from the POPULATED roots, not the union (§H13)', () => {
+      // The §H12 defect. Migrations 015/016 SEED stat_definitions and
+      // stat_availability, so a freshly migrated database is never fully empty —
+      // the whole-union short circuit could never fire, and the closure of the
+      // EMPTY clubs/seasons roots was adjudicated anyway. A truncate that will be
+      // skipped cascades into nothing, so only populated roots may contribute.
+      expect(loaderSource).toContain('populated_roots = any_rows(pg, sorted(to_truncate))');
+      expect(loaderSource).toContain('cascade_dependents(pg, populated_roots)');
+      expect(loaderSource).not.toContain('cascade_dependents(pg, sorted(to_truncate))');
+      // The behavioural proof of this lives in tests/python/reference_cascade_contract.py;
+      // this assertion only pins the shape it depends on.
+    });
+
+    it('will not let the guard and the truncate disagree about the roots (§H13)', () => {
+      expect(loaderSource).toContain('_cleared_roots');
+      expect(loaderSource).toMatch(/unadjudicated = sorted\(set\(populated\) - _cleared_roots\)/);
+    });
+
+    it('skips a TRUNCATE whose targets are already empty', () => {
+      // TRUNCATE ... CASCADE needs privileges on the whole cascade set, not just on
+      // the tables named — and the cascade from clubs reaches relations afldb_import
+      // may not touch. Truncating an empty table removes nothing, so it is skipped.
+      expect(loaderSource).toMatch(/def reload_truncate\(/);
+      const body = loaderSource.slice(loaderSource.indexOf('def reload_truncate('));
+      // the emptiness check comes BEFORE the statement it guards
+      expect(body.indexOf('populated = any_rows(')).toBeGreaterThan(-1);
+      expect(body.indexOf('populated = any_rows('))
+        .toBeLessThan(body.indexOf('truncate(pg, *tables)'));
+      expect(body).toMatch(/if not populated:\s*\n\s*return/);
+      for (const call of ['reload_truncate(pg, "seasons")',
+                          'reload_truncate(pg, "clubs", "club_aliases")',
+                          'reload_truncate(pg, "stat_definitions", "stat_availability")']) {
+        expect(loaderSource).toContain(call);
+      }
+      // No GROUP LOADER calls the raw truncate() any more. Scoped to a quoted table
+      // literal, which is how the group loaders name their targets — reload_truncate's
+      // own `truncate(pg, *tables)` delegation is the one legitimate call site.
+      expect(loaderSource).not.toMatch(/^\s{4}truncate\(pg, "/m);
+    });
+
+    it('needs no new grant: privileges.sql is untouched by this repair', () => {
+      const privileges = readFileSync(
+        join(root, 'tools', 'maintenance', 'privileges.sql'), 'utf8');
+      // The two relations in the closure that afldb_import cannot read stay that way.
+      expect(privileges).not.toContain('GRANT SELECT ON player_link_match_candidates');
+      expect(privileges).not.toContain('GRANT SELECT ON player_match_period_stats');
+    });
+  });
+
+  /*
+   * The generalisation. Migration 045 seeded import_writable_tables from every
+   * public base table that then existed, so anything created AFTER 045 is revoked
+   * from afldb_import unless it calls afldb_meta.grant_import_write(). That is the
+   * mechanism, and it will keep producing relations the FK closure reaches and the
+   * import role cannot read. This test pins the set so a new one is a visible,
+   * DB-free change rather than a surprise mid-rebuild.
+   */
+  describe('post-045 tables unreadable to afldb_import (§H12)', () => {
+    const migrations = join(root, 'src', 'db', 'migrations');
+    const files = readdirSync(migrations).filter((f) => f.endsWith('.sql')).sort();
+
+    const created: { table: string; migration: string }[] = [];
+    const registered = new Set<string>();
+    for (const f of files) {
+      const sql = readFileSync(join(migrations, f), 'utf8')
+        .split('\n').map((l) => l.replace(/--.*$/, '')).join('\n');
+      if (Number(f.slice(0, 3)) > 45) {
+        for (const m of sql.matchAll(
+          /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z0-9_]+)\s*\(/gi)) {
+          created.push({ table: m[1].toLowerCase(), migration: f });
+        }
+      }
+      for (const m of sql.matchAll(/grant_import_write\('([a-z0-9_]+)'\)/gi)) {
+        registered.add(m[1].toLowerCase());
+      }
+    }
+
+    it('finds the tables created after 045 that never registered import write', () => {
+      const unregistered = created
+        .filter((c) => !registered.has(c.table)).map((c) => c.table).sort();
+      // If this list grows, check whether the new table is in the reference
+      // loader's FK cascade closure before running another destructive rebuild.
+      expect(unregistered).toEqual([
+        'app_health_events',
+        'data_edits',
+        'nl_search_feedback',
+        'nl_search_log',
+        'nl_search_review',
+        'player_link_match_candidates',
+        'player_link_resolutions',
+        'player_link_suggestions',
+        'player_match_period_stats',
+      ]);
+    });
+
+    it('confirms the two that sit in the reference loader cascade closure', () => {
+      // player_link_match_candidates -> players -> clubs/seasons  (migration 067)
+      // player_match_period_stats.club_id -> clubs                (migration 062)
+      // player_link_resolutions is also in the closure but privileges.sql grants it
+      // SELECT explicitly (migration 068), so it reads fine.
+      for (const t of ['player_link_match_candidates', 'player_match_period_stats']) {
+        expect(registered.has(t)).toBe(false);
+      }
+      const privileges = readFileSync(
+        join(root, 'tools', 'maintenance', 'privileges.sql'), 'utf8');
+      expect(privileges).toContain('GRANT SELECT ON player_link_resolutions TO afldb_import');
+    });
+  });
+
   it('has zero dependency on the legacy SQLite path', () => {
     // The docstring may name AFLDB_LEGACY_SQLITE to say it is not used; the
     // code must never read it or open the legacy database.
@@ -222,4 +376,31 @@ describe('load_reference_data.py', () => {
     expect(second.status).toBe(0);
     expect(second.stdout).toBe(first.stdout);
   });
+
+  /*
+   * AFLDB-ISSUE-093 §H13 — the BEHAVIOURAL contract.
+   *
+   * The §H12 tests above are source-string contracts. They passed while the control
+   * flow was wrong, because they could assert the shape of the short circuit but not
+   * that it ever fired. This drives the real guard_cascade() and reload_truncate()
+   * against a fake connection and asserts what they actually do. No database.
+   */
+  it.skipIf(!canRun)('cascade guard behaves correctly (tests/python/reference_cascade_contract.py)',
+    () => {
+      const run = spawnSync(python, ['tests/python/reference_cascade_contract.py'],
+        { cwd: root, encoding: 'utf8' });
+      expect(run.status, `${run.stdout}\n${run.stderr}`).toBe(0);
+      expect(run.stdout).toContain('All cascade-guard scenarios hold.');
+      expect(run.stdout).not.toContain('FAIL ');
+      // the scenarios that matter most, named so a silent removal is visible here
+      for (const scenario of [
+        'A2 the closure is taken from the POPULATED roots only',
+        'A4 no readability split is needed at all',
+        'B1 the loader refuses',
+        'C2 the guarded TRUNCATE is issued',
+        'D2 an unadjudicated root is refused, not truncated',
+      ]) {
+        expect(run.stdout).toContain(`PASS  ${scenario}`);
+      }
+    });
 });

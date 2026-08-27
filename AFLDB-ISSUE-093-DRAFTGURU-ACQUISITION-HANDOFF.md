@@ -2145,3 +2145,1309 @@ newly created tracked manifest `docs/rebuild-manifests/draftguru/annual-html-202
 Gitignored working artifacts: the 42-year `data/sources/draftguru/annual-html-20260826/`
 snapshot. No other repository file was modified. No Git, SQL, SSH or deployment command was
 executed by the agent.
+
+---
+
+## 30. STAGE B1 — PLANNING CHECKPOINT: **FROZEN SAMPLE + EXECUTION CONTRACT** (2026-08-26,
+##     Opus / High / Plan). **APPROVED. PLANNING SESSION ENDS HERE.**
+
+**This section is the approved Stage B1 execution contract and supersedes §29's "recommended next
+session" only in respect of the session profile (§30.9). Everything §29 settles remains binding.**
+
+No person page was crawled. No Stage B1 implementation file was created. No Step 1 query was run.
+Stage A was not modified. No Git, SQL, SSH, test, build or deployment command was executed by the
+agent in this session.
+
+### 30.1 Purpose (unchanged, single question)
+
+Does the DraftGuru **person page** carry a reliable, deterministic
+`player_url → AFL Tables external identity` bridge, and does it carry one for the players AFLDB is
+missing? One observation exists (`/players/brad_miller/1` →
+`http://afltables.com/afl/stats/players/B/Brad_Miller.html`); it is **not** generalised.
+
+### 30.2 Fixed Stage B1 snapshot label
+
+```text
+person-html-20260826
+```
+
+Working dir (gitignored): `data/sources/draftguru/person-html-20260826/`
+Manifest (tracked, written LAST): `docs/rebuild-manifests/draftguru/person-html-20260826.json`
+
+The accepted Stage A snapshot `annual-html-20260826` and its manifest are **immutable** and are
+read-only inputs here. Stage B1 must be structurally incapable of writing into them (§30.5).
+
+### 30.3 Frozen sample — exactly 120 distinct persons, mutually exclusive primary cohorts
+
+| Order | `primary_cohort` | Size | Source of truth | Rule |
+|---:|---|---:|---|---|
+| 1 | `convergence` | **8** | Handoff + accepted snapshot | The four Residual-B pairs. URLs verified present in the accepted `parsed/persons.jsonl`: `adam_houlihan/1,2`, `andrew_hill/1,2`, `brad_miller/1,2`, `michael_brown/1,2` |
+| 2 | `residual` | **68 — complete census** | **One bounded read-only `afldb_dev` query (§30.4)** | Every Residual-A person, not a sample |
+| 3 | `decade_control` | **30** | Accepted Stage A snapshot | **6 per decade** — 1980s / 1990s / 2000s / 2010s / 2020s — drawn only from persons whose DraftGuru **reported games > 0** |
+| 4 | `zero_game_control` | **14** | Accepted Stage A snapshot | Persons where **every** row reports games `"0"` |
+
+**Total 120.** Cohorts are drawn in the order above, each excluding already-selected URLs, so
+**every selected person has exactly one `primary_cohort` — selected cohorts are mutually exclusive
+by construction, and no overlap is claimed.** Other predicates a person also satisfies are recorded
+as descriptive `eligibility_tags` (`games_zero`, `games_positive`, `decade_1990s`, …), never as
+membership.
+
+**Deterministic ordering (cohorts 3 and 4):** within each stratum, order candidates by
+`sha256(player_url utf-8)` hex ascending and take the first N. Decade = `min(years)` from
+`parsed/persons.jsonl`. No randomness. No name-based selection, ever. A stratum with fewer
+candidates than its quota takes all of them and records the shortfall explicitly — never a silent
+backfill from another stratum.
+
+Cohorts 1, 3 and 4 are derived **entirely offline** from the accepted Stage A snapshot. Only
+cohort 2 touches the database.
+
+### 30.4 Step 1 — the single bounded read-only `afldb_dev` query (frozen text)
+
+The only database access required for sample construction. The console shows the guard/identity
+proof and the cross-check aggregates; **psql itself writes the 68 residual `player_url` values**
+(`\o`, unaligned, tuples-only — no header, no footer) to a deterministic gitignored file inside the
+Stage B1 snapshot. **No manual copy/paste. No parsing of mixed terminal output.**
+
+Residual input file:
+
+```text
+data/sources/draftguru/person-html-20260826/input/residual_player_urls.txt
+```
+
+`player_url` values only, one per line, byte-exact as returned. **No names, no player ids, no
+external ids, no other database data.** Expected console counts `3464 / 3460 / 68 / 68 / 60 / 8`;
+expected file **exactly 68 non-empty lines**.
+
+```bash
+cd /d/dev/afldb && mkdir -p data/sources/draftguru/person-html-20260826/input && DSN="$(sed -n 's/^AFLDB_OWNER_DATABASE_URL=//p' .env | head -1)" && case "$DSN" in */afldb_dev) ;; *) echo "REFUSED: AFLDB_OWNER_DATABASE_URL does not target /afldb_dev"; exit 3;; esac && PGOPTIONS='-c default_transaction_read_only=on' psql -X -v ON_ERROR_STOP=1 -P pager=off "$DSN" <<'SQL' && { echo "--- residual input file ---"; wc -l < data/sources/draftguru/person-html-20260826/input/residual_player_urls.txt; sha256sum data/sources/draftguru/person-html-20260826/input/residual_player_urls.txt; }
+BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;
+DO $guard$
+BEGIN
+  IF current_database() <> 'afldb_dev' THEN
+    RAISE EXCEPTION 'refusing: current_database() = %', current_database();
+  END IF;
+  IF current_setting('transaction_read_only') <> 'on'
+     OR current_setting('default_transaction_read_only') <> 'on' THEN
+    RAISE EXCEPTION 'refusing: transaction is not read-only';
+  END IF;
+END
+$guard$;
+\echo == identity ==
+SELECT current_database() AS db, current_user AS usr,
+       current_setting('transaction_read_only') AS txn_ro,
+       current_setting('transaction_isolation') AS txn_iso;
+\echo == residual counts (expect 3464 / 3460 / 68 / 68 / 60 / 8) ==
+WITH linked AS (
+  SELECT dp.player_id, dp.player_url, dp.link_status
+  FROM draft_persons dp
+  JOIN sources s ON s.id = dp.source_id AND s.key = 'draftguru'
+  WHERE dp.player_id IS NOT NULL
+), qualifying AS (
+  SELECT DISTINCT ei.player_id
+  FROM external_identities ei
+  JOIN sources s ON s.id = ei.source_id AND s.key = 'afltables'
+  WHERE ei.player_id IS NOT NULL AND ei.status IN ('unique','resolved')
+), residual AS (
+  SELECT l.* FROM linked l
+  WHERE NOT EXISTS (SELECT 1 FROM qualifying q WHERE q.player_id = l.player_id)
+)
+SELECT (SELECT count(*) FROM linked)                                   AS linked_persons,
+       (SELECT count(DISTINCT player_id) FROM linked)                  AS canonical_players,
+       (SELECT count(DISTINCT player_id) FROM residual)                AS residual_players,
+       (SELECT count(*) FROM residual)                                 AS residual_persons,
+       (SELECT count(*) FROM residual WHERE link_status = 'unique')    AS residual_unique,
+       (SELECT count(*) FROM residual WHERE link_status = 'resolved')  AS residual_resolved;
+\echo == writing player_url values to data/sources/draftguru/person-html-20260826/input/residual_player_urls.txt ==
+\pset format unaligned
+\pset tuples_only on
+\o data/sources/draftguru/person-html-20260826/input/residual_player_urls.txt
+WITH linked AS (
+  SELECT dp.player_id, dp.player_url
+  FROM draft_persons dp
+  JOIN sources s ON s.id = dp.source_id AND s.key = 'draftguru'
+  WHERE dp.player_id IS NOT NULL
+), qualifying AS (
+  SELECT DISTINCT ei.player_id
+  FROM external_identities ei
+  JOIN sources s ON s.id = ei.source_id AND s.key = 'afltables'
+  WHERE ei.player_id IS NOT NULL AND ei.status IN ('unique','resolved')
+)
+SELECT l.player_url FROM linked l
+WHERE NOT EXISTS (SELECT 1 FROM qualifying q WHERE q.player_id = l.player_id)
+ORDER BY l.player_url;
+\o
+\pset tuples_only off
+\pset format aligned
+ROLLBACK;
+SQL
+```
+
+**Safety envelope (unchanged from Step 1 / the residual audit):** DSN derived from `.env` by `sed`
+(never sourced); shell guard refusing any DSN not ending `/afldb_dev`; in-SQL `DO` guard on
+`current_database()` **and** both read-only settings; `PGOPTIONS` read-only at connect time;
+`psql -X`; `ON_ERROR_STOP=1`; pager off; one `BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ
+READ ONLY` ending in `ROLLBACK`. `afldb_test_pre_rebuild_20260825` is never named, connected to or
+enumerated. `AFLDB_LEGACY_SQLITE` is not involved. **Egress is `player_url` plus aggregate counts,
+nothing else.**
+
+### 30.5 Step 2 — freeze the sample (`tools/rebuild/draftguru/stage_b1_sample.py`, new)
+
+Reads the accepted Stage A `parsed/persons.jsonl` + `parsed/rows.jsonl` and the residual input
+file; applies §30.3; writes `data/sources/draftguru/person-html-20260826/sample.json`.
+
+Residual input handling: read as **bytes**; record `sha256` + byte size in `sample.json` verbatim;
+split on `\n`, strip one optional trailing `\r` (psql on Windows may emit CRLF); require **exactly
+68 non-empty lines**, each matching the contract's `canonical_player_url` regex. No other
+transformation — **percent-encoding (`%20`, `%C3%A1`) is significant and is never decoded or
+space-normalised**.
+
+Per person: `player_url` (byte-exact), `slug`, `ordinal`, **`primary_cohort`** (exactly one of
+`convergence` | `residual` | `decade_control` | `zero_game_control`), `eligibility_tags[]`,
+`decade`, `reported_games_basis`, `draft_years`. File level: the selection rule, per-stratum
+candidate/selected/shortfall counts, the residual-file sha256, and the Stage A manifest label +
+sha256 it derives from.
+
+Fail-closed: exactly 120 distinct URLs; every URL present byte-exactly in the accepted snapshot;
+all 8 convergence URLs present; no URL carrying two primary cohorts. Zero network, zero database,
+zero `psycopg`.
+
+### 30.6 Implementation semantics — **manifest ownership and execution ordering**
+
+**Full-mode `acquire_persons.py` owns Stage B1 orchestration.** The accepted full run is a single
+ordered pipeline:
+
+```text
+sample.json
+  -> acquire / classify all 120 identities
+  -> invoke the offline person-page profiler
+  -> produce parsed/person_profile.jsonl
+  -> produce parsed/afltables_link_profile.json
+  -> verify all 120 identities carry terminal classifications
+  -> build the Stage B1 manifest
+  -> final manifest-immutability check (existing label => abort, write nothing)
+  -> write the manifest LAST
+```
+
+`profile_person_pages.py` exposes **reusable offline profiling functionality** (stdlib only, no
+network, no PostgreSQL, no `psycopg`) and may keep its own CLI for validation/debugging, but **the
+accepted full B1 run must not write the manifest before profiler/aggregate completion.** This
+removes any ambiguity between the acquisition step and the profiling step: they are one accepted
+run, in that order, with the manifest as the last act.
+
+**Probe mode is different:** bounded probe acquisition only (e.g. the two Brad Miller pages); the
+profiler may be run separately for inspection; **probe mode MUST NOT write the accepted Stage B1
+manifest.**
+
+### 30.7 Implementation semantics — **terminal classification and resume**
+
+A person is **terminally classified** when either:
+
+- **A. fetched** — a raw response file **and** its HTTP metadata record both exist; or
+- **B. terminally failed** — acquisition exhausted the approved retry policy (3 retries, 2/4/8s,
+  only on timeout / connection error / 5xx / 429) or received another deterministic terminal
+  failure (e.g. 404), **and** an HTTP failure record exists containing: exact `player_url`,
+  terminal classification, HTTP status where available, reason, and the attempt/retry evidence the
+  contract requires.
+
+**Resume rules:**
+
+- successful raw+HTTP pairs are reused and **never rewritten**;
+- terminal failure records are **also reused** — never silently retried, never silently
+  reclassified;
+- interrupted / non-terminal attempts may resume;
+- retrying an already-terminal failure requires an **explicit future retry mechanism/decision**,
+  not normal resume behaviour.
+
+**Therefore a completed B1 experiment may legitimately have `requested = 120`, `fetched < 120`,
+`failed > 0` and still receive a manifest, provided `fetched + failed = 120`, all 120 carry
+deterministic terminal classifications, and profiler/aggregate processing is complete.**
+
+**An interrupted run where `fetched + failed < 120` MUST NOT receive a manifest.** Raw/http
+artifacts are retained for resume; absence of a manifest means the experiment did not complete.
+
+HTTP/page failures are **findings**, not incompleteness. The manifest records `requested` /
+`fetched` / `failed` counts and the **exact** failed identities with their reasons, plus
+`person_pages { stage: "B1", sample_basis }` and the §10 `afltables_link_profile`.
+**`identity_complete: false` and `import_capable: false` are mandatory** — a profiling sample can
+never become an import source.
+
+### 30.8 Remaining implementation contract (execution session)
+
+- **Contract additions** — `tools/rebuild/draftguru/draftguru-contract.json`, **additive only**
+  (no existing Stage A key changes; the accepted manifest and the 34/34 suite depend on them):
+  `person_stage` with `person_url_pattern` (reusing the frozen `canonical_player_url` regex),
+  `person_snapshot { root: data/sources/draftguru, label_pattern: "^person-html-[0-9]{8}$",
+  manifest_dir: docs/rebuild-manifests/draftguru }` **plus an explicit refusal if the supplied
+  label matches the annual pattern**, and `afltables_link` (recognised host forms
+  `afltables.com` / `www.afltables.com`, http/https; the `players/<A>/<Name>.html` shape; the
+  normalisation contract mirroring `tools/migration/import_fitzroy_core.py:211
+  normalise_profile_url()`, which strips `^https?://afltables\.com/afl/stats/` only — **a `www.`
+  host therefore does not reduce and is a finding, not a silent pass**). HTTP policy reused
+  unchanged: 1.5s min delay, 20s timeout, 3 retries 2/4/8s, same-host redirects, concurrency 1.
+- **`acquire_persons.py`** — imports and reuses, without modifying, `acquire_draft.py`'s `Fetcher`,
+  `check_robots`, `atomic_write_bytes`, `atomic_write_json`, `sha256_hex`, `utc_now`. Input
+  `sample.json`; ordering slug then ordinal, byte-identical across runs. Layout
+  `raw/persons/<slug>__<ordinal>.html` (exact bytes, binary write, no decode) +
+  `http/persons/<slug>__<ordinal>.json` (status, final URL, redirect chain, content-type, byte
+  size, sha256, `fetched_at`, terminal classification) + `http/persons_index.json` mapping
+  filename → exact `player_url` **so a filename never becomes identity**. robots.txt fetched fresh
+  for this snapshot with `/players/*` explicitly checked — a disallow is **stop and report**, never
+  a workaround.
+- **`profile_person_pages.py`** — per person, verbatim: source `player_url`; requested URL; final
+  URL + redirect chain; HTTP status; title / `<h1>` display name; DOB if exposed; height; original
+  club; DraftGuru reported games and club splits; **every** `<a href>` on an AFL Tables host,
+  verbatim and in document order, with count; the normalised `players/A/Name.html` form per href
+  (or the reason it does not reduce); other external identity links (Wikipedia/AFL.com) as
+  vocabulary only; flags for no link, multiple distinct AFL Tables candidates, malformed form,
+  missing/dead page, self-link disagreeing with the requested `player_url`, and `primary_cohort`.
+  Aggregate: overall coverage %, per-cohort coverage, URL-form vocabulary, duplicate/collision
+  counts (**two DraftGuru persons → one AFL Tables profile is a finding, never a merge
+  instruction**), and the per-pair convergence result — do the two members of each pair resolve to
+  *distinct* AFL Tables identities?
+  **Hard rules: never infer a link from a name; never modify raw bytes; never percent-decode a
+  slug; write nothing to PostgreSQL.**
+- **Tests** — extend the existing semantic home `tests/draftguru-acquisition.test.ts` (34/34 today;
+  **existing tests must not be weakened**): sample determinism and the exact 120 / 8 / 68 / 30 / 14
+  shape; mutually-exclusive `primary_cohort`; residual-input parsing (68-line requirement, CRLF
+  tolerance, regex, hash recording); percent-encoded slug round-trip; Stage-A-snapshot-write
+  refusal (annual label rejected, accepted snapshot path never written); AFL Tables href extraction
+  from committed person fixtures; normalisation agreement with `normalise_profile_url` including
+  the `www.` non-reducing case; multiple-candidate and no-link classification; manifest
+  `identity_complete:false` / `import_capable:false`; **manifest written only after all 120 reach a
+  terminal classification and the profiler/aggregate output exists**; **`fetched + failed = 120`
+  with `failed > 0` still yields a manifest, while `fetched + failed < 120` yields none**;
+  **terminal failure records are reused on resume, not retried or reclassified**; probe mode writes
+  no manifest; manifest immutability; zero legacy-SQLite / zero DB dependency pins. Fixtures
+  `tests/fixtures/draftguru/person_*_excerpt.html` are trimmed from real Stage B1 raw bytes after
+  the probe — Brad Miller `/1` and `/2` first.
+- **Verification order:** static suite → 2-page probe (`brad_miller/1`, `/2`, no manifest) →
+  full 120-identity run → manifest present ⇒ complete.
+
+### 30.9 Post-crawl reconciliation — second bounded read-only query (aggregate only)
+
+Deliberately **not** part of Step 1. "Does DraftGuru expose the same identity AFLDB already holds,
+or contradict it?" is answered **after** the crawl by passing the observed
+`(player_url → normalised afltables path)` pairs into a read-only `afldb_dev` query as a `VALUES`
+list and returning **aggregate counts and categories only** — same / absent / contradicts /
+not-linked. **No `external_id`, name or id egress.** Same safety envelope as §30.4.
+
+### 30.10 HALT conditions (preserve the evidence in this section before stopping)
+
+Residual counts differ from `3464 / 3460 / 68 / 68 / 60 / 8`; the input file is not exactly 68
+valid non-empty lines; any line fails the canonical `player_url` regex; any residual URL is absent
+byte-exactly from the accepted `parsed/persons.jsonl`; robots.txt disallows `/players/*`; person
+pages are not server-rendered or require JavaScript/browser automation; a page exposes multiple
+plausible AFL Tables person identities; link forms are structurally inconsistent enough to change
+the identity model; the 120-person sample proves insufficient; Stage B2 appears necessary; or any
+need arises for a PostgreSQL write, legacy SQLite, or name-only matching.
+
+### 30.11 Decision boundary
+
+Stage B1 concludes with **exactly one** recommendation: **A** bridge reliable enough to be a
+primary external-identity acquisition path; **B** useful but incomplete — use where present and
+require another deterministic path for residuals; **C** too inconsistent/ambiguous to justify
+larger acquisition; **D** evidence insufficient — one specifically bounded further experiment.
+
+**Stage B2 is not self-approved (U2).** Any proposal must state measured B1 coverage, the
+known false/contradictory rate, residual coverage gained, the convergence-pair result, expected
+incremental value, estimated request count/cost and the exact safety/validation design — then
+**HALT for approval**.
+
+### 30.12 Settled boundaries carried forward (must not be reopened)
+
+Zero `AFLDB_LEGACY_SQLITE`; no PostgreSQL writes anywhere in Stage B1; acquisition and import
+remain separate phases; **the DraftGuru PostgreSQL importer is not implemented in Stage B1** (§16
+records its requirements); `player_url` is the durable person identity in its U1 canonical form,
+byte-exact including percent-encoding; the rendered name is never identity; Brad Miller `/1` and
+`/2` are different people; old automatic DraftGuru links are audit/reconciliation baseline only and
+must be re-earned; only explicit `player_link_resolutions` rows are replayable; the accepted Stage
+A snapshot/manifest and the frozen CSV corpus are immutable; `IssuesIndex.md` and `CHANGELOG.md`
+stay untouched during Stage B1 (deferred per §28); **U3** (off-host archive path for the accepted
+Stage A `raw/`) remains an open operational item and is not a Stage B1 blocker.
+
+### 30.13 Execution boundary — **the planning session ends here**
+
+Approved planning work is complete once (1) this §30 is saved, (2) the §30.4 query text is frozen,
+and (3) the §30.3/§30.5 sample-construction contract is frozen. All three are done.
+
+**Not done and deliberately not started in the planning session:** Step 1 was **not run**; no
+Stage B1 implementation file was created; no person page was crawled; Stage A was not modified; no
+Git command was executed.
+
+**The next session starts from this section and performs, in order:**
+
+1. **Step 1** — the bounded read-only `afldb_dev` residual query of §30.4 (user-run), evaluating
+   the counts and the 68-line input file against §30.10;
+2. **Step 2** — build and validate `sample.json` per §30.5 (exactly 120, one primary cohort each);
+
+before proceeding into contract/adapter/profiler/test implementation, the 2-page probe, and only
+then the full 120-identity run.
+
+**Recommended execution profile:**
+
+| | |
+|---|---|
+| **Model** | **Opus** |
+| **Reasoning** | **High** |
+| **Mode** | **Manual / execution** |
+
+**Files changed by this planning session:** `AFLDB-ISSUE-093-DRAFTGURU-ACQUISITION-HANDOFF.md`
+(this §30) only.
+
+---
+
+## 31. STAGE B1 EXECUTION LOG — 2026-08-26 (Opus / High / Manual execution session)
+
+Execution session opened from §30. §30 is the implementation contract; nothing in it was re-planned.
+
+### 31.1 Step 1 — bounded read-only `afldb_dev` residual query: EXECUTED, **PASS**
+
+Pre-flight (agent-side, native file inspection only — no shell, no Git, `.env` never read):
+
+- `data/sources/draftguru/person-html-20260826/` did not exist ⇒ `mkdir -p` was a fresh create;
+- `.gitignore:37` `/data/*` with opt-ins only for `/data/awards`, `/data/records`,
+  `/data/reference/*.json` ⇒ the whole Stage B1 snapshot is gitignored, as §30.2 requires;
+- accepted Stage A `annual-html-20260826/parsed/{persons,rows}.jsonl` present; the Step 1 command
+  references neither;
+- `tools/rebuild/draftguru/` held only Stage A files ⇒ consistent with §30.13 ("no Stage B1
+  implementation file was created");
+- sole write in the command is `input/residual_player_urls.txt` via `\o`.
+
+**Verdict: the §30.4 frozen command remained valid and was issued unmodified.**
+
+**Exact user-run command:** the §30.4 frozen command, verbatim (Git Bash, cwd `/d/dev/afldb`).
+
+**Observed identity proof**
+
+```text
+db=afldb_dev  user=afldb_owner  txn_ro=on  default_ro=on  isolation=repeatable read
+```
+
+**Observed residual counts — match §30 expectations exactly**
+
+| Metric | Expected | Observed |
+|---|---:|---:|
+| `linked_persons` | 3464 | **3464** |
+| `canonical_players` | 3460 | **3460** |
+| `residual_players` | 68 | **68** |
+| `residual_persons` | 68 | **68** |
+| `residual_unique` | 60 | **60** |
+| `residual_resolved` | 8 | **8** |
+
+**Residual input file (gitignored, inside the Stage B1 snapshot)**
+
+```text
+data/sources/draftguru/person-html-20260826/input/residual_player_urls.txt
+lines  = 68
+bytes  = 3580
+sha256 = df6c9a7559bceb649e8e28e457fbe91d3351d8c1737a9042f233b1f1e3c5e841
+```
+
+No §30.10 HALT condition triggered. Egress was `player_url` values plus aggregate counts only — no
+names, no canonical player ids, no external ids. The transaction ended in `ROLLBACK`;
+`afldb_test_pre_rebuild_20260825` was never named or connected to; `AFLDB_LEGACY_SQLITE` was not
+involved. Terminal echo noise reported by the user around the paste was explicitly excluded from the
+evidence above.
+
+**These three values are now contract inputs** and are recorded verbatim in `sample.json` by Step 2.
+
+### 31.2 Stage A facts re-verified for Step 2 (agent-side native reads, no commands)
+
+- `parsed/persons.jsonl` fields: `player_url`, `slug`, `ordinal`, `years[]`, `row_count`,
+  `display_names_raw[]`. Decade basis = `min(years)`.
+- `parsed/rows.jsonl` reported games live at `parity_only.games` as **strings**. Measured across all
+  6,810 rows: **0 nulls**; **5,292** match `^\d+$`; **1,518** match `^\d+ \(\d+\)$` (career total
+  with a club split in parentheses); 5,292 + 1,518 = 6,810 ⇒ **the only two accepted forms**, and no
+  `"0 (0)"` form exists. Career games = the leading integer; the parenthetical is a club split.
+  `stage_b1_sample.py` fails closed on any third form rather than coercing it.
+- All eight §30.3 convergence URLs are present in `parsed/persons.jsonl` (`adam_houlihan/1,2`
+  lines 51–52, `andrew_hill/1,2` 222–223, `brad_miller/1,2` 588–589, `michael_brown/1,2`
+  3381–3382), each with exactly two ordinals and no third.
+- Accepted manifest carries `"snapshot_label": "annual-html-20260826"` and
+  `"distinct_player_url_count": 5057` — both cross-checked by Step 2.
+
+### 31.3 Step 2 — sample freezer implemented, **validation PENDING**
+
+**File created:** `tools/rebuild/draftguru/stage_b1_sample.py` (new, ~560 lines). No other
+repository file was changed by this step. Stage A snapshot, Stage A manifest, the frozen CSV
+corpus, `import_draft.py`, migrations, `src/`, `IssuesIndex.md` and `CHANGELOG.md` are untouched.
+
+Implements §30.3/§30.5 exactly:
+
+- **Inputs, all read-only:** accepted Stage A `parsed/persons.jsonl` + `parsed/rows.jsonl`, the
+  accepted Stage A manifest (bytes hashed), and the §30.4 residual input file.
+- **Residual handling:** read as bytes; sha256 + byte size recorded verbatim; split on `\n`; one
+  optional trailing `\r` stripped per line (Windows psql CRLF) and counted; **no other
+  transformation** — percent-encoding is never decoded. Requires exactly 68 non-empty lines, each
+  matching the frozen `canonical_player_url` regex, each unique, and each present **byte-exactly**
+  in the accepted Stage A person set. The measured §31.1 evidence is **pinned in code**
+  (`68` lines / `3580` bytes / `df6c9a75…e841`); a mismatch fails closed as a §30.10 HALT finding
+  rather than being absorbed.
+- **Cohorts, drawn in order, each excluding already-selected URLs:** convergence (8, fixed contract
+  order, all eight asserted present in Stage A) → residual (68, complete census, explicit
+  overlap check with a named error) → decade controls (6 per decade 1980s–2020s, career games > 0)
+  → zero-game controls (14, every row `"0"`).
+- **Determinism:** control strata order candidates by `sha256(player_url utf-8)` hex ascending and
+  take the first N. No randomness, no name-based selection. `sample.json` carries **no timestamp**,
+  so a rerun over identical inputs is byte-identical; `--validate-only` proves that against the
+  on-disk file, and a differing existing `sample.json` is never silently replaced (`--overwrite` is
+  a deliberate human act).
+- **Games basis:** `parity_only.games` parsed with `^(\d+)( \((\d+)\))?$`; career games is the
+  leading integer. Any third form fails closed instead of being coerced (§31.2 measurement).
+- **Per person:** `player_url`, `slug`, `ordinal`, `primary_cohort` (exactly one),
+  `eligibility_tags[]` (descriptive only — `decade_*`, `games_zero`/`games_positive`,
+  `residual_census_member`, `convergence_pair_member`), `decade`, `decade_basis_year`,
+  `draft_years`, `stage_a_row_count`, `reported_games_basis`, `player_url_sha256`.
+- **File level:** selection algorithm + ordering + mutual-exclusion statement, per-stratum
+  candidates/quota/selected/shortfall, residual sha256/bytes/lines/CRLF count, Stage A label +
+  manifest sha256 + persons/rows jsonl sha256 + person/row counts, the exact 120-URL selected list,
+  and mandatory `identity_complete: false` / `import_capable: false`.
+- **Fail-closed gates:** exactly 120 distinct URLs; cohort counts exactly 8 / 68 / 30 / 14; one
+  `primary_cohort` per person (a second assignment raises); all eight convergence URLs present;
+  every selected URL present byte-exactly in Stage A; any stratum shortfall is an error, never a
+  silent backfill from another stratum.
+- **Structural Stage A protection:** the label must match `^person-html-[0-9]{8}$` (the
+  `person_stage` contract block wins once it exists); an **annual** label or the frozen CSV label is
+  refused by name; and every write target is asserted to resolve inside the Stage B1 snapshot and
+  outside the Stage A snapshot before any bytes are written.
+- **Zero** network, PostgreSQL, `psycopg` and legacy SQLite. Only `parse_draft_snapshot`
+  (`load_contract`, `FROZEN_CSV_LABEL`, `ParseFailure`) is imported; the acquisition adapter — the
+  only module carrying network code — is deliberately **not** imported.
+
+**Exact next action:** user runs the Step 2 command below; agent evaluates counts against
+§30.3 before any contract/adapter/profiler work.
+
+```bash
+cd /d/dev/afldb && python.exe tools/rebuild/draftguru/stage_b1_sample.py --label person-html-20260826
+```
+
+Expected: cohort counts `8 / 68 / 30 / 14`, total `120`, zero shortfalls, all eight convergence
+URLs listed, residual evidence echoing `68 / 3580 / df6c9a75…e841`, and a `sample.json` sha256 to
+record. **PENDING — no person page has been crawled; no Stage B1 manifest exists.**
+
+### 31.4 Step 2 — sample freeze: EXECUTED, **PASS**. The 120-person sample is now **FROZEN**
+
+**Exact user-run command**
+
+```bash
+cd /d/dev/afldb && python.exe tools/rebuild/draftguru/stage_b1_sample.py --label person-html-20260826
+```
+
+**Result: PASS — frozen Stage B1 sample validated (120 persons, one primary_cohort each).**
+
+| Evidence | Observed |
+|---|---|
+| Stage A label / persons / rows | `annual-html-20260826` / 5,057 / 6,810 |
+| Residual input | 68 lines, 3,580 bytes, sha256 `df6c9a75…e841`, **0 CRLF lines stripped** |
+| `convergence` | **8** |
+| `residual` | **68** |
+| `decade_control` | **30** (6 per decade, zero shortfall) |
+| `zero_game_control` | **14** |
+| **TOTAL** | **120** |
+| Convergence URLs present | 8/8 (`adam_houlihan/1,2`, `andrew_hill/1,2`, `brad_miller/1,2`, `michael_brown/1,2`) |
+
+Candidate pools measured (evidence that no stratum was backfilled): decade controls
+1980s **269**, 1990s **958**, 2000s **847**, 2010s **917**, 2020s **462**; zero-game **1,528**.
+Every stratum shortfall was **0**.
+
+**FROZEN artifact**
+
+```text
+data/sources/draftguru/person-html-20260826/sample.json
+sha256 = d8d743fbcfca39a4c9e708a1198c7e34592270d32628d4fc0003aea88068db28
+```
+
+**The sample membership and the deterministic selection are now FROZEN.** They must not change
+unless new evidence triggers an explicit HALT/review. `sample.json` is timestamp-free, so any
+rebuild from identical inputs reproduces this exact sha256; `--validate-only` proves it, and the
+tool refuses to replace a differing on-disk sample without a deliberate `--overwrite`.
+
+### 31.5 Pre-probe implementation batch — COMPLETE, **validation PENDING**
+
+No person page was crawled. No live acquisition, test, build, Git, database or deployment command
+was executed by the agent. The only shell use was a read-only `ast.parse`/`json.load` syntax check
+of the new files (no imports executed, no writes).
+
+**Files changed**
+
+| File | Change |
+|---|---|
+| `tools/rebuild/draftguru/draftguru-contract.json` | **additive** `person_stage` block only — no Stage A key touched |
+| `tools/rebuild/draftguru/acquire_persons.py` | **new** — person acquisition + full-run orchestration |
+| `tools/rebuild/draftguru/profile_person_pages.py` | **new** — offline person-page profiler |
+| `tools/rebuild/draftguru/stage_b1_sample.py` | `--expect-residual-bytes` added (was a hard constant); **no change to selection logic or to the frozen `sample.json` bytes** |
+| `tests/draftguru-acquisition.test.ts` | Stage B1 cases appended; the 34 Stage A tests are untouched |
+
+`person_stage` pins: the person URL pattern (reusing the frozen `canonical_player_url` regex),
+snapshot root/label pattern `^person-html-[0-9]{8}$`/manifest dir, **explicit refusal of
+`annual-html-*`, `csv-export-*` and `full-history-*` labels**, the layout and the
+filename-is-never-identity rule, the frozen sample shape, the AFL Tables vocabulary
+(`afltables.com` / `www.afltables.com`, http/https, `players/<A>/<Name>.html`) with
+`www_host_reduces: false`, the inherited HTTP policy, mandatory
+`identity_complete:false` / `import_capable:false`, and the terminal-classification/resume rules.
+
+**`acquire_persons.py`** reuses Stage A's `Fetcher`, `check_robots`, `atomic_write_bytes`,
+`atomic_write_json`, `sha256_hex`, `utc_now` **without modifying them**; orders by slug then
+ordinal; writes `raw/persons/<slug>__<ordinal>.html` (exact bytes) + `http/persons/<...>.json` +
+`http/persons_index.json` (filename → exact `player_url`); writes **raw bytes before** the terminal
+record so a crash resumes rather than leaving a terminal record with no evidence; reuses terminal
+successes and terminal failures without retrying or rewriting them; refuses probe targets outside
+the frozen sample; and owns the accepted ordering — acquire → profile → verify 120 terminal
+classifications → build manifest → immutability re-check → **manifest LAST**.
+
+**`profile_person_pages.py`** is offline stdlib only (it imports no network module and never
+imports the acquisition adapter). It records, per person: exact `player_url`, requested/final URL
+and redirect evidence, HTTP status, title/`<h1>`, heuristic DOB/height/labelled fields (explicitly
+labelled heuristic and never identity), **every** AFL Tables href verbatim in document order with
+its classification, the canonical reduced identity or the reason it does not reduce, DraftGuru
+self-links, external Wikipedia/AFL.com links as vocabulary only, and the flags for no-link,
+multiple candidates, malformed form, missing/dead page, self-link disagreement and non-reducing
+host. The aggregate answers §30.8's questions 1–10, including per-cohort coverage, URL-form
+vocabulary, collisions and the per-pair convergence result.
+
+**AFL Tables normalisation is a deliberate mirror**, not a re-derivation: the strip is exactly
+`^https?://afltables\.com/afl/stats/` as in `tools/migration/import_fitzroy_core.py:220`, so a
+`www.` host **does not reduce** and is classified `non_reducing_host` — reported as a finding, never
+silently repaired. A test asserts the mirror and asserts the regex was **not** broadened.
+
+**Two deliberate additions beyond §30's literal text — both restrict behaviour, neither broadens
+scope. Flagged for your review:**
+
+1. **A fully-resumed run performs no network access at all.** If every requested identity is
+   already terminally classified there is no request to authorise, so the run reuses the robots.txt
+   evidence recorded by the acquiring run (`http/robots_txt.json`) instead of re-fetching it. A
+   snapshot that never fetched robots.txt cannot be completed.
+2. **`--no-fetch`** — complete/verify only: never make a request, and fail closed with **no
+   manifest** if any requested identity is still unclassified.
+
+Together these make completion, manifest and resume semantics provable offline, before any live
+request. Progress logging was routed to stderr so stdout carries only the machine-readable summary.
+
+**Tests added** (Stage B1 section appended; existing 34 Stage A tests unchanged and not weakened):
+contract additivity and Stage-A-key stability; label shape and Stage A label refusal;
+profiling-only manifest declaration; frozen 120 / 8 / 68 / 30 / 14 shape; AFL Tables vocabulary and
+the www finding; inherited HTTP policy; terminal/resume pins; zero database-driver imports in all
+three tools and zero network imports in the freezer/profiler; no destructive filesystem operations;
+the `normalise_profile_url` mirror; manifest-written-LAST source ordering; **spawned** sample-freezer
+tests (exact 120 with one cohort each, 6 games-positive controls per decade, all 8 convergence
+persons, byte-identical determinism + `--validate-only`, residual evidence recorded, CRLF-only
+tolerance, refusal of short/blank/duplicate/foreign residual input, hash-drift refusal,
+percent-encoded round-trip with no decoding, Stage A label refusal writing nothing); adapter offline
+paths (existing-manifest abort, Stage A label refusal, deterministic plan ordering with
+storage-only filenames, probe target outside the sample refused); profiler behaviour on **clearly
+labelled synthetic** pages (canonical extraction, www non-reduction finding, no-link with the name
+present and unused, multiple-candidate refusal, collision finding, convergence-pair distinctness,
+terminal failure as missing page, incomplete-experiment refusal); and completion semantics
+(`fetched + failed = 120` with `failed > 0` writes a profiling-only manifest;
+`fetched + failed < 120` writes none; terminal successes and failures byte-identical after resume;
+probe writes no manifest; every filename maps back to its exact `player_url`).
+
+**Explicitly PENDING until the Brad Miller probe produces real bytes:** every assertion about real
+DraftGuru person-page **structure** — where the AFL Tables link actually sits, the real DOB/height/
+original-club/games markup, and the trimmed fixtures
+`tests/fixtures/draftguru/person_*_excerpt.html`. No real-source fixture was fabricated to close
+the matrix; the synthetic pages carry a banner saying they test parser mechanics only.
+
+**Exact next action:** user runs the targeted suite below; agent evaluates it before any live
+acquisition.
+
+```bash
+npx vitest run tests/draftguru-acquisition.test.ts
+```
+
+**Validation PENDING.** No person page crawled, no Stage B1 manifest written, Stage B2 not started,
+no importer implemented.
+
+### 31.6 Step 3 — pre-probe implementation validation: EXECUTED, **PASS (79/79)**
+
+**Exact user-run command**
+
+```bash
+npx vitest run tests/draftguru-acquisition.test.ts
+```
+
+**Result**
+
+```text
+Test Files  1 passed (1)
+Tests       79 passed (79)
+Duration    12.11s
+```
+
+- the **34 Stage A tests remain green** — none weakened, skipped or rewritten;
+- all Stage B1 pre-probe tests green (45 added);
+- the **frozen `sample.json` rebuilt byte-identically** under `--validate-only`
+  (sha256 `d8d743fb…db28` reproduced from the accepted Stage A snapshot + the 68-line residual
+  input);
+- no person page crawled, no Stage B1 manifest, no database access anywhere in the suite.
+
+**Baseline for the rest of Stage B1: `tests/draftguru-acquisition.test.ts` = 79/79 PASS.**
+
+### 31.7 Step 4 — bounded two-page live probe: command issued, **awaiting output**
+
+Scope: exactly two frozen-sample identities, under the Stage B1 label, in probe mode.
+
+```text
+https://www.draftguru.com.au/players/brad_miller/1
+https://www.draftguru.com.au/players/brad_miller/2
+```
+
+These are the proven-different-people anchor pair, so the probe simultaneously tests acquisition,
+server-rendering, byte preservation and whether the `/1` vs `/2` distinction survives to an AFL
+Tables identity.
+
+**Exact command issued**
+
+```bash
+cd /d/dev/afldb && python.exe tools/rebuild/draftguru/acquire_persons.py --label person-html-20260826 --probe "https://www.draftguru.com.au/players/brad_miller/1" --probe "https://www.draftguru.com.au/players/brad_miller/2"
+```
+
+Pre-flight verified by agent-side inspection before issuing it:
+
+- `docs/rebuild-manifests/draftguru/person-html-20260826.json` does **not** exist, so the run is
+  not aborted by the immutability gate and — being probe mode — **cannot write it either**;
+- both URLs are in the frozen `sample.json` (`convergence` cohort), so the probe-target check
+  passes; a target outside the sample would be refused;
+- neither identity has a raw/HTTP record yet, so both are pending: robots.txt is fetched fresh for
+  this snapshot with `/players/*` explicitly checked, and a disallow **stops the run**;
+- the frozen HTTP policy is inherited unchanged (concurrency 1, 1.5 s pacing, 20 s timeout,
+  3 retries at 2/4/8 s, same-host redirects only);
+- every write lands under `data/sources/draftguru/person-html-20260826/`
+  (`raw/persons/brad_miller__{1,2}.html`, `http/persons/brad_miller__{1,2}.json`,
+  `http/persons_index.json`, `http/robots.txt`, `http/robots_txt.json`); Stage A paths are
+  structurally unreachable.
+
+**Expected on success:** two 200s with byte sizes, then a stdout JSON summary with
+`"mode": "probe"`, both URLs under `requested`, `failed: []`, and **`"manifest_written": false`**.
+
+### 31.8 Step 4 — bounded two-page live probe: EXECUTED, **PASS**
+
+**Result**
+
+```text
+brad_miller__1: 200 20816 bytes
+brad_miller__2: 200 7993 bytes
+mode = probe   failed = []   manifest_written = false
+```
+
+Exactly two identities were fetched, both from the frozen sample's `convergence` cohort:
+
+```text
+https://www.draftguru.com.au/players/brad_miller/1
+https://www.draftguru.com.au/players/brad_miller/2
+```
+
+Proven by this probe: person pages are reachable under the frozen HTTP policy; acquisition,
+byte-exact storage and the terminal-classification path work end to end; **no accepted Stage B1
+manifest was written** (probe mode cannot write one); robots.txt permitted `/players/*` — a
+disallow would have stopped the run. The two pages differ materially in size (20,816 vs 7,993
+bytes), which is itself consistent with `/1` and `/2` being different people rather than one
+duplicated record.
+
+The remaining 118 identities are **not** crawled.
+
+### 31.9 Probe evidence — agent-side READ-ONLY inspection of the acquired bytes
+
+No file was modified, nothing was fetched, no Git/database command was run. Findings below come
+from the stored raw bytes and their HTTP records.
+
+**Stored evidence**
+
+| | `/1` | `/2` |
+|---|---|---|
+| bytes | 20,816 | 7,993 |
+| sha256 | `1296a83b…974d` | `b8801a60…a844` |
+| HTTP status / final URL | 200, no redirect | 200, no redirect |
+| `content_type` | `text/html` (no charset) | `text/html; charset=utf-8` |
+| charset resolution | `<meta charset="utf-8" />` | HTTP header |
+| `<td>` data cells | 219 | 44 |
+| `<title>` | `Brad Miller (born 1983) - Draftguru` | `Brad Miller (number 2) - Draftguru` |
+
+**1. Server-rendered? YES — both, fully.** Real data is present in the delivered bytes (219 / 44
+`<td>` cells, `<table>`/`<thead>`/22 `<th>`, club and year values such as Melbourne, Richmond,
+2001). Five `<script>` tags exist but **no hydration markers at all** — no `__NEXT_DATA__`, no
+`data-reactroot`, no `window.__INITIAL*`, no `ng-app`. **No browser automation is required**; the
+offline profiler is sufficient.
+
+**2. Every AFL Tables href, exactly as stored**
+
+`/1` — one, inside a "More details:" paragraph
+(`<p class="top-bump smaller-text">`), anchor text `AFL Tables`:
+
+```html
+<a href="http://afltables.com/afl/stats/players/B/Brad_Miller.html">AFL Tables</a>
+```
+
+`/2` — **none.** The string `afltables` does not appear anywhere in the 7,993 bytes.
+
+**3. Link count per page: `/1` = exactly ONE AFL Tables profile link; `/2` = ZERO.**
+
+**4. Do the two pages resolve to distinct AFL Tables identities? PARTIALLY — and this is the
+first substantive Stage B1 finding.** `/1` reduces under the existing canonicaliser to
+`players/B/Brad_Miller.html`. `/2` exposes **no** AFL Tables identity, so the pair cannot be
+separated *by DraftGuru evidence*: there is no collision, but there is also no bridge. The bridge
+is absent exactly where the historical ambiguity lives. The two pages are nevertheless clearly
+different records — different byte size, different `<td>` count, and DraftGuru itself disambiguates
+them in the title (`born 1983` vs `number 2`), which is display evidence and **never identity**.
+
+**5. `www.afltables.com` — NOT exercised by this probe.** The one real href uses the bare
+`afltables.com` host over `http`, which reduces correctly. The `non_reducing_host` finding path
+therefore remains covered by synthetic cases only until a real `www.` form appears in the 120-page
+run.
+
+**6. Material differences from the synthetic parser-mechanics fixtures** (all recorded, none
+"repaired"):
+
+- **No `<h1>` anywhere.** The display name lives in `<title>` and in `<h2 class="heading">`. The
+  synthetic fixtures used `<h1>`, so `page.h1` will be `null` for real pages while `page.title`
+  carries the name. Identity is unaffected — the name is never identity — but the profiler should
+  also capture `<h2>` as display evidence.
+- **External identity links are a set, not a single link.** `/1` carries three in one paragraph:
+  ```text
+  http://afltables.com/afl/stats/players/B/Brad_Miller.html   AFL Tables
+  http://www.footywire.com/afl/footy/pp-richmond-tigers--brad-miller   Footywire
+  http://en.wikipedia.org/wiki/Brad_Miller_(footballer)   Wikipedia
+  ```
+  Wikipedia is in the contract's `external_vocabulary_hosts`; **Footywire is not**, so it is
+  currently discarded rather than recorded as vocabulary. That is a measurement gap, not an
+  identity risk.
+- **No DraftGuru `/players/...` self-link** on either page, so `self_link_disagreement` cannot fire
+  on real pages of this shape.
+- Real pages carry statistics tables; the synthetic fixtures deliberately do not.
+
+**Verdict: the acquired bytes are suitable for the existing offline profiler.** Two evidence-driven
+profiler adjustments are **recommended but not yet made** (they are measurement improvements, and
+neither changes an identity rule): capture `<h2>` display text alongside `<title>`/`<h1>`, and
+record every non-DraftGuru external host as vocabulary instead of only the contract's four.
+
+### 31.10 Step 5 — offline profiler over the two-page probe: EXECUTED, **PASS**
+
+**Exact user-run command**
+
+```bash
+cd /d/dev/afldb && python.exe tools/rebuild/draftguru/profile_person_pages.py --label person-html-20260826
+```
+
+**Measured counts**
+
+```text
+requested = 2   fetched = 2   profiled = 2   failed = 0
+with_afltables_identity = 1   without_afltables_link = 1
+malformed_links = 0   multiple_candidates = 0   non_reducing_host = 0
+parse_errors = 0   self_link_disagreement = 0   collisions = 0
+```
+
+Probe coverage 1/2 = **50%**. **This is probe coverage only and is NOT an estimate for the
+120-person sample** — the two probe pages are the convergence anchor pair, deliberately the hardest
+case, not a random draw.
+
+**Substantive finding (carried forward to the Stage B1 decision):**
+
+- `brad_miller/1` exposes exactly one reducible AFL Tables identity — `players/B/Brad_Miller.html`;
+- `brad_miller/2` exposes **no** AFL Tables link at all;
+- **no collision** exists between the pair;
+- therefore the person-page bridge is **useful but incomplete for this known historical
+  convergence case** — it identifies one member and is silent on the other, so it cannot by itself
+  separate the pair.
+
+Artifacts written inside the Stage B1 snapshot only:
+`parsed/person_profile.jsonl`, `parsed/afltables_link_profile.json`. No manifest was written.
+
+### 31.11 Step 6 — real-source fixtures + measurement-only profiler additions, **validation PENDING**
+
+No network access, no additional person crawled, Stage A untouched, sample membership unchanged, no
+manifest, no database access, no Git.
+
+**Files changed**
+
+| File | Change |
+|---|---|
+| `tests/fixtures/draftguru/person_brad_miller_1_real_excerpt.html` | **new** — trimmed REAL-SOURCE excerpt of the acquired `/1` bytes |
+| `tests/fixtures/draftguru/person_brad_miller_2_real_excerpt.html` | **new** — trimmed REAL-SOURCE excerpt of the acquired `/2` bytes |
+| `tools/rebuild/draftguru/profile_person_pages.py` | `<h2>` display capture + all-external-host vocabulary (measurement only) |
+| `tests/draftguru-acquisition.test.ts` | real-source fixture regression tests appended |
+
+**Fixtures.** Every element is copied verbatim from the acquired bytes; intervening site chrome,
+scripts, stylesheets and surplus statistics rows were **removed**, and nothing was added, reordered
+or reformatted. Both files carry a provenance header naming the `player_url`, the snapshot label,
+the byte size, the sha256 and the fetch timestamp, and are explicitly labelled
+**TRIMMED REAL-SOURCE FIXTURE (not synthetic)** so they can never be confused with the synthetic
+parser-mechanics pages (which carry their own `SYNTHETIC fixture` banner). Both acquired pages are
+pure ASCII (0 non-ASCII bytes), so the excerpts are byte-faithful. They preserve: the
+`<h2 class="heading">Brad Miller</h2>` heading with **no `<h1>`**; the exact bare-host href
+`http://afltables.com/afl/stats/players/B/Brad_Miller.html` with its `AFL Tables` anchor text; the
+sibling Footywire and Wikipedia links in the same "More details" paragraph; `/2`'s complete absence
+of any AFL Tables reference; and the surrounding `<table class="general individual-player">`
+statistics structure on both pages.
+
+**Profiler additions (measurement only — identity semantics unchanged).**
+
+1. `<h2>` display text is captured alongside `<title>`/`<h1>` and surfaced as
+   `page.display_name_evidence`, whose `$note` states it is **never** used for identity matching.
+   No matching path consumes it.
+2. Every non-DraftGuru external host on a person page is now recorded as vocabulary/evidence, each
+   entry flagged `recognised_vocabulary` (true for the contract's four hosts, false otherwise) and
+   carrying a `$note` that it is never an identity source. The aggregate gains
+   `external_vocabulary_hosts_outside_contract`. **AFL Tables hrefs never enter this list** — they
+   remain the only identity candidates.
+
+**Unchanged and re-verified:** the AFL Tables host/scheme/path vocabulary; `normalise_profile_url()`
+mirroring (`^https?://afltables\.com/afl/stats/` only); `www.afltables.com` still classifies as
+`non_reducing_host` and is still a finding — **the canonicaliser was not broadened**; no host other
+than the AFL Tables vocabulary can yield an identity.
+
+**Tests added** (existing 79 preserved): fixtures are labelled real-source and carry provenance, and
+are distinct from synthetic ones; the observed structure is pinned (h2 heading, no h1, exactly one
+href on `/1`, none on `/2`, ≥9 `<th>`/`<td>` on both) with structural claims made against the
+fixture **body** so the provenance comment cannot satisfy them; the profiler extracts the identity
+from the href with the exact verbatim URL and `AFL Tables` anchor text; display name is read from
+`<h2>` with `h1 = null` and the two pages carry the **same rendered name yet different identity
+outcomes**; `/2` classifies as `no_afltables_link` (not a parse error) despite its tables; Footywire
+records as unrecognised vocabulary and Wikipedia as recognised, with AFL Tables excluded from
+vocabulary; the aggregate reports 1 identity / 1 absence / 0 collisions and the convergence pair as
+`both_resolved:false`, `distinct_identities:null` (unanswerable, never guessed); and — when the
+gitignored snapshot is present locally — the pinned markup is proven to exist byte-for-byte in the
+acquired pages, with both fixtures strictly smaller than their sources.
+
+**Additional evidence recorded, no action taken:** both real pages carry
+`<link rel="canonical" href="http://www.draftguru.com.au/players/brad_miller/N" />` — the **http**
+scheme, while AFLDB identity is the **https** `player_url`. Identity is never taken from a page, so
+nothing changes; noted because a future `<link rel=canonical>`-based check would need this.
+
+**Exact next action:** user runs the targeted suite; agent evaluates before any further crawling.
+
+```bash
+npx vitest run tests/draftguru-acquisition.test.ts
+```
+
+### 31.12 Step 6 — real-source regression gate: EXECUTED, **PASS (87/87)**
+
+**Exact user-run command**
+
+```bash
+npx vitest run tests/draftguru-acquisition.test.ts
+```
+
+```text
+Test Files  1 passed (1)
+Tests       87 passed (87)
+Duration    10.80s
+```
+
+All 79 previous tests remain green; the 8 real-source tests prove: the real pages use the observed
+`<h2 class="heading">` structure with no `<h1>`; `/1` exposes exactly one reducible identity
+`players/B/Brad_Miller.html`; `/2` exposes none; identity comes only from href evidence, never
+display text; Footywire and Wikipedia stay descriptive vocabulary; statistics-table content creates
+no false AFL Tables link; the real convergence pair is **one bridge, one absence, zero collision**;
+and the fixtures are faithful excerpts of the acquired bytes.
+
+**New Stage B1 baseline: `tests/draftguru-acquisition.test.ts` = 87/87 PASS.**
+
+### 31.13 Step 7 — full 120-identity Stage B1 run: pre-flight PROVEN, command issued, **awaiting output**
+
+Pre-flight performed by the agent read-only, using the adapter's own resume logic in-process (no
+writes, no network, no database, no Git):
+
+| # | Fact to prove | Measured |
+|---|---|---|
+| 1 | no accepted manifest exists | `docs/rebuild-manifests/draftguru/person-html-20260826.json` — **absent** |
+| 2 | frozen sample still exactly 120 | **120** = `convergence 8 / residual 68 / decade_control 30 / zero_game_control 14`; `sample.json` sha256 **`d8d743fb…db28`** (unchanged since the §31.4 freeze) |
+| 3 | the two Brad Miller terminal successes are valid | `/1` state `fetched`, 200, 20,816 bytes; `/2` state `fetched`, 200, 7,993 bytes; **raw sha256 matches the recorded sha256 for both**, and each record's `player_url` matches its planned identity byte-exactly |
+| 4 | exactly 118 pending | plan entries **120**, terminal **2**, **pending 118** |
+| 5 | the run will not refetch the two successes | both are **absent from the pending list** — the acquisition loop reuses their raw+HTTP pairs and never rewrites them |
+
+**Exact command issued**
+
+```bash
+cd /d/dev/afldb && python.exe tools/rebuild/draftguru/acquire_persons.py --label person-html-20260826
+```
+
+Full mode (no `--probe`, no `--no-fetch`): reuse terminal records → acquire/classify the 118
+pending → offline profile all 120 terminal outcomes → aggregate → verify `fetched + failed = 120` →
+final immutability re-check → **write the accepted manifest LAST**, with `identity_complete:false`
+and `import_capable:false`. Frozen HTTP policy applies (concurrency 1, 1.5 s pacing, 20 s timeout,
+3 retries at 2/4/8 s, same-host redirects only); robots.txt is fetched fresh for the pending set
+with `/players/*` checked, and a disallow stops the run. Expect roughly 119 requests (118 pages plus
+robots) and ~4–6 minutes at the mandated pacing.
+
+If `fetched + failed < 120` the run writes **no** manifest and retains every artifact for resume.
+Individual page failures are findings, not experiment failure.
+
+### 31.14 Step 7 — full 120-identity Stage B1 run: EXECUTED, **PASS**
+
+```text
+requested = 120   fetched = 120   failed = 0
+identity_complete = false   import_capable = false   manifest_written = true
+```
+
+Accepted manifest: `docs/rebuild-manifests/draftguru/person-html-20260826.json`
+(written LAST, after profiling and the terminal-count gate).
+
+**Resume proven in the live run** — the two Brad Miller identities were reused, not refetched:
+
+```text
+brad_miller__1: already acquired (terminal), reusing
+brad_miller__2: already acquired (terminal), reusing
+```
+
+so exactly the 118 pending pages were requested, every one returning HTTP 200, with zero terminal
+failures. The manifest records this itself as `person_pages.reused_on_resume = {fetched: 2,
+failed: 0}`. Run window `2026-08-26T09:20:10Z` → `09:23:12Z`.
+
+### 31.15 STAGE B1 — COMPLETED MEASUREMENTS (read-only evaluation of the accepted artifacts)
+
+Sources: the accepted manifest, `parsed/person_profile.jsonl` (120 records) and
+`parsed/afltables_link_profile.json`. Nothing was modified, nothing fetched, no database touched.
+
+**1. Overall AFL Tables bridge coverage (120 requested, 120 fetched)**
+
+| Measure | Count |
+|---|---:|
+| with a reducible AFL Tables identity | **100** (83.33%) |
+| without any AFL Tables link | **20** |
+| malformed links | **0** |
+| multiple candidates on one page | **0** |
+| non-reducing host (`www.`) | **0** |
+| parse errors | **0** |
+| collisions (two persons → one profile) | **0** |
+| terminal failures | **0** |
+| redirects | **0** |
+| self-link disagreements | **0** |
+
+Link shape is perfectly uniform: **every one of the 100 links is a single
+`http://afltables.com/afl/stats/players/<A>/<Name>.html` href**, classified `canonical`
+(`url_form_vocabulary` = `{"http://afltables.com [canonical]": 100}`). No `https`, no `www`, no
+second form. Pages carry exactly one AFL Tables href or none (distribution `{1: 100, 0: 20}`), and
+the **100 identities are 100 distinct values**.
+
+**2. Coverage by primary cohort**
+
+| Cohort | Persons | With identity | Coverage |
+|---|---:|---:|---:|
+| `convergence` | 8 | 4 | **50.00%** |
+| `residual` | 68 | 66 | **97.06%** |
+| `decade_control` | 30 | 30 | **100.00%** |
+| `zero_game_control` | 14 | 0 | **0.00%** |
+
+**3. Residual cohort — the question Stage B1 exists to answer**
+
+**66 of the 68** residual persons gain a usable AFL Tables identity directly from DraftGuru
+(**97.06%**); **2 remain without a bridge**:
+`.../players/fred_rodriguez/1` and `.../players/riley_onley/1`, both "no AFL Tables href on the
+page" — an absence, not an ambiguity.
+
+**4. All four historical convergence pairs**
+
+| Pair | `/1` | `/2` | Same identity? |
+|---|---|---|---|
+| Adam Houlihan | `players/A/Adam_Houlihan.html` | **no link** | no |
+| Andrew Hill | **no link** | `players/A/Andrew_Hill.html` | no |
+| Brad Miller | `players/B/Brad_Miller.html` | **no link** | no |
+| Michael Brown | `players/M/Michael_Brown.html` | **no link** | no |
+
+**No pair converges to the same AFL Tables identity — in every pair exactly one side carries a
+bridge and the other carries none** (note Andrew Hill is reversed: the identity sits on `/2`).
+DraftGuru therefore never asserts that the two members are the same person; it simply says nothing
+about one of them. `distinct_identities` is `null` for all four — unanswerable from one identity,
+and deliberately never guessed.
+
+**5. Zero-game cohort: 0 of 14.** This is semantically correct rather than a defect: AFL Tables
+profiles players who played senior AFL games, so a person who never played has no profile to link.
+
+**Mechanism (measured, not assumed).** Cross-tabulating DraftGuru's reported career games against
+identity presence over all 120:
+
+| | identity | no identity |
+|---|---:|---:|
+| games > 0 | **96** | **0** |
+| games = 0 | 4 | 20 |
+
+**Every person DraftGuru reports as having played at least one game carries a link — zero
+exceptions.** The four `games = 0` persons that still carry a link (`gary_keane/1`,
+`simon_hawking/1`, `simon_luhrs/1`, `terry_board/2`, all residual) are consistent with the Stage A
+contract's standing rule that DraftGuru's games figure is **coerced to 0 at source and is
+parity-only, never a fact**. The unresolved side of every convergence pair is a `games = 0` person —
+which is precisely why the old automatic linking merged a real player with a never-played draftee.
+
+**6. External-host vocabulary observed** (evidence only, never identity):
+`en.wikipedia.org` **54**, `www.footywire.com` **19**. `external_vocabulary_hosts_outside_contract`
+= `["www.footywire.com"]`. AFL Tables hrefs never enter this list.
+
+**7. Real `www.afltables.com` non-reducing case: NONE appeared.** All 100 links use the bare host,
+so the `non_reducing_host` finding path remains covered by synthetic tests only. The canonicaliser
+was not broadened, and `www.` would still be reported as a finding if it ever appears.
+
+**8. Anomalous evidence: none.** Zero malformed links, zero multiple-candidate pages, zero
+collisions, zero parse errors, zero redirects, zero self-link disagreements, zero failures. One
+structural fact carried forward: **no page has an `<h1>` (0/120); all 120 carry
+`<h2 class="heading">`**, and every real page's `<link rel="canonical">` uses the `http` scheme
+while AFLDB identity is the `https` `player_url` — recorded as evidence; identity is never taken
+from a page.
+
+**9. Internal consistency and immutability of the accepted experiment — all verified**
+
+- `requested 120 = fetched 120 + failed 0`; `person_pages.failed = []`;
+- 120 raw files and 120 HTTP records on disk, one per sampled identity;
+- `sample_basis.sample_sha256` = **`d8d743fb…db28`** — matches `sample.json` on disk, i.e. the
+  frozen sample was not altered;
+- `sample_basis.stage_a_manifest_sha256` = **`d06bf6be…4652`** — matches the accepted Stage A
+  manifest on disk, i.e. Stage A is intact and was only read;
+- `sample_basis.residual_input_sha256` = **`df6c9a75…e841`** — the §31.1 query output;
+- `parsed_outputs.person_profile.sha256` and `parsed_outputs.afltables_link_profile.sha256` both
+  match the files on disk; `person_profile` records = **120**;
+- `robots_txt_sha256` = `d3bdd069…` matches `http/robots.txt` on disk;
+- `identity_complete: false`, `import_capable: false`, `immutable: true`,
+  `identity_fields_present: ["player_url"]`;
+- a re-run against this label now aborts on the existing manifest, as designed.
+
+### 31.16 Preliminary Stage B1 conclusion — **B**, pending reconciliation (NOT self-approved)
+
+**B — the bridge is useful but incomplete: use it where present, and require another deterministic
+path for the identities it does not cover.**
+
+Supporting evidence: 83.33% overall coverage; **97.06% (66/68) on exactly the residual population
+AFLDB lacks**; 100% on ordinary decade controls; a single, perfectly uniform URL form; 100 distinct
+identities with **zero collisions, zero ambiguity, zero malformed forms and zero failures**; and a
+coherent mechanism — a link exists whenever DraftGuru reports senior games, so the absences are
+concentrated in never-played persons rather than scattered unpredictably.
+
+Why not **A**: coverage is measured, **correctness is not yet**. Nothing so far tests whether a
+DraftGuru-asserted AFL Tables identity agrees with the identity AFLDB already holds; a
+systematically wrong-but-confident link would look identical in this profile. Also, the bridge is
+structurally silent on never-played persons, and it resolves only one side of each convergence
+pair — so it cannot by itself separate the historical convergence cases that motivated ISSUE-093.
+
+Why not **C**: the evidence is the opposite of inconsistent — one URL form, no ambiguity, no
+collisions.
+
+Why not **D**: no further *acquisition* experiment is needed. The remaining uncertainty is not
+about DraftGuru; it is about agreement with AFLDB, which is answered by reading AFLDB, not by
+crawling more pages.
+
+**Recommended next approved step: the bounded read-only `afldb_dev` reconciliation of §30.9** —
+pass the observed `(player_url → normalised afltables path)` pairs in as a `VALUES` list under the
+§30.4 safety envelope and return **aggregate categories only** (same / absent / contradicts /
+not-linked), with no name, id or `external_id` egress. That measures the false/contradictory rate,
+which is the one input the A/B/C/D decision still lacks.
+
+**HALTING for user review. Stage B2 is not started and is not self-approved; no importer work; no
+database command has been run.**
+
+### 31.17 FINAL B1 GATE — bounded read-only reconciliation: prepared, **awaiting user run**
+
+**File created:** `tools/rebuild/draftguru/reconcile_person_bridge.py` (new, ~200 lines). No other
+file changed. `psql` is not installed on this host, so the runner uses the project virtualenv
+(`.venv/Scripts/python.exe`, Python 3.12.10) with **psycopg 3.3.4**.
+
+**Question:** when AFLDB already holds enough identity evidence to compare a DraftGuru person with
+an AFL Tables identity, does the person-page bridge **agree**?
+
+**Input:** only the observed Stage B1 pairs `player_url → normalised AFL Tables path`, read offline
+from the accepted `parsed/person_profile.jsonl`. Verified offline before issuing: **120 pairs, 100
+with a bridge, 20 without**, every path of the `players/…` form. Matching is by `player_url` and by
+normalised path — **names are never used**.
+
+**Category definitions (frozen before the run):**
+
+| Category | Meaning |
+|---|---|
+| `same` | AFLDB holds an AFL Tables identity for this person and the observed bridge **matches it exactly** |
+| `contradicts` | AFLDB holds an AFL Tables identity and the observed bridge names a **different** one |
+| `absent` | the person is linked to a canonical player, but AFLDB holds **no** AFL Tables identity for that player — the bridge is **new information** |
+| `not_linked` | AFLDB knows this DraftGuru person but has no canonical player for it — nothing to compare |
+| `person_absent` | AFLDB has no `draft_persons` row for that `player_url` at all |
+| `no_bridge_observed_afldb_has_identity` | DraftGuru exposes no AFL Tables link, but AFLDB already holds one |
+| `no_bridge_observed` | DraftGuru exposes no link and AFLDB holds none either |
+
+Each category is additionally split by **provenance**, kept deliberately separate:
+`explicit_admin_decision` (a `player_link_resolutions` row of action `linked` or
+`confirmed_unlinked` exists for a `draft_picks` row of that person) versus `automatic_only`, plus
+the AFLDB `link_status`. **An old automatic link is reconciliation evidence, never identity truth**;
+nothing is replayed, repaired or modified.
+
+**Safety envelope (mirrors §30.4):** `AFLDB_OWNER_DATABASE_URL` parsed out of `.env` (never sourced,
+never printed); URL path hard-guarded to `/afldb_dev` and `afldb_test_pre_rebuild*` refused by name;
+`default_transaction_read_only=on` set at connect time; connection `read_only`,
+`REPEATABLE READ`; in-session verification of `current_database()`, `transaction_read_only`,
+`default_transaction_read_only` and isolation, each refusing on mismatch; exactly one SELECT, then
+`ROLLBACK`; **zero writes**; no legacy embedded store. **Egress is aggregate categories, provenance
+classes and counts only** — no canonical player id, player name, external id or row detail.
+
+**Exact command issued**
+
+```bash
+cd /d/dev/afldb && .venv/Scripts/python.exe tools/rebuild/draftguru/reconcile_person_bridge.py
+```
+
+#### Attempt 1 — **FAIL: implementation defect before any reconciliation result**
+
+```text
+UndefinedColumn: column "dg_id" does not exist
+LINE 36:     WHEN dg_id IS NULL
+```
+
+**This is a runner SQL defect, NOT evidence for or against the bridge.** No reconciliation result
+was produced, and none is recorded. The bridge measurements of §31.15 are unaffected.
+
+Safety behaved correctly up to the failure — the pre-query evidence was exactly as contracted:
+
+```text
+observed pairs: 120 persons, 100 with a bridge, 20 without
+db=afldb_dev  user=afldb_owner  txn_ro=on  default_ro=on  isolation=repeatable read
+```
+
+so the guards, the read-only envelope and the offline input load are all proven; only the final
+statement was malformed. Nothing was written and the transaction did not commit.
+
+**Root cause (proven by reading the query, not guessed):** the final `SELECT` of `RECONCILE_SQL`
+had **no `FROM j` clause**. The `j` CTE does define `dg_id` (`SELECT dp.id AS dg_id …` in `dg`,
+re-selected as `dg.dg_id` in `j`), but with no table in the outer `FROM`, every column reference in
+that `SELECT` is unresolvable; PostgreSQL reports the first one it reaches, `dg_id`, which made the
+error look like a scope/alias problem when it was a missing `FROM`.
+
+**Minimal fix applied — two edits, no semantic change:**
+
+1. added the missing `FROM j` between the outer select list and `GROUP BY 1, 2, 3`;
+2. hardened teardown: `conn.rollback()` now runs in a `finally` (itself wrapped so the close always
+   happens) so a failed SELECT — or a guard refusal — rolls back and closes the connection
+   deterministically rather than relying on the success path.
+
+Category definitions, provenance separation, the safety envelope, aggregate-only egress and the
+identity rules are all unchanged. The rest of the query was re-read line by line: `j` exposes
+`dg_id`, `player_id`, `link_status`, `observed_path`, `afldb_identities`, `exact_matches`,
+`admin_linked` and `admin_unlinked`, and every outer reference resolves against them.
+
+#### Attempt 2 — command reissued, **awaiting output**
+
+```bash
+cd /d/dev/afldb && .venv/Scripts/python.exe tools/rebuild/draftguru/reconcile_person_bridge.py
+```
+
+#### Attempt 2 — **PASS**
+
+Same command, after the `FROM j` repair. Pre-query evidence unchanged and correct
+(`120 persons, 100 with a bridge, 20 without`; `db=afldb_dev user=afldb_owner txn_ro=on
+default_ro=on isolation=repeatable read`), and the run ended `ROLLBACK completed — nothing was
+written.`
+
+**Reconciliation categories (aggregate only — no id, name or external_id was emitted)**
+
+| Category | Persons |
+|---|---:|
+| `same` | **33** |
+| `contradicts` | **0** (category not emitted) |
+| `absent` | **66** |
+| `not_linked` | **15** |
+| `no_bridge_observed_afldb_has_identity` | **4** |
+| `no_bridge_observed` | **2** |
+| **TOTAL** | **120** |
+
+**Headline: comparable 33 / agreement 33 / contradictions 0 → contradiction rate 0.00%;
+new information 66.**
+
+**Provenance breakdown (automatic history kept strictly separate from explicit decisions)**
+
+| Category | Provenance | `link_status` | Persons |
+|---|---|---|---:|
+| `same` | automatic_only | `unique` | 30 |
+| `same` | automatic_only | `resolved` | 3 |
+| `absent` | automatic_only | `unique` | 60 |
+| `absent` | automatic_only | `resolved` | 5 |
+| `absent` | explicit_admin_decision | `resolved` | 1 |
+| `no_bridge_observed` | explicit_admin_decision | `resolved` | 2 |
+| `no_bridge_observed_afldb_has_identity` | automatic_only | `unique` | 4 |
+| `not_linked` | automatic_only | `unmatched` | 14 |
+| `not_linked` | automatic_only | `implausible` | 1 |
+
+**Historical automatic links remain evidence only and must never be promoted to identity truth
+merely because they exist. Explicit human/admin decisions remain a distinct provenance class and
+must be preserved.**
+
+---
+
+## 32. STAGE B1 — **COMPLETE**. FINAL DECISION: **B**. (2026-08-26)
+
+### 32.1 Final recommendation — **B: the bridge is useful but incomplete**
+
+Use the person-page bridge **where present**, and require another deterministic path for the
+identities it does not cover. Rationale, entirely from measured evidence:
+
+1. **97.06% (66/68)** coverage over the exact residual population AFLDB lacks;
+2. all 100 observed bridges share one uniform form
+   `http://afltables.com/afl/stats/players/<A>/<Name>.html`;
+3. all 100 reduced identities are **distinct**;
+4. **0** malformed links, **0** multiple-candidate pages, **0** non-reducing real hosts, **0** parse
+   errors, **0** collisions, **0** failures, **0** redirects, **0** self-link disagreements;
+5. **every independently comparable bridge agreed: same 33, contradicts 0 — a 0.00% contradiction
+   rate**;
+6. the bridge contributes **66 AFL Tables identities AFLDB does not currently hold** for
+   already-linked canonical players;
+7. it is nevertheless incomplete: 20/120 expose no bridge, `zero_game_control` is 0/14, 15 sampled
+   persons are linked to no canonical player, and **every convergence pair is bridged on one side
+   only** — so the bridge cannot independently resolve every DraftGuru person.
+
+### 32.2 What Stage B1 **DID** prove
+
+- DraftGuru person pages carry a **deterministic** `player_url → AFL Tables identity` bridge where
+  a link is present, in a single uniform URL form that reduces under the **existing**
+  `normalise_profile_url()` canonicaliser without broadening it;
+- the bridge is **highly available for people who actually played AFL football** — of the 96 sampled
+  persons DraftGuru reports with games > 0, **96 carry a bridge and 0 do not**;
+- **66 of the 68** historical residual DraftGuru persons gain the external identity AFLDB is missing;
+- **every** case that could be checked against an identity AFLDB already holds **agreed** (33/33,
+  0.00% contradiction);
+- **no ambiguity, no collision and no contradiction was observed anywhere** in the 120-person sample.
+
+### 32.3 What Stage B1 **DID NOT** prove
+
+- **not** complete identity for every DraftGuru person (20/120 expose nothing);
+- **not** identity for never-played draftees (`zero_game_control` 0/14) — AFL Tables has no profile
+  for a person who never played, so absence here is semantically correct and permanent;
+- **not** identity for the no-link side of any historical convergence pair;
+- **not** the correctness of historical automatic DraftGuru links **as a class** — the 33 agreements
+  are a bounded sample, and `absent`/`not_linked` cases were never independently verified;
+- **not** permission to replay old automatic links — they remain audit/reconciliation evidence that
+  must be independently re-earned;
+- **not** permission to implement or import anything. No importer, no migration, no write.
+
+### 32.4 Preserved accepted artifacts and hashes (authoritative)
+
+| Artifact | Value |
+|---|---|
+| Stage A manifest | `docs/rebuild-manifests/draftguru/annual-html-20260826.json` |
+| Stage A manifest sha256 | `d06bf6be358663ad3c44a56066c9096fbc4bdf4760349ed181a642476d374652` |
+| Stage B1 manifest | `docs/rebuild-manifests/draftguru/person-html-20260826.json` |
+| Stage B1 manifest sha256 | `bca69a59b1492ae81c180119789bf2fd751e3888945fa325f51955b0b1bf43a7` |
+| Frozen sample | `data/sources/draftguru/person-html-20260826/sample.json` |
+| Sample sha256 | `d8d743fbcfca39a4c9e708a1198c7e34592270d32628d4fc0003aea88068db28` |
+| Residual census sha256 | `df6c9a7559bceb649e8e28e457fbe91d3351d8c1737a9042f233b1f1e3c5e841` (68 lines, 3,580 bytes) |
+| `parsed/person_profile.jsonl` sha256 | `2a40399a9e5d74765c9a134b68743a319d0c20655b25d753a3c48cb68825aca2` (120 records) |
+| `parsed/afltables_link_profile.json` sha256 | `d608e6f2291bba5d9c2cb0308d15674be7db81ed8145fbffa688f7113ef3ed60` |
+| robots.txt sha256 | `d3bdd06996b60f3806e7ebe732d8c12951b9a4b640706bbbfb77d258a695413b` |
+| Acquisition window | `2026-08-26T09:20:10Z` → `09:23:12Z` |
+| Test baseline | `tests/draftguru-acquisition.test.ts` **87/87 PASS** |
+
+### 32.5 Files created/changed across the Stage B1 execution sessions
+
+```text
+tools/rebuild/draftguru/stage_b1_sample.py            (new)
+tools/rebuild/draftguru/acquire_persons.py            (new)
+tools/rebuild/draftguru/profile_person_pages.py       (new)
+tools/rebuild/draftguru/reconcile_person_bridge.py    (new)
+tools/rebuild/draftguru/draftguru-contract.json       (additive person_stage block only)
+tests/draftguru-acquisition.test.ts                   (Stage B1 cases appended; 34 Stage A tests untouched)
+tests/fixtures/draftguru/person_brad_miller_1_real_excerpt.html   (new, trimmed real source)
+tests/fixtures/draftguru/person_brad_miller_2_real_excerpt.html   (new, trimmed real source)
+docs/rebuild-manifests/draftguru/person-html-20260826.json        (new accepted B1 manifest)
+AFLDB-ISSUE-093-DRAFTGURU-ACQUISITION-HANDOFF.md      (§31, §32)
+AFLDB-ISSUE-093-DRAFTGURU-B2-HANDOFF.md               (new planning handoff)
+```
+
+Stage A remains untouched and read-only throughout. No Git command was run by the agent.
+`IssuesIndex.md` and `CHANGELOG.md` remain deferred per §28.
+
+### 32.6 Phase boundary
+
+**Stage B1 is COMPLETE.** Continuation is planning-only and moves to
+`AFLDB-ISSUE-093-DRAFTGURU-B2-HANDOFF.md`. Stage B2 is **not** approved, not started, and must not
+be self-approved.
