@@ -10,6 +10,7 @@ import type {
   NlAnswer, NlClubSeasonRow, NlHeadToHeadRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
   NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '@/search/nl/answer-types';
+import { getQualifyingMatchesHref } from '@/search/nl/qualifying-matches-href';
 
 /**
  * Renders a natural-language answer at the top of /search: a lead-result
@@ -80,7 +81,7 @@ function renderPayload(answer: NlAnswer) {
     case 'team_match':
       return <TeamMatchTable rows={payload.rows} total={payload.total} />;
     case 'team_aggregate':
-      return <TeamAggregateTable rows={payload.rows} total={payload.total} />;
+      return <TeamAggregateTable rows={payload.rows} total={payload.total} planToken={answer.planToken} />;
     case 'head_to_head':
       return <HeadToHeadTable row={payload.row} />;
     case 'team_streak':
@@ -155,7 +156,7 @@ function HeadToHeadTable({ row }: { row: NlHeadToHeadRow | null }) {
   );
 }
 
-function TeamAggregateTable({ rows, total }: { rows: NlTeamAggregateRow[]; total: number }) {
+export function TeamAggregateTable({ rows, total, planToken }: { rows: NlTeamAggregateRow[]; total: number; planToken?: string | null }) {
   if (rows.length === 0) return null;
   return (
     <>
@@ -169,12 +170,21 @@ function TeamAggregateTable({ rows, total }: { rows: NlTeamAggregateRow[]; total
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.organizationId}>
-                  <td className="wide"><Link href={clubPath(r.clubSlug)}>{r.clubName}</Link></td>
-                  <td className="num">{formatNumber(r.value)}</td>
-                </tr>
-              ))}
+              {rows.map((r) => {
+                const href = getQualifyingMatchesHref(planToken, r.clubSlug);
+                return (
+                  <tr key={r.organizationId}>
+                    <td className="wide"><Link href={clubPath(r.clubSlug)}>{r.clubName}</Link></td>
+                    <td className="num">
+                      {href ? (
+                        <Link href={href}>{formatNumber(r.value)}</Link>
+                      ) : (
+                        formatNumber(r.value)
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
