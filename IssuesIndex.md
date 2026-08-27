@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-27
-**Open issues:** 13
+**Open issues:** 11
 
 ## How Claude should use this file
 
@@ -26,7 +26,6 @@
 |---|---|---|---|
 | `AFLDB-ISSUE-059` | Low | Search | Grouped qualifying-match counts are plain text because current Match Search cannot replay every grouped predicate. |
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | React #418 remains intermittent under production-style NL search hydration; narrow H7 diagnostic is awaiting authoritative live-build validation. |
-| `AFLDB-ISSUE-071` | Low | Audit | V2 residual failures require generator/oracle re-baselining before any remaining parser defect is promoted. |
 | `AFLDB-ISSUE-076` | Medium | Performance | `won_final_at_venue` Grid Solver combinations can exceed the 5-second PostgreSQL statement timeout and crash the rendered page. |
 | `AFLDB-ISSUE-077` | Medium | UI/Settings | The saved super-admin frontend theme can change between pages during the same browsing session. |
 | `AFLDB-ISSUE-083` | Medium | Tests / Database privileges | Importers are tested as `afldb_owner` but run as `afldb_import`, so missing-grant defects pass CI and fail in production. |
@@ -75,14 +74,6 @@
   8. If the run is 0/118, repeat the exact 118-row discriminator before accepting H7.
 - **Do not mark resolved yet.**
 - **Do not add a changelog entry merely for the end-of-day diagnostic status.**
-
-## AFLDB-ISSUE-071 — Parser-v25 V2 stress residual failure classification
-
-- **Severity:** Low
-- **Area:** Audit
-- **Key files:** `tools/nl/v2-runner.ts`; report `/home/arm/nl-stress-out-codex-v25-v2/report.md`
-- **Current state:** The 250k V2 run had 20,000/20,000 verified football answers correct, 24,393/24,393 expected declines safe, zero unsafe answers, and 6,788/6,788 metamorphic groups consistent. Residual hard/soft findings are dominated by known corpus/oracle-policy tension, with smaller numeric-condition clusters requiring review.
-- **Next action:** Re-baseline the V2 generator/oracles for season-range sum expectations, historical coverage policy, wrong-decline-reason expectations, and numeric-condition operator contradictions. Promote a product defect only after the oracle layer is reconciled.
 
 ## AFLDB-ISSUE-076 — Grid Solver `won_final_at_venue` queries can hit statement timeout
 

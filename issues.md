@@ -7,13 +7,12 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 12
+**Open issues:** 11
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
 | `AFLDB-ISSUE-059` | Low | Search | Grouped `Qualifying matches` counts have no safe drill-down to the exact matching fixtures. | Extend Match Search or add a dedicated NL drill-down route that can faithfully replay the grouped row predicates. |
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
-| `AFLDB-ISSUE-071` | Low | Audit | Parser-v25 V2 residual failures still mix corpus/oracle debt with possible smaller parser follow-up. | Re-baseline V2 generator/oracles first; promote a product defect only after the oracle layer is reconciled. |
 | `AFLDB-ISSUE-076` | Medium | Performance | Grid Solver combinations using `won_final_at_venue` can exceed PostgreSQL's 5-second statement timeout and crash the page. | Capture and compare the generated SQL/EXPLAIN plan against `played_at_venue`, then optimise the `won_final_at_venue` query shape without raising the application timeout. |
 | `AFLDB-ISSUE-077` | Medium | UI/Settings | The super-admin-selected frontend theme is not stable within a browsing session; different pages can render different themes as the user navigates. | Trace every theme source (database setting, server render, cookie/local storage and client hydration), establish one authoritative theme value per request/session, and add navigation regression coverage. |
 | `AFLDB-ISSUE-083` | Medium | Tests / Database privileges | Every database-backed importer test substitutes the owner DSN for `AFLDB_IMPORT_DATABASE_URL`, so a privilege the importer needs but does not hold is invisible; `AFLDB-ISSUE-078` shipped exactly that defect. | Add a restricted test DSN plus a shared helper that runs the importer as `afldb_import` while fixtures stay on the owner handle, and prove it on the first-kick-goal loader first. |
@@ -3260,13 +3259,13 @@ Regenerate or re-baseline the 12k corpus oracles separately from NL semantic fix
 
 ## AFLDB-ISSUE-071 - Parser-v25 V2 stress residual failure classification
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Low
 - **Area:** Audit
 - **Found:** 2026-08-21
-- **Resolved:** N/A
+- **Resolved:** 2026-08-27
 - **Queries:** `record tackles since 2010`, `most bounces in the 1960s`, `players with 3+ goals and exactly 3 clubs`
-- **Files:** `tools/nl/v2-runner.ts`, `/home/arm/nl-stress-out-codex-v25-v2/report.md`
+- **Files:** `AFLDB-ISSUE-071.md`, `tools/nl/v2.ts`, `tools/nl/v2-runner.ts`, `tools/nl/README.md`, `tests/nl-stress-v2.test.ts`, `/home/arm/nl-stress-out-codex-v25-v2/report.md`
 
 ### Symptom
 The full 250,000-row V2 qualification corpus completed against parser version 25 with residual hard and soft findings even though verified football-answer rows and expected-decline safety rows passed.
@@ -3291,19 +3290,19 @@ Headline V2 report:
 - Soft classes: expected-plan historical coverage declines (2,169 rows) and wrong decline reason classifications (3,094 rows).
 
 ### First wrong layer
-Generated corpus/oracle classification, with possible parser follow-up for the remaining numeric-condition clusters.
+Generated corpus/oracle classification. No current production parser defect is proven.
 
 ### Root cause
-Not yet fully classified. The largest clusters match known oracle/policy tension: generated range rows expect `player_game` sum semantics where AFLDB intentionally routes named season/range leaderboards to `player_season`, and historical stat rows expect answerable plans where coverage correctly declines. The smaller numeric-condition clusters need separate generator/oracle review because the report shows expectations such as `3+ goals and exactly 3 clubs` disagreeing with the actual English operators.
+The residual set mixed four different contracts. The 6,643 season/range rows carry stale `player_game` sum expectations; current `NL-025` regressions and verified-answer evidence establish `player_season` unless the reader explicitly asks for a total. The 2,169 historical rows expect plans where typed coverage validation correctly declines a wholly unrecorded era. The 3,094 decline rows over-specify a reason even though the parser remains safely declining. The 537 numeric-condition findings expose a V2 oracle blind spot: `oracleDefect()` associated operators by numeric value only, so same-valued clauses such as `3+ goals and exactly 3 clubs` could swap the two operators in `expected_semantics_json` without being quarantined.
 
 ### Fix
-No application fix made for this classification entry. Parser version 25 was separately fixed under `AFLDB-ISSUE-066`.
+No application parser/plan fix was made. The V2 oracle now associates explicit operators and values with the finite generated condition noun that follows them, so known same-valued clauses cannot exchange operators invisibly. Unknown nouns retain conservative checking. Focused oracle regressions cover the exact ISSUE-071 swap and a correct same-valued control. Harness documentation now states accurately that `--report-only` is V1-only. Parser version remains 25.
 
 ### Validation
-The full V2 run completed in 5m10s against `afldb_dev`, parser version 25, concurrency 6. Report path: `/home/arm/nl-stress-out-codex-v25-v2/report.md`.
+Historical evidence remains the completed 5m10s V2 run against `afldb_dev`, parser version 25, concurrency 6, at `/home/arm/nl-stress-out-codex-v25-v2/report.md`. Current DB-free source/test inspection proves the four-category classification and the same-value oracle blind spot. Direct Node 22 execution of the actual `tools/nl/v2.ts` module passed 11/11 oracle-contract assertions, including the exact swapped/correct ISSUE-071 pair and `toV2Case()` quarantine attachment. Final user-run validation on 2026-08-27 passed all 3 focused files and 382/382 tests in 447 ms: `nl-stress-v2` 58/58, `nl-regression-corpus` 163/163, and `nl-parser` 161/161. No PostgreSQL or browser was involved.
 
 ### Follow-up
-Review and re-baseline the V2 generator/oracles for season-range sum expectations, historical coverage policy, wrong-decline-reason expectations, and numeric-condition operator contradictions. Only promote any remaining product defect after the oracle layer is reconciled.
+Resolved. The focused suite is the correctness proof for this oracle-only defect: it directly covers field-aware same-value quarantine plus the current parser/regression contracts. Re-running the external 250k corpus is optional follow-up measurement to refresh aggregate counts and enumerate stale decline-reason rows; it is not required to prove the fixed invariant. If performed, retain the established classifications: season/range rows use `player_season` unless explicitly totalled, wholly unavailable historical rows remain policy declines, stale decline reasons must never be converted into false answers, and contradictory numeric expectations remain reported in `corpus-defects.jsonl` rather than scored. No database-backed acceptance is required for this resolution.
 
 ## AFLDB-ISSUE-072 — site-settings default-shape test is stale after frontendTheme
 

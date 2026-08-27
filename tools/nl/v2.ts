@@ -187,13 +187,43 @@ const STATED_OPERATOR_PHRASES: [RegExp, string][] = [
   [/\b(\d+)\+/g, 'gte'],
 ];
 
-/** Every (operator, value) pair the question states in plain English. */
-function statedOperators(question: string): { op: string; value: number }[] {
-  const found: { op: string; value: number }[] = [];
+/**
+ * The finite condition nouns emitted by the V2 numeric-condition
+ * generator. This intentionally does not reuse CAREER_STAT_WORDS from the
+ * production parser: the oracle needs an independent, simpler reader or a
+ * parser vocabulary bug could excuse a bad expectation.
+ */
+const STATED_CONDITION_COLUMNS: [RegExp, string][] = [
+  [/^\s*brownlow\s+medals?\b/, 'brownlow_medals'],
+  [/^\s*brownlow\s+votes?\b/, 'brownlow_votes'],
+  [/^\s*(?:premierships?|flags?)\b/, 'premierships'],
+  [/^\s*finals?\b/, 'finals'],
+  [/^\s*clubs?\b/, 'clubs_played'],
+  [/^\s*goals?\b/, 'goals'],
+  [/^\s*games?\b/, 'games'],
+  [/^\s*wins?\b/, 'wins'],
+  [/^\s*losses?\b/, 'losses'],
+  [/^\s*draws?\b/, 'draws'],
+];
+
+function statedColumnAfter(question: string, offset: number): string | undefined {
+  const tail = question.slice(offset);
+  return STATED_CONDITION_COLUMNS.find(([re]) => re.test(tail))?.[1];
+}
+
+/** Every (operator, value, condition column) tuple stated in plain English. */
+function statedOperators(question: string): { op: string; value: number; column?: string }[] {
+  const found: { op: string; value: number; column?: string }[] = [];
   for (const [re, op] of STATED_OPERATOR_PHRASES) {
     re.lastIndex = 0;
     let match: RegExpExecArray | null;
-    while ((match = re.exec(question)) !== null) found.push({ op, value: Number(match[1]) });
+    while ((match = re.exec(question)) !== null) {
+      found.push({
+        op,
+        value: Number(match[1]),
+        column: statedColumnAfter(question, match.index + match[0].length),
+      });
+    }
   }
   return found;
 }
@@ -203,19 +233,19 @@ function statedOperators(question: string): { op: string; value: number }[] {
  * when it does not.
  *
  * A corpus is only an oracle while it agrees with itself. The 250k
- * generator emitted 4,421 numeric-condition rows whose surface text says
- * "exactly 300" and whose expectation asserts `gt 300` -- rows a correct
- * parser must fail and an incorrect one could pass. Scoring them rewards
- * wrong parsing, so they are quarantined.
+ * generator emitted thousands of numeric-condition rows whose surface
+ * text says "exactly 300" and whose expectation asserts `gt 300` -- rows
+ * a correct parser must fail and an incorrect one could pass. Scoring
+ * them rewards wrong parsing, so they are quarantined.
  *
  * Two deliberate conservatism rules, both erring toward NOT quarantining:
  *
  *  - A value the question states no operator for is unjudgeable, and is
  *    skipped rather than assumed.
- *  - A value stated with several operators ("at least 5 finals and at
- *    most 5 goals" both state 5) counts as agreeing with any of them. So
- *    a corpus that swapped two same-valued clauses is invisible here, and
- *    the count this produces is a floor, not a total.
+ *  - If a condition noun is outside the finite generator vocabulary and
+ *    its value is stated with several different operators, it is skipped
+ *    rather than guessed. Known nouns are associated with their own
+ *    clause, so same-valued clauses cannot exchange operators invisibly.
  */
 export function oracleDefect(v2Case: V2Case): string | null {
   const conditions = v2Case.expectedSemantics?.careerConditions;
@@ -225,12 +255,28 @@ export function oracleDefect(v2Case: V2Case): string | null {
   if (stated.length === 0) return null;
 
   for (const condition of conditions) {
+    const field = condition.column ?? condition.awardKey;
+    const sameFieldValue = field === undefined
+      ? []
+      : stated.filter((s) => s.column === field && s.value === condition.value);
+    if (sameFieldValue.length > 0) {
+      if (sameFieldValue.some((s) => s.op === condition.op)) continue;
+      const says = [...new Set(sameFieldValue.map((s) => s.op))].join('/');
+      return `question states ${field} ${says} ${condition.value}, expectation asserts `
+        + `${field} ${condition.op} ${condition.value}`;
+    }
+
     const sameValue = stated.filter((s) => s.value === condition.value);
     if (sameValue.length === 0) continue;
+    // Legacy value-only comparison remains useful for a generator noun
+    // this narrow reader does not know, but only when the question gives
+    // that value one unambiguous operator. Otherwise do not guess which
+    // clause belongs to the expected condition.
+    if (new Set(sameValue.map((s) => s.op)).size > 1) continue;
     if (sameValue.some((s) => s.op === condition.op)) continue;
     const says = [...new Set(sameValue.map((s) => s.op))].join('/');
     return `question states ${says} ${condition.value}, expectation asserts `
-      + `${condition.column ?? condition.awardKey ?? '?'} ${condition.op} ${condition.value}`;
+      + `${field ?? '?'} ${condition.op} ${condition.value}`;
   }
   return null;
 }

@@ -600,12 +600,30 @@ describe('oracleDefect', () => {
     ]))).toBeNull();
   });
 
-  // Conservatism rule 2: same-valued clauses are invisible to it, which
-  // is why the reported count is documented as a floor, not a total.
-  it('cannot see a swap between two same-valued clauses', () => {
+  it('flags swapped operators between two same-valued clauses', () => {
     expect(oracleDefect(withConditions('players with at least 5 finals and at most 5 goals', [
       { kind: 'column', column: 'finals', op: 'lte', value: 5 },
       { kind: 'column', column: 'goals', op: 'gte', value: 5 },
+    ]))).toMatch(/finals gte 5.*finals lte 5/);
+  });
+
+  it('accepts correctly associated operators on same-valued clauses', () => {
+    expect(oracleDefect(withConditions('players with 3+ goals and exactly 3 clubs', [
+      { kind: 'column', column: 'goals', op: 'gte', value: 3 },
+      { kind: 'column', column: 'clubs_played', op: 'eq', value: 3 },
+    ]))).toBeNull();
+  });
+
+  it('flags the ISSUE-071 same-valued generated-oracle swap', () => {
+    expect(oracleDefect(withConditions('players with 3+ goals and exactly 3 clubs', [
+      { kind: 'column', column: 'goals', op: 'eq', value: 3 },
+      { kind: 'column', column: 'clubs_played', op: 'gte', value: 3 },
+    ]))).toMatch(/goals gte 3.*goals eq 3/);
+  });
+
+  it('does not guess between same-valued clauses outside its finite noun vocabulary', () => {
+    expect(oracleDefect(withConditions('players with at least 5 awards and at most 5 honours', [
+      { kind: 'column', column: 'games', op: 'lt', value: 5 },
     ]))).toBeNull();
   });
 

@@ -65,6 +65,11 @@ commit.
 - **The proof was refusing because of its own observer connection.** After the incident fixes, the hardened proof failed twice with "1 other client session(s) connected to `afldb_test`" while a standalone `pg_stat_activity` check saw none. The CLI held a single postgres.js connection open across the entire proof, so the psql process counted it as another client backend; the Node-side gate could not see itself. The proof now runs in three phases — observation session opened and closed, then psql alone, then a fresh session for the post-rollback fingerprint — and its dependency interface exposes a scoped `withSession` rather than a connection handle, so nothing can span the reset. The exclusivity gate itself is unchanged and no session is exempted by name, PID or role.
 - 96 new DB-free tests in `tests/db-test-rebuild.test.ts` cover execution-path parity (including a test that drives both callers through one recorded spawn and asserts identical argv), psql availability, every refusal, the absence of a commit path, and the proof's inability to continue into migrations, privileges, importers or the derived rebuild.
 - No database was created, modified or destroyed by this change, and no rebuild has been executed.
+### AFLDB-ISSUE-071 — V2 numeric-condition oracle keeps operators with their clauses - 27 August 2026
+
+- Corrected the V2 corpus-oracle checker so explicit numeric operators are associated with their generated condition noun, preventing same-valued clauses such as `3+ goals and exactly 3 clubs` from exchanging operators invisibly and being reported as parser `DROPPED_FILTER`/`EXTRA_FILTER` defects.
+- Added focused harness regressions for the stale swapped expectation and a correct same-valued control. Production NL parser, typed plan, confidence, coverage, and decline behaviour are unchanged; parser version remains 25.
+- Corrected the NL stress documentation to state that the existing DB-free `--report-only` mode is V1-only. Final DB-free validation passed 3/3 focused files and 382/382 tests (`nl-stress-v2` 58/58, `nl-regression-corpus` 163/163, `nl-parser` 161/161). The unavailable historical 250k rerun is optional aggregate rebaseline measurement, not a correctness or resolution blocker.
 
 ### AFLDB-ISSUE-091 — Migration checksums are deterministic across LF/CRLF checkouts - 25 August 2026
 
