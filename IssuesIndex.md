@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-27
-**Open issues:** 10
+**Open issues:** 9
 
 ## How Claude should use this file
 
@@ -27,7 +27,6 @@
 | `AFLDB-ISSUE-059` | Low | Search | Grouped qualifying-match counts are plain text because current Match Search cannot replay every grouped predicate. |
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | React #418 remains intermittent under production-style NL search hydration; narrow H7 diagnostic is awaiting authoritative live-build validation. |
 | `AFLDB-ISSUE-076` | Medium | Performance | `won_final_at_venue` Grid Solver combinations can exceed the 5-second PostgreSQL statement timeout and crash the rendered page. |
-| `AFLDB-ISSUE-083` | Medium | Tests / Database privileges | Importers are tested as `afldb_owner` but run as `afldb_import`, so missing-grant defects pass CI and fail in production. |
 | `AFLDB-ISSUE-085` | Low | Data integrity / Import | `import_captaincies` reconciles its whole table with no ownership predicate — the ISSUE-080 defect class, latent because the importer is today the only writer. |
 | `AFLDB-ISSUE-086` | Needs triage | Admin / Data integrity | Data-editor edits to source-owned rows can be silently reverted by the owning source's next reload; severity awaits the four-question triage recorded in the entry. |
 | `AFLDB-ISSUE-088` | Low | Tests / Tooling | NL-UI stress harness has no `actionTimeout`/`globalTimeout` policy and retains latent unbounded auto-wait sites; hardening deliberately deferred until the D4 timing evidence can set values. |
@@ -93,36 +92,6 @@
 - **Next action:** Trace every `frontendTheme` authority and cache boundary (database, admin mutation/revalidation, SSR layout, cookie/local storage, hydration), reduce them to one authoritative resolved theme, then add browser coverage that navigates across multiple routes and proves the theme remains unchanged until a super admin deliberately changes it.
 
 
-
-## AFLDB-ISSUE-083 — Importers are tested as `afldb_owner`, so missing-grant defects are invisible
-
-- **Severity:** Medium
-- **Area:** Tests / Database privileges
-- **Key files:** `tests/integration/first-kick-goal-reload-links.test.ts`,
-  `draftguru-import.test.ts`, `awards-reload-links.test.ts`,
-  `data-editor.test.ts`, `privileges.test.ts`, `tests/setup.ts`, `.env.example`,
-  `tools/maintenance/privileges.sql`
-  (`draft-reload-links.test.ts` was retired with the legacy draft importer by
-  AFLDB-ISSUE-093 Stage B2-7; its successor `draftguru-import.test.ts` has the
-  identical owner-DSN substitution and so carries the same gap.)
-- **Current state:** **Being handled SEPARATELY by Codex as of 2026-08-27; that work is
-  NOT yet integrated into this working tree.** Do not absorb it into ISSUE-093, which is
-  Resolved (2026-08-27) and is **no longer waiting on this issue** — the clean rebuild ran its
-  data stages under the restricted `afldb_import` role with `AFLDB_TEST_IMPORT_DATABASE_URL`
-  set by the operator. `tools/db/rebuild-test.ts` still fails closed while that variable is
-  unset rather than silently substituting owner access.
-  Investigation complete, nothing implemented here. Every
-  database-backed importer test assigns the owner test DSN to
-  `AFLDB_IMPORT_DATABASE_URL`, so no test ever connects as the role the
-  importers actually run as. `privileges.test.ts` asserts confinement (the roles
-  hold no more than intended) and cannot assert sufficiency. `AFLDB-ISSUE-078`
-  shipped a real instance: 13 green tests over an importer whose retirement
-  preflight read two tables `afldb_import` had no privilege on.
-- **Next action:** Add a restricted test DSN (skipped, not failed, when absent)
-  and a shared helper that runs the importer as a child process under it while
-  fixture setup stays on the owner `sql` handle; prove it on the first-kick-goal
-  loader, whose exact requirements are already known. Do not re-run the existing
-  integration suite as `afldb_import`.
 
 ## AFLDB-ISSUE-085 — `import_captaincies` reconciles an unscoped population with no ownership predicate
 

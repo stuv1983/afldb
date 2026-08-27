@@ -4,14 +4,25 @@ import postgres from 'postgres';
 import { sql } from '@/db/client';
 import { saveMatchSheet } from '@/db/queries/match-sheet';
 import { recomputeClubSeasons } from '@/db/queries/player-derived';
+import { createImportRoleParityHarness } from './import-role-parity';
 
 // Ensure saveMatchSheet uses the test database.
 process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
+const importRole = createImportRoleParityHarness(
+  process.env.AFLDB_TEST_DATABASE_URL,
+  process.env.AFLDB_TEST_IMPORT_DATABASE_URL,
+);
+const roleParitySuffix = importRole.isConfigured ? '' : ` — ${importRole.skipMessage}`;
 
 // The required data_edits audit commits inside the mutation transaction
 // (AFLDB-ISSUE-027), so committing tests need a real auth_users row in
 // THIS database for the admin_user_id foreign key.
-const TEST_NOTES = ['test mutation', 'restore', 'issue-027 atomic audit test'];
+const TEST_NOTES = [
+  'test mutation',
+  'restore',
+  'issue-027 atomic audit test',
+  'issue-083 restricted import-role audit proof',
+];
 let adminUserId = 0;
 let createdThrowawayAdmin = false;
 
@@ -216,6 +227,58 @@ describe('Atomic required audit (AFLDB-ISSUE-027)', () => {
     expect(orphans).toHaveLength(0);
   });
 });
+
+describe.skipIf(!importRole.isConfigured)(
+  `Atomic required audit role parity (AFLDB-ISSUE-083)${roleParitySuffix}`,
+  () => {
+    beforeAll(() => importRole.validate());
+
+    it('commits the production match-sheet and migration-066 audit path as afldb_import', async () => {
+      const [stat] = await sql<{
+        matchId: number;
+        playerId: number;
+        clubId: number;
+        kicks: number | null;
+        jumperNumber: string | null;
+      }[]>`
+        SELECT match_id AS "matchId", player_id AS "playerId", club_id AS "clubId",
+               kicks, jumper_number AS "jumperNumber"
+          FROM player_match_stats
+         ORDER BY match_id, player_id
+         LIMIT 1
+      `;
+      expect(stat).toBeDefined();
+
+      const note = 'issue-083 restricted import-role audit proof';
+      const result = await importRole.withImportDsn(() => saveMatchSheet({
+        matchId: stat.matchId,
+        syncMatchScores: false,
+        players: [{
+          playerId: stat.playerId,
+          clubId: stat.clubId,
+          jumperNumber: stat.jumperNumber ?? undefined,
+          kicks: stat.kicks,
+        }],
+        adminUserId,
+        note,
+      }));
+      expect(result).toMatchObject({ ok: true });
+
+      const [audit] = await sql<{ id: number }[]>`
+        SELECT id FROM data_edits
+         WHERE admin_user_id = ${adminUserId}
+           AND table_name = 'matches'
+           AND row_id = ${stat.matchId}
+           AND field_group = 'match_sheet'
+           AND note = ${note}
+         ORDER BY id DESC
+         LIMIT 1
+      `;
+      expect(audit).toBeDefined();
+      await sql`DELETE FROM data_edits WHERE id = ${audit.id}`;
+    });
+  },
+);
 
 describe('Targeted club_seasons rebuild (AFLDB-ISSUE-015)', () => {
   const importSql = postgres(process.env.AFLDB_TEST_DATABASE_URL!, { max: 1, onnotice: () => {} });

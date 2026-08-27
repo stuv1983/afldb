@@ -1,6 +1,6 @@
 import './guard';
 
-import { spawnSync } from 'node:child_process';
+import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,6 +10,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { sql } from '@/db/client';
 
 import { lockBirthDateEnrichment, unlockBirthDateEnrichment } from './draft-lock';
+import { createImportRoleParityHarness } from './import-role-parity';
 
 /**
  * AFLDB-ISSUE-090 — DOB enrichment conflict writes are not pass-scoped or
@@ -47,7 +48,12 @@ function hasPsycopg(): boolean {
   const probe = spawnSync(python, ['-c', 'import psycopg'], { encoding: 'utf8' });
   return !probe.error && probe.status === 0;
 }
-const canRun = hasPsycopg();
+const importRole = createImportRoleParityHarness(
+  integrationDsn,
+  process.env.AFLDB_TEST_IMPORT_DATABASE_URL,
+);
+const canRun = hasPsycopg() && importRole.isConfigured;
+const roleParitySuffix = importRole.isConfigured ? '' : ` — ${importRole.skipMessage}`;
 
 // ---------------------------------------------------------------------
 // Migration 072: exercised by re-executing verbatim slices of the real
@@ -173,7 +179,7 @@ function writeClubListCsv(dir: string, fileName: string, rows: string[]): void {
   writeFileSync(join(dir, fileName), [CSV_HEADER, ...rows].join('\n') + '\n', 'utf8');
 }
 
-function expectSuccess(result: ReturnType<typeof spawnSync>, label: string): void {
+function expectSuccess(result: SpawnSyncReturns<string>, label: string): void {
   if (result.status !== 0) {
     throw new Error(
       `${label} exited ${String(result.status)}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
@@ -181,11 +187,11 @@ function expectSuccess(result: ReturnType<typeof spawnSync>, label: string): voi
   }
 }
 
-function runClubList(csvDir: string): ReturnType<typeof spawnSync> {
-  return spawnSync(
+function runClubList(csvDir: string): SpawnSyncReturns<string> {
+  return importRole.spawn(
     python,
     ['tools/migration/enrich_birth_dates_from_club_lists.py', '--quiet', '--csv-dir', csvDir],
-    { cwd: root, encoding: 'utf8', env: { ...process.env, AFLDB_IMPORT_DATABASE_URL: integrationDsn } },
+    { cwd: root },
   );
 }
 
@@ -224,14 +230,14 @@ let fixtureSourceId = 0;
 function runRegister(
   sqlitePath: string,
   extraArgs: string[] = [],
-): ReturnType<typeof spawnSync> {
-  return spawnSync(
+): SpawnSyncReturns<string> {
+  return importRole.spawn(
     python,
     ['tools/migration/enrich_birth_dates.py', '--quiet',
       '--source-key', FIXTURE_SOURCE_KEY, ...extraArgs],
     {
-      cwd: root, encoding: 'utf8',
-      env: { ...process.env, AFLDB_IMPORT_DATABASE_URL: integrationDsn, AFLDB_LEGACY_SQLITE: sqlitePath },
+      cwd: root,
+      env: { AFLDB_LEGACY_SQLITE: sqlitePath },
     },
   );
 }
@@ -275,7 +281,9 @@ async function cleanupIssue090Fixtures(): Promise<void> {
   }
 }
 
-describe.skipIf(!canRun)('DOB enrichment issue reconciliation (AFLDB-ISSUE-090)', () => {
+describe.skipIf(!canRun)(
+  `DOB enrichment issue reconciliation (AFLDB-ISSUE-090)${roleParitySuffix}`,
+  () => {
   let issueSnapshot: Array<{
     id: number; entityType: string; entityId: number | null; issueType: string;
     severity: string; description: string; details: unknown; detectedAt: string;
@@ -288,6 +296,7 @@ describe.skipIf(!canRun)('DOB enrichment issue reconciliation (AFLDB-ISSUE-090)'
   }> = [];
 
   beforeAll(async () => {
+    await importRole.validate();
     await lockBirthDateEnrichment(integrationDsn);
 
     // §5.1: dedicated fixture source, seeded idempotently at runtime (not
@@ -1127,4 +1136,5 @@ describe.skipIf(!canRun)('DOB enrichment issue reconciliation (AFLDB-ISSUE-090)'
       expect(row.n).toBe(0);
     });
   });
-});
+  },
+);

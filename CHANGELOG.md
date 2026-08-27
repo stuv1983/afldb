@@ -71,6 +71,45 @@ commit.
 - Added focused harness regressions for the stale swapped expectation and a correct same-valued control. Production NL parser, typed plan, confidence, coverage, and decline behaviour are unchanged; parser version remains 25.
 - Corrected the NL stress documentation to state that the existing DB-free `--report-only` mode is V1-only. Final DB-free validation passed 3/3 focused files and 382/382 tests (`nl-stress-v2` 58/58, `nl-regression-corpus` 163/163, `nl-parser` 161/161). The unavailable historical 250k rerun is optional aggregate rebaseline measurement, not a correctness or resolution blocker.
 
+### AFLDB-ISSUE-083 — Importer tests enforce production-role parity - 27 August 2026
+
+- Added the optional `AFLDB_TEST_IMPORT_DATABASE_URL` contract and a shared,
+  fail-closed integration harness that verifies the restricted credential uses
+  the same `_test` database as owner fixtures, authenticates as `afldb_import`,
+  and remains denied DELETE authority over `auth_users`.
+- Supported Under-22 awards, first-kick-goal and DOB-enrichment production
+  importer children now run with the restricted credential while setup,
+  assertions and cleanup remain owner-backed. Data Editor gained a bounded
+  restricted-role proof for the migration-066 transactional audit write path.
+  During integration after ISSUE-093, the retired legacy Draft seam remained
+  deleted and its restricted-role contract was ported to the supported canonical
+  DraftGuru importer suite instead.
+- Missing restricted credentials skip explicitly and never fall back to the
+  owner DSN. No PostgreSQL privilege or importer semantics changed.
+- The harness receives both DSNs through explicit dependency injection. Passing
+  `undefined` deliberately therefore models an absent restricted credential
+  even when the invoking shell has `AFLDB_TEST_IMPORT_DATABASE_URL` configured;
+  it can no longer be repopulated by a default parameter from ambient state.
+- Child-process callers supply partial environment overrides, which are merged
+  over `process.env` before the validated restricted import DSN is applied;
+  first-kick-goal parity uses one focused accepted-retirement execution so its
+  role proof does not inherit the historical semantic test's three full reloads;
+  focused import fixtures no longer need to fabricate unrelated required keys.
+- Awards parity now uses the production `under_22` group, whose PostgreSQL
+  identity resolution avoids the legacy honours loader's intentional coupling
+  to SQLite player surrogate ids while still exercising real importer reads,
+  upserts, batch/sequence writes, and completion accounting as `afldb_import`.
+- First-kick-goal integration setup now loads its canonical source rows
+  explicitly with the owner fixture credential and supplies one bounded linked
+  row when sparse test data cannot resolve any automatically. Focused parity
+  tests therefore no longer depend on an incidental prior FKG database load;
+  the production subprocess under assertion remains `afldb_import`.
+- Final validation against the privilege-reconciled rebuilt test database is
+  green: live harness 2/2, DB-free harness 4/4, and focused Data Editor,
+  first-kick-goal, Under-22 awards, club-list DOB and register DOB restricted
+  paths all passed. ISSUE-083 is resolved; coverage is intentionally scoped to
+  those supported paths rather than every historical importer in the tree.
+
 ### AFLDB-ISSUE-091 — Migration checksums are deterministic across LF/CRLF checkouts - 25 August 2026
 
 - `tools/db/migrate.ts` checksum computation and drift comparison now use a new pure module (`tools/db/migration-checksum.ts`) that derives three bounded representations of a migration file's content — raw bytes, canonical all-LF, canonical all-CRLF — and accepts a stored ledger checksum matching any one of them.

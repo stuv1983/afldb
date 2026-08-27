@@ -11,6 +11,7 @@ import { sql } from '@/db/client';
 import { confirmUnlinked, resolveLink } from '@/db/queries/player-links';
 
 import { lockDraftTables, unlockDraftTables } from './draft-lock';
+import { createImportRoleParityHarness } from './import-role-parity';
 
 /*
  * TEST DATABASE SAFETY — this must run before anything imports a production helper.
@@ -71,9 +72,17 @@ function hasPsycopg(): boolean {
   return !probe.error && probe.status === 0;
 }
 
-const canRun = hasPsycopg()
+const canSpawnImporter = hasPsycopg()
   && existsSync(join(SNAPSHOT_DIR, 'raw', 'years'))
   && existsSync(LEDGER_PATH);
+
+const importRole = createImportRoleParityHarness(
+  process.env.AFLDB_TEST_DATABASE_URL,
+  process.env.AFLDB_TEST_IMPORT_DATABASE_URL,
+);
+
+const canRun = canSpawnImporter && importRole.isConfigured;
+const roleParitySuffix = importRole.isConfigured ? '' : ` — ${importRole.skipMessage}`;
 
 type Ledger = {
   decisions: {
@@ -96,37 +105,16 @@ const draftguruTargets = ledger.decisions
 const unlinkedKey = ledger.decisions.find((d) => d.decision === 'confirmed_unlinked')?.player_url;
 
 /**
- * The DSN every database path in this file must use, asserted rather than assumed.
- *
- * guard.ts requires AFLDB_TEST_DATABASE_URL to be set and setup.ts refuses any value
- * that does not end in `_test`, so this is a third layer. It exists because the one
- * thing standing between the importer subprocess and afldb_dev is an env override, and
- * an override that silently resolved to undefined would let the subprocess fall back to
- * the .env value through the importer's own load_env().
+ * The real importer child must run as the restricted afldb_import role against the
+ * same _test database used by the owner-backed fixture connections. The shared parity
+ * harness validates both identities and targets before it permits the subprocess to
+ * spawn, then supplies the validated restricted DSN as AFLDB_IMPORT_DATABASE_URL.
  */
-function requireTestDsn(): string {
-  const dsn = process.env.AFLDB_TEST_DATABASE_URL;
-  if (!dsn) throw new Error('AFLDB_TEST_DATABASE_URL is not set.');
-  const database = new URL(dsn).pathname.replace(/^\//, '');
-  if (!/_test$/.test(database)) {
-    throw new Error(
-      `Refusing to run the importer against '${database}': this suite may only target a `
-      + '_test database.',
-    );
-  }
-  return dsn;
-}
-
 function runImporter(extra: string[] = []) {
-  const dsn = requireTestDsn();
-  return spawnSync(
+  return importRole.spawn(
     python,
     ['tools/rebuild/draftguru/import_draftguru.py', '--quiet', ...extra],
-    {
-      cwd: root,
-      encoding: 'utf8',
-      env: { ...process.env, AFLDB_IMPORT_DATABASE_URL: dsn },
-    },
+    { cwd: root },
   );
 }
 
@@ -192,8 +180,44 @@ async function releaseAndDeletePlayers(ids: number[]): Promise<void> {
   await sql`DELETE FROM players WHERE id = ANY(${ids})`;
 }
 
-describe.skipIf(!canRun)('DraftGuru supported importer (afldb_test)', () => {
+async function adminLinkFixturePlayer(): Promise<{ id: number }> {
+  if (provisionedPlayerIds.length) {
+    const [fixture] = await sql<{ id: number }[]>`
+      SELECT id FROM players
+       WHERE id = ANY(${provisionedPlayerIds})
+       ORDER BY id
+       LIMIT 1`;
+    if (fixture) return fixture;
+  }
+
+  // A canonical rebuild already contains the ledger targets, so this suite may
+  // legitimately provision no players of its own. In that case use an existing
+  // canonical player that is not already attached to a DraftGuru person. The
+  // test never owns or deletes this fallback player.
+  const [canonical] = await sql<{ id: number }[]>`
+    SELECT p.id
+      FROM players p
+     WHERE NOT EXISTS (
+       SELECT 1
+         FROM draft_persons dp
+        WHERE dp.player_id = p.id
+     )
+     ORDER BY p.id
+     LIMIT 1`;
+
+  if (!canonical) {
+    throw new Error(
+      'DraftGuru live-decision fixture requires an existing unlinked canonical player.',
+    );
+  }
+  return canonical;
+}
+
+describe.skipIf(!canRun)(
+  `DraftGuru supported importer (afldb_test)${roleParitySuffix}`,
+  () => {
   beforeAll(async () => {
+    await importRole.validate();
     await lockDraftTables();
     draftguruSourceId = await sourceId('draftguru');
     afltablesSourceId = await sourceId('afltables');
@@ -614,8 +638,7 @@ describe.skipIf(!canRun)('DraftGuru supported importer (afldb_test)', () => {
          WHERE p.source_id = ${draftguruSourceId} AND p.player_id IS NULL
          GROUP BY p.player_url
          ORDER BY p.player_url LIMIT 2`;
-      const [player] = await sql<{ id: number }[]>`
-        SELECT id FROM players WHERE id = ANY(${provisionedPlayerIds}) ORDER BY id LIMIT 1`;
+      const player = await adminLinkFixturePlayer();
 
       const [admin] = await sql<{ id: number }[]>`
         INSERT INTO auth_users (email, role)
@@ -715,8 +738,7 @@ describe.skipIf(!canRun)('DraftGuru supported importer (afldb_test)', () => {
          ORDER BY p.player_url LIMIT 1`;
       expect(person, 'need a person with at least two picks').toBeDefined();
 
-      const [player] = await sql<{ id: number }[]>`
-        SELECT id FROM players WHERE id = ANY(${provisionedPlayerIds}) ORDER BY id LIMIT 1`;
+      const player = await adminLinkFixturePlayer();
       const [admin] = await sql<{ id: number }[]>`
         INSERT INTO auth_users (email, role)
         VALUES ('b2-7-contradiction@example.invalid', 'super_admin')

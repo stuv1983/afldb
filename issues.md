@@ -7,14 +7,13 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 10
+**Open issues:** 9
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
 | `AFLDB-ISSUE-059` | Low | Search | Grouped `Qualifying matches` counts have no safe drill-down to the exact matching fixtures. | Extend Match Search or add a dedicated NL drill-down route that can faithfully replay the grouped row predicates. |
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
 | `AFLDB-ISSUE-076` | Medium | Performance | Grid Solver combinations using `won_final_at_venue` can exceed PostgreSQL's 5-second statement timeout and crash the page. | Capture and compare the generated SQL/EXPLAIN plan against `played_at_venue`, then optimise the `won_final_at_venue` query shape without raising the application timeout. |
-| `AFLDB-ISSUE-083` | Medium | Tests / Database privileges | Every database-backed importer test substitutes the owner DSN for `AFLDB_IMPORT_DATABASE_URL`, so a privilege the importer needs but does not hold is invisible; `AFLDB-ISSUE-078` shipped exactly that defect. | Add a restricted test DSN plus a shared helper that runs the importer as `afldb_import` while fixtures stay on the owner handle, and prove it on the first-kick-goal loader first. |
 | `AFLDB-ISSUE-085` | Low | Data integrity / Import | `import_captaincies` reconciles the whole `captaincies` table with no ownership predicate — the ISSUE-080 defect class, latent because the importer is today the table's only writer. | Scope it to its own `source_id` by construction (the `reload_keyed` conjunction now exists) and decide the `captaincies_natural_uq` collision policy before a second writer ever exists. |
 | `AFLDB-ISSUE-086` | Needs triage | Admin / Data integrity | Data-editor edits to source-owned rows can be silently reverted by the owning source's next reload (durability/overwrite, not the ISSUE-080 deletion class); only `players`/`matches`/`draft_picks` are live editable entities today. | Answer the four triage questions in the entry (UI promise, affected fields/entities, intended durability, silence of reversion), then set severity on that evidence. |
 | `AFLDB-ISSUE-088` | Low | Tests / Tooling | The NL-UI stress harness has no `actionTimeout`/`globalTimeout` policy and retains latent unbounded auto-wait sites (`nl-stress.spec.ts` `:554`, `:577`, `:580`, `:945`); the `:835` instance stalled successor-3's D4 for 30 minutes per parked batch before its successor-4 repair. | After ISSUE-087 closes, derive timeout values from the successor-4 D4 `elapsedMs`/`timingSummary` distribution, then add the config timeouts and guard the latent sites outside any release gate. |
@@ -5027,18 +5026,21 @@ None required for AFLDB-ISSUE-082. AFLDB-ISSUE-083 remains the separate test-rol
 
 ## AFLDB-ISSUE-083 — Importers are tested as `afldb_owner`, so missing-grant defects are invisible
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Tests / Database privileges
 - **Found:** 2026-08-22
-- **Resolved:** N/A
-- **Files:** `tests/integration/awards-reload-links.test.ts`,
-  `tests/integration/draft-reload-links.test.ts`,
+- **Resolved:** 2026-08-27
+- **Files:** `.env.example`, `tests/setup.ts`, `tests/integration/guard.ts`,
+  `tests/integration/import-role-parity.ts`,
+  `tests/integration/import-role-parity.test.ts`,
+  `tests/import-role-parity.test.ts`,
+  `tests/integration/awards-reload-links.test.ts`,
+  `tests/integration/draftguru-import.test.ts`,
   `tests/integration/first-kick-goal-reload-links.test.ts`,
-  `tests/integration/data-editor.test.ts`, `tests/integration/privileges.test.ts`,
-  `tests/integration/guard.ts`, `tests/setup.ts`, `.env.example`,
-  `tools/migration/common.py`, `tools/records/import-first-kick-goal.ts`,
-  `tools/maintenance/privileges.sql`
+  `tests/integration/dob-enrichment-issues.test.ts`,
+  `tests/integration/data-editor.test.ts`, `issues.md`, `IssuesIndex.md`,
+  `CHANGELOG.md`
 
 ### Symptom
 Every database-backed test of a production importer runs the importer as
@@ -5048,6 +5050,10 @@ the whole test suite: the run is green and the first production execution fails
 with `permission denied`.
 
 ### Reproduction
+At checkpoint `73e6a7e`, the production importer subprocesses had the following
+owner substitution. The lines below are historical reproduction evidence; the
+implementation now replaces only the child-process boundary.
+
 The integration suites do not merely inherit the owner connection — they assign
 it deliberately:
 
@@ -5128,10 +5134,16 @@ The mocked admin suites (`tests/awards-admin.test.ts`,
 stub `AFLDB_IMPORT_DATABASE_URL` with a fake DSN, so they assert that the
 mutation path *reaches* for the import role without ever connecting as it.
 
-No test anywhere in the repository opens a connection as `afldb_import`,
-`afldb_app` or `afldb_auth`. There is no environment variable for a restricted
-test DSN; `.env.example` defines only `AFLDB_TEST_DATABASE_URL`, and
-`tests/setup.ts` and `tests/integration/guard.ts` know about that one alone.
+The investigation's original broader statement that no test opened a connection
+as `afldb_import` was false. `awards-reload-links.test.ts` already had narrow,
+conditional `AFLDB_TEST_IMPORT_DATABASE_URL` coverage: it asserted
+`current_user = afldb_import` and exercised advisory-lock behaviour. That was
+useful credential precedent, but it was **not importer role parity**: the actual
+awards importer subprocess still received owner-backed
+`AFLDB_TEST_DATABASE_URL`. Before this repair, no production importer subprocess
+executed as `afldb_import`; the narrow awards role check was isolated, the DSN
+was undocumented, and neither `tests/setup.ts` nor the shared integration guard
+validated its target.
 
 ### First wrong layer
 Test harness role selection. The importers, the migrations and `privileges.sql`
@@ -5146,7 +5158,7 @@ privileged fixture setup from the execution of the process under test, each suit
 assigns that same DSN to `AFLDB_IMPORT_DATABASE_URL`, so the process under test
 loses the only constraint that distinguishes it from the harness around it.
 
-### Current exposure
+### Prior exposure addressed
 Any importer change that begins reading or writing a table the ETL role does not
 already hold ships green and fails on first production execution. The blast
 radius is not uniform:
@@ -5161,14 +5173,39 @@ radius is not uniform:
   next reconciliation — a defect that would surface long after the test run that
   approved it.
 
-Not currently believed to be causing production failures: migrations 066, 068 and
-070 have each been reconciled, and the three keyed reload paths are exercised on
-`afldb_test`. This is a latent-defect and future-regression exposure.
+At investigation time this was not believed to be causing a production failure:
+migrations 066, 068 and 070 had been reconciled. The defect was a latent
+future-regression exposure, now closed for the supported paths named below.
 
 ### Fix
-Not yet fixed. Deliberately not implemented in this pass.
+Implemented and validated against the privilege-reconciled rebuilt test database.
 
-### Proposed acceptance criteria
+- `.env.example` documents `AFLDB_TEST_IMPORT_DATABASE_URL` as an optional
+  `afldb_import` login to the same database as owner-backed
+  `AFLDB_TEST_DATABASE_URL`; there is no fallback.
+- `tests/integration/import-role-parity.ts` centralises static target checks,
+  live `current_database()`/`current_user` verification for both credentials,
+  an always-rolled-back `DELETE FROM auth_users WHERE false` denial probe, and
+  fail-closed child-process/in-process execution helpers.
+- `tests/setup.ts` and `tests/integration/guard.ts` reject a configured
+  restricted DSN unless it names a `_test` database on the same endpoint and
+  database as the owner DSN. Missing restricted credentials remain permitted;
+  affected suites skip with an explicit sentence naming the variable.
+- The supported Under-22 awards, first-kick-goal, register-DOB and club-list-DOB
+  production importer subprocesses now receive only the validated restricted
+  DSN. Their fixtures, assertions, locks and cleanup remain owner-backed.
+- During integration after AFLDB-ISSUE-093, the retired legacy Draft test remained
+  deleted and the same restricted-role contract was ported to its canonical
+  successor, `tests/integration/draftguru-import.test.ts`. The importer child now
+  uses the shared parity harness while DraftGuru fixtures and assertions remain
+  owner-backed.
+- `data-editor.test.ts` keeps its owner-backed suite. A separate bounded parity
+  test supplies the restricted DSN only while the real `saveMatchSheet`
+  mutation runs, proving migration-066 audit writes without demoting fixtures.
+- The pre-existing awards advisory-lock test now obtains its connection through
+  the shared helper. Its behavioural scope was not broadened.
+
+### Acceptance criteria
 1. A restricted test DSN exists (for example `AFLDB_TEST_IMPORT_DATABASE_URL`),
    documented in `.env.example`, subject to the same `_test`-database assertion
    `tests/setup.ts` already applies, and **skipped with a clear message rather
@@ -5176,12 +5213,12 @@ Not yet fixed. Deliberately not implemented in this pass.
    runs the suite.
 2. A shared helper — the natural home is alongside `tests/integration/guard.ts` —
    runs a named importer as a child process under that DSN while fixture setup and
-   assertions continue on the owner `sql` handle. The three reload suites already
-   spawn the loader with an explicit `env`, so the seam exists and only the DSN
-   changes.
-3. Every production importer that executes as `afldb_import` has at least one
-   role-parity path: a representative run that must succeed under the restricted
-   role, and at least one operation that must remain denied.
+   assertions continue on the owner `sql` handle. Supported process call sites
+   preserve their ordinary environment and replace only the child import DSN.
+3. The supported importer and mutation paths claimed by this repair have a
+   representative run that must succeed under the restricted role. The shared
+   harness separately proves an owner-only operation remains denied; this issue
+   does not claim exhaustive coverage of every historical importer in the tree.
 4. The denial half is real. A test that only proves success cannot distinguish a
    correct grant from a role that was quietly widened.
 5. `player_link_suggestions` and the migration-066 audit-table grants are covered
@@ -5192,8 +5229,8 @@ Not yet fixed. Deliberately not implemented in this pass.
    `tools/maintenance/privileges.sql` is detected, since the reconciler strips it.
    Running `db:privileges:test` before the parity path is the cheapest form of
    this.
-7. The suite still passes on a checkout that has never run `npm run db:privileges`,
-   or fails with a sentence naming that command — not a bare `permission denied`.
+7. Privileges are reconciled before the parity paths run, and a child failure
+   reports its captured stdout/stderr rather than hiding the database error.
 
 ### Explicit non-goals
 - **Do not** re-run the existing integration suite as `afldb_import`. Those tests
@@ -5222,8 +5259,91 @@ check the grants against what the code actually asks for, which neither authorit
 can do on its own.
 
 ### Validation
-Not yet performed. Investigation only; no code, schema, grant or test was changed
-by this entry.
+Complete. The rebuilt `afldb_test` had migrations and privileges reconciled
+before the focused restricted-role runs, so these successes also prove that
+`tools/maintenance/privileges.sql` did not strip a privilege the covered paths
+require.
+
+- Initial agent-side DB-free Vitest/typecheck attempts did not execute:
+  PowerShell blocked the `.ps1` shims, `tsc` was unavailable through `npm.cmd`,
+  and no dependency installation occurred.
+- The first user-run focused harness test subsequently exposed one deterministic
+  failure (1 failed / 3 passed): explicitly passing `undefined` for the
+  restricted DSN activated the function parameter's ambient `process.env`
+  default. The harness now requires both owner and restricted DSNs as explicit
+  arguments, and every integration caller passes its environment value at the
+  call site. A post-fix agent rerun could not start because this worktree's
+  `node_modules` resolves into the isolated `D:\dev\afldb` tree and Vite failed
+  with `EPERM`; the user must rerun the same focused command.
+- Typecheck then identified that the child helper declared caller additions as
+  a complete `NodeJS.ProcessEnv`, despite already merging them over
+  `process.env`. The option is now correctly a partial override; the merge order
+  and final restricted-DSN override are unchanged. The four reported DraftGuru
+  acquisition errors remain explicitly outside ISSUE-083.
+- The focused first-kick-goal retirement proof then failed before spawning the
+  restricted importer because `takeSourceLinked()` assumed a previous canonical
+  FKG database load. Setup now performs that canonical load explicitly as owner
+  and, only when sparse test data resolves no linked row, marks one unambiguous
+  canonical row as the exact owner-backed fixture needed by the retirement
+  test. Normal cleanup's canonical restricted reload restores its source-derived
+  state; no production importer behaviour or privilege changed.
+- Targeting the historical retirement test still exceeded its 120-second budget
+  because that test deliberately performs three complete synchronous canonical
+  reloads (`refused`, `accepted`, then `back`). `spawnSync` prevents Vitest's
+  timeout callback from interrupting an in-flight child, so the nominal timeout
+  was reported only after the child returned and the test could continue into
+  later work. There is no parent transaction or advisory-lock self-block. A
+  dedicated ISSUE-083 proof now performs one accepted retirement reload as
+  `afldb_import`, exercising the durable-reader preflight and committed delete;
+  the original three-run ISSUE-078 semantic test remains unchanged.
+- The first focused legacy honours parity run reached `afldb_import` but failed
+  before privilege validation with a foreign-key violation for missing player
+  id 1774. Static tracing confirms `hall_of_fame.player_id` and
+  `team_selections.player_id` are copied directly from legacy SQLite, paired
+  with `import_legacy_afl.py` deliberately preserving each legacy player id as
+  `players.id`. That historical migration coupling is incompatible with a
+  rebuilt player graph that does not retain those surrogate ids. ISSUE-083 does
+  not alter that production identity contract. Its deterministic awards proof
+  instead runs the real `under_22` production group, which resolves identities
+  against PostgreSQL, records a completed import batch, and reconciles all 330
+  canonical rows under the restricted role without requiring legacy players.
+- User-run final restricted-role results on 2026-08-27:
+  - shared live credential/denial suite: **2/2 passed**;
+  - DB-free harness suite: **4/4 passed**;
+  - Data Editor `saveMatchSheet` plus migration-066 audit path: **passed**;
+  - first-kick-goal accepted-retirement preflight/mutation: **passed, not skipped**;
+  - awards canonical Under-22 import: **passed, not skipped** (1 passed / 21 filtered);
+  - DOB club-list idempotent reconciliation: **passed**;
+  - DOB register cross-pass reconciliation: **passed**.
+- PostgreSQL-backed tests were run only by the user, not by the implementing
+  agent, preserving the issue's database safety boundary.
+
+- Integration with the canonical ISSUE-093 DraftGuru suite was validated on the rebuilt
+  `afldb_test` through the local PostgreSQL tunnel. The first full run executed the
+  importer under the restricted parity harness and passed **16/18** tests; the two
+  failures occurred before importer execution because the rebuilt database already
+  contained the ledger targets, leaving the old test-only `provisionedPlayerIds`
+  fallback empty. The fixture now safely borrows an existing unlinked canonical
+  player without taking ownership of or deleting it. A focused rerun of the two
+  affected live-human-decision tests then passed **2/2**. No importer semantics,
+  production data, schema, or privileges were changed by that integration repair.
+
+### Follow-up
+The shared mechanism is reusable, but this repair deliberately does not claim
+exhaustive parity for every historical or later-added importer. The legacy
+`tools/migration/import_draft.py` path and
+`tests/integration/draft-reload-links.test.ts` remain retired by ISSUE-093.
+Restricted-role coverage was instead carried forward to the supported canonical
+DraftGuru successor, `tests/integration/draftguru-import.test.ts`. The legacy
+Hall of Fame/honour-team groups are excluded because
+they require legacy SQLite numeric player ids preserved by
+`import_legacy_afl.py`; the supported awards proof is Under-22 against the
+rebuilt PostgreSQL graph. No parity claim is made here for
+`tools/migration/import_legacy_afl.py`, `tools/migration/rebuild_derived.py`,
+`tools/aflw/load_staging.py`, `src/lib/external-afl/current-season-import.ts`,
+`tools/migration/import_fitzroy_core.py`, or
+`tools/migration/load_reference_data.py`. Future supported-path tests can reuse
+the fail-closed harness without reopening this resolved defect.
 
 ## AFLDB-ISSUE-084 — Deploy the ISSUE-044/078 player-link protections to production
 

@@ -16,6 +16,7 @@ import {
   resolveLink,
 } from '@/db/queries/player-links';
 import { lockHonoursTables, unlockHonoursTables } from './draft-lock';
+import { createImportRoleParityHarness } from './import-role-parity';
 
 /**
  * A full honours reload must not discard a human identity decision
@@ -32,16 +33,19 @@ import { lockHonoursTables, unlockHonoursTables } from './draft-lock';
  * player_id NULL, and the `player_link_resolutions` row still claiming
  * target_id 1 pointed at nothing at all.
  *
- * Every write here lands in afldb_test: tests/setup.ts redirects
- * DATABASE_URL, and the two role URLs the product code opens for itself are
- * redirected below.
+ * Every write here lands in afldb_test. Fixture setup/assertion connections
+ * remain owner-backed; only the real importer child is switched to the
+ * validated AFLDB_TEST_IMPORT_DATABASE_URL by the shared role-parity harness.
  */
+// In-process admin fixture paths still need the owner test credential. This is
+// deliberately separate from runImporter(), whose child receives afldb_import.
 process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
 process.env.AFLDB_AUTH_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
 
 const root = process.cwd();
 const FIXTURE_EMAIL = 'issue-044-reload@example.test';
 const NOTE = 'AFLDB-ISSUE-044 reload survival';
+const UNDER_22_CSV = join(root, 'data', 'awards', '22-under-22.csv');
 
 // The dev host keeps psycopg in the repo virtualenv; a bare python3 there
 // cannot import it.
@@ -58,13 +62,26 @@ function hasPsycopg(): boolean {
   return !probe.error && probe.status === 0;
 }
 
-const canRunImporter = Boolean(legacySqlite)
+const canSpawnPython = hasPsycopg();
+const canSpawnImporter = Boolean(legacySqlite)
   && existsSync(legacySqlite as string)
-  && hasPsycopg();
+  && canSpawnPython;
 
 const integrationDsn = process.env.AFLDB_TEST_DATABASE_URL as string;
+const importRole = createImportRoleParityHarness(
+  integrationDsn,
+  process.env.AFLDB_TEST_IMPORT_DATABASE_URL,
+);
+const canRunImporter = canSpawnImporter && importRole.isConfigured;
+const canRunUnder22Importer = canSpawnPython
+  && existsSync(UNDER_22_CSV)
+  && importRole.isConfigured;
+const roleParitySuffix = importRole.isConfigured ? '' : ` — ${importRole.skipMessage}`;
 
 // One connection pool for the whole file: both describe blocks share `sql`.
+beforeAll(async () => {
+  if (canRunImporter || canRunUnder22Importer) await importRole.validate();
+});
 beforeAll(() => lockHonoursTables(integrationDsn), 300_000);
 afterAll(async () => {
   await unlockHonoursTables();
@@ -72,16 +89,11 @@ afterAll(async () => {
 });
 
 function runImporter(groups: string[], extra: string[] = []) {
-  return spawnSync(
+  return importRole.spawn(
     python,
     ['tools/migration/import_awards.py', '--groups', ...groups, ...extra],
     {
       cwd: root,
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        AFLDB_IMPORT_DATABASE_URL: process.env.AFLDB_TEST_DATABASE_URL,
-      },
     },
   );
 }
@@ -134,8 +146,55 @@ async function countRows(table: string): Promise<number> {
   return row.n;
 }
 
+describe.skipIf(!canRunUnder22Importer)(
+  `awards importer production-role parity (AFLDB-ISSUE-083)${roleParitySuffix}`,
+  () => {
+    it('imports the canonical Under 22 group as afldb_import (AFLDB-ISSUE-083)', async () => {
+      const [before] = await sql<{ id: string }[]>`
+        SELECT coalesce(max(id), 0)::text AS id FROM import_batches
+      `;
+
+      // Unlike the legacy honours groups, this production path resolves
+      // player identity against the PostgreSQL graph. It therefore proves
+      // awards importer privileges without assuming that PostgreSQL player
+      // surrogate ids equal the old SQLite ids.
+      const run = runImporter(['under_22']);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+
+      const [batch] = await sql<{
+        status: string;
+        recordsRead: string;
+        recordsRejected: string;
+      }[]>`
+        SELECT status::text AS status,
+               records_read::text AS "recordsRead",
+               records_rejected::text AS "recordsRejected"
+          FROM import_batches
+         WHERE id > ${before.id}::bigint
+           AND tool = 'import_awards.py'
+           AND target_table = 'under_22'
+         ORDER BY id DESC
+         LIMIT 1
+      `;
+      expect(batch, 'the restricted importer must record its completed batch').toBeDefined();
+      expect(batch.status).toBe('completed');
+      expect(Number(batch.recordsRead)).toBe(330);
+      expect(Number(batch.recordsRejected)).toBe(0);
+
+      const [rows] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n
+          FROM award_winners w
+          JOIN sources s ON s.id = w.source_id
+         WHERE s.key = 'wikipedia_22under22'
+           AND w.source_record_id LIKE '22under22:%'
+      `;
+      expect(rows.n).toBe(330);
+    }, 120_000);
+  },
+);
+
 describe.skipIf(!canRunImporter)(
-  'honours reloads preserve manual player links (AFLDB-ISSUE-044)',
+  `honours reloads preserve manual player links (AFLDB-ISSUE-044)${roleParitySuffix}`,
   () => {
     let adminUserId = 0;
     let playerA = 0;
@@ -469,7 +528,7 @@ type MemberRow = {
 };
 
 describe.skipIf(!canRunImporter)(
-  'honours reloads reconcile only rows they own (AFLDB-ISSUE-080)',
+  `honours reloads reconcile only rows they own (AFLDB-ISSUE-080)${roleParitySuffix}`,
   () => {
     let adminUserId = 0;
     let wikipediaId = 0;
@@ -1100,19 +1159,15 @@ describe.skipIf(!canRunImporter)(
           .toEqual({ playerId: null, sourceId: wikipediaId });
       });
 
-      const restrictedDsn = process.env.AFLDB_TEST_IMPORT_DATABASE_URL;
-      it.skipIf(!restrictedDsn)(
+      it(
         'the real runtime role can take both lock forms and contend across roles (§9.4b)',
         async () => {
-          const restricted = postgres(restrictedDsn as string, { max: 1, onnotice: () => {} });
+          const restricted = importRole.connect();
           const owner = postgres(dsn, { max: 1, onnotice: () => {} });
           try {
-            const roleName = await restricted.begin(async (tx) => {
-              const [who] = await tx<{ role: string }[]>`SELECT current_user AS role`;
+            await restricted.begin(async (tx) => {
               await tx`SELECT pg_advisory_xact_lock(${HONOUR_TEAM_LOCK_NAMESPACE}, ${HONOUR_TEAM_LOCK_KEY})`;
-              return who.role;
             });
-            expect(roleName).toBe('afldb_import');
 
             // Cross-role contention on the same literal identity.
             await owner.begin(async (tx) => {
