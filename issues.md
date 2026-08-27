@@ -7,16 +7,14 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 9
+**Open issues:** 7
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
 | `AFLDB-ISSUE-059` | Low | Search | Grouped `Qualifying matches` counts have no safe drill-down to the exact matching fixtures. | Extend Match Search or add a dedicated NL drill-down route that can faithfully replay the grouped row predicates. |
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
 | `AFLDB-ISSUE-076` | Medium | Performance | Grid Solver combinations using `won_final_at_venue` can exceed PostgreSQL's 5-second statement timeout and crash the page. | Capture and compare the generated SQL/EXPLAIN plan against `played_at_venue`, then optimise the `won_final_at_venue` query shape without raising the application timeout. |
-| `AFLDB-ISSUE-085` | Low | Data integrity / Import | `import_captaincies` reconciles the whole `captaincies` table with no ownership predicate — the ISSUE-080 defect class, latent because the importer is today the table's only writer. | Scope it to its own `source_id` by construction (the `reload_keyed` conjunction now exists) and decide the `captaincies_natural_uq` collision policy before a second writer ever exists. |
 | `AFLDB-ISSUE-086` | Needs triage | Admin / Data integrity | Data-editor edits to source-owned rows can be silently reverted by the owning source's next reload (durability/overwrite, not the ISSUE-080 deletion class); only `players`/`matches`/`draft_picks` are live editable entities today. | Answer the four triage questions in the entry (UI promise, affected fields/entities, intended durability, silence of reversion), then set severity on that evidence. |
-| `AFLDB-ISSUE-088` | Low | Tests / Tooling | The NL-UI stress harness has no `actionTimeout`/`globalTimeout` policy and retains latent unbounded auto-wait sites (`nl-stress.spec.ts` `:554`, `:577`, `:580`, `:945`); the `:835` instance stalled successor-3's D4 for 30 minutes per parked batch before its successor-4 repair. | After ISSUE-087 closes, derive timeout values from the successor-4 D4 `elapsedMs`/`timingSummary` distribution, then add the config timeouts and guard the latent sites outside any release gate. |
 | `AFLDB-ISSUE-090` | Medium | Data integrity / Import | The two DOB enrichment passes have contradictory `dob_conflict` lifecycles: the club-list pass stacks a duplicate unresolved row on every rerun (proven — entity 4347 holds three copies of one logical conflict), and the register pass deletes unresolved DOB conflicts it does not own. Both use `SOURCE_KEY='afltables'`, so `details->>'source'` cannot express pass ownership. | Migration 072 APPLIED to `afldb_test`; the fixed reconciliation is validated (23/23). `release-gates.test.ts` validation is HALTED and blocked by `AFLDB-ISSUE-092` (an unrelated importer defect this issue's own regression suite exposed, emptying `afldb_test.external_identities`; migration 072 is conclusively not implicated). Resume `release-gates.test.ts`/`privileges.test.ts` only after `AFLDB-ISSUE-092` is implemented and recovery is validated. |
 | `AFLDB-ISSUE-092` | Medium | Data integrity / Tooling safety | `enrich_birth_dates.py`'s `external_identities` reconciliation deletes any row absent from the run's asserted population with no proof that population is complete. `dob-enrichment-issues.test.ts` test 5 ran the real importer against shared `afldb_test` with a tiny synthetic register, wiping the entire real 12,472-row AFL-Tables profile-identity population. | Planning complete in `AFLDB-ISSUE-092.md`, not yet approved/implemented: (A) fail-closed population-sanity gate in the importer for any caller, with an explicit override flag; (B) fixture-scoped `source_id` so the test's real register-pass invocation can never intersect real data; then recover `afldb_test.external_identities` via the fixed importer and the complete legacy source. No schema change. Blocks `AFLDB-ISSUE-090`. |
 | `AFLDB-ISSUE-095` | Medium | Data acquisition / Import architecture / Data integrity | `club_seasons` has no canonical acquisition path: `rebuild_derived.py` builds it only from `staging.team_seasons`, whose only writer is the legacy importer under `AFLDB_LEGACY_SQLITE`. A legacy-free canonical rebuild therefore correctly produces `club_seasons = 0`, leaving ladders, premiership/wooden-spoon flags, finals counts and club-season NL answers unavailable. | Plan D1–D7 in `AFLDB-ISSUE-095.md` (authoritative source; per-field reconstructed-vs-sourced split; historical premiership-points/byes/forfeits/published-rank handling; provenance `source_id`; club-identity re-pointing; new rebuild stage vs existing stage; Stage-9 gate) before writing any importer. Zero supported `AFLDB_LEGACY_SQLITE` dependency. Do NOT add a `club_seasons` Stage-9 gate until this lands. Links `AFLDB-ISSUE-015` (not absorbed) and `AFLDB-ISSUE-093`. |
@@ -5489,12 +5487,12 @@ The `afldb-email-intake.timer` and `afldb-email-intake.service` systemd units ar
 
 ## AFLDB-ISSUE-085 — `import_captaincies` reconciles an unscoped population with no ownership predicate
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Low (latent — no second writer exists today)
 - **Area:** Data integrity / Import
 - **Found:** 2026-08-23 (during the `AFLDB-ISSUE-080` investigation; runbook
   `AFLDB-ISSUE-080.md` §2.2, §4.6, §6, gate G6)
-- **Resolved:** N/A
+- **Resolved:** 2026-08-26
 - **Files:** `tools/migration/import_awards.py` (`import_captaincies`),
   `tools/migration/common.py` (`reload_keyed`),
   `src/db/migrations/042_awards_natural_keys.sql` (`captaincies_natural_uq`)
@@ -5508,15 +5506,26 @@ issue's evidence threshold required a proven second legitimate owner, and none
 exists.
 
 ### Evidence
-Verified during the ISSUE-080 investigation: the importer is the only writer of
-`captaincies` in the tree — the table is absent from the `data_edits` allowlist
-(migration 058), absent from `src/lib/ingest/datasets.ts`, and has no admin
-mutation in `src/db/queries/`. The day a second writer exists (an admin screen,
-an ingest dataset), its rows are classified as vanished and deleted by the next
-reload — or abort it if they carry a link decision. `captaincies_natural_uq
-UNIQUE (season, club_id, player_name_raw, role)` binds the fact and is
-source-blind by design (migration 042), so scoping will also need a collision
-policy for it.
+Reconfirmed at this base: the importer is the only fact-row writer for
+`captaincies` in the tree — the table remains absent from the `data_edits`
+allowlist and `src/lib/ingest/datasets.ts`, with no captaincy create/import
+mutation in `src/db/queries/`. Player-link review can update the link fields but
+does not own a second fact population. The loader stamps every accepted staging
+row with the Wikipedia source, but previously used `sources.get("wikipedia")`
+and passed no reconciliation scope. The day a second fact writer exists, its
+rows would therefore be classified as vanished and deleted by the next reload
+— or abort it if they carry a link decision.
+
+`captaincies_natural_uq UNIQUE (season, club_id, player_name_raw, role)` binds
+the fact globally and is source-blind by design (migration 042). After source
+scoping, a foreign- or NULL-provenance row occupying an incoming natural key
+cannot be adopted: the incoming INSERT would collide with that constraint.
+
+### Root cause
+Captaincy reconciliation used an unscoped keyed reload. Although Wikipedia was
+the only writer at the time, the reload did not constrain reconciliation to
+Wikipedia-owned rows and did not fail closed when a foreign- or
+NULL-provenance row occupied an incoming captaincy natural key.
 
 ### Expected
 The reload is scoped by construction — domain plus `source_id`, the way
@@ -5526,19 +5535,58 @@ The `reload_keyed` conjunction machinery and the fail-closed `require_source`
 guard ISSUE-080 added make this a small change.
 
 ### Fix
-Not yet fixed. Deliberately excluded from `AFLDB-ISSUE-080` (no proven second
-owner). Severity is set on this issue's own evidence — latent, no reachable
-loss today — not inherited from ISSUE-080.
+Implemented and validated on 2026-08-26.
+
+- `import_captaincies` now resolves `wikipedia` through the established
+  fail-closed `require_source` helper and scopes `reload_keyed` to exactly that
+  `source_id`, leaving every foreign- or NULL-provenance row outside its
+  UPDATE/INSERT/DELETE population.
+- The stable reload identity remains `(source_id, source_record_id)`, preserving
+  existing row IDs and link-decision behaviour during normal reloads.
+- A captaincy-local preflight applies ISSUE-080's
+  `ReloadOwnershipCollision` convention to `captaincies_natural_uq`: an
+  incoming fact already held outside the Wikipedia scope is named and refused
+  before the keyed reload writes, rather than adopted, mutated, or exposed as
+  a raw database uniqueness error.
+- No schema migration and no `reload_keyed` redesign were required.
 
 ### Validation
-Not yet performed.
+Full-file attempt executed against `AFLDB_TEST_DATABASE_URL`: **23 total, 3
+passed, 19 failed, 1 skipped**. The 19 failures were overwhelmingly unrelated
+ISSUE-044/080 cases whose fixtures assume historical Hall of Fame, honour-team,
+award, player and legacy-link populations already exist in `afldb_test`; that
+assumption is false on the freshly rebuilt test database. The two new ISSUE-085
+tests also failed at their own `afldb_test needs a wikipedia-owned captaincy`
+baseline assumption. No failure from this run reached or contradicted the
+captaincy ownership implementation.
+
+The ISSUE-085 block is now deterministic and self-contained. It creates a
+temporary SQLite database containing only the `captaincies` table and the empty
+`person_links` table that the selected importer path eagerly reads. Its single
+source row uses `player_id NULL`, a valid PostgreSQL reference season, and the
+Adelaide club name resolved by the real `ClubResolver`. Test setup explicitly
+creates the matching Wikipedia-owned PostgreSQL row; the survival case creates
+its own manual-owned row. The block points only its importer processes at that
+temporary SQLite path, cleans up only its fixture rows, and removes the
+temporary directory afterward. It no longer requires the main repository's
+historical `AFLDB_LEGACY_SQLITE`.
+
+Focused ISSUE-085 integration validation passed against a guarded
+`AFLDB_TEST_DATABASE_URL` ending in `_test`, with `AFLDB_PYTHON` pinned and no
+`AFLDB_LEGACY_SQLITE` dependency:
+
+`npx vitest run tests/integration/awards-reload-links.test.ts -t AFLDB-ISSUE-085`
+
+Result: **2 passed / 0 failed; 21 unrelated tests filtered/skipped** (one test
+file passed; duration 7.81 seconds). The executed regressions proved that the
+Wikipedia-owned row reconciles under the same stable id, the foreign-owned row
+survives unchanged without adoption, a second identical reload is idempotent,
+and a foreign-owned row occupying the incoming `captaincies_natural_uq` key is
+refused without mutation.
 
 ### Follow-up
-Scope `import_captaincies` to `source_id = ANY([wikipedia])` via `reload_keyed`,
-with the `require_source` guard; decide the `captaincies_natural_uq` collision
-policy (declare it to an ISSUE-080-style preflight or document the raw
-constraint failure as acceptable); cover it in
-`tests/integration/awards-reload-links.test.ts`.
+None. The unrelated ISSUE-044/080 historical-fixture assumptions exposed by
+the full-file diagnostic run remain outside ISSUE-085 and were not changed.
 
 ## AFLDB-ISSUE-086 — Data-editor edits to source-owned rows can be reverted by the next source reload
 
@@ -5844,16 +5892,18 @@ its own terms. Production deployment never occurs inside ISSUE-087.
   values can be chosen from the completed D4 timing evidence rather than
   guessed.
 
-## AFLDB-ISSUE-088 — NL-UI stress harness has no timeout policy and retains latent unbounded waits
+## AFLDB-ISSUE-088 — Playwright timeout policy and latent NL-UI waits
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Low
 - **Area:** Tests / Tooling
 - **Found:** 2026-08-24 (adjudication of the `AFLDB-ISSUE-087` successor-3 D4
   HALT; recorded at the pre-R9 ledger sync per `AFLDB-ISSUE-087-S4.md` §3)
-- **Resolved:** N/A
-- **Files:** `tests/nl-ui/nl-stress.spec.ts`,
-  `playwright.nl-stress.config.ts`
+- **Resolved:** 2026-08-27
+- **Files:** `playwright.config.ts`, `playwright.admin-nav.config.ts`,
+  `playwright.nl-stress.config.ts`, `tests/nl-ui/nl-stress.spec.ts`,
+  `tests/nl-ui/timeout-policy.ts`,
+  `tests/playwright-timeout-policy.test.ts`
 
 ### Symptom
 `playwright.nl-stress.config.ts` sets no `actionTimeout` or `globalTimeout`;
@@ -5865,21 +5915,114 @@ deterministically parked successor-3's D4 batches for 30 minutes each and made
 the release gate unadjudicable.
 
 ### Current state
-The `:835` instance was repaired in ISSUE-087 successor-4 (`0da44f9`,
-count()-guarded read). Latent unbounded sites remain, none evidenced as having
-fired:
+**2026-08-27 timeout audit — classification: PARTIALLY FIXED.** The `:835`
+instance was repaired in ISSUE-087 successor-4 (`0da44f9`, count()-guarded
+read), but the repository still has the remainder below. No executable file
+had been edited when this inventory was recorded.
 
-- `:554` `panel.locator('h2').first().textContent()` — safe today only because
-  both application branches render an `h2` (guarded by an application
-  invariant, not by the harness);
-- `:577` `await doc.serverHtmlPromise`;
-- `:580` `readHydrationProbe`;
-- `:945` `page.screenshot({ fullPage: true })`.
+| Harness before ISSUE-088 changes | Test timeout | Expect timeout | Action timeout | Navigation timeout | Global timeout | Retries / workers | Other bounds |
+|---|---:|---:|---:|---:|---:|---|---|
+| Ordinary deterministic E2E (`playwright.config.ts`) | 30 s | 5 s Playwright default | 0 (unbounded at action layer) | 0 (unbounded at navigation layer) | 0 (disabled) | local 0 / CI 1; default 50% logical CPUs; fully parallel; desktop + mobile | local `webServer` readiness 60 s; 46 tests/project, 92 total before skips |
+| Admin navigation diagnostic (`playwright.admin-nav.config.ts`) | 15 min/test | 5 s default | 0 | 0 | 0 | 0; one worker; setup then two diagnostic tests | both custom `waitForFunction` calls explicitly 60 s; fixed 250 ms and <=3 s visual sampling sleeps |
+| NL-UI stress (`playwright.nl-stress.config.ts`) | 30 min/batch | 5 s default | 0 | 0 | 0 | 0; `NL_UI_WORKERS`, default 4; fully parallel; setup dependency | each primary `page.goto` explicitly uses `NL_UI_TIMEOUT_MS`, default 15 s; default 100 questions/batch; documented 12,000-load run takes about one hour |
+| Vitest (`vitest.config.mts`, not a Playwright harness) | 30 s/test | assertion-controlled | N/A | N/A | no suite policy | Vitest-managed | hook timeout 30 s |
 
-Timeout hardening was **deliberately excluded** from successor-4 (S4 runbook
-§3): an evidence-free `actionTimeout` can convert slow-but-successful actions
-under 4-worker load into `page_error` batch failures — a harness measuring
-itself — and no per-action duration distribution existed to choose values.
+Inventory details:
+
+- no `test.setTimeout(...)`, `test.setTimeout(0)`, literal `timeout: 0`,
+  `page.setDefaultTimeout`, or `page.setDefaultNavigationTimeout` exists;
+- ordinary E2E has no custom polling/retry loop, promise race, child process or
+  server-ready loop. Its locator/navigation/request waits are indirectly
+  capped by the 30-second test timeout. The built-in `webServer` child and
+  health polling are explicitly capped at 60 seconds;
+- the admin diagnostic's loops are finite (3 rounds over 14 routes and five
+  screenshot offsets). Both polling calls use a 60-second deadline;
+- NL global setup is synchronous finite directory cleanup; there is no global
+  teardown or custom server-ready loop. Its DOM traversal `while` stops at the
+  document or depth 8; its clean-control retry loop stops after 3 attempts;
+- `waitForTimeout(250)`, bounded visual offsets through 3,000 ms, and the NL
+  clean-control `waitForTimeout(300)` are deliberate measurement/capture
+  delays, not polling escape paths;
+- the separate plan-level `npm run nl:stress`/250k tooling is not invoked by
+  either Playwright script and remains outside this Playwright policy change;
+- no CI wrapper invokes Playwright in this tree. `package.json` exposes only
+  `test:e2e` (default config) and `nl:ui` (separate NL config); the admin
+  diagnostic config is manual.
+
+Repository-wide child-process search also found 21 synchronous `spawnSync`
+calls with no child timeout across `tests/draftguru-acquisition.test.ts`,
+`tests/club-list-sources.test.ts`, `tests/fitzroy-core-import.test.ts`,
+`tests/reference-data.test.ts`, `tests/under-22-source.test.ts`,
+`tests/under-22-importer.test.ts` and the awards/DOB/draft/first-kick-goal
+integration reload suites. Vitest's 30-second timer cannot pre-empt a blocked
+synchronous OS call. Two tooling provenance reads similarly use synchronous
+Git children (`tools/matching/backtest.ts`, `tools/nl/v2-runner.ts`). None is
+reachable from `test:e2e`, `nl:ui`, any Playwright config/global setup, or a
+Playwright helper. They are therefore genuine pre-existing child-wait risks
+outside ISSUE-088's executable graph; changing DraftGuru/importer/NL-plan
+stress tooling would violate this task's explicit scope prohibitions, so no
+such file was changed and no general test-cleanup follow-up was manufactured.
+The unreferenced root `scratch-playwright.ts` is likewise outside every package
+script/config/CI path: its library actions use Playwright's finite library
+defaults, while its final `browser.close()` has no separate manual deadline if
+someone elects to run that scratch file directly.
+
+The waits still lacking a useful direct deadline are:
+
+- `readAnswerShape`'s `h2.textContent()` is protected only by the application
+  invariant and the 30-minute batch timeout;
+- `await doc.serverHtmlPromise` and `readHydrationProbe(page)` are arbitrary
+  promises, so an action timeout does not substitute for a manual deadline;
+- both hydration-artifact full-page screenshots have no explicit timeout and
+  suppress failures with `catch(() => null)`; the first was the historical
+  `:945` site, and the same pattern also exists in the clean control.
+
+These per-operation waits are indirectly bounded by the 30-minute test
+timeout, so they are not infinite in isolation. The genuinely unbounded policy
+scope is the whole Playwright run: all three configs leave `globalTimeout` at
+zero, so setup/worker/teardown failure has no runner-level deadline.
+
+### Audited repair plan (2026-08-27)
+
+Keep each harness independent:
+
+- ordinary E2E: 10-second actions, 30-second navigation/test timeout, and a
+  30-minute global cap. Ten seconds matches the suite's slowest existing
+  explicit UI readiness allowance; 30 minutes is a fail-fast ceiling for a
+  normally short 92-case run, not an attempt to permit every case to exhaust
+  its individual timeout;
+- admin diagnostic: 60-second action/navigation limits and a 60-minute global
+  cap. The per-navigation measurement already defines 60 seconds, while the
+  three sequential tests can consume at most 45 minutes of test budgets;
+- NL-UI stress: action/navigation and manual capture deadlines use the
+  existing positive `NL_UI_TIMEOUT_MS` contract (15 seconds by default), with
+  a 2-hour global cap. This preserves the separately documented approximately
+  one-hour 12,000-load workload with one full-run margin without importing
+  ordinary E2E limits;
+- retain the 30-minute NL batch timeout: it is a batch crash backstop, not a
+  substitute for action, navigation, promise or global deadlines;
+- make the heading read count-guarded, manually deadline the raw response body
+  and hydration probe with labelled errors, and give both forensic screenshots
+  explicit deadlines plus labelled failure diagnostics.
+
+Rejected/amended approaches:
+
+- do not apply one timeout set to all configs: the deterministic suite, 15-route
+  timing diagnostic and 12,000-load sweep have different semantics;
+- do not raise the 30-minute batch timeout or add retries; either would mask
+  the issue or duplicate stress observations;
+- do not use only `globalTimeout`: it cannot identify the individual action or
+  navigation that wedged;
+- do not use only `actionTimeout`: it does not bound `response.text()` or the
+  hydration-probe promise;
+- amend the historical “count-guard all four sites” proposal: count-guarding is
+  correct for an optional locator, but impossible for response-body/probe
+  promises and inappropriate for screenshots;
+- the successor-4 observation files containing the promised raw timing
+  distribution are not retained in this worktree. Values therefore come from
+  the live 15-second navigation contract, the diagnostic's existing 60-second
+  settle contract, the documented approximately one-hour full sweep, and the
+  finite suite/test counts—not invented per-action percentiles.
 
 ### Evidence
 Successor-3 D4 (`D4_EXIT=143`, 840/1440 observed, batches 003/009 parked at
@@ -5889,16 +6032,85 @@ D4 now provides `elapsedMs`/`timingSummary` for all 1,440 observations — the
 evidence base for choosing values.
 
 ### Fix
-Not yet fixed (policy work deferred until after ISSUE-087 closes).
+Implemented 2026-08-27, without changing production application code:
+
+- all three configs now state the finite action, navigation, test, expect and
+  global timeout policy recorded above;
+- NL's `NL_UI_TIMEOUT_MS` is parsed once as a positive safe integer and shared
+  by config, primary navigation and manual capture deadlines, so `0`, negative,
+  fractional, non-numeric and infinite overrides fail before a run starts;
+- the optional answer heading is count-guarded;
+- raw document-response reads, hydration-probe evaluation, failing/clean DOM
+  snapshots and clean-page close use a labelled `Promise.race` deadline;
+- failing and clean forensic screenshots pass the same explicit timeout and
+  log the corpus id plus the failed capture operation instead of silently
+  returning `null`;
+- the NL batch timeout remains 30 minutes, retries remain zero, and the
+  independent default worker count remains four.
+
+Exact executable/test files changed:
+
+1. `playwright.config.ts`
+2. `playwright.admin-nav.config.ts`
+3. `playwright.nl-stress.config.ts`
+4. `tests/nl-ui/nl-stress.spec.ts`
+5. `tests/nl-ui/timeout-policy.ts` (new)
+6. `tests/playwright-timeout-policy.test.ts` (new)
+
+Tracking files changed: `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`.
 
 ### Validation
-Not yet run.
+DB-free/static validation on Windows, 2026-08-27:
 
-### Follow-up
-Derive `actionTimeout`/`globalTimeout` values from the successor-4 D4 timing
-distribution, add them to `playwright.nl-stress.config.ts`, and guard the four
-latent sites with the same count()-guarded idiom — outside any release gate,
-as an ordinary reviewed harness change.
+- `npx vitest run tests/playwright-timeout-policy.test.ts` did not start
+  Vitest because local PowerShell policy blocked `npx.ps1`; no test result;
+- `.\node_modules\.bin\vitest.cmd run tests/playwright-timeout-policy.test.ts`
+  also did not start tests: Vite received `EPERM` while trying to create
+  `node_modules/.vite-temp/...` through the read-only dependency junction;
+- `.\node_modules\.bin\vitest.cmd run --configLoader runner tests/playwright-timeout-policy.test.ts`
+  — PASS twice, 1 file / 6 tests; final post-edit rerun 479 ms. `--configLoader runner` avoids Vite trying
+  to write its temporary bundled config inside the read-only `node_modules`
+  junction target;
+- `npm.cmd run typecheck` — FAIL with exactly four pre-existing/out-of-scope
+  diagnostics in `tests/draftguru-acquisition.test.ts` at lines 299, 302, 479
+  and 592 (`string | NonSharedBuffer` has no `.trim()`). No ISSUE-088 file
+  produced a diagnostic. DraftGuru was not changed;
+- post-change static search — PASS: no literal `timeout: 0`,
+  `test.setTimeout(0)`, `page.setDefaultTimeout`, or
+  `page.setDefaultNavigationTimeout` in the executable Playwright scope;
+- during implementation, no DB, browser, server, network, migration or NL
+  stress command ran;
+- final user-run browser liveness proof — PASS: `npm.cmd run nl:ui` against
+  `afldb-ui-questions-60-real-user-decline-v3-20260822.csv` with
+  `NL_UI_LIMIT=2`, `NL_UI_BATCH=2`, `NL_UI_WORKERS=1` and run tag
+  `issue-088-timeout-liveness-20260827` completed with exit 0: 2 passed in
+  5.2 s; beta-gate setup passed with analytics declined; the
+  `decline_001–decline_002` batch completed in 2.6 s; pass/fail/unscored was
+  2/0/0; outcomes were 0 answered, 2 unanswerable, 0 absent, 0 HTTP errors and
+  0 page errors; filler disagreements, client errors and hydration errors were
+  all zero.
+
+The generated ignored `tsconfig.tsbuildinfo` created by typecheck was removed;
+it is not a retained change.
+
+### Resolution (2026-08-27)
+
+All ISSUE-088 gates are satisfied. The final root cause was reliance on
+Playwright's zero action/navigation/global defaults, with a 30-minute NL batch
+timeout acting as an excessively broad indirect backstop for optional locator
+reads and arbitrary capture promises. The retained fix gives ordinary E2E,
+the admin diagnostic and NL stress independent finite policies, directly
+bounds the NL promises/actions that carried the latent risk, rejects invalid
+zero/non-positive overrides, and preserves labelled diagnostics.
+
+The 6/6 DB-free contract proves the configured timeout layers and manual
+deadline behaviour. The 2/2 real-browser proof demonstrates that the shared
+policy loads in Playwright and both known-unanswerable shapes complete promptly
+without timeout, page error, browser/client error or hydration error. No
+production application source changed. The unrelated synchronous
+`spawnSync`/tooling waits and four DraftGuru typecheck diagnostics remain
+explicitly outside ISSUE-088. No full ordinary E2E or full NL stress run is
+required for resolution, and there is no remaining blocker or follow-up.
 
 ## AFLDB-ISSUE-089 — NL-UI stress harness loses a batch's observations when the batch does not complete
 
@@ -6639,6 +6851,114 @@ All three gates green (2026-08-25), full evidence in `AFLDB-ISSUE-091.md` §13:
 ### Follow-up
 None. `AFLDB-ISSUE-090` is unblocked with respect to this issue — migration 072 remains
 CREATED, NOT APPLIED, and applying it is ISSUE-090's own next action.
+
+## AFLDB-ISSUE-094 — Real-user NL semantic intent mapping gaps
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Area:** Natural-language search / query planning / answer compilation
+- **Found:** 2026-08-26
+- **Resolved:** 2026-08-26
+- **Files:** `src/search/nl/parser.ts`, `src/search/nl/vocab.ts`, `src/search/nl/plan.ts`,
+  `src/search/nl/answer-types.ts`, `src/search/nl/describe.ts`, `src/db/queries/nl/`,
+  focused NL tests and realistic NL UI corpora.
+
+### Symptom
+Realistic AFL wording is declined or cannot be represented for grouped upper-bound
+queries, two-club head-to-head records/draws, club-specific career-games leaders, and
+player suffix variants. Rebound-50 wording is currently accepted even though the product
+does not support that statistic in NL search.
+
+### Reproduction
+Representative inputs are `teams with at most 2 wins against Richmond`, `Richmond v
+Carlton head to head`, `Richmond record against Carlton`, `who has won more Richmond or
+Carlton`, `how many draws between Richmond and Carlton`, `last draw between Richmond and
+Carlton`, `Richmond career leader for games`, `Gary Ablett Jr career goals`, and `most
+rebound 50s in 2024`. The existing realistic 1,440-question baseline answered 1,238 and
+failed 202: head-to-head 80, draws 80, grouped thresholds 18, club career leaders 16, and
+player career 8.
+
+### Expected
+Each supported phrase family maps atomically to explicit typed semantics, validates before
+SQL, and returns database-correct organization-lineage/player results. Unsupported rebound
+50 queries decline explicitly. Meaningful leftover words and unknown input continue to
+fail closed.
+
+### Actual / evidence
+`extractHavingClause()` detects `at most` but removes only the result noun and numeric
+count, leaving `most` as a meaningful token. `NlGrain`, `NlQueryPlan`, `NlAnswerPayload`,
+compiler dispatch, and `describeAnswer()` have no head-to-head concept. The
+`player_career` compiler reads `player_career_stats.games` even when `scope.clubFor` is
+present, so club-specific games are not expressible. Player lookup passes suffix spelling
+through unchanged. `METRIC_WORDS` and stat-game idioms map R50/rebound-50 wording to
+`rebounds`.
+
+### Root cause
+Several realistic phrases are being forced through generic extraction even though they
+carry relationship or operator semantics that must be consumed and represented as a
+single typed cue. Two required answer families are absent from the plan/compiler contract,
+and one deliberately unsupported metric remains exposed in the NL vocabulary.
+
+The initial integration tests also incorrectly assumed the rebuilt `afldb_test` contained
+specific historical Richmond career rows and both Gary Ablett junior/senior identities.
+Those rows are not part of the supported baseline test-database contract; the resulting
+two failures were invalid test-data assumptions, not implementation defects.
+
+### Plan
+Capture focused red parser reports; atomically consume comparison operators; add a typed
+head-to-head grain/kind, validator, compiler, payload, and description; compile
+club-scoped career games from match participation; normalize player suffix variants only
+inside player resolution; explicitly decline rebound 50s; remove only invalid generated
+`<player> most games in a game` benchmark rows; bump parser version; then run focused,
+integration, database-truth, UI-realistic, and decline validations as available.
+
+### Fix
+Parser version 26 atomically consumes comparison phrases through the comparison vocabulary
+and adds explicit `no more than`/`no fewer than` mappings. A DB-free semantic-intent module
+maps record, compare-wins, draw-count and last-draw phrase families to a typed
+`head_to_head` grain carrying exactly one matchup. Validation, PostgreSQL compilation,
+answer payload/description, execution dispatch and UI rendering now share that contract.
+The compiler counts physical matches once across organization lineages and returns both
+clubs' wins, draws, total meetings, latest meeting and latest draw.
+
+Club-scoped career games now route to `player_career` and count distinct match appearances
+for the named organization rather than reading whole-career `c.games`; the compiler can
+also total allowlisted match-stat metrics for a club without silently dropping the scope.
+Player suffix variants normalize only at resolver comparison (`Jr`/`Jnr`/`Junior`,
+`Sr`/`Snr`/`Senior`), keeping junior and senior identities distinct. Rebound-50 phrases
+now return a deterministic unsupported-statistic response and `rebounds` is removed from
+the NL metric catalogue while the Grid Solver catalogue remains untouched. Five invalid
+`<player> most games in a game` rows were removed from the realistic corpus, leaving 1,435
+real questions with stable original ids.
+
+The integration tests now create deterministic isolated fixture organizations, historical
+club identities, matches and distinct junior/senior players. They compare the production
+answers with independent PostgreSQL truth and perform targeted idempotent cleanup.
+
+### Validation
+- Pre-change DB-free NL parser baseline: 161/161 green.
+- Focused semantic corpus: 480/480 expected plan/decline classifications green; every plan
+  also passed `validatePlan`.
+- Cleaned realistic target-family parser check: 395/395 head-to-head, draw, grouped
+  threshold, club-career and player-career rows parsed and validated.
+- Permanent NL-focused unit gate: 13 files, 593 tests green. The narrower new/affected gate
+  is 6 files, 280 tests green.
+- `git diff --check`: green.
+- `npm run typecheck`: the changed NL code is clean, but the repository gate remains red on
+  four pre-existing `string | NonSharedBuffer` `.trim()` errors in
+  `tests/draftguru-acquisition.test.ts` (lines 299, 302, 479, 592).
+- User-run PostgreSQL gate against the guarded `AFLDB_TEST_DATABASE_URL`:
+  `npm.cmd test -- --run tests/integration/nl-semantic-mapping.test.ts` — 1 test file,
+  6/6 tests passed in 5.25 seconds. Record, compare-wins, draw-count, last-draw,
+  organization-lineage career games, and Jr/Jnr/Junior versus Sr/Snr/Senior identity all
+  passed against independent PostgreSQL truth and deterministic isolated fixtures.
+- No post-change browser answerability score or database-correctness percentage beyond
+  these independently checked semantic families is claimed.
+
+### Follow-up
+None for ISSUE-094. The previously observed streak-telemetry gap remains separate; this
+semantic patch does not change telemetry routing. Future UI answerability benchmarking is
+a product measurement, not an outstanding database-truth defect in this resolved issue.
 
 ## AFLDB-ISSUE-095 — Canonical legacy-free ladder / team-season acquisition
 

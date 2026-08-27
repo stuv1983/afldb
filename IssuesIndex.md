@@ -6,8 +6,8 @@
 > `issues.md` disagree, trust `issues.md` and immediately synchronize this file
 > and the Open Issues table at the top of `issues.md`.
 
-**Last updated:** 2026-08-27
-**Open issues:** 9
+**Last updated:** 2026-08-28
+**Open issues:** 7
 
 ## How Claude should use this file
 
@@ -27,9 +27,7 @@
 | `AFLDB-ISSUE-059` | Low | Search | Grouped qualifying-match counts are plain text because current Match Search cannot replay every grouped predicate. |
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | React #418 remains intermittent under production-style NL search hydration; narrow H7 diagnostic is awaiting authoritative live-build validation. |
 | `AFLDB-ISSUE-076` | Medium | Performance | `won_final_at_venue` Grid Solver combinations can exceed the 5-second PostgreSQL statement timeout and crash the rendered page. |
-| `AFLDB-ISSUE-085` | Low | Data integrity / Import | `import_captaincies` reconciles its whole table with no ownership predicate — the ISSUE-080 defect class, latent because the importer is today the only writer. |
 | `AFLDB-ISSUE-086` | Needs triage | Admin / Data integrity | Data-editor edits to source-owned rows can be silently reverted by the owning source's next reload; severity awaits the four-question triage recorded in the entry. |
-| `AFLDB-ISSUE-088` | Low | Tests / Tooling | NL-UI stress harness has no `actionTimeout`/`globalTimeout` policy and retains latent unbounded auto-wait sites; hardening deliberately deferred until the D4 timing evidence can set values. |
 | `AFLDB-ISSUE-090` | Medium | Data integrity / Import | Confirmed release blocker: club-list DOB enrichment stacks duplicate unresolved `dob_conflict` rows on rerun, and the register pass deletes conflicts it does not own. Migration 072 APPLIED to `afldb_test`; dob-enrichment suite GREEN 23/23; release-gates validation HALTED, blocked by `AFLDB-ISSUE-092`. |
 | `AFLDB-ISSUE-092` | Medium | Data integrity / Tooling safety | §4 fail-closed gate + §5 `--source-key` containment IMPLEMENTED (2026-08-25, ISSUE-093 Phase 3; reusable `check_population_drop()` in `common.py`). Database validation (§11 tests 24–27) still pending, but **no longer blocked on a database**: `afldb_test` was rebuilt and validated on 2026-08-27 by `AFLDB-ISSUE-093` (Resolved). §6 recovery obsolete for the rebuild path. Blocks `AFLDB-ISSUE-090`. |
 | `AFLDB-ISSUE-095` | Medium | Data acquisition / Import architecture / Data integrity | `club_seasons` has no canonical, legacy-free acquisition path — `rebuild_derived.py` builds it only from `staging.team_seasons`, whose sole writer is `import_legacy_afl.py` under `AFLDB_LEGACY_SQLITE`. A clean canonical rebuild therefore correctly yields `club_seasons = 0`. Runbook `AFLDB-ISSUE-095.md`; decisions D1–D7 open. Stage 9 must NOT gate `club_seasons` until this lands. |
@@ -93,23 +91,6 @@
 
 
 
-## AFLDB-ISSUE-085 — `import_captaincies` reconciles an unscoped population with no ownership predicate
-
-- **Severity:** Low (latent — no second writer exists today)
-- **Area:** Data integrity / Import
-- **Key files:** `tools/migration/import_awards.py` (`import_captaincies`),
-  `tools/migration/common.py` (`reload_keyed`)
-- **Current state:** Structural finding from the `AFLDB-ISSUE-080` runbook
-  (G6), deliberately excluded from that fix because the importer is provably
-  the table's only writer (absent from the `data_edits` allowlist, the ingest
-  datasets and the admin mutations). The day a second writer exists, its rows
-  are deleted by the next reload. `captaincies_natural_uq` is fact-grained and
-  source-blind, so scoping also needs a collision policy.
-- **Next action:** Scope the loader to `source_id = ANY([wikipedia])` with the
-  `require_source` guard (the `reload_keyed` conjunction machinery from
-  ISSUE-080 already exists), settle the `captaincies_natural_uq` collision
-  policy, and cover it in `tests/integration/awards-reload-links.test.ts`.
-
 ## AFLDB-ISSUE-086 — Data-editor edits to source-owned rows can be reverted by the next source reload
 
 - **Severity:** Needs triage (deliberately not pre-classified — runbook G5)
@@ -125,21 +106,6 @@
 - **Next action:** Answer the entry's four triage questions (UI promise,
   affected fields/entities, intended durability, silence of reversion) against
   the three live editable entities, then set severity on that evidence.
-
-## AFLDB-ISSUE-088 — NL-UI stress harness has no timeout policy and retains latent unbounded waits
-
-- **Severity:** Low
-- **Area:** Tests / Tooling
-- **Key files:** `tests/nl-ui/nl-stress.spec.ts`,
-  `playwright.nl-stress.config.ts`
-- **Current state:** No `actionTimeout`/`globalTimeout` (Playwright default 0 ⇒
-  unbounded auto-waits, capped only by the 30-minute per-batch timeout). The
-  `:835` instance that parked successor-3's D4 was repaired in `0da44f9`;
-  latent unbounded sites remain at `:554`, `:577`, `:580`, `:945`. Hardening
-  was deliberately deferred out of the ISSUE-087 release gate.
-- **Next action:** After ISSUE-087 closes, derive timeout values from the
-  successor-4 D4 `elapsedMs`/`timingSummary` distribution, add them to the
-  config, and guard the latent sites with the count()-guarded idiom.
 
 ## AFLDB-ISSUE-090 — DOB enrichment conflict writes are not pass-scoped or idempotent
 

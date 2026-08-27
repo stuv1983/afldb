@@ -15,6 +15,39 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-094 — Typed real-user NL semantic mappings - 26 August 2026
+
+- Parser version 26 adds first-class head-to-head record, win-comparison, draw-count and
+  last-draw intents, with validated two-organization plans, an organization-lineage-aware
+  PostgreSQL compiler, a structured answer payload and dedicated UI rendering.
+- Grouped result thresholds now consume their full comparison phrase atomically and cover
+  `at most`, `no more than`, `at least`, `no fewer than`, `more than`, `less/fewer than`
+  and `exactly` without leaving `most` for player fallback.
+- Club career-games leaders now count appearances for the named club organization rather
+  than filtering players and ranking their whole-career totals. Player resolver suffix
+  variants keep junior/senior identity while accepting Jr/Jnr/Junior and Sr/Snr/Senior.
+- Rebound 50s now decline explicitly as unsupported in NL search and are no longer exposed
+  through its metric catalogue; Grid Solver definitions are unchanged.
+- Removed the five nonsensical generated `<player> most games in a game` rows from the
+  realistic product corpus (1,440 to 1,435). The focused 480-case semantic corpus and the
+  593-test NL unit gate pass. The initial PostgreSQL run's two failures were invalid
+  assumptions that the rebuilt test database contained incidental Richmond career rows
+  and both Gary Ablett identities, not implementation defects. The tests now use isolated
+  deterministic fixtures, independent SQL truth and targeted cleanup; the user-run guarded
+  `AFLDB_TEST_DATABASE_URL` gate passed 6/6 on 26 August 2026.
+
+### AFLDB-ISSUE-088 — Playwright runs have finite, harness-specific timeout policies - 27 August 2026
+
+- Ordinary E2E, the admin navigation diagnostic and the separate NL-UI stress harness now declare finite action, navigation, expect, test and whole-run timeouts instead of inheriting Playwright's zero action/navigation/global defaults. Each harness keeps limits derived from its own workload; NL batch timeouts and zero-retry observation semantics are unchanged.
+- NL-UI now rejects non-positive or invalid `NL_UI_TIMEOUT_MS` overrides, count-guards the optional answer heading, manually deadlines response-body/probe/DOM/page-close promises that Playwright action timeouts do not own, and explicitly deadlines forensic screenshots with corpus-labelled diagnostics.
+- New DB-free config/deadline coverage passes 6/6. Final real-browser liveness passes 2/2 in 5.2 seconds: both known-unanswerable rows complete promptly with no timeout, page error, client error or hydration error. ISSUE-088 is resolved; neither a full E2E run nor a full NL stress run is required for this tooling-only change.
+
+### AFLDB-ISSUE-085 — Captaincy reloads reconcile only Wikipedia-owned rows - 26 August 2026
+
+- `import_captaincies` now resolves the Wikipedia source through the fail-closed `require_source` helper and limits keyed reconciliation to that `source_id`, so foreign- and NULL-provenance captaincies remain outside its update/delete population while existing owned row ids and link decisions retain their stable keyed-reload semantics.
+- Because `captaincies_natural_uq (season, club_id, player_name_raw, role)` is globally source-blind, an incoming fact already held outside the Wikipedia scope is now refused with an explicit ownership collision before writes instead of being adopted, overwritten, deleted, or left to a raw uniqueness error. No schema migration or `reload_keyed` redesign was required.
+- Deterministic integration coverage uses a temporary captaincies-only SQLite fixture and explicitly seeded PostgreSQL rows, independent of historical `afldb_test` populations and the repository's legacy SQLite database. Focused validation passed 2/2 with 21 unrelated tests filtered/skipped.
+
 ### AFLDB-ISSUE-093 — AFLDB rebuilds end to end from tracked sources, with no legacy database - 27 August 2026
 
 - **The first complete clean rebuild of `afldb_test` succeeded.** `npm run db:test:rebuild -- --acknowledge-destroy afldb_test` ran all nine stages — PRECHECK, DATABASE RESET, MIGRATIONS (72/72), PRIVILEGES, REFERENCE DATA, FITZROY CORE, DRAFTGURU, DERIVED, FINAL VALIDATION — and finished with `AFLDB-FINAL-VALIDATION PASSED: 13 checks`. AFLDB can now be reconstructed from tracked, hash-bound, reproducible sources with **zero `AFLDB_LEGACY_SQLITE` dependency**, which is the objective this issue was opened for.
