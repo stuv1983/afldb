@@ -553,9 +553,16 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     }
     case 'won_final_at_venue': {
       const venueId = requireInt(axis, 'venue', 'Venue');
-      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
-                            JOIN matches m ON m.id = pms.match_id
-                           WHERE m.venue_id = ${venueId} AND m.is_final AND m.winner_club_id = pms.club_id)`;
+      // Build the distinct winner-player set once. A plain IN subquery let
+      // Postgres underestimate this set (325 planned vs 9,629 participation
+      // rows at the MCG) and rescan a materialised copy for every career,
+      // removing 113m rows by join filter on the ISSUE-076 grid. The scalar
+      // array is an InitPlan, retaining the same player/club/match semantics
+      // without making the surrounding criterion determine the join shape.
+      return sql`p.id = ANY (ARRAY(SELECT DISTINCT pms.player_id FROM player_match_stats pms
+                                    JOIN matches m ON m.id = pms.match_id
+                                   WHERE m.venue_id = ${venueId} AND m.is_final
+                                     AND m.winner_club_id = pms.club_id))`;
     }
     case 'venue_game_stat_min': {
       const venueId = requireInt(axis, 'venue', 'Venue');

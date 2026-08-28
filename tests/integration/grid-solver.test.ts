@@ -9,6 +9,8 @@
  */
 import './guard';
 
+import { performance } from 'node:perf_hooks';
+
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
@@ -48,6 +50,129 @@ describe('every grid builder compiles and solves', () => {
 });
 
 describe('grid solver correctness', () => {
+  it('solves the mapped ISSUE-076 won-final grid within the four-second safety margin', async () => {
+    const [identity] = await sql<{
+      playerId: number; playerName: string;
+      fitzroyId: number; fitzroySlug: string;
+      gwsId: number; gwsSlug: string;
+      venueId: number; venueLegacyName: string; venueName: string;
+    }[]>`
+      WITH cerra AS (
+        SELECT ei.player_id
+          FROM external_identities ei
+          JOIN sources s ON s.id = ei.source_id
+         WHERE s.key = 'afltables'
+           AND ei.external_id = 'players/A/Adam_Cerra.html'
+           AND ei.status IN ('unique', 'resolved')
+      ), fitzroy AS (
+        SELECT id, slug FROM club_organizations WHERE slug = 'fitzroy'
+      ), gws AS (
+        SELECT id, slug FROM club_organizations WHERE slug = 'greater-western-sydney'
+      ), mcg AS (
+        SELECT id, legacy_name, canonical_name FROM venues WHERE legacy_name = 'M.C.G.'
+      )
+      SELECT cerra.player_id AS "playerId", p.display_name AS "playerName",
+             fitzroy.id AS "fitzroyId", fitzroy.slug AS "fitzroySlug",
+             gws.id AS "gwsId", gws.slug AS "gwsSlug",
+             mcg.id AS "venueId", mcg.legacy_name AS "venueLegacyName",
+             mcg.canonical_name AS "venueName"
+        FROM cerra
+        JOIN players p ON p.id = cerra.player_id
+        CROSS JOIN fitzroy
+        CROSS JOIN gws
+        CROSS JOIN mcg
+    `;
+    expect(identity).toMatchObject({
+      playerName: 'Adam Cerra',
+      fitzroySlug: 'fitzroy',
+      gwsSlug: 'greater-western-sydney',
+      venueLegacyName: 'M.C.G.',
+      venueName: 'Melbourne Cricket Ground',
+    });
+    expect(identity.playerId).toBeGreaterThan(0);
+    expect(identity.fitzroyId).toBeGreaterThan(0);
+    expect(identity.gwsId).toBeGreaterThan(0);
+    expect(identity.venueId).toBeGreaterThan(0);
+
+    const rows = [
+      { builder: 'games_at_multiple_clubs_min', params: { games: '50', clubs: '2' } },
+      { builder: 'teammate_of', params: { player: String(identity.playerId) } },
+      { builder: 'single_game_stat_min', params: { stat: 'kicks', x: '20' } },
+    ] as const satisfies readonly GridAxisState[];
+    const commonCols = [
+      { builder: 'played_for_club', params: { club: String(identity.fitzroyId) } },
+      { builder: 'played_for_club', params: { club: String(identity.gwsId) } },
+    ] as const satisfies readonly GridAxisState[];
+    const wonCols = [
+      ...commonCols,
+      { builder: 'won_final_at_venue', params: { venue: String(identity.venueId) } },
+    ] as const satisfies readonly GridAxisState[];
+    const playedCols = [
+      ...commonCols,
+      { builder: 'played_at_venue', params: { venue: String(identity.venueId) } },
+    ] as const satisfies readonly GridAxisState[];
+
+    const started = performance.now();
+    const wonCells = await Promise.all(rows.map((row) => Promise.all(
+      wonCols.map((col) => solveCellSummary(row, col, 'games_asc')),
+    )));
+    const elapsedMs = performance.now() - started;
+
+    expect(elapsedMs).toBeLessThan(4_000);
+    expect(wonCells.map((line) => line.map((cell) => ({
+      eligible: cell.eligible,
+      topName: cell.top?.displayName ?? null,
+    })))).toEqual([
+      [{ eligible: 31, topName: 'Dean Turner' }, { eligible: 22, topName: 'Rhys Palmer' }, { eligible: 279, topName: 'Stuart Cochrane' }],
+      [{ eligible: 0, topName: null }, { eligible: 11, topName: 'Caleb Marchbank' }, { eligible: 42, topName: 'Alex Cincotta' }],
+      [{ eligible: 120, topName: 'Lyle Skinner' }, { eligible: 41, topName: 'Finn Callaghan' }, { eligible: 1071, topName: 'Josh Carmichael' }],
+    ]);
+
+    const playedCells = await Promise.all(rows.map((row) => Promise.all(
+      playedCols.map((col) => solveCellSummary(row, col, 'games_asc')),
+    )));
+    expect(playedCells.map((line) => line.map((cell) => ({
+      eligible: cell.eligible,
+      topName: cell.top?.displayName ?? null,
+    })))).toEqual([
+      [{ eligible: 31, topName: 'Dean Turner' }, { eligible: 22, topName: 'Rhys Palmer' }, { eligible: 372, topName: 'Stuart Cochrane' }],
+      [{ eligible: 0, topName: null }, { eligible: 11, topName: 'Caleb Marchbank' }, { eligible: 112, topName: 'Lucas Camporeale' }],
+      [{ eligible: 120, topName: 'Lyle Skinner' }, { eligible: 41, topName: 'Finn Callaghan' }, { eligible: 1836, topName: 'Graham Schodde' }],
+    ]);
+
+    const [expectedKicksWinner] = await sql<{ count: string }[]>`
+      WITH kickers AS MATERIALIZED (
+        SELECT DISTINCT player_id FROM player_match_stats WHERE kicks >= 20
+      ), winners AS MATERIALIZED (
+        SELECT DISTINCT pms.player_id
+          FROM player_match_stats pms
+          JOIN matches m ON m.id = pms.match_id
+         WHERE m.venue_id = ${identity.venueId}
+           AND m.is_final
+           AND m.winner_club_id = pms.club_id
+      )
+      SELECT count(*) FROM kickers JOIN winners USING (player_id)
+    `;
+    expect(wonCells[2][2].eligible).toBe(Number(expectedKicksWinner.count));
+
+    for (const line of wonCells) {
+      const top = line[2].top;
+      expect(top).not.toBeNull();
+      const [semantic] = await sql<{ qualifies: boolean }[]>`
+        SELECT EXISTS (
+          SELECT 1
+            FROM player_match_stats pms
+            JOIN matches m ON m.id = pms.match_id
+           WHERE pms.player_id = ${top!.id}
+             AND m.venue_id = ${identity.venueId}
+             AND m.is_final
+             AND m.winner_club_id = pms.club_id
+        ) AS qualifies
+      `;
+      expect(semantic.qualifies).toBe(true);
+    }
+  });
+
   it('22Under22 selection matches linked rows from the fixed award series', async () => {
     const summary = await solveCellSummary(
       { builder: 'under_22_selection', params: {} },
