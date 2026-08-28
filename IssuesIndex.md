@@ -6,7 +6,7 @@
 > `issues.md` disagree, trust `issues.md` and immediately synchronize this file
 > and the Open Issues table at the top of `issues.md`.
 
-**Last updated:** 2026-08-28
+**Last updated:** 2026-08-29
 **Open issues:** 5
 
 ## How Claude should use this file

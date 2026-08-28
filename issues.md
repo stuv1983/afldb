@@ -3456,7 +3456,7 @@ None. No production files changed; no follow-up defect identified.
 
 ## AFLDB-ISSUE-076 — Grid Solver `won_final_at_venue` queries can hit statement timeout
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Performance
 - **Found:** 2026-08-22
@@ -8534,3 +8534,73 @@ None — record-only.
 ### Follow-up
 A future issue may take up the design once it is scheduled deliberately. Nothing is decided
 here.
+
+## AFLDB-ISSUE-103 — Grid Solver `won_a_final` / `never_won_a_final` queries can hit statement timeout
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Area:** Grid Solver / Performance
+- **Found:** 2026-08-28 (final validation of resolved AFLDB-ISSUE-076)
+- **Resolved:** 2026-08-29
+- **Runbook:** `AFLDB-ISSUE-103.md`
+- **Files:** `src/db/queries/grid-solver.ts`, `src/search/grid-solver-spec.ts`, `tests/integration/grid-solver.test.ts`
+- **Related:** `AFLDB-ISSUE-076` was resolved separately by `6014b9e`; its `won_final_at_venue` repair is evidence lineage only and is not reopened or absorbed here.
+
+### Symptom
+Four complete runs of `tests/integration/grid-solver.test.ts` under the normal
+`AFLDB_STATEMENT_TIMEOUT_MS=5000` repeatedly left three failures involving the untouched
+`won_a_final` / `never_won_a_final` predicates. PostgreSQL statement timeout is the established
+symptom; the exact three test names/cells and SQLSTATE evidence are the first reproduction task.
+
+### Established evidence
+- Broader-suite outcome was 127/130 passed, with the same three failures remaining.
+- ISSUE-076's separate historical regression remained green at 341 ms, 361 ms, 344 ms and
+  357 ms across those runs.
+- `won_a_final` / `never_won_a_final` code was not changed by ISSUE-076.
+- No timeout increase, schema change or index change was used.
+
+### Scope
+Determine from evidence whether both predicates share one pathological SQL shape, whether the
+negative predicate is expensive because it negates/anti-joins the positive logic, whether there
+are two distinct defects, or whether the timeout depends on the other Grid Solver axis. Do not
+absorb unrelated Grid Solver performance work.
+
+### First wrong layer
+Database query/compiler performance in the generated finals-win membership predicates.
+
+### Root cause
+`won_a_final` and `never_won_a_final` compiled the same winning-final participation relation into
+query shapes that PostgreSQL planned as `Nested Loop Semi Join` and `Nested Loop Anti Join`
+operations over a `Materialize` node. The planner estimated about 1,737 qualifying participation
+rows, while bounded analysis found 14,499 qualifying rows and 3,618 distinct players. The cheap
+winner set was therefore repeatedly rescanned through pathological outer join shapes;
+`never_won_a_final` inherited the same defect through its negation, and combining the predicates
+duplicated it.
+
+### Fix
+Compile the distinct winning-final player set as a scalar-array InitPlan. `won_a_final` now tests
+`p.id = ANY (ARRAY(...))`, while `never_won_a_final` applies its exact complement with
+`NOT (p.id = ANY (ARRAY(...)))`. The base-table contract remains unchanged: a player qualifies by
+participating in a finals match with `player_match_stats.club_id = matches.winner_club_id`. No
+timeout, index, schema, data, or unrelated finals-predicate change was made.
+
+### Validation
+- The focused ISSUE-103 regression independently derives the winner set from `matches` and
+  `player_match_stats`, exercises all three failing cells, verifies the positive set, its
+  complement and their empty intersection, and enforces a one-second ceiling under
+  `AFLDB_STATEMENT_TIMEOUT_MS=5000`.
+- Focused regression: 1 passed / 130 skipped in 1.15 seconds; the three-cell test completed in
+  840 ms.
+- Post-fix production SQL completed in 57 ms, 504 ms and 105 ms. Corresponding
+  `EXPLAIN (ANALYZE, BUFFERS)` execution times were 35.386 ms, 501.698 ms and 103.791 ms. The
+  winner relation is evaluated once per predicate as a scalar-array InitPlan; the old
+  `Nested Loop Semi Join` / `Nested Loop Anti Join` plus `Materialize` pathology is absent.
+- Full `tests/integration/grid-solver.test.ts`: 131 / 131 passed in 36.97 seconds against
+  `afldb_test` with the normal five-second statement timeout. Relevant tests completed in 39 ms
+  (`won_a_final`), 502 ms (`never_won_a_final`), 114 ms (positive/negative disjointness), and
+  802 ms (the exact three-cell independent-oracle regression). No SQLSTATE `57014` occurred.
+- The resolved AFLDB-ISSUE-076 regression remained green at 380 ms.
+- The temporary plan diagnostic was removed after its evidence was recorded.
+
+### Next action
+None. Retain the focused regression and normal statement-timeout boundary.

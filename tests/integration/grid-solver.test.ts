@@ -357,6 +357,120 @@ describe('grid solver correctness', () => {
     expect(summary.eligible).toBe(0);
   });
 
+  it('solves the three ISSUE-103 finals-win cells under one second with an independent oracle', async () => {
+    const [environment] = await sql<{ database: string; statementTimeout: string }[]>`
+      SELECT current_database() AS database,
+             current_setting('statement_timeout') AS "statementTimeout"
+    `;
+    expect(environment.database).toBe('afldb_test');
+    expect(environment.statementTimeout).toBe('5s');
+
+    const cases: Array<{
+      cell: string;
+      row: GridAxisState;
+      col: GridAxisState;
+    }> = [
+      {
+        cell: 'won_x_games_1',
+        row: { builder: 'won_a_final', params: {} },
+        col: { builder: 'career_games_min', params: { games: '1' } },
+      },
+      {
+        cell: 'never_won_x_games_1',
+        row: { builder: 'never_won_a_final', params: {} },
+        col: { builder: 'career_games_min', params: { games: '1' } },
+      },
+      {
+        cell: 'won_x_never_won',
+        row: { builder: 'won_a_final', params: {} },
+        col: { builder: 'never_won_a_final', params: {} },
+      },
+    ];
+
+    const actual = new Map<string, Awaited<ReturnType<typeof solveCellSummary>>>();
+    for (const cell of cases) {
+      const started = performance.now();
+      const summary = await solveCellSummary(cell.row, cell.col, 'games_asc');
+      const elapsedMs = performance.now() - started;
+      expect(elapsedMs, `${cell.cell} took ${elapsedMs.toFixed(1)} ms`).toBeLessThan(1000);
+      actual.set(cell.cell, summary);
+    }
+
+    // Structurally independent oracle: derive the unique winning-final set
+    // from base participation/match facts, derive its complement with a left
+    // anti join, then intersect those independent sets for the impossible
+    // third cell. This does not call compileAxis/solveCellSummary or reuse the
+    // generated production predicate.
+    const expected = await sql<{
+      cell: string;
+      eligible: string;
+      topId: number | null;
+      topName: string | null;
+    }[]>`
+      WITH winning_final_players AS (
+        SELECT pms.player_id
+          FROM player_match_stats pms
+          JOIN matches m
+            ON m.id = pms.match_id
+           AND m.winner_club_id = pms.club_id
+         WHERE m.is_final
+         GROUP BY pms.player_id
+      ),
+      never_winning_final_players AS (
+        SELECT p.id AS player_id
+          FROM players p
+          LEFT JOIN winning_final_players winners ON winners.player_id = p.id
+         WHERE winners.player_id IS NULL
+      ),
+      cell_members AS (
+        SELECT 'won_x_games_1'::text AS cell,
+               p.id AS player_id, p.display_name, p.sort_name, career.games
+          FROM winning_final_players winners
+          JOIN players p ON p.id = winners.player_id
+          JOIN player_career_stats career ON career.player_id = p.id
+         WHERE career.games >= 1
+        UNION ALL
+        SELECT 'never_won_x_games_1',
+               p.id, p.display_name, p.sort_name, career.games
+          FROM never_winning_final_players never_winners
+          JOIN players p ON p.id = never_winners.player_id
+          JOIN player_career_stats career ON career.player_id = p.id
+         WHERE career.games >= 1
+        UNION ALL
+        SELECT 'won_x_never_won',
+               p.id, p.display_name, p.sort_name, career.games
+          FROM winning_final_players winners
+          JOIN never_winning_final_players never_winners USING (player_id)
+          JOIN players p ON p.id = winners.player_id
+          JOIN player_career_stats career ON career.player_id = p.id
+      ),
+      cell_keys(cell, ordinal) AS (
+        VALUES ('won_x_games_1'::text, 1),
+               ('never_won_x_games_1'::text, 2),
+               ('won_x_never_won'::text, 3)
+      )
+      SELECT keys.cell,
+             count(members.player_id)::text AS eligible,
+             (array_agg(members.player_id ORDER BY members.games, members.sort_name)
+               FILTER (WHERE members.player_id IS NOT NULL))[1] AS "topId",
+             (array_agg(members.display_name ORDER BY members.games, members.sort_name)
+               FILTER (WHERE members.player_id IS NOT NULL))[1] AS "topName"
+        FROM cell_keys keys
+        LEFT JOIN cell_members members ON members.cell = keys.cell
+       GROUP BY keys.cell, keys.ordinal
+       ORDER BY keys.ordinal
+    `;
+
+    expect(expected).toHaveLength(cases.length);
+    for (const oracle of expected) {
+      const summary = actual.get(oracle.cell);
+      expect(summary, oracle.cell).toBeDefined();
+      expect(summary!.eligible, oracle.cell).toBe(Number(oracle.eligible));
+      expect(summary!.top?.id ?? null, oracle.cell).toBe(oracle.topId);
+      expect(summary!.top?.displayName ?? null, oracle.cell).toBe(oracle.topName);
+    }
+  });
+
   it('lost_grand_final_against finds a real losing-side player against a real winning-side player', async () => {
     const [gf] = await sql<{ matchId: number; winnerClubId: number }[]>`
       SELECT id AS "matchId", winner_club_id AS "winnerClubId"

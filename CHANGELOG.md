@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-103 — Grid Solver finals-win predicates stay within the database timeout - 29 August 2026
+
+- Re-shaped `won_a_final` and `never_won_a_final` around a distinct winning-player scalar-array InitPlan, preserving the exact winning-side participation semantics and complement while eliminating the timeout-producing nested-loop semi/anti joins over a materialized relation. The normal five-second statement timeout remains in force; no index, schema, or data change was required.
+- Added an independent base-table SQL oracle for the exact three failing cells. The complete Grid Solver integration file now passes 131 / 131 under `AFLDB_STATEMENT_TIMEOUT_MS=5000`; post-fix analyzed execution times were 35.386 ms, 501.698 ms and 103.791 ms, and the resolved ISSUE-076 regression remained green.
+
 ### AFLDB-ISSUE-076 — Grid Solver winning-final venue queries stay within the database timeout - 28 August 2026
 
 - Re-shaped `won_final_at_venue` membership so PostgreSQL computes the distinct winner-player IDs once as a scalar-array InitPlan instead of allowing an underestimated qualifying set to produce a repeatedly scanned materialised join shape. Venue, final and player-club winner semantics are unchanged; the normal five-second statement timeout remains intact, and no index or schema change was needed.

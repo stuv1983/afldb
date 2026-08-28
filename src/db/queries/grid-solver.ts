@@ -83,6 +83,22 @@ function orderedRange(axis: GridAxisState, loKey: string, loLabel: string, hiKey
 }
 
 /**
+ * Distinct players who participated for the winning club in a final.
+ *
+ * ISSUE-103 plan evidence showed the old semi/anti joins repeatedly scanning
+ * a materially underestimated winner-participation relation even though
+ * producing this distinct set takes about 15 ms. A scalar array makes the
+ * shared semantic set a one-time InitPlan for either membership or complement
+ * checks. player_match_stats.player_id is NOT NULL, so NOT (= ANY(array)) is
+ * the exact complement of membership, including for an empty array.
+ */
+function winningFinalPlayerIdsArray(): SqlFragment {
+  return sql`ARRAY(SELECT DISTINCT pms.player_id FROM player_match_stats pms
+                     JOIN matches m ON m.id = pms.match_id
+                    WHERE m.is_final AND m.winner_club_id = pms.club_id)`;
+}
+
+/**
  * The player's career total for a stat, grain-aware: player_career_stats
  * precomputes a real total column for the 8 'always'/'era_limited' stats
  * (goals plus the original 7), so those read directly from `c`. The other
@@ -410,9 +426,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     case 'premiership_player':
       return sql`c.premierships > 0`;
     case 'won_a_final':
-      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
-                            JOIN matches m ON m.id = pms.match_id
-                           WHERE m.is_final AND m.winner_club_id = pms.club_id)`;
+      return sql`p.id = ANY (${winningFinalPlayerIdsArray()})`;
     case 'finals_wins_min': {
       const n = requireInt(axis, 'x', 'At least');
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
@@ -421,9 +435,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                            GROUP BY pms.player_id HAVING count(*) >= ${n})`;
     }
     case 'never_won_a_final':
-      return sql`NOT EXISTS (SELECT 1 FROM player_match_stats pms
-                               JOIN matches m ON m.id = pms.match_id
-                              WHERE pms.player_id = p.id AND m.is_final AND m.winner_club_id = pms.club_id)`;
+      return sql`NOT (p.id = ANY (${winningFinalPlayerIdsArray()}))`;
     case 'played_finals_no_wins':
       return sql`c.finals > 0 AND NOT EXISTS (
                     SELECT 1 FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
