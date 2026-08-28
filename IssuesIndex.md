@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-28
-**Open issues:** 10
+**Open issues:** 9
 
 ## How Claude should use this file
 
@@ -26,7 +26,27 @@
 |---|---|---|---|
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | React #418 remains intermittent under production-style NL search hydration; narrow H7 diagnostic is awaiting authoritative live-build validation. |
 | `AFLDB-ISSUE-076` | Medium | Performance | `won_final_at_venue` Grid Solver combinations can exceed the 5-second PostgreSQL statement timeout and crash the rendered page. |
-| `AFLDB-ISSUE-090` | Medium | Data integrity / Import | Confirmed release blocker: club-list DOB enrichment stacks duplicate unresolved `dob_conflict` rows on rerun, and the register pass deletes conflicts it does not own. Migration 072 APPLIED to `afldb_test`; dob-enrichment suite GREEN (now 27/27 including ISSUE-092's tests). **UNBLOCKED 2026-08-28** — `AFLDB-ISSUE-092` is Resolved, so the release-gates halt is lifted. Next: `release-gates.test.ts`, then `privileges.test.ts`. Expect the two external-identity gates to read **13,275** against a stale legacy-derived pin of **12,472**; that re-pin decision is this issue's, and 12,472 must not be silently reinstated. |
+<!-- RETIRED 2026-08-28 — `AFLDB-ISSUE-090` is **Resolved** and is NO LONGER an open issue.
+     Do not read the commented-out row below as current: it is the pre-resolution index row,
+     kept only as lineage, and its "Next action" text is SUPERSEDED. Authoritative records:
+     the `AFLDB-ISSUE-090` entry in `issues.md` (Resolution, 2026-08-28) and
+     `AFLDB-ISSUE-090.md` §27. Final evidence: DOB reconciliation suite 27/27, the canonical
+     external-identity release assertion 1/1 (pin 13,275), privileges 24/24 with no grant
+     widened. NOTE: the full `release-gates.test.ts` suite is NOT green — Gate 1 was 42
+     passed / 22 failed on 2026-08-28 and the 16 unrelated failures stay with
+     `AFLDB-ISSUE-095`, `AFLDB-ISSUE-093`/DraftGuru B3, `AFLDB-ISSUE-096`/`-098`/`-099` and
+     rebuild-baseline drift. Two unowned observations are carried at `AFLDB-ISSUE-090.md`
+     §27.5: no legacy-free writer for `brownlow_season_votes`, and no writer at all for
+     `unlinked_player_with_games` backlog issues. Neither was converted to an issue here.
+
+| `AFLDB-ISSUE-090` | Medium | Data integrity / Import | Club-list DOB enrichment stacked duplicate unresolved `dob_conflict` rows on rerun and the register pass deleted conflicts it did not own. **Reconciliation contract IMPLEMENTED and PROVEN**: migration 072 applied, focused suite 27/27, and the global duplicate-issue invariant in `release-gates.test.ts` is **GREEN**. **Gate 1 run 2026-08-28** — 64 tests / 42 passed / 22 failed, all classified (handoff §11.3). Owned repair made: external-identity pin `12_472` → `13_275` (test-baseline repair from the canonical rebuild; live 13,275 = `measured.players` = `distinct_urls`, `missing_url` 0). The five `gate: birth dates` population assertions are **RETIRED as acceptance** — the canonical rebuild runs neither enrichment pass, 855 DOBs is the accepted baseline's contracted figure, the register pass needs `AFLDB_LEGACY_SQLITE` plus a `legacy_player_id` nothing writes, and the club-list CSVs are gitignored/absent. Revised standard: `AFLDB-ISSUE-090.md` §27.4. **Next action: run `privileges.test.ts` (Gate 2) — no grant widened.** Other 16 failures owned by ISSUE-095 / ISSUE-093-B3 / ISSUE-096-098-099 / rebuild drift; untouched. |
+-->
+
+<!-- Open issues continue. The header is repeated because the retired ISSUE-090 row
+     above interrupts the table. -->
+
+| Issue | Severity | Area | Current state |
+|---|---|---|---|
 | `AFLDB-ISSUE-095` | Medium | Data acquisition / Import architecture / Data integrity | `club_seasons` has no canonical, legacy-free acquisition path — `rebuild_derived.py` builds it only from `staging.team_seasons`, whose sole writer is `import_legacy_afl.py` under `AFLDB_LEGACY_SQLITE`. A clean canonical rebuild therefore correctly yields `club_seasons = 0`. Runbook `AFLDB-ISSUE-095.md`; decisions D1–D7 open. Stage 9 must NOT gate `club_seasons` until this lands. |
 <!-- RETIRED 2026-08-28 — `AFLDB-ISSUE-096` is **Resolved** (complete within its authorised S1–S4
      scope) and is NO LONGER an open issue. Do not read the commented-out row below as current:
@@ -159,7 +179,20 @@
 
 -->
 
-## AFLDB-ISSUE-090 — DOB enrichment conflict writes are not pass-scoped or idempotent
+<!-- RETIRED 2026-08-28 — `AFLDB-ISSUE-090` is **Resolved** and is NO LONGER an open issue.
+     The detail block below is kept as lineage only. Every "Current state", "Next action"
+     and HALT line in it is SUPERSEDED. Authoritative records: the `AFLDB-ISSUE-090` entry
+     in `issues.md` (Resolution, 2026-08-28) and `AFLDB-ISSUE-090.md` §27. -->
+
+## AFLDB-ISSUE-090 — DOB enrichment conflict writes are not pass-scoped or idempotent (RETIRED)
+
+- **Status:** **Resolved 2026-08-28.** Final validation, operator-run against the
+  canonically rebuilt `afldb_test`: DOB reconciliation suite **27/27** · canonical
+  external-identity release assertion **1/1** (63 skipped; pin **13,275**) · privileges
+  **24/24** with **no grant widened**. Resolved against the amended standard at
+  `AFLDB-ISSUE-090.md` §27.4. **The full `release-gates.test.ts` suite is NOT green** —
+  Gate 1 was 42 passed / 22 failed; the 16 unrelated failures keep their own owners and were
+  left unchanged.
 
 - **Severity:** Medium
 - **Area:** Data integrity / Import
@@ -167,12 +200,15 @@
   `tools/migration/enrich_birth_dates.py` (`:407-412`),
   `src/db/migrations/072_dob_conflict_ownership.sql` (new),
   `tests/integration/dob-enrichment-issues.test.ts` (new)
-- **Runbook:** `AFLDB-ISSUE-090.md` — durable source of truth. Planning
-  COMPLETE/APPROVED, implementation IN PROGRESS. Migration 072 APPLIED to `afldb_test`
+- **Runbook:** `AFLDB-ISSUE-090.md` — durable source of truth. Planning COMPLETE/APPROVED;
+  **implementation COMPLETE and validated 2026-08-28** (§27.4 standard, §27.6 resolution) —
+  the "implementation IN PROGRESS" text that stood here is superseded lineage.
+  Migration 072 APPLIED to `afldb_test`
   (`db:status` 72/72, 0 pending). `dob-enrichment-issues.test.ts` post-migration rerun
   GREEN 23/23 (fixed a test-harness bigint/string assertion defect on the way, not a
   migration defect). `AFLDB-ISSUE-091`'s migration-checksum blocker is Resolved.
-- **Current state:** `release-gates.test.ts` validation was HALTED; **the halt is LIFTED as
+- **Current state (SUPERSEDED 2026-08-28 by the Gate 1 result below; retained as lineage):**
+  `release-gates.test.ts` validation was HALTED; **the halt is LIFTED as
   of 2026-08-28**. The intended duplicate-`dob_conflict` gate is GREEN (the fix ISSUE-090 set
   out to make). Two unrelated `external_identities` gates had flipped green→red (expected
   12,472 `afltables_profile_url`/`unique` rows, found 0) — root-caused to a pre-existing
@@ -187,14 +223,32 @@
   D1a no `recurrence_of`; D2 targeted partial unique index; D3 equivalent
   `dob_internal_conflict` invariant; D4 `external_identity_conflict` is follow-up;
   D5 recompute `players.dob_disputed`.
-- **Exact next action:** **UNBLOCKED 2026-08-28.** `AFLDB-ISSUE-092` is Resolved (27/27,
-  no skips) and `afldb_test.external_identities` was repopulated by the 2026-08-27 canonical
-  rebuild, so no §6 recovery is outstanding and none is authorised. Resume
-  `release-gates.test.ts`, then `privileges.test.ts`. Expect the two external-identity gates
-  to read **13,275** (canonical, from `import_fitzroy_core.py`) against their stale
-  legacy-derived pin of **12,472**. Deciding that re-pin is **this** issue's call — it was
-  an explicit ISSUE-092 non-goal — and 12,472 must not be silently reinstated. This issue
-  remains OPEN.
+- **Gate 1 result (2026-08-28):** `release-gates.test.ts` — **64 tests, 42 passed, 22
+  failed**, every failure classified in `AFLDB-ISSUE-090-HANDOFF.md` §11.3. **ISSUE-090's own
+  duplicate-`dob_conflict` invariant (`:497-507`) is GREEN.** Six failures touched this
+  issue: the one stale pin (repaired) and five `gate: birth dates` population assertions
+  (retired as acceptance). The other 16 are owned by `AFLDB-ISSUE-095` (3),
+  `AFLDB-ISSUE-093`/DraftGuru B3 (2), `AFLDB-ISSUE-096`/`-098`/`-099` (2), rebuild-baseline
+  drift (4) and two unowned gaps (5) — **left unchanged.**
+- **The one repair:** `tests/integration/release-gates.test.ts` `gate: birth dates` →
+  `matches players on the profile URL rather than the name`, `12_472` → `13_275`. A
+  **test-baseline repair caused by the canonical rebuild, not a data change** — live
+  `afldb_test` 13,275, accepted baseline `measured.players` 13,275,
+  `identity_scan.distinct_urls` 13,275, `missing_url`/`malformed_url` 0, Stage 9 PASSED.
+  12,472 was the retired `AFLDB_LEGACY_SQLITE` register population. **The
+  `player_birth_evidence` 12,472 pin was NOT re-pinned** — a different population, live 855.
+- **Acceptance amended (`AFLDB-ISSUE-090.md` §27):** ISSUE-090 no longer has to recreate the
+  old 12,478-player enriched DOB snapshot. The canonical rebuild invokes neither enrichment
+  pass; `players_with_dob: 855` / `players_with_dob_conflict: 0` are the accepted baseline's
+  own contracted figures; the register pass requires `AFLDB_LEGACY_SQLITE` **and** would
+  resolve zero players because nothing canonical writes `players.legacy_player_id`; the
+  club-list pass's CSV directory is gitignored and absent. Old requirement preserved as
+  lineage at §27.3; revised standard at §27.4.
+- **Next action — NONE. SUPERSEDED, retained as lineage.** This bullet read *"run
+  `npm test -- tests/integration/privileges.test.ts` (Gate 2) … This issue remains **OPEN**
+  until Gate 2 passes."* Gate 2 was run on 2026-08-28: **24/24 PASS, no grant widened.** With
+  that, every item of the `AFLDB-ISSUE-090.md` §27.4 standard is met and the issue is
+  **Resolved**. There is no outstanding ISSUE-090 action.
 
 <!-- RETIRED 2026-08-28 — `AFLDB-ISSUE-092` is **Resolved** and is NO LONGER an open issue.
      Its index row and detail block have been removed from this open-issues-only file.

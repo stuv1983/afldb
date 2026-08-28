@@ -639,7 +639,15 @@ describe('gate: birth dates', () => {
       SELECT count(*)::int AS n FROM external_identities
        WHERE match_method = 'afltables_profile_url' AND status = 'unique'
     `;
-    expect(row.n).toBe(12_472);
+    // AFLDB-ISSUE-090: re-pinned 12,472 -> 13,275 as a test-baseline repair
+    // caused by the 2026-08-27 canonical rebuild, NOT a data change. 12,472
+    // was the retired AFLDB_LEGACY_SQLITE register population; the canonical
+    // fitzRoy import writes exactly one unique profile-URL identity per
+    // player, and the accepted baseline full-history-20260827 measures
+    // players = 13,275 with identity_scan.distinct_urls = 13,275 and
+    // missing_url = 0. The player_birth_evidence pin above is a DIFFERENT
+    // population and is deliberately not changed with this one.
+    expect(row.n).toBe(13_275);
   });
 
   it('stores the profile URL it matched on, not a legacy row id', async () => {
