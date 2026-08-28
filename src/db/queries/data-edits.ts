@@ -201,7 +201,7 @@ export async function saveEdit(input: {
     const applied = await importSql.begin(async (tx) => {
       const before = await readCurrent(tx, entity, group.fields, input.rowId);
       if (!before) return null;
-      
+
       const naturalKey = await getEntityNaturalKey(tx, input.entityKey, input.rowId);
 
       if (input.entityKey === 'players') {
@@ -211,20 +211,20 @@ export async function saveEdit(input: {
       } else {
         await applyMatchEdit(tx, input.rowId, input.groupKey, values);
       }
-      
+
       if (naturalKey !== null) {
         const [existing] = await tx<{ override_values: Record<string, any> }[]>`
           SELECT override_values FROM data_overrides
            WHERE entity_type = ${input.entityKey} AND entity_key = ${naturalKey} AND field_group = ${input.groupKey}
         `;
-        
+
         const overrides: Record<string, any> = existing ? { ...existing.override_values } : {};
         for (const field of group.fields) {
           if (values[field] !== before[field]) {
             overrides[field] = values[field];
           }
         }
-        
+
         // Upsert the active override so importers can replay it
         if (Object.keys(overrides).length > 0) {
           await tx`

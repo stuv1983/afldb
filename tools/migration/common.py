@@ -892,7 +892,7 @@ class Reporter:
 
 def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
     """Replay durable admin overrides for the given table over newly imported rows.
-    
+
     For DraftGuru integration (AFLDB-ISSUE-093), this helper can be called
     directly by the new draft importer without redesign. The canonical DraftGuru importer
     usage here is retained for historical compatibility on this branch.
@@ -952,10 +952,10 @@ def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
             cur.execute("""
                 UPDATE matches m
                    SET attendance = CASE WHEN jsonb_exists(o.override_values, 'attendance') THEN (o.override_values->>'attendance')::integer ELSE m.attendance END,
-                       attendance_status = CASE 
+                       attendance_status = CASE
                            WHEN jsonb_exists(o.override_values, 'attendance') THEN
                                CASE WHEN (o.override_values->>'attendance') IS NULL THEN 'not_collected'::coverage_status ELSE 'complete'::coverage_status END
-                           ELSE m.attendance_status 
+                           ELSE m.attendance_status
                        END,
                        attendance_source_id = CASE
                            WHEN jsonb_exists(o.override_values, 'attendance') THEN

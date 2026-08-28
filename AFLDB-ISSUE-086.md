@@ -8,7 +8,7 @@
 
 ## Plan / Architecture
 - **Durable Source of Truth (`data_overrides`)**: Introduced `073_data_overrides.sql` containing `data_overrides` mapping an `entity_type`, `entity_key` (natural key), and `field_group` to an `override_values` JSONB payload.
-- **Natural Key Resolution (`saveEdit`)**: 
+- **Natural Key Resolution (`saveEdit`)**:
   - Matches: `match_key`
   - Players: Uses `afltables:<external_id>` from `external_identities` (status unique/resolved). Missing/ambiguous identity fails closed (not durably stored, since they aren't source-owned).
   - Draft Picks: `source_id|player_url|draft_year|draft_kind`

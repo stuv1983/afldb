@@ -7,11 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-28
-<<<<<<< HEAD
-**Open issues:** 12
-=======
-**Open issues:** 6
->>>>>>> 4af53d8 (fix: index data override admin foreign key)
+**Open issues:** 11
 
 ## How Claude should use this file
 

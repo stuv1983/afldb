@@ -19,10 +19,10 @@ describe('AFLDB-ISSUE-086 Source Contract', () => {
   test('JSON absent vs explicit NULL semantics', () => {
     // One nullable text field (given_name)
     expect(pyCommon).toMatch(/given_name\s*=\s*CASE WHEN jsonb_exists\(o\.override_values,\s*'given_name'\)\s*THEN\s*o\.override_values->>'given_name'\s*ELSE\s*p\.given_name\s*END/);
-    
+
     // One nullable numeric/date field (dob)
     expect(pyCommon).toMatch(/dob\s*=\s*CASE WHEN jsonb_exists\(o\.override_values,\s*'dob'\)\s*THEN\s*\(o\.override_values->>'dob'\)::date\s*ELSE\s*p\.dob\s*END/);
-    
+
     // One NOT NULL field (display_name)
     expect(pyCommon).toMatch(/display_name\s*=\s*COALESCE\(o\.override_values->>'display_name',\s*p\.display_name\)/);
   });
