@@ -2,10 +2,14 @@ import postgres from 'postgres';
 
 import sourceFamiliesRaw from '../../../data/reference/source-families.json';
 import {
+  decideObservation,
+  type JsonValue,
+  type ObservationHead,
+} from '../acquisition/observations';
+import {
   getSourceFamily,
   parseSourceFamilyRegistry,
 } from '../acquisition/source-families';
-
 import {
   fetchKaliCurrentMatches,
   fetchSquiggleCurrentMatches,
@@ -24,17 +28,20 @@ export type CurrentSeasonRunOptions = {
 };
 
 export type CurrentSeasonRunResult = {
-  fetched: number;
+  observationsFetched: number;
   sourceCounts: Record<ExternalSource, number>;
   independenceGroupCounts: Record<string, number>;
-  complete: number;
-  withScores: number;
-  staged: number;
-  inserted: number;
-  resolved: number;
-  updated: number;
-  unresolved: number;
-  incompleteFixtures: number;
+  completeObservations: number;
+  observationsWithScores: number;
+  observationsStaged: number;
+  observationVersionsInserted: number;
+  observationsMarkedAbsent: number;
+  canonicalMatchesResolved: number;
+  canonicalRowsInserted: number;
+  canonicalRowsUpdated: number;
+  unresolvedObservations: number;
+  incompleteSourceRecords: number;
+  rejectedOrConflicted: number;
   sourceDisagreements: number;
   sameGroupConflicts: number;
   applied: boolean;
@@ -250,24 +257,27 @@ export async function runCurrentSeasonRefresh(options: CurrentSeasonRunOptions):
     kali: matches.filter((m) => m.source === 'kali').length,
   };
   const independenceGroupCounts = countMatchIndependenceGroups(matches);
-  const fetched = matches.length;
-  const complete = matches.filter((m) => m.completePercent === 100).length;
-  const withScores = matches.filter((m) => m.homeScore !== null && m.awayScore !== null).length;
+  const observationsFetched = matches.length;
+  const completeObservations = matches.filter((m) => m.completePercent === 100).length;
+  const observationsWithScores = matches.filter((m) => m.homeScore !== null && m.awayScore !== null).length;
 
   if (!options.apply || matches.length === 0) {
     if (matches.length === 0) {
       return {
-        fetched,
+        observationsFetched,
         sourceCounts,
         independenceGroupCounts,
-        complete,
-        withScores,
-        staged: 0,
-        inserted: 0,
-        resolved: 0,
-        updated: 0,
-        unresolved: 0,
-        incompleteFixtures: 0,
+        completeObservations,
+        observationsWithScores,
+        observationsStaged: 0,
+        observationVersionsInserted: 0,
+        observationsMarkedAbsent: 0,
+        canonicalMatchesResolved: 0,
+        canonicalRowsInserted: 0,
+        canonicalRowsUpdated: 0,
+        unresolvedObservations: 0,
+        incompleteSourceRecords: 0,
+        rejectedOrConflicted: 0,
         sourceDisagreements: 0,
         sameGroupConflicts: 0,
         applied: false,
@@ -276,52 +286,25 @@ export async function runCurrentSeasonRefresh(options: CurrentSeasonRunOptions):
 
     const sql = createImportClient();
     try {
-      let resolved = 0;
-      let unresolved = 0;
-      let incompleteFixtures = 0;
-      const updatesByLocalMatchId = new Map<number, MatchCandidate[]>();
-      const insertsByMatchKey = new Map<string, MatchCandidate[]>();
-      for (const match of matches) {
-        const homeClubId = await resolveClub(sql, match.homeTeamRaw, match.season);
-        const awayClubId = await resolveClub(sql, match.awayTeamRaw, match.season);
-        const localMatchId = await resolveLocalMatch(sql, match, homeClubId, awayClubId);
-        const resolution = classifyCurrentSeasonResolution(localMatchId, match);
-        if (resolution === 'resolved') {
-          resolved += 1;
-        } else if (resolution === 'unresolved') {
-          unresolved += 1;
-        } else {
-          incompleteFixtures += 1;
-        }
-        if (isCompleteScoredMatch(match) && homeClubId !== null && awayClubId !== null) {
-          if (localMatchId !== null) {
-            appendCandidate(updatesByLocalMatchId, localMatchId, { match, homeClubId, awayClubId });
-          } else if (resolution === 'unresolved') {
-            const matchKey = await missingMatchKey(sql, match, homeClubId, awayClubId);
-            if (matchKey !== null) {
-              appendCandidate(insertsByMatchKey, matchKey, { match, homeClubId, awayClubId });
-            }
-          }
-        }
-      }
-      const conflictCounts = countCandidateConflicts([
-        ...updatesByLocalMatchId.values(),
-        ...insertsByMatchKey.values(),
-      ]);
+      const resolvedObservations = await resolveCurrentSeasonObservations(sql, matches);
+      const plan = planCurrentSeasonCanonicalWork(resolvedObservations, options.insertMissingMatches);
       return {
-        fetched,
+        observationsFetched,
         sourceCounts,
         independenceGroupCounts,
-        complete,
-        withScores,
-        staged: matches.length,
-        inserted: 0,
-        resolved,
-        updated: 0,
-        unresolved,
-        incompleteFixtures,
-        sourceDisagreements: conflictCounts.sourceDisagreements,
-        sameGroupConflicts: conflictCounts.sameGroupConflicts,
+        completeObservations,
+        observationsWithScores,
+        observationsStaged: 0,
+        observationVersionsInserted: 0,
+        observationsMarkedAbsent: 0,
+        canonicalMatchesResolved: plan.canonicalMatchesResolved,
+        canonicalRowsInserted: plan.canonicalRowsInserted,
+        canonicalRowsUpdated: 0,
+        unresolvedObservations: plan.unresolvedObservations,
+        incompleteSourceRecords: plan.incompleteSourceRecords,
+        rejectedOrConflicted: plan.rejectedOrConflicted,
+        sourceDisagreements: plan.sourceDisagreements,
+        sameGroupConflicts: plan.sameGroupConflicts,
         applied: false,
       };
     } finally {
@@ -338,17 +321,20 @@ export async function runCurrentSeasonRefresh(options: CurrentSeasonRunOptions):
       options.insertMissingMatches,
     );
     return {
-      fetched,
+      observationsFetched,
       sourceCounts,
       independenceGroupCounts,
-      complete,
-      withScores,
-      staged: result.staged,
-      inserted: result.inserted,
-      resolved: result.resolved,
-      updated: result.updated,
-      unresolved: result.unresolved,
-      incompleteFixtures: result.incompleteFixtures,
+      completeObservations,
+      observationsWithScores,
+      observationsStaged: result.observationsStaged,
+      observationVersionsInserted: result.observationVersionsInserted,
+      observationsMarkedAbsent: result.observationsMarkedAbsent,
+      canonicalMatchesResolved: result.canonicalMatchesResolved,
+      canonicalRowsInserted: result.canonicalRowsInserted,
+      canonicalRowsUpdated: result.canonicalRowsUpdated,
+      unresolvedObservations: result.unresolvedObservations,
+      incompleteSourceRecords: result.incompleteSourceRecords,
+      rejectedOrConflicted: result.rejectedOrConflicted,
       sourceDisagreements: result.sourceDisagreements,
       sameGroupConflicts: result.sameGroupConflicts,
       applied: true,
@@ -411,23 +397,147 @@ function primaryLocalRoundCode(match: ExternalCurrentMatch): string | null {
   return localRoundCodes(match)[0] ?? null;
 }
 
-function localRoundNumber(match: ExternalCurrentMatch): number | null {
-  const code = primaryLocalRoundCode(match);
-  return code !== null && /^\d+$/.test(code) ? Number(code) : null;
+export type ResolvedCurrentSeasonObservation = {
+  match: ExternalCurrentMatch;
+  homeClubId: number | null;
+  awayClubId: number | null;
+  localMatchId: number | null;
+};
+
+export type CanonicalInsertAssessment = {
+  status: 'incomplete_source_family' | 'source_disagreement' | 'same_group_conflict';
+  observationCount: number;
+  independenceGroups: string[];
+  disagreeingGroups: string[];
+  sameGroupConflictGroups: string[];
+  independentlyCorroborated: boolean;
+  venueRaw: string | null;
+};
+
+export type CurrentSeasonCanonicalPlan = {
+  canonicalMatchesResolved: number;
+  canonicalRowsInserted: 0;
+  unresolvedObservations: number;
+  incompleteSourceRecords: number;
+  rejectedOrConflicted: number;
+  sourceDisagreements: number;
+  sameGroupConflicts: number;
+  insertAssessments: CanonicalInsertAssessment[];
+};
+
+function isCompleteMissingMatchCandidate(
+  observation: ResolvedCurrentSeasonObservation,
+): observation is ResolvedCurrentSeasonObservation & { homeClubId: number; awayClubId: number } {
+  const { match, homeClubId, awayClubId } = observation;
+  return observation.localMatchId === null
+    && match.completePercent === 100
+    && match.matchDate !== null
+    && primaryLocalRoundCode(match) !== null
+    && homeClubId !== null
+    && awayClubId !== null
+    && match.homeScore !== null
+    && match.awayScore !== null;
 }
 
-function localRoundType(match: ExternalCurrentMatch): 'home_and_away' | 'elimination_final' | 'qualifying_final' | 'semi_final' | 'preliminary_final' | 'grand_final' | null {
-  const code = primaryLocalRoundCode(match);
-  if (code === null) return null;
-  if (/^\d+$/.test(code)) return 'home_and_away';
-  if (code === 'EF') return 'elimination_final';
-  if (code === 'QF') return 'qualifying_final';
-  if (code === 'SF') return 'semi_final';
-  if (code === 'PF') return 'preliminary_final';
-  if (code === 'GF') return 'grand_final';
-  return null;
+function missingMatchIdentity(
+  observation: ResolvedCurrentSeasonObservation & { homeClubId: number; awayClubId: number },
+): string {
+  const { match, homeClubId, awayClubId } = observation;
+  return [
+    match.season,
+    primaryLocalRoundCode(match),
+    match.matchDate,
+    homeClubId,
+    awayClubId,
+  ].join('|');
 }
 
+/**
+ * Classify canonical work independently from staging operations while using
+ * ISSUE-097's independence-group collapse as the sole evidence comparator.
+ *
+ * The current API sources own observations and score corroboration only.
+ * Their registered match-family promotion policy is `never`, and neither
+ * source supplies the complete canonical family (attendance, period scores,
+ * and played participation/statistics). A completed observation can therefore
+ * identify missing canonical work, but cannot create a partial `matches` row.
+ */
+export function planCurrentSeasonCanonicalWork(
+  observations: readonly ResolvedCurrentSeasonObservation[],
+  insertMissingMatches: boolean,
+): CurrentSeasonCanonicalPlan {
+  const resolvedIds = new Set<number>();
+  const candidateSets = new Map<string, MatchCandidate[]>();
+  const missingCandidateKeys = new Set<string>();
+  let unresolvedObservations = 0;
+  let incompleteSourceRecords = 0;
+
+  for (const observation of observations) {
+    if (observation.localMatchId !== null) {
+      resolvedIds.add(observation.localMatchId);
+      if (isCompleteScoredMatch(observation.match)
+          && observation.homeClubId !== null && observation.awayClubId !== null) {
+        appendCandidate(candidateSets, `resolved:${observation.localMatchId}`, {
+          match: observation.match,
+          homeClubId: observation.homeClubId,
+          awayClubId: observation.awayClubId,
+        });
+      }
+      continue;
+    }
+    if (!isCompleteMissingMatchCandidate(observation)) {
+      incompleteSourceRecords += 1;
+      continue;
+    }
+    unresolvedObservations += 1;
+    const key = `missing:${missingMatchIdentity(observation)}`;
+    missingCandidateKeys.add(key);
+    appendCandidate(candidateSets, key, {
+      match: observation.match,
+      homeClubId: observation.homeClubId,
+      awayClubId: observation.awayClubId,
+    });
+  }
+
+  const insertAssessments: CanonicalInsertAssessment[] = [];
+  let sourceDisagreements = 0;
+  let sameGroupConflicts = 0;
+  let rejectedOrConflicted = 0;
+  for (const [key, candidates] of candidateSets) {
+    const { corroboration, representative } = analyseCandidates(candidates, candidates[0].homeClubId);
+    const hasIndependentDisagreement = corroboration.disagreeingGroups.length > 0;
+    const hasSameGroupConflict = corroboration.sameGroupConflictGroups.length > 0;
+    if (hasIndependentDisagreement) sourceDisagreements += 1;
+    if (hasSameGroupConflict) sameGroupConflicts += 1;
+    if (hasIndependentDisagreement || hasSameGroupConflict) rejectedOrConflicted += 1;
+
+    if (insertMissingMatches && missingCandidateKeys.has(key)) {
+      if (!hasIndependentDisagreement && !hasSameGroupConflict) rejectedOrConflicted += 1;
+      insertAssessments.push({
+        status: hasSameGroupConflict
+          ? 'same_group_conflict'
+          : hasIndependentDisagreement ? 'source_disagreement' : 'incomplete_source_family',
+        observationCount: candidates.length,
+        independenceGroups: [...corroboration.independenceGroups],
+        disagreeingGroups: [...corroboration.disagreeingGroups],
+        sameGroupConflictGroups: [...corroboration.sameGroupConflictGroups],
+        independentlyCorroborated: corroboration.independentlyCorroborated,
+        venueRaw: representative.match.venueRaw,
+      });
+    }
+  }
+
+  return {
+    canonicalMatchesResolved: resolvedIds.size,
+    canonicalRowsInserted: 0,
+    unresolvedObservations,
+    incompleteSourceRecords,
+    rejectedOrConflicted,
+    sourceDisagreements,
+    sameGroupConflicts,
+    insertAssessments,
+  };
+}
 function clubAliasKey(raw: string): string {
   return raw.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
@@ -482,10 +592,18 @@ async function resolveLocalMatch(
   return rows.length === 1 ? rows[0].id : null;
 }
 
-async function clubName(sql: Db, clubId: number): Promise<string> {
-  const [row] = await sql<{ name: string }[]>`SELECT name FROM clubs WHERE id = ${clubId}`;
-  if (!row) throw new Error(`Club ${clubId} no longer exists.`);
-  return row.name;
+async function resolveCurrentSeasonObservations(
+  sql: Db,
+  matches: readonly ExternalCurrentMatch[],
+): Promise<ResolvedCurrentSeasonObservation[]> {
+  const observations: ResolvedCurrentSeasonObservation[] = [];
+  for (const match of matches) {
+    const homeClubId = await resolveClub(sql, match.homeTeamRaw, match.season);
+    const awayClubId = await resolveClub(sql, match.awayTeamRaw, match.season);
+    const localMatchId = await resolveLocalMatch(sql, match, homeClubId, awayClubId);
+    observations.push({ match, homeClubId, awayClubId, localMatchId });
+  }
+  return observations;
 }
 
 async function refreshSeasonMetadata(sql: Db, season: number): Promise<void> {
@@ -524,15 +642,6 @@ type MatchCandidate = {
   awayClubId: number;
 };
 
-function classifyCurrentSeasonResolution(
-  localMatchId: number | null,
-  match: ExternalCurrentMatch,
-): 'resolved' | 'unresolved' | 'incomplete' {
-  if (localMatchId !== null) return 'resolved';
-  if (match.completePercent === 100 && match.matchDate !== null) return 'unresolved';
-  return 'incomplete';
-}
-
 function isCompleteScoredMatch(match: ExternalCurrentMatch): boolean {
   return match.completePercent === 100
     && match.matchDate !== null
@@ -544,19 +653,6 @@ function appendCandidate<K>(map: Map<K, MatchCandidate[]>, key: K, candidate: Ma
   const candidates = map.get(key);
   if (candidates) candidates.push(candidate);
   else map.set(key, [candidate]);
-}
-
-async function missingMatchKey(
-  sql: Db,
-  match: ExternalCurrentMatch,
-  homeClubId: number,
-  awayClubId: number,
-): Promise<string | null> {
-  const roundCode = primaryLocalRoundCode(match);
-  if (roundCode === null || match.matchDate === null) return null;
-  const homeName = await clubName(sql, homeClubId);
-  const awayName = await clubName(sql, awayClubId);
-  return `${match.season}|${roundCode}|${match.matchDate}|${homeName}|${awayName}`;
 }
 
 function evidenceForCandidate(
@@ -603,39 +699,184 @@ function analyseCandidates(candidates: readonly MatchCandidate[], canonicalHomeC
   return { corroboration, representative };
 }
 
-function countCandidateConflicts(candidateSets: readonly MatchCandidate[][]): {
-  sourceDisagreements: number;
-  sameGroupConflicts: number;
-} {
-  let sourceDisagreements = 0;
-  let sameGroupConflicts = 0;
-  for (const candidates of candidateSets) {
-    const { corroboration } = analyseCandidates(candidates, candidates[0].homeClubId);
-    if (corroboration.disagreeingGroups.length > 0) sourceDisagreements += 1;
-    if (corroboration.sameGroupConflictGroups.length > 0) sameGroupConflicts += 1;
+function asJsonValue(payload: unknown): JsonValue {
+  return payload as JsonValue;
+}
+
+async function persistSourceObservation(
+  tx: postgres.TransactionSql,
+  sourceId: number,
+  match: ExternalCurrentMatch,
+  batchId: number,
+  observedAt: string,
+): Promise<'version_inserted' | 'head_refreshed'> {
+  const family = 'match';
+  const contract = getSourceFamily(SOURCE_FAMILY_REGISTRY, sourceKey(match.source), family);
+  const [storedHead] = await tx<{
+    versionSeq: number;
+    payloadHash: string;
+    hashRecipe: string;
+    rawPayload: JsonValue;
+    absentSince: Date | string | null;
+  }[]>`
+    SELECT v.version_seq AS "versionSeq",
+           v.payload_hash AS "payloadHash",
+           p.hash_recipe AS "hashRecipe",
+           p.raw_payload AS "rawPayload",
+           r.absent_since AS "absentSince"
+      FROM staging.source_records r
+      JOIN staging.source_record_versions v
+        ON v.source_id = r.source_id
+       AND v.family = r.family
+       AND v.external_record_id = r.external_record_id
+       AND v.version_seq = r.current_version_seq
+      JOIN staging.source_payloads p
+        ON p.source_id = v.source_id
+       AND p.family = v.family
+       AND p.payload_hash = v.payload_hash
+     WHERE r.source_id = ${sourceId}
+       AND r.family = ${family}
+       AND r.external_record_id = ${match.externalGameId}
+     FOR UPDATE OF r
+  `;
+  const head: ObservationHead | null = storedHead ? {
+    versionSeq: storedHead.versionSeq,
+    payloadHash: storedHead.payloadHash,
+    hashRecipe: storedHead.hashRecipe,
+    rawPayload: storedHead.rawPayload,
+    absentSince: storedHead.absentSince === null ? null : String(storedHead.absentSince),
+  } : null;
+  const payload = asJsonValue(match.rawPayload);
+  const decision = decideObservation({ contract, head, payload, observedAt });
+  const scopeKey = `season=${match.season}`;
+
+  if (decision.action === 'unchanged') {
+    await tx`
+      UPDATE staging.source_records
+         SET scope_key = ${scopeKey},
+             last_seen_at = ${observedAt},
+             last_batch_id = ${batchId},
+             absent_since = NULL
+       WHERE source_id = ${sourceId}
+         AND family = ${family}
+         AND external_record_id = ${match.externalGameId}
+    `;
+    return 'head_refreshed';
   }
-  return { sourceDisagreements, sameGroupConflicts };
+
+  await tx`
+    INSERT INTO staging.source_payloads (
+      source_id, family, payload_hash, hash_recipe, raw_payload, first_stored_at
+    ) VALUES (
+      ${sourceId}, ${family}, ${decision.payloadHash}, ${decision.recipe},
+      ${tx.json(payload as never)}, ${observedAt}
+    )
+    ON CONFLICT (source_id, family, payload_hash) DO NOTHING
+  `;
+
+  if (decision.closesPreviousVersion) {
+    await tx`
+      UPDATE staging.source_record_versions
+         SET observed_to = ${observedAt}, closed_by_batch_id = ${batchId}
+       WHERE source_id = ${sourceId}
+         AND family = ${family}
+         AND external_record_id = ${match.externalGameId}
+         AND version_seq = ${decision.versionSeq - 1}
+         AND observed_to IS NULL
+    `;
+  }
+
+  await tx`
+    INSERT INTO staging.source_record_versions (
+      source_id, family, external_record_id, version_seq, payload_hash,
+      source_updated_at, observed_from, opened_by_batch_id
+    ) VALUES (
+      ${sourceId}, ${family}, ${match.externalGameId}, ${decision.versionSeq},
+      ${decision.payloadHash}, ${decision.sourceUpdatedAt}, ${observedAt}, ${batchId}
+    )
+  `;
+
+  if (head === null) {
+    await tx`
+      INSERT INTO staging.source_records (
+        source_id, family, external_record_id, scope_key,
+        current_version_seq, current_payload_hash,
+        first_seen_at, last_seen_at, last_batch_id, absent_since
+      ) VALUES (
+        ${sourceId}, ${family}, ${match.externalGameId}, ${scopeKey},
+        ${decision.versionSeq}, ${decision.payloadHash},
+        ${observedAt}, ${observedAt}, ${batchId}, NULL
+      )
+    `;
+  } else {
+    await tx`
+      UPDATE staging.source_records
+         SET scope_key = ${scopeKey},
+             current_version_seq = ${decision.versionSeq},
+             current_payload_hash = ${decision.payloadHash},
+             last_seen_at = ${observedAt},
+             last_batch_id = ${batchId},
+             absent_since = NULL
+       WHERE source_id = ${sourceId}
+         AND family = ${family}
+         AND external_record_id = ${match.externalGameId}
+    `;
+  }
+  return 'version_inserted';
+}
+
+async function markMissingObservationsAbsent(
+  tx: postgres.TransactionSql,
+  sourceIds: ReadonlyMap<ExternalSource, number>,
+  matches: readonly ExternalCurrentMatch[],
+  batchId: number,
+  observedAt: string,
+): Promise<number> {
+  const scopes = new Map<string, { sourceId: number; season: number }>();
+  for (const match of matches) {
+    const sourceId = sourceIds.get(match.source);
+    if (!sourceId) continue;
+    scopes.set(`${sourceId}|${match.season}`, { sourceId, season: match.season });
+  }
+
+  let markedAbsent = 0;
+  for (const { sourceId, season } of scopes.values()) {
+    const rows = await tx`
+      UPDATE staging.source_records
+         SET absent_since = ${observedAt}
+       WHERE source_id = ${sourceId}
+         AND family = 'match'
+         AND scope_key = ${`season=${season}`}
+         AND last_batch_id <> ${batchId}
+         AND absent_since IS NULL
+       RETURNING external_record_id
+    `;
+    markedAbsent += rows.length;
+  }
+  return markedAbsent;
 }
 
 async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], updateMatches: boolean, insertMissingMatches: boolean): Promise<{
-  staged: number;
-  inserted: number;
-  resolved: number;
-  updated: number;
-  unresolved: number;
-  incompleteFixtures: number;
+  observationsStaged: number;
+  observationVersionsInserted: number;
+  observationsMarkedAbsent: number;
+  canonicalMatchesResolved: number;
+  canonicalRowsInserted: 0;
+  canonicalRowsUpdated: number;
+  unresolvedObservations: number;
+  incompleteSourceRecords: number;
+  rejectedOrConflicted: number;
   sourceDisagreements: number;
   sameGroupConflicts: number;
 }> {
-  let staged = 0;
-  let inserted = 0;
-  let resolved = 0;
-  let updated = 0;
-  let unresolved = 0;
-  let incompleteFixtures = 0;
-  let sourceDisagreements = 0;
-  let sameGroupConflicts = 0;
+  let observationsStaged = 0;
+  let observationVersionsInserted = 0;
+  let observationHeadsRefreshed = 0;
+  let observationsMarkedAbsent = 0;
+  let canonicalRowsUpdated = 0;
   const touchedSeasons = new Set<number>();
+  let canonicalPlan: CurrentSeasonCanonicalPlan = planCurrentSeasonCanonicalWork([], insertMissingMatches);
+  const observedAt = new Date().toISOString();
 
   await sql.begin(async (tx) => {
     const sourceIds = new Map<ExternalSource, number>();
@@ -653,13 +894,13 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
     const [batch] = await tx<{ id: number }[]>`
       INSERT INTO import_batches (source_id, tool, target_table, records_read, notes)
       VALUES (${firstSourceId}, 'current-season external refresh',
-              'staging.external_current_matches', ${matches.length},
+              'staging.source_record_versions', ${matches.length},
               ${`sources=${[...new Set(matches.map((m) => m.source))].join(',')}`})
       RETURNING id
     `;
 
     const updatesByLocalMatchId = new Map<number, MatchCandidate[]>();
-    const insertsByMatchKey = new Map<string, MatchCandidate[]>();
+    const resolvedObservations: ResolvedCurrentSeasonObservation[] = [];
 
     for (const match of matches) {
       const sourceId = sourceIds.get(match.source);
@@ -668,16 +909,19 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
       const homeClubId = await resolveClub(tx, match.homeTeamRaw, match.season);
       const awayClubId = await resolveClub(tx, match.awayTeamRaw, match.season);
       const localMatchId = await resolveLocalMatch(tx, match, homeClubId, awayClubId);
-      
-      const resolution = classifyCurrentSeasonResolution(localMatchId, match);
-      if (resolution === 'resolved') {
-        resolved += 1;
-      } else if (resolution === 'unresolved') {
-        unresolved += 1;
+      resolvedObservations.push({ match, homeClubId, awayClubId, localMatchId });
+
+      const observationAction = await persistSourceObservation(
+        tx, sourceId, match, batch.id, observedAt,
+      );
+      if (observationAction === 'version_inserted') {
+        observationVersionsInserted += 1;
       } else {
-        incompleteFixtures += 1;
+        observationHeadsRefreshed += 1;
       }
 
+      // This table is the mutable current-season resolution projection. The
+      // immutable source evidence was persisted above before this upsert.
       await tx`
         INSERT INTO staging.external_current_matches (
           source_id, external_game_id, season, round_label, round_number,
@@ -715,29 +959,19 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
           raw_payload = EXCLUDED.raw_payload,
           last_seen_at = now()
       `;
-      staged += 1;
+      observationsStaged += 1;
 
       if (localMatchId !== null && isCompleteScoredMatch(match)) {
         appendCandidate(updatesByLocalMatchId, localMatchId, {
           match, homeClubId: homeClubId!, awayClubId: awayClubId!,
         });
       }
-
-      if (localMatchId === null && isCompleteScoredMatch(match)
-          && homeClubId !== null && awayClubId !== null) {
-        const matchKey = await missingMatchKey(tx, match, homeClubId, awayClubId);
-        if (matchKey !== null) {
-          appendCandidate(insertsByMatchKey, matchKey, { match, homeClubId, awayClubId });
-        }
-      }
     }
 
-    const conflictCounts = countCandidateConflicts([
-      ...updatesByLocalMatchId.values(),
-      ...insertsByMatchKey.values(),
-    ]);
-    sourceDisagreements = conflictCounts.sourceDisagreements;
-    sameGroupConflicts = conflictCounts.sameGroupConflicts;
+    canonicalPlan = planCurrentSeasonCanonicalWork(resolvedObservations, insertMissingMatches);
+    observationsMarkedAbsent = await markMissingObservationsAbsent(
+      tx, sourceIds, matches, batch.id, observedAt,
+    );
 
     if (updateMatches) {
       for (const [localMatchId, candidates] of updatesByLocalMatchId.entries()) {
@@ -815,72 +1049,8 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
                  import_batch_id = ${batch.id}
            WHERE id = ${localMatchId}
         `;
-        updated += 1;
+        canonicalRowsUpdated += 1;
         touchedSeasons.add(match.season);
-      }
-    }
-
-    if (insertMissingMatches) {
-      for (const [matchKey, candidates] of insertsByMatchKey.entries()) {
-        const { match, homeClubId, awayClubId } = candidates[0];
-        const { corroboration } = analyseCandidates(candidates, homeClubId);
-        if (corroboration.disagreeingGroups.length > 0) {
-          continue;
-        }
-        if (corroboration.sameGroupConflictGroups.length > 0) {
-          continue;
-        }
-        if (corroboration.values === null) continue;
-        const values = corroboration.values;
-        const result = values.homeScore === values.awayScore
-          ? 'draw'
-          : values.homeScore > values.awayScore ? 'home_win' : 'away_win';
-        const roundCode = primaryLocalRoundCode(match);
-        const roundType = localRoundType(match);
-        if (roundCode === null || roundType === null) continue;
-
-        const winnerClubId = result === 'draw' ? null : result === 'home_win' ? homeClubId : awayClubId;
-        const sourceId = sourceIds.get(match.source)!;
-
-        const [insertedRow] = await tx<{ id: number }[]>`
-          INSERT INTO matches (
-            match_key, season, round_code, round_number, round_type, is_final,
-            match_date, venue_raw, home_club_id, away_club_id,
-            home_goals, home_behinds, home_score,
-            away_goals, away_behinds, away_score,
-            result, winner_club_id, margin,
-            attendance, attendance_status, attendance_source_id,
-            source_id, source_record_id, import_batch_id
-          ) VALUES (
-            ${matchKey}, ${match.season}, ${roundCode}, ${localRoundNumber(match)},
-            ${roundType}::round_type, ${roundType !== 'home_and_away'},
-            ${match.matchDate}, ${match.venueRaw ?? 'Unknown'},
-            ${homeClubId}, ${awayClubId},
-            ${values.homeGoals}, ${values.homeBehinds}, ${values.homeScore},
-            ${values.awayGoals}, ${values.awayBehinds}, ${values.awayScore},
-            ${result}::match_result, ${winnerClubId}, ${Math.abs(values.homeScore - values.awayScore)},
-            NULL, 'not_collected'::coverage_status, NULL,
-            ${sourceId}, ${match.externalGameId}, ${batch.id}
-          )
-          ON CONFLICT (match_key) DO NOTHING
-          RETURNING id
-        `;
-
-        if (insertedRow) {
-          inserted += 1;
-          unresolved -= candidates.length;
-          touchedSeasons.add(match.season);
-          
-          for (const candidate of candidates) {
-            const cSourceId = sourceIds.get(candidate.match.source)!;
-            await tx`
-              UPDATE staging.external_current_matches
-                 SET local_match_id = ${insertedRow.id}
-               WHERE source_id = ${cSourceId}
-                 AND external_game_id = ${candidate.match.externalGameId}
-            `;
-          }
-        }
       }
     }
 
@@ -891,19 +1061,40 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
     await tx`
       UPDATE import_batches
          SET completed_at = now(), status = 'completed',
-             records_inserted = ${staged + inserted}, records_updated = ${updated},
-             records_rejected = ${unresolved},
+             records_inserted = ${observationVersionsInserted},
+             records_updated = ${observationHeadsRefreshed},
+             records_rejected = ${canonicalPlan.rejectedOrConflicted},
              validation_result = ${tx.json({
-               staged, inserted, resolved, updated, unresolved, incompleteFixtures,
-               sourceDisagreements, sameGroupConflicts,
+               observationsFetched: matches.length,
+               observationsStaged,
+               observationVersionsInserted,
+               observationHeadsRefreshed,
+               observationsMarkedAbsent,
+               canonicalMatchesResolved: canonicalPlan.canonicalMatchesResolved,
+               canonicalRowsInserted: canonicalPlan.canonicalRowsInserted,
+               canonicalRowsUpdated,
+               unresolvedObservations: canonicalPlan.unresolvedObservations,
+               incompleteSourceRecords: canonicalPlan.incompleteSourceRecords,
+               rejectedOrConflicted: canonicalPlan.rejectedOrConflicted,
+               sourceDisagreements: canonicalPlan.sourceDisagreements,
+               sameGroupConflicts: canonicalPlan.sameGroupConflicts,
              } as never)}
        WHERE id = ${batch.id}
     `;
   });
 
   return {
-    staged, inserted, resolved, updated, unresolved, incompleteFixtures,
-    sourceDisagreements, sameGroupConflicts,
+    observationsStaged,
+    observationVersionsInserted,
+    observationsMarkedAbsent,
+    canonicalMatchesResolved: canonicalPlan.canonicalMatchesResolved,
+    canonicalRowsInserted: canonicalPlan.canonicalRowsInserted,
+    canonicalRowsUpdated,
+    unresolvedObservations: canonicalPlan.unresolvedObservations,
+    incompleteSourceRecords: canonicalPlan.incompleteSourceRecords,
+    rejectedOrConflicted: canonicalPlan.rejectedOrConflicted,
+    sourceDisagreements: canonicalPlan.sourceDisagreements,
+    sameGroupConflicts: canonicalPlan.sameGroupConflicts,
   };
 }
 
@@ -917,7 +1108,12 @@ async function reportStaging(sql: postgres.Sql, year: number): Promise<CurrentSe
            count(*) FILTER (WHERE (e.home_club_id IS NULL AND lower(e.home_team_raw) NOT IN ('not recorded', 'tbd', '')) OR (e.away_club_id IS NULL AND lower(e.away_team_raw) NOT IN ('not recorded', 'tbd', '')))::int AS "unresolvedTeams"
       FROM staging.external_current_matches e
       JOIN sources s ON s.id = e.source_id
+      LEFT JOIN staging.source_records r
+        ON r.source_id = e.source_id
+       AND r.family = 'match'
+       AND r.external_record_id = e.external_game_id
      WHERE e.season = ${year}
+       AND (r.external_record_id IS NULL OR r.absent_since IS NULL)
      GROUP BY s.key
      ORDER BY s.key
   `;
@@ -933,7 +1129,12 @@ async function reportStaging(sql: postgres.Sql, year: number): Promise<CurrentSe
            e.away_club_id AS "awayClubId"
       FROM staging.external_current_matches e
       JOIN sources s ON s.id = e.source_id
+      LEFT JOIN staging.source_records r
+        ON r.source_id = e.source_id
+       AND r.family = 'match'
+       AND r.external_record_id = e.external_game_id
      WHERE e.season = ${year} AND e.local_match_id IS NULL
+       AND (r.external_record_id IS NULL OR r.absent_since IS NULL)
        AND (e.complete_percent IS NULL OR e.complete_percent < 100 OR e.match_date IS NULL)
        AND NOT ((e.home_club_id IS NULL AND lower(e.home_team_raw) NOT IN ('not recorded', 'tbd', '')) OR (e.away_club_id IS NULL AND lower(e.away_team_raw) NOT IN ('not recorded', 'tbd', '')))
      ORDER BY s.key, e.match_date NULLS LAST, e.external_game_id
@@ -951,7 +1152,12 @@ async function reportStaging(sql: postgres.Sql, year: number): Promise<CurrentSe
            e.away_club_id AS "awayClubId"
       FROM staging.external_current_matches e
       JOIN sources s ON s.id = e.source_id
+      LEFT JOIN staging.source_records r
+        ON r.source_id = e.source_id
+       AND r.family = 'match'
+       AND r.external_record_id = e.external_game_id
      WHERE e.season = ${year} AND e.local_match_id IS NULL
+       AND (r.external_record_id IS NULL OR r.absent_since IS NULL)
        AND e.complete_percent = 100 AND e.match_date IS NOT NULL
        AND NOT ((e.home_club_id IS NULL AND lower(e.home_team_raw) NOT IN ('not recorded', 'tbd', '')) OR (e.away_club_id IS NULL AND lower(e.away_team_raw) NOT IN ('not recorded', 'tbd', '')))
      ORDER BY s.key, e.match_date NULLS LAST, e.external_game_id
@@ -969,7 +1175,12 @@ async function reportStaging(sql: postgres.Sql, year: number): Promise<CurrentSe
            e.away_club_id AS "awayClubId"
       FROM staging.external_current_matches e
       JOIN sources s ON s.id = e.source_id
+      LEFT JOIN staging.source_records r
+        ON r.source_id = e.source_id
+       AND r.family = 'match'
+       AND r.external_record_id = e.external_game_id
      WHERE e.season = ${year} AND e.local_match_id IS NULL
+       AND (r.external_record_id IS NULL OR r.absent_since IS NULL)
        AND ((e.home_club_id IS NULL AND lower(e.home_team_raw) NOT IN ('not recorded', 'tbd', '')) OR (e.away_club_id IS NULL AND lower(e.away_team_raw) NOT IN ('not recorded', 'tbd', '')))
      ORDER BY s.key, e.match_date NULLS LAST, e.external_game_id
      LIMIT 10

@@ -14,7 +14,6 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
 | `AFLDB-ISSUE-076` | Medium | Performance | Grid Solver combinations using `won_final_at_venue` can exceed PostgreSQL's 5-second statement timeout and crash the page. | Capture and compare the generated SQL/EXPLAIN plan against `played_at_venue`, then optimise the `won_final_at_venue` query shape without raising the application timeout. |
 | `AFLDB-ISSUE-095` | Medium | Data acquisition / Import architecture / Data integrity | `club_seasons` has no canonical acquisition path: `rebuild_derived.py` builds it only from `staging.team_seasons`, whose only writer is the legacy importer under `AFLDB_LEGACY_SQLITE`. A legacy-free canonical rebuild therefore correctly produces `club_seasons = 0`, leaving ladders, premiership/wooden-spoon flags, finals counts and club-season NL answers unavailable. | Plan D1–D7 in `AFLDB-ISSUE-095.md` (authoritative source; per-field reconstructed-vs-sourced split; historical premiership-points/byes/forfeits/published-rank handling; provenance `source_id`; club-identity re-pointing; new rebuild stage vs existing stage; Stage-9 gate) before writing any importer. Zero supported `AFLDB_LEGACY_SQLITE` dependency. Do NOT add a `club_seasons` Stage-9 gate until this lands. Links `AFLDB-ISSUE-015` (not absorbed) and `AFLDB-ISSUE-093`. |
-| `AFLDB-ISSUE-098` | Medium | Data integrity / Import | Four source-verified defects in the shipped current-season importer: fabricated `venue_raw = 'Unknown'` (`:619`); canonical inserts creating half-matches with no attendance, period scores or player participation (`:607-629`); staging `ON CONFLICT DO UPDATE` making a source correction indistinguishable from a deletion (`:420-439`); and incoherent counters that can go negative and conflate staging with canonical rows (`:633`, `:657`). | Contain the four defects. Independently actionable — **not dependent on `AFLDB-ISSUE-096` or `AFLDB-ISSUE-097`**; probe **P7** recommended to size live impact but not required to start. References `AFLDB-ISSUE-086` for the unrestricted canonical score overwrite (`:567-590`) and does **not** duplicate it. |
 | `AFLDB-ISSUE-099` | Medium | Data acquisition / Import architecture | 2026 has no player-match statistics, period scores, attendance or Brownlow votes, because Squiggle/Kali carry none of them. AFL Tables — already the frozen canonical historical source — was confirmed by live probe to carry 2026 through Round 25 including per-match player statistics, venue, attendance and a ladder. | Build a nightly in-season settle pass: partial fitzRoy acquisition (`acquire_core.R --from/--to`) + SHA-256 manifest, then **reviewed** promotion of matches, period scores, attendance, player stats and Brownlow votes, reusing the ISSUE-093 machinery. Depends on `AFLDB-ISSUE-096`; implementation gated on probe **P5** (stop condition if stable `ID`/`url` are absent for 2026). |
 | `AFLDB-ISSUE-100` | Medium | Data acquisition / Import architecture | AFLDB has no model for announced teams, jumper numbers, substitutions or late changes; canonical participation is the played match sheet, which exists only after a match. `fetch_lineup_afl` is the only free source found that supplies lineups at all. | Add a new `staging.external_lineups` table fed by `fetch_lineup_afl`, for admin visibility and reconciliation only. **Lineups are staging-only and never become canonical participation**; no public surface. Depends on `AFLDB-ISSUE-096`; implementation gated on probe **P3**, which must supply the still-UNKNOWN column set. |
 | `AFLDB-ISSUE-101` | Medium | Data acquisition / Import architecture / Data integrity | The approved historical boundary gives the API pipeline only the in-progress season, but nothing performs the transition when a season completes, so in-season provenance would become permanent and the Stage-9 gate would drift. | Implement the rollover: extend `fitzroy-accepted-baselines.json` to the completed season, supersede in-season provenance, advance `seasons.json.in_progress_seasons`, re-point the Stage-9 `matches_after_accepted_last_season` gate. **Must not redefine completed-season `club_seasons` ownership — that stays with `AFLDB-ISSUE-095`.** Depends on `AFLDB-ISSUE-099` plus coordination/completion of the relevant ISSUE-095 path. |
@@ -8086,14 +8085,16 @@ gate remains unchanged. The superseded `/matches`-is-a-proxy branch stays closed
 
 ## AFLDB-ISSUE-098 — Shipped current-season importer defects
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Data integrity / Import
 - **Found:** 2026-08-28 (2026+ API acquisition investigation, source-verified)
-- **Resolved:** N/A
+- **Resolved:** 2026-08-28
 - **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §1.1 and §9 row C.
-- **Files:** `src/lib/external-afl/current-season-import.ts` (`:607-629`, `:619`, `:420-439`,
-  `:633`, `:657`, `:219-225`)
+- **Files:** `src/lib/external-afl/current-season-import.ts`,
+  `tests/current-season-import.test.ts`, `tools/current-season/update-current-season.ts`,
+  `src/app/admin/current-season/actions.ts`,
+  `src/app/admin/current-season/CurrentSeasonControls.tsx`
 - **Related:** `AFLDB-ISSUE-086` — the unrestricted canonical score overwrite at
   `current-season-import.ts:567-590` is **that issue's behaviour class, referenced here and
   deliberately not duplicated**. ISSUE-086 retains ownership and its severity triage.
@@ -8128,12 +8129,62 @@ Independently actionable containment of the four defects above. **Kept separate 
 Depends on nothing — **not dependent on `AFLDB-ISSUE-096` or `AFLDB-ISSUE-097`**. Evidence
 probe **P7** is recommended to size the live impact but is not required to start.
 
+### Root cause
+1. The canonical insert coerced nullable source venue evidence to the literal `Unknown` because
+   `matches.venue_raw` is non-nullable, rather than refusing a canonical row the source family
+   could not authoritatively complete.
+2. The same insert treated the current API score/fixture projection as ownership of the complete
+   canonical match family even though the registered Squiggle/Kali match families are
+   non-promotable and do not supply attendance, period scores or played participation/statistics.
+3. The legacy `staging.external_current_matches` current-state projection was incorrectly serving
+   as observation history, so its upsert destroyed the previous payload and had no explicit
+   absence state despite migration 074 already providing the required append-only spine.
+4. One mutable counter represented both source observations and canonical rows; successful
+   dual-source insertion subtracted observation cardinality from canonical unresolved work, and
+   the batch ledger summed staging and canonical inserts.
+
+### Fix
+- Source venue absence remains `null` through normalisation, the mutable staging projection and
+  canonical planning; no `Unknown` fallback or canonical match INSERT remains.
+  - Missing completed matches are reported as unresolved. ISSUE-097's group-aware comparator first
+    classifies incoherent evidence as `same_group_conflict` or `source_disagreement`; coherent
+    evidence—including two agreeing independent match witnesses—still cannot authorize promotion
+    and is deterministically rejected as `incomplete_source_family`. This does not add lineup,
+    player-stat, period-score or attendance acquisition and does not touch ISSUE-086's existing-row
+    score-update authority.
+- Every applied observation now passes through migration 074's existing spine before the legacy
+  projection is refreshed: immutable payloads are hash-deduplicated, changed content appends and
+  closes ordered versions, the current head identifies the newest correction, and a complete
+  non-empty season fetch marks omitted keys with `absent_since` without deleting any payload,
+  version, projection or canonical row. Reappearance clears absence under the existing contract.
+- Results, CLI/admin reporting and `import_batches.validation_result` now distinguish observations
+  fetched/staged, observation versions inserted, observations marked absent, unique canonical
+  matches resolved, canonical rows inserted/updated, unresolved observations, incomplete source
+  records and rejected/conflicted work. Batch insert/update counters describe observation-spine
+  operations only; canonical counters never decrement.
+- No migration or privilege change was required; migration 074 already represented the required
+  history and absence semantics.
+
 ### Validation
-None yet — nothing implemented. Planned home is `tests/current-season-import.test.ts` with
-deterministic fixtures.
+  - Focused ISSUE-098 deterministic slice after the ISSUE-097 rebase: **13/13 passed**
+    (110 unrelated tests skipped), including coherent independent agreement that remains
+    insufficient for canonical promotion and a separately classified same-group conflict.
+  - `npm test -- tests/current-season-import.test.ts`: **123/123 passed** (one complete deterministic
+    importer suite combining both ISSUE-097 and ISSUE-098 coverage).
+  - Focused ISSUE-097 corroboration slice: **9/9 passed** (114 unrelated tests skipped), including
+    per-family independence groups, concrete provenance/counters, coherent independent disagreement,
+    proxy drift and the conflicted-group counterexample.
+- Changed-file ESLint: **0 errors, 0 warnings** across the importer, test, CLI and admin callers.
+- `git diff --check`: **passed** (exit 0; only the checkout's expected LF-to-CRLF notices).
+- `npm run typecheck`: repository-wide check reached TypeScript and reported **9 pre-existing,
+  unrelated test errors** in `tests/draftguru-acquisition.test.ts`,
+  `tests/integration/draftguru-import.test.ts` and
+  `tests/integration/observation-spine.test.ts`; no changed ISSUE-098 file appeared in diagnostics.
+- No live API call, database write, current-season apply, canonical insert/update, migration or
+  destructive SQL was used for validation.
 
 ### Follow-up
-None recorded yet.
+None. P7 remains optional impact sizing and is not required for this deterministic containment.
 
 ## AFLDB-ISSUE-099 — In-season AFL Tables settle stage
 

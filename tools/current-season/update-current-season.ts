@@ -39,13 +39,18 @@ function valueFor(argv: string[], flag: string): string | null {
 }
 
 function parseArgs(argv: string[]): Args {
+  if (argv.includes('--insert-missing-matches')) {
+    throw new Error(
+      '--insert-missing-matches is disabled: current API observations do not own the complete canonical match family.',
+    );
+  }
   const sources = parseCurrentSeasonSources(valueFor(argv, '--source') ?? 'squiggle');
   const year = validateCurrentSeasonYear(Number(valueFor(argv, '--year') ?? new Date().getFullYear()));
   return {
     year,
     sources,
     apply: argv.includes('--apply'),
-    insertMissingMatches: argv.includes('--insert-missing-matches'),
+    insertMissingMatches: false,
     report: argv.includes('--report'),
     updateMatches: argv.includes('--update-matches'),
   };
@@ -62,7 +67,7 @@ async function main(): Promise<void> {
     }
     console.log(`Staged external current-match rows for ${args.year}:`);
     for (const row of report.rows) {
-      console.log(`  ${row.source}: staged ${row.staged}, resolved ${row.resolved}, complete ${row.complete}, has score fields ${row.withScores}, unresolved teams ${row.unresolvedTeams}`);
+      console.log(`  ${row.source}: current observations ${row.staged}, observations resolving to canonical matches ${row.resolved}, complete observations ${row.complete}, observations with score fields ${row.withScores}, unresolved teams ${row.unresolvedTeams}`);
     }
     if (report.incompleteSamples.length > 0) {
       console.log('\nIncomplete fixture samples:');
@@ -86,27 +91,27 @@ async function main(): Promise<void> {
   }
 
   const result = await runCurrentSeasonRefresh(args);
-  console.log(`Fetched ${result.fetched} external match rows for ${args.year}.`);
+  console.log(`Fetched ${result.observationsFetched} external match observations for ${args.year}.`);
   for (const source of args.sources) {
     console.log(`  ${source}: ${result.sourceCounts[source]}`);
   }
   for (const [group, count] of Object.entries(result.independenceGroupCounts).sort()) {
     console.log(`  independence group ${group}: ${count}`);
   }
-  console.log(`  complete: ${result.complete}`);
-  console.log(`  has score fields: ${result.withScores}`);
+  console.log(`  complete observations: ${result.completeObservations}`);
+  console.log(`  observations with score fields: ${result.observationsWithScores}`);
 
   if (!args.apply) {
-    console.log(`\nProcessed ${result.staged}; inserted matches ${result.inserted}; resolved ${result.resolved}; updated matches ${result.updated}; unresolved ${result.unresolved}; incomplete fixtures ${result.incompleteFixtures}.`);
+    console.log(`\nStaged observations ${result.observationsStaged}; resolved canonical matches ${result.canonicalMatchesResolved}; inserted canonical rows ${result.canonicalRowsInserted}; updated canonical rows ${result.canonicalRowsUpdated}; unresolved observations ${result.unresolvedObservations}; incomplete source records ${result.incompleteSourceRecords}; rejected/conflicted work ${result.rejectedOrConflicted}.`);
     console.log(`Source disagreements: ${result.sourceDisagreements}`);
     console.log(`Within-group source conflicts: ${result.sameGroupConflicts}`);
     console.log('\nDry run. Nothing was written. Re-run with --apply to stage snapshots.');
-    console.log('Add --insert-missing-matches with --apply to insert completed matches missing from AFLDB.');
+    console.log('Missing canonical matches remain unresolved until a complete, authorised match-family importer supplies them.');
     console.log('Add --update-matches with --apply only to overwrite local final scores for unambiguously resolved completed matches.');
     return;
   }
 
-  console.log(`\nStaged ${result.staged}; inserted matches ${result.inserted}; resolved ${result.resolved}; updated matches ${result.updated}; unresolved ${result.unresolved}; incomplete fixtures ${result.incompleteFixtures}.`);
+  console.log(`\nStaged observations ${result.observationsStaged} (${result.observationVersionsInserted} new versions); marked absent ${result.observationsMarkedAbsent}; resolved canonical matches ${result.canonicalMatchesResolved}; inserted canonical rows ${result.canonicalRowsInserted}; updated canonical rows ${result.canonicalRowsUpdated}; unresolved observations ${result.unresolvedObservations}; incomplete source records ${result.incompleteSourceRecords}; rejected/conflicted work ${result.rejectedOrConflicted}.`);
   console.log(`Source disagreements: ${result.sourceDisagreements}`);
   console.log(`Within-group source conflicts: ${result.sameGroupConflicts}`);
 }

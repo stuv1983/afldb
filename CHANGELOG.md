@@ -30,6 +30,15 @@ commit.
   disagreement, and preserves single-source behaviour. Deterministic current-season coverage is
   green at 116/116, with the focused source-registry contract green at 1/1.
 
+### AFLDB-ISSUE-098 — Current-season observations retain evidence and cannot create partial canonical matches - 28 August 2026
+
+- Current-season venue absence now remains `null`; the importer no longer fabricates `venue_raw = 'Unknown'`. The unsafe missing-match INSERT has been removed because Squiggle/Kali do not own the complete canonical match family, so missing completed matches stay unresolved and requested promotion is rejected without absorbing attendance, period-score, lineup or player-stat acquisition.
+- Applied source records now enter the existing migration-074 observation spine before the legacy current-state projection is refreshed. Corrections append immutable ordered versions, the newest version remains identifiable, later source omission sets `absent_since` without deleting history or canonical data, and reappearance clears the absence state. No migration or privilege change was required.
+- Import results, CLI/admin output and batch validation now separate observations fetched/staged and observation versions from unique canonical matches resolved, canonical rows inserted/updated, unresolved observations, incomplete source records and rejected/conflicted work. Canonical counters no longer decrement, and ISSUE-097 independence-group disagreements still block unsafe missing-match work.
+- Added deterministic venue, correction-wiring, absence, canonical-boundary and counter regressions;
+  after layering the fix over ISSUE-097, the complete current-season importer suite passes 123/123,
+  the focused ISSUE-098 slice passes 13/13 and the focused ISSUE-097 corroboration slice passes 9/9.
+
 ### AFLDB-ISSUE-090 — DOB conflict writes are now pass-scoped, idempotent and structurally deduplicated - 28 August 2026
 
 - The two DOB enrichment passes had contradictory `dob_conflict` lifecycles. The club-list pass appended a fresh unresolved row on every rerun (entity 4347 held three copies of one logical conflict), and the register pass issued an unscoped `DELETE` over every unresolved `dob_conflict`/`dob_internal_conflict` row, destroying conflicts the other pass owned. Both passes write `SOURCE_KEY = 'afltables'`, so `details->>'source'` could not express ownership at all.

@@ -6,7 +6,9 @@ import { fetchKaliCurrentMatches, fetchSquiggleCurrentMatches } from '@/lib/exte
 import {
   analyseCurrentSeasonCorroboration,
   parseCurrentSeasonSources,
+  planCurrentSeasonCanonicalWork,
   type CurrentSeasonEvidenceObservation,
+  type ResolvedCurrentSeasonObservation,
 } from '@/lib/external-afl/current-season-import';
 
 /**
@@ -63,6 +65,21 @@ describe('current-season external source import contracts', () => {
       .toBeLessThan(importer.indexOf('UPDATE matches'));
   });
 
+  it('writes immutable observation history before refreshing the legacy projection', () => {
+    expect(importer).toContain('decideObservation({ contract, head, payload, observedAt })');
+    expect(importer).toContain('INSERT INTO staging.source_payloads');
+    expect(importer).toContain('INSERT INTO staging.source_record_versions');
+    expect(importer).toContain('UPDATE staging.source_record_versions');
+    expect(importer.indexOf('persistSourceObservation('))
+      .toBeLessThan(importer.indexOf('INSERT INTO staging.external_current_matches'));
+  });
+
+  it('represents later source absence as state and never as deletion', () => {
+    expect(importer).toContain('SET absent_since = ${observedAt}');
+    expect(importer).toContain('AND absent_since IS NULL');
+    expect(importer).not.toMatch(/DELETE FROM staging\.(source_records|source_record_versions|source_payloads)/);
+  });
+
   it('only applies final-score updates when explicitly requested', () => {
     expect(tool).toContain("argv.includes('--update-matches')");
     expect(importer).toContain('if (updateMatches) {');
@@ -84,11 +101,10 @@ describe('current-season external source import contracts', () => {
     expect(tool).toContain('Staged external current-match rows for ${args.year}:');
   });
 
-  it('inserts missing completed matches only behind an explicit flag', () => {
-    expect(tool).toContain("argv.includes('--insert-missing-matches')");
-    expect(importer).toContain('INSERT INTO matches');
-    expect(importer).toContain("if (localMatchId !== null) return 'resolved';");
-    expect(importer).toContain("return 'unresolved';");
+  it('never promotes a partial current-API match family into a canonical match', () => {
+    expect(tool).toContain('--insert-missing-matches is disabled');
+    expect(importer).not.toContain('INSERT INTO matches');
+    expect(importer).toContain("status: 'incomplete_source_family'");
   });
 
   it('records source and import-batch provenance on local score updates', () => {
@@ -196,9 +212,39 @@ describe('Melbourne date handling', () => {
 });
 
 describe('Source completion and placeholders', () => {
+  it('preserves an absent source venue as null instead of fabricating evidence', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const payload = String(input).includes('q=teams')
+        ? { teams: [{ id: 10, name: 'Richmond' }, { id: 7, name: 'Geelong' }] }
+        : { games: [{ id: 1, year: 2026, round: 1, hteam: 10, ateam: 7, hscore: 90, ascore: 72, complete: 100 }] };
+      return new Response(JSON.stringify(payload), { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+
+    const [row] = await fetchSquiggleCurrentMatches(2026);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(row.venueRaw).toBeNull();
+    expect(JSON.stringify(row)).not.toContain('Unknown');
+  });
+
+  it('keeps a concrete source venue distinguishable from absence', async () => {
+    vi.stubEnv('KALI_AFL_API_KEY', 'test-key');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      data: [{
+        matchId: 1, year: 2026, round: 1, date: '2026-03-20',
+        homeTeamName: 'Richmond', awayTeamName: 'Geelong', venue: 'MCG',
+        homeScore: 90, awayScore: 72, complete: 100,
+      }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+
+    const [row] = await fetchKaliCurrentMatches(2026);
+
+    expect(row.venueRaw).toBe('MCG');
+  });
+
   it('treats Squiggle explicit complete match today as complete', async () => {
     const melbourneToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input);
       const payload = url.includes('q=teams')
         ? { teams: [{ id: 10, name: 'Richmond' }, { id: 7, name: 'Geelong' }] }
@@ -212,7 +258,7 @@ describe('Source completion and placeholders', () => {
   it('treats Kali date-only match today with scores as incomplete unless explicit completion exists', async () => {
     vi.stubEnv('KALI_AFL_API_KEY', 'test-key');
     const melbourneToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
       data: [{
         matchId: 1,
         year: 2026,
@@ -230,6 +276,26 @@ describe('Source completion and placeholders', () => {
   });
 });
 
+function resolvedObservation(
+  overrides: Partial<ResolvedCurrentSeasonObservation> = {},
+): ResolvedCurrentSeasonObservation {
+  return {
+    match: {
+      source: 'squiggle', externalGameId: '38494', season: 2026,
+      roundLabel: 'Opening Round', roundNumber: 0, completePercent: 100,
+      matchDate: '2026-03-05', venueRaw: null,
+      homeTeamRaw: 'Sydney', awayTeamRaw: 'Carlton',
+      homeScore: 132, awayScore: 69,
+      homeGoals: 20, homeBehinds: 12, awayGoals: 10, awayBehinds: 9,
+      rawPayload: { id: 38494, hscore: 132, ascore: 69 },
+    },
+    homeClubId: 1,
+    awayClubId: 2,
+    localMatchId: null,
+    ...overrides,
+  };
+}
+
 describe('Placeholder and Dry-Run Resolution Logic', () => {
   it('treats future fixture with not recorded participants as incomplete, unresolvedTeams = 0', () => {
     expect(importer).toContain("lower(e.home_team_raw) NOT IN ('not recorded', 'tbd', '')");
@@ -239,26 +305,79 @@ describe('Placeholder and Dry-Run Resolution Logic', () => {
     expect(importer).toContain("lower(e.home_team_raw) NOT IN ('not recorded', 'tbd', '')");
   });
 
-  it('dry-run existing AFLDB match sets Resolved > 0, canonical writes = 0', () => {
-    expect(importer).toContain("if (localMatchId !== null) {");
-    expect(importer).toContain("resolved += 1;");
-    expect(importer).toContain("if (!options.apply || matches.length === 0) {");
+  it('counts unique canonical matches separately from source observations', () => {
+    const plan = planCurrentSeasonCanonicalWork([
+      resolvedObservation({ localMatchId: 42 }),
+      resolvedObservation({
+        match: { ...resolvedObservation().match, source: 'kali', externalGameId: '11405' },
+        localMatchId: 42,
+      }),
+    ], false);
+
+    expect(plan).toMatchObject({
+      canonicalMatchesResolved: 1,
+      canonicalRowsInserted: 0,
+      unresolvedObservations: 0,
+      incompleteSourceRecords: 0,
+      rejectedOrConflicted: 0,
+    });
   });
 
-  it('dry-run future fixture sets Incomplete > 0, not Unresolved', () => {
-    expect(importer).toContain("if (match.completePercent === 100 && match.matchDate !== null) return 'unresolved';");
-    expect(importer).toContain("return 'incomplete';");
-    expect(importer).toContain("unresolved += 1;");
-    expect(importer).toContain("incompleteFixtures += 1;");
+  it('classifies a future or structurally incomplete source record as incomplete', () => {
+    const plan = planCurrentSeasonCanonicalWork([
+      resolvedObservation({
+        match: { ...resolvedObservation().match, completePercent: null, homeScore: null },
+      }),
+    ], false);
+
+    expect(plan).toMatchObject({ unresolvedObservations: 0, incompleteSourceRecords: 1 });
   });
 
-  it('dry-run missing completed match is classified according to insert policy without being written', () => {
-    expect(importer).toContain("unresolved += 1;");
+  it('keeps a missing completed match unresolved and rejects partial-family promotion', () => {
+    const plan = planCurrentSeasonCanonicalWork([resolvedObservation()], true);
+
+    expect(plan).toMatchObject({
+      canonicalRowsInserted: 0,
+      unresolvedObservations: 1,
+      rejectedOrConflicted: 1,
+      sourceDisagreements: 0,
+    });
+    expect(plan.insertAssessments[0]).toMatchObject({
+      status: 'incomplete_source_family',
+      venueRaw: null,
+    });
   });
 
-  it('ensures dry-run/apply pre-write classification parity', () => {
-    expect(importer.match(/classifyCurrentSeasonResolution\(localMatchId, match\)/g)).toHaveLength(2);
-    expect(importer).toContain("if (match.completePercent === 100 && match.matchDate !== null) return 'unresolved';");
+  it('does not treat coherent independent corroboration as authority to promote', () => {
+    const squiggle = resolvedObservation();
+    const kali = resolvedObservation({
+      match: {
+        ...resolvedObservation().match,
+        source: 'kali', externalGameId: '11405',
+        rawPayload: { id: 11405, homeScore: 132, awayScore: 69 },
+      },
+    });
+
+    const plan = planCurrentSeasonCanonicalWork([squiggle, kali], true);
+
+    expect(plan).toMatchObject({
+      canonicalRowsInserted: 0,
+      unresolvedObservations: 2,
+      rejectedOrConflicted: 1,
+      sourceDisagreements: 0,
+      sameGroupConflicts: 0,
+    });
+    expect(plan.insertAssessments[0]).toMatchObject({
+      status: 'incomplete_source_family',
+      independentlyCorroborated: true,
+      independenceGroups: ['kali', 'squiggle'],
+    });
+  });
+
+  it('uses the same canonical planner for dry-run and apply reporting', () => {
+    expect(importer).toContain('planCurrentSeasonCanonicalWork(resolvedObservations, options.insertMissingMatches)');
+    expect(importer).toContain('planCurrentSeasonCanonicalWork(resolvedObservations, insertMissingMatches)');
+    expect(importer).toContain('observationsStaged: 0');
   });
 
   it('reports source-all row counts at both concrete-source and independence-group grain', () => {
@@ -267,6 +386,16 @@ describe('Placeholder and Dry-Run Resolution Logic', () => {
     expect(tool).toContain('Object.entries(result.independenceGroupCounts).sort()');
     expect(tool).toContain('independence group ${group}: ${count}');
     expect(tool).toContain('Within-group source conflicts: ${result.sameGroupConflicts}');
+  });
+
+  it('keeps observation and canonical batch counters distinct without subtraction', () => {
+    expect(importer).toContain('records_inserted = ${observationVersionsInserted}');
+    expect(importer).toContain('records_updated = ${observationHeadsRefreshed}');
+    expect(importer).toContain('canonicalRowsInserted: canonicalPlan.canonicalRowsInserted');
+    expect(importer).not.toContain('staged + inserted');
+    expect(importer).not.toMatch(/\b(unresolved|canonicalRowsInserted)\s*-=/);
+    expect(tool).toContain('Staged observations ${result.observationsStaged}');
+    expect(tool).toContain('inserted canonical rows ${result.canonicalRowsInserted}');
   });
 });
 
@@ -290,7 +419,7 @@ describe('Update logic genuine-change and disagreements', () => {
 
   it('does not update when independent groups disagree', () => {
     expect(importer).toContain('if (corroboration.disagreeingGroups.length > 0) {\n          continue;\n        }');
-    expect(importer).toContain('sourceDisagreements = conflictCounts.sourceDisagreements;');
+    expect(importer).toContain('sourceDisagreements: canonicalPlan.sourceDisagreements');
   });
 
   it('Orientation reversal: correctly aligns home/away before comparison', () => {
@@ -304,12 +433,56 @@ describe('Update logic genuine-change and disagreements', () => {
     expect(importer).toContain('agreedAwayBehinds = agreedAwayBehinds ?? current.awayBehinds;');
   });
 
-  it('Dual-source missing insert: deduplicates insert for missing match', () => {
-    expect(importer).toContain('const insertsByMatchKey = new Map<string, MatchCandidate[]>();');
-    expect(importer).toContain('for (const [matchKey, candidates] of insertsByMatchKey.entries())');
-    expect(importer).toContain('unresolved -= candidates.length;');
-    expect(importer).toContain('for (const candidate of candidates) {');
-    expect(importer).toContain('UPDATE staging.external_current_matches');
+  it('independent-source disagreement blocks unsafe missing-match work', () => {
+    const squiggle = resolvedObservation();
+    const kali = resolvedObservation({
+      match: {
+        ...resolvedObservation().match,
+        source: 'kali', externalGameId: '11405', awayScore: 70,
+        rawPayload: { id: 11405, homeScore: 132, awayScore: 70 },
+      },
+    });
+
+    const plan = planCurrentSeasonCanonicalWork([squiggle, kali], true);
+
+    expect(plan).toMatchObject({
+      canonicalRowsInserted: 0,
+      unresolvedObservations: 2,
+      rejectedOrConflicted: 1,
+      sourceDisagreements: 1,
+    });
+    expect(plan.insertAssessments[0]).toMatchObject({
+      status: 'source_disagreement',
+      disagreeingGroups: ['kali', 'squiggle'],
+    });
+    expect(Object.values(plan).filter((value) => typeof value === 'number').every((value) => value >= 0)).toBe(true);
+  });
+
+  it('same-group conflict remains distinct and blocks unsafe missing-match work', () => {
+    const first = resolvedObservation();
+    const conflictingProxy = resolvedObservation({
+      match: {
+        ...resolvedObservation().match,
+        externalGameId: '38494-proxy', awayScore: 70,
+        rawPayload: { id: '38494-proxy', hscore: 132, ascore: 70 },
+      },
+    });
+
+    const plan = planCurrentSeasonCanonicalWork([first, conflictingProxy], true);
+
+    expect(plan).toMatchObject({
+      canonicalRowsInserted: 0,
+      unresolvedObservations: 2,
+      rejectedOrConflicted: 1,
+      sourceDisagreements: 0,
+      sameGroupConflicts: 1,
+    });
+    expect(plan.insertAssessments[0]).toMatchObject({
+      status: 'same_group_conflict',
+      disagreeingGroups: [],
+      sameGroupConflictGroups: ['squiggle'],
+      independentlyCorroborated: false,
+    });
   });
 });
 
@@ -438,9 +611,10 @@ describe('AFLDB-ISSUE-097 current-season independence-group corroboration', () =
     expect(result.disagreeingGroups).toEqual([]);
     expect(result.independentlyCorroborated).toBe(false);
     expect(result.values).toBeNull();
-    expect(importer.match(
-      /if \(corroboration\.sameGroupConflictGroups\.length > 0\) \{\s*continue;\s*\}/g,
-    )).toHaveLength(2);
+    expect(importer).toContain(
+      'if (corroboration.sameGroupConflictGroups.length > 0) {\n          continue;\n        }',
+    );
+    expect(importer).not.toContain('INSERT INTO matches');
   });
 });
 

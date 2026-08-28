@@ -66,7 +66,6 @@
 
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
-| `AFLDB-ISSUE-098` | Medium | Data integrity / Import | Four source-verified defects in the shipped current-season importer: fabricated `venue_raw = 'Unknown'`, half-match canonical inserts, correction-indistinguishable-from-deletion staging, incoherent counters. Independently actionable. |
 | `AFLDB-ISSUE-099` | Medium | Data acquisition / Import architecture | 2026 has no player stats, period scores, attendance or Brownlow votes. Nightly in-season AFL Tables settle pass. Depends on ISSUE-096; gated on probe P5. |
 | `AFLDB-ISSUE-100` | Medium | Data acquisition / Import architecture | Staging-only lineup/team-announcement domain fed by `fetch_lineup_afl`. **Never canonical participation.** Depends on ISSUE-096; gated on probe P3. |
 | `AFLDB-ISSUE-101` | Medium | Data acquisition / Import architecture / Data integrity | End-of-season promotion / baseline rollover. Depends on ISSUE-099 plus coordination with ISSUE-095. **Must not redefine completed-season `club_seasons` ownership.** |
@@ -492,23 +491,6 @@
   seasons re-acquired via the full-history fitzRoy path.
 
 -->
-
-## AFLDB-ISSUE-098 — Shipped current-season importer defects
-
-- **Severity:** Medium
-- **Area:** Data integrity / Import
-- **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §1.1, §9 row C.
-- **Key files:** `src/lib/external-afl/current-season-import.ts`
-  (`:619`, `:607-629`, `:420-439`, `:633`, `:657`)
-- **Current state:** OPEN, source-verified. Fabricated `venue_raw = 'Unknown'`; canonical
-  inserts creating half-matches with no attendance, period scores or player participation;
-  staging `ON CONFLICT DO UPDATE` making a source correction indistinguishable from a
-  deletion; counters that can go negative and conflate staging with canonical rows.
-- **Exact next action:** Contain the four defects. Probe **P7** is recommended to size the
-  live impact but is not required to start.
-- **Dependencies:** none — **independently actionable, not dependent on `AFLDB-ISSUE-096`**.
-- **Do NOT** duplicate `AFLDB-ISSUE-086`: the unrestricted canonical score overwrite at
-  `:567-590` is that issue's behaviour class and is referenced here only.
 
 ## AFLDB-ISSUE-099 — In-season AFL Tables settle stage
 
