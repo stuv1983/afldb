@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-28
-**Open issues:** 8
+**Open issues:** 6
 
 ## How Claude should use this file
 
@@ -123,7 +123,19 @@
 - **Current state:** Reproducible on build `NQrtI3zQGWx62e6zbI5bR`. PostgreSQL cancels the exact Grid Solver query at ~5.05–5.14 seconds with SQLSTATE `57014` and Next.js digest `1511510695`. The failing grid combines `games_at_multiple_clubs_min(50,2)`, `teammate_of(12603)`, `single_game_stat_min(kicks,20)`, clubs 103/108 and `won_final_at_venue(234)`. Changing only `won_final_at_venue(234)` to `played_at_venue(234)` makes the otherwise identical grid complete in ~360–397 ms. Do not raise the normal statement timeout as the fix.
 - **Next action:** Capture the exact generated SQL/bind parameters for the failing and successful variants, compare `EXPLAIN (ANALYZE, BUFFERS)` plans, then optimise the `won_final_at_venue` query shape (and add an index only if the plan demonstrates one is appropriate). Add a regression for this exact grid and require correct results comfortably below the 5-second guard, preferably below 1 second on dev.
 
-## AFLDB-ISSUE-077 — Frontend theme changes unpredictably during a user session
+<!-- RETIRED 2026-08-28 — `AFLDB-ISSUE-077` is **Resolved** (2026-08-26) and is NO LONGER an
+     open issue. The detail block below is retained as lineage only: its "Current state" and
+     "Next action" text is the pre-resolution index text and is SUPERSEDED. Authoritative
+     record: the `AFLDB-ISSUE-077` entry in `issues.md` (Status: Resolved, Resolved:
+     2026-08-26). Root cause: `saveSiteSettings` revalidated only four paths, so statically
+     generated pages kept serving a stale root layout and the client router flipped the theme
+     on navigation between a revalidated and a stale page. Fix: `revalidatePath('/', 'layout')`
+     in `src/app/admin/settings/actions.ts`, invalidating the whole root-layout cache boundary
+     in one operation. Validation: `tests/admin-settings-actions.test.ts` 1/1, asserting the
+     exact call and that it is the only revalidation issued. This block was left uncommented
+     when the issue was resolved and was retired by the 2026-08-28 ledger reconciliation.
+
+## AFLDB-ISSUE-077 — Frontend theme changes unpredictably during a user session (RETIRED)
 
 - **Severity:** Medium
 - **Area:** UI/Settings
@@ -131,6 +143,9 @@
 - **First wrong layer:** UI/settings state propagation or cache consistency.
 - **Current state:** A theme selected by a super admin is not stable during ordinary browsing. One public page can render with the configured theme and the next internal navigation can render a different theme without any settings change. This is separate from ISSUE-072, which only covers the stale `frontendTheme` default-shape test.
 - **Next action:** Trace every `frontendTheme` authority and cache boundary (database, admin mutation/revalidation, SSR layout, cookie/local storage, hydration), reduce them to one authoritative resolved theme, then add browser coverage that navigates across multiple routes and proves the theme remains unchanged until a super admin deliberately changes it.
+
+-->
+
 
 
 

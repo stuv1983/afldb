@@ -127,6 +127,11 @@ commit.
 - Because `captaincies_natural_uq (season, club_id, player_name_raw, role)` is globally source-blind, an incoming fact already held outside the Wikipedia scope is now refused with an explicit ownership collision before writes instead of being adopted, overwritten, deleted, or left to a raw uniqueness error. No schema migration or `reload_keyed` redesign was required.
 - Deterministic integration coverage uses a temporary captaincies-only SQLite fixture and explicitly seeded PostgreSQL rows, independent of historical `afldb_test` populations and the repository's legacy SQLite database. Focused validation passed 2/2 with 21 unrelated tests filtered/skipped.
 
+### AFLDB-ISSUE-077 — The selected frontend theme stays stable across site navigation - 26 August 2026
+
+- Saving site settings revalidated only `/`, `/aflw`, `/search` and `/admin/settings`, so every other statically generated page kept serving the previously cached root layout and its stale `data-site-theme`. Navigating between a revalidated and a stale page let the client router patch `<html>` from the older layout payload, so the theme appeared to change mid-session with no settings change.
+- `saveSiteSettings` now issues `revalidatePath('/', 'layout')`, invalidating the whole root-layout cache boundary in one operation so every page resolves the same theme on its next render. The persisted database setting remains the authoritative value. Covered by `tests/admin-settings-actions.test.ts` 1/1, which asserts that exact call and that it is the only revalidation issued.
+
 ### AFLDB-ISSUE-093 — AFLDB rebuilds end to end from tracked sources, with no legacy database - 27 August 2026
 
 - **The first complete clean rebuild of `afldb_test` succeeded.** `npm run db:test:rebuild -- --acknowledge-destroy afldb_test` ran all nine stages — PRECHECK, DATABASE RESET, MIGRATIONS (72/72), PRIVILEGES, REFERENCE DATA, FITZROY CORE, DRAFTGURU, DERIVED, FINAL VALIDATION — and finished with `AFLDB-FINAL-VALIDATION PASSED: 13 checks`. AFLDB can now be reconstructed from tracked, hash-bound, reproducible sources with **zero `AFLDB_LEGACY_SQLITE` dependency**, which is the objective this issue was opened for.
