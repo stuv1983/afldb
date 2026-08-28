@@ -9,12 +9,17 @@ Do not rely on chat history.
 ```
 Planning:       COMPLETE (§4 gate + §5 containment authorised for implementation via the
                 AFLDB-ISSUE-093 Phase-3 session, 2026-08-25)
-Implementation: §4 + §5 IMPLEMENTED (2026-08-25, ISSUE-093 Phase 3) — validation pending
-Recovery:       OBSOLETE for the rebuild path (§6 targeted the old afldb_test, now
-                preserved read-only as afldb_test_pre_rebuild_20260825; a rebuilt
-                database starts empty, so §6's one-time restoration will never run)
+Implementation: §4 + §5 + §11 IMPLEMENTED (2026-08-25, ISSUE-093 Phase 3); re-verified
+                against the working tree on 2026-08-28 — see §17.1.
+Recovery:       SUPERSEDED BY REBUILD, with positive evidence (§17.2), not merely
+                "obsolete because a rebuild starts empty". The canonical rebuild
+                repopulated afltables external_identities itself, to 13,275.
+Validation:     COMPLETE 2026-08-28 — 27/27, no skips, user-run against the rebuilt
+                afldb_test (§17.5). Tests 24-27 executed and green.
+ISSUE STATUS:   RESOLVED 2026-08-28.
 Production:     NOT TOUCHED
-Blocks:         AFLDB-ISSUE-090 (release-gates validation HALTED pending this issue)
+Blocks:         NOTHING. AFLDB-ISSUE-090 is UNBLOCKED as of 2026-08-28 and remains OPEN
+                for its own validation (§17.4).
 ```
 
 **Implementation record (2026-08-25, ISSUE-093 Phase-3 session):**
@@ -40,9 +45,11 @@ Blocks:         AFLDB-ISSUE-090 (release-gates validation HALTED pending this is
 - Static Phase-3 gate PASS 33/33 (user-run 2026-08-25) — proves the club-list wiring
   and that no existing static suite regressed; it does not exercise this issue's §11
   database tests.
-- §12 validation NOT yet run: the suite needs a live test database and there is
-  currently no `afldb_test` (ISSUE-093 rebuild in progress). §6 recovery and the
-  §12 release-gates/privileges steps are superseded by the ISSUE-093 rebuild path.
+- §12 validation NOT yet run *as at 2026-08-25*: at the time of writing the suite needed
+  a live test database and there was no `afldb_test` (ISSUE-093 rebuild in progress).
+  That constraint is GONE as of 2026-08-27, and the validation itself **completed on
+  2026-08-28, 27/27 with no skips** — see §17.5. This bullet is preserved as the record
+  of the state at implementation time only.
 
 ---
 
@@ -205,7 +212,17 @@ pure insert (`asserted_count` large, `candidate_delete_count = 0`), so neither c
    cleanliness, not a safety requirement, since the fixture source can never touch real data
    either way.
 
-## 6. Recovery design for `afldb_test.external_identities` (after the fix lands, not before)
+## 6. Recovery design — HISTORICAL; SUPERSEDED BY REBUILD, NEVER EXECUTED (see §17.2)
+
+> **This recovery was never run and is NOT authorised. Do not execute any step below.** The
+> 2026-08-27 canonical rebuild repopulated `afldb_test.external_identities` to **13,275** AFL
+> Tables identities through `import_fitzroy_core.py` under this issue's own gate, which
+> discharged the need for it (§17.2). The section is retained as the approved design of the
+> day and as evidence of how the damage was to have been repaired — including the
+> "unblocked" and HALT wording below, which reflects 2026-08-25 conditions and is not
+> current. `AFLDB-ISSUE-090` is unblocked as of 2026-08-28 by §17.5, not by anything here.
+
+The design as approved on 2026-08-25:
 
 Recovery must not run until §4's importer fix is implemented and validated — otherwise recovery
 would use the same vulnerable code path it is trying to repair the damage of.
@@ -265,7 +282,7 @@ file invokes it, so no other test file is at risk of triggering this defect. (Ot
 `external_identities`, so it is out of scope for this specific defect — already established in
 `AFLDB-ISSUE-090.md`'s own scoped fix for that importer's `data_issues` writes.)
 
-## 10. Files expected to change (implementation session — not yet done)
+## 10. Files expected to change (LANDED 2026-08-25; re-verified in-tree 2026-08-28 — §17.1)
 
 | File | Change |
 |---|---|
@@ -277,7 +294,7 @@ file invokes it, so no other test file is at risk of triggering this defect. (Ot
 
 No migration file. No production file. No importer other than `enrich_birth_dates.py`.
 
-## 11. Deterministic regression tests (design, not yet implemented)
+## 11. Deterministic regression tests (IMPLEMENTED as tests 24–27; EXECUTED AND GREEN — §17.5)
 
 Extend `dob-enrichment-issues.test.ts` (closest existing home; this file already owns real
 register-pass coverage):
@@ -301,7 +318,14 @@ register-pass coverage):
 Exact fixture construction, table/column details, and threshold-boundary values are an
 implementation-session task, not fixed here.
 
-## 12. Validation sequence (implementation session, one command at a time, user-executed)
+## 12. Validation sequence — HISTORICAL (as planned 2026-08-25); superseded by §17.5
+
+> **This section is the plan as written in the planning session. It is retained as evidence of
+> what was intended and is NOT live instruction. For what actually happened, and for the
+> current state of ISSUE-090, read §17.5 and §17.4. Where this section and §17 disagree,
+> §17 wins.**
+
+The sequence as planned on 2026-08-25:
 
 ```
 1. npm run typecheck (if the TS test-file change is non-trivial)
@@ -311,8 +335,20 @@ implementation-session task, not fixed here.
 5. npm test -- tests/integration/privileges.test.ts                (resumes AFLDB-ISSUE-090's own blocked step)
 ```
 
-Do not run `privileges.test.ts` or resume `AFLDB-ISSUE-090` release-gate work before step 4 is
-green.
+The original hold attached to that sequence — *"Do not run `privileges.test.ts` or resume
+`AFLDB-ISSUE-090` release-gate work before step 4 is green"* — **applied only while ISSUE-092
+was unvalidated. It was lifted on 2026-08-28 and must not be read as current.**
+
+**What actually happened:**
+
+- Step 2 ran and passed **27/27, no skips** (§17.5). That is this issue's acceptance result.
+- Step 3 was **never run and is not authorised**: the §6 recovery was superseded by the
+  2026-08-27 canonical rebuild, which repopulated the AFL Tables identities to 13,275 through
+  the gated import path (§17.2).
+- Steps 4 and 5 are **not ISSUE-092's to run**. They are `AFLDB-ISSUE-090`'s own remaining
+  validation, and that issue is **unblocked as of 2026-08-28** and free to resume them (§17.4).
+  Its two external-identity gates will read 13,275 against a stale pin of 12,472; that re-pin
+  is an ISSUE-090 decision.
 
 ## 13. Non-goals
 
@@ -328,19 +364,34 @@ green.
 - Resolving the 11 pre-existing, unrelated `release-gates.test.ts` failures (draft/attendance/
   birth-date snapshot drift, 2026-snapshot-date) — parent-release scope, not ISSUE-090/092's.
 - Re-pinning any release-gate expected value.
-- Merging this issue back into `AFLDB-ISSUE-090`. `AFLDB-ISSUE-090` stays open, blocked on this
-  issue; each is resolved and recorded independently.
+- Merging this issue back into `AFLDB-ISSUE-090`; each is resolved and recorded
+  independently. (As written 2026-08-25 this bullet continued "`AFLDB-ISSUE-090` stays open,
+  blocked on this issue". The *blocked* half expired on 2026-08-28: ISSUE-090 **stays open**
+  but is **no longer blocked** — see §17.4. The separation of the two issues, which is what
+  this non-goal is actually about, still holds.)
 - Any production mutation, importer run, or backup restore in the planning session that produced
   this document.
 
 ## 14. Relationship to AFLDB-ISSUE-090
 
-`AFLDB-ISSUE-090` is blocked by this issue. Its own remaining validation
-(`release-gates.test.ts` full pass, then `privileges.test.ts`) cannot resume until:
+**Current (2026-08-28): `AFLDB-ISSUE-090` is UNBLOCKED and REMAINS OPEN.** It may resume its
+own remaining validation — `release-gates.test.ts`, then `privileges.test.ts` — now. Nothing
+in this issue gates it any longer. It is **not** resolved by this issue. See §17.4 for the
+handover detail, including the 13,275-vs-12,472 re-pin decision that belongs to ISSUE-090.
 
-(a) this issue's importer + test fix is implemented and validated, and
-(b) `afldb_test.external_identities` is recovered per §6 and reverified via
-    `release-gates.test.ts`.
+**Historical — the blocking relationship as recorded 2026-08-25, now discharged:**
+
+> `AFLDB-ISSUE-090` is blocked by this issue. Its own remaining validation
+> (`release-gates.test.ts` full pass, then `privileges.test.ts`) cannot resume until:
+>
+> (a) this issue's importer + test fix is implemented and validated, and
+> (b) `afldb_test.external_identities` is recovered per §6 and reverified via
+>     `release-gates.test.ts`.
+
+Condition (a) was met on 2026-08-28 (§17.5, 27/27 no skips). Condition (b) was **discharged by
+supersession, not by execution**: the 2026-08-27 canonical rebuild repopulated the table to
+13,275 through the gated import path, so the §6 recovery it referred to was never run and is
+not authorised (§17.2).
 
 `AFLDB-ISSUE-090`'s own scope (D1-D5, migration 072, the `dob_conflict`/`dob_internal_conflict`
 lifecycle) is unchanged and unaffected by this issue.
@@ -355,15 +406,33 @@ lifecycle) is unchanged and unaffected by this issue.
    the safety gate.
 3. Full `dob-enrichment-issues.test.ts` remains green (23/23 plus the new §11 tests) after the
    change.
-4. `afldb_test.external_identities` is restored to the expected population (12,472 `unique`
-   `afltables_profile_url` rows) via §6, using the fixed importer only.
-5. `release-gates.test.ts` returns to 52 passed — the two external-identity gates green again,
-   net 11 remaining pre-existing failures, none newly introduced.
+4. ~~`afldb_test.external_identities` is restored to the expected population (12,472 `unique`
+   `afltables_profile_url` rows) via §6, using the fixed importer only.~~
+   **SUPERSEDED 2026-08-27 by the ISSUE-093 canonical rebuild (§17.2).** The population was
+   restored by `import_fitzroy_core.py` under the `afltables` source during the rebuild, not
+   by a §6 run of `enrich_birth_dates.py` against `AFLDB_LEGACY_SQLITE`. The count is
+   consequently the canonical **13,275**, not the legacy-derived 12,472. No §6 recovery run
+   is to be performed.
+5. ~~`release-gates.test.ts` returns to 52 passed — the two external-identity gates green
+   again, net 11 remaining pre-existing failures, none newly introduced.~~
+   **NOT ISSUE-092-OWNED as written.** With the canonical population at 13,275, the
+   `release-gates.test.ts` gate pinned at 12,472 measures the *rebuild's* dataset, not this
+   issue's fix. Re-pinning a release-gate expected value is an explicit §13 non-goal here.
+   That gate belongs to `AFLDB-ISSUE-090`'s own resumed validation; ISSUE-092 must not
+   change it.
 6. No schema/migration change introduced.
 7. No production data touched at any point.
 8. `privileges.test.ts` and `AFLDB-ISSUE-090`'s remaining validation sequence become unblocked.
+   — **MET 2026-08-28.** They are unblocked and may resume; running them is ISSUE-090's work,
+   not this issue's (§17.4).
 
-## 16. HALT conditions (implementation/recovery session)
+## 16. HALT conditions — HISTORICAL (implementation/recovery session); none fired
+
+> Retained as the safety contract the implementation and recovery sessions ran under. **None
+> of these conditions fired.** The recovery-specific ones (dry-run counts, legacy source
+> completeness, recovery database identity) were never reached, because the recovery was
+> superseded rather than executed (§6 banner, §17.2). The issue is Resolved (§17.5), so this
+> section is no longer an active stop list.
 
 ```
 dry-run recovery counts do not match the expected shape (~15,310 read / ~12,472 registered);
@@ -378,3 +447,130 @@ any other evidence materially invalidating this design.
 
 Response to a material contradiction: stop, record the evidence in this file, report, wait for
 review — same discipline as `AFLDB-ISSUE-090.md`.
+
+---
+
+## 17. Current truth (2026-08-28 verification session)
+
+This section supersedes any earlier "not yet implemented" wording above. It was written after
+reading the working tree, not chat history, and resolves the drift between the records that
+said planning was complete-but-unimplemented and those that said §4/§5 already landed during
+ISSUE-093 Phase 3. **The latter is correct.**
+
+### 17.1 Implementation — present and complete, verified line by line
+
+| Requirement | Where | Verified |
+|---|---|---|
+| §4 gate, reusable | `tools/migration/common.py:116-184` — `POPULATION_DROP_THRESHOLD = 0.10`, `PopulationDropRefused`, `check_population_drop()` | yes |
+| §4 check 1 not bypassable | `common.py:160-166` raises on `asserted_count == 0` **before** `acknowledged` is consulted at `:167` | yes |
+| §4 check 2 bypass + logged | `common.py:167-184`; `Reporter.warn` (`common.py:890-891`) prints unconditionally, so the acknowledgement is visible even under `--quiet` | yes |
+| Gate called before the DELETE, in-transaction, on pre-write counts | `enrich_birth_dates.py:539-556` (single `SELECT count(*), count(*) FILTER (...)`) immediately preceding the DELETE at `:557-563` | yes |
+| Deletion scoped to the rows this pass owns | `enrich_birth_dates.py:558-562` — `WHERE source_id = %s AND match_method = 'afltables_profile_url'`, with `source_id` resolved from `--source-key` at `:422-426` | yes |
+| §5 `--source-key` containment | `enrich_birth_dates.py:389-390`, threaded into the `sources` lookup (`:422`) **and** `import_batch` (`:475`) | yes |
+| §5 fixture source seeded at runtime | `dob-enrichment-issues.test.ts:305-314` — idempotent `INSERT ... ON CONFLICT (key) DO NOTHING` for `afltables_issue090_fixture`; no migration | yes |
+| §5 every real register invocation contained | `runRegister()` (`:230-243`) always passes `--source-key FIXTURE_SOURCE_KEY`; it is the suite's only spawn of this importer, so test 5 (`:571-598`) is contained too | yes |
+| §5.4 cleanup extension | `cleanupIssue090Fixtures()` (`:266-282`) also clears `external_identities` under `fixtureSourceId` | yes |
+| §11 acceptance tests | tests 24–27, `dob-enrichment-issues.test.ts:605-735` | yes |
+| §8 no schema change | no migration touches this; the fixture `sources` row is runtime data | yes |
+| Fail-closed default | the gate runs on every invocation; only check 2 is bypassable, and only per-invocation | yes |
+
+Two supporting facts that make tests 25/26 sound, both confirmed in `common.py`:
+
+- `ImportBatch.__post_init__` **commits the batch row before the block runs** (`:210-223`), and
+  `import_batch` rolls back and then marks `status='failed'` on exception (`:262-279`). Test
+  25's `import_batches ... status = 'failed'` assertion therefore survives the rollback.
+- `enrich_birth_dates.py` has **no early return for an empty register**, so test 25's zero-row
+  fixture genuinely reaches the gate rather than exiting 0 beforehand.
+
+Deliberately **not** changed: the `dob_conflict` details still record the literal
+`"source": SOURCE_KEY` (`enrich_birth_dates.py:78`, `:217`) regardless of `--source-key`. That
+string is an ISSUE-090 *pass label* and part of that issue's issue-identity/dedup contract
+(tests 1/2 compare `details` for equality). Rewriting it to `args.source_key` would change
+ISSUE-090 semantics for no ISSUE-092 benefit; §5 scoped `--source-key` to the sources lookup
+and `import_batch` only, and it stays that way.
+
+### 17.2 Recovery — superseded by the ISSUE-093 rebuild, with positive evidence
+
+The Status block previously reasoned that §6 was obsolete because "a rebuilt database starts
+empty". That reasoning was incomplete and is now replaced by direct evidence: **the canonical
+rebuild repopulates this exact table itself.**
+
+- `tools/migration/import_fitzroy_core.py` writes `external_identities` under
+  `SOURCE_KEY_AFLTABLES = 'afltables'` with `MATCH_METHOD = 'afltables_profile_url'`
+  (`:89`, `:100`, `:1497`) — reusing this issue's own `check_population_drop` gate at
+  `:1473-1478`, per ISSUE-093 §9.
+- `tools/db/rebuild-test.ts:521-523` defines the Stage 9 `players` gate as
+  `SELECT count(*) FROM external_identities ei JOIN sources s ON s.id = ei.source_id WHERE s.key = 'afltables'`.
+- That gate read **13,275** in the passing 2026-08-27 rebuild
+  (`AFLDB-ISSUE-093.md` §H15.4, `AFLDB-FINAL-VALIDATION PASSED: 13 checks`).
+
+So `afldb_test.external_identities` is populated again — canonically, by the frozen fitzRoy
+source, through the gated importer. **No §6 recovery run is required or authorised.** The old
+emptied database is preserved read-only as `afldb_test_pre_rebuild_20260825` and is never an
+input. §2's incident record and the §1 root cause stand unchanged as historical evidence.
+
+The count difference (13,275 canonical vs the old 12,472 legacy-derived) is expected: the
+population now comes from a different, authoritative source. It is a release-gate pinning
+question for `AFLDB-ISSUE-090`, not a defect of this issue — see the amended §15.4/§15.5.
+
+### 17.3 What remained ISSUE-092-owned — DONE
+
+Exactly one thing: **run the acceptance tests**. No code, no schema, no recovery, no
+release-gate change. Executed 2026-08-28 — see §17.5.
+
+```
+npm test -- tests/integration/dob-enrichment-issues.test.ts
+```
+
+Preconditions were already satisfied by the rebuilt database: migrations 75/75 with 072
+applied (the suite gates tests 15–18 on `afldb_meta.schema_migrations`); a `sources` row
+keyed `afltables` (`data/reference/sources.json:12`); club organizations `University` and
+`Brisbane Bears` (`:322-332`).
+
+### 17.4 Effect on AFLDB-ISSUE-090
+
+§17.3 is green, so ISSUE-092's acceptance conditions (§15.1–§15.3, §15.6–§15.7) are met, the
+blocking hazard is gone, and **ISSUE-090 is UNBLOCKED for its own remaining validation**
+(`release-gates.test.ts`, then `privileges.test.ts`). ISSUE-090 must expect its two
+external-identity gates to read **13,275** against a stale pin of **12,472** and to decide
+that re-pin under its own scope; 12,472 must not be silently reinstated. **ISSUE-090 remains
+OPEN, is not resolved by this issue, and was not edited by it** beyond the one-line ledger
+truthfulness update removing the now-false "blocked by ISSUE-092" statement.
+
+### 17.5 Acceptance validation — PASSED 2026-08-28
+
+User-run against the rebuilt `afldb_test`:
+
+```
+npm test -- tests/integration/dob-enrichment-issues.test.ts
+
+Test Files  1 passed (1)
+Tests      27 passed (27)
+Duration   16.46s
+no skips
+```
+
+The §11 acceptance block executed and passed — these tests are now **executed and green**,
+not merely authored:
+
+| Test | Proves |
+|---|---|
+| 24 | a fixture-source run cannot touch the real `afltables` population (§5 containment) |
+| 25 | an empty asserted population is refused **unconditionally**, including with `--acknowledge-population-drop`; no row deleted; batch marked `failed` (§4 check 1) |
+| 26 | an over-threshold drop is refused by default and permitted **only** with the explicit acknowledgement flag, which is logged (§4 check 2) |
+| 27 | an equal-or-larger asserted population passes with no false positive — ordinary rerun and the rebuild-from-empty direction (§11.5) |
+
+The remaining 23 tests in the file — ISSUE-090's own reconciliation suite, including test 5's
+"an existing club-list assertion survives a real register run untouched" — stayed green under
+the fixture-scoped source key, so §5 containment did not regress the existing contract.
+
+An earlier run of this suite reported skips. That was a **worktree Python-environment
+artefact** (the suite `skipIf`-skips without importable `psycopg` and the role-parity DSNs)
+and is explicitly **not** validation evidence. This 27/27 run is the authoritative result.
+
+**AFLDB-ISSUE-092 is RESOLVED as of 2026-08-28.** The safety invariant it existed to
+establish now holds and is regression-covered: a partial or synthetic population cannot
+delete unrelated real `external_identities`, the default fails closed, the only bypass is
+per-invocation and logged, the zero-population case has no bypass at all, and a fixture
+invoking the real importer is contained by source ownership rather than by mocking the
+importer away.

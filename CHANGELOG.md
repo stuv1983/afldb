@@ -15,6 +15,14 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-092 — External-identity reconciliation now fails closed on an unproven-complete source - 28 August 2026
+
+- An importer that reconciles `external_identities` by deleting rows absent from its input can only be correct if that input is the complete current population. `enrich_birth_dates.py` never checked that, so a truncated, wrong or synthetic source silently deleted the identities it failed to assert — in any environment, production included.
+- Added the reusable fail-closed gate `check_population_drop()` / `PopulationDropRefused` / `POPULATION_DROP_THRESHOLD = 0.10` to `tools/migration/common.py`, called inside the transaction immediately before the destructive statement, on counts read prior to the run's own writes. Asserting an **empty** population against stored rows is refused unconditionally and has **no bypass**; a drop above the threshold is refused unless the caller passes the per-invocation `--acknowledge-population-drop`, which is logged as a warning so its use is visible in run output. The deletion is scoped to the rows the current source and pass own.
+- `enrich_birth_dates.py` gained `--source-key`, so a test or partial run can be contained to its own `sources` row and cannot intersect the shared AFL Tables identity population. The DOB enrichment suite exercises the **real** importer under a runtime-seeded fixture source rather than a migration or a mock, keeping the existing acceptance contract intact while making the invocation structurally harmless.
+- `import_fitzroy_core.py` reuses the same gate and flags for its own `external_identities` reconciliation, so the canonical rebuild imports under the same protection.
+- Validated against PostgreSQL: `tests/integration/dob-enrichment-issues.test.ts` passes **27/27**, covering fixture-source containment, the unbypassable empty-population refusal, threshold refusal and explicit acknowledgement, and the no-false-positive case for equal-or-larger populations and rebuild-from-empty.
+
 ### AFLDB-ISSUE-086 — Durable admin overrides regain complete FK-index coverage (migration 075) - 28 August 2026
 
 - Added `src/db/migrations/075_data_overrides_fk_index.sql`, which creates `ix_data_overrides_admin_user_id ON data_overrides (admin_user_id)` — unconditional, non-unique, non-partial, following the migration-041/071 shape for a `NOT NULL` foreign-key column.

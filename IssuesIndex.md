@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-28
-**Open issues:** 11
+**Open issues:** 10
 
 ## How Claude should use this file
 
@@ -26,8 +26,7 @@
 |---|---|---|---|
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | React #418 remains intermittent under production-style NL search hydration; narrow H7 diagnostic is awaiting authoritative live-build validation. |
 | `AFLDB-ISSUE-076` | Medium | Performance | `won_final_at_venue` Grid Solver combinations can exceed the 5-second PostgreSQL statement timeout and crash the rendered page. |
-| `AFLDB-ISSUE-090` | Medium | Data integrity / Import | Confirmed release blocker: club-list DOB enrichment stacks duplicate unresolved `dob_conflict` rows on rerun, and the register pass deletes conflicts it does not own. Migration 072 APPLIED to `afldb_test`; dob-enrichment suite GREEN 23/23; release-gates validation HALTED, blocked by `AFLDB-ISSUE-092`. |
-| `AFLDB-ISSUE-092` | Medium | Data integrity / Tooling safety | §4 fail-closed gate + §5 `--source-key` containment IMPLEMENTED (2026-08-25, ISSUE-093 Phase 3; reusable `check_population_drop()` in `common.py`). Database validation (§11 tests 24–27) still pending, but **no longer blocked on a database**: `afldb_test` was rebuilt and validated on 2026-08-27 by `AFLDB-ISSUE-093` (Resolved). §6 recovery obsolete for the rebuild path. Blocks `AFLDB-ISSUE-090`. |
+| `AFLDB-ISSUE-090` | Medium | Data integrity / Import | Confirmed release blocker: club-list DOB enrichment stacks duplicate unresolved `dob_conflict` rows on rerun, and the register pass deletes conflicts it does not own. Migration 072 APPLIED to `afldb_test`; dob-enrichment suite GREEN (now 27/27 including ISSUE-092's tests). **UNBLOCKED 2026-08-28** — `AFLDB-ISSUE-092` is Resolved, so the release-gates halt is lifted. Next: `release-gates.test.ts`, then `privileges.test.ts`. Expect the two external-identity gates to read **13,275** against a stale legacy-derived pin of **12,472**; that re-pin decision is this issue's, and 12,472 must not be silently reinstated. |
 | `AFLDB-ISSUE-095` | Medium | Data acquisition / Import architecture / Data integrity | `club_seasons` has no canonical, legacy-free acquisition path — `rebuild_derived.py` builds it only from `staging.team_seasons`, whose sole writer is `import_legacy_afl.py` under `AFLDB_LEGACY_SQLITE`. A clean canonical rebuild therefore correctly yields `club_seasons = 0`. Runbook `AFLDB-ISSUE-095.md`; decisions D1–D7 open. Stage 9 must NOT gate `club_seasons` until this lands. |
 <!-- RETIRED 2026-08-28 — `AFLDB-ISSUE-096` is **Resolved** (complete within its authorised S1–S4
      scope) and is NO LONGER an open issue. Do not read the commented-out row below as current:
@@ -167,49 +166,52 @@
   (`db:status` 72/72, 0 pending). `dob-enrichment-issues.test.ts` post-migration rerun
   GREEN 23/23 (fixed a test-harness bigint/string assertion defect on the way, not a
   migration defect). `AFLDB-ISSUE-091`'s migration-checksum blocker is Resolved.
-- **Current state:** `release-gates.test.ts` validation HALTED. The intended
-  duplicate-`dob_conflict` gate is now GREEN (the fix ISSUE-090 set out to make). But two
-  unrelated `external_identities` gates flipped green→red (expected 12,472
-  `afltables_profile_url`/`unique` rows, found 0) — root-caused to a pre-existing importer
-  defect in `enrich_birth_dates.py` exposed by this issue's own new regression suite,
-  **not** to migration 072 (conclusively ruled out — see `AFLDB-ISSUE-090.md`). Tracked and
-  blocked on **`AFLDB-ISSUE-092`**.
+- **Current state:** `release-gates.test.ts` validation was HALTED; **the halt is LIFTED as
+  of 2026-08-28**. The intended duplicate-`dob_conflict` gate is GREEN (the fix ISSUE-090 set
+  out to make). Two unrelated `external_identities` gates had flipped green→red (expected
+  12,472 `afltables_profile_url`/`unique` rows, found 0) — root-caused to a pre-existing
+  importer defect in `enrich_birth_dates.py` exposed by this issue's own new regression
+  suite, **not** to migration 072 (conclusively ruled out — see `AFLDB-ISSUE-090.md`). That
+  defect was tracked as **`AFLDB-ISSUE-092`**, which is now **Resolved** (fail-closed
+  population gate + `--source-key` containment, validated 27/27 on 2026-08-28), and the
+  emptied population was restored to **13,275** by the 2026-08-27 canonical rebuild. The
+  0-row condition is gone; what remains is whether the 12,472 pin is still the right expected
+  value — an ISSUE-090 decision. This issue is **OPEN and unblocked**, not resolved.
 - **Approved decisions:** D1 identical resolved recurrence suppressed (assertion-specific);
   D1a no `recurrence_of`; D2 targeted partial unique index; D3 equivalent
   `dob_internal_conflict` invariant; D4 `external_identity_conflict` is follow-up;
   D5 recompute `players.dob_disputed`.
-- **Exact next action:** Blocked. Cannot resume `release-gates.test.ts`/`privileges.test.ts`
-  validation until `AFLDB-ISSUE-092` is implemented and `afldb_test.external_identities` is
-  recovered per that runbook's §6. Do not re-pin any release-gate expected value. Do not
-  restore any backup or rerun the importer outside `AFLDB-ISSUE-092`'s approved sequence.
+- **Exact next action:** **UNBLOCKED 2026-08-28.** `AFLDB-ISSUE-092` is Resolved (27/27,
+  no skips) and `afldb_test.external_identities` was repopulated by the 2026-08-27 canonical
+  rebuild, so no §6 recovery is outstanding and none is authorised. Resume
+  `release-gates.test.ts`, then `privileges.test.ts`. Expect the two external-identity gates
+  to read **13,275** (canonical, from `import_fitzroy_core.py`) against their stale
+  legacy-derived pin of **12,472**. Deciding that re-pin is **this** issue's call — it was
+  an explicit ISSUE-092 non-goal — and 12,472 must not be silently reinstated. This issue
+  remains OPEN.
 
-## AFLDB-ISSUE-092 — `external_identities` reconciliation trusts an unproven-complete source population
+<!-- RETIRED 2026-08-28 — `AFLDB-ISSUE-092` is **Resolved** and is NO LONGER an open issue.
+     Its index row and detail block have been removed from this open-issues-only file.
+     Authoritative records: the `AFLDB-ISSUE-092` entry in `issues.md` and
+     `AFLDB-ISSUE-092.md` §17 (§17.1 implementation verification, §17.2 recovery superseded
+     by rebuild, §17.5 acceptance validation).
 
-- **Severity:** Medium
-- **Area:** Data integrity / Tooling safety
-- **Key files:** `tools/migration/enrich_birth_dates.py` (`:500-539`),
-  `tests/integration/dob-enrichment-issues.test.ts` (test 5, `:216-224`, `:529-556`)
-- **Runbook:** `AFLDB-ISSUE-092.md` — durable source of truth. Planning complete, not yet
-  approved/implemented.
-- **Current state:** `afldb_test.external_identities` is completely empty. Root cause:
-  `enrich_birth_dates.py`'s external-identity DELETE assumes its caller always supplies the
-  complete register population, with no fail-closed check; `dob-enrichment-issues.test.ts`
-  test 5 invokes the real importer against shared `afldb_test` with a tiny synthetic
-  register, which caused the DELETE to remove the entire real 12,472-row population. Proven
-  to predate migration 072 (independent pre-072 backup already shows the table empty).
-  Confirmed the table's sole writer today, so no other feature's data was lost.
-- **Implemented (2026-08-25, ISSUE-093 Phase-3 session):** (A) §4 fail-closed gate — reusable
-  `check_population_drop()`/`PopulationDropRefused`/`POPULATION_DROP_THRESHOLD=0.10` in
-  `tools/migration/common.py`, wired into `enrich_birth_dates.py` before the DELETE; check 1
-  (empty asserted population) not bypassable, check 2 (>10% drop) bypassable only via
-  per-invocation `--acknowledge-population-drop` (logged); (B) §5 containment —
-  `--source-key` flag, fixture source `afltables_issue090_fixture`, cleanup extension, new
-  tests 24–27 in `dob-enrichment-issues.test.ts`. No schema/migration change.
-- **Exact next action:** Run the §11 database tests (`dob-enrichment-issues.test.ts`) against
-  `afldb_test`, which was rebuilt and validated on 2026-08-27 by `AFLDB-ISSUE-093` (Resolved),
-  so this is no longer blocked on a database. §6 recovery of the old database is obsolete for
-  the rebuild path; `AFLDB-ISSUE-090`'s release-gate validation resumes against the rebuilt
-  database.
+     Outcome: the fail-closed `external_identities` population-drop gate
+     (`check_population_drop()` in `tools/migration/common.py`, reused by
+     `import_fitzroy_core.py`) plus `--source-key` containment were implemented 2026-08-25
+     and VALIDATED 2026-08-28 — `npm test -- tests/integration/dob-enrichment-issues.test.ts`
+     **27/27, no skips**, tests 24–27 executed and green. §6 recovery of the emptied test
+     database was superseded by the 2026-08-27 canonical rebuild, which repopulated the
+     AFL Tables identity population to **13,275** through the gated import path.
+
+     The historical incident (a one-row synthetic register wiping the real 12,472-row
+     population via `dob-enrichment-issues.test.ts` test 5) is preserved in full in
+     `issues.md` and `AFLDB-ISSUE-092.md` §1/§2 and must not be erased.
+
+     Downstream: `AFLDB-ISSUE-090` is UNBLOCKED but still OPEN, listed above. Its two
+     external-identity release gates are pinned at the stale legacy-derived 12,472 against a
+     canonical 13,275; that re-pin is an ISSUE-090 decision and 12,472 must not be silently
+     reinstated. -->
 
 ## AFLDB-ISSUE-095 — Canonical legacy-free ladder / team-season acquisition
 
