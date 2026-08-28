@@ -49,5 +49,32 @@ describe('AFLDB-ISSUE-086 Source Contract', () => {
     expect(sqlOverrides).toMatch(/override_values\s+jsonb\s+NOT NULL/);
     expect(sqlOverrides).toMatch(/is_active\s+boolean\s+NOT NULL DEFAULT true/);
     expect(sqlOverrides).toMatch(/UNIQUE \(entity_type, entity_key, field_group\)/);
+
+    // AFLDB-ISSUE-086 (reopened 2026-08-28): 073 declares
+    // admin_user_id NOT NULL REFERENCES auth_users(id) but indexes only
+    // (entity_type, entity_key), so fk-indexes.test.ts reports
+    // data_overrides(admin_user_id) -> auth_users as uncovered.
+    // Migration 075 is the forward repair; 073 is not edited.
+    const fkIndexPath = path.join(root, 'src/db/migrations/075_data_overrides_fk_index.sql');
+    expect(fs.existsSync(fkIndexPath)).toBe(true);
+
+    const statement = fs.readFileSync(fkIndexPath, 'utf-8')
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('--'))
+      .join('\n')
+      .match(/CREATE[\s\S]*?;/);
+    expect(statement).not.toBeNull();
+    const createIndex = statement![0];
+
+    // Name, target table and admin_user_id as the leading/only key column,
+    // created IF NOT EXISTS.
+    expect(createIndex).toMatch(
+      /^CREATE INDEX IF NOT EXISTS ix_data_overrides_admin_user_id\s+ON data_overrides \(admin_user_id\);$/,
+    );
+    // Not unique, not partial, and not CONCURRENTLY (the migration runner
+    // wraps each migration in a transaction).
+    expect(createIndex).not.toMatch(/UNIQUE/i);
+    expect(createIndex).not.toMatch(/\bWHERE\b/i);
+    expect(createIndex).not.toMatch(/CONCURRENTLY/i);
   });
 });

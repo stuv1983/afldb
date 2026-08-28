@@ -36,3 +36,57 @@
 - Privilege reconciliation explicitly re-grants SELECT-only access to `data_overrides` for `afldb_import`.
 
 - **Status**: Resolved — implementation and DB-backed acceptance validated 2026-08-28.
+  *(Superseded 2026-08-28 — see "Reopened 2026-08-28" below. The original
+  resolution evidence and implementation record above are retained; the issue is
+  reopened only for the separate schema defect below.)*
+
+## Reopened 2026-08-28 — `data_overrides(admin_user_id)` has no covering index
+
+### Post-resolution validation (all passed)
+- Migration checksum-baseline repair completed successfully.
+- Clean rebuild through migration 073 passed final validation **13/13**.
+- Migration status **73/73, 0 pending, no drift**.
+- DB-free source contract: **6/6**.
+- Restricted-role DraftGuru integration: **19/19**.
+
+### New proven defect
+`tests/integration/fk-indexes.test.ts` is **1/2**: the coverage case reports
+`data_overrides(admin_user_id) -> auth_users` as having no index the referential
+check can use. Migration 073 declares
+`admin_user_id integer NOT NULL REFERENCES auth_users(id)` and creates only
+`ix_data_overrides_entity ON data_overrides (entity_type, entity_key) WHERE is_active = true`,
+which does not lead with `admin_user_id`. `auth_users` is deliberately absent
+from that test's `DELETE_FREE_PARENTS` — migration 071 says so outright and
+indexed `data_edits.admin_user_id` on exactly those grounds — so a parent-side
+`auth_users` delete sequentially scans `data_overrides`.
+
+The suite's second case (`keeps the exemption list free of entries that no
+longer apply`) is unaffected and passes.
+
+### Forward repair
+`src/db/migrations/075_data_overrides_fk_index.sql`:
+
+```sql
+CREATE INDEX IF NOT EXISTS ix_data_overrides_admin_user_id
+  ON data_overrides (admin_user_id);
+```
+
+Unconditional, non-unique, non-partial, no `CONCURRENTLY` — the shape
+migrations 041 and 071 established for a NOT NULL foreign-key column.
+Migration 073 is **not** edited: it is applied and checksum-baselined, so the
+repair is forward-only.
+
+### Application order — 075 remains unapplied to afldb_test
+Migration 075 is authored and remains unapplied to `afldb_test`. It stays
+unapplied until `AFLDB-ISSUE-096`'s migration 074 is repaired and present. The
+eventual application order must be **074 then 075**.
+
+### Validation of the repair
+- `tests/data-overrides-source-contract.test.ts` extended (still one suite, the
+  existing `Migration/schema contract` test) to prove migration 075 exists,
+  creates `ix_data_overrides_admin_user_id`, targets `data_overrides`, indexes
+  `admin_user_id` as the leading/only key, uses `IF NOT EXISTS`, and is not
+  unique, not partial and not `CONCURRENTLY`.
+- Command: `npm test -- tests/data-overrides-source-contract.test.ts`
+- The DB-backed `fk-indexes.test.ts` re-run to 2/2 is pending, and is blocked
+  on applying 074 then 075.

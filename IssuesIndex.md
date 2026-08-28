@@ -7,7 +7,11 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-28
+<<<<<<< HEAD
 **Open issues:** 12
+=======
+**Open issues:** 6
+>>>>>>> 4af53d8 (fix: index data override admin foreign key)
 
 ## How Claude should use this file
 
@@ -26,6 +30,7 @@
 |---|---|---|---|
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | React #418 remains intermittent under production-style NL search hydration; narrow H7 diagnostic is awaiting authoritative live-build validation. |
 | `AFLDB-ISSUE-076` | Medium | Performance | `won_final_at_venue` Grid Solver combinations can exceed the 5-second PostgreSQL statement timeout and crash the rendered page. |
+| `AFLDB-ISSUE-086` | Medium | Admin / Data integrity | REOPENED 2026-08-28. The 073 durable-override fix stands (checksum-baseline repair completed; clean rebuild through 073 passed 13/13; 73/73 migrations, 0 pending, no drift; source contract 6/6; restricted-role DraftGuru integration 19/19). New proven defect: `data_overrides(admin_user_id) -> auth_users` has no covering index, so `fk-indexes.test.ts` is 1/2. Migration 075 written as the forward repair and unapplied to `afldb_test` until ISSUE-096's migration 074 is repaired and present. |
 | `AFLDB-ISSUE-090` | Medium | Data integrity / Import | Confirmed release blocker: club-list DOB enrichment stacks duplicate unresolved `dob_conflict` rows on rerun, and the register pass deletes conflicts it does not own. Migration 072 APPLIED to `afldb_test`; dob-enrichment suite GREEN 23/23; release-gates validation HALTED, blocked by `AFLDB-ISSUE-092`. |
 | `AFLDB-ISSUE-092` | Medium | Data integrity / Tooling safety | §4 fail-closed gate + §5 `--source-key` containment IMPLEMENTED (2026-08-25, ISSUE-093 Phase 3; reusable `check_population_drop()` in `common.py`). Database validation (§11 tests 24–27) still pending, but **no longer blocked on a database**: `afldb_test` was rebuilt and validated on 2026-08-27 by `AFLDB-ISSUE-093` (Resolved). §6 recovery obsolete for the rebuild path. Blocks `AFLDB-ISSUE-090`. |
 | `AFLDB-ISSUE-095` | Medium | Data acquisition / Import architecture / Data integrity | `club_seasons` has no canonical, legacy-free acquisition path — `rebuild_derived.py` builds it only from `staging.team_seasons`, whose sole writer is `import_legacy_afl.py` under `AFLDB_LEGACY_SQLITE`. A clean canonical rebuild therefore correctly yields `club_seasons = 0`. Runbook `AFLDB-ISSUE-095.md`; decisions D1–D7 open. Stage 9 must NOT gate `club_seasons` until this lands. |
@@ -87,6 +92,38 @@
 - **Next action:** Trace every `frontendTheme` authority and cache boundary (database, admin mutation/revalidation, SSR layout, cookie/local storage, hydration), reduce them to one authoritative resolved theme, then add browser coverage that navigates across multiple routes and proves the theme remains unchanged until a super admin deliberately changes it.
 
 
+
+## AFLDB-ISSUE-086 — Durable admin overrides: `data_overrides(admin_user_id)` is an unindexed foreign key
+
+- **Severity:** Medium
+- **Area:** Admin / Data integrity
+- **Key files:** `src/db/migrations/073_data_overrides.sql` (applied,
+  checksum-baselined, **must not be edited**);
+  `src/db/migrations/075_data_overrides_fk_index.sql` (new, **unapplied to
+  `afldb_test`**);
+  `tests/data-overrides-source-contract.test.ts`;
+  `tests/integration/fk-indexes.test.ts` (read-only here);
+  `AFLDB-ISSUE-086.md` (runbook, durable source of truth).
+- **First wrong layer:** Database schema (migration 073).
+- **Current state:** REOPENED 2026-08-28. The durable-override fix itself is
+  validated and unchanged: checksum-baseline repair completed successfully; the
+  clean rebuild through migration 073 passed **13/13** final validation;
+  migration status **73/73, 0 pending, no drift**; DB-free source contract
+  **6/6**; restricted-role DraftGuru integration **19/19**. Reopened for a
+  separate proven defect: migration 073 declares
+  `admin_user_id integer NOT NULL REFERENCES auth_users(id)` but indexes only
+  `(entity_type, entity_key)`, so `tests/integration/fk-indexes.test.ts` is
+  **1/2** on `data_overrides(admin_user_id) -> auth_users` and a parent-side
+  `auth_users` delete sequentially scans `data_overrides`. Migration 075 is the
+  forward repair (`CREATE INDEX IF NOT EXISTS ix_data_overrides_admin_user_id
+  ON data_overrides (admin_user_id);`) and is **unapplied to `afldb_test`** until
+  `AFLDB-ISSUE-096`'s migration 074 is repaired and present.
+- **Exact next action:** Repair ISSUE-096's migration 074 first, then apply
+  **074 then 075** in that order, then re-run
+  `tests/integration/fk-indexes.test.ts` and expect 2/2. Until then the only
+  available check is
+  `npm test -- tests/data-overrides-source-contract.test.ts`. Do not apply 075
+  alone, do not renumber it, and do not edit migration 073.
 
 ## AFLDB-ISSUE-090 — DOB enrichment conflict writes are not pass-scoped or idempotent
 
