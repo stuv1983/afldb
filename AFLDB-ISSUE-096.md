@@ -1618,7 +1618,20 @@ historical payload hash, exactly one open version per record, `promotion_decisio
 empty-staging guard and no `club_seasons` Stage-9 gate until ISSUE-095 lands; and no change to
 `current-season-import.ts` or `staging.external_current_matches`.
 
-### 16.13 PostgreSQL validation phase — **HALTED AT PREFLIGHT 2026-08-28** by migration-073 checksum drift
+### 16.13 PostgreSQL validation phase — halted at preflight 2026-08-28, **BLOCKER RESOLVED 2026-08-28**
+
+**RESOLUTION, recorded 2026-08-28.** The migration-073 checksum-baseline blocker described in the
+rest of this section **is resolved**. `AFLDB-ISSUE-086` rebuilt `afldb_test` cleanly through the
+committed `073_data_overrides.sql`, and the runner now reports **73/73 applied, 0 pending, no
+drift** — so the ledger and the sole committed revision of 073 agree again and no applied row is
+drifting. **The PostgreSQL validation phase may resume**, and the §16.14 three-index repair is
+therefore no longer deferred: it has been performed (see §16.14). Everything below this paragraph
+is the retained halt record and its evidence, unchanged; the prohibitions it lists on editing 073,
+hand-editing `afldb_meta.schema_migrations`, weakening checksum validation, and touching ISSUE-086's
+worktrees **all still stand**, and the two prohibitions that were conditional on the incoherent
+baseline — do not perform the §16.14 repair, do not apply 074 — are superseded only as follows: the
+§16.14 repair is done, and 074 was subsequently **applied** — 074 then 075, `75/75`, `0 pending`,
+FK gate `2/2`. See **§16.16** for the applied-schema evidence and the refreshed §5.H matrix.
 
 The separately authorised post-S4 phase (apply migration 074 to `afldb_test` and validate the
 §5.H PostgreSQL behaviours) **stopped at its first command**. Migration 074 was **NOT applied**,
@@ -1730,10 +1743,13 @@ boundary (§14 approval 4, §16.5) is unchanged by this incident.
   owned by another issue. When the baseline is repaired, ISSUE-096 resumes at exactly this point
   with the §5.H matrix (§16.15) unchanged.
 
-### 16.14 Migration 074 — three uncovered foreign keys, repair DEFERRED
+### 16.14 Migration 074 — three uncovered foreign keys, **REPAIRED IN PLACE 2026-08-28**
 
-Found by inspection during the same session, **before** the preflight, and **not yet repaired**
-(§16.13 defers it until the baseline is coherent).
+Found by inspection during the same session, **before** the preflight, deferred while the 073
+baseline was incoherent (§16.13), and **now repaired in `074_source_observation_spine.sql` itself**
+— legitimately, because 074 has never been applied anywhere. The structural pre-application review
+that found them is what makes the repair free: once 074 is applied its file is frozen by the same
+checksum guard, and the fix would have cost a further migration.
 
 `tests/integration/fk-indexes.test.ts` is an existing green gate: every foreign key in `public`
 whose parent is not in its `DELETE_FREE_PARENTS` list must have a **leading-column** index, and a
@@ -1757,18 +1773,37 @@ Staging FKs are out of scope: that suite filters child tables to `nspname = 'pub
 
 **Sequencing, and why this is recorded rather than left to be noticed later.** `migrate.ts` refuses
 to run once an **applied** migration's checksum drifts, so once 074 is applied its file is frozen
-and this repair costs a migration 075. The three indexes must therefore land in 074 **after** the
-073 baseline is repaired and **before** 074 is applied. Proposed minimal repair, unchanged from the
-session review and **not applied**:
+and this repair costs a migration 075. The three indexes therefore had to land in 074 **after** the
+073 baseline was repaired and **before** 074 is applied, which is exactly where they now are —
+authored into the file's existing table sections, `promotion_candidates` first and
+`promotion_decisions` second, with no `IF NOT EXISTS` because none of 074's four pre-existing
+`CREATE INDEX` statements uses it:
 
 ```sql
 CREATE INDEX ix_promotion_candidates_evidence
   ON promotion_candidates (source_id, family, external_record_id, source_version_seq);
 CREATE INDEX ix_promotion_candidates_decision
-  ON promotion_candidates (resolved_decision_id) WHERE resolved_decision_id IS NOT NULL;
+  ON promotion_candidates (resolved_decision_id)
+  WHERE resolved_decision_id IS NOT NULL;
 CREATE INDEX ix_promotion_decisions_admin
   ON promotion_decisions (admin_user_id);
 ```
+
+**Nothing else in 074 changed.** The repair was validated DB-free first, by the source-contract
+assertion added to `tests/current-season-import.test.ts`
+("covers its own foreign keys before it is ever applied"). That test reads the migration's
+executable statements, not its prose — the S2 false-positive repair (§16.3) — and pins each index
+whole: the evidence index on `promotion_candidates` with the leading key order
+`(source_id, family, external_record_id, source_version_seq)`; the decision index on
+`promotion_candidates (resolved_decision_id)` with exactly the predicate
+`WHERE resolved_decision_id IS NOT NULL`; the admin index on `promotion_decisions (admin_user_id)`
+plain rather than partial; and none of the three `UNIQUE` or `CONCURRENTLY`.
+
+**Since confirmed against the real catalogue (§16.16).** 074 and 075 were applied in normal
+filename order — **074 then 075** — leaving `75/75` applied, `0 pending`, no drift, and
+`tests/integration/fk-indexes.test.ts` **2/2**. That suite is unmodified throughout, so its pass is
+independent evidence for both this repair and `AFLDB-ISSUE-086`'s
+`ix_data_overrides_admin_user_id`.
 
 These are **not speculative performance indexes** — they satisfy a machine-enforced repository
 invariant. `DELETE_FREE_PARENTS` is not to be widened instead: `auth_users` is deletable, and the
@@ -1808,13 +1843,149 @@ assertion whose subject is an import re-run or the accept transaction has no cod
 **Two of eight fully executable, three partial, three blocked.** No blocked assertion is to be made
 artificially green, and no fake canonical write is to be created in order to test "0 writes".
 
-**Integration tests do not exist yet.** All 21 spine references in
+**Integration tests did not exist at this checkpoint.** All 21 spine references in
 `tests/current-season-import.test.ts` read **migration source text**, not a database; nothing under
-`tests/integration/` touches the spine. When the phase resumes, the conventions to follow are the
+`tests/integration/` touched the spine. The conventions named for the resumption were the
 repository's own: `import './guard'` first, `sql` from `@/db/client` (redirected to
 `AFLDB_TEST_DATABASE_URL` by `tests/setup.ts`, which already refuses any database not matching
 `_test`), and `database.test.ts`'s `sql.begin` + deliberate `Rollback` envelope so no fixture is
 ever committed. Privilege assertions belong in `tests/integration/privileges.test.ts`.
+**Superseded by §16.16**, which was written against the applied schema and follows exactly those
+conventions; the classification above is the pre-application one and is retained as history.
+
+### 16.16 PostgreSQL validation phase — RESUMED 2026-08-28, schema gate GREEN
+
+**Schema/migration gate, user-run 2026-08-28. This is recorded evidence, not inference.**
+
+| Fact | Value |
+|---|---|
+| Application order | **074 then 075**, normal filename order, one run — `074_source_observation_spine.sql ... ok`, `075_data_overrides_fk_index.sql ... ok`, `Applied 2 migration(s).` |
+| Post-apply status | **75 migration file(s), 75 already applied, 0 pending** — no drift |
+| Privilege reconciliation | completed successfully |
+| `tests/integration/fk-indexes.test.ts` | **2/2 passed** |
+| Post-migration fingerprint | `c5afad8cd3e6ff6417e429807bd7dfb4f8da096a84d691e63383691438722227` |
+| Catalogue shape | `afldb_test` / `afldb_owner`; schemas 5, relations 143, routines 44, types 210, extensions 3; `migrations: present|75|075_data_overrides_fk_index.sql` |
+
+The FK gate passing at 2/2 is the **real catalogue** proof of both repairs at once: ISSUE-096's
+three §16.14 indexes in 074, and `AFLDB-ISSUE-086`'s `data_overrides.admin_user_id` index in 075.
+The §16.13 migration-baseline blocker is **closed** and the §16.14 pre-application review is
+**discharged by evidence** rather than by argument.
+
+**The governing constraint has NOT changed.** `src/lib/acquisition/` still contains **no
+persistence layer**: every module is pure, `resolveSourceId` is the boundary nothing crosses, and
+no module imports `@/db/client`. Applying 074 created tables; it did not create a writer for them.
+So a §5.H row whose subject is *an import re-run* or *the accept transaction* still has no
+production code to exercise, and none was written here — S1–S4 stop at S4 and there is no approved
+S5 (§16.12).
+
+**What the new integration suite therefore is, stated exactly.** `tests/integration/`
+`observation-spine.test.ts` drives the **real** decision functions (`decideObservation`,
+`sweepAbsences`) and applies each returned decision to `afldb_test` with the SQL a persistence
+layer would issue. It proves the **schema half** of §5.H — that PostgreSQL admits the histories the
+model requires and refuses the ones it forbids. Every decision is taken from state **read back out
+of PostgreSQL** — the stored open head plus the stored payload-hash set — rather than from a value
+carried forward in memory, so a write that left the record pointing at the wrong version changes
+the outcome instead of being absorbed by the test's own bookkeeping. It does **not** prove any
+production persistence path, because none exists. Every
+test runs inside one always-rolled-back transaction against a synthetic `sources` row created in
+that transaction, so nothing is committed and no fixture id is shared with real data.
+
+**Refreshed §5.H matrix — reassessed against the applied schema and the current code, not carried
+over from §16.15.**
+
+| §5.H assertion | Class now | What the DB actually proves |
+|---|---|---|
+| **Idempotence** | **PARTIALLY EXECUTABLE** | Proved: an unchanged poll's persisted consequence is one `UPDATE staging.source_records` — 0 new payload rows, 0 new version rows, `current_version_seq` unchanged, `last_seen_at` advanced, `first_seen_at` and the open interval untouched. **Unproved:** "0 canonical writes" as a *runtime* fact, and re-running a production import — there is no importer. The canonical clause is instead proved **structurally** from `pg_trigger`/`pg_rewrite`: the five relations carry no trigger and no rule. |
+| **Correction replay A → B → A** | **EXECUTABLE DB-BACKED NOW** | Fully. Three ordered `version_seq` rows over **two** payload rows, the third row's hash identical to the first, intervals chained with no gap or overlap, exactly one open version, `opened_by`/`closed_by` batches correct. Also proved: `ux_source_record_versions_open` refuses a second open version, and `source_record_versions_close_ck` refuses a closed version naming no batch. |
+| **Absence ≠ deletion** | **EXECUTABLE DB-BACKED NOW** | Fully. `absent_since` stamped on the record row only; a record in a **non-enumerated** scope is untouched; payload/version/record counts invariant across the sweep; reappearance clears `absent_since` and appends no version; `absent_since` exists on `source_records` and on **neither** history table (`information_schema`); an `absent` candidate proposing a target is refused by `promotion_candidates_absent_ck`. Canonical untouched is again structural (no trigger, no rule) plus count invariance. |
+| **Foreign ownership** | **PARTIALLY EXECUTABLE** | Proved in PostgreSQL: `foreign_owned_collision` — and every other refusal verb — **cannot reach `accepted`**; `promotion_candidates_acceptable_ck` refuses the transition while the identical transition to `rejected` succeeds, so the refusal is the verb rule and not the workflow columns. **Unproved:** the ownership predicate itself, which is pure TypeScript with no DB path (covered DB-free). |
+| **Stale-review race** | **PARTIALLY EXECUTABLE** | Proved in PostgreSQL: one live proposal per record+target (`ux_promotion_candidates_pending` refuses the second pending row); **supersession frees the slot** for the replacement, which is the S4 `stale_review` → supersede distinction having a real schema consequence; a resolved candidate naming no decision is refused (`promotion_candidates_decision_ck`); a `requeue` with no reason is refused (`promotion_decisions_requeue_ck`); both stale reasons are storable and an unknown reason is not (`promotion_decisions_reason_ck`). **Unproved:** the race itself — there is no accept transaction to race. |
+| **Manual authority, incl. indeterminate** | **BLOCKED — `AFLDB-ISSUE-086`** | Unchanged. No DB-backed authority query exists; `UNAVAILABLE_MANUAL_AUTHORITY` is still the only provider. Only the refusal **vocabulary** is storable, and no test pretends the predicate ran. |
+| **Source disagreement + `data_issues` row** | **BLOCKED — never implemented** | Unchanged and re-verified: **nothing in `src/lib/acquisition/` references `data_issues`.** Decision C names the write; no stage built it. No fabricated `data_issues` row was inserted to make this row green. |
+| **Rollover supersession** | **BLOCKED — `AFLDB-ISSUE-101`, unsupported by 074** | Unchanged and re-verified against the applied schema: **074 has no supersession column on any of the three grains** — `superseded` exists only as a `promotion_candidates.status`. A forward gap for ISSUE-101, not repaired here. |
+
+**Two fully executable, three partially executable, three blocked.** The three blocked rows have
+**no test at all** rather than a weak one, and nothing was implemented to move a row out of
+BLOCKED.
+
+**No canonical acceptance/write path was added.** The suite inserts no canonical row, creates no
+`'accept'` decision, and contains no force/override/bypass/consensus path; the only decisions it
+writes are `reject` and `requeue`, both of which S4 actually builds. The `accepted` status is
+exercised **only** as a transition PostgreSQL must refuse.
+
+**VALIDATION GREEN — user-run 2026-08-28.**
+
+| Suite | Result | What it settles |
+|---|---:|---|
+| `tests/current-season-import.test.ts` | **106/106** | The DB-free contract, including the 074 source-contract FK-index assertion added with the §16.14 repair — the three indexes are pinned whole, by leading key order and predicate, over executable SQL statements. |
+| `tests/integration/fk-indexes.test.ts` | **2/2** | The real catalogue gate, unmodified throughout: **the §16.14 FK repair in 074 is validated**, and so is `AFLDB-ISSUE-086`'s 075 `data_overrides.admin_user_id` index, both in the same pass. |
+| `tests/integration/observation-spine.test.ts` | **13/13** | The §5.H rows classified executable or partially executable above, against `afldb_test`. |
+
+Migration state at validation: **75 migration file(s), 75 already applied, 0 pending**, with
+**074 applied before 075**; privileges reconciled; fingerprint
+**`c5afad8cd3e6ff6417e429807bd7dfb4f8da096a84d691e63383691438722227`**.
+
+**The first spine run exposed one defect and it was in the fixture, not in the schema or the
+assertions.** `seed()` wrote `seasons.is_complete`, which migration 015 dropped and re-added as
+`GENERATED ALWAYS AS (status = 'complete') STORED`; ten cases aborted in shared setup **before
+reaching their bodies**, so nothing failed on §5.H semantics. The fixture now writes the writable
+authority — `INSERT INTO seasons (year, league, status) VALUES (2099, 'AFL',
+'in_progress'::season_status)` — and the rerun passed 13/13. **No behavioural assertion was
+changed** to obtain it, and `is_complete` is the only generated column in the entire schema, so no
+other seed column was affected.
+
+**What 13/13 does and does not mean.** It proves the **implemented PostgreSQL/schema half** of
+§5.H: that migration 074 admits the histories the model requires and refuses the ones it forbids.
+It does **not** prove an importer or a canonical accept transaction, because **neither exists** —
+`src/lib/acquisition/` still has no persistence layer. **The three PARTIALLY EXECUTABLE rows above
+stay partial.** Their schema consequences passing is exactly what "partial" claimed; the
+unproved halves — a production import re-run, the ownership predicate's DB path, and the
+render-to-accept race itself — have no code to exercise and are not made green by this run.
+**The three BLOCKED rows stay blocked** and still have no test at all.
+
+**The one remaining ISSUE-096-owned validation gap — CLOSED 2026-08-28,
+`tests/integration/privileges.test.ts` 24/24 passed (user-run).**
+074's append-only-by-grant invariant on `promotion_decisions` had no catalogue test:
+`tests/integration/privileges.test.ts` names its append-only auth tables in an explicit array and
+did not name it, so the drift its own migration comment warns about — `privileges.sql` regenerating
+`grant_import_write()`'s UPDATE/DELETE/TRUNCATE over the ledger — would not have been caught.
+Closed in that file's **existing** contract, in its two existing homes and with no new privilege
+model: `('promotion_decisions', 'SELECT')` and `('promotion_decisions', 'INSERT')` added to the
+positive "privileges the reconciler must grant" list, and `promotion_decisions` added to the
+append-only array that asserts `afldb_auth` holds **no** UPDATE, DELETE or TRUNCATE.
+`tools/maintenance/privileges.sql` was inspected and **not changed**: it already specifies
+`['promotion_decisions', 'SELECT, INSERT']` and lists the table in the sequence-grant set, so the
+grants are correct and only the test was missing. `promotion_candidates` was deliberately left out
+— its column-scoped UPDATE is a different shape and not this invariant.
+
+### 16.17 ISSUE-096 RESOLVED 2026-08-28 — complete within the authorised S1–S4 scope
+
+**Final validated evidence, all user-run 2026-08-28:** `tests/current-season-import.test.ts`
+**106/106**; `tests/integration/observation-spine.test.ts` **13/13**;
+`tests/integration/fk-indexes.test.ts` **2/2**; `tests/integration/privileges.test.ts` **24/24**;
+migrations **75/75 applied, 0 pending** with **074 applied before 075**; privileges reconciled;
+fingerprint `c5afad8cd3e6ff6417e429807bd7dfb4f8da096a84d691e63383691438722227`.
+
+**Migration 074 is applied and checksum-frozen. It must not be edited again** — the runner refuses
+every migration once an applied file drifts, so any further change to the spine is a new migration.
+
+**The §5.H matrix in §16.16 stands exactly as written.** No partial row became a full pass because
+its schema consequences passed; that is precisely what "partially executable" claimed. **The
+remaining partial and blocked rows are NOT unfinished ISSUE-096-owned S1–S4 work.** They are, in
+every case, one of two things:
+
+1. **A consequence that cannot be exercised without a future persistence or accept path.** The
+   unproved halves — a production import re-run, the ownership predicate's DB path, the
+   render-to-accept race — have **no code to exercise**: `src/lib/acquisition/` deliberately holds
+   no persistence layer, and the canonical acceptance/write transaction is outside S1–S4 by
+   approval and gated on `AFLDB-ISSUE-086`.
+2. **A separately owned downstream capability.** Manual authority → `AFLDB-ISSUE-086`; the
+   `data_issues` disagreement row → never implemented in S1–S4, and building it would absorb
+   `AFLDB-ISSUE-097`/`AFLDB-ISSUE-099`; rollover supersession → `AFLDB-ISSUE-101`, which also owns
+   the observation-grain supersession model 074 deliberately does not provide.
+
+**No approved S5 exists** (§16.12): a next stage is a fresh approval decision, not a continuation.
+The admin review screen remains an explicit §2 non-goal. No family importer was built here.
 
 ---
 

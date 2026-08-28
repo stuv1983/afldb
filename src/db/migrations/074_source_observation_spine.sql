@@ -222,6 +222,23 @@ CREATE INDEX ix_promotion_candidates_queue
 CREATE INDEX ix_promotion_candidates_target
   ON promotion_candidates (target_table, target_id);
 
+-- The composite foreign key back to the observation this proposal was
+-- derived from. ux_promotion_candidates_pending does NOT cover it: its
+-- fourth column is target_table rather than source_version_seq, and its
+-- `WHERE status = 'pending'` predicate is not one a referential probe
+-- implies. Without this, deleting a source version scans the queue.
+CREATE INDEX ix_promotion_candidates_evidence
+  ON promotion_candidates (source_id, family, external_record_id, source_version_seq);
+
+-- resolved_decision_id, whose foreign key is added at the foot of this
+-- migration once promotion_decisions exists. Partial on the 041 shape --
+-- `WHERE col IS NOT NULL`, the only predicate the parent-side probe
+-- implies -- because a pending candidate has no decision and pending is
+-- the common state.
+CREATE INDEX ix_promotion_candidates_decision
+  ON promotion_candidates (resolved_decision_id)
+  WHERE resolved_decision_id IS NOT NULL;
+
 COMMENT ON TABLE promotion_candidates IS
   'Proposed canonical changes awaiting super-admin review. Creating one NEVER changes canonical data. Only new/corrected/rescheduled may ever be accepted; every refusal verb is barred from acceptance by CHECK.';
 COMMENT ON COLUMN promotion_candidates.source_version_seq IS
@@ -263,6 +280,13 @@ CREATE TABLE promotion_decisions (
 );
 
 CREATE INDEX ix_promotion_decisions_candidate ON promotion_decisions (candidate_id);
+
+-- The auth_users reference, indexed on the same terms as the nine
+-- operational-bookkeeping indexes in migration 041: no read path filters
+-- on it, but deleting an administrator scans this ledger without it. The
+-- column is NOT NULL, so the index is plain rather than partial.
+CREATE INDEX ix_promotion_decisions_admin
+  ON promotion_decisions (admin_user_id);
 
 COMMENT ON TABLE promotion_decisions IS
   'One append-only row per super-admin promotion decision. Append-only by grant: no UPDATE, no DELETE. A wrong decision is corrected by a later decision, never by rewriting this log.';

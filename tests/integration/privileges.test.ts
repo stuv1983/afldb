@@ -314,7 +314,13 @@ describe('afldb_auth is confined to the operational tables', () => {
                 ('player_link_resolutions', 'INSERT'),
                 -- Manual-edit audit (057).
                 ('data_edits',              'SELECT'),
-                ('data_edits',              'INSERT')
+                ('data_edits',              'INSERT'),
+                -- Reviewed promotion (074): the super-admin review screen
+                -- reads the ledger and appends one decision row per review.
+                -- The ledger is deliberately NOT import-writable, so this
+                -- grant is the only write path it has.
+                ('promotion_decisions',     'SELECT'),
+                ('promotion_decisions',     'INSERT')
              ) AS t(name, privilege)
        ORDER BY 1, 2
     `;
@@ -333,10 +339,16 @@ describe('afldb_auth is confined to the operational tables', () => {
     // one of the three that is meant to be mutable.
     // player_link_resolutions (056) and data_edits (057) are append-only
     // the same way: a wrong decision gets a new row, never an edit.
+    // promotion_decisions (074) is the third of that family and the one
+    // most exposed to drift: its migration explains that registering it as
+    // import-writable would have handed out UPDATE, DELETE and TRUNCATE
+    // through a registry the reconciler regenerates from, so append-only
+    // there rests entirely on the grant this test reads back.
     const rows = await sql<{ name: string; privilege: string }[]>`
       SELECT t.name, p.privilege
         FROM unnest(ARRAY['nl_search_feedback', 'nl_search_log',
-                          'player_link_resolutions', 'data_edits']) AS t(name)
+                          'player_link_resolutions', 'data_edits',
+                          'promotion_decisions']) AS t(name)
        CROSS JOIN LATERAL (VALUES ('UPDATE'), ('DELETE'), ('TRUNCATE')) AS p(privilege)
        WHERE has_table_privilege(${AUTH_ROLE}, t.name, p.privilege)
        ORDER BY 1, 2

@@ -4,13 +4,34 @@ import { readFileSync } from 'node:fs';
 
 import { fetchKaliCurrentMatches, fetchSquiggleCurrentMatches } from '@/lib/external-afl/current-matches';
 
-const tool = readFileSync('tools/current-season/update-current-season.ts', 'utf8');
-const importer = readFileSync('src/lib/external-afl/current-season-import.ts', 'utf8');
-const adminAction = readFileSync('src/app/admin/current-season/actions.ts', 'utf8');
-const adminPage = readFileSync('src/app/admin/current-season/page.tsx', 'utf8');
-const adminNav = readFileSync('src/app/admin/nav-model.ts', 'utf8');
-const migration = readFileSync('src/db/migrations/063_external_current_match_sources.sql', 'utf8');
-const client = readFileSync('src/lib/external-afl/current-matches.ts', 'utf8');
+/**
+ * A source file read as text for a source-contract assertion, with CRLF
+ * normalised to LF.
+ *
+ * Every assertion in this file that spans a line break embeds `\n`, because
+ * that is what the committed blob holds. On a Windows checkout with
+ * `core.autocrlf=true` the working tree materialises those blobs as CRLF, so
+ * a raw read makes a multiline `toContain` fail on a file whose content is
+ * byte-for-byte correct -- a platform false positive, not a behaviour
+ * failure, and the same class of defect `AFLDB-ISSUE-091` fixed for
+ * migration checksums. Line endings are not semantic source content, so they
+ * are normalised here, at the read boundary, rather than by loosening the
+ * assertions that carry the contract.
+ *
+ * JSON fixtures are read directly below: they go through `JSON.parse`, which
+ * is line-ending insensitive already.
+ */
+function readSource(path: string): string {
+  return readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
+}
+
+const tool = readSource('tools/current-season/update-current-season.ts');
+const importer = readSource('src/lib/external-afl/current-season-import.ts');
+const adminAction = readSource('src/app/admin/current-season/actions.ts');
+const adminPage = readSource('src/app/admin/current-season/page.tsx');
+const adminNav = readSource('src/app/admin/nav-model.ts');
+const migration = readSource('src/db/migrations/063_external_current_match_sources.sql');
+const client = readSource('src/lib/external-afl/current-matches.ts');
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -86,7 +107,7 @@ describe('current-season external source import contracts', () => {
   });
 
   it('adds provenance columns to matches in a forward-only migration', () => {
-    const provenance = readFileSync('src/db/migrations/064_matches_external_provenance.sql', 'utf8');
+    const provenance = readSource('src/db/migrations/064_matches_external_provenance.sql');
     expect(provenance).toContain("SELECT add_provenance_columns('matches')");
   });
 
@@ -314,8 +335,8 @@ import {
   type ObservationHead,
 } from '@/lib/acquisition/observations';
 
-const spine = readFileSync('src/db/migrations/074_source_observation_spine.sql', 'utf8');
-const privilegesSql = readFileSync('tools/maintenance/privileges.sql', 'utf8');
+const spine = readSource('src/db/migrations/074_source_observation_spine.sql');
+const privilegesSql = readSource('tools/maintenance/privileges.sql');
 
 /**
  * The executable statements of a migration: `--` comments removed, whitespace
@@ -703,6 +724,47 @@ describe('S2 promotion ledger — reviewed only, append only', () => {
     expect(spine).toContain('ux_source_record_versions_open');
     expect(spine).toMatch(/CREATE UNIQUE INDEX ux_source_record_versions_open[\s\S]*?WHERE observed_to IS NULL/);
   });
+
+  it('covers its own foreign keys before it is ever applied', () => {
+    // tests/integration/fk-indexes.test.ts fails any foreign key in `public`
+    // whose referencing columns are not the LEADING key columns of some
+    // index, and counts a partial index only when its predicate is exactly
+    // `(col IS NOT NULL)`. Three of 074's foreign keys need an index of
+    // their own -- the rest are covered or point at a DELETE_FREE_PARENTS
+    // parent -- and that suite needs a database, so this is the DB-free
+    // gate that catches a regression here first. Asserted over executable
+    // statements, not raw text, for the same reason the uniqueness test
+    // above is: the migration's prose names these columns too.
+    const statements = sqlStatements(spine);
+    const indexNamed = (name: string) => statements
+      .filter((statement) => new RegExp(`\\bINDEX ${name}\\b`).test(statement));
+
+    // The composite evidence key, in exactly the foreign key's column order.
+    expect(indexNamed('ix_promotion_candidates_evidence')).toEqual([
+      'CREATE INDEX ix_promotion_candidates_evidence ON promotion_candidates '
+        + '(source_id, family, external_record_id, source_version_seq)',
+    ]);
+    // The nullable decision reference, partial on the only predicate a
+    // referential probe implies.
+    expect(indexNamed('ix_promotion_candidates_decision')).toEqual([
+      'CREATE INDEX ix_promotion_candidates_decision ON promotion_candidates '
+        + '(resolved_decision_id) WHERE resolved_decision_id IS NOT NULL',
+    ]);
+    // The auth_users reference: NOT NULL, so plain and never partial -- a
+    // predicate here would narrow the index the probe needs whole.
+    expect(indexNamed('ix_promotion_decisions_admin')).toEqual([
+      'CREATE INDEX ix_promotion_decisions_admin ON promotion_decisions (admin_user_id)',
+    ]);
+    expect(indexNamed('ix_promotion_decisions_admin')[0]).not.toMatch(/\bWHERE\b/i);
+
+    // None of the three may be UNIQUE -- that would constrain the data
+    // rather than cover a key -- and none CONCURRENTLY, which cannot run
+    // inside the migration runner's transaction.
+    for (const name of ['ix_promotion_candidates_evidence',
+      'ix_promotion_candidates_decision', 'ix_promotion_decisions_admin']) {
+      expect(indexNamed(name)[0]).not.toMatch(/\bUNIQUE\b|\bCONCURRENTLY\b/i);
+    }
+  });
 });
 
 describe('S2 promotion ledger — acceptance fails closed', () => {
@@ -799,7 +861,7 @@ describe('S2 provider provenance', () => {
     // Provider independence is NOT proven-distinct ultimate authority, so
     // agreement between two groups grants nothing on its own: acceptance
     // still runs the full gate, and no S2 code consults a witness count.
-    const observations = readFileSync('src/lib/acquisition/observations.ts', 'utf8');
+    const observations = readSource('src/lib/acquisition/observations.ts');
     const acceptance = observations.slice(
       observations.indexOf('export function evaluateAcceptance'),
       observations.indexOf('* Provider provenance'),
@@ -847,7 +909,7 @@ import {
   type ReconciliationOutcome,
 } from '@/lib/acquisition/reconciliation';
 
-const reconciliationSource = readFileSync('src/lib/acquisition/reconciliation.ts', 'utf8');
+const reconciliationSource = readSource('src/lib/acquisition/reconciliation.ts');
 const kaliFixture = getSourceFamily(registry, 'kali_afl_stats', 'fixture');
 
 /** The canonical match row, and the three things a source might propose for it. */
@@ -1367,7 +1429,7 @@ import {
   type ReviewEvidence,
 } from '@/lib/acquisition/promotion-review';
 
-const promotionReviewSource = readFileSync('src/lib/acquisition/promotion-review.ts', 'utf8');
+const promotionReviewSource = readSource('src/lib/acquisition/promotion-review.ts');
 
 /** The canonical match row as the review would re-read it — wider than the proposal. */
 const TARGET_ROW: Record<string, JsonValue> = {
