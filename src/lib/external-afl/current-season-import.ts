@@ -1,5 +1,11 @@
 import postgres from 'postgres';
 
+import sourceFamiliesRaw from '../../../data/reference/source-families.json';
+import {
+  getSourceFamily,
+  parseSourceFamilyRegistry,
+} from '../acquisition/source-families';
+
 import {
   fetchKaliCurrentMatches,
   fetchSquiggleCurrentMatches,
@@ -20,6 +26,7 @@ export type CurrentSeasonRunOptions = {
 export type CurrentSeasonRunResult = {
   fetched: number;
   sourceCounts: Record<ExternalSource, number>;
+  independenceGroupCounts: Record<string, number>;
   complete: number;
   withScores: number;
   staged: number;
@@ -29,7 +36,36 @@ export type CurrentSeasonRunResult = {
   unresolved: number;
   incompleteFixtures: number;
   sourceDisagreements: number;
+  sameGroupConflicts: number;
   applied: boolean;
+};
+
+export type CurrentSeasonScoreValues = {
+  homeScore: number;
+  awayScore: number;
+  homeGoals: number | null;
+  homeBehinds: number | null;
+  awayGoals: number | null;
+  awayBehinds: number | null;
+};
+
+export type CurrentSeasonEvidenceObservation = {
+  sourceKey: string;
+  family: string;
+  externalGameId: string;
+  values: CurrentSeasonScoreValues;
+};
+
+export type CurrentSeasonCorroboration = {
+  observations: readonly CurrentSeasonEvidenceObservation[];
+  independenceGroups: readonly string[];
+  independenceGroupCounts: Readonly<Record<string, number>>;
+  sourceCounts: Readonly<Record<string, number>>;
+  independentWitnessCount: number;
+  independentlyCorroborated: boolean;
+  disagreeingGroups: readonly string[];
+  sameGroupConflictGroups: readonly string[];
+  values: CurrentSeasonScoreValues | null;
 };
 
 export type CurrentSeasonReportRow = {
@@ -65,6 +101,116 @@ type Db = postgres.Sql | postgres.TransactionSql;
 const EXTERNAL_CLUB_NAME_ALIASES = new Map<string, string>([
   ['brisbane', 'Brisbane Lions'],
 ]);
+
+const SOURCE_FAMILY_REGISTRY = parseSourceFamilyRegistry(sourceFamiliesRaw);
+
+function scoreValuesCompatible(a: CurrentSeasonScoreValues, b: CurrentSeasonScoreValues): boolean {
+  if (a.homeScore !== b.homeScore || a.awayScore !== b.awayScore) return false;
+  const components = [
+    [a.homeGoals, b.homeGoals],
+    [a.homeBehinds, b.homeBehinds],
+    [a.awayGoals, b.awayGoals],
+    [a.awayBehinds, b.awayBehinds],
+  ];
+  return components.every(([left, right]) => left === null || right === null || left === right);
+}
+
+function mergeScoreValues(
+  a: CurrentSeasonScoreValues,
+  b: CurrentSeasonScoreValues,
+): CurrentSeasonScoreValues {
+  if (!scoreValuesCompatible(a, b)) {
+    throw new Error('Cannot merge conflicting current-season score observations.');
+  }
+  return {
+    homeScore: a.homeScore,
+    awayScore: a.awayScore,
+    homeGoals: a.homeGoals ?? b.homeGoals,
+    homeBehinds: a.homeBehinds ?? b.homeBehinds,
+    awayGoals: a.awayGoals ?? b.awayGoals,
+    awayBehinds: a.awayBehinds ?? b.awayBehinds,
+  };
+}
+
+/**
+ * Compare concrete observations at ISSUE-096's independence-group grain.
+ * Concrete source attribution is retained in `observations` and `sourceCounts`;
+ * only witness counting and disagreement classification are collapsed.
+ */
+export function analyseCurrentSeasonCorroboration(
+  observations: readonly CurrentSeasonEvidenceObservation[],
+): CurrentSeasonCorroboration {
+  const withGroups = observations.map((observation) => ({
+    observation,
+    group: getSourceFamily(
+      SOURCE_FAMILY_REGISTRY,
+      observation.sourceKey,
+      observation.family,
+    ).independence.group,
+  }));
+  const independenceGroupCounts: Record<string, number> = {};
+  const sourceCounts: Record<string, number> = {};
+  const observationsByGroup = new Map<string, CurrentSeasonEvidenceObservation[]>();
+  for (const { observation, group } of withGroups) {
+    independenceGroupCounts[group] = (independenceGroupCounts[group] ?? 0) + 1;
+    sourceCounts[observation.sourceKey] = (sourceCounts[observation.sourceKey] ?? 0) + 1;
+    const groupObservations = observationsByGroup.get(group);
+    if (groupObservations) groupObservations.push(observation);
+    else observationsByGroup.set(group, [observation]);
+  }
+
+  // Collapse concrete aliases/proxies first. A group that contradicts
+  // itself has no coherent witness value to offer another group.
+  const sameGroupConflictGroups = new Set<string>();
+  const coherentGroups: { group: string; values: CurrentSeasonScoreValues }[] = [];
+  for (const [group, groupObservations] of observationsByGroup) {
+    let groupValues: CurrentSeasonScoreValues | null = groupObservations[0].values;
+    for (const observation of groupObservations.slice(1)) {
+      if (!scoreValuesCompatible(groupValues, observation.values)) {
+        sameGroupConflictGroups.add(group);
+        groupValues = null;
+        break;
+      }
+      groupValues = mergeScoreValues(groupValues, observation.values);
+    }
+    if (groupValues !== null) coherentGroups.push({ group, values: groupValues });
+  }
+
+  // Only coherent independence-group values may establish corroboration or
+  // genuine cross-group disagreement.
+  const disagreeingGroups = new Set<string>();
+  for (let left = 0; left < coherentGroups.length; left += 1) {
+    for (let right = left + 1; right < coherentGroups.length; right += 1) {
+      const a = coherentGroups[left];
+      const b = coherentGroups[right];
+      if (scoreValuesCompatible(a.values, b.values)) continue;
+      disagreeingGroups.add(a.group);
+      disagreeingGroups.add(b.group);
+    }
+  }
+
+  const independenceGroups = Object.keys(independenceGroupCounts).sort();
+  const hasAnyConflict = disagreeingGroups.size > 0 || sameGroupConflictGroups.size > 0;
+  let values: CurrentSeasonScoreValues | null = null;
+  if (!hasAnyConflict && coherentGroups.length > 0) {
+    values = coherentGroups[0].values;
+    for (const coherentGroup of coherentGroups.slice(1)) {
+      values = mergeScoreValues(values, coherentGroup.values);
+    }
+  }
+
+  return {
+    observations: [...observations],
+    independenceGroups,
+    independenceGroupCounts,
+    sourceCounts,
+    independentWitnessCount: independenceGroups.length,
+    independentlyCorroborated: coherentGroups.length >= 2 && !hasAnyConflict,
+    disagreeingGroups: [...disagreeingGroups].sort(),
+    sameGroupConflictGroups: [...sameGroupConflictGroups].sort(),
+    values,
+  };
+}
 
 export function parseCurrentSeasonSources(value: string): ExternalSource[] {
   const sourceArg = value.trim() || 'kali';
@@ -103,6 +249,7 @@ export async function runCurrentSeasonRefresh(options: CurrentSeasonRunOptions):
     squiggle: matches.filter((m) => m.source === 'squiggle').length,
     kali: matches.filter((m) => m.source === 'kali').length,
   };
+  const independenceGroupCounts = countMatchIndependenceGroups(matches);
   const fetched = matches.length;
   const complete = matches.filter((m) => m.completePercent === 100).length;
   const withScores = matches.filter((m) => m.homeScore !== null && m.awayScore !== null).length;
@@ -112,6 +259,7 @@ export async function runCurrentSeasonRefresh(options: CurrentSeasonRunOptions):
       return {
         fetched,
         sourceCounts,
+        independenceGroupCounts,
         complete,
         withScores,
         staged: 0,
@@ -121,6 +269,7 @@ export async function runCurrentSeasonRefresh(options: CurrentSeasonRunOptions):
         unresolved: 0,
         incompleteFixtures: 0,
         sourceDisagreements: 0,
+        sameGroupConflicts: 0,
         applied: false,
       };
     }
@@ -130,21 +279,39 @@ export async function runCurrentSeasonRefresh(options: CurrentSeasonRunOptions):
       let resolved = 0;
       let unresolved = 0;
       let incompleteFixtures = 0;
+      const updatesByLocalMatchId = new Map<number, MatchCandidate[]>();
+      const insertsByMatchKey = new Map<string, MatchCandidate[]>();
       for (const match of matches) {
         const homeClubId = await resolveClub(sql, match.homeTeamRaw, match.season);
         const awayClubId = await resolveClub(sql, match.awayTeamRaw, match.season);
         const localMatchId = await resolveLocalMatch(sql, match, homeClubId, awayClubId);
-        if (localMatchId !== null) {
+        const resolution = classifyCurrentSeasonResolution(localMatchId, match);
+        if (resolution === 'resolved') {
           resolved += 1;
-        } else if (match.completePercent === 100 && match.matchDate !== null) {
+        } else if (resolution === 'unresolved') {
           unresolved += 1;
         } else {
           incompleteFixtures += 1;
         }
+        if (isCompleteScoredMatch(match) && homeClubId !== null && awayClubId !== null) {
+          if (localMatchId !== null) {
+            appendCandidate(updatesByLocalMatchId, localMatchId, { match, homeClubId, awayClubId });
+          } else if (resolution === 'unresolved') {
+            const matchKey = await missingMatchKey(sql, match, homeClubId, awayClubId);
+            if (matchKey !== null) {
+              appendCandidate(insertsByMatchKey, matchKey, { match, homeClubId, awayClubId });
+            }
+          }
+        }
       }
+      const conflictCounts = countCandidateConflicts([
+        ...updatesByLocalMatchId.values(),
+        ...insertsByMatchKey.values(),
+      ]);
       return {
         fetched,
         sourceCounts,
+        independenceGroupCounts,
         complete,
         withScores,
         staged: matches.length,
@@ -153,7 +320,8 @@ export async function runCurrentSeasonRefresh(options: CurrentSeasonRunOptions):
         updated: 0,
         unresolved,
         incompleteFixtures,
-        sourceDisagreements: 0,
+        sourceDisagreements: conflictCounts.sourceDisagreements,
+        sameGroupConflicts: conflictCounts.sameGroupConflicts,
         applied: false,
       };
     } finally {
@@ -172,6 +340,7 @@ export async function runCurrentSeasonRefresh(options: CurrentSeasonRunOptions):
     return {
       fetched,
       sourceCounts,
+      independenceGroupCounts,
       complete,
       withScores,
       staged: result.staged,
@@ -181,6 +350,7 @@ export async function runCurrentSeasonRefresh(options: CurrentSeasonRunOptions):
       unresolved: result.unresolved,
       incompleteFixtures: result.incompleteFixtures,
       sourceDisagreements: result.sourceDisagreements,
+      sameGroupConflicts: result.sameGroupConflicts,
       applied: true,
     };
   } finally {
@@ -206,6 +376,19 @@ function createImportClient(): postgres.Sql {
 
 function sourceKey(source: ExternalSource): string {
   return source === 'squiggle' ? 'squiggle_api' : 'kali_afl_stats';
+}
+
+function countMatchIndependenceGroups(matches: readonly ExternalCurrentMatch[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const match of matches) {
+    const group = getSourceFamily(
+      SOURCE_FAMILY_REGISTRY,
+      sourceKey(match.source),
+      'match',
+    ).independence.group;
+    counts[group] = (counts[group] ?? 0) + 1;
+  }
+  return counts;
 }
 
 function roundCodes(match: ExternalCurrentMatch): string[] {
@@ -243,12 +426,6 @@ function localRoundType(match: ExternalCurrentMatch): 'home_and_away' | 'elimina
   if (code === 'PF') return 'preliminary_final';
   if (code === 'GF') return 'grand_final';
   return null;
-}
-
-function resultFromScores(match: ExternalCurrentMatch): 'home_win' | 'away_win' | 'draw' | null {
-  if (match.homeScore === null || match.awayScore === null) return null;
-  if (match.homeScore === match.awayScore) return 'draw';
-  return match.homeScore > match.awayScore ? 'home_win' : 'away_win';
 }
 
 function clubAliasKey(raw: string): string {
@@ -341,6 +518,105 @@ async function refreshSeasonMetadata(sql: Db, season: number): Promise<void> {
   `;
 }
 
+type MatchCandidate = {
+  match: ExternalCurrentMatch;
+  homeClubId: number;
+  awayClubId: number;
+};
+
+function classifyCurrentSeasonResolution(
+  localMatchId: number | null,
+  match: ExternalCurrentMatch,
+): 'resolved' | 'unresolved' | 'incomplete' {
+  if (localMatchId !== null) return 'resolved';
+  if (match.completePercent === 100 && match.matchDate !== null) return 'unresolved';
+  return 'incomplete';
+}
+
+function isCompleteScoredMatch(match: ExternalCurrentMatch): boolean {
+  return match.completePercent === 100
+    && match.matchDate !== null
+    && match.homeScore !== null
+    && match.awayScore !== null;
+}
+
+function appendCandidate<K>(map: Map<K, MatchCandidate[]>, key: K, candidate: MatchCandidate): void {
+  const candidates = map.get(key);
+  if (candidates) candidates.push(candidate);
+  else map.set(key, [candidate]);
+}
+
+async function missingMatchKey(
+  sql: Db,
+  match: ExternalCurrentMatch,
+  homeClubId: number,
+  awayClubId: number,
+): Promise<string | null> {
+  const roundCode = primaryLocalRoundCode(match);
+  if (roundCode === null || match.matchDate === null) return null;
+  const homeName = await clubName(sql, homeClubId);
+  const awayName = await clubName(sql, awayClubId);
+  return `${match.season}|${roundCode}|${match.matchDate}|${homeName}|${awayName}`;
+}
+
+function evidenceForCandidate(
+  candidate: MatchCandidate,
+  canonicalHomeClubId: number,
+): CurrentSeasonEvidenceObservation {
+  const { match } = candidate;
+  if (match.homeScore === null || match.awayScore === null) {
+    throw new Error('A corroboration candidate must carry both score values.');
+  }
+  const sameOrientation = candidate.homeClubId === canonicalHomeClubId;
+  return {
+    sourceKey: sourceKey(match.source),
+    family: 'match',
+    externalGameId: match.externalGameId,
+    values: {
+      homeScore: sameOrientation ? match.homeScore : match.awayScore,
+      awayScore: sameOrientation ? match.awayScore : match.homeScore,
+      homeGoals: sameOrientation ? match.homeGoals : match.awayGoals,
+      homeBehinds: sameOrientation ? match.homeBehinds : match.awayBehinds,
+      awayGoals: sameOrientation ? match.awayGoals : match.homeGoals,
+      awayBehinds: sameOrientation ? match.awayBehinds : match.homeBehinds,
+    },
+  };
+}
+
+function candidateCompleteness(candidate: MatchCandidate): number {
+  const { match } = candidate;
+  return [match.homeGoals, match.homeBehinds, match.awayGoals, match.awayBehinds]
+    .filter((value) => value !== null).length;
+}
+
+function analyseCandidates(candidates: readonly MatchCandidate[], canonicalHomeClubId: number): {
+  corroboration: CurrentSeasonCorroboration;
+  representative: MatchCandidate;
+} {
+  if (candidates.length === 0) throw new Error('Cannot analyse an empty candidate set.');
+  const corroboration = analyseCurrentSeasonCorroboration(
+    candidates.map((candidate) => evidenceForCandidate(candidate, canonicalHomeClubId)),
+  );
+  const representative = candidates.reduce((best, candidate) => (
+    candidateCompleteness(candidate) > candidateCompleteness(best) ? candidate : best
+  ));
+  return { corroboration, representative };
+}
+
+function countCandidateConflicts(candidateSets: readonly MatchCandidate[][]): {
+  sourceDisagreements: number;
+  sameGroupConflicts: number;
+} {
+  let sourceDisagreements = 0;
+  let sameGroupConflicts = 0;
+  for (const candidates of candidateSets) {
+    const { corroboration } = analyseCandidates(candidates, candidates[0].homeClubId);
+    if (corroboration.disagreeingGroups.length > 0) sourceDisagreements += 1;
+    if (corroboration.sameGroupConflictGroups.length > 0) sameGroupConflicts += 1;
+  }
+  return { sourceDisagreements, sameGroupConflicts };
+}
+
 async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], updateMatches: boolean, insertMissingMatches: boolean): Promise<{
   staged: number;
   inserted: number;
@@ -349,6 +625,7 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
   unresolved: number;
   incompleteFixtures: number;
   sourceDisagreements: number;
+  sameGroupConflicts: number;
 }> {
   let staged = 0;
   let inserted = 0;
@@ -357,6 +634,7 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
   let unresolved = 0;
   let incompleteFixtures = 0;
   let sourceDisagreements = 0;
+  let sameGroupConflicts = 0;
   const touchedSeasons = new Set<number>();
 
   await sql.begin(async (tx) => {
@@ -380,10 +658,8 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
       RETURNING id
     `;
 
-    type UpdateCandidate = { match: ExternalCurrentMatch, homeClubId: number, awayClubId: number };
-    const updatesByLocalMatchId = new Map<number, UpdateCandidate[]>();
-    type InsertCandidate = { match: ExternalCurrentMatch, homeClubId: number, awayClubId: number };
-    const insertsByMatchKey = new Map<string, InsertCandidate[]>();
+    const updatesByLocalMatchId = new Map<number, MatchCandidate[]>();
+    const insertsByMatchKey = new Map<string, MatchCandidate[]>();
 
     for (const match of matches) {
       const sourceId = sourceIds.get(match.source);
@@ -393,9 +669,10 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
       const awayClubId = await resolveClub(tx, match.awayTeamRaw, match.season);
       const localMatchId = await resolveLocalMatch(tx, match, homeClubId, awayClubId);
       
-      if (localMatchId !== null) {
+      const resolution = classifyCurrentSeasonResolution(localMatchId, match);
+      if (resolution === 'resolved') {
         resolved += 1;
-      } else if (match.completePercent === 100 && match.matchDate !== null) {
+      } else if (resolution === 'unresolved') {
         unresolved += 1;
       } else {
         incompleteFixtures += 1;
@@ -440,24 +717,27 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
       `;
       staged += 1;
 
-      if (localMatchId !== null && match.completePercent === 100 && match.homeScore !== null && match.awayScore !== null) {
-        let arr = updatesByLocalMatchId.get(localMatchId);
-        if (!arr) { arr = []; updatesByLocalMatchId.set(localMatchId, arr); }
-        arr.push({ match, homeClubId: homeClubId!, awayClubId: awayClubId! });
+      if (localMatchId !== null && isCompleteScoredMatch(match)) {
+        appendCandidate(updatesByLocalMatchId, localMatchId, {
+          match, homeClubId: homeClubId!, awayClubId: awayClubId!,
+        });
       }
 
-      if (localMatchId === null && match.completePercent === 100 && match.matchDate !== null && homeClubId !== null && awayClubId !== null && match.homeScore !== null && match.awayScore !== null) {
-        const roundCode = primaryLocalRoundCode(match);
-        if (roundCode !== null) {
-          const homeName = await clubName(tx, homeClubId);
-          const awayName = await clubName(tx, awayClubId);
-          const matchKey = `${match.season}|${roundCode}|${match.matchDate}|${homeName}|${awayName}`;
-          let arr = insertsByMatchKey.get(matchKey);
-          if (!arr) { arr = []; insertsByMatchKey.set(matchKey, arr); }
-          arr.push({ match, homeClubId, awayClubId });
+      if (localMatchId === null && isCompleteScoredMatch(match)
+          && homeClubId !== null && awayClubId !== null) {
+        const matchKey = await missingMatchKey(tx, match, homeClubId, awayClubId);
+        if (matchKey !== null) {
+          appendCandidate(insertsByMatchKey, matchKey, { match, homeClubId, awayClubId });
         }
       }
     }
+
+    const conflictCounts = countCandidateConflicts([
+      ...updatesByLocalMatchId.values(),
+      ...insertsByMatchKey.values(),
+    ]);
+    sourceDisagreements = conflictCounts.sourceDisagreements;
+    sameGroupConflicts = conflictCounts.sameGroupConflicts;
 
     if (updateMatches) {
       for (const [localMatchId, candidates] of updatesByLocalMatchId.entries()) {
@@ -479,74 +759,21 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
         `;
         if (!current) continue;
 
-        let disagreement = false;
-        let agreedHomeScore: number | null = null;
-        let agreedAwayScore: number | null = null;
-        let agreedHomeGoals: number | null = null;
-        let agreedHomeBehinds: number | null = null;
-        let agreedAwayGoals: number | null = null;
-        let agreedAwayBehinds: number | null = null;
-        let representativeCandidate: UpdateCandidate | null = null;
-
-        for (const candidate of candidates) {
-          const { match, homeClubId } = candidate;
-          const isHome = current.homeClubId === homeClubId;
-          const candidateHomeScore = isHome ? match.homeScore : match.awayScore;
-          const candidateAwayScore = isHome ? match.awayScore : match.homeScore;
-          const candidateHomeGoals = isHome ? match.homeGoals : match.awayGoals;
-          const candidateHomeBehinds = isHome ? match.homeBehinds : match.awayBehinds;
-          const candidateAwayGoals = isHome ? match.awayGoals : match.homeGoals;
-          const candidateAwayBehinds = isHome ? match.awayBehinds : match.homeBehinds;
-
-          if (agreedHomeScore === null) {
-            agreedHomeScore = candidateHomeScore;
-            agreedAwayScore = candidateAwayScore;
-            agreedHomeGoals = candidateHomeGoals;
-            agreedHomeBehinds = candidateHomeBehinds;
-            agreedAwayGoals = candidateAwayGoals;
-            agreedAwayBehinds = candidateAwayBehinds;
-            representativeCandidate = candidate;
-          } else {
-            if (agreedHomeScore !== candidateHomeScore || agreedAwayScore !== candidateAwayScore) {
-              disagreement = true;
-              break;
-            }
-            
-            const merge = (agreed: number | null, cand: number | null) => {
-              if (agreed === null) return cand;
-              if (cand === null) return agreed;
-              if (agreed !== cand) return 'conflict';
-              return agreed;
-            };
-
-            const hg = merge(agreedHomeGoals, candidateHomeGoals);
-            const hb = merge(agreedHomeBehinds, candidateHomeBehinds);
-            const ag = merge(agreedAwayGoals, candidateAwayGoals);
-            const ab = merge(agreedAwayBehinds, candidateAwayBehinds);
-
-            if (hg === 'conflict' || hb === 'conflict' || ag === 'conflict' || ab === 'conflict') {
-              disagreement = true;
-              break;
-            }
-
-            agreedHomeGoals = hg as number | null;
-            agreedHomeBehinds = hb as number | null;
-            agreedAwayGoals = ag as number | null;
-            agreedAwayBehinds = ab as number | null;
-            
-            if ((candidateHomeGoals !== null && representativeCandidate!.match.homeGoals === null) ||
-                (candidateAwayGoals !== null && representativeCandidate!.match.awayGoals === null)) {
-               representativeCandidate = candidate;
-            }
-          }
+        const { corroboration, representative } = analyseCandidates(candidates, current.homeClubId);
+        if (corroboration.disagreeingGroups.length > 0) {
+          continue;
         }
-
-        if (disagreement) {
-          sourceDisagreements += 1;
+        if (corroboration.sameGroupConflictGroups.length > 0) {
           continue;
         }
 
-        if (agreedHomeScore === null || agreedAwayScore === null || representativeCandidate === null) continue;
+        if (corroboration.values === null) continue;
+        const agreedHomeScore = corroboration.values.homeScore;
+        const agreedAwayScore = corroboration.values.awayScore;
+        let agreedHomeGoals = corroboration.values.homeGoals;
+        let agreedHomeBehinds = corroboration.values.homeBehinds;
+        let agreedAwayGoals = corroboration.values.awayGoals;
+        let agreedAwayBehinds = corroboration.values.awayBehinds;
 
         agreedHomeGoals = agreedHomeGoals ?? current.homeGoals;
         agreedHomeBehinds = agreedHomeBehinds ?? current.homeBehinds;
@@ -561,7 +788,7 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
           continue;
         }
 
-        const { match } = representativeCandidate;
+        const { match } = representative;
         const sourceId = sourceIds.get(match.source)!;
 
         await tx`
@@ -596,10 +823,21 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
     if (insertMissingMatches) {
       for (const [matchKey, candidates] of insertsByMatchKey.entries()) {
         const { match, homeClubId, awayClubId } = candidates[0];
-        const result = resultFromScores(match);
+        const { corroboration } = analyseCandidates(candidates, homeClubId);
+        if (corroboration.disagreeingGroups.length > 0) {
+          continue;
+        }
+        if (corroboration.sameGroupConflictGroups.length > 0) {
+          continue;
+        }
+        if (corroboration.values === null) continue;
+        const values = corroboration.values;
+        const result = values.homeScore === values.awayScore
+          ? 'draw'
+          : values.homeScore > values.awayScore ? 'home_win' : 'away_win';
         const roundCode = primaryLocalRoundCode(match);
         const roundType = localRoundType(match);
-        if (result === null || roundCode === null || roundType === null) continue;
+        if (roundCode === null || roundType === null) continue;
 
         const winnerClubId = result === 'draw' ? null : result === 'home_win' ? homeClubId : awayClubId;
         const sourceId = sourceIds.get(match.source)!;
@@ -618,9 +856,9 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
             ${roundType}::round_type, ${roundType !== 'home_and_away'},
             ${match.matchDate}, ${match.venueRaw ?? 'Unknown'},
             ${homeClubId}, ${awayClubId},
-            ${match.homeGoals}, ${match.homeBehinds}, ${match.homeScore},
-            ${match.awayGoals}, ${match.awayBehinds}, ${match.awayScore},
-            ${result}::match_result, ${winnerClubId}, ${Math.abs(match.homeScore! - match.awayScore!)},
+            ${values.homeGoals}, ${values.homeBehinds}, ${values.homeScore},
+            ${values.awayGoals}, ${values.awayBehinds}, ${values.awayScore},
+            ${result}::match_result, ${winnerClubId}, ${Math.abs(values.homeScore - values.awayScore)},
             NULL, 'not_collected'::coverage_status, NULL,
             ${sourceId}, ${match.externalGameId}, ${batch.id}
           )
@@ -655,12 +893,18 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
          SET completed_at = now(), status = 'completed',
              records_inserted = ${staged + inserted}, records_updated = ${updated},
              records_rejected = ${unresolved},
-             validation_result = ${tx.json({ staged, inserted, resolved, updated, unresolved, incompleteFixtures, sourceDisagreements } as never)}
+             validation_result = ${tx.json({
+               staged, inserted, resolved, updated, unresolved, incompleteFixtures,
+               sourceDisagreements, sameGroupConflicts,
+             } as never)}
        WHERE id = ${batch.id}
     `;
   });
 
-  return { staged, inserted, resolved, updated, unresolved, incompleteFixtures, sourceDisagreements };
+  return {
+    staged, inserted, resolved, updated, unresolved, incompleteFixtures,
+    sourceDisagreements, sameGroupConflicts,
+  };
 }
 
 async function reportStaging(sql: postgres.Sql, year: number): Promise<CurrentSeasonReport> {

@@ -33,6 +33,7 @@ function ResultSummary({ state }: { state: CurrentSeasonAdminState }) {
                 <th scope="col">Unresolved</th>
                 <th scope="col">Incomplete</th>
                 <th scope="col">Disagreements</th>
+                <th scope="col">Within-group conflicts</th>
               </tr>
             </thead>
             <tbody>
@@ -47,6 +48,7 @@ function ResultSummary({ state }: { state: CurrentSeasonAdminState }) {
                 <td className="num">{result.unresolved}</td>
                 <td className="num">{result.incompleteFixtures}</td>
                 <td className="num">{result.sourceDisagreements}</td>
+                <td className="num">{result.sameGroupConflicts}</td>
               </tr>
             </tbody>
           </table>

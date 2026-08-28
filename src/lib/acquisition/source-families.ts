@@ -461,8 +461,8 @@ export function getSourceFamily(
 
 /**
  * The independence groups covering these sources for one family, deduplicated.
- * Corroboration counts THESE, never the number of source rows: Squiggle and
- * Kali both report the `squiggle` group for matches, so they are one witness.
+ * Corroboration counts THESE, never the number of source rows. Sources share
+ * one witness only where this per-family registry assigns the same group.
  */
 export function independenceGroups(
   registry: SourceFamilyRegistry, family: string, sourceKeys: readonly string[],

@@ -7,14 +7,13 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 9
+**Open issues:** 8
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
 | `AFLDB-ISSUE-076` | Medium | Performance | Grid Solver combinations using `won_final_at_venue` can exceed PostgreSQL's 5-second statement timeout and crash the page. | Capture and compare the generated SQL/EXPLAIN plan against `played_at_venue`, then optimise the `won_final_at_venue` query shape without raising the application timeout. |
 | `AFLDB-ISSUE-095` | Medium | Data acquisition / Import architecture / Data integrity | `club_seasons` has no canonical acquisition path: `rebuild_derived.py` builds it only from `staging.team_seasons`, whose only writer is the legacy importer under `AFLDB_LEGACY_SQLITE`. A legacy-free canonical rebuild therefore correctly produces `club_seasons = 0`, leaving ladders, premiership/wooden-spoon flags, finals counts and club-season NL answers unavailable. | Plan D1–D7 in `AFLDB-ISSUE-095.md` (authoritative source; per-field reconstructed-vs-sourced split; historical premiership-points/byes/forfeits/published-rank handling; provenance `source_id`; club-identity re-pointing; new rebuild stage vs existing stage; Stage-9 gate) before writing any importer. Zero supported `AFLDB_LEGACY_SQLITE` dependency. Do NOT add a `club_seasons` Stage-9 gate until this lands. Links `AFLDB-ISSUE-015` (not absorbed) and `AFLDB-ISSUE-093`. |
-| `AFLDB-ISSUE-097` | Medium | Data acquisition / Data integrity | Proven by live probe: Kali `/v1/fixture` returns Squiggle's schema with Squiggle's own game ids and `updated` timestamps (id `38494`, `updated "2026-03-05 22:16:49"`), so the two configured sources are not independent witnesses for fixtures and `sourceDisagreements` can report self-agreement as corroboration. | Run evidence probe **P1** to determine whether the proxying extends to the authenticated `/matches` endpoint AFLDB actually consumes — currently **UNKNOWN** — then update `sourceDisagreements` and `--source all` corroboration semantics on that evidence. |
 | `AFLDB-ISSUE-098` | Medium | Data integrity / Import | Four source-verified defects in the shipped current-season importer: fabricated `venue_raw = 'Unknown'` (`:619`); canonical inserts creating half-matches with no attendance, period scores or player participation (`:607-629`); staging `ON CONFLICT DO UPDATE` making a source correction indistinguishable from a deletion (`:420-439`); and incoherent counters that can go negative and conflate staging with canonical rows (`:633`, `:657`). | Contain the four defects. Independently actionable — **not dependent on `AFLDB-ISSUE-096` or `AFLDB-ISSUE-097`**; probe **P7** recommended to size live impact but not required to start. References `AFLDB-ISSUE-086` for the unrestricted canonical score overwrite (`:567-590`) and does **not** duplicate it. |
 | `AFLDB-ISSUE-099` | Medium | Data acquisition / Import architecture | 2026 has no player-match statistics, period scores, attendance or Brownlow votes, because Squiggle/Kali carry none of them. AFL Tables — already the frozen canonical historical source — was confirmed by live probe to carry 2026 through Round 25 including per-match player statistics, venue, attendance and a ladder. | Build a nightly in-season settle pass: partial fitzRoy acquisition (`acquire_core.R --from/--to`) + SHA-256 manifest, then **reviewed** promotion of matches, period scores, attendance, player stats and Brownlow votes, reusing the ISSUE-093 machinery. Depends on `AFLDB-ISSUE-096`; implementation gated on probe **P5** (stop condition if stable `ID`/`url` are absent for 2026). |
 | `AFLDB-ISSUE-100` | Medium | Data acquisition / Import architecture | AFLDB has no model for announced teams, jumper numbers, substitutions or late changes; canonical participation is the played match sheet, which exists only after a match. `fetch_lineup_afl` is the only free source found that supplies lineups at all. | Add a new `staging.external_lineups` table fed by `fetch_lineup_afl`, for admin visibility and reconciliation only. **Lineups are staging-only and never become canonical participation**; no public surface. Depends on `AFLDB-ISSUE-096`; implementation gated on probe **P3**, which must supply the still-UNKNOWN column set. |
@@ -7976,11 +7975,11 @@ and the six unresolved items in §12." That approval was given; see §14 of the 
 
 ## AFLDB-ISSUE-097 — Squiggle/Kali source independence: `/v1/fixture` is a verbatim Squiggle proxy
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Data acquisition / Data integrity
 - **Found:** 2026-08-28 (2026+ API acquisition investigation, live probe)
-- **Resolved:** N/A
+- **Resolved:** 2026-08-28
 - **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §2.1 and §9 row B.
 - **Files:** `src/lib/external-afl/current-matches.ts`,
   `src/lib/external-afl/current-season-import.ts` (`sourceDisagreements`)
@@ -8023,26 +8022,67 @@ Track the proven `/fixture` proxying as a corroboration risk; **P1 has now settl
 `/matches` half — Kali IS a second match witness**; rewrite `sourceDisagreements` and
 `--source all` to count **independence groups** rather than source rows.
 
+### Root cause
+`current-season-import.ts` predated ISSUE-096's source-family registry. Dry-run always returned
+`sourceDisagreements: 0`; apply-mode update candidates were compared sequentially as concrete
+source rows, and missing-match inserts selected `candidates[0]` without any disagreement check.
+Nothing resolved each observation's `(source_key, family)` contract or collapsed observations by
+`independence.group`, so endpoint aliases could manufacture apparent corroboration and the result
+depended on concrete row count/processing order rather than independent evidence groups. The first
+group-aware implementation still compared raw concrete observations pairwise across groups, so an
+internally conflicted proxy group could also fabricate a cross-group disagreement when another
+group matched one of its concrete rows.
+
+### Fix
+The current-season comparison path now parses and consumes
+`data/reference/source-families.json`. It retains every concrete observation and per-source count,
+but derives witness counts, agreement, cross-group disagreement and within-group proxy drift from
+the registry's family contracts. Each group is first merged to one coherent score value; a group
+with internal conflict exposes no value to cross-group comparison. Only coherent group values can
+agree or disagree. Dry-run and apply mode use the same grouped candidate analysis;
+both resolved-match updates and missing-match insert planning refuse conflicting evidence.
+`--source all` reports concrete-source counts plus independence-group observation counts, while a
+separate within-group conflict counter keeps proxy drift visible without calling it independent
+disagreement. Canonical and staging provenance continue to use the concrete source key and
+external record id.
+
 ### Dependencies and gates
 Depends on nothing. **The P1 gate is CLEARED (2026-08-28).** The implementation consumes
 `AFLDB-ISSUE-096`'s independence-group semantics and its registry; it does not redefine them.
 
 ### Validation
-Evidence only, read-only, 2026-08-28: P1 and P2 executed against the live Kali API with the
-supplied key (never printed or persisted), plus Squiggle `q=games&year=2026`. No write, no
-schema change, no code change under this issue yet.
+Resolved implementation validation, deterministic and DB-free, 2026-08-28:
+
+- `npm test -- tests/current-season-import.test.ts -t "AFLDB-ISSUE-097 current-season independence-group corroboration"`
+  — **PASS, 9/9** (107 intentionally filtered/skipped), including the internally conflicted
+  Squiggle group plus matching coherent Kali counterexample.
+- `npm test -- tests/current-season-import.test.ts` — **PASS, 116/116**. Nine focused
+  ISSUE-097 cases prove fixture proxy = one group, authenticated Kali match = a second group,
+  duplicates cannot manufacture corroboration or outvote another group, independent disagreement
+  remains visible, source/group counters reconcile, single-source behaviour is unchanged, and
+  concrete provenance survives grouping.
+- `npm test -- tests/reference-data.test.ts -t "counts Squiggle and Kali as TWO match witnesses now that P1 has run"`
+  — **PASS, 1/1** (33 intentionally filtered/skipped).
+- Changed-file ESLint — **PASS with 0 errors**; two pre-existing unused-variable warnings remain
+  in unchanged test lines.
+- `git diff --check` — **PASS**; only the existing Windows LF-to-CRLF working-copy warnings were
+  emitted.
+- Full `npm run typecheck` is **not globally green** because of unrelated existing DraftGuru and
+  observation-spine test typing errors; it reported no error in an ISSUE-097-changed file.
+- The full `tests/reference-data.test.ts` run is **not globally green**: 31 passed, 2 skipped and
+  one unrelated stale expected-table-list assertion failed because it omits migrations 074/075's
+  `promotion_decisions` and `data_overrides`. The focused independence contract passes.
+
+No live API call, database connection, staging write or canonical write was used for this fix.
 
 ### Exact next action
-Rewrite `sourceDisagreements` and `--source all` against independence groups from
-`data/reference/source-families.json`, and surface the Essendon v Port Adelaide
-**95–105 / 95–104** case as the first real disagreement — under the old one-group
-model it was invisible, because the two sources were assumed to be one witness.
+None inside ISSUE-097. Continue with `AFLDB-ISSUE-098` as a separate scope; do not absorb its
+current-season staging, insertion or counter defects here.
 
 ### Follow-up
-**Superseded (2026-08-28):** "if P1 shows `/matches` is also a proxy, Kali drops to a
-statistics-only source and this issue's scope widens." P1 showed the opposite, so that branch
-is closed. The live follow-up is the reverse risk: two groups that may still share an ultimate
-upstream must not be presented to a reviewer as full corroboration.
+The standing evidence limit remains: two provider/pipeline groups may still share an ultimate
+upstream, so agreement is reporting evidence and never automatic authority. ISSUE-096's review
+gate remains unchanged. The superseded `/matches`-is-a-proxy branch stays closed.
 
 ## AFLDB-ISSUE-098 — Shipped current-season importer defects
 

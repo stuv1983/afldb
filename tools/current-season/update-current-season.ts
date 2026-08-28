@@ -90,12 +90,16 @@ async function main(): Promise<void> {
   for (const source of args.sources) {
     console.log(`  ${source}: ${result.sourceCounts[source]}`);
   }
+  for (const [group, count] of Object.entries(result.independenceGroupCounts).sort()) {
+    console.log(`  independence group ${group}: ${count}`);
+  }
   console.log(`  complete: ${result.complete}`);
   console.log(`  has score fields: ${result.withScores}`);
 
   if (!args.apply) {
     console.log(`\nProcessed ${result.staged}; inserted matches ${result.inserted}; resolved ${result.resolved}; updated matches ${result.updated}; unresolved ${result.unresolved}; incomplete fixtures ${result.incompleteFixtures}.`);
     console.log(`Source disagreements: ${result.sourceDisagreements}`);
+    console.log(`Within-group source conflicts: ${result.sameGroupConflicts}`);
     console.log('\nDry run. Nothing was written. Re-run with --apply to stage snapshots.');
     console.log('Add --insert-missing-matches with --apply to insert completed matches missing from AFLDB.');
     console.log('Add --update-matches with --apply only to overwrite local final scores for unambiguously resolved completed matches.');
@@ -104,6 +108,7 @@ async function main(): Promise<void> {
 
   console.log(`\nStaged ${result.staged}; inserted matches ${result.inserted}; resolved ${result.resolved}; updated matches ${result.updated}; unresolved ${result.unresolved}; incomplete fixtures ${result.incompleteFixtures}.`);
   console.log(`Source disagreements: ${result.sourceDisagreements}`);
+  console.log(`Within-group source conflicts: ${result.sameGroupConflicts}`);
 }
 
 main().catch((error) => {

@@ -15,6 +15,21 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-097 — Current-season corroboration now counts independent evidence groups - 28 August 2026
+
+- Reworked current-season disagreement/corroboration planning to consume ISSUE-096's tracked
+  `(source_key, family) → independence.group` registry. Squiggle plus Kali's verbatim `/fixture`
+  proxy is one fixture witness, while Squiggle plus authenticated Kali `/matches` remains two
+  match witnesses; duplicate observations inside one group cannot manufacture agreement or
+  outvote another group. Concrete observations are now collapsed to one coherent value per group
+  before groups are compared; a group with internal proxy drift is reported and blocked but cannot
+  fabricate an independent disagreement against a group matching one of its concrete rows.
+- Dry-run and apply mode now share the same group-aware comparison for resolved updates and
+  missing-match inserts. `--source all` retains concrete per-source/provenance counts, adds
+  independence-group observation counts, reports proxy drift separately from genuine independent
+  disagreement, and preserves single-source behaviour. Deterministic current-season coverage is
+  green at 116/116, with the focused source-registry contract green at 1/1.
+
 ### AFLDB-ISSUE-090 — DOB conflict writes are now pass-scoped, idempotent and structurally deduplicated - 28 August 2026
 
 - The two DOB enrichment passes had contradictory `dob_conflict` lifecycles. The club-list pass appended a fresh unresolved row on every rerun (entity 4347 held three copies of one logical conflict), and the register pass issued an unscoped `DELETE` over every unresolved `dob_conflict`/`dob_internal_conflict` row, destroying conflicts the other pass owned. Both passes write `SOURCE_KEY = 'afltables'`, so `details->>'source'` could not express ownership at all.
