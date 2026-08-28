@@ -7253,15 +7253,17 @@ a product measurement, not an outstanding database-truth defect in this resolved
 
 ## AFLDB-ISSUE-095 — Canonical legacy-free ladder / team-season acquisition
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Data acquisition / Import architecture / Data integrity
 - **Found:** 2026-08-27 (proven during `AFLDB-ISSUE-093`'s first complete canonical clean
   rebuild of `afldb_test` — see `AFLDB-ISSUE-093.md` §H15.5)
-- **Resolved:** N/A
+- **Resolved:** 2026-08-28
 - **Runbook:** `AFLDB-ISSUE-095.md` — durable source of truth. Contains the proven source
-  chain, the per-field table, the fitzRoy capability split, and decisions D1–D7. Nothing is
-  pre-decided; no code has been written for this issue.
+  chain, the per-field table, the fitzRoy capability split, and decisions D1–D7.
+  **D1–D7 DRAFTED 2026-08-28 in §10**, from the exhaustive 1897–2025 coverage probe. One
+  design point (§10.8, `premiership_points`/`ladder_rank`) awaits operator approval. No
+  importer code has been written.
 - **Files (today, for orientation only — none changed yet):**
   `tools/migration/rebuild_derived.py` (`REBUILDS["club_seasons"]`, `:312`),
   `tools/migration/import_legacy_afl.py` (`:767`, `:776`, `:795`, `:996`, `:1021`),
@@ -7326,6 +7328,181 @@ Give the ladder/team-season domain a canonical, legacy-free acquisition and load
 
 Full decision list D1–D7 is in `AFLDB-ISSUE-095.md` §5. The source/provenance design decision
 is deliberately **not** made in this entry.
+
+### Resolution — 2026-08-28
+Full record in `AFLDB-ISSUE-095.md` §14. Acceptance proven by a **clean `afldb_test`
+rebuild**: every stage passed, the 1,622-row ladder witness comparison agreed on every
+compared field, and FINAL VALIDATION passed **19/19** (13 existing + 6 new `club_seasons`
+gates). Release gates moved **42 -> 45 of 64** with **all nine club-organization/identity
+gates green**.
+
+**Actual root cause.** Not a defect in the rebuild. `club_seasons` had no acquisition path
+that did not go through `AFLDB_LEGACY_SQLITE`, so a legacy-free rebuild correctly produced
+zero rows. The apparent replacement source was not a source at all: pinned fitzRoy 1.8.0's
+`fetch_ladder_afltables` **computes** the ladder from results under a uniform 4/2/0 rule
+rather than reading a published one — established by deparsing the pinned implementation
+and corroborated by measurement over its own 1,622 rows.
+
+**The fix as shipped.** Every `club_seasons` column is derived from AFLDB's own canonical
+match set under an explicitly declared rule; provenance moved `sports_data_lab` ->
+`afltables`; `ladder_rank` fails closed to NULL on an exact points-and-percentage tie (zero
+such ties exist in 1897-2025, audited by exact rational comparison); `recomputeClubSeasons`
+is in lockstep with its guard re-pointed to canonical matches, which also cleared the
+fail-closed breakage of every match create/delete/score-edit. Historical identity is
+**proved by a Stage-9 gate rather than forced** by re-pointing. A **fail-open** identity
+defect was found and closed: the `North Melbourne` 1999-2007 -> Kangaroos rule was scoped
+to `results`, and because North Melbourne's span contains the Kangaroos era a ladder lookup
+passed the era check and resolved silently to the modern identity. The acquired ladder is
+retained as a **validation witness only**, cross-checked as a tenth *validation* stage; the
+four-stage data topology is unchanged.
+
+**Validation.** Clean rebuild 19/19; witness comparison 1,622/1,622; witness validator
+26/26 offline; resolver contract 40/40; DB-free suites 323 passed / 6 skipped with one
+out-of-scope failure. **No migration added (75/75), no privilege widened, no `afldb_dev` or
+production access.**
+
+**The 19 remaining release-gate failures are owned elsewhere and were left untouched:**
+Brownlow acquisition (6, incl. one Advanced Search case), DraftGuru Stage B3 (3),
+attendance baseline (1), DOB enrichment (5), current-season 2026 (3), and the Advanced
+Search id-hash case below.
+
+### Follow-up
+Tracked elsewhere; none reopens this issue.
+
+1. **Advanced Search `debuted in the 1960s with exactly two clubs` — pre-existing, NOT
+   caused by this issue.** Count is correct at 110; only the id hash differs
+   (`42d5dd22f2712ffe` vs the pinned `8cebc4aa37002766`). Four independent proofs:
+   `runAdvancedSearch` reads `players`/`player_career_stats` and **never `club_seasons`**;
+   every hunk of this issue's `rebuild_derived.py` diff lies inside the `club_seasons`
+   block; `AFLDB-ISSUE-090-HANDOFF.md` §11.3 row 7 already recorded this exact gate failing
+   the same way, classified rebuild-baseline drift, before this issue had any code; and
+   `players.id` is identity-generated at import, with the live table holding 13,277 rows
+   numbered 1-13,277 against a retired legacy population of 12,472. Membership is intact —
+   a direct query returns exactly 110 players, all with `debut_season` 1960-1969 and
+   `clubs_played = 2`, mapping to 110 **distinct** AFL Tables profile URLs. The pin hashes
+   a surrogate key every rebuild re-mints; the rebuild-stable equivalent over profile URLs
+   is `44d77e946fc5afd8`. **Not re-pinned here** — that is `AFLDB-ISSUE-090`/`-093`
+   baseline territory.
+2. **`AFLDB-ISSUE-102`** — the awards sibling of the same legacy gap. Unchanged.
+3. **`AFLDB-ISSUE-101`** — end-of-season rollover must re-derive the completed season
+   through this path and supersede in-season provenance.
+4. **`brownlow_season_votes` has no canonical legacy-free writer** — the third sibling of
+   this gap, still recorded as an unowned observation rather than a tracked issue.
+
+### Evidence and drafted decisions — 2026-08-28
+Full record in `AFLDB-ISSUE-095.md` §10. Summary only; §10 is authoritative.
+
+- **Exhaustive D1 probe, 1897–2025 (read-only, no database).** `fetch_ladder_afltables`
+  returned **129/129 seasons** with zero errors, zero zero-row seasons, zero schema drift,
+  zero duplicate-team seasons and zero missing ladder positions; 1,622 rows, 20 distinct
+  labels, 4 rows (1916) to 18 (2012–2025). **Historical coverage is proven sufficient.**
+- **The source is a local recomputation, not a published ladder.** `Percentage` equals
+  `Score.For/Score.Against` exactly in all 129 seasons; `sum(Season.Points) mod 4 = 0` and
+  `sum(Score.For) = sum(Score.Against)` in all 129 seasons with no bye, forfeit or deduction
+  exception in 128 years; the 1,622-row population is identical to the accepted snapshot's
+  1,622 results-derived `(club string, season)` pairs; `Round.Number` is a free parameter and
+  no `wins`/`draws`/`losses` columns exist. **fitzRoy is therefore adopted as a VALIDATION
+  artefact, not a field authority** — the tallies are derived from canonical `matches`.
+  The pinned package's code was not read: a CRAN binary install stores it in a compressed
+  lazy-load database with no readable source. §10.1 carries the confirming command.
+- **D5 gap found and closed in the plan.** The source emits one modernised label per
+  organization in both directions (`Sydney` to 1897, `Brisbane Lions` to 1987, `Footscray`
+  to 2025, Kangaroos never exposed). Existing rules cover three of the four families; the
+  `North Melbourne` 1999–2007 → Kangaroos rule is scoped `dataset: "results"` and would
+  **fail open** for a ladder dataset, silently resolving to the modern identity. A
+  `dataset: "ladder"` rule is added, and `KNOWN_DATASETS` gains `"ladder"`.
+- **Scope correction.** ISSUE-095 owns **two** release-gate failures, not three.
+  `gate: 2026 is provisional` → `preserves the raw ladder untouched in staging`
+  (`tests/integration/release-gates.test.ts:872`) asserts a 2026 `staging.team_seasons` row
+  and belongs to the current-season pipeline (`AFLDB-ISSUE-098`/`-099`, rollover
+  `AFLDB-ISSUE-101`). No new issue was created; the owning issues already exist.
+### Implementation — 2026-08-28
+Full record in `AFLDB-ISSUE-095.md` §11. **Not resolved**; acceptance is outstanding.
+
+- **§10.8 approved (Option B)** with a fail-closed tie refinement, after the operator
+  deparsed pinned fitzRoy 1.8.0 and confirmed `fetch_ladder_afltables` computes points and
+  position locally with **no tie-break beyond percentage**.
+- **Tie audit:** zero exact points-and-percentage ties across all 1,622 accepted
+  club-seasons, by exact rational comparison. Points-then-percentage is sufficient for
+  1897–2025. The fail-closed branch ships anyway — a tie yields `ladder_rank = NULL` and no
+  wooden spoon, never an order taken from club id, alphabet or row order — with a Stage-9
+  gate turning any future tie into a loud failure.
+- **Derivation:** every `club_seasons` column now comes from `matches` (home-and-away only;
+  `NOT is_final` is CHECK-equivalent to fitzRoy's `Round.Type == "Regular"`), under a
+  declared 4/2/0 rule, percentage stored ×100, provenance `afltables`. Wooden-spoon
+  completion gate, drawn-Grand-Final exclusion and finals counting preserved verbatim.
+- **`recomputeClubSeasons`** brought into lockstep, guard re-pointed to "no canonical
+  home-and-away matches". This clears the operational consequence recorded above: match
+  create/delete/score-edit no longer throws on a canonically rebuilt database.
+- **Identity proved, not forced:** the derivation does not re-point through
+  `afldb_identity_for_season` — matches already carry the historical identity — and a
+  Stage-9 gate asserts the invariant instead, so a mis-attributed match fails the rebuild.
+- **Six Stage-9 gates** added; the §8 prohibition is satisfied and superseded. **Nine-stage
+  rebuild topology unchanged; no migration; state stays 75/75.**
+- **Validation run:** `tests/python/ladder_identity_contract.py` **37/37**, DB-free —
+  all 1,622 label-season pairs resolve to exactly one time-bounded identity, era partitions
+  **101/128/101**, Fitzroy keeps its 100 seasons and never merges into Brisbane.
+  **No vitest suite was run:** this worktree has no `node_modules` and `D:\dev\afldb` is
+  off-limits.
+- **Release-gate pins repaired** (ISSUE-095-owned only): `to: 2026` → `2025`, era totals
+  102/129/102 → **101/128/101**, matching the measured source.
+- **DB-free validation and repair pass (`AFLDB-ISSUE-095.md` §12).** Five suites reported
+  six failures; **five repaired, one classified out of scope**, no product design changed.
+  Final: **309 passed, 1 failed, 6 skipped**, plus the resolver contract 37/37.
+  - **One was ISSUE-095's:** the contract test asserted a flat dataset key list, which
+    conflated fact-bearing datasets with a validation witness. Repaired *semantically* —
+    the three fact datasets are now identified by not carrying `role: VALIDATION_WITNESS`
+    and are asserted equal to `full_history.required_datasets`, and `ladder` is separately
+    asserted to be a witness, absent from that list, with no field promoted to fact.
+  - **Four were pre-existing CRLF sensitivity**, reproduced against the unmodified HEAD
+    blobs. `core.autocrlf=true` on this worktree, and four assertions compare source text
+    using `\n`. Notably the `has zero legacy/database dependency` guard was **inert, not
+    merely tripping**: it strips comments with `/#.*$/` and JavaScript's `.` does not match
+    `\r`, so nothing was ever stripped on a CRLF checkout. Repaired by normalising the
+    source on read in two test files; every assertion left as written. Rewording the
+    adapter comment would have gone green while leaving the guard switched off.
+  - **One is out of scope and untouched:** `finds the tables created after 045 that never
+    registered import write` now also lists `data_overrides` (migration 073) and
+    `promotion_decisions` (074) — `AFLDB-ISSUE-096`/`AFLDB-ISSUE-086` tables. ISSUE-095
+    added no table, touched no migration and changed no grant. Repairing it would assert
+    that those two correctly lack import write, which is ISSUE-086's manual-authority
+    decision and is recorded as blocked and unbuilt. **Not repaired here.**
+### Witness contract and D7 validation path — 2026-08-28
+Full record in `AFLDB-ISSUE-095.md` §13. **Still not resolved**; the rebuild is outstanding.
+
+- **Witness acquired:** `ladder-20260828`, 129 files, 1,622 rows, zero fetch failures.
+  Pinned in `fitzroy-contract.json` as `datasets.ladder.accepted_witness` with the tracked
+  manifest bound by sha256. The core accepted baseline was **not** touched — that register's
+  `exactly_one_accepted` policy would refuse a second accepted entry.
+- **New single authority:** `tools/rebuild/fitzroy/validate_ladder_witness.py`. Offline mode
+  makes no database connection and no network request and proves manifest binding, per-file
+  sha256, row counts, the eight-column schema, per-season structure, the 1897–2025 range,
+  and resolution of all 1,622 labels through the real `ClubResolver`. **26/26.** The
+  existing contract test now defers to it instead of re-implementing it, and additionally
+  proves the tracked label universe equals the acquired one.
+- **Durability answered by reuse, not invention:** ISSUE-093's convention already covers it
+  — bytes gitignored, manifest tracked, PRECHECK re-proves hashes before destruction. The
+  rebuild's preflight now refuses on a missing or altered witness. **Proven by execution:**
+  exit 2 with the bytes moved aside, exit 0 restored.
+- **D7 cross-check wired** as a tenth **validation** stage `ladder-witness` between
+  `derived` and `fingerprints`, comparing season, resolved identity, points for/against,
+  premiership points and ladder rank, with per-row diagnostics and no mutation. This amends
+  §11.4's "no tenth stage": D6 concerned **data** stages, and the four-stage data topology
+  is unchanged and now asserted by test. Percentage is compared by exact decimal
+  reconstruction from the witness's integers (×100, ROUND_HALF_UP to match PostgreSQL),
+  never float-to-float.
+- **Acquirer messaging repaired narrowly:** a witness-only run reported
+  `missing_seasons: [all 129]` and pointed at the core adjudicator. It now measures the
+  witness's own files, records `acquisition_kind: validation_witness`, and names the right
+  validator. Core gates unchanged.
+- **The remaining `reference-data` failure does not block the rebuild**, checked two ways:
+  `db:test:rebuild` runs no vitest, and neither `data_overrides` nor `promotion_decisions`
+  reaches `clubs`/`players`/`seasons`, so neither is in the reference loader's FK cascade
+  closure. Still `AFLDB-ISSUE-096`/`-086`'s.
+- **Validation:** five suites **314 passed / 1 failed / 6 skipped** (the failure above);
+  contract test **40/40**; witness validator **26/26**.
+- **Outstanding:** the clean `afldb_test` rebuild — a separate authorisation, a full
+  destructive recreate, and the only thing that can prove the D7 cross-check.
 
 ### fitzRoy capability split (established, ISSUE-093 §H15.5)
 Deterministically reconstructable from the accepted match facts: `played`, `wins`, `draws`,

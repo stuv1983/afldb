@@ -308,12 +308,15 @@ describe('Targeted club_seasons rebuild (AFLDB-ISSUE-015)', () => {
        wooden_spoon, is_premier, finals_played, source_id`;
 
   async function pickCompleteSeason(): Promise<number> {
+    // AFLDB-ISSUE-095: the ladder is derived from canonical matches, so the
+    // precondition is home-and-away matches rather than staging ladder rows.
     const [row] = await importSql<{ season: number }[]>`
       SELECT cs.season
         FROM club_seasons cs
         JOIN seasons se ON se.year = cs.season
        WHERE se.status = 'complete'
-         AND EXISTS (SELECT 1 FROM staging.team_seasons st WHERE st.season = cs.season)
+         AND EXISTS (SELECT 1 FROM matches m
+                      WHERE m.season = cs.season AND NOT m.is_final)
        GROUP BY cs.season
        ORDER BY cs.season DESC
        LIMIT 1
@@ -364,24 +367,87 @@ describe('Targeted club_seasons rebuild (AFLDB-ISSUE-015)', () => {
     });
   });
 
-  it('fails closed when the canonical staging ladder is missing', async () => {
-    const season = await pickCompleteSeason();
+  // AFLDB-ISSUE-095 re-pointed the fail-closed guard at the new source. The property
+  // under test is unchanged and is the one that matters: the guard throws BEFORE the
+  // DELETE, so a season it cannot derive keeps whatever it already had rather than
+  // being silently emptied by the surrounding mutation.
+  //
+  // The trigger is now a season with no canonical home-and-away matches, which is
+  // exactly the in-progress season's state after a canonical rebuild — so this also
+  // pins the boundary that keeps 2026 with the current-season pipeline
+  // (AFLDB-ISSUE-098/-099) rather than this path.
+  it('refuses to build a ladder for a season it has no matches for', async () => {
+    const [row] = await importSql<{ year: number }[]>`
+      SELECT s.year FROM seasons s
+       WHERE NOT EXISTS (SELECT 1 FROM matches m
+                          WHERE m.season = s.year AND NOT m.is_final)
+       ORDER BY s.year DESC LIMIT 1
+    `;
+    expect(row, 'a canonical rebuild leaves the in-progress season without matches')
+      .toBeDefined();
+
     await inRolledBackTransaction(async (tx) => {
-      const [{ count: storedBefore }] = await tx<{ count: string }[]>`
-        SELECT count(*) AS count FROM club_seasons WHERE season = ${season}
+      // Stand a row up so "throws before anything is deleted" is a real assertion
+      // rather than a vacuous one over an already-empty season.
+      await tx`
+        INSERT INTO club_seasons
+              (season, club_id, played, wins, draws, losses,
+               points_for, points_against)
+        VALUES (${row.year}, (SELECT id FROM clubs ORDER BY id LIMIT 1),
+                0, 0, 0, 0, 0, 0)
       `;
-      expect(Number(storedBefore)).toBeGreaterThan(0);
 
-      await tx`DELETE FROM staging.team_seasons WHERE season = ${season}`;
-
-      await expect(recomputeClubSeasons(tx, season)).rejects.toThrow(
-        /no canonical staging\.team_seasons rows/,
+      await expect(recomputeClubSeasons(tx, row.year)).rejects.toThrow(
+        /no canonical home-and-away matches for season/,
       );
 
       const [{ count: storedAfter }] = await tx<{ count: string }[]>`
-        SELECT count(*) AS count FROM club_seasons WHERE season = ${season}
+        SELECT count(*) AS count FROM club_seasons WHERE season = ${row.year}
       `;
-      expect(storedAfter).toBe(storedBefore);
+      expect(Number(storedAfter)).toBe(1);
+    });
+  });
+
+  it('derives the ladder from match facts, following a score correction', async () => {
+    // The ISSUE-015 shape is gone with its source: a published tally could not move
+    // when a score was corrected, but a derived one must. Flipping a decided
+    // home-and-away result has to move both sides' win/loss and points columns.
+    const season = await pickCompleteSeason();
+    await inRolledBackTransaction(async (tx) => {
+      const [match] = await tx<{ id: number; home: number; away: number }[]>`
+        SELECT id, home_club_id AS home, away_club_id AS away
+          FROM matches
+         WHERE season = ${season} AND NOT is_final AND result = 'home_win'
+         ORDER BY id LIMIT 1
+      `;
+      expect(match).toBeDefined();
+
+      const winsOf = async (club: number) => {
+        const [r] = await tx<{ wins: number; pts: number }[]>`
+          SELECT wins, premiership_points AS pts FROM club_seasons
+           WHERE season = ${season} AND club_id = ${club}
+        `;
+        return r;
+      };
+      const homeBefore = await winsOf(match.home);
+      const awayBefore = await winsOf(match.away);
+
+      // Reverse the result. The margin CHECK is satisfied by swapping the scores.
+      await tx`
+        UPDATE matches
+           SET home_score = away_score, away_score = home_score,
+               result = 'away_win', winner_club_id = ${match.away}
+         WHERE id = ${match.id}
+      `;
+      await recomputeClubSeasons(tx, season);
+
+      const homeAfter = await winsOf(match.home);
+      const awayAfter = await winsOf(match.away);
+      expect(homeAfter.wins).toBe(homeBefore.wins - 1);
+      expect(awayAfter.wins).toBe(awayBefore.wins + 1);
+      // The declared 4/2/0 rule moves with it.
+      expect(homeAfter.pts).toBe(homeBefore.pts - 4);
+      expect(awayAfter.pts).toBe(awayBefore.pts + 4);
     });
   });
 });

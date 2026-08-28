@@ -247,6 +247,28 @@ run_acquire <- function() {
     if (!r$ok) stop("results failed: ", r$error)
     add_file("results", as.data.frame(r$data), "results.csv")
   }
+  if ("ladder" %in% datasets) {
+    # AFLDB-ISSUE-095. A VALIDATION WITNESS, never a fact source: the contract's
+    # `ladder` provenance block records that fitzRoy computes these values from
+    # results rather than reading a published ladder, so no column here is
+    # imported. It is acquired so the rebuild's FINAL VALIDATION stage can
+    # cross-check AFLDB's independently derived ladder against it.
+    #
+    # Per-season files, like player_stats: fetch_ladder_afltables takes ONE
+    # season and defaults to the most recent round, which for a completed
+    # season is the final home-and-away ladder. Requesting a range would
+    # silently return one season's ladder.
+    for (s in from:to) {
+      r <- try_fetch(sprintf("ladder %d", s),
+                     function() fitzRoy::fetch_ladder_afltables(season = s))
+      if (!r$ok) stop("ladder season ", s, " failed: ", r$error,
+                      " (no partial manifest is written; rerun under the same label after fixing)")
+      df <- as.data.frame(r$data)
+      # A source failure must never be recorded as an absence.
+      if (nrow(df) == 0) stop("ladder season ", s, " returned zero rows")
+      add_file("ladder", df, sprintf("ladder_%d.csv", s))
+    }
+  }
 
   # --- completeness accounting (AFLDB-ISSUE-093 full-history contract) -----
   # Measured facts only. `full_history` is COMPUTED from the contract's gates and
@@ -259,18 +281,40 @@ run_acquire <- function() {
     m <- regmatches(f$filename, regexpr("[0-9]{4}", f$filename))
     if (length(m) == 1) as.integer(m) else NA_integer_
   }
-  ps_files <- Filter(function(f) f$dataset == "player_stats", files)
-  seasons_acquired <- sort(unique(stats::na.omit(vapply(ps_files, season_of, integer(1)))))
+  # AFLDB-ISSUE-095. A VALIDATION WITNESS acquisition is not a core snapshot and must not
+  # be measured as one. Acquiring only the ladder used to report seasons_acquired = [] and
+  # missing_seasons = every season in the range, because the season accounting counted
+  # player_stats files exclusively — so a run that acquired all 129 of its own seasons
+  # described itself as having missed all 129, and then told the operator to run the CORE
+  # adjudicator, which necessarily fails over datasets the witness never claimed.
+  #
+  # The repair is to measure the right thing, NOT to relax the core gates: when every
+  # requested dataset is a witness, the per-season accounting counts the witness's own
+  # files and the required range is the range that was requested. When any fact-bearing
+  # dataset is present the core contract applies unchanged, exactly as before.
+  is_witness <- function(d) identical(contract$datasets[[d]]$role, "VALIDATION_WITNESS")
+  witness_only <- length(datasets) > 0 && all(vapply(datasets, is_witness, logical(1)))
+
+  counted_files <- if (witness_only) {
+    Filter(function(f) f$dataset %in% datasets, files)
+  } else {
+    Filter(function(f) f$dataset == "player_stats", files)
+  }
+  seasons_acquired <- sort(unique(stats::na.omit(
+    vapply(counted_files, season_of, integer(1)))))
   approved_gaps <- as.integer(unlist(fh$approved_source_gaps$seasons))
   if (length(approved_gaps) == 0) approved_gaps <- integer(0)
 
-  required_first <- as.integer(fh$season_range$first_season)
-  required_last <- as.integer(fh$season_range$last_season)
-  required_seasons <- setdiff(required_first:required_last, approved_gaps)
-  required_datasets <- unlist(fh$required_datasets)
+  # A witness is required to cover exactly the range it was asked for; a core snapshot is
+  # required to cover the contract's full-history range whatever was asked for.
+  required_first <- if (witness_only) from else as.integer(fh$season_range$first_season)
+  required_last <- if (witness_only) to else as.integer(fh$season_range$last_season)
+  required_seasons <- setdiff(required_first:required_last,
+                              if (witness_only) integer(0) else approved_gaps)
+  required_datasets <- if (witness_only) datasets else unlist(fh$required_datasets)
 
   duplicate_seasons <- seasons_acquired[duplicated(
-    vapply(ps_files, season_of, integer(1)))]
+    vapply(counted_files, season_of, integer(1)))]
   missing_seasons <- setdiff(required_seasons, seasons_acquired)
   extra_seasons <- setdiff(seasons_acquired, required_first:required_last)
   missing_datasets <- setdiff(required_datasets, unique(vapply(
@@ -314,12 +358,20 @@ run_acquire <- function() {
   manifest$intentional_gaps <- as.list(approved_gaps)
   manifest$missing_seasons <- as.list(missing_seasons)
   manifest$acquisition_observations <- observed
-  manifest$identity_observations <- identity_obs
-  # Never a verdict: only the validator may confer full-history status.
+  # player_stats-only measurements. Recorded as not-applicable for a witness rather than
+  # as a row of zeroes, which would read as "measured and found empty".
+  manifest$identity_observations <- if (witness_only) "not_applicable" else identity_obs
+  # Never a verdict: only a validator may confer completeness, and WHICH validator
+  # depends on what was acquired. Pointing a witness at the core adjudicator manufactures
+  # a false failure over datasets it never claimed.
+  manifest$acquisition_kind <- if (witness_only) "validation_witness" else "core_snapshot"
   manifest$completeness <- "unvalidated"
   manifest$full_history <- FALSE
-  manifest$verdict_authority <-
+  manifest$verdict_authority <- if (witness_only) {
+    paste0("tools/rebuild/fitzroy/validate_ladder_witness.py --label ", label)
+  } else {
     "tools/migration/import_fitzroy_core.py --validate-only --require-full-history"
+  }
 
   # The manifest is written LAST, after every raw artefact exists and is hashed.
   write_json(manifest, manifest_path)
@@ -328,12 +380,23 @@ run_acquire <- function() {
   if (length(not_observed)) {
     cat("  observations not satisfied:", paste(not_observed, collapse = ", "), "\n")
   }
-  cat("  player_stats rows:", identity_obs$rows,
-      "| rows without an ID:", identity_obs$rows_without_id,
-      "| rows without a profile URL:", identity_obs$rows_without_url, "\n")
-  cat("\nNow validate independently:\n",
-      " .venv/bin/python tools/migration/import_fitzroy_core.py --label", label,
-      "--validate-only --require-full-history\n")
+  if (witness_only) {
+    cat("  acquisition kind: validation_witness (", paste(datasets, collapse = ", "),
+        ") — NOT a core snapshot.\n", sep = "")
+    cat("\nNow validate independently:\n",
+        " .venv/bin/python tools/rebuild/fitzroy/validate_ladder_witness.py --label",
+        label, "\n")
+    cat("  Do NOT run import_fitzroy_core.py --require-full-history against this label:",
+        "\n  it adjudicates the CORE snapshot and would fail over datasets a witness",
+        "never claimed.\n")
+  } else {
+    cat("  player_stats rows:", identity_obs$rows,
+        "| rows without an ID:", identity_obs$rows_without_id,
+        "| rows without a profile URL:", identity_obs$rows_without_url, "\n")
+    cat("\nNow validate independently:\n",
+        " .venv/bin/python tools/migration/import_fitzroy_core.py --label", label,
+        "--validate-only --require-full-history\n")
+  }
   cat("\nAcquisition complete:", length(files), "file(s);",
       sum(vapply(files, function(f) f$row_count, integer(1))), "total rows.\n",
       "Manifest:", manifest_path, "\n",

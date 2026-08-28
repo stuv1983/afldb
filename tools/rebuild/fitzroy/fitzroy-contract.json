@@ -53,7 +53,7 @@
     }
   },
   "source_club_normalisation": {
-    "$comment": "AFLDB-ISSUE-093 — SOURCE normalisation, not club identity. fitzRoy emits one modern club string per organization, so a historical season can arrive labelled with a name that did not exist then. Where the organization is continuous (Footscray/Western Bulldogs, Kangaroos/North Melbourne, South Melbourne/Sydney) ClubResolver already remaps within the organization and needs no rule here. This block exists ONLY for the case the organization model deliberately refuses to bridge: a MERGER. Brisbane Bears (1987-1996) and Brisbane Lions (1997-) are separate organizations — migration 017: 'folding them into the Lions record would invent a history the club does not have' — so the org walk finds no candidate and fails closed, which is correct. These rules are scoped to this source, to an exact raw string, and to an exact season range. They add NO alias, so the two identities remain non-interchangeable everywhere else in AFLDB, and nothing outside a listed range is affected.",
+    "$comment": "AFLDB-ISSUE-093 — SOURCE normalisation, not club identity. fitzRoy emits one modern club string per organization, so a historical season can arrive labelled with a name that did not exist then. Where the organization is continuous (Footscray/Western Bulldogs, Kangaroos/North Melbourne, South Melbourne/Sydney) ClubResolver already remaps within the organization and needs no rule here. This block exists ONLY for the case the organization model deliberately refuses to bridge: a MERGER. Brisbane Bears (1987-1996) and Brisbane Lions (1997-) are separate organizations — migration 017: 'folding them into the Lions record would invent a history the club does not have' — so the org walk finds no candidate and fails closed, which is correct. A SECOND class was added later and is the more dangerous one: a NESTED era, where the modern identity's canonical span CONTAINS the historical identity's (North Melbourne 1925-present contains Kangaroos 1999-2007). There the era check succeeds, no organization walk is attempted, and the row resolves to the wrong identity SILENTLY — it fails open, not closed — so every dataset that carries the modernised label needs its own rule. These rules are scoped to this source, to an exact raw string, and to an exact season range. They add NO alias, so the two identities remain non-interchangeable everywhere else in AFLDB, and nothing outside a listed range is affected.",
     "applies_to_source": "AFL Tables via fitzRoy",
     "is_alias": false,
     "dataset_scope": "A rule may name a `dataset` when the defect belongs to ONE fitzRoy dataset rather than to the source as a whole. A rule with no `dataset` applies to every dataset; a rule with one applies only there, so a correction written for results can never rewrite a player_stats row that happens to carry the same string.",
@@ -74,6 +74,15 @@
         "resolves_to_hist": "Kangaroos",
         "reason": "The two fitzRoy datasets disagree with each other for the Kangaroos era: player_stats uses 'Kangaroos' while results uses 'North Melbourne', so the same match resolves to two different historical identities and the match join fails. The club competed as the Kangaroos from 1999 to 2007 and migration 017 models the chain as North Melbourne (1925-) -> Kangaroos (1999-2007) -> North Melbourne, so results is the dataset carrying a label from the wrong era. Scoped to results ONLY: a player_stats row reading 'North Melbourne' is untouched, because outside 1999-2007 that string is correct and inside those seasons player_stats already says 'Kangaroos'. The ordinary era rule cannot repair this on its own — North Melbourne's canonical span (1925-present) overlaps the Kangaroos era, so era containment succeeds and no remap is attempted.",
         "evidence": "full-history-20260827: 9,196 player_stats rows across 198 (season, home, away) match combinations, seasons 1999-2007, could not join results. The Footscray/Western Bulldogs disagreement in the same seasons needs no rule — Footscray's era ends in 1996, so the ordinary organization remap already resolves it."
+      },
+      {
+        "dataset": "ladder",
+        "raw": "North Melbourne",
+        "first_season": 1999,
+        "last_season": 2007,
+        "resolves_to_hist": "Kangaroos",
+        "reason": "AFLDB-ISSUE-095 D5. The ladder dataset needs the same repair as results, and needs it as its OWN rule: rule scoping means a `results`-scoped rule is skipped for a ladder lookup, and this is the one boundary that then FAILS OPEN rather than closed. North Melbourne's canonical span (1925-present) CONTAINS 1999-2007, so era containment succeeds, no organization walk is attempted, and the row resolves silently to the modern identity with no error. The other three boundary families are already safe without a ladder rule: Sydney<=1981 and Footscray>=1997 are era misses that the same-organization walk resolves to exactly one candidate, and Brisbane Lions 1987-1996 is caught by the unscoped Brisbane rule above. Adding this rule is what makes the ladder witness's identity resolution total.",
+        "evidence": "AFLDB-ISSUE-095 exhaustive probe, 2026-08-28: fetch_ladder_afltables emits ONE modernised label per organization across all time, in both directions — 'Sydney' back to 1897, 'Brisbane Lions' back to 1987, 'Footscray' forward to 2025 — and never emits 'Kangaroos' at all. 1,622 (label, season) pairs over 20 distinct labels, 1897-2025."
       }
     ],
     "fail_closed": "A raw string/season combination outside these exact rules is never normalised here; it falls through to the ordinary era resolution and still fails closed if that cannot name exactly one identity."
@@ -158,6 +167,63 @@
         { "target": "player identity/name", "candidate_columns": ["Player", "ID"], "status": "SUPPORTED_WITH_COVERAGE_LIMITATION", "note": "Probe 2026-08-25 (16,731 rows): `Player` name present; NO stable AFL Tables ID column in this dataset — identity is name+Team+Cap grain only. Stable-ID reconciliation must come from player_stats" },
         { "target": "player DOB", "candidate_columns": ["DOB", "Date.of.birth"], "status": "MISSING", "note": "Probe 2026-08-25: no DOB column returned (columns: Player, Team, Cap, #, HT, WT, Games, Wins, Draws, Losses, Goals, Seasons, Debut, Last, date_accessed)" },
         { "target": "debut/career span", "candidate_columns": ["Debut", "Seasons", "Games"], "status": "SUPPORTED", "note": "Probe 2026-08-25: Debut, Seasons, Games all returned, 0 NA" }
+      ]
+    },
+    "ladder": {
+      "fitzroy_function": "fetch_ladder_afltables",
+      "grain": "club-season (final home-and-away ladder)",
+      "role": "VALIDATION_WITNESS",
+      "$comment": "AFLDB-ISSUE-095. Deliberately NOT in full_history.required_datasets: this dataset is not the source of any club_seasons column, and the accepted full-history snapshots do not contain it. It is acquired under its own label and read only by the rebuild FINAL VALIDATION stage, as an independently computed cross-check on AFLDB own match set and is_final classification. Adding it to required_datasets would retroactively invalidate every accepted baseline.",
+      "provenance": {
+        "verdict": "LOCALLY_COMPUTED",
+        "$comment": [
+          "Established 2026-08-28 by reading the pinned fitzRoy 1.8.0 implementation and by",
+          "measuring its own output. The function does NOT scrape a published AFL Tables",
+          "ladder. It calls fetch_results_afltables(season), filters Round.Type == Regular,",
+          "derives the winner from Home.Points/Away.Points, scores win=1 / draw=0.5 / loss=0,",
+          "sets points = win * 4, cumulates season_points, score_for and score_against,",
+          "computes percentage = score_for / score_against, sorts by Season, Round.Number,",
+          "descending season_points then descending percentage, and assigns ladder_pos from",
+          "that local ordering. There is no further tie-break.",
+          "Independently corroborated by measurement over its own 1,622 rows: percentage",
+          "equals score_for/score_against exactly in all 129 seasons; every season points",
+          "total is divisible by 4 with no bye, forfeit or deduction exception in 128 years;",
+          "and the row population is identical to the 1,622 results-derived (club string,",
+          "season) pairs recorded in source_club_normalisation above.",
+          "CONSEQUENCE: Season.Points, Ladder.Position and Percentage are NOT independently",
+          "published observations and must never be imported as sourced facts."
+        ]
+      },
+      "accepted_witness": {
+        "$comment": "AFLDB-ISSUE-095 durability binding. The raw witness CSVs are gitignored like every other acquired snapshot (ISSUE-093 convention: bytes are reproduced by acquisition, only the manifest is tracked). This block pins WHICH acquisition is accepted and binds the tracked manifest byte-for-byte, so the per-file hash list inside it cannot be edited to cover for tampered bytes. tools/rebuild/fitzroy/validate_ladder_witness.py re-proves every file hash against this manifest before the witness may be used, and REFUSES when the manifest exists but its bytes do not.",
+        "snapshot_label": "ladder-20260828",
+        "manifest": "docs/rebuild-manifests/afltables_fitzroy_core/ladder-20260828.json",
+        "manifest_sha256": "70cc17768685a3140a428d3eef796bf465ae2fd9dca71a66684f248cdde8b6df",
+        "files": 129,
+        "rows": 1622,
+        "acquired_on": "2026-08-28",
+        "validator": "tools/rebuild/fitzroy/validate_ladder_witness.py --label ladder-20260828",
+        "not_validated_by": "import_fitzroy_core.py --require-full-history is the CORE snapshot adjudicator and must never be pointed at a witness-only acquisition; doing so manufactures a false failure over datasets the witness never claimed."
+      },
+      "coverage": {
+        "$comment": "Exhaustive read-only probe, 1897-2025, run 2026-08-28. Zero call errors, zero zero-row seasons, zero schema drift, zero wrong-Season echoes, zero blank Team, zero duplicate-team seasons, zero missing or duplicated ladder positions, zero NA Season.Points.",
+        "first_season": 1897,
+        "last_season": 2025,
+        "seasons_returned": 129,
+        "club_season_rows": 1622,
+        "distinct_labels": 20,
+        "min_rows_season": { "season": 1916, "rows": 4 },
+        "max_rows_season": { "seasons": "2012-2025", "rows": 18 },
+        "exact_points_and_percentage_ties": 0
+      },
+      "fields": [
+        { "target": "club label (modernised, one per organization)", "candidate_columns": ["Team"], "status": "SUPPORTED", "note": "Requires season-aware identity resolution; see source_club_normalisation. Never a fact source." },
+        { "target": "season and round of the returned ladder", "candidate_columns": ["Season", "Round.Number"], "status": "SUPPORTED", "note": "Round.Number is a free parameter; unspecified returns the final home-and-away round" },
+        { "target": "points for / against (cross-check only)", "candidate_columns": ["Score.For", "Score.Against"], "status": "SUPPORTED", "note": "The gate that independently validates AFLDB home-and-away match set and is_final classification" },
+        { "target": "premiership points (cross-check only)", "candidate_columns": ["Season.Points"], "status": "SUPPORTED", "note": "Locally computed 4/2/0; cross-checked against AFLDB own declared rule, never imported" },
+        { "target": "ladder position (cross-check only)", "candidate_columns": ["Ladder.Position"], "status": "SUPPORTED", "note": "Locally sorted on points then percentage with no further tie-break; cross-check only" },
+        { "target": "percentage", "candidate_columns": ["Percentage"], "status": "SUPPORTED", "note": "Proven an exact recomputation of Score.For/Score.Against; a ratio, where AFLDB stores it x100" },
+        { "target": "wins / draws / losses", "candidate_columns": [], "status": "MISSING", "note": "The dataset carries no W/D/L columns at all. AFLDB derives them from matches." }
       ]
     },
     "results": {

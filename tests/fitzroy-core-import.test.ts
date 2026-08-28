@@ -20,7 +20,12 @@ import { afterAll, describe, expect, it } from 'vitest';
  */
 const root = process.cwd();
 const importerPath = join(root, 'tools', 'migration', 'import_fitzroy_core.py');
-const importerSource = readFileSync(importerPath, 'utf8');
+// Normalised on read: the structural assertions below pin multi-line source shapes
+// (the fail-closed identity HALT, the contract-rule refusals), and they express those
+// with \n. This repository is checked out with core.autocrlf=true on Windows, so the
+// file on disk has \r\n and every such assertion missed for a reason that has nothing
+// to do with what the importer does. The assertions themselves are unchanged.
+const importerSource = readFileSync(importerPath, 'utf8').replace(/\r\n/g, '\n');
 
 const venvPython = process.platform === 'win32'
   ? join(root, '.venv', 'Scripts', 'python.exe')

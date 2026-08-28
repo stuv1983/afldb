@@ -298,61 +298,129 @@ LEFT JOIN (
 """
 
 # --- club_seasons ----------------------------------------------------------
-# Ladder positions come from the source ladder; premiership flags are
-# resolved from Grand Final results so there is one definition.
+# AFLDB-ISSUE-095. The season ladder is derived from AFLDB's own canonical
+# match set. It is NOT acquired from an external ladder feed.
 #
-# The source ladder names every club by its MODERN name, so its rows must
-# be re-pointed at the identity that was actually trading in that season.
-# Without this, Sydney had ladder rows back to 1897 and Footscray had
-# none at all, while both clubs' player leaders came from the historical
-# identities — a club page that disagreed with itself.
+# WHY THE SOURCE CHANGED (was: staging.team_seasons, written only by the
+# retired AFLDB_LEGACY_SQLITE importer). The candidate replacement,
+# fitzRoy's fetch_ladder_afltables, was probed across every completed
+# season 1897-2025 and its pinned 1.8.0 implementation was read. It does
+# not scrape a published ladder: it calls fetch_results_afltables, keeps
+# Round.Type == "Regular", and computes season points (4 per win, 2 per
+# draw), score for/against, percentage and ladder position locally.
+# Measured proof over its own 1,622 rows: percentage equals
+# score_for/score_against exactly in all 129 seasons, and every season's
+# points total is divisible by 4 with no bye, forfeit or deduction
+# exception in 128 years. Importing those columns would have laundered a
+# local recomputation into external-source provenance, so AFLDB derives
+# the same facts from its own matches and keeps that artefact as an
+# independent VALIDATION witness at the rebuild's final validation stage.
 #
-# Everything downstream (premierships, finals counts) joins on the
-# RESOLVED identity, because matches also store historical identities.
+# `NOT is_final` is exactly fitzRoy's "Regular" filter: migration 003
+# CHECK-constrains is_final = (round_type <> 'home_and_away').
+#
+# No identity re-pointing is needed or wanted here. The old SQL re-pointed
+# through afldb_identity_for_season because the legacy ladder named every
+# club by its MODERN name, which gave Sydney rows back to 1897 and
+# Footscray none. matches already store the HISTORICAL identity, so the
+# era is correct by construction. Stage 9 PROVES that invariant rather
+# than this SQL forcing it, so a mis-attributed match fails the rebuild
+# instead of being silently normalised away.
 REBUILDS["club_seasons"] = """
 TRUNCATE club_seasons;
 INSERT INTO club_seasons
       (season, club_id, played, wins, draws, losses, points_for, points_against,
        premiership_points, percentage, ladder_rank, wooden_spoon, is_premier,
        finals_played, source_id)
-WITH resolved AS (
-    SELECT
-        s.*,
-        se.status AS season_status,
-        COALESCE(
-            afldb_identity_for_season(rc.organization_id, s.season),
-            s.club_id
-        ) AS identity_id
-    FROM staging.team_seasons s
-    JOIN seasons se ON se.year = s.season
-    JOIN clubs   rc ON rc.id = s.club_id
+WITH sides AS (
+    -- One row per club per home-and-away match, from that club's point of view.
+    SELECT season, home_club_id AS club_id,
+           home_score AS score_for, away_score AS score_against,
+           result = 'draw'               AS drew,
+           winner_club_id = home_club_id AS won
+      FROM matches WHERE NOT is_final
+    UNION ALL
+    SELECT season, away_club_id,
+           away_score, home_score,
+           result = 'draw',
+           winner_club_id = away_club_id
+      FROM matches WHERE NOT is_final
+),
+tallies AS (
+    -- winner_club_id is NULL on a draw, so `won` is NULL there and the
+    -- FILTER counts it as neither a win nor a loss.
+    SELECT season, club_id,
+           count(*)                     AS played,
+           count(*) FILTER (WHERE won)  AS wins,
+           count(*) FILTER (WHERE drew) AS draws,
+           sum(score_for)               AS points_for,
+           sum(score_against)           AS points_against
+      FROM sides GROUP BY season, club_id
+),
+rated AS (
+    SELECT t.season, t.club_id, t.played, t.wins, t.draws,
+           -- Subtracted, never counted independently, so the table's
+           -- CHECK (played = wins + draws + losses) cannot be violated.
+           t.played - t.wins - t.draws AS losses,
+           t.points_for, t.points_against,
+           -- The DECLARED premiership-points rule: 4 for a win, 2 for a
+           -- draw, 0 for a loss, and nothing for a bye or an unplayed
+           -- match. AFLDB-ISSUE-095 D2/D3.
+           t.wins * 4 + t.draws * 2 AS premiership_points,
+           -- Ranked on the exact ratio, stored rounded, so rounding can
+           -- never manufacture or hide a tie.
+           CASE WHEN t.points_against > 0
+                THEN t.points_for::numeric / t.points_against
+           END AS ratio
+      FROM tallies t
+),
+ranked AS (
+    SELECT r.*,
+           rank() OVER (PARTITION BY r.season
+                        ORDER BY r.premiership_points DESC,
+                                 r.ratio DESC NULLS LAST)          AS pos,
+           count(*) OVER (PARTITION BY r.season,
+                                       r.premiership_points,
+                                       r.ratio)                    AS tied,
+           count(*) OVER (PARTITION BY r.season)                   AS clubs_in_season
+      FROM rated r
 )
 SELECT
-    r.season,
-    r.identity_id,
-    r.played, r.wins, r.draws, r.losses, r.points_for, r.points_against,
-    r.premiership_points, r.percentage, r.ladder_rank,
-    -- A wooden spoon is only awarded once a season has finished. The raw
-    -- ladder flags whoever is currently last, which for an in-progress
-    -- season is a standing, not an honour.
-    r.wooden_spoon AND r.season_status = 'complete',
+    k.season,
+    k.club_id,
+    k.played, k.wins, k.draws, k.losses, k.points_for, k.points_against,
+    k.premiership_points,
+    -- Percentage is conventionally points_for/points_against * 100; the
+    -- round-by-round ladder in src/db/queries/rounds.ts uses the same scale.
+    round(k.ratio * 100, 4),
+    -- FAIL CLOSED on an exact tie. VFL/AFL countback rules beyond points
+    -- and percentage are not modelled in AFLDB, so two clubs level on
+    -- both get NO rank rather than an order invented from row order or
+    -- club id. Audited across the accepted 1897-2025 corpus: zero exact
+    -- ties, so this branch is defence in depth, not a live gap.
+    CASE WHEN k.tied = 1 THEN k.pos END,
+    -- A wooden spoon is only awarded once a season has finished; before
+    -- that, last place is a standing, not an honour. A tie for last
+    -- awards no spoon, for the same reason it awards no rank.
+    k.tied = 1 AND k.pos = k.clubs_in_season AND se.status = 'complete',
     COALESCE(gf.won, false),
     COALESCE(f.finals, 0),
-    (SELECT id FROM sources WHERE key = 'sports_data_lab')
-FROM resolved r
+    (SELECT id FROM sources WHERE key = 'afltables')
+FROM ranked k
+JOIN seasons se ON se.year = k.season
 LEFT JOIN (
     -- winner_club_id is NULL for a drawn Grand Final, so the 1948, 1977
     -- and 2010 draws drop out and only the replays count.
     SELECT season, winner_club_id AS club_id, true AS won
     FROM matches WHERE round_type = 'grand_final' AND winner_club_id IS NOT NULL
-) gf ON gf.season = r.season AND gf.club_id = r.identity_id
+) gf ON gf.season = k.season AND gf.club_id = k.club_id
 LEFT JOIN (
     SELECT season, club_id, count(*) AS finals FROM (
         SELECT season, home_club_id AS club_id FROM matches WHERE is_final
         UNION ALL
         SELECT season, away_club_id FROM matches WHERE is_final
     ) x GROUP BY season, club_id
-) f ON f.season = r.season AND f.club_id = r.identity_id;
+) f ON f.season = k.season AND f.club_id = k.club_id;
 """
 
 # --- search ranking --------------------------------------------------------

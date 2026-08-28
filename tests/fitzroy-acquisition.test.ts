@@ -10,7 +10,13 @@ const contractPath = path.join(root, "tools/rebuild/fitzroy/fitzroy-contract.jso
 const scriptPath = path.join(root, "tools/rebuild/fitzroy/acquire_core.R");
 
 const contract = JSON.parse(readFileSync(contractPath, "utf8"));
-const script = readFileSync(scriptPath, "utf8");
+// Normalised on read. Every source-text assertion below is about CONTENT, never about
+// which line ending the checkout happens to use, and this repository is checked out
+// with core.autocrlf=true on Windows. It is not cosmetic: the "zero legacy/database
+// dependency" guard strips comments with /#.*$/, and JavaScript's `.` does not match
+// \r, so on a CRLF checkout the strip silently removed NOTHING and the guard passed
+// or failed for the wrong reason. Normalising here restores it on both conventions.
+const script = readFileSync(scriptPath, "utf8").replace(/\r\n/g, "\n");
 
 const STATUSES = [
   "SUPPORTED",
@@ -26,21 +32,55 @@ describe("fitzRoy acquisition contract (tools/rebuild/fitzroy/fitzroy-contract.j
     expect(contract.pinned_version_evidence).toMatch(/CRAN/);
   });
 
-  it("declares exactly the three canonical AFL Tables datasets", () => {
-    expect(Object.keys(contract.datasets).sort()).toEqual([
-      "player_details",
-      "player_stats",
-      "results",
-    ]);
-    expect(contract.datasets.player_stats.fitzroy_function).toBe(
-      "fetch_player_stats_afltables"
-    );
-    expect(contract.datasets.player_details.fitzroy_function).toBe(
-      "fetch_player_details_afltables"
-    );
-    expect(contract.datasets.results.fitzroy_function).toBe(
-      "fetch_results_afltables"
-    );
+  // The contract holds two KINDS of dataset and the distinction is architectural, not
+  // bookkeeping: a fact-bearing dataset is a source of canonical AFLDB columns, while a
+  // validation witness is acquired only to be checked against. Asserting a flat list of
+  // keys conflated them, so adding a witness looked identical to adding a fact source.
+  const FACT_DATASETS = {
+    player_details: "fetch_player_details_afltables",
+    player_stats: "fetch_player_stats_afltables",
+    results: "fetch_results_afltables",
+  } as const;
+
+  it("declares exactly the three canonical fact-bearing AFL Tables datasets", () => {
+    const factKeys = Object.keys(contract.datasets)
+      .filter((k) => contract.datasets[k].role !== "VALIDATION_WITNESS")
+      .sort();
+    expect(factKeys).toEqual(["player_details", "player_stats", "results"]);
+    for (const [key, fn] of Object.entries(FACT_DATASETS)) {
+      expect(contract.datasets[key].fitzroy_function).toBe(fn);
+    }
+    // A fact dataset is exactly one that the full-history contract requires.
+    expect([...contract.full_history.required_datasets].sort()).toEqual(factKeys);
+  });
+
+  it("carries the ladder as a validation witness that can never become a fact source", () => {
+    // AFLDB-ISSUE-095. fetch_ladder_afltables does not read a published ladder: it
+    // computes points, percentage and position from results. Its columns are therefore
+    // cross-checks, and promoting any of them to a canonical value would launder a
+    // local recomputation into external-source provenance.
+    const ladder = contract.datasets.ladder;
+    expect(ladder).toBeDefined();
+    expect(ladder.role).toBe("VALIDATION_WITNESS");
+    expect(ladder.fitzroy_function).toBe("fetch_ladder_afltables");
+    expect(ladder.provenance.verdict).toBe("LOCALLY_COMPUTED");
+
+    // It must never join the full-history requirement: no accepted baseline contains
+    // it, so requiring it would retroactively invalidate every one of them.
+    expect(contract.full_history.required_datasets).not.toContain("ladder");
+
+    // And no ladder field may be declared an authoritative AFLDB source. Each supported
+    // field says what it is for in its target or its note; the W/D/L columns simply do
+    // not exist in this dataset at all.
+    for (const field of ladder.fields) {
+      if (field.status === "MISSING") continue;
+      expect(`${field.target} ${field.note}`.toLowerCase()).toMatch(
+        /cross-check|never a fact source|recomputation|free parameter|identity resolution/
+      );
+    }
+    const wdl = ladder.fields.find((f: any) => /wins/.test(f.target));
+    expect(wdl.status).toBe("MISSING");
+    expect(wdl.candidate_columns).toEqual([]);
   });
 
   it("classifies every field with a known status and never invents support", () => {

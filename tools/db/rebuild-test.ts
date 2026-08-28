@@ -47,7 +47,7 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 
 import { runPsql, type SpawnSyncLike } from './psql';
 
@@ -128,6 +128,9 @@ const FITZROY_MANIFEST_DIR = join('docs', 'rebuild-manifests', 'afltables_fitzro
 
 /** The acceptance/promotion register — which acquisition is the canonical core source. */
 const ACCEPTED_BASELINES = join('data', 'reference', 'fitzroy-accepted-baselines.json');
+
+/** The source contract, which also names the accepted AFLDB-ISSUE-095 ladder witness. */
+const FITZROY_CONTRACT = join('tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json');
 
 // ---------------------------------------------------------------------------
 // Safety — every refusal happens before any destruction
@@ -359,9 +362,31 @@ export function resolveFitzroySource(
 // The stage graph
 // ---------------------------------------------------------------------------
 
-const VENV_PYTHON = process.platform === 'win32'
+/** The platform-local project interpreter, unchanged: this stays the default. */
+export const DEFAULT_VENV_PYTHON = process.platform === 'win32'
   ? join('.venv', 'Scripts', 'python.exe')
   : join('.venv', 'bin', 'python');
+
+/**
+ * The Python interpreter every Python stage runs under.
+ *
+ * `AFLDB_PYTHON` is the portable override AFLDB already uses for exactly this case — a
+ * checkout whose usable interpreter is not the in-tree `.venv`, which is the normal state
+ * of a git worktree, since `.venv/` is not part of a checkout. Seven existing test suites
+ * resolve Python the same way; this brings the rebuild harness onto the same contract
+ * instead of hard-failing with a bare "The system cannot find the path specified."
+ *
+ * Deliberately NOT resolved by searching parent or sibling directories: an interpreter
+ * found by walking out of the repository is an interpreter nobody chose, and this harness
+ * drives a destructive rebuild. Explicit override, or the platform-local default.
+ *
+ * Read at call time, never captured at module load, so the environment a stage actually
+ * runs under is the one that selected the interpreter.
+ */
+export function resolvePython(env: NodeJS.ProcessEnv = process.env): string {
+  const override = (env.AFLDB_PYTHON ?? '').trim();
+  return override !== '' ? override : DEFAULT_VENV_PYTHON;
+}
 
 /**
  * The fixed dependency order. Pure: given a target and sources it returns the exact
@@ -370,6 +395,8 @@ const VENV_PYTHON = process.platform === 'win32'
 export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
                            opts: Options): Stage[] {
   const dataEnv = { AFLDB_IMPORT_DATABASE_URL: target.importDsn };
+  // One resolution for the whole graph, so no two stages can disagree.
+  const python = resolvePython();
 
   return [
     {
@@ -404,7 +431,7 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       name: 'REFERENCE DATA — tracked canonical datasets',
       kind: 'data',
       run: 'command',
-      argv: [VENV_PYTHON, 'tools/migration/load_reference_data.py'],
+      argv: [python, 'tools/migration/load_reference_data.py'],
       envOverlay: dataEnv,
     },
     {
@@ -412,7 +439,7 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       name: `FITZROY CORE — ${fitzroy.label}`,
       kind: 'data',
       run: 'command',
-      argv: [VENV_PYTHON, 'tools/migration/import_fitzroy_core.py',
+      argv: [python, 'tools/migration/import_fitzroy_core.py',
              '--label', fitzroy.label],
       envOverlay: dataEnv,
     },
@@ -423,7 +450,7 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       name: `DRAFTGURU — ${opts.draftguruLabel}`,
       kind: 'data',
       run: 'command',
-      argv: [VENV_PYTHON, 'tools/rebuild/draftguru/import_draftguru.py',
+      argv: [python, 'tools/rebuild/draftguru/import_draftguru.py',
              '--label', opts.draftguruLabel],
       envOverlay: dataEnv,
     },
@@ -432,7 +459,23 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       name: 'DERIVED — recomputed summaries',
       kind: 'data',
       run: 'command',
-      argv: [VENV_PYTHON, 'tools/migration/rebuild_derived.py'],
+      argv: [python, 'tools/migration/rebuild_derived.py'],
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-095 D7. The ladder witness cross-check. It must follow `derived`,
+      // which is where club_seasons is built, and precede FINAL VALIDATION so a
+      // disagreement is reported with its own per-row diagnostics rather than collapsed
+      // into a scalar count.
+      //
+      // This is a VALIDATION stage, not a data stage: D6's "no tenth data stage" holds —
+      // nothing here imports, and the validator opens its one connection read-only.
+      id: 'ladder-witness',
+      name: `LADDER WITNESS — cross-check club_seasons against ${ladderWitnessLabel()}`,
+      kind: 'validation',
+      run: 'command',
+      argv: [python, LADDER_WITNESS_VALIDATOR,
+             '--label', ladderWitnessLabel(), '--compare'],
       envOverlay: dataEnv,
     },
     {
@@ -445,6 +488,36 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
   ];
 }
 
+export const LADDER_WITNESS_VALIDATOR =
+  'tools/rebuild/fitzroy/validate_ladder_witness.py';
+
+/**
+ * The accepted ladder witness, read from the tracked contract.
+ *
+ * Never a default and never "whatever snapshot happens to be on this machine": the
+ * contract names one accepted label and binds its manifest by sha256, so a rebuild on a
+ * fresh checkout either has those exact bytes or refuses.
+ */
+export function ladderWitnessLabel(
+  readContract: () => Record<string, unknown> | null = () => {
+    const path = join(REPO_ROOT, FITZROY_CONTRACT);
+    return existsSync(path)
+      ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
+      : null;
+  },
+): string {
+  const contract = readContract();
+  const datasets = contract?.datasets as Record<string, any> | undefined;
+  const accepted = datasets?.ladder?.accepted_witness?.snapshot_label;
+  if (!accepted) {
+    throw new RebuildRefused(
+      `${FITZROY_CONTRACT} records no accepted ladder witness `
+      + '(datasets.ladder.accepted_witness.snapshot_label). AFLDB-ISSUE-095 D7 has no '
+      + 'artefact to cross-check club_seasons against, and the rebuild will not guess one.');
+  }
+  return String(accepted);
+}
+
 /** DraftGuru preflight: the accepted Stage A inputs, proven before destruction. */
 export const DRAFTGURU_PREFLIGHT_FILES = [
   'tools/rebuild/draftguru/draftguru-contract.json',
@@ -452,9 +525,11 @@ export const DRAFTGURU_PREFLIGHT_FILES = [
   'data/reference/draftguru-link-decisions.json',
 ];
 
-export const DRAFTGURU_VALIDATE_ARGV = [
-  VENV_PYTHON, 'tools/rebuild/draftguru/import_draftguru.py', '--validate-only',
-];
+/** Built per call, not frozen at module load, so AFLDB_PYTHON is honoured. */
+export function draftguruValidateArgv(): string[] {
+  return [resolvePython(), 'tools/rebuild/draftguru/import_draftguru.py',
+          '--validate-only'];
+}
 
 /** The counts the DraftGuru preflight must see before anything is destroyed. */
 export const DRAFTGURU_EXPECTED = {
@@ -587,7 +662,74 @@ export function finalValidationChecks(
   checks.push({ key: 'draft_picks', sql: 'SELECT count(*) FROM draft_picks',
                 expected: draftguru.picks });
 
+  // AFLDB-ISSUE-095 D7. The club_seasons gate §8 of the runbook deferred until the
+  // domain had a canonical contract. It now has one — the table is derived from this
+  // same match set — so a zero-row club_seasons is a rebuild FAILURE, not a known gap.
+  for (const check of clubSeasonChecks(Number(measured.seasons_last))) checks.push(check);
+
   return checks;
+}
+
+/**
+ * The population the derivation must produce, measured — not assumed.
+ *
+ * 1,622 is the club-season universe of the accepted 1897-2025 core: it is what the
+ * fitzRoy ladder witness returns across 129 seasons AND, independently, the count of
+ * distinct (club string, season) pairs the contract's source_club_normalisation records
+ * for the accepted snapshot's results.csv. Two derivations of the same number from the
+ * same source, so a drift here means AFLDB's home-and-away match set has moved.
+ */
+export const CLUB_SEASONS_EXPECTED = {
+  rows: 1622,
+  brisbaneLionsFirstSeason: 1997,
+};
+
+/** Structural invariants for the derived ladder. Read-only scalar counts. */
+export function clubSeasonChecks(acceptedLastSeason: number): FinalCheck[] {
+  return [
+    { key: 'club_seasons_rows',
+      sql: 'SELECT count(*) FROM club_seasons',
+      expected: CLUB_SEASONS_EXPECTED.rows },
+
+    // The identity invariant. The derivation reads matches, which already store the
+    // HISTORICAL identity, so it never re-points through afldb_identity_for_season.
+    // This PROVES the era is right rather than forcing it: a match attributed to the
+    // wrong era identity fails the rebuild instead of being normalised away silently.
+    // It is also the gate that would have caught the ladder source's modernised labels
+    // (Sydney to 1897, Footscray to 2025, North Melbourne over the Kangaroos era).
+    { key: 'club_seasons_identity_era_violations',
+      sql: 'SELECT count(*) FROM club_seasons cs JOIN clubs c ON c.id = cs.club_id'
+         + ' WHERE cs.club_id IS DISTINCT FROM'
+         + ' afldb_identity_for_season(c.organization_id, cs.season)',
+      expected: 0 },
+
+    { key: 'club_seasons_duplicate_identity_seasons',
+      sql: 'SELECT count(*) FROM (SELECT season, club_id FROM club_seasons'
+         + ' GROUP BY 1, 2 HAVING count(*) > 1) t',
+      expected: 0 },
+
+    // A rank is NULL only where two clubs are exactly level on premiership points AND
+    // percentage, which the accepted corpus was audited for and does not contain. If a
+    // match correction ever creates one, this fires loudly instead of the ladder quietly
+    // losing a position. AFLDB-ISSUE-095 D2/§10.8.
+    { key: 'club_seasons_unranked_rows',
+      sql: 'SELECT count(*) FROM club_seasons WHERE ladder_rank IS NULL',
+      expected: 0 },
+
+    // The merger boundary, in the derived table rather than only in the relations table:
+    // Fitzroy's 100 seasons are Fitzroy's, and the Lions' record starts in 1997.
+    { key: 'club_seasons_brisbane_lions_first_season',
+      sql: "SELECT min(season) FROM club_seasons WHERE club_id ="
+         + " (SELECT id FROM clubs WHERE slug = 'brisbane-lions')",
+      expected: CLUB_SEASONS_EXPECTED.brisbaneLionsFirstSeason },
+
+    // 2026 is the current-season pipeline's (AFLDB-ISSUE-098/-099/-101), never this
+    // path's. The derivation carries no hard-coded year: it produces nothing for 2026
+    // because the accepted core contains no 2026 match. This gate proves that.
+    { key: 'club_seasons_after_accepted_last_season',
+      sql: `SELECT count(*) FROM club_seasons WHERE season > ${acceptedLastSeason}`,
+      expected: 0 },
+  ];
 }
 
 /**
@@ -790,7 +932,7 @@ export function executeRebuild(
 
 /** fitzRoy preflight: re-prove the full-history claim against the raw artefacts. */
 export function fitzroyValidateArgv(source: FitzroySource): string[] {
-  const argv = [VENV_PYTHON, 'tools/migration/import_fitzroy_core.py',
+  const argv = [resolvePython(), 'tools/migration/import_fitzroy_core.py',
                 '--label', source.label, '--validate-only'];
   // The accepted canonical baseline is held to BOTH: its acceptance bindings (manifest and
   // artefact-set hashes, contract version, measured fingerprint) and — because
@@ -804,6 +946,23 @@ export function fitzroyValidateArgv(source: FitzroySource): string[] {
 
 /** The preflight stage's own work, kept separate so it is testable in isolation. */
 export function runPreflight(deps: Deps, source?: FitzroySource): void {
+  // Before anything else. Every stage below this line is a Python child process, and a
+  // missing interpreter surfaces on Windows as nothing but "The system cannot find the
+  // path specified." — attributed to whichever stage happened to run first, which is how
+  // this presented as a fitzRoy preflight failure. Name the interpreter and where it came
+  // from instead. The value is a path this repository chose; no credential or unrelated
+  // environment value is printed.
+  const python = resolvePython();
+  if (!deps.fileExists(python)) {
+    const overridden = (process.env.AFLDB_PYTHON ?? '').trim() !== '';
+    throw new RebuildRefused(
+      `No Python interpreter at '${python}' `
+      + `(${overridden ? 'from AFLDB_PYTHON' : 'the platform-local project default'}). `
+      + 'Every data stage and preflight runs Python, so the rebuild cannot start. Set '
+      + 'AFLDB_PYTHON to the interpreter for this checkout — a git worktree has no .venv '
+      + 'of its own. Nothing has been destroyed.');
+  }
+
   if (source) {
     const fitzroy = deps.runCommand(fitzroyValidateArgv(source), {});
     if (fitzroy.status !== 0) {
@@ -819,13 +978,34 @@ export function runPreflight(deps: Deps, source?: FitzroySource): void {
         + 'Nothing has been destroyed.');
     }
   }
-  const result = deps.runCommand(DRAFTGURU_VALIDATE_ARGV, {});
+  const result = deps.runCommand(draftguruValidateArgv(), {});
   if (result.status !== 0) {
     throw new RebuildRefused(
       'DraftGuru preflight failed (import_draftguru.py --validate-only). '
       + `Nothing has been destroyed.\n${result.stdout}${result.stderr}`);
   }
   assertDraftguruPreflight(result.stdout);
+
+  // AFLDB-ISSUE-095 D7 durability gate. The witness's raw CSVs are gitignored, like every
+  // other acquired snapshot: only the manifest is tracked, and the bytes are reproduced by
+  // acquisition. So the one failure mode that matters is a checkout where the manifest
+  // exists and the bytes do not — or do not hash to it. Proving that HERE, offline and
+  // before the destructive stage, is the difference between refusing an unusable rebuild
+  // and discovering at the last stage that the database has already been destroyed.
+  const witness = deps.runCommand(ladderWitnessValidateArgv(), {});
+  if (witness.status !== 0) {
+    throw new RebuildRefused(
+      'Ladder witness preflight failed. The tracked contract accepts '
+      + `'${ladderWitnessLabel()}', but its acquired bytes are missing, incomplete or do `
+      + 'not match the manifest. Re-acquire it with acquire_core.R --datasets ladder. '
+      + `Nothing has been destroyed.\n${witness.stdout}${witness.stderr}`);
+  }
+}
+
+/** Offline witness validation — no --compare, so no database is contacted. */
+export function ladderWitnessValidateArgv(): string[] {
+  return [resolvePython(), LADDER_WITNESS_VALIDATOR, '--label',
+          ladderWitnessLabel()];
 }
 
 export function parseArgs(argv: string[]): Options {
@@ -917,7 +1097,10 @@ async function main(): Promise<number> {
           + 'database does not match the accepted contracts; treat the rebuild as FAILED.');
       }
     },
-    fileExists: (path) => existsSync(join(REPO_ROOT, path)),
+    // AFLDB_PYTHON is normally an ABSOLUTE path, and path.join does not reset on one:
+    // join('D:/repo', 'C:/py.exe') yields 'D:/repo/C:/py.exe'. Resolving relative to
+    // the repo root unconditionally would have rejected every valid override.
+    fileExists: (path) => existsSync(isAbsolute(path) ? path : join(REPO_ROOT, path)),
     log: (line) => console.log(line),
   };
 

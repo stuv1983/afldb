@@ -347,17 +347,26 @@ describe('gate: club organizations and identities', () => {
 
     // Before this was fixed, the source ladder's modern-only club names
     // gave Sydney rows back to 1897 and Footscray none at all.
+    // AFLDB-ISSUE-095 re-pinned the upper bound from 2026 to 2025. club_seasons is now
+    // derived from the canonical match set, whose accepted baseline is 1897-2025; the
+    // in-progress season belongs to the current-season pipeline (ISSUE-098/-099), not
+    // here. The old 2026 bound was inherited from the retired legacy ladder.
     expect(by['footscray']).toMatchObject({ from: 1925, to: 1996 });
-    expect(by['western-bulldogs']).toMatchObject({ from: 1997, to: 2026 });
+    expect(by['western-bulldogs']).toMatchObject({ from: 1997, to: 2025 });
     expect(by['south-melbourne']).toMatchObject({ from: 1897, to: 1981 });
-    expect(by['sydney']).toMatchObject({ from: 1982, to: 2026 });
+    expect(by['sydney']).toMatchObject({ from: 1982, to: 2025 });
     expect(by['kangaroos']).toMatchObject({ from: 1999, to: 2007 });
-    expect(by['north-melbourne']).toMatchObject({ from: 1925, to: 2026 });
+    expect(by['north-melbourne']).toMatchObject({ from: 1925, to: 2025 });
 
     // The eras partition the lineage: no season is lost or duplicated.
-    expect(by['footscray'].n + by['western-bulldogs'].n).toBe(102);
-    expect(by['south-melbourne'].n + by['sydney'].n).toBe(129);
-    expect(by['kangaroos'].n + by['north-melbourne'].n).toBe(102);
+    // 101/128/101 over 1897-2025, not the retired 102/129/102 which counted 2026.
+    // South Melbourne is one short of its span because the 1916 competition ran with
+    // four clubs and it was not one of them — a club that did not play has no ladder
+    // row, which is absence, not a zero. Independently derived from the ladder source
+    // by tests/python/ladder_identity_contract.py over all 1,622 label-season pairs.
+    expect(by['footscray'].n + by['western-bulldogs'].n).toBe(101);
+    expect(by['south-melbourne'].n + by['sydney'].n).toBe(128);
+    expect(by['kangaroos'].n + by['north-melbourne'].n).toBe(101);
   });
 
   it('resolves a season to exactly one identity per organization', async () => {

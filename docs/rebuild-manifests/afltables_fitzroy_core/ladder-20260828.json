@@ -1,0 +1,2369 @@
+{
+  "source": "AFL Tables via fitzRoy",
+  "adapter": "tools/rebuild/fitzroy/acquire_core.R",
+  "adapter_schema_version": 1,
+  "fitzroy_version_installed": "1.8.0",
+  "fitzroy_version_pinned": "1.8.0",
+  "fitzroy_version_match": true,
+  "extraction_date": "2026-08-28",
+  "extraction_timestamp_utc": "2026-08-28T08:56:25Z",
+  "mode": "acquire",
+  "snapshot_label": "ladder-20260828",
+  "requested_range": {
+    "from": 1897,
+    "to": 2025
+  },
+  "datasets_requested": [
+    "ladder"
+  ],
+  "working_directory": "data/sources/afltables/fitzroy_core/ladder-20260828",
+  "files": [
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1897.csv",
+      "row_count": 8,
+      "sha256": "0470c6e59a615ea145b49290396ab7f3973f552a7ac82fe25c1ccd6c85817df1",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1898.csv",
+      "row_count": 8,
+      "sha256": "92735680554a01f37ee6f8ab14fedfacf8300b1da2b73012213dd40135d46b5d",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1899.csv",
+      "row_count": 8,
+      "sha256": "f3f4b5651776636de4c0dad7c5628526d0b3e19c6e0616e2cec5d0e3789786d3",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1900.csv",
+      "row_count": 8,
+      "sha256": "5fc6aed4c886779176427cbe1c7ee2a2637d92a0a52dab57420d136482029364",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1901.csv",
+      "row_count": 8,
+      "sha256": "9bedba2e332e60eb494931eb0235a85ad5137daa27435f8b439d30e871ff3cac",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1902.csv",
+      "row_count": 8,
+      "sha256": "c812bc772bebf07501d9cdbb4f891dfb237ff0e110d8638da7e8fe7982e6f2ee",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1903.csv",
+      "row_count": 8,
+      "sha256": "3aec41cfedefc40e782edba5100da76889c2e357e9ff045021b65d669eeb52ee",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1904.csv",
+      "row_count": 8,
+      "sha256": "60581d30b470b6e809014a4aee9107f65ae8365930bc159e93c14d6c7ba03e3b",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1905.csv",
+      "row_count": 8,
+      "sha256": "e2fac82047c47db46f553b85d7ff32bffb29ce8d88cb75fbdb0365e029e117c1",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1906.csv",
+      "row_count": 8,
+      "sha256": "475d38256ad2b8de0075dbb07c84ff0adc7a5e8a6f7260f345e0f22f77e5efad",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1907.csv",
+      "row_count": 8,
+      "sha256": "cf8ce35d50e2720719e3dc0b3dcebbc01b564dcfda814e42fa7879e7877f9ac3",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1908.csv",
+      "row_count": 10,
+      "sha256": "1e85a88267f944d2bf2670ec4c1467435da7dae3a0e0c2b4617e80e626615fbe",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1909.csv",
+      "row_count": 10,
+      "sha256": "b1eb8e55c453af943911c513a8a27decca0874bc48933c90d56240b151756c7a",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1910.csv",
+      "row_count": 10,
+      "sha256": "5cc9c149785068677dc69cefd5a6ee3ee0edbb0ade771d27d41f7c74d0f07744",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1911.csv",
+      "row_count": 10,
+      "sha256": "174c9a88cd0a348eeaa25402d0d6553640c5a5541663fcf564da4d31303c42a9",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1912.csv",
+      "row_count": 10,
+      "sha256": "8b1331f58d64b639a43ae8f9661d91ce7e9fd6872d0977b4e3b962cf22912031",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1913.csv",
+      "row_count": 10,
+      "sha256": "05945cb523a56f0f9f9c8a129104b1f82ffdc2c1491cfa22cc868fe7f33921ea",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1914.csv",
+      "row_count": 10,
+      "sha256": "f3c3f444ea0a0f0e484be077107f5c8349dfcab13eabae2832053d682acaa745",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1915.csv",
+      "row_count": 9,
+      "sha256": "9cebc41273c9cff8d01858c8c77cdc4862b6b964125bfe2c5dac3264899768ac",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1916.csv",
+      "row_count": 4,
+      "sha256": "5257a4bc5af884c62db13f9a6af03be528e00f6304ff3f2c12e272cc7e6fe84b",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1917.csv",
+      "row_count": 6,
+      "sha256": "75a74be9d8cf6f32577c950e22d6d319fc28ed5507038a10266ccffdbce1b7f8",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1918.csv",
+      "row_count": 8,
+      "sha256": "68668efd4b976f414f3215d485265ef8f85fa21888b5a3f6a68bcb2d1ef186be",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1919.csv",
+      "row_count": 9,
+      "sha256": "61dad063ef5bc7acd41ae9881e6aad30eba86010ffa891c62d4587417c226b16",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1920.csv",
+      "row_count": 9,
+      "sha256": "ccb1d5b8ed84cb77b84068615770349f527a6656a02d2ed38cfccaee7a837df2",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1921.csv",
+      "row_count": 9,
+      "sha256": "436e80e3735ac537c91e7ce5809c1b8db83806b943cd9c955c17ab7e5a92d7f4",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1922.csv",
+      "row_count": 9,
+      "sha256": "c218ab0e5f0385d0611924186e50097e79258a0512fc100c469d4431608e2a3f",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1923.csv",
+      "row_count": 9,
+      "sha256": "5b2f99e1e97b9a422fe4058f123b6cb693005bcf0a009c3755be7b7e7db961d6",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1924.csv",
+      "row_count": 9,
+      "sha256": "c94c2c3bad8e965d8cf304d8d2de27a0e72f0bcb05805193a45093e7b6856c48",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1925.csv",
+      "row_count": 12,
+      "sha256": "59f0889b833e58da3e5a453ffa54a795511f71f2c6a26fd49d6c75c87b62a56b",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1926.csv",
+      "row_count": 12,
+      "sha256": "3215b89bc363c86303c74d0f753d4ba5a0aedaf927791358b293b64db99ec128",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1927.csv",
+      "row_count": 12,
+      "sha256": "bec3bb9a266d292cdb229a3920d3786336578b601cea163886dce055034a98dc",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1928.csv",
+      "row_count": 12,
+      "sha256": "01a88301d2cd9c76bcc83ecfebe3f7518cc21702d8ea588a52153fc2e7fd01e2",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1929.csv",
+      "row_count": 12,
+      "sha256": "cc7231a2f2ffc5012a42a72c9003a524bc5704cb9526f76f0e395ce591890879",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1930.csv",
+      "row_count": 12,
+      "sha256": "1dbd6cd9d6feafd761de5e903e5efbac86ef908d8ad84bf3283864639170c7d8",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1931.csv",
+      "row_count": 12,
+      "sha256": "25e5e36b804dd0a6335a3e41d16ca8a1803949e0a30e70af89cf0af14e00036b",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1932.csv",
+      "row_count": 12,
+      "sha256": "f54bc700840a13ce30cc2e60c410ad0199adcc4c2a9554b9e6bd675ae8dcadc2",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1933.csv",
+      "row_count": 12,
+      "sha256": "dc6452d46fdb1ffd8d13d347747bab33f9fa57b2e45cd7d0dde1cf90148dccf0",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1934.csv",
+      "row_count": 12,
+      "sha256": "f1c35b0b5912ec2e8ec91a694526a509f7b07b3d4e5916fc104fb72270fd7e9e",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1935.csv",
+      "row_count": 12,
+      "sha256": "d423165d20b46ce1ea167f2fe9b2ef0bfe3cab82817653e9ce8fb9add345b0e6",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1936.csv",
+      "row_count": 12,
+      "sha256": "752dd5edf15a2d37f91fd51d0972b6311cf892a2a3b430d70cb1a517fb31c829",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1937.csv",
+      "row_count": 12,
+      "sha256": "b9902f1fe5fa372adf8082afa5224789ff86364d943974758f4a9deea718730d",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1938.csv",
+      "row_count": 12,
+      "sha256": "c77813675a5eb52e4d5ad88e5f4bcc117bf220760feb62e23b47731b187e7fde",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1939.csv",
+      "row_count": 12,
+      "sha256": "d16f9f3265525ce71f789a4c3815f33595045f40b54ae384b9501b60b0c9605a",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1940.csv",
+      "row_count": 12,
+      "sha256": "4af455dcecf1e016b0e0eccc6d31432ad89e2d3723e75c92b7cb2417e677ca98",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1941.csv",
+      "row_count": 12,
+      "sha256": "6612f51ae88ece4c38181a9466d253a8abac5fc85ba1a77bd8c506f1d040b427",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1942.csv",
+      "row_count": 11,
+      "sha256": "0ed05de65aa62b22f3d02cf48862fd2db42920758f93eddd08cf2de7dbab53ea",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1943.csv",
+      "row_count": 11,
+      "sha256": "89f938c79ff7ce6387cb8d336d51001c28385ac63dea9857a40d30cf5771189d",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1944.csv",
+      "row_count": 12,
+      "sha256": "b6e7ea8e4e93dd8af20553e3a4696fe63c1d03f58fdf8174fab94b17d38c8934",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1945.csv",
+      "row_count": 12,
+      "sha256": "e76743a338858e032c73785617a47f5b6025a0cdfebd5296320a101845226481",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1946.csv",
+      "row_count": 12,
+      "sha256": "054f82ef61cd2863882921a71ecf95c4b98b6e3db82ee76f2753b841e06f5d5e",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1947.csv",
+      "row_count": 12,
+      "sha256": "2feedbc90e9c07da851ed5ce02610e2cc14bcded67659c29ae1e467f86c0195b",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1948.csv",
+      "row_count": 12,
+      "sha256": "f48713363f7f1b90cf96782996bd2ae6dfaa9bbaede699da417ffeb84eb2faf5",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1949.csv",
+      "row_count": 12,
+      "sha256": "2d605ee59bd36227908b6293655eb5c02a07990f8ac0d7394f142543e7a96926",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1950.csv",
+      "row_count": 12,
+      "sha256": "fe3057ce6626f584d27a8b92647ee7ee5f2c300e81944c9597bb7fec52e03f20",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1951.csv",
+      "row_count": 12,
+      "sha256": "1c38bb4bbb649ae6da357439c81b2d931c8dddeceb69cbfa3e98d2e879e63225",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1952.csv",
+      "row_count": 12,
+      "sha256": "016e5a181960eaf99c955a810d95ebef7df686a56093b32c57ff367e45130efe",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1953.csv",
+      "row_count": 12,
+      "sha256": "5440990bda3c3e1d496a8b05bd14c79f6923e79e53a5f44efddf8c008dbfeda9",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1954.csv",
+      "row_count": 12,
+      "sha256": "aa599ce882bcd780140baf6175b21b9b0c88b9baf408aec573b3ea6db571cfa3",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1955.csv",
+      "row_count": 12,
+      "sha256": "f6329cfb4926460a1e5e8442c8497c4ce3d77b9e29957fce026312ef705f0fc3",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1956.csv",
+      "row_count": 12,
+      "sha256": "f710b5855a8b6db6f41ac774e9b5e3bd048533929b8db9ed0d70c79aa4fbe060",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1957.csv",
+      "row_count": 12,
+      "sha256": "ac5e8013580f99ebc8376684c7ea7be55db0d575b00e39d2031ab978e21d727b",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1958.csv",
+      "row_count": 12,
+      "sha256": "6e372427cd5a6649c46931a32f6ef1f13cdecf443c613f49b009b2f1fee1d4eb",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1959.csv",
+      "row_count": 12,
+      "sha256": "35fb2460277b73840d2b4c17db85ff9097bdc384db24d7a60bc096f09e09479c",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1960.csv",
+      "row_count": 12,
+      "sha256": "1d6b602c82d0149637c01663919b2fb5f0e8a296ffdbdb8a3697d45b54dd5c00",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1961.csv",
+      "row_count": 12,
+      "sha256": "a4a2fcd721f66ec99fc09ab121066cc33b1ccc19120c0468c70cf0877faf9d2a",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1962.csv",
+      "row_count": 12,
+      "sha256": "0e4a345c572622e265fdae346f1e0729234b6f8353e6b89d62762cb4b339f2f5",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1963.csv",
+      "row_count": 12,
+      "sha256": "41566c9f273c664c5585384e527376f520fb4f8cb9d8cc3b3f6ad5df8f3b4cb6",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1964.csv",
+      "row_count": 12,
+      "sha256": "167bffc22e334b4b6011f42be3c0500528dd69941f68b08ef5ef3c71203fb255",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1965.csv",
+      "row_count": 12,
+      "sha256": "956eb3afddf7de4eb9f8fc205bed0b3b3b76896b2d4d249cf83b2162e39cedd1",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1966.csv",
+      "row_count": 12,
+      "sha256": "c94a60e364464ee155a7ff8baa56ccfe0665f93c6985a95478b543d001e31dd3",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1967.csv",
+      "row_count": 12,
+      "sha256": "3639698c8a8bc58518998cf4480bf9a68c8e2dfaacd8b18101d3abca9db147a4",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1968.csv",
+      "row_count": 12,
+      "sha256": "005ec06157d5dba7a31020288b281d8fa07c22bfe2c81b406247275cb707bc46",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1969.csv",
+      "row_count": 12,
+      "sha256": "c94d2da3598fb129d067b19ef83c4b54c603345161377965ccf82a37e8bbab5f",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1970.csv",
+      "row_count": 12,
+      "sha256": "c35e95215b05a6e894d7c37774d49ab6c0dc6da20476121be47d9bdb0cf621fa",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1971.csv",
+      "row_count": 12,
+      "sha256": "a21617a84bde69c15519bad136ac753855405a6070d9fee5ddc7535791bde47d",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1972.csv",
+      "row_count": 12,
+      "sha256": "e67d68e6885d9cef2716be9761bdc8515645160a6bfcdf44e699cf6a62fa3332",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1973.csv",
+      "row_count": 12,
+      "sha256": "5575eeb0982bb402fa984c52f8fc3ed7e842a58ab86c6bd9ce2f10f3343b4db1",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1974.csv",
+      "row_count": 12,
+      "sha256": "e25fda861c887b61fcfd10622efaad05aeebe0b9d3ae346d789b2c4edf0f7b01",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1975.csv",
+      "row_count": 12,
+      "sha256": "5f8183f35b50887b7a7f019e887439e73c3e685d94eff59d62cf6e42789940da",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1976.csv",
+      "row_count": 12,
+      "sha256": "4fadd567c28fdf694a01f92e0a0e4c704cb4880eae9c89c8b1f7e46991bc528d",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1977.csv",
+      "row_count": 12,
+      "sha256": "88b81b38d4acd281eb94dcb9657f19184a222b55da6212eeaee518bea8161ad1",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1978.csv",
+      "row_count": 12,
+      "sha256": "4ea5085b1f0659ce35005088ef5773a987dc4c32a0941fcd240f2c60b02280f0",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1979.csv",
+      "row_count": 12,
+      "sha256": "e7807e5195597b13ff1354b545771de4edfdcd34eb498b53e2ab1d3466269184",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1980.csv",
+      "row_count": 12,
+      "sha256": "3ec940ee9b8adaf7e8220454b24824bcadc5d0c1c127cd1b811ac98d39bad795",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1981.csv",
+      "row_count": 12,
+      "sha256": "1f6a90a2d39dcc517f7100ebeb5e4235cdcc530d762495eaa97cd82daef28187",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1982.csv",
+      "row_count": 12,
+      "sha256": "3a3ad97128128b98f39a9065a5c00b5e1eab689075a99f552bdd3a8c145ce96e",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1983.csv",
+      "row_count": 12,
+      "sha256": "c78bbbe7ceb5a8c4ce59f238a6cb75177d86ff785c31ea7102ed7c9e7df5a53b",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1984.csv",
+      "row_count": 12,
+      "sha256": "afe56639f0e57baa54d11894a3c5e5c3a48df8e39a3f8d7226d052814442dcc0",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1985.csv",
+      "row_count": 12,
+      "sha256": "70b038770def99d63c57f4c80b8e46282c73bdabd62c422d14ffc30fb829bd54",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1986.csv",
+      "row_count": 12,
+      "sha256": "ac8c769266c37afb327c1d0ec44adc9d11cd9683b145fd3d6925ca5c6ffa8af6",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1987.csv",
+      "row_count": 14,
+      "sha256": "328f131efb717005a8622cf71d3d1d42b3d3dc413a90204befdf8285ae0aaeb1",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1988.csv",
+      "row_count": 14,
+      "sha256": "039810cabdda54d7d009a91983ff56e3a3848be20e9e85056a3501548c1732ae",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1989.csv",
+      "row_count": 14,
+      "sha256": "443cc1d6f968283cf11146b76c8f2f592967dc899aa4edbf48d3a46b7710cb89",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1990.csv",
+      "row_count": 14,
+      "sha256": "cbd2b53202fc6b95843f8e552757ff07d24d4a73c42ca9eb64d4b52e11058fc6",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1991.csv",
+      "row_count": 15,
+      "sha256": "428be947f7a0c958cacea815915563843dee356d210994567d306dffec2e3263",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1992.csv",
+      "row_count": 15,
+      "sha256": "c1ee6a78776b30d0b22a13ba6acb36f3b6ff9d984fcfb4c839888b0543e8d1a7",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1993.csv",
+      "row_count": 15,
+      "sha256": "3bcd8ed6a529b0a2ec71aadcea72af6fc99d6a958a43743230a0b4f5a3148909",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1994.csv",
+      "row_count": 15,
+      "sha256": "595fa759dba0bae1e1e032c93a774e8fea11e1e1636cf401c70f06b75d5176b5",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1995.csv",
+      "row_count": 16,
+      "sha256": "f37df419f55109fa9473a6ce07bb9c32212711cfca163b183e15a2815294d489",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1996.csv",
+      "row_count": 16,
+      "sha256": "1a663de6c1f1373e5347e55d5a1bb3d1410522c1da425d1309eae16df1a3b7ee",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1997.csv",
+      "row_count": 16,
+      "sha256": "14d4b0e6180f18c72587bc55e9941b6f069b2b18717f07da7baebcea55c9df4b",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1998.csv",
+      "row_count": 16,
+      "sha256": "fb5ad6d3eedd4623bfab59f20974084613c5a7dce54962bf4f9dd3b5210a9850",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_1999.csv",
+      "row_count": 16,
+      "sha256": "32193689eed6217b0c94855986c88be9dc7abd0213612ec0f12c214e0d83a4d3",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2000.csv",
+      "row_count": 16,
+      "sha256": "ae82b47eebe0d42620a89ac8c53e6a2d5b03ebe46489dae7e44b3ae6d0901052",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2001.csv",
+      "row_count": 16,
+      "sha256": "194e2813e5f02a4a8bdec4bdb197dba612db92e8458d2b943e0c780301ef9972",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2002.csv",
+      "row_count": 16,
+      "sha256": "717269373e2901191e3e3f7ac7e6c00ab2b73002243a2fad2a79ac322ec55c60",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2003.csv",
+      "row_count": 16,
+      "sha256": "2cd96fe3f95cc97da313902ccef19522f9552c23bcc314ee2ab9879a8b1f43cc",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2004.csv",
+      "row_count": 16,
+      "sha256": "151731669ff0e163435c25e36c204a47b3770f4005b9093f888985a9659ebca1",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2005.csv",
+      "row_count": 16,
+      "sha256": "d601af94e9d0aaf51b2845da03cd856a5cadfb6e42ecc713dbecff8c4baa1c84",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2006.csv",
+      "row_count": 16,
+      "sha256": "d69e2505341922cf86ee5af24750d2848d78186ec0f3397876f78ff528903e59",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2007.csv",
+      "row_count": 16,
+      "sha256": "e8623a2ccd5f1ae80a84eee30f841180df3f3053e566e43e559dfef67dae6a0f",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2008.csv",
+      "row_count": 16,
+      "sha256": "96ef5af07bda842569aa7838ed3d8f89973f1a59ff015cddfbf8d4a25c37f05c",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2009.csv",
+      "row_count": 16,
+      "sha256": "3bb0391da94324fe82a17d23fd5d5eee718c094fce1a1bed7f2212f76134a8e7",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2010.csv",
+      "row_count": 16,
+      "sha256": "1855df1f3e696cd53b0a1c5660e23c74da3b94d8c3d9cb45699f7e873707f13a",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2011.csv",
+      "row_count": 17,
+      "sha256": "6f36a1f85ec30a1e5539508c500c7d006469e754935b28f3acd61df8452c9f5d",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2012.csv",
+      "row_count": 18,
+      "sha256": "3389890ce57ac47399a4a62f6d8320c20224dd8ee03187df3ea91c4ef3653867",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2013.csv",
+      "row_count": 18,
+      "sha256": "253931bb85d452971f8dca13f1d5f5eede326a27228fc94d67b3016bc28638f6",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2014.csv",
+      "row_count": 18,
+      "sha256": "83823d1764fdfef862d2356a00c2d41885d000f7c3ecac4c60a6396365a9f96c",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2015.csv",
+      "row_count": 18,
+      "sha256": "a33f2a54b1019fef81de6333af566e0c8b78bab8d2e45b1ba6557a40c0a05577",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2016.csv",
+      "row_count": 18,
+      "sha256": "854292e9093d78321153a0ca896128f1c7c69e42a49c85b6aedda3a2f2fe3a77",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2017.csv",
+      "row_count": 18,
+      "sha256": "b409eceef2ae56aedf7b735571efaab30cad019385134fd07472053c2939caea",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2018.csv",
+      "row_count": 18,
+      "sha256": "04a5c9588adeef4068da2134b65ad183f07addd51ac6abe0b346acc6b0d15638",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2019.csv",
+      "row_count": 18,
+      "sha256": "2d593da0bca2747d35bc409374f3481d320ec506fa8a7085853db223d4185373",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2020.csv",
+      "row_count": 18,
+      "sha256": "174fb2aa65c4820c0d58cae55b45d8028e23b70b47d9815ef5b7b2bc12d38cab",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2021.csv",
+      "row_count": 18,
+      "sha256": "55f15b69c60927aa39a9719596f30c5f6d445281c3adaac17ae77035aa453e5e",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2022.csv",
+      "row_count": 18,
+      "sha256": "b5798c72e4308ac74c6edd3fe6342e2ab384ce6aa5703b84d901d418f7390b94",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2023.csv",
+      "row_count": 18,
+      "sha256": "2ea79a43659e6b9dbaae97cabed2373a01ef53513f47d0368cad8584aff7b9c2",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2024.csv",
+      "row_count": 18,
+      "sha256": "b7af223fe3ac97497379c83b66dbb166ca61e8d12af39711679251bfb7d135c7",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    },
+    {
+      "dataset": "ladder",
+      "filename": "ladder_2025.csv",
+      "row_count": 18,
+      "sha256": "0d0d6c4fa9a8491e03314f615e204b9b91273a84b4fa12f2319d37bca4f6d268",
+      "columns": [
+        "Season",
+        "Team",
+        "Round.Number",
+        "Season.Points",
+        "Score.For",
+        "Score.Against",
+        "Percentage",
+        "Ladder.Position"
+      ]
+    }
+  ],
+  "contract_full_history_version": 1,
+  "seasons_requested": [
+    1897,
+    1898,
+    1899,
+    1900,
+    1901,
+    1902,
+    1903,
+    1904,
+    1905,
+    1906,
+    1907,
+    1908,
+    1909,
+    1910,
+    1911,
+    1912,
+    1913,
+    1914,
+    1915,
+    1916,
+    1917,
+    1918,
+    1919,
+    1920,
+    1921,
+    1922,
+    1923,
+    1924,
+    1925,
+    1926,
+    1927,
+    1928,
+    1929,
+    1930,
+    1931,
+    1932,
+    1933,
+    1934,
+    1935,
+    1936,
+    1937,
+    1938,
+    1939,
+    1940,
+    1941,
+    1942,
+    1943,
+    1944,
+    1945,
+    1946,
+    1947,
+    1948,
+    1949,
+    1950,
+    1951,
+    1952,
+    1953,
+    1954,
+    1955,
+    1956,
+    1957,
+    1958,
+    1959,
+    1960,
+    1961,
+    1962,
+    1963,
+    1964,
+    1965,
+    1966,
+    1967,
+    1968,
+    1969,
+    1970,
+    1971,
+    1972,
+    1973,
+    1974,
+    1975,
+    1976,
+    1977,
+    1978,
+    1979,
+    1980,
+    1981,
+    1982,
+    1983,
+    1984,
+    1985,
+    1986,
+    1987,
+    1988,
+    1989,
+    1990,
+    1991,
+    1992,
+    1993,
+    1994,
+    1995,
+    1996,
+    1997,
+    1998,
+    1999,
+    2000,
+    2001,
+    2002,
+    2003,
+    2004,
+    2005,
+    2006,
+    2007,
+    2008,
+    2009,
+    2010,
+    2011,
+    2012,
+    2013,
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+  ],
+  "seasons_acquired": [],
+  "intentional_gaps": [],
+  "missing_seasons": [
+    1897,
+    1898,
+    1899,
+    1900,
+    1901,
+    1902,
+    1903,
+    1904,
+    1905,
+    1906,
+    1907,
+    1908,
+    1909,
+    1910,
+    1911,
+    1912,
+    1913,
+    1914,
+    1915,
+    1916,
+    1917,
+    1918,
+    1919,
+    1920,
+    1921,
+    1922,
+    1923,
+    1924,
+    1925,
+    1926,
+    1927,
+    1928,
+    1929,
+    1930,
+    1931,
+    1932,
+    1933,
+    1934,
+    1935,
+    1936,
+    1937,
+    1938,
+    1939,
+    1940,
+    1941,
+    1942,
+    1943,
+    1944,
+    1945,
+    1946,
+    1947,
+    1948,
+    1949,
+    1950,
+    1951,
+    1952,
+    1953,
+    1954,
+    1955,
+    1956,
+    1957,
+    1958,
+    1959,
+    1960,
+    1961,
+    1962,
+    1963,
+    1964,
+    1965,
+    1966,
+    1967,
+    1968,
+    1969,
+    1970,
+    1971,
+    1972,
+    1973,
+    1974,
+    1975,
+    1976,
+    1977,
+    1978,
+    1979,
+    1980,
+    1981,
+    1982,
+    1983,
+    1984,
+    1985,
+    1986,
+    1987,
+    1988,
+    1989,
+    1990,
+    1991,
+    1992,
+    1993,
+    1994,
+    1995,
+    1996,
+    1997,
+    1998,
+    1999,
+    2000,
+    2001,
+    2002,
+    2003,
+    2004,
+    2005,
+    2006,
+    2007,
+    2008,
+    2009,
+    2010,
+    2011,
+    2012,
+    2013,
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+  ],
+  "acquisition_observations": {
+    "datasets_complete": false,
+    "seasons_complete": false,
+    "no_duplicate_seasons": true,
+    "no_seasons_outside_range": true,
+    "all_rows_non_zero": true,
+    "version_pinned": true,
+    "requested_range_matches_contract": true
+  },
+  "identity_observations": {
+    "rows": 0,
+    "rows_without_id": 0,
+    "rows_without_url": 0,
+    "seasons_with_missing_id": []
+  },
+  "completeness": "unvalidated",
+  "full_history": false,
+  "verdict_authority": "tools/migration/import_fitzroy_core.py --validate-only --require-full-history"
+}

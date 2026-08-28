@@ -100,7 +100,10 @@ DOB_EVIDENCE_TYPE = "fitzroy_player_stats"
 MATCH_METHOD = "afltables_profile_url"
 
 #: The fitzRoy datasets a source-normalisation rule may name.
-KNOWN_DATASETS = ("player_stats", "player_details", "results")
+#: `ladder` is acquired as an AFLDB-ISSUE-095 VALIDATION witness only — no
+#: ladder column is imported as a fact — but it still needs its own rule
+#: scope, because it modernises club labels exactly as `results` does.
+KNOWN_DATASETS = ("player_stats", "player_details", "results", "ladder")
 
 EARLIEST_PLAUSIBLE_DOB = date(1850, 1, 1)
 

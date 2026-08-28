@@ -1,11 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 
 import {
+  CLUB_SEASONS_EXPECTED,
   DRAFTGURU_EXPECTED,
-  DRAFTGURU_VALIDATE_ARGV,
+  LADDER_WITNESS_VALIDATOR,
+  resolvePython,
+  ladderWitnessLabel,
+  ladderWitnessValidateArgv,
+  DEFAULT_VENV_PYTHON,
+  draftguruValidateArgv,
   FINAL_VALIDATION_MARKER,
   RESET_SQL,
   RebuildRefused,
@@ -588,10 +594,72 @@ describe('stage graph', () => {
   const stages = planStages(target(), fitzroy(), OPTS);
 
   it('runs the §10 order exactly', () => {
+    // AFLDB-ISSUE-095 added 'ladder-witness' between derived and fingerprints. It is a
+    // VALIDATION stage, not a data stage — the nine-stage DATA topology is unchanged and
+    // nothing new imports. See 'ladder witness cross-check' below.
     expect(idsOf(stages)).toEqual([
       'precheck', 'recreate', 'migrations', 'privileges',
-      'reference', 'fitzroy', 'draftguru', 'derived', 'fingerprints',
+      'reference', 'fitzroy', 'draftguru', 'derived',
+      'ladder-witness', 'fingerprints',
     ]);
+  });
+
+  it('adds no data stage beyond the four the rebuild already had', () => {
+    expect(idsOf(stages.filter((s) => s.kind === 'data')))
+      .toEqual(['reference', 'fitzroy', 'draftguru', 'derived']);
+  });
+
+  describe('ladder witness cross-check (AFLDB-ISSUE-095 D7)', () => {
+    const witness = stages.find((s) => s.id === 'ladder-witness')!;
+
+    it('runs after club_seasons is derived and before final validation', () => {
+      const ids = idsOf(stages);
+      expect(ids.indexOf('derived')).toBeLessThan(ids.indexOf('ladder-witness'));
+      expect(ids.indexOf('ladder-witness')).toBeLessThan(ids.indexOf('fingerprints'));
+    });
+
+    it('cross-checks against the label the tracked contract accepts', () => {
+      const contract = JSON.parse(readFileSync(
+        join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+      const accepted = contract.datasets.ladder.accepted_witness;
+      expect(witness.argv).toContain(accepted.snapshot_label);
+      expect(witness.argv).toContain('--compare');
+      expect(witness.argv).toContain(LADDER_WITNESS_VALIDATOR);
+      // The manifest is bound by hash, so the bytes cannot be swapped underneath it.
+      expect(accepted.manifest_sha256).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it('refuses rather than guessing when no witness is accepted', () => {
+      expect(() => ladderWitnessLabel(() => ({ datasets: {} }))).toThrow(RebuildRefused);
+      expect(() => ladderWitnessLabel(() => null)).toThrow(RebuildRefused);
+    });
+
+    it('proves the witness offline BEFORE anything is destroyed', () => {
+      // The durability gate: the raw CSVs are gitignored, so a fresh checkout has the
+      // manifest and not the bytes. That must refuse at preflight, not at the last stage
+      // with the database already gone.
+      const argv = ladderWitnessValidateArgv();
+      expect(argv).toContain(LADDER_WITNESS_VALIDATOR);
+      expect(argv).not.toContain('--compare');   // offline: no database contact
+
+      const draftguruOk = 'snapshot : x (42 year pages, sha256 verified)\n'
+        + 'persons    : 5057\npicks      : 6810\n';
+      const failing: Deps = {
+        ...fakeDeps().deps,
+        runCommand: (a: string[]) => (a.includes(LADDER_WITNESS_VALIDATOR)
+          ? { status: 2, stdout: 'REFUSED: acquired bytes are absent', stderr: '' }
+          : { status: 0, stdout: draftguruOk, stderr: '' }),
+      };
+      expect(() => runPreflight(failing)).toThrow(RebuildRefused);
+      expect(() => runPreflight(failing)).toThrow(/Nothing has been destroyed/);
+
+      // ... and it passes when the bytes are there, so the gate is not vacuous.
+      const passing: Deps = {
+        ...fakeDeps().deps,
+        runCommand: () => ({ status: 0, stdout: draftguruOk, stderr: '' }),
+      };
+      expect(() => runPreflight(passing)).not.toThrow();
+    });
   });
 
   it('puts every preflight before the destructive stage', () => {
@@ -639,6 +707,106 @@ describe('stage graph', () => {
 
   it('carries no AFLDB_LEGACY_SQLITE anywhere in the plan', () => {
     expect(JSON.stringify(stages)).not.toContain('AFLDB_LEGACY_SQLITE');
+  });
+});
+
+/*
+ * Python interpreter resolution.
+ *
+ * A git worktree has no .venv of its own, so the hard-coded in-tree path made every
+ * Python stage fail before it ran. On Windows the only symptom was "The system cannot
+ * find the path specified.", attributed to whichever stage ran first — it presented as a
+ * fitzRoy preflight failure. AFLDB_PYTHON is the override seven existing suites already
+ * use; these tests hold the harness to that same contract.
+ */
+describe('Python interpreter resolution', () => {
+  const PY_STAGES = [
+    'tools/migration/load_reference_data.py',
+    'tools/migration/import_fitzroy_core.py',
+    'tools/rebuild/draftguru/import_draftguru.py',
+    'tools/migration/rebuild_derived.py',
+    LADDER_WITNESS_VALIDATOR,
+  ];
+  const OVERRIDE = process.platform === 'win32'
+    ? 'C:\\some\\other\\python.exe' : '/usr/bin/python3';
+
+  it('keeps the platform-local project default when nothing is set', () => {
+    expect(resolvePython({})).toBe(DEFAULT_VENV_PYTHON);
+    expect(DEFAULT_VENV_PYTHON).toBe(process.platform === 'win32'
+      ? join('.venv', 'Scripts', 'python.exe')
+      : join('.venv', 'bin', 'python'));
+  });
+
+  it('prefers AFLDB_PYTHON when it is set', () => {
+    expect(resolvePython({ AFLDB_PYTHON: OVERRIDE })).toBe(OVERRIDE);
+  });
+
+  it('treats a blank or whitespace override as unset rather than as a path', () => {
+    expect(resolvePython({ AFLDB_PYTHON: '' })).toBe(DEFAULT_VENV_PYTHON);
+    expect(resolvePython({ AFLDB_PYTHON: '   ' })).toBe(DEFAULT_VENV_PYTHON);
+  });
+
+  it('never resolves by searching outside the repository', () => {
+    // An interpreter found by walking to a parent or sibling checkout is one nobody
+    // chose, and this harness drives a destructive rebuild.
+    const source = readFileSync(join(root, 'tools', 'db', 'rebuild-test.ts'), 'utf8');
+    expect(source).not.toMatch(/\.\.[/\\]\.\.[/\\]/);
+    expect(source).not.toContain('D:\\dev\\afldb');
+    expect(source).not.toMatch(/readdirSync|process\.env\.PATH/);
+  });
+
+  describe('with AFLDB_PYTHON set', () => {
+    const saved = process.env.AFLDB_PYTHON;
+    beforeEach(() => { process.env.AFLDB_PYTHON = OVERRIDE; });
+    afterEach(() => {
+      if (saved === undefined) delete process.env.AFLDB_PYTHON;
+      else process.env.AFLDB_PYTHON = saved;
+    });
+
+    it('runs every planned Python stage under the one override', () => {
+      const stages = planStages(target(), fitzroy(), OPTS);
+      const seen = stages.filter((s) => s.argv?.some((a) => PY_STAGES.includes(a)));
+      expect(seen.length).toBe(PY_STAGES.length);
+      for (const stage of seen) expect(stage.argv![0]).toBe(OVERRIDE);
+      // and no stage is left on the in-tree default
+      expect(JSON.stringify(stages)).not.toContain(DEFAULT_VENV_PYTHON);
+    });
+
+    it('uses the override for both preflights and the witness validator', () => {
+      expect(fitzroyValidateArgv(fitzroy())[0]).toBe(OVERRIDE);
+      expect(draftguruValidateArgv()[0]).toBe(OVERRIDE);
+      expect(ladderWitnessValidateArgv()[0]).toBe(OVERRIDE);
+    });
+  });
+
+  it('refuses with the selected path when that interpreter does not exist', () => {
+    const deps: Deps = { ...fakeDeps().deps, fileExists: (p: string) => p !== DEFAULT_VENV_PYTHON };
+    expect(() => runPreflight(deps)).toThrow(RebuildRefused);
+    expect(() => runPreflight(deps)).toThrow(new RegExp(
+      `No Python interpreter at .*${DEFAULT_VENV_PYTHON.replace(/[\\/.]/g, '.')}`));
+    expect(() => runPreflight(deps)).toThrow(/AFLDB_PYTHON/);
+    expect(() => runPreflight(deps)).toThrow(/Nothing has been destroyed/);
+  });
+
+  it('accepts an ABSOLUTE override path, which is what an override always is', () => {
+    // path.join does not reset on an absolute second argument — join('D:/repo',
+    // 'C:/py.exe') is 'D:/repo/C:/py.exe' — so resolving every candidate against the
+    // repo root would have rejected every valid AFLDB_PYTHON.
+    const source = readFileSync(join(root, 'tools', 'db', 'rebuild-test.ts'), 'utf8');
+    expect(source).toContain('isAbsolute(path) ? path : join(REPO_ROOT, path)');
+    expect(isAbsolute(OVERRIDE)).toBe(true);
+  });
+
+  it('names AFLDB_PYTHON as the source when the override is the missing one', () => {
+    const saved = process.env.AFLDB_PYTHON;
+    process.env.AFLDB_PYTHON = OVERRIDE;
+    try {
+      const deps: Deps = { ...fakeDeps().deps, fileExists: (p: string) => p !== OVERRIDE };
+      expect(() => runPreflight(deps)).toThrow(/from AFLDB_PYTHON/);
+    } finally {
+      if (saved === undefined) delete process.env.AFLDB_PYTHON;
+      else process.env.AFLDB_PYTHON = saved;
+    }
   });
 });
 
@@ -728,6 +896,65 @@ describe('final validation', () => {
       .toThrow(RebuildRefused);
   });
 
+  // AFLDB-ISSUE-095 D7. Until the ladder domain had a canonical contract, a non-zero
+  // club_seasons gate would have failed every rebuild over a known, deliberate gap, so
+  // the runbook forbade one. The table is now derived from the same accepted match set,
+  // so its absence is a failure rather than an expected outcome.
+  describe('club_seasons gates', () => {
+    const checks = () => finalValidationChecks(measuredRegister({
+      matches: 16838, seasons_first: 1897, seasons_last: 2025,
+    }));
+    const gate = (key: string) => checks().find((c) => c.key === key);
+
+    it('requires the derived ladder to exist at all', () => {
+      expect(gate('club_seasons_rows')?.expected).toBe(CLUB_SEASONS_EXPECTED.rows);
+      expect(CLUB_SEASONS_EXPECTED.rows).toBe(1622);
+    });
+
+    it('proves the historical identity rather than forcing it', () => {
+      // The derivation reads matches, which already carry the historical identity, so it
+      // deliberately does NOT re-point through afldb_identity_for_season. This gate is
+      // what turns that into a checked invariant instead of an assumption.
+      const g = gate('club_seasons_identity_era_violations')!;
+      expect(g.expected).toBe(0);
+      expect(g.sql).toContain('afldb_identity_for_season');
+      expect(g.sql).toContain('IS DISTINCT FROM');
+    });
+
+    it('awards no rank to an exact points-and-percentage tie', () => {
+      // Zero in the accepted corpus, audited over all 1,622 rows. If a match correction
+      // ever creates a tie, the rebuild must fail loudly rather than drop a position.
+      const g = gate('club_seasons_unranked_rows')!;
+      expect(g.expected).toBe(0);
+      expect(g.sql).toContain('ladder_rank IS NULL');
+    });
+
+    it('keeps a merger navigable without transferring history', () => {
+      expect(gate('club_seasons_brisbane_lions_first_season')?.expected).toBe(1997);
+    });
+
+    it('excludes the current season by the accepted baseline, not a hard-coded year', () => {
+      expect(gate('club_seasons_after_accepted_last_season')?.sql).toContain('season > 2025');
+      // Re-pointing the register must move this gate with it.
+      const rolled = finalValidationChecks(measuredRegister({
+        matches: 1, seasons_last: 2026,
+      })).find((c) => c.key === 'club_seasons_after_accepted_last_season');
+      expect(rolled?.sql).toContain('season > 2026');
+    });
+
+    it('renders every club_seasons gate into the executed stream', () => {
+      const sql = finalValidationSql();
+      for (const key of [
+        'club_seasons_rows', 'club_seasons_identity_era_violations',
+        'club_seasons_duplicate_identity_seasons', 'club_seasons_unranked_rows',
+        'club_seasons_brisbane_lions_first_season',
+        'club_seasons_after_accepted_last_season',
+      ]) {
+        expect(sql).toContain(key);
+      }
+    });
+  });
+
   it('refuses a baseline with no measured block rather than validating nothing', () => {
     expect(() => finalValidationChecks(register())).toThrow(RebuildRefused);
   });
@@ -796,8 +1023,8 @@ describe('DraftGuru preflight', () => {
   });
 
   it('validates with no database and no legacy source', () => {
-    expect(DRAFTGURU_VALIDATE_ARGV).toContain('--validate-only');
-    expect(DRAFTGURU_VALIDATE_ARGV.join(' '))
+    expect(draftguruValidateArgv()).toContain('--validate-only');
+    expect(draftguruValidateArgv().join(' '))
       .toContain('tools/rebuild/draftguru/import_draftguru.py');
   });
 

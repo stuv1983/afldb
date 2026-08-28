@@ -88,16 +88,33 @@ describe('admin match mutation source contracts', () => {
     expect(dataEdits).toContain('recomputeClubSeasons(tx, match.season)');
     expect(dataEdits.indexOf('recomputeSeasonMetadata(tx, match.season)'))
       .toBeLessThan(dataEdits.indexOf('recomputeClubSeasons(tx, match.season)'));
-    // Fail closed: the canonical staging guard throws before anything is
-    // deleted, so a season without published ladder rows keeps its stored rows.
-    expect(playerDerived).toContain('no canonical staging.team_seasons rows');
-    expect(playerDerived.indexOf('no canonical staging.team_seasons rows'))
+    // Fail closed, re-pointed by AFLDB-ISSUE-095 at the new source: the guard still
+    // throws BEFORE anything is deleted, so a season with nothing to derive from keeps
+    // its stored rows instead of being silently emptied. Only what counts as "nothing"
+    // changed — no home-and-away matches, rather than no staging ladder rows.
+    expect(playerDerived).toContain('no canonical home-and-away matches for season');
+    expect(playerDerived.indexOf('no canonical home-and-away matches for season'))
       .toBeLessThan(playerDerived.indexOf('DELETE FROM club_seasons'));
-    // Ladder tallies stay sourced from the published staging ladder, never an
-    // improvised aggregate over matches.
-    expect(playerDerived).toContain('FROM staging.team_seasons s');
-    expect(playerDerived).toContain("wooden_spoon AND r.season_status = 'complete'");
-    expect(playerDerived).toContain("(SELECT id FROM sources WHERE key = 'sports_data_lab')");
+    // The ladder is derived from AFLDB's own canonical match set. staging.team_seasons
+    // was written only by the retired AFLDB_LEGACY_SQLITE importer, and the external
+    // ladder that replaced it is a validation witness whose own values are a proven
+    // local recomputation — so it is never read here.
+    // Asserted against the read, not the whole file: the doc comment explains why the
+    // old source was retired and must stay readable.
+    expect(playerDerived).not.toContain('FROM staging.team_seasons');
+    expect(playerDerived).toContain('FROM matches WHERE NOT is_final');
+    // The DECLARED premiership-points rule, and the ranking it feeds.
+    expect(playerDerived).toContain('t.wins * 4 + t.draws * 2');
+    expect(playerDerived).toContain('r.premiership_points DESC');
+    // No rank is invented for an exact points-and-percentage tie.
+    expect(playerDerived).toContain('CASE WHEN k.tied = 1 THEN k.pos END');
+    // Preserved semantics: a wooden spoon is still gated on a finished season, a drawn
+    // Grand Final still awards no premiership, and provenance is no longer the retired
+    // legacy registry key.
+    expect(playerDerived).toContain("se.status = 'complete'");
+    expect(playerDerived).toContain('winner_club_id IS NOT NULL');
+    expect(playerDerived).toContain("(SELECT id FROM sources WHERE key = 'afltables')");
+    expect(playerDerived).not.toContain('sports_data_lab');
   });
 
   it('does not silently duplicate a natural match key and cites manual attendance', () => {

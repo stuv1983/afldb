@@ -47,7 +47,19 @@
 
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
-| `AFLDB-ISSUE-095` | Medium | Data acquisition / Import architecture / Data integrity | `club_seasons` has no canonical, legacy-free acquisition path — `rebuild_derived.py` builds it only from `staging.team_seasons`, whose sole writer is `import_legacy_afl.py` under `AFLDB_LEGACY_SQLITE`. A clean canonical rebuild therefore correctly yields `club_seasons = 0`. Runbook `AFLDB-ISSUE-095.md`; decisions D1–D7 open. Stage 9 must NOT gate `club_seasons` until this lands. |
+<!-- RETIRED 2026-08-28 — `AFLDB-ISSUE-095` is **Resolved** and is NO LONGER an open
+     issue. The row below is the pre-resolution index row, kept only as lineage; its
+     "next action" text is SUPERSEDED. Authoritative records: the `AFLDB-ISSUE-095`
+     entry in `issues.md` (Resolution, 2026-08-28) and `AFLDB-ISSUE-095.md` §14.
+     Final evidence: clean afldb_test rebuild passed, 1,622-row ladder witness
+     comparison agreed on every field, final validation 19/19, release gates 45/64
+     with all nine club-organization/identity gates green. No migration (75/75), no
+     privilege widened. The 19 remaining gate failures are owned by Brownlow
+     acquisition, DraftGuru B3, DOB enrichment, the attendance baseline and the
+     current-season 2026 pipeline — NOT by this issue.
+
+| `AFLDB-ISSUE-095` | Medium | Data acquisition / Import architecture / Data integrity | `club_seasons` has no canonical, legacy-free acquisition path — `rebuild_derived.py` builds it only from `staging.team_seasons`, whose sole writer is `import_legacy_afl.py` under `AFLDB_LEGACY_SQLITE`. A clean canonical rebuild therefore correctly yields `club_seasons = 0`. **D1–D7 approved and IMPLEMENTED 2026-08-28** (`AFLDB-ISSUE-095.md` §10 decisions, §11 record). The pinned fitzRoy `fetch_ladder_afltables` was deparsed and **computes** its ladder from results under a uniform 4/2/0 rule, so it is adopted as a **validation witness only**; every `club_seasons` column is now derived from canonical `matches` under a declared rule, `ladder_rank` fails closed to NULL on an exact tie (audited: zero ties in 1,622 rows), provenance moved `sports_data_lab` → `afltables`, and a **fail-open** `North Melbourne` 1999–2007 identity gap was closed. Six Stage-9 gates added; nine-stage topology unchanged; no migration. Resolver proof 37/37 DB-free. **Not resolved** — vitest suites unrun (worktree has no `node_modules`), ladder acquisition and clean rebuild outstanding. |
+-->
 <!-- RETIRED 2026-08-28 — `AFLDB-ISSUE-096` is **Resolved** (complete within its authorised S1–S4
      scope) and is NO LONGER an open issue. Do not read the commented-out row below as current:
      it is the pre-resolution index row, kept only as lineage, and its intermediate "UNAPPLIED",
@@ -271,6 +283,10 @@
      canonical 13,275; that re-pin is an ISSUE-090 decision and 12,472 must not be silently
      reinstated. -->
 
+<!-- RETIRED 2026-08-28 — `AFLDB-ISSUE-095` is RESOLVED. Retained as lineage only; it is
+     NOT an open issue and its "next action" text is SUPERSEDED. See `issues.md` and
+     `AFLDB-ISSUE-095.md` §14.
+
 ## AFLDB-ISSUE-095 — Canonical legacy-free ladder / team-season acquisition
 
 - **Severity:** Medium
@@ -292,15 +308,24 @@
   `lib/edit/spec.ts`). Also note `recomputeClubSeasons` fails closed on an empty
   `staging.team_seasons`, so match create/delete/score-edit throws for every season on a
   canonically rebuilt database — by design, not a new defect.
-- **Exact next action:** Settle decisions **D1–D7** in `AFLDB-ISSUE-095.md` §5 as an approved
-  plan before writing any importer — authoritative non-legacy source; per-field
-  reconstructed-vs-externally-sourced split across `played`/`wins`/`draws`/`losses`/
-  `points_for`/`points_against`/`percentage`/`premiership_points`/`ladder_rank`/
-  `wooden_spoon`/`is_premier`/`finals_played`; historical premiership-points rules, byes,
-  forfeits and published rankings; provenance `source_id` (the SQL currently hardcodes
-  `sports_data_lab`, which match-derived rows must not inherit); `afldb_identity_for_season`
-  club-identity re-pointing; new rebuild stage vs existing stage; then the Stage-9 gate.
-  **ZERO supported `AFLDB_LEGACY_SQLITE` dependency.**
+- **DB-free validation: GREEN for this issue** (`AFLDB-ISSUE-095.md` §12) — 309 passed,
+  6 skipped, plus the resolver contract 37/37. The single remaining failure,
+  `reference-data.test.ts` → `finds the tables created after 045 that never registered
+  import write`, is **`AFLDB-ISSUE-096`/`-086` drift** from migrations 073/074
+  (`data_overrides`, `promotion_decisions`) and was deliberately left untouched: repairing
+  it asserts a privilege decision that belongs to ISSUE-086's blocked manual-authority
+  contract.
+- **Witness acquired and validated (`AFLDB-ISSUE-095.md` §13).** `ladder-20260828`,
+  129 files / 1,622 rows, pinned in the contract by `accepted_witness` + manifest sha256.
+  New single-authority validator `tools/rebuild/fitzroy/validate_ladder_witness.py`
+  (26/26 offline, no DB, no network); D7 cross-check wired as a tenth **validation** stage
+  (`ladder-witness`, between `derived` and `fingerprints`) — the four-stage **data**
+  topology is unchanged and now asserted. Durability reuses ISSUE-093's convention:
+  bytes gitignored, manifest tracked, PRECHECK refuses before destruction — proven by
+  execution (exit 2 with bytes absent, 0 restored).
+- **Exact next action:** the clean `afldb_test` rebuild — a **separate authorisation**, and
+  the only thing that can prove the D7 cross-check. It is a **full destructive recreate**
+  of `afldb_test`. **ZERO supported `AFLDB_LEGACY_SQLITE` dependency.**
 - **Do NOT** add a `club_seasons` non-zero Stage-9 gate until this lands — it would fail every
   canonical rebuild over a known, deliberate gap.
 - **Links:** `AFLDB-ISSUE-093` (Resolved 2026-08-27, this issue is its recorded follow-up) and
@@ -320,6 +345,8 @@
      exists, or downstream capabilities owned by `AFLDB-ISSUE-086` (manual authority),
      `AFLDB-ISSUE-099` (the `data_issues` disagreement row) and
      `AFLDB-ISSUE-101` (rollover supersession), all of which remain open above.
+
+-->
 
 ## AFLDB-ISSUE-096 — 2026+ API-first acquisition architecture and contract (RETIRED)
 
