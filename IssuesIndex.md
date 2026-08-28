@@ -125,8 +125,8 @@
 - **Area:** Admin / Data integrity
 - **Key files:** `src/db/migrations/073_data_overrides.sql` (applied,
   checksum-baselined, **must not be edited**);
-  `src/db/migrations/075_data_overrides_fk_index.sql` (new, **unapplied to
-  `afldb_test`**);
+  `src/db/migrations/075_data_overrides_fk_index.sql` (**applied to `afldb_test`
+  2026-08-28, after 074; now checksum-frozen — must not be edited**);
   `tests/data-overrides-source-contract.test.ts`;
   `tests/integration/fk-indexes.test.ts` (read-only here);
   `AFLDB-ISSUE-086.md` (runbook, durable source of truth).
@@ -138,18 +138,24 @@
   **6/6**; restricted-role DraftGuru integration **19/19**. Reopened for a
   separate proven defect: migration 073 declares
   `admin_user_id integer NOT NULL REFERENCES auth_users(id)` but indexes only
-  `(entity_type, entity_key)`, so `tests/integration/fk-indexes.test.ts` is
+  `(entity_type, entity_key)`, so `tests/integration/fk-indexes.test.ts` was
   **1/2** on `data_overrides(admin_user_id) -> auth_users` and a parent-side
   `auth_users` delete sequentially scans `data_overrides`. Migration 075 is the
   forward repair (`CREATE INDEX IF NOT EXISTS ix_data_overrides_admin_user_id
-  ON data_overrides (admin_user_id);`) and is **unapplied to `afldb_test`** until
-  `AFLDB-ISSUE-096`'s migration 074 is repaired and present.
-- **Exact next action:** Repair ISSUE-096's migration 074 first, then apply
-  **074 then 075** in that order, then re-run
-  `tests/integration/fk-indexes.test.ts` and expect 2/2. Until then the only
-  available check is
-  `npm test -- tests/data-overrides-source-contract.test.ts`. Do not apply 075
-  alone, do not renumber it, and do not edit migration 073.
+  ON data_overrides (admin_user_id);`) and is **APPLIED to `afldb_test`**:
+  `AFLDB-ISSUE-096` applied **074 then 075** in that order on 2026-08-28
+  (75 files, 75 applied, 0 pending, no drift; privileges reconciled), and
+  `tests/integration/fk-indexes.test.ts` is **2/2**, validating ISSUE-096's three
+  074 FK indexes and this issue's `ix_data_overrides_admin_user_id` in one pass.
+- **Exact next action:** *(The previous action — "repair ISSUE-096's migration
+  074 first, then apply **074 then 075**, then re-run
+  `tests/integration/fk-indexes.test.ts` and expect 2/2" — was executed on
+  2026-08-28 and passed.)* The unindexed-FK defect is repaired and
+  database-validated. **Whether that closes `AFLDB-ISSUE-086` is this issue's own
+  decision** — `AFLDB-ISSUE-096` synced the proven facts only and changed no
+  status, scope, ownership or historical conclusion. Migrations 073, 074 and 075
+  are all applied and checksum-frozen: do not edit any of them, and do not
+  renumber 075.
 
 -->
 

@@ -1,19 +1,33 @@
 # AFLDB-ISSUE-096 — 2026+ API-first acquisition architecture and contract
 
-**Status:** approved (§14); S1 IMPLEMENTED + AMENDED and validated GREEN; **S2 COMPLETE and GREEN —
-`61/61`, 0 failures, on the final post-hygiene run of 2026-08-28 (§16.2). Migration
-`src/db/migrations/074_source_observation_spine.sql` is the correct spine migration and remains
-UNAPPLIED.** **S3 COMPLETE and GREEN — `84/84`, 0 failures, 316 ms, user-run 2026-08-28
-(§15, S3 section).** **S4 COMPLETE and GREEN — `105/105`, 0 failures,
-357 ms on the final post-hygiene run, user-run 2026-08-28 (§16.10). The promotion-review contract
-is implemented; the canonical acceptance/write transaction remains **deliberately unimplemented**
-behind ISSUE-086's authority gate (§7). The §16.11 NUL hygiene item is RESOLVED. Migration 074
-remains UNAPPLIED. §11's stage decomposition ends at S4 — there is no approved S5 (§16.12).**
-**The separately authorised PostgreSQL validation phase was HALTED at its preflight on 2026-08-28:
-`afldb_test`'s migration baseline is incoherent because applied migration `073_data_overrides.sql`
-(`AFLDB-ISSUE-086`'s) fails the runner's checksum guard, so migration 074 cannot be applied through
-supported tooling and must not be modified until that is repaired (§16.13, §16.14).**
-**Fresh-session handoff: read §16 first, then §16.13.**
+**Status:** **RESOLVED 2026-08-28 — complete within the authorised S1–S4 scope (§16.17, §16.18).**
+All four approved stages are implemented and green — S1 `34/34`, S2 `61/61`, S3 `84/84`, S4
+`105/105` — and the separately authorised **PostgreSQL validation phase is COMPLETE**.
+`src/db/migrations/074_source_observation_spine.sql` is **APPLIED to `afldb_test`** (2026-08-28,
+**074 before 075**, with `AFLDB-ISSUE-086`'s 075 applied in the same run) and is now
+**checksum-frozen — it must not be edited; any further change to the spine is a new migration.**
+**Final focused re-validation, user-run 2026-08-28: `145/145` across four suites** —
+`tests/current-season-import.test.ts` `106/106`, `tests/integration/observation-spine.test.ts`
+`13/13`, `tests/integration/fk-indexes.test.ts` `2/2`, `tests/integration/privileges.test.ts`
+`24/24`; migration status **75 files, 75 applied, 0 pending, no drift**, ledger order
+`073 → 074 → 075`; privileges reconciled; fingerprint
+`c5afad8cd3e6ff6417e429807bd7dfb4f8da096a84d691e63383691438722227`. All database work was
+`afldb_test` only — never `afldb_dev`, never production.
+**The canonical acceptance/write transaction remains deliberately unimplemented** behind
+ISSUE-086's authority gate (§7). The §16.11 NUL hygiene item is RESOLVED. §11's stage decomposition
+ends at S4 — there is no approved S5 (§16.12). The §5.H rows still classed PARTIAL or BLOCKED are
+**outside** ISSUE-096's scope, not unfinished work inside it (§16.18).
+*(Superseded header text, retained as lineage rather than deleted: this header previously read
+"Migration 074 ... remains UNAPPLIED" and "the separately authorised PostgreSQL validation phase was
+HALTED at its preflight on 2026-08-28 ... because applied migration `073_data_overrides.sql` fails
+the runner's checksum guard". Both statements were true only at that preflight. `AFLDB-ISSUE-086`
+then rebuilt `afldb_test` cleanly through the committed 073, the phase resumed, and it completed —
+§16.13, §16.16, §16.18.)*
+**Read order for any future session: §16.17, then §16.18.** Everything in §15 through §16.15 is a
+**dated checkpoint record kept as lineage**, in this file's append-only convention. Any statement
+inside those sections that migration 074 is unapplied, that nothing here is database-validated, or
+that the PostgreSQL validation phase is pending, blocked or halted, was true only at that
+checkpoint and is **superseded** by §16.16–§16.18. Do not act on one.
 **Mode:** foundation implementation, stages S1–S4. No family importer. No Git.
 **Created:** 2026-08-28. **Model/effort:** Opus / High / Plan.
 **Parent runbook:** `AFLDB-2026-API-ACQUISITION.md` — source evidence, source-of-truth matrix,
@@ -1986,6 +2000,65 @@ every case, one of two things:
 
 **No approved S5 exists** (§16.12): a next stage is a fresh approval decision, not a continuation.
 The admin review screen remains an explicit §2 non-goal. No family importer was built here.
+
+### 16.18 Final close-out 2026-08-28 — re-validated, tracking synchronised, ready for integration
+
+A later session opened against the stale untracked handoff `AFLDB-ISSUE-096-PG-HANDOFF.md`, which
+still recorded the §16.13 preflight halt. That handoff was written at base `ffb5a49` and was never
+advanced; the tracked records are three commits ahead of it. The contradiction was settled by
+**evidence, not by preferring a document** — the validation was re-run in full rather than
+inherited.
+
+**Final re-validation — user-run 2026-08-28, one migration-status check and one four-file test run.**
+
+| Evidence | Result |
+|---|---|
+| `npm run db:migrate:test -- --status` | **75 migration file(s), 75 already applied, 0 pending**, no checksum-drift refusal, ledger order `073_data_overrides.sql → 074_source_observation_spine.sql → 075_data_overrides_fk_index.sql` |
+| `tests/current-season-import.test.ts` | **106/106** |
+| `tests/integration/observation-spine.test.ts` | **13/13** |
+| `tests/integration/fk-indexes.test.ts` | **2/2** |
+| `tests/integration/privileges.test.ts` | **24/24** |
+| Combined | **4 test files passed / 4; 145 tests passed / 145** |
+
+This reproduces §16.16/§16.17 exactly. **No executable file changed** between that validation and
+this one, and none changed during the close-out: the close-out pass touched documentation and
+tracking only. Migration **074 is applied and checksum-frozen**, migration **075 is applied**, and
+neither may be edited.
+
+**S1–S4 are complete within the approved scope, and the PostgreSQL validation phase is complete.**
+What remains is classified below, and none of it is unfinished ISSUE-096 work. The distinction is
+preserved deliberately: nothing was implemented to move a row, and no blocked row was given a
+fabricated test.
+
+**PARTIAL — the schema/pure-semantics half is proved; the other half has no code to exercise.**
+
+| Row | Proved | Unproved, and what would prove it |
+|---|---|---|
+| Observation idempotence | The persisted consequence of an unchanged poll, plus the structural "no trigger, no rule" canonical clause | A production **import re-run** — there is no importer, and `src/lib/acquisition/` has no persistence layer |
+| Foreign ownership | That `foreign_owned_collision` and every other refusal verb **cannot reach `accepted`** in PostgreSQL | The ownership **predicate's runtime/DB path** — it is pure TypeScript today and is covered DB-free |
+| Stale-review race | One live proposal per record+target, supersession freeing the slot, and the storable stale reasons | The **concurrency race itself** — there is no accept transaction to race |
+
+**OUTSIDE ISSUE-096 — separately owned, and not absorbed here.**
+
+| Capability | Owner |
+|---|---|
+| Durable manual override authority | `AFLDB-ISSUE-086` |
+| Source-disagreement `data_issues` integration | successor family issues, `AFLDB-ISSUE-097` / `AFLDB-ISSUE-099` |
+| Rollover / supersession (074 has no supersession column by design) | `AFLDB-ISSUE-101` |
+| The canonical acceptance/write transaction | gated on ISSUE-086's authority contract by §7; no approved S5 |
+| Family-specific importers | `AFLDB-ISSUE-099` / `AFLDB-ISSUE-100` |
+| Admin review UI | explicit §2 non-goal |
+
+**Tracking synchronised at close-out.** `issues.md`'s ISSUE-096 entry keeps **Status: Resolved /
+Resolved: 2026-08-28** and stays absent from the authoritative Open Issues table; three stale
+in-entry statements (074 unapplied; "nothing in ISSUE-096 is database-validated"; the "no CHANGELOG
+entry" checkpoint decision) were corrected in place with their superseded text retained.
+`IssuesIndex.md` had **live Git conflict markers** on its open-issue count from the `552c941`
+cherry-pick — resolved to **12**, which is the row count of both the index and the authoritative
+`issues.md` table. One `CHANGELOG.md` entry was added under `[Unreleased]`, following the
+`AFLDB-ISSUE-073` schema-migration precedent. `AFLDB-ISSUE-086`'s records were corrected **on the
+narrow facts this issue produced only** — 075 applied, FK gate 2/2 — with its status, scope and
+historical conclusions untouched.
 
 ---
 

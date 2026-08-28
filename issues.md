@@ -7404,7 +7404,8 @@ focused suite. The stale header now reads "migration 074". `AFLDB-ISSUE-096.md` 
 
 **Final post-hygiene run — 2026-08-28: `61/61`, 1 test file passed, 0 failures, 303 ms.** That run
 covers the repaired assertions and the hygiene edits together and **closes the S2 checkpoint**. S1
-remains approved and green (34/34). Migration **074 remains UNAPPLIED** — the focused suite is
+remains approved and green (34/34). Migration **074 remains UNAPPLIED** *(true at this S2
+checkpoint only; 074 was applied to `afldb_test` on 2026-08-28 — see **Resolution**)* — the focused suite is
 DB-free and proves the semantics module plus the migration's source contract, not PostgreSQL
 behaviour. **No CHANGELOG entry, correctly:** the runbook requires none at this checkpoint,
 nothing user-visible has changed and no migration has run. *(At the time of writing, S3 had not
@@ -7616,8 +7617,12 @@ no Git operation, and the key was never printed or persisted.
   remains **deliberately unimplemented** behind ISSUE-086's authority gate.
 
 These suites are DB-free by design: they prove the reference-data contract, the semantics modules
-and the migration's **source** contract — not PostgreSQL behaviour. **Migration 074 is UNAPPLIED**,
-so nothing in ISSUE-096 is database-validated; any PostgreSQL validation is `afldb_test` only.
+and the migration's **source** contract — not PostgreSQL behaviour. *(Superseded 2026-08-28. This
+paragraph previously ended "**Migration 074 is UNAPPLIED**, so nothing in ISSUE-096 is
+database-validated". That was true only at the S1–S4 checkpoint. Migration **074 is applied** to
+`afldb_test` — 074 before 075 — and the PostgreSQL validation recorded under **Resolution** below is
+**complete**. All database work was and remains `afldb_test` only, never `afldb_dev`, never
+production.)*
 
 ### Follow-up
 Retry **P1/P2** when a `KALI_AFL_API_KEY` is available, and **P7** when interactive SSH/database
@@ -7642,6 +7647,7 @@ catalogue, and §5.H is validated to the full extent the implemented code permit
 | Migrations | **75/75 applied, 0 pending**, **074 applied before 075** |
 | Privileges | reconciled successfully |
 | Fingerprint | `c5afad8cd3e6ff6417e429807bd7dfb4f8da096a84d691e63383691438722227` |
+| Close-out re-validation, same four suites in one run (2026-08-28) | **4 test files passed / 4; 145 tests passed / 145**, and `npm run db:migrate:test -- --status` re-confirmed **75 files, 75 applied, 0 pending**, no checksum-drift refusal, ledger order `073 → 074 → 075` |
 
 **Root cause addressed.** AFLDB had no standing contract for acquiring a current or future season,
 so each new data family would have repeated the shipped path's choices. S1–S4 deliver that
@@ -7793,9 +7799,11 @@ added; migration **074 APPLIED to `afldb_test` only** (2026-08-28, **074 before 
 `afldb_dev` work at any point; the §5.H PostgreSQL spine suite
 `tests/integration/observation-spine.test.ts` is **`13/13`**, proving the implemented schema half of
 §5.H and nothing beyond it; the `source-families.ts` NUL hygiene item **RESOLVED**; **S5 not
-started**; `AFLDB-ISSUE-100` remains separate and does **not** block it. **No CHANGELOG entry** —
-the runbook requires none at this milestone: validation is recorded state, and no application
-behaviour has landed.
+started**; `AFLDB-ISSUE-100` remains separate and does **not** block it. **No CHANGELOG entry at
+that checkpoint** — nothing had landed then. *(Superseded at resolution, 2026-08-28: migration 074
+has since been applied and the issue is Resolved, so a single `CHANGELOG.md` entry was added under
+`[Unreleased]`, following the `AFLDB-ISSUE-073` precedent for a resolved schema-migration issue with
+no user-visible behaviour.)*
 
 **S4 prerequisites/stop conditions already recorded:** §7's implementation gate — `corrected`/update
 promotion onto existing rows cannot be implemented until ISSUE-086's authority contract lands, and
@@ -7812,9 +7820,11 @@ one; migration **074 is applied to `afldb_test` only** and any PostgreSQL valida
 `observations.ts` defects (done; post-hygiene rerun `61/61`); and the S3 validation run (done;
 `84/84`).
 
-Migration **074** is written but **UNAPPLIED**: any PostgreSQL validation is `afldb_test` only,
-never `afldb_dev`, never production. Retained follow-ups owned elsewhere: an `afl_api` `sources`
-row and the 20th AFL API lineup column, both `AFLDB-ISSUE-100`'s; **P7 remains BLOCKED**.
+Migration **074** is **APPLIED** to `afldb_test` (2026-08-28, **074 before 075**) and is now
+**checksum-frozen — it must not be edited**; any further change to the spine is a new migration. All
+database work was `afldb_test` only, never `afldb_dev`, never production. Retained follow-ups owned
+elsewhere: an `afl_api` `sources` row and the 20th AFL API lineup column, both
+`AFLDB-ISSUE-100`'s; **P7 remains BLOCKED**.
 
 **Superseded next action (2026-08-28):** "HALT for user review — approve or amend decisions A–H
 and the six unresolved items in §12." That approval was given; see §14 of the runbook.
