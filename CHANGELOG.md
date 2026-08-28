@@ -15,6 +15,14 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-086 — Durable admin overrides regain complete FK-index coverage (migration 075) - 28 August 2026
+
+- Added `src/db/migrations/075_data_overrides_fk_index.sql`, which creates `ix_data_overrides_admin_user_id ON data_overrides (admin_user_id)` — unconditional, non-unique, non-partial, following the migration-041/071 shape for a `NOT NULL` foreign-key column.
+- `data_overrides.admin_user_id` references `auth_users(id)` but had no index leading with that column, so a parent-side `auth_users` delete sequentially scanned the durable admin-override table. The table now has complete foreign-key index coverage.
+- Repaired forward-only: migration 073, which introduced `data_overrides`, is applied and checksum-baselined and was not edited.
+- Validated against the real PostgreSQL foreign-key catalogue: `tests/integration/fk-indexes.test.ts` passes 2/2, covering both every deletable-parent foreign key having a usable index and no stale exemption remaining.
+
+
 ### AFLDB-ISSUE-059 — Safe qualifying-match drill-down - 28 August 2026
 
 - Grouped NL `Qualifying matches` counts can now open a dedicated drill-down that faithfully replays the supported grouped predicates instead of approximating them through Match Search.

@@ -36,9 +36,11 @@
 - Privilege reconciliation explicitly re-grants SELECT-only access to `data_overrides` for `afldb_import`.
 
 - **Status**: Resolved — implementation and DB-backed acceptance validated 2026-08-28.
-  *(Superseded 2026-08-28 — see "Reopened 2026-08-28" below. The original
-  resolution evidence and implementation record above are retained; the issue is
-  reopened only for the separate schema defect below.)*
+  *(Reopened 2026-08-28 for a separate schema defect only — see "Reopened
+  2026-08-28" below — and **re-resolved the same day**; see "Re-resolution
+  2026-08-28" at the end of this document. The original resolution evidence and
+  implementation record above stand unchanged: the reopening was never about the
+  override behaviour.)*
 
 ## Reopened 2026-08-28 — `data_overrides(admin_user_id)` has no covering index
 
@@ -76,17 +78,59 @@ migrations 041 and 071 established for a NOT NULL foreign-key column.
 Migration 073 is **not** edited: it is applied and checksum-baselined, so the
 repair is forward-only.
 
-### Application order — 075 remains unapplied to afldb_test
-Migration 075 is authored and remains unapplied to `afldb_test`. It stays
-unapplied until `AFLDB-ISSUE-096`'s migration 074 is repaired and present. The
-eventual application order must be **074 then 075**.
+### Application order — 074 then 075, both applied 2026-08-28
+Migration 075 was deliberately **held** until `AFLDB-ISSUE-096`'s migration 074
+could apply first, so the two pending migrations would land in normal filename
+order rather than 075 jumping ahead of a lower-numbered pending file. Once 074
+was ready the ordered run succeeded:
+
+```text
+074_source_observation_spine.sql ... ok
+075_data_overrides_fk_index.sql ... ok
+Applied 2 migration(s).
+```
+
+Post-apply ledger state, `afldb_test`:
+
+```text
+75 migration file(s), 75 already applied
+0 pending.
+```
+
+**No checksum drift.** Migration 073 was **not edited after application** at any
+point: the repair is forward-only, which is why it is a new migration rather
+than a change to 073.
 
 ### Validation of the repair
 - `tests/data-overrides-source-contract.test.ts` extended (still one suite, the
   existing `Migration/schema contract` test) to prove migration 075 exists,
   creates `ix_data_overrides_admin_user_id`, targets `data_overrides`, indexes
   `admin_user_id` as the leading/only key, uses `IF NOT EXISTS`, and is not
-  unique, not partial and not `CONCURRENTLY`.
-- Command: `npm test -- tests/data-overrides-source-contract.test.ts`
-- The DB-backed `fk-indexes.test.ts` re-run to 2/2 is pending, and is blocked
-  on applying 074 then 075.
+  unique, not partial and not `CONCURRENTLY`. Command:
+  `npm test -- tests/data-overrides-source-contract.test.ts`.
+- **DB-backed catalogue validation now GREEN: `tests/integration/fk-indexes.test.ts`
+  2/2 passed** against `afldb_test`. That suite interrogates `pg_catalog` rather
+  than asserting index names, so both of its cases carry weight: every foreign
+  key whose parent can be deleted from has a usable leading-column index, and no
+  stale `DELETE_FREE_PARENTS` exemption remains. The suite itself was never
+  modified to obtain the pass.
+- Privilege reconciliation completed successfully.
+- Post-migration fingerprint, `afldb_test`:
+  `c5afad8cd3e6ff6417e429807bd7dfb4f8da096a84d691e63383691438722227`.
+
+### Re-resolution 2026-08-28
+- **Status**: **Resolved 2026-08-28.**
+- **What was reopened, and what was not.** The reopening was **solely** the
+  missing supporting index on `data_overrides(admin_user_id) -> auth_users(id)` —
+  a schema-coverage omission in migration 073. It was **never** a defect in the
+  durable admin-override behaviour. That behaviour was validated at the original
+  resolution and **remains validated**: `tests/data-overrides-source-contract.test.ts`
+  **6/6** and `tests/integration/draftguru-import.test.ts` **19/19**, the latter
+  proving under the restricted importer role that an admin override survives a
+  destructive source reload. Nothing above supersedes that record.
+- **How it was repaired.** Forward-only in
+  `src/db/migrations/075_data_overrides_fk_index.sql`, with 073 left untouched
+  after application; 075 held until 074 could apply first; 074 then 075 applied
+  cleanly; ledger now **75/75, 0 pending, no drift**; FK catalogue gate **2/2**.
+- **Scope of the evidence.** All of it is from **`afldb_test`**. No production
+  or `afldb_dev` application is claimed by this record.

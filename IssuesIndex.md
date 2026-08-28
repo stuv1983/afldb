@@ -30,7 +30,6 @@
 |---|---|---|---|
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | React #418 remains intermittent under production-style NL search hydration; narrow H7 diagnostic is awaiting authoritative live-build validation. |
 | `AFLDB-ISSUE-076` | Medium | Performance | `won_final_at_venue` Grid Solver combinations can exceed the 5-second PostgreSQL statement timeout and crash the rendered page. |
-| `AFLDB-ISSUE-086` | Medium | Admin / Data integrity | REOPENED 2026-08-28. The 073 durable-override fix stands (checksum-baseline repair completed; clean rebuild through 073 passed 13/13; 73/73 migrations, 0 pending, no drift; source contract 6/6; restricted-role DraftGuru integration 19/19). New proven defect: `data_overrides(admin_user_id) -> auth_users` has no covering index, so `fk-indexes.test.ts` is 1/2. Migration 075 written as the forward repair and unapplied to `afldb_test` until ISSUE-096's migration 074 is repaired and present. |
 | `AFLDB-ISSUE-090` | Medium | Data integrity / Import | Confirmed release blocker: club-list DOB enrichment stacks duplicate unresolved `dob_conflict` rows on rerun, and the register pass deletes conflicts it does not own. Migration 072 APPLIED to `afldb_test`; dob-enrichment suite GREEN 23/23; release-gates validation HALTED, blocked by `AFLDB-ISSUE-092`. |
 | `AFLDB-ISSUE-092` | Medium | Data integrity / Tooling safety | §4 fail-closed gate + §5 `--source-key` containment IMPLEMENTED (2026-08-25, ISSUE-093 Phase 3; reusable `check_population_drop()` in `common.py`). Database validation (§11 tests 24–27) still pending, but **no longer blocked on a database**: `afldb_test` was rebuilt and validated on 2026-08-27 by `AFLDB-ISSUE-093` (Resolved). §6 recovery obsolete for the rebuild path. Blocks `AFLDB-ISSUE-090`. |
 | `AFLDB-ISSUE-095` | Medium | Data acquisition / Import architecture / Data integrity | `club_seasons` has no canonical, legacy-free acquisition path — `rebuild_derived.py` builds it only from `staging.team_seasons`, whose sole writer is `import_legacy_afl.py` under `AFLDB_LEGACY_SQLITE`. A clean canonical rebuild therefore correctly yields `club_seasons = 0`. Runbook `AFLDB-ISSUE-095.md`; decisions D1–D7 open. Stage 9 must NOT gate `club_seasons` until this lands. |
@@ -110,7 +109,22 @@
 
 
 
-## AFLDB-ISSUE-086 — Durable admin overrides: `data_overrides(admin_user_id)` is an unindexed foreign key
+<!-- RETIRED 2026-08-28 — `AFLDB-ISSUE-086` is **Resolved** and is NO LONGER an open issue. The
+     detail block below is retained as lineage only, and its "unapplied", "1/2" and "next action"
+     text is SUPERSEDED. The reopening was solely the missing supporting index on
+     `data_overrides(admin_user_id) -> auth_users(id)` omitted by migration 073 — never a defect
+     in the durable admin-override behaviour, which remains validated by
+     `tests/data-overrides-source-contract.test.ts` 6/6 and
+     `tests/integration/draftguru-import.test.ts` 19/19 (an admin override surviving a destructive
+     source reload under the restricted importer role). Repaired forward-only in migration 075
+     with 073 untouched after application; 075 held until 074 could apply first; 074 then 075
+     applied cleanly; ledger 75/75, 0 pending, no drift; `tests/integration/fk-indexes.test.ts`
+     2/2; privileges reconciled; `afldb_test` fingerprint
+     `c5afad8cd3e6ff6417e429807bd7dfb4f8da096a84d691e63383691438722227`. All evidence is from
+     `afldb_test`; no production or `afldb_dev` application is claimed. Authoritative records:
+     the `AFLDB-ISSUE-086` entry in `issues.md` and `AFLDB-ISSUE-086.md`.
+
+## AFLDB-ISSUE-086 — Durable admin overrides: `data_overrides(admin_user_id)` is an unindexed foreign key (RETIRED)
 
 - **Severity:** Medium
 - **Area:** Admin / Data integrity
@@ -141,6 +155,8 @@
   available check is
   `npm test -- tests/data-overrides-source-contract.test.ts`. Do not apply 075
   alone, do not renumber it, and do not edit migration 073.
+
+-->
 
 ## AFLDB-ISSUE-090 — DOB enrichment conflict writes are not pass-scoped or idempotent
 
