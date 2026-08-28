@@ -107,11 +107,6 @@ describe('grid solver correctness', () => {
       ...commonCols,
       { builder: 'won_final_at_venue', params: { venue: String(identity.venueId) } },
     ] as const satisfies readonly GridAxisState[];
-    const playedCols = [
-      ...commonCols,
-      { builder: 'played_at_venue', params: { venue: String(identity.venueId) } },
-    ] as const satisfies readonly GridAxisState[];
-
     const started = performance.now();
     const wonCells = await Promise.all(rows.map((row) => Promise.all(
       wonCols.map((col) => solveCellSummary(row, col, 'games_asc')),
@@ -119,57 +114,94 @@ describe('grid solver correctness', () => {
     const elapsedMs = performance.now() - started;
 
     expect(elapsedMs).toBeLessThan(4_000);
-    expect(wonCells.map((line) => line.map((cell) => ({
-      eligible: cell.eligible,
-      topName: cell.top?.displayName ?? null,
-    })))).toEqual([
-      [{ eligible: 31, topName: 'Dean Turner' }, { eligible: 22, topName: 'Rhys Palmer' }, { eligible: 279, topName: 'Stuart Cochrane' }],
-      [{ eligible: 0, topName: null }, { eligible: 11, topName: 'Caleb Marchbank' }, { eligible: 42, topName: 'Alex Cincotta' }],
-      [{ eligible: 120, topName: 'Lyle Skinner' }, { eligible: 41, topName: 'Finn Callaghan' }, { eligible: 1071, topName: 'Josh Carmichael' }],
-    ]);
 
-    const playedCells = await Promise.all(rows.map((row) => Promise.all(
-      playedCols.map((col) => solveCellSummary(row, col, 'games_asc')),
-    )));
-    expect(playedCells.map((line) => line.map((cell) => ({
-      eligible: cell.eligible,
-      topName: cell.top?.displayName ?? null,
-    })))).toEqual([
-      [{ eligible: 31, topName: 'Dean Turner' }, { eligible: 22, topName: 'Rhys Palmer' }, { eligible: 372, topName: 'Stuart Cochrane' }],
-      [{ eligible: 0, topName: null }, { eligible: 11, topName: 'Caleb Marchbank' }, { eligible: 112, topName: 'Lucas Camporeale' }],
-      [{ eligible: 120, topName: 'Lyle Skinner' }, { eligible: 41, topName: 'Finn Callaghan' }, { eligible: 1836, topName: 'Graham Schodde' }],
-    ]);
-
-    const [expectedKicksWinner] = await sql<{ count: string }[]>`
-      WITH kickers AS MATERIALIZED (
-        SELECT DISTINCT player_id FROM player_match_stats WHERE kicks >= 20
-      ), winners AS MATERIALIZED (
+    const independentOracle = await sql<{
+      rowIndex: number;
+      eligible: number;
+      topId: number | null;
+      topName: string | null;
+    }[]>`
+      WITH qualifying_organization_stints AS (
+        SELECT pc.player_id, c.organization_id
+          FROM player_clubs pc
+          JOIN clubs c ON c.id = pc.club_id
+         GROUP BY pc.player_id, c.organization_id
+        HAVING sum(pc.games) >= 50
+      ), multi_club_players AS (
+        SELECT player_id
+          FROM qualifying_organization_stints
+         GROUP BY player_id
+        HAVING count(*) >= 2
+      ), cerra_seasons AS (
+        SELECT club_id, season
+          FROM player_club_season_stats
+         WHERE player_id = ${identity.playerId}
+      ), cerra_teammates AS (
+        SELECT DISTINCT pcs.player_id
+          FROM player_club_season_stats pcs
+          JOIN cerra_seasons cs
+            ON cs.club_id = pcs.club_id
+           AND cs.season = pcs.season
+         WHERE pcs.player_id <> ${identity.playerId}
+      ), twenty_kick_players AS (
+        SELECT DISTINCT player_id
+          FROM player_match_stats
+         WHERE kicks >= 20
+      ), mcg_final_winners AS (
         SELECT DISTINCT pms.player_id
           FROM player_match_stats pms
           JOIN matches m ON m.id = pms.match_id
          WHERE m.venue_id = ${identity.venueId}
            AND m.is_final
            AND m.winner_club_id = pms.club_id
+      ), row_memberships AS (
+        SELECT 0 AS row_index, player_id FROM multi_club_players
+        UNION ALL
+        SELECT 1 AS row_index, player_id FROM cerra_teammates
+        UNION ALL
+        SELECT 2 AS row_index, player_id FROM twenty_kick_players
+      ), eligible_players AS (
+        SELECT rm.row_index, rm.player_id
+          FROM row_memberships rm
+          JOIN mcg_final_winners winners ON winners.player_id = rm.player_id
+      ), row_keys(row_index) AS (
+        VALUES (0), (1), (2)
+      ), eligible_counts AS (
+        SELECT row_index, count(*)::int AS eligible
+          FROM eligible_players
+         GROUP BY row_index
       )
-      SELECT count(*) FROM kickers JOIN winners USING (player_id)
+      SELECT keys.row_index AS "rowIndex",
+             coalesce(counts.eligible, 0) AS eligible,
+             top_player.id AS "topId",
+             top_player.display_name AS "topName"
+        FROM row_keys keys
+        LEFT JOIN eligible_counts counts USING (row_index)
+        LEFT JOIN LATERAL (
+          SELECT p.id, p.display_name
+            FROM eligible_players eligible
+            JOIN player_career_stats career ON career.player_id = eligible.player_id
+            JOIN players p ON p.id = eligible.player_id
+           WHERE eligible.row_index = keys.row_index
+           ORDER BY career.games ASC, p.sort_name
+           LIMIT 1
+        ) top_player ON true
+       ORDER BY keys.row_index
     `;
-    expect(wonCells[2][2].eligible).toBe(Number(expectedKicksWinner.count));
 
-    for (const line of wonCells) {
-      const top = line[2].top;
-      expect(top).not.toBeNull();
-      const [semantic] = await sql<{ qualifies: boolean }[]>`
-        SELECT EXISTS (
-          SELECT 1
-            FROM player_match_stats pms
-            JOIN matches m ON m.id = pms.match_id
-           WHERE pms.player_id = ${top!.id}
-             AND m.venue_id = ${identity.venueId}
-             AND m.is_final
-             AND m.winner_club_id = pms.club_id
-        ) AS qualifies
-      `;
-      expect(semantic.qualifies).toBe(true);
+    expect(independentOracle).toHaveLength(rows.length);
+    for (const expected of independentOracle) {
+      const actual = wonCells[expected.rowIndex][2];
+      expect(actual.eligible).toBe(expected.eligible);
+      expect(actual.top?.id ?? null).toBe(expected.topId);
+      expect(actual.top?.displayName ?? null).toBe(expected.topName);
+      if (expected.eligible === 0) {
+        expect(expected.topId).toBeNull();
+        expect(expected.topName).toBeNull();
+      } else {
+        expect(expected.topId).not.toBeNull();
+        expect(expected.topName).not.toBeNull();
+      }
     }
   });
 

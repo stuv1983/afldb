@@ -553,12 +553,11 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     }
     case 'won_final_at_venue': {
       const venueId = requireInt(axis, 'venue', 'Venue');
-      // Build the distinct winner-player set once. A plain IN subquery let
-      // Postgres underestimate this set (325 planned vs 9,629 participation
-      // rows at the MCG) and rescan a materialised copy for every career,
-      // removing 113m rows by join filter on the ISSUE-076 grid. The scalar
-      // array is an InitPlan, retaining the same player/club/match semantics
-      // without making the surrounding criterion determine the join shape.
+      // Build the distinct winner-player set once. Under the ISSUE-076
+      // workload, the previous IN form produced a repeatedly scanned,
+      // materialised qualifying-player set in the surrounding join shape.
+      // The scalar array lets Postgres compute those ids once as an InitPlan
+      // while retaining the same player/club/match semantics.
       return sql`p.id = ANY (ARRAY(SELECT DISTINCT pms.player_id FROM player_match_stats pms
                                     JOIN matches m ON m.id = pms.match_id
                                    WHERE m.venue_id = ${venueId} AND m.is_final

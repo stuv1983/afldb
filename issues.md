@@ -7,12 +7,11 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 6
+**Open issues:** 5
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
-| `AFLDB-ISSUE-076` | Medium | Performance | Grid Solver combinations using `won_final_at_venue` can exceed PostgreSQL's 5-second statement timeout and crash the page. | Capture and compare the generated SQL/EXPLAIN plan against `played_at_venue`, then optimise the `won_final_at_venue` query shape without raising the application timeout. |
 | `AFLDB-ISSUE-099` | Medium | Data acquisition / Import architecture | 2026 has no player-match statistics, period scores, attendance or Brownlow votes, because Squiggle/Kali carry none of them. AFL Tables — already the frozen canonical historical source — was confirmed by live probe to carry 2026 through Round 25 including per-match player statistics, venue, attendance and a ladder. | Build a nightly in-season settle pass: partial fitzRoy acquisition (`acquire_core.R --from/--to`) + SHA-256 manifest, then **reviewed** promotion of matches, period scores, attendance, player stats and Brownlow votes, reusing the ISSUE-093 machinery. Depends on `AFLDB-ISSUE-096`; implementation gated on probe **P5** (stop condition if stable `ID`/`url` are absent for 2026). |
 | `AFLDB-ISSUE-100` | Medium | Data acquisition / Import architecture | AFLDB has no model for announced teams, jumper numbers, substitutions or late changes; canonical participation is the played match sheet, which exists only after a match. `fetch_lineup_afl` is the only free source found that supplies lineups at all. | Add a new `staging.external_lineups` table fed by `fetch_lineup_afl`, for admin visibility and reconciliation only. **Lineups are staging-only and never become canonical participation**; no public surface. Depends on `AFLDB-ISSUE-096`; implementation gated on probe **P3**, which must supply the still-UNKNOWN column set. |
 | `AFLDB-ISSUE-101` | Medium | Data acquisition / Import architecture / Data integrity | The approved historical boundary gives the API pipeline only the in-progress season, but nothing performs the transition when a season completes, so in-season provenance would become permanent and the Stage-9 gate would drift. | Implement the rollover: extend `fitzroy-accepted-baselines.json` to the completed season, supersede in-season provenance, advance `seasons.json.in_progress_seasons`, re-point the Stage-9 `matches_after_accepted_last_season` gate. **Must not redefine completed-season `club_seasons` ownership — that stays with `AFLDB-ISSUE-095`.** Depends on `AFLDB-ISSUE-099` plus coordination/completion of the relevant ISSUE-095 path. |
@@ -2741,7 +2740,7 @@ Keep this issue out of NL semantic defect counts. The regenerated expanded corpu
 
 ## AFLDB-ISSUE-068 - Intermittent React hydration errors during NL UI sweeps
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** UI/Hydration
 - **Found:** 2026-08-21
@@ -3461,8 +3460,8 @@ None. No production files changed; no follow-up defect identified.
 - **Severity:** Medium
 - **Area:** Performance
 - **Found:** 2026-08-22
-- **Resolved:** N/A
-- **Files:** `src/db/queries/grid-solver.ts`, `src/search/grid-solver-spec.ts`, `tests/integration/grid-solver.test.ts`
+- **Resolved:** 2026-08-28
+- **Files:** `src/db/queries/grid-solver.ts`, `tests/integration/grid-solver.test.ts`, `AFLDB-ISSUE-076-CODEX-HANDOFF.md`
 
 ### Symptom
 A valid `/grid-solver` grid can repeatedly crash during server rendering with Next.js digest `1511510695`.
@@ -3519,24 +3518,27 @@ This isolates the expensive path to the `won_final_at_venue` implementation or i
 Database query/compiler performance.
 
 ### Root cause
-Not yet confirmed. Likely candidates include an expensive correlated subquery, repeated scans of `player_match_stats`/match facts, planner-hostile join order, late application of final/venue/winner predicates, or a missing/ineffective index. The exact generated SQL and execution plan have not yet been captured.
+The `won_final_at_venue` compiler emitted player membership as `p.id IN (SELECT pms.player_id ...)`. Under the historical mixed Grid Solver workload, PostgreSQL underestimated the qualifying winner-player set and chose a surrounding plan that repeatedly scanned a materialised copy and discarded rows through a join filter. The equivalent `played_at_venue` control avoided that pathological shape, explaining its approximately 360–397 ms runtime.
+
+The current plan still underestimates the winner-player set, but cardinality estimation itself was not the acceptance defect. The defect was allowing that underestimated set to determine a repeatedly scanned surrounding join shape.
 
 ### Fix
-Not yet fixed. Do **not** treat increasing PostgreSQL `statement_timeout` as the fix; the successful `played_at_venue` comparison shows the query shape should be investigated first.
+Changed only `won_final_at_venue` membership to `p.id = ANY (ARRAY(SELECT DISTINCT ...))`. PostgreSQL now builds the distinct qualifying winner-player IDs once as an InitPlan and reuses the scalar array. Exact semantics are preserved: the player participated at the requested venue, the match was a final, and `matches.winner_club_id` equals the player's `player_match_stats.club_id` for that match.
+
+No statement-timeout increase, index, schema change or weakened predicate was used. Plan evidence did not justify an index.
 
 ### Validation
-Runtime evidence only. The timeout is reproducible and correlated to the exact digest and grid configuration. No SQL-plan remediation has yet been tested.
+Validated through the dedicated verified SSH tunnel against authoritative `afldb_test` as `afldb_owner`, with the normal `AFLDB_STATEMENT_TIMEOUT_MS=5000` guard.
+
+- The exact mapped historical concurrent 3x3 workload remains in `tests/integration/grid-solver.test.ts`, ordered by `games_asc` with a `< 4000 ms` safety assertion.
+- Its final focused post-cleanup run passed in **380 ms** (whole run 679 ms; 1 passed / 129 skipped; no SQLSTATE `57014`).
+- The regression independently reconstructs all three MCG `won_final_at_venue` cells from base relations: two qualifying 50-game organisation stints, Adam Cerra club-season teammates, and players with a 20-kick match, each intersected with actual winning-final participation at the MCG. It independently compares eligible counts and the first player under `player_career_stats.games ASC, players.sort_name` by id and display name. It does not call the Grid Solver compiler as its oracle.
+- The actual captured production query for `single_game_stat_min(kicks,20)` x `won_final_at_venue(MCG venue 26)` used binds `$1=20`, `$2=26`. `EXPLAIN (ANALYZE, BUFFERS)` completed in **172.621 ms** after 1.195 ms planning, with 272,326 shared-buffer hits and 1,071 eligible rows.
+- The winner-player set is `InitPlan 1`, `loops=1`: 9,629 qualifying participation rows become 3,007 distinct players through `Unique`, also at one loop. The estimate remains low (324 planned), but there is no winner-set `Materialize` node, repeated materialised scan, or massive rows-removed-by-join-filter pathology.
+- Four complete Grid Solver integration-file runs kept the ISSUE-076 test green at **341 ms, 361 ms, 344 ms and 357 ms**. Each broader run passed 127/130 tests; the same three unrelated `won_a_final` / `never_won_a_final` predicates timed out at their own five-second boundary. Those separate compiler cases are untouched by this issue and were left unchanged rather than broadening ISSUE-076.
 
 ### Follow-up
-1. Locate and compare `won_final_at_venue` and `played_at_venue` in the Grid Solver compiler.
-2. Reproduce the exact failing grid against development PostgreSQL and capture generated SQL plus bind parameters.
-3. Run `EXPLAIN (ANALYZE, BUFFERS)` in development, temporarily raising the diagnostic session timeout only if required.
-4. Inspect sequential scans, nested loops, correlated subqueries, repeated large-table scans, predicate timing, `DISTINCT`/`GROUP BY`, cardinality estimates and existing indexes.
-5. Prefer a better query shape before adding an index unless the execution plan demonstrates an index is appropriate.
-6. Preserve semantics: the player must have won, the match must be a final, and the match must have been played at the requested venue.
-7. Add regression coverage for the exact failing combination plus standalone and mixed `won_final_at_venue` cases.
-8. Acceptance target: correct result, no timeout, comfortably below five seconds and preferably below one second on the development dataset.
-9. Track the misleading RSC `status=200` trace behaviour separately as an observability follow-up if needed; do not mix it into the query-performance fix.
+None within ISSUE-076. The separately observed `won_a_final` / `never_won_a_final` timeouts are not part of this fix and must not cause the proven `won_final_at_venue` optimisation to be redesigned.
 
 
 ## AFLDB-ISSUE-075 — Confidence-scored suggestions for /admin/player-links

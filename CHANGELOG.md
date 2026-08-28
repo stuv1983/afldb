@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-076 — Grid Solver winning-final venue queries stay within the database timeout - 28 August 2026
+
+- Re-shaped `won_final_at_venue` membership so PostgreSQL computes the distinct winner-player IDs once as a scalar-array InitPlan instead of allowing an underestimated qualifying set to produce a repeatedly scanned materialised join shape. Venue, final and player-club winner semantics are unchanged; the normal five-second statement timeout remains intact, and no index or schema change was needed.
+- Added the exact historical concurrent 3x3 Grid Solver workload as a performance regression plus a structurally independent base-table oracle for all three implicated MCG cells. The final focused `afldb_test` run completed in 380 ms, while the captured representative production query completed in 172.621 ms under `EXPLAIN (ANALYZE, BUFFERS)` with a one-loop InitPlan and no historical materialised join-filter pathology.
+
 ### AFLDB-ISSUE-097 — Current-season corroboration now counts independent evidence groups - 28 August 2026
 
 - Reworked current-season disagreement/corroboration planning to consume ISSUE-096's tracked
