@@ -9,7 +9,11 @@ UNAPPLIED.** **S3 COMPLETE and GREEN — `84/84`, 0 failures, 316 ms, user-run 2
 is implemented; the canonical acceptance/write transaction remains **deliberately unimplemented**
 behind ISSUE-086's authority gate (§7). The §16.11 NUL hygiene item is RESOLVED. Migration 074
 remains UNAPPLIED. §11's stage decomposition ends at S4 — there is no approved S5 (§16.12).**
-**Fresh-session handoff: read §16 first.**
+**The separately authorised PostgreSQL validation phase was HALTED at its preflight on 2026-08-28:
+`afldb_test`'s migration baseline is incoherent because applied migration `073_data_overrides.sql`
+(`AFLDB-ISSUE-086`'s) fails the runner's checksum guard, so migration 074 cannot be applied through
+supported tooling and must not be modified until that is repaired (§16.13, §16.14).**
+**Fresh-session handoff: read §16 first, then §16.13.**
 **Mode:** foundation implementation, stages S1–S4. No family importer. No Git.
 **Created:** 2026-08-28. **Model/effort:** Opus / High / Plan.
 **Parent runbook:** `AFLDB-2026-API-ACQUISITION.md` — source evidence, source-of-truth matrix,
@@ -1535,6 +1539,9 @@ ambiguity.
 **Both source files are now confirmed free of raw NUL bytes**, and the two composite machine keys —
 `observationKey()` and `parseSourceFamilyRegistry`'s `identity` — retain U+0000 separators.
 
+> **RESOLVED 2026-08-28 — the byte was removed by the user and this file is NUL-free; the record
+> below is retained as lineage.** *(Original text follows.)*
+>
 > **OUTSTANDING, in this runbook file only — one raw NUL byte, introduced 2026-08-28 while writing
 > this very section.** §16.7a's incident repeated exactly: the assistant tried to write the escape
 > into prose and the pipeline materialised the character instead. It sits between the two backticks
@@ -1610,6 +1617,204 @@ historical payload hash, exactly one open version per record, `promotion_decisio
 `indeterminate` failing closed, and **no force flag**; no weakening of `recomputeClubSeasons`'s
 empty-staging guard and no `club_seasons` Stage-9 gate until ISSUE-095 lands; and no change to
 `current-season-import.ts` or `staging.external_current_matches`.
+
+### 16.13 PostgreSQL validation phase — **HALTED AT PREFLIGHT 2026-08-28** by migration-073 checksum drift
+
+The separately authorised post-S4 phase (apply migration 074 to `afldb_test` and validate the
+§5.H PostgreSQL behaviours) **stopped at its first command**. Migration 074 was **NOT applied**,
+was **NOT modified**, and no database was written to. **S1–S4 are unaffected and remain green.**
+
+**Preflight, user-run 2026-08-28** — `npx tsx tools/db/migrate.ts --status --target test`:
+
+```text
+AFLDB migrations -> test (afldb_owner@127.0.0.1:5432/afldb_test)
+  74 migration file(s), 73 already applied
+
+ERROR: these applied migrations have been modified since they ran:
+  - 073_data_overrides.sql
+
+Add a new migration instead of editing an applied one.
+```
+
+**What it proves.** The target really is `afldb_test`; 74 migration files exist and 73 are
+recorded applied, so **074 is the sole unapplied migration by count**; and the runner's
+drift guard (`tools/db/migrate.ts:182-190`) refused before the status listing was ever printed.
+The refusal is the correct behaviour and was **not** worked around: no manual `psql`, no hand-run
+074, no edit to `073`, no write to `afldb_meta.schema_migrations`.
+
+**First wrong layer: `AFLDB-ISSUE-086`'s change management for `073_data_overrides.sql`.** The
+version recorded in `afldb_test`'s ledger is a form of 073 that **exists nowhere in Git history**.
+Three candidate explanations were tested and two are eliminated:
+
+| Hypothesis | Verdict | Evidence |
+|---|---|---|
+| Line-ending artefact (CRLF vs LF) | **ELIMINATED** | `matchesStoredChecksum` accepts **three** bounded representations — `raw`, `canonicalLf`, `canonicalCrlf` (`tools/db/migration-checksum.ts`, the ISSUE-091 tolerance). A stored checksum is rejected only for a **non-line-ending** byte difference. `core.autocrlf=true` and there is no `.gitattributes`, so the worktree file is the committed blob re-materialised as CRLF — exactly the case the tolerance exists to absorb. |
+| Checksum-algorithm evolution | **ELIMINATED** | The same runner validated **72 of 73** applied rows in the same pass. An incompatible algorithm would have drifted many rows, not one. |
+| The applied artefact was never committed | **CONFIRMED** | Git history plus the ledger timestamps below: `afldb_test` recorded 073 **1 h 1 min 48 s before the sole committed revision existed**. |
+
+**Git evidence (read-only; no history or working file altered).**
+
+| Fact | Value |
+|---|---|
+| Commits touching `073_data_overrides.sql`, all refs | **two**: `2a068a8` (on `dev`, HEAD) and `e0d64aa` (on `agy/issue-086-port`) |
+| Both commits | `fix: preserve admin edits across source reloads`, Stu Villanti, **Fri Aug 28 02:56:29 2026 +1000** — the same commit content on two branches |
+| Blob id of 073 in **both** | **`a8ad3079d65bd38bcaaec43d6a54bc4d9df02f7e`** — byte-identical |
+| Working tree | clean for 073; differs from the blob only from char 73 of line 1, i.e. the first line ending |
+| Stashes | none |
+
+**Therefore exactly one committed revision of 073 has ever existed, and the runner has already
+rejected that revision in all three representations.** No committed revision can match what
+`afldb_test` recorded, so the applied artefact is an **uncommitted intermediate state** of 073 —
+applied to the test database while the file was still being iterated, and edited before it was
+committed.
+
+**`dev` does NOT contain an invalid mutation of an applied migration.** The distinction matters
+for the repair: the single blob was never rewritten after being committed, so no committed history
+is invalid and **nothing needs history surgery**. The incoherence is between the **database ledger**
+and the only committed revision — a database-state problem, not a repository-content problem.
+
+**Ledger evidence — user-run read-only, 2026-08-28. The diagnosis is now CONFIRMED, not inferred.**
+
+| Datum | Value |
+|---|---|
+| `afldb_test` stored checksum, `073_data_overrides.sql` | `47937827404c5d7ae0b46b08e7a077219b55196979922ba271d1ca57bc420d93` |
+| Committed 073, canonical-LF sha256 (`git show 2a068a8:… | sha256sum`) | `778c5bfb7964263127c7e2a061eb2745548452bfe8bba4dd94ebbc03dca93bc9` |
+| `applied_at` for 073 in `afldb_test` | **`2026-08-28 01:54:41.063665+10`** |
+| Commit time of the sole committed 073 revision | **`2026-08-28 02:56:29+10`** |
+| Interval | the database applied 073 **1 h 1 min 48 s BEFORE the committed revision existed** |
+| Control row: `072_dob_conflict_ownership.sql` | checksum `da42510d2b44459b59abafb45d846a9bfc1364cbed04afcc3f367618d5451e4a`, applied `2026-08-27 22:02:21.991501+10` — validates cleanly under the same algorithm |
+
+The two checksums differ in full, and the runner had already ruled out the raw/LF/CRLF variants of
+the current file. **`afldb_test` was migrated with an uncommitted intermediate version of
+`073_data_overrides.sql`, and that intermediate version was changed again before the final file was
+committed.** The applied artefact is not recoverable from this repository: it was never committed
+and no stash holds it.
+
+**Repair model — CORRECTION, recorded because the naive reading is wrong.** A later corrective
+migration **cannot by itself** restore a coherent baseline. `migrate.ts` validates the checksums of
+**already-applied** migrations *before* it runs anything (`:182-190`), so a hypothetical 075 would
+never execute: the run would halt on 073 first. **The baseline must be made coherent first, and
+only then can any later migration run.** Evaluating and choosing the mechanism belongs to
+`AFLDB-ISSUE-086` and must account for the test-data and rebuild consequences; the avenue that
+issue is expected to investigate is whether `afldb_test` should be rebuilt from a coherent
+ISSUE-086 checkpoint ending at the committed 073. **That decision is not ISSUE-096's and is not
+made here.**
+
+**Prohibitions binding on ISSUE-096 while this is blocked:** do not edit 073; do not update
+`afldb_meta.schema_migrations` by hand; do not bypass or weaken checksum validation; do not rebuild
+`afldb_test` **from this worktree** — this tree carries pending migration 074, which a rebuild
+would sweep in *before* its three FK-covering indexes (§16.14) exist; do not apply 074; and do not
+perform the §16.14 three-index repair yet.
+
+**Owning workstream: `AFLDB-ISSUE-086`.** It owns `073_data_overrides.sql` and its application to
+environments. ISSUE-096 has never touched that file (§16.1's file list excludes it, and the Git
+history above shows it was authored entirely under ISSUE-086), must not repair it, must not access
+ISSUE-086's worktrees, and must not infer ISSUE-086 authority semantics from its contents — that
+boundary (§14 approval 4, §16.5) is unchanged by this incident.
+
+**Consequence for ISSUE-096, recorded as the durable status:**
+
+- **S1–S4 remain green — `34/34`, `61/61`, `84/84`, `105/105`.** Nothing in this halt reflects on
+  them.
+- **Migration 074 has NOT failed.** It was never executed: the runner refused before reaching any
+  pending migration. 074 remains **unapplied and untouched**.
+- The **PostgreSQL validation phase is BLOCKED before 074**, by `AFLDB-ISSUE-086`'s migration-073
+  ledger drift — a dependency outside this issue, not a defect in ISSUE-096's work.
+- The **PostgreSQL validation phase is BLOCKED** until the `afldb_test` migration baseline is
+  coherent. The runner refuses every migration while any applied row drifts, so 074 cannot be
+  applied through supported tooling, and no unsupported route is acceptable.
+- **Migration 074 must NOT be modified while the baseline is incoherent**, including the FK-index
+  repair in §16.14. Editing a pending migration is legitimate; doing it while a *different*
+  migration's provenance is unresolved would entangle two independent repairs.
+- **Nothing in the S1–S4 design is implicated.** The drift is entirely in a neighbouring migration
+  owned by another issue. When the baseline is repaired, ISSUE-096 resumes at exactly this point
+  with the §5.H matrix (§16.15) unchanged.
+
+### 16.14 Migration 074 — three uncovered foreign keys, repair DEFERRED
+
+Found by inspection during the same session, **before** the preflight, and **not yet repaired**
+(§16.13 defers it until the baseline is coherent).
+
+`tests/integration/fk-indexes.test.ts` is an existing green gate: every foreign key in `public`
+whose parent is not in its `DELETE_FREE_PARENTS` list must have a **leading-column** index, and a
+partial index counts only when its predicate is exactly `(col IS NOT NULL)`. Its own header names
+`auth_users` as the case that must "fail here rather than ship".
+
+074 adds seven foreign keys in `public`. Three are uncovered, so **applying 074 as written turns
+that suite red**:
+
+| Foreign key | Covered? |
+|---|---|
+| `promotion_candidates(source_id) -> sources` | exempt parent |
+| `promotion_candidates(season) -> seasons` | exempt parent |
+| `promotion_candidates(created_by_batch_id) -> import_batches` | exempt parent |
+| `promotion_decisions(candidate_id) -> promotion_candidates` | yes — `ix_promotion_decisions_candidate` |
+| **`promotion_candidates(source_id, family, external_record_id, source_version_seq)`** | **NO** — `ux_promotion_candidates_pending` has a different 4th column and a non-matching partial predicate |
+| **`promotion_candidates(resolved_decision_id) -> promotion_decisions`** | **NO** |
+| **`promotion_decisions(admin_user_id) -> auth_users`** | **NO** |
+
+Staging FKs are out of scope: that suite filters child tables to `nspname = 'public'`.
+
+**Sequencing, and why this is recorded rather than left to be noticed later.** `migrate.ts` refuses
+to run once an **applied** migration's checksum drifts, so once 074 is applied its file is frozen
+and this repair costs a migration 075. The three indexes must therefore land in 074 **after** the
+073 baseline is repaired and **before** 074 is applied. Proposed minimal repair, unchanged from the
+session review and **not applied**:
+
+```sql
+CREATE INDEX ix_promotion_candidates_evidence
+  ON promotion_candidates (source_id, family, external_record_id, source_version_seq);
+CREATE INDEX ix_promotion_candidates_decision
+  ON promotion_candidates (resolved_decision_id) WHERE resolved_decision_id IS NOT NULL;
+CREATE INDEX ix_promotion_decisions_admin
+  ON promotion_decisions (admin_user_id);
+```
+
+These are **not speculative performance indexes** — they satisfy a machine-enforced repository
+invariant. `DELETE_FREE_PARENTS` is not to be widened instead: `auth_users` is deletable, and the
+suite's companion test refuses an exemption that is not load-bearing.
+
+The rest of 074 was reviewed in full against S2–S4 and **no contradiction was found**: the three
+grains carry the approved identities; the only `UNIQUE` on the history table is
+`ux_source_record_versions_open` and there is **no uniqueness on `payload_hash`**; `absent_since`
+lives only on `source_records`; the candidate verb CHECK is Decision C's nine non-`unchanged` verbs
+with `history_only` correctly absent; `promotion_candidates_acceptable_ck` restricts `accepted` to
+`PROMOTABLE_VERBS`; the pending partial-unique index still permits supersession; the ledger is
+`SELECT, INSERT` to `afldb_auth` only and is deliberately not import-writable; and **no FK carries
+an `ON DELETE` action and no trigger or rule exists**, so no observation history can be silently
+erased and no observation write can reach a canonical table. Two limitations are recorded rather
+than repaired: payload/version immutability is a **grant** property (`privileges.sql` grants
+`afldb_import` full DML on all of `staging`, the existing 063 model), and
+`baseline_canonical_hash` carries no format CHECK where `payload_hash` does.
+
+### 16.15 §5.H PostgreSQL validation matrix — what is actually provable at this checkpoint
+
+Built before any implementation, as the phase required, and **retained unrun** because §16.13
+halted the phase. The governing fact: `src/lib/acquisition/` contains **no persistence layer at
+all** — every module is pure, and `resolveSourceId` is the boundary nothing crosses. Any §5.H
+assertion whose subject is an import re-run or the accept transaction has no code to exercise.
+
+| §5.H assertion | Class | What is actually provable |
+|---|---|---|
+| **Idempotence** | **PARTIAL** | The observation half is provable: `decideObservation` returns `unchanged`, the persisted consequence is one `UPDATE staging.source_records` and zero A1/A2 inserts, `current_version_seq` unchanged. The "0 canonical writes" clause is **vacuous** — no code path can write canonical data — and is provable only structurally. |
+| **Correction replay A -> B -> A** | **EXECUTABLE** | Fully: three ordered versions over two payloads is pure schema behaviour. |
+| **Absence is not deletion** | **EXECUTABLE** | Fully, with "canonical untouched" proven structurally (074 creates no trigger and no rule) plus row-count invariance. |
+| **Foreign ownership** | **PARTIAL** | The predicate is pure TypeScript with no DB path (green DB-free at 105/105). DB-provable: a `foreign_owned_collision` candidate reaching `accepted` is unrepresentable by CHECK. |
+| **Stale-review race** | **PARTIAL** | No accept transaction exists, so the race cannot be run. DB-provable: the approved S4 distinction has a real schema consequence — `stale_review` -> supersede frees `ux_promotion_candidates_pending` for the replacement candidate, while `stale_canonical_target` -> re-render keeps one pending row; `requeue` requires a `refusal_reason` and both reasons are in the ledger vocabulary. |
+| **Manual authority, incl. indeterminate** | **BLOCKED — `AFLDB-ISSUE-086`** | No DB-backed authority query exists. Vocabulary only. |
+| **Source disagreement + `data_issues` row** | **BLOCKED — never implemented** | Confirmed by search: **nothing in `src/lib/acquisition/` references `data_issues`.** Decision C names the write; no stage built it, and building it now would absorb ISSUE-097/099. |
+| **Rollover supersession** | **BLOCKED — `AFLDB-ISSUE-101`, and unsupported by 074** | Beyond having no code: §5.G requires in-season observation rows to be **marked superseded**, and **074 has no supersession column on any of the three grains** — `superseded` exists only as a `promotion_candidates.status`. Recorded as a forward gap for ISSUE-101; **not** repaired here. |
+
+**Two of eight fully executable, three partial, three blocked.** No blocked assertion is to be made
+artificially green, and no fake canonical write is to be created in order to test "0 writes".
+
+**Integration tests do not exist yet.** All 21 spine references in
+`tests/current-season-import.test.ts` read **migration source text**, not a database; nothing under
+`tests/integration/` touches the spine. When the phase resumes, the conventions to follow are the
+repository's own: `import './guard'` first, `sql` from `@/db/client` (redirected to
+`AFLDB_TEST_DATABASE_URL` by `tests/setup.ts`, which already refuses any database not matching
+`_test`), and `database.test.ts`'s `sql.begin` + deliberate `Rollback` envelope so no fixture is
+ever committed. Privilege assertions belong in `tests/integration/privileges.test.ts`.
 
 ---
 

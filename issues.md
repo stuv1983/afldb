@@ -7481,6 +7481,48 @@ access is available (exact commands in `AFLDB-2026-API-ACQUISITION.md` §13.7). 
 contract.
 
 ### Exact next action
+
+**PostgreSQL validation phase HALTED AT PREFLIGHT 2026-08-28 — BLOCKED by migration-073 checksum
+drift (`AFLDB-ISSUE-096.md` §16.13).** The separately authorised phase (apply 074 to `afldb_test`,
+run the §5.H integration tests) stopped at its first command:
+`npx tsx tools/db/migrate.ts --status --target test` proved the target is `afldb_test` with 73 of
+74 migrations applied, then **refused** because applied migration `073_data_overrides.sql`
+(`AFLDB-ISSUE-086`'s) no longer matches its recorded checksum. **074 was NOT applied and NOT
+modified; no database was written to; S1–S4 remain green.**
+
+First wrong layer: **ISSUE-086's change management for 073**, not the runner, not line endings and
+not ISSUE-096. Line-ending drift is eliminated — `matchesStoredChecksum` accepts raw/LF/CRLF
+representations (ISSUE-091) — and algorithm drift is eliminated by the 72 rows that validated in
+the same pass. Git shows **exactly one committed revision of 073 has ever existed** (blob
+`a8ad3079…`, identical in `2a068a8` on `dev` and `e0d64aa` on `agy/issue-086-port`, both dated
+2026-08-28 02:56:29 +1000), the worktree is clean, and there are no stashes — so **no committed
+revision can match what `afldb_test` recorded** and the applied artefact is an uncommitted
+intermediate state. **`dev` contains no invalid mutation of an applied migration**: the blob was
+never rewritten after being committed, so no history surgery is needed and the incoherence is
+between the **database ledger** and the sole committed revision.
+
+**CONFIRMED by the ledger, user-run read-only 2026-08-28.** Stored checksum for 073 in `afldb_test`
+is `47937827404c5d7ae0b46b08e7a077219b55196979922ba271d1ca57bc420d93`; the committed revision's
+canonical-LF sha256 is `778c5bfb7964263127c7e2a061eb2745548452bfe8bba4dd94ebbc03dca93bc9`; the
+database applied 073 at **`2026-08-28 01:54:41.063665+10`**, which is **1 h 1 min 48 s BEFORE** the
+sole committed revision existed (`2026-08-28 02:56:29+10`). The control row
+`072_dob_conflict_ownership.sql` (applied `2026-08-27 22:02:21.991501+10`) validates cleanly under
+the same algorithm. `afldb_test` was therefore migrated with an **uncommitted intermediate version**
+of 073 that was changed again before the final file was committed; the applied artefact is not
+recoverable from this repository.
+
+**Repair-model correction:** a later corrective migration **cannot by itself** fix this —
+`migrate.ts` validates already-applied checksums *before* running anything, so a 075 would never
+execute and the run would halt on 073 first. **The baseline must be made coherent first.** Choosing
+and executing the mechanism is **`AFLDB-ISSUE-086`'s**, weighing the test-data/rebuild consequences
+(the avenue to investigate there is rebuilding `afldb_test` from a coherent checkpoint ending at
+the committed 073). ISSUE-096 must not repair 073, must not touch `afldb_meta.schema_migrations`,
+must not bypass checksum validation, must not rebuild `afldb_test` **from this worktree** (it
+carries pending 074, which a rebuild would sweep in before its §16.14 FK indexes exist), must not
+apply 074, must not perform the §16.14 three-index repair yet, and must not access ISSUE-086's
+worktrees. **S1–S4 remain green (34/34, 61/61, 84/84, 105/105) and migration 074 has NOT failed —
+it was never executed.**
+
 **None inside ISSUE-096 as approved — all four authorised stages are complete.** §11's
 decomposition is S1–S4 and stops there, and §14's approval authorised implementation "through
 stages S1–S4" only, so **there is no approved S5**: any next stage is a fresh approval decision,
@@ -7490,9 +7532,16 @@ not a continuation (`AFLDB-ISSUE-096.md` §16.12). The three unbuilt pieces and 
    decision row) — **BLOCKED on `AFLDB-ISSUE-086`** by §7's implementation gate. Replacing
    `UNAVAILABLE_MANUAL_AUTHORITY` is permitted only against ISSUE-086's own confirmed contract,
    never inferred from `073_data_overrides.sql`, whose worktrees stay off limits.
-2. **Applying migration 074 and the §5.H PostgreSQL integration tests** — **not** blocked by
-   ISSUE-086, but a separate explicitly authorised step: **`afldb_test` only**, never `afldb_dev`,
-   never production, with `grant_app_read()` / `privileges.sql` treatment for every new table.
+2. **Applying migration 074 and the §5.H PostgreSQL integration tests** — authorised and attempted
+   on 2026-08-28, then **HALTED at preflight and now BLOCKED on the `afldb_test` migration-baseline
+   repair owned by `AFLDB-ISSUE-086`** (see the halt record above and §16.13). Still **`afldb_test`
+   only**, never `afldb_dev`, never production, with `grant_app_read()` / `privileges.sql`
+   treatment for every new table. Two findings are held for the resumption: 074 has **three
+   uncovered foreign keys** that would turn `tests/integration/fk-indexes.test.ts` red and must be
+   indexed **before** it is applied (§16.14), and the §5.H matrix (§16.15) classifies three of the
+   eight assertions as **BLOCKED** — manual authority (ISSUE-086), the `data_issues` disagreement
+   row (never implemented in S1–S4), and rollover supersession (ISSUE-101, and with no supersession
+   column in 074).
 3. **The admin review screen** — an explicit §2 **non-goal** of ISSUE-096. S4 delivered the domain
    contract it would render; building the route and components is not this issue's approved work.
 
