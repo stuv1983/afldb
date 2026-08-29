@@ -1,12 +1,15 @@
 # AFLDB-ISSUE-108 — `afldb_test` guarded integration is not green
 
-- **Status:** Open — Path A complete, all 33 stable failures classified; awaiting the
-  serial guarded re-run on Linux dev
+- **Status:** **Resolved — 2026-08-30.** Path A complete and validated: the guarded serial
+  suite is green on Linux at the exact implementation commit `673f0e3` — **89 passed / 5
+  skipped test files, 2,515 passed / 104 skipped tests, 0 failures, 122.21 s** (§12).
+- **Resolved:** 2026-08-30
 - **Severity:** Medium
 - **Area:** Test database / Data integrity / Tooling
 - **Found:** 2026-08-29 (AFLDB-ISSUE-107 Linux Next 16 validation gate G2)
 - **Owner runbook:** this file
-- **Blocks:** `AFLDB-ISSUE-107` G2 (guarded database-integration leg)
+- **Blocked (now released):** `AFLDB-ISSUE-107` G2 (guarded database-integration leg) —
+  G2 is **PASS** as of this validation
 - **Do not touch:** `AFLDB-ISSUE-068` (resolved), `AFLDB-ISSUE-109` (separate)
 - **Resolution path:** **A — correct the stale test contract to the accepted canonical
   baseline `full-history-20260827`; run the guarded gate serially.** `afldb_test` is
@@ -273,8 +276,9 @@ are accepted as obsolete under the canonical rebuild.
 - **No `afldb_dev` or production mutation.** No database was written. No SSH, psql,
   npm, migration or deployment command was executed from this session.
 - **No Git operations.**
-- `AFLDB-ISSUE-107` G2 stays blocked; `AFLDB-ISSUE-107` remains Open. `AFLDB-ISSUE-068`
-  and `AFLDB-ISSUE-109` untouched.
+- *(As at the §1–§7 investigation phase)* `AFLDB-ISSUE-107` G2 stayed blocked and
+  `AFLDB-ISSUE-107` remained Open. **SUPERSEDED by §12** — G2 is now PASS.
+  `AFLDB-ISSUE-068` and `AFLDB-ISSUE-109` untouched.
 
 ---
 
@@ -477,3 +481,74 @@ rebuild's own validation work, not with ISSUE-108.
   33 stable failures are now classified. **`afldb_test` was not rebuilt; no
   `afldb_dev`, production, database-write or Git command was run.** ISSUE-108 stays
   **Open** until the Linux serial suite is actually green.
+- **2026-08-30** — **Final validation PASSED on Linux at the exact implementation commit
+  `673f0e3`: 89 passed / 5 skipped test files, 2,515 passed / 104 skipped tests, 0
+  failures, 122.21 s.** ISSUE-108 marked **Resolved**; `AFLDB-ISSUE-107` G2 set to
+  **PASS**. Evidence and residual follow-up in §12. `afldb_test` was never rebuilt.
+
+---
+
+## 12. Final validation — 2026-08-30 — PASS
+
+The exact ISSUE-108 implementation commit was run on Linux, serially, against the
+`afldb_test` DSN. Nothing was rebuilt, migrated or written outside the guarded suite's
+own transactional fixtures.
+
+| Item | Value |
+|---|---|
+| Commit | **`673f0e31877e6107368ab1377632b5a2d2048a62`** (`673f0e3`, "Resolve canonical test contract drift") |
+| Branch | `claude/issue-108` (`origin/claude/issue-108`) |
+| Working directory | `/home/arm/projects/afldb-issue-108-validation-673f0e3` |
+| Node / npm | `v22.23.2` / `10.9.8` |
+| Command | `npm test -- --no-file-parallelism` (serial is now the config default; the flag is redundant but harmless) |
+| **Test files** | **89 passed, 5 skipped (94 total), 0 failed** |
+| **Tests** | **2,515 passed, 104 skipped, 0 failed** |
+| **Duration** | **122.21 s** |
+
+**Result: 0 failures.** The 33 stable failures and the 3 parallelism flakes carried from
+`AFLDB-ISSUE-107`'s G2 gate are all cleared. Every residual is a deliberate, accounted-for
+skip with an owning issue — the retired Brownlow season/career authority gates
+(`AFLDB-ISSUE-090` §27.5), the DraftGuru Stage B3 identity-link gates, the 2026 provisional
+gates (`AFLDB-ISSUE-099` / current-season work), the DOB conflict-adjudication gates
+(retired as acceptance under `AFLDB-ISSUE-090`), the gitignored DraftGuru CSV parity oracle,
+and the restricted `afldb_import`-role parity cases that skip when
+`AFLDB_TEST_IMPORT_DATABASE_URL` is unset.
+
+### 12.1 Confirmed outcome
+
+`afldb_test` was **not** stale or corrupt. It matched the accepted canonical legacy-free
+baseline `full-history-20260827` exactly. The failures were a stale test contract, and were
+resolved by test-contract cleanup, explicit retirement of unavailable legacy acquisition
+expectations, portability fixes and semantic identity repairs — never by weakening a gate
+whose data exists. Key adjudications stand as recorded in §9: Brownlow season/career
+authority gaps remain owned by `AFLDB-ISSUE-090` §27.5; DraftGuru Stage B3 link expectations
+retired; the canonical measured DOB state is 855 populated dates; the 2026 provisional gates
+belong to current-season work / `AFLDB-ISSUE-099`; the optional DraftGuru parity corpus skips
+when absent; the `data-editor` fixture was repaired to satisfy
+`matches_score_components_ck`; the `db-health` invariant excludes DraftGuru-only shells with
+no match history; the manifest hash is platform-independent via a canonical LF
+representation; and every `players.id` was reseeded by the canonical rebuild, so the gates
+are re-anchored to semantic/durable identities rather than legacy surrogate IDs.
+
+Canonical identity evidence (unchanged from §9.4): Brent Harvey 432 games, `clubs_played` 1,
+`Kangaroos:200` + `North Melbourne:232`; Ron Barassi 58 games 1936–1940 and 254 games
+1953–1969; Gary Ablett 357 games 2002–2020 and 248 games 1982–1996; the 1960s/exactly-two-club
+cohort at 110 players → 110 durable AFL Tables identity keys → rebuild-stable hash
+`4b4c6a2aa975cc17`.
+
+Canonical aggregate proof: `player_match_stats` rows 685,471 = career games 685,471; finals
+fact rows 29,318 = career finals 29,318; fact goals 407,963 = career goals 407,963. Cohort
+expectations: 200–249 games with 16+ finals = 115; 200+ games with 100+ goals and 15+ finals
+= 219.
+
+### 12.2 Effect on AFLDB-ISSUE-107
+
+`AFLDB-ISSUE-107` **G2 is PASS**. This was the only gate ISSUE-107 was still open on.
+
+### 12.3 Residual follow-up — non-blocking, not in ISSUE-108 scope
+
+`tools/validation/validate_migration.py` and `tests/fixtures/oracle_baseline.json` remain
+bound to the retired legacy dataset (694,210 player-match rows, 13,361 players, legacy
+surrogate-ID cohort lists). That tool is outside the guarded vitest gate, so it does not
+affect this validation. Re-basing it belongs with the canonical rebuild's own validation
+work (§9.4.4) and must not reopen ISSUE-108.

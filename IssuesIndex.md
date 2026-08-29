@@ -6,8 +6,8 @@
 > `issues.md` disagree, trust `issues.md` and immediately synchronize this file
 > and the Open Issues table at the top of `issues.md`.
 
-**Last updated:** 2026-08-29
-**Open issues:** 4
+**Last updated:** 2026-08-30
+**Open issues:** 3 — `AFLDB-ISSUE-109`, `AFLDB-ISSUE-102`, `AFLDB-ISSUE-104`
 
 ## How Claude should use this file
 
@@ -24,9 +24,34 @@
 
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
-| `AFLDB-ISSUE-107` | Medium | Framework / Runtime / Deployment | **Open; deployed and proven live on Linux dev.** Next 16.3.1/Webpack, React/ReactDOM 19.2.8, Node v22.23.2; typecheck 0 errors; complete standalone build `uZReW8G1XnsGnG5FNYY-I` proven live via `x-afldb-build`; systemd healthy at unchanged 4 workers / pool 10; 17/17 live routes clean with zero hydration/client errors. Only guarded database integration is not green, blocked by `AFLDB-ISSUE-108` and provably not framework attributable. |
+<!-- RETIRED 2026-08-30 — `AFLDB-ISSUE-107` is **Resolved** and is NO LONGER an open issue.
+     Its pre-resolution row and detail block are retired below; their "Only open gate" and
+     "Exact next action" text is SUPERSEDED. Authoritative records: the `AFLDB-ISSUE-107`
+     entry in `issues.md` (Resolution, 2026-08-30) and `AFLDB-ISSUE-107.md` "Gates".
+     Final gate state: G0/G1/G2/G3/G4 PASS; G5 (production eligibility) is out of ISSUE-107's
+     scope by design and is NOT a completion condition. G2 closed when `AFLDB-ISSUE-108`
+     validated green on Linux at commit 673f0e3 (89 passed / 5 skipped files, 2,515 passed /
+     104 skipped tests, 0 failures, 122.21 s). Production rollout is separate work under its
+     own review and is NOT authorised by this resolution. -->
 | `AFLDB-ISSUE-109` | Medium | Admin / Privileges / Data integrity | **Open.** The data editor's override save inserts into `data_overrides` on the `afldb_import` connection, but migration `073` grants that role `SELECT` only and `privileges.sql` agrees. Latent since `073`; applying it to `afldb_dev` moved the failure from *relation does not exist* to *permission denied*. Fix belongs in a new migration or by moving the write off the importer connection — never a hand-granted privilege. |
-| `AFLDB-ISSUE-108` | Medium | Test database / Data integrity | **Open; Path A complete, all 33 stable failures classified, awaiting serial re-run.** Root cause corrected: `afldb_test` (77/77) already matches the accepted canonical baseline `full-history-20260827` exactly — the failures are a **stale test contract** (legacy-SQLite `IMMUTABLE` pins) plus 3 shared-DB parallelism flakes, not stale data. NOT rebuilt. Fixed: Class-A re-pins/skips in `release-gates`/`database`/`db-health` tests; manifest-hash line-ending defect (register + `.gitattributes`); `db-health` career-row check scoped to players with match history; `data-editor` score-swap fixture; `draftguru-acquisition` CSV-oracle `existsSync` guard; `vitest.config.mts` `fileParallelism: false`. Second defect (last 7): the canonical rebuild **re-seeds `players.id`** (13,277 players, 0 with `legacy_player_id`), so every pinned legacy ID addressed a different person — two gates were passing on the wrong people. Gates re-anchored to the data; membership digest re-based onto the durable AFL Tables identity (`4b4c6a2aa975cc17`); cohorts re-pinned 117→115, 222→219; decided-season Brownlow zero retired to `AFLDB-ISSUE-090` §27.5. Next: push, run `npm test` on Linux dev against the `afldb_test` DSN. |
+<!-- RETIRED 2026-08-30 — `AFLDB-ISSUE-108` is **Resolved** and is NO LONGER an open issue.
+     Do not read the row below as current: it is the pre-resolution index row, kept only as
+     lineage, and its "Open" / "awaiting serial re-run" / "Next" text is SUPERSEDED.
+     Authoritative records: the `AFLDB-ISSUE-108` entry in `issues.md` (Resolved, 2026-08-30)
+     and `AFLDB-ISSUE-108.md` §12. Final validation, Linux, exact commit 673f0e3, Node
+     v22.23.2 / npm 10.9.8, `npm test -- --no-file-parallelism`: 89 passed / 5 skipped test
+     files (94), 2,515 passed / 104 skipped tests, 0 failures, 122.21 s. `afldb_test` was NOT
+     rebuilt and was never stale — it matched the accepted canonical baseline
+     `full-history-20260827`. Every residual is a deliberate skip with an owning issue
+     (`AFLDB-ISSUE-090` §27.5 Brownlow, DraftGuru Stage B3, `AFLDB-ISSUE-099` 2026 provisional,
+     retired DOB adjudication, the gitignored DraftGuru CSV oracle, and the restricted
+     `afldb_import`-role parity cases). Non-blocking follow-up carried forward, NOT reopening
+     this issue: `tools/validation/validate_migration.py` and `tests/fixtures/oracle_baseline.json`
+     are still bound to the retired legacy dataset. This closure set `AFLDB-ISSUE-107` G2 to PASS.
+     The pre-resolution index row is DELETED, not merely commented out, so ISSUE-108 cannot
+     render as an open row under any renderer. Its full pre-resolution text is preserved in
+     `AFLDB-ISSUE-108.md` §9 and in the `AFLDB-ISSUE-108` entry in `issues.md`. -->
+
 <!-- RETIRED 2026-08-28 — `AFLDB-ISSUE-090` is **Resolved** and is NO LONGER an open issue.
      Do not read the commented-out row below as current: it is the pre-resolution index row,
      kept only as lineage, and its "Next action" text is SUPERSEDED. Authoritative records:
@@ -148,7 +173,7 @@
 
 <!-- No open rows follow. Everything below is retired lineage only: ISSUE-106 (retired
      2026-08-29) and ISSUE-093 (retired 2026-08-27). The three open issues are
-     ISSUE-068, ISSUE-102 and ISSUE-104, listed above. -->
+     ISSUE-109, ISSUE-102 and ISSUE-104, listed above. -->
 
 <!-- RETIRED 2026-08-29 — `AFLDB-ISSUE-106` is **Resolved** and is NO LONGER an open issue.
      Do not read the commented-out row below as current: it is the pre-resolution index row,
@@ -224,7 +249,22 @@
 
 -->
 
-## AFLDB-ISSUE-107 — Next.js 16 framework/runtime upgrade
+<!-- RETIRED 2026-08-30 — `AFLDB-ISSUE-107` and `AFLDB-ISSUE-108` are both **Resolved** and are
+     NO LONGER open issues. The two detail blocks below are retained as lineage only; their
+     "Current state", "Only open gate" and "Exact next action" text is SUPERSEDED. Authoritative
+     records: the `AFLDB-ISSUE-107` and `AFLDB-ISSUE-108` entries in `issues.md` (both
+     Resolved 2026-08-30), `AFLDB-ISSUE-107.md` "Gates" and `AFLDB-ISSUE-108.md` §12.
+
+     ISSUE-108 final validation — Linux, exact commit 673f0e3, Node v22.23.2 / npm 10.9.8,
+     `npm test -- --no-file-parallelism`: 89 passed / 5 skipped test files (94), 2,515 passed /
+     104 skipped tests, 0 failures, 122.21 s. `afldb_test` was NOT rebuilt and was never stale.
+
+     ISSUE-107 final gate state: G0 PASS, G1 PASS, G2 PASS, G3 PASS, G4 PASS; G5 (production
+     eligibility) is out of ISSUE-107's scope by design and is NOT a completion condition.
+     Production rollout is separate work under its own review and is NOT authorised by this
+     resolution. `AFLDB-ISSUE-109` remains Open and separate.
+
+## AFLDB-ISSUE-107 — Next.js 16 framework/runtime upgrade (RETIRED)
 
 - **Severity:** Medium
 - **Area:** Framework / Runtime / Deployment
@@ -259,7 +299,7 @@
   Re-run guarded integration once ISSUE-108 restores `afldb_test`. Do not resolve either issue
   before its owned gates pass, and do not roll out production.
 
-## AFLDB-ISSUE-108 — the guarded test contract predates the canonical legacy-free `afldb_test`
+## AFLDB-ISSUE-108 — the guarded test contract predates the canonical legacy-free `afldb_test` (RETIRED)
 
 - **Severity:** Medium
 - **Area:** Test database / Data integrity / Tooling
@@ -303,6 +343,11 @@
   now the config default; `--no-file-parallelism` is redundant but harmless). When serial is green
   (or every residual is an accounted-for skip), mark Resolved and set `AFLDB-ISSUE-107` G2 to
   PASS. Neither before that run passes.
+
+     DONE 2026-08-30 — that run passed (89/5 files, 2,515/104 tests, 0 failures, 122.21 s at
+     commit 673f0e3). ISSUE-108 Resolved, ISSUE-107 G2 PASS, ISSUE-107 Resolved.
+-->
+
 
 <!-- RETIRED 2026-08-28 — `AFLDB-ISSUE-077` is **Resolved** (2026-08-26) and is NO LONGER an
      open issue. The detail block below is retained as lineage only: its "Current state" and

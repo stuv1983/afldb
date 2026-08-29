@@ -1,6 +1,9 @@
 # AFLDB-ISSUE-107 — Next.js 16 framework/runtime upgrade
 
-- **Status:** Open
+- **Status:** **Resolved — 2026-08-30.** Every gate ISSUE-107 owns is PASS (G0–G4). G5 is a
+  production-eligibility gate that is out of ISSUE-107's scope by design and receives its own
+  review; it is not a completion condition (see "Gates" and "Completion").
+- **Resolved:** 2026-08-30
 - **Severity:** Medium
 - **Area:** Framework / Runtime / Deployment
 - **Found:** 2026-08-29
@@ -270,7 +273,8 @@ output, guarded integration, production-route E2E or the Linux/systemd runtime.
   DB integration and full `npm run build` on Linux development, then execute
   `deploy/sync-dev.ps1 -Issue107Gate` through the normal Git/npm/systemd path. Preserve the
   build ID, service status, health, worker/pool evidence and focused route/E2E console results.
-  ISSUE-107 stays Open until those G2/G3 results are green.
+  ISSUE-107 stays Open until those G2/G3 results are green. *(As-at 2026-08-29 planning —
+  **SUPERSEDED**: G2 and G3 are both PASS and ISSUE-107 is Resolved 2026-08-30; see "Gates".)*
 - Exact ISSUE-068 handoff after G3: run one comparable live Linux-dev 1,440-row sweep with
   every response bound to that build ID, `AFLDB_WORKERS=4` and established concurrency
   unchanged. ISSUE-068 may close only at zero unexplained hydration/client errors and no
@@ -350,7 +354,12 @@ value. `AFLDB_WORKERS=4` comes from `Environment=` in the unit rather than `.env
   `16.3.1`. `npm ci` clean, **0 vulnerabilities**.
 - `npm run typecheck` (`next typegen && tsc --noEmit`) on Linux: **PASS, 0 errors**.
 
-### Database-backed validation — NOT green, and not attributable to Next 16
+### Database-backed validation — NOT green as at 2026-08-29, and not attributable to Next 16
+
+> **SUPERSEDED 2026-08-30 — see "Gates".** `AFLDB-ISSUE-108` corrected the stale test contract
+> and the guarded suite is now green on Linux at commit `673f0e3` (89 passed / 5 skipped files,
+> 2,515 passed / 104 skipped tests, 0 failures, 122.21 s). The run below is retained as the
+> lineage of what G2 blocked on.
 
 `vitest run` against the guarded `afldb_test` DSN (the harness redirects `DATABASE_URL` to the
 `_test` database and refuses any other target):
@@ -383,6 +392,12 @@ Rebuilding is out of ISSUE-107's scope and is blocked here anyway: `db:test:rebu
 destructive, requires the absent `AFLDB_TEST_IMPORT_DATABASE_URL`, and preflights the absent
 corpus. Tracked separately as **`AFLDB-ISSUE-108`**. **G2's integration leg is therefore not
 green, and ISSUE-107 is not claimed to be Resolved on this evidence.**
+
+> **SUPERSEDED 2026-08-30 — as-at 2026-08-29 only.** The attributed cause above ("`afldb_test`'s
+> data has never been rebuilt") was **wrong**: `AFLDB-ISSUE-108` proved the data already matched
+> the accepted canonical baseline `full-history-20260827`, and the failures were a stale
+> legacy-era test contract. `afldb_test` was never rebuilt. With the contract corrected, the
+> guarded suite is green at commit `673f0e3` (0 failures) and **G2 is PASS** — see "Gates".
 
 ### Next 16 Webpack build and standalone output
 
@@ -575,11 +590,11 @@ and ISSUE-107 owns no schema change.
 - **G5 — Production eligibility:** G0-G4 are green and the production rollout receives its own
   review. Until then, production is out of scope.
 
-Current state (2026-08-29, after the Linux development gate): **G0 PASS; G1 PASS; G2 PARTIAL —
-build, typecheck and focused route/E2E all PASS on Linux, but the guarded database integration
-does NOT pass and is blocked by `AFLDB-ISSUE-108` (`afldb_test` data, provably not framework
-attributable); G3 PASS; G4 PENDING under ISSUE-068; G5 PENDING.** Neither ISSUE-107 nor
-ISSUE-068 is resolved.
+Intermediate state (2026-08-29, after the Linux development gate — **SUPERSEDED**, retained as
+lineage): G0 PASS; G1 PASS; G2 PARTIAL — build, typecheck and focused route/E2E all PASS on
+Linux, but the guarded database integration did NOT pass and was blocked by `AFLDB-ISSUE-108`
+(`afldb_test` test contract, provably not framework attributable); G3 PASS; G4 PENDING under
+ISSUE-068; G5 PENDING.
 
 **Update 2026-08-30 (`AFLDB-ISSUE-108` Path A):** `AFLDB-ISSUE-108` established that the 33
 guarded failures are a stale legacy-era test contract, not a stale `afldb_test` (which already
@@ -589,17 +604,37 @@ The test contract has been corrected to the canonical baseline and the guarded g
 related defect was found and repaired in the same pass: the canonical rebuild **re-seeds
 `players.id`**, so every legacy player ID pinned in the guarded suite addressed a different
 person — those gates are now anchored to the data instead (`AFLDB-ISSUE-108.md` §9.4). All 33
-stable failures are classified. **G2's integration leg is PENDING a clean serial `npm test` on
-Linux dev against the corrected contract.** Once
-that run is green (or every residual failure is an accounted-for skip with an owning issue),
-G2 → PASS and `AFLDB-ISSUE-107` should be re-assessed: G0/G1/G3 are PASS and G4 (ISSUE-068's
-1,440-row acceptance) already passed on 2026-08-29, so ISSUE-107 would then be eligible for
-resolution with only G5 (production rollout) outstanding by design.
+stable failures are classified. G2's integration leg was then PENDING a clean serial
+`npm test` on Linux dev against the corrected contract.
 
-ISSUE-107 stays **Open** on G2 alone. Every gate it owns outright is green: the Next 16.3.1
-Webpack build, complete standalone output, `BUILD_ID uZReW8G1XnsGnG5FNYY-I` proven live via
-`x-afldb-build`, a systemd-managed restart, health, unchanged 4-worker/10-pool controls, and
-17/17 clean live routes with zero hydration or client errors.
+**G2 → PASS (2026-08-30).** `AFLDB-ISSUE-108` is **Resolved**. Its final validation ran the
+exact implementation commit `673f0e3` on Linux
+(`/home/arm/projects/afldb-issue-108-validation-673f0e3`, Node `v22.23.2`, npm `10.9.8`)
+with `npm test -- --no-file-parallelism`:
+
+| Metric | Result |
+|---|---|
+| Test files | **89 passed, 5 skipped (94), 0 failed** |
+| Tests | **2,515 passed, 104 skipped, 0 failed** |
+| Duration | **122.21 s** |
+
+Zero failures. Every residual is a deliberate, accounted-for skip with an owning issue
+(Brownlow season/career authority → `AFLDB-ISSUE-090` §27.5; DraftGuru Stage B3; 2026
+provisional → `AFLDB-ISSUE-099`; DOB conflict adjudication retired as acceptance; the
+gitignored DraftGuru CSV parity oracle; the restricted `afldb_import`-role parity cases).
+`afldb_test` was never rebuilt — it already matched the accepted canonical baseline
+`full-history-20260827`. Full evidence: `AFLDB-ISSUE-108.md` §12.
+
+**Final gate state (2026-08-30): G0 PASS; G1 PASS; G2 PASS; G3 PASS; G4 PASS; G5 NOT
+APPLICABLE TO THIS ISSUE — production eligibility, out of scope by design and subject to its
+own review.**
+
+Every gate ISSUE-107 owns is therefore green: the Next 16.3.1 Webpack build, complete
+standalone output, `BUILD_ID uZReW8G1XnsGnG5FNYY-I` proven live via `x-afldb-build`, a
+systemd-managed restart, health, unchanged 4-worker/10-pool controls, 17/17 clean live routes
+with zero hydration or client errors, ISSUE-068's deployed 1,440-row acceptance, and now the
+guarded database integration. **ISSUE-107 is Resolved.** Production rollout remains out of
+scope and is not authorised by this resolution.
 
 ## Handoff to AFLDB-ISSUE-068 — the exact deployed build
 
@@ -637,7 +672,9 @@ hydration errors on every cut, zero client errors, zero violations, zero metamor
 disagreements, zero HTTP and page errors, and no semantic regression — outcomes improved to
 1,440 / 0 / 0. That improvement belongs to the NL work merged between the A/B source and
 `be2a963`, not to the framework upgrade; see `AFLDB-ISSUE-068.md` for the full result and the
-corpus provenance. ISSUE-068 remains Open pending an explicit decision to close.
+corpus provenance. ISSUE-068 remains Open pending an explicit decision to close. *(As-at the
+2026-08-29 handoff — **SUPERSEDED**: `AFLDB-ISSUE-068` was closed **Resolved 2026-08-29**, so
+ISSUE-107's G4 is PASS.)*
 
 ## Stop conditions
 

@@ -15,6 +15,26 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-107 — Next.js 16 framework/runtime upgrade RESOLVED - 30 August 2026
+
+**Resolved.** Every gate ISSUE-107 owns is green. The last one outstanding was G2's guarded
+database integration, which was blocked by `AFLDB-ISSUE-108` and provably not framework
+attributable; `AFLDB-ISSUE-108`'s corrected test contract validated green on Linux at commit
+`673f0e3` (89 passed / 5 skipped test files, 2,515 passed / 104 skipped tests, 0 failures,
+122.21 s), so **G2 is PASS**.
+
+- Final gate state: **G0 PASS, G1 PASS, G2 PASS, G3 PASS, G4 PASS.** G5 (production
+  eligibility) is out of ISSUE-107's scope by design and is not a completion condition —
+  the production rollout receives its own review and is **not** authorised by this resolution.
+- The shipped closure is unchanged from the deployed one: Next 16.3.1 with Webpack, React and
+  ReactDOM held at 19.2.8, Node v22.23.2, standalone/systemd deployment and 4-worker / pool-10
+  controls preserved, BUILD_ID `uZReW8G1XnsGnG5FNYY-I` proven live via `x-afldb-build`, typecheck
+  0 errors, 17/17 focused live routes clean, and `AFLDB-ISSUE-068`'s 1,440-row hydration
+  acceptance passed with zero hydration and client errors.
+- `AFLDB-ISSUE-109` — the data editor's `data_overrides` write on a `SELECT`-only importer
+  connection, exposed while applying migration `073` to `afldb_dev` under this issue — remains
+  open and separate. It is not a regression from the upgrade.
+
 ### AFLDB-ISSUE-108 — guarded test contract aligned to the canonical legacy-free baseline - 30 August 2026
 
 The guarded database integration suite had 33 stable failures against a `afldb_test` that is
@@ -73,6 +93,18 @@ parallelism. `afldb_test` was **not** rebuilt and no application semantics chang
   in parallel). A data-editor fixture that reversed a result by swapping only the score totals
   now swaps goals and behinds too, satisfying `matches_score_components_ck`; the DraftGuru CSV
   parity-oracle test skips when its gitignored corpus is absent.
+- **Validated green on Linux — RESOLVED.** The exact implementation commit `673f0e3` was run
+  serially against the `afldb_test` DSN on Node v22.23.2 / npm 10.9.8
+  (`npm test -- --no-file-parallelism`): **89 passed / 5 skipped test files (94 total), 2,515
+  passed / 104 skipped tests, 0 failures, 122.21 s.** Every residual is a deliberate skip with an
+  owning issue — Brownlow season/career authority (`AFLDB-ISSUE-090` §27.5), DraftGuru Stage B3
+  identity links, the 2026 provisional gates (`AFLDB-ISSUE-099`), the DOB conflict adjudication
+  already retired as acceptance, the gitignored DraftGuru CSV parity oracle, and the restricted
+  `afldb_import`-role parity cases that skip when `AFLDB_TEST_IMPORT_DATABASE_URL` is unset.
+  This closed `AFLDB-ISSUE-107`'s G2 gate. Known follow-up, deliberately not in scope:
+  `tools/validation/validate_migration.py` and `tests/fixtures/oracle_baseline.json` are still
+  bound to the retired legacy dataset and carry the same surrogate-ID defect; both sit outside
+  the guarded vitest gate.
 
 ### AFLDB-ISSUE-068 — intermittent React hydration errors RESOLVED - 29 August 2026
 
