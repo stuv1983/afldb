@@ -742,3 +742,166 @@ describe('afldb_import is confined to the statistical tables', () => {
     expect(lost).toEqual([]);
   });
 });
+
+/*
+ * AFLDB-ISSUE-099 T5, amendments A9 and A11 — the two staging projections
+ * migration 076 created.
+ *
+ * A9: 076 deliberately did NOT register them in tools/maintenance/privileges.sql,
+ * because the reconciler already grants the whole `staging` schema. That was
+ * read out of the source; these tests prove it out of the APPLIED catalogue
+ * instead, because a privilege claim inferred from a script is exactly the kind
+ * that has been wrong before (023 auth tables, 037 site_media, both past a
+ * header saying no grant was intended).
+ *
+ * A11: the importer holds TRUNCATE on both tables. It was granted at CREATE
+ * TABLE time by migration 014's staging default privilege, NOT by 076 -- whose
+ * four GRANT statements are inert, naming a subset of what the default had
+ * already applied. ISSUE-099 accepts that inherited repository-wide staging
+ * policy rather than introducing the repository's first per-table staging
+ * exception: it does not require TRUNCATE, but these tables hold disposable
+ * re-derivable staging data that cannot mutate a canonical fact, afldb_app is
+ * read-only on them, and afldb_auth cannot reach the schema at all.
+ *
+ * That acceptance carries obligation O2, discharged by the second test below:
+ * the staging default privilege is asserted EXPLICITLY, so a future widening of
+ * the blanket policy fails here instead of silently applying to every staging
+ * table, present and future. (O1 -- proving the ISSUE-099 code path never
+ * issues TRUNCATE or DELETE against either projection -- belongs to the settle
+ * implementation and is asserted there, not in a grant.)
+ */
+describe('AFL Tables settle projections are privileged like the rest of staging', () => {
+  const PROJECTIONS = ['afltables_match', 'afltables_player_match'];
+
+  /** Migration 014's staging policy: DML plus TRUNCATE, and nothing else. */
+  const STAGING_IMPORT_GRANTS = ['DELETE', 'INSERT', 'SELECT', 'TRUNCATE', 'UPDATE'];
+
+  it('carries exactly the schema-wide staging grants, and nothing wider', async () => {
+    const rows = await sql<{ name: string; privileges: string }[]>`
+      SELECT c.relname AS name,
+             coalesce(string_agg(p.privilege, ', ' ORDER BY p.privilege)
+                      FILTER (WHERE has_table_privilege(${IMPORT_ROLE}, c.oid, p.privilege)),
+                      '') AS privileges
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+       CROSS JOIN LATERAL (VALUES ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE'),
+                                  ('TRUNCATE'), ('REFERENCES'), ('TRIGGER')) AS p(privilege)
+       WHERE n.nspname = 'staging'
+         AND c.relname = ANY(${[...PROJECTIONS, 'source_payloads']})
+       GROUP BY c.relname
+       ORDER BY 1
+    `;
+    const byName = Object.fromEntries(rows.map((r) => [r.name, r.privileges]));
+    expect(Object.keys(byName).sort()).toEqual([...PROJECTIONS, 'source_payloads'].sort());
+    for (const name of [...PROJECTIONS, 'source_payloads']) {
+      // The expected set is stated OUTRIGHT rather than inferred from the
+      // comparator, so this asserts the accepted A11 contract rather than
+      // merely observing that the new tables resemble an existing one. No
+      // REFERENCES, no TRIGGER, nothing beyond DML plus TRUNCATE.
+      expect(byName[name].split(', ').sort(), `${name} privileges`)
+        .toEqual(STAGING_IMPORT_GRANTS);
+    }
+  });
+
+  it('inherits that from migration 014, whose default privilege is pinned here', async () => {
+    // Obligation O2. The grants above exist because of a DEFAULT privilege
+    // attached to (afldb_owner, staging) -- a catalogue rule no source-text
+    // check can see, and the reason 076's "grants no TRUNCATE" was true of the
+    // migration and false of the applied database. Pinning it means a widening
+    // of the blanket staging policy fails HERE, once, instead of silently
+    // applying to every staging table that any future migration creates.
+    const rows = await sql<{ role: string; acl: string[] }[]>`
+      SELECT pg_get_userbyid(d.defaclrole) AS role,
+             array_agg(a::text ORDER BY a::text) AS acl
+        FROM pg_default_acl d
+        JOIN pg_namespace n ON n.oid = d.defaclnamespace
+       CROSS JOIN LATERAL unnest(d.defaclacl) AS a
+       WHERE n.nspname = 'staging' AND d.defaclobjtype = 'r'
+       GROUP BY 1
+       ORDER BY 1
+    `;
+    // One granting role, and exactly the two entries migration 014 declares:
+    // the importer's DML+TRUNCATE, and the app's read. `arwdD` is
+    // INSERT/SELECT/UPDATE/DELETE/TRUNCATE.
+    expect(rows.map((r) => r.role)).toEqual(['afldb_owner']);
+    expect(rows[0].acl).toEqual([
+      'afldb_app=r/afldb_owner',
+      'afldb_import=arwdD/afldb_owner',
+    ]);
+  });
+
+  it('keeps the app read-only on them and afldb_auth out entirely', async () => {
+    const rows = await sql<{
+      name: string; appReads: boolean; appWrites: boolean; authUsage: boolean;
+    }[]>`
+      SELECT c.relname AS name,
+             has_table_privilege(${APP_ROLE}, c.oid, 'SELECT') AS "appReads",
+             (has_any_column_privilege(${APP_ROLE}, c.oid, 'INSERT')
+              OR has_any_column_privilege(${APP_ROLE}, c.oid, 'UPDATE')
+              OR has_table_privilege(${APP_ROLE}, c.oid, 'DELETE')
+              OR has_table_privilege(${APP_ROLE}, c.oid, 'TRUNCATE')) AS "appWrites",
+             has_schema_privilege(${AUTH_ROLE}, 'staging', 'USAGE') AS "authUsage"
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'staging' AND c.relname = ANY(${PROJECTIONS})
+       ORDER BY 1
+    `;
+    expect(rows.map((r) => r.name)).toEqual(PROJECTIONS);
+    for (const row of rows) {
+      expect(row.appReads, `${row.name} must be app-readable`).toBe(true);
+      expect(row.appWrites, `${row.name} must not be app-writable`).toBe(false);
+      // afldb_auth never gets USAGE on staging, so it cannot reach these at
+      // all. Migration 076 grants it nothing, and must not start to.
+      expect(row.authUsage, 'afldb_auth must have no route into staging').toBe(false);
+    }
+  });
+
+  it('leaves migration 074 append-only ledger boundary untouched', async () => {
+    // 076 must not have widened the promotion ledger as a side effect. It is
+    // append-only BY GRANT: afldb_auth holds SELECT and INSERT, nothing else,
+    // and the importer is deliberately not registered for it at all.
+    const [ledger] = await sql<{
+      authSelect: boolean; authInsert: boolean; authUpdate: boolean;
+      authDelete: boolean; authTruncate: boolean; importInsert: boolean;
+    }[]>`
+      SELECT has_table_privilege(${AUTH_ROLE}, 'promotion_decisions', 'SELECT')     AS "authSelect",
+             has_table_privilege(${AUTH_ROLE}, 'promotion_decisions', 'INSERT')     AS "authInsert",
+             has_table_privilege(${AUTH_ROLE}, 'promotion_decisions', 'UPDATE')     AS "authUpdate",
+             has_table_privilege(${AUTH_ROLE}, 'promotion_decisions', 'DELETE')     AS "authDelete",
+             has_table_privilege(${AUTH_ROLE}, 'promotion_decisions', 'TRUNCATE')   AS "authTruncate",
+             has_table_privilege(${IMPORT_ROLE}, 'promotion_decisions', 'INSERT')   AS "importInsert"
+    `;
+    expect(ledger).toEqual({
+      authSelect: true,
+      authInsert: true,
+      authUpdate: false,
+      authDelete: false,
+      authTruncate: false,
+      importInsert: false,
+    });
+  });
+
+  it('changed no grant by adding a column to data_issues', async () => {
+    // An added column cannot change a table-level grant, but it CAN change a
+    // column-scoped one, and data_issues is app-readable. This asserts the
+    // whole shape rather than assuming.
+    const [issues] = await sql<{
+      appSelect: boolean; appWrites: boolean; importInsert: boolean; hasKey: boolean;
+    }[]>`
+      SELECT has_table_privilege(${APP_ROLE}, 'data_issues', 'SELECT')  AS "appSelect",
+             (has_any_column_privilege(${APP_ROLE}, 'data_issues', 'INSERT')
+              OR has_any_column_privilege(${APP_ROLE}, 'data_issues', 'UPDATE')
+              OR has_table_privilege(${APP_ROLE}, 'data_issues', 'DELETE')) AS "appWrites",
+             has_table_privilege(${IMPORT_ROLE}, 'data_issues', 'INSERT') AS "importInsert",
+             EXISTS (SELECT 1 FROM information_schema.columns
+                      WHERE table_schema = 'public' AND table_name = 'data_issues'
+                        AND column_name = 'issue_key') AS "hasKey"
+    `;
+    expect(issues).toEqual({
+      appSelect: true,
+      appWrites: false,
+      importInsert: true,
+      hasKey: true,
+    });
+  });
+});

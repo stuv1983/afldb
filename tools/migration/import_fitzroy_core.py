@@ -8,6 +8,18 @@
 
 AFLDB-ISSUE-093 §13.4a — the historical/core importer of the rebuild path.
 
+It is ALSO the offline adjudicator of an AFLDB-ISSUE-099 in-season snapshot:
+
+    python tools/migration/import_fitzroy_core.py --label settle-2026-08-29 \
+        --validate-only --require-in-season
+
+`--require-in-season` and the historical gates (`--require-full-history`,
+`--require-accepted-baseline`) adjudicate different acquisition kinds and
+refuse each other explicitly. An in-season snapshot is NEVER imported by this
+tool — the canonical writers here upsert with no ownership predicate and
+delete by match and season, so an in-season snapshot reaches PostgreSQL only
+through the reviewed settle pass.
+
 Source boundary
 ---------------
 The ONLY inputs are an already-acquired canonical snapshot
@@ -75,6 +87,9 @@ CONTRACT_PATH = REPO_ROOT / "tools" / "rebuild" / "fitzroy" / "fitzroy-contract.
 SNAPSHOT_ROOT = REPO_ROOT / "data" / "sources" / "afltables" / "fitzroy_core"
 MANIFEST_ROOT = REPO_ROOT / "docs" / "rebuild-manifests" / "afltables_fitzroy_core"
 CLUBS_JSON = REPO_ROOT / "data" / "reference" / "clubs.json"
+# The one authority for which seasons are still being played (AFLDB-ISSUE-099). Read from
+# tracked reference data, never derived from the clock.
+SEASONS_JSON = REPO_ROOT / "data" / "reference" / "seasons.json"
 # The acceptance/promotion register (AFLDB-ISSUE-093). Binds an accepted acquisition to its
 # hashes, contract version and measured fingerprint; never a substitute for the gates.
 ACCEPTED_BASELINES_PATH = REPO_ROOT / "data" / "reference" / "fitzroy-accepted-baselines.json"
@@ -82,6 +97,13 @@ VENUES_JSON = REPO_ROOT / "data" / "reference" / "venue-canonical.json"
 AVAILABILITY_JSON = REPO_ROOT / "data" / "reference" / "stat-availability.json"
 
 ADAPTER_SCHEMA_VERSION = 1
+
+# The acquisition kinds acquire_core.R can write. AFLDB-ISSUE-099 added the third; a
+# manifest predating the field is a core snapshot by construction, because no other kind
+# existed when it was written.
+CORE_SNAPSHOT_KIND = "core_snapshot"
+VALIDATION_WITNESS_KIND = "validation_witness"
+IN_SEASON_KIND = "in_season_partial"
 
 # Provenance attribution mirrors the legacy importer's split exactly:
 # match facts and Brownlow votes are AFL Tables data; the player-match
@@ -601,6 +623,173 @@ def enforce_accepted_fingerprint(baseline: dict, summary: dict, coverage: dict) 
             "since acceptance; re-validate and re-accept deliberately.")
 
 
+def acquisition_kind(manifest: dict) -> str:
+    """The acquisition kind a manifest declares.
+
+    Manifests written before the field existed carry none; they are core snapshots by
+    construction. Absent therefore reads as `core_snapshot`, never as "unknown, allow".
+    """
+    return str(manifest.get("acquisition_kind") or CORE_SNAPSHOT_KIND)
+
+
+def refuse_in_season_for_historical(manifest: dict, gate: str) -> None:
+    """AFLDB-ISSUE-099 §10.1 — an in-season partial can never satisfy a historical gate.
+
+    Explicit, and ON TOP OF the existing range check rather than instead of it: it runs
+    first so the refusal names the real reason. An in-season snapshot is a partial
+    observation of a season still being played, so admitting one to the full-history gates
+    or to the accepted-baseline register would weaken the historical fail-closed contract.
+    """
+    if acquisition_kind(manifest) == IN_SEASON_KIND:
+        raise SnapshotValidationError(
+            f"{manifest.get('snapshot_label')!r} is an {IN_SEASON_KIND} acquisition and can "
+            f"NEVER satisfy {gate}. An in-season snapshot is a partial observation of a "
+            "season still in progress; validate it with --require-in-season instead.")
+
+
+def load_in_progress_seasons() -> set[int]:
+    """The seasons AFLDB declares still in progress (AFLDB-ISSUE-099)."""
+    if not SEASONS_JSON.exists():
+        raise SnapshotValidationError(f"season register not found: {SEASONS_JSON}")
+    data = json.loads(SEASONS_JSON.read_text(encoding="utf-8"))
+    seasons = data.get("in_progress_seasons")
+    if not isinstance(seasons, list) or not seasons:
+        raise SnapshotValidationError(
+            f"{SEASONS_JSON} declares no in_progress_seasons, so no season may be "
+            "validated in-season")
+    return {int(s) for s in seasons}
+
+
+def measure_identity_coverage(entries: list[dict], snapshot_dir: Path,
+                              id_rule: dict) -> dict:
+    """Measure player identity coverage across the snapshot's player_stats artefacts.
+
+    ONE implementation, shared by the full-history and in-season gates. import_fitzroy_core
+    builds players ONLY from player_stats and fails closed on a row with no url, so this is
+    measured BEFORE any import runs rather than discovered part-way through one. Names are
+    never consulted.
+
+    The canonical durable identity is the AFL Tables profile URL — that is what
+    external_identities stores and what players are resolved by. The fitzRoy numeric ID
+    never reaches a database column, so its ABSENCE is tolerated; a malformed or missing
+    URL is not, and a name is never a fallback. (AFLDB-ISSUE-099 §2.1 measured 82 rows with
+    no ID and zero rows with no url in the 2026 in-season population, which is why the
+    in-season contract declares ID enrichment-only.)
+    """
+    url_shape = re.compile(id_rule.get("profile_url_shape", r"^https?://\S+$"))
+    coverage = {"rows": 0, "missing_id": 0, "missing_url": 0, "malformed_url": 0,
+                "distinct_ids": 0, "distinct_urls": 0}
+    ids: set[str] = set()
+    urls: set[str] = set()
+    for entry in entries:
+        if entry.get("dataset") != "player_stats":
+            continue
+        path = snapshot_dir / entry["filename"]
+        with path.open(newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                coverage["rows"] += 1
+                player_id = (row.get("ID") or "").strip()
+                url = (row.get("url") or "").strip()
+                if not player_id:
+                    coverage["missing_id"] += 1
+                else:
+                    ids.add(player_id)
+                if not url:
+                    coverage["missing_url"] += 1
+                else:
+                    urls.add(url)
+                    if not url_shape.match(url):
+                        coverage["malformed_url"] += 1
+    coverage["distinct_ids"] = len(ids)
+    coverage["distinct_urls"] = len(urls)
+
+    if coverage["missing_url"] or coverage["malformed_url"]:
+        raise SnapshotValidationError(
+            f"identity incomplete: {coverage['missing_url']} row(s) without a profile URL "
+            f"and {coverage['malformed_url']} with a non-canonical one. The profile URL is "
+            "the durable identity and is never inferred from a name.")
+    return coverage
+
+
+def enforce_in_season(manifest: dict, snapshot_dir: Path, contract: dict) -> dict:
+    """Prove a snapshot is a valid IN-SEASON partial (AFLDB-ISSUE-099 §10.1).
+
+    The mirror image of enforce_full_history, and the in-season path's one adjudicator: the
+    manifest's own claim is never taken on trust, every gate is re-derived here from the
+    contract's `in_season` block, data/reference/seasons.json and the artefacts, and
+    acquire_core.R remains a recorder rather than a judge.
+
+    This gate is deliberately NOT a relaxed full-history gate. It is a different, narrower
+    contract for a different kind of snapshot, and it refuses anything that is not an
+    in_season_partial acquisition just as the historical gates refuse anything that is.
+
+    Returns the measured identity coverage so the caller can report it.
+    """
+    ins = contract.get("in_season")
+    if not ins:
+        raise SnapshotValidationError(
+            "the fitzRoy contract carries no in_season block, so no snapshot can be "
+            "validated as an in-season partial")
+
+    kind = acquisition_kind(manifest)
+    if kind != IN_SEASON_KIND:
+        raise SnapshotValidationError(
+            f"acquisition_kind {kind!r} is not {IN_SEASON_KIND!r}: --require-in-season "
+            "adjudicates in-season partials ONLY. A core snapshot is validated with "
+            "--require-full-history, and a validation witness by its own validator.")
+
+    rng = manifest.get("requested_range") or {}
+    first, last = rng.get("from"), rng.get("to")
+    if not isinstance(first, int) or not isinstance(last, int) or first != last:
+        raise SnapshotValidationError(
+            f"an in-season snapshot covers exactly one season, but requested_range is "
+            f"{first}-{last}")
+    season = first
+
+    in_progress = load_in_progress_seasons()
+    if season not in in_progress:
+        raise SnapshotValidationError(
+            f"season {season} is not declared in progress by "
+            f"data/reference/seasons.json (in_progress_seasons: "
+            f"{', '.join(str(s) for s in sorted(in_progress))}). A completed season is "
+            "validated as a core snapshot, never in-season.")
+
+    entries = manifest.get("files", [])
+    datasets_present = {e.get("dataset") for e in entries}
+    missing_datasets = [d for d in (ins.get("required_datasets") or [])
+                        if d not in datasets_present]
+    if missing_datasets:
+        raise SnapshotValidationError(
+            f"missing required dataset(s): {', '.join(missing_datasets)}")
+    allowed = list(ins.get("allowed_datasets") or [])
+    extra = sorted(str(d) for d in datasets_present if d not in allowed)
+    if extra:
+        raise SnapshotValidationError(
+            f"dataset(s) not permitted in an in-season snapshot: {', '.join(extra)} "
+            f"(allowed: {', '.join(allowed)})")
+
+    seasons: list[int] = []
+    for entry in entries:
+        if entry.get("dataset") != "player_stats":
+            continue
+        match = PLAYER_STATS_FILE.match(entry.get("filename", ""))
+        if match:
+            seasons.append(int(match.group(1)))
+    if sorted(seasons) != [season]:
+        found = ", ".join(str(s) for s in sorted(seasons)) or "none"
+        raise SnapshotValidationError(
+            f"an in-season snapshot needs exactly one player_stats artefact, for season "
+            f"{season}; found {found}")
+
+    empty = [e.get("filename") for e in entries if not e.get("row_count")]
+    if empty:
+        raise SnapshotValidationError(
+            f"artefact(s) with zero rows: {', '.join(str(f) for f in empty[:5])}")
+
+    return measure_identity_coverage(entries, snapshot_dir,
+                                     ins.get("identity_requirement", {}))
+
+
 def enforce_full_history(manifest: dict, snapshot_dir: Path, contract: dict) -> dict:
     """Prove a snapshot has EARNED `full_history: true` (AFLDB-ISSUE-093).
 
@@ -615,6 +804,10 @@ def enforce_full_history(manifest: dict, snapshot_dir: Path, contract: dict) -> 
         raise SnapshotValidationError(
             "the fitzRoy contract carries no full_history block, so no snapshot can be "
             "validated as full history")
+
+    # AFLDB-ISSUE-099 §10.1: explicit, and BEFORE the range check, so an in-season partial
+    # is refused for what it is rather than incidentally for the range it covers.
+    refuse_in_season_for_historical(manifest, "--require-full-history")
 
     # The manifest's own `full_history` field is NOT consulted as a verdict. The first
     # full-history acquisition published `full_history: true` while this validator
@@ -672,48 +865,9 @@ def enforce_full_history(manifest: dict, snapshot_dir: Path, contract: dict) -> 
         raise SnapshotValidationError(
             f"artefact(s) with zero rows: {', '.join(str(f) for f in empty[:5])}")
 
-    # Identity coverage. import_fitzroy_core builds players ONLY from player_stats and
-    # fails closed on a row with no ID/url, so this is measured BEFORE any import runs
-    # rather than discovered part-way through one. Names are never consulted.
-    id_rule = fh.get("identity_requirement", {})
-    url_shape = re.compile(id_rule.get("profile_url_shape", r"^https?://\S+$"))
-    coverage = {"rows": 0, "missing_id": 0, "missing_url": 0, "malformed_url": 0,
-                "distinct_ids": 0, "distinct_urls": 0}
-    ids: set[str] = set()
-    urls: set[str] = set()
-    for entry in entries:
-        if entry.get("dataset") != "player_stats":
-            continue
-        path = snapshot_dir / entry["filename"]
-        with path.open(newline="", encoding="utf-8") as handle:
-            for row in csv.DictReader(handle):
-                coverage["rows"] += 1
-                player_id = (row.get("ID") or "").strip()
-                url = (row.get("url") or "").strip()
-                if not player_id:
-                    coverage["missing_id"] += 1
-                else:
-                    ids.add(player_id)
-                if not url:
-                    coverage["missing_url"] += 1
-                else:
-                    urls.add(url)
-                    if not url_shape.match(url):
-                        coverage["malformed_url"] += 1
-    coverage["distinct_ids"] = len(ids)
-    coverage["distinct_urls"] = len(urls)
-
-    # The canonical durable identity is the AFL Tables profile URL — that is what
-    # external_identities stores and what players are resolved by. The fitzRoy numeric ID
-    # never reaches a database column, so its ABSENCE is tolerated; a malformed or missing
-    # URL is not, and a name is never a fallback.
-    if coverage["missing_url"] or coverage["malformed_url"]:
-        raise SnapshotValidationError(
-            f"identity incomplete: {coverage['missing_url']} row(s) without a profile URL "
-            f"and {coverage['malformed_url']} with a non-canonical one. The profile URL is "
-            "the durable identity and is never inferred from a name.")
-
-    return coverage
+    # Identity coverage, measured by the one shared implementation.
+    return measure_identity_coverage(entries, snapshot_dir,
+                                     fh.get("identity_requirement", {}))
 
 
 def validate_snapshot(snapshot_dir: Path, manifest_path: Path,
@@ -818,6 +972,129 @@ def validate_snapshot(snapshot_dir: Path, manifest_path: Path,
 
 
 # ---------------------------------------------------------------------------
+# AFLDB-ISSUE-099 — record-error policy and the observation-bundle contract
+#
+# Everything in this section is DB-FREE by construction: it reads the acquired CSVs and
+# the tracked contracts, and writes one JSON file. Observation persistence, reconciliation,
+# promotion candidates and every canonical mutation belong to TypeScript.
+# ---------------------------------------------------------------------------
+
+#: Default. One bad record aborts the whole pass — correct for a clean rebuild, where a
+#: partial import is worse than no import.
+ON_RECORD_ERROR_ABORT = "abort"
+#: Opt-in, in-season only. A bad record is COLLECTED and the pass continues, because a
+#: nightly settle must not be killed by one malformed row (AFLDB-ISSUE-099 F6).
+ON_RECORD_ERROR_REJECT = "reject"
+
+BUNDLE_CONTRACT_VERSION = 1
+FAMILY_MATCH = "afltables.match"
+FAMILY_PLAYER_MATCH = "afltables.player_match_stats"
+
+#: The declared payload column set of `afltables.match`. The payload is the SOURCE
+#: observation: raw club and venue strings, the source's own round vocabulary, and the
+#: match-grain supplements AFL Tables repeats on every player row. Resolved identities
+#: live in the projection, never here.
+MATCH_PAYLOAD_COLUMNS = (
+    "season", "round_code", "round_number", "round_type", "match_date",
+    "venue_raw", "home_team_raw", "away_team_raw",
+    "home_goals", "home_behinds", "home_points",
+    "away_goals", "away_behinds", "away_points", "margin",
+    "attendance", "match_time", "period_scores",
+)
+
+#: The declared payload column set of `afltables.player_match_stats`. The statistic keys
+#: are STAT_MAP's TARGET names, so the one mapping authority is reused rather than a
+#: second naming policy being invented (AFLDB-ISSUE-099 §17.3).
+PLAYER_MATCH_PAYLOAD_COLUMNS = (
+    "url", "afltables_id", "season", "round_code", "match_key",
+    "playing_for_raw", "jumper_number", "career_games",
+    "first_name", "surname", "player_name", "dob",
+    *(target for _, target in STAT_MAP),
+)
+
+
+@dataclass
+class RecordRejection:
+    """One source record that was OBSERVED but could not be interpreted.
+
+    `external_record_id` is None when no stable key could be established at all. That case
+    is materially different (AFLDB-ISSUE-099 §19): the record's PRESENCE cannot be
+    represented, so the affected (family, scope_key) is not safe for absence sweeping and
+    the bundle marks its enumeration incomplete.
+    """
+    family: str
+    scope_key: str
+    external_record_id: str | None
+    reason: str
+    detail: str
+
+
+class RecordErrorPolicy:
+    """What happens when one source record cannot be interpreted.
+
+    Under `abort` (the default) the original exception is re-raised, so the historical
+    rebuild path behaves exactly as it did before this class existed. Under `reject` the
+    failure is collected and the pass continues.
+
+    A rejected record is NEVER an absent record. It was observed; only its projection
+    failed. The bundle emitter enumerates presence independently of projection, and this
+    object is what tells it which observed records did not project and why.
+    """
+
+    def __init__(self, mode: str = ON_RECORD_ERROR_ABORT, scope_key: str = "") -> None:
+        if mode not in (ON_RECORD_ERROR_ABORT, ON_RECORD_ERROR_REJECT):
+            raise SnapshotValidationError(
+                f"unknown --on-record-error policy {mode!r}")
+        self.mode = mode
+        self.scope_key = scope_key
+        self.rejections: list[RecordRejection] = []
+        #: url -> reason, for identity contradictions that are only decidable once every
+        #: row has been read (a player with no usable name; one fitzRoy ID under two
+        #: profile URLs). Their records are enumerated and never projected.
+        self.unusable_players: dict[str, str] = {}
+        #: The player-match grain keys that were ACCEPTED. A second row carrying an
+        #: identity that already succeeded is a duplicate, and rejecting the duplicate
+        #: must not retract the record the first row legitimately produced.
+        self.accepted_player_match: set = set()
+
+    @property
+    def collecting(self) -> bool:
+        return self.mode == ON_RECORD_ERROR_REJECT
+
+    def reject(self, exc: Exception, *, family: str, external_record_id: str | None,
+               reason: str) -> None:
+        """Collect a per-record failure, or re-raise it under the abort policy."""
+        if not self.collecting:
+            raise exc
+        self.rejections.append(RecordRejection(
+            family=family, scope_key=self.scope_key,
+            external_record_id=external_record_id, reason=reason, detail=str(exc)))
+
+    def refuse_player(self, exc: Exception, url: str, reason: str) -> None:
+        """Collect an aggregate player-identity contradiction, or re-raise it."""
+        if not self.collecting:
+            raise exc
+        self.unusable_players.setdefault(url, f"{reason}: {exc}")
+
+    def keyed(self, family: str) -> dict[str, RecordRejection]:
+        return {r.external_record_id: r for r in self.rejections
+                if r.family == family and r.external_record_id is not None}
+
+    def unkeyed(self, family: str) -> list[RecordRejection]:
+        return [r for r in self.rejections
+                if r.family == family and r.external_record_id is None]
+
+
+def reason_for(exc: Exception) -> str:
+    """A stable machine reason code for a per-record interpretation failure."""
+    if isinstance(exc, PlayerIdentityError):
+        return "player_identity"
+    if isinstance(exc, MatchIdentityError):
+        return "match_identity"
+    return "record_invalid"
+
+
+# ---------------------------------------------------------------------------
 # Scan phase (no database)
 # ---------------------------------------------------------------------------
 
@@ -884,63 +1161,121 @@ def normalise_stats_round(raw: str, context: str) -> str:
     raise MatchIdentityError(f"{context}: unrecognised player_stats round code {raw!r}")
 
 
-def scan_results(path: Path, clubs: ClubResolver) -> dict[tuple, MatchFact]:
+def results_identity(row: dict, clubs: ClubResolver) -> dict | None:
+    """The stable source identity of a results row, established WITHOUT projecting it.
+
+    AFLDB-ISSUE-099 §19: presence and projection are separate facts and are carried
+    separately. A row whose scores do not reconcile still has an identity and is therefore
+    still PRESENT; a row whose season, date, round or club strings cannot be read has no
+    provable identity at all, and its presence cannot be represented — that is what forces
+    the affected enumeration incomplete rather than letting it be swept as absent.
+
+    The key is byte-identical to `match_key_of()`, so one match observation has one identity
+    whichever side of the pass produced it.
+    """
+    try:
+        season = int(row["Season"])
+        match_date = parse_iso_date(row["Date"], "identity")
+        round_code, round_type = normalise_results_round(row["Round"], "identity")
+        home_hist = clubs.resolve(row["Home.Team"], season, "results")
+        away_hist = clubs.resolve(row["Away.Team"], season, "results")
+    except (MatchIdentityError, SnapshotValidationError, ValueError, TypeError, KeyError):
+        return None
+    return {
+        "season": season, "match_date": match_date,
+        "round_code": round_code, "round_type": round_type,
+        "home_hist": home_hist, "away_hist": away_hist,
+        "external_record_id": "|".join([
+            str(season), round_code, match_date.isoformat(),
+            clubs.name_of(home_hist), clubs.name_of(away_hist),
+        ]),
+    }
+
+
+def scan_results(path: Path, clubs: ClubResolver,
+                 policy: "RecordErrorPolicy | None" = None) -> dict[tuple, MatchFact]:
     matches: dict[tuple, MatchFact] = {}
     with path.open(newline="", encoding="utf-8") as fh:
         for i, row in enumerate(csv.DictReader(fh), start=2):
             context = f"results.csv line {i}"
-            season = int(row["Season"])
-            match_date = parse_iso_date(row["Date"], context)
-            if match_date.year != season:
-                raise MatchIdentityError(
-                    f"{context}: date {match_date} is outside season {season}")
-            round_code, round_type = normalise_results_round(row["Round"], context)
-            round_number = None
-            if round_type == "home_and_away":
-                round_number = to_int(row["Round.Number"])
-                if round_number is None or str(round_number) != round_code:
-                    raise MatchIdentityError(
-                        f"{context}: Round {row['Round']!r} disagrees with "
-                        f"Round.Number {row['Round.Number']!r}")
-
-            home_hist = clubs.resolve(row["Home.Team"], season, "results")
-            away_hist = clubs.resolve(row["Away.Team"], season, "results")
-            if home_hist == away_hist:
-                raise MatchIdentityError(f"{context}: home and away resolve to "
-                                         f"the same identity {home_hist!r}")
-
-            values = {}
-            for col in ("Home.Goals", "Home.Behinds", "Home.Points",
-                        "Away.Goals", "Away.Behinds", "Away.Points", "Margin"):
-                v = to_int(row[col])
-                if v is None:
-                    raise MatchIdentityError(f"{context}: {col} is missing")
-                values[col] = v
-            for side in ("Home", "Away"):
-                if values[f"{side}.Points"] != 6 * values[f"{side}.Goals"] + values[f"{side}.Behinds"]:
-                    raise MatchIdentityError(
-                        f"{context}: {side} goals/behinds do not reconcile with points")
-            if abs(values["Margin"]) != abs(values["Home.Points"] - values["Away.Points"]):
-                raise MatchIdentityError(f"{context}: Margin disagrees with the scores")
-
-            key = (match_date, home_hist, away_hist)
-            if key in matches:
-                raise MatchIdentityError(
-                    f"{context}: duplicate match {match_date} "
-                    f"{home_hist} v {away_hist}")
-            venue = clean(row["Venue"])
-            if venue is None:
-                raise MatchIdentityError(f"{context}: Venue is missing")
-            matches[key] = MatchFact(
-                game_id=row["Game"].strip(), season=season,
-                round_code=round_code, round_number=round_number,
-                round_type=round_type, match_date=match_date, venue_raw=venue,
-                home_hist=home_hist, away_hist=away_hist,
-                home_goals=values["Home.Goals"], home_behinds=values["Home.Behinds"],
-                home_points=values["Home.Points"], away_goals=values["Away.Goals"],
-                away_behinds=values["Away.Behinds"], away_points=values["Away.Points"],
-            )
+            try:
+                key, fact = interpret_results_row(row, context, clubs, matches)
+            except (MatchIdentityError, SnapshotValidationError, ValueError) as exc:
+                # Under the default abort policy this re-raises, unchanged.
+                identity = results_identity(row, clubs)
+                policy_or_abort(policy).reject(
+                    exc, family=FAMILY_MATCH, reason=reason_for(exc),
+                    external_record_id=(identity or {}).get("external_record_id"))
+                continue
+            matches[key] = fact
     return matches
+
+
+def policy_or_abort(policy: "RecordErrorPolicy | None") -> "RecordErrorPolicy":
+    """The supplied policy, or a fresh abort policy that re-raises."""
+    return policy if policy is not None else RecordErrorPolicy(ON_RECORD_ERROR_ABORT)
+
+
+def interpret_results_row(row: dict, context: str, clubs: ClubResolver,
+                          seen: dict[tuple, MatchFact]) -> tuple[tuple, MatchFact]:
+    """Interpret one results row into its key and MatchFact, or raise.
+
+    Extracted from scan_results() without changing a check, a message or the order they
+    run in, so the historical path fails on exactly the same row for exactly the same
+    reason. The extraction exists so one bad record can be REJECTED rather than aborting
+    the pass, and for no other purpose.
+    """
+    season = int(row["Season"])
+    match_date = parse_iso_date(row["Date"], context)
+    if match_date.year != season:
+        raise MatchIdentityError(
+            f"{context}: date {match_date} is outside season {season}")
+    round_code, round_type = normalise_results_round(row["Round"], context)
+    round_number = None
+    if round_type == "home_and_away":
+        round_number = to_int(row["Round.Number"])
+        if round_number is None or str(round_number) != round_code:
+            raise MatchIdentityError(
+                f"{context}: Round {row['Round']!r} disagrees with "
+                f"Round.Number {row['Round.Number']!r}")
+
+    home_hist = clubs.resolve(row["Home.Team"], season, "results")
+    away_hist = clubs.resolve(row["Away.Team"], season, "results")
+    if home_hist == away_hist:
+        raise MatchIdentityError(f"{context}: home and away resolve to "
+                                 f"the same identity {home_hist!r}")
+
+    values = {}
+    for col in ("Home.Goals", "Home.Behinds", "Home.Points",
+                "Away.Goals", "Away.Behinds", "Away.Points", "Margin"):
+        v = to_int(row[col])
+        if v is None:
+            raise MatchIdentityError(f"{context}: {col} is missing")
+        values[col] = v
+    for side in ("Home", "Away"):
+        if values[f"{side}.Points"] != 6 * values[f"{side}.Goals"] + values[f"{side}.Behinds"]:
+            raise MatchIdentityError(
+                f"{context}: {side} goals/behinds do not reconcile with points")
+    if abs(values["Margin"]) != abs(values["Home.Points"] - values["Away.Points"]):
+        raise MatchIdentityError(f"{context}: Margin disagrees with the scores")
+
+    key = (match_date, home_hist, away_hist)
+    if key in seen:
+        raise MatchIdentityError(
+            f"{context}: duplicate match {match_date} "
+            f"{home_hist} v {away_hist}")
+    venue = clean(row["Venue"])
+    if venue is None:
+        raise MatchIdentityError(f"{context}: Venue is missing")
+    return key, MatchFact(
+        game_id=row["Game"].strip(), season=season,
+        round_code=round_code, round_number=round_number,
+        round_type=round_type, match_date=match_date, venue_raw=venue,
+        home_hist=home_hist, away_hist=away_hist,
+        home_goals=values["Home.Goals"], home_behinds=values["Home.Behinds"],
+        home_points=values["Home.Points"], away_goals=values["Away.Goals"],
+        away_behinds=values["Away.Behinds"], away_points=values["Away.Points"],
+    )
 
 
 def load_row_corrections() -> list[dict]:
@@ -1000,12 +1335,45 @@ def iter_player_stats(files: list[SnapshotFile], corrections: list[dict] | None 
                 f"correction apply to data it was not reviewed for.")
 
 
+def player_match_identity(row: dict, clubs: ClubResolver,
+                          matches: dict[tuple, MatchFact]) -> dict | None:
+    """The stable source identity of a player_stats row, WITHOUT projecting it.
+
+    AFLDB-ISSUE-099 §6.1: `<normalised profile url path>@<match_key>`. Both halves must be
+    provable — a row with no `url`, or one whose results join fails so there is no
+    match_key, has no representable presence at all. Returning None is what forces the
+    affected enumeration incomplete rather than allowing a later absence sweep to conclude
+    the record disappeared (§19, stop condition SC5).
+
+    `ID` is never consulted: it is enrichment, and 82 in-season rows carry none (P5).
+    """
+    url_path = normalise_profile_url(row.get("url"))
+    if url_path is None:
+        return None
+    try:
+        season = int(row["Season"])
+        match_date = parse_iso_date(row["Date"], "identity")
+        key = (match_date,
+               clubs.resolve(row["Home.team"], season, "player_stats"),
+               clubs.resolve(row["Away.team"], season, "player_stats"))
+    except (MatchIdentityError, SnapshotValidationError, ValueError, TypeError, KeyError):
+        return None
+    match = matches.get(key)
+    if match is None:
+        return None
+    return {
+        "url": url_path, "match": match, "match_key": match_key_of(match, clubs),
+        "external_record_id": f"{url_path}@{match_key_of(match, clubs)}",
+    }
+
+
 def scan_player_stats(
     files: list[SnapshotFile],
     matches: dict[tuple, MatchFact],
     clubs: ClubResolver,
     round_vote_seasons: set[int],
     corrections: list[dict] | None = None,
+    policy: "RecordErrorPolicy | None" = None,
 ) -> tuple[dict[str, PlayerFact], int, int]:
     """First streaming pass: player identity + match-grain supplements.
 
@@ -1025,96 +1393,115 @@ def scan_player_stats(
 
     for context, file_season, row in iter_player_stats(files, corrections):
         rows_read += 1
-        season = int(row["Season"])
-        if season != file_season:
-            raise SnapshotValidationError(
-                f"{context}: row season {season} does not match the file season")
-        match_date = parse_iso_date(row["Date"], context)
-        home_hist = clubs.resolve(row["Home.team"], season, "player_stats")
-        away_hist = clubs.resolve(row["Away.team"], season, "player_stats")
-        key = (match_date, home_hist, away_hist)
-        match = matches.get(key)
-        if match is None:
-            raise MatchIdentityError(
-                f"{context}: no results.csv match for {match_date} "
-                f"{home_hist} v {away_hist}")
-
-        # Cross-checks against the canonical match structure.
-        if match.season != season:
-            raise MatchIdentityError(f"{context}: season disagrees with results.csv")
-        round_code = normalise_stats_round(row["Round"], context)
-        if round_code != match.round_code:
-            raise MatchIdentityError(
-                f"{context}: round {round_code!r} disagrees with results.csv "
-                f"round {match.round_code!r}")
-        home_score, away_score = to_int(row["Home.score"]), to_int(row["Away.score"])
-        if home_score != match.home_points or away_score != match.away_points:
-            raise MatchIdentityError(f"{context}: scores disagree with results.csv")
-        venue = clean(row["Venue"])
-        if venue is not None and venue != match.venue_raw:
-            raise MatchIdentityError(
-                f"{context}: venue {venue!r} disagrees with results.csv "
-                f"{match.venue_raw!r}")
-
-        playing_for = clubs.resolve(row["Playing.for"], season, "player_stats")
-        if playing_for not in (home_hist, away_hist):
-            raise MatchIdentityError(
-                f"{context}: Playing.for {row['Playing.for']!r} is neither "
-                f"side of the match")
-
-        # Match-grain attendance: a blank cell is NO observation (not a
-        # contradiction, not a 0); 0 is a legitimate recorded value. One
-        # distinct non-null observation wins regardless of how many rows
-        # are blank; two distinct non-null values fail closed.
-        attendance = to_int(row["Attendance"])
-        if attendance is not None:
-            if match.attendance is not None and match.attendance != attendance:
+        # Every check below runs in exactly the order it did before, so the historical path
+        # still fails on the same row for the same reason. The ONLY change is that the
+        # match-grain mutations are deferred to the commit block after the last check, so a
+        # record REJECTED under --on-record-error reject leaves no partial trace behind.
+        try:
+            season = int(row["Season"])
+            if season != file_season:
+                raise SnapshotValidationError(
+                    f"{context}: row season {season} does not match the file season")
+            match_date = parse_iso_date(row["Date"], context)
+            home_hist = clubs.resolve(row["Home.team"], season, "player_stats")
+            away_hist = clubs.resolve(row["Away.team"], season, "player_stats")
+            key = (match_date, home_hist, away_hist)
+            match = matches.get(key)
+            if match is None:
                 raise MatchIdentityError(
-                    f"{context}: attendance {attendance} disagrees with "
-                    f"{match.attendance} for the same match")
-            match.attendance = attendance
+                    f"{context}: no results.csv match for {match_date} "
+                    f"{home_hist} v {away_hist}")
 
-        match_time = clean(row["Local.start.time"])
-        if match.has_player_rows:
-            if match.match_time != match_time:
+            # Cross-checks against the canonical match structure.
+            if match.season != season:
+                raise MatchIdentityError(f"{context}: season disagrees with results.csv")
+            round_code = normalise_stats_round(row["Round"], context)
+            if round_code != match.round_code:
+                raise MatchIdentityError(
+                    f"{context}: round {round_code!r} disagrees with results.csv "
+                    f"round {match.round_code!r}")
+            home_score, away_score = to_int(row["Home.score"]), to_int(row["Away.score"])
+            if home_score != match.home_points or away_score != match.away_points:
+                raise MatchIdentityError(f"{context}: scores disagree with results.csv")
+            venue = clean(row["Venue"])
+            if venue is not None and venue != match.venue_raw:
+                raise MatchIdentityError(
+                    f"{context}: venue {venue!r} disagrees with results.csv "
+                    f"{match.venue_raw!r}")
+
+            playing_for = clubs.resolve(row["Playing.for"], season, "player_stats")
+            if playing_for not in (home_hist, away_hist):
+                raise MatchIdentityError(
+                    f"{context}: Playing.for {row['Playing.for']!r} is neither "
+                    f"side of the match")
+
+            # Match-grain attendance: a blank cell is NO observation (not a
+            # contradiction, not a 0); 0 is a legitimate recorded value. One
+            # distinct non-null observation wins regardless of how many rows
+            # are blank; two distinct non-null values fail closed.
+            attendance = to_int(row["Attendance"])
+            if attendance is not None:
+                if match.attendance is not None and match.attendance != attendance:
+                    raise MatchIdentityError(
+                        f"{context}: attendance {attendance} disagrees with "
+                        f"{match.attendance} for the same match")
+
+            match_time = clean(row["Local.start.time"])
+            if match.has_player_rows and match.match_time != match_time:
                 raise MatchIdentityError(
                     f"{context}: start time {match_time!r} disagrees with "
                     f"{match.match_time!r} for the same match")
-        else:
-            match.match_time = match_time
 
-        quarters = tuple(to_int(row[c]) for c in QUARTER_COLUMNS)
-        if match.has_player_rows:
-            if match.quarters != quarters:
+            quarters = tuple(to_int(row[c]) for c in QUARTER_COLUMNS)
+            if match.has_player_rows and match.quarters != quarters:
                 raise MatchIdentityError(
                     f"{context}: quarter scores disagree between player rows "
                     f"of the same match")
-        else:
+
+            # Player identity.
+            #
+            # The AFL Tables profile URL is the durable canonical identity: it is what
+            # external_identities stores and what players are resolved by. The fitzRoy
+            # numeric `ID` never reaches a database column at all — it is
+            # grouping/provenance only — so identity is keyed on the URL and `ID` is
+            # optional.
+            #
+            # Measured on the 1897-2025 acquisition (685,473 rows): 83 rows across 5
+            # players, all in 2025, carry a canonical URL and NO ID, and there is not one
+            # URL with two IDs or one ID with two URLs anywhere in the source. Requiring
+            # both would discard five real players and their matches for a column the
+            # schema never keeps. AFLDB-ISSUE-099 §2.1 re-measured the same shape
+            # in-season: 82 rows, 5 urls, 0 missing urls.
+            afl_id = clean(row["ID"])
+            url_path = normalise_profile_url(row["url"])
+            if url_path is None:
+                raise PlayerIdentityError(
+                    f"{context}: player row has no profile URL — identity cannot be "
+                    f"registered deterministically, and a name is never identity")
+            pm_key = (url_path, key)
+            if pm_key in seen_player_match:
+                raise MatchIdentityError(
+                    f"{context}: duplicate player-match row for {url_path}")
+        except (MatchIdentityError, PlayerIdentityError,
+                SnapshotValidationError, ValueError) as exc:
+            # Under the default abort policy this re-raises, unchanged.
+            identity = player_match_identity(row, clubs, matches)
+            policy_or_abort(policy).reject(
+                exc, family=FAMILY_PLAYER_MATCH, reason=reason_for(exc),
+                external_record_id=(identity or {}).get("external_record_id"))
+            continue
+
+        # ---- commit: the record is accepted, so the match-grain supplements it carries
+        # may now be absorbed. Nothing above this line mutates shared state.
+        if attendance is not None:
+            match.attendance = attendance
+        if not match.has_player_rows:
+            match.match_time = match_time
             match.quarters = quarters
         match.has_player_rows = True
-
-        # Player identity.
-        #
-        # The AFL Tables profile URL is the durable canonical identity: it is what
-        # external_identities stores and what players are resolved by. The fitzRoy numeric
-        # `ID` never reaches a database column at all — it is grouping/provenance only —
-        # so identity is keyed on the URL and `ID` is optional.
-        #
-        # Measured on the 1897-2025 acquisition (685,473 rows): 83 rows across 5 players,
-        # all in 2025, carry a canonical URL and NO ID, and there is not one URL with two
-        # IDs or one ID with two URLs anywhere in the source. Requiring both would discard
-        # five real players and their matches for a column the schema never keeps.
-        afl_id = clean(row["ID"])
-        url_path = normalise_profile_url(row["url"])
-        if url_path is None:
-            raise PlayerIdentityError(
-                f"{context}: player row has no profile URL — identity cannot be "
-                f"registered deterministically, and a name is never identity")
-        pm_key = (url_path, key)
-        if pm_key in seen_player_match:
-            raise MatchIdentityError(
-                f"{context}: duplicate player-match row for {url_path}")
         seen_player_match.add(pm_key)
+        if policy is not None:
+            policy.accepted_player_match.add(pm_key)
 
         fact = players.get(url_path)
         if fact is None:
@@ -1162,19 +1549,30 @@ def scan_player_stats(
     # construction. The remaining contradiction to catch is the other direction: one
     # fitzRoy ID appearing under two different profile URLs, which would mean the source
     # disagrees with itself about who someone is.
+    #
+    # These are AGGREGATE contradictions: they are only decidable once every row has been
+    # read, so they cannot be rejected per record inside the loop. Under `abort` they raise
+    # exactly as before. Under `reject` they mark the player unusable, and the bundle
+    # emitter refuses to PROJECT that player's records while still ENUMERATING them — the
+    # §19 rule that an observed record is never turned into an absent one.
+    sink = policy_or_abort(policy)
     by_id: dict[str, str] = {}
     for url, fact in players.items():
         if fact.afl_id is not None:
             other = by_id.get(fact.afl_id)
             if other is not None:
-                raise PlayerIdentityError(
+                exc = PlayerIdentityError(
                     f"fitzRoy ID {fact.afl_id} is claimed by profile URLs {other!r} and "
                     f"{url!r} — refusing to collapse two players")
-            by_id[fact.afl_id] = url
+                sink.refuse_player(exc, url, "identity_conflict")
+                sink.refuse_player(exc, other, "identity_conflict")
+            else:
+                by_id[fact.afl_id] = url
         if fact.display_name is None or fact.surname is None:
             # Names are display payload, never identity — but a player row with no name
             # at all means the source row was not what it claimed to be.
-            raise PlayerIdentityError(f"{url} has no usable name")
+            sink.refuse_player(PlayerIdentityError(f"{url} has no usable name"),
+                               url, "no_usable_name")
     return players, rows_read, round_vote_rows
 
 
@@ -1204,6 +1602,403 @@ def summarise(matches: dict[tuple, MatchFact], players: dict[str, PlayerFact],
         "seasons": f"{seasons[0]}-{seasons[-1]}" if seasons else "-",
         "club_identities": ", ".join(sorted(hists)),
         "brownlow_round_vote_rows": round_vote_rows,
+    }
+
+
+# ---------------------------------------------------------------------------
+# AFLDB-ISSUE-099 — observation-bundle emission (still no database)
+#
+# The bundle is the ONE boundary between Python's AFL Tables interpretation and
+# TypeScript's migration-074 persistence. Python owns everything above it: club and player
+# identity, the attendance dedupe, the quarter/score reconciliation, NULL/NA semantics and
+# the stable external keys. Python owns NOTHING below it: no observation is persisted, no
+# reconciliation verb is computed, no promotion candidate is created and no canonical row
+# is ever touched here.
+# ---------------------------------------------------------------------------
+
+
+def period_scores_of(quarters: tuple | None) -> list[dict] | None:
+    """The 24 QUARTER_COLUMNS as typed period rows, NULLs preserved.
+
+    Cumulative-to-date, exactly as AFL Tables publishes them and exactly as the historical
+    importer writes them. Periods 1-4 only: fitzRoy carries extra-time columns and the
+    historical path deliberately does not import them, so neither does this.
+    """
+    if quarters is None:
+        return None
+    rows: list[dict] = []
+    index = 0
+    for side in ("home", "away"):
+        for period in (1, 2, 3, 4):
+            goals, behinds, points = quarters[index:index + 3]
+            index += 3
+            rows.append({"side": side, "period": period, "goals": goals,
+                         "behinds": behinds, "points": points})
+    return rows
+
+
+def match_payload(row: dict, identity: dict, fact: "MatchFact | None") -> dict:
+    """The `afltables.match` payload: the SOURCE observation, NULLs preserved.
+
+    Raw club and venue strings, the source's own round vocabulary, and the match-grain
+    supplements AFL Tables repeats on every player row. A blank cell stays None — never 0.
+    """
+    round_number = to_int(row.get("Round.Number")) \
+        if identity["round_type"] == "home_and_away" else None
+    return {
+        "season": identity["season"],
+        "round_code": identity["round_code"],
+        "round_number": round_number,
+        "round_type": identity["round_type"],
+        "match_date": identity["match_date"].isoformat(),
+        "venue_raw": clean(row.get("Venue")),
+        "home_team_raw": clean(row.get("Home.Team")),
+        "away_team_raw": clean(row.get("Away.Team")),
+        "home_goals": to_int(row.get("Home.Goals")),
+        "home_behinds": to_int(row.get("Home.Behinds")),
+        "home_points": to_int(row.get("Home.Points")),
+        "away_goals": to_int(row.get("Away.Goals")),
+        "away_behinds": to_int(row.get("Away.Behinds")),
+        "away_points": to_int(row.get("Away.Points")),
+        "margin": to_int(row.get("Margin")),
+        # Supplements exist only once a player row has been joined to the match.
+        "attendance": fact.attendance if fact is not None else None,
+        "match_time": fact.match_time if fact is not None else None,
+        "period_scores": period_scores_of(fact.quarters) if fact is not None else None,
+    }
+
+
+def match_projection(fact: MatchFact, clubs: ClubResolver) -> dict:
+    """The typed `afltables.match` projection: source-resolved identity, typed fields.
+
+    "Resolved" here means resolved as far as an OFFLINE pass can: to a historical club
+    identity, not to a database id. Mapping those onto clubs.id / venues.id — and refusing
+    when they do not map — is TypeScript's, inside the settle transaction.
+
+    Attendance follows AFLDB-ISSUE-099 §17.1: a non-NULL value (including a legitimate 0)
+    cites its source; NULL is `not_collected` and cites nothing. NULL is never 0.
+    """
+    if fact.home_points > fact.away_points:
+        result, winner = "home_win", fact.home_hist
+    elif fact.away_points > fact.home_points:
+        result, winner = "away_win", fact.away_hist
+    else:
+        result, winner = "draw", None
+    return {
+        "match_key": match_key_of(fact, clubs),
+        "season": fact.season,
+        "round_code": fact.round_code,
+        "round_number": fact.round_number,
+        "round_type": fact.round_type,
+        "is_final": fact.round_type != "home_and_away",
+        "match_date": fact.match_date.isoformat(),
+        "match_time": fact.match_time,
+        "venue_raw": fact.venue_raw,
+        "home_club_hist": fact.home_hist,
+        "away_club_hist": fact.away_hist,
+        "home_club_name": clubs.name_of(fact.home_hist),
+        "away_club_name": clubs.name_of(fact.away_hist),
+        "home_goals": fact.home_goals, "home_behinds": fact.home_behinds,
+        "home_score": fact.home_points,
+        "away_goals": fact.away_goals, "away_behinds": fact.away_behinds,
+        "away_score": fact.away_points,
+        "result": result,
+        "winner_club_hist": winner,
+        "margin": abs(fact.home_points - fact.away_points),
+        "attendance": fact.attendance,
+        "attendance_status": "complete" if fact.attendance is not None
+                             else "not_collected",
+        "attendance_source_key": SOURCE_KEY_AFLTABLES if fact.attendance is not None
+                                 else None,
+        # A side/period whose goals, behinds AND points are all NULL is *not recorded* and
+        # writes no row. That is not the same as 0.
+        "period_scores": [p for p in (period_scores_of(fact.quarters) or [])
+                          if not (p["goals"] is None and p["behinds"] is None
+                                  and p["points"] is None)],
+    }
+
+
+def player_match_payload(row: dict, identity: dict) -> dict:
+    """The `afltables.player_match_stats` payload: the source row at its own grain.
+
+    Match-grain fields (attendance, venue, team names, scores) belong to the match family
+    and are deliberately absent, so a match-level correction does not appear as a
+    correction to every one of its player rows.
+    """
+    payload = {
+        "url": identity["url"],
+        "afltables_id": clean(row.get("ID")),
+        "season": to_int(row.get("Season")),
+        "round_code": clean(row.get("Round")),
+        "match_key": identity["match_key"],
+        "playing_for_raw": clean(row.get("Playing.for")),
+        "jumper_number": clean(row.get("Jumper.No.")),
+        "career_games": to_int(row.get("Career.Games")),
+        "first_name": clean(row.get("First.name")),
+        "surname": clean(row.get("Surname")),
+        "player_name": clean(row.get("Player")),
+        "dob": clean(row.get("DOB")),
+    }
+    # STAT_MAP by explicit NAME, never by CSV column position. An empty cell is
+    # "not recorded" and stays None all the way through the bundle.
+    for source_column, target in STAT_MAP:
+        payload[target] = to_int(row.get(source_column))
+    return payload
+
+
+def player_match_projection(row: dict, identity: dict, clubs: ClubResolver,
+                            round_vote_seasons: set[int]) -> dict:
+    """The typed `afltables.player_match_stats` projection.
+
+    Two canonical targets ride one observation (AFLDB-ISSUE-099 §6.1): the
+    player_match_stats fact row, and — only when the source actually published a vote — a
+    brownlow_round_votes row. NA is never 0 and never a filler row.
+    """
+    match = identity["match"]
+    stats = {target: to_int(row.get(source_column))
+             for source_column, target in STAT_MAP}
+    votes = stats.get("brownlow_votes")
+    eligible = (match.season in round_vote_seasons
+                and match.round_code not in FINALS_CODES)
+    return {
+        "url": identity["url"],
+        "afltables_id": clean(row.get("ID")),
+        "match_key": identity["match_key"],
+        "season": match.season,
+        "round_code": match.round_code,
+        "round_number": match.round_number,
+        "is_final": match.round_type != "home_and_away",
+        "club_hist": clubs.resolve(row["Playing.for"], match.season, "player_stats"),
+        "career_game_no": to_int(row.get("Career.Games")),
+        "jumper_number": clean(row.get("Jumper.No.")),
+        "stats": stats,
+        # No vote published, an ungated season, or a final: NO row. Never votes = 0, never
+        # a played=true/votes=NULL filler row, never a season total derived from a partial
+        # round set.
+        "brownlow_round_vote": (
+            {"season": match.season, "round_number": int(match.round_code),
+             "votes": votes}
+            if eligible and votes is not None else None
+        ),
+    }
+
+
+def measure_brownlow_votes(files: list[SnapshotFile], corrections: list[dict] | None,
+                           round_vote_seasons: set[int]) -> dict:
+    """AFLDB-ISSUE-099 F11 / U2 — the bounded OFFLINE Brownlow.Votes measurement.
+
+    Counts what the acquired snapshot actually publishes, over the bytes already on disk.
+    No network call and no rerun of probe P5. In-season AFL Tables publishes no votes until
+    the count, so `rows_with_votes: 0` is the EXPECTED result and is not a defect: it means
+    zero Brownlow candidates, which is the honest outcome. It must never become a zero.
+    """
+    total = 0
+    na = 0
+    values: set[int] = set()
+    projectable = 0
+    for context, _season, row in iter_player_stats(files, corrections):
+        total += 1
+        votes = to_int(row.get("Brownlow.Votes"))
+        if votes is None:
+            na += 1
+            continue
+        values.add(votes)
+        season = to_int(row.get("Season"))
+        round_code = clean(row.get("Round"))
+        if season in round_vote_seasons and round_code not in FINALS_CODES:
+            projectable += 1
+    return {
+        "rows": total,
+        "rows_with_votes": total - na,
+        "rows_na": na,
+        "distinct_values": sorted(values),
+        "projectable_round_vote_rows": projectable,
+        "seasons_gated_for_round_votes": sorted(
+            round_vote_seasons & {f.season for f in files if f.season is not None}),
+    }
+
+
+def emit_observation_bundle(
+    *, out_path: Path, label: str, manifest_path: Path, manifest: dict,
+    files: list[SnapshotFile], matches: dict[tuple, MatchFact], clubs: ClubResolver,
+    corrections: list[dict], round_vote_seasons: set[int],
+    policy: RecordErrorPolicy, season: int,
+) -> dict:
+    """Write the deterministic versioned observation bundle (AFLDB-ISSUE-099 §8).
+
+    THE PRESENCE CONTRACT (§19). `enumerations` is built by re-reading the acquired rows
+    and computing each row's stable identity, INDEPENDENTLY of whether that row projected.
+    A record that was observed and then rejected is therefore still enumerated, so a later
+    absence sweep can never conclude it disappeared. A row whose identity cannot be
+    established at all goes to `unkeyed_rejections` and forces `complete: false` on its
+    (family, scope_key), which is what makes the affected sweep refuse rather than guess.
+    """
+    scope_key = f"season={season}"
+
+    # ---- afltables.match: enumerate presence from the raw results rows.
+    results_file = next(f for f in files if f.dataset == "results")
+    by_match_key = {match_key_of(m, clubs): m for m in matches.values()}
+    match_order: list[str] = []
+    match_rows: dict[str, dict] = {}
+    match_identities: dict[str, dict] = {}
+    match_unkeyed: list[dict] = []
+    with results_file.path.open(newline="", encoding="utf-8") as handle:
+        for line, row in enumerate(csv.DictReader(handle), start=2):
+            identity = results_identity(row, clubs)
+            if identity is None:
+                match_unkeyed.append({
+                    "family": FAMILY_MATCH, "scope_key": scope_key,
+                    "reason": "no_match_identity",
+                    "detail": f"results.csv line {line}",
+                })
+                continue
+            record_id = identity["external_record_id"]
+            if record_id not in match_rows:
+                match_order.append(record_id)
+                match_rows[record_id] = row
+                match_identities[record_id] = identity
+
+    # ---- afltables.player_match_stats: same, from the raw player_stats rows.
+    player_order: list[str] = []
+    player_rows: dict[str, dict] = {}
+    player_identities: dict[str, dict] = {}
+    player_unkeyed: list[dict] = []
+    for context, _file_season, row in iter_player_stats(files, corrections):
+        identity = player_match_identity(row, clubs, matches)
+        if identity is None:
+            player_unkeyed.append({
+                "family": FAMILY_PLAYER_MATCH, "scope_key": scope_key,
+                "reason": "no_player_match_identity", "detail": context,
+            })
+            continue
+        record_id = identity["external_record_id"]
+        if record_id not in player_rows:
+            player_order.append(record_id)
+            player_rows[record_id] = row
+            player_identities[record_id] = identity
+
+    match_rejections = policy.keyed(FAMILY_MATCH)
+    player_rejections = policy.keyed(FAMILY_PLAYER_MATCH)
+    records: list[dict] = []
+
+    for record_id in match_order:
+        row = match_rows[record_id]
+        fact = by_match_key.get(record_id)
+        rejection = match_rejections.get(record_id)
+        projection = None
+        if fact is None:
+            rejection = rejection or {"reason": "record_invalid",
+                                      "detail": "row did not survive interpretation"}
+        elif not fact.has_player_rows:
+            # §17.1: a match may not be PROPOSED without at least one joined player row
+            # proving it was played. It is still a full observation.
+            rejection = {"reason": "incomplete_match_evidence",
+                         "detail": "no player_stats row joined to this match"}
+        else:
+            projection = match_projection(fact, clubs)
+            rejection = None
+        records.append({
+            "family": FAMILY_MATCH, "scope_key": scope_key,
+            "external_record_id": record_id,
+            "payload": match_payload(row, match_identities[record_id], fact),
+            "observed_columns": list(MATCH_PAYLOAD_COLUMNS),
+            "projection": projection,
+            "rejection": rejection_json(rejection),
+        })
+
+    for record_id in player_order:
+        row = player_rows[record_id]
+        identity = player_identities[record_id]
+        match = identity["match"]
+        accepted = (identity["url"],
+                    (match.match_date, match.home_hist, match.away_hist)) \
+            in policy.accepted_player_match
+        unusable = policy.unusable_players.get(identity["url"])
+        projection = None
+        if not accepted:
+            # A duplicate row's rejection must not retract the record the FIRST row
+            # legitimately produced, so a rejection is only applied to a record the
+            # scan never accepted.
+            rejection = player_rejections.get(record_id) or {
+                "reason": "record_invalid",
+                "detail": "row did not survive interpretation"}
+        elif unusable is not None:
+            rejection = {"reason": "unresolved_identity", "detail": unusable}
+        else:
+            rejection = None
+            projection = player_match_projection(row, identity, clubs,
+                                                 round_vote_seasons)
+        records.append({
+            "family": FAMILY_PLAYER_MATCH, "scope_key": scope_key,
+            "external_record_id": record_id,
+            "payload": player_match_payload(row, identity),
+            "observed_columns": list(PLAYER_MATCH_PAYLOAD_COLUMNS),
+            "projection": projection,
+            "rejection": rejection_json(rejection),
+        })
+
+    enumerations = [
+        enumeration_of(FAMILY_MATCH, scope_key, match_order, match_unkeyed),
+        enumeration_of(FAMILY_PLAYER_MATCH, scope_key, player_order, player_unkeyed),
+    ]
+    unkeyed = match_unkeyed + player_unkeyed
+    rejected = sum(1 for r in records if r["rejection"] is not None)
+
+    bundle = {
+        "bundle_contract_version": BUNDLE_CONTRACT_VERSION,
+        "generated_by": "tools/migration/import_fitzroy_core.py",
+        "snapshot_label": label,
+        "manifest_path": str(manifest_path).replace("\\", "/"),
+        "manifest_sha256": sha256_file(manifest_path),
+        "acquisition_kind": acquisition_kind(manifest),
+        "season": season,
+        "fitzroy_version": manifest.get("fitzroy_version_pinned"),
+        "on_record_error": policy.mode,
+        "enumerations": enumerations,
+        "records": sorted(records, key=lambda r: (r["family"], r["external_record_id"])),
+        "unkeyed_rejections": unkeyed,
+        "counts": {
+            "matches": len(match_order),
+            "player_match_rows": len(player_order),
+            "rejections": rejected,
+            "unkeyed_rejections": len(unkeyed),
+        },
+        "measurements": {
+            "brownlow_votes": measure_brownlow_votes(files, corrections,
+                                                     round_vote_seasons),
+        },
+    }
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(bundle, indent=2, sort_keys=True) + "\n",
+                        encoding="utf-8")
+    return bundle
+
+
+def rejection_json(rejection) -> dict | None:
+    """Normalise a rejection to the bundle's shape (or None when the record projected)."""
+    if rejection is None:
+        return None
+    if isinstance(rejection, RecordRejection):
+        return {"reason": rejection.reason, "detail": rejection.detail}
+    return {"reason": rejection["reason"], "detail": rejection["detail"]}
+
+
+def enumeration_of(family: str, scope_key: str, record_ids: list[str],
+                   unkeyed: list[dict]) -> dict:
+    """One presence enumeration.
+
+    `complete` is FALSE whenever any observed row of this (family, scope_key) had no
+    provable identity. Its presence cannot be represented, so the scope is not safe for
+    absence sweeping and TypeScript must skip the sweep for it (§19, SC5). This is the one
+    place that decision is made, and it fails closed.
+    """
+    return {
+        "family": family,
+        "scope_key": scope_key,
+        "complete": not unkeyed,
+        "incomplete_reason": None if not unkeyed else
+                             f"{len(unkeyed)} observed row(s) had no provable identity",
+        "external_record_ids": sorted(record_ids),
     }
 
 
@@ -1790,6 +2585,26 @@ def main() -> int:
                              "bindings still hold and its measured fingerprint has not "
                              "drifted. IMPLIES --require-full-history: the acceptance record "
                              "binds, it never blesses")
+    parser.add_argument("--require-in-season", action="store_true",
+                        help="refuse unless the snapshot is an in_season_partial "
+                             "acquisition of exactly one season that "
+                             "data/reference/seasons.json declares in progress; re-derives "
+                             "every gate from the contract's in_season block and the "
+                             "artefacts. Offline only, and mutually exclusive with the "
+                             "historical gates (AFLDB-ISSUE-099)")
+    parser.add_argument("--on-record-error", choices=(ON_RECORD_ERROR_ABORT,
+                                                      ON_RECORD_ERROR_REJECT),
+                        default=ON_RECORD_ERROR_ABORT,
+                        help="what to do when one source record cannot be interpreted. "
+                             f"{ON_RECORD_ERROR_ABORT!r} (default) aborts the pass, which "
+                             "is what a clean rebuild needs. "
+                             f"{ON_RECORD_ERROR_REJECT!r} collects the failure and "
+                             "continues, so a nightly settle is not killed by one bad "
+                             "row; in-season only (AFLDB-ISSUE-099 F6)")
+    parser.add_argument("--emit-observations", metavar="PATH",
+                        help="write the deterministic AFLDB-ISSUE-099 observation bundle "
+                             "to PATH and exit. Offline: no database connection, no "
+                             "canonical write. Requires --require-in-season")
     parser.add_argument("--validate-only", action="store_true",
                         help="validate manifest/snapshot and print the plan; "
                              "no database connection at all")
@@ -1815,7 +2630,29 @@ def main() -> int:
     # to bypass the gates it claims were passed.
     require_full_history = args.require_full_history or args.require_accepted_baseline
 
+    # AFLDB-ISSUE-099: the two gates adjudicate different acquisition kinds, and a run that
+    # asked for both is asking for a contradiction. Refuse rather than silently letting one
+    # win.
+    if args.require_in_season and require_full_history:
+        parser.error(
+            "--require-in-season cannot be combined with --require-full-history or "
+            "--require-accepted-baseline: they adjudicate different acquisition kinds")
+
+    # AFLDB-ISSUE-099 F6: the historical path must keep aborting on a bad record. Making
+    # `reject` in-season only means a rebuild cannot silently drop a record even if an
+    # operator asks it to.
+    if args.on_record_error == ON_RECORD_ERROR_REJECT and not args.require_in_season:
+        parser.error(
+            "--on-record-error reject is in-season only: pass --require-in-season. A "
+            "clean rebuild must abort on a record it cannot interpret, never drop it.")
+    if args.emit_observations and not args.require_in_season:
+        parser.error(
+            "--emit-observations requires --require-in-season: the observation bundle "
+            "declares acquisition_kind in_season_partial and an in-progress season, so it "
+            "must not be produced from any other snapshot kind")
+
     started = time.time()
+    in_season_coverage: dict | None = None
     full_history_coverage: dict | None = None
     accepted_baseline: dict | None = None
     acceptance_binding: dict | None = None
@@ -1823,7 +2660,18 @@ def main() -> int:
         files = validate_snapshot(snapshot_dir, manifest_path, args.label)
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+        # The observation scope is the acquired season. A multi-season snapshot has no
+        # single scope, and --emit-observations is refused for one above.
+        rng = manifest.get("requested_range") or {}
+        season_scope = rng.get("from") if (isinstance(rng.get("from"), int)
+                                           and rng.get("from") == rng.get("to")) else None
+        policy = RecordErrorPolicy(
+            args.on_record_error,
+            scope_key=f"season={season_scope}" if season_scope is not None else "")
         if args.require_accepted_baseline:
+            # Explicit, and before the register is even opened: an in-season partial is
+            # not a candidate for acceptance, so it must not be adjudicated as one.
+            refuse_in_season_for_historical(manifest, "--require-accepted-baseline")
             register_path = Path(args.accepted_baselines) if args.accepted_baselines                 else ACCEPTED_BASELINES_PATH
             if not register_path.exists():
                 raise SnapshotValidationError(
@@ -1834,6 +2682,8 @@ def main() -> int:
                 accepted_baseline, manifest_path, manifest, contract)
         if require_full_history:
             full_history_coverage = enforce_full_history(manifest, snapshot_dir, contract)
+        if args.require_in_season:
+            in_season_coverage = enforce_in_season(manifest, snapshot_dir, contract)
         corrections = load_row_corrections()
         clubs = ClubResolver(
             json.loads(CLUBS_JSON.read_text(encoding="utf-8")),
@@ -1842,9 +2692,9 @@ def main() -> int:
         )
         round_vote_seasons = load_round_vote_seasons()
         results_file = next(f for f in files if f.dataset == "results")
-        matches = scan_results(results_file.path, clubs)
+        matches = scan_results(results_file.path, clubs, policy)
         players, rows_read, round_vote_rows = scan_player_stats(
-            files, matches, clubs, round_vote_seasons, corrections)
+            files, matches, clubs, round_vote_seasons, corrections, policy)
     except (SnapshotValidationError, MatchIdentityError, PlayerIdentityError) as exc:
         raise fail(str(exc))
 
@@ -1857,6 +2707,10 @@ def main() -> int:
         print("full-history gates PASSED — identity coverage")
         for k, v in full_history_coverage.items():
             print(f"  {k:<28} {v}")
+    if in_season_coverage is not None:
+        print("in-season gates PASSED — identity coverage")
+        for k, v in in_season_coverage.items():
+            print(f"  {k:<28} {v}")
 
     if accepted_baseline is not None:
         try:
@@ -1868,10 +2722,52 @@ def main() -> int:
         for k, v in (acceptance_binding or {}).items():
             print(f"  {k:<28} {v}")
 
+    if args.emit_observations:
+        # AFLDB-ISSUE-099 S-B. Offline emission, then exit: nothing below this branch is
+        # reached, so no database connection is ever opened on the settle path.
+        try:
+            bundle = emit_observation_bundle(
+                out_path=Path(args.emit_observations), label=args.label,
+                manifest_path=manifest_path, manifest=manifest, files=files,
+                matches=matches, clubs=clubs, corrections=corrections,
+                round_vote_seasons=round_vote_seasons, policy=policy,
+                season=season_scope)
+        except (SnapshotValidationError, MatchIdentityError,
+                PlayerIdentityError) as exc:
+            raise fail(str(exc))
+        print(f"\nobservation bundle v{bundle['bundle_contract_version']} written to "
+              f"{args.emit_observations}")
+        for k, v in bundle["counts"].items():
+            print(f"  {k:<28} {v}")
+        for enumeration in bundle["enumerations"]:
+            print(f"  {enumeration['family']:<28} "
+                  f"{len(enumeration['external_record_ids'])} record(s), "
+                  f"complete={enumeration['complete']}")
+        votes = bundle["measurements"]["brownlow_votes"]
+        print("  Brownlow.Votes (offline measurement, AFLDB-ISSUE-099 F11)")
+        for k, v in votes.items():
+            print(f"    {k:<26} {v}")
+        print(f"\nEmission complete in {time.time() - started:.1f}s "
+              "(no database access).")
+        return 0
+
     if args.validate_only:
         print(f"\nValidation complete in {time.time() - started:.1f}s "
               "(no database access).")
         return 0
+
+    # AFLDB-ISSUE-099 F4/§15. An in-season snapshot is NEVER imported by this tool. The
+    # canonical import_* writers upsert with no ownership predicate and delete by match and
+    # season — correct for a clean rebuild, destructive and unreviewed in-season — so an
+    # in-season snapshot reaches PostgreSQL only through the reviewed settle pass. This
+    # guard is the reason --require-in-season can be used safely without --validate-only.
+    if args.require_in_season:
+        raise fail(
+            "--require-in-season is OFFLINE ONLY: an in_season_partial snapshot is never "
+            "imported by this tool, because the canonical writers upsert and delete "
+            "without an ownership predicate. Use --validate-only to adjudicate it; the "
+            "reviewed settle pass (tools/current-season/settle-afltables.ts) is the only "
+            "path from an in-season snapshot to PostgreSQL.")
 
     # Database work starts here — and only here.
     from common import Reporter, connect_pg, load_env, require_env, safe_dsn

@@ -21,6 +21,16 @@
 #     An existing manifest label is never overwritten — a reacquisition is a new
 #     snapshot with a new label (§4 snapshot immutability).
 #
+#   Rscript tools/rebuild/fitzroy/acquire_core.R --acquire --in-season \
+#       --label <snapshot-label> --from <Y> --to <Y> [--datasets player_stats,results]
+#     AFLDB-ISSUE-099 in-season acquisition: a THIRD acquisition kind
+#     (`in_season_partial`), not a narrowed core snapshot. Exactly one season, and
+#     that season must be declared in-progress by data/reference/seasons.json.
+#     No full-history gate is relaxed for it; it is measured against the contract's
+#     own `in_season` block and adjudicated by
+#     import_fitzroy_core.py --require-in-season. It can never be accepted as a
+#     rebuild baseline.
+#
 # Version pin (§5): the installed fitzRoy version must equal
 # fitzroy-contract.json's pinned_version; anything else fails closed unless
 # --allow-version-mismatch is passed, and the version actually used is recorded
@@ -38,6 +48,7 @@ if (!ok_fitzroy) stop("Package 'fitzRoy' is required: install.packages('fitzRoy'
 suppressWarnings(suppressMessages(library(fitzRoy)))
 
 CONTRACT_PATH <- "tools/rebuild/fitzroy/fitzroy-contract.json"
+SEASONS_PATH <- "data/reference/seasons.json"
 WORKING_ROOT <- "data/sources/afltables/fitzroy_core"
 MANIFEST_ROOT <- "docs/rebuild-manifests/afltables_fitzroy_core"
 ADAPTER <- "tools/rebuild/fitzroy/acquire_core.R"
@@ -57,6 +68,9 @@ opt <- function(name, default = NULL) {
 }
 
 allow_mismatch <- has_flag("--allow-version-mismatch")
+# AFLDB-ISSUE-099. Opt-in only: with this flag absent every existing path below
+# behaves exactly as it did before.
+in_season <- has_flag("--in-season")
 
 # --- version pin (fail closed) ------------------------------------------
 installed_version <- as.character(utils::packageVersion("fitzRoy"))
@@ -191,9 +205,49 @@ run_acquire <- function() {
   from <- as.integer(opt("--from", "1897"))
   to <- as.integer(opt("--to", format(Sys.Date(), "%Y")))
   if (is.na(from) || is.na(to) || from > to) stop("Invalid --from/--to season range")
-  datasets <- strsplit(opt("--datasets", "player_stats,player_details,results"), ",")[[1]]
+
+  # --- AFLDB-ISSUE-099 in-season preconditions ----------------------------
+  # STRUCTURAL preconditions, not a verdict. The acquirer still does not adjudicate
+  # (see the completeness accounting below): these only establish that the run is
+  # shaped like an in-season acquisition at all, and the one adjudicator
+  # import_fitzroy_core.py --require-in-season re-derives every gate afterwards.
+  ins <- contract$in_season
+  if (in_season) {
+    if (is.null(ins)) {
+      stop("--in-season requires an `in_season` block in ", CONTRACT_PATH)
+    }
+    if (from != to) {
+      stop("--in-season acquires exactly one season: --from (", from,
+           ") must equal --to (", to, ")")
+    }
+    if (!file.exists(SEASONS_PATH)) {
+      stop("--in-season requires ", SEASONS_PATH, ", the in-progress season register")
+    }
+    seasons_ref <- jsonlite::fromJSON(SEASONS_PATH, simplifyVector = FALSE)
+    in_progress <- as.integer(unlist(seasons_ref$in_progress_seasons))
+    if (!(from %in% in_progress)) {
+      stop("Season ", from, " is not declared in progress by ", SEASONS_PATH,
+           " (in_progress_seasons: ", paste(in_progress, collapse = ", "),
+           "). A completed season is acquired as a core snapshot, never in-season.")
+    }
+  }
+
+  default_datasets <- if (in_season) {
+    paste(unlist(ins$required_datasets), collapse = ",")
+  } else {
+    "player_stats,player_details,results"
+  }
+  datasets <- strsplit(opt("--datasets", default_datasets), ",")[[1]]
   unknown <- setdiff(datasets, names(contract$datasets))
   if (length(unknown)) stop("Unknown dataset(s): ", paste(unknown, collapse = ", "))
+  if (in_season) {
+    disallowed <- setdiff(datasets, unlist(ins$allowed_datasets))
+    if (length(disallowed)) {
+      stop("Dataset(s) not permitted in an in-season snapshot: ",
+           paste(disallowed, collapse = ", "), " (allowed: ",
+           paste(unlist(ins$allowed_datasets), collapse = ", "), ")")
+    }
+  }
 
   out_dir <- file.path(WORKING_ROOT, label)
   files <- list()
@@ -213,6 +267,12 @@ run_acquire <- function() {
   # source actually supplied, rather than leaving it to be discovered at import time.
   identity_obs <- list(rows = 0, rows_without_id = 0, rows_without_url = 0,
                        seasons_with_missing_id = list())
+
+  # AFLDB-ISSUE-099. How far the in-progress season has actually run, measured from
+  # the acquired results rather than asserted, so the adjudicator and the settle pass
+  # can see the observed extent of the snapshot without re-reading the CSV.
+  in_season_obs <- list(matches = 0L, rounds_observed = integer(0),
+                        round_types_observed = character(0))
 
   if ("player_stats" %in% datasets) {
     # One canonical acquisition (runbook §8): identity/name, DOB, profile URL,
@@ -245,7 +305,19 @@ run_acquire <- function() {
   if ("results" %in% datasets) {
     r <- try_fetch("results", function() fitzRoy::fetch_results_afltables(season = from:to))
     if (!r$ok) stop("results failed: ", r$error)
-    add_file("results", as.data.frame(r$data), "results.csv")
+    results_df <- as.data.frame(r$data)
+    if (in_season) {
+      in_season_obs$matches <- nrow(results_df)
+      if ("Round.Number" %in% names(results_df)) {
+        in_season_obs$rounds_observed <- sort(unique(stats::na.omit(
+          as.integer(results_df$Round.Number))))
+      }
+      if ("Round.Type" %in% names(results_df)) {
+        in_season_obs$round_types_observed <- sort(unique(stats::na.omit(
+          as.character(results_df$Round.Type))))
+      }
+    }
+    add_file("results", results_df, "results.csv")
   }
   if ("ladder" %in% datasets) {
     # AFLDB-ISSUE-095. A VALIDATION WITNESS, never a fact source: the contract's
@@ -295,6 +367,14 @@ run_acquire <- function() {
   is_witness <- function(d) identical(contract$datasets[[d]]$role, "VALIDATION_WITNESS")
   witness_only <- length(datasets) > 0 && all(vapply(datasets, is_witness, logical(1)))
 
+  # AFLDB-ISSUE-099. An in-season snapshot is measured against ITS OWN one-season
+  # requirement, for exactly the reason the witness repair above exists: measuring a
+  # single in-progress season against the 1897-2025 core range would report 129
+  # missing seasons for a run that acquired everything it claimed. This does NOT relax
+  # a core gate — it applies the contract's separate, narrower `in_season` block, and
+  # the core gates continue to apply unchanged to every core snapshot.
+  scoped_range <- witness_only || in_season
+
   counted_files <- if (witness_only) {
     Filter(function(f) f$dataset %in% datasets, files)
   } else {
@@ -307,11 +387,17 @@ run_acquire <- function() {
 
   # A witness is required to cover exactly the range it was asked for; a core snapshot is
   # required to cover the contract's full-history range whatever was asked for.
-  required_first <- if (witness_only) from else as.integer(fh$season_range$first_season)
-  required_last <- if (witness_only) to else as.integer(fh$season_range$last_season)
+  required_first <- if (scoped_range) from else as.integer(fh$season_range$first_season)
+  required_last <- if (scoped_range) to else as.integer(fh$season_range$last_season)
   required_seasons <- setdiff(required_first:required_last,
-                              if (witness_only) integer(0) else approved_gaps)
-  required_datasets <- if (witness_only) datasets else unlist(fh$required_datasets)
+                              if (scoped_range) integer(0) else approved_gaps)
+  required_datasets <- if (witness_only) {
+    datasets
+  } else if (in_season) {
+    unlist(ins$required_datasets)
+  } else {
+    unlist(fh$required_datasets)
+  }
 
   duplicate_seasons <- seasons_acquired[duplicated(
     vapply(counted_files, season_of, integer(1)))]
@@ -361,13 +447,40 @@ run_acquire <- function() {
   # player_stats-only measurements. Recorded as not-applicable for a witness rather than
   # as a row of zeroes, which would read as "measured and found empty".
   manifest$identity_observations <- if (witness_only) "not_applicable" else identity_obs
+  # AFLDB-ISSUE-099. The in-season block is the snapshot's own declaration of what it is:
+  # one in-progress season, the datasets it carries, and the observed extent of that
+  # season. It also carries, in the artefact itself, the two gates this kind of snapshot
+  # may NEVER satisfy, so the exclusion travels with the manifest and not only with the
+  # adjudicator's source.
+  if (in_season) {
+    manifest$contract_in_season_version <- ins$contract_in_season_version
+    manifest$in_season <- list(
+      season = from,
+      datasets = as.list(datasets),
+      matches = in_season_obs$matches,
+      player_match_rows = identity_obs$rows,
+      rounds_observed = as.list(in_season_obs$rounds_observed),
+      round_types_observed = as.list(in_season_obs$round_types_observed),
+      never_admissible_for = as.list(unlist(ins$never_admissible_for$gates))
+    )
+  }
   # Never a verdict: only a validator may confer completeness, and WHICH validator
   # depends on what was acquired. Pointing a witness at the core adjudicator manufactures
-  # a false failure over datasets it never claimed.
-  manifest$acquisition_kind <- if (witness_only) "validation_witness" else "core_snapshot"
+  # a false failure over datasets it never claimed, and pointing an in-season partial at
+  # it would manufacture a false failure over 128 seasons it never claimed.
+  manifest$acquisition_kind <- if (in_season) {
+    "in_season_partial"
+  } else if (witness_only) {
+    "validation_witness"
+  } else {
+    "core_snapshot"
+  }
   manifest$completeness <- "unvalidated"
   manifest$full_history <- FALSE
-  manifest$verdict_authority <- if (witness_only) {
+  manifest$verdict_authority <- if (in_season) {
+    paste0("tools/migration/import_fitzroy_core.py --label ", label,
+           " --validate-only --require-in-season")
+  } else if (witness_only) {
     paste0("tools/rebuild/fitzroy/validate_ladder_witness.py --label ", label)
   } else {
     "tools/migration/import_fitzroy_core.py --validate-only --require-full-history"
@@ -380,7 +493,21 @@ run_acquire <- function() {
   if (length(not_observed)) {
     cat("  observations not satisfied:", paste(not_observed, collapse = ", "), "\n")
   }
-  if (witness_only) {
+  if (in_season) {
+    cat("  acquisition kind: in_season_partial (season ", from,
+        ") — NOT a core snapshot and NEVER an accepted baseline.\n", sep = "")
+    cat("  matches observed:", in_season_obs$matches,
+        "| rounds observed:", paste(in_season_obs$rounds_observed, collapse = ","), "\n")
+    cat("  player_stats rows:", identity_obs$rows,
+        "| rows without a profile URL:", identity_obs$rows_without_url,
+        "| rows without an ID (enrichment only):", identity_obs$rows_without_id, "\n")
+    cat("\nNow validate independently:\n",
+        " .venv/bin/python tools/migration/import_fitzroy_core.py --label", label,
+        "--validate-only --require-in-season\n")
+    cat("  Do NOT run --require-full-history or --require-accepted-baseline against this",
+        "\n  label: an in-season partial can never satisfy either gate, and both refuse it",
+        "\n  explicitly.\n")
+  } else if (witness_only) {
     cat("  acquisition kind: validation_witness (", paste(datasets, collapse = ", "),
         ") — NOT a core snapshot.\n", sep = "")
     cat("\nNow validate independently:\n",
@@ -409,5 +536,5 @@ if (has_flag("--probe")) {
 } else if (has_flag("--acquire")) {
   run_acquire()
 } else {
-  stop("Usage: acquire_core.R --probe [--season N] | --acquire --label L [--from Y] [--to Y] [--datasets a,b] [--allow-version-mismatch]")
+  stop("Usage: acquire_core.R --probe [--season N] | --acquire --label L [--from Y] [--to Y] [--datasets a,b] [--in-season] [--allow-version-mismatch]")
 }

@@ -242,13 +242,24 @@
     },
     {
       "source_key": "afltables",
-      "family": "player_match_stats",
-      "endpoint": "fitzRoy fetch_player_stats_afltables(season)",
-      "status": "identity_only",
-      "external_key": null,
-      "required_columns": null,
-      "known_columns": null,
-      "known_columns_status": "undeclared",
+      "family": "match",
+      "endpoint": "fitzRoy fetch_results_afltables(season) + fetch_player_stats_afltables(season)",
+      "status": "declared",
+      "external_key": ["season", "round_code", "match_date", "home_team_raw", "away_team_raw"],
+      "required_columns": [
+        "season", "round_code", "round_type", "match_date", "venue_raw",
+        "home_team_raw", "away_team_raw",
+        "home_goals", "home_behinds", "home_points",
+        "away_goals", "away_behinds", "away_points", "margin"
+      ],
+      "known_columns": [
+        "season", "round_code", "round_number", "round_type", "match_date",
+        "venue_raw", "home_team_raw", "away_team_raw",
+        "home_goals", "home_behinds", "home_points",
+        "away_goals", "away_behinds", "away_points", "margin",
+        "attendance", "match_time", "period_scores"
+      ],
+      "known_columns_status": "complete",
       "hash_exclusions": [],
       "source_updated_at_field": null,
       "zero_is_missing_columns": [],
@@ -258,16 +269,68 @@
         "group": "afltables",
         "evidence": "proven_independent"
       },
-      "promotion_policy": "not_yet_declared",
+      "promotion_policy": "reviewed",
       "promotion_owner": "AFLDB-ISSUE-099",
       "evidence": [
-        "P5 PASS 2026-08-28: 9,522 x 81, 2026-03-05 to 2026-08-23, 207 distinct matches, rounds 1-25 with no finals rows yet."
+        "P5 PASS 2026-08-28: 207 distinct matches for 2026, 2026-03-05 to 2026-08-23, rounds 1-25 with no finals rows yet; `Attendance` 0 NA across 9,522 player-match rows.",
+        "AFLDB-ISSUE-099 T3 (validated 2026-08-28, 48/48): tools/migration/import_fitzroy_core.py emits exactly these 18 payload columns as MATCH_PAYLOAD_COLUMNS, with periods 1-4 both sides preserved cumulative-to-date and every absent value NULL."
       ],
       "notes": [
-        "BINDING: the in-season identity keys on profile `url` (0 NA across 9,522 rows). `ID` is 82 NA across 5 distinct urls, none of which carries an `ID` anywhere in 2026, so `ID` is an enrichment field and must NEVER be required.",
+        "The bundle names this family `afltables.match`; this registry keys it as (source_key `afltables`, family `match`), exactly as squiggle_api/match is keyed. The dotted form is the wire name, the pair is the contract key.",
+        "ONE observation, TWO canonical targets: `matches` and `match_period_scores`. Migration 074's ux_promotion_candidates_pending is unique on (source, family, external_record_id, target_table), so target-specific candidates are the designed dimension — not two families.",
+        "COMPOSED KEY: the two club components of external_record_id are the RESOLVED historical club identities, not the raw strings listed here. `home_team_raw`/`away_team_raw` are the payload columns the key is derived FROM; ClubResolver turns each into exactly one historical identity or fails closed, and the resulting key is byte-identical to matches.match_key.",
+        "The record is a results.csv row PLUS the match-grain supplements AFL Tables repeats on every player row (attendance, local start time, quarter scores), deduplicated at source with two distinct non-null values failing the record closed.",
+        "zero_is_missing_columns is deliberately EMPTY. `attendance` 0 is a legitimate recorded value that cites its source, and a 0 score is real; absence is NULL. Listing any column here would convert a real 0 into a NULL and is exactly the defect this family must not have.",
+        "hash_exclusions is empty: AFL Tables publishes no fetch-date or response-noise column in this payload, so every column is content and the payload hash is the whole observation.",
+        "source_updated_at_field is null and must stay null: AFL Tables publishes no upstream mutation timestamp. Fetch time, observed_from and last_seen_at are never substituted for one.",
+        "`round_number` is nullable — it is NULL for a final — so it is known but not required. `attendance`, `match_time` and `period_scores` are likewise present-but-nullable.",
+        "promotion_policy is `reviewed`, never automatic: every proposal is a promotion_candidate for a human. AFLDB-ISSUE-099 v1 writes NO canonical row at all."
+      ]
+    },
+    {
+      "source_key": "afltables",
+      "family": "player_match_stats",
+      "endpoint": "fitzRoy fetch_player_stats_afltables(season)",
+      "status": "declared",
+      "external_key": ["url", "match_key"],
+      "required_columns": ["url", "match_key", "season", "round_code", "playing_for_raw"],
+      "known_columns": [
+        "url", "afltables_id", "season", "round_code", "match_key",
+        "playing_for_raw", "jumper_number", "career_games",
+        "first_name", "surname", "player_name", "dob",
+        "kicks", "marks", "handballs", "disposals", "goals", "behinds", "hitouts",
+        "tackles", "rebounds", "inside_50s", "clearances", "clangers", "frees_for",
+        "frees_against", "contested", "uncontested", "contested_marks",
+        "marks_inside_50", "one_percenters", "bounces", "goal_assists", "brownlow_votes"
+      ],
+      "known_columns_status": "complete",
+      "hash_exclusions": [],
+      "source_updated_at_field": null,
+      "zero_is_missing_columns": [],
+      "round_vocabulary": "afltables_2026",
+      "independence": {
+        "derives_from": null,
+        "group": "afltables",
+        "evidence": "proven_independent"
+      },
+      "promotion_policy": "reviewed",
+      "promotion_owner": "AFLDB-ISSUE-099",
+      "evidence": [
+        "P5 PASS 2026-08-28: 9,522 x 81, 2026-03-05 to 2026-08-23, 207 distinct matches, rounds 1-25 with no finals rows yet.",
+        "AFLDB-ISSUE-099 T3 (validated 2026-08-28, 48/48): import_fitzroy_core.py emits exactly these 34 payload columns as PLAYER_MATCH_PAYLOAD_COLUMNS. The 22 statistic keys are STAT_MAP's TARGET names, mapped from the source columns by explicit name — proven by re-emitting with the CSV stat columns in reverse order and getting identical values."
+      ],
+      "notes": [
+        "The bundle names this family `afltables.player_match_stats`; this registry keys it as (source_key `afltables`, family `player_match_stats`).",
+        "BINDING: the in-season identity keys on profile `url` (0 NA across 9,522 rows). `ID` is 82 NA across 5 distinct urls, none of which carries an `ID` anywhere in 2026, so `ID` is an enrichment field, is carried as the nullable `afltables_id`, and must NEVER be required.",
+        "external_key is (`url`, `match_key`): the normalised profile-URL path plus the match identity, joined as `<url path>@<match_key>`. Names are never an identity key, at any grain — `first_name`, `surname` and `player_name` are display payload only.",
         "A row whose `url` is unknown to AFLDB is `unresolved_identity` and goes to a human. A debutant can arrive with NA `Player` and NA `DOB`, which is itself an argument for reviewed promotion.",
-        "`Substitute` is NA for all 9,522 rows: the column exists and carries nothing.",
-        "The 81-column set and the composition of external_record_id (player url x match identity) are AFLDB-ISSUE-099's to declare with its own evidence. Until then this family cannot be projected or promoted."
+        "`Substitute` is NA for all 9,522 rows: the column exists and carries nothing, so it is not declared.",
+        "`Time.on.Ground` has no player_match_stats column and is deliberately not projected, so it is not declared either.",
+        "ONE observation, TWO canonical targets: `player_match_stats` and `brownlow_round_votes`. A NULL `brownlow_votes` is NA and produces NO round-vote row — never a 0, never a played/votes filler row.",
+        "zero_is_missing_columns is deliberately EMPTY. Every statistic here is NULL when not recorded and 0 when genuinely 0, including `brownlow_votes`. Listing a column would silently convert real zeroes to nulls.",
+        "hash_exclusions is empty: no column in this payload is fetch noise. The player-grain name and DOB columns stay INSIDE the hash — a source name correction is a real source change, and reconciliation classifies it as `history_only` because it moves no projected fact field, so it advances history without proposing anything.",
+        "Match-grain fields (attendance, venue, team names, match scores) are deliberately ABSENT from this payload: they belong to `afltables.match`, so a match-level correction does not appear as a correction to every one of its player rows.",
+        "AMENDED 2026-08-28 by AFLDB-ISSUE-099 T4. This family was `identity_only` / `not_yet_declared` while its shape and key were unproven; T3 proved both, so it is now `declared` with `reviewed` promotion. Reviewed means every proposal is a promotion_candidate for a human — v1 writes NO canonical row."
       ]
     },
     {

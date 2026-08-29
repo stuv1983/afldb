@@ -2,10 +2,12 @@ import postgres from 'postgres';
 
 import sourceFamiliesRaw from '../../../data/reference/source-families.json';
 import {
-  decideObservation,
-  type JsonValue,
-  type ObservationHead,
-} from '../acquisition/observations';
+  markMissingObservationsAbsent,
+  persistSourceObservation,
+  type EnumeratedScope,
+  type SourceObservation,
+} from '../acquisition/observation-store';
+import { type JsonValue } from '../acquisition/observations';
 import {
   getSourceFamily,
   parseSourceFamilyRegistry,
@@ -703,157 +705,44 @@ function asJsonValue(payload: unknown): JsonValue {
   return payload as JsonValue;
 }
 
-async function persistSourceObservation(
-  tx: postgres.TransactionSql,
-  sourceId: number,
-  match: ExternalCurrentMatch,
-  batchId: number,
-  observedAt: string,
-): Promise<'version_inserted' | 'head_refreshed'> {
-  const family = 'match';
-  const contract = getSourceFamily(SOURCE_FAMILY_REGISTRY, sourceKey(match.source), family);
-  const [storedHead] = await tx<{
-    versionSeq: number;
-    payloadHash: string;
-    hashRecipe: string;
-    rawPayload: JsonValue;
-    absentSince: Date | string | null;
-  }[]>`
-    SELECT v.version_seq AS "versionSeq",
-           v.payload_hash AS "payloadHash",
-           p.hash_recipe AS "hashRecipe",
-           p.raw_payload AS "rawPayload",
-           r.absent_since AS "absentSince"
-      FROM staging.source_records r
-      JOIN staging.source_record_versions v
-        ON v.source_id = r.source_id
-       AND v.family = r.family
-       AND v.external_record_id = r.external_record_id
-       AND v.version_seq = r.current_version_seq
-      JOIN staging.source_payloads p
-        ON p.source_id = v.source_id
-       AND p.family = v.family
-       AND p.payload_hash = v.payload_hash
-     WHERE r.source_id = ${sourceId}
-       AND r.family = ${family}
-       AND r.external_record_id = ${match.externalGameId}
-     FOR UPDATE OF r
-  `;
-  const head: ObservationHead | null = storedHead ? {
-    versionSeq: storedHead.versionSeq,
-    payloadHash: storedHead.payloadHash,
-    hashRecipe: storedHead.hashRecipe,
-    rawPayload: storedHead.rawPayload,
-    absentSince: storedHead.absentSince === null ? null : String(storedHead.absentSince),
-  } : null;
-  const payload = asJsonValue(match.rawPayload);
-  const decision = decideObservation({ contract, head, payload, observedAt });
-  const scopeKey = `season=${match.season}`;
-
-  if (decision.action === 'unchanged') {
-    await tx`
-      UPDATE staging.source_records
-         SET scope_key = ${scopeKey},
-             last_seen_at = ${observedAt},
-             last_batch_id = ${batchId},
-             absent_since = NULL
-       WHERE source_id = ${sourceId}
-         AND family = ${family}
-         AND external_record_id = ${match.externalGameId}
-    `;
-    return 'head_refreshed';
-  }
-
-  await tx`
-    INSERT INTO staging.source_payloads (
-      source_id, family, payload_hash, hash_recipe, raw_payload, first_stored_at
-    ) VALUES (
-      ${sourceId}, ${family}, ${decision.payloadHash}, ${decision.recipe},
-      ${tx.json(payload as never)}, ${observedAt}
-    )
-    ON CONFLICT (source_id, family, payload_hash) DO NOTHING
-  `;
-
-  if (decision.closesPreviousVersion) {
-    await tx`
-      UPDATE staging.source_record_versions
-         SET observed_to = ${observedAt}, closed_by_batch_id = ${batchId}
-       WHERE source_id = ${sourceId}
-         AND family = ${family}
-         AND external_record_id = ${match.externalGameId}
-         AND version_seq = ${decision.versionSeq - 1}
-         AND observed_to IS NULL
-    `;
-  }
-
-  await tx`
-    INSERT INTO staging.source_record_versions (
-      source_id, family, external_record_id, version_seq, payload_hash,
-      source_updated_at, observed_from, opened_by_batch_id
-    ) VALUES (
-      ${sourceId}, ${family}, ${match.externalGameId}, ${decision.versionSeq},
-      ${decision.payloadHash}, ${decision.sourceUpdatedAt}, ${observedAt}, ${batchId}
-    )
-  `;
-
-  if (head === null) {
-    await tx`
-      INSERT INTO staging.source_records (
-        source_id, family, external_record_id, scope_key,
-        current_version_seq, current_payload_hash,
-        first_seen_at, last_seen_at, last_batch_id, absent_since
-      ) VALUES (
-        ${sourceId}, ${family}, ${match.externalGameId}, ${scopeKey},
-        ${decision.versionSeq}, ${decision.payloadHash},
-        ${observedAt}, ${observedAt}, ${batchId}, NULL
-      )
-    `;
-  } else {
-    await tx`
-      UPDATE staging.source_records
-         SET scope_key = ${scopeKey},
-             current_version_seq = ${decision.versionSeq},
-             current_payload_hash = ${decision.payloadHash},
-             last_seen_at = ${observedAt},
-             last_batch_id = ${batchId},
-             absent_since = NULL
-       WHERE source_id = ${sourceId}
-         AND family = ${family}
-         AND external_record_id = ${match.externalGameId}
-    `;
-  }
-  return 'version_inserted';
+/**
+ * The current-season adapter onto the shared spine contract
+ * (`src/lib/acquisition/observation-store.ts`). This importer's family is
+ * `match`, its external record id is the provider's game id, and its
+ * enumeration scope is the season — supplied here, so the store itself stays
+ * family-agnostic and ISSUE-099 reaches the same writer rather than a second
+ * implementation of it.
+ */
+function matchObservation(
+  sourceId: number, match: ExternalCurrentMatch,
+): SourceObservation {
+  return {
+    contract: getSourceFamily(SOURCE_FAMILY_REGISTRY, sourceKey(match.source), 'match'),
+    sourceId,
+    externalRecordId: match.externalGameId,
+    scopeKey: `season=${match.season}`,
+    payload: asJsonValue(match.rawPayload),
+  };
 }
 
-async function markMissingObservationsAbsent(
-  tx: postgres.TransactionSql,
+/**
+ * The `(source, family, season)` scopes this fetch actually enumerated. A
+ * match whose source has no resolved id is skipped, exactly as before: its
+ * scope was never enumerated, so nothing in it may be asserted absent.
+ */
+function enumeratedMatchScopes(
   sourceIds: ReadonlyMap<ExternalSource, number>,
   matches: readonly ExternalCurrentMatch[],
-  batchId: number,
-  observedAt: string,
-): Promise<number> {
-  const scopes = new Map<string, { sourceId: number; season: number }>();
+): EnumeratedScope[] {
+  const scopes = new Map<string, EnumeratedScope>();
   for (const match of matches) {
     const sourceId = sourceIds.get(match.source);
     if (!sourceId) continue;
-    scopes.set(`${sourceId}|${match.season}`, { sourceId, season: match.season });
+    scopes.set(`${sourceId}|${match.season}`, {
+      sourceId, family: 'match', scopeKey: `season=${match.season}`,
+    });
   }
-
-  let markedAbsent = 0;
-  for (const { sourceId, season } of scopes.values()) {
-    const rows = await tx`
-      UPDATE staging.source_records
-         SET absent_since = ${observedAt}
-       WHERE source_id = ${sourceId}
-         AND family = 'match'
-         AND scope_key = ${`season=${season}`}
-         AND last_batch_id <> ${batchId}
-         AND absent_since IS NULL
-       RETURNING external_record_id
-    `;
-    markedAbsent += rows.length;
-  }
-  return markedAbsent;
+  return [...scopes.values()];
 }
 
 async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], updateMatches: boolean, insertMissingMatches: boolean): Promise<{
@@ -912,7 +801,7 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
       resolvedObservations.push({ match, homeClubId, awayClubId, localMatchId });
 
       const observationAction = await persistSourceObservation(
-        tx, sourceId, match, batch.id, observedAt,
+        tx, matchObservation(sourceId, match), batch.id, observedAt,
       );
       if (observationAction === 'version_inserted') {
         observationVersionsInserted += 1;
@@ -970,7 +859,7 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
 
     canonicalPlan = planCurrentSeasonCanonicalWork(resolvedObservations, insertMissingMatches);
     observationsMarkedAbsent = await markMissingObservationsAbsent(
-      tx, sourceIds, matches, batch.id, observedAt,
+      tx, enumeratedMatchScopes(sourceIds, matches), batch.id, observedAt,
     );
 
     if (updateMatches) {

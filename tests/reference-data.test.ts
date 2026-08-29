@@ -325,11 +325,18 @@ describe('load_reference_data.py', () => {
     it('finds the tables created after 045 that never registered import write', () => {
       const unregistered = created
         .filter((c) => !registered.has(c.table)).map((c) => c.table).sort();
-      // If this list grows, check whether the new table is in the reference
-      // loader's FK cascade closure before running another destructive rebuild.
+      // Exact equality on purpose: a NEW post-045 table that skips
+      // grant_import_write() must show up here as a visible source diff, so a
+      // human decides whether it belongs in the reference loader's FK cascade
+      // closure BEFORE the next destructive rebuild. A subset check would let
+      // one appear silently.
       expect(unregistered).toEqual([
         'app_health_events',
         'data_edits',
+        // 073 (AFLDB-ISSUE-086). Human overrides are not importer-owned:
+        // privileges.sql grants afldb_import SELECT only and states they
+        // "deliberately remain outside afldb_meta.import_writable_tables".
+        'data_overrides',
         'nl_search_feedback',
         'nl_search_log',
         'nl_search_review',
@@ -337,6 +344,13 @@ describe('load_reference_data.py', () => {
         'player_link_resolutions',
         'player_link_suggestions',
         'player_match_period_stats',
+        // 074 (AFLDB-ISSUE-096). The promotion ledger is append-only BY GRANT:
+        // afldb_auth gets SELECT, INSERT and nothing else. Registering it would
+        // hand back UPDATE/DELETE/TRUNCATE on every privileges reconcile and
+        // silently end the append-only guarantee — migration 074 says so in
+        // full. Its sibling promotion_candidates IS registered and is absent
+        // from this list, which is the distinction working.
+        'promotion_decisions',
       ]);
     });
 
@@ -345,6 +359,16 @@ describe('load_reference_data.py', () => {
       // player_match_period_stats.club_id -> clubs                (migration 062)
       // player_link_resolutions is also in the closure but privileges.sql grants it
       // SELECT explicitly (migration 068), so it reads fine.
+      //
+      // Of the two entries added above: data_overrides has no FK to any truncate
+      // root at all (admin_user_id -> auth_users only), so it is outside the
+      // closure entirely. promotion_decisions IS transitively reachable —
+      // seasons <- promotion_candidates.season <- promotion_decisions.candidate_id
+      // — and afldb_import cannot SELECT it. That is not a defect and not a third
+      // member of this pair: since §H13 the closure is taken from POPULATED roots
+      // only, and a clean rebuild's roots are empty, so it is never adjudicated.
+      // If seasons is ever truncated while populated, the guard refuses — which is
+      // the fail-closed behaviour working, not a privilege to widen here.
       for (const t of ['player_link_match_candidates', 'player_match_period_stats']) {
         expect(registered.has(t)).toBe(false);
       }
@@ -509,15 +533,146 @@ describe('source families dataset (AFLDB-ISSUE-096 S1)', () => {
     expect(stats.notes.join(' ').toLowerCase()).toContain('heuristic');
   });
 
-  it('promotes nothing in v1, and lineups never at all', () => {
-    expect(registry.families.filter(isPromotable)).toEqual([]);
+  /*
+   * AMENDED 2026-08-28 by AFLDB-ISSUE-099 T4. The registry previously promoted
+   * NOTHING, because no family had a proven shape and key. The two AFL Tables
+   * families now do, so they carry `reviewed` — which means every proposal is a
+   * promotion_candidate for a human, and never an automatic canonical write.
+   * Everything the original assertion protected is still protected below.
+   */
+  it('promotes only the two reviewed AFL Tables families, and lineups never at all', () => {
+    expect(registry.families.filter(isPromotable).map((f) => `${f.sourceKey}/${f.family}`).sort())
+      .toEqual(['afltables/match', 'afltables/player_match_stats']);
+    // `reviewed` is the only promotable policy there is: nothing is automatic.
+    for (const family of registry.families.filter(isPromotable)) {
+      expect(family.promotionPolicy).toBe('reviewed');
+      expect(family.promotionOwner).toBe('AFLDB-ISSUE-099');
+    }
     expect(getSourceFamily(registry, 'afl_api', 'lineup').promotionPolicy).toBe('never');
     expect(getSourceFamily(registry, 'squiggle_api', 'match').promotionPolicy).toBe('never');
+    expect(getSourceFamily(registry, 'kali_afl_stats', 'match').promotionPolicy).toBe('never');
     // Reviewed promotion cannot be declared for a source with no sources row.
     refuses((data) => { familyIn(data, 'afl_api', 'roster').promotion_policy = 'reviewed'; });
     // ...nor for a family whose column contract was never proven.
     refuses((data) => {
-      familyIn(data, 'afltables', 'player_match_stats').promotion_policy = 'reviewed';
+      familyIn(data, 'kali_afl_stats', 'player_stats').promotion_policy = 'reviewed';
+    });
+    // ...and a promotable family may not lose the shape that earned it.
+    refuses((data) => { familyIn(data, 'afltables', 'match').status = 'identity_only'; });
+  });
+
+  /*
+   * AFLDB-ISSUE-099 T4 — the two AFL Tables families, declared against the exact
+   * payload the T3 emitter produces. The registry and the emitter are ONE
+   * contract with two halves, so the column sets are pinned against
+   * import_fitzroy_core.py's own constants rather than retyped here: a change to
+   * either side that is not made to the other fails this test.
+   */
+  describe('AFL Tables in-season families (AFLDB-ISSUE-099)', () => {
+    const importer = readFileSync(
+      join(root, 'tools', 'migration', 'import_fitzroy_core.py'), 'utf8');
+
+    /** The quoted names of a Python tuple constant, in source order. */
+    const pythonNames = (constant: string): string[] => {
+      // Anchored: MATCH_PAYLOAD_COLUMNS is a substring of the player constant's
+      // name, so an unanchored match could read the wrong block.
+      const block = new RegExp(`^${constant} = \\(([\\s\\S]*?)\\n\\)`, 'm').exec(importer);
+      expect(block, `${constant} not found in the importer`).not.toBeNull();
+      return [...block![1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    };
+    // STAT_MAP is spread into the player payload, so its TARGET names are part of
+    // that column set. Reading them here is what keeps the one mapping authority.
+    const statTargets = [...new RegExp('STAT_MAP = \\[([\\s\\S]*?)\\n\\]')
+      .exec(importer)![1].matchAll(/\("[^"]+",\s*"([^"]+)"\)/g)].map((m) => m[1]);
+
+    const matchFamily = getSourceFamily(registry, 'afltables', 'match');
+    const playerFamily = getSourceFamily(registry, 'afltables', 'player_match_stats');
+
+    it('declares both families with a proven shape and key', () => {
+      for (const family of [matchFamily, playerFamily]) {
+        expect(family.status).toBe('declared');
+        expect(family.knownColumnsStatus).toBe('complete');
+        expect(family.independence).toMatchObject({
+          derivesFrom: null, group: 'afltables', evidence: 'proven_independent',
+        });
+        expect(family.roundVocabulary).toBe('afltables_2026');
+      }
+      expect(independenceGroups(registry, 'match', ['afltables', 'squiggle_api', 'kali_afl_stats']))
+        .toEqual(['afltables', 'kali', 'squiggle']);
+    });
+
+    it('declares exactly the columns the emitter produces', () => {
+      expect(matchFamily.knownColumns).toEqual(pythonNames('MATCH_PAYLOAD_COLUMNS'));
+      expect(matchFamily.knownColumns).toHaveLength(18);
+      expect(playerFamily.knownColumns).toEqual([
+        ...pythonNames('PLAYER_MATCH_PAYLOAD_COLUMNS'), ...statTargets,
+      ]);
+      expect(playerFamily.knownColumns).toHaveLength(34);
+      expect(statTargets).toHaveLength(22);
+      // Time.on.Ground has no target column, so it is never declared.
+      expect(playerFamily.knownColumns).not.toContain('time_on_ground');
+      // The emitted payload is therefore projectable, and drift in either
+      // direction is a refusal rather than a silent NULL.
+      expect(() => assertProjectableColumns(matchFamily, matchFamily.knownColumns!))
+        .not.toThrow();
+      expect(() => assertProjectableColumns(playerFamily, playerFamily.knownColumns!))
+        .not.toThrow();
+      expect(() => assertProjectableColumns(
+        playerFamily, playerFamily.knownColumns!.filter((c) => c !== 'url')))
+        .toThrow(/missing required column\(s\): url/);
+      expect(() => assertProjectableColumns(
+        matchFamily, [...matchFamily.knownColumns!, 'Substitute']))
+        .toThrow(/undeclared column\(s\): Substitute/);
+    });
+
+    it('keys the player grain on the profile URL, with ID enrichment-only (P5)', () => {
+      expect(playerFamily.externalKey).toEqual(['url', 'match_key']);
+      expect(playerFamily.requiredColumns).toContain('url');
+      // 82 in-season rows carry no ID, so requiring it would discard real
+      // appearances. It rides the payload as a nullable enrichment column.
+      expect(playerFamily.requiredColumns).not.toContain('afltables_id');
+      expect(playerFamily.knownColumns).toContain('afltables_id');
+      expect(playerFamily.notes.join(' ').toLowerCase()).toContain('never be required');
+      // A name is never an identity key at any grain.
+      for (const name of ['first_name', 'surname', 'player_name']) {
+        expect(playerFamily.knownColumns).toContain(name);
+        expect(playerFamily.externalKey).not.toContain(name);
+        expect(playerFamily.requiredColumns).not.toContain(name);
+      }
+    });
+
+    it('composes the match key from the columns the resolver reads', () => {
+      expect(matchFamily.externalKey).toEqual([
+        'season', 'round_code', 'match_date', 'home_team_raw', 'away_team_raw',
+      ]);
+      // round_number is NULL for a final, so it is known but never required.
+      expect(matchFamily.knownColumns).toContain('round_number');
+      expect(matchFamily.requiredColumns).not.toContain('round_number');
+      for (const nullable of ['attendance', 'match_time', 'period_scores']) {
+        expect(matchFamily.knownColumns).toContain(nullable);
+        expect(matchFamily.requiredColumns).not.toContain(nullable);
+      }
+    });
+
+    it('keeps NULL distinct from zero and the payload hash whole', () => {
+      for (const family of [matchFamily, playerFamily]) {
+        // A recorded 0 attendance, a 0 statistic and a 0 Brownlow vote are all
+        // REAL values. Listing any column here would silently null them out.
+        expect(family.zeroIsMissingColumns).toEqual([]);
+        // Nothing in an AFL Tables payload is fetch noise, so the hash covers
+        // the whole observation and stays the change oracle.
+        expect(family.hashExclusions).toEqual([]);
+        // AFL Tables publishes no upstream mutation timestamp, and fetch time is
+        // never substituted for one.
+        expect(family.sourceUpdatedAtField).toBeNull();
+      }
+      // The fail-closed column cross-check applies to these families too.
+      refuses((data) => {
+        familyIn(data, 'afltables', 'match').zero_is_missing_columns = ['not_a_column'];
+      });
+      refuses((data) => {
+        familyIn(data, 'afltables', 'player_match_stats').external_key = ['not_a_column'];
+      });
     });
   });
 
@@ -548,15 +703,24 @@ describe('source families dataset (AFLDB-ISSUE-096 S1)', () => {
     ]);
   });
 
+  /*
+   * AMENDED 2026-08-28 by AFLDB-ISSUE-099 T4: the AFL Tables player grain was the
+   * example here while its shape was unproven. T3 proved it, so the Kali grain —
+   * which still has no stable provider player id (P2) — is now the unprojectable
+   * one, and the rule itself is unchanged.
+   */
   it('refuses to project a family whose shape was never proven', () => {
-    const stats = getSourceFamily(registry, 'afltables', 'player_match_stats');
+    const stats = getSourceFamily(registry, 'kali_afl_stats', 'player_stats');
     expect(stats.status).toBe('identity_only');
     expect(stats.requiredColumns).toBeNull();
-    expect(() => assertProjectableColumns(stats, ['url', 'ID'])).toThrow(/no column contract/);
-    // P5: `ID` is 82 NA in-season, so it must never become a required column.
-    expect(stats.notes.join(' ').toLowerCase()).toContain('never be required');
-    expect(() => assertProjectableColumns(
-      getSourceFamily(registry, 'kali_afl_stats', 'player_stats'), ['matchId'])).toThrow();
+    expect(stats.externalKey).toBeNull();
+    expect(() => assertProjectableColumns(stats, ['matchId', 'playerName']))
+      .toThrow(/no column contract/);
+    // Every family that is NOT declared must be equally unprojectable.
+    for (const family of registry.families.filter((f) => f.status !== 'declared')) {
+      expect(() => assertProjectableColumns(family, ['anything'])).toThrow(/no column contract/);
+      expect(isPromotable(family)).toBe(false);
+    }
   });
 
   it('accepts the proven lineup columns and refuses drift in either direction', () => {

@@ -121,9 +121,10 @@ const M2: FixtureMatch = {
   aq: [[4, 3, 27], [7, 7, 49], [10, 11, 71], [14, 15, 99]],
 };
 
-function resultsRow(m: FixtureMatch): Cell[] {
+// `season` is opt-in with the historical default, so every existing fixture is unchanged.
+function resultsRow(m: FixtureMatch, season = 2024): Cell[] {
   return [m.game, m.date, m.roundResults, m.home, m.hg, m.hb, m.hp,
-    m.away, m.ag, m.ab, m.ap, m.venue, m.margin, 2024, m.roundType, m.roundNumber];
+    m.away, m.ag, m.ab, m.ap, m.venue, m.margin, season, m.roundType, m.roundNumber];
 }
 
 interface FixturePlayer {
@@ -796,6 +797,181 @@ describe.skipIf(!canSpawn)('full-history completeness gates', () => {
   it('treats a missing season as failure while no gap is approved', () => {
     expect(FH.approved_source_gaps.seasons).toEqual([]);
     expect(importerSource).toContain('approved source gap');
+  });
+});
+
+/*
+ * AFLDB-ISSUE-099 T2 — the in-season adjudicator.
+ *
+ * An in-season snapshot is a partial observation of a season still being played. It is a
+ * THIRD acquisition kind with its OWN gate, never a relaxed full-history gate, and the two
+ * refuse each other explicitly so an in-season partial can never drift into the historical
+ * fail-closed contract or into the accepted-baseline register.
+ */
+describe.skipIf(!canSpawn)('in-season completeness gates (AFLDB-ISSUE-099)', () => {
+  const CONTRACT = JSON.parse(readFileSync(
+    join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+  const SEASONS = JSON.parse(readFileSync(
+    join(root, 'data', 'reference', 'seasons.json'), 'utf8'));
+  const INS = CONTRACT.in_season;
+  const SEASON = SEASONS.in_progress_seasons[0] as number;
+  const COMPLETED = CONTRACT.full_history.season_range.last_season as number;
+
+  // Two regular-round matches in the in-progress season. P5 measured no finals rows
+  // in-season, so neither fixture is a final.
+  const IM1: FixtureMatch = { ...M1, date: `${SEASON}-03-05` };
+  const IM2: FixtureMatch = {
+    ...M2, date: `${SEASON}-05-16`, roundResults: 'R10', roundStats: '10',
+    roundType: 'Regular', roundNumber: '10',
+  };
+
+  const inSeasonSpec = (
+    over: Partial<SnapshotSpec> = {},
+    season = SEASON,
+    rowOverrides: Record<string, Cell> = {},
+  ): SnapshotSpec => ({
+    results: [resultsRow(IM1, season), resultsRow(IM2, season)],
+    playerStats: {
+      [`player_stats_${season}.csv`]: {
+        rows: [
+          psRow(IM1, P_A, { Season: season, ...rowOverrides }),
+          psRow(IM1, P_B, { Season: season }),
+          psRow(IM2, P_C, { Season: season }),
+          psRow(IM2, P_D, { Season: season }),
+        ],
+      },
+    },
+    range: { from: season, to: season },
+    mutateManifest: (m: any) => { m.acquisition_kind = 'in_season_partial'; },
+    ...over,
+  });
+
+  const runWith = (snapshot: { dir: string; manifest: string }, ...gates: string[]) =>
+    spawnSync(python, [importerPath, '--label', LABEL,
+      '--snapshot-dir', snapshot.dir, '--manifest', snapshot.manifest,
+      '--validate-only', ...gates], { cwd: root, encoding: 'utf8' });
+
+  const runInSeason = (snapshot: { dir: string; manifest: string }) =>
+    runWith(snapshot, '--require-in-season');
+
+  it('passes a single in-progress season acquired as an in_season_partial', () => {
+    const result = runInSeason(buildSnapshot(inSeasonSpec()));
+    expect(result.status).toBe(0);
+    expect(String(result.stdout)).toContain('in-season gates PASSED');
+    expect(String(result.stdout)).toContain('no database access');
+  });
+
+  it('refuses a snapshot that is not an in_season_partial acquisition', () => {
+    // No acquisition_kind at all: a pre-ISSUE-099 manifest reads as a core snapshot, and
+    // absence must never read as "unknown, allow".
+    const result = runInSeason(buildSnapshot(inSeasonSpec({ mutateManifest: undefined })));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('in_season_partial');
+    expect(String(result.stderr)).toContain('adjudicates in-season partials ONLY');
+  });
+
+  it('refuses a range covering more than one season', () => {
+    const result = runInSeason(buildSnapshot(inSeasonSpec({
+      range: { from: SEASON - 1, to: SEASON },
+    })));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('covers exactly one season');
+  });
+
+  it('refuses a completed season, whatever the manifest claims', () => {
+    // The most important negative: the in-season gate is not a back door into the
+    // historical range. seasons.json is the one authority for what is still being played.
+    const result = runInSeason(buildSnapshot(inSeasonSpec({}, COMPLETED)));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('not declared in progress');
+    expect(String(result.stderr)).toContain('never in-season');
+  });
+
+  it('refuses a dataset the in-season contract does not permit', () => {
+    const result = runInSeason(buildSnapshot(inSeasonSpec({ withPlayerDetails: true })));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('not permitted in an in-season snapshot');
+    expect(String(result.stderr)).toContain('player_details');
+  });
+
+  it('tolerates an absent fitzRoy ID but never an absent profile URL (P5)', () => {
+    // AFLDB-ISSUE-099 §2.1: 82 in-season rows carried no ID and none carried no url.
+    // Requiring ID in-season would reject real appearances.
+    const ok = runInSeason(buildSnapshot(inSeasonSpec({}, SEASON, { ID: '' })));
+    expect(ok.status).toBe(0);
+    expect(String(ok.stdout)).toMatch(/missing_id\s+1/);
+    expect(String(ok.stdout)).toMatch(/missing_url\s+0/);
+
+    const bad = runInSeason(buildSnapshot(inSeasonSpec({}, SEASON, { url: '' })));
+    expect(bad.status).not.toBe(0);
+    expect(String(bad.stderr)).toMatch(/profile URL|no usable/);
+  });
+
+  it('--require-full-history refuses an in_season_partial explicitly, not by range', () => {
+    const result = runWith(buildSnapshot(inSeasonSpec()), '--require-full-history');
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('in_season_partial');
+    expect(String(result.stderr)).toContain('can NEVER satisfy --require-full-history');
+    // The refusal is for WHAT IT IS, on top of the range check — not incidentally for the
+    // range it happens to cover.
+    expect(String(result.stderr)).not.toContain('does not equal the contract');
+  });
+
+  it('--require-accepted-baseline refuses an in_season_partial before the register', () => {
+    const result = runWith(buildSnapshot(inSeasonSpec()), '--require-accepted-baseline');
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('can NEVER satisfy --require-accepted-baseline');
+    // It never reaches the acceptance register, so it can never be reported as merely
+    // "not the accepted baseline" — a label problem the operator might try to fix.
+    expect(String(result.stderr)).not.toContain('is not the accepted baseline');
+  });
+
+  it('refuses to combine the in-season and historical gates', () => {
+    for (const gate of ['--require-full-history', '--require-accepted-baseline']) {
+      const result = runWith(buildSnapshot(inSeasonSpec()), '--require-in-season', gate);
+      expect(result.status).not.toBe(0);
+      expect(String(result.stderr)).toContain('cannot be combined');
+    }
+  });
+
+  it('never reaches the database import path', () => {
+    // AFLDB-ISSUE-099 F4/§15: the canonical writers upsert with no ownership predicate and
+    // delete by match and season. An in-season snapshot reaches PostgreSQL only through
+    // the reviewed settle pass, so --require-in-season without --validate-only refuses
+    // BEFORE any connection is attempted.
+    const snapshot = buildSnapshot(inSeasonSpec());
+    const result = spawnSync(python, [importerPath, '--label', LABEL,
+      '--snapshot-dir', snapshot.dir, '--manifest', snapshot.manifest,
+      '--require-in-season'], { cwd: root, encoding: 'utf8' });
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('OFFLINE ONLY');
+    expect(String(result.stderr)).toContain('settle-afltables.ts');
+    expect(String(result.stdout)).not.toContain('AFLDB fitzRoy core import');
+  });
+
+  it('declares the in-season contract the gate re-derives', () => {
+    expect(INS.acquisition_kind).toBe('in_season_partial');
+    expect(INS.required_datasets).toEqual(['player_stats', 'results']);
+    expect(INS.allowed_datasets).toEqual(['player_stats', 'results']);
+    expect(INS.identity_requirement.required_columns).toEqual(['url']);
+    expect(INS.identity_requirement.enrichment_columns).toEqual(['ID']);
+    expect(INS.never_admissible_for.gates).toEqual([
+      '--require-full-history', '--require-accepted-baseline',
+    ]);
+    expect(importerSource).toContain('def enforce_in_season');
+    expect(importerSource).toContain('--require-in-season');
+    // The gate reads the contract and the season register, never the manifest's claim.
+    expect(importerSource).toContain('def load_in_progress_seasons');
+    expect(importerSource).toContain('in_progress_seasons');
+  });
+
+  it('keeps ONE implementation of the identity-coverage contract', () => {
+    // Both gates measure identity the same way; a second copy would be the acquirer/
+    // validator drift ISSUE-093 §H11 was burned by, in miniature.
+    expect(importerSource.match(/def measure_identity_coverage/g)).toHaveLength(1);
+    expect(importerSource.match(/measure_identity_coverage\(entries, snapshot_dir/g))
+      .toHaveLength(2);
+    expect(importerSource.match(/identity incomplete/g)).toHaveLength(1);
   });
 });
 

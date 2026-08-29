@@ -7,15 +7,17 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 5
+**Open issues:** 7
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
-| `AFLDB-ISSUE-099` | Medium | Data acquisition / Import architecture | 2026 has no player-match statistics, period scores, attendance or Brownlow votes, because Squiggle/Kali carry none of them. AFL Tables — already the frozen canonical historical source — was confirmed by live probe to carry 2026 through Round 25 including per-match player statistics, venue, attendance and a ladder. | Build a nightly in-season settle pass: partial fitzRoy acquisition (`acquire_core.R --from/--to`) + SHA-256 manifest, then **reviewed** promotion of matches, period scores, attendance, player stats and Brownlow votes, reusing the ISSUE-093 machinery. Depends on `AFLDB-ISSUE-096`; implementation gated on probe **P5** (stop condition if stable `ID`/`url` are absent for 2026). |
 | `AFLDB-ISSUE-100` | Medium | Data acquisition / Import architecture | AFLDB has no model for announced teams, jumper numbers, substitutions or late changes; canonical participation is the played match sheet, which exists only after a match. `fetch_lineup_afl` is the only free source found that supplies lineups at all. | Add a new `staging.external_lineups` table fed by `fetch_lineup_afl`, for admin visibility and reconciliation only. **Lineups are staging-only and never become canonical participation**; no public surface. Depends on `AFLDB-ISSUE-096`; implementation gated on probe **P3**, which must supply the still-UNKNOWN column set. |
-| `AFLDB-ISSUE-101` | Medium | Data acquisition / Import architecture / Data integrity | The approved historical boundary gives the API pipeline only the in-progress season, but nothing performs the transition when a season completes, so in-season provenance would become permanent and the Stage-9 gate would drift. | Implement the rollover: extend `fitzroy-accepted-baselines.json` to the completed season, supersede in-season provenance, advance `seasons.json.in_progress_seasons`, re-point the Stage-9 `matches_after_accepted_last_season` gate. **Must not redefine completed-season `club_seasons` ownership — that stays with `AFLDB-ISSUE-095`.** Depends on `AFLDB-ISSUE-099` plus coordination/completion of the relevant ISSUE-095 path. |
+| `AFLDB-ISSUE-101` | Medium | Data acquisition / Import architecture / Data integrity | The approved historical boundary gives the API pipeline only the in-progress season, but nothing performs the transition when a season completes, so in-season provenance would become permanent and the Stage-9 gate would drift. | Implement the rollover: extend `fitzroy-accepted-baselines.json` to the completed season, supersede in-season provenance, advance `seasons.json.in_progress_seasons`, re-point the Stage-9 `matches_after_accepted_last_season` gate. **Must not redefine completed-season `club_seasons` ownership — that stays with `AFLDB-ISSUE-095`.** `AFLDB-ISSUE-099` is **Resolved as of 2026-08-29, so that dependency is satisfied**; still needs coordination/completion of the relevant ISSUE-095 path. |
 | `AFLDB-ISSUE-102` | Medium | Data acquisition / Import architecture | `tools/migration/import_awards.py:1408` still requires `AFLDB_LEGACY_SQLITE`, so the awards/honours domain has the same legacy dependency `AFLDB-ISSUE-095` records for `club_seasons`, previously untracked. No free API covers Coleman, Rising Star, All-Australian, AFLCA, AFLPA or club best-and-fairest; Brownlow is the exception via the AFL Tables path. | **Record only.** Do not design the replacement under this investigation — no source selection, no per-award provenance decision, no importer work is authorised by this entry. Links `AFLDB-ISSUE-095` as the direct sibling gap; not absorbed. |
+| `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
+| `AFLDB-ISSUE-105` | Low | Data acquisition / Import architecture / Type safety | postgres.js renders `import_batches.id` (`bigint`) as **text**, so an uncast `RETURNING id` is a JavaScript string at runtime while `SettleRunResult.batchId` and the ISSUE-098 current-season code declare `number`. Latent, not currently misbehaving; the ISSUE-099 integration suite hit it as a test failure. | Decide the driver-boundary convention — a branded/string-typed batch id, or an explicit documented decode — then apply it to both call sites and the shared `observation-store.ts` signatures in one change. **Do NOT cast the bigint to `int`**; that trades a typing bug for an overflow risk on an identity column. |
+| `AFLDB-ISSUE-106` | Low | Data acquisition / Import architecture | `proposedPeriodScoreValues()` returns `{ period_scores: [] }` rather than `null` when a match published no quarter scores, so such a match would raise a `match_period_scores` candidate proposing an empty array — the sibling of the Brownlow defect ISSUE-099 D2 fixed. **Unreachable in the real T8 snapshot**: all 207 acquired 2026 matches carried period scores. | Decide whether a match with no published period scores establishes the target at all. If not, return `null` and extend `targetEstablishedBySource()`, then reconcile the integration suite's rejected-record expectation (a rejected match record currently refuses on **both** match targets) deliberately rather than incidentally. |
 
 ---
 
@@ -8366,17 +8368,28 @@ None. P7 remains optional impact sizing and is not required for this determinist
 
 ## AFLDB-ISSUE-099 — In-season AFL Tables settle stage
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Data acquisition / Import architecture
 - **Found:** 2026-08-28 (2026+ API acquisition investigation)
-- **Resolved:** N/A
-- **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §2.4, §5 and §9 row D.
-- **Files (today, for orientation only — none changed yet):**
-  `tools/rebuild/fitzroy/acquire_core.R`, `tools/rebuild/fitzroy/fitzroy-contract.json`,
-  `tools/migration/import_fitzroy_core.py`
+- **Resolved:** 2026-08-29
+- **Runbook:** `AFLDB-ISSUE-099.md` — **durable source of truth, approved implementation
+  contract and complete T1–T8 execution record.** `AFLDB-2026-API-ACQUISITION.md` §2.4, §5,
+  §9 row D and §13.5 remain the parent investigation record.
+- **Files changed:** `tools/rebuild/fitzroy/acquire_core.R`,
+  `tools/rebuild/fitzroy/fitzroy-contract.json`, `tools/migration/import_fitzroy_core.py`,
+  `data/reference/source-families.json`, `src/db/migrations/076_afltables_settle_projections.sql`
+  (**new, applied, checksum-frozen — never edit**), `src/lib/acquisition/observation-store.ts`
+  (new, extracted), `src/lib/acquisition/settle-afltables.ts` (new),
+  `src/lib/acquisition/reconciliation.ts` (one behaviour-neutral `export`),
+  `src/lib/external-afl/current-season-import.ts` (re-pointed at the extracted store),
+  `tools/current-season/settle-afltables.ts` (new CLI),
+  and the acquisition/import/registry/settle test suites.
+  `src/db/migrations/074_source_observation_spine.sql` was **not** edited.
 - **Related:** `AFLDB-ISSUE-093` (Resolved — supplies the acquisition/manifest machinery being
-  reused), `AFLDB-ISSUE-096` (parent contract)
+  reused), `AFLDB-ISSUE-096` (parent contract; ISSUE-099 owns the `data_issues` disagreement
+  row it left unimplemented), `AFLDB-ISSUE-086` (authority mechanism — a prerequisite of the
+  future acceptance stage, **not** a v1 gate), `AFLDB-ISSUE-101` (rollover, downstream)
 
 ### Problem
 2026 has no player-match statistics, period scores, attendance or Brownlow votes at all,
@@ -8387,25 +8400,123 @@ including per-match player statistics, venue, attendance and a ladder. The histo
 also a current-season source, and the existing architecture does not exploit that.
 
 ### Scope
-A nightly in-season settle pass: partial fitzRoy acquisition via `acquire_core.R --from/--to`
-producing a snapshot plus SHA-256 manifest, then **reviewed** promotion of `matches`,
-`match_period_scores`, `attendance`, `player_match_stats` and `brownlow_round_votes`. Reuses
-the ISSUE-093 machinery rather than introducing a second importer.
 
-Note the existing boundary: a narrowed range is labelled `partial` and normal rebuild mode
-correctly refuses it, so an in-season consumer must opt in explicitly.
+**SUPERSEDED WORDING, retained as lineage.** The original scope paragraph read: *"A nightly
+in-season settle pass: partial fitzRoy acquisition via `acquire_core.R --from/--to` producing
+a snapshot plus SHA-256 manifest, then **reviewed** promotion of `matches`,
+`match_period_scores`, `attendance`, `player_match_stats` and `brownlow_round_votes`. Reuses
+the ISSUE-093 machinery rather than introducing a second importer. Note the existing
+boundary: a narrowed range is labelled `partial` and normal rebuild mode correctly refuses
+it, so an in-season consumer must opt in explicitly."* The `partial`-label sentence is
+**factually superseded**: `acquire_core.R` no longer emits a `partial` label at all — it
+records `acquisition_kind` (`core_snapshot` / `validation_witness`),
+`completeness: "unvalidated"` and `full_history: FALSE`, and deliberately does not
+adjudicate (`acquire_core.R:326-374`). See `AFLDB-ISSUE-099.md` F1.
+
+**Current scope (approved 2026-08-28, `AFLDB-ISSUE-099.md`).** A nightly in-season settle
+pass: an explicitly in-season partial fitzRoy acquisition (a third `acquisition_kind`,
+`in_season_partial`, with its own offline adjudicator) producing a snapshot plus SHA-256
+manifest → a deterministic Python→TypeScript observation bundle → migration-074 observation
+persistence → typed family projections → reconciliation → `promotion_candidates` →
+idempotent `data_issues` → dry-run/apply reporting. Two families —
+`afltables.match` (targets `matches`, `match_period_scores`; attendance is a `matches`
+field) and `afltables.player_match_stats` (targets `player_match_stats`,
+`brownlow_round_votes`). The ISSUE-093 acquisition, manifest-validation and scan machinery
+is reused; its canonical writers are **not** — they upsert without an ownership predicate
+and delete by match/season, which is correct for a clean rebuild and forbidden in-season.
+
+**v1 performs ZERO canonical INSERT/UPDATE operations and writes no `accept`
+`promotion_decisions` row.** The canonical acceptance transaction is a separately approved
+later stage with its own recorded prerequisites (`AFLDB-ISSUE-099.md` §16).
 
 ### Dependencies and gates
-Depends on **`AFLDB-ISSUE-096`**. Implementation is gated on evidence probe **P5**.
-If P5 shows AFL Tables lacks stable `ID`/`url` for 2026, implementation is blocked and the
-in-season plan reverts to Squiggle-provisional-only — see the §8 stop conditions; do not
-proceed past that point without a fresh decision.
+
+**SUPERSEDED WORDING, retained as lineage:** *"Depends on **`AFLDB-ISSUE-096`**.
+Implementation is gated on evidence probe **P5**. If P5 shows AFL Tables lacks stable
+`ID`/`url` for 2026, implementation is blocked and the in-season plan reverts to
+Squiggle-provisional-only."*
+
+**Current status.** **P5 ran on 2026-08-28 and PASSED. The stop condition was NOT triggered
+and ISSUE-099 is no longer probe-blocked** (`AFLDB-2026-API-ACQUISITION.md` §13.5). Do not
+rerun P5. The authoritative result: 9,522 × 81 rows, 2026-03-05 → 2026-08-23, 207 distinct
+matches; `url` **0 NA**; populated `url` **1:1** with populated `ID` (663 ↔ 663); `ID`
+itself **82 NA** across 5 urls, none of which carries an `ID` anywhere in 2026.
+**Binding: the in-season player-match identity keys on the stable profile `url` and must
+never require `ID`. Names are never an identity key.**
+
+`AFLDB-ISSUE-096` is **Resolved** and its migration 074 is applied and checksum-frozen.
+`AFLDB-ISSUE-086` is **Resolved** but its `data_overrides.entity_type` CHECK covers only
+`players`, `matches` and `draft_picks`; that gap is a prerequisite of the future acceptance
+stage, **not** a v1 gate.
+
+### Root cause
+Not a defect — a missing capability. The 2026 path stages matches from Squiggle/Kali, and
+neither source carries player-match statistics, period scores, attendance or Brownlow votes.
+AFL Tables carries all of them and was already the frozen canonical historical source, but
+the acquisition contract admitted only whole completed seasons: `enforce_full_history()`
+refused a narrowed range by design, and there was no in-season acquisition kind, no
+observation bundle and no reviewed settle path.
+
+### Implementation (T1–T8, 2026-08-28 → 2026-08-29)
+A third acquisition kind, `in_season_partial`, with its own contract block and its own
+offline adjudicator (`--require-in-season`); the historical fail-closed gates refuse it and
+it refuses them, symmetrically. Python owns AFL Tables interpretation and emits a
+deterministic, versioned, manifest-bound observation bundle (`--emit-observations`,
+`--on-record-error reject`); TypeScript owns validation, the migration-074 observation spine,
+two typed migration-076 staging projections, reconciliation, `promotion_candidates`,
+`import_rejections` and the `data_issues` disagreement lifecycle. The boundary is JSON and
+fails closed on contract drift. Identity is the stable AFL Tables profile `url`; the fitzRoy
+numeric `ID` is enrichment only (82/9522 in-season rows carry none) and a name is never
+identity. The operator CLI is review-first: `--dry-run` is the default and executes the real
+write path against real constraints before rolling back; `--apply` must be explicit.
+
+**v1 writes NO canonical fact row and no acceptance decision** — `canonicalRowsInserted` and
+`canonicalRowsUpdated` are literally 0 and asserted as a runtime fact. Absence is observation
+state only, is never swept in an incomplete scope, and never produces a candidate.
+
+Two defects were found by T8's real-data run and repaired: **D1**, an already-absolute
+`manifest_path` joined onto the project root a second time (cross-platform; Windows made it
+visible), fixed by a `resolveManifestPath()` boundary; and **D2**, target existence being
+decided from the identity-resolved projection, which manufactured **803**
+`brownlow_round_votes / unresolved_identity` candidates from 9522 NA vote observations, fixed
+by establishing target existence from the source record **before** identity is consulted.
 
 ### Validation
-None yet — nothing implemented.
+All user-run. Acquisition contract 23/23; source contract 77 passed / 4 skipped; Python
+bundle contract 48/48; reference data 37 passed / 2 skipped; migration 076 applied,
+checksum-frozen, 76/76 with 0 pending; privileges 29/29 across a reconcile; FK/index 2/2;
+`tests/current-season-import.test.ts` **172/172**; `tests/integration/settle-afltables.test.ts`
+**20/20 with zero skips**, including the restricted `afldb_import` role-parity case;
+typecheck at exactly the 13-error/4-file unrelated baseline with zero ISSUE-099 errors;
+targeted ESLint silent.
+
+End-to-end on real 2026 data (`afldb_test`, as `afldb_import`): one bounded in-season
+acquisition — 207 matches, rounds 1–25, 9522 player rows, **0 missing profile URLs**, 82
+missing IDs — then a genuine first apply (batch 90: 9729 observations, 9729 versions, 8926
+projections, 9936 candidates) and an idempotent rerun (batch 91: 0 payloads, 0 versions, 0
+candidates, 0 `data_issues`, identical queue). **Zero canonical rows written by any
+transaction**, re-proved retroactively by an `xmin` scan of all four fact tables. **All §25
+stop conditions are inactive**; SC7 fired twice during T8 (D1, D2) and both are discharged.
+The F11/Brownlow measurement — 9522 rows, 0 with votes, all NA — closes **U2** and confirms
+**R3**: zero Brownlow candidates in-season is the correct result.
 
 ### Follow-up
-None recorded yet.
+Prerequisites of the future canonical acceptance stage, recorded and deliberately excluded
+from v1 (`AFLDB-ISSUE-099.md` §16): provenance columns on `match_period_scores` and
+`brownlow_round_votes`, `player_match_stats.source_record_id`, a representable manual
+authority for the three player/period-grain targets (`AFLDB-ISSUE-086`), the acceptance
+transaction itself, ownership handover for any 2026 match already stamped `squiggle`/`kali`
+(a reviewed human decision, never an automated transfer), and whether acceptance triggers
+`recomputeClubSeasons` for the in-progress season.
+
+Three implementation limitations were carried out of this issue as **separately tracked
+work, none of which blocks it**: `AFLDB-ISSUE-104` (the foreign-owner `data_issues` refresh
+limitation), `AFLDB-ISSUE-105` (the bigint `import_batches.id` runtime typing debt) and
+`AFLDB-ISSUE-106` (`proposedPeriodScoreValues()` returning an empty array rather than no
+target). `AFLDB-ISSUE-101` remains the downstream end-of-season rollover.
+
+**Nothing is scheduled by this issue** — no cron entry and no systemd timer. Scheduling the
+settle pass is a separate authorisation.
 
 ## AFLDB-ISSUE-100 — Staging-only lineup / team-announcement domain
 
@@ -8604,3 +8715,113 @@ timeout, index, schema, data, or unrelated finals-predicate change was made.
 
 ### Next action
 None. Retain the focused regression and normal statement-timeout boundary.
+
+## AFLDB-ISSUE-104 — `data_issues` open-row dedup is not ownership-scoped
+
+- **Status:** Open
+- **Severity:** Low
+- **Area:** Data acquisition / Import architecture / Data integrity
+- **Found:** 2026-08-29 (`AFLDB-ISSUE-099` T7, carried to T8 close-out)
+- **Resolved:** N/A
+- **Files:** `src/db/migrations/076_afltables_settle_projections.sql` (**applied and
+  checksum-frozen — a change here needs a NEW forward migration**),
+  `src/lib/acquisition/settle-afltables.ts` (`writeDisagreementIssue()`)
+- **Related:** `AFLDB-ISSUE-099` (Resolved — origin)
+
+### Problem
+Migration 076's partial unique index for one open finding per key is
+`(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL`. It **does not
+include owner**. `writeDisagreementIssue()` infers that index in `ON CONFLICT ... DO UPDATE`,
+so if another writer ever held an **open** row on an identically shaped `issue_key`, a
+recurrence would refresh **that** row — overwriting its `entity_id`, `severity`,
+`description` and `details`, and stamping `details.owner` as `AFLDB-ISSUE-099`. Resolution
+is correctly ownership-scoped (`details->>'owner'`) and is proved never to close a
+foreign-owned row; **the refresh path is not, because the index is not.**
+
+### Current reachability
+**Unreachable today, verified at close-out.** `issue_key` was introduced by migration 076 and
+`settle-afltables.ts` is the only writer that populates it — every other `data_issues` writer
+(`tools/records/import-first-kick-goal.ts`, `tools/migration/enrich_birth_dates.py`,
+`enrich_birth_dates_from_club_lists.py`, migration 020) leaves it NULL, and the index is
+partial on `issue_key IS NOT NULL`. Keys are namespaced
+`afltables|<family>|<record>|<target>`.
+
+### Why it was not fixed in ISSUE-099
+`AFLDB-ISSUE-099.md` §13.3 scoped ownership to **resolution** deliberately, and §26's T7
+instruction specified exactly this upsert, so the writer implements the contract as written.
+Narrowing it needs either a forward migration changing a frozen dedup contract, or a
+pre-read of ownership before the upsert — which introduces a TOCTOU window and requires a new
+undefined behaviour (fail closed? counter? skip?) that no approved contract specifies.
+Improvising that at close-out was refused.
+
+### Exact next action
+**Binding precondition: before any second writer begins populating `data_issues.issue_key`,
+ownership must become part of the conflict/dedup contract** — either a forward migration
+adding owner to the partial unique key, or an ownership-scoped persistence path with defined
+behaviour when a foreign-owned open row exists. Until such a writer is proposed there is
+nothing to do. **Do not edit migration 076.**
+
+## AFLDB-ISSUE-105 — `import_batches.id` bigint is a string at runtime, typed as number
+
+- **Status:** Open
+- **Severity:** Low
+- **Area:** Data acquisition / Import architecture / Type safety
+- **Found:** 2026-08-29 (`AFLDB-ISSUE-099` T6; predates it in `AFLDB-ISSUE-098` code)
+- **Resolved:** N/A
+- **Files:** `src/lib/external-afl/current-season-import.ts:783-789`,
+  `src/lib/acquisition/settle-afltables.ts` (`SettleRunResult.batchId`),
+  `src/lib/acquisition/observation-store.ts` (signatures extracted verbatim)
+- **Related:** `AFLDB-ISSUE-098`, `AFLDB-ISSUE-099` (both Resolved)
+
+### Problem
+`import_batches.id` is `bigint ... GENERATED ALWAYS AS IDENTITY` (migration 001:55).
+postgres.js renders `int8` as **text** rather than risk a lossy `Number`, so an uncast
+`RETURNING id` yields a JavaScript **string** at runtime while the declared type is
+`number | null`. Nothing misbehaves today — the value is only passed back into SQL — but the
+hazard is latent: any arithmetic, strict comparison or number-keyed lookup on it fails
+silently. The ISSUE-099 integration suite hit exactly that as a test failure before the type
+was understood.
+
+### Boundary
+**Do NOT cast the bigint to `int`.** That trades a latent typing bug for a real overflow risk
+on an identity column. The repair is a type contract that tells the truth about the driver's
+output — a branded/string-typed batch id, or an explicit documented decode at the driver
+boundary — applied consistently across the current-season and settle paths.
+
+### Exact next action
+Decide the boundary convention, then apply it to both call sites and the shared
+`observation-store.ts` signatures in one change. Cross-issue by nature: it is not
+ISSUE-098's or ISSUE-099's alone.
+
+## AFLDB-ISSUE-106 — `match_period_scores` proposes an empty array instead of no target
+
+- **Status:** Open
+- **Severity:** Low
+- **Area:** Data acquisition / Import architecture
+- **Found:** 2026-08-29 (`AFLDB-ISSUE-099` T8, while fixing the Brownlow sibling defect)
+- **Resolved:** N/A
+- **Files:** `src/lib/acquisition/settle-afltables.ts`
+  (`proposedPeriodScoreValues()`, `targetEstablishedBySource()`)
+- **Related:** `AFLDB-ISSUE-099` (Resolved — origin; its D2 fixed the Brownlow sibling)
+
+### Problem
+ISSUE-099's D2 established that a target the source never published must produce no
+candidate, no rejection and no projection. `brownlow_round_votes` expresses that by returning
+`null`, and `targetEstablishedBySource()` now gates it before identity is consulted.
+`proposedPeriodScoreValues()` does not: with no published quarter scores it returns
+`{ period_scores: [] }`, so such a match would produce a `match_period_scores` candidate
+proposing an **empty** array — a review item with nothing to review.
+
+### Why it is tracked rather than fixed
+**Unreachable in the real T8 snapshot** — all 207 acquired 2026 matches carried period-score
+observations, so no empty proposal was produced. Fixing it means changing a different
+function's declared return contract and adding `match_period_scores` to the optional-target
+set, which would alter a signed-off assertion: a Python-rejected match record currently
+refuses on **both** match targets, and `tests/integration/settle-afltables.test.ts` asserts
+that. ISSUE-099 was not expanded at close-out to do it.
+
+### Exact next action
+Decide whether a match with no published period scores establishes the target at all. If it
+does not, make `proposedPeriodScoreValues()` return `null` on an empty set and extend
+`targetEstablishedBySource()`, then reconcile the integration suite's rejected-record
+expectation deliberately rather than incidentally.

@@ -268,7 +268,15 @@ function stableJson(value: JsonValue): string {
   return JSON.stringify(value);
 }
 
-function sameValue(a: JsonValue, b: JsonValue): boolean {
+/**
+ * Value equality for corroboration and field diffing, by stable JSON.
+ *
+ * Exported so a caller that must EXPLAIN a disagreement compares fields with
+ * exactly the semantics that classified it. A second implementation could
+ * drift and produce a finding that names a disagreeing group with no
+ * conflicting field to show for it.
+ */
+export function sameValue(a: JsonValue, b: JsonValue): boolean {
   return stableJson(a) === stableJson(b);
 }
 

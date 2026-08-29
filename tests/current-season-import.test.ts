@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { fetchKaliCurrentMatches, fetchSquiggleCurrentMatches } from '@/lib/external-afl/current-matches';
 import {
@@ -39,6 +40,15 @@ const adminPage = readSource('src/app/admin/current-season/page.tsx');
 const adminNav = readSource('src/app/admin/nav-model.ts');
 const migration = readSource('src/db/migrations/063_external_current_match_sources.sql');
 const client = readSource('src/lib/external-afl/current-matches.ts');
+/**
+ * The migration-074 spine writer, extracted from the importer by
+ * `AFLDB-ISSUE-099` T6a (amendment A12) so a second family importer reaches
+ * one persistence contract rather than a second implementation of it. The
+ * source-contract assertions below follow the implementation to the file that
+ * now holds it; none is relaxed, and the importer is separately asserted to be
+ * a thin adapter that does not duplicate any of it.
+ */
+const store = readSource('src/lib/acquisition/observation-store.ts');
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -66,17 +76,40 @@ describe('current-season external source import contracts', () => {
   });
 
   it('writes immutable observation history before refreshing the legacy projection', () => {
-    expect(importer).toContain('decideObservation({ contract, head, payload, observedAt })');
-    expect(importer).toContain('INSERT INTO staging.source_payloads');
-    expect(importer).toContain('INSERT INTO staging.source_record_versions');
-    expect(importer).toContain('UPDATE staging.source_record_versions');
+    expect(store).toContain('decideObservation({ contract, head, payload, observedAt })');
+    expect(store).toContain('INSERT INTO staging.source_payloads');
+    expect(store).toContain('INSERT INTO staging.source_record_versions');
+    expect(store).toContain('UPDATE staging.source_record_versions');
+    // The payload is stored, then the previous version is closed, then the new
+    // version is appended, then the record head moves. Reordering any of these
+    // would leave two open versions or a head citing an unstored payload.
+    expect(store.indexOf('INSERT INTO staging.source_payloads'))
+      .toBeLessThan(store.indexOf('UPDATE staging.source_record_versions'));
+    expect(store.indexOf('UPDATE staging.source_record_versions'))
+      .toBeLessThan(store.indexOf('INSERT INTO staging.source_record_versions'));
+    expect(store.indexOf('INSERT INTO staging.source_record_versions'))
+      .toBeLessThan(store.indexOf('INSERT INTO staging.source_records'));
+    // Unchanged content refreshes the head under a row lock and appends nothing.
+    expect(store).toContain('FOR UPDATE OF r');
+    expect(store).toContain("return 'head_refreshed';");
+    // The importer is a thin adapter, not a second copy of the writer.
+    expect(importer).toContain("} from '../acquisition/observation-store';");
+    expect(importer).not.toContain('decideObservation(');
+    expect(importer).not.toContain('INSERT INTO staging.source_payloads');
+    expect(importer).not.toContain('INSERT INTO staging.source_record_versions');
+    expect(importer).not.toContain('UPDATE staging.source_record_versions');
+    expect(importer).not.toContain('INSERT INTO staging.source_records');
+    expect(importer).not.toContain('UPDATE staging.source_records');
     expect(importer.indexOf('persistSourceObservation('))
       .toBeLessThan(importer.indexOf('INSERT INTO staging.external_current_matches'));
   });
 
   it('represents later source absence as state and never as deletion', () => {
-    expect(importer).toContain('SET absent_since = ${observedAt}');
-    expect(importer).toContain('AND absent_since IS NULL');
+    expect(store).toContain('SET absent_since = ${observedAt}');
+    expect(store).toContain('AND absent_since IS NULL');
+    expect(store).toContain('AND last_batch_id <> ${batchId}');
+    expect(store).not.toMatch(/DELETE FROM staging\.(source_records|source_record_versions|source_payloads)/);
+    expect(store).not.toMatch(/\bTRUNCATE\b/i);
     expect(importer).not.toMatch(/DELETE FROM staging\.(source_records|source_record_versions|source_payloads)/);
   });
 
@@ -1082,6 +1115,222 @@ describe('S2 promotion ledger — reviewed only, append only', () => {
       'ix_promotion_candidates_decision', 'ix_promotion_decisions_admin']) {
       expect(indexNamed(name)[0]).not.toMatch(/\bUNIQUE\b|\bCONCURRENTLY\b/i);
     }
+  });
+});
+
+/*
+ * AFLDB-ISSUE-099 T5 — migration 076, before it is ever applied.
+ *
+ * Once 076 is applied it is checksum-frozen and any correction needs a NEW
+ * forward migration, so everything that can be proven from the source is
+ * proven here first. Two things dominate:
+ *
+ *   * the v1 boundary — v1 writes NOTHING canonical, so 076 must contain no
+ *     schema that exists only for the future acceptance transaction, and must
+ *     modify no canonical table beyond the one approved data_issues column;
+ *   * NULL is not zero — every projected statistic stays nullable, with no
+ *     default and no coercion anywhere in the schema.
+ */
+describe('migration 076 — AFL Tables settle projections (AFLDB-ISSUE-099)', () => {
+  const settle = readSource('src/db/migrations/076_afltables_settle_projections.sql');
+  const statements = sqlStatements(settle);
+  // Every negative assertion runs over the EXECUTABLE statements, never the raw
+  // file: 076 explains each exclusion in prose immediately above the schema, so
+  // a raw-text regex would match the explanation of the forbidden thing instead
+  // of the forbidden thing. Same lesson as 074's source contract.
+  const executable = statements.join(' ; ');
+  const indexNamed = (name: string) => statements
+    .filter((statement) => new RegExp(`\\bINDEX ${name}\\b`).test(statement));
+
+  it('adds no schema for the future canonical acceptance stage', () => {
+    // AFLDB-ISSUE-099 §10.3. Each of these is a prerequisite of the
+    // acceptance transaction (§16 A1-A4). v1 writes nothing canonical, so
+    // nothing in v1 needs them, and adding them now would be schema built
+    // for a stage that has not been approved.
+    expect(executable).not.toMatch(/add_provenance_columns/i);
+    expect(executable).not.toMatch(/source_record_id\b/i);
+    expect(executable).not.toMatch(/\bdata_overrides\b/i);
+    for (const target of ['match_period_scores', 'brownlow_round_votes',
+      'player_match_stats', 'matches', 'players', 'clubs', 'venues',
+      'data_overrides']) {
+      expect(statements.filter((s) => new RegExp(`^ALTER TABLE ${target}\\b`, 'i').test(s)))
+        .toEqual([]);
+    }
+    // And it edits none of the applied, checksum-frozen migrations.
+    for (const frozen of ['073_data_overrides', '074_source_observation_spine',
+      '075_data_overrides_fk_index']) {
+      expect(settle).not.toContain(frozen);
+    }
+  });
+
+  it('modifies exactly one existing table, and only additively', () => {
+    const alters = statements.filter((s) => /^ALTER TABLE\b/i.test(s));
+    expect(alters).toEqual(['ALTER TABLE data_issues ADD COLUMN issue_key text']);
+    // No DML at all: a migration that writes rows into a canonical table is
+    // exactly what the v1 zero-canonical-write boundary forbids.
+    expect(statements.filter((s) => /^(INSERT|UPDATE|DELETE|TRUNCATE)\b/i.test(s)))
+      .toEqual([]);
+    // No trigger, rule or default may reach a canonical table either.
+    expect(executable).not.toMatch(/CREATE\s+(OR\s+REPLACE\s+)?(TRIGGER|RULE|FUNCTION)/i);
+  });
+
+  it('creates both typed projections in staging, keyed to the observation version', () => {
+    const creates = statements
+      .filter((s) => /^CREATE TABLE\b/i.test(s))
+      .map((s) => /^CREATE TABLE (\S+)/i.exec(s)![1]);
+    expect(creates).toEqual(['staging.afltables_match', 'staging.afltables_player_match']);
+
+    // AFLDB-ISSUE-096 Decision B: resolution and diffing read the TYPED
+    // projection, and a projection is bound to the exact source version it
+    // came from — so evidence can never be conflated.
+    for (const table of creates) {
+      const body = statements.find((s) => s.startsWith(`CREATE TABLE ${table}`))!;
+      expect(body).toContain('PRIMARY KEY (source_id, family, external_record_id)');
+      expect(body).toContain(
+        'FOREIGN KEY (source_id, family, external_record_id, version_seq) '
+        + 'REFERENCES staging.source_record_versions '
+        + '(source_id, family, external_record_id, version_seq)');
+    }
+    // The player projection deliberately has NO canonical match FK: on a
+    // canonically rebuilt database the in-progress season has zero matches,
+    // so requiring one would make every in-season projection unwritable.
+    const player = statements.find((s) =>
+      s.startsWith('CREATE TABLE staging.afltables_player_match'))!;
+    expect(player).not.toMatch(/REFERENCES matches\b/i);
+    expect(player).toContain('match_key text NOT NULL');
+  });
+
+  it('covers its own foreign keys before it is ever applied', () => {
+    // The parents that are never deleted from row-by-row -- seasons, clubs,
+    // sources, import_batches -- are exempt on exactly the grounds
+    // tests/integration/fk-indexes.test.ts already accepts. These four are
+    // not, so each needs a leading-column index of its own.
+    expect(indexNamed('ix_afltables_match_version')).toEqual([
+      'CREATE INDEX ix_afltables_match_version ON staging.afltables_match '
+        + '(source_id, family, external_record_id, version_seq)',
+    ]);
+    expect(indexNamed('ix_afltables_player_match_version')).toEqual([
+      'CREATE INDEX ix_afltables_player_match_version ON staging.afltables_player_match '
+        + '(source_id, family, external_record_id, version_seq)',
+    ]);
+    expect(indexNamed('ix_afltables_player_match_player')).toEqual([
+      'CREATE INDEX ix_afltables_player_match_player '
+        + 'ON staging.afltables_player_match (player_id)',
+    ]);
+    // Nullable, so partial on the only predicate a referential probe implies.
+    expect(indexNamed('ix_afltables_match_venue')).toEqual([
+      'CREATE INDEX ix_afltables_match_venue ON staging.afltables_match (venue_id) '
+        + 'WHERE venue_id IS NOT NULL',
+    ]);
+    // No covering index may be UNIQUE -- that would constrain the data rather
+    // than cover a key -- and none CONCURRENTLY, which cannot run inside the
+    // migration runner's transaction.
+    for (const statement of statements.filter((s) => /^CREATE( UNIQUE)? INDEX/i.test(s))) {
+      expect(statement).not.toMatch(/\bCONCURRENTLY\b/i);
+      if (/^CREATE UNIQUE INDEX/i.test(statement)) {
+        expect(statement).toContain('uq_data_issues_open_by_key');
+      }
+    }
+  });
+
+  it('keeps NULL distinct from zero across every projected value', () => {
+    const bodies = statements.filter((s) => /^CREATE TABLE staging\./i.test(s));
+    for (const body of bodies) {
+      // Nothing may default a projected value, and a coerced zero is exactly
+      // what "not recorded" must never become.
+      expect(body).not.toMatch(/DEFAULT 0\b/i);
+      expect(body).not.toMatch(/COALESCE/i);
+    }
+    // Asserted as the whole column DEFINITION including its trailing comma: a
+    // NOT NULL column would read `kicks smallint NOT NULL,` and fail here, and
+    // matching the definition rather than a bare name keeps the CHECK
+    // constraints (which mention every column twice) out of it.
+    const player = bodies.find((b) => b.includes('afltables_player_match'))!;
+    for (const column of ['kicks smallint,', 'marks smallint,', 'handballs smallint,',
+      'disposals smallint,', 'goals smallint,', 'behinds smallint,', 'hitouts smallint,',
+      'tackles smallint,', 'rebounds smallint,', 'inside_50s smallint,',
+      'clearances smallint,', 'clangers smallint,', 'frees_for smallint,',
+      'frees_against smallint,', 'contested smallint,', 'uncontested smallint,',
+      'contested_marks smallint,', 'marks_inside_50 smallint,',
+      'one_percenters smallint,', 'bounces smallint,', 'goal_assists smallint,',
+      'brownlow_votes smallint,', 'career_game_no smallint,', 'jumper_number text,',
+      'afltables_id text,', 'brownlow_round_number smallint,']) {
+      expect(player).toContain(column);
+    }
+    const match = bodies.find((b) => b.includes('afltables_match '))!;
+    // A recorded 0 crowd is real and must cite a source; an unrecorded one is
+    // NULL and cites nothing. Migration 020's rule, held at this store too.
+    expect(match).toContain('afltables_match_attendance_status_ck');
+    expect(match).toContain('afltables_match_zero_attendance_ck');
+    expect(match).not.toMatch(/\battendance\s+integer\s+NOT NULL/i);
+    // Periods 1-4 only: fitzRoy carries extra time and the historical path
+    // deliberately does not import it, so neither does this.
+    for (const absent of ['q5', 'q6', 'q7', 'q8', '_et_', 'extra_time']) {
+      expect(match).not.toContain(absent);
+    }
+    expect(new Set(match.match(/\b(?:home|away)_q[1-4]_(?:goals|behinds|points)\b/g)).size)
+      .toBe(24);
+    for (const side of ['home', 'away']) {
+      for (const q of [1, 2, 3, 4]) {
+        for (const kind of ['goals', 'behinds', 'points']) {
+          expect(match).toContain(`${side}_q${q}_${kind} smallint`);
+        }
+      }
+    }
+  });
+
+  it('makes an NA Brownlow vote structurally unable to become a row', () => {
+    const player = statements.find((s) =>
+      s.startsWith('CREATE TABLE staging.afltables_player_match'))!;
+    expect(player).toContain('brownlow_votes IS NULL OR brownlow_votes BETWEEN 0 AND 3');
+    // NULL votes and finals can never carry a proposed round-vote row.
+    expect(player).toContain(
+      'brownlow_round_number IS NULL OR (brownlow_votes IS NOT NULL '
+      + 'AND is_final = false AND brownlow_round_number >= 1)');
+  });
+
+  it('deduplicates one open disagreement per key without touching other writers', () => {
+    expect(statements).toContain('ALTER TABLE data_issues ADD COLUMN issue_key text');
+    // Migration 072's convention: a partial unique index over unresolved rows
+    // only, on plain columns. issue_key NULL rows are excluded entirely, so
+    // every existing data_issues writer is unaffected, and resolved history is
+    // unconstrained -- a recurrence UPDATEs the open row, a disappearance
+    // RESOLVES it, and neither ever deletes.
+    expect(statements).toContain(
+      'CREATE UNIQUE INDEX uq_data_issues_open_by_key ON data_issues (issue_type, issue_key) '
+      + 'WHERE issue_key IS NOT NULL AND resolved_at IS NULL');
+    // Migration 072's own index must survive untouched.
+    expect(executable).not.toContain('uq_data_issues_open_dob_per_player');
+    expect(executable).not.toMatch(/\bDROP\b/i);
+  });
+
+  it('grants the minimum the v1 persistence path needs, and widens nothing', () => {
+    const grants = statements.filter((s) => /^GRANT\b/i.test(s));
+    expect(grants).toEqual([
+      'GRANT SELECT, INSERT, UPDATE, DELETE ON staging.afltables_match TO afldb_import',
+      'GRANT SELECT, INSERT, UPDATE, DELETE ON staging.afltables_player_match TO afldb_import',
+      'GRANT SELECT ON staging.afltables_match TO afldb_app',
+      'GRANT SELECT ON staging.afltables_player_match TO afldb_app',
+    ]);
+    // The pass upserts and reads back; it never truncates.
+    for (const grant of grants) expect(grant).not.toMatch(/\bTRUNCATE\b|\bALL\b/i);
+    // Migration 074's append-only ledger boundary is untouched, and no grant
+    // reaches afldb_auth or any public table.
+    expect(executable).not.toMatch(/promotion_decisions|promotion_candidates|afldb_auth/i);
+    expect(executable).not.toMatch(/grant_import_write|grant_app_read/i);
+  });
+
+  it('needs no privileges.sql change, and does not make one', () => {
+    // privileges.sql already grants the whole staging schema, so a reconcile
+    // keeps these two tables without naming them. Registering them would be a
+    // redundant second declaration of the same grant.
+    expect(privilegesSql).toContain(
+      "EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES "
+      + "IN SCHEMA staging TO afldb_import'");
+    expect(privilegesSql).toContain(
+      "EXECUTE 'GRANT SELECT ON ALL TABLES IN SCHEMA staging TO afldb_app'");
+    expect(privilegesSql).not.toContain('afltables_match');
+    expect(privilegesSql).not.toContain('afltables_player_match');
   });
 });
 
@@ -2292,5 +2541,762 @@ describe('S4 promotion decisions — append-only, and never an accept', () => {
     // The proposed field set and the proposed values are the same fields.
     expect(() => assertCandidateShape(reviewCandidate({ proposedValues: { away_score: 70, venue: 'MCG' } })))
       .toThrow(/exactly the same fields/);
+  });
+});
+
+
+/*
+ * AFLDB-ISSUE-099 T6b — the AFL Tables settle contract, DB-free.
+ *
+ * The semantic home §24 names for "registry + reconciliation, DB-free":
+ * bundle validation refusals, the ownership-`indeterminate` supply rule, the
+ * corroboration field set, `issue_key` derivation and the per-target
+ * projection rules. Every fixture is a literal and every call is pure — no
+ * snapshot on disk, no database, no clock.
+ */
+import {
+  agreementRestored,
+  contractFamilyOf,
+  disagreementConflicts,
+  disagreementSeverity,
+  draftDisagreementIssue,
+  ownershipForTarget,
+  planAbsenceSweep,
+  proposedBrownlowValues,
+  proposedFieldsFor,
+  proposedMatchValues,
+  proposedPeriodScoreValues,
+  proposedPlayerMatchValues,
+  readMatchProjection,
+  readPlayerMatchProjection,
+  resolveManifestPath,
+  settleIssueKey,
+  targetEstablishedBySource,
+  validateSettleBundle,
+  BROWNLOW_ROUND_VOTES_PROPOSED_FIELDS,
+  CORROBORATED_MATCH_FIELDS,
+  MATCHES_PROPOSED_FIELDS,
+  PLAYER_MATCH_STATS_PROPOSED_FIELDS,
+  PLAYER_MATCH_STAT_COLUMNS,
+  SETTLE_ISSUE_OWNER,
+  SETTLE_ISSUE_TYPE,
+  TARGETS_WITHOUT_SOURCE_ID,
+  type SettleTargetTable,
+} from '@/lib/acquisition/settle-afltables';
+
+const afltablesMatch = getSourceFamily(registry, 'afltables', 'match');
+const afltablesPlayerMatch = getSourceFamily(registry, 'afltables', 'player_match_stats');
+
+const SETTLE_LABEL = 'settle-2026-08-29';
+const MANIFEST_SHA = 'a'.repeat(64);
+const MATCH_RECORD = '2026|1|2026-03-05|Sydney|Carlton';
+const PLAYER_RECORD = 'players/M/Marc_Murphy.html@2026|1|2026-03-05|Sydney|Carlton';
+const SETTLE_SCOPE = 'season=2026';
+
+/** The canonical ids the settle resolver looks up inside the transaction. */
+const RESOLVED_MATCH = {
+  homeClubId: 11, awayClubId: 3, venueId: 42, winnerClubId: 11, attendanceSourceId: 9,
+};
+
+function matchProjectionJson(over: Record<string, JsonValue> = {}): JsonValue {
+  return {
+    match_key: MATCH_RECORD,
+    season: 2026,
+    round_code: '1',
+    round_number: 1,
+    round_type: 'home_and_away',
+    is_final: false,
+    match_date: '2026-03-05',
+    match_time: '7:30 PM',
+    venue_raw: 'S.C.G.',
+    home_club_hist: 'sydney',
+    away_club_hist: 'carlton',
+    home_club_name: 'Sydney',
+    away_club_name: 'Carlton',
+    home_goals: 20, home_behinds: 12, home_score: 132,
+    away_goals: 10, away_behinds: 9, away_score: 69,
+    result: 'home_win', winner_club_hist: 'sydney', margin: 63,
+    attendance: 42123, attendance_status: 'complete', attendance_source_key: 'afltables',
+    period_scores: [
+      { side: 'home', period: 1, goals: 5, behinds: 3, points: 33 },
+      { side: 'away', period: 1, goals: 2, behinds: 2, points: 14 },
+    ],
+    ...over,
+  };
+}
+
+function playerProjectionJson(over: Record<string, JsonValue> = {}): JsonValue {
+  const stats: Record<string, JsonValue> = {};
+  for (const column of PLAYER_MATCH_STAT_COLUMNS) stats[column] = 4;
+  stats.brownlow_votes = null;
+  return {
+    url: 'players/M/Marc_Murphy.html',
+    afltables_id: null,
+    match_key: MATCH_RECORD,
+    season: 2026,
+    round_code: '1',
+    round_number: 1,
+    is_final: false,
+    club_hist: 'carlton',
+    career_game_no: 301,
+    jumper_number: '3',
+    stats,
+    brownlow_round_vote: null,
+    ...over,
+  };
+}
+
+type SettleBundleOverrides = {
+  root?: Record<string, JsonValue>;
+  matchRecord?: Record<string, JsonValue>;
+  playerRecord?: Record<string, JsonValue>;
+  matchEnumeration?: Record<string, JsonValue>;
+  playerEnumeration?: Record<string, JsonValue>;
+};
+
+function settleBundleJson(over: SettleBundleOverrides = {}): JsonValue {
+  return {
+    bundle_contract_version: 1,
+    generated_by: 'tools/migration/import_fitzroy_core.py',
+    snapshot_label: SETTLE_LABEL,
+    manifest_path: 'docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-08-29.json',
+    manifest_sha256: MANIFEST_SHA,
+    acquisition_kind: 'in_season_partial',
+    season: 2026,
+    fitzroy_version: '1.8.0',
+    enumerations: [
+      {
+        family: 'afltables.match', scope_key: SETTLE_SCOPE, complete: true,
+        incomplete_reason: null, external_record_ids: [MATCH_RECORD],
+        ...over.matchEnumeration,
+      },
+      {
+        family: 'afltables.player_match_stats', scope_key: SETTLE_SCOPE, complete: true,
+        incomplete_reason: null, external_record_ids: [PLAYER_RECORD],
+        ...over.playerEnumeration,
+      },
+    ],
+    records: [
+      {
+        family: 'afltables.match', scope_key: SETTLE_SCOPE, external_record_id: MATCH_RECORD,
+        payload: { season: 2026 },
+        observed_columns: [...(afltablesMatch.knownColumns ?? [])],
+        projection: matchProjectionJson(),
+        rejection: null,
+        ...over.matchRecord,
+      },
+      {
+        family: 'afltables.player_match_stats', scope_key: SETTLE_SCOPE,
+        external_record_id: PLAYER_RECORD,
+        payload: { url: 'players/M/Marc_Murphy.html' },
+        observed_columns: [...(afltablesPlayerMatch.knownColumns ?? [])],
+        projection: playerProjectionJson(),
+        rejection: null,
+        ...over.playerRecord,
+      },
+    ],
+    unkeyed_rejections: [],
+    counts: { matches: 1, player_match_rows: 1, rejections: 0, unkeyed_rejections: 0 },
+    ...over.root,
+  } as JsonValue;
+}
+
+function settleValidate(over: SettleBundleOverrides = {}, expectedLabel = SETTLE_LABEL) {
+  return validateSettleBundle({
+    raw: settleBundleJson(over),
+    expectedSnapshotLabel: expectedLabel,
+    actualManifestSha256: MANIFEST_SHA,
+    inProgressSeasons: [2026],
+    registry,
+  });
+}
+
+describe('AFLDB-ISSUE-099 settle — the observation bundle is validated fail-closed', () => {
+  it('accepts a well-formed in-season bundle and reads both AFL Tables families', () => {
+    const bundle = settleValidate();
+    expect(bundle.season).toBe(2026);
+    expect(bundle.acquisitionKind).toBe('in_season_partial');
+    expect(bundle.records.map((record) => record.family).sort())
+      .toEqual(['afltables.match', 'afltables.player_match_stats']);
+    // The dotted name is the wire form; the registry key is the pair.
+    expect(contractFamilyOf('afltables.match')).toBe('match');
+    expect(contractFamilyOf('afltables.player_match_stats')).toBe('player_match_stats');
+    expect(() => contractFamilyOf('afltables.ladder'))
+      .toThrow(/not an AFLDB-ISSUE-099 source family/);
+  });
+
+  it('refuses a bundle contract version it does not speak, rather than tolerating it', () => {
+    expect(() => settleValidate({ root: { bundle_contract_version: 2 } }))
+      .toThrow(/version 2 is not supported/);
+    expect(() => settleValidate({ root: { bundle_contract_version: '1' } }))
+      .toThrow(/must be an integer/);
+  });
+
+  /**
+   * AFLDB-ISSUE-099 T8 regression. The real 2026 dry-run died before any
+   * connection was opened, on
+   *
+   *   ENOENT ... 'D:\dev\afldb-issue-099\D:\dev\afldb-issue-099\docs\
+   *               rebuild-manifests\afltables_fitzroy_core\<label>.json'
+   *
+   * because the emitter's `manifest_path` is always absolute and the CLI
+   * joined it onto the repository root a second time. These cases are written
+   * against the resolution boundary itself, so they need no snapshot, no
+   * bundle and no database -- and they are platform-native rather than
+   * Windows-only, because the same defect doubles a POSIX path too.
+   */
+  describe('the manifest path a bundle names', () => {
+    // Absolute on both platforms: a drive-qualified path on Windows, a rooted
+    // one on Linux. `resolve` is only being used to spell "absolute" portably.
+    const root = resolve('/dev/afldb-issue-099');
+    const relative = 'docs/rebuild-manifests/afltables_fitzroy_core/issue099-t8-20260829.json';
+    // Exactly what the emitter writes: absolute, forward-slashed.
+    const emitted = `${root.replace(/\\/g, '/')}/${relative}`;
+
+    it('never re-prefixes an absolute path the emitter already resolved', () => {
+      const resolved = resolveManifestPath(root, emitted);
+
+      expect(resolved).toBe(resolve(root, relative));
+      // The doubled-path symptom, stated directly: the root must appear once.
+      expect(resolved.indexOf(root)).toBe(resolved.lastIndexOf(root));
+    });
+
+    it('keeps an absolute path outside the worktree, rather than rewriting it', () => {
+      const elsewhere = resolve('/srv/snapshots/afltables/issue099-t8-20260829.json');
+      expect(resolveManifestPath(root, elsewhere)).toBe(elsewhere);
+    });
+
+    it('still resolves a repository-relative path against this worktree root', () => {
+      expect(resolveManifestPath(root, relative)).toBe(resolve(root, relative));
+    });
+
+    it('refuses rather than guessing when it has nothing absolute to work from', () => {
+      expect(() => resolveManifestPath(root, ''))
+        .toThrow(/names no manifest_path/);
+      // A relative base would silently make the manifest depend on the
+      // directory the operator started in. That is not a resolution.
+      expect(() => resolveManifestPath('afldb-issue-099', relative))
+        .toThrow(/repository root must be absolute/);
+    });
+  });
+
+  it('refuses a bundle that does not describe the requested snapshot or its manifest', () => {
+    expect(() => settleValidate({}, 'settle-2026-08-30'))
+      .toThrow(/is not the requested snapshot/);
+    expect(() => validateSettleBundle({
+      raw: settleBundleJson(),
+      expectedSnapshotLabel: SETTLE_LABEL,
+      actualManifestSha256: 'b'.repeat(64),
+      inProgressSeasons: [2026],
+      registry,
+    })).toThrow(/does not match the manifest on disk/);
+  });
+
+  it('reads only an in-season snapshot, and only a season this pipeline owns', () => {
+    expect(() => settleValidate({ root: { acquisition_kind: 'full_history' } }))
+      .toThrow(/reads only 'in_season_partial' snapshots/);
+    expect(() => validateSettleBundle({
+      raw: settleBundleJson(),
+      expectedSnapshotLabel: SETTLE_LABEL,
+      actualManifestSha256: MANIFEST_SHA,
+      inProgressSeasons: [2025],
+      registry,
+    })).toThrow(/not in in_progress_seasons/);
+  });
+
+  it('runs the projection gate on every record: drift refuses, it never NULLs', () => {
+    expect(() => settleValidate({
+      matchRecord: { observed_columns: [...(afltablesMatch.knownColumns ?? []), 'weather'] },
+    })).toThrow(/undeclared column\(s\): weather/);
+    expect(() => settleValidate({
+      matchRecord: { observed_columns: ['season', 'round_code'] },
+    })).toThrow(/missing required column/);
+  });
+
+  it('refuses any disagreement between the presence enumeration and the records', () => {
+    // A record the enumeration does not list: presence would be understated.
+    expect(() => settleValidate({ matchEnumeration: { external_record_ids: ['2026|1|other'] } }))
+      .toThrow(/is not listed in the afltables\.match enumeration/);
+    // A complete enumeration listing a record the bundle does not carry.
+    expect(() => settleValidate({
+      matchEnumeration: { external_record_ids: [MATCH_RECORD, '2026|1|missing'] },
+    })).toThrow(/carries no record for it/);
+    // A record in a scope nobody enumerated.
+    expect(() => settleValidate({ matchRecord: { scope_key: 'season=2025' } }))
+      .toThrow(/which the bundle does not enumerate/);
+  });
+
+  it('refuses an unkeyed rejection whose scope still claims to be complete (SC5)', () => {
+    expect(() => settleValidate({
+      root: {
+        unkeyed_rejections: [{
+          family: 'afltables.player_match_stats', scope_key: SETTLE_SCOPE,
+          reason: 'no_profile_url', detail: 'player_stats_2026.csv line 4821',
+        }],
+      },
+    })).toThrow(/claims complete: true/);
+  });
+});
+
+describe('AFLDB-ISSUE-099 settle — presence and projection are separate facts (§19)', () => {
+  it('keeps an observed-but-rejected record present and enumerated (I1)', () => {
+    const bundle = settleValidate({
+      matchRecord: {
+        projection: null,
+        rejection: { reason: 'incomplete_match_evidence', detail: 'no player_stats row joined' },
+      },
+    });
+    const record = bundle.records.find((row) => row.family === 'afltables.match');
+    expect(record?.projection).toBeNull();
+    expect(record?.rejection?.reason).toBe('incomplete_match_evidence');
+    // Still enumerated, so the sweep sees it as seen rather than absent.
+    const enumeration = bundle.enumerations.find((row) => row.family === 'afltables.match');
+    expect(enumeration?.complete).toBe(true);
+    expect(enumeration?.externalRecordIds).toContain(MATCH_RECORD);
+  });
+
+  it('sweeps only proven-complete scopes and reports the ones it deliberately skipped (I2)', () => {
+    const plan = planAbsenceSweep(settleValidate({
+      root: {
+        unkeyed_rejections: [{
+          family: 'afltables.player_match_stats', scope_key: SETTLE_SCOPE,
+          reason: 'no_profile_url', detail: 'player_stats_2026.csv line 4821',
+        }],
+      },
+      playerEnumeration: {
+        complete: false,
+        incomplete_reason: '1 observed row(s) had no provable identity',
+      },
+    }));
+    expect(plan.sweepable)
+      .toEqual([{ family: 'afltables.match', contractFamily: 'match', scopeKey: SETTLE_SCOPE }]);
+    expect(plan.skipped).toEqual([{
+      family: 'afltables.player_match_stats',
+      scopeKey: SETTLE_SCOPE,
+      reason: '1 observed row(s) had no provable identity',
+    }]);
+  });
+
+  it('sweeps every scope when the whole bundle is proven complete (I3)', () => {
+    const plan = planAbsenceSweep(settleValidate());
+    expect(plan.skipped).toEqual([]);
+    expect(plan.sweepable.map((scope) => scope.contractFamily).sort())
+      .toEqual(['match', 'player_match_stats']);
+  });
+});
+
+describe('AFLDB-ISSUE-099 settle — ownership, data_issues identity and corroboration', () => {
+  it('supplies indeterminate ownership for a target that carries no source_id column', () => {
+    expect(TARGETS_WITHOUT_SOURCE_ID).toEqual(['match_period_scores', 'brownlow_round_votes']);
+    for (const target of TARGETS_WITHOUT_SOURCE_ID) {
+      // Never 'unowned': a table with no provenance column has not DECLARED an
+      // absence of ownership, it cannot answer. Indeterminate fails closed.
+      expect(ownershipForTarget(target, null)).toEqual({ state: 'indeterminate' });
+      expect(ownershipForTarget(target, 'afltables')).toEqual({ state: 'indeterminate' });
+    }
+    expect(ownershipForTarget('matches', null)).toEqual({ state: 'unowned' });
+    expect(ownershipForTarget('matches', 'squiggle_api'))
+      .toEqual({ state: 'owned', sourceKey: 'squiggle_api' });
+  });
+
+  it('derives one stable data_issues key per source, family, record and target', () => {
+    expect(settleIssueKey('afltables.match', MATCH_RECORD, 'matches'))
+      .toBe(`afltables|match|${MATCH_RECORD}|matches`);
+    // The contract family, not the wire name: never 'afltables|afltables.match'.
+    expect(settleIssueKey('afltables.match', MATCH_RECORD, 'matches'))
+      .not.toContain('afltables.match');
+    // The target is part of the key, so two targets of one record never collide.
+    expect(settleIssueKey('afltables.match', MATCH_RECORD, 'match_period_scores'))
+      .not.toBe(settleIssueKey('afltables.match', MATCH_RECORD, 'matches'));
+    expect(() => settleIssueKey('afltables.match', '', 'matches'))
+      .toThrow(/needs the external record id/);
+    expect(SETTLE_ISSUE_TYPE).toBe('source_disagreement');
+    expect(SETTLE_ISSUE_OWNER).toBe('AFLDB-ISSUE-099');
+  });
+
+  it('compares other providers on the shared match fields only, and escalates a score conflict', () => {
+    expect(CORROBORATED_MATCH_FIELDS).toEqual(['home_score', 'away_score', 'attendance']);
+    expect(disagreementSeverity(['attendance'])).toBe('warning');
+    expect(disagreementSeverity(['home_score'])).toBe('error');
+    expect(disagreementSeverity(['attendance', 'away_score'])).toBe('error');
+  });
+});
+
+/**
+ * §13 — the one `data_issues` row ISSUE-099 writes, drafted purely.
+ *
+ * Every draft here is built from a REAL `classifyCorroboration()` report over
+ * real registry contracts, so the conflicts a row shows can never drift from
+ * the groups that classified it.
+ */
+type MatchClaim = { contract: typeof squiggleMatch; values: Record<string, JsonValue> };
+
+/** A second source inside another provider's OWN independence group. */
+function mirrorOf(contract: typeof squiggleMatch, sourceKey: string) {
+  return { ...contract, sourceKey };
+}
+
+describe('AFLDB-ISSUE-099 settle — the data_issues disagreement draft (§13)', () => {
+  const PROPOSED = { home_score: 132, away_score: 69, attendance: 42123 };
+
+  function claim(contract: typeof squiggleMatch, values: Record<string, JsonValue>): MatchClaim {
+    return { contract, values };
+  }
+
+  function draft(
+    claims: readonly MatchClaim[],
+    over: { targetId?: number | null } = {},
+  ) {
+    return draftDisagreementIssue({
+      wireFamily: 'afltables.match',
+      externalRecordId: MATCH_RECORD,
+      targetTable: 'matches',
+      targetId: over.targetId === undefined ? 5150 : over.targetId,
+      sourceVersionSeq: 3,
+      proposedValues: PROPOSED,
+      claims,
+      corroboration: classifyCorroboration(afltablesMatch, PROPOSED, claims),
+    });
+  }
+
+  it('drafts §13.1 exactly for a single disagreeing group', () => {
+    const row = draft([claim(squiggleMatch, { home_score: 130, away_score: 69 })]);
+
+    expect(row.entityType).toBe('matches');
+    expect(row.entityId).toBe(5150);
+    expect(row.issueType).toBe('source_disagreement');
+    expect(row.issueKey).toBe(`afltables|match|${MATCH_RECORD}|matches`);
+    // A score conflict on a completed match escalates.
+    expect(row.severity).toBe('error');
+    expect(row.description).toContain('home_score');
+    expect(row.description.split('\n')).toHaveLength(1);
+    expect(row.details).toEqual({
+      owner: 'AFLDB-ISSUE-099',
+      source_key: 'afltables',
+      family: 'match',
+      external_record_id: MATCH_RECORD,
+      target_table: 'matches',
+      source_version_seq: 3,
+      agreeing_groups: [],
+      disagreeing_groups: ['squiggle'],
+      // Only the field that actually differs: away_score agrees, and
+      // attendance is not shared, so neither is reported as a conflict.
+      conflicts: [{ field: 'home_score', afltables: 132, squiggle: 130 }],
+    });
+  });
+
+  it('stamps the owner that alone authorises this pass to resolve the row later', () => {
+    const row = draft([claim(squiggleMatch, { home_score: 130, away_score: 69 })]);
+    expect(row.details.owner).toBe(SETTLE_ISSUE_OWNER);
+    expect(row.issueType).toBe(SETTLE_ISSUE_TYPE);
+  });
+
+  it('reports a target that does not exist yet with a NULL entity id', () => {
+    const row = draft([claim(squiggleMatch, { home_score: 130, away_score: 69 })], {
+      targetId: null,
+    });
+    expect(row.entityId).toBeNull();
+    expect(row.issueKey).toBe(`afltables|match|${MATCH_RECORD}|matches`);
+  });
+
+  it('merges two disagreeing groups into ONE object per field, in a deterministic key order', () => {
+    const row = draft([
+      claim(kaliMatch, { home_score: 128, away_score: 69 }),
+      claim(squiggleMatch, { home_score: 130, away_score: 69 }),
+    ]);
+
+    expect(row.details.disagreeing_groups).toEqual(['kali', 'squiggle']);
+    const conflicts = row.details.conflicts as Record<string, JsonValue>[];
+    // One object per FIELD, never one per (field, group) pair.
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]).toEqual({
+      field: 'home_score', afltables: 132, kali: 128, squiggle: 130,
+    });
+    // The key order is fixed: field, this source, then groups sorted.
+    expect(Object.keys(conflicts[0])).toEqual(['field', 'afltables', 'kali', 'squiggle']);
+  });
+
+  it('orders fields deterministically and never lists an agreeing group as a conflict', () => {
+    const row = draft([
+      claim(squiggleMatch, { home_score: 130, away_score: 70 }),
+      claim(kaliMatch, { home_score: 132, away_score: 69 }),
+    ]);
+
+    expect(row.details.agreeing_groups).toEqual(['kali']);
+    expect(row.details.disagreeing_groups).toEqual(['squiggle']);
+    const conflicts = row.details.conflicts as Record<string, JsonValue>[];
+    expect(conflicts).toEqual([
+      { field: 'away_score', afltables: 69, squiggle: 70 },
+      { field: 'home_score', afltables: 132, squiggle: 130 },
+    ]);
+    // Agreement is recorded for the reviewer and authorises nothing; it is
+    // never evidence OF the disagreement.
+    for (const conflict of conflicts) expect(conflict).not.toHaveProperty('kali');
+  });
+
+  it('never reports this source\'s own group drifting from itself as a witness', () => {
+    const row = draft([
+      claim(mirrorOf(afltablesMatch, 'afltables_mirror'), { home_score: 999, away_score: 69 }),
+      claim(squiggleMatch, { home_score: 130, away_score: 69 }),
+    ]);
+
+    expect(row.details.disagreeing_groups).toEqual(['squiggle']);
+    const conflicts = row.details.conflicts as Record<string, JsonValue>[];
+    expect(conflicts).toEqual([{ field: 'home_score', afltables: 132, squiggle: 130 }]);
+    // The proxy's value appears nowhere: a source drifting from its own
+    // upstream is a data-quality signal, not a second witness.
+    expect(JSON.stringify(row.details)).not.toContain('999');
+  });
+
+  it('counts a group once however many provider rows carry it, whatever order they arrive in', () => {
+    const rows = [
+      claim(kaliMatch, { home_score: 128, away_score: 69 }),
+      claim(mirrorOf(kaliMatch, 'kali_mirror'), { home_score: 120, away_score: 69 }),
+    ];
+    const forward = draft(rows);
+    const reversed = draft([...rows].reverse());
+
+    // One key per GROUP, and the same row whichever order PostgreSQL returned
+    // the evidence in: the value comes from the lowest source key.
+    expect(forward.details.conflicts)
+      .toEqual([{ field: 'home_score', afltables: 132, kali: 128 }]);
+    expect(reversed.details).toEqual(forward.details);
+    expect(reversed.description).toBe(forward.description);
+  });
+
+  it('refuses to draft a finding the evidence does not support', () => {
+    // No disagreeing group at all.
+    expect(() => draft([claim(squiggleMatch, { home_score: 132, away_score: 69 })]))
+      .toThrow(/at least one disagreeing independence group/);
+    // A named disagreeing group with no conflicting field to show for it.
+    expect(() => draftDisagreementIssue({
+      wireFamily: 'afltables.match',
+      externalRecordId: MATCH_RECORD,
+      targetTable: 'matches',
+      targetId: 5150,
+      sourceVersionSeq: 3,
+      proposedValues: PROPOSED,
+      claims: [],
+      corroboration: {
+        ownGroup: 'afltables',
+        agreeingGroups: [],
+        disagreeingGroups: ['squiggle'],
+        sameGroupConflicts: [],
+      },
+    })).toThrow(/no conflicting field/);
+  });
+
+  it('reports conflicts only for groups named as disagreeing', () => {
+    // The builder is given the agreeing group as well, and still ignores it.
+    const claims = [
+      claim(squiggleMatch, { home_score: 130, away_score: 69 }),
+      claim(kaliMatch, { home_score: 132, away_score: 69 }),
+    ];
+    expect(disagreementConflicts(PROPOSED, claims, ['squiggle']))
+      .toEqual([{ field: 'home_score', afltables: 132, squiggle: 130 }]);
+    expect(disagreementConflicts(PROPOSED, claims, [])).toEqual([]);
+  });
+});
+
+/**
+ * §13.3 as amended for T7. Resolution needs POSITIVE current-run evidence;
+ * silence is never agreement, exactly as an un-enumerated scope is never
+ * absence (§19).
+ */
+describe('AFLDB-ISSUE-099 settle — a disagreement resolves only on positive evidence', () => {
+  const PROPOSED = { home_score: 132, away_score: 69, attendance: 42123 };
+  const report = (claims: readonly MatchClaim[]) =>
+    classifyCorroboration(afltablesMatch, PROPOSED, claims);
+
+  it('resolves when an independent group is comparable and positively agrees', () => {
+    expect(agreementRestored(report([
+      { contract: squiggleMatch, values: { home_score: 132, away_score: 69 } },
+    ]))).toBe(true);
+  });
+
+  it('does not resolve while any independent group still disagrees', () => {
+    expect(agreementRestored(report([
+      { contract: squiggleMatch, values: { home_score: 132, away_score: 69 } },
+      { contract: kaliMatch, values: { home_score: 130, away_score: 69 } },
+    ]))).toBe(false);
+  });
+
+  it('does not resolve when no other provider is present at all', () => {
+    expect(agreementRestored(report([]))).toBe(false);
+  });
+
+  it('does not resolve when the only other provider shares none of the compared fields', () => {
+    // Comparable is not the same as present: a claim sharing no field is
+    // neither agreement nor disagreement.
+    expect(agreementRestored(report([
+      { contract: squiggleMatch, values: { round_number: 1 } },
+    ]))).toBe(false);
+  });
+
+  it('does not accept this source\'s own group as the agreeing witness', () => {
+    expect(agreementRestored(report([
+      {
+        contract: mirrorOf(afltablesMatch, 'afltables_mirror'),
+        values: { home_score: 132, away_score: 69 },
+      },
+    ]))).toBe(false);
+  });
+});
+
+describe('AFLDB-ISSUE-099 settle — per-family projection rules (§17)', () => {
+  it('proposes the matches field set, keeping venue_id NULL rather than inventing a venue', () => {
+    const projection = readMatchProjection(matchProjectionJson(), 'projection');
+    const values = proposedMatchValues(projection, { ...RESOLVED_MATCH, venueId: null });
+    expect(Object.keys(values).sort()).toEqual([...MATCHES_PROPOSED_FIELDS].sort());
+    expect(proposedFieldsFor('matches')).toEqual(MATCHES_PROPOSED_FIELDS);
+    // The ISSUE-098 defect: venue_raw carries the real string, venue_id is NULL,
+    // and the literal 'Unknown' is never produced.
+    expect(values.venue_id).toBeNull();
+    expect(values.venue_raw).toBe('S.C.G.');
+    expect(JSON.stringify(values)).not.toContain('Unknown');
+  });
+
+  it('keeps a blank attendance as no observation and a recorded zero as a real crowd', () => {
+    const absent = readMatchProjection(matchProjectionJson({
+      attendance: null, attendance_status: 'not_collected', attendance_source_key: null,
+    }), 'projection');
+    const absentValues = proposedMatchValues(absent, {
+      ...RESOLVED_MATCH, attendanceSourceId: null,
+    });
+    expect(absentValues.attendance).toBeNull();
+    expect(absentValues.attendance_status).toBe('not_collected');
+    expect(absentValues.attendance_source_id).toBeNull();
+
+    const zero = readMatchProjection(matchProjectionJson({
+      attendance: 0, attendance_status: 'complete', attendance_source_key: 'afltables',
+    }), 'projection');
+    const zeroValues = proposedMatchValues(zero, RESOLVED_MATCH);
+    // A genuine 0 is storable precisely because it cites a source. NULL is never 0.
+    expect(zeroValues.attendance).toBe(0);
+    expect(zeroValues.attendance_status).toBe('complete');
+    expect(zeroValues.attendance_source_id).toBe(9);
+  });
+
+  it('carries period scores as published, periods 1-4 only, and invents no extra time', () => {
+    const projection = readMatchProjection(matchProjectionJson(), 'projection');
+    const values = proposedPeriodScoreValues(projection, RESOLVED_MATCH);
+    expect(Object.keys(values)).toEqual(['period_scores']);
+    // `side` resolves to the club identity the canonical grain uses.
+    expect(values.period_scores).toEqual([
+      { club_id: 3, period: 1, goals: 2, behinds: 2, points: 14 },
+      { club_id: 11, period: 1, goals: 5, behinds: 3, points: 33 },
+    ]);
+    expect(() => readMatchProjection(matchProjectionJson({
+      period_scores: [{ side: 'home', period: 5, goals: 1, behinds: 1, points: 7 }],
+    }), 'projection')).toThrow(/periods 1-4 only/);
+  });
+
+  it('proposes the 21 statistics by name, and never the vote to player_match_stats', () => {
+    const projection = readPlayerMatchProjection(playerProjectionJson(), 'projection');
+    const values = proposedPlayerMatchValues(projection, 7);
+    expect(Object.keys(values).sort()).toEqual([...PLAYER_MATCH_STATS_PROPOSED_FIELDS].sort());
+    expect(PLAYER_MATCH_STAT_COLUMNS).toHaveLength(21);
+    expect(PLAYER_MATCH_STAT_COLUMNS).not.toContain('brownlow_votes');
+    expect(values).not.toHaveProperty('brownlow_votes');
+    // Time.on.Ground has no target column and is never projected.
+    expect(values).not.toHaveProperty('time_on_ground');
+    expect(values.club_id).toBe(7);
+  });
+
+  it('keeps an unrecorded statistic NULL rather than coercing it to zero', () => {
+    const stats: Record<string, JsonValue> = {};
+    for (const column of PLAYER_MATCH_STAT_COLUMNS) stats[column] = null;
+    stats.brownlow_votes = null;
+    const projection = readPlayerMatchProjection(
+      playerProjectionJson({ stats, career_game_no: null, jumper_number: null }), 'projection',
+    );
+    const values = proposedPlayerMatchValues(projection, 7);
+    for (const column of PLAYER_MATCH_STAT_COLUMNS) expect(values[column]).toBeNull();
+    expect(values.career_game_no).toBeNull();
+    expect(values.jumper_number).toBeNull();
+  });
+
+  it('treats the profile url as identity and the fitzRoy ID as enrichment only', () => {
+    const projection = readPlayerMatchProjection(playerProjectionJson(), 'projection');
+    // P5 measured in-season rows carrying no ID at all; that is not a refusal.
+    expect(projection.afltablesId).toBeNull();
+    expect(projection.url).toBe('players/M/Marc_Murphy.html');
+    // Identity itself is never optional, and a name never stands in for it.
+    expect(() => readPlayerMatchProjection(
+      playerProjectionJson({ url: null }), 'projection',
+    )).toThrow(/url must be a non-empty string/);
+  });
+
+  it('never manufactures a Brownlow row from an absent vote, and keeps a published zero', () => {
+    // NA is the expected in-season outcome: no row, ever. Not votes = 0, and
+    // not a played=true/votes=NULL filler row.
+    const na = readPlayerMatchProjection(playerProjectionJson(), 'projection');
+    expect(na.brownlowRoundVote).toBeNull();
+    expect(proposedBrownlowValues(na)).toBeNull();
+
+    const zero = readPlayerMatchProjection(playerProjectionJson({
+      brownlow_round_vote: { season: 2026, round_number: 1, votes: 0 },
+    }), 'projection');
+    // A published 0 is a real vote and stays distinct from NA.
+    expect(proposedBrownlowValues(zero)).toEqual({ played: true, votes: 0 });
+    expect(proposedFieldsFor('brownlow_round_votes'))
+      .toEqual(BROWNLOW_ROUND_VOTES_PROPOSED_FIELDS);
+
+    // Finals are never polled, so a vote on one is refused outright.
+    expect(() => readPlayerMatchProjection(playerProjectionJson({
+      is_final: true, round_code: 'GF',
+      brownlow_round_vote: { season: 2026, round_number: 1, votes: 3 },
+    }), 'projection')).toThrow(/finals are never polled/);
+  });
+
+  /**
+   * AFLDB-ISSUE-099 T8 regression, defect D2. The first real apply persisted
+   * **803** pending `brownlow_round_votes / unresolved_identity` candidates
+   * from a snapshot whose 9522 `Brownlow.Votes` observations were *all* NA --
+   * exactly one for every record whose player URL was not linked in that
+   * database. The existence question had been asked of the identity-resolved
+   * projection, so a record that failed identity never reached it and proposed
+   * a vote nobody had published.
+   *
+   * Every case here is stated against the source record alone. The function is
+   * given no identity argument at all, and that is the fix: whether AFL Tables
+   * published a vote is a fact about the source, and cannot depend on whether
+   * this database happens to know the player.
+   */
+  it('gives an NA Brownlow record no target at all, whatever identity did', () => {
+    // The exact 2026 shape, on all 9522 rows.
+    expect(targetEstablishedBySource('brownlow_round_votes', playerProjectionJson()))
+      .toBe(false);
+    // A published 0 is a real vote, so the target genuinely exists (R3).
+    expect(targetEstablishedBySource('brownlow_round_votes', playerProjectionJson({
+      brownlow_round_vote: { season: 2026, round_number: 1, votes: 0 },
+    }))).toBe(true);
+    // A record nobody could interpret establishes no vote either: absence of
+    // evidence that one exists is not evidence that it does.
+    expect(targetEstablishedBySource('brownlow_round_votes', null)).toBe(false);
+
+    // The other targets are established by the record itself. A rejected
+    // record still refuses on them, exactly as before -- unchanged here.
+    for (const target of ['matches', 'match_period_scores', 'player_match_stats'] as const) {
+      expect(targetEstablishedBySource(target, null)).toBe(true);
+      expect(targetEstablishedBySource(target, playerProjectionJson())).toBe(true);
+    }
+
+    // And it agrees with the one reader of that JSON, in both directions, so
+    // it cannot drift from what the projection actually says.
+    for (const raw of [
+      playerProjectionJson(),
+      playerProjectionJson({ brownlow_round_vote: { season: 2026, round_number: 3, votes: 3 } }),
+    ]) {
+      expect(targetEstablishedBySource('brownlow_round_votes', raw))
+        .toBe(readPlayerMatchProjection(raw, 'projection').brownlowRoundVote !== null);
+    }
+  });
+
+  it('maps each family to exactly its two canonical targets', () => {
+    const targets: SettleTargetTable[] = [
+      'matches', 'match_period_scores', 'player_match_stats', 'brownlow_round_votes',
+    ];
+    for (const target of targets) expect(proposedFieldsFor(target).length).toBeGreaterThan(0);
   });
 });

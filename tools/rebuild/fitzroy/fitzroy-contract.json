@@ -141,6 +141,48 @@
       "profile_url_shape": "^https?://afltables\\.com/afl/stats/players/[A-Za-z]/[^/]+\\.html$"
     }
   },
+  "in_season": {
+    "$comment": "AFLDB-ISSUE-099 — what an IN-SEASON partial AFL Tables snapshot is, and how it stays permanently distinguishable from a full-history core snapshot. An in-season acquisition covers exactly ONE season, that season must be declared in-progress by data/reference/seasons.json, and the result is a THIRD acquisition kind (`in_season_partial`) with its OWN adjudicator. It is NOT a narrowed core snapshot: no full-history gate is relaxed for it, and it can never be accepted as a rebuild baseline. As in the full_history block, nothing here is a verdict — acquire_core.R records what it measured, and import_fitzroy_core.py --require-in-season re-derives every gate from this contract and the raw artefacts.",
+    "contract_in_season_version": 1,
+    "acquisition_kind": "in_season_partial",
+    "competition": "VFL/AFL men's senior competition",
+    "single_season": true,
+    "season_source": "data/reference/seasons.json in_progress_seasons",
+    "season_rule": "--from must equal --to, and that season must be listed in data/reference/seasons.json in_progress_seasons; a completed season is acquired as a core snapshot, never in-season",
+    "required_datasets": ["player_stats", "results"],
+    "allowed_datasets": ["player_stats", "results"],
+    "excluded_datasets": {
+      "datasets": ["player_details", "ladder"],
+      "reason": "player_details is a whole-population dataset with no season argument and no stable AFL Tables ID (see its own field statuses), so it carries nothing an in-season settle may consume. `ladder` is a VALIDATION_WITNESS whose values fitzRoy computes locally from results (AFLDB-ISSUE-095), so it is never a fact source and never part of an in-season snapshot."
+    },
+    "completeness_gates": [
+      "acquisition_kind is exactly in_season_partial",
+      "requested_range covers exactly one season and from equals to",
+      "the acquired season is listed in data/reference/seasons.json in_progress_seasons",
+      "every dataset in required_datasets is present in the manifest",
+      "no dataset outside allowed_datasets is present in the manifest",
+      "the acquired season has exactly one player_stats artefact",
+      "no artefact lies outside the acquired season",
+      "every artefact records a sha256 and that hash matches the file on disk",
+      "every artefact records a non-zero row_count",
+      "every artefact's column set is one of the accepted schema variants for its dataset",
+      "the acquisition recorded no failed season: a source failure is terminal and must not be written as an absence",
+      "fitzroy_version_installed equals pinned_version and fitzroy_version_match is true"
+    ],
+    "never_admissible_for": {
+      "$comment": "An in-season snapshot is a partial observation of a season still being played. Admitting one to either gate below would weaken the historical fail-closed contract, so both adjudicators must refuse acquisition_kind in_season_partial EXPLICITLY, on top of their existing range checks — and --require-in-season must symmetrically refuse anything that is not in_season_partial.",
+      "gates": ["--require-full-history", "--require-accepted-baseline"],
+      "register": "data/reference/fitzroy-accepted-baselines.json"
+    },
+    "identity_requirement": {
+      "$comment": "AFLDB-ISSUE-099 §2.1, probe P5 (2026-08-28, 9,522 x 81 rows over 207 matches). In-season player_stats rows can arrive with a blank fitzRoy `ID` — 82 such rows across 5 profile URLs were measured in 2026, and none of those 5 URLs carries an ID anywhere in the season — so `ID` is ENRICHMENT ONLY here and must never be required. The stable identity is the AFL Tables profile `url`, which had ZERO NA values in the same measurement and was 1:1 with every populated ID (663 distinct pairs). This is the one place the in-season contract deliberately differs from full_history.identity_requirement, which requires both columns.",
+      "required_columns": ["url"],
+      "enrichment_columns": ["ID"],
+      "rule": "every player_stats row must carry a non-empty url; a populated ID must stay 1:1 with url; identity is never inferred from a name, at any grain",
+      "profile_url_shape": "^https?://afltables\\.com/afl/stats/players/[A-Za-z]/[^/]+\\.html$"
+    },
+    "verdict_authority": "tools/migration/import_fitzroy_core.py --validate-only --require-in-season"
+  },
   "pinned_version": "1.8.0",
   "pinned_version_evidence": "CRAN fitzRoy index page, checked 2026-08-25 (published 2026-08-23)",
   "datasets": {

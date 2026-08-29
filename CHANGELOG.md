@@ -20,6 +20,100 @@ commit.
 - Re-shaped `won_a_final` and `never_won_a_final` around a distinct winning-player scalar-array InitPlan, preserving the exact winning-side participation semantics and complement while eliminating the timeout-producing nested-loop semi/anti joins over a materialized relation. The normal five-second statement timeout remains in force; no index, schema, or data change was required.
 - Added an independent base-table SQL oracle for the exact three failing cells. The complete Grid Solver integration file now passes 131 / 131 under `AFLDB_STATEMENT_TIMEOUT_MS=5000`; post-fix analyzed execution times were 35.386 ms, 501.698 ms and 103.791 ms, and the resolved ISSUE-076 regression remained green.
 
+### AFLDB-ISSUE-099 — In-season AFL Tables acquisition, observation bundle and settle projections - 29 August 2026
+
+- **`acquire_core.R` gained an opt-in `--in-season` mode**, a third acquisition kind
+  (`in_season_partial`) alongside `core_snapshot` and `validation_witness`. It acquires exactly
+  one season, that season must be declared in-progress by `data/reference/seasons.json`, and it
+  is measured against its own `in_season` contract block rather than the 1897–2025 full-history
+  range. The full-history and validation-witness paths are unchanged.
+- **`import_fitzroy_core.py` gained `enforce_in_season()` and `--require-in-season`**, the
+  in-season adjudicator. It re-derives every gate from the contract, the season register and the
+  raw artefacts, exactly as the full-history gate does. The two gate families now **refuse each
+  other explicitly**: `--require-full-history` and `--require-accepted-baseline` reject an
+  `in_season_partial` snapshot for what it is rather than incidentally for its range, and
+  `--require-in-season` rejects anything that is not one. An in-season snapshot can therefore
+  never enter the historical fail-closed contract or the accepted-baseline register.
+  `--require-in-season` is also **offline-only**: it refuses before any database work, because
+  the canonical writers in that tool upsert with no ownership predicate and delete by match and
+  season.
+- **New `--emit-observations` writes a deterministic, versioned observation bundle** — the one
+  boundary between Python's AFL Tables interpretation and TypeScript's persistence. Presence is
+  enumerated **independently of projection**, so a row that was observed and then rejected is
+  still recorded as present and can never be mistaken for one the source withdrew; a row whose
+  identity cannot be established at all is recorded separately and marks its scope incomplete,
+  which disables absence sweeping there rather than guessing. New `--on-record-error` defaults
+  to `abort`, keeping the historical rebuild path unchanged, with `reject` opt-in and in-season
+  only.
+- **Player identity keys on the AFL Tables profile URL.** The fitzRoy numeric `ID` is enrichment
+  and is never required — 82 in-season rows carry none — and a name is never an identity key at
+  any grain. NULL stays distinct from zero throughout: an absent statistic, an unpublished
+  attendance and an NA Brownlow vote all remain NULL, and none can become a `0` or a fabricated
+  row.
+- **`data/reference/source-families.json` declares the two AFL Tables families** —
+  `afltables.match` (new) and `afltables.player_match_stats` (upgraded from identity-only) — with
+  proven column contracts and reviewed promotion. Their declared columns are pinned against the
+  emitter's own constants, so the registry and the emitter cannot drift apart.
+- **Migration 076** adds two typed staging projections, `staging.afltables_match` and
+  `staging.afltables_player_match`, plus `data_issues.issue_key` and a partial unique index so a
+  recurring disagreement refreshes one open row instead of stacking duplicates. Existing
+  `data_issues` writers are unaffected: rows without an `issue_key` are outside the index
+  entirely. Real foreign keys make resolved identity a database-enforced fact, and CHECK
+  constraints hold the score, period and attendance invariants at the store.
+- **The observation persistence layer was extracted, behaviour-preserving**, from the
+  current-season importer into `src/lib/acquisition/observation-store.ts`. The SQL, the row lock,
+  the decision call, the write order and the absence predicate are unchanged; only that one
+  importer's row shape became parameters, so a second family importer reaches the migration-074
+  spine through one contract instead of reimplementing it. Absence remains state, never a
+  deletion.
+- **New `src/lib/acquisition/settle-afltables.ts` and `tools/current-season/settle-afltables.ts`**
+  consume the observation bundle. The bundle is validated fail-closed and its manifest re-hashed
+  from disk **before any database connection is opened**, so an unverified snapshot cannot reach
+  PostgreSQL. The settle pass then runs in **one transaction**: every keyed record reaches the
+  observation spine whether or not it projects, a typed projection row is written only where
+  identity fully resolved, both canonical targets of each family are reconciled, and the result
+  is a `promotion_candidate` for a human. Absence is asserted only inside a scope the snapshot
+  proved complete. Review-first is the default — `--dry-run` needs no flag, `--apply` must be
+  explicit, and the dry run executes the identical write path against real constraints and
+  privileges before deliberately rolling back.
+- **No canonical data is written.** Migration 076 contains no DML, no trigger and no rule, and
+  modifies exactly one existing table (`data_issues`, additively). The settle pass writes
+  observations, typed staging projections, promotion candidates and import rejections, and
+  **nothing in this issue writes** `matches`, `match_period_scores`, `player_match_stats`,
+  `brownlow_round_votes` or any identity table — no player, club, venue or venue alias is ever
+  created. That is now proved at runtime rather than asserted: an integration suite brackets
+  every settle run with canonical fact-table row counts and then scans each of those tables for
+  any surviving row written by one of the settle transactions, identified by the transaction id
+  of the `import_batches` row it inserted. Both staging projections are maintained by upsert
+  alone — no statement the settle path sends deletes or truncates either one.
+- **A `data_issues` disagreement lifecycle, driven by evidence in both directions.** When AFL
+  Tables and an independent current-season provider disagree on a comparable field, the settle
+  pass opens one durable finding per record and target, keyed so a recurrence refreshes that same
+  row and preserves when it was first detected rather than stacking duplicates. It closes a
+  finding only on **positive current-run evidence** — the record present, its scope proven
+  complete, corroboration re-evaluated this run, at least one comparable provider agreeing and
+  none disagreeing. A disagreement that merely stops reappearing is never treated as resolved,
+  silence is never agreement, and a finding another writer owns is never touched. Findings are
+  resolved in place, never deleted.
+- **`--report` shows the review queue read-only** — pending promotion candidates by target, and
+  the open disagreements behind the ones that are blocked. It offers no path to accept, resolve
+  or retire anything: every mutation happens inside the settle transaction, on evidence.
+- **Validated end-to-end against the real 2026 season.** One bounded in-season acquisition (207
+  matches, rounds 1–25, 9,522 player-match rows, **no row missing its profile URL**), then a
+  first apply and an identical rerun on a test database under the restricted importer role. The
+  rerun created no second version, no second candidate and no second finding, and **both runs
+  wrote zero canonical rows**. Two defects were found by that run and fixed: an already-absolute
+  manifest path was being joined onto the project root a second time, which made the operator
+  path fail on Windows and would have resolved to the wrong file on Linux; and a target the
+  source had never published was being proposed whenever identity failed to resolve, which
+  raised 803 Brownlow candidates from a season whose Brownlow votes are entirely unpublished.
+  **An unpublished vote now means no `brownlow_round_votes` target at all** — no candidate, no
+  rejection, no projection and no invented value — while a published `0` remains a real vote.
+  Whether a target exists is decided from what the source published, before identity is
+  consulted, because it cannot depend on whether this database happens to know the player.
+- **Nothing is scheduled.** No cron entry and no timer is added by this work; running the settle
+  pass on a schedule is a separate decision.
+
 ### AFLDB-ISSUE-076 — Grid Solver winning-final venue queries stay within the database timeout - 28 August 2026
 
 - Re-shaped `won_final_at_venue` membership so PostgreSQL computes the distinct winner-player IDs once as a scalar-array InitPlan instead of allowing an underestimated qualifying set to produce a repeatedly scanned materialised join shape. Venue, final and player-club winner semantics are unchanged; the normal five-second statement timeout remains intact, and no index or schema change was needed.
