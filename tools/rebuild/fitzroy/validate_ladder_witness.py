@@ -102,14 +102,25 @@ def pct_stored(score_for: int, score_against: int) -> Decimal | None:
         Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
 
-def load_witness(label: str, rep: Report) -> tuple[dict, list[dict]]:
-    """Manifest + raw artefact validation. Returns (manifest, rows)."""
-    manifest_path = MANIFEST_DIR / f"{label}.json"
+def load_witness(label: str, rep: Report, contract_path: Path | None = None,
+                 manifest_dir: Path | None = None) -> tuple[dict, list[dict]]:
+    """Manifest + raw artefact validation. Returns (manifest, rows).
+
+    AFLDB-ISSUE-101: ``contract_path`` and ``manifest_dir`` default to the tracked
+    contract and the tracked manifest directory, so every existing caller is
+    unchanged. They exist so the OFFLINE half of this validator can adjudicate a
+    candidate witness against a TEMPORARY successor contract before any tracked file
+    is written — the tracked contract still names the outgoing witness until then, so
+    this validator would otherwise refuse a correct successor acquisition. The
+    manifest is still derived as ``<manifest_dir>/<label>.json``, so a manifest whose
+    filename is not the label can never be validated in its place.
+    """
+    manifest_path = (manifest_dir or MANIFEST_DIR) / f"{label}.json"
     if not manifest_path.exists():
         raise WitnessError(f"no tracked manifest at {manifest_path}")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-    contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    contract = json.loads((contract_path or CONTRACT).read_text(encoding="utf-8"))
     ladder_ds = contract["datasets"].get(DATASET)
     if ladder_ds is None:
         raise WitnessError("the fitzRoy contract declares no 'ladder' dataset")
@@ -246,10 +257,11 @@ def load_witness(label: str, rep: Report) -> tuple[dict, list[dict]]:
     return manifest, rows
 
 
-def resolve_all(rows: list[dict], rep: Report) -> dict[tuple[int, str], dict]:
+def resolve_all(rows: list[dict], rep: Report,
+                contract_path: Path | None = None) -> dict[tuple[int, str], dict]:
     """Resolve every source label through the REAL ClubResolver. One authority."""
     print("\n4. historical identity resolution")
-    contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    contract = json.loads((contract_path or CONTRACT).read_text(encoding="utf-8"))
     clubs = json.loads(CLUBS.read_text(encoding="utf-8"))
     slug_of = {c["hist"]: c["slug"] for c in clubs["identities"]}
     resolver = fz.ClubResolver(clubs, contract["source_club_normalisation"]["rules"])
@@ -344,13 +356,39 @@ def main() -> int:
     ap.add_argument("--label", required=True)
     ap.add_argument("--compare", action="store_true",
                     help="also run the D7 cross-check against club_seasons (read-only)")
+    ap.add_argument("--contract",
+                    help="override the fitzRoy contract path. OFFLINE ONLY (never with "
+                         "--compare). AFLDB-ISSUE-101 points it at a TEMPORARY successor "
+                         "contract so a candidate witness is proven before any tracked "
+                         "file is written. Default: the tracked contract")
+    ap.add_argument("--manifest-dir",
+                    help="override the directory the '<label>.json' manifest is read from. "
+                         "OFFLINE ONLY (never with --compare). Default: "
+                         "docs/rebuild-manifests/afltables_fitzroy_core")
     args = ap.parse_args()
+
+    # The D7 cross-check reads the rebuilt database. Its whole meaning is that the
+    # TRACKED, accepted witness agrees with canonical club_seasons, so it must never be
+    # run against a temporary successor state.
+    for flag, value in (("--contract", args.contract),
+                        ("--manifest-dir", args.manifest_dir)):
+        if value and args.compare:
+            ap.error(f"{flag} cannot be combined with --compare: the database cross-check "
+                     "adjudicates the tracked accepted witness, never a temporary state.")
+        if value and not Path(value).exists():
+            ap.error(f"{flag} does not exist: {value}")
+
+    contract_path = Path(args.contract) if args.contract else CONTRACT
+    manifest_dir = Path(args.manifest_dir) if args.manifest_dir else MANIFEST_DIR
 
     rep = Report()
     print(f"AFLDB-ISSUE-095 ladder witness validation - {args.label}")
+    if args.contract or args.manifest_dir:
+        print(f"  contract     {contract_path}")
+        print(f"  manifest dir {manifest_dir}")
     try:
-        _, rows = load_witness(args.label, rep)
-        resolved = resolve_all(rows, rep)
+        _, rows = load_witness(args.label, rep, contract_path, manifest_dir)
+        resolved = resolve_all(rows, rep, contract_path)
         if args.compare:
             compare_to_database(resolved, rep)
     except WitnessError as exc:

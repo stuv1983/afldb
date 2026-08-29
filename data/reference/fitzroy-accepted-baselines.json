@@ -24,12 +24,27 @@
   "schema_version": 1,
   "selection_policy": {
     "rule": "exactly_one_accepted",
+    "retired_statuses": ["retired"],
     "$comment": [
       "The rebuild resolves its default core source by selecting the single entry whose",
       "acceptance_status is 'accepted'. Zero accepted entries and more than one accepted",
       "entry are BOTH refusals. There is no 'latest label', filename-ordering or date",
       "tiebreak: deterministic selection among multiple baselines is not defined policy,",
-      "so the rebuild fails closed and a human must decide."
+      "so the rebuild fails closed and a human must decide.",
+      "",
+      "retired_statuses (AFLDB-ISSUE-101) declares the lifecycle vocabulary for a baseline",
+      "that WAS accepted and has since been replaced by a newer accepted baseline. It is a",
+      "policy declaration only: adding it changes no acceptance, no measurement and no",
+      "acquisition fingerprint, and the accepted baseline below is untouched. The end-of-",
+      "season rollover (tools/db/rollover-season.ts) may set an outgoing baseline only to a",
+      "status listed here, and 'accepted' may never appear in this list because that would",
+      "break exactly_one_accepted.",
+      "",
+      "'retired' is the ONLY correct value for a superseded baseline. Do NOT use 'candidate'",
+      "for one: a candidate is an acquisition that has not yet been accepted, and describing",
+      "a validated, previously accepted baseline that way would misstate its history. Every",
+      "status other than 'accepted' is equally non-selectable to the rebuild — this list",
+      "exists so the retirement is a named decision rather than an arbitrary string."
     ]
   },
   "inert_acquisition_fields": {

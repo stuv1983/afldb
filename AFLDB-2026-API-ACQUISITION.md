@@ -360,8 +360,33 @@ of lineup data into canonical participation.
 
 ## 6. Interaction with `AFLDB-ISSUE-095` — coordinate, do not absorb
 
-ISSUE-095 owns the ladder/team-season domain and its D1–D7 decisions are **open and not
-pre-empted here**. This investigation contributes evidence only:
+> **CORRECTED 2026-08-29 (AFLDB-ISSUE-101).** This section was written while ISSUE-095 was
+> open. `AFLDB-ISSUE-095` is now **Resolved** and its **D1–D7 decisions are implemented, not
+> open**. Two statements below are therefore superseded and are corrected in place; the
+> surrounding evidence is retained as lineage because it is what the decisions were made on.
+>
+> 1. **"D1–D7 are open and not pre-empted here"** — superseded. They are settled. The
+>    resolved architecture: `club_seasons` is derived from AFLDB's own canonical `matches`
+>    under a declared 4/2/0 rule (`tools/migration/rebuild_derived.py`
+>    `REBUILDS["club_seasons"]`; `recomputeClubSeasons` in
+>    `src/db/queries/player-derived.ts`), `source_id` is `afltables`, `ladder_rank` fails
+>    closed to NULL on an exact tie, and `fetch_ladder_afltables` is a **validation witness
+>    only** — never a fact source. The derivation carries no hard-coded year.
+> 2. **The "Blocking note" below** — superseded. `recomputeClubSeasons` no longer reads
+>    `staging.team_seasons` at all, so it does **not** throw on every match mutation on a
+>    canonically rebuilt database. It now derives from `matches` and refuses only when the
+>    season has zero home-and-away matches (`AFLDB-ISSUE-099` F10). There is nothing to
+>    "fix" and no guard to weaken.
+> 3. **"Do not add a `club_seasons` Stage-9 gate until ISSUE-095 lands"** — superseded by
+>    events: ISSUE-095 landed and its D7 **added six** `club_seasons` Stage-9 gates
+>    (`tools/db/rebuild-test.ts:688-733`). The standing instruction for `AFLDB-ISSUE-101` is
+>    now the opposite in form and the same in intent: **do not add another one.**
+>
+> What rollover actually coordinates with ISSUE-095 is the **accepted ladder witness**:
+> `validate_ladder_witness.py --compare` is a bidirectional set equality against the whole
+> `club_seasons` table, so the witness must cover exactly the accepted completed span.
+
+ISSUE-095 owns the ladder/team-season domain. This investigation contributed evidence only:
 
 - **D1 (authoritative source):** three free candidates now have evidence —
   `fetch_ladder_afltables`; the AFL Tables season-page ladder (proven live for 2026 **[PROBE]**);
@@ -382,11 +407,13 @@ pre-empted here**. This investigation contributes evidence only:
 - **Coexistence:** the API pipeline supplies the *in-progress* season's ladder; ISSUE-095's
   chosen canonical chain supplies completed seasons. At rollover the completed season's ladder
   is re-derived through ISSUE-095's path and supersedes the in-season rows.
-- **Blocking note:** ISSUE-095 §6 records that `recomputeClubSeasons` fails closed on an empty
-  `staging.team_seasons`, so on a canonically rebuilt database **every** match create/delete/
-  score-edit throws. Any 2026+ promotion writing `matches` will hit this. The API work must not
-  "fix" it by weakening the guard.
-- **Do not add a `club_seasons` Stage-9 gate** until ISSUE-095 lands.
+- **Blocking note — SUPERSEDED 2026-08-29, retained as lineage.** This read: *"ISSUE-095 §6
+  records that `recomputeClubSeasons` fails closed on an empty `staging.team_seasons`, so on a
+  canonically rebuilt database **every** match create/delete/score-edit throws."* That is no
+  longer true — ISSUE-095 re-pointed the function at `matches`; see the correction box at the
+  top of this section.
+- **Do not add a `club_seasons` Stage-9 gate — SUPERSEDED 2026-08-29.** ISSUE-095 landed and
+  its D7 added six. The standing instruction for `AFLDB-ISSUE-101` is **do not add another**.
 
 ---
 

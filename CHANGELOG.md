@@ -15,6 +15,79 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-101 — End-of-season promotion / baseline rollover - 29 August 2026
+
+- **AFLDB can now move the completed-history boundary as one reviewed operation.** The
+  boundary between completed history and the in-progress season is declared across four
+  tracked JSON artefacts plus one TypeScript constant, and existing machinery cross-checks
+  them against each other — so moving one and forgetting another failed the rebuild only
+  after several files had been hand-edited. A new planner (`src/lib/rollover/
+  season-rollover.ts`) computes the entire successor state and proves it coherent under the
+  same rules the current state must satisfy, and a new CLI (`tools/db/rollover-season.ts`)
+  applies it. The planner is pure — it imports only `node:crypto`, with no filesystem, clock,
+  network or database — and the CLI owns all I/O.
+- **Dry run is the default, and applying is an explicit acknowledgement.** With no `--apply`
+  nothing reaches the filesystem; `--apply` additionally requires
+  `--acknowledge-season-complete`. **There is no automatic or date-based completion
+  detector**: the tool reads no clock and no calendar, `--rollover-date` is a required
+  explicit input for every stamped date, and completion is established by an acknowledged
+  operator decision backed by a validated full-history candidate.
+- **The successor state is validated before any tracked file is written.** The computed
+  successor contract and acceptance register are materialised in an OS temporary directory —
+  never inside the repository — and the repository's own validators are executed against
+  them. Each captured run is bound by the bytes read back from those files, so a gate that
+  adjudicated some other state is refused rather than read. Any failure means zero tracked
+  writes, and a dry run runs every gate and still writes nothing.
+- **Three executed pre-apply authorities**, identical in dry run and apply:
+  `import_fitzroy_core.py --validate-only --require-full-history` (re-hashes every artefact,
+  checks every CSV shape, resolves club and player identity, measures identity coverage);
+  the same importer with `--require-accepted-baseline` against the successor register (the
+  acceptance binding and fingerprint-drift gate); and
+  `validate_ladder_witness.py` offline (manifest binding, per-file hashes, per-season
+  structure, identity resolution). The two importer runs must also agree with each other.
+- **`measured` and `identity_scan` are derived from validator execution, never from an
+  operator.** Both are read out of the executed full-history gate's own stdout. There is no
+  flag that supplies a transcript, skips a run or asserts a verdict —
+  `--skip-validation`, `--no-validate`, `--force`, `--core-validator-output`,
+  `--assume-validated` and `--identity-scan` are all refused by name.
+- **New backward-compatible, offline-only validator path overrides** make that possible:
+  `--contract` and `--stat-availability` on `import_fitzroy_core.py` (both require
+  `--validate-only`, so no run that can reach PostgreSQL is redirectable), and `--contract`
+  and `--manifest-dir` on `validate_ladder_witness.py` (both refused with `--compare`).
+  **Every default is unchanged**, so the rebuild orchestrator, the Python contract scripts
+  and the in-season settle path behave exactly as before.
+- **Retired-baseline lifecycle is declared, not invented.** `retired` is the status a
+  previously accepted baseline takes, declared in the acceptance register as
+  `selection_policy.retired_statuses`. `accepted` may never appear in that list, `candidate`
+  is deliberately not valid for a baseline that *was* accepted, and a register declaring no
+  vocabulary refuses with the remedy named.
+- **`accepted_corrections` are reviewed per acquisition and never inherited.** Correction
+  decisions record what a specific acquisition's bytes were examined for, so carrying the
+  outgoing baseline's list forward would claim a review that never happened. The outgoing
+  record supplies category names only; "no corrections" is stated explicitly as the same
+  categories with empty arrays.
+- **Stat availability is reviewed, never fabricated.** `stat-availability.json` describes real
+  data availability, so a range mechanically dragged into a season nobody has played is
+  refused, as is any loss of recorded coverage for a completed season. The reviewed bytes are
+  written through verbatim, so the landed file is byte-identical to the file that was
+  reviewed.
+- **`CLUB_SEASONS_EXPECTED.rows` stays explicit reviewed evidence.** The operator states it
+  and the planner refuses unless it equals the ladder witness manifest's own row total, so a
+  rollover that advances the witness and forgets stage 9 fails loudly instead of agreeing
+  with itself. The stage-9 accepted-season boundary itself is untouched: it already derives
+  from `accepted.measured.seasons_last` and re-points itself.
+- **No canonical database write and no migration.** The CLI opens no database connection and
+  issues no SQL; completed-history supersession remains the existing clean rebuild from the
+  newly accepted baseline. All rollover state is tracked JSON plus one TypeScript constant.
+- **Only `validate_ladder_witness.py --compare` remains post-rebuild**, because it is the
+  bidirectional set equality against a rebuilt `club_seasons` and genuinely requires the
+  database. It was neither moved nor weakened.
+- **No season has been rolled.** The 2026 season is still in progress and the tracked boundary
+  is unchanged (accepted through 2025; `seasons.json` `last_season 2026`,
+  `in_progress_seasons [2026]`). This entry describes a reusable mechanism; executing a real
+  rollover is a future operator action once a season is formally complete and its
+  full-history candidate and ladder witness have genuinely been acquired.
+
 ### AFLDB-ISSUE-100 — Staging-only AFL API lineup / team-announcement domain - 29 August 2026
 
 - **AFLDB can now record announced teams before a match is played.** A new bounded acquisition

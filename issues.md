@@ -7,12 +7,11 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 7
+**Open issues:** 5
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
-| `AFLDB-ISSUE-101` | Medium | Data acquisition / Import architecture / Data integrity | The approved historical boundary gives the API pipeline only the in-progress season, but nothing performs the transition when a season completes, so in-season provenance would become permanent and the Stage-9 gate would drift. | Implement the rollover: extend `fitzroy-accepted-baselines.json` to the completed season, supersede in-season provenance, advance `seasons.json.in_progress_seasons`, re-point the Stage-9 `matches_after_accepted_last_season` gate. **Must not redefine completed-season `club_seasons` ownership — that stays with `AFLDB-ISSUE-095`.** `AFLDB-ISSUE-099` is **Resolved as of 2026-08-29, so that dependency is satisfied**; still needs coordination/completion of the relevant ISSUE-095 path. |
 | `AFLDB-ISSUE-102` | Medium | Data acquisition / Import architecture | `tools/migration/import_awards.py:1408` still requires `AFLDB_LEGACY_SQLITE`, so the awards/honours domain has the same legacy dependency `AFLDB-ISSUE-095` records for `club_seasons`, previously untracked. No free API covers Coleman, Rising Star, All-Australian, AFLCA, AFLPA or club best-and-fairest; Brownlow is the exception via the AFL Tables path. | **Record only.** Do not design the replacement under this investigation — no source selection, no per-award provenance decision, no importer work is authorised by this entry. Links `AFLDB-ISSUE-095` as the direct sibling gap; not absorbed. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
 | `AFLDB-ISSUE-105` | Low | Data acquisition / Import architecture / Type safety | postgres.js renders `import_batches.id` (`bigint`) as **text**, so an uncast `RETURNING id` is a JavaScript string at runtime while `SettleRunResult.batchId` and the ISSUE-098 current-season code declare `number`. Latent, not currently misbehaving; the ISSUE-099 integration suite hit it as a test failure. | Decide the driver-boundary convention — a branded/string-typed batch id, or an explicit documented decode — then apply it to both call sites and the shared `observation-store.ts` signatures in one change. **Do NOT cast the bigint to `int`**; that trades a typing bug for an overflow risk on an identity column. |
@@ -8832,46 +8831,308 @@ this issue.
 
 ## AFLDB-ISSUE-101 — End-of-season promotion / baseline rollover
 
-- **Status:** Open
+- **Status:** **Resolved**
 - **Severity:** Medium
 - **Area:** Data acquisition / Import architecture / Data integrity
 - **Found:** 2026-08-28 (2026+ API acquisition investigation)
-- **Resolved:** N/A
+- **Resolved:** 2026-08-29 — **the reusable mechanism only.** No season has been rolled.
+  Executing an actual 2026 → 2027 rollover is a deliberate future operator action, deferred
+  until the season is formally complete and genuine completed-season evidence exists
+  (see *Deferred execution* below).
 - **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §5 (rollover row) and §9 row F.
-- **Files (today, for orientation only — none changed yet):**
+- **Files:** `src/lib/rollover/season-rollover.ts` (new — the planner),
+  `tools/db/rollover-season.ts` (new — the CLI),
+  `tests/season-rollover.test.ts` (new),
+  `tools/migration/import_fitzroy_core.py` (new offline-only `--contract` /
+  `--stat-availability` overrides; defaults unchanged),
+  `tools/rebuild/fitzroy/validate_ladder_witness.py` (new offline-only `--contract` /
+  `--manifest-dir` overrides; defaults unchanged),
   `data/reference/fitzroy-accepted-baselines.json`, `data/reference/seasons.json`,
-  `tools/db/rebuild-test.ts` (Stage 9 `matches_after_accepted_last_season`)
-- **Related:** `AFLDB-ISSUE-099` (settle stage — prerequisite), `AFLDB-ISSUE-093` (Resolved —
-  accepted-baseline register), `AFLDB-ISSUE-095` (ladder/team-season — **coordinated, not
-  absorbed, and not redefined here**)
+  `data/reference/stat-availability.json`,
+  `tools/rebuild/fitzroy/fitzroy-contract.json`,
+  `tools/db/rebuild-test.ts` (`CLUB_SEASONS_EXPECTED.rows` only)
+- **Related:** `AFLDB-ISSUE-099` (settle stage — **Resolved**, dependency satisfied),
+  `AFLDB-ISSUE-093` (Resolved — accepted-baseline register), `AFLDB-ISSUE-095`
+  (ladder/team-season — **Resolved**; coordinated, not absorbed, and not redefined here)
+
+### Resolution summary
+An explicit, deterministic, fail-closed **rollover planner + CLI** now performs the coordinated
+reference-state transition that moves a completed season out of the in-season pipeline and into
+the accepted historical baseline. It computes the entire successor state, proves the candidate
+acquisition with the repository's own validators **executed against that successor state**, and
+only then writes.
+
+- **Planner** (`src/lib/rollover/season-rollover.ts`) is pure: it imports only `node:crypto` —
+  no filesystem, clock, network or database, asserted from its own source text. Two stages:
+  `planSuccessorContract()` computes the successor contract and `seasons.json` and performs
+  every refusal that needs no validator evidence; `planSeasonRollover()` then consumes the
+  executed gate and emits file **contents**, never writing.
+- **CLI** (`tools/db/rollover-season.ts`) owns all I/O. **Dry run is the default**; `--apply`
+  additionally requires `--acknowledge-season-complete`. Writes are per-file temp-file +
+  rename (per-file atomicity only — there is no cross-file transaction, and the tool says so;
+  Git is the cross-file recovery boundary).
+- **Temporary successor-state validation.** The computed successor contract and register are
+  materialised in an **OS temp directory, never inside the repository**, and the validators are
+  pointed at them through new backward-compatible, offline-only overrides. Each captured run is
+  bound by the **bytes read back** from those files, so a gate that adjudicated some other state
+  is refused rather than read. Any failure ⇒ **zero tracked writes**; a dry run runs every gate
+  and writes nothing.
+- **Three executed pre-apply gates**, identical in dry run and apply:
+  1. `import_fitzroy_core.py --validate-only --require-full-history --contract <tmp>
+     --stat-availability <reviewed>` — re-hashes every artefact, checks every CSV shape,
+     resolves club and player identity, and measures identity coverage;
+  2. `import_fitzroy_core.py --validate-only --require-accepted-baseline --accepted-baselines
+     <tmp successor register>` — the acceptance binding and fingerprint-drift gate;
+  3. `validate_ladder_witness.py --contract <tmp> --manifest-dir <dir>` — the offline witness
+     proof. Gates 1 and 2 are additionally required to agree with each other.
+- **`measured` and `identity_scan` are derived from validator execution**, read from gate 1's
+  `snapshot scan summary` and `full-history gates PASSED — identity coverage` blocks.
+  **`--identity-scan` does not exist** — supplying it is an explicit refusal — and there is no
+  `--skip-validation`, `--no-validate`, `--force`, `--core-validator-output` or
+  `--assume-validated`.
+- **Retired-baseline lifecycle**, **per-acquisition `accepted_corrections`**, **reviewed
+  stat availability** and **explicit `CLUB_SEASONS_EXPECTED` evidence** are each adjudicated
+  below and enforced by the planner.
+- **No canonical write.** The CLI opens no database connection and issues no SQL.
+  Completed-history supersession remains the existing clean rebuild from the newly accepted
+  baseline. **No migration** — all rollover state is tracked JSON plus one TypeScript constant;
+  applied migrations through 077 are untouched and stay checksum-frozen.
+- **Only `validate_ladder_witness.py --compare` remains post-rebuild**, because it is the D7
+  bidirectional set equality against `club_seasons` and genuinely requires the rebuilt
+  database. It was neither moved nor weakened, and the new overrides refuse to combine with it.
+
+### Deferred execution — no season has been rolled
+The 2026 season is still in progress. The real boundary is unchanged and verified:
+`fitzroy-accepted-baselines.json` accepts `full-history-20260827` with
+`measured.seasons_last = 2025` and `required_range 1897-2025`; `seasons.json` remains
+`last_season 2026`, `in_progress_seasons [2026]`; `fitzroy-contract.json` still declares
+`season_range 1897-2025`. **No production rollover rehearsal has been performed**, and none was
+attempted: a genuine dry run requires a real full-history candidate covering `1897..Y` and a
+matching ladder witness, which for 2026 do not exist and **must not be manufactured as truth**.
+
+Executing the 2026 → 2027 rollover is a **future operator action**, taken once the season is
+formally complete and genuine completed-season evidence exists. The exact prerequisites are
+recorded under *Production prerequisites* below. This issue is Resolved for the **mechanism**;
+it is not a record that a rollover happened.
+
+### Production prerequisites for a future completed season Y
+On disk first: the acquired full-history snapshot `1897..Y` under
+`data/sources/afltables/fitzroy_core/<core-label>/`; the acquired ladder witness bytes under
+`.../<witness-label>/`; and the ladder manifest filed as `<witness-label>.json`.
+
+Then all nine arguments, none optional — `--season Y`, `--rollover-date YYYY-MM-DD` (explicit;
+no clock is read), `--retire-status retired`, `--expected-club-season-rows N`,
+`--core-manifest`, `--ladder-manifest`, `--ladder-coverage`, `--stat-availability`,
+`--accepted-corrections` — plus `--acknowledge-season-complete` alongside `--apply`.
 
 ### Problem
 The approved historical boundary is that only the in-progress season belongs to the API
-pipeline. Nothing currently performs the transition: when a season completes, its in-season
-API-provenance rows must be superseded by a standard full-history fitzRoy re-acquisition, and
-the surrounding registers must advance in step. Without this, in-season provenance would become
-permanent and the Stage-9 gate would drift.
+pipeline. Nothing currently performs the transition: when a season completes, the accepted
+historical baseline, the fitzRoy full-history contract, the season register, the accepted
+ladder witness and stage 9's expected club-season population must all advance in step, and the
+completed season must be re-acquired through the standard full-history path.
 
 ### Scope
-The rollover operation: extend `data/reference/fitzroy-accepted-baselines.json` to include the
-completed season, supersede the in-season provenance, advance
-`seasons.json.in_progress_seasons`, and re-point the Stage-9
-`matches_after_accepted_last_season` gate.
+The rollover operation, as a coordinated reference-state transition followed by the existing
+clean rebuild.
+
+### Corrections to earlier wording in this entry (2026-08-29)
+The three statements below stood in this entry and are **superseded**; they are corrected
+here rather than deleted, because they shaped the original orientation.
+
+1. *"supersede the in-season provenance"* — `AFLDB-ISSUE-099` writes **zero canonical
+   rows** (`tools/current-season/settle-afltables.ts:13-16`; migration `076` header), so
+   there is no ISSUE-099 canonical provenance to rewrite and **no in-place provenance
+   rewriter is built here**. Completed-history supersession happens the one way it already
+   does: a clean rebuild from the newly accepted baseline. The only canonical in-season
+   stamping is `AFLDB-ISSUE-098`'s `matches.source_id = squiggle/kali`, which
+   `AFLDB-ISSUE-099` F8/A6 bind to a reviewed human decision and **never** an automated
+   ownership transfer.
+2. *"re-point the Stage-9 `matches_after_accepted_last_season` gate"* — the gate already
+   derives its boundary from `accepted.measured.seasons_last`
+   (`tools/db/rebuild-test.ts:653-658`) and **re-points itself** when the register advances.
+   It is not edited by this issue. What genuinely needs advancing, and was **not** listed
+   here, is `CLUB_SEASONS_EXPECTED.rows`.
+3. The orientation file list omitted **`tools/rebuild/fitzroy/fitzroy-contract.json`**,
+   which carries four of the coupled transitions (`full_history.season_range.last_season`,
+   `full_history.current_season_excluded.seasons`, `datasets.ladder.accepted_witness`,
+   `datasets.ladder.coverage`) and two hard refusals in `import_fitzroy_core.py` and
+   `validate_ladder_witness.py`. `data/reference/stat-availability.json` was also omitted.
 
 ### Boundary — `club_seasons` ownership
-**This issue must not independently redefine completed-season `club_seasons` ownership.** That
-remains with `AFLDB-ISSUE-095`, whose D1–D7 decisions are open and are not pre-empted here. Do
-not add a `club_seasons` Stage-9 gate under this issue.
+**This issue must not independently redefine completed-season `club_seasons` ownership.**
+`AFLDB-ISSUE-095` is **Resolved** and its D1–D7 decisions are **implemented, not open**: the
+derivation in `rebuild_derived.py` / `recomputeClubSeasons` is legacy-free, season-agnostic
+and derived from canonical `matches`, and D7 **already added six `club_seasons` stage-9
+gates** (`tools/db/rebuild-test.ts:688-733`). **Do not add another `club_seasons` stage-9 gate
+and do not add a second ownership path.** The rollover's only coordination point with
+ISSUE-095 is the **accepted ladder witness**, which `validate_ladder_witness.py --compare`
+set-compares against the whole `club_seasons` table and which must therefore cover exactly the
+accepted completed span.
+
+### Implementation state (2026-08-29)
+**Planner and CLI IMPLEMENTED; not yet validated; 2026 NOT rolled.** New pure, DB-free
+`src/lib/rollover/season-rollover.ts` computes and fully validates the entire successor state
+in memory; new dry-run-by-default `tools/db/rollover-season.ts` applies it. **No migration**
+(applied migrations through 077 stay frozen), **no canonical write**, no database connection,
+no clock read. The real 2025/2026 boundary is unchanged.
+
+**Retired-baseline lifecycle vocabulary — ADJUDICATED 2026-08-29.** The register previously
+declared only the *selection* rule (`exactly_one_accepted`) and no vocabulary for what a
+superseded baseline becomes, so the planner refused rather than invent a status word.
+`retired` is now the adopted value and is declared in the real register as
+`selection_policy.retired_statuses: ["retired"]`. That edit is a **policy/schema declaration
+only**: the accepted baseline, `measured.seasons_last` (2025), `required_range`, both
+acquisition fingerprints and every other file are unchanged, and 2026 is not rolled.
+`--retire-status` must be a member; `accepted` may never appear in the list (it would break
+`exactly_one_accepted`); `candidate` is deliberately **not** a valid value for a previously
+accepted baseline, because a candidate is an acquisition that was never accepted and using it
+would misstate history. Unknown values refuse.
+
+**`accepted_corrections` are reviewed per acquisition — ADJUDICATED 2026-08-29.** The planner
+originally carried the outgoing baseline's `accepted_corrections` into the new baseline. That
+is corrected: correction decisions record what a **specific acquisition's bytes** were
+examined for, so inheriting them would make the acceptance record claim a review that never
+happened. The reviewed state is now a required input (`--accepted-corrections`), the outgoing
+record is consulted for its **category names only** and never for its values, and an
+acquisition needing no corrections states that explicitly as the same categories with empty
+arrays. A missing category, an unknown category, a non-array category, or an entry without
+both `kind` and `rule` all refuse. No new correction system was invented — the existing
+register structure is the schema.
 
 ### Dependencies and gates
-Depends on **`AFLDB-ISSUE-099`**, and on coordination/completion of the relevant
-`AFLDB-ISSUE-095` canonical ladder/team-season path. Not gated on any probe.
+`AFLDB-ISSUE-099` and `AFLDB-ISSUE-095` are both **Resolved**, so both dependencies are
+satisfied. Not gated on any probe.
 
 ### Validation
-None yet — nothing implemented.
+**GREEN 2026-08-29 (user-run), after the pre-apply path-override work:**
+
+- `tests/season-rollover.test.ts` — **131/131**, no skips (was 106/106 before the overrides;
+  the growth is the three executed pre-apply gates, the temp-successor byte bindings, the
+  retirement of `--identity-scan`, and the Python default/confinement assertions).
+- Broader regression — **5/5 suites, 472 passed, 6 existing skips** (was 426/6 before this
+  work; the skip count is unchanged, which is the property that mattered). Covers
+  `tests/fitzroy-core-import.test.ts`, `tests/fitzroy-acquisition.test.ts`,
+  `tests/db-test-rebuild.test.ts` and `tests/reference-data.test.ts`.
+  `tests/fitzroy-core-import.test.ts` spawns the real importer with `--validate-only`,
+  `--require-full-history` and `--accepted-baselines`, so `main()`'s new path resolution and
+  the offline-only confinement are exercised end-to-end; it also drives
+  `tests/python/fitzroy_corrections_contract.py`, which covers `load_row_corrections()`'s
+  default. `tests/reference-data.test.ts` drives
+  `tests/python/reference_cascade_contract.py`.
+
+**Direct witness-validator coverage — CLOSED 2026-08-29.**
+`tests/python/ladder_identity_contract.py` is the only executable test of
+`validate_ladder_witness.py` (its §7 spawns the validator with **default** paths), and no
+vitest suite runs it, so the 472 did not exercise the changed witness validator.
+`tools/db/rebuild-test.ts` invokes it only during a real rebuild, and
+`tests/db-test-rebuild.test.ts` uses fake command runners. It was therefore run directly:
+
+```
+.venv/Scripts/python.exe tests/python/ladder_identity_contract.py
+  sections 1-6                     PASS
+  section 7 accepted-witness contract  PASS
+  acquired witness bytes           SKIP (gitignored by design)
+  All checks passed.
+```
+
+That proves the witness validator's **default** behaviour is unchanged by the new
+`--contract` / `--manifest-dir` overrides. The acquired-bytes half self-skips on a checkout
+without the gitignored snapshot; the rebuild's own preflight is what refuses when they are
+genuinely required.
+
+No live `--apply` and no live dry run has been run: **2026 is still in progress**, and a
+genuine dry run needs a real full-history candidate covering `1897..2026`, which does not
+exist and must not be manufactured. See *Deferred execution* above.
+
+### Validator authority (corrected 2026-08-29)
+An earlier iteration accepted an operator-supplied text file as the full-history validator's
+output, which made a file that merely *looked* like a passing transcript sufficient authority
+for `--apply`. That is removed. The CLI now **executes**
+`import_fitzroy_core.py --label <L> --snapshot-dir <D> --manifest <M> --validate-only` as a
+subprocess on **every** invocation — dry run and apply alike — and refuses on a non-zero exit.
+`assertValidatorRun()` additionally proves from the captured argv that the run was the
+importer, in `--validate-only` mode, carrying no flag that changes what it adjudicates, and
+pointed at exactly the label/manifest/snapshot the acceptance record is about to bind. There
+is no `--skip-validation`, no flag that supplies a transcript, and no cached success; those
+flag names are explicitly refused.
+
+**The former limitation, and how it was closed (2026-08-29).** Both
+`import_fitzroy_core.py --require-full-history` and `validate_ladder_witness.py` read
+`tools/rebuild/fitzroy/fitzroy-contract.json` from a **fixed module constant** (`CONTRACT_PATH`
+at `import_fitzroy_core.py:86`; `CONTRACT` at `validate_ladder_witness.py:50`), and both
+compare the candidate against the boundary that file currently declares — the full-history gate
+(`requested_range … does not equal the contract's required range`), the witness at
+`load_witness()` (the contract must already *accept* the label) plus the `coverage` dimensions
+and span. A successor candidate could therefore pass neither while the TRACKED contract still
+declared the previous boundary, so an earlier iteration printed both as mandatory **post-apply**
+steps and accepted `identity_scan` as a reviewed operator input.
+
+That is now closed. **Backward-compatible, offline-only path overrides were added:**
+
+| Script | New option | Default | Confinement |
+|---|---|---|---|
+| `import_fitzroy_core.py` | `--contract <path>` | `CONTRACT_PATH` | requires `--validate-only` |
+| `import_fitzroy_core.py` | `--stat-availability <path>` | `AVAILABILITY_JSON` | requires `--validate-only` |
+| `validate_ladder_witness.py` | `--contract <path>` | `CONTRACT` | refused with `--compare` |
+| `validate_ladder_witness.py` | `--manifest-dir <path>` | `MANIFEST_DIR` | refused with `--compare` |
+
+`--accepted-baselines` already existed. All four **read sites** of the importer's contract
+(`validate_snapshot`, `load_row_corrections`, and both `main()` sites) route through the
+resolved path, so the gate and the scan cannot read different contracts; both witness sites
+(`load_witness`, `resolve_all`) do the same. `--stat-availability` is included because
+`load_round_vote_seasons()` decides which seasons derive `brownlow_round_votes`, and that count
+is part of the measured fingerprint the register binds — validating a successor acquisition
+against the *outgoing* availability document could record a fingerprint the very next run
+disagrees with. Every default is unchanged, so `tools/db/rebuild-test.ts`, `tests/python/` and
+the settle path are unaffected. The overrides cannot be used by any run that can open a
+database, and the witness's D7 `--compare` can never be pointed at a temporary state.
+
+**Pre-apply sequence, as implemented.** `planSuccessorContract()` (stage one, pure) computes the
+successor contract and `seasons.json` and performs every refusal that needs no validator
+evidence. The CLI materialises the successor contract in an **OS temp directory** — never inside
+the repository — and runs three gates before any tracked write:
+
+1. `--validate-only --require-full-history --contract <tmp> --stat-availability <reviewed>`;
+2. `--validate-only --require-accepted-baseline …  --accepted-baselines <tmp successor register>`;
+3. `validate_ladder_witness.py --label <witness> --contract <tmp> --manifest-dir <dir>`.
+
+Each captured run is bound by the **bytes read back** from the temporary files it was pointed
+at, compared against the successor documents the planner computed, so a gate that adjudicated
+some other state is refused rather than read. `assertPreApplyAuthority()` also requires runs (1)
+and (2) to agree with each other on the whole fingerprint. Any failure ⇒ **zero tracked writes**;
+a dry run runs all three and writes nothing.
+
+**`identity_scan` is now MEASURED, not supplied.** It is read from the
+`full-history gates PASSED — identity coverage` block that gate (1) prints, and
+**`--identity-scan` no longer exists** — supplying it is an explicit refusal. The post-apply
+`--require-accepted-baseline` run and the rebuild's PRECHECK still re-derive all six; they are
+now a second proof of an executed measurement rather than the first proof of a stated one.
+
+**What still waits for the rebuild:** `validate_ladder_witness.py --compare` only. It is the D7
+bidirectional set equality against `club_seasons` and genuinely needs the rebuilt database; it
+was neither moved nor weakened.
+
+### Write strategy
+`data/reference/stat-availability.json` is replaced wholesale by the reviewed document, so
+the planner writes the operator's **own bytes verbatim** — what lands is byte-identical to
+what was reviewed, and the file's hand-maintained column alignment survives. The register,
+`seasons.json` and `fitzroy-contract.json` are mutated in place on parsed documents and
+re-serialised as deterministic 2-space JSON with a trailing newline — the same convention
+`tools/rebuild/draftguru/export_link_decisions.py` already uses for a tracked
+`data/reference/*.json`, asserted in the suite by round-tripping that file. Those three are
+hand-formatted with inline arrays that no serialiser reproduces, so a rewrite expands them;
+per the "prove it" requirement the suite asserts by semantic path diff that the **only**
+content changes are the intended mutations. The source document's line ending is detected and
+preserved (every tracked artefact is CRLF in a Windows checkout, and emitting LF would have
+rewritten every line).
 
 ### Follow-up
-Schedule before the 2026 season closes.
+None tracked as an open defect. The one outstanding item is the **deferred operator action**
+recorded above: run the rollover — dry run first, then `--apply
+--acknowledge-season-complete` — once a season is formally complete and its full-history
+candidate and ladder witness have genuinely been acquired. Reopen this issue only if that
+execution surfaces a defect in the mechanism.
 
 ## AFLDB-ISSUE-102 — Awards have no canonical legacy-free acquisition path
 

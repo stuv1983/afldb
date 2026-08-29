@@ -432,18 +432,27 @@ class ClubResolver:
         return self.identities[hist].name
 
 
-def load_round_vote_seasons() -> set[int]:
+def load_round_vote_seasons(availability_path: Path | None = None) -> set[int]:
     """Seasons allowed to carry brownlow_round_votes rows.
 
     stat-availability.json is the coverage authority: only seasons whose
     brownlow_round_votes coverage is complete/partial/pending may derive
     round-vote rows. 1931-1934 match votes stay in player_match_stats
     only, matching the baseline's round-vote coverage (1984+).
+
+    AFLDB-ISSUE-101: ``availability_path`` routes this at a REVIEWED SUCCESSOR
+    document instead, for offline validation of a candidate rollover before any
+    tracked file changes. It matters because this file decides which seasons
+    derive round-vote rows, and ``brownlow_round_vote_rows`` is part of the
+    measured fingerprint the acceptance register binds — so validating a
+    successor acquisition against the OUTGOING availability document could
+    record a fingerprint the very next run disagrees with. ``None`` keeps the
+    tracked document, so every existing caller is unchanged.
     """
-    dataset = json.loads(AVAILABILITY_JSON.read_text(encoding="utf-8"))
+    path = availability_path or AVAILABILITY_JSON
+    dataset = json.loads(path.read_text(encoding="utf-8"))
     if dataset.get("status") != "READY":
-        raise SnapshotValidationError(
-            "data/reference/stat-availability.json is not READY")
+        raise SnapshotValidationError(f"{path} is not READY")
     seasons: set[int] = set()
     for r in dataset["coverage_ranges"]:
         if (r["stat_key"] == "brownlow_round_votes"
@@ -871,7 +880,8 @@ def enforce_full_history(manifest: dict, snapshot_dir: Path, contract: dict) -> 
 
 
 def validate_snapshot(snapshot_dir: Path, manifest_path: Path,
-                      label: str) -> list[SnapshotFile]:
+                      label: str,
+                      contract_path: Path | None = None) -> list[SnapshotFile]:
     if not manifest_path.exists():
         raise SnapshotValidationError(f"manifest not found: {manifest_path}")
     try:
@@ -891,7 +901,7 @@ def validate_snapshot(snapshot_dir: Path, manifest_path: Path,
             f"{manifest.get('adapter_schema_version')!r} "
             f"(this importer understands {ADAPTER_SCHEMA_VERSION})")
 
-    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    contract = json.loads((contract_path or CONTRACT_PATH).read_text(encoding="utf-8"))
     pinned = contract["pinned_version"]
     if manifest.get("fitzroy_version_pinned") != pinned:
         raise SnapshotValidationError(
@@ -1278,9 +1288,12 @@ def interpret_results_row(row: dict, context: str, clubs: ClubResolver,
     )
 
 
-def load_row_corrections() -> list[dict]:
-    """Tracked per-row source corrections from the fitzRoy contract (may be empty)."""
-    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+def load_row_corrections(contract_path: Path | None = None) -> list[dict]:
+    """Tracked per-row source corrections from the fitzRoy contract (may be empty).
+
+    ``contract_path`` defaults to the tracked contract (AFLDB-ISSUE-101).
+    """
+    contract = json.loads((contract_path or CONTRACT_PATH).read_text(encoding="utf-8"))
     return list(contract.get("source_row_corrections", {}).get("rules", []))
 
 
@@ -2574,7 +2587,21 @@ def main() -> int:
     parser.add_argument("--manifest",
                         help="override the manifest path (tests)")
     parser.add_argument("--accepted-baselines",
-                        help="override the acceptance register path (tests)")
+                        help="override the acceptance register path (tests; and the "
+                             "AFLDB-ISSUE-101 pre-apply successor validation)")
+    parser.add_argument("--contract",
+                        help="override the fitzRoy contract path. OFFLINE VALIDATION ONLY "
+                             "(requires --validate-only). AFLDB-ISSUE-101 uses it with "
+                             "--accepted-baselines to run --require-full-history / "
+                             "--require-accepted-baseline against a TEMPORARY successor "
+                             "reference state, so a rollover is proven before any tracked "
+                             "file is written. Default: the tracked contract")
+    parser.add_argument("--stat-availability",
+                        help="override data/reference/stat-availability.json. OFFLINE "
+                             "VALIDATION ONLY (requires --validate-only). It gates which "
+                             "seasons derive brownlow_round_votes, so a successor "
+                             "acquisition must be measured against the reviewed successor "
+                             "document. Default: the tracked document")
     parser.add_argument("--require-full-history", action="store_true",
                         help="refuse unless the snapshot has EARNED full_history under the "
                              "contract's completeness gates; re-derives every gate from the "
@@ -2626,6 +2653,29 @@ def main() -> int:
     manifest_path = Path(args.manifest) if args.manifest \
         else MANIFEST_ROOT / f"{args.label}.json"
 
+    # AFLDB-ISSUE-101. The two reference-document overrides exist so a candidate SUCCESSOR
+    # state can be adjudicated by the real gates BEFORE any tracked file moves. They are
+    # confined to the offline path: a run that can reach PostgreSQL must read the tracked
+    # documents, so no import, dry run or settle can ever be redirected at a temporary
+    # contract or a temporary availability document.
+    contract_path = Path(args.contract) if args.contract else CONTRACT_PATH
+    availability_path = Path(args.stat_availability) if args.stat_availability \
+        else AVAILABILITY_JSON
+    for flag, value in (("--contract", args.contract),
+                        ("--stat-availability", args.stat_availability)):
+        if value and not args.validate_only:
+            parser.error(
+                f"{flag} is offline-validation only: pass --validate-only. A run that can "
+                "reach a database must read the tracked reference documents.")
+        if value and not Path(value).exists():
+            parser.error(f"{flag} does not exist: {value}")
+    if args.contract or args.stat_availability:
+        # Printed before any gate output, so the transcript can never be mistaken for a
+        # run against the tracked reference state.
+        print("reference documents OVERRIDDEN for this offline validation")
+        print(f"  contract                     {contract_path}")
+        print(f"  stat-availability            {availability_path}")
+
     # Acceptance implies full history: a hand-edited acceptance record must never be able
     # to bypass the gates it claims were passed.
     require_full_history = args.require_full_history or args.require_accepted_baseline
@@ -2657,9 +2707,9 @@ def main() -> int:
     accepted_baseline: dict | None = None
     acceptance_binding: dict | None = None
     try:
-        files = validate_snapshot(snapshot_dir, manifest_path, args.label)
+        files = validate_snapshot(snapshot_dir, manifest_path, args.label, contract_path)
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
         # The observation scope is the acquired season. A multi-season snapshot has no
         # single scope, and --emit-observations is refused for one above.
         rng = manifest.get("requested_range") or {}
@@ -2684,13 +2734,13 @@ def main() -> int:
             full_history_coverage = enforce_full_history(manifest, snapshot_dir, contract)
         if args.require_in_season:
             in_season_coverage = enforce_in_season(manifest, snapshot_dir, contract)
-        corrections = load_row_corrections()
+        corrections = load_row_corrections(contract_path)
         clubs = ClubResolver(
             json.loads(CLUBS_JSON.read_text(encoding="utf-8")),
-            (json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+            (json.loads(contract_path.read_text(encoding="utf-8"))
              .get("source_club_normalisation", {}).get("rules", [])),
         )
-        round_vote_seasons = load_round_vote_seasons()
+        round_vote_seasons = load_round_vote_seasons(availability_path)
         results_file = next(f for f in files if f.dataset == "results")
         matches = scan_results(results_file.path, clubs, policy)
         players, rows_read, round_vote_rows = scan_player_stats(
