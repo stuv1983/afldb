@@ -1,4 +1,4 @@
-# CLAUDE.md — AFLDB Repository Instructions
+# AGENTS.md — AFLDB Repository Instructions
 
 ## Purpose
 
@@ -87,9 +87,9 @@ Treat the current AFLDB repository root as the working boundary.
 
 Work only inside the repository unless explicitly instructed otherwise.
 
-Claude should use native repository tools such as **Read, Grep, Glob/file search and editing tools itself**.
+Codex should use native repository tools such as **Read, Grep, Glob/file search and editing tools itself**.
 
-Do not ask the user to run shell `grep`, `find`, `cat`, `type`, directory listings, or similar commands for information Claude can obtain with native repository tools.
+Do not ask the user to run shell `grep`, `find`, `cat`, `type`, directory listings, or similar commands for information Codex can obtain with native repository tools.
 
 Do not scan parent directories, sibling projects, home directories, or drives.
 
@@ -146,7 +146,7 @@ Do not reread unchanged material without a reason.
 
 Use documentation selectively:
 
-1. `CLAUDE.md` — operating rules.
+1. `AGENTS.md` — operating rules.
 2. `IssuesIndex.md` — current open work when relevant.
 3. Relevant subsystem code.
 4. Exact issue entry in `issues.md`.
@@ -340,14 +340,14 @@ Do not run or request the full corpus for every parser/planner change.
 
 The user executes shell and command-line verification by default.
 
-Claude may:
+Codex may:
 
 - inspect/search/edit repository files with native tools;
 - reason about source/config/data;
 - provide exact commands;
 - analyse command output returned by the user.
 
-Claude must not execute shell commands by default, including:
+Codex must not execute shell commands by default, including:
 
 - tests;
 - builds/typechecks;
@@ -362,7 +362,7 @@ Claude must not execute shell commands by default, including:
 
 This applies even to read-only commands.
 
-Exception: only when the user explicitly authorises Claude to execute commands for the current task.
+Exception: only when the user explicitly authorises Codex to execute commands for the current task.
 
 Do not interpret "fix", "investigate", "review", or "verify" as command-execution permission.
 
@@ -476,15 +476,15 @@ Never expose secrets, passwords, tokens, private DSNs, or production credentials
 
 Git is user-operated.
 
-Claude must not execute Git commands by default.
+Codex must not execute Git commands by default.
 
 The user performs status/diff/log inspection, commit/push/pull, merge/rebase, checkout/switch, reset/stash, tagging/branch operations, and cleanup.
 
-Claude may provide an exact Git command when requested, but must not execute it without explicit authorisation.
+Codex may provide an exact Git command when requested, but must not execute it without explicit authorisation.
 
 Never direct the user to discard unrelated changes simply to make the working tree clean.
 
-Before finishing, report every repository file Claude changed.
+Before finishing, report every repository file Codex changed.
 
 ---
 
@@ -538,13 +538,3 @@ Before declaring a behaviour/code/data-changing task complete:
 Then stop.
 
 Do not automatically begin another investigation.
-
-<!-- BEGIN:nextjs-agent-rules -->
-
-# This is NOT the Next.js you know
-
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
-
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
-
-<!-- END:nextjs-agent-rules -->

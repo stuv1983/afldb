@@ -1,7 +1,7 @@
 # AFLDB-ISSUE-093 — Deterministic afldb_test rebuild from authoritative sources
 
 **This file is the durable source of truth for ISSUE-093.** A fresh session must be able to
-execute from `CLAUDE.md`, `WORKFLOW.md`, this file, `issues.md` and `IssuesIndex.md` alone.
+execute from `CLAUDE.md`, `docs/development/WORKFLOW.md`, this file, `issues.md` and `IssuesIndex.md` alone.
 Do not rely on chat history.
 
 ## Status

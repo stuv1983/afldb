@@ -943,7 +943,7 @@ Five findings changed the contract rather than merely filling a blank:
    the same competition (§13.3), so a staging projection must declare its required columns and
    refuse surprises.
 
-The full contract these feed into is `AFLDB-ISSUE-096.md`.
+The full contract these feed into is `issues/closed/AFLDB-ISSUE-096.md`.
 
 ### 13.10 P3b — AFL API lineup shape, types, NULLs and round completeness — PASS
 

@@ -44,7 +44,7 @@ Its behaviour is proven by ``tests/draftguru-import.test.ts`` and
 file's own regression suite used to protect: migration-069 stable person and pick identity,
 source ownership, manual link preservation, confirmed_unlinked, contradictory-decision
 refusal, foreign-row preservation and idempotence. The mapping is recorded in
-AFLDB-ISSUE-093-DRAFTGURU-B2-HANDOFF.md §89.
+issues/closed/AFLDB-ISSUE-093-DRAFTGURU-B2-HANDOFF.md §89.
 
 Historical records in ``issues.md``, ``CHANGELOG.md`` and the ISSUE-078/079/080/084 runbooks
 deliberately still describe this file as it was. They are history and remain accurate.

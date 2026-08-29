@@ -1,6 +1,6 @@
 /**
  * Unit tests for tools/db/migration-checksum.ts. No database, no filesystem —
- * synthetic migration-like content only. See AFLDB-ISSUE-091.md §5 for the
+ * synthetic migration-like content only. See issues/closed/AFLDB-ISSUE-091.md §5 for the
  * requirement -> test mapping and §4.2 for the full compatibility matrix.
  */
 import { createHash } from 'node:crypto';

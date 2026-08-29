@@ -4,7 +4,7 @@
  * A stored ledger checksum may have been computed from a raw checkout that
  * happened to be LF or CRLF at the time a migration was applied. Validating
  * from a different-line-ending checkout later must not report false drift.
- * See AFLDB-ISSUE-091.md for the full compatibility matrix and rationale.
+ * See issues/closed/AFLDB-ISSUE-091.md for the full compatibility matrix and rationale.
  */
 import { createHash } from 'node:crypto';
 
@@ -56,7 +56,7 @@ export function computeChecksumRepresentations(
  * A stored ledger checksum is accepted if it equals ANY of the three bounded
  * representations of the current content. It is never accepted merely
  * because it differs by non-line-ending bytes — see the compatibility
- * matrix in AFLDB-ISSUE-091.md §4.
+ * matrix in issues/closed/AFLDB-ISSUE-091.md §4.
  */
 export function matchesStoredChecksum(
   stored: string,

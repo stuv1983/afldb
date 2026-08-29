@@ -2743,7 +2743,7 @@ Keep this issue out of NL semantic defect counts. The regenerated expanded corpu
 - **Area:** UI/Hydration
 - **Found:** 2026-08-21
 - **Resolved:** 2026-08-29
-- **Runbook:** `AFLDB-ISSUE-068.md`
+- **Runbook:** `issues/closed/AFLDB-ISSUE-068.md`
 - **Related:** `AFLDB-ISSUE-107` owns the framework upgrade and Linux development deployment.
   *(As at 2026-08-29 it remained Open with ISSUE-108 blocking its G2 database-integration gate;
   updated 2026-08-30 — `AFLDB-ISSUE-107` and `AFLDB-ISSUE-108` are both **Resolved**.)*
@@ -3356,7 +3356,7 @@ Regenerate or re-baseline the 12k corpus oracles separately from NL semantic fix
 - **Found:** 2026-08-21
 - **Resolved:** 2026-08-27
 - **Queries:** `record tackles since 2010`, `most bounces in the 1960s`, `players with 3+ goals and exactly 3 clubs`
-- **Files:** `AFLDB-ISSUE-071.md`, `tools/nl/v2.ts`, `tools/nl/v2-runner.ts`, `tools/nl/README.md`, `tests/nl-stress-v2.test.ts`, `/home/arm/nl-stress-out-codex-v25-v2/report.md`
+- **Files:** `issues/closed/AFLDB-ISSUE-071.md`, `tools/nl/v2.ts`, `tools/nl/v2-runner.ts`, `tools/nl/README.md`, `tests/nl-stress-v2.test.ts`, `/home/arm/nl-stress-out-codex-v25-v2/report.md`
 
 ### Symptom
 The full 250,000-row V2 qualification corpus completed against parser version 25 with residual hard and soft findings even though verified football-answer rows and expected-decline safety rows passed.
@@ -3569,7 +3569,7 @@ None. No production files changed; no follow-up defect identified.
 - **Area:** Performance
 - **Found:** 2026-08-22
 - **Resolved:** 2026-08-28
-- **Files:** `src/db/queries/grid-solver.ts`, `tests/integration/grid-solver.test.ts`, `AFLDB-ISSUE-076-CODEX-HANDOFF.md`
+- **Files:** `src/db/queries/grid-solver.ts`, `tests/integration/grid-solver.test.ts`, `issues/closed/AFLDB-ISSUE-076-CODEX-HANDOFF.md`
 
 ### Symptom
 A valid `/grid-solver` grid can repeatedly crash during server rendering with Next.js digest `1511510695`.
@@ -4556,7 +4556,7 @@ No remediation is authorised by this issue. It covers **diagnosis only**.
 ### Validation
 
 Both audits were executed on 2026-08-23 under the approved AFLDB-ISSUE-079
-rev. 8 runbook (`AFLDB-ISSUE-079.md`): read-only, one
+rev. 8 runbook (`issues/closed/AFLDB-ISSUE-079.md`): read-only, one
 `REPEATABLE READ READ ONLY` snapshot each, identity gate passed, live schema
 gate passed, `psql exit status: 0`, `ssh/remote exit status: 0`, and an explicit
 final `ROLLBACK` with no `COMMIT`. All seven of the runbook's mandatory
@@ -4709,7 +4709,7 @@ should be counted the same way while the audit is being run.
   **Production still runs the old loaders:** rollout is owned by
   `AFLDB-ISSUE-084`, and the corrected `common.py` / `import_awards.py` /
   `awards-admin.ts` are a deployment prerequisite there.
-- **Runbook:** `AFLDB-ISSUE-080.md` (revision 5) — the approved investigation and
+- **Runbook:** `issues/closed/AFLDB-ISSUE-080.md` (revision 5) — the approved investigation and
   implementation plan; authoritative for the full evidence chain, collision
   analysis and gates summarised here.
 - **Files:** `tools/migration/common.py` (`reload_keyed`, `_scope_clause`,
@@ -4829,7 +4829,7 @@ converts a correct fail-closed stop into the silent data loss this issue exists
 to end. The row must stop being in the reload's scope at all.
 
 ### Fix
-Implemented 2026-08-23, per the approved runbook (`AFLDB-ISSUE-080.md` §8).
+Implemented 2026-08-23, per the approved runbook (`issues/closed/AFLDB-ISSUE-080.md` §8).
 Code-only: **no migration, no backfill, no privilege change** — the no-privilege
 conclusion proven rather than assumed (see Validation).
 
@@ -4934,7 +4934,7 @@ blocking correctness findings** and independently verified the design
 TRUE` complement, the five modified loaders, the §4.3/§4.4 matrix, the
 advisory-lock protocol, and the create-only admin path). Four bounded
 dispositions were applied: the corrected Profile-B staleness rule with the
-full Plane-B baseline recorded above and in `AFLDB-ISSUE-080.md` (H1); the
+full Plane-B baseline recorded above and in `issues/closed/AFLDB-ISSUE-080.md` (H1); the
 load-bearing migration-059 prerequisite recorded in the `AFLDB-ISSUE-084`
 handoff (M4); the runbook status header corrected to describe the resolved
 implementation (L5); and one new real-database integration test in
@@ -5501,7 +5501,7 @@ Not yet deployed. Migrations 058–070 unapplied in `afldb_prod`; all three
 corrected loaders undeployed; production `--rekey` not run.
 
 ### Evidence
-`AFLDB-ISSUE-079.md` Phase 0a/0b (production at migration 057, checkout
+`issues/closed/AFLDB-ISSUE-079.md` Phase 0a/0b (production at migration 057, checkout
 `a32a0a1`, 84 commits behind local; destructive loader call sites enumerated in
 Phase 5) and the audit artifact
 `artifacts/audits/issue-079-player-link-integrity-prod-20260823.txt`.
@@ -5528,7 +5528,7 @@ migrated schema, with Plane B rerun from the exact deployment-candidate code
 and the exact canonical SQLite artifact selected for the production reload —
 runs after the migrations, privileges and corrected loaders are in place and
 **before the first awards/honours reload** (step 6/7 territory; full ordering
-in `AFLDB-ISSUE-080.md` §7.2 and its ISSUE-084 handoff table). The comparison
+in `issues/closed/AFLDB-ISSUE-080.md` §7.2 and its ISSUE-084 handoff table). The comparison
 against the ISSUE-080 entry's recorded Plane-B baseline uses the **corrected
 staleness rule** (2026-08-23): the operative comparison is the canonical
 artifact SHA-256 plus the regenerated incoming natural-key counts/fingerprints
@@ -5589,7 +5589,7 @@ The `afldb-email-intake.timer` and `afldb-email-intake.service` systemd units ar
 - **Severity:** Low (latent — no second writer exists today)
 - **Area:** Data integrity / Import
 - **Found:** 2026-08-23 (during the `AFLDB-ISSUE-080` investigation; runbook
-  `AFLDB-ISSUE-080.md` §2.2, §4.6, §6, gate G6)
+  `issues/closed/AFLDB-ISSUE-080.md` §2.2, §4.6, §6, gate G6)
 - **Resolved:** 2026-08-26
 - **Files:** `tools/migration/import_awards.py` (`import_captaincies`),
   `tools/migration/common.py` (`reload_keyed`),
@@ -5692,14 +5692,14 @@ the full-file diagnostic run remain outside ISSUE-085 and were not changed.
 - **Severity:** Medium
 - **Area:** Admin / Data integrity
 - **Found:** 2026-08-23 (during the `AFLDB-ISSUE-080` investigation; runbook
-  `AFLDB-ISSUE-080.md` §6, §2.4b, gate G5)
+  `issues/closed/AFLDB-ISSUE-080.md` §6, §2.4b, gate G5)
 - **Resolved:** 2026-08-28 — original durable-override resolution retained below;
   **reopened the same day for one separate schema defect** (migration 073 omitted
   the supporting `admin_user_id` FK index) and **re-resolved 2026-08-28** by
   forward-only migration 075. See "Reopened 2026-08-28" and "Resolution —
   re-resolved 2026-08-28" at the end of this entry.
 - **Reopened:** 2026-08-28 (closed the same day)
-- **Runbook:** `AFLDB-ISSUE-086.md`
+- **Runbook:** `issues/closed/AFLDB-ISSUE-086.md`
 - **Files:** `src/db/queries/data-edits.ts`,
   `src/db/migrations/073_data_overrides.sql`,
   `src/db/migrations/075_data_overrides_fk_index.sql` (reopen repair; **applied
@@ -5845,7 +5845,7 @@ catalogue gate 2/2**; privileges reconciled; fingerprint
 `c5afad8cd3e6ff6417e429807bd7dfb4f8da096a84d691e63383691438722227`.
 
 All evidence is from **`afldb_test`**. **No production or `afldb_dev`
-application is claimed.** Full record: `AFLDB-ISSUE-086.md`.
+application is claimed.** Full record: `issues/closed/AFLDB-ISSUE-086.md`.
 
 ## AFLDB-ISSUE-087 — Validate the release candidate and promote `origin/main`
 
@@ -5857,7 +5857,7 @@ application is claimed.** Full record: `AFLDB-ISSUE-086.md`.
 - **Found:** 2026-08-23 (planning session; supersedes the planning handoff
   `AFLDB-ISSUE-087-PLANNING-HANDOFF.md`)
 - **Resolved:** 2026-08-24
-- **Runbook:** `AFLDB-ISSUE-087.md` — the authoritative execution contract
+- **Runbook:** `issues/closed/AFLDB-ISSUE-087.md` — the authoritative execution contract
   (frozen); successor-4 execution per `AFLDB-ISSUE-087-S4.md` (approved),
   with `AFLDB-ISSUE-087-R6-HANDOFF.md` and `AFLDB-ISSUE-087-S4-RESUME.md`
   recording intermediate verified state
@@ -5867,7 +5867,7 @@ application is claimed.** Full record: `AFLDB-ISSUE-086.md`.
   `CANDIDATE_SHA = 0da44f9dd71398d2b72fe33f42867861d7eab6e7` (short `0da44f9`,
   `test: guard nl-stress tableNote read against absent details element`, tree
   `bb12cc390547f7f2c41dd4147b6559bc9ac94a6c`)
-- **Files:** `AFLDB-ISSUE-087.md`; validation touches the whole candidate tree
+- **Files:** `issues/closed/AFLDB-ISSUE-087.md`; validation touches the whole candidate tree
   and, read-only, the production Caddyfile and `afldb_prod`
 
 ### Symptom
@@ -5902,7 +5902,7 @@ runbook and the planning handoff:
 
 ### Fix
 Not a code fix. Execute the fifteen gates D1–D15 through phases R0–R9 in
-`AFLDB-ISSUE-087.md`, then — only on explicit user approval at the R9
+`issues/closed/AFLDB-ISSUE-087.md`, then — only on explicit user approval at the R9
 checkpoint — fast-forward `origin/main` to `CANDIDATE_SHA` with a normal
 (never forced) push.
 
@@ -6071,7 +6071,7 @@ runbook is pinned to 070. ISSUE-087 exists to close that gap on `main`.
 ISSUE-087 may **reuse** an ISSUE-084 reviewed command, SQL envelope or
 transport as a safe mechanism; that is transport reuse only. It never executes
 or advances an ISSUE-084 phase, and every production read-only result belongs
-to ISSUE-087. `AFLDB-ISSUE-084.md` is frozen and unmodified, and no
+to ISSUE-087. `issues/closed/AFLDB-ISSUE-084.md` is frozen and unmodified, and no
 `<TARGET_SHA>` is fixed inside it.
 
 After a successful `main` promotion, ISSUE-084 restarts from its required
@@ -6367,9 +6367,9 @@ None.
   `tests/integration/release-gates.test.ts -t "matches players on the profile URL rather than
   the name"` **1/1** (63 skipped; the repaired canonical pin reads **13,275**) ·
   `tests/integration/privileges.test.ts` **24/24**, **no grant widened**.
-  Resolved against the amended standard at `AFLDB-ISSUE-090.md` §27.4 — **not** against a
+  Resolved against the amended standard at `issues/closed/AFLDB-ISSUE-090.md` §27.4 — **not** against a
   wholly green `release-gates.test.ts`, which it never was and is not claimed to be.
-- **Runbook:** `AFLDB-ISSUE-090.md` — the approved plan, authoritative for the full
+- **Runbook:** `issues/closed/AFLDB-ISSUE-090.md` — the approved plan, authoritative for the full
   evidence chain, the D1-D5 decisions, the migration design and the HALT conditions.
   Planning COMPLETE/APPROVED; **implementation COMPLETE and validated (2026-08-28)** — the
   amended acceptance standard is §27.4 and the resolution record is §27.6. `AFLDB-ISSUE-091`'s
@@ -6442,7 +6442,7 @@ unique-key upsert), the other eleven release-gate failures, and importer-side lo
 superseded; kept as lineage). The §10 reconciliation is live in **both** importers
 (`enrich_birth_dates_from_club_lists.py:202-327`, `enrich_birth_dates.py:172-295`), the old
 unscoped `DELETE` is gone, and migration `072_dob_conflict_ownership.sql` exists and is
-applied to `afldb_test`. Design as approved in `AFLDB-ISSUE-090.md`: one unresolved `dob_conflict`
+applied to `afldb_test`. Design as approved in `issues/closed/AFLDB-ISSUE-090.md`: one unresolved `dob_conflict`
 row per player carrying a versioned `disputed_by` map with explicit per-pass assertion
 provenance; evidence-based owned populations (club-list scoped by processed source file,
 register scoped to its resolved population); assertion-specific suppression of identical
@@ -6458,11 +6458,11 @@ migration 072 applied to `afldb_test`; the focused suite
 ISSUE-092), user-run 2026-08-28 against the canonically rebuilt `afldb_test`.
 
 **Gate 1 — `release-gates.test.ts`, 2026-08-28: 64 tests, 42 passed, 22 failed.** All 22
-classified in `AFLDB-ISSUE-090-HANDOFF.md` §11.3. **ISSUE-090's own duplicate-issue
+classified in `issues/closed/AFLDB-ISSUE-090-HANDOFF.md` §11.3. **ISSUE-090's own duplicate-issue
 invariant (`:497-507`, deliberately global and un-fixture-scoped) is GREEN** — the
 reconciliation contract holds against the real database. Six failures touched this issue:
 one stale pin (repaired, below) and five `gate: birth dates` population assertions retired
-by `AFLDB-ISSUE-090.md` §27.3. The other 16 are owned by `AFLDB-ISSUE-095`,
+by `issues/closed/AFLDB-ISSUE-090.md` §27.3. The other 16 are owned by `AFLDB-ISSUE-095`,
 `AFLDB-ISSUE-093`/DraftGuru B3, `AFLDB-ISSUE-096`/`-098`/`-099`, rebuild-baseline drift, or
 the two unowned gaps at §27.5 — **left unchanged.**
 
@@ -6479,7 +6479,7 @@ unchanged. **The `player_birth_evidence` 12,472 pin was NOT re-pinned** — a di
 population, live at 855.
 
 **Why the five DOB population assertions are not repaired here** (full proof at
-`AFLDB-ISSUE-090.md` §27.3): the nine-stage canonical rebuild
+`issues/closed/AFLDB-ISSUE-090.md` §27.3): the nine-stage canonical rebuild
 (`tools/db/rebuild-test.ts:370-445`) invokes neither enrichment pass; `players_with_dob: 855`
 and `players_with_dob_conflict: 0` are the **accepted baseline's own contracted figures**, and
 `MEASURED_NOT_DB_GATED` records that a raw DOB count is deliberately not that baseline's
@@ -6577,7 +6577,7 @@ the structural backstop, behind fail-closed preconditions.
 - **The five historical DOB-population release assertions remain unchanged** (12,478 players
   with a DOB, 2 visible conflicts, 2 open `dob_conflict` rows, 12,472/11,533 evidence, 883
   without a date). They are **superseded snapshot assumptions outside ISSUE-090's
-  reconciliation contract** — see `AFLDB-ISSUE-090.md` §27.3. The canonical rebuild invokes
+  reconciliation contract** — see `issues/closed/AFLDB-ISSUE-090.md` §27.3. The canonical rebuild invokes
   neither enrichment pass; `players_with_dob: 855` / `players_with_dob_conflict: 0` are the
   accepted baseline's own contracted figures; the register pass needs `AFLDB_LEGACY_SQLITE`
   **and** a `players.legacy_player_id` nothing canonical writes; the club-list pass's CSV
@@ -6591,7 +6591,7 @@ the structural backstop, behind fail-closed preconditions.
   close-out.** The only repository change outside documentation is one test expectation.
 
 **Gate 1 evidence, retained as history.** `release-gates.test.ts` ran **64 tests, 42 passed,
-22 failed** on 2026-08-28. All 22 are classified in `AFLDB-ISSUE-090-HANDOFF.md` §11.3. Six
+22 failed** on 2026-08-28. All 22 are classified in `issues/closed/AFLDB-ISSUE-090-HANDOFF.md` §11.3. Six
 touched this issue — one stale pin (repaired) and the five retired population assertions. The
 other 16 belong to `AFLDB-ISSUE-095` (3), `AFLDB-ISSUE-093`/DraftGuru B3 (2),
 `AFLDB-ISSUE-096`/`-098`/`-099` (2), rebuild-baseline drift (4) and the two unowned
@@ -6599,7 +6599,7 @@ observations below (5), and were left unchanged. **The complete release-gates su
 green and this resolution does not claim it is.**
 
 **Observations carried forward — recorded, unowned, deliberately not converted to issues in
-this close-out** (also at `AFLDB-ISSUE-090.md` §27.5):
+this close-out** (also at `issues/closed/AFLDB-ISSUE-090.md` §27.5):
 
 1. **`brownlow_season_votes` has no canonical legacy-free writer.** Only
    `import_legacy_afl.py:721` writes it; `import_fitzroy_core.py` writes
@@ -6628,7 +6628,7 @@ population gate. Recorded here so it is not lost.
   16.46s, no skips**, user-run against the rebuilt `afldb_test`. Tests 24–27 executed and
   green; they are no longer merely authored. An earlier skipped run was a worktree Python
   environment artefact and is explicitly **not** validation evidence.
-- **Runbook:** `AFLDB-ISSUE-092.md` — authoritative for the full evidence chain, the
+- **Runbook:** `issues/closed/AFLDB-ISSUE-092.md` — authoritative for the full evidence chain, the
   safety-contract design, the test-containment design and the recovery design. §4/§5/§11
   **implemented 2026-08-25** (ISSUE-093 Phase-3 session), re-verified in-tree 2026-08-28
   (§17.1), **validated 2026-08-28** (§17.5). §6 recovery superseded by rebuild (§17.2).
@@ -6680,7 +6680,7 @@ repository-wide sanity-gate retrofit onto other importers.
 ### Fix
 IMPLEMENTED 2026-08-25 (ISSUE-093 Phase-3 session); re-verified in-tree and **VALIDATED
 2026-08-28, 27/27** — see Validation below.
-Per the approved design in `AFLDB-ISSUE-092.md`: (A) a fail-closed
+Per the approved design in `issues/closed/AFLDB-ISSUE-092.md`: (A) a fail-closed
 population-sanity gate in the importer — refuses an authoritative deletion when the
 asserted population is zero against existing rows, or when it would remove more than a
 configurable threshold of the stored population, bypassable only via an explicit
@@ -6710,18 +6710,18 @@ in full:
   (ordinary rerun and the rebuild-from-empty direction).
 
 The implementation was additionally re-verified line by line against the working tree on
-2026-08-28 (`AFLDB-ISSUE-092.md` §17.1) before that run. The earlier Phase-3 static gate
+2026-08-28 (`issues/closed/AFLDB-ISSUE-092.md` §17.1) before that run. The earlier Phase-3 static gate
 (33/33, user-run 2026-08-25) proved no static regression; this 27/27 database-backed run is
 the authoritative acceptance result. Acceptance criteria §15.1–§15.3 and §15.6–§15.7 are met;
 §15.4/§15.5 were superseded by the rebuild (below) and reassigned.
 
-**§6 recovery is SUPERSEDED BY REBUILD, on positive evidence** (`AFLDB-ISSUE-092.md` §17.2),
+**§6 recovery is SUPERSEDED BY REBUILD, on positive evidence** (`issues/closed/AFLDB-ISSUE-092.md` §17.2),
 not merely because a rebuild starts empty: the canonical rebuild's `import_fitzroy_core.py`
 writes `external_identities` under the `afltables` source with
 `match_method='afltables_profile_url'`, reusing this issue's own `check_population_drop`
 gate, and the Stage 9 `players` gate — which counts exactly those rows
 (`tools/db/rebuild-test.ts:521-523`) — read **13,275** in the passing 2026-08-27 rebuild
-(`AFLDB-ISSUE-093.md` §H15.4). The table is populated again from an authoritative source. No
+(`issues/closed/AFLDB-ISSUE-093.md` §H15.4). The table is populated again from an authoritative source. No
 §6 run of `enrich_birth_dates.py` against `AFLDB_LEGACY_SQLITE` is to be performed. The old
 emptied database is preserved read-only as `afldb_test_pre_rebuild_20260825`.
 
@@ -6743,11 +6743,11 @@ reinstated, and re-pinning it is an explicit ISSUE-092 non-goal — the decision
 - **Resolved:** 2026-08-27 — the first complete canonical clean rebuild of `afldb_test` ran
   end to end and passed all nine stages, with `AFLDB-FINAL-VALIDATION PASSED: 13 checks`.
   See **Resolution** below.
-- **Current state:** **RESOLVED 2026-08-27.** `AFLDB-ISSUE-093.md` §H15 is the authoritative
+- **Current state:** **RESOLVED 2026-08-27.** `issues/closed/AFLDB-ISSUE-093.md` §H15 is the authoritative
   record of the passing rebuild; §19 remains the authoritative record of the frozen canonical
   source. Where §19 and earlier sections disagree, §19 wins; where §H15 and §19 disagree about
   execution state, §H15 wins.
-- **Runbook:** `AFLDB-ISSUE-093.md` — the approved architecture, authoritative for the full
+- **Runbook:** `issues/closed/AFLDB-ISSUE-093.md` — the approved architecture, authoritative for the full
   source-to-schema matrix, fitzRoy/non-fitzRoy classification, canonical snapshot/archive
   policy, preflight-before-destruction rebuild order, safety contract, release-gate
   Class A/B policy, missing-source backlog and implementation phases. Planning complete and
@@ -6755,15 +6755,15 @@ reinstated, and re-pinning it is an explicit ISSUE-092 non-goal — the decision
 - **Files:** Phase 1 (2026-08-25): `data/reference/sources.json`, `seasons.json`,
   `clubs.json`, `stat-definitions.json`, `stat-availability.json`, `venue-canonical.json`
   (new tracked datasets); `tools/migration/load_reference_data.py` (new standalone
-  loader); `tests/reference-data.test.ts` (new); `AFLDB-ISSUE-093.md` §15;
-  `AFLDB-ISSUE-093-PHASE-2-HANDOFF.md` (new). Phase 2 (2026-08-25):
+  loader); `tests/reference-data.test.ts` (new); `issues/closed/AFLDB-ISSUE-093.md` §15;
+  `issues/closed/AFLDB-ISSUE-093-PHASE-2-HANDOFF.md` (new). Phase 2 (2026-08-25):
   `tools/rebuild/fitzroy/fitzroy-contract.json`, `tools/rebuild/fitzroy/acquire_core.R`,
   `tests/fitzroy-acquisition.test.ts`,
   `docs/rebuild-manifests/afltables_fitzroy_core/trial-2024.json` (all new); `.gitignore`
-  (data/reference opt-in); `AFLDB-ISSUE-093.md` §16; `AFLDB-ISSUE-093-PHASE-3-HANDOFF.md`
+  (data/reference opt-in); `issues/closed/AFLDB-ISSUE-093.md` §16; `issues/closed/AFLDB-ISSUE-093-PHASE-3-HANDOFF.md`
   (new). `import_legacy_afl.py` unchanged. Phase 4a (2026-08-25):
   `tools/migration/import_fitzroy_core.py`, `tests/fitzroy-core-import.test.ts` (both
-  new); `AFLDB-ISSUE-093.md` §18. Later phases: DraftGuru, awards/honours, and eventually
+  new); `issues/closed/AFLDB-ISSUE-093.md` §18. Later phases: DraftGuru, awards/honours, and eventually
   a new `db:test:rebuild` orchestrator
 
 ### Problem
@@ -6783,7 +6783,7 @@ explicitly tracks which domains are IMPLEMENTED/DERIVED/STATIC/MISSING, and fail
 any required domain that is still missing rather than silently falling back to the legacy
 source. Full detail (source-to-schema matrix, fitzRoy coverage split, canonical snapshot
 layout, phase order, safety contract, release-gate policy, backlog) is in
-`AFLDB-ISSUE-093.md`.
+`issues/closed/AFLDB-ISSUE-093.md`.
 
 ### Scope
 Architecture and tracking only in this pass. No importer, adapter, orchestrator script, or
@@ -6793,8 +6793,8 @@ today's database; this issue rebuilds a database from scratch).
 
 ### Fix
 **CHECKPOINT 2026-08-27 — CANONICAL FULL-HISTORY FITZROY SOURCE FROZEN.** The
-authoritative current-state record is **`AFLDB-ISSUE-093.md` §19**; detailed evidence is in
-`AFLDB-ISSUE-093-DRAFTGURU-B2-HANDOFF.md` (PART I–XV DraftGuru Stage B2, PART XVI–XVIII
+authoritative current-state record is **`issues/closed/AFLDB-ISSUE-093.md` §19**; detailed evidence is in
+`issues/closed/AFLDB-ISSUE-093-DRAFTGURU-B2-HANDOFF.md` (PART I–XV DraftGuru Stage B2, PART XVI–XVIII
 full-history fitzRoy). Summary of what this checkpoint settled:
 
 - **Accepted canonical baseline `full-history-20260827`** — VFL/AFL men's senior
@@ -6847,7 +6847,7 @@ full-history fitzRoy). Summary of what this checkpoint settled:
 **NOT COMPLETE.** No clean rebuild has ever been executed, and `RESET_SQL` has never run
 against live PostgreSQL. Everything above is proven offline only.
 
-**RESET_SQL PROOF IMPLEMENTED — awaiting execution (2026-08-27, `AFLDB-ISSUE-093.md` §20).**
+**RESET_SQL PROOF IMPLEMENTED — awaiting execution (2026-08-27, `issues/closed/AFLDB-ISSUE-093.md` §20).**
 Blocker 2 of §19.9. Inspecting `RESET_SQL` before designing the proof found **two real
 defects, both now fixed**:
 
@@ -7003,13 +7003,13 @@ The incident lineage above is retained in full and is **not** rewritten: the run
 sent its query, the mis-escaped `pg_` exclusion, the committed reset that wiped `afldb_test`,
 the DSN-first execution-path hypothesis (leading but never forensically confirmed, because the
 refusal discarded the decisive stderr), the psql hardening, the commit/autocommit trap, and
-the observer self-collision. Full chain in `AFLDB-ISSUE-093.md` §H3.
+the observer self-collision. Full chain in `issues/closed/AFLDB-ISSUE-093.md` §H3.
 
 *Superseded next action, kept as history: "the FIRST ACTUAL CLEAN REBUILD, owned by a fresh
-session" per the FIRST CLEAN REBUILD HANDOFF (`AFLDB-ISSUE-093.md` §H1–§H10). That rebuild has
+session" per the FIRST CLEAN REBUILD HANDOFF (`issues/closed/AFLDB-ISSUE-093.md` §H1–§H10). That rebuild has
 since been executed and passed — see **Resolution** below and §H15.*
 
-**Phase 4a IMPLEMENTED (2026-08-25, subsequently validated — `AFLDB-ISSUE-093.md`
+**Phase 4a IMPLEMENTED (2026-08-25, subsequently validated — `issues/closed/AFLDB-ISSUE-093.md`
 §18, §19)** — §13.4a historical/core PostgreSQL importer:
 `tools/migration/import_fitzroy_core.py` (new) consumes a canonical snapshot + manifest
 (never live fitzRoy) into venues, players (+ `player_birth_evidence` under the distinct
@@ -7023,7 +7023,7 @@ deduplicated by match, conflicts fail closed, migration-020 provenance),
 authoritative fields are not derivable from this snapshot). Player identity = profile-URL
 path via `external_identities` (fitzRoy `ID` in-run only; **the original 1:1 ID rule was
 REMOVED on 2026-08-27** — the 1897-2025 evidence shows the fitzRoy ID is optional, so the
-URL is mandatory and the ID is not canonical identity; see `AFLDB-ISSUE-093.md` §19.5);
+URL is mandatory and the ID is not canonical identity; see `issues/closed/AFLDB-ISSUE-093.md` §19.5);
 match identity =
 `match_key` in the current-season-import convention; club strings era-remapped within
 one organization, fail-closed otherwise. Fail-closed manifest/SHA-256/row-count/column/
@@ -7031,7 +7031,7 @@ version validation runs before any DB access (`--validate-only` needs no psycopg
 Keyed upserts + snapshot-scoped delete-then-COPY make every group retry-safe without
 touching other writers' rows. New static/spawn suite `tests/fitzroy-core-import.test.ts`.
 
-**Phase 3 IMPLEMENTED (2026-08-25, validation partially pending — `AFLDB-ISSUE-093.md`
+**Phase 3 IMPLEMENTED (2026-08-25, validation partially pending — `issues/closed/AFLDB-ISSUE-093.md`
 §17)** — §13.4: club-list DOB enrichment wired to the canonical
 `data/sources/afltables/club_lists/` directory (`--csv-dir` now optional; canonical mode
 is complete-or-refuse across the five expected `FILE_ORGS` files, with fail-closed header
@@ -7073,12 +7073,12 @@ known-good baseline into the datasets (88 coverage ranges = 24 stat keys × 130 
 AFL Tables slugs preserved verbatim; 1942–1945 Brownlow `not_applicable` war-year
 semantics; `legacy_club_key` deliberately excluded; `sources.key` is the durable identity
 contract, numeric `sources.id` database-local). The baseline was returned to
-`ALLOW_CONNECTIONS=false` and is reference-only. Full detail: `AFLDB-ISSUE-093.md` §15.
+`ALLOW_CONNECTIONS=false` and is reference-only. Full detail: `issues/closed/AFLDB-ISSUE-093.md` §15.
 Remaining phases (2–9) not yet implemented.
 
 ### Resolution — 2026-08-27
 **RESOLVED.** The objective this issue was opened for is achieved and proven by execution, not
-by inspection. Authoritative evidence: `AFLDB-ISSUE-093.md` §H15 (§H15.1–§H15.7). Basis:
+by inspection. Authoritative evidence: `issues/closed/AFLDB-ISSUE-093.md` §H15 (§H15.1–§H15.7). Basis:
 
 1. A tracked canonical clean rebuild of `afldb_test` completed from scratch —
    `npm run db:test:rebuild -- --acknowledge-destroy afldb_test`.
@@ -7142,7 +7142,7 @@ Tracked separately; none of these reopen this issue.
 
 1. **`AFLDB-ISSUE-095` — canonical legacy-free ladder / team-season acquisition (OPEN).**
    `club_seasons` has no non-legacy acquisition path, so a canonical rebuild correctly yields
-   zero rows. Runbook `AFLDB-ISSUE-095.md`. **Stage 9 must NOT gate `club_seasons` until that
+   zero rows. Runbook `issues/closed/AFLDB-ISSUE-095.md`. **Stage 9 must NOT gate `club_seasons` until that
    issue lands.** It links `AFLDB-ISSUE-015` (per-season `recomputeClubSeasons` parity) but
    does not absorb it.
 2. **`AFLDB-ISSUE-083`** — restricted `afldb_import` test-role parity/closeout, handled
@@ -7183,7 +7183,7 @@ rebuilt path or not.
 - **Files:** `tools/db/migration-checksum.ts` (new), `tools/db/migrate.ts` (`:113-116`
   checksum computation, `:142-151` drift check — now delegated to the new module),
   `tests/migration-checksum.test.ts` (new)
-- **Runbook:** `AFLDB-ISSUE-091.md` — complete, implementation-ready plan drafted 2026-08-25,
+- **Runbook:** `issues/closed/AFLDB-ISSUE-091.md` — complete, implementation-ready plan drafted 2026-08-25,
   revised the same day after user review found the original raw+LF-only compatibility design
   was asymmetric (missed a stored-CRLF/current-LF false positive — the exact mirror of the
   bug this issue fixes). Revised design uses three bounded representations (raw, canonical-LF,
@@ -7224,7 +7224,7 @@ not deterministic across platforms/checkout configurations that may legitimately
 CRLF vs LF for the same committed blob.
 
 ### Fix
-Implemented exactly per the approved, revised `AFLDB-ISSUE-091.md`: checksum logic extracted
+Implemented exactly per the approved, revised `issues/closed/AFLDB-ISSUE-091.md`: checksum logic extracted
 into a new pure module `tools/db/migration-checksum.ts` computing three bounded
 representations of the current file content — raw bytes, canonical all-LF, canonical
 all-CRLF — and `migrate.ts`'s drift check accepts a stored ledger checksum that matches any
@@ -7240,7 +7240,7 @@ and comparison changed. No historical applied migration and no recorded `schema_
 checksum was rewritten.
 
 ### Validation
-All three gates green (2026-08-25), full evidence in `AFLDB-ISSUE-091.md` §13:
+All three gates green (2026-08-25), full evidence in `issues/closed/AFLDB-ISSUE-091.md` §13:
 - `npm test -- tests/migration-checksum.test.ts` — 12/12 passed, 0 failures.
 - `npm run typecheck` — PASS.
 - `AFLDB_MIGRATE_TARGET=test npm run db:status` — `72 migration file(s), 71 already applied`,
@@ -7366,9 +7366,9 @@ a product measurement, not an outstanding database-truth defect in this resolved
 - **Severity:** Medium
 - **Area:** Data acquisition / Import architecture / Data integrity
 - **Found:** 2026-08-27 (proven during `AFLDB-ISSUE-093`'s first complete canonical clean
-  rebuild of `afldb_test` — see `AFLDB-ISSUE-093.md` §H15.5)
+  rebuild of `afldb_test` — see `issues/closed/AFLDB-ISSUE-093.md` §H15.5)
 - **Resolved:** 2026-08-28
-- **Runbook:** `AFLDB-ISSUE-095.md` — durable source of truth. Contains the proven source
+- **Runbook:** `issues/closed/AFLDB-ISSUE-095.md` — durable source of truth. Contains the proven source
   chain, the per-field table, the fitzRoy capability split, and decisions D1–D7.
   **D1–D7 DRAFTED 2026-08-28 in §10**, from the exhaustive 1897–2025 coverage probe. One
   design point (§10.8, `premiership_points`/`ladder_rank`) awaits operator approval. No
@@ -7435,11 +7435,11 @@ Give the ladder/team-season domain a canonical, legacy-free acquisition and load
 - once implemented, add an appropriate Stage-9 validation gate;
 - **preserve ZERO supported `AFLDB_LEGACY_SQLITE` dependency**, including as a fallback.
 
-Full decision list D1–D7 is in `AFLDB-ISSUE-095.md` §5. The source/provenance design decision
+Full decision list D1–D7 is in `issues/closed/AFLDB-ISSUE-095.md` §5. The source/provenance design decision
 is deliberately **not** made in this entry.
 
 ### Resolution — 2026-08-28
-Full record in `AFLDB-ISSUE-095.md` §14. Acceptance proven by a **clean `afldb_test`
+Full record in `issues/closed/AFLDB-ISSUE-095.md` §14. Acceptance proven by a **clean `afldb_test`
 rebuild**: every stage passed, the 1,622-row ladder witness comparison agreed on every
 compared field, and FINAL VALIDATION passed **19/19** (13 existing + 6 new `club_seasons`
 gates). Release gates moved **42 -> 45 of 64** with **all nine club-organization/identity
@@ -7483,7 +7483,7 @@ Tracked elsewhere; none reopens this issue.
    (`42d5dd22f2712ffe` vs the pinned `8cebc4aa37002766`). Four independent proofs:
    `runAdvancedSearch` reads `players`/`player_career_stats` and **never `club_seasons`**;
    every hunk of this issue's `rebuild_derived.py` diff lies inside the `club_seasons`
-   block; `AFLDB-ISSUE-090-HANDOFF.md` §11.3 row 7 already recorded this exact gate failing
+   block; `issues/closed/AFLDB-ISSUE-090-HANDOFF.md` §11.3 row 7 already recorded this exact gate failing
    the same way, classified rebuild-baseline drift, before this issue had any code; and
    `players.id` is identity-generated at import, with the live table holding 13,277 rows
    numbered 1-13,277 against a retired legacy population of 12,472. Membership is intact —
@@ -7499,7 +7499,7 @@ Tracked elsewhere; none reopens this issue.
    this gap, still recorded as an unowned observation rather than a tracked issue.
 
 ### Evidence and drafted decisions — 2026-08-28
-Full record in `AFLDB-ISSUE-095.md` §10. Summary only; §10 is authoritative.
+Full record in `issues/closed/AFLDB-ISSUE-095.md` §10. Summary only; §10 is authoritative.
 
 - **Exhaustive D1 probe, 1897–2025 (read-only, no database).** `fetch_ladder_afltables`
   returned **129/129 seasons** with zero errors, zero zero-row seasons, zero schema drift,
@@ -7526,7 +7526,7 @@ Full record in `AFLDB-ISSUE-095.md` §10. Summary only; §10 is authoritative.
   and belongs to the current-season pipeline (`AFLDB-ISSUE-098`/`-099`, rollover
   `AFLDB-ISSUE-101`). No new issue was created; the owning issues already exist.
 ### Implementation — 2026-08-28
-Full record in `AFLDB-ISSUE-095.md` §11. **Not resolved**; acceptance is outstanding.
+Full record in `issues/closed/AFLDB-ISSUE-095.md` §11. **Not resolved**; acceptance is outstanding.
 
 - **§10.8 approved (Option B)** with a fail-closed tie refinement, after the operator
   deparsed pinned fitzRoy 1.8.0 and confirmed `fetch_ladder_afltables` computes points and
@@ -7555,7 +7555,7 @@ Full record in `AFLDB-ISSUE-095.md` §11. **Not resolved**; acceptance is outsta
   off-limits.
 - **Release-gate pins repaired** (ISSUE-095-owned only): `to: 2026` → `2025`, era totals
   102/129/102 → **101/128/101**, matching the measured source.
-- **DB-free validation and repair pass (`AFLDB-ISSUE-095.md` §12).** Five suites reported
+- **DB-free validation and repair pass (`issues/closed/AFLDB-ISSUE-095.md` §12).** Five suites reported
   six failures; **five repaired, one classified out of scope**, no product design changed.
   Final: **309 passed, 1 failed, 6 skipped**, plus the resolver contract 37/37.
   - **One was ISSUE-095's:** the contract test asserted a flat dataset key list, which
@@ -7577,7 +7577,7 @@ Full record in `AFLDB-ISSUE-095.md` §11. **Not resolved**; acceptance is outsta
     that those two correctly lack import write, which is ISSUE-086's manual-authority
     decision and is recorded as blocked and unbuilt. **Not repaired here.**
 ### Witness contract and D7 validation path — 2026-08-28
-Full record in `AFLDB-ISSUE-095.md` §13. **Still not resolved**; the rebuild is outstanding.
+Full record in `issues/closed/AFLDB-ISSUE-095.md` §13. **Still not resolved**; the rebuild is outstanding.
 
 - **Witness acquired:** `ladder-20260828`, 129 files, 1,622 rows, zero fetch failures.
   Pinned in `fitzroy-contract.json` as `datasets.ladder.accepted_witness` with the tracked
@@ -7642,10 +7642,10 @@ new canonical definition as part of this issue's implementation. That does not r
 - **Resolved:** 2026-08-28 — **complete within its authorised S1–S4 scope.** All four approved
   stages implemented and green, migration 074 applied to `afldb_test` and validated against the
   real catalogue, and §5.H validated to the full extent the implemented code permits. See
-  **Resolution** below and `AFLDB-ISSUE-096.md` §16.16.
-- **Runbook:** `AFLDB-ISSUE-096.md` — **durable source of truth for this issue** (scope,
+  **Resolution** below and `issues/closed/AFLDB-ISSUE-096.md` §16.16.
+- **Runbook:** `issues/closed/AFLDB-ISSUE-096.md` — **durable source of truth for this issue** (scope,
   evidence summary, decisions A–H, schema concepts, boundaries, validation, HALT).
-  `AFLDB-2026-API-ACQUISITION.md` remains the parent investigation runbook; this entry is its
+  `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` remains the parent investigation runbook; this entry is its
   §9 row A, and its §13 holds the dated P1–P7 probe results.
 - **Files changed (S1, 2026-08-28):** `data/reference/source-families.json` (new),
   `src/lib/acquisition/source-families.ts` (new), `tests/reference-data.test.ts` (extended)
@@ -7684,7 +7684,7 @@ Agree and record:
 - the reconciliation/diff model;
 - the reviewed-promotion queue;
 - the provenance, ownership, absence and idempotence rules — the ten standing rules in
-  `AFLDB-2026-API-ACQUISITION.md` §4.
+  `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §4.
 
 ### Approved standing policy carried into this issue
 Free/hobby sources only; fetch/staging/diff may run automatically; canonical promotion is
@@ -7697,7 +7697,7 @@ Do not create a Champion Data licensing issue. Do not open a `player_match_perio
 while no free source exists. Do not duplicate `AFLDB-ISSUE-086` or `AFLDB-ISSUE-095`.
 
 ### Evidence baseline — P1–P7, run 2026-08-28
-Full record in `AFLDB-2026-API-ACQUISITION.md` §13; summary in `AFLDB-ISSUE-096.md` §4.
+Full record in `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §13; summary in `issues/closed/AFLDB-ISSUE-096.md` §4.
 
 - **P3 PASS** — AFL API lineup identity adequate (`CD_M…`/`CD_T…`/`CD_I…`); **column set differs
   between rounds (19 vs 20)**; **no substitute field**.
@@ -7743,7 +7743,7 @@ and participates only if ISSUE-086's final contract says so. No second authority
 
 ### Approval and implementation state — 2026-08-28
 The **§13 HALT is LIFTED**. The user approved the amended decisions; the approvals are recorded
-verbatim in `AFLDB-ISSUE-096.md` §14 and convert this issue from design-only to **foundation
+verbatim in `issues/closed/AFLDB-ISSUE-096.md` §14 and convert this issue from design-only to **foundation
 implementation across stages S1–S4** (family importers still excluded). Approved: the three-grain
 observation model; retaining `staging.external_current_matches`; **no automatic canonical
 promotion in v1**; the ISSUE-086 authority boundary (interface and invariant only); Kali inside the
@@ -7756,7 +7756,7 @@ and P1 **disproved** the Squiggle-derived assumption, so approval 5's own escape
 ("unless P1 later proves independence") fired and the registry was corrected. **P7 remains
 BLOCKED and no local database may substitute for it.**
 
-**S1 IMPLEMENTED, then AMENDED by the P1/P2 re-run** (`AFLDB-ISSUE-096.md` §15): the
+**S1 IMPLEMENTED, then AMENDED by the P1/P2 re-run** (`issues/closed/AFLDB-ISSUE-096.md` §15): the
 tracked source-family registry
 `data/reference/source-families.json` plus a pure, fail-closed typed parser
 `src/lib/acquisition/source-families.ts` and nine DB-free contract tests extending
@@ -7767,13 +7767,13 @@ refuses; `afltables.player_match_stats` and the new `kali_afl_stats.player_stats
 `identity_only` and cannot be projected. No migration, no importer, no change to
 `sources.json`, `seasons.json` or `current-season-import.ts`.
 
-**S1 amended 2026-08-28 by P1/P2** (`AFLDB-ISSUE-096.md` §15.1–§15.2):
+**S1 amended 2026-08-28 by P1/P2** (`issues/closed/AFLDB-ISSUE-096.md` §15.1–§15.2):
 `kali_afl_stats.match` moved from the `squiggle` group (`assumed_derived_pending_probe`) to its
 own `kali` group (`proven_independent`), and from `identity_only` to a fully declared 14-column
 shape with `sourcedAt` as `source_updated_at` and a new `kali_2026` round vocabulary; a new
 `kali_afl_stats.player_stats` family records the proven identity gap. The affected tests were
 amended with it.
-**S2 IMPLEMENTED 2026-08-28** (`AFLDB-ISSUE-096.md` §15, S2 section): migration
+**S2 IMPLEMENTED 2026-08-28** (`issues/closed/AFLDB-ISSUE-096.md` §15, S2 section): migration
 `074_source_observation_spine.sql` — `staging.source_payloads` (immutable, content-addressed,
 storing the `hash_recipe` that produced each hash), `staging.source_record_versions` (ordered by
 `version_seq`, valid-time intervals, one open version per key, and **deliberately no uniqueness on
@@ -7814,7 +7814,7 @@ on the history table. **Only the tests were repaired** (`tests/current-season-im
 `sqlStatements()` helper strips `--` comments and splits on `;`; the ledger assertion now pins the
 complete set of executable GRANTs on `promotion_decisions`, which also catches TRUNCATE/ALL, and
 the history assertion pins the single `UNIQUE` statement on the versions table and proves it omits
-`payload_hash`). The migration was not changed and no invariant was weakened. `AFLDB-ISSUE-096.md`
+`payload_hash`). The migration was not changed and no invariant was weakened. `issues/closed/AFLDB-ISSUE-096.md`
 §16.3. **The user then reran the focused suite: 61/61, 1 test file PASSED, no failures.** The
 repaired assertions are stricter than the ones they replaced and pass against an unchanged
 migration — the outcome that separates a false-positive test from a real defect.
@@ -7829,7 +7829,7 @@ semantics and make the key ambiguous, since a space can occur inside a family or
 id while U+0000 cannot. Live design question deferred to S3/S4, not an S2 defect: if this key is
 ever persisted to a PostgreSQL `text` column the separator must change, because PostgreSQL cannot
 store U+0000 in `text`; `observationKey()` currently has no caller outside its own module and the
-focused suite. The stale header now reads "migration 074". `AFLDB-ISSUE-096.md` §16.4.
+focused suite. The stale header now reads "migration 074". `issues/closed/AFLDB-ISSUE-096.md` §16.4.
 
 **Final post-hygiene run — 2026-08-28: `61/61`, 1 test file passed, 0 failures, 303 ms.** That run
 covers the repaired assertions and the hygiene edits together and **closes the S2 checkpoint**. S1
@@ -7846,7 +7846,7 @@ but during the hygiene repair the assistant ran `sed -i`, `grep`, `wc`, `tr` and
 script over repository files to locate and remove the NUL bytes. No test, build, Git, SQL, SSH,
 deployment or package-manager command was run, and every validation run stayed user-executed. One
 `sed -i` edit was silently reverted when a later file-editing call wrote back a stale snapshot, so
-byte counts were re-checked after each edit; `AFLDB-ISSUE-096.md` §16.7a.
+byte counts were re-checked after each edit; `issues/closed/AFLDB-ISSUE-096.md` §16.7a.
 
 **Observed, not investigated:** `src/db/migrations/073_data_overrides.sql` now exists and
 `privileges.sql:294` references it as `AFLDB-ISSUE-086`'s. That is the authority mechanism
@@ -8001,7 +8001,7 @@ component or React code; no migration and no change to 074; no change to `curren
 `staging.external_current_matches` or `reconciliation.ts`; no family importer; no ISSUE-086
 implementation and no worktree access; no CHANGELOG entry.
 
-**NUL-byte hygiene — RESOLVED 2026-08-28 (`AFLDB-ISSUE-096.md` §16.11).** Two source files carried
+**NUL-byte hygiene — RESOLVED 2026-08-28 (`issues/closed/AFLDB-ISSUE-096.md` §16.11).** Two source files carried
 the same artefact: a raw `0x00` written where the intended runtime value is U+0000.
 `src/lib/acquisition/observations.ts` was repaired earlier (§16.4). `source-families.ts` carried it
 in `parseSourceFamilyRegistry`'s duplicate-declaration **machine key** — deliberately unlike the
@@ -8055,7 +8055,7 @@ production.)*
 
 ### Follow-up
 Retry **P1/P2** when a `KALI_AFL_API_KEY` is available, and **P7** when interactive SSH/database
-access is available (exact commands in `AFLDB-2026-API-ACQUISITION.md` §13.7). Neither blocks the
+access is available (exact commands in `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §13.7). Neither blocks the
 contract.
 
 ### Resolution
@@ -8107,7 +8107,7 @@ checksum-frozen: it must not be edited again; a further change is a new migratio
 ### Validation record
 
 **PostgreSQL validation phase RESUMED 2026-08-28 — schema/migration gate GREEN
-(`AFLDB-ISSUE-096.md` §16.16).** The migration-073 baseline blocker is **closed**: `AFLDB-ISSUE-086`
+(`issues/closed/AFLDB-ISSUE-096.md` §16.16).** The migration-073 baseline blocker is **closed**: `AFLDB-ISSUE-086`
 rebuilt `afldb_test` cleanly through the committed `073_data_overrides.sql`, the §16.14 three-index
 repair was authored into 074 **before** its first application, and both pending migrations were then
 applied in normal filename order — **074 then 075**, `Applied 2 migration(s).` Post-apply status is
@@ -8155,7 +8155,7 @@ migration's own comment warns about — a reconcile silently restoring UPDATE/DE
 the ledger through `grant_import_write()`'s registry — is now machine-enforced.
 
 **Retained halt record — PostgreSQL validation phase HALTED AT PREFLIGHT 2026-08-28, blocked at the
-time by migration-073 checksum drift (`AFLDB-ISSUE-096.md` §16.13).** The separately authorised phase (apply 074 to `afldb_test`,
+time by migration-073 checksum drift (`issues/closed/AFLDB-ISSUE-096.md` §16.13).** The separately authorised phase (apply 074 to `afldb_test`,
 run the §5.H integration tests) stopped at its first command:
 `npx tsx tools/db/migrate.ts --status --target test` proved the target is `afldb_test` with 73 of
 74 migrations applied, then **refused** because applied migration `073_data_overrides.sql`
@@ -8198,7 +8198,7 @@ it was never executed.**
 **None inside ISSUE-096 as approved — all four authorised stages are complete.** §11's
 decomposition is S1–S4 and stops there, and §14's approval authorised implementation "through
 stages S1–S4" only, so **there is no approved S5**: any next stage is a fresh approval decision,
-not a continuation (`AFLDB-ISSUE-096.md` §16.12). The three unbuilt pieces and their blockers:
+not a continuation (`issues/closed/AFLDB-ISSUE-096.md` §16.12). The three unbuilt pieces and their blockers:
 
 1. **The canonical acceptance/write transaction** (write + provenance quartet + real `accept`
    decision row) — **BLOCKED on `AFLDB-ISSUE-086`** by §7's implementation gate. Replacing
@@ -8265,7 +8265,7 @@ and the six unresolved items in §12." That approval was given; see §14 of the 
 - **Area:** Data acquisition / Data integrity
 - **Found:** 2026-08-28 (2026+ API acquisition investigation, live probe)
 - **Resolved:** 2026-08-28
-- **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §2.1 and §9 row B.
+- **Runbook:** `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §2.1 and §9 row B.
 - **Files:** `src/lib/external-afl/current-matches.ts`,
   `src/lib/external-afl/current-season-import.ts` (`sourceDisagreements`)
 - **Related:** `AFLDB-ISSUE-096` (architecture rule 9, compare before promoting)
@@ -8282,7 +8282,7 @@ report self-agreement as corroboration.
 ### Established vs unknown — **updated 2026-08-28, P1 has now run**
 - **Established:** the proxying, for Kali `/v1/fixture`.
 - **Established (P1, re-run once `KALI_AFL_API_KEY` was supplied): `/matches` is NOT a proxy.**
-  Five independent proofs, in `AFLDB-2026-API-ACQUISITION.md` §13.1 — (a) a genuine value
+  Five independent proofs, in `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §13.1 — (a) a genuine value
   disagreement on a completed match: Essendon v Port Adelaide 2026-08-23, Kali **95–105** vs
   Squiggle **95–104** with Squiggle `complete = 100`; (b) `crowd` populated on 80 of 204 rows
   where Squiggle publishes no attendance field at all; (c) disjoint id spaces, 11405–11611 vs
@@ -8376,7 +8376,7 @@ gate remains unchanged. The superseded `/matches`-is-a-proxy branch stays closed
 - **Area:** Data integrity / Import
 - **Found:** 2026-08-28 (2026+ API acquisition investigation, source-verified)
 - **Resolved:** 2026-08-28
-- **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §1.1 and §9 row C.
+- **Runbook:** `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §1.1 and §9 row C.
 - **Files:** `src/lib/external-afl/current-season-import.ts`,
   `tests/current-season-import.test.ts`, `tools/current-season/update-current-season.ts`,
   `src/app/admin/current-season/actions.ts`,
@@ -8479,8 +8479,8 @@ None. P7 remains optional impact sizing and is not required for this determinist
 - **Area:** Data acquisition / Import architecture
 - **Found:** 2026-08-28 (2026+ API acquisition investigation)
 - **Resolved:** 2026-08-29
-- **Runbook:** `AFLDB-ISSUE-099.md` — **durable source of truth, approved implementation
-  contract and complete T1–T8 execution record.** `AFLDB-2026-API-ACQUISITION.md` §2.4, §5,
+- **Runbook:** `issues/closed/AFLDB-ISSUE-099.md` — **durable source of truth, approved implementation
+  contract and complete T1–T8 execution record.** `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §2.4, §5,
   §9 row D and §13.5 remain the parent investigation record.
 - **Files changed:** `tools/rebuild/fitzroy/acquire_core.R`,
   `tools/rebuild/fitzroy/fitzroy-contract.json`, `tools/migration/import_fitzroy_core.py`,
@@ -8517,9 +8517,9 @@ it, so an in-season consumer must opt in explicitly."* The `partial`-label sente
 **factually superseded**: `acquire_core.R` no longer emits a `partial` label at all — it
 records `acquisition_kind` (`core_snapshot` / `validation_witness`),
 `completeness: "unvalidated"` and `full_history: FALSE`, and deliberately does not
-adjudicate (`acquire_core.R:326-374`). See `AFLDB-ISSUE-099.md` F1.
+adjudicate (`acquire_core.R:326-374`). See `issues/closed/AFLDB-ISSUE-099.md` F1.
 
-**Current scope (approved 2026-08-28, `AFLDB-ISSUE-099.md`).** A nightly in-season settle
+**Current scope (approved 2026-08-28, `issues/closed/AFLDB-ISSUE-099.md`).** A nightly in-season settle
 pass: an explicitly in-season partial fitzRoy acquisition (a third `acquisition_kind`,
 `in_season_partial`, with its own offline adjudicator) producing a snapshot plus SHA-256
 manifest → a deterministic Python→TypeScript observation bundle → migration-074 observation
@@ -8533,7 +8533,7 @@ and delete by match/season, which is correct for a clean rebuild and forbidden i
 
 **v1 performs ZERO canonical INSERT/UPDATE operations and writes no `accept`
 `promotion_decisions` row.** The canonical acceptance transaction is a separately approved
-later stage with its own recorded prerequisites (`AFLDB-ISSUE-099.md` §16).
+later stage with its own recorded prerequisites (`issues/closed/AFLDB-ISSUE-099.md` §16).
 
 ### Dependencies and gates
 
@@ -8543,7 +8543,7 @@ Implementation is gated on evidence probe **P5**. If P5 shows AFL Tables lacks s
 Squiggle-provisional-only."*
 
 **Current status.** **P5 ran on 2026-08-28 and PASSED. The stop condition was NOT triggered
-and ISSUE-099 is no longer probe-blocked** (`AFLDB-2026-API-ACQUISITION.md` §13.5). Do not
+and ISSUE-099 is no longer probe-blocked** (`docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §13.5). Do not
 rerun P5. The authoritative result: 9,522 × 81 rows, 2026-03-05 → 2026-08-23, 207 distinct
 matches; `url` **0 NA**; populated `url` **1:1** with populated `ID` (663 ↔ 663); `ID`
 itself **82 NA** across 5 urls, none of which carries an `ID` anywhere in 2026.
@@ -8608,7 +8608,7 @@ The F11/Brownlow measurement — 9522 rows, 0 with votes, all NA — closes **U2
 
 ### Follow-up
 Prerequisites of the future canonical acceptance stage, recorded and deliberately excluded
-from v1 (`AFLDB-ISSUE-099.md` §16): provenance columns on `match_period_scores` and
+from v1 (`issues/closed/AFLDB-ISSUE-099.md` §16): provenance columns on `match_period_scores` and
 `brownlow_round_votes`, `player_match_stats.source_record_id`, a representable manual
 authority for the three player/period-grain targets (`AFLDB-ISSUE-086`), the acceptance
 transaction itself, ownership handover for any 2026 match already stamped `squiggle`/`kali`
@@ -8631,7 +8631,7 @@ settle pass is a separate authorisation.
 - **Area:** Data acquisition / Import architecture
 - **Found:** 2026-08-28 (2026+ API acquisition investigation)
 - **Resolved:** 2026-08-29
-- **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §2.5, §9 row E, §13.3 (P3), §13.10 (P3b),
+- **Runbook:** `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §2.5, §9 row E, §13.3 (P3), §13.10 (P3b),
   §13.11 (L2 implementation).
 - **Files:** `data/reference/source-families.json` (`afl_api.lineup` family, `afl_api_2026`
   round vocabulary); `tools/rebuild/afl_api/` (`afl-api-contract.json`, `acquire_lineups.R`,
@@ -8705,7 +8705,7 @@ reconciliation only.
   round-20 Carlton lineup player ids present as `providerId` in `fetch_player_details_afl`.
   **The identity gate is satisfied and is not revisited.**
 - **Established by P3b (PASS 2026-08-29) — shape, types, NULLs, completeness.** See
-  `AFLDB-2026-API-ACQUISITION.md` §13.10. R20 **468 × 20**, R25 **104 × 19**; the single R20-only
+  `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §13.10. R20 **468 × 20**, R25 **104 × 19**; the single R20-only
   column is **`lateChanges`** and R25's set is a strict subset. 0 NA everywhere except
   `lateChanges` (442/468 NA), 0 blank strings anywhere, 0 duplicate external keys over 572 rows,
   and exact fixture-to-lineup **match-set** equality in both rounds. **This is the gate that
@@ -8947,7 +8947,7 @@ this issue.
   Executing an actual 2026 → 2027 rollover is a deliberate future operator action, deferred
   until the season is formally complete and genuine completed-season evidence exists
   (see *Deferred execution* below).
-- **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §5 (rollover row) and §9 row F.
+- **Runbook:** `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §5 (rollover row) and §9 row F.
 - **Files:** `src/lib/rollover/season-rollover.ts` (new — the planner),
   `tools/db/rollover-season.ts` (new — the CLI),
   `tests/season-rollover.test.ts` (new),
@@ -9249,7 +9249,7 @@ execution surfaces a defect in the mechanism.
 - **Area:** Data acquisition / Import architecture
 - **Found:** 2026-08-28 (2026+ API acquisition investigation, source-verified)
 - **Resolved:** N/A
-- **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §2.7 and §9 row G.
+- **Runbook:** `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §2.7 and §9 row G.
 - **Files:** `tools/migration/import_awards.py` (`:1408`)
 - **Related:** `AFLDB-ISSUE-095` — the direct sibling of this gap for the ladder/team-season
   domain. Linked, **not absorbed**; ISSUE-095's status and decisions are unchanged.
@@ -9288,7 +9288,7 @@ here.
 - **Area:** Grid Solver / Performance
 - **Found:** 2026-08-28 (final validation of resolved AFLDB-ISSUE-076)
 - **Resolved:** 2026-08-29
-- **Runbook:** `AFLDB-ISSUE-103.md`
+- **Runbook:** `issues/closed/AFLDB-ISSUE-103.md`
 - **Files:** `src/db/queries/grid-solver.ts`, `src/search/grid-solver-spec.ts`, `tests/integration/grid-solver.test.ts`
 - **Related:** `AFLDB-ISSUE-076` was resolved separately by `6014b9e`; its `won_final_at_venue` repair is evidence lineage only and is not reopened or absorbed here.
 
@@ -9382,7 +9382,7 @@ partial on `issue_key IS NOT NULL`. Keys are namespaced
 `afltables|<family>|<record>|<target>`.
 
 ### Why it was not fixed in ISSUE-099
-`AFLDB-ISSUE-099.md` §13.3 scoped ownership to **resolution** deliberately, and §26's T7
+`issues/closed/AFLDB-ISSUE-099.md` §13.3 scoped ownership to **resolution** deliberately, and §26's T7
 instruction specified exactly this upsert, so the writer implements the contract as written.
 Narrowing it needs either a forward migration changing a frozen dedup contract, or a
 pre-read of ownership before the upsert — which introduces a TOCTOU window and requires a new
@@ -9617,7 +9617,7 @@ and `AFLDB-ISSUE-102` (awards legacy dependency) remain separately open and unto
 - **Area:** Framework / Runtime / Deployment
 - **Found:** 2026-08-29 (ISSUE-068 matched framework-closure A/B closeout)
 - **Resolved:** 2026-08-30
-- **Runbook:** `AFLDB-ISSUE-107.md`
+- **Runbook:** `issues/closed/AFLDB-ISSUE-107.md`
 - **Related:** `AFLDB-ISSUE-068` (Resolved 2026-08-29) owned the deployed hydration acceptance;
   `AFLDB-ISSUE-108` (Resolved 2026-08-30) owned the guarded-integration blocker;
   `AFLDB-ISSUE-109` remains Open and separate.
@@ -9679,7 +9679,7 @@ controlled upgrade. ISSUE-068 was not swept and remains Open.
 
 ### Linux development deployment — 2026-08-29
 Deployed and validated on `arm@10.0.40.100`. No production host, database or credential was
-contacted, and no local Git operation was performed. Full evidence is in `AFLDB-ISSUE-107.md`.
+contacted, and no local Git operation was performed. Full evidence is in `issues/closed/AFLDB-ISSUE-107.md`.
 
 Database safety gate passed before anything was changed: `DATABASE_URL` and
 `AFLDB_OWNER_DATABASE_URL` resolve to `afldb_dev`, `AFLDB_TEST_DATABASE_URL` to `afldb_test`,
@@ -9763,7 +9763,7 @@ Every gate ISSUE-107 owns is PASS.
 | G2 — Application regression | **PASS** | Linux typecheck 0 errors; Webpack build with page-data collection, 1,499 static pages and complete standalone output; 17/17 focused live routes clean. Guarded database integration green on Linux at commit `673f0e3`: **89 passed / 5 skipped test files, 2,515 passed / 104 skipped tests, 0 failures, 122.21 s** (`AFLDB-ISSUE-108` final validation, Node v22.23.2 / npm 10.9.8, `npm test -- --no-file-parallelism`). |
 | G3 — Development runtime | **PASS** | systemd healthy, four `next-server (v16.3.1)` workers, `AFLDB_WORKERS=4` / `AFLDB_POOL_MAX=10` unchanged, live `x-afldb-build` equals built BUILD_ID `uZReW8G1XnsGnG5FNYY-I`, `/api/health` ok. |
 | G4 — Hydration acceptance | **PASS** | `AFLDB-ISSUE-068`'s deployed 1,440-row sweep on 2026-08-29: 1,440/1,440 bound to `uZReW8G1XnsGnG5FNYY-I`, zero hydration, client, violation, metamorphic, HTTP and page errors; semantics improved to 1,440 / 0 / 0. |
-| G5 — Production eligibility | **Out of ISSUE-107 scope by design** | Production rollout receives its own review and is explicitly not a completion condition for this issue (`AFLDB-ISSUE-107.md` "Gates" / "Completion"). Nothing here authorises a production rollout. |
+| G5 — Production eligibility | **Out of ISSUE-107 scope by design** | Production rollout receives its own review and is explicitly not a completion condition for this issue (`issues/closed/AFLDB-ISSUE-107.md` "Gates" / "Completion"). Nothing here authorises a production rollout. |
 
 The last blocker was G2's guarded-integration leg. `AFLDB-ISSUE-108` established that
 `afldb_test` was never stale — it already matched the accepted canonical baseline
@@ -9786,13 +9786,13 @@ Next 16.3.1 closure is separate work under its own review.
 - **Area:** Test database / Data integrity / Tooling
 - **Found:** 2026-08-29 (AFLDB-ISSUE-107 Linux development gate)
 - **Resolved:** 2026-08-30
-- **Runbook:** `AFLDB-ISSUE-108.md` (authoritative; final validation at §12).
+- **Runbook:** `issues/closed/AFLDB-ISSUE-108.md` (authoritative; final validation at §12).
 - **Related:** blocked `AFLDB-ISSUE-107`'s G2 guarded-integration leg — **G2 is now PASS** and
   `AFLDB-ISSUE-107` is Resolved.
 
 ### Root cause (corrected)
 The original hypothesis — "`afldb_test` data is stale/incomplete" — was **wrong** and is kept
-in `AFLDB-ISSUE-108.md` §1–§2 as lineage. `afldb_test` (77/77 migrations) already matches the
+in `issues/closed/AFLDB-ISSUE-108.md` §1–§2 as lineage. `afldb_test` (77/77 migrations) already matches the
 accepted canonical baseline `full-history-20260827` **exactly** on every gated value
 (`player_match_rows` 685,471; `players_with_dob` 855; AFL Tables identities 13,275; …). A
 `db:test:rebuild` would reproduce those same numbers and change nothing.
@@ -9807,7 +9807,7 @@ further parallel-only failures are shared-`afldb_test` cross-file interference.
 ### Resolution — Path A (operator-authorised 2026-08-30)
 `afldb_test` **not** rebuilt. The guarded test contract was corrected to the accepted baseline,
 and the guarded gate made serial. Every change is classified by ownership in
-`AFLDB-ISSUE-108.md` §9:
+`issues/closed/AFLDB-ISSUE-108.md` §9:
 
 - **D (line-ending defect):** `data/reference/fitzroy-accepted-baselines.json` `manifest_sha256`
   was bound to Windows CRLF bytes; re-pinned to the canonical LF hash
@@ -9910,7 +9910,7 @@ oracle `tests/fixtures/oracle_baseline.json` remain bound to the retired legacy 
 player-match rows, 13,361 players, legacy surrogate-ID cohort lists) and carry the same
 surrogate-addressing defect. Both are outside the guarded vitest gate, so neither affected this
 validation; re-basing them belongs with the canonical rebuild's own validation work
-(`AFLDB-ISSUE-108.md` §9.4.4) and must not reopen this issue. The missing legacy-free
+(`issues/closed/AFLDB-ISSUE-108.md` §9.4.4) and must not reopen this issue. The missing legacy-free
 acquisition paths stay with their existing owners: `brownlow_season_votes` / season-grain
 Brownlow and the `unlinked_player_with_games` backlog under `AFLDB-ISSUE-090` §27.5, DraftGuru
 Stage B3, DOB enrichment, and the 2026 current-season gates under `AFLDB-ISSUE-099`.

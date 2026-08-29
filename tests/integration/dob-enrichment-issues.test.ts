@@ -600,7 +600,7 @@ describe.skipIf(!canRun)(
 
   // ---------------------------------------------------------------------
   // AFLDB-ISSUE-092 -- external_identities population-sanity gate and
-  // fixture-source containment (§4/§5/§11 of AFLDB-ISSUE-092.md)
+  // fixture-source containment (§4/§5/§11 of issues/closed/AFLDB-ISSUE-092.md)
   // ---------------------------------------------------------------------
   describe('ISSUE-092: external_identities population gate', () => {
     async function seedIdentity(sourceId: number, externalId: string, playerId: number): Promise<void> {

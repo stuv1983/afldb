@@ -1,7 +1,7 @@
 # AFLDB-ISSUE-092 — `external_identities` reconciliation trusts an unproven-complete source population
 
 **This file is the durable source of truth for ISSUE-092.** A fresh session must be able to
-execute from `CLAUDE.md`, `WORKFLOW.md`, this file, `issues.md` and `IssuesIndex.md` alone.
+execute from `CLAUDE.md`, `docs/development/WORKFLOW.md`, this file, `issues.md` and `IssuesIndex.md` alone.
 Do not rely on chat history.
 
 ## Status

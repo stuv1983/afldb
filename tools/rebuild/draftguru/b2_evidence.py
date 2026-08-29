@@ -2,7 +2,7 @@
 """AFLDB-ISSUE-093 Stage B2-1 — bounded read-only evidence for gaps G2-G6 (+ a G7 supplement).
 
 EVIDENCE ONLY. This runner performs **zero writes**. It answers the derivation questions
-the Stage B2 plan (AFLDB-ISSUE-093-DRAFTGURU-B2-HANDOFF.md §19-§20) leaves open, so the
+the Stage B2 plan (issues/closed/AFLDB-ISSUE-093-DRAFTGURU-B2-HANDOFF.md §19-§20) leaves open, so the
 column-derivation register can be frozen before any adapter is written.
 
   G2  event vocabulary  — the exact (draft_type, draft_kind) pairs currently stored, and

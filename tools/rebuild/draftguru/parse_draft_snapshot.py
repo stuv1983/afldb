@@ -10,7 +10,7 @@ deterministic parsed outputs:
     parsed/schema.json               per-year header fingerprints + encoding counts
     parsed/trade_column_profile.json runbook section 9 profile
 
-Contract (AFLDB-ISSUE-093-DRAFTGURU-ACQUISITION-HANDOFF.md section 6):
+Contract (issues/closed/AFLDB-ISSUE-093-DRAFTGURU-ACQUISITION-HANDOFF.md section 6):
 
   * no database access of any kind -- pure stdlib, importable everywhere;
   * never touches the live site; never reads the CSV corpus except in the

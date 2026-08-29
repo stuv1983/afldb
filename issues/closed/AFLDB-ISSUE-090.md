@@ -1,7 +1,7 @@
 # AFLDB-ISSUE-090 — DOB enrichment conflict writes are not pass-scoped or idempotent
 
 **This file is the durable source of truth for ISSUE-090.** A fresh session must be able to
-execute from `CLAUDE.md`, `WORKFLOW.md`, this file, `issues.md` and `IssuesIndex.md` alone.
+execute from `CLAUDE.md`, `docs/development/WORKFLOW.md`, this file, `issues.md` and `IssuesIndex.md` alone.
 Do not rely on chat history.
 
 ## Status — RESOLVED 2026-08-28 (current)
@@ -58,7 +58,7 @@ D1-D5 design:              UNCHANGED
 ```
 
 This is a fresh-session handoff point. A new session should execute from this
-file, `CLAUDE.md`, `WORKFLOW.md`, `issues.md` and `IssuesIndex.md` alone —
+file, `CLAUDE.md`, `docs/development/WORKFLOW.md`, `issues.md` and `IssuesIndex.md` alone —
 do not rely on prior chat history.
 
 ### Implementation files changed (2026-08-25 snapshot — HISTORICAL)

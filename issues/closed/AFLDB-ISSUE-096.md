@@ -30,7 +30,7 @@ that the PostgreSQL validation phase is pending, blocked or halted, was true onl
 checkpoint and is **superseded** by §16.16–§16.18. Do not act on one.
 **Mode:** foundation implementation, stages S1–S4. No family importer. No Git.
 **Created:** 2026-08-28. **Model/effort:** Opus / High / Plan.
-**Parent runbook:** `AFLDB-2026-API-ACQUISITION.md` — source evidence, source-of-truth matrix,
+**Parent runbook:** `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` — source evidence, source-of-truth matrix,
 operating lifecycle, and the P1–P7 probe results (§13). This file is the durable source of truth
 for **ISSUE-096 itself**.
 
@@ -83,7 +83,7 @@ In scope:
 
 ## 3. Approved standing policy carried in
 
-From `AFLDB-2026-API-ACQUISITION.md` §0 **[DECISION]**, constraints rather than proposals:
+From `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §0 **[DECISION]**, constraints rather than proposals:
 
 1. Free/hobby sources only.
 2. Fetch, staging and diff computation may run automatically.
@@ -102,7 +102,7 @@ than waived (§15.1). `/fixture` remains a proven proxy and is still not a secon
 
 ## 4. P1–P7 evidence summary
 
-Run 2026-08-28. Full record, commands and interpretation in `AFLDB-2026-API-ACQUISITION.md` §13.
+Run 2026-08-28. Full record, commands and interpretation in `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §13.
 
 | Gate | Status | Outcome for this contract |
 |---|---|---|
@@ -574,7 +574,7 @@ source-contained (`source_id IS NULL OR source_id = :source_id`); `data/referenc
 Approval 6 said P1/P2 were not to be retried; the user then supplied `KALI_AFL_API_KEY` and
 **explicitly authorised the retry**, which supersedes that item for P1 and P2 only. **P7 remains
 BLOCKED and no local database may substitute for it.** Full evidence:
-`AFLDB-2026-API-ACQUISITION.md` §13.1.
+`docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §13.1.
 
 **Verdict: Kali `/matches` is NOT a Squiggle proxy**, on five independent proofs — a real
 value disagreement on a completed match (Essendon v Port Adelaide 2026-08-23: Kali 95–105 vs
@@ -624,7 +624,7 @@ corroboration. Under the corrected model it is exactly the `source_disagreement`
 
 ### 15.2 P2 re-run — Kali stable player identity — **PASS**; the gap is now proven
 
-Full evidence: `AFLDB-2026-API-ACQUISITION.md` §13.2.
+Full evidence: `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §13.2.
 
 **Verdict: there is no stable provider player identifier on the player-stat grain.**
 `/player-stats` and `/player-stats-advanced` project `matchId`, `playerName`, `teamId` and the
@@ -1036,7 +1036,7 @@ spine. A search of the S2 sources, the spine migration and the focused suite fin
 **S2 files:** `src/db/migrations/074_source_observation_spine.sql` ·
 `src/lib/acquisition/observations.ts` · `tools/maintenance/privileges.sql` ·
 `tests/current-season-import.test.ts` · `AFLDB-ISSUE-096.md` ·
-`AFLDB-2026-API-ACQUISITION.md` · `issues.md` · `IssuesIndex.md`. **No CHANGELOG entry.**
+`docs/acquisition/AFLDB-2026-API-ACQUISITION.md` · `issues.md` · `IssuesIndex.md`. **No CHANGELOG entry.**
 
 ### 16.2 Validation evidence — user-run 2026-08-28
 

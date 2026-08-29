@@ -10,7 +10,7 @@
  * PostgreSQL actually admits the histories the model requires and actually
  * refuses the ones it forbids. What is NOT proved is any production
  * persistence path, because none exists yet, and no test here pretends
- * otherwise (see AFLDB-ISSUE-096.md §16.16).
+ * otherwise (see issues/closed/AFLDB-ISSUE-096.md §16.16).
  *
  * Every decision is taken from state READ BACK FROM POSTGRESQL — the open
  * head (its `version_seq`, `payload_hash`, `hash_recipe`, `raw_payload` and

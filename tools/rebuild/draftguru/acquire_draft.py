@@ -11,7 +11,7 @@ requested) into an immutable raw snapshot:
     docs/rebuild-manifests/draftguru/<label>.json               written LAST, only on
                                                                 complete validated success
 
-Contract (AFLDB-ISSUE-093-DRAFTGURU-ACQUISITION-HANDOFF.md §1–§5, §11–§13):
+Contract (issues/closed/AFLDB-ISSUE-093-DRAFTGURU-ACQUISITION-HANDOFF.md §1–§5, §11–§13):
 
   * ordinary, respectful, single-threaded retrieval: explicit identifying
     User-Agent, 20s timeout, max 3 retries with 2s/4s/8s backoff (retrying only

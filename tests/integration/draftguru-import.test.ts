@@ -39,7 +39,7 @@ process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
  * remove. Every invariant it protected is carried here — migration-069 stable person and
  * pick identity, source ownership, manual link preservation, confirmed_unlinked,
  * contradictory-decision refusal, foreign-row preservation and idempotence — mapped
- * one-for-one in AFLDB-ISSUE-093-DRAFTGURU-B2-HANDOFF.md §89.
+ * one-for-one in issues/closed/AFLDB-ISSUE-093-DRAFTGURU-B2-HANDOFF.md §89.
  *
  * Everything here runs against afldb_test (tests/setup.ts enforces the _test
  * allowlist) and holds the shared draft advisory lock, because it reconciles the

@@ -85,7 +85,7 @@ EARLIEST_PLAUSIBLE = date(1850, 1, 1)
 # (enrich_birth_dates_from_club_lists.py) owns 'club_list'. Neither pass
 # ever writes the other's key, and both read resolved history to avoid
 # refiling an adjudicated finding (D1). Kept duplicated rather than shared
-# via common.py: see AFLDB-ISSUE-090.md Sec 20 for the approved file list.
+# via common.py: see issues/closed/AFLDB-ISSUE-090.md Sec 20 for the approved file list.
 CLUB_EXTERNAL_ID_RE = re.compile(r"^club-list:([a-z0-9-]+):")
 
 

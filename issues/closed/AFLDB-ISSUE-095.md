@@ -1,7 +1,7 @@
 # AFLDB-ISSUE-095 — Canonical legacy-free ladder / team-season acquisition
 
 **This file is the durable source of truth for ISSUE-095.** A fresh session must be able to
-plan and implement this issue from `CLAUDE.md`, `WORKFLOW.md`, this file, `issues.md` and
+plan and implement this issue from `CLAUDE.md`, `docs/development/WORKFLOW.md`, this file, `issues.md` and
 `IssuesIndex.md` alone. Do not rely on chat history.
 
 ## Status
@@ -196,7 +196,7 @@ failure. Add the gate as part of D7.
    keyed/scoped writes that cannot touch another writer's rows, and no owner fallback.
 5. Add the Stage-9 gate (D7) only once the data is accepted.
 
-Per `WORKFLOW.md`, the D1–D7 design belongs to an Opus/High planning session and the
+Per `docs/development/WORKFLOW.md`, the D1–D7 design belongs to an Opus/High planning session and the
 implementation to a fresh session against the approved plan.
 
 ---
@@ -458,7 +458,7 @@ here, and only here.
 
 ISSUE-095 owns completed seasons **through 2025**. The in-progress 2026 ladder remains with
 the current-season pipeline under `AFLDB-ISSUE-098`/`-099`, with rollover coordinated by
-`AFLDB-ISSUE-101`, exactly as `AFLDB-2026-API-ACQUISITION.md` §6 records. That
+`AFLDB-ISSUE-101`, exactly as `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §6 records. That
 `fetch_ladder_afltables` can return 2026 does not move it here.
 
 Consequently release-gate `gate: 2026 is provisional` →

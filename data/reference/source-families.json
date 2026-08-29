@@ -1,5 +1,5 @@
 {
-  "$comment": "AFLDB source-family acquisition registry (AFLDB-ISSUE-096 stage S1). Declares, per (source_key, family), the external key shape, the payload-hash exclusion list, the required/known column subset, the round vocabulary and the independence group. Keyed by STABLE SOURCE KEY only: no database-local numeric sources.id ever appears in a tracked contract. This file declares; it does not import. Family importers belong to AFLDB-ISSUE-099 (settle), AFLDB-ISSUE-100 (lineups) and AFLDB-ISSUE-095 (ladder, deliberately absent here). Evidence citations P3/P4/P5 refer to AFLDB-2026-API-ACQUISITION.md section 13, run 2026-08-28.",
+  "$comment": "AFLDB source-family acquisition registry (AFLDB-ISSUE-096 stage S1). Declares, per (source_key, family), the external key shape, the payload-hash exclusion list, the required/known column subset, the round vocabulary and the independence group. Keyed by STABLE SOURCE KEY only: no database-local numeric sources.id ever appears in a tracked contract. This file declares; it does not import. Family importers belong to AFLDB-ISSUE-099 (settle), AFLDB-ISSUE-100 (lineups) and AFLDB-ISSUE-095 (ladder, deliberately absent here). Evidence citations P3/P4/P5 refer to docs/acquisition/AFLDB-2026-API-ACQUISITION.md section 13, run 2026-08-28.",
   "contract_version": 1,
   "sources": {
     "afltables": {
@@ -130,7 +130,7 @@
       "promotion_policy": "never",
       "promotion_owner": null,
       "evidence": [
-        "Documented games field list, probed 2026-08-28 (AFLDB-2026-API-ACQUISITION.md section 2.2)."
+        "Documented games field list, probed 2026-08-28 (docs/acquisition/AFLDB-2026-API-ACQUISITION.md section 2.2)."
       ],
       "notes": [
         "Squiggle is the completion/latency TRIGGER for the settle pass, never the authority for a fact AFL Tables also carries, so promotion_policy is 'never' by standing decision.",

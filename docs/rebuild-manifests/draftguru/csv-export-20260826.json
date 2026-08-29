@@ -25,5 +25,5 @@
   "import_capable": false,
   "immutable": true,
   "role": "validation/parity oracle only (acquisition runbook section 7); never an import source",
-  "evidence": "Corpus facts measured 2026-08-26 (AFLDB-ISSUE-093-DRAFTGURU-INVESTIGATION-HANDOFF.md sections 1-2): 42 files, 6,810 rows, years 1981/1982/1986-2025; the browser export preserved rendered text only, so two same-name people (e.g. both 2001 Brad Millers) are indistinguishable in this artifact while the live annual HTML distinguishes them by href ordinal."
+  "evidence": "Corpus facts measured 2026-08-26 (issues/closed/AFLDB-ISSUE-093-DRAFTGURU-INVESTIGATION-HANDOFF.md sections 1-2): 42 files, 6,810 rows, years 1981/1982/1986-2025; the browser export preserved rendered text only, so two same-name people (e.g. both 2001 Brad Millers) are indistinguishable in this artifact while the live annual HTML distinguishes them by href ordinal."
 }

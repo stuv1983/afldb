@@ -20,7 +20,7 @@ const root = process.cwd();
 const importerPath = join(root, 'tools', 'migration', 'enrich_birth_dates_from_club_lists.py');
 const importerSource = readFileSync(importerPath, 'utf8');
 
-// The canonical contract, pinned literally (AFLDB-ISSUE-093.md §4). The
+// The canonical contract, pinned literally (issues/closed/AFLDB-ISSUE-093.md §4). The
 // filenames must match FILE_ORGS exactly; the keys are the importer's
 // deterministic derivation (org name lowercased, spaces to hyphens) and
 // are the stable prefix of every club-list external_id

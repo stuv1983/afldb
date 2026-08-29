@@ -813,7 +813,7 @@ Prove, at execution time:
 5. that the **post-candidate delta** `CANDIDATE_SHA..origin/dev` is bounded,
    inspected commit by commit, and touches **only** these permitted paths:
    `IssuesIndex.md`, `issues.md`, `CHANGELOG.md`, `AFLDB-ISSUE-*.md`,
-   `WORKFLOW.md`, `CLAUDE.md`, `README.md`, `docs/**/*.md`;
+   `docs/development/WORKFLOW.md`, `CLAUDE.md`, `README.md`, `docs/**/*.md`;
 6. that **no** runtime, schema, importer, dependency, deployment or application
    source change appears after the candidate — specifically nothing under `src/`,
    `tools/`, `deploy/`, `tests/`, `package.json`, `package-lock.json`, any
@@ -974,4 +974,4 @@ demonstration, not assumption.
 - No ledger issue created from prior-session memory alone.
 - No historical NL telemetry deleted.
 
-Execution begins in a fresh implementation session, per `WORKFLOW.md` §4.
+Execution begins in a fresh implementation session, per `docs/development/WORKFLOW.md` §4.

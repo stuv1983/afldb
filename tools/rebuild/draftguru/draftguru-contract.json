@@ -1,5 +1,5 @@
 {
-  "$comment": "AFLDB-ISSUE-093 §13.5 — DraftGuru annual-page acquisition contract (approved runbook: AFLDB-ISSUE-093-DRAFTGURU-ACQUISITION-HANDOFF.md). Pins the URL pattern, expected year set, intentional coverage gaps, canonical player_url form (U1, resolved 2026-08-26 against afldb_dev), accepted header variants, field classification and the CSV parity baseline. acquire_draft.py and parse_draft_snapshot.py fail closed on anything this contract does not accept. Statuses/baselines are measured evidence, never assumption.",
+  "$comment": "AFLDB-ISSUE-093 §13.5 — DraftGuru annual-page acquisition contract (approved runbook: issues/closed/AFLDB-ISSUE-093-DRAFTGURU-ACQUISITION-HANDOFF.md). Pins the URL pattern, expected year set, intentional coverage gaps, canonical player_url form (U1, resolved 2026-08-26 against afldb_dev), accepted header variants, field classification and the CSV parity baseline. acquire_draft.py and parse_draft_snapshot.py fail closed on anything this contract does not accept. Statuses/baselines are measured evidence, never assumption.",
   "contract_version": 1,
   "adapter": "tools/rebuild/draftguru/acquire_draft.py",
   "adapter_version": "1.0.0",
@@ -172,7 +172,7 @@
     }
   },
   "club_resolution": {
-    "$comment": "AFLDB-ISSUE-093 Stage B2-2b — completes the requirement fields.Club already states above ('era-aware AFLDB resolution required downstream, failing closed on Brisbane'). Additive: no Stage A or person_stage key is changed. Approved decision in AFLDB-ISSUE-093-DRAFTGURU-B2-HANDOFF.md §35.3 (G7 CLOSED). This block deliberately does NOT restate the 18 working mappings — data/reference/clubs.json already holds them and duplicating a slug list would create a second source of truth. It records only the rule, the one deliberate exception, and the measured reconciliation.",
+    "$comment": "AFLDB-ISSUE-093 Stage B2-2b — completes the requirement fields.Club already states above ('era-aware AFLDB resolution required downstream, failing closed on Brisbane'). Additive: no Stage A or person_stage key is changed. Approved decision in issues/closed/AFLDB-ISSUE-093-DRAFTGURU-B2-HANDOFF.md §35.3 (G7 CLOSED). This block deliberately does NOT restate the 18 working mappings — data/reference/clubs.json already holds them and duplicating a slug list would create a second source of truth. It records only the rule, the one deliberate exception, and the measured reconciliation.",
     "stage": "B2-2b",
     "rule": "exact string equality: stage_a.club_slug == clubs.slug",
     "source_of_truth": "data/reference/clubs.json (projected to the clubs table by tools/migration/load_reference_data.py; the runtime lookup key is clubs.slug)",

@@ -17,7 +17,7 @@
 #     Full acquisition. Raw CSVs land in the gitignored working area
 #     data/sources/afltables/fitzroy_core/<label>/ ; the tracked provenance
 #     manifest lands in docs/rebuild-manifests/afltables_fitzroy_core/<label>.json
-#     with per-file row counts and SHA-256 fingerprints (AFLDB-ISSUE-093.md §4).
+#     with per-file row counts and SHA-256 fingerprints (issues/closed/AFLDB-ISSUE-093.md §4).
 #     An existing manifest label is never overwritten — a reacquisition is a new
 #     snapshot with a new label (§4 snapshot immutability).
 #

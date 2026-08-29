@@ -67,7 +67,7 @@
  * SUITE'S OWN FIXTURES; it is teardown, and it is not part of the settle path
  * obligation O1 constrains.
  *
- * @see AFLDB-ISSUE-099.md §21, §22, §24, §26
+ * @see issues/closed/AFLDB-ISSUE-099.md §21, §22, §24, §26
  * @see src/lib/acquisition/settle-afltables.ts
  */
 import './guard';

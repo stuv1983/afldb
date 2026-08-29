@@ -4,7 +4,7 @@
 **Runbook status:** APPROVED CONTRACT for the implementation session.
 **Planning session:** 2026-08-28. Investigation + contract only; no ISSUE-099 code written.
 **Parent contract:** `AFLDB-ISSUE-096.md` (Resolved) · **Parent investigation:**
-`AFLDB-2026-API-ACQUISITION.md` §2.4, §5, §9 row D, §13.5.
+`docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §2.4, §5, §9 row D, §13.5.
 
 > This file is the durable source of truth for AFLDB-ISSUE-099. Where it and any older
 > `issues.md` / `IssuesIndex.md` wording disagree, **this file is authoritative** and the
@@ -35,7 +35,7 @@ fail-closed contract.
 
 ### 2.1 Probe P5 — PASS, stop condition NOT triggered (2026-08-28)
 
-Authoritative record: `AFLDB-2026-API-ACQUISITION.md` §13.5.
+Authoritative record: `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §13.5.
 
 | Measure | Value |
 |---|---|
@@ -747,7 +747,7 @@ Proposed fields: `round_code`, `round_number`, `round_type`, `is_final`, `match_
   historical identities, and at least one joined `player_stats` row
   (`MatchFact.has_player_rows`) proving the match was played and supplying the match-grain
   supplements. Anything short of that is not proposed.
-- **Attendance** (`AFLDB-2026-API-ACQUISITION.md` §3): repeated at player-match grain and
+- **Attendance** (`docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §3): repeated at player-match grain and
   deduplicated to match grain by `scan_player_stats`. A blank cell is **no observation**;
   `0` is a legitimate recorded value; **two distinct non-NULL values fail the record closed**
   (in-season this becomes a bundle rejection, not a whole-run abort — F6).

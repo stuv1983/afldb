@@ -578,9 +578,9 @@ designed in this document.**
 | **Model** | **Fable** |
 | **Effort** | **High** |
 | **Mode** | **Normal** |
-| **Basis** | `WORKFLOW.md` §2: *"Multi-file implementation with approved complex runbook — Fable / High / Normal."* The design judgement is done and is in this document; what remains is bounded multi-file implementation against a fixed contract. |
+| **Basis** | `docs/development/WORKFLOW.md` §2: *"Multi-file implementation with approved complex runbook — Fable / High / Normal."* The design judgement is done and is in this document; what remains is bounded multi-file implementation against a fixed contract. |
 | **Session start** | Fresh session. Read `IssuesIndex.md`, the `AFLDB-ISSUE-093` entry, and **this runbook**; do not re-read the investigation handoff in full — its §1.4/§1.5 field and event catalogues are the only parts the parser needs. |
-| **Escalate to Opus** | Only if U1 or the §7 parity stage produces a contradiction with this runbook. `WORKFLOW.md` §3: contradiction between evidence and an approved runbook is a stop-and-report, not a redesign in flight. |
+| **Escalate to Opus** | Only if U1 or the §7 parity stage produces a contradiction with this runbook. `docs/development/WORKFLOW.md` §3: contradiction between evidence and an approved runbook is a stop-and-report, not a redesign in flight. |
 | **First action** | Settle **U1** with one user-run read-only `afldb_dev` lookup, then write `draftguru-contract.json` and `tests/draftguru-acquisition.test.ts` **before** the adapter. |
 
 ---
@@ -1417,7 +1417,7 @@ parity with `--parity --validate-only`. Only once variant B is proven may the fu
 
 **Recommended session — Model: Opus · Reasoning: High · Mode: Manual / execution.**
 
-Read first: `CLAUDE.md`, `WORKFLOW.md`, `AFLDB-ISSUE-093.md`, and this handoff (§18–§22 are the
+Read first: `CLAUDE.md`, `docs/development/WORKFLOW.md`, `AFLDB-ISSUE-093.md`, and this handoff (§18–§22 are the
 complete resume state; the prior conversation is not required). The fresh session begins with
 the 1986 variant-B acquisition probe above.
 
@@ -1450,7 +1450,7 @@ executed by the agent.**
 **Opus / High / Manual-execution.** The next task is bounded (one NBSP root-cause cycle),
 but Opus is the available coding model on the takeover account; it should execute this
 approved runbook precisely and must not reopen the architecture or any settled boundary.
-Read first: `CLAUDE.md`, `WORKFLOW.md`, `AFLDB-ISSUE-093.md`, and this handoff. The prior
+Read first: `CLAUDE.md`, `docs/development/WORKFLOW.md`, `AFLDB-ISSUE-093.md`, and this handoff. The prior
 conversation is not required — this §18 is the complete resume state.
 
 > **HISTORICAL TRAILER.** The block immediately above belongs to §18 and is superseded.
@@ -1464,7 +1464,7 @@ conversation is not required — this §18 is the complete resume state.
 
 ### Session start — read set and pre-flight re-confirmation
 
-Read: `CLAUDE.md`, `WORKFLOW.md`, `AFLDB-ISSUE-093.md` §13 (phase 5 — "Draft adapter
+Read: `CLAUDE.md`, `docs/development/WORKFLOW.md`, `AFLDB-ISSUE-093.md` §13 (phase 5 — "Draft adapter
 (DraftGuru) — follows 4a"), and this handoff §1–§22. The prior conversation was not required.
 
 Pre-flight re-confirmed against current on-disk state (agent-side native reads only, nothing
@@ -2041,7 +2041,7 @@ missing?* Stage B1 answers that and nothing else. Its output is the §10 profile
 ### Read first (in this order)
 
 1. `CLAUDE.md` — operating rules.
-2. `WORKFLOW.md` — session/model/handoff strategy.
+2. `docs/development/WORKFLOW.md` — session/model/handoff strategy.
 3. **This handoff** — §3 (person-page boundary and sample composition), §10 (AFL Tables-link
    profiling requirements), §16 (downstream importer requirements + U2), and §28–§29 (accepted
    Stage A state and this resume boundary).

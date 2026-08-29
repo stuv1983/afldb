@@ -1,7 +1,7 @@
 # AFLDB-ISSUE-091 — Migration checksum comparison is line-ending sensitive, causing false drift on a Windows checkout
 
 **This file is the durable, implementation-ready runbook for ISSUE-091.** A fresh session
-must be able to execute from `CLAUDE.md`, `WORKFLOW.md`, this file, `issues.md` and
+must be able to execute from `CLAUDE.md`, `docs/development/WORKFLOW.md`, this file, `issues.md` and
 `IssuesIndex.md` alone. Do not rely on chat history.
 
 ## Status / handoff (2026-08-25, current)
