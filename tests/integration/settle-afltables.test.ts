@@ -1025,7 +1025,8 @@ describe('AFLDB-ISSUE-099 settle — the transaction against PostgreSQL', () => 
     expect(result.counters.observationsSeen).toBe(3);
     expect(result.counters.versionsAppended).toBe(3);
     expect(result.counters.projectionRowsWritten).toBe(2);
-    expect(result.counters.candidatesCreated).toBe(5);
+    // Four, not five: see the apply run below (AFLDB-ISSUE-106).
+    expect(result.counters.candidatesCreated).toBe(4);
 
     // And nothing was kept — not even the import_batches row.
     expect(await spineRow('match', MATCH_RECORD)).toBeUndefined();
@@ -1081,9 +1082,12 @@ describe('AFLDB-ISSUE-099 settle — the transaction against PostgreSQL', () => 
     expect(projected.venueId).toBeNull();
     expect(projected.venueRaw).toBe(VENUE_RAW);
 
-    // One 'new' proposal for matches; every dependent target is a refusal,
-    // because no canonical match exists to key them on.
-    expect(result.counters.candidatesCreated).toBe(5);
+    // One 'new' proposal for matches; every dependent target that the source
+    // actually established is a refusal, because no canonical match exists to
+    // key them on. FOUR, not five: AFLDB-ISSUE-106 removed the fifth, which
+    // was a `match_period_scores` refusal for a record that established no
+    // period score at all (see the candidate list below).
+    expect(result.counters.candidatesCreated).toBe(4);
     expect(result.counters.candidatesRefreshed).toBe(0);
     expect(result.counters.unresolvedIdentityMatch).toBe(2);
     // AFLDB-ISSUE-105. `runSettleAfltables()` returns the id exactly as
@@ -1100,14 +1104,30 @@ describe('AFLDB-ISSUE-099 settle — the transaction against PostgreSQL', () => 
       externalRecordId, targetTable, verb: 'unresolved_identity', status: 'pending',
       sourceVersionSeq: 1, createdByBatchId: batchId,
     });
+    // AFLDB-ISSUE-106, DELIBERATE. The rejected record no longer refuses on
+    // `match_period_scores`. It is Python-rejected and carries NO projection
+    // at all, so nothing about it establishes a period score — and a target
+    // the source never established is not a refusal, exactly as an NA
+    // Brownlow vote is not one (D2). What it DOES establish is that a results
+    // row exists whose club could not be resolved, and it still refuses on
+    // `matches` to say so. MATCH_RECORD published period scores, so its
+    // `match_period_scores` refusal is unchanged.
     expect(await candidateRows()).toEqual([
       refusal(MATCH_RECORD, 'match_period_scores'),
       { externalRecordId: MATCH_RECORD, targetTable: 'matches',
         verb: 'new', status: 'pending', sourceVersionSeq: 1, createdByBatchId: batchId },
-      refusal(REJECTED_RECORD, 'match_period_scores'),
       refusal(REJECTED_RECORD, 'matches'),
       refusal(PLAYER_RECORD, 'player_match_stats'),
     ].sort(byRecordThenTarget));
+
+    // And no candidate anywhere proposes an empty period set (§17.2).
+    const [empty] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM promotion_candidates
+       WHERE target_table = 'match_period_scores'
+         AND external_record_id LIKE ${`${PREFIX}%`}
+         AND proposed_fields->'period_scores' = '[]'::jsonb
+    `;
+    expect(empty.n).toBe(0);
 
     // §17.4: no vote was published, so brownlow_round_votes is not a target
     // at all — not a candidate proposing votes = 0.
@@ -1118,8 +1138,9 @@ describe('AFLDB-ISSUE-099 settle — the transaction against PostgreSQL', () => 
     `;
     expect(votes.n).toBe(0);
 
-    // import_rejections is written for unresolved identity only.
-    expect(await countLike('import_rejections', 'source_record_id', `${PREFIX}%`)).toBe(4);
+    // import_rejections is written for unresolved identity only — one per
+    // refusal above, so three since ISSUE-106 rather than four.
+    expect(await countLike('import_rejections', 'source_record_id', `${PREFIX}%`)).toBe(3);
 
     const [batchRow] = await sql<
       { status: string; recordsRead: number; recordsRejected: number }[]
@@ -1131,9 +1152,9 @@ describe('AFLDB-ISSUE-099 settle — the transaction against PostgreSQL', () => 
     expect(batchRow.status).toBe('completed');
     expect(batchRow.recordsRead).toBe(3);
     // Migration 001: records_rejected must equal the number of
-    // import_rejections rows for the batch — the four asserted above, not the
+    // import_rejections rows for the batch — the three asserted above, not the
     // bundle's single rejected record.
-    expect(batchRow.recordsRejected).toBe(4);
+    expect(batchRow.recordsRejected).toBe(3);
   });
 
   it('reruns idempotently: no payload, no version, no candidate, no rejection', async () => {
@@ -1151,7 +1172,21 @@ describe('AFLDB-ISSUE-099 settle — the transaction against PostgreSQL', () => 
     expect(result.counters.payloadsReused).toBe(0);
     // Unchanged content is decided by the family hash contract alone, before
     // identity is consulted, so no target proposes anything.
-    expect(result.counters.observationsUnchanged).toBe(5);
+    //
+    // The unit is RECONCILIATION OUTCOMES, one per (record x target the SOURCE
+    // ESTABLISHED) — not records, not versions. Four here: MATCH_RECORD on
+    // `matches` and `match_period_scores` (it published quarter scores),
+    // REJECTED_RECORD on `matches` alone, and PLAYER_RECORD on
+    // `player_match_stats` alone. The two absent from that list are the two
+    // targets this source never established for those records: PLAYER_RECORD's
+    // NA `brownlow_round_votes` (ISSUE-099 D2) and, since AFLDB-ISSUE-106,
+    // REJECTED_RECORD's `match_period_scores`. A target that does not exist is
+    // never reconciled, so it cannot report an outcome of any kind — an
+    // `unchanged` one included. Losing that fifth count is the fix working,
+    // not a lost observation: the record itself is still seen, still hashed
+    // and still unchanged, and every idempotence assertion around this one
+    // says so directly.
+    expect(result.counters.observationsUnchanged).toBe(4);
     expect(result.counters.observationsCorrected).toBe(0);
     expect(result.counters.candidatesCreated).toBe(0);
     expect(result.counters.candidatesRefreshed).toBe(0);

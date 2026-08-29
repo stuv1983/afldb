@@ -7,14 +7,13 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 4
+**Open issues:** 3
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
 | `AFLDB-ISSUE-102` | Medium | Data acquisition / Import architecture | `tools/migration/import_awards.py:1408` still requires `AFLDB_LEGACY_SQLITE`, so the awards/honours domain has the same legacy dependency `AFLDB-ISSUE-095` records for `club_seasons`, previously untracked. No free API covers Coleman, Rising Star, All-Australian, AFLCA, AFLPA or club best-and-fairest; Brownlow is the exception via the AFL Tables path. | **Record only.** Do not design the replacement under this investigation — no source selection, no per-award provenance decision, no importer work is authorised by this entry. Links `AFLDB-ISSUE-095` as the direct sibling gap; not absorbed. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
-| `AFLDB-ISSUE-106` | Low | Data acquisition / Import architecture | `proposedPeriodScoreValues()` returns `{ period_scores: [] }` rather than `null` when a match published no quarter scores, so such a match would raise a `match_period_scores` candidate proposing an empty array — the sibling of the Brownlow defect ISSUE-099 D2 fixed. **Unreachable in the real T8 snapshot**: all 207 acquired 2026 matches carried period scores. | Decide whether a match with no published period scores establishes the target at all. If not, return `null` and extend `targetEstablishedBySource()`, then reconcile the integration suite's rejected-record expectation (a rejected match record currently refuses on **both** match targets) deliberately rather than incidentally. |
 
 ---
 
@@ -9405,13 +9404,15 @@ and were not touched.
 
 ## AFLDB-ISSUE-106 — `match_period_scores` proposes an empty array instead of no target
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Low
 - **Area:** Data acquisition / Import architecture
 - **Found:** 2026-08-29 (`AFLDB-ISSUE-099` T8, while fixing the Brownlow sibling defect)
-- **Resolved:** N/A
+- **Resolved:** 2026-08-29
 - **Files:** `src/lib/acquisition/settle-afltables.ts`
-  (`proposedPeriodScoreValues()`, `targetEstablishedBySource()`)
+  (`readMatchProjection()`/new `readPeriodScores()`, `proposedPeriodScoreValues()`,
+  `targetEstablishedBySource()`), `tests/current-season-import.test.ts`,
+  `tests/integration/settle-afltables.test.ts`
 - **Related:** `AFLDB-ISSUE-099` (Resolved — origin; its D2 fixed the Brownlow sibling)
 
 ### Problem
@@ -9422,16 +9423,79 @@ candidate, no rejection and no projection. `brownlow_round_votes` expresses that
 `{ period_scores: [] }`, so such a match would produce a `match_period_scores` candidate
 proposing an **empty** array — a review item with nothing to review.
 
-### Why it is tracked rather than fixed
+### Why it was tracked rather than fixed at ISSUE-099 close-out
 **Unreachable in the real T8 snapshot** — all 207 acquired 2026 matches carried period-score
-observations, so no empty proposal was produced. Fixing it means changing a different
+observations, so no empty proposal was produced. Fixing it meant changing a different
 function's declared return contract and adding `match_period_scores` to the optional-target
-set, which would alter a signed-off assertion: a Python-rejected match record currently
-refuses on **both** match targets, and `tests/integration/settle-afltables.test.ts` asserts
-that. ISSUE-099 was not expanded at close-out to do it.
+set, which altered a signed-off assertion: a Python-rejected match record refused on **both**
+match targets, and `tests/integration/settle-afltables.test.ts` asserted that. ISSUE-099 was
+not expanded at close-out to do it. Retained as lineage; superseded by the record below.
 
-### Exact next action
-Decide whether a match with no published period scores establishes the target at all. If it
-does not, make `proposedPeriodScoreValues()` return `null` on an empty set and extend
-`targetEstablishedBySource()`, then reconcile the integration suite's rejected-record
-expectation deliberately rather than incidentally.
+### Adjudication (2026-08-29)
+1. **Payload shapes.** `period_scores` absent, `null`, or `[]` are the SAME fact — the source
+   published nothing about periods — and now read identically. One or more published periods
+   establishes the target. NULLs *inside* a published period stay NULL and are preserved.
+2. **An empty array is absence of evidence**, not authoritative evidence of zero periods. The
+   emitter already drops an all-NULL side/period, so `[]` cannot distinguish "no periods" from
+   "nothing recorded" even in principle.
+3. **No legitimate completed AFL match canonically means `period_scores = []`.** That target
+   state was never invented, and is not invented now.
+4. **Partial publication** is preserved exactly as published: only the quarters the source
+   carried, no filler for the rest, no fabricated extra time (periods 5+ still refuse).
+5. **The rejected record establishes only `matches`.** It is Python-rejected with
+   `projection: null`, so nothing about it establishes a period score — the integration suite
+   expected both targets only because `targetEstablishedBySource()` returned `true`
+   unconditionally for every non-Brownlow target, not because the record published anything.
+   `matches` and `player_match_stats` remain established by the record itself: a results row
+   IS a match observation and a stats row IS a participation observation.
+6. **Candidate/refusal generation only.** Corroboration claims are gathered for `matches`
+   alone, and `agreementRestored()` needs a positively agreeing group, so `data_issues` and
+   the disagreement lifecycle are untouched. `observationsUnchanged` counts reconciliation
+   outcomes per *established* target, so the idempotent rerun reports 4 rather than 5 — the
+   fifth was the rejected record's fabricated `match_period_scores` outcome. Idempotence
+   itself is unchanged: no payload, version, candidate, rejection or canonical write.
+
+### Fix
+- `readMatchProjection()` reads an absent/NULL `period_scores` as `[]` (new `readPeriodScores()`),
+  mirroring `brownlow_round_vote`; a present non-array still fails the contract.
+- `proposedPeriodScoreValues()` returns `null` when nothing was published, never `{ period_scores: [] }`.
+- `targetEstablishedBySource('match_period_scores', …)` is `false` for a null projection and
+  for a projection carrying no period, `true` otherwise.
+No schema, migration or canonical period-score representation change; migrations through 077
+are untouched.
+
+### Test changes
+`tests/current-season-import.test.ts` gained two focused cases — no published evidence in all
+three shapes (absent, `null`, `[]`) yields no target and a `null` proposal while `matches`
+stays established, and partial publication is preserved exactly with its NULLs intact — and
+the existing period-score case adapted to the nullable return. The D2 case's "other targets"
+loop narrowed to `matches` / `player_match_stats`; it had asserted that a *player* projection
+established `match_period_scores`, which is now a cross-family read.
+
+`tests/integration/settle-afltables.test.ts` carries three deliberate expectation changes,
+each commented with its reason:
+- `candidatesCreated` 5 → 4 (dry-run and apply), and the rejected record's
+  `match_period_scores` refusal removed from the expected candidate list;
+- `import_rejections` / `records_rejected` 4 → 3, one per remaining refusal;
+- `observationsUnchanged` 5 → 4 on the idempotent rerun.
+
+A new assertion proves the defect cannot recur: no candidate anywhere carries
+`proposed_fields->'period_scores' = '[]'::jsonb`.
+
+### Validation (2026-08-29, user-run)
+- `tests/current-season-import.test.ts` — **180/180 passed**.
+- `tests/integration/settle-afltables.test.ts` — **19 passed / 1 skipped**. The skip is the
+  pre-existing restricted `afldb_import`-role parity case, skipped because
+  `AFLDB_TEST_IMPORT_DATABASE_URL` is unset — **it did not run**. Not a blocker here: no
+  privilege, role, schema or migration behaviour changed.
+
+Idempotence was re-proved directly by the rerun case that surfaced the counter change: no new
+payload, no new version, candidate rows byte-equal to the prior run and still attributed to
+their creating batch, `import_rejections` unchanged, projection rows refreshed in place (2 and
+2), and zero canonical rows inserted or updated.
+
+### Follow-up
+None. The `observationsUnchanged` counter name remains broader than its unit (reconciliation
+outcomes per established target); that is documented at the assertion and in the function's
+contract, and is not a defect. `AFLDB-ISSUE-104` (the `data_issues` open-row ownership key)
+and `AFLDB-ISSUE-102` (awards legacy dependency) remain separately open and untouched.

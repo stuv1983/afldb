@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-29
-**Open issues:** 4
+**Open issues:** 3
 
 ## How Claude should use this file
 
@@ -144,12 +144,31 @@
 | `AFLDB-ISSUE-105` | Low | Data acquisition / Import architecture / Type safety | postgres.js returns uncast `import_batches.id` (`bigint`) as a **string** while several call sites declared `number`. **Adjudicated and IMPLEMENTED 2026-08-29, NOT yet validated.** Convention: an opaque branded **string** `ImportBatchId`, decoded once at the driver boundary by a fail-closed `asImportBatchId()` — new `src/lib/import-batch-id.ts`. Applied to every TS `INSERT INTO import_batches ... RETURNING id` and every signature carrying a batch id (observation-store, settle, lineup-store, current-season, ingest pipeline/datasets, submissions page, first-kick-goal tool). **No schema/migration change** (077 stays frozen); **no `bigint`→`int` cast** — seven pre-existing test casts removed; **no `Number()` narrowing** — the ISSUE-099 `Number(result.batchId)` workaround is gone. Runtime behaviour is unchanged: every value was already a string. Next action: run `npm test -- tests/current-season-import.test.ts`, then the settle and lineup integration suites. |
 -->
 
-<!-- Open issues continue. The header is repeated because the retired ISSUE-105 row
-     above interrupts the table. -->
+<!-- No open rows follow. Everything below is retired lineage only: ISSUE-106 (retired
+     2026-08-29) and ISSUE-093 (retired 2026-08-27). The three open issues are
+     ISSUE-068, ISSUE-102 and ISSUE-104, listed above. -->
 
-| Issue | Severity | Area | Current state |
-|---|---|---|---|
+<!-- RETIRED 2026-08-29 — `AFLDB-ISSUE-106` is **Resolved** and is NO LONGER an open issue.
+     Do not read the commented-out row below as current: it is the pre-resolution index row,
+     kept only as lineage, and its "Next action" text is SUPERSEDED.
+     Authoritative record: the `AFLDB-ISSUE-106` entry in `issues.md` (Resolution, 2026-08-29).
+     Final semantics: absent/NULL/empty `period_scores` all mean the source published NO
+     period-score evidence, so `match_period_scores` is **not established**,
+     `proposedPeriodScoreValues()` returns `null`, and no empty-array candidate can be
+     created. Published periods are preserved exactly (partial publication included, NULL
+     stays NULL, no periods 5+ invented). Deliberate accounting corrections: a rejected
+     record with `projection: null` establishes `matches` only, so the settle suite's
+     rejected-record expectation is 4 candidates / 3 rejections, and `observationsUnchanged`
+     — which counts reconciliation outcomes per **established** target — is 4, not 5.
+     Final evidence, user-run: `current-season-import` 180/180; `settle-afltables` integration
+     19 passed / 1 skipped. **The skip is the restricted `afldb_import`-role parity case,
+     skipped because `AFLDB_TEST_IMPORT_DATABASE_URL` is unset — it did NOT run.** Not a
+     blocker: no privilege, role, schema or migration behaviour changed. No migration (077
+     remains the highest, untouched) and no change to the canonical period-score
+     representation.
+
 | `AFLDB-ISSUE-106` | Low | Data acquisition / Import architecture | `proposedPeriodScoreValues()` returns `{ period_scores: [] }` instead of `null` for a match with no published quarter scores, so it would raise an **empty** `match_period_scores` candidate — the sibling of the Brownlow defect ISSUE-099 D2 fixed. **Unreachable in the real T8 snapshot** (all 207 matches carried period scores). Next action: decide whether that match establishes the target; if not, return `null`, extend `targetEstablishedBySource()`, and reconcile the integration suite's rejected-record expectation deliberately. |
+-->
 <!-- RETIRED 2026-08-27 — `AFLDB-ISSUE-093` is Resolved and is NO LONGER an open issue.
      Do not read the commented-out row below: it is the pre-resolution index row, kept only
      as lineage, and its "NEXT PHASE"/"next action" text is SUPERSEDED — the first clean

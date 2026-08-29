@@ -15,6 +15,35 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-106 — A match period-score target now requires published period evidence - 29 August 2026
+
+- **Target establishment now asks whether the source published anything.** In the AFL Tables
+  settle pass, `match_period_scores` exists for a record only where the source actually
+  published at least one period observation. `targetEstablishedBySource()` answers that from
+  the source projection alone, before identity is consulted — the same rule ISSUE-099's D2
+  established for `brownlow_round_votes`, of which this was the untreated sibling.
+- **No empty-array proposal can be created.** `proposedPeriodScoreValues()` returns `null`
+  when nothing was published rather than `{ period_scores: [] }`. An empty array would have
+  asserted that the canonical target should hold zero rows — a claim no AFL Tables results row
+  has ever made — and would have raised a review candidate with nothing in it to review.
+- **Absent, `null` and empty source data all read as one fact:** the source published no
+  period-score evidence. An absent or `null` `period_scores` in the projection is no longer a
+  hard read failure; a value that is present but is not an array is still refused.
+- **Published periods are preserved exactly.** Partial publication keeps only the quarters the
+  source carried, a NULL inside a published period stays NULL rather than becoming zero, and
+  no period 5+ is invented — the reader still refuses one outright.
+- **Rejected-record target accounting corrected deliberately.** A record the source emitter
+  rejected carries no projection, so it establishes `matches` alone and refuses only there;
+  it no longer manufactures a second refusal about period scores nobody published. The settle
+  integration expectations moved with it: 4 candidates rather than 5, 3 `import_rejections`
+  rows rather than 4, and `observationsUnchanged` — which counts reconciliation outcomes per
+  *established* target — 4 rather than 5 on an idempotent rerun. Idempotence itself is
+  unchanged, as are `matches`, `player_match_stats`, Brownlow and the `data_issues`
+  disagreement lifecycle.
+- **No schema migration**, no change to the canonical period-score representation, and no
+  source-specific workaround: the rule is stated against the payload shape, not against the
+  current snapshot, in which all 207 acquired 2026 matches happened to carry period scores.
+
 ### AFLDB-ISSUE-105 — Import-batch bigint ids are typed truthfully at the driver boundary - 29 August 2026
 
 - **`import_batches.id` is now represented as what it actually is.** The column is

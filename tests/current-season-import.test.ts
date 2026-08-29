@@ -3180,15 +3180,76 @@ describe('AFLDB-ISSUE-099 settle — per-family projection rules (§17)', () => 
   it('carries period scores as published, periods 1-4 only, and invents no extra time', () => {
     const projection = readMatchProjection(matchProjectionJson(), 'projection');
     const values = proposedPeriodScoreValues(projection, RESOLVED_MATCH);
-    expect(Object.keys(values)).toEqual(['period_scores']);
+    expect(values).not.toBeNull();
+    expect(Object.keys(values ?? {})).toEqual(['period_scores']);
     // `side` resolves to the club identity the canonical grain uses.
-    expect(values.period_scores).toEqual([
+    expect(values?.period_scores).toEqual([
       { club_id: 3, period: 1, goals: 2, behinds: 2, points: 14 },
       { club_id: 11, period: 1, goals: 5, behinds: 3, points: 33 },
     ]);
     expect(() => readMatchProjection(matchProjectionJson({
       period_scores: [{ side: 'home', period: 5, goals: 1, behinds: 1, points: 7 }],
     }), 'projection')).toThrow(/periods 1-4 only/);
+  });
+
+  /**
+   * AFLDB-ISSUE-106, the sibling of the Brownlow D2 defect below. A match the
+   * source published no quarter scores for establishes NO `match_period_scores`
+   * target: an empty `period_scores` array would assert that the canonical
+   * target should hold zero rows, which no AFL Tables results row has ever
+   * claimed, and it would raise a candidate with nothing in it to review.
+   *
+   * The rule is stated against the SOURCE PAYLOAD SHAPE, never against the
+   * current snapshot: every one of T8's 207 acquired 2026 matches happened to
+   * carry period scores, which is why this was unreachable, not why it is
+   * correct.
+   */
+  it('gives a match with no published period scores no target and no empty proposal', () => {
+    // (b) the structure is present but empty, and (a) it is absent or NULL
+    // altogether, are the SAME fact: the source published nothing about
+    // periods. None of the three establishes the target.
+    const withoutTheField = { ...(matchProjectionJson() as Record<string, JsonValue>) };
+    delete withoutTheField.period_scores;
+
+    for (const raw of [
+      matchProjectionJson({ period_scores: [] }),
+      matchProjectionJson({ period_scores: null }),
+      withoutTheField as JsonValue,
+    ]) {
+      const projection = readMatchProjection(raw, 'projection');
+      expect(projection.periodScores).toEqual([]);
+      // Never `{ period_scores: [] }`.
+      expect(proposedPeriodScoreValues(projection, RESOLVED_MATCH)).toBeNull();
+      expect(targetEstablishedBySource('match_period_scores', raw)).toBe(false);
+      // The match itself is still an observation, so `matches` is untouched.
+      expect(targetEstablishedBySource('matches', raw)).toBe(true);
+    }
+
+    // (c) One or more published periods: the target exists, exactly as before.
+    expect(targetEstablishedBySource('match_period_scores', matchProjectionJson())).toBe(true);
+    // A record nobody could interpret establishes no period score either.
+    expect(targetEstablishedBySource('match_period_scores', null)).toBe(false);
+
+    // And it agrees with the one reader of that JSON, in both directions, so
+    // it cannot drift from what the projection actually says.
+    for (const raw of [matchProjectionJson(), matchProjectionJson({ period_scores: [] })]) {
+      expect(targetEstablishedBySource('match_period_scores', raw))
+        .toBe(readMatchProjection(raw, 'projection').periodScores.length > 0);
+    }
+  });
+
+  it('keeps partially published period scores exactly as published', () => {
+    // (d) One quarter for one side only, with a NULL inside it. Nothing is
+    // invented for the away side or for quarters 2-4, and the NULL stays NULL
+    // rather than becoming 0 — *not recorded* is not zero.
+    const raw = matchProjectionJson({
+      period_scores: [{ side: 'home', period: 2, goals: 7, behinds: null, points: null }],
+    });
+    const projection = readMatchProjection(raw, 'projection');
+    expect(targetEstablishedBySource('match_period_scores', raw)).toBe(true);
+    expect(proposedPeriodScoreValues(projection, RESOLVED_MATCH)).toEqual({
+      period_scores: [{ club_id: 11, period: 2, goals: 7, behinds: null, points: null }],
+    });
   });
 
   it('proposes the 21 statistics by name, and never the vote to player_match_stats', () => {
@@ -3275,9 +3336,11 @@ describe('AFLDB-ISSUE-099 settle — per-family projection rules (§17)', () => 
     // evidence that one exists is not evidence that it does.
     expect(targetEstablishedBySource('brownlow_round_votes', null)).toBe(false);
 
-    // The other targets are established by the record itself. A rejected
-    // record still refuses on them, exactly as before -- unchanged here.
-    for (const target of ['matches', 'match_period_scores', 'player_match_stats'] as const) {
+    // `matches` and `player_match_stats` are established by the record itself:
+    // a results row IS a match observation and a stats row IS a participation
+    // observation. A rejected record still refuses on them, exactly as before.
+    // `match_period_scores` is NOT in this set any more -- see ISSUE-106 above.
+    for (const target of ['matches', 'player_match_stats'] as const) {
       expect(targetEstablishedBySource(target, null)).toBe(true);
       expect(targetEstablishedBySource(target, playerProjectionJson())).toBe(true);
     }

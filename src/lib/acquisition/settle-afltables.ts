@@ -149,22 +149,40 @@ export function targetTablesFor(wireFamily: string): readonly SettleTargetTable[
  *     (§17.4, R3). NA means no target — never `votes = 0`, never a
  *     `played = true, votes = NULL` filler, and never an empty candidate. A
  *     published **0 is a real vote** and the target exists.
- *   - A record with no projection at all (Python could not interpret it) does
- *     not establish the vote either. Fail closed: absence of evidence that a
- *     vote exists is not evidence that one does. Presence is untouched — the
- *     observation is still persisted in full (§19).
- *   - Every other target is established by the record itself.
+ *   - **`match_period_scores`** (AFLDB-ISSUE-106) is the exact sibling. It
+ *     exists only where the source published at least one period observation.
+ *     A results row that carries no quarter scores has not established that
+ *     the match had zero periods — it has published nothing about them — so
+ *     the target does not exist and no candidate proposing an empty
+ *     `period_scores` array is manufactured. A published period is preserved
+ *     exactly, partial publication included; nothing is invented to fill the
+ *     rest, and periods 5+ are still refused outright by the reader.
+ *   - A record with no projection at all (Python could not interpret it)
+ *     establishes NEITHER of them. Fail closed on both: absence of evidence
+ *     that the fact exists is not evidence that it does. Presence is
+ *     untouched — the observation is still persisted in full (§19).
+ *   - `matches` and `player_match_stats` ARE established by the record itself:
+ *     an AFL Tables results row IS a match observation and a player-stats row
+ *     IS a participation observation, whatever else failed to resolve. A
+ *     rejected record therefore still refuses on those, and only those.
  *
- * Shape knowledge stays with `readPlayerMatchProjection()` — the one reader of
- * that JSON — so this can never drift from what the projection actually says.
+ * Shape knowledge stays with `readMatchProjection()` / `readPlayerMatchProjection()`
+ * — the only readers of that JSON — so this can never drift from what the
+ * projection actually says.
  */
 export function targetEstablishedBySource(
   targetTable: SettleTargetTable, projection: JsonValue | null,
 ): boolean {
-  if (targetTable !== 'brownlow_round_votes') return true;
-  if (projection === null) return false;
-  return readPlayerMatchProjection(projection, 'the record projection')
-    .brownlowRoundVote !== null;
+  if (targetTable === 'brownlow_round_votes') {
+    if (projection === null) return false;
+    return readPlayerMatchProjection(projection, 'the record projection')
+      .brownlowRoundVote !== null;
+  }
+  if (targetTable === 'match_period_scores') {
+    if (projection === null) return false;
+    return readMatchProjection(projection, 'the record projection').periodScores.length > 0;
+  }
+  return true;
 }
 
 /**
@@ -960,7 +978,13 @@ export type MatchProjection = {
   attendance: number | null;
   attendanceStatus: string;
   attendanceSourceKey: string | null;
-  /** Periods 1-4 only, cumulative-to-date, all-NULL sides already dropped. */
+  /**
+   * Periods 1-4 only, cumulative-to-date, all-NULL sides already dropped.
+   *
+   * EMPTY MEANS THE SOURCE PUBLISHED NO PERIOD SCORES — not that the match had
+   * none (ISSUE-106). `targetEstablishedBySource()` reads it that way and the
+   * `match_period_scores` target then does not exist.
+   */
   periodScores: readonly PeriodScore[];
 };
 
@@ -1015,9 +1039,24 @@ export function readMatchProjection(projection: JsonValue, what: string): MatchP
     attendanceSourceKey: asNullableString(
       row.attendance_source_key, `${what}.attendance_source_key`,
     ),
-    periodScores: asArray(row.period_scores, `${what}.period_scores`)
-      .map((entry, i) => readPeriodScore(entry, `${what}.period_scores[${i}]`)),
+    periodScores: readPeriodScores(row.period_scores, `${what}.period_scores`),
   };
+}
+
+/**
+ * The published period set, or none at all.
+ *
+ * An absent or NULL `period_scores` reads exactly as an empty one: both say
+ * the source published no period observation for this match, and neither is a
+ * refusal. This mirrors `brownlow_round_vote`, whose absence is likewise read
+ * as "no vote published" rather than as a malformed projection. A value that
+ * is present but is not an array is still a contract violation and fails.
+ */
+function readPeriodScores(
+  value: JsonValue | undefined, what: string,
+): readonly PeriodScore[] {
+  if (value === undefined || value === null) return [];
+  return asArray(value, what).map((entry, i) => readPeriodScore(entry, `${what}[${i}]`));
 }
 
 function readPeriodScore(value: JsonValue, what: string): PeriodScore {
@@ -1148,10 +1187,20 @@ export function proposedMatchValues(
  * periods 1-4, with `side` resolved to the club identity the canonical grain
  * uses. A side/period whose goals, behinds AND points are all NULL is already
  * absent from the projection and writes no row — *not recorded* is not 0.
+ *
+ * **Null when the source published no period scores at all** (ISSUE-106), the
+ * same contract `proposedBrownlowValues()` states. `{ period_scores: [] }` is
+ * never returned: an empty array would assert that the canonical target should
+ * hold zero rows, which no AFL Tables results row has ever claimed, and it
+ * would raise a candidate with nothing in it to review. Absence of published
+ * evidence is not evidence of absence. Partial publication is preserved
+ * exactly as published — only the quarters the source carried, never a filler
+ * for the rest.
  */
 export function proposedPeriodScoreValues(
   projection: MatchProjection, identity: ResolvedMatchIdentity,
-): Record<string, JsonValue> {
+): Record<string, JsonValue> | null {
+  if (projection.periodScores.length === 0) return null;
   const rows = projection.periodScores
     .map((score) => ({
       club_id: score.side === 'home' ? identity.homeClubId : identity.awayClubId,
