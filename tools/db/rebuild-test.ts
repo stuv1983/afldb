@@ -383,7 +383,9 @@ export const DEFAULT_VENV_PYTHON = process.platform === 'win32'
  * Read at call time, never captured at module load, so the environment a stage actually
  * runs under is the one that selected the interpreter.
  */
-export function resolvePython(env: NodeJS.ProcessEnv = process.env): string {
+export function resolvePython(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): string {
   const override = (env.AFLDB_PYTHON ?? '').trim();
   return override !== '' ? override : DEFAULT_VENV_PYTHON;
 }

@@ -25,7 +25,7 @@
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | **Open; H9 confirmed at owning-layer level.** The Next 15.5.23 framework dependency closure/runtime/client/serving path owns the defect; two matched Next 16.3.1 passes had zero hydration/client errors with unchanged semantics. Single residual: deployed Linux-dev acceptance after ISSUE-107. |
-| `AFLDB-ISSUE-107` | Medium | Framework / Runtime / Deployment | **Open.** Implement the bounded Next.js 15.5.23 → 16.3.1 closure with Webpack first, validate and deploy to Linux dev, then hand the final 1,440-row hydration acceptance to ISSUE-068. No production rollout before dev gates pass. |
+| `AFLDB-ISSUE-107` | Medium | Framework / Runtime / Deployment | **Open; local implementation complete.** Next 16.3.1/Webpack resolves with React/ReactDOM 19.2.8 and clean typecheck/focused DB-free validation. Linux database-backed build/standalone, guarded integration, browser/E2E and systemd/build-ID gates remain before ISSUE-068 handoff. |
 <!-- RETIRED 2026-08-28 — `AFLDB-ISSUE-090` is **Resolved** and is NO LONGER an open issue.
      Do not read the commented-out row below as current: it is the pre-resolution index row,
      kept only as lineage, and its "Next action" text is SUPERSEDED. Authoritative records:
@@ -208,18 +208,22 @@
 - **Severity:** Medium
 - **Area:** Framework / Runtime / Deployment
 - **Runbook:** `AFLDB-ISSUE-107.md`.
-- **Current state:** Open; implementation has not started. The scope is the proven Next.js
-  15.5.23 → 16.3.1 framework closure, retaining React/ReactDOM 19.2.8 unless a genuine
-  dependency constraint requires otherwise, Node >=20.9, and Webpack for the first controlled
-  build (`next build --webpack`).
-- **Required validation:** dependency/lockfile integrity, Next 16 TypeScript/generated controls,
-  build, typecheck, unit/integration, standalone output, and focused route/E2E regression.
+- **Current state:** Open; local implementation complete. Next/eslint-config-next are exactly
+  16.3.1, React/ReactDOM remain 19.2.8, Webpack is explicit for dev/build, clean generated-type
+  reproduction and full typecheck pass, and 800 focused DB-free tests pass. The local compile/
+  framework type phase passes but page collection requires the absent build database.
+- **Required validation:** Linux `_test` integration, complete Webpack build/standalone output,
+  focused live route/E2E console/hydration checks, and systemd/build-ID/runtime-control proof.
 - **Deployment order:** Linux dev only → prove `x-afldb-build` and unchanged runtime controls →
   ISSUE-068 final deployed 1,440-row acceptance → only then consider a separately reviewed
   production rollout.
 - **Stop conditions:** unexplained React/dependency expansion, simultaneous bundler change,
   semantic/security regression, unreproducible framework controls, live build mismatch,
   reduced concurrency, or any unexplained hydration/client error in ISSUE-068 acceptance.
+- **Exact next action:** enable `AFLDB_TRACE_REQUESTS=on` on Linux dev, retain 4 workers/pool 10,
+  run the remaining database-backed gates and `deploy/sync-dev.ps1 -Issue107Gate`, then hand
+  that exact live build to ISSUE-068 for its 1,440-row acceptance. Do not resolve either issue
+  before its owned gates pass.
 
 <!-- RETIRED 2026-08-28 — `AFLDB-ISSUE-077` is **Resolved** (2026-08-26) and is NO LONGER an
      open issue. The detail block below is retained as lineage only: its "Current state" and

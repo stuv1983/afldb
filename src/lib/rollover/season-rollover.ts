@@ -569,7 +569,7 @@ export function artefactSetDigest(manifest: Json): string {
 
 export function manifestRowTotal(manifest: Json): number {
   return arr(manifest.files, 'the manifest `files` list')
-    .reduce((total, entry, index) =>
+    .reduce<number>((total, entry, index) =>
       total + int(obj(entry, `manifest file[${index}]`).row_count,
         `manifest file[${index}].row_count`), 0);
 }

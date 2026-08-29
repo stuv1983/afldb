@@ -15,6 +15,37 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-107 — Next.js 16 local upgrade and Linux-dev gate preparation - 29 August 2026
+
+- Upgraded the controlled framework/tooling closure from Next.js 15.5.23 to exactly 16.3.1
+  and eslint-config-next 16.3.1 while retaining React and ReactDOM 19.2.8. Development and
+  production build scripts explicitly select Webpack, and standalone preparation remains the
+  final build step; Turbopack is not part of this first upgrade.
+- Accepted and reproduced Next 16's framework-managed TypeScript controls (`jsx: react-jsx`,
+  production/development generated route-type includes, and import-style generated
+  `next-env.d.ts`). `npm run typecheck` now generates route types first, and the ESLint setup
+  uses Next 16's native flat exports instead of the incompatible legacy `FlatCompat` adapter.
+- Removed all eight pre-existing typecheck failures only where they became real production
+  build blockers: explicit numeric reduction typing in the season-rollover planner, a truthful
+  one-key environment contract for the rebuild harness, the missing guarded DraftGuru advisory
+  lock DSN, and an explicit observation-spine JSON fixture type. The resulting full typecheck
+  and focused 800-test compatibility/semantic set pass without changing AFLDB application or
+  NL-search semantics.
+- Preserved the existing Edge `middleware.ts` convention for the controlled upgrade because
+  Next 16's `proxy.ts` migration also changes that boundary to the Node runtime. The warning is
+  accepted for now rather than changing a second runtime axis. Next 16's incremental,
+  layout-deduplicated segment/prefetch serving shape is likewise treated as an expected
+  framework-path change; AFLDB's deliberate primary-navigation `prefetch={false}` remains.
+- Prepared the normal Linux development deployment path with an explicit ISSUE-107 gate:
+  Node >=20.9, unskipped clean install/Webpack build/systemd restart/health, unchanged
+  development worker 4/pool 10 controls, and equality between the standalone BUILD_ID and the
+  live `x-afldb-build` header. Request tracing remains development opt-in and is documented for
+  preservation through ISSUE-068 acceptance.
+- This is local implementation/preparation only. Database-backed page collection, complete
+  standalone output, guarded integration, live browser/E2E, Linux systemd validation and
+  ISSUE-068's final 1,440-row hydration sweep remain pending; neither issue is resolved and no
+  production deployment was performed.
+
 ### Tooling — DraftGuru UTF-8 spawn helpers retain string output types - 29 August 2026
 
 - `tests/draftguru-acquisition.test.ts` now declares all six UTF-8 child-process helpers as

@@ -29,7 +29,7 @@ Deployment on the **development server**. Production cutover is a separate, deli
 |---|---|
 | Host | `arm@10.0.40.100` (`streamanator`), 24 cores, 31 GB RAM |
 | Project | `/home/arm/projects/afldb` |
-| Node | 22.23.2 via nvm (user-local, no root) |
+| Node | 22.23.2 via nvm (user-local, no root; Next.js 16 requires >=20.9) |
 | App port | **3100** (3000 was already in use) |
 | Proxy port | **8090** (deliberately not 80/443) |
 | Databases | `afldb_dev`, `afldb_test`, `afldb_restore_test` |
@@ -70,7 +70,30 @@ powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1
 Use `-WhatIf` to print the target without touching the server, and
 `-SkipMigrate`, `-SkipBuild` or `-SkipRestart` for narrower maintenance runs.
 
-`npm run build` runs `next build` then `tools/build/prepare-standalone.mjs`, which copies `.next/static` into the standalone bundle and creates `.next/cache`. **Both are required** — without them the site starts but every stylesheet 404s and ISR cannot persist.
+For AFLDB-ISSUE-107's controlled Next.js 16 deployment, first set
+`AFLDB_TRACE_REQUESTS=on` in the development host's `.env`, retain
+`AFLDB_WORKERS=4` and `AFLDB_POOL_MAX=10`, then run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1 -Issue107Gate
+```
+
+That mode refuses skipped install/build/restart/health steps, enforces Node >=20.9, checks the
+development 4-worker/10-connection-pool controls after the systemd restart, and fails unless
+`.next/standalone/.next/BUILD_ID` equals the live `x-afldb-build` response header.
+
+`npm run build` deliberately runs `next build --webpack` for the controlled Next.js 16
+upgrade, then `tools/build/prepare-standalone.mjs`, which copies `.next/static` into the
+standalone bundle and creates `.next/cache`. **Both are required** — without them the site
+starts but every stylesheet 404s and ISR cannot persist. Turbopack is not part of this first
+framework upgrade.
+
+Next.js 16's navigation cache deduplicates shared layouts and may issue more, smaller
+incremental prefetch requests than Next 15. The resulting RSC/static request and output shape
+is therefore not expected to be byte-for-byte identical. AFLDB retains its intentional
+`prefetch={false}` primary/mobile navigation links and otherwise uses the framework defaults;
+validate route semantics, console/hydration health and build identity rather than treating a
+different `.rsc`/segment layout as a regression by itself.
 
 ## 4. Service management
 

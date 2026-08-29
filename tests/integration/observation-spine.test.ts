@@ -703,7 +703,7 @@ describe('ISSUE-096 §5.H — the promotion queue refuses in the schema', () => 
   async function candidate(
     tx: Tx, f: Fixtures, verb: string, targetTable = 'matches',
   ): Promise<number> {
-    const fields = verb === 'absent' ? {} : { home_score: 132 };
+    const fields: JsonValue = verb === 'absent' ? {} : { home_score: 132 };
     const [row] = await tx<{ id: number }[]>`
       INSERT INTO promotion_candidates
         (source_id, family, external_record_id, source_version_seq, verb, season,

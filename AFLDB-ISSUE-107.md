@@ -128,6 +128,154 @@ unexplained hydration/client errors and no semantic regression from 1,238 / 202 
 Only after that pass may ISSUE-068 close and a production rollout be considered. Production
 deployment is not automatic and remains a separately reviewed operator action.
 
+## Implementation evidence — 2026-08-29
+
+ISSUE-107 remains **Open**. The bounded local implementation is complete and is ready to enter
+the Linux development gate, but this Windows worktree has no `.env`, build database or `_test`
+database. It therefore cannot legitimately prove database-backed page collection, standalone
+output, guarded integration, production-route E2E or the Linux/systemd runtime.
+
+### Phase 0 control
+
+- Local Node: `v22.21.0`; the documented Linux development service pins Node `v22.23.2`.
+  Both satisfy Next 16.3.1's package-declared `>=20.9.0` requirement.
+- Baseline resolved closure after clean `npm ci`: Next `15.5.23`, React `19.2.8`, ReactDOM
+  `19.2.8`, eslint-config-next `15.5.24`.
+- Baseline production command: `next build` followed by
+  `tools/build/prepare-standalone.mjs`; standalone output was configured but absent after the
+  failed baseline build.
+- Documented Linux development controls: `AFLDB_WORKERS=4`, `AFLDB_POOL_MAX=10` (52 maximum
+  application/auth connections under the documented formula).
+- Baseline typecheck reproduced the expected **8 errors in 4 files**, with no extras:
+  `season-rollover.ts` (2), `db-test-rebuild.test.ts` (4),
+  `integration/draftguru-import.test.ts` (1), and
+  `integration/observation-spine.test.ts` (1).
+- Baseline DB-free Vitest: 65 files / 2,090 tests passed, 18 skipped, with one pre-existing
+  failure because the gitignored DraftGuru `full-history-20260826` corpus is absent.
+- Baseline lint: 172 errors and 81 warnings. This was already not a green repository gate.
+- Baseline Next 15 Webpack compilation succeeded, then framework typechecking stopped on the
+  known `season-rollover.ts` error before page collection or standalone emission.
+
+### Phase 1 dependency and bundler result
+
+- Direct dependencies now pin Next exactly `16.3.1` and eslint-config-next exactly `16.3.1`.
+- A clean `npm ci` resolves Next `16.3.1`, React `19.2.8`, ReactDOM `19.2.8`, and
+  eslint-config-next `16.3.1`; `npm ls` reports a coherent top-level closure.
+- `npm audit` reports zero vulnerabilities. The existing PostCSS/Sharp security overrides are
+  retained deliberately so the controlled upgrade does not introduce another dependency axis.
+- Both scripts are explicitly Webpack-controlled: `next dev --webpack -p 3100` and
+  `next build --webpack`; standalone preparation remains chained to the production build.
+  Turbopack was neither enabled nor used.
+
+### Phase 2 framework controls and serving-path review
+
+- `next typegen` made the mandatory tracked `tsconfig.json` change from `jsx: preserve` to
+  `jsx: react-jsx`, and added `.next/dev/types/**/*.ts` beside the existing production route
+  type include.
+- Generated/ignored `next-env.d.ts` now uses imports for `.next/types/routes.d.ts` and
+  `.next/types/root-params.d.ts`. `npm run typecheck` runs `next typegen` first, so deleting
+  `.next` plus `next-env.d.ts` after a clean install reproduced the same generated state and a
+  green typecheck. The generated declaration was not hand-edited or made source-controlled.
+- Next 16's dev server appended its version-matched managed agent-rules block to the existing
+  `CLAUDE.md`, pointing future work at the installed `node_modules/next/dist/docs/`.
+- The Next 16 native flat ESLint exports replaced the incompatible Next 15 `FlatCompat`
+  adapter; the now-unused direct `@eslint/eslintrc` dependency was removed.
+- The deprecated `middleware.ts` convention is retained for this first controlled upgrade.
+  Next 16.3.1's installed upgrade guide states that renaming it to `proxy.ts` also changes its
+  runtime from Edge to Node.js; taking that second runtime axis here would weaken the A/B
+  control. The deprecation warning is recorded and is not a build failure.
+- Next 16's layout-deduplicated, incremental navigation prefetch/segment-cache format is
+  accepted as part of the proven serving-path candidate. AFLDB's intentional
+  `prefetch={false}` primary/mobile navigation remains unchanged; no configuration attempts to
+  force Next 15's `.rsc` or static output shape.
+
+### Phase 3 local validation result
+
+- The initial post-upgrade typecheck had exactly the same 8-error baseline and no new Next 16
+  errors. All 8 became blockers once `next build --webpack` reached framework typechecking, so
+  the runbook's blocker exception was applied narrowly:
+  - `manifestRowTotal()` now supplies the existing numeric `reduce` operation's generic;
+  - `resolvePython()` accepts the one optional environment key it actually reads without
+    inheriting Next's required `NODE_ENV` augmentation;
+  - the DraftGuru integration setup now passes its guarded `_test` DSN to the advisory-lock
+    helper (restoring the lock its comments and teardown already required); and
+  - the observation-spine test's conditional JSON fixture is explicitly `JsonValue`.
+- Post-repair `npm run typecheck`: **PASS, 0 errors**. This is a legitimate disappearance of
+  the known 8-error baseline, not a claim that it was green before the upgrade.
+- Focused compatibility/semantic tests: **10 files, 800 tests passed**, covering auth,
+  indexing, SEO, NL parse/plan/description/regression/semantic mapping, season rollover and
+  the database rebuild harness. The two directly owning DB-free suites also passed 333 tests.
+- Full DB-free Vitest after the upgrade is unchanged from baseline: 65 files / 2,090 tests
+  passed, 18 skipped, and the same one missing gitignored DraftGuru-corpus failure.
+- Guarded database integration: **not run**; no `AFLDB_TEST_DATABASE_URL` is present, and the
+  guard correctly refuses any non-`_test` substitution.
+- Lint now executes under the supported Next 16 flat config. It reports 180 errors and 81
+  warnings versus baseline 172/81. The **net** delta is +8 errors, but the diagnostic-set delta
+  is nine new errors minus one removed generated-file error: Next 16's native config ignores
+  `next-env.d.ts`, removing the baseline `next-env.d.ts:3`
+  `@typescript-eslint/triple-slash-reference` error ("Do not use a triple slash reference for
+  ./.next/types/routes.d.ts, use `import` style instead."), while
+  `eslint-plugin-react-hooks` 7.1.1's recommended preset newly enables
+  `react-hooks/set-state-in-effect` at error severity. All nine newly exposed diagnostics are
+  classification **A (new rule exposure only)**: the source patterns and React/ReactDOM 19.2.8
+  runtime are unchanged, and Next 16's installed native config directly supplies the rule, so
+  none is a framework compatibility defect or a flat-config mismatch.
+
+  | File | Line | Rule | Message | Class |
+  | --- | ---: | --- | --- | --- |
+  | `src/app/admin/AdminNav.tsx` | 55 | `react-hooks/set-state-in-effect` | `Error: Calling setState synchronously within an effect can trigger cascading renders` (`Avoid calling setState() directly within an effect`) | A |
+  | `src/app/admin/AdminSection.tsx` | 48 | `react-hooks/set-state-in-effect` | `Error: Calling setState synchronously within an effect can trigger cascading renders` (`Avoid calling setState() directly within an effect`) | A |
+  | `src/app/admin/settings/SearchPlaceholderSettings.tsx` | 44 | `react-hooks/set-state-in-effect` | `Error: Calling setState synchronously within an effect can trigger cascading renders` (`Avoid calling setState() directly within an effect`) | A |
+  | `src/app/admin/settings/SearchPlaceholderSettings.tsx` | 81 | `react-hooks/set-state-in-effect` | `Error: Calling setState synchronously within an effect can trigger cascading renders` (`Avoid calling setState() directly within an effect`) | A |
+  | `src/components/ConsentBanner.tsx` | 46 | `react-hooks/set-state-in-effect` | `Error: Calling setState synchronously within an effect can trigger cascading renders` (`Avoid calling setState() directly within an effect`) | A |
+  | `src/components/PlayerPicker.tsx` | 55 | `react-hooks/set-state-in-effect` | `Error: Calling setState synchronously within an effect can trigger cascading renders` (`Avoid calling setState() directly within an effect`) | A |
+  | `src/components/ReorderableSections.tsx` | 77 | `react-hooks/set-state-in-effect` | `Error: Calling setState synchronously within an effect can trigger cascading renders` (`Avoid calling setState() directly within an effect`) | A |
+  | `src/components/SearchBox.tsx` | 67 | `react-hooks/set-state-in-effect` | `Error: Calling setState synchronously within an effect can trigger cascading renders` (`Avoid calling setState() directly within an effect`) | A |
+  | `src/components/SearchBox.tsx` | 119 | `react-hooks/set-state-in-effect` | `Error: Calling setState synchronously within an effect can trigger cascading renders` (`Avoid calling setState() directly within an effect`) | A |
+
+  No rule was suppressed and no source or lint-config repair was made for this non-blocking
+  exposure.
+- `next build --webpack`: Webpack compilation **PASS** and framework TypeScript **PASS**; page
+  data collection then stops while collecting `/_not-found` and `/aflw/clubs/[code]`, both with
+  the same sole cause: `DATABASE_URL is not set`. The middleware-convention deprecation and
+  Next-internal `dynamic-rendering.js` Edge-API messages are non-fatal warnings; no other Next 16
+  build error occurs before the database configuration stop. Standalone output/preparation is
+  therefore **not proven locally** and must be the first Linux development build gate.
+- A live Next 16.3.1 Webpack dev process proved `/` -> `/beta` (307), `/admin` ->
+  `/admin/login` (307), and `/robots.txt` (200), without framework-error response bodies.
+  Data-backed routes returned the expected environment failure because no build/runtime DSN
+  exists. The in-app browser was unavailable, so console/hydration inspection was not run.
+- The dev server also warned that `src/app/sitemap.ts` and
+  `src/app/sitemap.xml/route.ts` both resolve to `/sitemap.xml`. This is classified
+  **pre-existing/non-causal**: both route sources implement the pre-upgrade segmented sitemap
+  design and neither was introduced or changed by ISSUE-107. Next 16's build manifest still
+  contains the explicit `/sitemap.xml/route` index and generated
+  `/sitemap/[__metadata_id__]/route` segments. No SEO route was removed or redesigned under this
+  framework-only issue; the live focused route gate must still verify the intended response.
+- The ISSUE-068 1,440-row sweep was **not run**, as required by the ownership boundary.
+
+### Phase 4 Linux development preparation and exact residual
+
+- `deploy/sync-dev.ps1` now always enforces Node >=20.9 and captures the standalone BUILD_ID.
+  Its explicit `-Issue107Gate` mode refuses skipped install/build/restart/health stages, checks
+  live development controls remain `AFLDB_WORKERS=4` / `AFLDB_POOL_MAX=10`, and fails if the
+  live `x-afldb-build` header is absent or differs from
+  `.next/standalone/.next/BUILD_ID`. PowerShell parsing and `-WhatIf -Issue107Gate` pass; no SSH
+  or deployment was performed.
+- Before that gate, the Linux development `.env` must have `AFLDB_TRACE_REQUESTS=on`; the
+  option is documented in `.env.example` and `docs/deployment.md`. This preserves per-response
+  build/worker evidence through ISSUE-068 acceptance without making tracing a production
+  default.
+- Exact next action: after the user commits/pushes the reviewed local changes, run the guarded
+  DB integration and full `npm run build` on Linux development, then execute
+  `deploy/sync-dev.ps1 -Issue107Gate` through the normal Git/npm/systemd path. Preserve the
+  build ID, service status, health, worker/pool evidence and focused route/E2E console results.
+  ISSUE-107 stays Open until those G2/G3 results are green.
+- Exact ISSUE-068 handoff after G3: run one comparable live Linux-dev 1,440-row sweep with
+  every response bound to that build ID, `AFLDB_WORKERS=4` and established concurrency
+  unchanged. ISSUE-068 may close only at zero unexplained hydration/client errors and no
+  semantic regression from 1,238 / 202 / 0.
+
 ## Gates
 
 - **G0 — Candidate integrity:** Next 16.3.1; React/ReactDOM 19.2.8; Node >=20.9; Webpack chosen.
@@ -141,6 +289,10 @@ deployment is not automatic and remains a separately reviewed operator action.
   hydration/client errors and semantic 1,238 / 202 / 0 or better without changed expectations.
 - **G5 — Production eligibility:** G0-G4 are green and the production rollout receives its own
   review. Until then, production is out of scope.
+
+Current state (2026-08-29): **G0 PASS; G1 PASS; G2 PARTIAL/PENDING Linux database-backed
+build, guarded integration, standalone and focused browser/E2E; G3 PENDING; G4 PENDING under
+ISSUE-068; G5 PENDING.** Neither ISSUE-107 nor ISSUE-068 is resolved.
 
 ## Stop conditions
 

@@ -12,7 +12,7 @@ created, reopened, resolved, or materially reclassified.
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | H9 is confirmed at the owning-layer level: the defect belongs to the Next 15.5.23 framework dependency closure/runtime/client/serving path; two matched Next 16.3.1 passes eliminated all hydration/client errors without semantic change. | Complete the single residual: after ISSUE-107 deploys the proven closure to Linux dev, prove `x-afldb-build` and run one comparable 1,440-row acceptance sweep at unchanged worker/concurrency controls. |
-| `AFLDB-ISSUE-107` | Medium | Framework / Runtime / Deployment | Bounded Next.js 15.5.23 → 16.3.1 framework/runtime upgrade using Webpack first; React/ReactDOM remain 19.2.8 unless dependency constraints genuinely require otherwise. | Implement and validate the bounded closure, deploy it to Linux dev, prove the live build, then hand the final deployed 1,440-row hydration acceptance to ISSUE-068. No production rollout before the dev gates pass. |
+| `AFLDB-ISSUE-107` | Medium | Framework / Runtime / Deployment | **Open; local implementation complete.** Next 16.3.1/Webpack resolves with React/ReactDOM 19.2.8; clean type generation/typecheck and focused DB-free regressions pass. Database-backed build/standalone, guarded integration, browser/E2E and Linux systemd evidence remain pending. | Validate and deploy through Linux dev with `deploy/sync-dev.ps1 -Issue107Gate`, prove the live build and unchanged 4×10 controls, then hand the final deployed 1,440-row hydration acceptance to ISSUE-068. No production rollout before the dev gates pass. |
 | `AFLDB-ISSUE-102` | Medium | Data acquisition / Import architecture | `tools/migration/import_awards.py:1408` still requires `AFLDB_LEGACY_SQLITE`, so the awards/honours domain has the same legacy dependency `AFLDB-ISSUE-095` records for `club_seasons`, previously untracked. No free API covers Coleman, Rising Star, All-Australian, AFLCA, AFLPA or club best-and-fairest; Brownlow is the exception via the AFL Tables path. | **Record only.** Do not design the replacement under this investigation — no source selection, no per-award provenance decision, no importer work is authorised by this entry. Links `AFLDB-ISSUE-095` as the direct sibling gap; not absorbed. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
 
@@ -9614,7 +9614,28 @@ application/security/semantic regression, build-ID mismatch, reduced runtime con
 unexplained hydration/client error in ISSUE-068 acceptance. Preserve the exact failed closure
 and evidence; do not suppress errors or lower concurrency.
 
+### Implementation state — 2026-08-29
+The local controlled closure is implemented: Next and eslint-config-next are exactly 16.3.1,
+React/ReactDOM remain 19.2.8, local/documented Linux Node 22 satisfies >=20.9, dev/build scripts
+explicitly select Webpack, Next 16's tracked/generated TypeScript controls reproduce after a
+clean install, and the native flat ESLint configuration loads. All eight known baseline
+typecheck errors became build blockers and received narrow typing/test-harness repairs; the
+full typecheck now passes. Focused auth/indexing/SEO/NL/tooling coverage passed 800/800 tests,
+and the broad DB-free result is unchanged at 2,090 passing with the same one missing
+gitignored-corpus failure.
+
+The local Webpack compile and framework typecheck pass, but page collection stops because this
+worktree has no `DATABASE_URL`; no `_test` DSN or connected in-app browser is available either.
+Consequently guarded integration, complete standalone output, data-backed route/E2E and Linux
+runtime evidence remain pending. The deployment helper's `-Issue107Gate` now enforces Node,
+unskipped install/build/restart/health, development 4-worker/10-pool controls, and equality of
+the standalone BUILD_ID with live `x-afldb-build`. The Next 16 middleware deprecation remains
+deliberately: renaming to `proxy` would also switch Edge to Node runtime, widening this first
+controlled upgrade. ISSUE-068 was not swept and remains Open.
+
 ### Next action
-Follow `AFLDB-ISSUE-107.md` from candidate preflight through the bounded Next 16.3.1/Webpack
-implementation and Linux development deployment. The framework upgrade is not implemented by
-the ISSUE-068 closeout task.
+After the user commits/pushes the reviewed local changes, run guarded integration and the full
+Webpack/standalone build on Linux development, then deploy with
+`deploy/sync-dev.ps1 -Issue107Gate` while `AFLDB_TRACE_REQUESTS=on`, preserve the build/service/
+worker/pool/route evidence, and keep ISSUE-107 Open until those G2/G3 gates pass. Then hand the
+same live build to ISSUE-068 for its one 1,440-row acceptance at unchanged controls.

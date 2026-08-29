@@ -218,7 +218,7 @@ describe.skipIf(!canRun)(
   () => {
   beforeAll(async () => {
     await importRole.validate();
-    await lockDraftTables();
+    await lockDraftTables(process.env.AFLDB_TEST_DATABASE_URL!);
     draftguruSourceId = await sourceId('draftguru');
     afltablesSourceId = await sourceId('afltables');
     const [clubCount] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM clubs`;
