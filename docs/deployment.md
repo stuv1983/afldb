@@ -82,6 +82,27 @@ That mode refuses skipped install/build/restart/health steps, enforces Node >=20
 development 4-worker/10-connection-pool controls after the systemd restart, and fails unless
 `.next/standalone/.next/BUILD_ID` equals the live `x-afldb-build` response header.
 
+Three things about the remote side are worth knowing, because each was a silent failure before
+it was fixed:
+
+- **Node comes from nvm and is not on an SSH `PATH`.** A non-interactive *or* login SSH shell
+  resolves `/usr/bin/node`, which is 18.19.1 on the development host — below Next 16's floor.
+  The script sources nvm's default before checking, so the build runs on the same v22.23.2 the
+  systemd unit pins. A host without nvm keeps its `PATH` Node and is still held to the floor.
+- **The remote script is sent base64-encoded.** PowerShell writes a UTF-8 BOM into a native
+  command's stdin pipe, so piping the script straight into `bash -s` made the remote shell fail
+  on its first line — `set -Eeuo pipefail` — and then run on past failed stages, able to exit 0.
+  Base64 is plain ASCII and survives the pipe, CRLF and PowerShell's argument handling.
+- **Restart falls back to the unit's `Restart=` policy.** `sudo` needs a password here, so
+  `sudo -n systemctl restart afldb` cannot work over SSH and plain `systemctl restart` returns
+  *Interactive authentication required*. The unit runs as `arm` with `Restart=always`, so the
+  script terminates `MainPID` and lets **systemd** respawn the service from the unit, proving it
+  by a changed `MainPID`. systemd is not bypassed and `.env` is re-read.
+
+Build steps inside the remote script must be written as **single-quoted** PowerShell strings.
+A double-quoted one expands `$(…)` on the workstation, so a step meant to report the server's
+Node version, revision or working-tree state silently reports Windows instead.
+
 `npm run build` deliberately runs `next build --webpack` for the controlled Next.js 16
 upgrade, then `tools/build/prepare-standalone.mjs`, which copies `.next/static` into the
 standalone bundle and creates `.next/cache`. **Both are required** — without them the site

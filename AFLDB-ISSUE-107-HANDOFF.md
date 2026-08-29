@@ -1,5 +1,13 @@
 # AFLDB-ISSUE-107 Linux Dev Handoff
 
+> **SUPERSEDED 2026-08-29.** The Linux development gate described below has been executed.
+> The build is deployed and proven live at BUILD_ID `uZReW8G1XnsGnG5FNYY-I`. Read
+> `AFLDB-ISSUE-107.md` — sections *Linux development evidence — 2026-08-29* and
+> *Handoff to AFLDB-ISSUE-068* — for the authoritative current state. Everything below is the
+> pre-deployment plan, retained as lineage; its "exact remaining Linux dev gates" and "first
+> recommended Claude action" are no longer current. One gate remains open: guarded database
+> integration, blocked by `AFLDB-ISSUE-108`.
+
 ## Current repository state
 
 Implementation commit: `5ace3df Upgrade dev runtime to Next.js 16`

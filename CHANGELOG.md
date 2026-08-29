@@ -15,6 +15,92 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-068 — intermittent React hydration errors RESOLVED - 29 August 2026
+
+**Resolved.** The React #418 hydration defect was owned by the Next 15.5.23 framework dependency
+closure/runtime/client/serving path. The Next 16.3.1 framework closure eliminated the defect in
+matched Windows A/B testing, and the result is now confirmed on the real Linux development
+deployment with a clean 1,440-load acceptance. No exact internal Next.js function, commit or
+upstream bug ID is claimed, and none was required: React and ReactDOM resolved to 19.2.8 on both
+sides of the experiment, so they explain nothing. The fix shipped as `AFLDB-ISSUE-107`'s bounded
+framework upgrade, which retains React/ReactDOM 19.2.8 and Webpack.
+
+`AFLDB-ISSUE-107` remains open — `AFLDB-ISSUE-108` blocks its guarded database-integration gate —
+and `AFLDB-ISSUE-108` and `AFLDB-ISSUE-109` remain open and separate.
+
+- Ran the single 1,440-row acceptance sweep against the deployed Next 16.3.1 build
+  `uZReW8G1XnsGnG5FNYY-I` at four Playwright workers, pool 10, tracing on, JavaScript enabled and
+  no retries. **1,440 / 1,440 observations, every one carrying that build ID: zero hydration
+  errors, zero client errors, zero violations, zero metamorphic disagreements, zero HTTP and page
+  errors.** Hydration was zero on every cut the report makes — per worker, same- versus
+  cross-worker, and every RSC cluster. This is the deployed confirmation of the A/B finding that
+  the React #418 defect belonged to the Next 15.5.23 framework closure.
+- Semantic outcomes improved from `1,238 answered / 43 unanswerable / 159 absent` to
+  `1,440 / 0 / 0`. This is **not** attributable to the framework upgrade and is not reported as
+  such: the A/B held the application source constant, whereas this run is on `be2a963`, which
+  merged substantial later natural-language search work — head-to-head queries, the
+  qualifying-matches gate, semantic intents and team-match/player-career changes — covering
+  exactly the categories that previously failed.
+- Ran against the true 1,440-question corpus. The tracked copy is five rows short: a commit
+  merged after the A/B removed five ambiguous "most games in a game" questions. The complete
+  corpus survived on the development host and was proven a clean superset before use — stripping
+  those five ids reproduces the tracked file byte-for-byte — so no threshold was adjusted and no
+  row was fabricated.
+
+### Development database brought to 77/77 migrations - 29 August 2026
+
+- Applied the seven pending committed migrations `071`–`077` to `afldb_dev` through the normal
+  `npm run db:migrate` workflow, after confirming the target database server-side, the absence of
+  `AFLDB_PROD_DATABASE_URL` from both `.env` and the shell, and a 70/77 starting status. The
+  database is now **77/77 with 0 pending** and no checksum drift; a second run is a clean no-op.
+  This is deployment debt from already-merged issues — audit-link FK indexes, DOB conflict
+  ownership, `data_overrides`, the source-observation spine, afltables settle projections and AFL
+  API lineups — not a schema change of its own. No privileges reconciliation was required, and
+  production was not touched.
+- `/admin/data-editor` and `/admin/current-season` no longer fail on missing relations. Live
+  build identity, service process, worker count and pool settings were all unchanged by the
+  migration: no restart and no rebuild.
+- Recorded `AFLDB-ISSUE-109`. Applying `073` made a latent contradiction reachable: the data
+  editor's override save inserts into `data_overrides` on the `afldb_import` connection, which
+  that migration deliberately grants `SELECT` only. The failure moved from *relation does not
+  exist* to *permission denied*; it was not introduced here and is not fixed here, because grants
+  belong in a migration.
+
+### AFLDB-ISSUE-107 — Next.js 16 deployed to Linux development - 29 August 2026
+
+- Deployed the Next.js 16.3.1 / Webpack closure to the real Linux development runtime
+  (`arm@10.0.40.100`, commit `be2a963` on `dev`, Node v22.23.2). The build completed page data
+  collection, generated 1,499 static pages and produced complete standalone output;
+  **BUILD_ID `uZReW8G1XnsGnG5FNYY-I`** is proven live through the `x-afldb-build` response
+  header. The service runs four `next-server (v16.3.1)` workers at unchanged `AFLDB_WORKERS=4`
+  and `AFLDB_POOL_MAX=10`, with `AFLDB_TRACE_REQUESTS=on` and `/api/health` reporting
+  `{"status":"ok","database":"ok"}`. Focused live browser validation covered 17 routes across
+  the beta gate, admin protection, route handlers, SSG pages, advanced search, natural-language
+  search and the grid solver, with zero console, page and hydration errors. React and ReactDOM
+  remain 19.2.8 and no database migration was applied.
+- Repaired four defects in `deploy/sync-dev.ps1` that prevented `-Issue107Gate` from proving
+  what it reports. It now selects the nvm-managed Node the systemd unit pins, because nvm is
+  absent from a non-interactive SSH `PATH` and the deployment otherwise resolved Node 18.19.1,
+  below Next 16's floor. The remote script is sent base64-encoded, because PowerShell writes a
+  UTF-8 BOM into a native command's stdin pipe, which made the remote shell fail on
+  `set -Eeuo pipefail` and continue past failed stages while still able to exit 0. Six evidence
+  lines — including the `git status --porcelain` dirty-tree guard, the reported Node version and
+  the deployed revision — were double-quoted PowerShell strings that expanded `$(…)` on the
+  workstation and described the wrong machine; they now evaluate on the server. The restart step
+  falls back to terminating `MainPID` and letting systemd respawn the unit where `sudo` requires
+  a password, proving the respawn by a changed PID rather than assuming it.
+- Set `AFLDB_POOL_MAX=10` explicitly in the development host's `.env`. This changes no effective
+  value — it is already the default in `src/db/client.ts` — but makes the connection-pool control
+  provable in the running service rather than implied by a source default.
+- Closed the `/sitemap.xml` question. The Next 16 production build emits no duplicate-route
+  warning, and the route's 404 is the intended behaviour when `AFLDB_INDEXING` is not `on`, not a
+  regression. Nothing was repaired.
+
+Not yet green: the guarded database integration suite. 33 failures against `afldb_test` are
+database-content failures with no framework surface — recorded as `AFLDB-ISSUE-108` — so
+`AFLDB-ISSUE-107` remains Open on that gate alone, and `AFLDB-ISSUE-068`'s deployed 1,440-row
+hydration acceptance remains outstanding. Production was not deployed.
+
 ### AFLDB-ISSUE-107 — Next.js 16 local upgrade and Linux-dev gate preparation - 29 August 2026
 
 - Upgraded the controlled framework/tooling closure from Next.js 15.5.23 to exactly 16.3.1

@@ -7,12 +7,13 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 4
+**Open issues:** 5
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
-| `AFLDB-ISSUE-068` | Medium | UI/Hydration | H9 is confirmed at the owning-layer level: the defect belongs to the Next 15.5.23 framework dependency closure/runtime/client/serving path; two matched Next 16.3.1 passes eliminated all hydration/client errors without semantic change. | Complete the single residual: after ISSUE-107 deploys the proven closure to Linux dev, prove `x-afldb-build` and run one comparable 1,440-row acceptance sweep at unchanged worker/concurrency controls. |
-| `AFLDB-ISSUE-107` | Medium | Framework / Runtime / Deployment | **Open; local implementation complete.** Next 16.3.1/Webpack resolves with React/ReactDOM 19.2.8; clean type generation/typecheck and focused DB-free regressions pass. Database-backed build/standalone, guarded integration, browser/E2E and Linux systemd evidence remain pending. | Validate and deploy through Linux dev with `deploy/sync-dev.ps1 -Issue107Gate`, prove the live build and unchanged 4×10 controls, then hand the final deployed 1,440-row hydration acceptance to ISSUE-068. No production rollout before the dev gates pass. |
+| `AFLDB-ISSUE-107` | Medium | Framework / Runtime / Deployment | **Open; deployed and proven live on Linux dev.** Next 16.3.1/Webpack with React/ReactDOM 19.2.8 on Node v22.23.2; typecheck 0 errors; full Webpack build, 1,499 static pages and complete standalone output; BUILD_ID `uZReW8G1XnsGnG5FNYY-I` proven live via `x-afldb-build`; systemd healthy at unchanged 4×10 controls; 17/17 live routes clean with zero hydration/client errors. Only G2's guarded database integration is not green, blocked by `AFLDB-ISSUE-108` and provably not framework attributable. | Hand the exact live build to ISSUE-068 for its 1,440-row acceptance at 4 workers; re-run guarded integration once ISSUE-108 restores `afldb_test`. No production rollout. |
+| `AFLDB-ISSUE-109` | Medium | Admin / Privileges / Data integrity | **Open.** `saveEdit()` in `src/db/queries/data-edits.ts` inserts into `data_overrides` on the `afldb_import` connection, but migration `073` deliberately grants that role `SELECT` only, and `privileges.sql` reconciles to the same. Confirmed live: `has_table_privilege('afldb_import','data_overrides','INSERT')` is false. Latent since `073` was written; applying it to `afldb_dev` moved the data editor's override save from *relation does not exist* to *permission denied*. | Adjudicate ownership against ISSUE-086: either move the write off the importer connection, or add a new migration widening the grant. No hand-granting. Add a regression test that exercises an edit which produces an override. |
+| `AFLDB-ISSUE-108` | Medium | Test database / Data integrity | **Open.** `afldb_test`'s schema is current at 77/77 migrations but its data has never been rebuilt to the current full-history expectations, so 33 guarded integration tests fail on content (Brownlow votes 0 vs 79,113; 12,422 players without a DOB vs 883; draft-link identity 5 vs 3,459). The gitignored DraftGuru `full-history-20260826` corpus and `AFLDB_TEST_IMPORT_DATABASE_URL` are both absent on the dev host, so `db:test:rebuild` cannot run. Three further failures are cross-file interference on the single shared database under default vitest parallelism. | Restore the corpus and a restricted `afldb_test` import DSN, run `npm run db:test:rebuild`, then re-run the guarded suite; decide separately whether the release gates should tolerate shared-database parallelism. |
 | `AFLDB-ISSUE-102` | Medium | Data acquisition / Import architecture | `tools/migration/import_awards.py:1408` still requires `AFLDB_LEGACY_SQLITE`, so the awards/honours domain has the same legacy dependency `AFLDB-ISSUE-095` records for `club_seasons`, previously untracked. No free API covers Coleman, Rising Star, All-Australian, AFLCA, AFLPA or club best-and-fairest; Brownlow is the exception via the AFL Tables path. | **Record only.** Do not design the replacement under this investigation — no source selection, no per-award provenance decision, no importer work is authorised by this entry. Links `AFLDB-ISSUE-095` as the direct sibling gap; not absorbed. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
 
@@ -2739,14 +2740,51 @@ Keep this issue out of NL semantic defect counts. The regenerated expanded corpu
 
 ## AFLDB-ISSUE-068 - Intermittent React hydration errors during NL UI sweeps
 
-- **Status:** Open
+- **Status:** **Resolved**
 - **Severity:** Medium
 - **Area:** UI/Hydration
 - **Found:** 2026-08-21
-- **Resolved:** N/A
+- **Resolved:** 2026-08-29
 - **Runbook:** `AFLDB-ISSUE-068.md`
-- **Related:** `AFLDB-ISSUE-107` owns the framework upgrade and Linux development deployment;
-  ISSUE-068 owns the final deployed hydration acceptance.
+- **Related:** `AFLDB-ISSUE-107` owns the framework upgrade and Linux development deployment and
+  remains **Open** (ISSUE-108 blocks its G2 database-integration gate). `AFLDB-ISSUE-108` and
+  `AFLDB-ISSUE-109` remain **Open** and separate.
+
+### Resolution — 2026-08-29
+> The React #418 hydration defect was owned by the Next 15.5.23 framework dependency
+> closure/runtime/client/serving path. The Next 16.3.1 framework closure eliminated the defect
+> in matched Windows A/B testing, and the result is now confirmed on the real Linux development
+> deployment with a clean 1,440-load acceptance.
+
+No exact internal Next.js function, commit or upstream bug ID is claimed, and none is required
+for closure. Hydration forensics are complete.
+
+**Root cause (to the owning layer):** the Next 15.5.23 framework dependency closure, runtime,
+client and serving path, substituted as a unit. React and ReactDOM resolved to 19.2.8 on both
+sides of the experiment and explain nothing.
+
+**Fix:** the bounded Next 15.5.23 → 16.3.1 upgrade implemented and deployed by `AFLDB-ISSUE-107`,
+retaining React/ReactDOM 19.2.8 and Webpack.
+
+**Validation.** Live development at `http://10.0.40.100:8090`, BUILD_ID
+`uZReW8G1XnsGnG5FNYY-I`, Next.js 16.3.1, React/ReactDOM 19.2.8, Node v22.23.2, Webpack,
+`AFLDB_WORKERS=4`, `AFLDB_POOL_MAX=10`, `AFLDB_TRACE_REQUESTS=on`, 4 Playwright workers,
+`afldb_dev` at 77/77 migrations. Final sweep: **1,440 / 1,440 observed; 0 hydration errors;
+0 client errors; 0 violations; 0 metamorphic disagreements; 0 HTTP errors; 0 page errors; all
+responses HTTP 200; every observation carried BUILD_ID `uZReW8G1XnsGnG5FNYY-I`;
+`hydration.untraced` 0; zero hydration errors on every worker and RSC cut; ~3.4 minutes.**
+
+**Semantic result — improvement NOT attributed to Next 16.** The original reference was
+1,238 pass / 202 fail / 0 unscored; the final run was 1,440 pass / 0 fail / 0 unscored. The
+final run used later application source containing merged natural-language search improvements,
+whereas the A/B held application source constant and swapped only the framework. ISSUE-068's
+relevant acceptance criterion was **no semantic regression**, which was satisfied.
+
+**Corpus note.** The tracked corpus has 1,435 rows because five ambiguous questions were removed
+after the original A/B. The complete original 1,440-row corpus was retained on the Linux
+development host and proven to be the correct superset: removing exactly the five later-deleted
+ids reproduced the tracked 1,435-row corpus byte-for-byte. No rows were fabricated and no
+acceptance threshold was changed.
 - **Queries:** `Grand Final handballs leader`, `lowest H2 score by West Coast`, `Patrick Dangerfield total goals against Essendon`, `Gary Ablett Snr total goals against Richmond`, `players with at most 5 games`, `most goalss by a Carlton player against Geelong`, `most markss in 1999`, `most handballss in 2003`
 - **Files:** `tests/nl-ui/nl-stress.spec.ts`, `artifacts/hydration/exp_0022`, `artifacts/hydration/exp_0112`, `artifacts/hydration/exp_0183`, `artifacts/hydration/exp_0193`, `artifacts/hydration/exp_0255`, `artifacts/hydration/exp_0459`, `artifacts/hydration/exp_0481`, `artifacts/hydration/exp_0485`
 
@@ -9633,9 +9671,203 @@ the standalone BUILD_ID with live `x-afldb-build`. The Next 16 middleware deprec
 deliberately: renaming to `proxy` would also switch Edge to Node runtime, widening this first
 controlled upgrade. ISSUE-068 was not swept and remains Open.
 
+### Linux development deployment — 2026-08-29
+Deployed and validated on `arm@10.0.40.100`. No production host, database or credential was
+contacted, and no local Git operation was performed. Full evidence is in `AFLDB-ISSUE-107.md`.
+
+Database safety gate passed before anything was changed: `DATABASE_URL` and
+`AFLDB_OWNER_DATABASE_URL` resolve to `afldb_dev`, `AFLDB_TEST_DATABASE_URL` to `afldb_test`,
+and `AFLDB_PROD_DATABASE_URL` is absent and additionally dropped by the unit's
+`UnsetEnvironment=`. The running service holds only `afldb_dev` DSNs.
+
+Four deployment-path defects had to be repaired before `-Issue107Gate` could prove anything, all
+ISSUE-107-owned because ISSUE-107 introduced the gate: nvm's Node `v22.23.2` was not on the SSH
+`PATH`, so the deployment resolved `/usr/bin/node` `v18.19.1`, below Next 16's floor; PowerShell's
+UTF-8 BOM on the stdin pipe made the remote shell fail its first line, silently disabling
+`set -Eeuo pipefail` so a failed stage could still exit 0; six evidence lines were double-quoted
+PowerShell strings that expanded `$(…)` on the workstation, so the reported Node version, deployed
+revision and the dirty-tree guard all measured Windows; and `sudo -n systemctl restart` cannot work
+on a host where sudo needs a password, so the gate now terminates `MainPID` and lets systemd
+respawn from the unit, proving the new PID. `AFLDB_POOL_MAX=10` was added to the host `.env` so the
+already-default pool size is provable in the running process.
+
+Results: Node `v22.23.2` / npm `10.9.8`; checkout `73e6a7e` → `be2a963` on `dev`; `npm ci` clean
+with 0 vulnerabilities; Next `16.3.1`, React and ReactDOM `19.2.8`; `npm run typecheck` **PASS,
+0 errors**; `next build --webpack` compiled, typechecked, **completed page data collection**,
+generated 1,499 static pages and produced complete standalone output with
+**BUILD_ID `uZReW8G1XnsGnG5FNYY-I`**; `deploy/sync-dev.ps1 -Issue107Gate -SkipMigrate
+-AllowDirtyServer` exited 0; systemd respawned the service with four `next-server (v16.3.1)`
+workers; live `x-afldb-build` equals the built BUILD_ID; `/api/health` returns
+`{"status":"ok","database":"ok"}`; live `AFLDB_WORKERS=4`, `AFLDB_POOL_MAX=10` and
+`AFLDB_TRACE_REQUESTS=on`; no stale Next 15 process or build remains; no error-level journal
+entries. Focused live browser validation: **17/17 routes clean with zero console, page and
+hydration errors**, every response bound to the intended build.
+
+The `/sitemap.xml` classification is now closed rather than merely retained. The Linux production
+build emits no duplicate-route warning, and the route's `404` behind a beta-admitted session is
+the intended response — both sitemap sources return 404 / an empty segment list when
+`indexingEnabled()` is false, and development leaves `AFLDB_INDEXING` unset. Next 16 introduced no
+regression and nothing was repaired.
+
+Guarded database integration does **not** pass: 33 stable failures against `afldb_test`
+(36 under default parallelism, three of which are cross-file interference on the shared database).
+They are provably not framework-attributable — every failing file imports nothing from `next`,
+`react` or `src/app`, and every assertion is PostgreSQL content or on-disk corpus state.
+`afldb_test`'s schema is current at 77/77 but its data has never been rebuilt to the current
+full-history expectations. Tracked as `AFLDB-ISSUE-108`.
+
+`-SkipMigrate` was deliberate during the deployment gate: ISSUE-107 adds no migration, and
+migrations `071`–`077` belong to other merged issues.
+
+### Development migrations applied — 2026-08-29
+On operator instruction the seven pending committed migrations were applied to `afldb_dev`
+through the normal authorised workflow (`npm run db:migrate`, which targets `dev` and refuses any
+other target). Confirmed before running: server-side identity `database=afldb_dev
+user=afldb_owner port=5432`; `AFLDB_PROD_DATABASE_URL` absent from both `.env` and the shell;
+`AFLDB_MIGRATE_TARGET` unset; status exactly 70 applied with those seven pending and nothing
+else. All seven applied in order without failure, giving **77/77 applied, 0 pending**. Checksum
+integrity was re-verified twice — `db:status` re-reads every applied file and a second
+`db:migrate` is a clean no-op, and the runner refuses to run at all if an applied migration's
+bytes changed. All nine new objects exist. No separate privileges reconciliation was needed:
+the routine deployment does not include one and `074` calls `afldb_meta.grant_app_read()`
+itself, verified with read-only `has_table_privilege()`. Production was not touched.
+
+Post-migration smoke, all green and with no restart or rebuild: `/api/health` `200
+{"status":"ok","database":"ok"}`; `/admin`, `/admin/data-editor` and `/admin/current-season` all
+`307` to `/admin/login` with no 500; live `x-afldb-build` still `uZReW8G1XnsGnG5FNYY-I`; same
+`MainPID 2019778` and `NRestarts=1`; four `next-server (v16.3.1)` workers at `AFLDB_WORKERS=4`,
+`AFLDB_POOL_MAX=10`, `AFLDB_TRACE_REQUESTS=on`; zero error-level journal entries. The admin
+checks prove the routes are served, correctly protected and that their schema dependencies now
+exist and are readable; they do not prove the authenticated pages render, because no super-admin
+session was created.
+
+Applying `073` made a latent contradiction reachable: the data editor's override save writes
+`data_overrides` on a connection the migration grants `SELECT` only. Filed as
+`AFLDB-ISSUE-109`; not repaired here, because grants belong in a migration.
+
 ### Next action
-After the user commits/pushes the reviewed local changes, run guarded integration and the full
-Webpack/standalone build on Linux development, then deploy with
-`deploy/sync-dev.ps1 -Issue107Gate` while `AFLDB_TRACE_REQUESTS=on`, preserve the build/service/
-worker/pool/route evidence, and keep ISSUE-107 Open until those G2/G3 gates pass. Then hand the
-same live build to ISSUE-068 for its one 1,440-row acceptance at unchanged controls.
+Run the ISSUE-068 acceptance sweep against **BUILD_ID `uZReW8G1XnsGnG5FNYY-I`** on
+`http://10.0.40.100:8090` at 4 Playwright workers with `NL_UI_WORKERS` unset. ISSUE-107 stays
+**Open** on G2 alone until `AFLDB-ISSUE-108` restores a trustworthy `afldb_test` and the guarded
+integration suite is re-run against this same closure. Every other ISSUE-107 gate is green.
+Production rollout remains out of scope.
+
+## AFLDB-ISSUE-108 — `afldb_test` data has never been rebuilt to the current full-history expectations
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Test database / Data integrity / Tooling
+- **Found:** 2026-08-29 (AFLDB-ISSUE-107 Linux development gate)
+- **Resolved:** N/A
+- **Related:** blocks `AFLDB-ISSUE-107`'s G2 guarded-integration leg. Lineage is the
+  ISSUE-093 / ISSUE-096 / ISSUE-099 acquisition work whose expectations `afldb_test` predates.
+
+### Problem
+`afldb_test` on the development host is migrated to **77/77** — its schema is current — but its
+**data** is an older, partial load. Running the guarded suite against it fails 33 tests on
+database content, not on code:
+
+| Assertion | Expected | Actual |
+|---|---:|---:|
+| Brownlow season votes total | 79,113 | 0 / `null` |
+| Players with a date of birth | 12,478 | 855 |
+| Players honestly without a date | 883 | 12,422 |
+| `player_match_stats` rows | 694,210 | 685,471 |
+| Draft-link identity resolved once per person | 3,459 | 5 |
+| Advanced-search regression cohort | 269 | 1,690 |
+
+`tests/draftguru-acquisition.test.ts` fails separately with
+`ENOENT .../data/sources/draftguru/full-history-20260826` — the gitignored corpus is absent on
+the host, which is the same cause as the pre-existing local baseline failure.
+
+A further **three** failures appear only under vitest's default file parallelism and disappear
+under `--no-file-parallelism`: several integration suites mutate the one shared `afldb_test`
+concurrently, so `release-gates` asserted against a transient `2094` season that is absent from
+the database at rest, and `settle-afltables` saw canonical counts move underneath it.
+
+### Why this is not AFLDB-ISSUE-107
+Every failing file — `tests/integration/release-gates.test.ts`, `database.test.ts`,
+`db-health.test.ts`, `data-editor.test.ts`, `settle-afltables.test.ts`,
+`tests/draftguru-acquisition.test.ts`, `tests/db-test-rebuild.test.ts` — imports nothing from
+`next`, `react` or `src/app`, and every assertion is PostgreSQL content or on-disk corpus state.
+The Next.js version has no surface on them. Confirmed on Next 16.3.1 / React 19.2.8 /
+Node v22.23.2.
+
+### Blocked repair path
+`npm run db:test:rebuild` is the canonical fix (`docs/deployment.md` §6a) but cannot run on the
+development host today:
+
+- `AFLDB_TEST_IMPORT_DATABASE_URL` is absent from the host `.env`, and the runner fails closed
+  rather than inheriting the development `AFLDB_IMPORT_DATABASE_URL`, which points at
+  `afldb_dev`;
+- the tracked DraftGuru full-history corpus the preflight verifies is not on the host.
+
+It is also destructive, so it was deliberately not attempted under ISSUE-107.
+
+### Next action
+Restore the DraftGuru full-history corpus to the development host, provision a restricted
+`afldb_import` DSN for `afldb_test` as `AFLDB_TEST_IMPORT_DATABASE_URL`, run
+`npm run db:test:rebuild -- --fitzroy-label <full-history-label> --acknowledge-destroy afldb_test`,
+then re-run the guarded suite. Separately decide whether the release gates should assert global
+counts while other suites mutate the same database in parallel, or whether the suite should run
+`--no-file-parallelism`. Until then no integration result against `afldb_test` should be read as
+evidence about application code.
+
+## AFLDB-ISSUE-109 — the data editor writes `data_overrides` on a connection granted only SELECT
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Admin / Privileges / Data integrity
+- **Found:** 2026-08-29 (applying migrations 071–077 to `afldb_dev` under AFLDB-ISSUE-107)
+- **Resolved:** N/A
+- **Related:** migration `073_data_overrides.sql` (`AFLDB-ISSUE-086` lineage).
+
+### Problem
+`saveEdit()` in `src/db/queries/data-edits.ts` opens a short-lived connection on
+`AFLDB_IMPORT_DATABASE_URL` (`afldb_import`) and, inside that transaction, upserts the active
+override:
+
+```
+INSERT INTO data_overrides (entity_type, entity_key, field_group, override_values,
+                            admin_user_id, is_active, updated_at)
+```
+
+Migration `073` grants `afldb_import` **`SELECT` only** on `data_overrides`, deliberately —
+its comment reads *"Importers must be able to read active human override authority during
+reloads. SELECT only: `data_overrides` is not importer-owned and must not enter
+`afldb_meta.import_writable_tables`."* `tools/maintenance/privileges.sql` reconciles to the
+same `SELECT`-only grant, so running the reconciler would not change it either.
+
+Confirmed live on `afldb_dev` with read-only `has_table_privilege()` after applying 073:
+
+| Role | `SELECT` | `INSERT` | `UPDATE` |
+|---|---|---|---|
+| `afldb_app` | f | f | f |
+| `afldb_import` | **t** | **f** | **f** |
+
+The write is reached only when an edit actually produces overrides
+(`if (Object.keys(overrides).length > 0)`), so the failure is conditional on the edit rather
+than on every save.
+
+### Why this surfaced now
+It is not a regression from `AFLDB-ISSUE-107` and not caused by applying the migration. Before
+`073` was applied to `afldb_dev` the same path failed earlier, on a missing relation; applying
+the committed migration moved the failure from *table does not exist* to *permission denied*.
+The contradiction has been latent in the committed schema since `073` was written.
+
+### What must be decided
+The migration comment and the application code disagree about who owns `data_overrides` writes.
+One of the two is wrong, and the fix depends on which:
+
+- if the override ledger is admin-owned, the write belongs on a connection that may write it,
+  not on the importer connection; or
+- if the importer connection is the right place, `073`'s grant is too narrow and a **new**
+  migration must widen it — grants belong in a migration, never a manual `GRANT`.
+
+Do not resolve this by hand-granting on the development host.
+
+### Next action
+Adjudicate the ownership question against `AFLDB-ISSUE-086`'s intent, then either move the write
+off the importer connection or add a migration granting the needed privilege. Add a regression
+test that exercises `saveEdit()` through a path that produces an override, since no existing
+test caught a grant the schema explicitly withholds.
