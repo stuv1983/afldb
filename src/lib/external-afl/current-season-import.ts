@@ -12,6 +12,7 @@ import {
   getSourceFamily,
   parseSourceFamilyRegistry,
 } from '../acquisition/source-families';
+import { asImportBatchId } from '../import-batch-id';
 import {
   fetchKaliCurrentMatches,
   fetchSquiggleCurrentMatches,
@@ -780,13 +781,17 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
     const firstSourceId = sourceIds.get(matches[0].source);
     if (!firstSourceId) throw new Error(`No source id for ${matches[0].source}`);
 
-    const [batch] = await tx<{ id: number }[]>`
+    const [batch] = await tx<{ id: string }[]>`
       INSERT INTO import_batches (source_id, tool, target_table, records_read, notes)
       VALUES (${firstSourceId}, 'current-season external refresh',
               'staging.source_record_versions', ${matches.length},
               ${`sources=${[...new Set(matches.map((m) => m.source))].join(',')}`})
       RETURNING id
     `;
+    // AFLDB-ISSUE-105: `import_batches.id` is bigint, which postgres.js
+    // delivers as decimal text. Decoded once, here, and opaque from this
+    // point on — never narrowed to a number, never cast to int in SQL.
+    const batchId = asImportBatchId(batch.id);
 
     const updatesByLocalMatchId = new Map<number, MatchCandidate[]>();
     const resolvedObservations: ResolvedCurrentSeasonObservation[] = [];
@@ -801,7 +806,7 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
       resolvedObservations.push({ match, homeClubId, awayClubId, localMatchId });
 
       const observationAction = await persistSourceObservation(
-        tx, matchObservation(sourceId, match), batch.id, observedAt,
+        tx, matchObservation(sourceId, match), batchId, observedAt,
       );
       if (observationAction === 'version_inserted') {
         observationVersionsInserted += 1;
@@ -859,7 +864,7 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
 
     canonicalPlan = planCurrentSeasonCanonicalWork(resolvedObservations, insertMissingMatches);
     observationsMarkedAbsent = await markMissingObservationsAbsent(
-      tx, enumeratedMatchScopes(sourceIds, matches), batch.id, observedAt,
+      tx, enumeratedMatchScopes(sourceIds, matches), batchId, observedAt,
     );
 
     if (updateMatches) {
@@ -935,7 +940,7 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
                  margin = abs(${agreedHomeScore} - ${agreedAwayScore}),
                  source_id = ${sourceId},
                  source_record_id = ${match.externalGameId},
-                 import_batch_id = ${batch.id}
+                 import_batch_id = ${batchId}
            WHERE id = ${localMatchId}
         `;
         canonicalRowsUpdated += 1;
@@ -968,7 +973,7 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
                sourceDisagreements: canonicalPlan.sourceDisagreements,
                sameGroupConflicts: canonicalPlan.sameGroupConflicts,
              } as never)}
-       WHERE id = ${batch.id}
+       WHERE id = ${batchId}
     `;
   });
 

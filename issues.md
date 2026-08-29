@@ -7,14 +7,13 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 5
+**Open issues:** 4
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
 | `AFLDB-ISSUE-102` | Medium | Data acquisition / Import architecture | `tools/migration/import_awards.py:1408` still requires `AFLDB_LEGACY_SQLITE`, so the awards/honours domain has the same legacy dependency `AFLDB-ISSUE-095` records for `club_seasons`, previously untracked. No free API covers Coleman, Rising Star, All-Australian, AFLCA, AFLPA or club best-and-fairest; Brownlow is the exception via the AFL Tables path. | **Record only.** Do not design the replacement under this investigation — no source selection, no per-award provenance decision, no importer work is authorised by this entry. Links `AFLDB-ISSUE-095` as the direct sibling gap; not absorbed. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
-| `AFLDB-ISSUE-105` | Low | Data acquisition / Import architecture / Type safety | postgres.js renders `import_batches.id` (`bigint`) as **text**, so an uncast `RETURNING id` is a JavaScript string at runtime while `SettleRunResult.batchId` and the ISSUE-098 current-season code declare `number`. Latent, not currently misbehaving; the ISSUE-099 integration suite hit it as a test failure. | Decide the driver-boundary convention — a branded/string-typed batch id, or an explicit documented decode — then apply it to both call sites and the shared `observation-store.ts` signatures in one change. **Do NOT cast the bigint to `int`**; that trades a typing bug for an overflow risk on an identity column. |
 | `AFLDB-ISSUE-106` | Low | Data acquisition / Import architecture | `proposedPeriodScoreValues()` returns `{ period_scores: [] }` rather than `null` when a match published no quarter scores, so such a match would raise a `match_period_scores` candidate proposing an empty array — the sibling of the Brownlow defect ISSUE-099 D2 fixed. **Unreachable in the real T8 snapshot**: all 207 acquired 2026 matches carried period scores. | Decide whether a match with no published period scores establishes the target at all. If not, return `null` and extend `targetEstablishedBySource()`, then reconcile the integration suite's rejected-record expectation (a rejected match record currently refuses on **both** match targets) deliberately rather than incidentally. |
 
 ---
@@ -9290,15 +9289,21 @@ nothing to do. **Do not edit migration 076.**
 
 ## AFLDB-ISSUE-105 — `import_batches.id` bigint is a string at runtime, typed as number
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Low
 - **Area:** Data acquisition / Import architecture / Type safety
 - **Found:** 2026-08-29 (`AFLDB-ISSUE-099` T6; predates it in `AFLDB-ISSUE-098` code)
-- **Resolved:** N/A
-- **Files:** `src/lib/external-afl/current-season-import.ts:783-789`,
+- **Resolved:** 2026-08-29
+- **Files:** `src/lib/import-batch-id.ts` (**new** — the convention),
+  `src/lib/acquisition/observation-store.ts`,
   `src/lib/acquisition/settle-afltables.ts` (`SettleRunResult.batchId`),
-  `src/lib/acquisition/observation-store.ts` (signatures extracted verbatim)
-- **Related:** `AFLDB-ISSUE-098`, `AFLDB-ISSUE-099` (both Resolved)
+  `src/lib/acquisition/lineup-store.ts` (`LineupPersistResult.batchId`),
+  `src/lib/external-afl/current-season-import.ts:783-793`,
+  `src/lib/ingest/pipeline.ts` (`PromoteResult.batchId`),
+  `src/lib/ingest/datasets.ts` (`promoteRow` context),
+  `src/app/admin/submissions/[id]/page.tsx`,
+  `tools/records/import-first-kick-goal.ts`
+- **Related:** `AFLDB-ISSUE-098`, `AFLDB-ISSUE-099`, `AFLDB-ISSUE-100` (all Resolved)
 
 ### Problem
 `import_batches.id` is `bigint ... GENERATED ALWAYS AS IDENTITY` (migration 001:55).
@@ -9315,10 +9320,88 @@ on an identity column. The repair is a type contract that tells the truth about 
 output — a branded/string-typed batch id, or an explicit documented decode at the driver
 boundary — applied consistently across the current-season and settle paths.
 
-### Exact next action
-Decide the boundary convention, then apply it to both call sites and the shared
-`observation-store.ts` signatures in one change. Cross-issue by nature: it is not
-ISSUE-098's or ISSUE-099's alone.
+### Adjudication (2026-08-29)
+1. **Runtime type.** postgres.js 3.4 is created with no `types` override
+   (`src/db/client.ts`, and every tool builds its client the same way), so `int8`
+   arrives as its decimal **text**. Confirmed independently by the workaround the
+   ISSUE-099 suite had to carry (`Number(result.batchId)`).
+2. **Existing convention.** There was none for identity values — only `::int` on
+   *aggregate/count* reads, plus `RETURNING id::int` in two integration fixtures.
+   Those fixture casts were the ad-hoc workaround, not a convention to extend.
+3. **Chosen representation: an opaque branded string,** `ImportBatchId`, produced
+   only by `asImportBatchId()` at the driver boundary. Not native `bigint` (it
+   would need a driver-wide `types` change and JSON-hostile values), not a decoded
+   safe integer (lossy on an identity column with no upper bound), not a
+   repository-wide bigint abstraction (ISSUE-105 needs one column family).
+4. **Arithmetic.** None anywhere. Batch ids are inserted, compared for equality
+   and printed — exactly what an opaque identifier supports.
+5. **Serialisation.** Yes, but only as display/audit: the admin promote message,
+   the `submission.promoted` audit `detail` jsonb, the CLI reports and
+   `/admin/submissions/[id]`. All of these already received a string at runtime,
+   so **no serialised value changes** — only the declared types did.
+6. **Bindings.** Unchanged. Every one of these values was already a string when
+   bound into `bigint` parameters; PostgreSQL infers the parameter type from the
+   target column and parses the text. No cast was added or removed on a write.
+
+### Implementation (2026-08-29)
+New `src/lib/import-batch-id.ts` carries the type and the fail-closed decoder;
+it deliberately sits beside `jsonb.ts` as a driver-representation rule with one
+home. Every `INSERT INTO import_batches ... RETURNING id` in TypeScript now types
+the row as `{ id: string }` and decodes it once (`asImportBatchId`), and every
+signature that accepts or returns a batch id takes `ImportBatchId`:
+`persistSourceObservation`, `markMissingObservationsAbsent`, `SettleRunResult`
+and the settle internals, `LineupPersistResult`, `PromoteResult`, the dataset
+`promoteRow` context, and the submissions page row type. `lineup-store.ts`'s
+`let batchId = 0` sentinel is gone — the id is returned out of the transaction
+that creates it.
+
+**No schema or migration change** (001, 023, 074, 076 and 077 untouched; applied
+migrations through 077 stay frozen), **no `bigint`→`int` cast introduced** —
+seven pre-existing ones were *removed* from the fixtures and reads that compare
+against a batch id (two `RETURNING id::int`, `opened_by_batch_id::int`,
+`closed_by_batch_id::int`, `created_by_batch_id::int` and two
+`max(projected_by_batch_id)::int`) — and **no `Number()`/`parseInt` narrowing**.
+The ISSUE-099 suite's `Number(result.batchId)` workaround is replaced by a direct
+assertion that the returned value is the declared representation.
+
+### Validation (2026-08-29, user-run)
+- `tests/current-season-import.test.ts` — **178/178 passed.** DB-free: the decoder
+  (including a value beyond `Number.MAX_SAFE_INTEGER`, which a `Number()`
+  narrowing provably corrupts) plus the source contract across all six modules —
+  no `batchId: number`, no `*_batch_id::int`, no `Number()`/`parseInt()`
+  narrowing, and a decode at every `INSERT INTO import_batches`.
+- `tests/integration/settle-afltables.test.ts` — **19 passed / 1 skipped.** The
+  ISSUE-099 settle path against real PostgreSQL: `RETURNING id` really does
+  arrive as the declared representation, and it binds back into every `bigint`
+  parameter uncast. The former `Number(result.batchId)` workaround is gone.
+- `tests/integration/afl-api-lineup-store.test.ts` — **10 passed / 1 skipped.**
+  The ISSUE-100 lineup path, same proof.
+- `tests/integration/observation-spine.test.ts` — **13/13 passed.** The shared
+  migration-074 spine writer under the new signatures.
+
+**The two skips are the restricted `afldb_import`-role parity cases, skipped
+because `AFLDB_TEST_IMPORT_DATABASE_URL` is unset in this environment. They did
+NOT run and nothing here claims they did.** They are not a blocker for this
+issue: no privilege, grant, role, schema or migration behaviour was touched, and
+the changed representation was exercised through real PostgreSQL `RETURNING` and
+parameter-binding paths by the suites that did run. Restricted-role coverage
+remains an environment-dependent test, unchanged by ISSUE-105.
+
+### Resolution
+Resolved 2026-08-29. `import_batches.id` remains `bigint`; what changed is that
+the TypeScript now tells the truth about it. Root cause: postgres.js renders
+`int8` as decimal text while the current-season, settle, lineup, ingest, admin
+and records paths all declared `number` — a lie the compiler could not catch,
+because the value was only ever bound back into SQL. Fix: one
+opaque branded string (`ImportBatchId`) with a fail-closed decoder at the driver
+boundary, applied identically across the ISSUE-098, ISSUE-099 and ISSUE-100
+paths and the shared spine writer. **No runtime data-format change** — every one
+of these values was already a string, so no stored row, audit payload, API
+response or rendered page differs. **No migration**; 001, 023, 074, 076 and 077
+are untouched and migrations through 077 stay frozen.
+
+Follow-up: none. `AFLDB-ISSUE-104` and `AFLDB-ISSUE-106` remain separately open
+and were not touched.
 
 ## AFLDB-ISSUE-106 — `match_period_scores` proposes an empty array instead of no target
 

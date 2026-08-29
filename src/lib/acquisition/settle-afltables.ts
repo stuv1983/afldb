@@ -31,6 +31,8 @@ import { isAbsolute, resolve } from 'node:path';
 
 import postgres from 'postgres';
 
+import { asImportBatchId, type ImportBatchId } from '../import-batch-id';
+
 import {
   markMissingObservationsAbsent,
   persistSourceObservation,
@@ -1328,7 +1330,12 @@ export type SettleRunOptions = {
 
 export type SettleRunResult = {
   applied: boolean;
-  batchId: number | null;
+  /**
+   * The batch this run opened, as the driver delivered it (AFLDB-ISSUE-105):
+   * opaque decimal text, never a JavaScript number. `null` on a dry run,
+   * whose batch row was rolled back and so never existed.
+   */
+  batchId: ImportBatchId | null;
   counters: SettleCounters;
   absenceSweepSkipped: SweepPlan['skipped'];
 };
@@ -1496,14 +1503,14 @@ export async function runSettleAfltables(
   const sweep = planAbsenceSweep(bundle);
   counters.absenceSweepSkipped = sweep.skipped.length;
 
-  let batchId: number | null = null;
+  let batchId: ImportBatchId | null = null;
   let applied = false;
 
   try {
     await sql.begin(async (tx) => {
       const refs = await loadRefs(tx, bundle.season);
 
-      const [batch] = await tx<{ id: number }[]>`
+      const [batch] = await tx<{ id: string }[]>`
         INSERT INTO import_batches (source_id, tool, target_table, records_read, notes)
         VALUES (${refs.sourceId}, 'settle-afltables.ts',
                 'staging.source_record_versions',
@@ -1512,7 +1519,10 @@ export async function runSettleAfltables(
                   + `season=${bundle.season}; mode=${options.apply ? 'apply' : 'dry-run'}`})
         RETURNING id
       `;
-      batchId = batch.id;
+      // AFLDB-ISSUE-105: the column is bigint, so the driver hands it back as
+      // decimal text. Decoded once, here, and opaque from this point on.
+      const runBatchId = asImportBatchId(batch.id);
+      batchId = runBatchId;
 
       // §19's completeness proof, reused by §13.3: a scope this run could not
       // prove complete is not a scope in which anything can be positively
@@ -1527,7 +1537,7 @@ export async function runSettleAfltables(
 
       for (const wireFamily of Object.keys(BUNDLE_FAMILIES)) {
         await settleFamily(
-          tx, wireFamily, refs, batch.id, observedAt, options, counters,
+          tx, wireFamily, refs, runBatchId, observedAt, options, counters,
           completeScopes, restoredKeys,
         );
       }
@@ -1540,7 +1550,7 @@ export async function runSettleAfltables(
         scopeKey: scope.scopeKey,
       }));
       counters.observationsMarkedAbsent = await markMissingObservationsAbsent(
-        tx, scopes, batch.id, observedAt,
+        tx, scopes, runBatchId, observedAt,
       );
 
       // §13.3: close only the disagreements this run positively re-proved,
@@ -1560,7 +1570,7 @@ export async function runSettleAfltables(
       // where a target refused for unresolved identity.
       const [rejected] = await tx<{ n: number }[]>`
         SELECT count(*)::int AS n
-          FROM import_rejections WHERE import_batch_id = ${batch.id}
+          FROM import_rejections WHERE import_batch_id = ${runBatchId}
       `;
 
       // 'completed' is the success value of the `import_status` enum
@@ -1572,7 +1582,7 @@ export async function runSettleAfltables(
            SET completed_at = now(), status = 'completed',
                records_rejected = ${rejected.n},
                validation_result = ${tx.json(counters as never)}
-         WHERE id = ${batch.id}
+         WHERE id = ${runBatchId}
       `;
 
       // §22: the dry-run runs the real write path and then throws, so the
@@ -1592,7 +1602,7 @@ async function settleFamily(
   tx: Tx,
   wireFamily: string,
   refs: SettleRefs,
-  batchId: number,
+  batchId: ImportBatchId,
   observedAt: string,
   options: SettleRunOptions,
   counters: SettleCounters,
@@ -1747,7 +1757,7 @@ async function projectRecord(
   wireFamily: string,
   record: BundleRecord,
   refs: SettleRefs,
-  batchId: number,
+  batchId: ImportBatchId,
   counters: SettleCounters,
 ): Promise<ProjectedRecord | null> {
   const family = contractFamilyOf(wireFamily);
@@ -1813,7 +1823,7 @@ async function writeMatchProjection(
   projection: MatchProjection,
   identity: ResolvedMatchIdentity,
   refs: SettleRefs,
-  batchId: number,
+  batchId: ImportBatchId,
 ): Promise<void> {
   const family = contractFamilyOf(record.family);
   const versionSeq = await currentVersionSeq(tx, refs.sourceId, family, record.externalRecordId);
@@ -1902,7 +1912,7 @@ async function writePlayerMatchProjection(
   playerId: number,
   clubId: number,
   refs: SettleRefs,
-  batchId: number,
+  batchId: ImportBatchId,
 ): Promise<void> {
   const family = contractFamilyOf(record.family);
   const versionSeq = await currentVersionSeq(tx, refs.sourceId, family, record.externalRecordId);
@@ -2306,7 +2316,7 @@ async function recordOutcome(
     claims: readonly ProviderClaim[];
     season: number;
     refs: SettleRefs;
-    batchId: number;
+    batchId: ImportBatchId;
     counters: SettleCounters;
   },
 ): Promise<void> {

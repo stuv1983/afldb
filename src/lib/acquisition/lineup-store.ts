@@ -36,6 +36,8 @@
  */
 import postgres from 'postgres';
 
+import { asImportBatchId, type ImportBatchId } from '../import-batch-id';
+
 import {
   persistSourceObservation,
   type SourceObservation,
@@ -88,7 +90,11 @@ export type LineupCounters = {
 };
 
 export type LineupPersistResult = {
-  batchId: number;
+  /**
+   * The batch this run opened, as the driver delivered it (AFLDB-ISSUE-105):
+   * opaque decimal text, never a JavaScript number.
+   */
+  batchId: ImportBatchId;
   counters: LineupCounters;
 };
 
@@ -330,7 +336,7 @@ async function upsertProjection(
   season: number,
   roundNumber: number,
   projection: LineupProjection,
-  batchId: number,
+  batchId: ImportBatchId,
 ): Promise<'inserted' | 'updated'> {
   const [row] = await tx<{ inserted: boolean }[]>`
     INSERT INTO staging.afl_api_lineup (
@@ -418,8 +424,10 @@ export async function persistLineupBundle(
     playerIdsResolved: 0,
   };
 
-  let batchId = 0;
-  await sql.begin(async (tx) => {
+  // AFLDB-ISSUE-105: the id is produced inside the transaction and returned
+  // from it, so there is no sentinel to fall back to. A run that never
+  // reaches the INSERT never yields a batch id at all.
+  const batchId = await sql.begin(async (tx) => {
     // INVARIANT 1. Resolved here, from the literal key, inside the
     // transaction. `resolveSourceId` throws when the key has no row.
     const sources = await tx<{ id: number; key: string }[]>`SELECT id, key FROM sources`;
@@ -427,7 +435,7 @@ export async function persistLineupBundle(
       new Map(sources.map((row) => [row.key, row.id])), LINEUP_SOURCE_KEY,
     );
 
-    const [batch] = await tx<{ id: number }[]>`
+    const [batch] = await tx<{ id: string }[]>`
       INSERT INTO import_batches (source_id, tool, target_table, records_read, notes)
       VALUES (${sourceId}, ${LINEUP_TOOL}, ${LINEUP_TARGET_TABLE},
               ${bundle.records.length},
@@ -435,7 +443,9 @@ export async function persistLineupBundle(
                 + `season=${bundle.season}; round=${bundle.round_number}`})
       RETURNING id
     `;
-    batchId = batch.id;
+    // The column is bigint, so the driver hands it back as decimal text.
+    // Decoded once, here, and opaque from this point on.
+    const runBatchId = asImportBatchId(batch.id);
 
     for (const record of bundle.records) {
       const projection = projectLineupRecord(record);
@@ -450,7 +460,7 @@ export async function persistLineupBundle(
       // The spine decides whether this is a new version or an unchanged head.
       // Identical content refreshes the head and writes no version, which is
       // what makes a repeated import idempotent.
-      const action = await persistSourceObservation(tx, observation, batch.id, observedAt);
+      const action = await persistSourceObservation(tx, observation, runBatchId, observedAt);
       if (action === 'version_inserted') counters.versionsInserted += 1;
       else counters.headsRefreshed += 1;
 
@@ -459,7 +469,7 @@ export async function persistLineupBundle(
       const versionSeq = await currentVersionSeq(tx, sourceId, record.external_record_id);
 
       const outcome = await upsertProjection(
-        tx, sourceId, versionSeq, bundle.season, bundle.round_number, projection, batch.id,
+        tx, sourceId, versionSeq, bundle.season, bundle.round_number, projection, runBatchId,
       );
       if (outcome === 'inserted') counters.projectionsInserted += 1;
       else counters.projectionsUpdated += 1;
@@ -476,8 +486,10 @@ export async function persistLineupBundle(
              records_rejected = 0,
              completed_at = now(),
              status = 'completed'
-       WHERE id = ${batch.id}
+       WHERE id = ${runBatchId}
     `;
+
+    return runBatchId;
   });
 
   return { batchId, counters };

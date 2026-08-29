@@ -443,6 +443,10 @@ describe('afl_api.lineup persistence', () => {
 
   it('records the batch against the resolved afl_api source only', async () => {
     const { batchId } = await persistLineupBundle(sql, bundleOf([row()]), contract);
+    // AFLDB-ISSUE-105: `import_batches.id` is bigint, so the driver returns
+    // decimal text and `LineupPersistResult.batchId` says so. The value below
+    // is bound straight back into a bigint comparison, uncast.
+    expect(typeof batchId).toBe('string');
     const [batch] = await sql<{
       sourceKey: string; tool: string; targetTable: string;
       recordsRead: number; status: string;

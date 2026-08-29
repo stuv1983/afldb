@@ -15,6 +15,37 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-105 — Import-batch bigint ids are typed truthfully at the driver boundary - 29 August 2026
+
+- **`import_batches.id` is now represented as what it actually is.** The column is
+  `bigint ... GENERATED ALWAYS AS IDENTITY` and postgres.js renders `int8` as decimal text
+  rather than risk a lossy `Number`, but six call sites declared the value `number`. Nothing
+  misbehaved — the id was only ever bound back into SQL — yet the declaration was untrue, and
+  any arithmetic, strict comparison or number-keyed lookup on it would have failed silently.
+- **One shared convention, in one place:** new `src/lib/import-batch-id.ts` exports the opaque
+  branded string `ImportBatchId` and the fail-closed decoder `asImportBatchId()`, which accepts
+  only the driver's decimal text and refuses a number, a bigint or a padded value rather than
+  coercing it. It sits beside `jsonb.ts` for the same reason that module exists: a driver
+  representation rule belongs in one unit-testable home, not rediscovered per call site.
+- **The ISSUE-098, ISSUE-099 and ISSUE-100 paths now use one representation**, along with the
+  shared migration-074 spine writer they all reach the database through: the current-season
+  refresh, the AFL Tables settle pass (`SettleRunResult.batchId`), the AFL API lineup staging
+  pass (`LineupPersistResult.batchId`), `persistSourceObservation` /
+  `markMissingObservationsAbsent`, the admin submission promote path (`PromoteResult.batchId`
+  and the dataset `promoteRow` context), the submission review page and the first-kick-goal
+  importer. Each `RETURNING id` is decoded once, at the boundary that produced it.
+- **The ad-hoc workarounds are gone.** The ISSUE-099 suite's `Number(result.batchId)`
+  normalisation and seven `bigint`→`int` SQL casts on batch-id columns were removed, not
+  replaced; a batch id is never narrowed to a JavaScript number and never cast to `int` in
+  SQL, either of which would trade a typing bug for an overflow on an unbounded identity
+  column. A lineup-store `let batchId = 0` sentinel was removed with them — the id is returned
+  out of the transaction that creates it.
+- **No runtime data-format change and no schema migration.** Every one of these values was
+  already a string at runtime, so no stored row, audit payload, API response or rendered page
+  differs; only the declared types changed. No migration was added or edited (migrations
+  through 077 remain frozen), no driver-wide postgres.js type override was introduced, and no
+  unrelated `bigint` identifier was refactored.
+
 ### AFLDB-ISSUE-101 — End-of-season promotion / baseline rollover - 29 August 2026
 
 - **AFLDB can now move the completed-history boundary as one reviewed operation.** The

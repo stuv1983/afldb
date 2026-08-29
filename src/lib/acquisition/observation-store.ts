@@ -23,6 +23,8 @@
  */
 import postgres from 'postgres';
 
+import type { ImportBatchId } from '../import-batch-id';
+
 import {
   decideObservation,
   type JsonValue,
@@ -58,7 +60,7 @@ export type PersistObservationResult = 'version_inserted' | 'head_refreshed';
 export async function persistSourceObservation(
   tx: postgres.TransactionSql,
   observation: SourceObservation,
-  batchId: number,
+  batchId: ImportBatchId,
   observedAt: string,
 ): Promise<PersistObservationResult> {
   const { contract, sourceId, externalRecordId, scopeKey, payload } = observation;
@@ -199,7 +201,7 @@ export type EnumeratedScope = {
 export async function markMissingObservationsAbsent(
   tx: postgres.TransactionSql,
   scopes: readonly EnumeratedScope[],
-  batchId: number,
+  batchId: ImportBatchId,
   observedAt: string,
 ): Promise<number> {
   const distinct = new Map<string, EnumeratedScope>();

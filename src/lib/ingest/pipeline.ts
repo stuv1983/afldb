@@ -7,6 +7,7 @@ import postgres from 'postgres';
 import { authSql } from '@/db/authClient';
 import { getDataset } from '@/lib/ingest/datasets';
 import { CsvError, parseCsv, toObjects } from '@/lib/ingest/csv';
+import { asImportBatchId, type ImportBatchId } from '@/lib/import-batch-id';
 
 /**
  * The submission pipeline: staged -> validated -> approved -> promoted.
@@ -211,7 +212,7 @@ export async function validateSubmission(submissionId: number): Promise<Validati
 }
 
 export type PromoteResult =
-  | { ok: true; applied: number; batchId: number }
+  | { ok: true; applied: number; batchId: ImportBatchId }
   | { ok: false; error: string };
 
 /**
@@ -270,19 +271,23 @@ export async function promoteSubmission(submissionId: number): Promise<PromoteRe
       const [source] = await tx<{ id: number }[]>`
         SELECT id FROM sources WHERE key = 'sports_data_lab'
       `;
-      const [batch] = await tx<{ id: number }[]>`
+      const [batch] = await tx<{ id: string }[]>`
         INSERT INTO import_batches (source_id, tool, target_table, notes)
         VALUES (${source?.id ?? null}, 'admin-upload', ${spec.key},
                 ${'submission ' + submissionId})
         RETURNING id
       `;
+      // AFLDB-ISSUE-105: `import_batches.id` is bigint, which postgres.js
+      // delivers as decimal text. Decoded once, here, and opaque from this
+      // point on — it is bound back into SQL and reported, never counted.
+      const runBatchId = asImportBatchId(batch.id);
 
       for (const row of rows) {
         await spec.promoteRow(row.payload, row.reasons?.resolved ?? {}, {
           sql: tx as unknown as typeof importSql,
           awardId,
           sourceId: source?.id ?? 0,
-          batchId: batch.id,
+          batchId: runBatchId,
         });
       }
 
@@ -290,9 +295,9 @@ export async function promoteSubmission(submissionId: number): Promise<PromoteRe
         UPDATE import_batches
            SET completed_at = now(), status = 'completed',
                records_read = ${rows.length}, records_inserted = ${rows.length}
-         WHERE id = ${batch.id}
+         WHERE id = ${runBatchId}
       `;
-      return batch.id;
+      return runBatchId;
     });
 
     await authSql`

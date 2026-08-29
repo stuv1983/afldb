@@ -92,6 +92,7 @@ import {
   getSourceFamily,
   parseSourceFamilyRegistry,
 } from '@/lib/acquisition/source-families';
+import { asImportBatchId, type ImportBatchId } from '@/lib/import-batch-id';
 
 import { createImportRoleParityHarness } from './import-role-parity';
 
@@ -211,7 +212,8 @@ type Fixtures = {
   homeClubHist: string;
   awayClubHist: string;
   playerId: number;
-  batchId: number;
+  /** AFLDB-ISSUE-105: bigint, so the driver's decimal text, never a number. */
+  batchId: ImportBatchId;
   /** The ONE canonical matches row this harness creates. See the T7 note above. */
   disagreeMatchId: number;
 };
@@ -632,7 +634,7 @@ async function spineRow(family: string, recordId: string): Promise<SpineRow | un
 
 type CandidateRow = {
   externalRecordId: string; targetTable: string; verb: string; status: string;
-  sourceVersionSeq: number; createdByBatchId: number;
+  sourceVersionSeq: number; createdByBatchId: ImportBatchId;
 };
 
 /**
@@ -652,7 +654,7 @@ async function candidateRows(): Promise<CandidateRow[]> {
   const rows = await sql<CandidateRow[]>`
     SELECT external_record_id AS "externalRecordId", target_table AS "targetTable",
            verb, status, source_version_seq AS "sourceVersionSeq",
-           created_by_batch_id::int AS "createdByBatchId"
+           created_by_batch_id AS "createdByBatchId"
       FROM promotion_candidates
      WHERE external_record_id LIKE ${`${PREFIX}%`}
   `;
@@ -821,11 +823,15 @@ beforeAll(async () => {
     VALUES (${sourceId}, ${PLAYER_URL}, ${player.id}, 'unique', 'afltables_profile_url')
   `;
 
-  const [batch] = await sql<{ id: number }[]>`
+  // `import_batches.id` is bigint. It is NOT cast to int here: the fixture
+  // must hand back exactly what `runSettleAfltables()` hands back, or the
+  // suite would prove a representation the pass does not use
+  // (AFLDB-ISSUE-105).
+  const [batch] = await sql<{ id: string }[]>`
     INSERT INTO import_batches (source_id, tool, target_table, notes)
     VALUES (${sourceId}, ${FIXTURE_TOOL}, 'staging.source_record_versions',
             'AFLDB-ISSUE-099 slice 3 fixture')
-    RETURNING id::int AS id
+    RETURNING id
   `;
 
   // ---- T7 disagreement fixture (A17) -------------------------------
@@ -911,7 +917,7 @@ beforeAll(async () => {
     homeClubHist: clubs[0].hist,
     awayClubHist: clubs[1].hist,
     playerId: player.id,
-    batchId: batch.id,
+    batchId: asImportBatchId(batch.id),
     disagreeMatchId: disagreeMatch.id,
   };
 
@@ -1080,17 +1086,16 @@ describe('AFLDB-ISSUE-099 settle — the transaction against PostgreSQL', () => 
     expect(result.counters.candidatesCreated).toBe(5);
     expect(result.counters.candidatesRefreshed).toBe(0);
     expect(result.counters.unresolvedIdentityMatch).toBe(2);
-    // `runSettleAfltables()` returns the id exactly as postgres.js delivered
-    // it from a bigint `RETURNING id` — a STRING at runtime, whatever the
-    // declared type says, because the driver renders int8 as text rather than
-    // risk a lossy Number. `candidateRows()` casts `created_by_batch_id::int`,
-    // so the column genuinely yields a JS number, and the NUMBER is canonical
-    // at this boundary: it is the same reason this suite's fixture inserts use
-    // `RETURNING id::int`. The reported id is normalised so the comparison is
-    // like with like. The query is NOT loosened and the driver is NOT coerced
-    // to satisfy the assertion.
-    const batchId = Number(result.batchId);
-    expect(Number.isInteger(batchId)).toBe(true);
+    // AFLDB-ISSUE-105. `runSettleAfltables()` returns the id exactly as
+    // postgres.js delivered it from a bigint `RETURNING id` — decimal TEXT,
+    // because the driver renders int8 as text rather than risk a lossy
+    // Number — and `SettleRunResult.batchId` now says so. This is the runtime
+    // proof of that contract: the declared type and the value agree, and
+    // `candidateRows()` reads `created_by_batch_id` uncast, so both sides of
+    // the comparison are the one representation. No `::int` cast and no
+    // `Number()` normalisation is needed to make the assertion pass.
+    expect(typeof result.batchId).toBe('string');
+    const batchId = asImportBatchId(result.batchId);
     const refusal = (externalRecordId: string, targetTable: string): CandidateRow => ({
       externalRecordId, targetTable, verb: 'unresolved_identity', status: 'pending',
       sourceVersionSeq: 1, createdByBatchId: batchId,
@@ -1545,16 +1550,16 @@ describe('AFLDB-ISSUE-099 settle — the transaction against PostgreSQL', () => 
     it('left both projection sentinels in place across every run', async () => {
       // Neither sentinel is named by any bundle. A TRUNCATE, or any DELETE
       // not scoped to the record it was replacing, would have removed them.
-      const [match] = await sql<{ n: number; batchId: number }[]>`
-        SELECT count(*)::int AS n, max(projected_by_batch_id)::int AS "batchId"
+      const [match] = await sql<{ n: number; batchId: ImportBatchId }[]>`
+        SELECT count(*)::int AS n, max(projected_by_batch_id) AS "batchId"
           FROM staging.afltables_match WHERE external_record_id = ${SENTINEL_MATCH}
       `;
       expect(match.n).toBe(1);
       // Still the FIXTURE batch: no settle run rewrote it either.
       expect(match.batchId).toBe(fixtures.batchId);
 
-      const [player] = await sql<{ n: number; batchId: number }[]>`
-        SELECT count(*)::int AS n, max(projected_by_batch_id)::int AS "batchId"
+      const [player] = await sql<{ n: number; batchId: ImportBatchId }[]>`
+        SELECT count(*)::int AS n, max(projected_by_batch_id) AS "batchId"
           FROM staging.afltables_player_match WHERE external_record_id = ${SENTINEL_PLAYER}
       `;
       expect(player.n).toBe(1);

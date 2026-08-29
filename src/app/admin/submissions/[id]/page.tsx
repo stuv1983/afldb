@@ -6,6 +6,7 @@ import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { authSql } from '@/db/authClient';
 import { requireUploader } from '@/lib/auth/session';
 import { formatNumber } from '@/lib/format';
+import type { ImportBatchId } from '@/lib/import-batch-id';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +30,7 @@ export default async function SubmissionPage({
     id: number; dataset: string; filename: string; status: string;
     rowCount: number | null; uploadedAt: Date; uploadedBy: number; uploaderEmail: string;
     reviewerEmail: string | null; promotedAt: Date | null;
-    importBatchId: number | null; error: string | null;
+    importBatchId: ImportBatchId | null; error: string | null;
     report: { ok: number; warnings: number; errors: number; duplicates: number } | null;
   }[]>`
     SELECT s.id, s.dataset, s.filename, s.status::text,

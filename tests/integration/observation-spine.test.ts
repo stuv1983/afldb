@@ -52,6 +52,7 @@ import {
   getSourceFamily,
   parseSourceFamilyRegistry,
 } from '@/lib/acquisition/source-families';
+import { asImportBatchId, type ImportBatchId } from '@/lib/import-batch-id';
 
 afterAll(async () => {
   await sql.end();
@@ -106,7 +107,8 @@ type Fixtures = {
   sourceId: number;
   season: number;
   adminUserId: number;
-  batchId: number;
+  /** AFLDB-ISSUE-105: bigint, so the driver's decimal text, never a number. */
+  batchId: ImportBatchId;
 };
 
 /**
@@ -136,13 +138,19 @@ async function seed(tx: Tx): Promise<Fixtures> {
     VALUES ('issue096-spine-probe@example.invalid', 'admin')
     RETURNING id::int AS id
   `;
-  const [batch] = await tx<{ id: number }[]>`
+  // `import_batches.id` is bigint. It is NOT cast to int here: the fixture
+  // must hand back exactly what the production writers hand back, or the
+  // suite would prove a representation nothing else uses (AFLDB-ISSUE-105).
+  const [batch] = await tx<{ id: string }[]>`
     INSERT INTO import_batches (source_id, tool, target_table)
     VALUES (${source.id}, 'tests/integration/observation-spine', 'staging.source_records')
-    RETURNING id::int AS id
+    RETURNING id
   `;
   return {
-    sourceId: source.id, season: season.year, adminUserId: admin.id, batchId: batch.id,
+    sourceId: source.id,
+    season: season.year,
+    adminUserId: admin.id,
+    batchId: asImportBatchId(batch.id),
   };
 }
 
@@ -504,12 +512,12 @@ describe('ISSUE-096 §5.H — A -> B -> A is three states over two payloads', ()
 
       const versions = await tx<{
         seq: number; hash: string; from: Date; to: Date | null;
-        openedBy: number; closedBy: number | null;
+        openedBy: ImportBatchId; closedBy: ImportBatchId | null;
       }[]>`
         SELECT version_seq AS seq, payload_hash AS hash,
                observed_from AS "from", observed_to AS "to",
-               opened_by_batch_id::int AS "openedBy",
-               closed_by_batch_id::int AS "closedBy"
+               opened_by_batch_id AS "openedBy",
+               closed_by_batch_id AS "closedBy"
           FROM staging.source_record_versions
          WHERE source_id = ${f.sourceId} AND external_record_id = ${EXTERNAL_ID}
          ORDER BY version_seq

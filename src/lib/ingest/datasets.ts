@@ -2,6 +2,8 @@ import 'server-only';
 
 import type { Sql } from 'postgres';
 
+import type { ImportBatchId } from '../import-batch-id';
+
 /**
  * The dataset registry: what an administrator may upload, what it must
  * look like, and how a vetted file becomes rows in the statistical
@@ -56,7 +58,7 @@ export type DatasetSpec = {
   promoteRow: (
     row: Record<string, string | null>,
     resolved: Record<string, number | string | null>,
-    context: { sql: Sql; awardId: number | null; sourceId: number; batchId: number },
+    context: { sql: Sql; awardId: number | null; sourceId: number; batchId: ImportBatchId },
   ) => Promise<void>;
   /**
    * The award this dataset feeds, resolved once per promotion, for

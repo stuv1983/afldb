@@ -143,7 +143,7 @@ describe('current-season external source import contracts', () => {
   it('records source and import-batch provenance on local score updates', () => {
     expect(importer).toContain('source_id = ${sourceId}');
     expect(importer).toContain('source_record_id = ${match.externalGameId}');
-    expect(importer).toContain('import_batch_id = ${batch.id}');
+    expect(importer).toContain('import_batch_id = ${batchId}');
   });
 
   it('exposes the refresh only through a super-admin server action', () => {
@@ -3298,5 +3298,105 @@ describe('AFLDB-ISSUE-099 settle — per-family projection rules (§17)', () => 
       'matches', 'match_period_scores', 'player_match_stats', 'brownlow_round_votes',
     ];
     for (const target of targets) expect(proposedFieldsFor(target).length).toBeGreaterThan(0);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-105 — the import-batch id driver-boundary convention
+ *
+ * `import_batches.id` is `bigint ... GENERATED ALWAYS AS IDENTITY`
+ * (migration 001), and postgres.js renders int8 as decimal TEXT rather than
+ * risk a lossy Number. Several call sites declared it `number`; nothing
+ * misbehaved because the value is only ever bound back into SQL, but the
+ * type was untrue and any arithmetic or number-keyed lookup on it would have
+ * failed silently.
+ *
+ * These are DB-free. The runtime half of the contract — that a real
+ * `RETURNING id` really does arrive as this representation — is proved in
+ * `tests/integration/settle-afltables.test.ts` and
+ * `tests/integration/afl-api-lineup-store.test.ts`.
+ * ------------------------------------------------------------------ */
+
+import { asImportBatchId } from '@/lib/import-batch-id';
+
+const settleStore = readSource('src/lib/acquisition/settle-afltables.ts');
+const lineupStore = readSource('src/lib/acquisition/lineup-store.ts');
+const ingestPipeline = readSource('src/lib/ingest/pipeline.ts');
+const firstKickGoal = readSource('tools/records/import-first-kick-goal.ts');
+
+/** Every module that opens an import batch, plus the shared writer. */
+const BATCH_ID_SOURCES: Array<[string, string]> = [
+  ['observation-store.ts', store],
+  ['current-season-import.ts', importer],
+  ['settle-afltables.ts', settleStore],
+  ['lineup-store.ts', lineupStore],
+  ['ingest/pipeline.ts', ingestPipeline],
+  ['import-first-kick-goal.ts', firstKickGoal],
+];
+
+describe('import-batch ids are opaque identifiers at the driver boundary', () => {
+  it('decodes exactly the decimal text postgres.js returns for bigint', () => {
+    expect(asImportBatchId('1')).toBe('1');
+    expect(asImportBatchId('91')).toBe('91');
+    // Beyond Number.MAX_SAFE_INTEGER: the value survives intact, which is the
+    // whole reason the column is not narrowed to a JavaScript number.
+    const beyondSafe = '9007199254740993';
+    expect(asImportBatchId(beyondSafe)).toBe(beyondSafe);
+    expect(Number(beyondSafe).toString()).not.toBe(beyondSafe);
+  });
+
+  it('refuses any other representation rather than coercing it', () => {
+    // A number is what the old declarations claimed and what an `::int` cast
+    // or a Number() narrowing would produce. It is refused, not converted.
+    for (const wrong of [91, 91n, null, undefined, '', ' 91', '91 ', '+91', '-91', '0', '091', '9.1', 'ninety-one']) {
+      expect(() => asImportBatchId(wrong)).toThrow(/import_batches\.id/);
+    }
+  });
+
+  it('names the boundary rule in the error, so a future cast fails loudly', () => {
+    expect(() => asImportBatchId(91)).toThrow(/Do not cast the column to int/);
+    expect(() => asImportBatchId(91)).toThrow(/not narrow it with Number\(\)/);
+  });
+
+  it('types every import-batch id as the shared ImportBatchId', () => {
+    // The shared writer's two entry points, which every family importer
+    // reaches the spine through.
+    expect(store).toContain("import type { ImportBatchId } from '../import-batch-id';");
+    expect(store).toContain('batchId: ImportBatchId,');
+    expect(store.match(/batchId: ImportBatchId,/g)).toHaveLength(2);
+
+    // The two run results a caller can hold on to.
+    expect(settleStore).toContain('batchId: ImportBatchId | null;');
+    expect(lineupStore).toContain('batchId: ImportBatchId;');
+    expect(ingestPipeline).toContain('batchId: ImportBatchId }');
+
+    // And no module still declares one as a number.
+    for (const [name, source] of BATCH_ID_SOURCES) {
+      expect(source, `${name} must not declare a batch id as a number`)
+        .not.toMatch(/batchId: number/);
+    }
+  });
+
+  it('decodes the id at each INSERT rather than trusting the declaration', () => {
+    for (const [name, source] of BATCH_ID_SOURCES) {
+      if (!source.includes('INSERT INTO import_batches')) continue;
+      expect(source, `${name} must type RETURNING id as the driver's text`)
+        .toContain('const [batch] = await tx<{ id: string }[]>`');
+      expect(source, `${name} must decode the id at the boundary`)
+        .toContain('asImportBatchId(batch.id)');
+    }
+  });
+
+  it('never narrows an import-batch id to an int or a JavaScript number', () => {
+    for (const [name, source] of BATCH_ID_SOURCES) {
+      // No SQL cast of the identity column or any of its foreign keys.
+      expect(source, `${name} must not cast a bigint batch id to int`)
+        .not.toMatch(/(^|[^_a-z])(id|[a-z_]*batch_id)::int\b/m);
+      // No JavaScript narrowing of the decoded value.
+      expect(source, `${name} must not narrow a batch id with Number()`)
+        .not.toMatch(/Number\((batch\.id|batchId|runBatchId|result\.batchId)\)/);
+      expect(source, `${name} must not parse a batch id as an integer`)
+        .not.toMatch(/parseInt\((batch\.id|batchId|runBatchId)/);
+    }
   });
 });
