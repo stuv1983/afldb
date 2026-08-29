@@ -723,22 +723,83 @@ describe('source families dataset (AFLDB-ISSUE-096 S1)', () => {
     }
   });
 
-  it('accepts the proven lineup columns and refuses drift in either direction', () => {
+  it('accepts both proven lineup shapes and refuses drift in either direction', () => {
     const lineup = getSourceFamily(registry, 'afl_api', 'lineup');
-    const r25 = [...lineup.knownColumns!];
+    // P3b enumerated the column P3 could only count: `lateChanges`, present at
+    // round 20 and absent from round 25 entirely. The set is now complete at 20.
+    const r20 = [...lineup.knownColumns!];
+    expect(r20).toHaveLength(20);
+    expect(lineup.knownColumnsStatus).toBe('complete');
+    expect(r20).toContain('lateChanges');
+    expect(() => assertProjectableColumns(lineup, r20)).not.toThrow();
+
+    // `lateChanges` is CONDITIONAL, so the round-25 shape - the same set minus
+    // that one column - must project just as cleanly. This is the round-20
+    // refusal P3 left behind, closed by measurement rather than by relaxing the
+    // gate: both real shapes pass, and nothing else does.
+    const r25 = r20.filter((c) => c !== 'lateChanges');
     expect(r25).toHaveLength(19);
     expect(() => assertProjectableColumns(lineup, r25)).not.toThrow();
 
     // A missing required column is a refusal, not a silent NULL.
-    expect(() => assertProjectableColumns(lineup, r25.filter((c) => c !== 'teamStatus')))
+    expect(() => assertProjectableColumns(lineup, r20.filter((c) => c !== 'teamStatus')))
       .toThrow(/missing required column\(s\): teamStatus/);
 
-    // P3 measured 20 columns at round 20 and never enumerated the extra one, so
-    // known_columns is deliberately incomplete and a round-20 payload refuses.
-    // That refusal is AFLDB-ISSUE-100's signal to enumerate it.
-    expect(lineup.knownColumnsStatus).toBe('incomplete');
+    // Completing the set did NOT weaken the gate: a genuinely undeclared 21st
+    // column still fails closed, from either real shape.
+    expect(() => assertProjectableColumns(lineup, [...r20, 'someUnenumeratedColumn']))
+      .toThrow(/undeclared column\(s\): someUnenumeratedColumn/);
     expect(() => assertProjectableColumns(lineup, [...r25, 'someUnenumeratedColumn']))
       .toThrow(/undeclared column\(s\): someUnenumeratedColumn/);
+  });
+
+  it('fails closed on lineup identity and source state, not on optional fields', () => {
+    const lineup = getSourceFamily(registry, 'afl_api', 'lineup');
+    // Exactly the approved set: the three identity fields plus the two that
+    // carry announcement state. P3b measured 0 NULLs across two rounds for
+    // several other useful columns, which establishes them as typed and usable
+    // but is NOT a provider guarantee that they can never be absent - so they
+    // stay optional and a projection refuses only on identity and state.
+    expect([...lineup.requiredColumns!].sort()).toEqual(
+      ['player.playerId', 'providerId', 'status', 'teamId', 'teamStatus'],
+    );
+    expect(lineup.externalKey).toEqual(['providerId', 'teamId', 'player.playerId']);
+
+    const r20 = [...lineup.knownColumns!];
+    for (const optional of [
+      'position', 'teamType', 'round.roundNumber', 'player.playerJumperNumber', 'lateChanges',
+    ]) {
+      expect(r20).toContain(optional);
+      expect(() => assertProjectableColumns(lineup, r20.filter((c) => c !== optional)))
+        .not.toThrow();
+    }
+    for (const required of lineup.requiredColumns!) {
+      expect(() => assertProjectableColumns(lineup, r20.filter((c) => c !== required)))
+        .toThrow(/missing required column/);
+    }
+  });
+
+  it('treats the lineup family as staging-only with no captain signal', () => {
+    const lineup = getSourceFamily(registry, 'afl_api', 'lineup');
+    // Standing decision: lineups never become canonical participation.
+    expect(lineup.promotionPolicy).toBe('never');
+
+    // P3b measured player.captain FALSE for 572 of 572 rows across 11 matches
+    // and 22 team instances, with 0 TRUE and 0 NA. It carries no captain signal
+    // and is not projected in v1. It is deliberately NOT declared
+    // zero-is-missing: that list means "this value means absent", and the right
+    // treatment here is to project nothing rather than to null a real column.
+    expect(lineup.zeroIsMissingColumns).toEqual([]);
+    expect(lineup.knownColumns).toContain('player.captain');
+    // It stays in known_columns precisely so its disappearance is drift.
+    expect(() => assertProjectableColumns(
+      lineup, [...lineup.knownColumns!].filter((c) => c !== 'player.captain'),
+    )).not.toThrow();
+
+    // No fetch-noise column exists in this payload, and utcStartTime is a
+    // scheduled start time, never an upstream mutation timestamp.
+    expect(lineup.hashExclusions).toEqual([]);
+    expect(lineup.sourceUpdatedAtField).toBeNull();
   });
 
   it('keeps round integers inside their own vocabulary', () => {
@@ -756,6 +817,19 @@ describe('source families dataset (AFLDB-ISSUE-096 S1)', () => {
     for (const vocabulary of registry.roundVocabularies.values()) {
       expect(vocabulary.mappingStatus).toBe('anchors_only');
     }
+
+    // The AFL API vocabulary now carries both proven anchors. P3b added round
+    // 20, whose name matches its number; P3's round 25 is the one that proves
+    // the integer alone is ambiguous across vocabularies. TWO anchors are still
+    // not a season mapping, so mapping_status must stay anchors_only.
+    const aflApi = registry.roundVocabularies.get('afl_api_2026')!;
+    expect(aflApi.mappingStatus).toBe('anchors_only');
+    expect(aflApi.anchors.map((a) => [a.roundNumber, a.evidence]))
+      .toEqual([[20, 'P3b'], [25, 'P3']]);
+    expect(aflApi.anchors.find((a) => a.roundNumber === 25)!.meaning)
+      .toMatch(/Wildcard Finals/);
+    expect(aflApi.anchors.find((a) => a.roundNumber === 20)!.meaning)
+      .toMatch(/Round 20/);
     expect(() => translateRound(registry, openingSquiggle, 'afltables_2026'))
       .toThrow(/anchors_only/);
     expect(translateRound(registry, openingSquiggle, 'squiggle_2026')).toBe(openingSquiggle);

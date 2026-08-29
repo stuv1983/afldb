@@ -12,7 +12,6 @@ created, reopened, resolved, or materially reclassified.
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
 | `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
-| `AFLDB-ISSUE-100` | Medium | Data acquisition / Import architecture | AFLDB has no model for announced teams, jumper numbers, substitutions or late changes; canonical participation is the played match sheet, which exists only after a match. `fetch_lineup_afl` is the only free source found that supplies lineups at all. | Add a new `staging.external_lineups` table fed by `fetch_lineup_afl`, for admin visibility and reconciliation only. **Lineups are staging-only and never become canonical participation**; no public surface. Depends on `AFLDB-ISSUE-096`; implementation gated on probe **P3**, which must supply the still-UNKNOWN column set. |
 | `AFLDB-ISSUE-101` | Medium | Data acquisition / Import architecture / Data integrity | The approved historical boundary gives the API pipeline only the in-progress season, but nothing performs the transition when a season completes, so in-season provenance would become permanent and the Stage-9 gate would drift. | Implement the rollover: extend `fitzroy-accepted-baselines.json` to the completed season, supersede in-season provenance, advance `seasons.json.in_progress_seasons`, re-point the Stage-9 `matches_after_accepted_last_season` gate. **Must not redefine completed-season `club_seasons` ownership — that stays with `AFLDB-ISSUE-095`.** `AFLDB-ISSUE-099` is **Resolved as of 2026-08-29, so that dependency is satisfied**; still needs coordination/completion of the relevant ISSUE-095 path. |
 | `AFLDB-ISSUE-102` | Medium | Data acquisition / Import architecture | `tools/migration/import_awards.py:1408` still requires `AFLDB_LEGACY_SQLITE`, so the awards/honours domain has the same legacy dependency `AFLDB-ISSUE-095` records for `club_seasons`, previously untracked. No free API covers Coleman, Rising Star, All-Australian, AFLCA, AFLPA or club best-and-fairest; Brownlow is the exception via the AFL Tables path. | **Record only.** Do not design the replacement under this investigation — no source selection, no per-award provenance decision, no importer work is authorised by this entry. Links `AFLDB-ISSUE-095` as the direct sibling gap; not absorbed. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
@@ -8520,15 +8519,61 @@ settle pass is a separate authorisation.
 
 ## AFLDB-ISSUE-100 — Staging-only lineup / team-announcement domain
 
-- **Status:** Open
+- **Status:** **Resolved**
 - **Severity:** Medium
 - **Area:** Data acquisition / Import architecture
 - **Found:** 2026-08-28 (2026+ API acquisition investigation)
-- **Resolved:** N/A
-- **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §2.5 and §9 row E.
-- **Files (today, for orientation only — none changed yet):** new
-  `staging.external_lineups` (migration not yet written)
-- **Related:** `AFLDB-ISSUE-096` (parent contract)
+- **Resolved:** 2026-08-29
+- **Runbook:** `AFLDB-2026-API-ACQUISITION.md` §2.5, §9 row E, §13.3 (P3), §13.10 (P3b),
+  §13.11 (L2 implementation).
+- **Files:** `data/reference/source-families.json` (`afl_api.lineup` family, `afl_api_2026`
+  round vocabulary); `tools/rebuild/afl_api/` (`afl-api-contract.json`, `acquire_lineups.R`,
+  `emit_lineup_bundle.ts`, `persist_lineups.ts`); `src/lib/acquisition/lineup-bundle.ts`,
+  `src/lib/acquisition/lineup-store.ts`;
+  `src/db/migrations/077_afl_api_lineups.sql` (applied, checksum-frozen);
+  `tests/afl-api-lineup.test.ts`, `tests/afl-api-lineup-migration.test.ts`,
+  `tests/afl-api-lineup-store.test.ts`, `tests/integration/afl-api-lineup-store.test.ts`,
+  `tests/reference-data.test.ts`
+- **Related:** `AFLDB-ISSUE-096` (parent contract), `AFLDB-ISSUE-099` (spine and bundle
+  conventions reused)
+
+### Resolution summary
+The staging-only lineup domain is implemented end to end and validated against the real
+source. `fetch_lineup_afl` → SHA-256-bound raw JSON acquisition → deterministic observation
+bundle → migration-074 observation/version spine → typed `staging.afl_api_lineup`.
+**Announced/selected remains staging-only and is never canonical participation; canonical
+participation remains the played match sheet (`player_match_stats`), which this path neither
+reads nor writes.** `promotion_policy` for `afl_api.lineup` is `never`.
+
+**Real-source validation, 2026-08-29, `afldb_test` only.** Fresh acquisitions of both proven
+shapes, persisted through the production L3B2 path under the restricted `afldb_import` role:
+
+| | rows/cols | records | first persist | replay |
+|---|---|---|---|---|
+| R20 | 468 × 20, `lateChanges` present | 468 | 468 versions + 468 projections inserted | 0 versions, 468 heads refreshed, 468 projections updated |
+| R25 | 104 × 19, `lateChanges` absent | 104 | 104 versions + 104 projections inserted | 0 versions, 104 heads refreshed, 104 projections updated |
+
+Both rounds: 0 absent, 0 canonical writes, canonical FK resolution 0/0/0. Database
+verification after first persistence confirmed, per round, typed rows = distinct external ids
+= valid version links = current-version links (468/468 and 104/104), every `match_id`,
+`club_id` and `player_id` NULL, no `absent_since`, `player.captain` false on every payload,
+`lateChanges` key present on all 468 R20 payloads with 26 non-null, and the key **absent** from
+all 104 R25 payloads. Final replay proof `round|typed|versions|min|max|current|absent`:
+`20|468|468|1|1|468|0` and `25|104|104|1|1|104|0` — **identical replay produced no semantic
+revision**: version counts stayed at 468/104 with min = max = 1, so re-importing unchanged
+upstream content refreshed heads and rewrote no history.
+
+Regression at close-out: **5 test files, 126 passed / 2 pre-existing Python-gated skips**,
+spanning the L1 registry contract, L2 acquisition/emitter, the migration-077 contract, L3B2
+DB-free persistence, the DB integration suite and restricted `afldb_import` parity.
+
+**Migration 077 is applied to `afldb_test` and checksum-frozen; no migration 078 was needed.**
+**Absence sweeping remains disabled** for this family — row-grain completeness is not
+contractually established, every enumeration is `complete: false`, and
+`markMissingObservationsAbsent()` is never called. **Canonical FK enrichment is deliberately
+deferred**: no approved provider-ID mapping exists for match, club or player (see Follow-up),
+and a NULL there is an expected staging state, never a reason to discard a valid provider row.
+The staging rows written by this validation are retained in `afldb_test` as evidence.
 
 ### Problem
 AFLDB has no model for announced teams, jumper numbers, substitutions or late changes.
@@ -8548,21 +8593,242 @@ reconciliation only.
 ### Established vs unknown
 - **Established:** the source exists, requires no API key, and covers AFLM/AFLW and several
   state leagues.
-- **UNKNOWN:** the returned column set, and whether AFL provider ids are exposed and stable.
-  The staging schema cannot be designed until P3 supplies the shape.
+- **Established by P3 (PASS 2026-08-28) — identity.** Match `providerId` `CD_M…`, team `teamId`
+  `CD_T…`, player `player.playerId` `CD_I…`, one shared namespace, and P4 measured 26 of 26
+  round-20 Carlton lineup player ids present as `providerId` in `fetch_player_details_afl`.
+  **The identity gate is satisfied and is not revisited.**
+- **Established by P3b (PASS 2026-08-29) — shape, types, NULLs, completeness.** See
+  `AFLDB-2026-API-ACQUISITION.md` §13.10. R20 **468 × 20**, R25 **104 × 19**; the single R20-only
+  column is **`lateChanges`** and R25's set is a strict subset. 0 NA everywhere except
+  `lateChanges` (442/468 NA), 0 blank strings anywhere, 0 duplicate external keys over 572 rows,
+  and exact fixture-to-lineup **match-set** equality in both rounds. **This is the gate that
+  authorises source-contract completion and schema planning.**
+- **Corrected by P3b:** §13.3's round-25 record implied a uniformly `UNCONFIRMED_TEAMS` /
+  `PROVISIONAL_TEAM` payload. R25 is **50/50 mixed at match grain** — `CD_M20260142502` is
+  `CONCLUDED`/`FINAL_TEAM`, `CD_M20260142501` is `UNCONFIRMED_TEAMS`/`PROVISIONAL_TEAM`. P3
+  appears to have characterised a sampled row. The identity finding is unaffected.
+- **STILL UNKNOWN, and binding on design:** (a) whether a match's rows reflect the team **before
+  or after** a late change — both named players appeared in the one observed change, n = 1;
+  (b) whether the player rows for an individual team are **row-grain complete** on every run.
 - **Recorded risk:** this reads the AFL's own website API through a third-party package. Free
   and unauthenticated today, but not a published contract with AFLDB, and revocable without
   notice — which is part of why it is staging-only.
 
+### Binding limitations carried into implementation
+1. **Absence sweeping is DISABLED for `afl_api.lineup` in v1** — by decision, not omission.
+   Match-set completeness does not prove row-grain completeness, so
+   `markMissingObservationsAbsent()` is never called for this family, `absent_since` is never
+   set for it, and a missing player row is never read as a withdrawal. Migration-074
+   observation/version persistence is otherwise reused unchanged: changed payloads create normal
+   versions, identical payloads stay idempotent. Enabling absence needs an explicit durable
+   row-grain completeness contract and belongs to a future issue.
+2. **`player.captain` is not projected.** `FALSE` for 572/572 rows across 11 matches and 22 team
+   instances, 0 `TRUE`, 0 `NA`. It is a sentinel, carries no captain signal, and is deliberately
+   **not** declared zero-is-missing — the correct treatment is to project nothing. It stays in
+   `known_columns` so its disappearance stays detectable drift.
+3. **`lateChanges` is stored verbatim and never parsed.** Conditional, nullable, **team-grain**
+   free text with abbreviated human names and no provider player ids; name-matching it is
+   forbidden. Whether it warrants a small separate team-grain snapshot projection or stays
+   raw-observation-only is an explicit L3 decision — it must never be silently duplicated as a
+   player fact.
+4. **No closed enum CHECKs** on `status`, `teamStatus`, `teamType`, `compSeason.shortName` or
+   `position`. Those vocabularies are measurements from two rounds of one competition, not
+   exhaustive provider contracts. Drift stays fail-closed through the source-family contract.
+5. **`required_columns` stays at the five identity/state fields.** 0 NULLs over two rounds
+   establishes other columns as typed and usable, not as guaranteed present.
+
 ### Dependencies and gates
-Depends on **`AFLDB-ISSUE-096`**. Implementation is gated on evidence probe **P3**, which must
-supply the source shape.
+Depends on **`AFLDB-ISSUE-096`** (Resolved; migration 074 applied and checksum-frozen). The **P3
+gate is satisfied** and the **P3b gate is satisfied** — the issue is no longer probe-blocked for
+source-contract and schema work. Registering the `afl_api` `sources` row remains this issue's,
+per the registry's `registration_owner`, and is deferred to the schema stage rather than landed
+alone, because registration is also what lifts the validator's refusal of reviewed promotion for
+that source.
+
+### Durable contracts established by L2
+Three, all **family-local to `afl_api.lineup`** and none a repository-wide abstraction:
+
+1. **`external_record_id` = `providerId|teamId|player.playerId`**, in declared `external_key`
+   order — e.g. `CD_M20260142502|CD_T140|CD_I1020621`. `|` is **not** a universal AFLDB
+   encoder: `afltables.match` uses it only because it inherits the canonical
+   `matches.match_key`, and `afltables.player_match_stats` uses `@` around one. No generic
+   external-key encoder exists in the repository and none was created. Fail-closed: a
+   component that is missing, blank, non-string or itself contains `|` **refuses emission** —
+   the delimiter is never escaped, replaced or hashed, and player names are never a fallback.
+2. **`scope_key` = `season=<int>;round=<int>`** — the real grain of one acquisition. A
+   season-only scope would overstate what one `fetch_lineup_afl` call enumerated. The grammar
+   is pinned, both components are validated integers, and there is no free-form scope string.
+3. **Every enumeration is `complete: false`, permanently in v1**, with a fixed
+   `incomplete_reason` retaining all three facts (row-grain completeness not established;
+   intentionally incomplete for absence purposes; absence sweeping disabled). `complete` is
+   typed as the **literal `false`**, so widening it fails typecheck rather than a test regex.
 
 ### Validation
-None yet — nothing implemented.
+**L1 COMPLETE and GREEN 2026-08-29** — source contract only, no schema and no implementation.
+`data/reference/source-families.json` now declares the `afl_api.lineup` family with
+`known_columns` complete at 20 (`lateChanges` appended), the five approved `required_columns`
+unchanged, `external_key`, `hash_exclusions` and `source_updated_at_field` unchanged,
+`zero_is_missing_columns` still empty, and the P3b evidence and limitations recorded; the
+`afl_api_2026` round vocabulary gained the proven round-20 anchor and stays `anchors_only`.
+Gates: `tests/reference-data.test.ts` **39 passed / 2 pre-existing Python-gated skips**, and
+`tests/current-season-import.test.ts` **172/172**. No database was touched, no migration was
+created or applied, and no acquisition or persistence code exists yet.
+
+**L2 COMPLETE and GREEN 2026-08-29** — bounded acquisition and deterministic observation
+bundle, still entirely DB-free. New: `tools/rebuild/afl_api/afl-api-contract.json` (a
+**separate** source contract), `tools/rebuild/afl_api/acquire_lineups.R`,
+`src/lib/acquisition/lineup-bundle.ts`, `tools/rebuild/afl_api/emit_lineup_bundle.ts`,
+`tests/afl-api-lineup.test.ts`.
+
+Gates: `afl-api-lineup` **38/38**; with `reference-data`, `current-season-import` and
+`fitzroy-acquisition` together **272 passed / 2 pre-existing Python-gated skips**. Typecheck at
+the **exact pre-existing baseline — 13 errors in 4 unrelated files** (`db-test-rebuild`,
+`draftguru-acquisition`, `integration/draftguru-import`, `integration/observation-spine`),
+**zero in any ISSUE-100 file**. Targeted ESLint: 0 errors (3 `_`-prefixed unused-destructure
+warnings). No database, no migration, no `sources` row, no staging table, no persistence.
+
+**Proven end-to-end against live upstream, not only fixtures:** round 20 acquired **468 × 20**
+with `lateChanges` present, round 25 **104 × 19** with the column absent — matching P3b exactly.
+In the real round-20 bundle: 468 records, ids sorted, **26** rows carrying exactly one distinct
+verbatim `lateChanges` string and **442** present-and-null, `player.captain` `false` on 468/468,
+jumper numbers all integer over 1–51, every `projection` null, and `complete: false`. The
+round-25 bundle contains **no `lateChanges` key at all**. Re-acquire → re-emit reproduced a
+byte-identical bundle (`066675a7…`).
+
+**L3A identity adjudication COMPLETE 2026-08-29 — all three provider mappings are `none`.**
+Proven from schema and code, no database needed: `CD_M…`/`CD_T…`/`CD_I…` appear in **no**
+migration, query or lib outside ISSUE-100's own code, and `afl_api` appears in no migration at
+all. `external_identities` (migration 002) is the correct structural concept for person
+identity but its **only** writer is `import_fitzroy_core.py:2285`, hard-coded to
+`source_key=afltables` / `match_method='afltables_profile_url'` — so it holds no `afl_api` row
+and no approved bridge populates one. `clubs` has no provider-id column; `club_aliases` maps
+text. **No mapping was created to make ISSUE-100 resolve.**
+
+- **Pre-match match identity is structurally unavailable.** `matches.home_score`, `away_score`,
+  `result` and `margin` are all **NOT NULL** (migration 003), so an unplayed fixture cannot
+  exist in `matches`. `resolveLocalMatch` therefore cannot resolve an announcement — the target
+  row cannot exist until the match is played. `match_id` can never be NOT NULL, and no
+  placeholder match may be invented.
+- **Club resolution is incomplete.** DB-free measurement against the loader-derived alias set
+  (`load_reference_data.py` truncates and rebuilds `club_aliases` from `clubs.json` as exactly
+  {hist, name, short_name, abbreviation}): **12 of 18** R20 team names resolve; the six misses
+  are marketing forms (`Adelaide Crows`, `Gold Coast SUNS`, `GWS GIANTS`, `West Coast Eagles`,
+  `Sydney Swans`, `Geelong Cats`), of which two match no field at all. R25 scored 4/4 only
+  because its clubs are plain-named.
+- **The DB-backed half of the L3A measurement was not run:** this worktree has no `.env` and
+  `AFLDB_TEST_DATABASE_URL` is unset, so no DSN was available and none was fabricated. No query
+  was issued.
+
+**OPTION B APPROVED and implemented in migration 077.** A lineup row exists because the
+provider announced it; canonical resolution is separate enrichment. Provider identity is NOT
+NULL and is the row identity; `match_id`/`club_id`/`player_id` are **nullable and in no key**.
+This is not a new pattern — `staging.external_current_matches` (migration 063) is already
+exactly this shape. Option A would discard every pre-match announcement and, on R20 evidence,
+every row of six clubs, defeating the table's purpose.
+
+**Migration 077 WRITTEN and UNAPPLIED 2026-08-29** (`src/db/migrations/077_afl_api_lineups.sql`).
+001–076 re-confirmed contiguous and 077 unused on every ref immediately before creation. It
+registers `afl_api` **fail-closed** — idempotent on a semantically identical row, `RAISE
+EXCEPTION` on a conflicting one, rather than 060/063's blanket `ON CONFLICT DO UPDATE` — and
+creates `staging.afl_api_lineup`. `jumper_number` is **`text`**, following AFLDB's schema-wide
+convention (migrations 004, 025, 076; 025 states the reason: "Text because it identifies rather
+than counts") rather than the source's integer, so it stays directly comparable with
+`player_match_stats.jumper_number` in the reconciliation query this table exists to serve.
+Gate: `tests/afl-api-lineup-migration.test.ts` **22/22** over comment-stripped executable SQL.
+
+**Migration 077 REVIEWED, APPLIED and CHECKSUM-FROZEN 2026-08-29** — `afldb_test` only,
+identity proven `afldb_test|afldb_owner`, **77 files / 77 applied / 0 pending**. Two
+pre-application corrections landed first: the source description was narrowed so it describes
+the provider and the **lineup family only** (it previously bound every future `afl_api` family
+to a staging-only rule this issue never established), and "unauthenticated" became **"requires
+no operator-supplied API key"** — AFLDB configures no AFL credential, but fitzRoy handles the
+AFL.com.au access mechanism itself and nothing claims there is no token beneath it. The
+reported Markdown-looking URL was **chat auto-linking of a bare URL in prose, not file
+content**: the file holds the plain literal `'https://www.afl.com.au/'` exactly twice, now
+test-pinned. **077 must never be edited; a defect needs a forward migration.**
+
+**L3B2 COMPLETE and GREEN 2026-08-29.** `src/lib/acquisition/lineup-store.ts` persists an
+emitted bundle through the **migration-074 spine** via the shared
+`persistSourceObservation()` — no second observation system — then upserts the typed
+`staging.afl_api_lineup` projection linked to the exact `version_seq` read back out of
+PostgreSQL. One `sql.begin` covers the `import_batches` row, every spine version and every
+projection, so a typed row can never claim a version that was not persisted.
+`tools/rebuild/afl_api/persist_lineups.ts` is the bounded operator entry point; it re-hashes
+the artefact before opening a connection.
+
+Binding properties, each proved rather than asserted:
+- **`source_id` is resolved internally from the literal key `'afl_api'`** inside the
+  transaction via `resolveSourceId`, which refuses when the key has no `sources` row.
+  `persistLineupBundle`'s signature and `LineupPersistOptions` carry no `sourceId`, and a
+  bundle naming another source is refused before the transaction opens. This is the executable
+  half of the pair; migration 077's `family = 'lineup'` CHECK pins the other.
+- **Unresolved `match_id`/`club_id`/`player_id` remain NULL and the row still persists.**
+  No canonical enrichment path is used: L3A established none exists for any of the three, and
+  the one candidate resolver is private to ISSUE-099, name-based and measured at 12/18. All
+  three counters report 0.
+- **No absence sweep.** `markMissingObservationsAbsent`, `sweepAbsences` and `absent_since`
+  appear nowhere in the path; the counter reports 0 as a statement, not a total.
+- **No DELETE/TRUNCATE executable path.** The projection is maintained by keyed upsert alone
+  (`ON CONFLICT (source_id, family, external_record_id) DO UPDATE`). `afldb_import` holds both
+  privileges schema-wide from `privileges.sql`, so this is a property of the code, not the
+  grant — holding a privilege is not permission to use it.
+- **No canonical participation write.** The pass writes exactly `import_batches` and
+  `staging.afl_api_lineup`; `players`, `matches`, `player_match_stats`, `clubs`,
+  `promotion_candidates` and `external_identities` are bracketed unchanged across a run.
+- **No typed `lateChanges` or captain projection.** Both stay verbatim in the observation
+  payload; `LineupProjection` has 14 fields and neither is among them.
+
+Validation: `tests/afl-api-lineup-store.test.ts` **16/16** (DB-free) and
+`tests/integration/afl-api-lineup-store.test.ts` **11/11** against `afldb_test`, covering the
+spine/projection linkage, idempotent replay, revision replay with history retained, raw
+fidelity (`player.captain` false, `lateChanges` verbatim, omitted column absent), and canonical
+safety. **Restricted-role parity GREEN** — the whole write path re-run under
+`AFLDB_TEST_IMPORT_DATABASE_URL`, identity proven `afldb_test|afldb_import`, covering first
+persist, idempotent replay and revision advance. DELETE/TRUNCATE were deliberately **not
+executed** under that role: the invariant is that the production path never issues them, which
+is a source assertion, not something to prove by running a destructive statement.
 
 ### Follow-up
-None recorded yet.
+Recorded as genuine future work. **None is a defect in what shipped**, and none belongs to
+this issue.
+
+- **Canonical FK enrichment — deferred by decision, and each part needs its own adjudication.**
+  `match_id` can never be resolved before a match is played: `matches` requires NOT NULL
+  `home_score`/`away_score`/`result`/`margin` (migration 003), so an unplayed fixture is
+  structurally unstorable and a team announcement precedes it. Club enrichment would mean
+  reusing ISSUE-099's private, name-based `resolveClub`, measured at **12 of 18** R20 team
+  names with two clubs (`Adelaide Crows`, `Gold Coast SUNS`) matching no field at all —
+  closing that gap means new alias evidence, not new code. Player enrichment has **no**
+  `afl_api` bridge in `external_identities`: its only writer is
+  `import_fitzroy_core.py:2285`, hard-coded to `afltables`/`afltables_profile_url`, and no
+  approved deterministic path exists from `CD_I…` to `players.id` that does not rely on names.
+- **Row-grain completeness contract for lineups** — the only thing that could enable absence
+  semantics for this family. Match-set completeness is proven; row-grain completeness is not.
+  A future issue's work, not a reopening of this one.
+- **`lateChanges` team-grain projection** — settled as raw-observation-only for v1 (below).
+  Revisiting it needs more observed late changes across several rounds, since its pre/post-change
+  relationship to the player rows is still unknown at n = 1.
+- **Staging evidence retained.** The real R20/R25 rows written during validation are left in
+  `afldb_test` deliberately; they are valid staging observations, not test fixtures.
+- **Executable invariant B2 — IMPLEMENTED and PROVEN (was: recorded pre-application).**
+  `staging.afl_api_lineup.source_id` is deliberately **not** CHECK-constrained to
+  `sources.key = 'afl_api'` — SQL cannot express that without a trigger or a redundant
+  `source_key` column, and 077 adds neither. So the guarantee is executable and belongs to the
+  persistence path: it resolves `source_id` internally from the literal key `'afl_api'`;
+  a caller cannot supply an arbitrary `source_id`; it refuses when `sources.key = 'afl_api'`
+  is absent; and it never projects another source's observation into this table. **All four are
+  now covered by behavioural tests** in `tests/afl-api-lineup-store.test.ts`. The
+  `family = 'lineup'` CHECK pins the other half of the pair structurally.
+- **`lateChanges` ADJUDICATED and settled for v1: raw-observation-only.** No player-grain
+  column, no `team_late_changes` table, no parsing, no name matching, no IN/OUT identities, no
+  substitution or pre/post-change semantics. Its measured grain is team-level while every other
+  projected field is player-grain, so a typed projection would duplicate a team fact across 26
+  rows in exactly the shape that later gets misread as a player fact; and its pre/post-change
+  relationship to the player rows remains unknown at n=1. Migration 077 contains no such column
+  or table, test-pinned. A later issue may revisit this only on stronger evidence — more
+  observed late changes across several rounds.
+- **Future issue, not this one:** row-grain completeness contract for lineups, which is the only
+  thing that could enable absence semantics.
 
 ## AFLDB-ISSUE-101 — End-of-season promotion / baseline rollover
 

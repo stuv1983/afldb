@@ -88,6 +88,11 @@
       "mapping_owner": "AFLDB-ISSUE-100",
       "anchors": [
         {
+          "round_number": 20,
+          "meaning": "Round 20 (round.name), a home-and-away round whose name matches its number",
+          "evidence": "P3b"
+        },
+        {
           "round_number": 25,
           "meaning": "Wildcard Finals (round.name), NOT the last home-and-away round",
           "evidence": "P3"
@@ -347,9 +352,9 @@
         "round.roundNumber", "venue.name", "teamAbbr", "teamName", "teamNickname",
         "teamId", "position", "player.playerId", "player.captain",
         "player.playerJumperNumber", "player.playerName.givenName",
-        "player.playerName.surname", "teamStatus", "teamType"
+        "player.playerName.surname", "teamStatus", "teamType", "lateChanges"
       ],
-      "known_columns_status": "incomplete",
+      "known_columns_status": "complete",
       "hash_exclusions": [],
       "source_updated_at_field": null,
       "zero_is_missing_columns": [],
@@ -362,14 +367,30 @@
       "promotion_policy": "never",
       "promotion_owner": null,
       "evidence": [
-        "P3 PASS 2026-08-28: round 25 = 104 x 19 (status UNCONFIRMED_TEAMS / PROVISIONAL_TEAM), round 20 = 468 x 20 (CONCLUDED / FINAL_TEAM, 18 teams x 26 named players). Match CD_M20260142502, team CD_T140/CD_T30, player CD_I1020621."
+        "P3 PASS 2026-08-28: round 25 = 104 x 19, round 20 = 468 x 20 (18 teams x 26 named players). Match CD_M20260142502, team CD_T140/CD_T30, player CD_I1020621. Identity is adequate and the CD_ namespace is shared with the roster family (P4, 26 of 26 measured).",
+        "P3b PASS 2026-08-29 (AFLDB-ISSUE-100; R 4.6.1, fitzRoy 1.8.0, same environment as P3). Re-measured both rounds in full rather than by sample: r20 468 x 20, r25 104 x 19, and the single R20-only column is `lateChanges`. R25's 19 columns are a strict subset of R20's 20.",
+        "P3b types, identical for every shared column across both shapes: 2 integer (round.roundNumber, player.playerJumperNumber), 1 logical (player.captain), the remainder character. Flat tibble, no list-columns and no nested frames.",
+        "P3b NULL/blank measurement: R20 has 0 NA in every column EXCEPT lateChanges (442 NA / 26 non-NA); R25 has 0 NA in every column. 0 blank/whitespace-only strings in every character column of both rounds. lateChanges is therefore the family's only nullable field, and there is no empty-string-as-missing idiom anywhere in the payload.",
+        "P3b external-key uniqueness re-proven: sum(duplicated) on (providerId, teamId, player.playerId) is 0 in R20 and 0 in R25. Row counts reconcile exactly at 9 x 2 x 26 = 468 and 2 x 2 x 26 = 104.",
+        "P3b fixture-vs-lineup match-set equality, both directions empty in both rounds: R20 lineup 9 / fixture 9, R25 lineup 2 / fixture 2, every match returning exactly 52 rows. fetch_fixture_afl exposes providerId as a real top-level column, so the comparison joins on the same CD_M identity and needed no substitute key.",
+        "P3b player.captain: FALSE for 468/468 (R20) and 104/104 (R25) - 572 rows, 11 matches, 22 team instances, 2 rounds, with 0 TRUE and 0 NA.",
+        "P3b player.playerJumperNumber: integer, 0 NA and 0 blanks in both rounds, observed range 1-51 (R20) and 1-47 (R25). No zero, no negative and no sentinel value observed.",
+        "P3b position: the same 20 values in both rounds with 0 NA, distributed perfectly regularly as 18 distinct on-field positions once per team plus INT x5 and EMERG x3, giving 26 named players per team."
       ],
       "notes": [
         "STANDING DECISION: lineups are staging-only and never become canonical participation. promotion_policy is 'never' and is not negotiable by a later family issue.",
-        "known_columns_status is 'incomplete' ON PURPOSE. The 19 listed columns are the round-25 set; round 20 returned 20 columns and the extra one was never enumerated. A projection that refuses unexpected columns will therefore REFUSE a round-20 fetch. That refusal is the correct fail-closed behaviour and is the signal for AFLDB-ISSUE-100 to enumerate the missing column before building the staging projection.",
+        "known_columns_status was 'incomplete' until AFLDB-ISSUE-100's P3b enumerated the missing column. It is `lateChanges`, it is present in R20 and absent from R25 entirely, and the set is now complete at 20. The round-20 refusal this status previously caused was correct fail-closed behaviour and was resolved by measurement, never by relaxing assertProjectableColumns.",
+        "lateChanges is a CONDITIONAL, NULLABLE, TEAM-GRAIN FREE-TEXT column and is required_columns-exempt for that reason: the column itself is absent from a round in which no match carried a late change. In R20 all 26 non-NA rows belonged to ONE (match, team) - CD_M20260142007 / CD_T130, away - repeating one identical string denormalised onto every player row of that team.",
+        "BINDING on lateChanges: never parse it, never name-match it, and never infer substitution, participation or withdrawal from it. Its measured content is abbreviated human names with NO provider player ids, so joining it to player.playerId would require exactly the name matching this repository forbids at every grain. It is retained as raw observation material only; whether a separate team-grain snapshot projection is warranted is an explicit L3 decision and it must never be silently duplicated as a player fact.",
+        "PRE/POST-CHANGE STATE IS UNKNOWN, recorded rather than assumed away: in the single observed late change both the named incoming and the named outgoing player still appear in the returned player rows. Whether a match's rows reflect the team before or after a late change cannot be established from n=1, and resolving it from the EMERG or INT position values would be an inference the position vocabulary does not support.",
         "There is NO substitute field. EMERG and INT are positions within the 20-value position vocabulary, not a medical-sub marker.",
         "utcStartTime is the scheduled event start time and is a typed projection field. It is NOT an upstream mutation timestamp and must never populate source_updated_at.",
-        "player.captain was FALSE for all 468 round-20 rows: observed, not diagnosed."
+        "player.captain is NOT PROJECTABLE in v1. P3b measured it FALSE for 572 of 572 rows across 11 matches and 22 team instances with 0 TRUE and 0 NA; every AFL team names a captain, so the field carries no captain signal in the source as measured. It is deliberately NOT listed in zero_is_missing_columns - that list is for a value that means missing, and the correct v1 treatment here is to project nothing at all. It stays in known_columns so that its disappearance or a change in its type remains detectable source drift.",
+        "zero_is_missing_columns is deliberately EMPTY. The only measured false/zero-like sentinel is player.captain, and it is handled by not projecting the field rather than by nulling it.",
+        "hash_exclusions is empty and stays empty: the lineup payload carries no fetch-date or response-noise column, so every column is content and the payload hash is the whole observation.",
+        "ABSENCE SWEEPING IS DISABLED for this family in v1, by decision and not by omission. P3b proved exact fixture-to-lineup MATCH-SET equality, which proves every fixture was queried; it does NOT prove that the set of player rows returned for an individual team is complete on every future run. markMissingObservationsAbsent must therefore never be called for afl_api.lineup, absent_since must never be set for it, and a missing player row must never be read as a withdrawal. Enabling absence semantics requires an explicit durable row-grain completeness contract and belongs to a future issue.",
+        "Observation persistence still reuses migration 074 unchanged: a changed payload creates a normal version and an identical payload stays idempotent. Only the absence sweep is withheld.",
+        "The observed vocabularies of status, teamStatus, teamType, compSeason.shortName and position are MEASUREMENTS, not exhaustive provider contracts, and must not become closed database or source enum CHECKs. Two rounds of one competition produced only 2, 2, 2, 1 and 20 distinct values respectively. Presence and type drift stay fail-closed through this column contract instead."
       ]
     },
     {

@@ -15,6 +15,50 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-100 — Staging-only AFL API lineup / team-announcement domain - 29 August 2026
+
+- **AFLDB can now record announced teams before a match is played.** A new bounded acquisition
+  path takes one explicit season and round from the AFL.com.au API via fitzRoy
+  (`tools/rebuild/afl_api/acquire_lineups.R`), writes a SHA-256-bound raw JSON artefact and
+  manifest, and emits a deterministic observation bundle
+  (`src/lib/acquisition/lineup-bundle.ts`). There is no implicit current season and no implicit
+  latest round: the adapter refuses rather than guessing a scope, because the scope is the
+  absence boundary. The artefact is JSON rather than CSV so NULL, `false`, `0` and `""` remain
+  four distinct values.
+- **Lineups are STAGING-ONLY and never become canonical participation.** Announced or selected
+  does not mean played; canonical participation remains the played match sheet
+  (`player_match_stats`), which this path neither reads nor writes.
+  `afl_api.lineup` carries `promotion_policy: never`, no promotion candidate is ever created,
+  and no public surface was added.
+- **New migration 077** registers the `afl_api` source **fail-closed** — idempotent on a
+  semantically identical row, and refusing rather than silently rewriting the provenance of a
+  conflicting pre-existing one — and creates `staging.afl_api_lineup`. Provider identity
+  (`provider_match_id`, `provider_team_id`, `provider_player_id`) owns the row;
+  `match_id`, `club_id` and `player_id` are nullable enrichment that participate in no key.
+  `match_id` is nullable by necessity: `matches` requires NOT NULL scores/result/margin, so an
+  unplayed fixture cannot exist there and a team announcement precedes it.
+- **Persistence reuses the existing observation spine rather than duplicating it**
+  (`src/lib/acquisition/lineup-store.ts`): every record goes through migration 074's
+  version history via the shared `persistSourceObservation()`, and the typed projection is
+  linked to the exact `version_seq` read back from PostgreSQL, all in one transaction. The
+  projection is maintained by keyed upsert; the path issues no DELETE or TRUNCATE, which is a
+  property of the code rather than of the grant, since `privileges.sql` gives `afldb_import`
+  both across the whole staging schema.
+- **Absence sweeping is disabled for this family, by decision.** Fixture-to-lineup match-set
+  completeness is proven, but row-grain completeness is not, so every enumeration is
+  `complete: false`, a missing player row is never read as a withdrawal, and `absent_since` is
+  never written.
+- **Validated against the real 2026 source.** Round 20 (468 rows × 20 columns, `lateChanges`
+  present) and round 25 (104 rows × 19 columns, `lateChanges` absent) were acquired, emitted,
+  and persisted under the restricted `afldb_import` role: 468 and 104 versions and projections
+  inserted, 0 absent, 0 canonical writes. **Identical replay produced no semantic revision** —
+  0 versions inserted, heads refreshed and projections updated in place, with version counts
+  unchanged at min = max = 1. Every `match_id`, `club_id` and `player_id` is NULL, which is the
+  expected staging state: no approved provider-ID mapping to a canonical match, club or player
+  exists, and enrichment is deferred rather than guessed. `player.captain` (`false` on every
+  observed row) and `lateChanges` (verbatim, never parsed or name-matched) are preserved as raw
+  observation evidence with no typed projection.
+
 ### AFLDB-ISSUE-103 — Grid Solver finals-win predicates stay within the database timeout - 29 August 2026
 
 - Re-shaped `won_a_final` and `never_won_a_final` around a distinct winning-player scalar-array InitPlan, preserving the exact winning-side participation semantics and complement while eliminating the timeout-producing nested-loop semi/anti joins over a materialized relation. The normal five-second statement timeout remains in force; no index, schema, or data change was required.
