@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-29
-**Open issues:** 3
+**Open issues:** 4
 
 ## How Claude should use this file
 
@@ -24,7 +24,8 @@
 
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
-| `AFLDB-ISSUE-068` | Medium | UI/Hydration | React #418 remains intermittent under production-style NL search hydration; narrow H7 diagnostic is awaiting authoritative live-build validation. |
+| `AFLDB-ISSUE-068` | Medium | UI/Hydration | **Open; H9 confirmed at owning-layer level.** The Next 15.5.23 framework dependency closure/runtime/client/serving path owns the defect; two matched Next 16.3.1 passes had zero hydration/client errors with unchanged semantics. Single residual: deployed Linux-dev acceptance after ISSUE-107. |
+| `AFLDB-ISSUE-107` | Medium | Framework / Runtime / Deployment | **Open.** Implement the bounded Next.js 15.5.23 → 16.3.1 closure with Webpack first, validate and deploy to Linux dev, then hand the final 1,440-row hydration acceptance to ISSUE-068. No production rollout before dev gates pass. |
 <!-- RETIRED 2026-08-28 — `AFLDB-ISSUE-090` is **Resolved** and is NO LONGER an open issue.
      Do not read the commented-out row below as current: it is the pre-resolution index row,
      kept only as lineage, and its "Next action" text is SUPERSEDED. Authoritative records:
@@ -185,21 +186,40 @@
 
 - **Severity:** Medium
 - **Area:** UI/Hydration
-- **Key files:** `tests/nl-ui/nl-stress.spec.ts` plus the current feedback/search hydration implementation and captured `artifacts/hydration/*` / `artifacts/nl-ui/*` evidence.
-- **First wrong layer:** UI/runtime.
-- **Current state:** React #418 remains intermittent under production-style standalone load. Navigation prefetch reduction helped but did not eliminate it. The server-owned feedback-form change also did not fully resolve it. The current narrow H7 experiment removes only `useFormStatus`/pending-derived button disabling from `NlAnswerFeedbackControls`; typecheck/build passed. The ledger's last handover says the service had just been restarted but port 3100 initially refused connections, so the diagnostic build was not yet proven live. Latest measurement (2026-08-24, ISSUE-087 successor-4 D4, 1,440 questions): authoritative `totalHydrationErrors = 8` (0.56%) — release-gate PASS, H7 still unvalidated.
-- **Expected diagnostic build:** `0aYQumjOtVYcrJKPCj0_a`
-- **Exact next action:**
-  1. **Do not rebuild first.**
-  2. Check `systemctl is-active afldb`.
-  3. Check `http://127.0.0.1:3100/api/health`.
-  4. Check live `x-afldb-build`.
-  5. If the service is unhealthy, inspect service status, listener and journal before touching source.
-  6. If healthy and built/live IDs both equal `0aYQumjOtVYcrJKPCj0_a`, run only the unchanged 118-row feedback discriminator with four workers and `NL_UI_BATCH=12`.
-  7. If any feedback-present React #418 remains, preserve artifacts and stop; H7 is falsified/materially weakened. Do not broaden the patch or run 125/501/12k.
-  8. If the run is 0/118, repeat the exact 118-row discriminator before accepting H7.
+- **Runbook:** `AFLDB-ISSUE-068.md`.
+- **First wrong layer:** Next 15.5.23 framework dependency closure/runtime/client/serving path.
+- **Current state:** H9 is confirmed at the owning-layer level. Matched Next 15.5.23 passes
+  (`oroK-9PaBQoMFamvJGRqB`) completed 1,440 / 1,440 with 73 and 62 hydration/client errors;
+  matched Next 16.3.1 passes (`5RU_F0rm5IyuiVwKX9XHi`) completed 1,440 / 1,440 with zero and
+  zero. All four runs had identical 1,238 / 202 / 0 semantics, zero HTTP/page errors, zero
+  violations and zero metamorphic disagreements. Per-load `x-afldb-build` proved build identity.
+- **Causal boundary:** Do not claim a specific Next.js internal function, upstream bug/commit,
+  or `next` alone. React/ReactDOM stayed 19.2.8. Next 16 changes the segment-cache/prefetch
+  serving format, so internal hydration correction versus changed serving path is not
+  distinguished.
+- **Exact next action:** ISSUE-107 implements and deploys the proven closure to real Linux dev.
+  ISSUE-068 then proves the live build with `x-afldb-build` and runs one comparable 1,440-row
+  acceptance sweep. Close only at zero unexplained hydration/client errors, no regression from
+  1,238 / 202 / 0, and unchanged worker/concurrency controls.
 - **Do not mark resolved yet.**
-- **Do not add a changelog entry merely for the end-of-day diagnostic status.**
+
+## AFLDB-ISSUE-107 — Next.js 16 framework/runtime upgrade
+
+- **Severity:** Medium
+- **Area:** Framework / Runtime / Deployment
+- **Runbook:** `AFLDB-ISSUE-107.md`.
+- **Current state:** Open; implementation has not started. The scope is the proven Next.js
+  15.5.23 → 16.3.1 framework closure, retaining React/ReactDOM 19.2.8 unless a genuine
+  dependency constraint requires otherwise, Node >=20.9, and Webpack for the first controlled
+  build (`next build --webpack`).
+- **Required validation:** dependency/lockfile integrity, Next 16 TypeScript/generated controls,
+  build, typecheck, unit/integration, standalone output, and focused route/E2E regression.
+- **Deployment order:** Linux dev only → prove `x-afldb-build` and unchanged runtime controls →
+  ISSUE-068 final deployed 1,440-row acceptance → only then consider a separately reviewed
+  production rollout.
+- **Stop conditions:** unexplained React/dependency expansion, simultaneous bundler change,
+  semantic/security regression, unreproducible framework controls, live build mismatch,
+  reduced concurrency, or any unexplained hydration/client error in ISSUE-068 acceptance.
 
 <!-- RETIRED 2026-08-28 — `AFLDB-ISSUE-077` is **Resolved** (2026-08-26) and is NO LONGER an
      open issue. The detail block below is retained as lineage only: its "Current state" and

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { spawnSync } from "node:child_process";
+import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync,
@@ -47,11 +47,11 @@ const itPy = canSpawn ? it : it.skip;
 // Helpers
 // ---------------------------------------------------------------------------
 
-function runParser(args: string[]): ReturnType<typeof spawnSync> {
+function runParser(args: string[]): SpawnSyncReturns<string> {
   return spawnSync(python, [parserPath, ...args], { encoding: "utf8" });
 }
 
-function runAdapter(args: string[]): ReturnType<typeof spawnSync> {
+function runAdapter(args: string[]): SpawnSyncReturns<string> {
   return spawnSync(python, [adapterPath, ...args], { encoding: "utf8" });
 }
 
@@ -752,13 +752,13 @@ const SYNTHETIC_BANNER =
   + "live DraftGuru person-page structure, which is validated against real bytes after "
   + "the bounded Brad Miller probe. -->";
 
-function runSampleTool(args: string[]): ReturnType<typeof spawnSync> {
+function runSampleTool(args: string[]): SpawnSyncReturns<string> {
   return spawnSync(python, [sampleToolPath, ...args], { encoding: "utf8" });
 }
-function runPersons(args: string[]): ReturnType<typeof spawnSync> {
+function runPersons(args: string[]): SpawnSyncReturns<string> {
   return spawnSync(python, [personsAdapterPath, ...args], { encoding: "utf8" });
 }
-function runProfiler(args: string[]): ReturnType<typeof spawnSync> {
+function runProfiler(args: string[]): SpawnSyncReturns<string> {
   return spawnSync(python, [profilerPath, ...args], { encoding: "utf8" });
 }
 function sha256(data: Buffer | string): string {
@@ -841,7 +841,7 @@ function buildB1Fixture(options: { residual?: (urls: string[]) => string } = {})
   };
 }
 
-function freezeSample(fixture: B1Fixture, extra: string[] = []): ReturnType<typeof spawnSync> {
+function freezeSample(fixture: B1Fixture, extra: string[] = []): SpawnSyncReturns<string> {
   return runSampleTool([
     "--label", B1_LABEL,
     "--stage-a-label", STAGE_A_FIXTURE_LABEL,

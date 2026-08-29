@@ -7,11 +7,12 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 3
+**Open issues:** 4
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
-| `AFLDB-ISSUE-068` | Medium | UI/Hydration | Intermittent React #418 hydration failures remain isolated to the UI/runtime path under production-style NL search load. | First verify the restarted service and diagnostic build; if healthy and build IDs match, run only the unchanged 118-row feedback discriminator for the narrow H7 experiment. |
+| `AFLDB-ISSUE-068` | Medium | UI/Hydration | H9 is confirmed at the owning-layer level: the defect belongs to the Next 15.5.23 framework dependency closure/runtime/client/serving path; two matched Next 16.3.1 passes eliminated all hydration/client errors without semantic change. | Complete the single residual: after ISSUE-107 deploys the proven closure to Linux dev, prove `x-afldb-build` and run one comparable 1,440-row acceptance sweep at unchanged worker/concurrency controls. |
+| `AFLDB-ISSUE-107` | Medium | Framework / Runtime / Deployment | Bounded Next.js 15.5.23 → 16.3.1 framework/runtime upgrade using Webpack first; React/ReactDOM remain 19.2.8 unless dependency constraints genuinely require otherwise. | Implement and validate the bounded closure, deploy it to Linux dev, prove the live build, then hand the final deployed 1,440-row hydration acceptance to ISSUE-068. No production rollout before the dev gates pass. |
 | `AFLDB-ISSUE-102` | Medium | Data acquisition / Import architecture | `tools/migration/import_awards.py:1408` still requires `AFLDB_LEGACY_SQLITE`, so the awards/honours domain has the same legacy dependency `AFLDB-ISSUE-095` records for `club_seasons`, previously untracked. No free API covers Coleman, Rising Star, All-Australian, AFLCA, AFLPA or club best-and-fairest; Brownlow is the exception via the AFL Tables path. | **Record only.** Do not design the replacement under this investigation — no source selection, no per-award provenance decision, no importer work is authorised by this entry. Links `AFLDB-ISSUE-095` as the direct sibling gap; not absorbed. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
 
@@ -2738,11 +2739,14 @@ Keep this issue out of NL semantic defect counts. The regenerated expanded corpu
 
 ## AFLDB-ISSUE-068 - Intermittent React hydration errors during NL UI sweeps
 
-- **Status:** Resolved
+- **Status:** Open
 - **Severity:** Medium
 - **Area:** UI/Hydration
 - **Found:** 2026-08-21
 - **Resolved:** N/A
+- **Runbook:** `AFLDB-ISSUE-068.md`
+- **Related:** `AFLDB-ISSUE-107` owns the framework upgrade and Linux development deployment;
+  ISSUE-068 owns the final deployed hydration acceptance.
 - **Queries:** `Grand Final handballs leader`, `lowest H2 score by West Coast`, `Patrick Dangerfield total goals against Essendon`, `Gary Ablett Snr total goals against Richmond`, `players with at most 5 games`, `most goalss by a Carlton player against Geelong`, `most markss in 1999`, `most handballss in 2003`
 - **Files:** `tests/nl-ui/nl-stress.spec.ts`, `artifacts/hydration/exp_0022`, `artifacts/hydration/exp_0112`, `artifacts/hydration/exp_0183`, `artifacts/hydration/exp_0193`, `artifacts/hydration/exp_0255`, `artifacts/hydration/exp_0459`, `artifacts/hydration/exp_0481`, `artifacts/hydration/exp_0485`
 
@@ -2779,16 +2783,30 @@ The live v24 12,000-question UI corpus also reproduced it: `clientErrors=235`, `
 The parser-v25 audit reran the 501-row expanded browser corpus before the dev restart was blocked. It reproduced the same runtime class with `clientErrors=12`, `hydration.totalHydrationErrors=9`, HTTP failures 0, page errors 0, and report at `nl-ui-out/summary.json`. Captured React #418 examples included `Grand Final marks leader`, `finals record for disposals`, `fewest points scored at Adelaide Oval`, `Scott Pendlebury most handballs against Carlton`, `Patrick Dangerfield total goals against Richmond`, `Patrick Dangerfield total goals against Essendon`, `players with at most 1 games`, `players with most 2 games`, and `Ablett most games`. Three additional client errors were RSC payload fallback messages rather than hydration errors.
 
 ### First wrong layer
-UI/runtime
+Next 15.5.23 framework dependency closure/runtime/client/serving path.
 
 ### Root cause
-Not yet confirmed. Earlier parser-v25 captures pointed to eager App Router RSC prefetch from the persistent site navigation as a contributor: each React #418 capture had identical failing and clean server HTML for the same query, a clean same-question control, and a burst of successful `?_rsc=` fetches for visible nav links within the first few dozen milliseconds of the document load. Post-fix evidence below shows that disabling the persistent nav prefetch reduced but did not eliminate the defect, and the remaining dominant cluster can fire before any observed `_rsc` request starts. This keeps the first wrong layer in UI/runtime, not the NL parser or answer SQL, but no final root cause is proven.
+H9 is **CONFIRMED at the owning-layer level**. The strongest justified conclusion is that the
+React #418 defect is owned by the Next 15.5.23 framework dependency closure/runtime/client/
+serving path: substituting the matched Next 16.3.1 closure eliminated the defect across two
+independent 1,440-load passes. This does not identify a particular Next.js internal function,
+upstream commit or bug, and does not prove the `next` package alone causal. React and ReactDOM
+remained 19.2.8 on both sides.
+
+Next 16 materially changes the segment-cache/prefetch serving format. The experiment therefore
+does not distinguish an internal hydration correction from elimination through the changed
+framework serving path.
 
 ### Fix
-Disabled automatic Next.js prefetch on `PrimaryNav` and `TabBar` links in `src/components/SiteNav.tsx`. The links still navigate normally when clicked, but `/search` hydration no longer starts by prefetching the full visible nav route set across cluster workers.
+No complete application-level fix was proven under ISSUE-068. Earlier prefetch and feedback-form
+experiments remain investigation lineage; they did not eliminate the defect. `AFLDB-ISSUE-107`
+owns implementation and deployment of the proven Next 16.3.1 framework closure. The upgrade is
+not performed as part of this closeout.
 
-### Validation
-`npm.cmd run typecheck` passed locally. Full runtime validation is still required against a restarted deployed/dev standalone service containing the `SiteNav` change: rerun the varied 501-row expanded browser corpus first, then the 12,000-row UI corpus. The earlier serial replay only proves the exact rows are not deterministic query-level reproducers.
+### Historical validation record
+The chronology below is preserved as investigation lineage and is superseded for current
+root-cause and next-action purposes by the completed matched A/B and disposition recorded at
+the end of this entry.
 
 Current verification attempt on 2026-08-21 found the live dev checkout still lacked `prefetch={false}` in `src/components/SiteNav.tsx`, so the running service could not validate the fix. The existing local `SiteNav` change was staged and diffed on the dev host; the diff was exactly the two intended `prefetch={false}` props. `npm run build` completed and prepared the standalone bundle. After the later ISSUE-065 compiler change, `npm run build` completed again with both fixes included. The legitimate restart remains blocked: `sudo -n systemctl restart afldb` fails with `sudo: a password is required`. No varied 501-row or full 12,000-row post-fix browser corpus was run because the intended build is not live.
 
@@ -3052,7 +3070,11 @@ H7 deliberately removed. Reproduces on an untouched checkout on both Windows and
 the Linux dev host. Whoever concludes H7 must either restore `useFormStatus` or
 update that expectation to the intended boundary; it should not be left red.
 
-### Follow-up
+### Superseded 2026-08-21 handover
+
+This handover is retained only as historical evidence. Its H7 diagnostic, live-build checks
+and proposed discriminator are no longer the current next action.
+
 End-of-day status for 2026-08-21:
 
 Current diagnostic experiment:
@@ -3087,7 +3109,7 @@ Current ISSUE-068 evidence:
 - Current leading hypothesis H7: `useFormStatus().pending` inside `NlAnswerFeedbackControls` may occasionally cause the first hydrated client render to differ from the server-rendered feedback controls.
 - H7 is not proven. The current diagnostic build removes only that variable.
 
-Exact next step for the next session:
+Superseded next step recorded for the following session:
 
 - First, do not rebuild.
 - Check whether the restarted service has now finished starting:
@@ -3108,7 +3130,7 @@ Exact next step for the next session:
   - `$env:NL_UI_WORKERS='4'`
   - `.\node_modules\.bin\playwright.cmd test --config=playwright.nl-stress.config.ts --project=nl-stress --workers=4 --no-deps`
 
-H7 prediction:
+Historical H7 prediction:
 
 - If `useFormStatus().pending` is causal, the exact 118-row discriminator should produce 0 React #418 in feedback-present rows, feedback-absent rows should remain clean, and HTTP/page/timeouts should remain 0.
 - Historical comparison immediately before the H7 experiment: feedback absent 0/50, feedback present 2/68.
@@ -3127,9 +3149,55 @@ workers): authoritative `report.hydration.totalHydrationErrors = 8` (0.56% of
 1,440), with 8 error-carrying observation rows and 8 complete
 `artifacts/hydration/*` incident directories (all 8 files including
 `metadata.json`). This is well below the frozen 5.0% release threshold and
-PASSed the release gate, but it confirms React #418 remains intermittent under
-production-style load. It does **not** validate H7, which is still awaiting its
-own discriminator run. Issue remains open.
+PASSed that release gate, but confirmed React #418 remained intermittent under
+production-style load at that checkpoint. It did **not** validate H7. This historical
+handover is superseded by the completed matched A/B below; the issue remains Open for its
+single deployed-Linux acceptance residual.
+
+### Completed matched A/B — 2026-08-29
+
+The repeated matched framework-closure A/B is complete. Per-load `x-afldb-build` evidence
+proved every response used the intended build.
+
+| Runtime | Build ID | Pass | Loads | Hydration/client errors | Violations |
+|---|---|---:|---:|---:|---:|
+| Next 15.5.23 | `oroK-9PaBQoMFamvJGRqB` | 1 | 1,440 / 1,440 | 73 | 0 |
+| Next 15.5.23 | `oroK-9PaBQoMFamvJGRqB` | 2 | 1,440 / 1,440 | 62 | 0 |
+| Next 16.3.1 | `5RU_F0rm5IyuiVwKX9XHi` | 1 | 1,440 / 1,440 | 0 | 0 |
+| Next 16.3.1 | `5RU_F0rm5IyuiVwKX9XHi` | 2 | 1,440 / 1,440 | 0 | 0 |
+
+All four runs had identical semantic workload results:
+
+- pass / fail / unscored: 1,238 / 202 / 0;
+- answered / unanswerable / absent: 1,238 / 43 / 159;
+- HTTP error / page error: 0 / 0; and
+- metamorphic disagreements: 0.
+
+React and ReactDOM remained 19.2.8 on both sides. The Next 16 result is therefore evidence for
+the substituted framework closure/runtime/client/serving path, not for a React-version change.
+
+`AFLDB_AUTH_DATABASE_URL` was unset on both sides. The resulting stderr is shared, non-causal
+telemetry noise: both runtimes completed 1,440 / 1,440 with zero HTTP/page errors, Next 15's
+excess telemetry tracks its hydration failures, and Next 16 had zero hydration/client errors.
+Do not fix authentication telemetry under ISSUE-068.
+
+Preserved evidence: `D:\dev\afldb-issue-068-ab2-evidence`, including packaged
+`runtime\next16-pass2`. Do not modify or delete it.
+
+### Current disposition and exact residual
+
+ISSUE-068 remains **Open** and depends on **AFLDB-ISSUE-107**, which owns implementation and
+deployment of the bounded Next 16 upgrade. ISSUE-068 has exactly one residual: deployed
+Linux-development acceptance after that upgrade.
+
+1. Deploy the proven Next 16 framework closure to the real Linux development runtime.
+2. Prove the intended build is live via `x-afldb-build`.
+3. Run one comparable 1,440-row acceptance sweep on deployed Linux development.
+4. Close ISSUE-068 only if there are zero unexplained hydration/client errors, the semantic
+   result does not regress from 1,238 / 202 / 0, and worker/concurrency controls are not
+   reduced.
+
+Discovery of an exact internal Next.js line or upstream commit is not required before closure.
 
 ## AFLDB-ISSUE-069 - Expanded UI corpus expects unsupported debut-season leaderboards to answer
 
@@ -9499,3 +9567,54 @@ None. The `observationsUnchanged` counter name remains broader than its unit (re
 outcomes per established target); that is documented at the assertion and in the function's
 contract, and is not a defect. `AFLDB-ISSUE-104` (the `data_issues` open-row ownership key)
 and `AFLDB-ISSUE-102` (awards legacy dependency) remain separately open and untouched.
+
+## AFLDB-ISSUE-107 — Next.js 16 framework/runtime upgrade
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Framework / Runtime / Deployment
+- **Found:** 2026-08-29 (ISSUE-068 matched framework-closure A/B closeout)
+- **Resolved:** N/A
+- **Runbook:** `AFLDB-ISSUE-107.md`
+- **Related:** `AFLDB-ISSUE-068` remains Open and owns the final deployed hydration acceptance.
+
+### Problem
+ISSUE-068's React #418 defect remains present in the Next 15.5.23 framework dependency
+closure/runtime/client/serving path. Two matched Next 15 passes produced 73 and 62
+hydration/client errors; two matched Next 16.3.1 passes produced zero and zero. All four
+1,440-load runs had identical 1,238 / 202 / 0 semantic results, zero HTTP/page errors, zero
+violations and zero metamorphic disagreements, with every response bound to its intended build
+by `x-afldb-build`.
+
+### Scope
+Implement the bounded Next.js 15.5.23 → 16.3.1 framework/runtime upgrade. Retain resolved
+React/ReactDOM 19.2.8 unless genuine dependency constraints require otherwise; require Node
+>=20.9; use Webpack for the controlled first upgrade (`next build --webpack`); preserve the
+existing standalone/cluster deployment; reconcile Next 16's `tsconfig.json` / generated
+`next-env.d.ts` controls; account for the segment-cache/prefetch serving-format change; and
+preserve application, search, data and security semantics.
+
+Do not combine the framework upgrade with a Turbopack switch, unrelated dependencies,
+authentication telemetry cleanup, parser changes, database changes or reduced concurrency.
+
+### Gates and deployment order
+1. Prove candidate integrity: Next 16.3.1, React/ReactDOM 19.2.8, Node >=20.9 and Webpack.
+2. Pass dependency/lockfile checks, typecheck, unit tests, DB-free and guarded `_test` database
+   integration, `next build --webpack`, standalone preparation, and appropriate route/E2E
+   regression validation.
+3. Deploy only to the real Linux development runtime through the normal standalone/systemd
+   path; prove built and live build IDs match via `x-afldb-build`; keep worker/pool/concurrency
+   controls unchanged.
+4. Hand off to ISSUE-068 for its one comparable deployed 1,440-row hydration acceptance.
+5. Do not roll out to production until development validation and ISSUE-068 acceptance pass.
+
+Stop on an unexplained dependency expansion, required React/ReactDOM change, unexplained
+framework-generated TypeScript configuration, Webpack failure that suggests changing bundler,
+application/security/semantic regression, build-ID mismatch, reduced runtime controls, or any
+unexplained hydration/client error in ISSUE-068 acceptance. Preserve the exact failed closure
+and evidence; do not suppress errors or lower concurrency.
+
+### Next action
+Follow `AFLDB-ISSUE-107.md` from candidate preflight through the bounded Next 16.3.1/Webpack
+implementation and Linux development deployment. The framework upgrade is not implemented by
+the ISSUE-068 closeout task.

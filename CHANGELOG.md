@@ -15,6 +15,15 @@ commit.
 
 ## [Unreleased]
 
+### Tooling — DraftGuru UTF-8 spawn helpers retain string output types - 29 August 2026
+
+- `tests/draftguru-acquisition.test.ts` now declares all six UTF-8 child-process helpers as
+  `SpawnSyncReturns<string>`, matching their explicit `encoding: "utf8"` calls. The former
+  `ReturnType<typeof spawnSync>` annotations widened `stdout` and `stderr` to
+  `string | Buffer` and produced typecheck errors at the existing string-only assertions.
+- This is a narrow test/tooling type repair carried forward onto current development source.
+  It restores no stale ISSUE-093 test content and is not an ISSUE-068 hydration fix.
+
 ### AFLDB-ISSUE-106 — A match period-score target now requires published period evidence - 29 August 2026
 
 - **Target establishment now asks whether the source published anything.** In the AFL Tables
