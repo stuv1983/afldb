@@ -1296,8 +1296,9 @@ describe('baseline status vocabulary — never invented', () => {
     expect((accepted.measured as Record<string, unknown>).seasons_last).toBe(2025);
     expect((accepted.contract_binding as Record<string, Record<string, unknown>>)
       .required_range).toEqual({ first_season: 1897, last_season: 2025 });
+    // AFLDB-ISSUE-108: corrected from the CRLF-checkout hash to the canonical LF hash.
     expect((accepted.acquisition as Record<string, unknown>).manifest_sha256)
-      .toBe('cc8aaf0946fc59003dc4e5d6803410383db975e2f5bf58e9d510c31dc781e3b6');
+      .toBe('a42c6d5faacbcb6f4ce77a93a01f282577797375d14c60ef17f09bff2ab21d09');
     expect((accepted.raw_artefacts as Record<string, unknown>).artefact_set_sha256)
       .toBe('8e14ce6198685b9fec568ab3c680cab34783e8e202ab0c7e93f45773d96f4125');
   });

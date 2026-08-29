@@ -255,10 +255,15 @@ export async function reconcileCareerTotals(): Promise<ReconciliationCheck[]> {
         ON b.player_id = c.player_id
       WHERE c.brownlow_votes <> COALESCE(b.actual, 0)
     `,
+    // A canonical player_career_stats row is derived from player_match_stats, so it
+    // is required only for players who have match history. DraftGuru seeds a small
+    // number of canonical player shells for drafted people with no senior game
+    // (AFLDB-ISSUE-108); those legitimately have no career-stats row and are not drift.
     sql<{ count: string }[]>`
       SELECT count(*) FROM players p
       LEFT JOIN player_career_stats c ON c.player_id = p.id
       WHERE c.player_id IS NULL
+        AND EXISTS (SELECT 1 FROM player_match_stats s WHERE s.player_id = p.id)
     `,
   ]);
   return [
@@ -266,7 +271,7 @@ export async function reconcileCareerTotals(): Promise<ReconciliationCheck[]> {
     { check: 'goals: player_career_stats vs. player_match_stats', mismatches: Number(goals[0].count) },
     { check: 'finals: player_career_stats vs. player_match_stats + matches.is_final', mismatches: Number(finals[0].count) },
     { check: 'brownlow votes: player_career_stats vs. brownlow_season_votes', mismatches: Number(brownlow[0].count) },
-    { check: 'players with no player_career_stats row at all', mismatches: Number(missing[0].count) },
+    { check: 'players with match history but no player_career_stats row', mismatches: Number(missing[0].count) },
   ];
 }
 

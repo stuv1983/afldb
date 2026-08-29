@@ -703,8 +703,15 @@ describe("snapshot layout", () => {
     expect(manifest.immutable).toBe(true);
   });
 
-  it("the frozen CSV corpus itself is intact (42 files, expected years)", () => {
-    const dir = join(root, "data", "sources", "draftguru", "full-history-20260826");
+  // The frozen browser-export CSV corpus is a gitignored parity oracle (contract
+  // csv_artifact, import_capable: false). It is reproduced by acquisition and is not
+  // part of any rebuild, so a checkout without it skips this pin rather than failing
+  // (AFLDB-ISSUE-108) — the same posture as the Python-spawn tests above.
+  const csvCorpusDir = join(root, "data", "sources", "draftguru", "full-history-20260826");
+  const itCsvCorpus = existsSync(csvCorpusDir) ? it : it.skip;
+
+  itCsvCorpus("the frozen CSV corpus itself is intact (42 files, expected years)", () => {
+    const dir = csvCorpusDir;
     const files = readdirSync(dir).filter((f) => f.endsWith(".csv"));
     expect(files).toHaveLength(42);
     const years = files.map((f) => Number(f.slice(0, 4))).sort((a, b) => a - b);

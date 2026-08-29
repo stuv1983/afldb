@@ -399,6 +399,15 @@ describe('accepted canonical baseline', () => {
   const manifestBytes = readFileSync(MANIFEST_PATH);
   const manifest = JSON.parse(manifestBytes.toString('utf8'));
 
+  // AFLDB-ISSUE-108: the acceptance record binds the manifest by the SHA-256 of its
+  // canonical LF bytes. A Windows checkout without .gitattributes renders CRLF, which
+  // has a different hash — the binding must be platform-independent, so normalise
+  // line endings before hashing. import_fitzroy_core.py sees LF on the supported
+  // Linux runtime (and now everywhere, via .gitattributes).
+  const manifestLfSha = createHash('sha256')
+    .update(manifestBytes.toString('utf8').replace(/\r\n/g, '\n'), 'utf8')
+    .digest('hex');
+
   const setDigest = (files: any[]) => createHash('sha256')
     .update(`${files.map((f) => `${f.filename} ${f.sha256} ${f.row_count}`).sort().join('\n')}\n`)
     .digest('hex');
@@ -412,8 +421,7 @@ describe('accepted canonical baseline', () => {
   });
 
   it('binds acceptance to the acquisition manifest bytes', () => {
-    expect(accepted[0].acquisition.manifest_sha256)
-      .toBe(createHash('sha256').update(manifestBytes).digest('hex'));
+    expect(accepted[0].acquisition.manifest_sha256).toBe(manifestLfSha);
   });
 
   it('binds acceptance to the raw artefact hash set', () => {

@@ -581,6 +581,21 @@ does NOT pass and is blocked by `AFLDB-ISSUE-108` (`afldb_test` data, provably n
 attributable); G3 PASS; G4 PENDING under ISSUE-068; G5 PENDING.** Neither ISSUE-107 nor
 ISSUE-068 is resolved.
 
+**Update 2026-08-30 (`AFLDB-ISSUE-108` Path A):** `AFLDB-ISSUE-108` established that the 33
+guarded failures are a stale legacy-era test contract, not a stale `afldb_test` (which already
+matches the accepted canonical baseline `full-history-20260827`) and not a framework surface.
+The test contract has been corrected to the canonical baseline and the guarded gate made serial
+(`vitest.config.mts` `fileParallelism: false`, so `npm test` is now serial by default). A second,
+related defect was found and repaired in the same pass: the canonical rebuild **re-seeds
+`players.id`**, so every legacy player ID pinned in the guarded suite addressed a different
+person — those gates are now anchored to the data instead (`AFLDB-ISSUE-108.md` §9.4). All 33
+stable failures are classified. **G2's integration leg is PENDING a clean serial `npm test` on
+Linux dev against the corrected contract.** Once
+that run is green (or every residual failure is an accounted-for skip with an owning issue),
+G2 → PASS and `AFLDB-ISSUE-107` should be re-assessed: G0/G1/G3 are PASS and G4 (ISSUE-068's
+1,440-row acceptance) already passed on 2026-08-29, so ISSUE-107 would then be eligible for
+resolution with only G5 (production rollout) outstanding by design.
+
 ISSUE-107 stays **Open** on G2 alone. Every gate it owns outright is green: the Next 16.3.1
 Webpack build, complete standalone output, `BUILD_ID uZReW8G1XnsGnG5FNYY-I` proven live via
 `x-afldb-build`, a systemd-managed restart, health, unchanged 4-worker/10-pool controls, and

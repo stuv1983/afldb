@@ -15,6 +15,65 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-108 — guarded test contract aligned to the canonical legacy-free baseline - 30 August 2026
+
+The guarded database integration suite had 33 stable failures against a `afldb_test` that is
+itself correct: it already matches the accepted canonical baseline `full-history-20260827` on
+every gated value. The failures were a **stale test contract** — `IMMUTABLE`-labelled
+assertions carried over from the retired legacy-SQLite import — plus one gitignored artefact,
+one test-fixture defect, one cross-platform line-ending defect, and shared-database
+parallelism. `afldb_test` was **not** rebuilt and no application semantics changed.
+
+- **Legacy-era expectations reconciled to the canonical baseline.** Re-pinned where the
+  accepted `measured` fingerprint supplies the value: `player_match_stats` 694,210 → 685,471;
+  attendance `complete` 15,376 → 15,187; players with a birth date 12,478 → 855 (evidence rows
+  and evidence-linked players likewise → 855, conflicts → 0); players with no date 883 →
+  12,422. Retired-with-a-tracked-gap where the canonical rebuild has no writer and zero/minimal
+  is a missing-acquisition gap rather than a fact: the season/career-grain Brownlow authority
+  gates (79,113) and the "zero Brownlow votes" cohorts (`AFLDB-ISSUE-090` §27.5), the
+  DraftGuru identity-link count (3,459 — needs Stage B3) and its matching-backlog gates, and
+  the 2026-provisional gates that assert current-season-import / legacy-ladder state
+  (`AFLDB-ISSUE-099`). Structural guarantees in the same blocks still run.
+- **Identity gates re-anchored off retired surrogate player IDs.** The canonical legacy-free
+  rebuild re-seeds `players.id` — `import_fitzroy_core.py` inserts players with no
+  `legacy_player_id` and resolves identity by the AFL Tables profile URL — so every legacy
+  `players.id` pinned in the guarded suite now addresses a different person (measured: 13,277
+  players, **0** with a `legacy_player_id`). The people those gates protect are intact, so this
+  was obsolete addressing rather than identity corruption, but two gates were *passing* on the
+  wrong players and proving nothing. The club-identity, name-collision and Gary Ablett search
+  gates now resolve their witness from the data — surname lookup discriminated by career facts —
+  so they fail if the person is wrong and survive the next rebuild. The "debuted in the 1960s
+  with exactly two clubs" exact-membership digest moves from a `players.id` set hash, which
+  changes on every rebuild regardless of membership, to a hash of the durable AFL Tables
+  identity (110 cohort players → 110 identity keys). No new surrogate IDs were substituted for
+  the old ones.
+- **Two advanced-search cohort counts re-pinned to the canonical dataset** — 200–249 games with
+  16+ finals 117 → 115, and 200+ games / 100+ goals / 15+ finals 222 → 219. These follow from
+  the accepted baseline rather than from current output: `player_career_stats` is an exact
+  aggregate of the accepted fact table (`sum(games)` 685,471 = `player_match_stats` rows;
+  `sum(finals)` 29,318 = player rows in final matches; `sum(goals)` 407,963), and 685,471 is the
+  accepted `measured.player_match_rows`. The retired 117/222 were entailed by the 694,210-row
+  legacy set. The decided-season "genuine zero Brownlow" gate is retired with the other Brownlow
+  gates rather than pinned to zero: `rebuild_derived.py` marks a season `complete` only where
+  `brownlow_season_votes` has a row, and the canonical rebuild writes none, so the assertion is
+  structurally unreachable until a season-grain writer exists (`AFLDB-ISSUE-090` §27.5).
+- **Accepted-baseline manifest hash made platform-independent.**
+  `data/reference/fitzroy-accepted-baselines.json`'s `manifest_sha256` was bound to the
+  Windows CRLF rendering of the acquisition manifest (`cc8aaf09…`); it now binds the canonical
+  LF content (`a42c6d5f…`). A new `.gitattributes` forces `eol=lf` on the rebuild manifests
+  and hash-bound reference JSON so `import_fitzroy_core.py`'s manifest check is byte-identical
+  on every platform, and the DB-free rebuild test normalises line endings before hashing.
+- **Database Health "missing career row" check scoped to players with match history.**
+  `player_career_stats` is derived from `player_match_stats`, so a DraftGuru-seeded canonical
+  shell for a drafted person who never played a senior game legitimately has no career row and
+  is no longer reported as reconciliation drift.
+- **Guarded integration runs serially.** `vitest.config.mts` sets `fileParallelism: false`:
+  every integration suite shares the one mutable `afldb_test`, and under file parallelism one
+  suite's fixture mutations were read by another's assertions (three failures that appear only
+  in parallel). A data-editor fixture that reversed a result by swapping only the score totals
+  now swaps goals and behinds too, satisfying `matches_score_components_ck`; the DraftGuru CSV
+  parity-oracle test skips when its gitignored corpus is absent.
+
 ### AFLDB-ISSUE-068 — intermittent React hydration errors RESOLVED - 29 August 2026
 
 **Resolved.** The React #418 hydration defect was owned by the Next 15.5.23 framework dependency

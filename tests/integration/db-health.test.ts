@@ -28,6 +28,10 @@ afterAll(async () => {
 
 describe('db-health queries', () => {
   it('finds no drift between player_career_stats and its source fact tables', async () => {
+    // AFLDB-ISSUE-108: the "missing career row" check is scoped to players with
+    // match history. DraftGuru-seeded shells for drafted people who never played a
+    // senior game (e.g. Fred Rodriguez, Riley Onley) have no player_match_stats and
+    // therefore no derived career row — that is correct, not drift.
     const checks = await reconcileCareerTotals();
     expect(checks.length).toBeGreaterThan(0);
     for (const check of checks) {

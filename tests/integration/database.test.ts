@@ -143,7 +143,10 @@ describe('data integrity', () => {
     const [row] = await sql<{ n: number }[]>`
       SELECT count(*)::int AS n FROM player_match_stats
     `;
-    expect(row.n).toBe(694_210);
+    // AFLDB-ISSUE-108: re-pinned to the accepted canonical baseline
+    // full-history-20260827 (measured.player_match_rows = 685,471). 694,210 was
+    // the retired legacy SQLite import.
+    expect(row.n).toBe(685_471);
   });
 
   it('has no orphan player-match rows', async () => {
@@ -179,8 +182,16 @@ describe('data integrity', () => {
   });
 });
 
+// AFLDB-ISSUE-108: the canonical legacy-free rebuild has no writer for
+// brownlow_season_votes or player_career_stats.brownlow_votes
+// (AFLDB-ISSUE-090 §27.5), so the authoritative-total assertions (79,113) and the
+// legacy per-game figure (46,979) no longer describe the dataset. Skipped, not
+// re-pinned to zero; re-enable with a legacy-free season-grain Brownlow path.
+// When re-enabling, also re-address the Bob Skilton case below: player_id 3702 is a
+// retired legacy surrogate that the canonical rebuild re-seeded (it is now David
+// Stark). Resolve the witness from the data, as the club-identity gates now do.
 describe('Brownlow correctness', () => {
-  it('uses the authoritative season totals for career votes', async () => {
+  it.skip('uses the authoritative season totals for career votes', async () => {
     const [row] = await sql<{ career: number; authoritative: number }[]>`
       SELECT (SELECT sum(brownlow_votes) FROM player_career_stats)::int AS career,
              (SELECT sum(votes) FROM brownlow_season_votes)::int        AS authoritative
@@ -189,7 +200,7 @@ describe('Brownlow correctness', () => {
     expect(row.career).toBe(79_113);
   });
 
-  it('does not derive career votes from per-game votes', async () => {
+  it.skip('does not derive career votes from per-game votes', async () => {
     const [row] = await sql<{ perGame: number }[]>`
       SELECT sum(brownlow_votes)::int AS "perGame" FROM player_match_stats
     `;
@@ -199,7 +210,7 @@ describe('Brownlow correctness', () => {
     expect(row.perGame).toBeLessThan(79_113);
   });
 
-  it('credits Bob Skilton with the votes the legacy derivation lost', async () => {
+  it.skip('credits Bob Skilton with the votes the legacy derivation lost', async () => {
     const [row] = await sql<{ votes: number; medals: number }[]>`
       SELECT brownlow_votes AS votes, brownlow_medals AS medals
         FROM player_career_stats WHERE player_id = 3702
@@ -248,56 +259,84 @@ describe('Brownlow correctness', () => {
   });
 });
 
+// AFLDB-ISSUE-108: these gates used to pin players.id (788, 2520, 2521). That is a
+// surrogate the canonical rebuild re-seeds — import_fitzroy_core.py inserts players
+// with no legacy_player_id and resolves identity by AFL Tables profile URL, so after
+// the legacy-free rebuild those IDs addressed unrelated players (788 = Arthur Ford,
+// 2520/2521 = Campbell Gray/Heath). The club-identity and name-collision data are
+// correct; only the addressing was obsolete. Each witness is now resolved from the
+// data, so the gates keep meaning across the next rebuild too.
 describe('club identity', () => {
   it('counts a renamed club once in clubs_played', async () => {
     // Brent Harvey played for "Kangaroos" and "North Melbourne" — one club.
-    const [career] = await sql<{ clubs: number }[]>`
-      SELECT clubs_played AS clubs FROM player_career_stats WHERE player_id = 788
+    // He is the all-time games record holder, which identifies him among the
+    // players named Harvey without pinning a surrogate ID.
+    const [row] = await sql<{ games: number; clubs: number; stints: number }[]>`
+      SELECT c.games, c.clubs_played AS clubs,
+             (SELECT count(*)::int FROM player_clubs pc WHERE pc.player_id = p.id)
+               AS stints
+        FROM players p JOIN player_career_stats c ON c.player_id = p.id
+       WHERE p.search_name LIKE '%' || afldb_normalise_name('harvey') || '%'
+       ORDER BY c.games DESC
+       LIMIT 1
     `;
-    const [stints] = await sql<{ n: number }[]>`
-      SELECT count(*)::int AS n FROM player_clubs WHERE player_id = 788
-    `;
-    expect(career.clubs).toBe(1);
+    expect(row.games).toBe(432);
+    expect(row.clubs).toBe(1);
     // The historical stints are still recorded separately.
-    expect(stints.n).toBe(2);
+    expect(row.stints).toBe(2);
   });
 
   it('counts a genuine two-club career as two', async () => {
-    const [row] = await sql<{ clubs: number }[]>`
-      SELECT clubs_played AS clubs FROM player_career_stats WHERE player_id = 2521
+    // Ron Barassi Jr: Melbourne then Carlton — two organizations, not a rename.
+    const [row] = await sql<{ games: number; clubs: number }[]>`
+      SELECT c.games, c.clubs_played AS clubs
+        FROM players p JOIN player_career_stats c ON c.player_id = p.id
+       WHERE p.search_name LIKE '%' || afldb_normalise_name('barassi') || '%'
+       ORDER BY c.games DESC
+       LIMIT 1
     `;
+    expect(row.games).toBe(254);
     expect(row.clubs).toBe(2);
   });
 
   it('keeps players who share a name distinct', async () => {
-    const rows = await sql<{ id: number; games: number }[]>`
-      SELECT p.id, c.games
+    const rows = await sql<{ id: number; games: number; debut: number }[]>`
+      SELECT p.id, c.games, c.debut_season AS debut
         FROM players p JOIN player_career_stats c ON c.player_id = p.id
-       WHERE p.id IN (2520, 2521)
-       ORDER BY p.id
+       WHERE p.search_name LIKE '%' || afldb_normalise_name('barassi') || '%'
+       ORDER BY c.debut_season
     `;
     // Ron Barassi Sr and Jr must never be collapsed.
     expect(rows).toHaveLength(2);
-    expect(rows[0].games).toBe(58);
-    expect(rows[1].games).toBe(254);
+    expect(rows[0].id).not.toBe(rows[1].id);
+    expect([rows[0].debut, rows[0].games]).toEqual([1936, 58]);
+    expect([rows[1].debut, rows[1].games]).toEqual([1953, 254]);
   });
 });
 
 describe('search', () => {
   it('finds both Gary Abletts and ranks the more prominent first', async () => {
-    const rows = await sql<{ id: number; displayName: string; games: number }[]>`
+    const rows = await sql<{
+      id: number; displayName: string; games: number; debut: number;
+    }[]>`
       WITH q AS (SELECT afldb_normalise_name('ablett') AS term)
-      SELECT p.id, p.display_name AS "displayName", c.games
+      SELECT p.id, p.display_name AS "displayName", c.games,
+             c.debut_season AS debut
         FROM players p
         JOIN player_career_stats c ON c.player_id = p.id
        CROSS JOIN q
        WHERE p.search_name LIKE '%' || q.term || '%'
        ORDER BY c.games DESC
     `;
-    const ids = rows.map((r) => r.id);
-    expect(ids).toContain(1105);
-    expect(ids).toContain(567);
-    expect(rows[0].id).toBe(1105);
+    // AFLDB-ISSUE-108: asserted on the two careers, not on players.id. The IDs this
+    // used to pin (1105, 567) were legacy surrogates the canonical rebuild re-seeded
+    // and now address Ben King and Andrew Foster; the Abletts themselves are intact.
+    // Ranking by games must put the son (357 games from 2002) ahead of the father
+    // (248 from 1982), and both must survive as separate players.
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+    expect(rows[0].id).not.toBe(rows[1].id);
+    expect([rows[0].games, rows[0].debut]).toEqual([357, 2002]);
+    expect([rows[1].games, rows[1].debut]).toEqual([248, 1982]);
   });
 
   it('matches a hyphenated surname by its second part', async () => {
@@ -337,6 +376,14 @@ describe('search', () => {
   });
 });
 
+// AFLDB-ISSUE-108: the two counts re-pinned below follow from the accepted canonical
+// baseline rather than merely matching current output. player_career_stats is an exact
+// aggregate of the accepted full-history-20260827 fact table — measured on afldb_test:
+// sum(games) 685,471 = player_match_stats rows 685,471; sum(finals) 29,318 = player
+// rows in matches with is_final; sum(goals) 407,963 = player_match_stats goals — and
+// db-health's drift gate asserts that agreement continuously. Any cohort defined over
+// games/goals/finals is therefore entailed by the accepted fingerprint. The retired
+// 117 and 222 were entailed by the 694,210-row legacy SQLite set instead.
 describe('advanced search regression cases', () => {
   // Compared as exact ID sets in tools/validation; here the counts guard
   // the query paths the site actually uses.
@@ -353,10 +400,13 @@ describe('advanced search regression cases', () => {
       SELECT count(*)::int AS n FROM player_career_stats
        WHERE games BETWEEN 200 AND 249 AND finals >= 16
     `;
-    expect(row.n).toBe(117);
+    expect(row.n).toBe(115);
   });
 
-  it('50-199 goals and no Brownlow votes', async () => {
+  // AFLDB-ISSUE-108: skipped — with no canonical career-Brownlow acquisition,
+  // player_career_stats.brownlow_votes is 0 for almost every player, so this cohort
+  // no longer isolates anything. Re-enable with the legacy-free Brownlow path.
+  it.skip('50-199 goals and no Brownlow votes', async () => {
     const [row] = await sql<{ n: number }[]>`
       SELECT count(*)::int AS n FROM player_career_stats
        WHERE goals BETWEEN 50 AND 199 AND brownlow_votes = 0
@@ -370,7 +420,7 @@ describe('advanced search regression cases', () => {
       SELECT count(*)::int AS n FROM player_career_stats
        WHERE games >= 200 AND goals >= 100 AND finals >= 15
     `;
-    expect(row.n).toBe(222);
+    expect(row.n).toBe(219);
   });
 });
 

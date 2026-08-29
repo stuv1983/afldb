@@ -9752,66 +9752,101 @@ Run the ISSUE-068 acceptance sweep against **BUILD_ID `uZReW8G1XnsGnG5FNYY-I`** 
 integration suite is re-run against this same closure. Every other ISSUE-107 gate is green.
 Production rollout remains out of scope.
 
-## AFLDB-ISSUE-108 — `afldb_test` data has never been rebuilt to the current full-history expectations
+## AFLDB-ISSUE-108 — the guarded test contract predates the canonical legacy-free `afldb_test`
 
-- **Status:** Open
+- **Status:** Open — Path A complete, all 33 stable failures classified; awaiting the serial
+  guarded re-run on Linux dev
 - **Severity:** Medium
 - **Area:** Test database / Data integrity / Tooling
 - **Found:** 2026-08-29 (AFLDB-ISSUE-107 Linux development gate)
 - **Resolved:** N/A
-- **Related:** blocks `AFLDB-ISSUE-107`'s G2 guarded-integration leg. Lineage is the
-  ISSUE-093 / ISSUE-096 / ISSUE-099 acquisition work whose expectations `afldb_test` predates.
+- **Runbook:** `AFLDB-ISSUE-108.md` (authoritative).
+- **Related:** blocks `AFLDB-ISSUE-107`'s G2 guarded-integration leg.
 
-### Problem
-`afldb_test` on the development host is migrated to **77/77** — its schema is current — but its
-**data** is an older, partial load. Running the guarded suite against it fails 33 tests on
-database content, not on code:
+### Root cause (corrected)
+The original hypothesis — "`afldb_test` data is stale/incomplete" — was **wrong** and is kept
+in `AFLDB-ISSUE-108.md` §1–§2 as lineage. `afldb_test` (77/77 migrations) already matches the
+accepted canonical baseline `full-history-20260827` **exactly** on every gated value
+(`player_match_rows` 685,471; `players_with_dob` 855; AFL Tables identities 13,275; …). A
+`db:test:rebuild` would reproduce those same numbers and change nothing.
 
-| Assertion | Expected | Actual |
-|---|---:|---:|
-| Brownlow season votes total | 79,113 | 0 / `null` |
-| Players with a date of birth | 12,478 | 855 |
-| Players honestly without a date | 883 | 12,422 |
-| `player_match_stats` rows | 694,210 | 685,471 |
-| Draft-link identity resolved once per person | 3,459 | 5 |
-| Advanced-search regression cohort | 269 | 1,690 |
+The 33 stable serial failures are a **stale test contract**: `IMMUTABLE`-labelled assertions in
+`release-gates.test.ts`, `database.test.ts`, `db-health.test.ts` that encode the retired
+legacy-SQLite import (694,210 `player_match_stats`; 79,113 `brownlow_season_votes`; 12,478 DOB;
+3,459 DraftGuru identity links; 269-player cohorts) plus DOB-enrichment and DraftGuru-B3 passes
+that are not part of the canonical rebuild and have no legacy-free replacement yet. Three
+further parallel-only failures are shared-`afldb_test` cross-file interference.
 
-`tests/draftguru-acquisition.test.ts` fails separately with
-`ENOENT .../data/sources/draftguru/full-history-20260826` — the gitignored corpus is absent on
-the host, which is the same cause as the pre-existing local baseline failure.
+### Resolution — Path A (operator-authorised 2026-08-30)
+`afldb_test` **not** rebuilt. The guarded test contract was corrected to the accepted baseline,
+and the guarded gate made serial. Every change is classified by ownership in
+`AFLDB-ISSUE-108.md` §9:
 
-A further **three** failures appear only under vitest's default file parallelism and disappear
-under `--no-file-parallelism`: several integration suites mutate the one shared `afldb_test`
-concurrently, so `release-gates` asserted against a transient `2094` season that is absent from
-the database at rest, and `settle-afltables` saw canonical counts move underneath it.
+- **D (line-ending defect):** `data/reference/fitzroy-accepted-baselines.json` `manifest_sha256`
+  was bound to Windows CRLF bytes; re-pinned to the canonical LF hash
+  `a42c6d5f…`, hashing made CRLF-tolerant in the tests, new `.gitattributes` forces `eol=lf`
+  on hash-bound artefacts. Linux manifest not touched.
+- **E (intentional shells):** `reconcileCareerTotals()` "missing career row" check scoped to
+  players with `player_match_stats` — DraftGuru-seeded shells (Fred Rodriguez, Riley Onley)
+  legitimately have no derived career row.
+- **C (test-fixture defect):** the `data-editor` score-reversal fixture now swaps goals and
+  behinds too, satisfying `matches_score_components_ck`.
+- **B (gitignored oracle):** the `draftguru-acquisition` CSV parity-oracle test is
+  `existsSync`-guarded and skips when the corpus is absent.
+- **A (stale contract):** canonical-value assertions re-pinned to `full-history-20260827`
+  (`player_match_stats` 685,471; DOB 855 / 12,422; evidence 855; attendance complete 15,187);
+  missing-acquisition assertions skipped with a tracked-gap reference (Brownlow season votes →
+  `AFLDB-ISSUE-090` §27.5; DraftGuru identity links → Stage B3; 2026 provisional artefacts →
+  `AFLDB-ISSUE-099` / current-season gate).
+- **Serial gate:** `vitest.config.mts` `fileParallelism: false` — documented: every integration
+  suite shares the one mutable `afldb_test`.
 
-### Why this is not AFLDB-ISSUE-107
-Every failing file — `tests/integration/release-gates.test.ts`, `database.test.ts`,
-`db-health.test.ts`, `data-editor.test.ts`, `settle-afltables.test.ts`,
-`tests/draftguru-acquisition.test.ts`, `tests/db-test-rebuild.test.ts` — imports nothing from
-`next`, `react` or `src/app`, and every assertion is PostgreSQL content or on-disk corpus state.
-The Next.js version has no surface on them. Confirmed on Next 16.3.1 / React 19.2.8 /
-Node v22.23.2.
+No missing Brownlow / DraftGuru-B3 / DOB acquisition path was implemented here — those stay
+separate work under their existing owners.
 
-### Blocked repair path
-`npm run db:test:rebuild` is the canonical fix (`docs/deployment.md` §6a) but cannot run on the
-development host today:
+### Second defect found while adjudicating the last seven — retired surrogate player IDs
 
-- `AFLDB_TEST_IMPORT_DATABASE_URL` is absent from the host `.env`, and the runner fails closed
-  rather than inheriting the development `AFLDB_IMPORT_DATABASE_URL`, which points at
-  `afldb_dev`;
-- the tracked DraftGuru full-history corpus the preflight verifies is not on the host.
+`import_fitzroy_core.py` inserts players with **no `legacy_player_id`** and resolves identity by
+the AFL Tables profile URL through `external_identities`, so the canonical legacy-free rebuild
+re-seeds every `players.id`. Measured read-only on `afldb_test`: 13,277 players, **0** carrying a
+`legacy_player_id`. Every legacy `players.id` pinned in the guarded suite therefore addresses a
+different person now — 788 (Brent Harvey) is Arthur Ford, 2520/2521 (Ron Barassi Sr/Jr) are
+Campbell Gray/Heath, 1105/567 (the Gary Abletts) are Ben King/Andrew Foster, 3702/3578 (Bob
+Skilton / Dick Reynolds) are David Stark/Des Field.
 
-It is also destructive, so it was deliberately not attempted under ISSUE-107.
+This is **obsolete addressing, not identity corruption**: every protected person is present and
+correct (Brent Harvey id 2164, 432 games, `clubs_played` 1 across Kangaroos + North Melbourne;
+Ron Barassi Sr id 11248, 58 games 1936–1940 and Jr id 11247, 254 games 1953–1969; Gary Ablett Jr
+id 4702, 357 games from 2002 and Sr id 4701, 248 games from 1982). Two of these gates were
+*passing* on the wrong people and proving nothing.
+
+Each affected gate is now re-anchored to the data — surname lookup through
+`search_name`/`afldb_normalise_name`, discriminated by career facts — rather than to a surrogate,
+so it fails if the person is wrong and survives the next rebuild. New IDs were deliberately not
+substituted for old ones. The 1960s/two-club exact-membership digest moves from an ID-set hash
+(which changes on every rebuild regardless of membership) to a hash of the durable AFL Tables
+identity: 110 cohort players → 110 identity keys → `4b4c6a2aa975cc17`.
+
+The two remaining cohort counts re-pin 117 → **115** and 222 → **219**, proven entailed by the
+accepted baseline rather than by current output: `player_career_stats` is an exact aggregate of
+the accepted fact table (`sum(games)` 685,471 = `player_match_stats` rows; `sum(finals)` 29,318 =
+player rows in `is_final` matches; `sum(goals)` 407,963 = `player_match_stats` goals), and
+685,471 is the accepted `measured.player_match_rows`. The decided-season Brownlow genuine-zero
+gate is structurally unreachable without a season-grain writer — `rebuild_derived.py` marks a
+season `complete` only when `brownlow_season_votes` has a row for it, and the canonical rebuild
+writes none — so it is retired under `AFLDB-ISSUE-090` §27.5 rather than pinned to 0.
+
+**Follow-up, not actioned here:** `tools/validation/validate_migration.py` and its oracle
+`tests/fixtures/oracle_baseline.json` remain bound to the retired legacy dataset (694,210 rows,
+13,361 players, legacy-ID cohort lists) and carry the same surrogate-addressing defect. That tool
+is outside the guarded vitest gate and does not affect this issue's validation; re-basing it
+belongs with the canonical rebuild's own validation work.
 
 ### Next action
-Restore the DraftGuru full-history corpus to the development host, provision a restricted
-`afldb_import` DSN for `afldb_test` as `AFLDB_TEST_IMPORT_DATABASE_URL`, run
-`npm run db:test:rebuild -- --fitzroy-label <full-history-label> --acknowledge-destroy afldb_test`,
-then re-run the guarded suite. Separately decide whether the release gates should assert global
-counts while other suites mutate the same database in parallel, or whether the suite should run
-`--no-file-parallelism`. Until then no integration result against `afldb_test` should be read as
-evidence about application code.
+Push the Path-A changes; on Linux dev run the guarded serial suite against the `afldb_test` DSN.
+All 33 stable failures are now classified with established ownership. When the serial suite is
+green (or every residual failure is an accounted-for skip), mark ISSUE-108 Resolved and set
+`AFLDB-ISSUE-107` G2 to PASS. Neither may be marked before that run passes.
 
 ## AFLDB-ISSUE-109 — the data editor writes `data_overrides` on a connection granted only SELECT
 

@@ -1,0 +1,11 @@
+# AFLDB-ISSUE-108 — platform-independent bytes for hash-bound artefacts.
+#
+# tools/migration/import_fitzroy_core.py (verify_accepted_binding) and
+# tests/db-test-rebuild.test.ts bind data/reference/fitzroy-accepted-baselines.json
+# to the SHA-256 of the acquisition manifest FILE. A CRLF checkout on Windows
+# changed those bytes and broke the binding on one platform only. Force LF on
+# checkout for every tracked artefact whose exact bytes are hashed or compared,
+# so `sha256_file()` is the same on every platform.
+docs/rebuild-manifests/**       text eol=lf
+data/reference/*.json           text eol=lf
+tools/rebuild/**/*.json          text eol=lf

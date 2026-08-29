@@ -65,7 +65,7 @@
 
       "acquisition": {
         "manifest_path": "docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260827.json",
-        "manifest_sha256": "cc8aaf0946fc59003dc4e5d6803410383db975e2f5bf58e9d510c31dc781e3b6",
+        "manifest_sha256": "a42c6d5faacbcb6f4ce77a93a01f282577797375d14c60ef17f09bff2ab21d09",
         "immutable": true,
         "adapter": "tools/rebuild/fitzroy/acquire_core.R",
         "adapter_schema_version": 1,

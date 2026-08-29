@@ -432,10 +432,15 @@ describe('Targeted club_seasons rebuild (AFLDB-ISSUE-015)', () => {
       const homeBefore = await winsOf(match.home);
       const awayBefore = await winsOf(match.away);
 
-      // Reverse the result. The margin CHECK is satisfied by swapping the scores.
+      // Reverse the result. Swap the whole scoreline — goals and behinds as well
+      // as the totals — so both the margin CHECK and matches_score_components_ck
+      // (each total must equal 6*goals + behinds) stay satisfied. Swapping only
+      // the totals leaves them disagreeing with their components (AFLDB-ISSUE-108).
       await tx`
         UPDATE matches
-           SET home_score = away_score, away_score = home_score,
+           SET home_score = away_score,     away_score = home_score,
+               home_goals = away_goals,     away_goals = home_goals,
+               home_behinds = away_behinds, away_behinds = home_behinds,
                result = 'away_win', winner_club_id = ${match.away}
          WHERE id = ${match.id}
       `;
