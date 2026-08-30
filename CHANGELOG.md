@@ -15,6 +15,49 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-115 — Data QA search composes related-domain cards on one anchor (Resolved) - 30 August 2026
+
+- `/admin/query-builder` (Data QA search, super-admin only) can now ask QA questions that span two
+  relations — *rows that exist in one relation but not in another*. The query root owns an
+  **anchor** (the five existing grains: players, player career stats, clubs, matches, player match
+  stats — `from` / `defaultSort` / `displayColumns` carried over byte-identical), which alone
+  decides the returned row and columns; each card owns a **domain**. An anchor-domain card compiles
+  through the untouched pre-115 path; a related-domain card compiles to one correlated
+  `EXISTS` / `NOT EXISTS (SELECT 1 FROM <target> WHERE <correlation> AND <conditions>)` boolean on
+  the anchor row, with quantifier `any` / `none`. Cross-card AND/OR is the unchanged left fold.
+- Curated 12-relationship catalogue reached by subject (`player` → `p`, `club` → `cl`,
+  `match` → `m`): `player.career`, `player.match_stats`, `player.clubs`, `player.draft_picks`,
+  `player.hall_of_fame`, `player.captaincies`, `player.awards`, `player.link_candidates`,
+  `club.club_seasons`, `club.matches`, `match.player_stats`, `match.clubs`. Depth is exactly 1;
+  club correlation is on `club_id`, never `organization_id`; `player_career_stats` ×
+  `player.career` is rejected as self-equivalent at parse and compile from one shared helper.
+  Absence is always `NOT EXISTS` (never a nullable outer join); no `DISTINCT`, no related
+  aggregates or counts; `NOT EXISTS` with a condition includes rows whose column is `NULL`
+  ("not recorded ≠ zero"). Related conditions resolve columns against the card's domain catalogue;
+  `sql.unsafe` still sees only catalogue constants and every user value stays a bound parameter.
+- New limits `maxRelatedCards = 4` (evidence-gated by the Stage 5 cost measurements) and
+  `maxRelationshipDepth = 1`; no existing limit weakened; `AFLDB_STATEMENT_TIMEOUT_MS` never raised.
+  Pre-115 share tokens carry no domain and compile to byte-identical SQL.
+- UI: the table select is relabelled as the anchor; each card gains a grouped domain select sourced
+  from `relationshipsForAnchor()`, a quantifier select, a hint line and a legend sentence; changing
+  a card's domain resets its conditions. The results header still reads the anchor's columns.
+- **Evidence-driven V1 boundary:** `player_match_stats` remains a valid results anchor for its own-row
+  filtering and results but hosts **no related-domain cards** in V1. The anchor's own pre-115 query
+  (`count(*) OVER ()` plus an index-ordered `LIMIT 50` over 685,471 rows) measures 1.05–1.44 s with
+  no card at all, so no related card under it can meet the 1 s target and four shapes hit the 5 s
+  ceiling. All twelve relationships stay available through the other four anchors; no relationship
+  was removed globally; no index, InitPlan compiler path, timeout, schema or privilege change was
+  made. The baseline itself is tracked separately as `AFLDB-ISSUE-116`.
+- `docs/search.md` §6 rewritten for the anchor/domain/relationship model, coverage matrix,
+  card-independence boundary, NULL rule and limits; the stale "not linked from the admin nav"
+  sentence corrected.
+- Validation, all operator-run against `afldb_test` at the normal 5 s statement timeout:
+  `tests/query-builder-spec.test.ts` 24/24 (DB-free) and `tests/integration/query-builder.test.ts`
+  23/23 including the T-C11 cost gate — every supported anchor × relationship pair, bare,
+  conditioned and 4-card composite, under 1000 ms (slowest bare pair
+  `matches × match.player_stats EXISTS` 132.7 ms; slowest conditioned shape 687.5 ms; players × 4
+  related cards 88.3 ms); pre-115 regression cases unchanged; `npx tsc --noEmit` clean.
+
 ### AFLDB-ISSUE-111 — Coleman Medal derived from canonical AFLDB facts (Resolved) - 30 August 2026
 
 - Coleman Medal winners are now **derived from AFLDB's own canonical home-and-away match facts**

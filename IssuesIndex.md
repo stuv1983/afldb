@@ -7,8 +7,8 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-30
-**Open issues:** 4 tracked here — `AFLDB-ISSUE-102`, `AFLDB-ISSUE-104`,
-`AFLDB-ISSUE-112`, `AFLDB-ISSUE-113`.
+**Open issues:** 5 tracked here — `AFLDB-ISSUE-102`, `AFLDB-ISSUE-104`,
+`AFLDB-ISSUE-112`, `AFLDB-ISSUE-113`, `AFLDB-ISSUE-116`.
 
 > **`AFLDB-ISSUE-110` is allocated and is NOT free.** It belongs to active NL semantic-mapping
 > work that is **not merged into this worktree** (baseline `95819a3`), so its content is unknown
@@ -164,6 +164,16 @@
 | `AFLDB-ISSUE-112` | Medium | Data acquisition / Import architecture / Data integrity | **Child of ISSUE-102.** Replace the legacy SQLite input of the six legacy-dependent `import_awards.py` groups with checked-in, validated, reviewable **curated manifests** under `data/awards/`, in the 22 Under 22 mould. Runbook `issues/open/AFLDB-ISSUE-112.md`. Seven families: All-Australian, Hall of Fame, honour teams, captaincies, Rising Star, club best-and-fairest, named medals — plus the award definitions and the `person_links` bridge (`import_awards.py:1364-1376`, replace with the tracked DraftGuru ledger). **Scraping, HTML parsing, paid APIs and undocumented endpoints are NOT authorised.** Only the **input** changes: every `reload_keyed` call keeps its key, columns, ownership scopes and flags, so id/manual-link/`confirmed_unlinked` preservation, the name-change guard, collision refusal and the `(717275, 1)` lock all carry over. `data/reference/` is the wrong home (`load_reference_data.py` TRUNCATEs, no link handling). Grains differ — do not force one schema on all seven. Watch: `hall_of_fame` and `honour_team_members` reload on **natural** keys and have no `source_record_id`; do not add one (migration 059). **Next action: gate G0 — per-family read-only coverage measurement**, then the operator prerequisite on where the one-time extraction comes from (runbook §11.1). Phasing smallest-first: honour teams (113) → HoF (343) → captaincies (1,375) → Rising Star (766) → All-Australian (2,158) → club B&F → named medals. Headline acceptance: `awards-reload-links.test.ts:205-1247` runs **without** `AFLDB_LEGACY_SQLITE`. |
 | `AFLDB-ISSUE-113` | Medium | Data acquisition / Import architecture / Data integrity | **Coordinated by ISSUE-102 but OUTSIDE its closure boundary** — 102 may resolve with this open. Runbook `issues/open/AFLDB-ISSUE-113.md`. `brownlow_season_votes` has **no legacy-free writer**: sole writer `import_legacy_afl.py:684` `import_brownlow()`, which also `truncate()`s `brownlow_round_votes` (a coupling defect, since a canonical writer now owns that table). Not reconstructible from round votes — season totals are `complete 1924-1941` + `1946-2025` while round votes are `complete` only `1984-2025` (~56 of ~102 decided seasons have none), and `vote_rank`/`eligible_rank`/`is_ineligible`/`is_winner` are not computable from vote sums. `rebuild_derived.py:23-26` and `db-health.ts:94` treat it as **AUTHORITATIVE**. **Silent-wrongness hazard:** with the table empty, `rebuild_derived.py`'s `season_brownlow` CTE falls every decided season to `not_applicable`, so AFLDB would assert "no medal that season" for a century, and `sitemap.ts:114` would publish no Brownlow routes. Preserve migration 015 semantics exactly — **no NULL-to-zero**. **Replacement source UNDECIDED; no selection authorised.** Next action, recommended not decided: a **read-only probe of class B** (a free structured season-summary source carrying rank *and* ineligibility, not just totals) before committing to a ~16,120-row hand-maintained manifest; classes A/C/D in runbook §4. No probe has been performed. |
 <!-- RETIRED 2026-08-30 — `AFLDB-ISSUE-114` (ladder witness `manifest_sha256` was the pre-ISSUE-108 CRLF hash) is **Resolved** and is NO LONGER an open issue. Contract literal repaired to the canonical LF hash `604a8a16…8d3f`, value-asserted in `tests/db-test-rebuild.test.ts`; operator run `npm test -- tests/db-test-rebuild.test.ts` = **214 passed, 0 failed**. Authoritative record: the `AFLDB-ISSUE-114` entry in `issues.md` (Resolution, 2026-08-30). -->
+<!-- RETIRED 2026-08-30 — `AFLDB-ISSUE-115` (Data QA multi-domain composable queries) is **Resolved**
+     and is NO LONGER an open issue. Stages 0–8 complete on worktree `D:\dev\afldb-issue-115` /
+     branch `claude/issue-115`; not merged or deployed. Final evidence: spec suite 24/24, integration
+     suite 23/23 (47/47 across both, including the T-C11 cost gate under 1000 ms at the normal 5 s
+     timeout), `npx tsc --noEmit` clean, `docs/search.md` §6 reviewed GREEN. Evidence-driven V1
+     boundary: `player_match_stats` remains a valid results anchor but hosts no related-domain
+     cards; all 12 relationships stay available via the other four anchors; `maxRelatedCards = 4`.
+     Authoritative records: the `AFLDB-ISSUE-115` entry in `issues.md` (Resolved, 2026-08-30) and
+     `AFLDB-ISSUE-115.md` §20. The pre-existing PMS anchor baseline is `AFLDB-ISSUE-116` below. -->
+| `AFLDB-ISSUE-116` | Low | Admin tooling / Data QA / Query performance | The `player_match_stats` anchor of `/admin/query-builder` costs **1.05–1.44 s with no card** (T-C11 1056–1072 ms; `EXPLAIN ANALYZE` 1441 ms) — pre-ISSUE-115 behaviour. `runQueryBuilder` (`src/db/queries/query-builder.ts:282-286`) emits `count(*) OVER ()` with an index-ordered `ORDER BY m.match_date DESC LIMIT 50`; the planner costs it fast-start (`Limit cost=4.41..577`) but the window aggregate consumes all 685,471 rows and spills to temp. That plan turned every related card into a per-row Nested Loop Semi/Anti Join (685,471 executions), so ISSUE-115 excluded related cards under this anchor as an evidence-driven V1 boundary (`QUERYABLE_TABLES.player_match_stats.subjects = []`). Above the 1 s target, below the 5 s ceiling; own-row filtering works. Key files: `src/db/queries/query-builder.ts`, `src/search/query-builder-spec.ts`, `tests/integration/query-builder.test.ts` (T-C11 anchor-alone reference). **Next action: separate work, not started** — fix the page/count shape without raising the timeout, adding an index or changing schema; re-measure with T-C11; only then reconsider re-admitting related cards under PMS (T-A1/T-B8 assert `subjects: []` exactly). Do not reopen ISSUE-115. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key)` carries **no owner**, so the `data_issues` refresh upsert could update a foreign-owned open row. Resolution *is* ownership-scoped; refresh is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. Key files: `076_afltables_settle_projections.sql` (**frozen — never edit**), `settle-afltables.ts`. Next action: **nothing until a second `issue_key` writer is proposed**; ownership must enter the dedup contract before one ships. |
 <!-- RETIRED 2026-08-29 — `AFLDB-ISSUE-105` is **Resolved** and is NO LONGER an open issue.
      Do not read the commented-out row below as current: it is the pre-resolution index row,
@@ -181,8 +191,8 @@
 -->
 
 <!-- No open rows follow. Everything below is retired lineage only: ISSUE-106 (retired
-     2026-08-29) and ISSUE-093 (retired 2026-08-27). The two open issues are ISSUE-102 and
-     ISSUE-104, listed above. -->
+     2026-08-29) and ISSUE-093 (retired 2026-08-27). The open issues are ISSUE-102, -112, -113,
+     -116 and -104, listed above. -->
 
 <!-- RETIRED 2026-08-29 — `AFLDB-ISSUE-106` is **Resolved** and is NO LONGER an open issue.
      Do not read the commented-out row below as current: it is the pre-resolution index row,

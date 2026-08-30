@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 4 tracked here — `AFLDB-ISSUE-102`, `-104`, `-112`, `-113`.
+**Open issues:** 5 tracked here — `AFLDB-ISSUE-102`, `-104`, `-112`, `-113`, `-116`.
 
 > **`AFLDB-ISSUE-110` is allocated and is NOT free.** It belongs to active NL semantic-mapping
 > work that is **not merged into this worktree** (baseline `95819a3`). No row is written for it
@@ -22,6 +22,7 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-112` | Medium | Data acquisition / Import architecture / Data integrity | Replace the legacy SQLite input of the six legacy-dependent `import_awards.py` groups with checked-in, validated, reviewable curated manifests: All-Australian, Hall of Fame, honour teams, captaincies, Rising Star, club best-and-fairest, named medals (+ award definitions and the `person_links` bridge). Reuses `reload_keyed` unchanged — only the **input** changes. Scraping, HTML parsing, paid APIs and undocumented endpoints are **not** authorised. | **Blocked on gate G0** (per-family read-only coverage measurement) **and operator prerequisite §11.1** — where the one-time extraction comes from. Recommended phasing, smallest first: honour teams (113 rows) → Hall of Fame (343) → captaincies (1,375) → Rising Star (766) → All-Australian (2,158) → club B&F → named medals. Headline acceptance: `awards-reload-links.test.ts:205-1247` executes without `AFLDB_LEGACY_SQLITE`. |
 | `AFLDB-ISSUE-113` | Medium | Data acquisition / Import architecture / Data integrity | `brownlow_season_votes` has **no legacy-free writer** — sole writer `import_legacy_afl.py:684`. `rebuild_derived.py:23-26` and `db-health.ts:94` treat it as AUTHORITATIVE. Not reconstructible from round votes: season totals are complete 1924-1941 and 1946-2025 while round votes are complete only 1984-2025, and `vote_rank`/`eligible_rank`/`is_ineligible` are not computable from vote sums. **Silent-wrongness hazard:** with the table empty, `rebuild_derived.py`'s `season_brownlow` CTE falls every decided season to `not_applicable` — AFLDB would assert "no medal that season" for a century. | **Replacement source UNDECIDED and no selection is authorised.** Recommended next step, not a decision: a read-only probe of class B (a free structured season-summary source carrying rank **and** ineligibility) before committing to a 16,120-row manifest. Outside `AFLDB-ISSUE-102`'s closure boundary — 102 may resolve with this open. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
+| `AFLDB-ISSUE-116` | Low | Admin tooling / Data QA / Query performance | The `player_match_stats` anchor of `/admin/query-builder` costs **1.05–1.44 s with no card at all** (T-C11 1056–1072 ms; `EXPLAIN ANALYZE` 1441 ms) — a pre-`AFLDB-ISSUE-115` baseline. `runQueryBuilder` emits `count(*) OVER ()` with an index-ordered `ORDER BY m.match_date DESC LIMIT 50`; the planner costs it as a fast-start plan (`Limit cost=4.41..577`) but the window aggregate must consume all 685,471 rows and spills to temp. Under that plan every related card became a per-row correlated Nested Loop Semi/Anti Join (685,471 executions for 13,275 distinct keys), so ISSUE-115 excluded related-domain cards under this anchor as an evidence-driven V1 boundary. Above the 1 s target, below the 5 s ceiling; own-row filtering still works. | **Separate work, not started.** Fix the anchor baseline (e.g. take the total count off the paged query, or a two-step keyset/count shape) **without** raising `AFLDB_STATEMENT_TIMEOUT_MS`, adding an index or changing schema; re-measure with the T-C11 harness; only then reconsider re-admitting related cards under `player_match_stats` (`QUERYABLE_TABLES.player_match_stats.subjects`, currently `[]`). Do not reopen ISSUE-115. |
 
 ---
 
@@ -10718,3 +10719,256 @@ correct fail-closed shape and belongs to `AFLDB-ISSUE-111` handoff §5 Steps 1d/
 temporary label, then adjudicate file-by-file against this same tracked manifest). Admitting
 *different* bytes from a fresh acquisition remains an `AFLDB-ISSUE-101` successor-witness decision
 and must never be done by editing `manifest_sha256`.
+
+## AFLDB-ISSUE-115 — Data QA multi-domain composable queries
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Area:** Admin tooling / Data QA / Query compilation
+- **Found:** 2026-08-30 (operator request; planned by Opus in plan mode the same day)
+- **Resolved:** 2026-08-30 (Stages 0–8 complete on the worktree; not yet merged or deployed)
+- **Runbook:** `AFLDB-ISSUE-115.md` (repository root) — the complete approved implementation
+  contract: architecture decisions, invariants, rejected approaches, stop conditions,
+  validation commands and stage order, plus the §20 implementation record for every stage.
+  It is authoritative for this issue.
+- **Worktree / branch / baseline:** `D:\dev\afldb-issue-115` · `claude/issue-115` · `aa034b5`
+- **Files:** `src/search/query-builder-spec.ts`, `src/db/queries/query-builder.ts`,
+  `src/app/admin/query-builder/QueryBuilderForm.tsx`, `src/app/admin/query-builder/page.tsx`,
+  `tests/query-builder-spec.test.ts`, `tests/integration/query-builder.test.ts`, `docs/search.md`,
+  `CHANGELOG.md`
+- **Follow-up:** `AFLDB-ISSUE-116` — the pre-existing `player_match_stats` anchor baseline
+  (separate work; not a residue of this implementation)
+
+### Problem
+
+`/admin/query-builder` (Data QA search, super-admin only) holds **one global table** per query.
+Cards combine with AND/OR, but every card filters columns of that same table, so the class of QA
+question that matters most — *rows that exist in one relation but not in another* — is
+unreachable. The blocker is structural, not cosmetic: `QueryBuilderState.table` is a single key,
+`compileCondition` resolves every column against that key's catalogue, and the compiler emits one
+flat `SELECT … FROM <fixed fragment>`, so there is no place for a second relation to enter.
+
+### Approved design (summary — the runbook is authoritative)
+
+- **Anchor = returned row.** The root owns an anchor: exactly the five existing `QUERYABLE_TABLES`
+  grains, with `from` / `defaultSort` / `displayColumns` carried over byte-identical. The anchor
+  alone owns the outer FROM clause and the result columns.
+- **Card = self-contained boolean on the anchor row.** Each card owns a `domain` (absent ⇒ the
+  anchor's own domain, which is the pre-115 token shape) and, for related domains, a `quantifier`
+  (`any` | `none`). Anchor-domain cards compile through the untouched existing path; related cards
+  compile to correlated `EXISTS` / `NOT EXISTS (SELECT 1 FROM <subqueryFrom> WHERE <correlation>
+  AND <cardPredicate>)`. Cross-card AND/OR is the unchanged left fold over booleans.
+- **Curated relationship catalogue, reached by subject** (`player → p`, `club → cl`,
+  `match → m`; the existing `from` fragments already use these aliases): twelve V1 relationships
+  (`player.career`, `player.match_stats`, `player.clubs`, `player.draft_picks`,
+  `player.hall_of_fame`, `player.captaincies`, `player.awards`, `player.link_candidates`,
+  `club.club_seasons`, `club.matches`, `match.player_stats`, `match.clubs`). Subquery aliases are
+  `r_`-prefixed and disjoint from the anchor namespace. Depth is exactly 1. Club correlation is on
+  `club_id`, never `organization_id`.
+- **Self-equivalence** (`player_career_stats` × `player.career`) is rejected at parse **and**
+  compile from one shared helper, `relationshipsForAnchor()`.
+- **Invariants:** no `DISTINCT`; no aggregation or matched-row counts; absence is `NOT EXISTS`,
+  never a nullable outer join; `sql.unsafe` sees only catalogue constants; every user value stays a
+  bound parameter; no existing limit weakened; `AFLDB_STATEMENT_TIMEOUT_MS` never raised; no schema,
+  migration, privilege or index change.
+- **New limits:** `maxRelatedCards = 4` (provisional, evidence-gated by Stage 5) and
+  `maxRelationshipDepth = 1` (structural).
+- **Deferred, not authorised:** additional result anchors, cross-card shared-variable correlation,
+  related counts/aggregates, `player_season_stats`/`player_achievements` domains,
+  organization-lineage traversal, related display columns (runbook §13).
+
+### Stage record
+
+- **Stage 0 — tracking (2026-08-30):** runbook already persisted at `AFLDB-ISSUE-115.md`; id
+  confirmed free (only the runbook referenced it; highest ledger heading was `AFLDB-ISSUE-114`);
+  this entry, the Open Issues row and the `IssuesIndex.md` row added; open-issue count recomputed
+  from the live table as **5** (`102`, `104`, `112`, `113`, `115`). No `CHANGELOG.md` entry — nothing
+  has shipped.
+- **Stage 1 — spec model, DB-free (2026-08-30):** `src/search/query-builder-spec.ts` gained
+  `SubjectKey`, `AnchorDef` (`subjects` / `grainTable` / `grainSubject` on the five byte-identical
+  grains), `RelationshipDef`, the `RELATIONSHIPS` catalogue, `relationshipsForAnchor()` with the
+  self-equivalence filter, `domainColumns()`, the extended `CardSpec` (`domain`, `quantifier`), the
+  new `QB_LIMITS` fields and the extended `validateState`/`parseQueryState`. Spec suite 24/24.
+- **Stage 2 — compiler (2026-08-30):** `src/db/queries/query-builder.ts` resolves conditions against
+  the card's domain and dispatches related cards to `compileRelatedCard()`, which emits the
+  correlated `EXISTS` / `NOT EXISTS` boolean; the anchor path is untouched and the pre-115
+  regression cases (`reproduces the …`, `folds three cards`) returned unchanged results.
+- **Stage 3 — semantic proof (2026-08-30):** T-C1–T-C10 and T-C12 added to
+  `tests/integration/query-builder.test.ts`, each asserted against an independently formulated SQL
+  oracle (existence, absence, one-card same-row semantics, two cards over one relation, OR across
+  domains, NULL semantics, historical `club_id`, self-equivalence refusal). 20/20 at that point.
+- **Stage 4 — UI (2026-08-30):** anchor relabel, grouped domain select, quantifier select, hint and
+  legend, domain-change reset in `QueryBuilderForm.tsx`; subtitle only in `page.tsx`. Typecheck clean.
+- **Stage 5 — performance gate (2026-08-30):** see *Measured performance* below. Outcome, approved
+  by the operator: related-domain cards excluded under the `player_match_stats` anchor
+  (`QUERYABLE_TABLES.player_match_stats.subjects = []`, enforced through the existing
+  `relationshipsForAnchor()` single source of truth, so UI, parser and compiler all fail closed);
+  `maxRelatedCards = 4` retained; no global relationship exclusion; no index, InitPlan path,
+  timeout, schema or privilege change. The §9.4 partial-index concern was retired — the four
+  partial indexes are on `player_id IS NOT NULL`, which the equality correlation implies, and the
+  planner uses them.
+- **Stage 6 — focused regression (2026-08-30):** both suites in full, 47/47; typecheck clean.
+- **Stage 7 — documentation (2026-08-30):** `docs/search.md` §6 rewritten; admin-nav drift
+  sentence corrected; operator diff review GREEN.
+- **Stage 8 — close-out (2026-08-30):** `CHANGELOG.md` `Unreleased` entry added; this entry
+  resolved; `AFLDB-ISSUE-116` raised for the anchor baseline; index and Open Issues table
+  re-synchronised; open-issue count recomputed from the live table as **5**
+  (`102`, `104`, `112`, `113`, `116`).
+
+### Root cause
+
+`QueryBuilderState.table` was a single key, `compileCondition` resolved every column against that
+key's catalogue, and the compiler emitted one flat `SELECT … FROM <fixed fragment>`, so a second
+relation had no way to enter a query. There was no relationship model at all — not a defect in
+existing behaviour but a structural absence.
+
+### Fix
+
+The anchor/domain/relationship model summarised above, implemented exactly per the runbook:
+the anchor alone owns the outer `FROM` and the result columns; each card is a self-contained
+boolean on the anchor row; related cards are correlated `EXISTS` / `NOT EXISTS` subqueries over a
+curated, subject-keyed catalogue with `r_`-prefixed aliases disjoint from the anchor namespace;
+every invariant in the runbook §16 holds (no `DISTINCT`, no aggregation, absence is never a
+nullable outer join, `sql.unsafe` sees only catalogue constants, every user value is a bound
+parameter, no existing limit weakened, timeout never raised, no schema/migration/privilege/index
+change). Pre-115 tokens compile byte-identically.
+
+**Deviation from the approved plan (operator-approved, runbook §18-9):** the runbook's §5.1
+declared `player_match_stats` as a related-card host; Stage 5 evidence reduced its `subjects` to
+none. That is a narrowing of reachability, not a design change, and every relationship remains
+reachable through the other anchors.
+
+### Measured performance (Stage 5, `afldb_test`, PostgreSQL 16.15, normal 5 s statement timeout)
+
+Snapshot: players 13,277 · player_career_stats 13,275 · player_match_stats 685,471 · matches
+16,838 · clubs 24 · player_clubs 16,713 · draft_picks 6,810 · club_seasons 1,622 · captaincies,
+hall_of_fame and player_link_match_candidates empty in `afldb_test` (their timings are floors).
+
+- **GREEN — every relationship under `players`, `player_career_stats`, `clubs`, `matches`:** 19
+  anchor × relationship pairs (all 12 relationships covered), bare `EXISTS` and `NOT EXISTS`,
+  7.4–132.7 ms. Conditioned shapes: players × `player.match_stats` goals≥8 EXISTS 467.5 / NOT
+  EXISTS 474.6; player_career_stats × `player.match_stats` goals≥8 489.9 / 514.3; matches ×
+  `match.player_stats` `club_is_participant IS FALSE` EXISTS **687.5** (closest to the bound;
+  Hash Semi Join over all PMS rows, retained at 1000 ms) / NOT EXISTS 334.0; matches ×
+  `match.player_stats` disposals≥30 197.5 / 213.3. Composites: players × 4 related
+  `player.match_stats` cards **88.3** (four hashed SubPlans, each evaluated once);
+  player_career_stats × 2 anchor + 4 related cards **133.1**. Anchor reference points: players
+  alone 22.2, matches alone 28.6.
+- **RED — every shape under the `player_match_stats` anchor (excluded):** anchor alone
+  **1056–1072 ms (T-C11) / 1441 ms (EXPLAIN)** with no card; `player.match_stats` EXISTS bare,
+  EXISTS goals≥8, NOT EXISTS goals≥8 and `club.matches` EXISTS bare all hit the **5 s statement
+  timeout**; `player.match_stats` NOT EXISTS bare 4152 ms; `player.clubs` EXISTS 3383 ms;
+  `player.awards` NOT EXISTS 3111 ms; `club.club_seasons` EXISTS 2198 ms; `club.matches`
+  is_final 2107 ms; the `player.draft_picks` / `hall_of_fame` / `captaincies` /
+  `link_candidates` NOT EXISTS forms 1.9–2.0 s; every remaining form 1.08–1.15 s (baseline plus
+  a cheap probe). The §9.3 InitPlan form was measured too: it clears the 5 s ceiling
+  (305–4184 ms) but never the 1 s target for a large result, because the anchor alone is already
+  over it; it rests on a `rows=10` misestimate for `p.id = ANY($n)`; and it regresses the bare
+  form under `players`. Rejected.
+- Plan-shape findings: the PMS anchor's `ORDER BY m.match_date DESC LIMIT 50` with
+  `count(*) OVER ()` is costed as a fast-start plan (`Limit cost=4.41..577`) but the window
+  aggregate must consume all 685,471 rows and spills to temp; under that plan the planner keeps
+  every related card as a per-row Nested Loop Semi/Anti Join (685,471 executions for 13,275
+  distinct keys); `club.matches` under PMS reproduces the `AFLDB-ISSUE-103` Materialize shape;
+  small-result shapes are fast everywhere because the anti join lands on the small side.
+
+### Validation
+
+All operator-run on 2026-08-30 in worktree `D:\dev\afldb-issue-115`, `afldb_test` on the 55432
+tunnel, `AFLDB_STATEMENT_TIMEOUT_MS=5000` never raised:
+
+| Stage | Command | Result |
+|---|---|---|
+| 1 | `npm test -- tests/query-builder-spec.test.ts` | 24/24, 287 ms, no database contacted |
+| 2 | `npm test -- tests/integration/query-builder.test.ts -t "reproduces the"` / `-t "folds three cards"` | 1/1 each; regression case still returns the expected 110 players; three-card fold unchanged |
+| 3 | `npm test -- tests/integration/query-builder.test.ts` | 20/20 (9 pre-existing + 11 new) against independent SQL oracles |
+| 4 | `npm test -- tests/query-builder-spec.test.ts` + `npx tsc --noEmit` | 24/24; no TypeScript errors |
+| 5 | `npm test -- tests/query-builder-spec.test.ts` + `… -t "cost\|T-C12"` | 24/24; 4 passed / 19 skipped — T-C12 exclusion proof and all three T-C11 cost cases under 1000 ms, no statement timeout |
+| 6 | `npm test -- tests/query-builder-spec.test.ts tests/integration/query-builder.test.ts` + `npx tsc --noEmit` | **2/2 files, 47/47 tests**, 10.43 s; PMS anchor-alone reference 1056.3 ms (5 s ceiling only); typecheck clean |
+| 7 | operator review of `git diff -- docs/search.md` | GREEN |
+| 8 | ledger/index/changelog consistency (no §15 command) | recorded in `AFLDB-ISSUE-115.md` §20.8 |
+
+Not claimed: no merge to `dev`/`main`, no deployment, no production or `afldb_dev` change. The
+work lives on branch `claude/issue-115` in the worktree.
+
+### Resolution — 2026-08-30
+
+The Data QA search composes anchor-domain and related-domain cards on one anchor row over the
+twelve-relationship catalogue, within every runbook invariant and at the normal statement
+timeout, with the `player_match_stats` anchor hosting no related cards in V1 on measured
+evidence. Removed from `IssuesIndex.md` and the Open Issues table; `CHANGELOG.md` updated under
+`Unreleased`. Deferred capabilities (runbook §13: further anchors, cross-card shared-variable
+correlation, related counts/aggregates, `player_season_stats` / `player_achievements` domains,
+organization-lineage traversal, related display columns) remain recorded and unauthorised. The
+pre-existing PMS anchor baseline is `AFLDB-ISSUE-116`.
+
+---
+
+## AFLDB-ISSUE-116 — The `player_match_stats` Data QA anchor exceeds 1 s with no card
+
+- **Status:** Open
+- **Severity:** Low
+- **Area:** Admin tooling / Data QA / Query performance
+- **Found:** 2026-08-30 (`AFLDB-ISSUE-115` Stage 5 performance gate)
+- **Files:** `src/db/queries/query-builder.ts` (`runQueryBuilder`, the `count(*) OVER () AS
+  "__total"` / `ORDER BY … LIMIT … OFFSET …` page query at `:282-286`);
+  `src/search/query-builder-spec.ts` (`QUERYABLE_TABLES.player_match_stats`, `defaultSort:
+  'm.match_date DESC'`, `subjects: []`); `tests/integration/query-builder.test.ts` (the T-C11
+  cost-gate `describe`, which already carries the anchor-alone reference point)
+- **Related:** `AFLDB-ISSUE-115` (found it; the V1 exclusion below is its evidence-driven
+  boundary and is **not** reopened by this issue); `AFLDB-ISSUE-103` (the same Nested Loop over
+  `Materialize` pathology appears under this anchor for `club.matches`)
+
+### Problem
+
+The `player_match_stats` anchor of `/admin/query-builder` (super-admin Data QA search) is the only
+one of the five anchors whose **own-row query, with no card at all**, exceeds the 1 s target that
+`AFLDB-ISSUE-115` applies to every related-card shape. This is pre-ISSUE-115 behaviour: the anchor's
+`from`, `defaultSort` and page query are unchanged by ISSUE-115.
+
+### Evidence (ISSUE-115 Stage 5, `afldb_test`, PostgreSQL 16.15, 685,471 `player_match_stats` rows)
+
+- Anchor alone: **1072.4 ms** (T-C11, first run), **1065.6 ms** (Stage 5 final), **1056.3 ms**
+  (Stage 6 full run); `EXPLAIN (ANALYZE, BUFFERS)` **1441.4 ms**. Above the 1 s target, below the
+  5 s `AFLDB_STATEMENT_TIMEOUT_MS` ceiling.
+- Plan: `runQueryBuilder` selects `count(*) OVER () AS "__total"` with `ORDER BY m.match_date DESC
+  LIMIT 50 OFFSET n`. The planner costs it as a fast-start plan (`Limit cost=4.41..577`) — an
+  index-ordered walk expecting to stop after 50 rows — but the window aggregate must consume all
+  685,471 rows before the first row can be emitted, and it spills to temp (3,401 blocks). The
+  materialisation, not the sort, is the cost; a plan estimated at 577 units executes to completion.
+- Consequence for related cards: under that fast-start plan the planner kept every correlated
+  `EXISTS` / `NOT EXISTS` card as a per-row Nested Loop Semi/Anti Join — 685,471 executions for
+  13,275 distinct player keys — so four shapes hit the 5 s timeout and every large-result shape
+  measured 1.9–4.8 s. The §9.3 InitPlan form still could not get under 1 s because the baseline
+  alone is over it. ISSUE-115 therefore excluded related-domain cards under this anchor
+  (`QUERYABLE_TABLES.player_match_stats.subjects = []`) as an evidence-driven V1 boundary; all twelve
+  relationships remain available under `players`, `player_career_stats`, `clubs` and `matches`.
+- The other anchors alone: players 22.2 ms, matches 28.6 ms. The shape is the same; the anchor
+  cardinality is what makes it slow.
+
+### Scope
+
+Fixing the anchor baseline is **separate work** from ISSUE-115 and was deliberately not absorbed
+into it. The fix must not raise `AFLDB_STATEMENT_TIMEOUT_MS`, add an index (every plan already uses
+the right index — cost is row count and materialisation), or change schema or privileges. Candidate
+directions, none selected: take the total count out of the paged query (a separate bounded or
+estimated count, or no total for this anchor); a two-step page shape that pages by the index and
+counts separately; a keyset page. Only after the anchor alone measures comfortably under the
+target should re-admitting related cards under `player_match_stats` be reconsidered, and that
+re-admission would need the ISSUE-115 T-C11 harness re-run for every relationship under that
+anchor — the InitPlan measurements in `AFLDB-ISSUE-115.md` §20.5 show that a fast anchor is
+necessary but not sufficient for the large-result shapes.
+
+### Impact
+
+Low: own-row filtering and results on the `player_match_stats` anchor work and complete within
+the 5 s ceiling; only super-admins reach the tool; no public route is affected. The cost is that
+QA questions at per-player-per-match grain cannot combine with related domains until this is
+fixed.
+
+### Next action
+
+Not started. When taken up: reproduce with the T-C11 anchor-alone reference point, capture the
+plan, choose and implement a page/count shape, re-measure, and only then decide on re-admission
+under ISSUE-115's existing tests (T-B8/T-A1 assert the current `subjects: []` exactly and must be
+changed deliberately, not silently).
