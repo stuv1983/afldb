@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-30
-**Open issues:** 3 — `AFLDB-ISSUE-109`, `AFLDB-ISSUE-102`, `AFLDB-ISSUE-104`
+**Open issues:** 2 — `AFLDB-ISSUE-102`, `AFLDB-ISSUE-104`
 
 ## How Claude should use this file
 
@@ -33,7 +33,6 @@
      validated green on Linux at commit 673f0e3 (89 passed / 5 skipped files, 2,515 passed /
      104 skipped tests, 0 failures, 122.21 s). Production rollout is separate work under its
      own review and is NOT authorised by this resolution. -->
-| `AFLDB-ISSUE-109` | Medium | Admin / Privileges / Data integrity | **Open.** The data editor's override save inserts into `data_overrides` on the `afldb_import` connection, but migration `073` grants that role `SELECT` only and `privileges.sql` agrees. Latent since `073`; applying it to `afldb_dev` moved the failure from *relation does not exist* to *permission denied*. Fix belongs in a new migration or by moving the write off the importer connection — never a hand-granted privilege. |
 <!-- RETIRED 2026-08-30 — `AFLDB-ISSUE-108` is **Resolved** and is NO LONGER an open issue.
      Do not read the row below as current: it is the pre-resolution index row, kept only as
      lineage, and its "Open" / "awaiting serial re-run" / "Next" text is SUPERSEDED.
@@ -172,8 +171,8 @@
 -->
 
 <!-- No open rows follow. Everything below is retired lineage only: ISSUE-106 (retired
-     2026-08-29) and ISSUE-093 (retired 2026-08-27). The three open issues are
-     ISSUE-109, ISSUE-102 and ISSUE-104, listed above. -->
+     2026-08-29) and ISSUE-093 (retired 2026-08-27). The two open issues are ISSUE-102 and
+     ISSUE-104, listed above. -->
 
 <!-- RETIRED 2026-08-29 — `AFLDB-ISSUE-106` is **Resolved** and is NO LONGER an open issue.
      Do not read the commented-out row below as current: it is the pre-resolution index row,
@@ -262,7 +261,8 @@
      ISSUE-107 final gate state: G0 PASS, G1 PASS, G2 PASS, G3 PASS, G4 PASS; G5 (production
      eligibility) is out of ISSUE-107's scope by design and is NOT a completion condition.
      Production rollout is separate work under its own review and is NOT authorised by this
-     resolution. `AFLDB-ISSUE-109` remains Open and separate.
+     resolution. `AFLDB-ISSUE-109` was open and separate at that checkpoint; it is now
+     Resolved (2026-08-30), with its runbook in `issues/closed/AFLDB-ISSUE-109.md`.
 
 ## AFLDB-ISSUE-107 — Next.js 16 framework/runtime upgrade (RETIRED)
 
@@ -1131,23 +1131,3 @@
   clean rebuild. Preserved `afldb_test_pre_rebuild_20260825` stays locked, never an input.
   ISSUE-092 §11 tests 24–27 still pending.
 -->
-
-## AFLDB-ISSUE-109 — data editor writes `data_overrides` on a SELECT-only connection
-
-- **Severity:** Medium
-- **Area:** Admin / Privileges / Data integrity
-- **Current state:** Open. `saveEdit()` in `src/db/queries/data-edits.ts` opens a short-lived
-  `afldb_import` connection and inserts into `data_overrides` inside it, but migration
-  `073_data_overrides.sql` deliberately grants `afldb_import` only `SELECT` on that table, and
-  `tools/maintenance/privileges.sql` reconciles to the same grant. Confirmed live on `afldb_dev`:
-  `has_table_privilege('afldb_import','data_overrides','INSERT')` is false. Reached only when an
-  edit actually produces overrides.
-- **Not a regression:** latent since `073` was written. Applying the committed migration to
-  `afldb_dev` on 2026-08-29 moved the failure from *relation does not exist* to *permission
-  denied*; it did not create it.
-- **Key files/subsystem:** `src/db/queries/data-edits.ts`, `src/db/migrations/073_data_overrides.sql`,
-  `tools/maintenance/privileges.sql`, `src/app/admin/data-editor/`.
-- **Exact next action:** adjudicate ownership against `AFLDB-ISSUE-086`'s intent — either move the
-  override write off the importer connection, or add a **new** migration widening the grant. Do
-  not hand-`GRANT` on any host. Add a regression test that exercises an edit producing an
-  override.

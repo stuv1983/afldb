@@ -15,10 +15,35 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-109 — Data Editor durable overrides keep atomic least-privilege writes (Resolved) - 30 August 2026
+
+- Added forward migration `078_data_overrides_admin_write.sql` so the existing
+  `afldb_import` statistical-mutation transaction can persist the human-owned durable override
+  and required audit atomically. The exception is column-scoped and remains outside
+  `afldb_meta.import_writable_tables`: no `DELETE`, `TRUNCATE`, table-wide write, or sequence
+  reset privilege was added.
+- Updated the subtractive privilege reconciler to restore the same narrow grant shape rather
+  than stripping it after deployment.
+- Added DB-free grant-contract coverage, exact PostgreSQL catalogue privilege assertions, and
+  a restricted-role Data Editor integration case that exercises both override insert and
+  conflict-update paths, verifies the canonical row/override/audit, and restores its fixture.
+- Validation is green on `afldb_test`: migration 078 applied cleanly (78/78, 0 pending),
+  privilege reconciliation completed, the source contract passed 7/7, privilege catalogue
+  coverage passed 30/30, Data Editor integration passed 9/9 with zero skips including both
+  restricted-role paths, required atomic audit behaviour passed, and typecheck passed.
+- Completed authenticated `afldb_dev` runtime acceptance on dedicated retained match `17059`
+  (`2026|R30|2026-12-31|104|103`, Collingwood v Carlton). Save, hard reload/navigation,
+  durable override insert, conflict-path update, and UI restoration all passed without
+  permission, Server Action, page, or server errors. Final read-only evidence confirmed the
+  exact baseline in both canonical Notes and the one intentional active override. Append-only
+  audit rows 22–25 accurately retain creation, the mistaken first Notes input, its correction,
+  and restoration under admin user 4; no manual SQL mutation was used. All ISSUE-109 acceptance
+  gates are complete.
+
 ### Repository root hygiene - 30 August 2026
 
 - Moved resolved issue runbooks, handoffs, and implementation reports from the repository root
-  to `issues/closed/`; reserved `issues/open/` for standalone documentation owned by the three
+  to `issues/closed/`; reserved `issues/open/` for standalone documentation owned by the two
   issues that remain open in the authoritative ledgers.
 - Moved the 2026 API acquisition runbook to `docs/acquisition/`, the contributor workflow to
   `docs/development/`, and the superseded README to `docs/archive/`.
@@ -127,8 +152,9 @@ upstream bug ID is claimed, and none was required: React and ReactDOM resolved t
 sides of the experiment, so they explain nothing. The fix shipped as `AFLDB-ISSUE-107`'s bounded
 framework upgrade, which retains React/ReactDOM 19.2.8 and Webpack.
 
-`AFLDB-ISSUE-107` remains open — `AFLDB-ISSUE-108` blocks its guarded database-integration gate —
-and `AFLDB-ISSUE-108` and `AFLDB-ISSUE-109` remain open and separate.
+At that checkpoint `AFLDB-ISSUE-107` remained open, with `AFLDB-ISSUE-108` blocking its guarded
+database-integration gate, and `AFLDB-ISSUE-109` was open and separate. All three are now
+resolved, each under its own recorded acceptance evidence.
 
 - Ran the single 1,440-row acceptance sweep against the deployed Next 16.3.1 build
   `uZReW8G1XnsGnG5FNYY-I` at four Playwright workers, pool 10, tracing on, JavaScript enabled and

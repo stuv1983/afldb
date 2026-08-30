@@ -2,6 +2,7 @@ import './guard';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import postgres from 'postgres';
 import { sql } from '@/db/client';
+import { saveEdit } from '@/db/queries/data-edits';
 import { saveMatchSheet } from '@/db/queries/match-sheet';
 import { recomputeClubSeasons } from '@/db/queries/player-derived';
 import { createImportRoleParityHarness } from './import-role-parity';
@@ -22,6 +23,8 @@ const TEST_NOTES = [
   'restore',
   'issue-027 atomic audit test',
   'issue-083 restricted import-role audit proof',
+  'issue-109 restricted override proof',
+  'issue-109 restricted override restore',
 ];
 let adminUserId = 0;
 let createdThrowawayAdmin = false;
@@ -229,7 +232,7 @@ describe('Atomic required audit (AFLDB-ISSUE-027)', () => {
 });
 
 describe.skipIf(!importRole.isConfigured)(
-  `Atomic required audit role parity (AFLDB-ISSUE-083)${roleParitySuffix}`,
+  `Restricted Data Editor role parity (AFLDB-ISSUE-083/-109)${roleParitySuffix}`,
   () => {
     beforeAll(() => importRole.validate());
 
@@ -276,6 +279,123 @@ describe.skipIf(!importRole.isConfigured)(
       `;
       expect(audit).toBeDefined();
       await sql`DELETE FROM data_edits WHERE id = ${audit.id}`;
+    });
+
+    it('inserts and updates a durable override atomically as afldb_import', async () => {
+      const [match] = await sql<{
+        id: number;
+        matchKey: string;
+        notes: string | null;
+      }[]>`
+        SELECT m.id, m.match_key AS "matchKey", m.notes
+          FROM matches m
+         WHERE NOT EXISTS (
+           SELECT 1 FROM data_overrides o
+            WHERE o.entity_type = 'matches'
+              AND o.entity_key = m.match_key
+              AND o.field_group = 'notes'
+         )
+         ORDER BY m.id
+         LIMIT 1
+      `;
+      expect(match, 'test database needs a match without a notes override').toBeDefined();
+
+      let editedNotes = `ISSUE-109 restricted override proof for match ${match.id}`;
+      if (editedNotes === match.notes) editedNotes += ' (changed)';
+
+      try {
+        const saved = await importRole.withImportDsn(() => saveEdit({
+          entityKey: 'matches',
+          rowId: match.id,
+          groupKey: 'notes',
+          raw: { notes: editedNotes },
+          adminUserId,
+          note: 'issue-109 restricted override proof',
+        }));
+        expect(saved).toMatchObject({ ok: true });
+
+        const [afterInsert] = await sql<{ notes: string | null }[]>`
+          SELECT notes FROM matches WHERE id = ${match.id}
+        `;
+        expect(afterInsert.notes).toBe(editedNotes);
+
+        const [insertedOverride] = await sql<{
+          overrideValues: Record<string, unknown>;
+          adminUserId: number;
+          isActive: boolean;
+        }[]>`
+          SELECT override_values AS "overrideValues",
+                 admin_user_id AS "adminUserId",
+                 is_active AS "isActive"
+            FROM data_overrides
+           WHERE entity_type = 'matches'
+             AND entity_key = ${match.matchKey}
+             AND field_group = 'notes'
+        `;
+        expect(insertedOverride).toEqual({
+          overrideValues: { notes: editedNotes },
+          adminUserId,
+          isActive: true,
+        });
+
+        const [insertAudit] = await sql<{ id: number }[]>`
+          SELECT id FROM data_edits
+           WHERE table_name = 'matches'
+             AND row_id = ${match.id}
+             AND field_group = 'notes'
+             AND admin_user_id = ${adminUserId}
+             AND note = 'issue-109 restricted override proof'
+        `;
+        expect(insertAudit).toBeDefined();
+
+        // Exercise ON CONFLICT DO UPDATE as the restricted role too, and
+        // prove the canonical value can be restored through the real path.
+        const restored = await importRole.withImportDsn(() => saveEdit({
+          entityKey: 'matches',
+          rowId: match.id,
+          groupKey: 'notes',
+          raw: { notes: match.notes ?? '' },
+          adminUserId,
+          note: 'issue-109 restricted override restore',
+        }));
+        expect(restored).toMatchObject({ ok: true });
+
+        const [afterRestore] = await sql<{ notes: string | null }[]>`
+          SELECT notes FROM matches WHERE id = ${match.id}
+        `;
+        expect(afterRestore.notes).toBe(match.notes);
+
+        const [updatedOverride] = await sql<{
+          overrideValues: Record<string, unknown>;
+        }[]>`
+          SELECT override_values AS "overrideValues"
+            FROM data_overrides
+           WHERE entity_type = 'matches'
+             AND entity_key = ${match.matchKey}
+             AND field_group = 'notes'
+        `;
+        expect(updatedOverride.overrideValues).toEqual({ notes: match.notes });
+      } finally {
+        // Restore the exact pre-test state even if an assertion fails. The
+        // selected match had no pre-existing notes override.
+        await sql.begin(async (tx) => {
+          await tx`UPDATE matches SET notes = ${match.notes} WHERE id = ${match.id}`;
+          await tx`
+            DELETE FROM data_overrides
+             WHERE entity_type = 'matches'
+               AND entity_key = ${match.matchKey}
+               AND field_group = 'notes'
+          `;
+          await tx`
+            DELETE FROM data_edits
+             WHERE admin_user_id = ${adminUserId}
+               AND note IN (
+                 'issue-109 restricted override proof',
+                 'issue-109 restricted override restore'
+               )
+          `;
+        });
+      }
     });
   },
 );

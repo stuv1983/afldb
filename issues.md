@@ -7,11 +7,10 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 3
+**Open issues:** 2
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
-| `AFLDB-ISSUE-109` | Medium | Admin / Privileges / Data integrity | **Open.** `saveEdit()` in `src/db/queries/data-edits.ts` inserts into `data_overrides` on the `afldb_import` connection, but migration `073` deliberately grants that role `SELECT` only, and `privileges.sql` reconciles to the same. Confirmed live: `has_table_privilege('afldb_import','data_overrides','INSERT')` is false. Latent since `073` was written; applying it to `afldb_dev` moved the data editor's override save from *relation does not exist* to *permission denied*. | Adjudicate ownership against ISSUE-086: either move the write off the importer connection, or add a new migration widening the grant. No hand-granting. Add a regression test that exercises an edit which produces an override. |
 | `AFLDB-ISSUE-102` | Medium | Data acquisition / Import architecture | `tools/migration/import_awards.py:1408` still requires `AFLDB_LEGACY_SQLITE`, so the awards/honours domain has the same legacy dependency `AFLDB-ISSUE-095` records for `club_seasons`, previously untracked. No free API covers Coleman, Rising Star, All-Australian, AFLCA, AFLPA or club best-and-fairest; Brownlow is the exception via the AFL Tables path. | **Record only.** Do not design the replacement under this investigation — no source selection, no per-award provenance decision, no importer work is authorised by this entry. Links `AFLDB-ISSUE-095` as the direct sibling gap; not absorbed. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
 
@@ -2747,7 +2746,8 @@ Keep this issue out of NL semantic defect counts. The regenerated expanded corpu
 - **Related:** `AFLDB-ISSUE-107` owns the framework upgrade and Linux development deployment.
   *(As at 2026-08-29 it remained Open with ISSUE-108 blocking its G2 database-integration gate;
   updated 2026-08-30 — `AFLDB-ISSUE-107` and `AFLDB-ISSUE-108` are both **Resolved**.)*
-  `AFLDB-ISSUE-109` remains **Open** and separate.
+  `AFLDB-ISSUE-109` was **Open** and separate at that checkpoint; it is now **Resolved**
+  (2026-08-30).
 
 ### Resolution — 2026-08-29
 > The React #418 hydration defect was owned by the Next 15.5.23 framework dependency
@@ -9620,7 +9620,8 @@ and `AFLDB-ISSUE-102` (awards legacy dependency) remain separately open and unto
 - **Runbook:** `issues/closed/AFLDB-ISSUE-107.md`
 - **Related:** `AFLDB-ISSUE-068` (Resolved 2026-08-29) owned the deployed hydration acceptance;
   `AFLDB-ISSUE-108` (Resolved 2026-08-30) owned the guarded-integration blocker;
-  `AFLDB-ISSUE-109` remains Open and separate.
+  `AFLDB-ISSUE-109` was Open and separate at that checkpoint; it is now Resolved
+  (2026-08-30).
 
 ### Problem
 ISSUE-068's React #418 defect remains present in the Next 15.5.23 framework dependency
@@ -9917,11 +9918,11 @@ Stage B3, DOB enrichment, and the 2026 current-season gates under `AFLDB-ISSUE-0
 
 ## AFLDB-ISSUE-109 — the data editor writes `data_overrides` on a connection granted only SELECT
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Admin / Privileges / Data integrity
 - **Found:** 2026-08-29 (applying migrations 071–077 to `afldb_dev` under AFLDB-ISSUE-107)
-- **Resolved:** N/A
+- **Resolved:** 2026-08-30
 - **Related:** migration `073_data_overrides.sql` (`AFLDB-ISSUE-086` lineage).
 
 ### Problem
@@ -9973,3 +9974,130 @@ Adjudicate the ownership question against `AFLDB-ISSUE-086`'s intent, then eithe
 off the importer connection or add a migration granting the needed privilege. Add a regression
 test that exercises `saveEdit()` through a path that produces an override, since no existing
 test caught a grant the schema explicitly withholds.
+
+### Adjudication and implementation — 2026-08-30
+
+Option 2 is confirmed, in the narrow mutation-role sense rather than importer ownership.
+Migration 057 explicitly assigns Data Editor statistical writes to `afldb_import`, and migration
+066 calls it the mutation role and gives it exceptional operational-table access when a required
+audit must share the statistical transaction. Direct inspection found no existing alternative:
+`afldb_app` is read-only, `afldb_auth` cannot write the canonical statistical tables, and the
+owner credential is migration/maintenance-only. Moving the write to auth would widen the
+login/session credential across historical data; splitting roles would recreate ISSUE-027's
+partial-commit defect.
+
+Implemented forward-only in `078_data_overrides_admin_write.sql`; migration 073 remains frozen.
+The new migration and `tools/maintenance/privileges.sql` grant:
+
+- column-scoped `INSERT` on the seven columns named by `saveEdit()`;
+- column-scoped `UPDATE` on `override_values`, `admin_user_id`, `is_active`, `updated_at`;
+- `USAGE` only on `data_overrides_id_seq`;
+- no table-wide write, `DELETE`, `TRUNCATE`, sequence `SELECT`/`UPDATE`, default privilege, or
+  `afldb_meta.import_writable_tables` entry.
+
+Regression coverage was added to the existing semantic homes:
+
+- `tests/data-overrides-source-contract.test.ts` pins migration/reconciler parity and rejects
+  broad grants;
+- `tests/integration/privileges.test.ts` checks the exact table, column, sequence and registry
+  catalogue state;
+- `tests/integration/data-editor.test.ts` runs `saveEdit()` as restricted `afldb_import`, exercises
+  both insert and conflict-update, verifies canonical row + override + audit, restores through
+  the production path, and removes the test artifacts in a `finally` cleanup.
+
+### Initial local validation state — 2026-08-30 (superseded later the same day)
+
+- Dependency-free source check: **PASS** (migration/reconciler parity, forbidden-grant scan,
+  regression markers, migration 078 ordering).
+- Focused Vitest: **not run** — this worktree has no installed `vitest`; the command stopped
+  before collection with `vitest is not recognized`.
+- Typecheck: **not run** — this worktree has no installed Next.js toolchain; `next typegen`
+  stopped with `next is not recognized`.
+- Migration, privilege reconciliation, catalogue, restricted-role integration and live browser
+  validation: **not run by Codex**, per the database/environment command boundary.
+
+The later user-run database/toolchain results below supersede these environment-limited gaps.
+
+These initial environment-limited notes are superseded by the user-run database/toolchain and
+authenticated runtime evidence below. The final runbook is retained at
+`issues/closed/AFLDB-ISSUE-109.md`.
+
+### Validation update — 2026-08-30
+
+User-run validation is green:
+
+- migration 078 applied cleanly to `afldb_test`;
+- migration status 78/78 applied, 0 pending;
+- `db:privileges:test` completed successfully;
+- `tests/data-overrides-source-contract.test.ts`: 7/7 passed;
+- `tests/integration/privileges.test.ts`: 30/30 passed;
+- `tests/integration/data-editor.test.ts`: 9/9 passed, 0 skipped;
+- restricted `afldb_import` match-sheet path passed;
+- restricted `afldb_import` durable override insert + conflict-update path passed;
+- required canonical mutation + durable override + `data_edits` audit atomicity passed;
+- typecheck passed.
+
+This proves the forward migration, reconciler parity, exact catalogue confinement, and real
+restricted-role transaction on the integration database. At this iteration the authenticated
+development runtime save/reload/restore gate remained; it subsequently passed as recorded below.
+
+### Runtime fixture preflight — 2026-08-30
+
+The `afldb_dev` preflight returned zero active `data_overrides` rows for `matches` / `notes`
+whose payload contains `notes`. No arbitrary historical match is authorised.
+
+Direct verification of the partial-parse source established that a first changed Notes save
+creates an active override and a restoring save updates the same payload while forcing
+`is_active = true`. The supported Delete Match transaction does not touch `data_overrides`,
+whose natural-key rows have no match foreign key; deletion would therefore strand an active
+override. The integration test's owner-role deletion of its override and audit rows is
+test-database teardown, not supported development cleanup.
+
+The pre-execution runbook initially specified one exact, future-dated 2100 match. The accepted
+run instead used the dedicated retained fixture recorded below. Supported cleanup remained the
+same: restore its exact baseline Notes through the Data Editor and preserve the resulting active
+baseline override plus append-only audit history. Full removal is not currently
+application-supported and direct SQL is prohibited.
+
+### Final authenticated runtime acceptance and resolution — 2026-08-30
+
+Final `afldb_dev` prerequisite evidence was green: migration 078 applied successfully, migration
+status was **78/78 applied, 0 pending**, and privilege reconciliation completed successfully.
+
+The authenticated super-admin Data Editor check used the dedicated retained development fixture:
+
+- match ID `17059`;
+- match key `2026|R30|2026-12-31|104|103`;
+- Collingwood v Carlton on `2026-12-31`;
+- baseline Notes
+  `AFLDB-ISSUE-109 DEDICATED DEVELOPMENT VALIDATION FIXTURE — BASELINE — RETAIN`.
+
+The save completed without permission-denied, Server Action, page, or server errors; the value
+survived hard reload and navigation/reopen. The durable override insert and later conflict-path
+update both succeeded. Restoration to the exact baseline completed through the UI, with no
+manual SQL mutation used for validation or restoration.
+
+Read-only final-state evidence reported `canonical_restored = true`, `override_rows = 1`,
+`active_override_rows = 1`, and `override_restored = true`. The one active baseline override is
+intentional retained state for this dedicated development fixture.
+
+The actual append-only audit chain, all under `admin_user_id = 4`, is:
+
+| Audit row | Actual transition | Note/evidence |
+|---|---|---|
+| `22` | `match_creation` | Dedicated fixture creation audit. |
+| `23` | Baseline Notes → `AFLDB-ISSUE-109 authenticated runtime validation` | The intended audit text was entered into the Notes value. |
+| `24` | That value → `AFLDB-ISSUE-109 AUTHENTICATED RUNTIME CHECK — TEMPORARY` | Source/audit note blank because this was the correction save. |
+| `25` | Temporary marker → exact retained baseline | Note: `AFLDB-ISSUE-109 authenticated runtime restore`. |
+
+The extra intermediate edit is an operator-input correction, not an application defect:
+canonical Notes, the durable override, and the audit chain remained mutually consistent. The
+final canonical and override values both equal the retained baseline.
+
+**Resolution:** keep the established atomic `afldb_import` statistical-mutation transaction and
+its migration-066-style exceptional capability, with the narrowly column-scoped grants from
+migration 078 and the matching privilege reconciler. `data_overrides` remains human-admin-owned
+and outside the broad importer-writable registry. All automated, database-backed,
+restricted-role, atomic-audit, typecheck, and authenticated development runtime acceptance gates
+passed. ISSUE-109 is **Resolved**; no acceptance gate remains. Full evidence and the retained
+fixture lifecycle are in `issues/closed/AFLDB-ISSUE-109.md`.

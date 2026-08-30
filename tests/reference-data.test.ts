@@ -333,9 +333,10 @@ describe('load_reference_data.py', () => {
       expect(unregistered).toEqual([
         'app_health_events',
         'data_edits',
-        // 073 (AFLDB-ISSUE-086). Human overrides are not importer-owned:
-        // privileges.sql grants afldb_import SELECT only and states they
-        // "deliberately remain outside afldb_meta.import_writable_tables".
+        // 073 / 078 (AFLDB-ISSUE-086 / -109). Human overrides are not
+        // importer-owned: privileges.sql grants replay SELECT plus only
+        // the column-scoped Data Editor upsert capability, and keeps the
+        // table outside afldb_meta.import_writable_tables.
         'data_overrides',
         'nl_search_feedback',
         'nl_search_log',

@@ -9,6 +9,7 @@ describe('AFLDB-ISSUE-086 Source Contract', () => {
   const pyFitzroy = fs.readFileSync(path.join(root, 'tools/migration/import_fitzroy_core.py'), 'utf-8');
   const pyDraftGuru = fs.readFileSync(path.join(root, 'tools/rebuild/draftguru/import_draftguru.py'), 'utf-8');
   const sqlOverrides = fs.readFileSync(path.join(root, 'src/db/migrations/073_data_overrides.sql'), 'utf-8');
+  const privileges = fs.readFileSync(path.join(root, 'tools/maintenance/privileges.sql'), 'utf-8');
 
   test('Player identity is never surrogate-ID based', () => {
     expect(tsContent).toMatch(/SELECT e\.external_id\s+FROM external_identities e\s+JOIN sources s ON s\.id = e\.source_id\s+WHERE e\.player_id = \S+\s+AND s\.key = 'afltables'\s+AND e\.status IN \('unique', 'resolved'\)/);
@@ -76,5 +77,53 @@ describe('AFLDB-ISSUE-086 Source Contract', () => {
     expect(createIndex).not.toMatch(/UNIQUE/i);
     expect(createIndex).not.toMatch(/\bWHERE\b/i);
     expect(createIndex).not.toMatch(/CONCURRENTLY/i);
+  });
+
+  test('AFLDB-ISSUE-109 grants only the Data Editor upsert capability', () => {
+    const writerGrantPath = path.join(
+      root,
+      'src/db/migrations/078_data_overrides_admin_write.sql',
+    );
+    expect(fs.existsSync(writerGrantPath)).toBe(true);
+
+    const writerGrant = fs.readFileSync(writerGrantPath, 'utf-8')
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('--'))
+      .join('\n');
+    const reconcilerGrant = privileges
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('--'))
+      .join('\n');
+
+    const insertGrant = /GRANT INSERT \(\s*entity_type, entity_key, field_group, override_values,\s*admin_user_id, is_active, updated_at\s*\) ON data_overrides TO afldb_import;/;
+    const updateGrant = /GRANT UPDATE \(\s*override_values, admin_user_id, is_active, updated_at\s*\) ON data_overrides TO afldb_import;/;
+
+    expect(writerGrant).toMatch(insertGrant);
+    expect(writerGrant).toMatch(updateGrant);
+    expect(writerGrant).toContain(
+      'GRANT USAGE ON SEQUENCE data_overrides_id_seq TO afldb_import;',
+    );
+    expect(writerGrant).not.toMatch(/grant_import_write\s*\(/i);
+    expect(writerGrant).not.toMatch(
+      /GRANT\s+(?:ALL|INSERT|UPDATE|DELETE|TRUNCATE)\s+ON\s+data_overrides/i,
+    );
+    expect(writerGrant).not.toMatch(
+      /GRANT\s+(?:SELECT|UPDATE)\s+ON\s+SEQUENCE\s+data_overrides_id_seq/i,
+    );
+
+    // The subtractive reconciler revokes this unregistered table first,
+    // then must restore the same narrow exception rather than a wider one.
+    expect(reconcilerGrant).toMatch(insertGrant);
+    expect(reconcilerGrant).toMatch(updateGrant);
+    expect(reconcilerGrant).toContain(
+      'GRANT USAGE ON SEQUENCE data_overrides_id_seq TO afldb_import;',
+    );
+    expect(reconcilerGrant).not.toMatch(
+      /GRANT\s+(?:ALL|INSERT|UPDATE|DELETE|TRUNCATE)\s+ON\s+data_overrides/i,
+    );
+    expect(reconcilerGrant).not.toMatch(
+      /GRANT\s+(?:SELECT|UPDATE)\s+ON\s+SEQUENCE\s+data_overrides_id_seq/i,
+    );
+    expect(reconcilerGrant).not.toMatch(/grant_import_write\(['"]data_overrides['"]\)/i);
   });
 });

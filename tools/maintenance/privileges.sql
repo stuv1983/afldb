@@ -291,12 +291,22 @@ BEGIN
     GRANT USAGE ON SEQUENCE data_edits_id_seq TO afldb_import;
   END IF;
 
-  -- Migration 073 (AFLDB-ISSUE-086): destructive source reloads must
-  -- read durable admin override authority and replay it before commit.
-  -- Read only: human overrides are not importer-owned and deliberately
-  -- remain outside afldb_meta.import_writable_tables.
+  -- Migrations 073 / 078 (AFLDB-ISSUE-086 / -109): destructive source
+  -- reloads read durable human override authority, while saveEdit writes
+  -- the override in the same mutation-role transaction as the canonical
+  -- edit and required audit. The table remains human-owned and outside
+  -- import_writable_tables: grant only the columns used by the upsert,
+  -- never DELETE, TRUNCATE, broad UPDATE, or sequence reset privileges.
   IF to_regclass('public.data_overrides') IS NOT NULL THEN
     GRANT SELECT ON data_overrides TO afldb_import;
+    GRANT INSERT (
+      entity_type, entity_key, field_group, override_values,
+      admin_user_id, is_active, updated_at
+    ) ON data_overrides TO afldb_import;
+    GRANT UPDATE (
+      override_values, admin_user_id, is_active, updated_at
+    ) ON data_overrides TO afldb_import;
+    GRANT USAGE ON SEQUENCE data_overrides_id_seq TO afldb_import;
   END IF;
 
   IF to_regclass('public.player_link_resolutions') IS NOT NULL THEN

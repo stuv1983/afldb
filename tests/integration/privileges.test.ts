@@ -585,13 +585,14 @@ describe('afldb_import is confined to the statistical tables', () => {
     // deliberately withholds -- so that table reads as unregistered here,
     // which it is.
     //
-    // data_edits and player_link_resolutions are the two deliberate
+    // data_edits and player_link_resolutions are the two table-level
     // exceptions (migration 066, AFLDB-ISSUE-027): the mutation role
     // holds INSERT-only on the audit tables so the required audit row
-    // commits inside the mutation transaction. They stay out of the
-    // registry on purpose -- registering them would grant full DML and
-    // destroy their append-only property -- and their exact narrow shape
-    // is asserted in its own test below.
+    // commits inside the mutation transaction. data_overrides is a third,
+    // column-scoped exception (migration 078, AFLDB-ISSUE-109), which does
+    // not satisfy this table-level INSERT probe. All three stay out of the
+    // registry on purpose -- registering them would grant full DML -- and
+    // their exact narrow shapes are asserted below.
     const rows = await sql<{ name: string; registered: boolean; writable: boolean }[]>`
       SELECT c.relname AS name,
              (w.name IS NOT NULL) AS registered,
@@ -664,6 +665,73 @@ describe('afldb_import is confined to the statistical tables', () => {
       { name: 'data_edits_id_seq', usage: true, selects: false, updates: false },
       { name: 'player_link_resolutions_id_seq', usage: true, selects: false, updates: false },
     ]);
+  });
+
+  it('holds only the Data Editor upsert capability on human overrides (AFLDB-ISSUE-109)', async () => {
+    const [table] = await sql<{
+      selects: boolean; inserts: boolean; updates: boolean;
+      deletes: boolean; truncates: boolean;
+    }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'data_overrides', 'SELECT')   AS selects,
+             has_table_privilege(${IMPORT_ROLE}, 'data_overrides', 'INSERT')   AS inserts,
+             has_table_privilege(${IMPORT_ROLE}, 'data_overrides', 'UPDATE')   AS updates,
+             has_table_privilege(${IMPORT_ROLE}, 'data_overrides', 'DELETE')   AS deletes,
+             has_table_privilege(${IMPORT_ROLE}, 'data_overrides', 'TRUNCATE') AS truncates
+    `;
+    expect(table).toEqual({
+      selects: true,
+      inserts: false,
+      updates: false,
+      deletes: false,
+      truncates: false,
+    });
+
+    const columns = await sql<{
+      name: string; inserts: boolean; updates: boolean;
+    }[]>`
+      SELECT a.attname AS name,
+             has_column_privilege(${IMPORT_ROLE}, 'data_overrides', a.attname, 'INSERT') AS inserts,
+             has_column_privilege(${IMPORT_ROLE}, 'data_overrides', a.attname, 'UPDATE') AS updates
+        FROM pg_attribute a
+       WHERE a.attrelid = 'data_overrides'::regclass
+         AND a.attnum > 0
+         AND NOT a.attisdropped
+       ORDER BY a.attnum
+    `;
+    expect(columns).toEqual([
+      { name: 'id', inserts: false, updates: false },
+      { name: 'entity_type', inserts: true, updates: false },
+      { name: 'entity_key', inserts: true, updates: false },
+      { name: 'field_group', inserts: true, updates: false },
+      { name: 'override_values', inserts: true, updates: true },
+      { name: 'is_active', inserts: true, updates: true },
+      { name: 'admin_user_id', inserts: true, updates: true },
+      { name: 'created_at', inserts: false, updates: false },
+      { name: 'updated_at', inserts: true, updates: true },
+    ]);
+
+    const [sequence] = await sql<{
+      usage: boolean; selects: boolean; updates: boolean;
+    }[]>`
+      SELECT has_sequence_privilege(
+               ${IMPORT_ROLE}, 'data_overrides_id_seq', 'USAGE'
+             ) AS usage,
+             has_sequence_privilege(
+               ${IMPORT_ROLE}, 'data_overrides_id_seq', 'SELECT'
+             ) AS selects,
+             has_sequence_privilege(
+               ${IMPORT_ROLE}, 'data_overrides_id_seq', 'UPDATE'
+             ) AS updates
+    `;
+    expect(sequence).toEqual({ usage: true, selects: false, updates: false });
+
+    const [registered] = await sql<{ registered: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM afldb_meta.import_writable_tables
+         WHERE name = 'data_overrides'
+      ) AS registered
+    `;
+    expect(registered.registered).toBe(false);
   });
 
   it('cannot reset the sequence behind an operational table', async () => {
