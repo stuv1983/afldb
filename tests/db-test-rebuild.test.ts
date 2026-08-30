@@ -6,6 +6,8 @@ import { isAbsolute, join } from 'node:path';
 import {
   CLUB_SEASONS_EXPECTED,
   DRAFTGURU_EXPECTED,
+  colemanChecks,
+  colemanFirstSeason,
   LADDER_WITNESS_VALIDATOR,
   resolvePython,
   ladderWitnessLabel,
@@ -608,13 +610,20 @@ describe('stage graph', () => {
     expect(idsOf(stages)).toEqual([
       'precheck', 'recreate', 'migrations', 'privileges',
       'reference', 'fitzroy', 'draftguru', 'derived',
-      'ladder-witness', 'fingerprints',
+      'coleman', 'ladder-witness', 'fingerprints',
     ]);
   });
 
-  it('adds no data stage beyond the four the rebuild already had', () => {
+  it('adds exactly one data stage beyond the four, and it derives rather than acquires', () => {
+    // AFLDB-ISSUE-111. 'coleman' is the fifth DATA stage. It is admitted because it
+    // acquires nothing: no legacy SQLite, no manifest, no network — it reads AFLDB's own
+    // canonical match facts and writes the award they imply.
     expect(idsOf(stages.filter((s) => s.kind === 'data')))
-      .toEqual(['reference', 'fitzroy', 'draftguru', 'derived']);
+      .toEqual(['reference', 'fitzroy', 'draftguru', 'derived', 'coleman']);
+    const coleman = stages.find((s) => s.id === 'coleman')!;
+    expect(coleman.argv).toEqual([
+      resolvePython(), 'tools/migration/import_awards.py', '--groups', 'coleman',
+    ]);
   });
 
   describe('ladder witness cross-check (AFLDB-ISSUE-095 D7)', () => {
@@ -634,7 +643,50 @@ describe('stage graph', () => {
       expect(witness.argv).toContain('--compare');
       expect(witness.argv).toContain(LADDER_WITNESS_VALIDATOR);
       // The manifest is bound by hash, so the bytes cannot be swapped underneath it.
+      // Its VALUE is asserted in the next test (AFLDB-ISSUE-114); a shape-only check
+      // here is exactly what let a stale CRLF literal survive AFLDB-ISSUE-108.
       expect(accepted.manifest_sha256).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it('binds the witness to the canonical LF bytes of the tracked manifest', () => {
+      // AFLDB-ISSUE-114 — the AFLDB-ISSUE-108 defect class, missed here.
+      // validate_ladder_witness.py:142-144 compares sha256 over the manifest's RAW
+      // bytes, so a literal captured from a CRLF working copy makes the witness
+      // binding fail closed on a CORRECT manifest, on every platform, before a single
+      // ladder CSV is read — and the rebuild's ladder gate with it. Assert the value,
+      // not the shape. Line endings are normalised before hashing for the same reason
+      // as the core register at :425-427: .gitattributes renders these bytes LF on
+      // every checkout, so the canonical LF hash is the only binding that can pass,
+      // and the assertion itself must not depend on the working copy's endings.
+      const contract = JSON.parse(readFileSync(
+        join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+      const accepted = contract.datasets.ladder.accepted_witness;
+
+      // The validator derives the manifest as `<manifest_dir>/<label>.json`, so a
+      // binding filed under any other name would hash a different file than the one
+      // it proves. Read the path from the contract rather than writing it here.
+      expect(accepted.manifest).toBe(
+        `docs/rebuild-manifests/afltables_fitzroy_core/${accepted.snapshot_label}.json`);
+
+      const lf = readFileSync(join(root, ...accepted.manifest.split('/')), 'utf8')
+        .replace(/\r\n/g, '\n');
+      const sha = (text: string) =>
+        createHash('sha256').update(text, 'utf8').digest('hex');
+
+      expect(accepted.manifest_sha256).toBe(sha(lf));
+      // ...and it is the LF rendering that is bound, never the CRLF rendering of the
+      // identical document. That substitution is the whole of AFLDB-ISSUE-114, and it
+      // is silent: both values are well-formed 64-hex digests of the same manifest.
+      expect(accepted.manifest_sha256).not.toBe(sha(lf.replace(/\n/g, '\r\n')));
+
+      // The manifest the binding accepts is still the accepted acquisition itself:
+      // this repair re-pointed the hash at the same document, it did not admit new
+      // bytes (that would be an AFLDB-ISSUE-101 successor-witness decision).
+      const manifest = JSON.parse(lf);
+      const ladderFiles = manifest.files.filter((f: any) => f.dataset === 'ladder');
+      expect(ladderFiles).toHaveLength(accepted.files);
+      expect(ladderFiles.reduce((n: number, f: any) => n + f.row_count, 0))
+        .toBe(accepted.rows);
     });
 
     it('refuses rather than guessing when no witness is accepted', () => {
@@ -667,6 +719,37 @@ describe('stage graph', () => {
         runCommand: () => ({ status: 0, stdout: draftguruOk, stderr: '' }),
       };
       expect(() => runPreflight(passing)).not.toThrow();
+    });
+  });
+
+  describe('Coleman derivation stage (AFLDB-ISSUE-111)', () => {
+    const coleman = stages.find((s) => s.id === 'coleman')!;
+
+    it('runs after the facts it derives from and before final validation', () => {
+      const ids = idsOf(stages);
+      // fitzRoy supplies matches, player_match_stats and the AFL Tables profile
+      // identities the durable key is built from.
+      expect(ids.indexOf('fitzroy')).toBeLessThan(ids.indexOf('coleman'));
+      // derived is where season_metadata decides which seasons are complete, and an
+      // undecided season must not materialise a winner.
+      expect(ids.indexOf('derived')).toBeLessThan(ids.indexOf('coleman'));
+      expect(ids.indexOf('coleman')).toBeLessThan(ids.indexOf('fingerprints'));
+    });
+
+    it('needs no legacy SQLite database', () => {
+      // G9. The group is legacy-free, so the stage passes no legacy environment and the
+      // whole plan still carries none (asserted separately below).
+      expect(JSON.stringify(coleman)).not.toContain('AFLDB_LEGACY_SQLITE');
+      expect(coleman.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: IMPORT });
+    });
+
+    it('runs only the coleman group, never the legacy awards families', () => {
+      expect(coleman.argv).toContain('--groups');
+      expect(coleman.argv).toContain('coleman');
+      for (const other of ['awards', 'all_australian', 'hall_of_fame', 'captaincies']) {
+        expect(coleman.argv!.slice(coleman.argv!.indexOf('--groups') + 1))
+          .not.toContain(other);
+      }
     });
   });
 
@@ -788,12 +871,24 @@ describe('Python interpreter resolution', () => {
   });
 
   it('refuses with the selected path when that interpreter does not exist', () => {
-    const deps: Deps = { ...fakeDeps().deps, fileExists: (p: string) => p !== DEFAULT_VENV_PYTHON };
-    expect(() => runPreflight(deps)).toThrow(RebuildRefused);
-    expect(() => runPreflight(deps)).toThrow(new RegExp(
-      `No Python interpreter at .*${DEFAULT_VENV_PYTHON.replace(/[\\/.]/g, '.')}`));
-    expect(() => runPreflight(deps)).toThrow(/AFLDB_PYTHON/);
-    expect(() => runPreflight(deps)).toThrow(/Nothing has been destroyed/);
+    // This case is about the DEFAULT interpreter, so the ambient environment must not
+    // choose one for it. AFLDB_PYTHON is the documented setup for a worktree, and an
+    // exported value made runPreflight resolve an absolute path this stub reports as
+    // present, so the refusal never fired and the run fell through to the DraftGuru
+    // preflight. Its siblings above and below already manage the variable explicitly.
+    const savedPython = process.env.AFLDB_PYTHON;
+    delete process.env.AFLDB_PYTHON;
+    try {
+      const deps: Deps = { ...fakeDeps().deps, fileExists: (p: string) => p !== DEFAULT_VENV_PYTHON };
+      expect(() => runPreflight(deps)).toThrow(RebuildRefused);
+      expect(() => runPreflight(deps)).toThrow(new RegExp(
+        `No Python interpreter at .*${DEFAULT_VENV_PYTHON.replace(/[\\/.]/g, '.')}`));
+      expect(() => runPreflight(deps)).toThrow(/AFLDB_PYTHON/);
+      expect(() => runPreflight(deps)).toThrow(/Nothing has been destroyed/);
+    } finally {
+      if (savedPython === undefined) delete process.env.AFLDB_PYTHON;
+      else process.env.AFLDB_PYTHON = savedPython;
+    }
   });
 
   it('accepts an ABSOLUTE override path, which is what an override always is', () => {
@@ -957,6 +1052,82 @@ describe('final validation', () => {
         'club_seasons_duplicate_identity_seasons', 'club_seasons_unranked_rows',
         'club_seasons_brisbane_lions_first_season',
         'club_seasons_after_accepted_last_season',
+      ]) {
+        expect(sql).toContain(key);
+      }
+    });
+  });
+
+  // AFLDB-ISSUE-111. The Coleman gate is added in the same change as the COLEMAN stage
+  // and never before it: a gate whose data source does not yet exist would fail every
+  // rebuild (the ISSUE-093 §H15.5 rule).
+  describe('Coleman gates', () => {
+    const checks = () => finalValidationChecks(measuredRegister({
+      matches: 16838, seasons_first: 1897, seasons_last: 2025,
+    }));
+    const gate = (key: string) => checks().find((c) => c.key === key);
+
+    it('takes the span from the tracked contract, not from this file', () => {
+      const contract = JSON.parse(readFileSync(
+        join(root, 'data', 'reference', 'coleman-derivation.json'), 'utf8'));
+      expect(contract.first_season).toBe(1980);
+      expect(colemanFirstSeason()).toBe(contract.first_season);
+      expect(gate('coleman_first_season')?.expected).toBe(1980);
+      // 1980..2025 inclusive.
+      expect(gate('coleman_seasons')?.expected).toBe(46);
+      expect(gate('coleman_rows')?.expected).toBe(46);
+    });
+
+    it('refuses rather than guessing when the contract declares no span', () => {
+      expect(() => colemanFirstSeason(() => null)).toThrow(RebuildRefused);
+      expect(() => colemanFirstSeason(() => ({}))).toThrow(RebuildRefused);
+      expect(() => colemanFirstSeason(() => ({ first_season: '1980' })))
+        .toThrow(RebuildRefused);
+    });
+
+    it('requires every derived winner to be linked', () => {
+      const g = gate('coleman_unlinked_rows')!;
+      expect(g.expected).toBe(0);
+      expect(g.sql).toContain('player_id IS NULL');
+    });
+
+    it('catches a surviving legacy row before it becomes a duplicate family', () => {
+      // The whole point of the one-time transition: an untransitioned draftguru row plus
+      // a derived row is 92 Coleman rows, and neither uniqueness constraint stops it.
+      const g = gate('coleman_rows_not_derived_from_afltables')!;
+      expect(g.expected).toBe(0);
+      expect(g.sql).toContain("key = 'afltables'");
+      expect(gate('coleman_rows')?.expected).toBe(46);
+    });
+
+    it('rejects the surrogate-id key form the design ruled out', () => {
+      // players.id is not canonical-rebuild-stable, so coleman:<season>:<players.id> is
+      // exactly the key this derivation must never produce.
+      const g = gate('coleman_rows_keyed_on_a_numeric_id')!;
+      expect(g.expected).toBe(0);
+      expect(g.sql).toContain('^coleman:[0-9]{4}:[0-9]+$');
+    });
+
+    it('excludes the current season by the accepted baseline, not a hard-coded year', () => {
+      expect(gate('coleman_after_accepted_last_season')?.sql).toContain('season > 2025');
+      const rolled = finalValidationChecks(measuredRegister({
+        matches: 1, seasons_last: 2026,
+      })).find((c) => c.key === 'coleman_after_accepted_last_season');
+      expect(rolled?.sql).toContain('season > 2026');
+    });
+
+    it('moves the span with the contract rather than pinning 1980 in code', () => {
+      const moved = colemanChecks(2025, 1990);
+      expect(moved.find((c) => c.key === 'coleman_first_season')?.expected).toBe(1990);
+      expect(moved.find((c) => c.key === 'coleman_seasons')?.expected).toBe(36);
+    });
+
+    it('renders every Coleman gate into the executed stream', () => {
+      const sql = finalValidationSql();
+      for (const key of [
+        'coleman_rows', 'coleman_seasons', 'coleman_first_season',
+        'coleman_unlinked_rows', 'coleman_rows_not_derived_from_afltables',
+        'coleman_rows_keyed_on_a_numeric_id', 'coleman_after_accepted_last_season',
       ]) {
         expect(sql).toContain(key);
       }

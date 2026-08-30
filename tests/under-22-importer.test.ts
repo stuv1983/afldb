@@ -61,16 +61,21 @@ describe('22 Under 22 awards import contract', () => {
   });
 
   it('allows a targeted non-destructive run without the legacy SQLite database', () => {
-    expect(importer).toContain('needs_legacy = any(key != "under_22" for key in selected)');
+    // AFLDB-ISSUE-111 generalised the single under_22 exemption into a set, so the
+    // derived Coleman group is legacy-free on the same terms. under_22 must still be in
+    // it, and the predicate must still be membership of that set.
+    expect(importer).toContain(
+      'needs_legacy = any(key not in LEGACY_FREE_GROUPS for key in selected)',
+    );
+    expect(importer).toMatch(/LEGACY_FREE_GROUPS = \{[^}]*"under_22"[^}]*\}/);
     expect(importer).toContain('elif key == "under_22":');
     expect(importer).toContain(
       'pg, under_22_rows, clubs, preserved_under_22_resolutions',
     );
     expect(importer).toContain("column_name = 'sort_order'");
     expect(importer).toContain('run database migration 061 first');
-    expect(importer).toContain(
-      'batch_source = UNDER_22_SOURCE_KEY if key == "under_22" else "sports_data_lab"',
-    );
+    expect(importer).toContain('batch_source = BATCH_SOURCE_KEYS.get(key, "sports_data_lab")');
+    expect(importer).toMatch(/BATCH_SOURCE_KEYS = \{[^}]*"under_22": UNDER_22_SOURCE_KEY/);
   });
 
   it('makes every destructive awards reload restore the independent team data', () => {
@@ -102,7 +107,9 @@ describe('22 Under 22 awards import contract', () => {
       /reload_keyed\([\s\S]*?"awards", \["slug"\][\s\S]*?scope_column="slug", scope_values=\[UNDER_22_SLUG\], scope_exclude=True/,
     );
     expect(legacyAwardsLoader).toContain('other_group_awards = [');
-    expect(legacyAwardsLoader).toContain('for slug in (UNDER_22_SLUG, ALL_AUSTRALIAN_SLUG)');
+    expect(legacyAwardsLoader).toContain(
+      'for slug in (UNDER_22_SLUG, ALL_AUSTRALIAN_SLUG, COLEMAN_SLUG)',
+    );
     expect(legacyAwardsLoader).toMatch(
       /reload_keyed\([\s\S]*?"award_winners", \["source_id", "source_record_id"\][\s\S]*?scope_column="award_id", scope_values=other_group_awards, scope_exclude=True/,
     );
@@ -169,7 +176,7 @@ describe('22 Under 22 awards import contract', () => {
     const loader = between(
       importer,
       'def import_under_22(',
-      '\n\n\n# ---------------------------------------------------------------------------\n# Group: Rising Star',
+      '\n\n\n# ---------------------------------------------------------------------------\n# Group: Coleman Medal',
     );
     expect(loader).not.toContain('truncate(');
     expect(loader).toMatch(
@@ -200,7 +207,7 @@ describe('22 Under 22 awards import contract', () => {
     const loader = between(
       importer,
       'def import_under_22(',
-      '\n\n\n# ---------------------------------------------------------------------------\n# Group: Rising Star',
+      '\n\n\n# ---------------------------------------------------------------------------\n# Group: Coleman Medal',
     );
     expect(loader).toContain('"22 Under 22 Team"');
     expect(loader).toContain("'honour_team', 'AFL'");

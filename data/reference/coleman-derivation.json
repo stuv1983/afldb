@@ -1,0 +1,54 @@
+{
+  "$comment": "AFLDB-ISSUE-111. The tracked derivation contract for the Coleman Medal. AFLDB does not acquire Coleman winners from an external award scrape: it DERIVES them from its own canonical home-and-away match facts (player_match_stats JOIN matches, NOT is_final). This file is the single declaration of the derivation's boundaries, read directly by tools/migration/import_awards.py and by the tests, so the loader and its gates cannot silently diverge. It is deliberately NOT registered in load_reference_data.py's GROUPS: it is a contract declaration, never a table load.",
+  "status": "READY",
+  "award_slug": "coleman",
+  "method_version": 1,
+
+  "first_season": 1980,
+  "first_season_basis": "PRESERVES AFLDB'S MEASURED LEGACY AWARD CONTRACT. This is NOT a claim about when the Coleman Medal was first awarded. Measured read-only 2026-08-30 (AFLDB-ISSUE-111 G0): awards.first_season = 1980, awards.last_season = 2025, 46 legacy winner rows, exactly one per season from 1980 to 2025 with no gaps. The derivation therefore begins where AFLDB's own award contract begins. Seasons before 1980 are NOT backfilled, and the span is NOT extended to 1897 merely because goals coverage reaches it: pre-contract leading-goalkicker history is a different concept, already served by getSeasonGoalkickers().",
+
+  "derivation_method": "player_match_stats JOIN matches, home-and-away matches only (NOT matches.is_final), sum(player_match_stats.goals) grouped by (matches.season, player_match_stats.player_id); the per-season maximum qualifying total wins.",
+
+  "excluded_source": "player_season_stats",
+  "excluded_source_reason": "player_season_stats.goals sums EVERY game of the season, finals included (tools/migration/rebuild_derived.py, REBUILDS['player_season_stats']). It backs src/db/queries/seasons.ts getSeasonGoalkickers(), which is AFLDB's whole-season leading-goalkicker concept and is NOT the Coleman Medal. It is also itself derived, so using it would make the award a derivation of a derivation. The Coleman derivation must never read it.",
+
+  "home_and_away_rule": "NOT matches.is_final. Exact, not approximate: src/db/migrations/003_matches.sql CHECK (is_final = (round_type <> 'home_and_away')) makes the two statements identical by construction.",
+
+  "completed_seasons_only": true,
+  "completed_seasons_rule": "Only a season with seasons.status = 'complete' materialises a winner. A season still in progress has not decided the award, so it produces no row — mirroring rebuild_derived.py's 'pending' Brownlow treatment rather than inventing a new status rule.",
+
+  "tie_rule": "EVERY player tied on the maximum qualifying home-and-away total receives a winner row. There is no tie-break, no 'fewest games' discriminator and no silent single-row pick. award_winners has no season-unique constraint, so a season may carry more than one Coleman row.",
+
+  "minimum_goals": 1,
+  "minimum_goals_reason": "A leading goalkicker must have kicked a goal. Without this, a season whose maximum total was zero would make every listed player a tied winner.",
+
+  "club_rule": "DISTINCT player_match_stats.club_id over the winner's qualifying home-and-away matches that season: exactly one distinct club -> persist it; more than one -> persist NULL. Measured 2026-08-30 (G4): all 45 linked historical winners represented exactly one club, so history establishes no primary-club tie-break and none is invented. award_winners.club_id is nullable (migration 005) and src/db/queries/awards.ts LEFT JOINs it, so NULL is schema-legal and consumer-safe.",
+
+  "source_key": "afltables",
+  "source_key_basis": "A derived row carries the underlying canonical source of the facts it was derived from, not a synthetic 'derived' source. This is the proven convention: AFLDB-ISSUE-095's club_seasons is derived entirely from canonical matches and stamps (SELECT id FROM sources WHERE key = 'afltables'). player_match_stats comes from AFL Tables via fitzRoy (import_fitzroy_core.py, SOURCE_KEY_AFLTABLES). draftguru is deliberately no longer claimed: the goals never came from DraftGuru's award scrape. No new sources row and no migration is required.",
+
+  "source_record_id_format": "coleman:<season>:<normalised AFL Tables profile path>",
+  "source_record_id_example": "coleman:1982:players/B/Malcolm_Blight.html",
+  "source_record_id_basis": "players.id is NOT canonical-rebuild-stable (AFLDB-ISSUE-108 §9.4: a rebuild re-seeds players.id and import_fitzroy_core.py resolves identity by AFL Tables profile URL). The durable canonical identity is the normalised AFL Tables profile path, persisted in external_identities with match_method = 'afltables_profile_url' under external_identities_uq UNIQUE (source_id, external_id). The key is identity, not position, so it survives reloads, ties changing size, a canonical rebuild's id reseed and a display-name correction. The path is used raw and readable, never hashed: every row key in this repository is readable and source_record_id is unbounded text (migration 005).",
+
+  "identity_match_method": "afltables_profile_url",
+  "identity_statuses": ["unique", "resolved"],
+  "identity_rule": "FAIL CLOSED. A derived winner with no afltables_profile_url identity, or with more than one, refuses the whole load. The loader must NEVER fall back to players.id, to the fitzRoy numeric id (83 players carry none) or to a name, and must never reach the network to resolve identity.",
+
+  "key_separator": ":",
+  "key_separator_rule": "REFUSE, do not sanitise. Following the AFLDB-ISSUE-100 delimiter precedent, a normalised profile path containing the ':' separator refuses the load. AFL Tables paths do not contain one, so this is a fail-closed guard rather than a transformation.",
+
+  "emit_order": ["season", "profile_path"],
+
+  "legacy_transition": {
+    "$comment": "The one-time ownership transition from the legacy draftguru Coleman rows to this derivation. Run once, before the first derived load, via: import_awards.py --rekey-coleman.",
+    "expected_rows": 46,
+    "legacy_source_key": "draftguru",
+    "legacy_source_record_id_pattern": "^coleman:[0-9]{4}:[0-9]+$",
+    "bridge": "(award_id, season)",
+    "bridge_basis": "G0 measured exactly one legacy row per season 1980-2025 with no gaps, and G3 measured LEGACY_ONLY = 0, so every legacy season is also a derived season. Any season that fails to bridge 1:1 aborts the whole transaction.",
+    "columns_changed": ["source_id", "source_record_id"],
+    "preserves_row_ids": true,
+    "first_load_expectation": "46 updated, 0 inserted, 0 deleted"
+  }
+}

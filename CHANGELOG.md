@@ -15,6 +15,76 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-111 — Coleman Medal derived from canonical AFLDB facts (Resolved) - 30 August 2026
+
+- Coleman Medal winners are now **derived from AFLDB's own canonical home-and-away match facts**
+  instead of being loaded from the legacy SQLite award scrape. The new `coleman` group in
+  `tools/migration/import_awards.py` sums `player_match_stats.goals` over `matches` where
+  `NOT is_final` — the exact home-and-away filter enforced by `matches_is_final_ck` — grouped by
+  `(season, player_id)`, and persists the per-season maximum to `award_winners`. It never reads
+  `player_season_stats.goals`, which includes finals and backs the separate `getSeasonGoalkickers()`
+  leading-goalkicker concept; that concept is unchanged.
+- Added `data/reference/coleman-derivation.json`, the single tracked declaration of the
+  derivation's boundaries — span (`first_season 1980`, preserving AFLDB's measured legacy award
+  contract rather than asserting when the medal began), method, excluded source, home-and-away rule,
+  completed-season rule, tie rule, club rule, provenance, key format, identity match rule and the
+  legacy transition contract. The loader, the rebuild gates and the tests all read it, so they
+  cannot silently diverge, and the gate code **refuses rather than guessing** if it cannot load.
+- Every player tied on the maximum qualifying total receives a winner row — no arbitrary
+  tie-break. A winner with home-and-away matches for more than one club records `club_id IS NULL`.
+  A season still in progress produces no row.
+- Winner rows are **born linked** under `afltables` provenance, never `draftguru`, and are keyed on
+  `coleman:<season>:<normalised AFL Tables profile path>` read from `external_identities`.
+  `players.id` is rejected as not rebuild-stable, and the loader **fails closed** — writing
+  nothing — when a winner has no profile identity, has an ambiguous one, or has a path containing
+  the key separator. Reloads keep the existing `reload_keyed` ownership contract, so row ids,
+  manual `linked` / `confirmed_unlinked` decisions and the source-name-change guard all survive.
+- Removed the operational legacy dependency for this family: `needs_legacy` was generalised from a
+  single `under_22` exemption to `LEGACY_FREE_GROUPS`, so a Coleman load runs with
+  `AFLDB_LEGACY_SQLITE` unset. Six of the eight `import_awards.py` groups still require it
+  (`AFLDB-ISSUE-112`).
+- Integrated into the canonical rebuild: a new `coleman` data stage runs after `derived` (so
+  `seasons.status` is already computed) and before the ladder witness, gated by seven Stage-9
+  checks — row count, season count, first season, unlinked rows, non-derived provenance, the
+  rejected numeric-id key form, and rows beyond the accepted last season.
+- Added a one-time `--rekey-coleman` transition that rekeys an existing legacy-loaded Coleman family
+  in place, preserving every `award_winners.id`, in a single fail-closed transaction that refuses a
+  mixed or unbridgeable state. **Deployment note:** it must be run once per existing environment
+  before the derived loader runs there — skipping it does not fail loudly, it silently duplicates
+  the family. `docs/deployment.md` §7 carries the sequence and the warning.
+- Validation, all operator-run: the destructive canonical rebuild of `afldb_test` completed with
+  **exit 0**, the Coleman stage reporting `46 winners (46 seasons, 0 updated, 46 inserted,
+  0 deleted)` and FINAL VALIDATION returning `AFLDB-FINAL-VALIDATION PASSED: 26 checks` with
+  `coleman_rows 46`, `coleman_seasons 46`, `coleman_first_season 1980`, `coleman_unlinked_rows 0`,
+  `coleman_rows_not_derived_from_afltables 0`, `coleman_rows_keyed_on_a_numeric_id 0`,
+  `coleman_after_accepted_last_season 0`; 29 of 29 ISSUE-111 integration cases against `afldb_test`,
+  including an independently shaped PostgreSQL oracle, tie / multi-club / in-progress /
+  finals-exclusion / span-boundary fixtures, the identity refusals, the legacy → derived transition
+  and its id preservation, a three-reload byte-identical fingerprint and the human-link-decision
+  survival audit; and 263 DB-free tests plus `npx tsc --noEmit` clean.
+
+### AFLDB-ISSUE-114 — ladder witness manifest binding repaired to its canonical LF hash (Resolved) - 30 August 2026
+
+- Re-pointed `datasets.ladder.accepted_witness.manifest_sha256` in
+  `tools/rebuild/fitzroy/fitzroy-contract.json` at the canonical LF hash of the same tracked
+  manifest (`604a8a16…8d3f`). The previously recorded value was the CRLF rendering of the identical
+  document, captured before `AFLDB-ISSUE-108` added `docs/rebuild-manifests/** text eol=lf`, so the
+  ladder witness integrity check failed closed on a correct manifest on every platform and blocked
+  the canonical rebuild's ladder gate regardless of the snapshot bytes.
+- No new bytes were accepted: the tracked manifest was not edited, `validate_ladder_witness.py` was
+  not normalised, no gate was relaxed, and `snapshot_label`, `manifest`, `files` (129), `rows`
+  (1,622) and all 129 per-file hashes are unchanged. Accepting different bytes from a fresh
+  acquisition remains an `AFLDB-ISSUE-101` successor-witness decision.
+- Added a value assertion binding the contract literal to the manifest's LF-normalised bytes,
+  rejecting the CRLF rendering of the same content and re-proving the 129 files / 1,622 rows, so the
+  binding can no longer rot silently behind the previous shape-only check.
+- Repaired one test-isolation defect exposed by the same run: the rebuild harness resolves the
+  Python interpreter from `process.env` by design, so the missing-interpreter case now saves,
+  clears and restores `AFLDB_PYTHON` as its siblings already did. Every assertion is unchanged and
+  no rebuild code was modified.
+- Validation, DB-free and operator-run: `npm test -- tests/db-test-rebuild.test.ts` — 214 passed,
+  0 failed.
+
 ### AFLDB-ISSUE-109 — Data Editor durable overrides keep atomic least-privilege writes (Resolved) - 30 August 2026
 
 - Added forward migration `078_data_overrides_admin_write.sql` so the existing

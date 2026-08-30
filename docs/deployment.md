@@ -248,6 +248,7 @@ source .venv/bin/activate    # or use ./.venv/bin/python directly
 ./.venv/bin/python tools/rebuild/draftguru/import_draftguru.py  # draft rows and people
 ./.venv/bin/python tools/migration/import_awards.py           # awards and representative teams
 ./.venv/bin/python tools/migration/rebuild_derived.py         # ~30s   summaries
+./.venv/bin/python tools/migration/import_awards.py --groups coleman  # after season_metadata
 ./.venv/bin/python tools/validation/validate_migration.py     # every check must pass
 
 npm run build && sudo systemctl restart afldb                 # refresh cached pages
@@ -259,7 +260,22 @@ the accepted Stage A snapshot and the tracked reference/decision artefacts, and 
 fails fast if invoked. Add `--validate-only` to check every input without touching the
 database, or `--dry-run` to run the whole transaction and roll it back.
 
-The order matters. `rebuild_derived.py` must run last: it reads the tables the earlier steps write, and its first target, `season_metadata`, decides whether a season is still in progress — which in turn decides whether that season's Brownlow reads as a zero or as "not yet awarded".
+The order matters. `rebuild_derived.py` must run last of the summary builders: it reads the tables the earlier steps write, and its first target, `season_metadata`, decides whether a season is still in progress — which in turn decides whether that season's Brownlow reads as a zero or as "not yet awarded".
+
+The `coleman` group is the one awards group that runs **after** `rebuild_derived.py`, and it is repeated there deliberately. Unlike every other awards family it is *derived*, not acquired: it computes the leading home-and-away goalkicker from `player_match_stats` joined to `matches` (AFLDB-ISSUE-111), and it materialises a winner only for a season `season_metadata` has marked complete. Running it before that pass would read a stale season status and could name a winner for a season still being played. The second pass is idempotent — a reload by key, with the row ids preserved — so repeating it costs one query and removes the ordering hazard. Its boundaries (first season, tie rule, club rule, provenance, key format) live in `data/reference/coleman-derivation.json`, not in the loader.
+
+For a Coleman-only correction, run
+`./.venv/bin/python tools/migration/import_awards.py --groups coleman` after
+`rebuild_derived.py`. Like `under_22`, it needs no legacy SQLite database and
+rewrites no other award family.
+
+**One-time only, per database:** `./.venv/bin/python tools/migration/import_awards.py --rekey-coleman`
+re-owns the 46 pre-existing DraftGuru-sourced Coleman rows in place before the
+first derived load, preserving every `award_winners.id`. It runs a fail-closed
+1:1 preflight and writes nothing unless every count reconciles; it is retry-safe
+(already transitioned → verify and no-op) and refuses on a mixed state. Skipping
+it does not fail loudly — it silently duplicates the family, because the derived
+loader's ownership scope cannot see the legacy rows.
 
 For a 22 Under 22-only correction, run
 `./.venv/bin/python tools/migration/import_awards.py --groups under_22` after

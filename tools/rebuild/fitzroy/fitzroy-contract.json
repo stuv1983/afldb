@@ -237,10 +237,10 @@
         ]
       },
       "accepted_witness": {
-        "$comment": "AFLDB-ISSUE-095 durability binding. The raw witness CSVs are gitignored like every other acquired snapshot (ISSUE-093 convention: bytes are reproduced by acquisition, only the manifest is tracked). This block pins WHICH acquisition is accepted and binds the tracked manifest byte-for-byte, so the per-file hash list inside it cannot be edited to cover for tampered bytes. tools/rebuild/fitzroy/validate_ladder_witness.py re-proves every file hash against this manifest before the witness may be used, and REFUSES when the manifest exists but its bytes do not.",
+        "$comment": "AFLDB-ISSUE-095 durability binding. The raw witness CSVs are gitignored like every other acquired snapshot (ISSUE-093 convention: bytes are reproduced by acquisition, only the manifest is tracked). This block pins WHICH acquisition is accepted and binds the tracked manifest byte-for-byte, so the per-file hash list inside it cannot be edited to cover for tampered bytes. tools/rebuild/fitzroy/validate_ladder_witness.py re-proves every file hash against this manifest before the witness may be used, and REFUSES when the manifest exists but its bytes do not. AFLDB-ISSUE-114: manifest_sha256 is the SHA-256 of the manifest's CANONICAL LF BYTES. The value recorded on 2026-08-28, 70cc17768685a3140a428d3eef796bf465ae2fd9dca71a66684f248cdde8b6df, was captured from a CRLF working copy of the SAME document; .gitattributes (AFLDB-ISSUE-108) renders docs/rebuild-manifests/** as eol=lf on every platform and this validator hashes raw bytes, so that literal failed closed on a correct manifest everywhere. The repair re-pointed the binding at the same document in its canonical form: same snapshot_label, same manifest, same 129 files / 1622 rows, same per-file hash list. Accepting DIFFERENT bytes from a fresh acquisition is a successor-witness decision (AFLDB-ISSUE-101), never an edit to this field.",
         "snapshot_label": "ladder-20260828",
         "manifest": "docs/rebuild-manifests/afltables_fitzroy_core/ladder-20260828.json",
-        "manifest_sha256": "70cc17768685a3140a428d3eef796bf465ae2fd9dca71a66684f248cdde8b6df",
+        "manifest_sha256": "604a8a162543e19060f426bd189222d32d07726a0b134bdf4f910175cb7a8d3f",
         "files": 129,
         "rows": 1622,
         "acquired_on": "2026-08-28",

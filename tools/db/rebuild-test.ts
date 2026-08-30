@@ -132,6 +132,9 @@ const ACCEPTED_BASELINES = join('data', 'reference', 'fitzroy-accepted-baselines
 /** The source contract, which also names the accepted AFLDB-ISSUE-095 ladder witness. */
 const FITZROY_CONTRACT = join('tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json');
 
+/** The AFLDB-ISSUE-111 Coleman derivation contract. Declares the derived span. */
+const COLEMAN_CONTRACT = join('data', 'reference', 'coleman-derivation.json');
+
 // ---------------------------------------------------------------------------
 // Safety — every refusal happens before any destruction
 // ---------------------------------------------------------------------------
@@ -465,6 +468,20 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       envOverlay: dataEnv,
     },
     {
+      // AFLDB-ISSUE-111. The Coleman Medal is DERIVED from canonical home-and-away match
+      // facts, not acquired: no legacy SQLite, no manifest, no network. It must follow
+      // `fitzroy`, which supplies matches, player_match_stats and the AFL Tables profile
+      // identities its durable source_record_id is built from, AND `derived`, which is
+      // where season_metadata decides which seasons are complete — an in-progress season
+      // has not decided the award and must not materialise a winner.
+      id: 'coleman',
+      name: 'COLEMAN — leading home-and-away goalkicker, derived',
+      kind: 'data',
+      run: 'command',
+      argv: [python, 'tools/migration/import_awards.py', '--groups', 'coleman'],
+      envOverlay: dataEnv,
+    },
+    {
       // AFLDB-ISSUE-095 D7. The ladder witness cross-check. It must follow `derived`,
       // which is where club_seasons is built, and precede FINAL VALIDATION so a
       // disagreement is reported with its own per-row diagnostics rather than collapsed
@@ -669,7 +686,99 @@ export function finalValidationChecks(
   // same match set — so a zero-row club_seasons is a rebuild FAILURE, not a known gap.
   for (const check of clubSeasonChecks(Number(measured.seasons_last))) checks.push(check);
 
+  // AFLDB-ISSUE-111. Added together with the COLEMAN stage, never before it: a gate
+  // whose data source does not yet exist would fail every rebuild (the ISSUE-093 §H15.5
+  // rule).
+  for (const check of colemanChecks(Number(measured.seasons_last))) checks.push(check);
+
   return checks;
+}
+
+/**
+ * The declared Coleman span, read from the tracked derivation contract.
+ *
+ * Never a literal here: the loader obeys the same declaration, so the gate and the
+ * derivation cannot drift apart. A missing or malformed contract refuses rather than
+ * defaulting to a year nobody chose.
+ */
+export function colemanFirstSeason(
+  readContract: () => Record<string, unknown> | null = () => {
+    const path = join(REPO_ROOT, COLEMAN_CONTRACT);
+    return existsSync(path)
+      ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
+      : null;
+  },
+): number {
+  const first = readContract()?.first_season;
+  if (typeof first !== 'number' || !Number.isInteger(first)) {
+    throw new RebuildRefused(
+      `${COLEMAN_CONTRACT} declares no integer first_season, so the rebuild has no `
+      + 'Coleman span to validate against and will not invent one.');
+  }
+  return first;
+}
+
+/**
+ * Structural invariants for the derived Coleman family. Read-only scalar counts.
+ *
+ * The row count and the season count are gated separately on purpose. Every season in
+ * the declared span must produce a winner, which is the season gate; the row gate is
+ * equal to it because the accepted 1980-2025 corpus contains no tied season (ISSUE-111
+ * G3 measured 46 derived winners over 46 seasons). A future tie is a real result, not a
+ * fault — but it must reach a curator loudly rather than appear silently, which is
+ * exactly what a row-count mismatch here does.
+ */
+export function colemanChecks(
+  acceptedLastSeason: number,
+  firstSeason: number = colemanFirstSeason(),
+): FinalCheck[] {
+  const span = acceptedLastSeason - firstSeason + 1;
+  const winners = "SELECT count(*) FROM award_winners w JOIN awards a ON a.id = w.award_id"
+    + " WHERE a.slug = 'coleman'";
+  return [
+    { key: 'coleman_rows', sql: winners, expected: span },
+
+    { key: 'coleman_seasons',
+      sql: "SELECT count(DISTINCT w.season) FROM award_winners w"
+         + " JOIN awards a ON a.id = w.award_id WHERE a.slug = 'coleman'",
+      expected: span },
+
+    { key: 'coleman_first_season',
+      sql: "SELECT min(w.season) FROM award_winners w"
+         + " JOIN awards a ON a.id = w.award_id WHERE a.slug = 'coleman'",
+      expected: firstSeason },
+
+    // Derived rows are born linked: player_id comes from player_match_stats, so an
+    // unlinked Coleman row means the derivation did not own the row it wrote.
+    { key: 'coleman_unlinked_rows',
+      sql: "SELECT count(*) FROM award_winners w JOIN awards a ON a.id = w.award_id"
+         + " WHERE a.slug = 'coleman' AND w.player_id IS NULL",
+      expected: 0 },
+
+    // Provenance is the canonical source of the facts the award was derived from.
+    // A surviving draftguru-owned row here is the duplication hazard the one-time
+    // transition exists to prevent, caught before anyone sees 92 Coleman rows.
+    { key: 'coleman_rows_not_derived_from_afltables',
+      sql: "SELECT count(*) FROM award_winners w JOIN awards a ON a.id = w.award_id"
+         + " WHERE a.slug = 'coleman' AND w.source_id IS DISTINCT FROM"
+         + " (SELECT id FROM sources WHERE key = 'afltables')",
+      expected: 0 },
+
+    // The durable key is the AFL Tables profile path, never a surrogate id. A key whose
+    // third field is an integer is the rejected coleman:<season>:<players.id> form.
+    { key: 'coleman_rows_keyed_on_a_numeric_id',
+      sql: "SELECT count(*) FROM award_winners w JOIN awards a ON a.id = w.award_id"
+         + " WHERE a.slug = 'coleman'"
+         + " AND w.source_record_id ~ '^coleman:[0-9]{4}:[0-9]+$'",
+      expected: 0 },
+
+    // 2026 belongs to the current-season pipeline, never this path's. The derivation
+    // carries no hard-coded year; this proves it produced nothing beyond the core.
+    { key: 'coleman_after_accepted_last_season',
+      sql: 'SELECT count(*) FROM award_winners w JOIN awards a ON a.id = w.award_id'
+         + ` WHERE a.slug = 'coleman' AND w.season > ${acceptedLastSeason}`,
+      expected: 0 },
+  ];
 }
 
 /**

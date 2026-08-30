@@ -5,6 +5,8 @@
     python tools/migration/import_awards.py --dry-run       # counts only
     python tools/migration/import_awards.py --groups rising_star
     python tools/migration/import_awards.py --groups under_22
+    python tools/migration/import_awards.py --groups coleman
+    python tools/migration/import_awards.py --rekey-coleman   # one-time, ISSUE-111
     python tools/migration/import_awards.py --list-groups
 
 Every target table already exists (migration 005). This importer fills
@@ -412,10 +414,15 @@ def import_awards(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
 
     # 2. Winners.
     source_id = require_source(sources, "draftguru")
-    # Winners owned by another group: 22 Under 22 upserts its own rows, and the
-    # All-Australian team is loaded from its own two sources immediately after.
+    # Winners owned by another group: 22 Under 22 upserts its own rows, the
+    # All-Australian team is loaded from its own two sources immediately after,
+    # and the Coleman Medal is derived from canonical match facts by the
+    # 'coleman' group (AFLDB-ISSUE-111). Excluding Coleman here is what stops
+    # the legacy group ever inserting, updating or deleting a Coleman winner
+    # again — without it the derived loader's separate ownership scope would
+    # leave the legacy rows in place and duplicate the family.
     other_group_awards = [
-        award_ids[slug] for slug in (UNDER_22_SLUG, ALL_AUSTRALIAN_SLUG)
+        award_ids[slug] for slug in (UNDER_22_SLUG, ALL_AUSTRALIAN_SLUG, COLEMAN_SLUG)
         if slug in award_ids
     ]
 
@@ -890,6 +897,577 @@ def import_under_22(
 
 
 # ---------------------------------------------------------------------------
+# Group: Coleman Medal — derived from canonical home-and-away match facts
+# ---------------------------------------------------------------------------
+# AFLDB-ISSUE-111. This group acquires nothing. It DERIVES the Coleman Medal
+# from AFLDB's own canonical facts — player_match_stats joined to matches,
+# home-and-away rounds only — and therefore needs no legacy SQLite database and
+# no network. Every boundary it obeys is declared in the tracked contract
+# data/reference/coleman-derivation.json, which the tests read too, so the
+# loader and its gates cannot silently diverge.
+COLEMAN_SLUG = "coleman"
+COLEMAN_GROUP = "coleman"
+COLEMAN_CONTRACT_PATH = (
+    Path(__file__).resolve().parents[2] / "data" / "reference" / "coleman-derivation.json"
+)
+# The legacy owner of the 46 pre-transition rows. Named here only so the
+# one-time rekey can recognise them; nothing in the derived path writes it.
+LEGACY_COLEMAN_SOURCE_KEY = "draftguru"
+LEGACY_COLEMAN_KEY_RE = re.compile(r"^coleman:\d{4}:\d+$")
+DERIVED_COLEMAN_KEY_RE = re.compile(r"^coleman:\d{4}:\S+$")
+
+_COLEMAN_REQUIRED_CONTRACT_KEYS = (
+    "award_slug", "method_version", "first_season", "source_key",
+    "minimum_goals", "identity_match_method", "identity_statuses",
+    "key_separator", "completed_seasons_only", "legacy_transition",
+)
+
+
+def load_coleman_contract(path: Path | None = None) -> dict:
+    """Read the tracked derivation contract, failing closed on drift.
+
+    The span, the provenance, the identity rule and the key separator are all
+    contract facts rather than constants in this file: a reader must be able to
+    audit the boundary without reading Python, and the tests assert against the
+    same declaration the loader obeys.
+    """
+    path = path or COLEMAN_CONTRACT_PATH
+    try:
+        contract = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            f"the Coleman derivation contract {path} is missing; this loader "
+            f"will not invent a span, a provenance or an identity rule"
+        ) from exc
+
+    missing = [key for key in _COLEMAN_REQUIRED_CONTRACT_KEYS if key not in contract]
+    if missing:
+        raise RuntimeError(
+            f"{path}: the Coleman derivation contract is missing "
+            f"{', '.join(missing)}; nothing has been read"
+        )
+    if contract["award_slug"] != COLEMAN_SLUG:
+        raise RuntimeError(
+            f"{path}: award_slug is {contract['award_slug']!r}, not {COLEMAN_SLUG!r}"
+        )
+    if not isinstance(contract["first_season"], int):
+        raise RuntimeError(f"{path}: first_season must be an integer")
+    if contract["completed_seasons_only"] is not True:
+        raise RuntimeError(
+            f"{path}: completed_seasons_only must be true — an undecided season "
+            f"cannot have a leading goalkicker of record"
+        )
+    statuses = contract["identity_statuses"]
+    if not isinstance(statuses, list) or not statuses:
+        raise RuntimeError(f"{path}: identity_statuses must be a non-empty list")
+    return contract
+
+
+# The derivation. Deliberately NOT player_season_stats: that aggregate includes
+# finals and backs getSeasonGoalkickers(), which is AFLDB's whole-season
+# leading-goalkicker concept and a different thing from this award. `NOT
+# m.is_final` is exact rather than approximate — migration 003 CHECK-constrains
+# is_final = (round_type <> 'home_and_away').
+COLEMAN_DERIVATION_SQL = """
+WITH ha AS (
+    SELECT m.season, pms.player_id, pms.club_id, pms.goals
+      FROM player_match_stats pms
+      JOIN matches  m ON m.id = pms.match_id
+      JOIN seasons  s ON s.year = m.season
+     WHERE NOT m.is_final
+       AND m.season >= %(first_season)s
+       AND s.status = 'complete'
+),
+totals AS (
+    SELECT season, player_id, sum(goals) AS goals
+      FROM ha
+     GROUP BY season, player_id
+),
+best AS (
+    SELECT season, player_id, goals
+      FROM (SELECT season, player_id, goals,
+                   max(goals) OVER (PARTITION BY season) AS top
+              FROM totals) ranked
+     WHERE goals = top
+       AND goals >= %(minimum_goals)s
+),
+club AS (
+    SELECT ha.season, ha.player_id,
+           count(DISTINCT ha.club_id) AS club_count,
+           min(ha.club_id)            AS sole_club
+      FROM ha
+      JOIN best b ON b.season = ha.season AND b.player_id = ha.player_id
+     GROUP BY ha.season, ha.player_id
+)
+SELECT b.season,
+       b.player_id,
+       b.goals,
+       p.display_name,
+       -- Exactly one distinct home-and-away club that season -> that club;
+       -- more than one -> NULL. No most-games/most-goals/final-club rule is
+       -- invented: a multi-club season is genuinely ambiguous at this grain.
+       CASE WHEN c.club_count = 1 THEN c.sole_club END AS club_id,
+       c.club_count,
+       ident.paths
+  FROM best b
+  JOIN club    c ON c.season = b.season AND c.player_id = b.player_id
+  JOIN players p ON p.id = b.player_id
+  LEFT JOIN LATERAL (
+      SELECT array_agg(DISTINCT ei.external_id) AS paths
+        FROM external_identities ei
+       WHERE ei.player_id = b.player_id
+         AND ei.match_method = %(match_method)s
+         AND ei.status::text = ANY(%(statuses)s)
+  ) ident ON TRUE
+ ORDER BY b.season, b.player_id
+"""
+
+# NULL is not zero. player_match_stats.goals is nullable, and SUM() skips
+# NULLs, so one unrecorded row would silently understate a season total. The
+# accepted coverage claims none exist in scope; this proves it per run rather
+# than trusting the claim.
+COLEMAN_NULL_GOALS_SQL = """
+SELECT count(*)
+  FROM player_match_stats pms
+  JOIN matches m ON m.id = pms.match_id
+  JOIN seasons s ON s.year = m.season
+ WHERE NOT m.is_final
+   AND m.season >= %(first_season)s
+   AND s.status = 'complete'
+   AND pms.goals IS NULL
+"""
+
+
+def coleman_query_params(contract: dict) -> dict:
+    return {
+        "first_season": contract["first_season"],
+        "minimum_goals": int(contract["minimum_goals"]),
+        "match_method": contract["identity_match_method"],
+        "statuses": list(contract["identity_statuses"]),
+    }
+
+
+def build_coleman_winners(rows, contract: dict) -> list[dict]:
+    """Compose a durable key for every derived winner. Pure, and fail-closed.
+
+    Kept separate from the query so the identity contract is testable without a
+    database. A winner with no durable AFL Tables identity, a winner with more
+    than one, and a normalised path carrying the key separator each refuse the
+    whole load. ``players.id`` is never used as identity — a canonical rebuild
+    re-seeds it — and neither is the fitzRoy numeric id or a name.
+    """
+    separator = contract["key_separator"]
+    winners: list[dict] = []
+    missing_identity: list[str] = []
+    ambiguous_identity: list[str] = []
+    unsafe_path: list[str] = []
+    for season, player_id, goals, display_name, club_id, club_count, paths in rows:
+        paths = [p for p in (paths or []) if p]
+        if not paths:
+            missing_identity.append(f"{season}: player {player_id} ({display_name})")
+            continue
+        if len(paths) > 1:
+            ambiguous_identity.append(
+                f"{season}: player {player_id} ({display_name}) holds "
+                f"{len(paths)} profile identities: {', '.join(sorted(paths))}"
+            )
+            continue
+        path = paths[0]
+        if separator in path:
+            unsafe_path.append(f"{season}: {path!r}")
+            continue
+        winners.append({
+            "season": season,
+            "player_id": player_id,
+            "goals": int(goals),
+            "display_name": display_name,
+            "club_id": club_id,
+            "club_count": club_count,
+            "profile_path": path,
+            "key": f"{COLEMAN_SLUG}{separator}{season}{separator}{path}",
+        })
+
+    if missing_identity or ambiguous_identity or unsafe_path:
+        detail = []
+        if missing_identity:
+            detail.append(
+                f"{len(missing_identity)} winner(s) hold no "
+                f"{contract['identity_match_method']} identity with status in "
+                f"{contract['identity_statuses']}:\n  "
+                + "\n  ".join(missing_identity[:10])
+            )
+        if ambiguous_identity:
+            detail.append(
+                f"{len(ambiguous_identity)} winner(s) hold more than one:\n  "
+                + "\n  ".join(ambiguous_identity[:10])
+            )
+        if unsafe_path:
+            detail.append(
+                f"{len(unsafe_path)} normalised path(s) contain the "
+                f"{separator!r} key separator and are REFUSED, not sanitised:\n  "
+                + "\n  ".join(unsafe_path[:10])
+            )
+        raise RuntimeError(
+            "coleman: the derivation cannot produce a durable source_record_id "
+            "for every winner, and will not fall back to players.id, to a "
+            "fitzRoy numeric id or to a name.\n"
+            + "\n".join(detail)
+            + "\nNothing has been written."
+        )
+
+    # Deterministic emit order: season, then the durable path. Never a ranking
+    # position — an ordinal would move a surviving row's key whenever a tied
+    # set changed size.
+    winners.sort(key=lambda w: (w["season"], w["profile_path"]))
+    return winners
+
+
+def derive_coleman_winners(pg: psycopg.Connection, contract: dict) -> list[dict]:
+    """Every Coleman winner the canonical home-and-away facts support."""
+    params = coleman_query_params(contract)
+    with pg.cursor() as cur:
+        cur.execute(COLEMAN_NULL_GOALS_SQL, params)
+        unrecorded = cur.fetchone()[0]
+        if unrecorded:
+            raise RuntimeError(
+                f"coleman: {unrecorded} home-and-away player_match_stats row(s) "
+                f"from {params['first_season']} onwards carry goals IS NULL. A "
+                f"missing statistic is not zero, so a season total derived over "
+                f"them would be understated. Nothing has been written."
+            )
+        cur.execute(COLEMAN_DERIVATION_SQL, params)
+        rows = cur.fetchall()
+    return build_coleman_winners(rows, contract)
+
+
+def coleman_award_id(pg: psycopg.Connection, winners: list[dict]) -> int:
+    """The Coleman award definition, created only when it does not exist.
+
+    In a legacy-loaded database the definition already comes from the legacy
+    ``awards`` group and is left exactly as it is — AFLDB-ISSUE-112 owns award
+    definitions. In a canonical rebuild there is no legacy group at all, so
+    without this the derived winners would have no parent row and the rebuild
+    stage could not run. Create-if-missing is therefore the smallest thing that
+    makes both paths work without taking ownership of the definition.
+    """
+    with pg.cursor() as cur:
+        cur.execute("SELECT id FROM awards WHERE slug = %s", (COLEMAN_SLUG,))
+        row = cur.fetchone()
+        if row is not None:
+            return row[0]
+        if not winners:
+            raise RuntimeError(
+                "coleman: no award definition exists and the derivation produced "
+                "no winners, so there is nothing to create it from"
+            )
+        cur.execute(
+            """INSERT INTO awards
+                 (slug, name, category, competition, club_id, description,
+                  first_season, last_season)
+               VALUES (%s, %s, 'award', 'AFL', NULL, %s, %s, %s)
+               RETURNING id""",
+            (
+                COLEMAN_SLUG, "Coleman Medal", AWARD_DESCRIPTIONS[COLEMAN_SLUG],
+                min(w["season"] for w in winners),
+                max(w["season"] for w in winners),
+            ),
+        )
+        return cur.fetchone()[0]
+
+
+def import_coleman(pg: psycopg.Connection, rep: Reporter, batch,
+                   sources: dict[str, int], allow_link_loss: bool = False,
+                   contract: dict | None = None) -> None:
+    contract = contract or load_coleman_contract()
+    # A derived row carries the underlying canonical source of the facts it was
+    # derived from (the AFLDB-ISSUE-095 club_seasons convention), never a
+    # synthetic "derived" source and never draftguru — the goals came from AFL
+    # Tables via fitzRoy, not from DraftGuru's award scrape.
+    source_id = require_source(sources, contract["source_key"])
+
+    winners = derive_coleman_winners(pg, contract)
+    award_id = coleman_award_id(pg, winners)
+    method_version = contract["method_version"]
+
+    def build():
+        for winner in winners:
+            batch.records_read += 1
+            note = (
+                f"Derived from AFLDB home-and-away match statistics: "
+                f"{winner['goals']} goals "
+                f"(coleman-derivation.json method_version {method_version})"
+            )
+            yield (
+                award_id, winner["season"], winner["player_id"],
+                winner["display_name"],
+                # Born linked: player_id comes from player_match_stats, so the
+                # identity is canonical rather than name-matched.
+                "resolved", 0,
+                winner["club_id"],
+                # There is no source club spelling to keep: the club is a
+                # canonical id derived from the winner's own match rows.
+                None,
+                # votes stays NULL. The UI labels that column "Votes"; a goal
+                # total is not a vote total, and it is recorded in the note.
+                None,
+                None, False, False, note,
+                source_id, winner["key"], batch.id,
+            )
+
+    # Ownership is domain AND provenance (AFLDB-ISSUE-080): the award alone
+    # would still reconcile a manual_admin_edit Coleman row, and the source
+    # alone would reach every other afltables-owned family.
+    stats = reload_keyed(
+        pg, "award_winners", ["source_id", "source_record_id"],
+        ["award_id", "season", "player_id", "player_name_raw", "link_status_value",
+         "candidate_count", "club_id", "club_name_raw", "votes", "position",
+         "is_captain", "is_vice_captain", "note", "source_id", "source_record_id",
+         "import_batch_id"],
+        build(), batch,
+        target_table="award_winners",
+        scope_column="award_id", scope_values=[award_id],
+        scopes=[("source_id", [source_id], False)],
+        allow_link_loss=allow_link_loss,
+    )
+    pg.commit()
+    report_reload(rep, "coleman", stats)
+    rep.result(
+        "coleman winners", len(winners),
+        f"({len({w['season'] for w in winners})} seasons, "
+        f"{stats.updated} updated, {stats.inserted} inserted, {stats.deleted} deleted)",
+    )
+    ties = sorted(
+        season for season in {w["season"] for w in winners}
+        if len([w for w in winners if w["season"] == season]) > 1
+    )
+    if ties:
+        # Surfaced, never reconciled: a tie is a real result, and a curator
+        # must be able to see which seasons produced more than one winner.
+        rep.warn(
+            f"coleman: {len(ties)} season(s) produced tied winners: "
+            + ", ".join(str(season) for season in ties)
+        )
+    multi_club = [w for w in winners if w["club_count"] > 1]
+    if multi_club:
+        rep.warn(
+            f"coleman: {len(multi_club)} winner(s) represented more than one "
+            f"home-and-away club and carry club_id NULL: "
+            + ", ".join(f"{w['season']} {w['display_name']}" for w in multi_club)
+        )
+
+
+# ---------------------------------------------------------------------------
+# One-time legacy -> derived transition (AFLDB-ISSUE-111 §7.1)
+# ---------------------------------------------------------------------------
+# reload_keyed matches only within its ownership scope. The 46 legacy rows are
+# owned by draftguru; the derived loader scopes to afltables. Left alone, the
+# derived loader would see an empty scope, INSERT 46 new rows and leave the
+# legacy 46 in place — 92 Coleman rows, silently duplicated, with neither
+# uniqueness constraint able to stop it because the two keys differ.
+#
+# So this runs ONCE, before the first derived load, and it re-owns the existing
+# rows rather than replacing them: no row is deleted, and every award_winners.id
+# is preserved because player_link_resolutions.target_id points at those ids.
+# The shape is tools/records/import-first-kick-goal.ts --rekey: an exact 1:1
+# preflight that writes nothing unless every count reconciles, retry-safe by
+# state (all legacy -> rekey; all transitioned -> verify and no-op; mixed ->
+# abort), and one transaction of UPDATE ... WHERE id = <rowId>.
+def coleman_link_decision_count(pg: psycopg.Connection, award_id: int) -> int:
+    """Human identity decisions recorded against any Coleman winner row."""
+    with pg.cursor() as cur:
+        cur.execute(
+            """SELECT count(*)
+                 FROM player_link_resolutions r
+                 JOIN award_winners w ON w.id = r.target_id
+                WHERE r.target_table = 'award_winners'
+                  AND w.award_id = %s""",
+            (award_id,),
+        )
+        return cur.fetchone()[0]
+
+
+def rekey_coleman(pg: psycopg.Connection, rep: Reporter, sources: dict[str, int],
+                  contract: dict | None = None) -> int:
+    """Re-own the legacy Coleman rows in place. Returns a process exit code."""
+    contract = contract or load_coleman_contract()
+    transition = contract["legacy_transition"]
+    expected_rows = int(transition["expected_rows"])
+    derived_source_id = require_source(sources, contract["source_key"])
+    legacy_source_id = require_source(sources, transition["legacy_source_key"])
+
+    with pg.cursor() as cur:
+        cur.execute("SELECT id FROM awards WHERE slug = %s", (COLEMAN_SLUG,))
+        row = cur.fetchone()
+    if row is None:
+        rep.step("coleman rekey: no coleman award definition exists; nothing to "
+                 "transition. The derived load will create it.")
+        return 0
+    award_id = row[0]
+
+    with pg.cursor() as cur:
+        cur.execute(
+            """SELECT id, season, source_id, source_record_id
+                 FROM award_winners
+                WHERE award_id = %s
+                ORDER BY id""",
+            (award_id,),
+        )
+        rows = cur.fetchall()
+
+    legacy = [r for r in rows if r[2] == legacy_source_id]
+    derived = [r for r in rows if r[2] == derived_source_id]
+    foreign = [r for r in rows if r[2] not in (legacy_source_id, derived_source_id)]
+
+    rep.step("coleman rekey preflight:")
+    rep.result("  rows in the coleman award", len(rows))
+    rep.result(f"  owned by {transition['legacy_source_key']}", len(legacy))
+    rep.result(f"  owned by {contract['source_key']}", len(derived))
+    rep.result("  owned by neither (left untouched)", len(foreign))
+
+    # ---- state: already transitioned -> verify and no-op --------------------
+    if derived and not legacy:
+        malformed = [r for r in derived if not DERIVED_COLEMAN_KEY_RE.match(r[3] or "")]
+        if malformed:
+            for row_id, season, _, key in malformed[:10]:
+                rep.warn(f"  id={row_id} season={season} key={key!r}")
+            rep.warn(
+                f"{len(malformed)} already-transitioned row(s) do not carry a "
+                f"derived key. Nothing was written."
+            )
+            return 1
+        rep.step(
+            f"Already rekeyed: {len(derived)} row(s) carry derived keys and are "
+            f"owned by {contract['source_key']}. Nothing to do."
+        )
+        return 0
+
+    # ---- state: nothing owned -> nothing to transition ----------------------
+    if not legacy and not derived:
+        rep.step("coleman rekey: no legacy or derived Coleman rows exist; "
+                 "nothing to transition.")
+        return 0
+
+    # ---- state: mixed -> abort ---------------------------------------------
+    if legacy and derived:
+        rep.warn(
+            f"Mixed ownership state: {len(derived)} row(s) already owned by "
+            f"{contract['source_key']} and {len(legacy)} still owned by "
+            f"{transition['legacy_source_key']}. This needs manual review; "
+            f"nothing was written."
+        )
+        return 1
+
+    # ---- state: all legacy -> exact 1:1 rekey -------------------------------
+    problems: list[str] = []
+    if len(legacy) != expected_rows:
+        problems.append(
+            f"expected exactly {expected_rows} legacy row(s) in scope, found "
+            f"{len(legacy)}"
+        )
+
+    bad_form = [r for r in legacy if not LEGACY_COLEMAN_KEY_RE.match(r[3] or "")]
+    for row_id, season, _, key in bad_form[:10]:
+        problems.append(f"id={row_id} season={season}: key {key!r} is not the legacy form")
+
+    seasons = [r[1] for r in legacy]
+    duplicated = sorted({s for s in seasons if seasons.count(s) > 1})
+    if duplicated:
+        problems.append(
+            "the bridge is (award_id, season) and these season(s) carry more "
+            f"than one legacy row: {', '.join(str(s) for s in duplicated)}"
+        )
+    if seasons and (min(seasons) != contract["first_season"]
+                    or max(seasons) - min(seasons) + 1 != len(set(seasons))):
+        problems.append(
+            f"legacy seasons are {min(seasons)}-{max(seasons)} over "
+            f"{len(set(seasons))} distinct value(s); the contract declares a "
+            f"gapless span from {contract['first_season']}"
+        )
+
+    # Re-verified at run time rather than trusted from the runbook: the first
+    # derived load rewrites player_name_raw to the canonical display name, which
+    # is safe only while no human decision is attached to any of these rows.
+    decisions = coleman_link_decision_count(pg, award_id)
+    rep.result("  Coleman player_link_resolutions rows", decisions)
+    if decisions:
+        problems.append(
+            f"{decisions} human player-link decision(s) now exist on Coleman "
+            f"rows; the transition refuses rather than moving rows whose "
+            f"decided identity it cannot guarantee"
+        )
+
+    winners = derive_coleman_winners(pg, contract)
+    by_season: dict[int, list[dict]] = {}
+    for winner in winners:
+        by_season.setdefault(winner["season"], []).append(winner)
+
+    mappings: list[tuple[int, str]] = []
+    used: set[str] = set()
+    for row_id, season, _, key in legacy:
+        candidates = by_season.get(season, [])
+        if not candidates:
+            problems.append(
+                f"id={row_id} season={season}: the derivation produces no winner "
+                f"for this season, so the row cannot be bridged"
+            )
+            continue
+        if len(candidates) > 1:
+            problems.append(
+                f"id={row_id} season={season}: the derivation produces "
+                f"{len(candidates)} tied winners, so the bridge is ambiguous"
+            )
+            continue
+        target = candidates[0]["key"]
+        if target in used:
+            problems.append(f"id={row_id} season={season}: target key {target!r} is not unique")
+            continue
+        used.add(target)
+        mappings.append((row_id, target))
+
+    if len(mappings) != len(legacy):
+        problems.append(
+            f"only {len(mappings)} of {len(legacy)} legacy row(s) bridge 1:1"
+        )
+
+    if mappings:
+        with pg.cursor() as cur:
+            cur.execute(
+                """SELECT id, source_record_id
+                     FROM award_winners
+                    WHERE source_record_id = ANY(%s)
+                      AND id <> ALL(%s)""",
+                ([key for _, key in mappings], [row_id for row_id, _ in mappings]),
+            )
+            occupied = cur.fetchall()
+        for row_id, key in occupied[:10]:
+            problems.append(f"target key {key!r} is already held by row id={row_id}")
+
+    rep.result("  exact 1:1 mappings", len(mappings))
+    if problems:
+        for problem in problems:
+            rep.warn(f"  {problem}")
+        rep.warn("The mapping is not exactly 1:1; nothing was written.")
+        return 1
+
+    # Only source_id and source_record_id change. player_id, link_status_value,
+    # club_id, player_name_raw, votes and note are deliberately left to the
+    # derived loader's own UPDATE, so the transition moves ownership without
+    # asserting a single fact.
+    with pg.cursor() as cur:
+        for row_id, key in mappings:
+            cur.execute(
+                """UPDATE award_winners
+                      SET source_id = %s, source_record_id = %s
+                    WHERE id = %s""",
+                (derived_source_id, key, row_id),
+            )
+    pg.commit()
+    rep.step(f"Rekeyed {len(mappings)} Coleman row(s) in place; "
+             f"every surrogate id is unchanged.")
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # Group: Rising Star nominations
 # ---------------------------------------------------------------------------
 STAT_COLUMNS = [
@@ -1321,17 +1899,33 @@ GROUPS = {
     "awards":         ("Award definitions and winners", ["awards", "award_winners"]),
     "all_australian": ("All-Australian teams", ["award_winners"]),
     "under_22":       ("AFLPA 22 Under 22 teams", ["awards", "award_winners"]),
+    COLEMAN_GROUP:    ("Coleman Medal, derived from canonical home-and-away facts",
+                       ["awards", "award_winners"]),
     "rising_star":    ("Rising Star nominations", ["award_nominations"]),
     "hall_of_fame":   ("Australian Football Hall of Fame", ["hall_of_fame"]),
     "honour_teams":   ("Teams of the century and similar", ["honour_team_members"]),
     "captaincies":    ("Club captains by season", ["captaincies"]),
 }
 
+# Groups that read no legacy SQLite database at all. under_22 loads a tracked
+# manifest; coleman derives from AFLDB's own canonical match facts. Either can
+# therefore run in a canonically rebuilt database with AFLDB_LEGACY_SQLITE unset.
+LEGACY_FREE_GROUPS = {"under_22", COLEMAN_GROUP}
+
+# The provenance each group's import_batch is recorded against. Everything not
+# named here is a legacy-SQLite extract, recorded as sports_data_lab.
+BATCH_SOURCE_KEYS = {
+    "under_22": UNDER_22_SOURCE_KEY,
+    COLEMAN_GROUP: "afltables",
+}
+
 # all_australian and rising_star both need the legacy award definitions, so
 # 'awards' always runs first. under_22 can also run alone because it upserts
-# only its own definition and rows.
-GROUP_ORDER = ["awards", "all_australian", "under_22", "rising_star", "hall_of_fame",
-               "honour_teams", "captaincies"]
+# only its own definition and rows, and coleman likewise owns only its own
+# derived rows — it runs after 'awards' so a legacy-loaded database supplies the
+# existing definition rather than having one created underneath it.
+GROUP_ORDER = ["awards", "all_australian", "under_22", COLEMAN_GROUP, "rising_star",
+               "hall_of_fame", "honour_teams", "captaincies"]
 
 # Groups that cannot be run without another.
 #
@@ -1387,8 +1981,29 @@ def main() -> int:
         help="proceed even when a manual player-link decision cannot survive "
              "the reload; every discarded decision is itemised",
     )
+    parser.add_argument(
+        "--rekey-coleman", action="store_true",
+        help="one-time AFLDB-ISSUE-111 transition: re-own the legacy Coleman "
+             "winner rows in place, preserving every award_winners.id. Runs a "
+             "fail-closed 1:1 preflight and writes nothing unless it reconciles",
+    )
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args()
+
+    if args.rekey_coleman:
+        load_env()
+        rep = Reporter(verbose=not args.quiet)
+        contract = load_coleman_contract()
+        dsn = require_env("AFLDB_IMPORT_DATABASE_URL")
+        rep.step(f"target        : {safe_dsn(dsn)}")
+        pg = connect_pg(dsn)
+        try:
+            with pg.cursor() as cur:
+                cur.execute("SELECT key, id FROM sources")
+                sources = dict(cur.fetchall())
+            return rekey_coleman(pg, rep, sources, contract)
+        finally:
+            pg.close()
 
     if args.list_groups:
         for key in GROUP_ORDER:
@@ -1404,7 +2019,7 @@ def main() -> int:
 
     load_env()
     rep = Reporter(verbose=not args.quiet)
-    needs_legacy = any(key != "under_22" for key in selected)
+    needs_legacy = any(key not in LEGACY_FREE_GROUPS for key in selected)
     legacy_path = require_env("AFLDB_LEGACY_SQLITE") if needs_legacy else None
 
     if legacy_path:
@@ -1430,6 +2045,13 @@ def main() -> int:
                 len(under_22_rows),
                 f"({len({row.season for row in under_22_rows})} seasons)",
             )
+        if COLEMAN_GROUP in selected:
+            contract = load_coleman_contract()
+            rep.step(
+                f"coleman derivation contract: first_season "
+                f"{contract['first_season']}, method_version "
+                f"{contract['method_version']}, provenance {contract['source_key']}"
+            )
         return 0
 
     dsn = require_env("AFLDB_IMPORT_DATABASE_URL")
@@ -1454,6 +2076,14 @@ def main() -> int:
         under_22_rows: list[Under22Selection] | None = None
         under_22_prepared: dict[str, Under22Prepared] | None = None
         under_22_source_id = sources.get(UNDER_22_SOURCE_KEY)
+        # Validated before the first group writes, for the same reason the
+        # Under 22 prerequisites are: a contract that does not parse must not
+        # be discovered only after a shared awards family has been rewritten.
+        coleman_contract = (
+            load_coleman_contract() if COLEMAN_GROUP in selected else None
+        )
+        if COLEMAN_GROUP in selected:
+            require_source(sources, coleman_contract["source_key"])
         if "under_22" in selected:
             # Validate every source/reference prerequisite before a requested
             # shared legacy awards rebuild deletes or rewrites its own rows.
@@ -1504,7 +2134,7 @@ def main() -> int:
 
         for key in selected:
             rep.step(f"{key} — {GROUPS[key][0]}")
-            batch_source = UNDER_22_SOURCE_KEY if key == "under_22" else "sports_data_lab"
+            batch_source = BATCH_SOURCE_KEYS.get(key, "sports_data_lab")
             with import_batch(pg, batch_source, "import_awards.py", key) as batch:
                 if key == "awards":
                     import_awards(pg, lite, rep, batch, clubs, sources, person_links,
@@ -1518,6 +2148,10 @@ def main() -> int:
                         source_rows=under_22_rows,
                         prepared_rows=under_22_prepared,
                     )
+                elif key == COLEMAN_GROUP:
+                    import_coleman(pg, rep, batch, sources,
+                                   allow_link_loss=args.allow_link_loss,
+                                   contract=coleman_contract)
                 elif key == "rising_star":
                     import_rising_star(pg, lite, rep, batch, clubs, sources,
                                        allow_link_loss=args.allow_link_loss)

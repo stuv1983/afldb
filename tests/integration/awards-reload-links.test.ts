@@ -1,7 +1,7 @@
 import './guard';
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -1398,6 +1398,2019 @@ describe.skipIf(!canRunFixtureImporter)(
       } finally {
         await sql`UPDATE captaincies SET source_id = ${wikipediaId} WHERE id = ${ownedId}`;
       }
+    });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-111 — the Coleman Medal derivation, against a real database
+// ---------------------------------------------------------------------------
+/*
+ * The Coleman Medal is not acquired from an award scrape: it is DERIVED from
+ * AFLDB's own canonical home-and-away match facts. tests/coleman-derivation.test.ts
+ * proves the contract and the pure key composition without a database; only a
+ * database can prove the SQL — that finals really are excluded, that an
+ * in-progress season really produces nothing, that the persisted club really is
+ * the sole home-and-away club, and that a reload really is stable.
+ *
+ * Every assertion here is scoped to the derived family (`awards.slug = 'coleman'`
+ * owned by the contract's source). The synthetic fixtures (tie, multi-club,
+ * missing identity) and the one-time legacy->derived transition are separate
+ * slices and are not exercised here.
+ *
+ * Writes land in afldb_test only, through the same restricted afldb_import role
+ * the production refresh uses.
+ */
+type ColemanContract = {
+  first_season: number;
+  minimum_goals: number;
+  method_version: number;
+  source_key: string;
+  identity_match_method: string;
+  identity_statuses: string[];
+  key_separator: string;
+  legacy_transition: {
+    expected_rows: number;
+    legacy_source_key: string;
+    first_load_expectation: string;
+  };
+};
+
+const coleman = JSON.parse(
+  readFileSync(join(root, 'data', 'reference', 'coleman-derivation.json'), 'utf8'),
+) as ColemanContract;
+
+/** `rep.result("coleman winners", n, "(S seasons, U updated, I inserted, D deleted)")`. */
+const COLEMAN_SIGNAL =
+  /coleman winners\s+([\d,]+)\s+\((\d+) seasons, (\d+) updated, (\d+) inserted, (\d+) deleted\)/;
+
+/** `note` is where the derivation records its character; `votes` is not a goal total. */
+const COLEMAN_NOTE =
+  /^Derived from AFLDB home-and-away match statistics: (\d+) goals \(coleman-derivation\.json method_version (\d+)\)$/;
+
+const COLEMAN_KEY = /^coleman:(\d{4}):([^:]+)$/;
+
+type ColemanRun = {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+  winners: number;
+  seasons: number;
+  updated: number;
+  inserted: number;
+  deleted: number;
+};
+
+/**
+ * One derived load, with AFLDB_LEGACY_SQLITE deliberately unset.
+ *
+ * Deliberately not runImporter(): its `sqlitePath` parameter defaults to the
+ * ambient legacy path, and passing `undefined` would silently restore that
+ * default. Spawning directly sets the variable to `undefined`, which node drops
+ * from the child environment entirely — that is the ISSUE-111 G9 proof: this
+ * group reads no legacy database at all.
+ */
+function runColeman(): ColemanRun {
+  const run = importRole.spawn(
+    python,
+    ['tools/migration/import_awards.py', '--groups', 'coleman'],
+    { cwd: root, env: { AFLDB_LEGACY_SQLITE: undefined } },
+  );
+  const signal = COLEMAN_SIGNAL.exec(run.stdout);
+  return {
+    status: run.status,
+    stdout: run.stdout,
+    stderr: run.stderr,
+    winners: signal ? Number(signal[1].replace(/,/g, '')) : -1,
+    seasons: signal ? Number(signal[2]) : -1,
+    updated: signal ? Number(signal[3]) : -1,
+    inserted: signal ? Number(signal[4]) : -1,
+    deleted: signal ? Number(signal[5]) : -1,
+  };
+}
+
+type ColemanWinnerRow = {
+  id: number;
+  season: number;
+  playerId: number | null;
+  playerNameRaw: string | null;
+  displayName: string | null;
+  status: string;
+  candidateCount: number;
+  clubId: number | null;
+  clubNameRaw: string | null;
+  votes: number | null;
+  note: string | null;
+  sourceKey: string;
+  recordId: string | null;
+  distinctClubs: number;
+  soleClub: number | null;
+  identityPaths: string[] | null;
+};
+
+/** Every persisted Coleman row, with the facts each assertion needs beside it. */
+async function readColemanWinners(): Promise<ColemanWinnerRow[]> {
+  return sql<ColemanWinnerRow[]>`
+    SELECT w.id::int                        AS id,
+           w.season                         AS season,
+           w.player_id::int                 AS "playerId",
+           w.player_name_raw                AS "playerNameRaw",
+           p.display_name                   AS "displayName",
+           w.link_status_value::text        AS status,
+           w.candidate_count::int           AS "candidateCount",
+           w.club_id::int                   AS "clubId",
+           w.club_name_raw                  AS "clubNameRaw",
+           w.votes::int                     AS votes,
+           w.note                           AS note,
+           s.key                            AS "sourceKey",
+           w.source_record_id               AS "recordId",
+           clubs.distinct_clubs::int        AS "distinctClubs",
+           clubs.sole_club::int             AS "soleClub",
+           ident.paths                      AS "identityPaths"
+      FROM award_winners w
+      JOIN awards  a ON a.id = w.award_id
+      JOIN sources s ON s.id = w.source_id
+      LEFT JOIN players p ON p.id = w.player_id
+      LEFT JOIN LATERAL (
+        SELECT count(DISTINCT pms.club_id) AS distinct_clubs,
+               min(pms.club_id)            AS sole_club
+          FROM player_match_stats pms
+          JOIN matches m ON m.id = pms.match_id
+         WHERE pms.player_id = w.player_id
+           AND m.season = w.season
+           AND NOT m.is_final
+      ) clubs ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT array_agg(DISTINCT ei.external_id) AS paths
+          FROM external_identities ei
+         WHERE ei.player_id = w.player_id
+           AND ei.match_method = ${coleman.identity_match_method}
+           AND ei.status::text = ANY(${coleman.identity_statuses})
+      ) ident ON TRUE
+     WHERE a.slug = 'coleman'
+     ORDER BY w.season, w.player_id
+  `;
+}
+
+/** The row-identity fingerprint the G8 reload-stability claim is measured on. */
+async function colemanFingerprint(): Promise<string> {
+  const [row] = await sql<{ fp: string | null }[]>`
+    SELECT md5(string_agg(
+             w.id::text || '|' || coalesce(w.source_record_id, '(null)'),
+             ',' ORDER BY w.id)) AS fp
+      FROM award_winners w
+      JOIN awards a ON a.id = w.award_id
+     WHERE a.slug = 'coleman'
+  `;
+  return row.fp ?? '';
+}
+
+async function colemanLinkDecisions(): Promise<number> {
+  const [row] = await sql<{ n: number }[]>`
+    SELECT count(*)::int AS n
+      FROM player_link_resolutions r
+      JOIN award_winners w ON w.id = r.target_id
+      JOIN awards a ON a.id = w.award_id
+     WHERE r.target_table = 'award_winners'
+       AND a.slug = 'coleman'
+  `;
+  return row.n;
+}
+
+describe.skipIf(!canRunFixtureImporter)(
+  `Coleman Medal derived from canonical match facts (AFLDB-ISSUE-111)${roleParitySuffix}`,
+  () => {
+    let firstRun!: ColemanRun;
+    let winners: ColemanWinnerRow[] = [];
+    let decisionsBefore = 0;
+    let batchFloor = '0';
+
+    beforeAll(async () => {
+      // The derived loader owns only its own provenance scope. Running it while
+      // legacy-owned Coleman rows are still present is precisely the duplication
+      // hazard the one-time transition exists to prevent — 46 legacy rows plus 46
+      // derived ones, with neither uniqueness constraint able to stop it because
+      // the two keys differ. Refuse rather than manufacture that state here.
+      const [foreign] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n
+          FROM award_winners w
+          JOIN awards  a ON a.id = w.award_id
+          JOIN sources s ON s.id = w.source_id
+         WHERE a.slug = 'coleman'
+           AND s.key <> ${coleman.source_key}
+      `;
+      if (foreign.n > 0) {
+        throw new Error(
+          `${foreign.n} Coleman award_winners row(s) in afldb_test are owned by a source `
+          + `other than '${coleman.source_key}'. The derived load would add a second, `
+          + 'differently keyed family beside them rather than replace them. Run the '
+          + 'one-time transition (import_awards.py --rekey-coleman) against afldb_test '
+          + 'first; this suite will not create a duplicated Coleman family.',
+        );
+      }
+
+      decisionsBefore = await colemanLinkDecisions();
+      const [batch] = await sql<{ id: string }[]>`
+        SELECT coalesce(max(id), 0)::text AS id FROM import_batches
+      `;
+      batchFloor = batch.id;
+
+      firstRun = runColeman();
+      winners = await readColemanWinners();
+    }, 600_000);
+
+    it('derives and loads with AFLDB_LEGACY_SQLITE unset (G9)', () => {
+      expect(firstRun.status, firstRun.stdout + firstRun.stderr).toBe(0);
+      expect(
+        firstRun.stdout,
+        'a legacy-free group must never announce a legacy source',
+      ).not.toContain('legacy source :');
+      expect(
+        firstRun.winners,
+        'the derivation reported no winner line; see stdout',
+      ).toBeGreaterThan(0);
+      expect(
+        winners.length,
+        'afldb_test produced no Coleman winners at all — the canonical match facts '
+        + 'the derivation reads are missing or the seasons are not marked complete',
+      ).toBe(firstRun.winners);
+    });
+
+    it('records its own batch against the derived provenance', async () => {
+      const [batch] = await sql<{
+        status: string;
+        sourceKey: string;
+        recordsRead: string;
+        recordsRejected: string;
+      }[]>`
+        SELECT b.status::text          AS status,
+               s.key                   AS "sourceKey",
+               b.records_read::text    AS "recordsRead",
+               b.records_rejected::text AS "recordsRejected"
+          FROM import_batches b
+          JOIN sources s ON s.id = b.source_id
+         WHERE b.id > ${batchFloor}::bigint
+           AND b.tool = 'import_awards.py'
+           AND b.target_table = 'coleman'
+         ORDER BY b.id DESC
+         LIMIT 1
+      `;
+      expect(batch, 'the restricted importer must record its completed batch').toBeDefined();
+      expect(batch.status).toBe('completed');
+      // A derived row carries the canonical source of the facts it was derived
+      // from (the ISSUE-095 club_seasons convention), never draftguru.
+      expect(batch.sourceKey).toBe(coleman.source_key);
+      expect(Number(batch.recordsRead)).toBe(winners.length);
+      expect(Number(batch.recordsRejected)).toBe(0);
+    });
+
+    it('owns every row under the derived provenance and the durable key', () => {
+      const wrongSource = winners.filter((w) => w.sourceKey !== coleman.source_key);
+      expect(wrongSource.map((w) => `${w.season}:${w.sourceKey}`)).toEqual([]);
+
+      // players.id is not rebuild-stable, so a key whose third field is an integer
+      // is the rejected coleman:<season>:<players.id> form.
+      const numericKeys = winners.filter((w) => /^coleman:\d{4}:\d+$/.test(w.recordId ?? ''));
+      expect(numericKeys.map((w) => w.recordId)).toEqual([]);
+
+      for (const winner of winners) {
+        const key = COLEMAN_KEY.exec(winner.recordId ?? '');
+        expect(key, `row ${winner.id} key ${winner.recordId}`).not.toBeNull();
+        expect(Number(key![1]), 'the key carries its own season').toBe(winner.season);
+        // The path is the durable AFL Tables identity the rebuild resolves by,
+        // not a display name and not a surrogate id.
+        expect(
+          winner.identityPaths ?? [],
+          `${winner.season} ${winner.displayName}: key path must be a persisted `
+          + `${coleman.identity_match_method} identity`,
+        ).toContain(key![2]);
+      }
+
+      const keys = winners.map((w) => w.recordId);
+      expect(new Set(keys).size, 'every derived key is unique').toBe(keys.length);
+    });
+
+    it('is born linked, and records the goal total in note rather than votes', () => {
+      for (const winner of winners) {
+        // player_id comes from player_match_stats, so identity is canonical
+        // rather than name-matched: an unlinked derived row is a defect.
+        expect(winner.playerId, `${winner.season} has no player_id`).not.toBeNull();
+        expect(winner.status).toBe('resolved');
+        expect(winner.candidateCount).toBe(0);
+        expect(winner.playerNameRaw).toBe(winner.displayName);
+
+        // The UI labels this column "Votes"; a goal total is not a vote total.
+        expect(winner.votes, `${winner.season} must not carry a goal total in votes`)
+          .toBeNull();
+        // There is no source club spelling to keep: the club is a canonical id
+        // derived from the winner's own match rows.
+        expect(winner.clubNameRaw).toBeNull();
+
+        const note = COLEMAN_NOTE.exec(winner.note ?? '');
+        expect(note, `${winner.season} note: ${winner.note}`).not.toBeNull();
+        expect(Number(note![1])).toBeGreaterThanOrEqual(coleman.minimum_goals);
+        expect(Number(note![2])).toBe(coleman.method_version);
+      }
+    });
+
+    it('reproduces the persisted winner set with an independent oracle query (G2)', async () => {
+      // Deliberately a different shape from COLEMAN_DERIVATION_SQL: round_type
+      // instead of NOT is_final (which the migration-003 CHECK makes equivalent,
+      // so this cross-checks that too), a season subquery instead of a join, and
+      // a separately grouped per-season maximum joined back instead of a window
+      // function.
+      //
+      // The per-season maximum is deliberately its own aggregate rather than a
+      // correlated `(SELECT max(...) FROM totals t2 WHERE t2.season = t.season)`.
+      // `totals` is referenced twice, so PostgreSQL 12+ materialises it, and a
+      // materialised CTE carries no index: a correlated max rescans the whole CTE
+      // once per outer row. Over ~46 seasons of home-and-away goalkickers that is
+      // roughly 34k x 34k row comparisons, which exceeds the client's 5s
+      // statement_timeout (src/db/client.ts) and cancels before it can compare
+      // anything. Grouping once and equi-joining is linear, and is still not the
+      // implementation's `max(goals) OVER (PARTITION BY season)`.
+      const oracle = await sql<{ season: number; playerId: number; goals: number }[]>`
+        WITH ha AS (
+          SELECT m.season AS season, pms.player_id AS player_id, pms.goals AS goals
+            FROM player_match_stats pms
+            JOIN matches m ON m.id = pms.match_id
+           WHERE m.round_type = 'home_and_away'
+             AND m.season >= ${coleman.first_season}
+             AND m.season IN (SELECT year FROM seasons WHERE status = 'complete')
+        ),
+        totals AS (
+          SELECT season, player_id, sum(goals)::int AS goals
+            FROM ha
+           GROUP BY season, player_id
+        ),
+        maxima AS (
+          SELECT season, max(goals) AS goals
+            FROM totals
+           GROUP BY season
+        )
+        SELECT t.season AS season, t.player_id::int AS "playerId", t.goals AS goals
+          FROM totals t
+          JOIN maxima mx ON mx.season = t.season AND mx.goals = t.goals
+         WHERE t.goals >= ${coleman.minimum_goals}
+         ORDER BY t.season, t.player_id
+      `;
+
+      expect(
+        winners.map((w) => `${w.season}:${w.playerId}`),
+        'the loader and an independently shaped query must name the same winners',
+      ).toEqual(oracle.map((o) => `${o.season}:${o.playerId}`));
+
+      // The persisted goal total is the same fact, not merely the same person.
+      const persisted = winners.map((w) => Number(COLEMAN_NOTE.exec(w.note ?? '')![1]));
+      expect(persisted).toEqual(oracle.map((o) => o.goals));
+    });
+
+    it('honours the declared span and the completed-season rule', async () => {
+      const seasons = winners.map((w) => w.season);
+      expect(
+        Math.min(...seasons),
+        'the declared span opens at the contract\'s first_season; a later value means '
+        + 'afldb_test is missing that season\'s canonical match facts',
+      ).toBe(coleman.first_season);
+      expect(
+        seasons.filter((season) => season < coleman.first_season),
+        'the derivation never reaches behind the declared first season',
+      ).toEqual([]);
+
+      const [undecided] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n
+          FROM award_winners w
+          JOIN awards a ON a.id = w.award_id
+          LEFT JOIN seasons s ON s.year = w.season
+         WHERE a.slug = 'coleman'
+           AND (s.year IS NULL OR s.status <> 'complete')
+      `;
+      expect(
+        undecided.n,
+        'a season still in progress has not decided the award and must produce no winner',
+      ).toBe(0);
+
+      // Every complete season the facts can decide produces a winner: the loader
+      // must not silently drop one. The qualifying threshold is the contract's,
+      // applied to a season total, exactly as the derivation applies it.
+      const [expected] = await sql<{ n: number }[]>`
+        SELECT count(DISTINCT q.season)::int AS n
+          FROM (
+            SELECT m.season AS season
+              FROM player_match_stats pms
+              JOIN matches m ON m.id = pms.match_id
+              JOIN seasons s ON s.year = m.season
+             WHERE NOT m.is_final
+               AND m.season >= ${coleman.first_season}
+               AND s.status = 'complete'
+             GROUP BY m.season, pms.player_id
+            HAVING sum(pms.goals) >= ${coleman.minimum_goals}
+          ) q
+      `;
+      expect(new Set(seasons).size).toBe(expected.n);
+      expect(firstRun.seasons).toBe(expected.n);
+    });
+
+    it('persists the sole home-and-away club, or NULL when there is more than one (G4)', () => {
+      for (const winner of winners) {
+        if (winner.distinctClubs === 1) {
+          expect(
+            winner.clubId,
+            `${winner.season} ${winner.displayName} represented one club`,
+          ).toBe(winner.soleClub);
+        } else {
+          // No most-games / most-goals / final-club rule is invented: a
+          // multi-club season is genuinely ambiguous at this grain.
+          expect(
+            winner.clubId,
+            `${winner.season} ${winner.displayName} represented ${winner.distinctClubs} clubs`,
+          ).toBeNull();
+        }
+      }
+    });
+
+    it('is stable across three consecutive reloads (G8)', async () => {
+      const first = await colemanFingerprint();
+      expect(first).not.toBe('');
+
+      const second = runColeman();
+      expect(second.status, second.stdout + second.stderr).toBe(0);
+      expect(second.updated).toBe(winners.length);
+      expect(second.inserted, 'a reload must match on the durable key, never insert').toBe(0);
+      expect(second.deleted, 'a reload must not delete a row it is about to rewrite').toBe(0);
+      expect(await colemanFingerprint(), 'surrogate ids survive a reload').toBe(first);
+
+      const third = runColeman();
+      expect(third.status, third.stdout + third.stderr).toBe(0);
+      expect(third.updated).toBe(winners.length);
+      expect(third.inserted).toBe(0);
+      expect(third.deleted).toBe(0);
+      expect(await colemanFingerprint()).toBe(first);
+    }, 900_000);
+
+    it('creates no player-link decision of its own', async () => {
+      // Derived rows are born linked, so the loader has nothing to resolve and
+      // must not manufacture a resolution row on anyone's behalf.
+      expect(await colemanLinkDecisions()).toBe(decisionsBefore);
+    });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-111 — the derivation rules history cannot demonstrate
+// ---------------------------------------------------------------------------
+/*
+ * The real corpus proves the ordinary case and nothing else: G4 measured 45 of
+ * 45 historical winners representing exactly one home-and-away club, so history
+ * supplies no tie, no multi-club season, no in-progress season inside the
+ * declared span and no finals total large enough to change a ranking. Those
+ * rules are therefore only ever exercised by a fixture.
+ *
+ * Every fixture is synthetic canonical data — real players and real clubs in
+ * reserved seasons the corpus does not use — loaded through the real
+ * `--groups coleman` importer, not through a hand-written query. The point is
+ * to prove COLEMAN_DERIVATION_SQL, so nothing here reimplements it.
+ *
+ * Cleanup is defensive at BOTH ends. A crashed run must not leave synthetic
+ * matches, player_match_stats or seasons behind, because the release gates
+ * count those tables; so the corpus is removed on entry as well as on exit,
+ * and afterAll re-runs the loader and proves the real family came back with
+ * byte-identical row ids.
+ */
+const FIXTURE_NOTE = 'AFLDB-ISSUE-111 synthetic fixture';
+const FIXTURE_MATCH_PREFIX = 'afldb-issue-111-fixture:';
+const FIXTURE_VENUE = 'AFLDB-ISSUE-111 fixture venue';
+
+/**
+ * The transition block's isolation witnesses live under an award of their own,
+ * so "the transition touches nothing but Coleman" is measured against rows that
+ * certainly exist rather than against whatever else afldb_test happens to hold.
+ * Declared here because one cleanup function removes everything the ISSUE-111
+ * fixtures create.
+ */
+const ISOLATION_AWARD_SLUG = 'afldb-issue-111-isolation';
+
+/**
+ * Reserved seasons. 2090–2093 are above every real season and below the
+ * `seasons_year_ck` ceiling of 2100; the boundary case must be the season
+ * immediately before the contract's own first_season, so it is read from the
+ * contract rather than written as a literal.
+ */
+const TIE_SEASON = 2090;
+const MULTI_CLUB_SEASON = 2091;
+const IN_PROGRESS_SEASON = 2092;
+const FINALS_SEASON = 2093;
+const BOUNDARY_SEASON = coleman.first_season - 1;
+const CREATED_SEASONS: { year: number; status: 'complete' | 'in_progress' }[] = [
+  { year: BOUNDARY_SEASON, status: 'complete' },
+  { year: TIE_SEASON, status: 'complete' },
+  { year: MULTI_CLUB_SEASON, status: 'complete' },
+  { year: IN_PROGRESS_SEASON, status: 'in_progress' },
+  { year: FINALS_SEASON, status: 'complete' },
+];
+const FIXTURE_SEASONS = CREATED_SEASONS.map((s) => s.year);
+
+/**
+ * The identity block below reserves one further season of its own. It is
+ * deliberately outside CREATED_SEASONS — that list drives the derivation-rule
+ * fixtures and their status assertions — but it uses the same markers, so one
+ * cleanup function still removes everything either block can create.
+ */
+const IDENTITY_SEASON = 2094;
+const ALL_FIXTURE_SEASONS = [...FIXTURE_SEASONS, IDENTITY_SEASON];
+
+/**
+ * Removes every synthetic row either AFLDB-ISSUE-111 fixture block can create,
+ * in foreign-key order.
+ *
+ * Seasons are matched on the fixture note, never on the year, so a real season
+ * that already existed (the boundary season is a real one in a fully loaded
+ * database) is never deleted — only one this block inserted. The synthetic
+ * player and its external_identities are matched the same way, and go after the
+ * award_winners delete because a derived winner row can point at that player.
+ */
+async function removeFixtureCorpus(): Promise<void> {
+  await sql`
+    DELETE FROM player_match_stats pms
+      USING matches m
+     WHERE m.id = pms.match_id
+       AND m.match_key LIKE ${`${FIXTURE_MATCH_PREFIX}%`}
+  `;
+  await sql`DELETE FROM matches WHERE match_key LIKE ${`${FIXTURE_MATCH_PREFIX}%`}`;
+  // award_winners.season references seasons(year), so any winner the fixtures
+  // produced must go before the seasons themselves.
+  await sql`
+    DELETE FROM award_winners w
+      USING awards a
+     WHERE a.id = w.award_id
+       AND a.slug = 'coleman'
+       AND w.season = ANY(${ALL_FIXTURE_SEASONS}::int[])
+  `;
+  // The transition block's isolation witnesses, and the award they hang from.
+  // The award cascades to its winners (migration 005); the explicit delete runs
+  // first so the intent is legible rather than implied.
+  await sql`
+    DELETE FROM award_winners w
+      USING awards a
+     WHERE a.id = w.award_id
+       AND a.slug = ${ISOLATION_AWARD_SLUG}
+  `;
+  await sql`DELETE FROM awards WHERE slug = ${ISOLATION_AWARD_SLUG}`;
+  await sql`
+    DELETE FROM external_identities ei
+      USING players p
+     WHERE p.id = ei.player_id
+       AND p.notes = ${FIXTURE_NOTE}
+  `;
+  await sql`DELETE FROM players WHERE notes = ${FIXTURE_NOTE}`;
+  await sql`DELETE FROM seasons WHERE notes = ${FIXTURE_NOTE}`;
+}
+
+describe.skipIf(!canRunFixtureImporter)(
+  `Coleman derivation rules that history cannot demonstrate (AFLDB-ISSUE-111)${roleParitySuffix}`,
+  () => {
+    let playerA = 0;
+    let playerB = 0;
+    let playerC = 0;
+    let clubA = 0;
+    let clubB = 0;
+
+    let baselineFingerprint = '';
+    let baselineWinners: ColemanWinnerRow[] = [];
+    let fixtureRun!: ColemanRun;
+    let fixtureWinners: ColemanWinnerRow[] = [];
+
+    const rowsFor = (season: number) => fixtureWinners.filter((w) => w.season === season);
+    const goalsIn = (row: ColemanWinnerRow) => Number(COLEMAN_NOTE.exec(row.note ?? '')![1]);
+
+    /** One synthetic match, returning its id. */
+    async function insertFixtureMatch(
+      season: number,
+      ordinal: number,
+      roundType: 'home_and_away' | 'elimination_final',
+    ): Promise<number> {
+      const isFinal = roundType !== 'home_and_away';
+      const [row] = await sql<{ id: number }[]>`
+        INSERT INTO matches (
+          match_key, season, round_code, round_number, round_type, is_final,
+          match_date, venue_raw, home_club_id, away_club_id,
+          home_score, away_score, result, winner_club_id, margin,
+          attendance, attendance_status
+        ) VALUES (
+          ${`${FIXTURE_MATCH_PREFIX}${season}:${ordinal}`}, ${season},
+          ${isFinal ? 'EF' : String(ordinal)}, ${isFinal ? null : ordinal},
+          ${roundType}::round_type, ${isFinal},
+          ${`${season}-04-${String(ordinal).padStart(2, '0')}`}::date,
+          ${FIXTURE_VENUE}, ${clubA}, ${clubB},
+          60, 40, 'home_win', ${clubA}, 20,
+          -- Not recorded, never defaulted to zero: matches_attendance_status_ck
+          -- requires the number and its status to agree.
+          NULL, 'not_collected'
+        )
+        RETURNING id::int AS id
+      `;
+      return row.id;
+    }
+
+    async function insertFixtureStat(
+      matchId: number, playerId: number, clubId: number, goals: number,
+    ): Promise<void> {
+      await sql`
+        INSERT INTO player_match_stats (player_id, match_id, club_id, goals)
+        VALUES (${playerId}, ${matchId}, ${clubId}, ${goals})
+      `;
+    }
+
+    beforeAll(async () => {
+      // A leaked corpus from a crashed run would silently change every count
+      // below, so clear it before measuring the baseline rather than after.
+      await removeFixtureCorpus();
+
+      const [foreign] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n
+          FROM award_winners w
+          JOIN awards  a ON a.id = w.award_id
+          JOIN sources s ON s.id = w.source_id
+         WHERE a.slug = 'coleman'
+           AND s.key <> ${coleman.source_key}
+      `;
+      if (foreign.n > 0) {
+        throw new Error(
+          `${foreign.n} Coleman award_winners row(s) in afldb_test are owned by a source `
+          + `other than '${coleman.source_key}'. Run the one-time transition `
+          + '(import_awards.py --rekey-coleman) first; this suite will not create a '
+          + 'duplicated Coleman family.',
+        );
+      }
+
+      baselineWinners = await readColemanWinners();
+      baselineFingerprint = await colemanFingerprint();
+
+      // Real players and real clubs: the fixtures exercise the derivation, not
+      // the identity contract, so every winner must already hold exactly one
+      // durable profile identity. A player holding two would make the loader
+      // refuse for a reason this block is not testing.
+      const players = await sql<{ id: number }[]>`
+        SELECT p.id::int AS id
+          FROM players p
+          JOIN external_identities ei ON ei.player_id = p.id
+         WHERE ei.match_method = ${coleman.identity_match_method}
+           AND ei.status::text = ANY(${coleman.identity_statuses})
+         GROUP BY p.id
+        HAVING count(DISTINCT ei.external_id) = 1
+         ORDER BY p.id
+         LIMIT 3
+      `;
+      const clubs = await sql<{ id: number }[]>`
+        SELECT id::int AS id FROM clubs ORDER BY id LIMIT 2
+      `;
+      if (players.length < 3 || clubs.length < 2) {
+        throw new Error(
+          'afldb_test lacks three singly-identified players or two clubs; the canonical '
+          + 'corpus is not loaded, so the derivation fixtures cannot be built.',
+        );
+      }
+      playerA = players[0].id;
+      playerB = players[1].id;
+      playerC = players[2].id;
+      clubA = clubs[0].id;
+      clubB = clubs[1].id;
+
+      for (const season of CREATED_SEASONS) {
+        await sql`
+          INSERT INTO seasons (year, competition, league, status, notes)
+          VALUES (${season.year}, 'VFL/AFL', ${season.year < 1990 ? 'VFL' : 'AFL'},
+                  ${season.status}::season_status, ${FIXTURE_NOTE})
+          ON CONFLICT (year) DO NOTHING
+        `;
+      }
+      const statuses = await sql<{ year: number; status: string }[]>`
+        SELECT year::int AS year, status::text AS status
+          FROM seasons
+         WHERE year = ANY(${FIXTURE_SEASONS}::int[])
+         ORDER BY year
+      `;
+      for (const season of CREATED_SEASONS) {
+        const found = statuses.find((s) => s.year === season.year);
+        if (found?.status !== season.status) {
+          throw new Error(
+            `fixture season ${season.year} has status ${found?.status ?? '(absent)'}, `
+            + `not ${season.status}; the fixture would not test what it claims`,
+          );
+        }
+      }
+
+      // Tie: two players share the season maximum, a third is below it.
+      const tie1 = await insertFixtureMatch(TIE_SEASON, 1, 'home_and_away');
+      const tie2 = await insertFixtureMatch(TIE_SEASON, 2, 'home_and_away');
+      await insertFixtureStat(tie1, playerA, clubA, 3);
+      await insertFixtureStat(tie2, playerA, clubA, 2);   // A: 5
+      await insertFixtureStat(tie1, playerB, clubB, 5);   // B: 5
+      await insertFixtureStat(tie2, playerC, clubB, 4);   // C: 4
+
+      // Multi-club: the winner represents two clubs in the one season.
+      const multi1 = await insertFixtureMatch(MULTI_CLUB_SEASON, 1, 'home_and_away');
+      const multi2 = await insertFixtureMatch(MULTI_CLUB_SEASON, 2, 'home_and_away');
+      await insertFixtureStat(multi1, playerA, clubA, 4);
+      await insertFixtureStat(multi2, playerA, clubB, 3);  // A: 7 over two clubs
+      await insertFixtureStat(multi1, playerB, clubB, 2);  // B: 2
+
+      // In progress: a clear leader in a season that has not decided anything.
+      const progress = await insertFixtureMatch(IN_PROGRESS_SEASON, 1, 'home_and_away');
+      await insertFixtureStat(progress, playerA, clubA, 9);
+
+      // Finals: B outscores A over the whole season but not over home-and-away.
+      const homeAway = await insertFixtureMatch(FINALS_SEASON, 1, 'home_and_away');
+      const finalMatch = await insertFixtureMatch(FINALS_SEASON, 2, 'elimination_final');
+      await insertFixtureStat(homeAway, playerA, clubA, 6);    // A: 6 H&A, 6 total
+      await insertFixtureStat(homeAway, playerB, clubB, 4);
+      await insertFixtureStat(finalMatch, playerB, clubB, 10); // B: 4 H&A, 14 total
+
+      // Boundary: a total nothing in the corpus could beat, one season early.
+      const early = await insertFixtureMatch(BOUNDARY_SEASON, 1, 'home_and_away');
+      await insertFixtureStat(early, playerA, clubA, 99);
+
+      fixtureRun = runColeman();
+      fixtureWinners = await readColemanWinners();
+    }, 600_000);
+
+    afterAll(async () => {
+      // Unconditional: the corpus must go even if an assertion above threw.
+      await removeFixtureCorpus();
+      const restored = runColeman();
+      if (restored.status !== 0) {
+        throw new Error(
+          `the restoring Coleman load failed (${restored.status}); afldb_test may still `
+          + `hold fixture-derived winners.\n${restored.stdout}${restored.stderr}`,
+        );
+      }
+      const after = await colemanFingerprint();
+      if (baselineFingerprint !== '' && after !== baselineFingerprint) {
+        throw new Error(
+          'the real Coleman family was not restored byte-for-byte after the fixtures '
+          + `were removed: fingerprint ${after} != ${baselineFingerprint}`,
+        );
+      }
+    }, 900_000);
+
+    it('loads the fixture corpus without refusing', () => {
+      expect(fixtureRun.status, fixtureRun.stdout + fixtureRun.stderr).toBe(0);
+      // Four new winners (two tied, one multi-club, one finals season) across
+      // three new seasons: the in-progress and pre-span seasons decide nothing.
+      expect(fixtureWinners.length).toBe(baselineWinners.length + 4);
+      expect(new Set(fixtureWinners.map((w) => w.season)).size)
+        .toBe(new Set(baselineWinners.map((w) => w.season)).size + 3);
+      expect(fixtureRun.inserted, 'the four fixture winners are new rows').toBe(4);
+      expect(fixtureRun.deleted, 'no real winner is displaced by a fixture').toBe(0);
+    });
+
+    it('awards every player tied on the season maximum', () => {
+      const tied = rowsFor(TIE_SEASON);
+      expect(
+        tied.map((w) => w.playerId).sort((a, b) => (a ?? 0) - (b ?? 0)),
+        'both leaders win; there is no tie-break and no silent single-row pick',
+      ).toEqual([playerA, playerB].sort((a, b) => a - b));
+      expect(tied.map(goalsIn)).toEqual([5, 5]);
+
+      // Distinct people hold distinct durable paths, so a tie cannot collide on
+      // the key — and no surviving row's key depends on a ranking position.
+      const keys = tied.map((w) => w.recordId);
+      expect(new Set(keys).size).toBe(2);
+      for (const key of keys) {
+        expect(COLEMAN_KEY.exec(key ?? '')?.[1]).toBe(String(TIE_SEASON));
+      }
+      expect(
+        fixtureRun.stdout,
+        'a tie is surfaced to the curator, never reconciled away',
+      ).toMatch(new RegExp(`produced tied winners:[^\\n]*\\b${TIE_SEASON}\\b`));
+    });
+
+    it('persists NULL rather than inventing a club for a two-club winner', () => {
+      const rows = rowsFor(MULTI_CLUB_SEASON);
+      expect(rows.map((w) => w.playerId), 'exactly one leader that season').toHaveLength(1);
+      const [winner] = rows;
+      expect(winner.playerId).toBe(playerA);
+      expect(goalsIn(winner), 'both clubs\' goals count towards the one total').toBe(7);
+      expect(winner.distinctClubs, 'the fixture really did span two clubs').toBe(2);
+      // No most-games / most-goals / final-club rule is invented.
+      expect(winner.clubId).toBeNull();
+      expect(winner.clubNameRaw).toBeNull();
+      expect(fixtureRun.stdout).toMatch(
+        new RegExp(`represented more than one[^\\n]*\\b${MULTI_CLUB_SEASON}\\b`),
+      );
+    });
+
+    it('decides nothing in a season still in progress', async () => {
+      expect(
+        rowsFor(IN_PROGRESS_SEASON),
+        'an in-progress season has not decided the award',
+      ).toEqual([]);
+      // The exclusion must be the season status, not an absence of facts.
+      const [leader] = await sql<{ goals: number }[]>`
+        SELECT sum(pms.goals)::int AS goals
+          FROM player_match_stats pms
+          JOIN matches m ON m.id = pms.match_id
+         WHERE m.season = ${IN_PROGRESS_SEASON}
+           AND NOT m.is_final
+         GROUP BY pms.player_id
+         ORDER BY 1 DESC NULLS LAST
+         LIMIT 1
+      `;
+      expect(
+        leader?.goals ?? 0,
+        'the season carries a clear leader it did not award',
+      ).toBeGreaterThanOrEqual(9);
+    });
+
+    it('never reaches behind the declared first season', async () => {
+      expect(rowsFor(BOUNDARY_SEASON)).toEqual([]);
+      expect(fixtureWinners.filter((w) => w.season < coleman.first_season)).toEqual([]);
+      const [leader] = await sql<{ goals: number }[]>`
+        SELECT sum(pms.goals)::int AS goals
+          FROM player_match_stats pms
+          JOIN matches m ON m.id = pms.match_id
+         WHERE m.season = ${BOUNDARY_SEASON}
+           AND NOT m.is_final
+         GROUP BY pms.player_id
+         -- DESC defaults to NULLS FIRST in PostgreSQL; a pre-1980 season with an
+         -- unrecorded goal total must not masquerade as the leader.
+         ORDER BY 1 DESC NULLS LAST
+         LIMIT 1
+      `;
+      expect(
+        // >= rather than =: in a fully loaded corpus this is a real season, and
+        // the fixture's 99 is added to whatever it already held.
+        leader?.goals ?? 0,
+        'the season immediately before the span holds an unbeatable total and still '
+        + 'produces no winner',
+      ).toBeGreaterThanOrEqual(99);
+    });
+
+    it('counts home-and-away goals only, never finals (G4 corollary)', () => {
+      const rows = rowsFor(FINALS_SEASON);
+      expect(rows.map((w) => w.playerId), 'exactly one leader that season').toHaveLength(1);
+      const [winner] = rows;
+      // B kicked 14 across the season and 4 across home-and-away; A kicked 6 of
+      // each. Reading player_season_stats instead would name B.
+      expect(
+        winner.playerId,
+        'the leading home-and-away goalkicker wins, not the leading goalkicker',
+      ).toBe(playerA);
+      expect(goalsIn(winner)).toBe(6);
+    });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-111 — the durable-identity contract, against a real database (G5a)
+// ---------------------------------------------------------------------------
+/*
+ * tests/coleman-derivation.test.ts already drives build_coleman_winners() over
+ * synthetic rows through a Python subprocess, so all three refusals are proven
+ * without a database. What that cannot prove is the same refusal reached
+ * through COLEMAN_DERIVATION_SQL: that its LATERAL really does return no path
+ * for a winner holding no identity, two paths for one holding two, and the
+ * stored path verbatim for one carrying the key separator.
+ *
+ * The acceptance shape is the opposite of every other Coleman block — a
+ * NON-ZERO exit, a named cause, and a database that did not move. The last is
+ * asserted rather than assumed: a refusal that had already written half a
+ * family would be worse than no refusal at all, so every refused run must
+ * leave the real family's row-identity fingerprint and row count untouched.
+ *
+ * The fixture is one reserved season holding one synthetic player, who is
+ * therefore that season's leading home-and-away goalkicker. Only that player's
+ * external_identities rows change between cases, so each refusal isolates
+ * identity as its cause. The final case gives the same player exactly one
+ * ordinary identity and requires the load to SUCCEED, keyed on the path — which
+ * is what makes the three refusals evidence about the identity contract rather
+ * than about a fixture that could never load at all.
+ *
+ * A synthetic player is unavoidable here: every real player in afldb_test
+ * already holds the identity this block needs to withhold. Cleanup therefore
+ * reuses removeFixtureCorpus(), which matches the player on the same fixture
+ * note it matches seasons on.
+ */
+const IDENTITY_PLAYER_NAME = 'AFLDB Issue 111 Fixture Goalkicker';
+const IDENTITY_PATH = 'players/Z/Afldb_Issue111_Fixture.html';
+const IDENTITY_PATH_ALIAS = 'players/Z/Afldb_Issue111_Fixture_Alias.html';
+const IDENTITY_PATH_UNSAFE = `players/Z/Afldb${coleman.key_separator}Issue111_Fixture.html`;
+const IDENTITY_GOALS = 7;
+
+describe.skipIf(!canRunFixtureImporter)(
+  `Coleman durable-identity refusals against a real database (AFLDB-ISSUE-111 G5a)${roleParitySuffix}`,
+  () => {
+    let baselineFingerprint = '';
+    let baselineRows = 0;
+    let fixturePlayer = 0;
+    let identitySource = 0;
+
+    const goalsIn = (row: ColemanWinnerRow) => Number(COLEMAN_NOTE.exec(row.note ?? '')![1]);
+
+    async function colemanRowCount(): Promise<number> {
+      const [row] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n
+          FROM award_winners w
+          JOIN awards a ON a.id = w.award_id
+         WHERE a.slug = 'coleman'
+      `;
+      return row.n;
+    }
+
+    /** Replaces the fixture player's durable identities with exactly these paths. */
+    async function setIdentities(paths: string[]): Promise<void> {
+      await sql`DELETE FROM external_identities WHERE player_id = ${fixturePlayer}`;
+      for (const path of paths) {
+        await sql`
+          INSERT INTO external_identities (
+            source_id, external_id, external_name, player_id, status, match_method
+          ) VALUES (
+            ${identitySource}, ${path}, ${IDENTITY_PLAYER_NAME}, ${fixturePlayer},
+            ${coleman.identity_statuses[0]}::link_status, ${coleman.identity_match_method}
+          )
+        `;
+      }
+    }
+
+    /** One load that must refuse, with the database proven not to have moved. */
+    async function expectRefusal(): Promise<string> {
+      const run = runColeman();
+      const output = run.stdout + run.stderr;
+
+      expect(run.status, `the loader must refuse this load, not perform it:\n${output}`)
+        .not.toBe(0);
+      expect(output).toContain(
+        'coleman: the derivation cannot produce a durable source_record_id',
+      );
+      // The whole point of the contract: no weaker identity is substituted.
+      expect(output, 'the refusal states that nothing weaker is substituted')
+        .toContain('will not fall back to players.id');
+      expect(output).toContain('Nothing has been written.');
+
+      expect(await colemanFingerprint(), 'a refused load moves no existing row')
+        .toBe(baselineFingerprint);
+      expect(await colemanRowCount(), 'a refused load creates no row').toBe(baselineRows);
+      const [written] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n
+          FROM award_winners w
+          JOIN awards a ON a.id = w.award_id
+         WHERE a.slug = 'coleman'
+           AND w.season = ${IDENTITY_SEASON}
+      `;
+      expect(
+        written.n,
+        'the unkeyable winner is not written under some other key either',
+      ).toBe(0);
+      return output;
+    }
+
+    beforeAll(async () => {
+      await removeFixtureCorpus();
+
+      const [foreign] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n
+          FROM award_winners w
+          JOIN awards  a ON a.id = w.award_id
+          JOIN sources s ON s.id = w.source_id
+         WHERE a.slug = 'coleman'
+           AND s.key <> ${coleman.source_key}
+      `;
+      if (foreign.n > 0) {
+        throw new Error(
+          `${foreign.n} Coleman award_winners row(s) in afldb_test are owned by a source `
+          + `other than '${coleman.source_key}'. Run the one-time transition `
+          + '(import_awards.py --rekey-coleman) first; this suite will not create a '
+          + 'duplicated Coleman family.',
+        );
+      }
+
+      baselineRows = await colemanRowCount();
+      baselineFingerprint = await colemanFingerprint();
+
+      const [source] = await sql<{ id: number }[]>`
+        SELECT id::int AS id FROM sources WHERE key = ${coleman.source_key}
+      `;
+      const clubs = await sql<{ id: number }[]>`
+        SELECT id::int AS id FROM clubs ORDER BY id LIMIT 2
+      `;
+      if (!source || clubs.length < 2) {
+        throw new Error(
+          `afldb_test lacks the '${coleman.source_key}' source or two clubs; the canonical `
+          + 'corpus is not loaded, so the identity fixtures cannot be built.',
+        );
+      }
+      identitySource = source.id;
+
+      await sql`
+        INSERT INTO seasons (year, competition, league, status, notes)
+        VALUES (${IDENTITY_SEASON}, 'VFL/AFL', 'AFL', 'complete'::season_status,
+                ${FIXTURE_NOTE})
+        ON CONFLICT (year) DO NOTHING
+      `;
+
+      // The id is taken above the corpus rather than from the identity
+      // sequence: the canonical import seeds players with explicit ids, which
+      // can leave the sequence behind max(id) and make a generated id collide.
+      const [player] = await sql<{ id: number }[]>`
+        INSERT INTO players (id, display_name, sort_name, search_name, slug, notes)
+        SELECT coalesce(max(id), 0) + 1,
+               ${IDENTITY_PLAYER_NAME},
+               'Zzz Fixture, Issue111',
+               'afldb issue 111 fixture goalkicker',
+               'afldb-issue-111-fixture-goalkicker',
+               ${FIXTURE_NOTE}
+          FROM players
+        RETURNING id::int AS id
+      `;
+      fixturePlayer = player.id;
+
+      const [match] = await sql<{ id: number }[]>`
+        INSERT INTO matches (
+          match_key, season, round_code, round_number, round_type, is_final,
+          match_date, venue_raw, home_club_id, away_club_id,
+          home_score, away_score, result, winner_club_id, margin,
+          attendance, attendance_status
+        ) VALUES (
+          ${`${FIXTURE_MATCH_PREFIX}${IDENTITY_SEASON}:1`}, ${IDENTITY_SEASON},
+          '1', 1, 'home_and_away'::round_type, false,
+          ${`${IDENTITY_SEASON}-04-01`}::date,
+          ${FIXTURE_VENUE}, ${clubs[0].id}, ${clubs[1].id},
+          60, 40, 'home_win', ${clubs[0].id}, 20,
+          NULL, 'not_collected'
+        )
+        RETURNING id::int AS id
+      `;
+      // The only goalkicker in a reserved season, so unambiguously its winner:
+      // whatever the loader does next is a decision about identity alone.
+      await sql`
+        INSERT INTO player_match_stats (player_id, match_id, club_id, goals)
+        VALUES (${fixturePlayer}, ${match.id}, ${clubs[0].id}, ${IDENTITY_GOALS})
+      `;
+    }, 600_000);
+
+    afterAll(async () => {
+      // Unconditional: the corpus must go even if an assertion above threw.
+      await removeFixtureCorpus();
+      const restored = runColeman();
+      if (restored.status !== 0) {
+        throw new Error(
+          `the restoring Coleman load failed (${restored.status}); afldb_test may still `
+          + `hold fixture-derived winners.\n${restored.stdout}${restored.stderr}`,
+        );
+      }
+      const after = await colemanFingerprint();
+      if (baselineFingerprint !== '' && after !== baselineFingerprint) {
+        throw new Error(
+          'the real Coleman family was not restored byte-for-byte after the identity '
+          + `fixtures were removed: fingerprint ${after} != ${baselineFingerprint}`,
+        );
+      }
+    }, 900_000);
+
+    it('refuses the whole load when a winner holds no durable identity', async () => {
+      const output = await expectRefusal();
+      expect(output).toContain(
+        `winner(s) hold no ${coleman.identity_match_method} identity with status in`,
+      );
+      expect(output, 'the refusal names the season and player it could not key')
+        .toContain(`${IDENTITY_SEASON}: player ${fixturePlayer}`);
+
+      // Refused, and recorded as refused: the batch it opened is marked failed
+      // with the reason, not left running and not quietly completed.
+      const [batch] = await sql<{ status: string; error: string | null }[]>`
+        SELECT b.status::text AS status, b.error AS error
+          FROM import_batches b
+         WHERE b.tool = 'import_awards.py'
+           AND b.target_table = 'coleman'
+         ORDER BY b.id DESC
+         LIMIT 1
+      `;
+      expect(batch.status).toBe('failed');
+      expect(batch.error).toContain('durable source_record_id');
+    }, 600_000);
+
+    it('refuses rather than choosing when a winner holds two durable identities', async () => {
+      await setIdentities([IDENTITY_PATH, IDENTITY_PATH_ALIAS]);
+      const output = await expectRefusal();
+      expect(output).toContain('winner(s) hold more than one');
+      expect(
+        output,
+        'an ambiguous identity is reported in full, never resolved by picking one',
+      ).toContain('holds 2 profile identities');
+      expect(output).toContain(IDENTITY_PATH);
+      expect(output).toContain(IDENTITY_PATH_ALIAS);
+    }, 600_000);
+
+    it('refuses a normalised path containing the key separator, and does not sanitise it', async () => {
+      await setIdentities([IDENTITY_PATH_UNSAFE]);
+      const output = await expectRefusal();
+      expect(output).toContain(
+        `normalised path(s) contain the '${coleman.key_separator}' key separator `
+        + 'and are REFUSED, not sanitised',
+      );
+      expect(output).toContain(`${IDENTITY_SEASON}: '${IDENTITY_PATH_UNSAFE}'`);
+    }, 600_000);
+
+    it('loads that same winner once the identity contract is satisfied', async () => {
+      // Without this the three refusals above would be consistent with a
+      // fixture that could never load for some unrelated reason.
+      await setIdentities([IDENTITY_PATH]);
+      const run = runColeman();
+      expect(run.status, run.stdout + run.stderr).toBe(0);
+      expect(run.inserted, 'exactly the one fixture winner is new').toBe(1);
+      expect(run.deleted, 'no real winner is displaced').toBe(0);
+
+      const winners = await readColemanWinners();
+      const rows = winners.filter((w) => w.season === IDENTITY_SEASON);
+      expect(rows).toHaveLength(1);
+      const [winner] = rows;
+      expect(winner.playerId).toBe(fixturePlayer);
+      expect(goalsIn(winner)).toBe(IDENTITY_GOALS);
+      // The key is composed from the durable path, never from players.id: the
+      // whole key is pinned, so a surrogate id could not appear anywhere in it.
+      expect(winner.recordId).toBe(
+        `coleman${coleman.key_separator}${IDENTITY_SEASON}`
+        + `${coleman.key_separator}${IDENTITY_PATH}`,
+      );
+      expect(await colemanRowCount()).toBe(baselineRows + 1);
+    }, 600_000);
+  },
+);
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-111 — the one-time legacy -> derived ownership transition
+// ---------------------------------------------------------------------------
+/*
+ * `reload_keyed` matches only within its own ownership scope. Left alone, the
+ * derived loader would see an empty afltables scope beside 46 legacy
+ * draftguru-owned rows, INSERT 46 new ones and leave the old ones standing —
+ * 92 Coleman rows, silently duplicated, with neither uniqueness constraint able
+ * to stop it because the two keys differ. `--rekey-coleman` exists to re-own
+ * those rows in place instead, preserving every award_winners.id because
+ * player_link_resolutions.target_id points at them.
+ *
+ * afldb_test's Coleman family is ALREADY derived, afltables-owned and keyed on
+ * profile paths — passes 3 to 5 put it there. So the legacy state this block
+ * needs is manufactured deliberately, from the derived family itself, and
+ * reversed by id afterwards. That is also what makes the 1:1 assertion sharp:
+ * the derived key each row must come back to is exactly the key it started
+ * with, so a correct rekey restores the baseline fingerprint byte for byte.
+ *
+ * Every state transition happens in beforeAll, in one ordered choreography, so
+ * each `it` is a pure assertion over a captured snapshot and a failing
+ * assertion cannot strand the database midway. afterAll restores by id rather
+ * than by reloading, so restoration does not depend on the loader it is
+ * testing, and then proves the restoration.
+ */
+const TRANSITION = coleman.legacy_transition;
+
+/** One `--rekey-coleman` run. AFLDB_LEGACY_SQLITE is dropped: it reads none. */
+type RekeyRun = { status: number | null; output: string };
+
+function runRekey(): RekeyRun {
+  const run = importRole.spawn(
+    python,
+    ['tools/migration/import_awards.py', '--rekey-coleman'],
+    { cwd: root, env: { AFLDB_LEGACY_SQLITE: undefined } },
+  );
+  return { status: run.status, output: run.stdout + run.stderr };
+}
+
+/** The ownership facts the transition is allowed to change, plus the ones it is not. */
+type OwnershipRow = {
+  id: number;
+  season: number;
+  sourceKey: string | null;
+  recordId: string | null;
+  playerId: number | null;
+  status: string;
+  playerNameRaw: string;
+};
+
+async function readOwnership(): Promise<OwnershipRow[]> {
+  return sql<OwnershipRow[]>`
+    SELECT w.id::int                 AS id,
+           w.season::int             AS season,
+           s.key                     AS "sourceKey",
+           w.source_record_id        AS "recordId",
+           w.player_id::int          AS "playerId",
+           w.link_status_value::text AS status,
+           w.player_name_raw         AS "playerNameRaw"
+      FROM award_winners w
+      JOIN awards a ON a.id = w.award_id
+      LEFT JOIN sources s ON s.id = w.source_id
+     WHERE a.slug = 'coleman'
+     ORDER BY w.id
+  `;
+}
+
+/** Comparable form: a row's identity, its ownership and the facts it carries. */
+const ownershipOf = (rows: OwnershipRow[]) => rows.map(
+  (r) => `${r.id}|${r.season}|${r.sourceKey}|${r.recordId}|${r.playerId}|${r.status}`,
+);
+
+type IsolationSnapshot = {
+  fingerprint: string;
+  rows: number;
+  draftguru: number;
+  unowned: number;
+  witnessKey: string | null;
+};
+
+/**
+ * Every award_winners row that is NOT a Coleman winner, fingerprinted on the
+ * columns the transition writes plus the ones it must leave alone.
+ */
+async function readIsolation(): Promise<IsolationSnapshot> {
+  const [row] = await sql<{
+    fingerprint: string | null;
+    rowCount: number;
+    draftguru: number;
+    unowned: number;
+  }[]>`
+    SELECT md5(string_agg(
+             w.id::text || '|' || coalesce(s.key, '(null)') || '|'
+             || coalesce(w.source_record_id, '(null)') || '|'
+             || coalesce(w.player_id::text, '(null)') || '|'
+             || w.link_status_value::text || '|' || coalesce(w.season::text, '(null)'),
+             ',' ORDER BY w.id))                                    AS fingerprint,
+           count(*)::int                                            AS "rowCount",
+           (count(*) FILTER (WHERE s.key = 'draftguru'))::int        AS draftguru,
+           (count(*) FILTER (WHERE w.source_id IS NULL
+                                OR s.key = 'manual_admin_edit'))::int AS unowned
+      FROM award_winners w
+      JOIN awards a ON a.id = w.award_id
+      LEFT JOIN sources s ON s.id = w.source_id
+     WHERE a.slug <> 'coleman'
+  `;
+  const [witness] = await sql<{ recordId: string | null }[]>`
+    SELECT w.source_record_id AS "recordId"
+      FROM award_winners w
+      JOIN awards a ON a.id = w.award_id
+     WHERE a.slug = ${ISOLATION_AWARD_SLUG}
+       AND w.source_record_id IS NOT NULL
+     ORDER BY w.id
+     LIMIT 1
+  `;
+  return {
+    fingerprint: row.fingerprint ?? '',
+    rows: row.rowCount,
+    draftguru: row.draftguru,
+    unowned: row.unowned,
+    witnessKey: witness?.recordId ?? null,
+  };
+}
+
+describe.skipIf(!canRunFixtureImporter)(
+  `Coleman legacy to derived ownership transition (AFLDB-ISSUE-111)${roleParitySuffix}`,
+  () => {
+    let baseline: OwnershipRow[] = [];
+    let baselineFingerprint = '';
+    let unlinkedRowId = 0;
+    let mixedRowId = 0;
+    let duplicatedSeason = 0;
+    let draftguruId = 0;
+    let afltablesId = 0;
+
+    let noopRun!: RekeyRun;
+    let afterNoop: OwnershipRow[] = [];
+
+    let mixedBefore: OwnershipRow[] = [];
+    let mixedRun!: RekeyRun;
+    let afterMixed: OwnershipRow[] = [];
+
+    let unbridgeableBefore: OwnershipRow[] = [];
+    let unbridgeableRun!: RekeyRun;
+    let afterUnbridgeable: OwnershipRow[] = [];
+
+    let legacyBefore: OwnershipRow[] = [];
+    let rekeyRun!: RekeyRun;
+    let afterRekey: OwnershipRow[] = [];
+    let fingerprintAfterRekey = '';
+
+    let firstLoad!: ColemanRun;
+    let afterFirstLoad: OwnershipRow[] = [];
+    let fingerprintAfterLoad = '';
+    let decisionsAfterLoad = -1;
+
+    let isolationBefore!: IsolationSnapshot;
+    let isolationAfterRekey!: IsolationSnapshot;
+    let isolationAfterLoad!: IsolationSnapshot;
+
+    const legacyKeyFor = (season: number, id: number) =>
+      `coleman${coleman.key_separator}${season}${coleman.key_separator}${id}`;
+
+    /**
+     * Rewrites the whole Coleman family into the legacy draftguru shape: the
+     * pre-ISSUE-111 provenance and the `coleman:<season>:<int>` key form the
+     * transition's preflight recognises. The integer is the row's own id, which
+     * is unique by construction, so neither uniqueness constraint can object.
+     *
+     * One row is left unlinked and `implausible`, mirroring the measured legacy
+     * 1982 Malcolm Blight row (id 9441 in afldb_dev). The transition must adopt
+     * it without asserting anything about it; the first derived load is what
+     * links it.
+     */
+    async function writeLegacyState(
+      seasonOverrides: Map<number, number> = new Map(),
+    ): Promise<void> {
+      for (const row of baseline) {
+        const season = seasonOverrides.get(row.id) ?? row.season;
+        const unlinked = row.id === unlinkedRowId;
+        await sql`
+          UPDATE award_winners
+             SET source_id         = ${draftguruId},
+                 source_record_id  = ${legacyKeyFor(season, row.id)},
+                 season            = ${season},
+                 player_id         = ${unlinked ? null : row.playerId},
+                 link_status_value = ${unlinked ? 'implausible' : row.status}::link_status
+           WHERE id = ${row.id}
+        `;
+      }
+    }
+
+    /** Exactly one row moved back to legacy ownership: the mixed state. */
+    async function writeMixedState(): Promise<void> {
+      const row = baseline.find((r) => r.id === mixedRowId)!;
+      await sql`
+        UPDATE award_winners
+           SET source_id        = ${draftguruId},
+               source_record_id = ${legacyKeyFor(row.season, row.id)}
+         WHERE id = ${row.id}
+      `;
+    }
+
+    /**
+     * Restores the derived family by id. Deliberately not a reload: restoration
+     * must not depend on the loader this block is testing.
+     */
+    async function restoreBaseline(): Promise<void> {
+      for (const row of baseline) {
+        await sql`
+          UPDATE award_winners
+             SET source_id         = ${afltablesId},
+                 source_record_id  = ${row.recordId},
+                 season            = ${row.season},
+                 player_id         = ${row.playerId},
+                 link_status_value = ${row.status}::link_status,
+                 player_name_raw   = ${row.playerNameRaw}
+           WHERE id = ${row.id}
+        `;
+      }
+    }
+
+    beforeAll(async () => {
+      await removeFixtureCorpus();
+
+      const sources = await sql<{ key: string; id: number }[]>`
+        SELECT key, id::int AS id
+          FROM sources
+         WHERE key = ANY(${[coleman.source_key, TRANSITION.legacy_source_key]})
+      `;
+      const derivedSource = sources.find((s) => s.key === coleman.source_key);
+      const legacySource = sources.find((s) => s.key === TRANSITION.legacy_source_key);
+      if (!derivedSource || !legacySource) {
+        throw new Error(
+          `afldb_test is missing the '${coleman.source_key}' or `
+          + `'${TRANSITION.legacy_source_key}' source row; the transition cannot be `
+          + 'exercised without both provenances.',
+        );
+      }
+      afltablesId = derivedSource.id;
+      draftguruId = legacySource.id;
+
+      baseline = await readOwnership();
+      baselineFingerprint = await colemanFingerprint();
+
+      const foreign = baseline.filter((r) => r.sourceKey !== coleman.source_key);
+      if (foreign.length > 0) {
+        throw new Error(
+          `${foreign.length} Coleman award_winners row(s) in afldb_test are not owned by `
+          + `'${coleman.source_key}'. This block manufactures the legacy state from the `
+          + 'derived family and restores it by id, so it refuses to run against a family '
+          + 'it did not start from.',
+        );
+      }
+      if (baseline.length !== TRANSITION.expected_rows) {
+        throw new Error(
+          `afldb_test holds ${baseline.length} Coleman winner row(s); the tracked contract `
+          + `declares exactly ${TRANSITION.expected_rows} and the transition's preflight `
+          + 'refuses any other count. The legacy state is manufactured from this family, so '
+          + 'the 1:1 rekey cannot be tested against a family of a different size — rebuild '
+          + 'afldb_test or reconcile data/reference/coleman-derivation.json.',
+        );
+      }
+      const decisionsBefore = await colemanLinkDecisions();
+      if (decisionsBefore !== 0) {
+        throw new Error(
+          `${decisionsBefore} human player-link decision(s) exist on Coleman rows in `
+          + 'afldb_test. The transition refuses in that state by design, so the happy path '
+          + 'below cannot be measured until they are understood.',
+        );
+      }
+
+      const bySeason = [...baseline].sort((a, b) => a.season - b.season);
+      unlinkedRowId = bySeason[0].id;
+      mixedRowId = bySeason[bySeason.length - 1].id;
+      // Move the earliest season's row onto the next season: that season then
+      // carries two legacy rows, so the (award_id, season) bridge is no longer
+      // 1:1 and the whole transaction must abort.
+      duplicatedSeason = bySeason[1].season;
+
+      // Isolation witnesses. The first is deliberately a legacy-SHAPED Coleman
+      // key on a different award: the transition scopes by award_id, so a key
+      // that merely looks like its own must be left completely alone. The
+      // second carries manual/NULL provenance, the rows the runbook names as
+      // untouchable.
+      const [isolationAward] = await sql<{ id: number }[]>`
+        INSERT INTO awards (slug, name, category, description)
+        VALUES (${ISOLATION_AWARD_SLUG}, 'AFLDB-ISSUE-111 isolation witness', 'award',
+                ${FIXTURE_NOTE})
+        ON CONFLICT (slug) DO UPDATE SET description = ${FIXTURE_NOTE}
+        RETURNING id::int AS id
+      `;
+      await sql`
+        INSERT INTO award_winners (
+          award_id, season, player_id, player_name_raw, link_status_value,
+          source_id, source_record_id, note
+        ) VALUES (
+          ${isolationAward.id}, ${coleman.first_season}, NULL,
+          'AFLDB-ISSUE-111 legacy-shaped witness', 'unmatched'::link_status,
+          ${draftguruId}, ${legacyKeyFor(coleman.first_season, 0)}, ${FIXTURE_NOTE}
+        ), (
+          ${isolationAward.id}, ${coleman.first_season}, NULL,
+          'AFLDB-ISSUE-111 unowned witness', 'unmatched'::link_status,
+          (SELECT id FROM sources WHERE key = 'manual_admin_edit'), NULL, ${FIXTURE_NOTE}
+        )
+      `;
+      isolationBefore = await readIsolation();
+
+      // 1. Already transitioned: a re-run must recognise the state and no-op.
+      noopRun = runRekey();
+      afterNoop = await readOwnership();
+
+      // 2. Mixed ownership: one legacy row beside the derived family aborts.
+      await writeMixedState();
+      mixedBefore = await readOwnership();
+      mixedRun = runRekey();
+      afterMixed = await readOwnership();
+      await restoreBaseline();
+
+      // 3. A season that cannot bridge 1:1 aborts the whole transaction.
+      await writeLegacyState(new Map([[unlinkedRowId, duplicatedSeason]]));
+      unbridgeableBefore = await readOwnership();
+      unbridgeableRun = runRekey();
+      afterUnbridgeable = await readOwnership();
+
+      // 4. The real transition: an all-legacy family, rekeyed exactly 1:1.
+      await writeLegacyState();
+      legacyBefore = await readOwnership();
+      rekeyRun = runRekey();
+      afterRekey = await readOwnership();
+      fingerprintAfterRekey = await colemanFingerprint();
+      isolationAfterRekey = await readIsolation();
+
+      // 5. The first derived load over the transitioned rows.
+      firstLoad = runColeman();
+      afterFirstLoad = await readOwnership();
+      fingerprintAfterLoad = await colemanFingerprint();
+      decisionsAfterLoad = await colemanLinkDecisions();
+      isolationAfterLoad = await readIsolation();
+    }, 1_800_000);
+
+    afterAll(async () => {
+      // Unconditional, and by id: restoration must not depend on the loader.
+      if (baseline.length > 0) {
+        await restoreBaseline();
+        const restored = ownershipOf(await readOwnership());
+        const fingerprint = await colemanFingerprint();
+        await removeFixtureCorpus();
+        if (fingerprint !== baselineFingerprint) {
+          throw new Error(
+            'the derived Coleman family was not restored after the transition fixtures: '
+            + `fingerprint ${fingerprint} != ${baselineFingerprint}`,
+          );
+        }
+        if (restored.join('\n') !== ownershipOf(baseline).join('\n')) {
+          throw new Error(
+            'the derived Coleman family came back with different ownership or facts after '
+            + 'the transition fixtures; afldb_test still holds manufactured legacy state.',
+          );
+        }
+      } else {
+        await removeFixtureCorpus();
+      }
+    }, 900_000);
+
+    it('verifies and no-ops when every Coleman row is already derived', () => {
+      // Retry safety: the transition is a one-time command a curator may well
+      // run twice, and the second run must recognise its own work.
+      expect(noopRun.status, noopRun.output).toBe(0);
+      expect(noopRun.output).toContain('Already rekeyed');
+      expect(noopRun.output).toMatch(
+        new RegExp(`owned by ${coleman.source_key}\\s+${baseline.length}\\b`),
+      );
+      expect(
+        noopRun.output,
+        'a no-op must not report a mutation it did not perform',
+      ).not.toContain('Coleman row(s) in place');
+      expect(ownershipOf(afterNoop)).toEqual(ownershipOf(baseline));
+    });
+
+    it('refuses a mixed ownership state and writes nothing', () => {
+      // Half-transitioned is the one state no automatic rule can resolve: it
+      // needs a human, so the tool says so rather than guessing.
+      expect(mixedRun.status, mixedRun.output).not.toBe(0);
+      expect(mixedRun.output).toContain('Mixed ownership state');
+      expect(mixedRun.output).toContain('nothing was written');
+      expect(mixedRun.output).toMatch(
+        new RegExp(`owned by ${TRANSITION.legacy_source_key}\\s+1\\b`),
+      );
+      expect(
+        ownershipOf(afterMixed),
+        'a refused transition leaves every row exactly as it found it',
+      ).toEqual(ownershipOf(mixedBefore));
+    });
+
+    it('refuses when a season cannot bridge 1:1, aborting the whole transaction', () => {
+      expect(unbridgeableRun.status, unbridgeableRun.output).not.toBe(0);
+      expect(unbridgeableRun.output).toContain('carry more than one legacy row');
+      expect(unbridgeableRun.output).toContain(String(duplicatedSeason));
+      expect(unbridgeableRun.output).toContain(
+        'The mapping is not exactly 1:1; nothing was written.',
+      );
+      // Not one of the 45 bridgeable rows was moved on the way to finding the
+      // one that was not: the refusal precedes every write.
+      expect(ownershipOf(afterUnbridgeable)).toEqual(ownershipOf(unbridgeableBefore));
+      expect(
+        afterUnbridgeable.filter((r) => r.sourceKey !== TRANSITION.legacy_source_key),
+        'every row is still legacy-owned after the abort',
+      ).toEqual([]);
+    });
+
+    it('rekeys an all-legacy family exactly 1:1, preserving every surrogate id', () => {
+      expect(
+        legacyBefore.filter((r) => r.sourceKey !== TRANSITION.legacy_source_key),
+        'the fixture really did put the whole family into the legacy state',
+      ).toEqual([]);
+      expect(legacyBefore.length).toBe(TRANSITION.expected_rows);
+
+      expect(rekeyRun.status, rekeyRun.output).toBe(0);
+      expect(rekeyRun.output).toMatch(
+        new RegExp(`rows in the coleman award\\s+${baseline.length}\\b`),
+      );
+      expect(rekeyRun.output).toMatch(
+        new RegExp(`owned by ${TRANSITION.legacy_source_key}\\s+${baseline.length}\\b`),
+      );
+      expect(rekeyRun.output).toMatch(
+        new RegExp(`exact 1:1 mappings\\s+${baseline.length}\\b`),
+      );
+      // The zero is re-verified at run time rather than trusted from the
+      // runbook: the first derived load rewrites player_name_raw, which is only
+      // safe while no human decision is attached to these rows.
+      expect(rekeyRun.output).toMatch(/Coleman player_link_resolutions rows\s+0\b/);
+      expect(rekeyRun.output).toContain(`Rekeyed ${baseline.length} Coleman row(s) in place`);
+      expect(rekeyRun.output).toContain('every surrogate id is unchanged');
+
+      // No row is deleted and no row is created: player_link_resolutions
+      // .target_id points at these ids and is not a foreign key, so a
+      // replacement row would silently orphan a human decision.
+      expect(afterRekey.map((r) => r.id)).toEqual(baseline.map((r) => r.id));
+      // 1:1 in the strongest available sense: each id came back to exactly the
+      // derived key it held before the legacy state was manufactured.
+      expect(afterRekey.map((r) => `${r.id}|${r.sourceKey}|${r.recordId}`))
+        .toEqual(baseline.map((r) => `${r.id}|${r.sourceKey}|${r.recordId}`));
+      expect(fingerprintAfterRekey).toBe(baselineFingerprint);
+
+      // Only source_id and source_record_id change. The transition moves
+      // ownership without asserting a single fact, so the unlinked legacy row
+      // is still unlinked: linking it is the derived load's job, below.
+      const adopted = afterRekey.find((r) => r.id === unlinkedRowId)!;
+      expect(adopted.playerId, 'the transition links nobody').toBeNull();
+      expect(adopted.status).toBe('implausible');
+    });
+
+    it('leaves every other award family untouched', () => {
+      expect(
+        isolationBefore.rows,
+        'the isolation claim needs non-Coleman rows to be about anything',
+      ).toBeGreaterThan(0);
+      expect(isolationBefore.draftguru, 'including another draftguru-owned row')
+        .toBeGreaterThan(0);
+      expect(isolationBefore.unowned, 'including a manual or unowned-provenance row')
+        .toBeGreaterThan(0);
+
+      expect(isolationAfterRekey, 'the transition is scoped to the Coleman award alone')
+        .toEqual(isolationBefore);
+      expect(isolationAfterLoad, 'and so is the derived load that follows it')
+        .toEqual(isolationBefore);
+      // The sharpest case: a key that merely looks like a legacy Coleman key,
+      // on a different award, survives verbatim.
+      expect(isolationAfterLoad.witnessKey)
+        .toBe(legacyKeyFor(coleman.first_season, 0));
+    });
+
+    it('reports 46 updated / 0 inserted / 0 deleted on the first derived load', () => {
+      expect(firstLoad.status, firstLoad.stdout + firstLoad.stderr).toBe(0);
+      // The acceptance signal from the runbook, read from the contract rather
+      // than written as a literal. An insert or a delete here means the bridge
+      // was wrong and the duplication the transition exists to prevent happened
+      // anyway.
+      expect(TRANSITION.first_load_expectation)
+        .toBe(`${TRANSITION.expected_rows} updated, 0 inserted, 0 deleted`);
+      expect(firstLoad.updated).toBe(TRANSITION.expected_rows);
+      expect(firstLoad.inserted, 'a transitioned row is matched, never inserted beside').toBe(0);
+      expect(firstLoad.deleted, 'and never deleted and rewritten').toBe(0);
+
+      expect(afterFirstLoad.map((r) => r.id)).toEqual(baseline.map((r) => r.id));
+      expect(fingerprintAfterLoad).toBe(baselineFingerprint);
+
+      // The 1982-Blight case: a legacy row the name matcher could not link is
+      // adopted and linked by the derivation, because identity now comes from
+      // player_match_stats rather than from a name.
+      const adopted = afterFirstLoad.find((r) => r.id === unlinkedRowId)!;
+      expect(adopted.playerId, 'the unlinked legacy row is adopted, not replaced').not.toBeNull();
+      expect(adopted.status).toBe('resolved');
+      expect(afterFirstLoad.filter((r) => r.playerId === null)).toEqual([]);
+      // Overriding no human decision, because there are none to override.
+      expect(decisionsAfterLoad).toBe(0);
+    });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-111 — human link decisions across the derived reload
+// ---------------------------------------------------------------------------
+/*
+ * The derived loader is born linked: it writes player_id, link_status_value AND
+ * player_name_raw for every winner from the canonical facts. An admin decision
+ * recorded against one of those rows is therefore in direct competition with
+ * the derivation on every single reload, which is exactly the collision
+ * AFLDB-ISSUE-044 exists to police.
+ *
+ * `import_coleman` passes target_table="award_winners" and takes reload_keyed's
+ * default name_column="player_name_raw" (tools/migration/common.py), so all
+ * three of that helper's decision rules apply here. This block measures them
+ * against the real derived family rather than assuming they carry over:
+ *
+ *   1. a `linked` decision outranks the derivation's own player, and the
+ *      disagreement is warned rather than silently reconciled;
+ *   2. a `confirmed_unlinked` decision keeps the row unlinked, and that
+ *      disagreement is warned too;
+ *   3. a decided row whose stored name no longer matches the derivation fails
+ *      the reload CLOSED, writing nothing.
+ *
+ * (3) is the runtime evidence for the transition runbook's safety claim: the
+ * first derived load rewrites player_name_raw — for the unlinked 1982 row, from
+ * the legacy spelling to the canonical display name — and that is safe ONLY
+ * while no human decision is attached. The runbook states it; here it is
+ * measured, together with the recovery that follows once the name agrees again.
+ *
+ * Both decisions are recorded through the real admin path (resolveLink /
+ * confirmUnlinked), which refuses a row that is not in the review queue, so each
+ * chosen row is returned to the queue first — the AFLDB-ISSUE-044 pattern above.
+ * Every state change happens in beforeAll, in one ordered choreography, and
+ * afterAll restores the touched rows BY ID and deletes the fixture decisions, so
+ * neither a failing assertion nor a crashed run can leave afldb_test carrying a
+ * human decision the other Coleman blocks refuse to run beside.
+ */
+const COLEMAN_LINK_EMAIL = 'issue-111-coleman-links@example.test';
+const COLEMAN_LINK_NOTE = 'AFLDB-ISSUE-111 decision survival';
+
+describe.skipIf(!canRunFixtureImporter)(
+  `Coleman derived reload preserves human link decisions (AFLDB-ISSUE-111)${roleParitySuffix}`,
+  () => {
+    let adminUserId = 0;
+    let adminPlayerId = 0;
+
+    let baseline: OwnershipRow[] = [];
+    let baselineFingerprint = '';
+
+    let linkedRowId = 0;
+    let linkedSourcePlayer = 0;
+    let linkedName = '';
+    let linkedKey = '';
+    let unlinkedRowId = 0;
+    let unlinkedKey = '';
+
+    let preservingRun!: ColemanRun;
+    let afterPreserving: OwnershipRow[] = [];
+    let fingerprintAfterPreserving = '';
+    let vetted = new Set<string>();
+    let decisionsAfterPreserving = -1;
+
+    let renamedBefore: OwnershipRow[] = [];
+    let refusedRun!: ColemanRun;
+    let afterRefused: OwnershipRow[] = [];
+    let fingerprintAfterRefused = '';
+
+    let healRun!: ColemanRun;
+    let afterHeal: OwnershipRow[] = [];
+    let fingerprintAfterHeal = '';
+
+    /** Ownership plus the two facts a decision moves: the link and the name. */
+    const factsOf = (rows: OwnershipRow[]) => rows.map(
+      (r) => `${r.id}|${r.sourceKey}|${r.recordId}|${r.playerId}|${r.status}|${r.playerNameRaw}`,
+    );
+
+    /**
+     * Returns one derived row to the review queue. resolveLink/confirmUnlinked
+     * lock an UNRESOLVED target and refuse anything else, so a born-linked
+     * 'resolved' row cannot be decided until it is queued — the same step the
+     * AFLDB-ISSUE-044 block takes for a source-linked Hall of Fame row.
+     */
+    async function queueForReview(id: number): Promise<void> {
+      await sql`
+        UPDATE award_winners
+           SET player_id = NULL, link_status_value = 'ambiguous'
+         WHERE id = ${id}
+      `;
+    }
+
+    /**
+     * Restores the three columns this block can move, by id. Deliberately not a
+     * reload: restoration must not depend on the loader under test, and a
+     * reload would in any case still honour a decision that has not been
+     * deleted yet.
+     */
+    async function restoreBaselineFacts(): Promise<void> {
+      for (const row of baseline) {
+        await sql`
+          UPDATE award_winners
+             SET player_id         = ${row.playerId},
+                 link_status_value = ${row.status}::link_status,
+                 player_name_raw   = ${row.playerNameRaw}
+           WHERE id = ${row.id}
+        `;
+      }
+    }
+
+    beforeAll(async () => {
+      await removeFixtureCorpus();
+
+      const [admin] = await sql<{ id: number }[]>`
+        INSERT INTO auth_users (email, role)
+        VALUES (${COLEMAN_LINK_EMAIL}, 'admin')
+        ON CONFLICT (email) DO UPDATE SET role = 'admin'
+        RETURNING id
+      `;
+      adminUserId = admin.id;
+      // Defensive on entry: a crashed earlier run of this block would leave its
+      // decisions behind, and the guard below — like every other Coleman
+      // block's — refuses to run beside a Coleman decision it did not record.
+      await sql`DELETE FROM player_link_resolutions WHERE admin_user_id = ${adminUserId}`;
+
+      baseline = await readOwnership();
+      baselineFingerprint = await colemanFingerprint();
+
+      const foreign = baseline.filter((r) => r.sourceKey !== coleman.source_key);
+      if (foreign.length > 0) {
+        throw new Error(
+          `${foreign.length} Coleman award_winners row(s) in afldb_test are not owned by `
+          + `'${coleman.source_key}'. This block decides rows of the derived family and `
+          + 'restores them by id, so it refuses a family it did not start from.',
+        );
+      }
+      if (baseline.length !== TRANSITION.expected_rows) {
+        throw new Error(
+          `afldb_test holds ${baseline.length} Coleman winner row(s); the tracked contract `
+          + `declares exactly ${TRANSITION.expected_rows}. The reload signal asserted below `
+          + 'is that count, so it cannot be measured against a family of a different size.',
+        );
+      }
+      const decisionsBefore = await colemanLinkDecisions();
+      if (decisionsBefore !== 0) {
+        throw new Error(
+          `${decisionsBefore} human player-link decision(s) already exist on Coleman rows in `
+          + 'afldb_test and were not recorded by this block. They must be understood before '
+          + 'a decision-survival fixture can mean anything.',
+        );
+      }
+
+      const bySeason = [...baseline].sort((a, b) => a.season - b.season);
+      linkedRowId = bySeason[0].id;
+      unlinkedRowId = bySeason[bySeason.length - 1].id;
+
+      // Both chosen rows must be exactly what a clean derived load leaves
+      // behind — born linked, and carrying the derivation's own name — or the
+      // disagreement and name-guard assertions below would be measuring a
+      // half-restored state instead of the loader.
+      const derived = await readColemanWinners();
+      for (const id of [linkedRowId, unlinkedRowId]) {
+        const winner = derived.find((w) => w.id === id);
+        if (!winner || winner.playerId === null || winner.status !== 'resolved'
+            || winner.playerNameRaw !== winner.displayName) {
+          throw new Error(
+            `Coleman row id=${id} is not in the born-linked derived state `
+            + `(player_id=${winner?.playerId ?? 'missing row'}, `
+            + `status=${winner?.status}, player_name_raw=${winner?.playerNameRaw}, `
+            + `display_name=${winner?.displayName}). Run the derived loader before `
+            + 'this block, or reconcile the row: a decision fixture is only evidence '
+            + 'about the reload if the row started where the derivation puts it.',
+          );
+        }
+      }
+      const linkedRow = baseline.find((r) => r.id === linkedRowId)!;
+      linkedSourcePlayer = linkedRow.playerId!;
+      linkedName = linkedRow.playerNameRaw;
+      linkedKey = linkedRow.recordId!;
+      unlinkedKey = baseline.find((r) => r.id === unlinkedRowId)!.recordId!;
+
+      // Someone the derivation certainly does not name for either row, so the
+      // decision genuinely contradicts the source rather than agreeing with it.
+      const derivedPlayers = [
+        linkedSourcePlayer,
+        baseline.find((r) => r.id === unlinkedRowId)!.playerId!,
+      ];
+      const [other] = await sql<{ id: number }[]>`
+        SELECT id::int AS id
+          FROM players
+         WHERE id <> ALL(${derivedPlayers}::int[])
+         ORDER BY id
+         LIMIT 1
+      `;
+      if (!other) throw new Error('afldb_test holds no spare player for the fixture decision');
+      adminPlayerId = other.id;
+
+      await queueForReview(linkedRowId);
+      const linked = await resolveLink({
+        targetTable: 'award_winners',
+        targetId: linkedRowId,
+        playerId: adminPlayerId,
+        adminUserId,
+        note: COLEMAN_LINK_NOTE,
+      });
+      if (!linked.ok) throw new Error(`resolveLink refused the fixture link: ${linked.error}`);
+
+      await queueForReview(unlinkedRowId);
+      const confirmed = await confirmUnlinked({
+        targetTable: 'award_winners',
+        targetId: unlinkedRowId,
+        adminUserId,
+        note: COLEMAN_LINK_NOTE,
+      });
+      if (!confirmed.ok) {
+        throw new Error(`confirmUnlinked refused the fixture decision: ${confirmed.error}`);
+      }
+
+      // 1. The reload that must honour both decisions.
+      preservingRun = runColeman();
+      afterPreserving = await readOwnership();
+      fingerprintAfterPreserving = await colemanFingerprint();
+      vetted = await listConfirmedUnlinked();
+      decisionsAfterPreserving = await colemanLinkDecisions();
+
+      // 2. The name guard: the decided row's stored name no longer matches the
+      // name the derivation supplies, so the decision cannot be carried across.
+      await sql`
+        UPDATE award_winners
+           SET player_name_raw = ${`${linkedName} (renamed)`}
+         WHERE id = ${linkedRowId}
+      `;
+      renamedBefore = await readOwnership();
+      refusedRun = runColeman();
+      afterRefused = await readOwnership();
+      fingerprintAfterRefused = await colemanFingerprint();
+
+      // 3. Restored by id, the same reload succeeds and the decisions stand.
+      await sql`
+        UPDATE award_winners SET player_name_raw = ${linkedName} WHERE id = ${linkedRowId}
+      `;
+      healRun = runColeman();
+      afterHeal = await readOwnership();
+      fingerprintAfterHeal = await colemanFingerprint();
+    }, 1_800_000);
+
+    afterAll(async () => {
+      // Decisions first: while one exists, every other Coleman block's guard
+      // refuses, and a reload would keep re-applying it over the derived facts.
+      if (adminUserId) {
+        await sql`DELETE FROM player_link_resolutions WHERE admin_user_id = ${adminUserId}`;
+        await sql`DELETE FROM auth_users WHERE id = ${adminUserId}`;
+      }
+      if (baseline.length > 0) {
+        await restoreBaselineFacts();
+        const restored = factsOf(await readOwnership());
+        const fingerprint = await colemanFingerprint();
+        const decisions = await colemanLinkDecisions();
+        await removeFixtureCorpus();
+        if (fingerprint !== baselineFingerprint) {
+          throw new Error(
+            'the derived Coleman family was not restored after the decision fixtures: '
+            + `fingerprint ${fingerprint} != ${baselineFingerprint}`,
+          );
+        }
+        if (restored.join('\n') !== factsOf(baseline).join('\n')) {
+          throw new Error(
+            'the derived Coleman family came back with different links or names after the '
+            + 'decision fixtures; afldb_test still holds fixture state.',
+          );
+        }
+        if (decisions !== 0) {
+          throw new Error(
+            `${decisions} Coleman player_link_resolutions row(s) survived this block's `
+            + 'cleanup; the next Coleman run would refuse.',
+          );
+        }
+      } else {
+        await removeFixtureCorpus();
+      }
+    }, 900_000);
+
+    it("keeps an admin's link across the derived reload, and reports the disagreement", () => {
+      expect(preservingRun.status, preservingRun.stdout + preservingRun.stderr).toBe(0);
+      // Both decisions were classified and carried across, and neither was
+      // discarded: a reload that quietly dropped one would still exit 0.
+      expect(preservingRun.stdout).toMatch(/coleman decisions preserved\s+2\b/);
+      expect(preservingRun.stdout).not.toContain('DISCARDING');
+      expect(decisionsAfterPreserving).toBe(2);
+
+      const after = afterPreserving.find((r) => r.id === linkedRowId);
+      expect(after, 'the decided row must survive under its own id').toBeDefined();
+      expect(after!.playerId, "the admin's decision outranks the derivation").toBe(adminPlayerId);
+      expect(after!.status).toBe('resolved');
+      expect(after!.recordId, 'and its durable key is untouched').toBe(linkedKey);
+
+      // Never silent: the derivation still names its own player, and says so.
+      expect(preservingRun.stdout).toContain(`award_winners id=${linkedRowId}`);
+      expect(preservingRun.stdout).toContain(`the source now links player ${linkedSourcePlayer}`);
+      expect(preservingRun.stdout).toContain(`an admin linked player ${adminPlayerId}`);
+
+      // Reconciled in place: nothing was inserted beside the decided rows and
+      // nothing deleted, so no surrogate id — and no decision target — moved.
+      expect(preservingRun.updated).toBe(TRANSITION.expected_rows);
+      expect(preservingRun.inserted).toBe(0);
+      expect(preservingRun.deleted).toBe(0);
+      expect(fingerprintAfterPreserving).toBe(baselineFingerprint);
+
+      // Only the two decided rows differ from the derived baseline: honouring a
+      // decision must not perturb the rest of the family.
+      const moved = afterPreserving
+        .filter((row) => {
+          const before = baseline.find((b) => b.id === row.id)!;
+          return `${row.playerId}|${row.status}` !== `${before.playerId}|${before.status}`;
+        })
+        .map((row) => row.id)
+        .sort((a, b) => a - b);
+      expect(moved).toEqual([linkedRowId, unlinkedRowId].sort((a, b) => a - b));
+    });
+
+    it('keeps a confirmed-unlinked decision, and reports that disagreement too', () => {
+      const after = afterPreserving.find((r) => r.id === unlinkedRowId);
+      expect(after, 'the vetted row must survive under its own id').toBeDefined();
+      // Vetted as genuinely not that player: born linked or not, the derivation
+      // does not get to relink it.
+      expect(after!.playerId).toBeNull();
+      // The row honestly keeps the unresolved status the admin decided from,
+      // rather than claiming a resolution nobody made.
+      expect(after!.status).toBe('ambiguous');
+      expect(after!.recordId).toBe(unlinkedKey);
+
+      expect(preservingRun.stdout).toContain(`award_winners id=${unlinkedRowId}`);
+      expect(preservingRun.stdout)
+        .toContain('an admin confirmed this row is genuinely unlinked');
+
+      // The decision is only useful while it still names a live row: that is
+      // exactly what a truncate-and-reload used to leave dangling.
+      expect(vetted.has(`award_winners:${unlinkedRowId}`)).toBe(true);
+    });
+
+    it('refuses the reload when a decided row no longer carries the derived name', () => {
+      // The transition runbook's safety claim, measured: the derived load
+      // rewrites player_name_raw, which is safe only while no human decision is
+      // attached to the row. With one attached, the name guard fails closed
+      // rather than reattributing the decision to a differently-named row.
+      expect(refusedRun.status, 'the reload must fail closed').not.toBe(0);
+      expect(refusedRun.stdout).toContain('cannot survive');
+      expect(refusedRun.stdout).toContain(`award_winners id=${linkedRowId}`);
+      expect(refusedRun.stdout).toContain('decision=linked');
+      expect(refusedRun.stdout).toContain('the source name changed to');
+      // The other decision is intact, so exactly one is at risk and it is named.
+      expect(refusedRun.stdout).toContain('1 human identity decision(s) cannot survive');
+
+      // It refused before writing anything at all: no reload report was even
+      // printed (runColeman reports -1 when the signal line is absent).
+      expect(refusedRun.updated, 'no reload ran, so there is no reload signal').toBe(-1);
+      expect(factsOf(afterRefused)).toEqual(factsOf(renamedBefore));
+      expect(fingerprintAfterRefused).toBe(baselineFingerprint);
+    });
+
+    it('loads again once the name agrees, with both decisions still standing', () => {
+      expect(healRun.status, healRun.stdout + healRun.stderr).toBe(0);
+      expect(healRun.updated).toBe(TRANSITION.expected_rows);
+      expect(healRun.inserted).toBe(0);
+      expect(healRun.deleted).toBe(0);
+
+      const linked = afterHeal.find((r) => r.id === linkedRowId)!;
+      expect(linked.playerId).toBe(adminPlayerId);
+      expect(linked.status).toBe('resolved');
+      expect(linked.playerNameRaw, 'the derivation owns the name again').toBe(linkedName);
+
+      const unlinked = afterHeal.find((r) => r.id === unlinkedRowId)!;
+      expect(unlinked.playerId).toBeNull();
+      expect(unlinked.status).toBe('ambiguous');
+
+      expect(fingerprintAfterHeal).toBe(baselineFingerprint);
     });
   },
 );
