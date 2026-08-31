@@ -77,8 +77,8 @@ function DeleteCodeButton({
   return (
     <div className="delete-confirm">
       <p className="delete-confirm-note">
-        Permanently delete “{code.label}”? The record goes for good; only the
-        audit trail will remember it.
+        Permanently delete “{code.label}” ({code.revokedAt ? 'revoked' : 'spent'})?
+        The record goes for good; only the audit trail will remember it.
       </p>
       <div className="delete-confirm-actions">
         <form action={action}>
@@ -300,10 +300,14 @@ export function AccessManager({
                             <button className="btn btn-secondary" type="submit">Revoke</button>
                           </form>
                         )}
-                        {/* Revoked is the only state that offers Delete, and
-                            the server enforces that independently: this is
-                            which control to show, not which rule applies. */}
-                        {state === 'revoked' && (
+                        {/* Revoked and spent both offer Delete; the server
+                            enforces that independently, so this is which
+                            control to show, not which rule applies. A spent
+                            code is deletable directly -- revoking something
+                            the database already refuses changed nothing.
+                            `live` here includes a partly-used code, which is
+                            still redeemable and so still needs a revoke. */}
+                        {(state === 'revoked' || state === 'spent') && (
                           <DeleteCodeButton code={code} action={deleteCodeAction} />
                         )}
                       </td>

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { authSql } from '@/db/authClient';
-import { deleteRevokedAccessCode } from '@/db/queries/access-codes';
+import { deleteRetiredAccessCode, retirementReason } from '@/db/queries/access-codes';
 import { generateToken, sha256Hex } from '@/lib/auth/crypto';
 import { audit, requireAdmin } from '@/lib/auth/session';
 import { parseIntInRange } from '@/lib/params';
@@ -82,25 +82,31 @@ export async function revokeAccessCode(
 }
 
 /**
- * Permanently delete a REVOKED access code (AFLDB-ISSUE-117).
+ * Permanently delete a RETIRED access code (AFLDB-ISSUE-117).
  *
- * The last step of Active -> Revoke -> Delete, and the only one that
- * destroys anything. Three things make that safe, and none of them is
- * the button being hidden:
+ * Retired means revoked or spent -- see deleteRetiredAccessCode for why
+ * those two and not expiry. A spent code is deletable directly: making
+ * an admin revoke something the database already refuses was ceremony,
+ * not safety. An active code that could still be redeemed must be
+ * revoked first, and that is enforced below rather than assumed.
+ *
+ * This is the only action in this file that destroys anything. Three
+ * things make that safe, and none of them is the button being hidden:
  *
  *   1. requireAdmin(), as every action in this file does. It re-checks
  *      the database row, so a revoked or disabled admin's cookie buys
  *      nothing here either.
- *   2. `revoked_at IS NOT NULL` inside the DELETE itself
- *      (deleteRevokedAccessCode). A live code named by a hand-rolled
- *      POST matches no row and is refused, so revocation is a genuine
- *      precondition rather than a convention of the UI.
+ *   2. The eligibility predicate is inside the DELETE itself
+ *      (deleteRetiredAccessCode). A still-redeemable code named by a
+ *      hand-rolled POST matches no row and is refused, so retirement is
+ *      a genuine precondition rather than a convention of the UI.
  *   3. The audit row is written inside the same transaction as the
  *      delete, so there is no window in which the code is gone and the
  *      trail does not say who removed it. The detail carries the id,
- *      the label and when the code had been revoked -- enough to
- *      reconstruct what was destroyed. It cannot carry the code: only
- *      the sha256 was ever stored, and that goes with the row.
+ *      the label, the use count and WHICH rule made the row disposable
+ *      -- enough to reconstruct what was destroyed and why it was
+ *      allowed. It cannot carry the code: only the sha256 was ever
+ *      stored, and that goes with the row.
  */
 export async function deleteAccessCode(
   _previous: AccessState,
@@ -111,23 +117,32 @@ export async function deleteAccessCode(
   if (!Number.isInteger(id)) return { error: 'Bad code id.' };
 
   const deleted = await authSql.begin(async (tx) => {
-    const row = await deleteRevokedAccessCode(tx, id);
+    const row = await deleteRetiredAccessCode(tx, id);
     if (!row) return null;
 
     await audit(
       'access.code_deleted',
-      { codeId: row.id, label: row.label, revokedAt: row.revokedAt.toISOString() },
+      {
+        codeId: row.id,
+        label: row.label,
+        reason: retirementReason(row),
+        revokedAt: row.revokedAt?.toISOString() ?? null,
+        useCount: row.useCount,
+        maxUses: row.maxUses,
+      },
       { userId: admin.id, label: admin.email },
       tx,
     );
     return row;
   });
 
-  // One message for "not revoked", "never existed" and "someone else
-  // just deleted it". Distinguishing them would tell an unauthenticated
-  // caller which ids are real, and an admin who can see the table does
-  // not need the endpoint to tell them.
-  if (!deleted) return { error: 'Only a revoked code can be deleted. Revoke it first.' };
+  // One message for "still redeemable", "never existed" and "someone
+  // else just deleted it". Distinguishing them would tell an
+  // unauthenticated caller which ids are real, and an admin who can see
+  // the table does not need the endpoint to tell them.
+  if (!deleted) {
+    return { error: 'Only a revoked or spent code can be deleted. Revoke it first.' };
+  }
 
   revalidatePath('/admin/access');
   return { message: `Code “${deleted.label}” permanently deleted.` };

@@ -1,13 +1,17 @@
 /**
- * The access-key lifecycle: Active -> Revoke -> Delete (AFLDB-ISSUE-117).
+ * The access-key lifecycle (AFLDB-ISSUE-117).
+ *
+ * A code is deletable once it is RETIRED -- revoked, or spent. A spent
+ * code goes directly, with no ceremonial revoke first; a code that could
+ * still be redeemed must be revoked before it can be destroyed.
  *
  * Deletion is the only control on /admin/access that destroys a row, so
  * what is asserted here is not that the happy path works but that the
  * refusals do, and that they live on the server. The database half --
- * that `revoked_at IS NOT NULL` really does match a revoked row and
- * really does not match a live one when PostgreSQL evaluates it, and
- * that afldb_auth holds the DELETE at all -- is asserted against a real
- * cluster in tests/integration/access-codes.test.ts and
+ * that the predicate really does match a revoked or spent row and really
+ * does not match a still-redeemable one when PostgreSQL evaluates it,
+ * and that afldb_auth holds the DELETE at all -- is asserted against a
+ * real cluster in tests/integration/access-codes.test.ts and
  * tests/integration/privileges.test.ts. These files are meant to be read
  * together; neither is sufficient alone.
  */
@@ -74,7 +78,18 @@ function form(id: unknown): FormData {
 
 /** The row a DELETE against a revoked code comes back with. */
 function deletedRow() {
-  return [{ id: 42, label: 'footy forum wave 1', revokedAt: REVOKED_AT }];
+  return [{
+    id: 42, label: 'footy forum wave 1',
+    revokedAt: REVOKED_AT, useCount: 1, maxUses: 5,
+  }];
+}
+
+/** A code deleted for being spent: never revoked, uses exhausted. */
+function spentRow() {
+  return [{
+    id: 43, label: 'trade period wave 2',
+    revokedAt: null, useCount: 5, maxUses: 5,
+  }];
 }
 
 beforeEach(() => {
@@ -86,19 +101,21 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('deleteAccessCode refuses anything but a revoked code', () => {
-  it('will not delete an active code, because the statement will not match one', async () => {
-    // The action cannot tell "live" from "already gone" by itself and does
-    // not try: it asks the database to delete a REVOKED row with this id
-    // and believes the row count. So the guard being in the SQL is the
-    // assertion here, not an implementation detail behind it.
+describe('deleteAccessCode refuses a code that could still be redeemed', () => {
+  it('will not delete an active unused code, because the statement will not match one', async () => {
+    // The action cannot tell "still live" from "already gone" by itself
+    // and does not try: it asks the database to delete a RETIRED row with
+    // this id and believes the row count. So the predicate being in the
+    // SQL is the assertion here, not an implementation detail behind it.
     state.deleteRows = [];
 
     const result = await deleteAccessCode({}, form(42));
 
     const del = state.statements.find((s) => /DELETE\s+FROM\s+beta_access_codes/.test(s.sql));
     expect(del, 'the action must issue the guarded DELETE').toBeDefined();
+    // Both limbs, and both required: revoked OR spent, never neither.
     expect(del!.sql).toMatch(/revoked_at\s+IS\s+NOT\s+NULL/);
+    expect(del!.sql).toMatch(/max_uses\s+IS\s+NOT\s+NULL\s+AND\s+use_count\s*>=\s*max_uses/);
     expect(result.error).toBeTruthy();
     expect(result.message).toBeUndefined();
   });
@@ -114,7 +131,7 @@ describe('deleteAccessCode refuses anything but a revoked code', () => {
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
-  it('gives an unknown id the same answer as a live one', async () => {
+  it('gives an unknown id the same answer as a still-redeemable one', async () => {
     // Both miss the WHERE clause, and the endpoint deliberately does not
     // say which: telling them apart would confirm which ids exist.
     state.deleteRows = [];
@@ -150,7 +167,7 @@ describe('deleteAccessCode refuses anything but a revoked code', () => {
   });
 });
 
-describe('deleteAccessCode removes a revoked code with a durable record', () => {
+describe('deleteAccessCode removes a retired code with a durable record', () => {
   it('deletes the row and reports it', async () => {
     state.deleteRows = deletedRow();
 
@@ -172,7 +189,10 @@ describe('deleteAccessCode removes a revoked code with a durable record', () => 
     expect(detail).toEqual({
       codeId: 42,
       label: 'footy forum wave 1',
+      reason: 'revoked',
       revokedAt: REVOKED_AT.toISOString(),
+      useCount: 1,
+      maxUses: 5,
     });
     // The acting admin, through the existing mechanism.
     expect(actor).toEqual({ userId: 7, label: 'admin@example.com' });
@@ -193,6 +213,38 @@ describe('deleteAccessCode removes a revoked code with a durable record', () => 
     const tx = vi.mocked(audit).mock.calls[0]![3];
     expect(tx, 'audit must be given the transaction handle').toBe(state.lastTx);
     expect(state.statements.every((s) => s.on === 'tx')).toBe(true);
+  });
+
+  it('deletes a SPENT code that was never revoked, with no revoke first', async () => {
+    // The manual-validation finding: requiring a revoke here was ceremony.
+    // The database already refuses a spent code, so the revoke changed
+    // nothing a redeemer could observe.
+    state.deleteRows = spentRow();
+
+    const result = await deleteAccessCode({}, form(43));
+
+    expect(result.error).toBeUndefined();
+    expect(result.message).toContain('trade period wave 2');
+    // No UPDATE was issued: deletion did not quietly revoke on the way past.
+    expect(state.statements.some((s) => /UPDATE\s+beta_access_codes/.test(s.sql))).toBe(false);
+  });
+
+  it('records a spent deletion as spent, with a null revocation time', async () => {
+    // The trail has to say WHICH rule allowed the row to go, or a reader
+    // cannot tell a revoked disposal from a spent one after the fact.
+    state.deleteRows = spentRow();
+
+    await deleteAccessCode({}, form(43));
+
+    const [, detail] = vi.mocked(audit).mock.calls[0]!;
+    expect(detail).toEqual({
+      codeId: 43,
+      label: 'trade period wave 2',
+      reason: 'spent',
+      revokedAt: null,
+      useCount: 5,
+      maxUses: 5,
+    });
   });
 
   it('revalidates /admin/access so the row leaves the list', async () => {

@@ -1,6 +1,7 @@
 # AFLDB-ISSUE-117 — Revoked access keys cannot be removed from the admin UI
 
-**Status: Open. Implemented. Automated validation PASSED 45/45 on 2026-08-31. NOT deployed.**
+**Status: Open. Implemented, incl. the revoked-or-spent widening (§5). Automated validation
+PASSED 51/51 on 2026-08-31. The §5 change is NOT yet deployed to dev; dev runs round-1 code.**
 **Severity:** Medium — **Area:** Admin / Access management / Security.
 **Created:** 2026-08-31 (operator brief).
 **Related:** `AFLDB-ISSUE-027` — the same "a mutation cannot commit without its audit"
@@ -22,8 +23,9 @@ guarantee, reached here on the auth pool rather than through migration 066.
 `src/app/admin/access/page.tsx` selects every code with no state filter. Revoked keys therefore
 accumulate in the admin list permanently, with no disposal path.
 
-Wanted: **Active → Revoke → Delete**, deletion available only on the revoked state and refused
-by the server rather than merely hidden in the browser.
+Wanted: **Active → Revoke → Delete**, deletion refused by the server rather than merely hidden
+in the browser. §5 records the manual-validation finding that widened "deletable" from *revoked*
+to *revoked or spent*; §3 below describes the first implementation, §5 the change on top of it.
 
 ---
 
@@ -53,7 +55,7 @@ change, and why the grant is also asserted in `tests/integration/privileges.test
 |---|---|
 | `src/db/migrations/079_access_code_delete.sql` | **new.** `GRANT DELETE ON beta_access_codes TO afldb_auth`, under the usual `IF EXISTS (afldb_auth)` guard. Precedent: `data_submission_rows` (023), `site_media` (037) |
 | `tools/maintenance/privileges.sql` | spec entry becomes `SELECT, INSERT, UPDATE, DELETE`, so the reconciler preserves the grant |
-| `src/db/queries/access-codes.ts` | **new.** `deleteRevokedAccessCode(tx, id)` — the one destructive statement. `revoked_at IS NOT NULL` lives in its `WHERE` clause. Takes a transaction handle, not a pool, the same contract `recordDataEdit` carries |
+| `src/db/queries/access-codes.ts` | **new.** The one destructive statement; its eligibility predicate lives in the `WHERE` clause. Takes a transaction handle, not a pool, the same contract `recordDataEdit` carries. **Renamed to `deleteRetiredAccessCode` and widened in §5** |
 | `src/app/admin/access/actions.ts` | **new** `deleteAccessCode`: `requireAdmin()`, then delete + `access.code_deleted` audit inside one `authSql.begin` |
 | `src/lib/auth/session.ts` | `audit()` takes an optional 4th arg, a transaction handle. Omitted, it behaves exactly as before (best-effort, on the pool); passed, the audit joins the mutation's transaction |
 | `src/app/admin/access/AccessManager.tsx` | `DeleteCodeButton` — a revoked row offers **Delete…**, which opens an in-row confirmation naming the code before anything submits |
@@ -64,8 +66,9 @@ change, and why the grant is also asserted in `tests/integration/privileges.test
 
 ### Where each safety requirement actually lives
 
-- **Active keys are not deletable** — `revoked_at IS NOT NULL` in the DELETE. A hand-rolled POST
-  naming a live code's id matches no row and deletes nothing. The hidden button is presentation.
+- **Still-redeemable keys are not deletable** — the eligibility predicate is in the DELETE. A
+  hand-rolled POST naming such a code's id matches no row and deletes nothing. The hidden button
+  is presentation. (§5 widened which codes qualify, never how it is enforced.)
 - **Authorisation** — `requireAdmin()`, first statement in the action, as in every other action
   in that file. The page's existing guard was deliberately **not** changed: `/admin/access` uses
   `requireAdmin`, not `requireSuperAdmin`, and this issue does not redesign that.
@@ -80,7 +83,7 @@ change, and why the grant is also asserted in `tests/integration/privileges.test
 
 ---
 
-## 4. Verification — RUN 2026-08-31, all green (results in §7)
+## 4. Verification — RERUN 2026-08-31 after the §5 widening, all green (results in §7)
 
 Operator-run from `D:\dev\afldb-issue-116`. Results and totals are in §7.
 
@@ -130,11 +133,15 @@ cannot be committed.
 
 | # | Brief's requirement | Covered by |
 |---|---|---|
-| 1 | an active key cannot be deleted | unit: `will not delete an active code…` (asserts the predicate is in the SQL) + integration: `refuses an active code and leaves it in place` |
+| 1 | an active key cannot be deleted | unit: `will not delete an active unused code…` (asserts **both** predicate limbs are in the SQL) + integration: `refuses an active unused code and leaves it in place` |
 | 2 | a revoked key can be deleted | integration: `deletes a revoked code and reports what it removed` |
+| 1a | a **spent** key can be deleted directly (§5) | unit: `deletes a SPENT code that was never revoked, with no revoke first` (also asserts no UPDATE was issued) + integration: `deletes a SPENT code that was never revoked` |
+| 1b | a **partly used** key is still refused (§5) | integration: `refuses a PARTLY USED code, which can still be redeemed` |
+| 1c | an **unlimited** key is never spent (§5) | integration: `refuses an UNLIMITED code however many times it has been used` — the NULL-comparison case only real PostgreSQL settles |
+| 1d | both limbs true at once behaves (§5) | integration: `deletes a code that is both revoked and spent, reporting it as revoked` |
 | 3 | the deleted row no longer appears in the list | integration, same test — the row count for that id is 0, and `page.tsx` selects with no state filter, so absence from the table is absence from the UI. Plus unit: `revalidates /admin/access…` |
-| 4 | deletion records the expected audit event | unit: `writes access.code_deleted naming what was destroyed, and no secret` |
-| 5 | a forged/direct request cannot delete an active key | integration: `refuses an active code…` calls the query function directly, with no UI in the way |
+| 4 | deletion records the expected audit event | unit: `writes access.code_deleted naming what was destroyed, and no secret`, plus `records a spent deletion as spent, with a null revocation time` — the trail says WHICH rule allowed the row to go |
+| 5 | a forged/direct request cannot delete an active key | integration: `refuses an active unused code…`, `refuses a PARTLY USED code…` and `refuses an UNLIMITED code…` all call the query function directly, with no UI in the way |
 | 6 | an unknown/already-deleted id fails cleanly | unit: `gives an unknown id the same answer as a live one`; integration: `fails cleanly on an id that does not exist` |
 | 7 | revoke behaviour unchanged | unit: `revoking is unchanged by the delete path` (still a one-shot UPDATE on the pool, same predicate, same audit call) |
 | 8 | auth/authz intact | unit: `requires an admin session before any statement runs` |
@@ -143,16 +150,76 @@ cannot be committed.
 
 ---
 
-## 5. Known gap — deliberate, not fixed here
+## 5. Manual dev validation, and the rule it widened
 
-A **spent** or **expired** code has `revoked_at IS NULL`, so it cannot be deleted; and the
-existing UI offers Revoke only in the `live` state, so it cannot be revoked either. Such a code
-remains undeletable after this change.
+**Manual validation on dev passed for Active → Revoke → Delete** (branch `claude/issue-116`
+deployed via `sync-dev.ps1 -RemoteRef claude/issue-116 -AllowDirtyServer`; `afldb_dev` already
+carried migration 079 and the reconciled `afldb_auth` DELETE grant).
 
-This follows the brief exactly — "only revoked keys may expose the Delete action", "do not
-change the existing revoke semantics merely to hide revoked rows" — and is recorded rather than
-silently widened. Closing it means showing Revoke on `spent` and `expired` rows, a visibility
-change to the revoke path. **Operator decision; not taken here.**
+It also confirmed the gap this runbook had recorded as deliberate in its previous revision: a
+**spent** code — `use_count >= max_uses` — was undeletable. Worse, it was *undisposable*: the
+admin table offers Revoke only in the `live` state, so a spent code could be neither revoked
+nor deleted and simply accumulated. The operator's requirement is that a spent code be
+deletable **directly**, without a revoke that changes nothing.
+
+### The rule now
+
+A code is **retired**, and so deletable, when it can no longer be redeemed *by its own terms*:
+
+```sql
+revoked_at IS NOT NULL
+OR (max_uses IS NOT NULL AND use_count >= max_uses)
+```
+
+| State | `revoked_at` | uses | Revoke | Delete |
+|---|---|---|---|---|
+| Active, unused | NULL | `0 < max_uses` | yes | **refused** |
+| Active, partly used | NULL | `0 < use_count < max_uses` | yes | **refused** — still redeemable |
+| Unlimited, any use count | NULL | `max_uses IS NULL` | yes | **refused** — never spent |
+| Spent | NULL | `use_count >= max_uses` | (not offered) | **yes, directly** |
+| Revoked | set | any | (not offered) | **yes** |
+| Expired, unused | NULL | under limit | (not offered) | **refused** — see below |
+
+**Why this is safe, stated so it can be checked.** Every limb of the predicate is a reason
+`redeemBetaCode` (`src/app/beta/actions.ts:80-88`) would refuse the code. That query redeems
+only when `revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now()) AND (max_uses IS
+NULL OR use_count < max_uses)`. So "revoked or spent" is a **strict subset of "not
+redeemable"**, and a code that could still let somebody in can never be deleted. Widening the
+delete rule did not widen the set of live codes at risk by one row.
+
+Two boundaries follow from that and are both tested:
+
+- **Partly used stays refused.** Two of five uses spent still leaves three admissions. Deleting
+  it would be a silent revoke with no revocation record.
+- **Unlimited is never spent.** `max_uses IS NULL` makes `use_count >= max_uses` evaluate to
+  NULL, not true, so an unlimited code stays deletable only by revoking it first — which is
+  exactly what migration 036 means by "unlimited means uncapped, not unrevocable". This is the
+  one case where only PostgreSQL's real three-valued logic settles the answer, which is why it
+  is an integration test and not a unit test.
+
+### Still deliberately excluded: expiry
+
+An **expired** code is unredeemable too, but is **not** deletable. Expiry is a moving line —
+`expires_at` passes on its own, with nobody deciding anything — and deletion is irreversible.
+Admitting it would mean rows becoming destroyable through the passage of time rather than an
+act. That is a deliberate product decision, not an oversight; it is a one-limb change to
+`deleteRetiredAccessCode` if it is ever wanted. Note the consequence, unchanged from before: an
+expired, unspent code is offered neither Revoke (the UI shows it only when `live`) nor Delete,
+so it still cannot be disposed of. **Operator decision; not taken here.**
+
+### What changed for it
+
+| File | Change |
+|---|---|
+| `src/db/queries/access-codes.ts` | `deleteRevokedAccessCode` → **`deleteRetiredAccessCode`**, predicate widened to revoked-or-spent. Renamed deliberately: a function still called `…Revoked` that also deletes spent codes is a trap for the next reader. `RETURNING` gained `use_count` and `max_uses`; `revokedAt` is now nullable. New `retirementReason()` returns `'revoked' or 'spent'`, revoked winning when both, matching the admin table's state precedence |
+| `src/app/admin/access/actions.ts` | calls the renamed query; audit detail gains `reason`, `useCount`, `maxUses`, and `revokedAt` is now nullable; refusal message now says "revoked or spent" |
+| `src/app/admin/access/AccessManager.tsx` | Delete shows on `revoked` **or** `spent`; the confirmation names which of the two |
+
+Unchanged, and verified unchanged: `requireAdmin()` still gates the action before any statement;
+the audit still runs inside the same `authSql.begin` as the DELETE, so an audit failure still
+rolls the deletion back; revoke keeps its own predicate, its own one-shot statement on the pool,
+and its own audit event; no migration, grant or privilege change was needed, because the widened
+rule is a `WHERE` clause and not a new capability.
 
 ---
 
@@ -176,30 +243,51 @@ Revoke → Delete on a real code in `/admin/access`, and only then consider prod
 
 ## 7. Status and evidence log
 
-Validation run by the operator from `D:\dev\afldb-issue-116` on **2026-08-31**.
+Two validation rounds. Round 1 covered the original revoked-only implementation; round 2 covers
+the revoked-or-spent widening from §5. **Round 2 is the current state.**
 
-| Milestone | State |
+### Round 2 — after the §5 widening (2026-08-31, `D:\dev\afldb-issue-116`)
+
+| Command | Result |
 |---|---|
-| Investigation (FKs, session refs, grants) | **done** — §2 |
-| Implementation | **done** — §3, working tree, uncommitted |
-| `npm ci` | **PASS** — 419 packages, 0 vulnerabilities |
-| `npx vitest run tests/admin-access-actions.test.ts` | **PASS — 1 file, 11/11 tests** |
-| `npx tsc --noEmit` | **PASS, clean (exit 0)** — after the fix recorded below |
-| `.env` supplied to this worktree | **done** — §4.1, copied from `afldb-issue-110` (55432 tunnel) |
-| `npm run db:migrate:test` | **PASS** — `applying 079_access_code_delete.sql ... ok (136 ms)`, 1 migration applied to `afldb_owner@127.0.0.1:55432/afldb_test` |
-| `npx vitest run tests/integration/access-codes.test.ts` | **PASS — 1 file, 4/4 tests** |
-| `npx vitest run tests/integration/privileges.test.ts` | **PASS — 1 file, 30/30 tests** (both together: 2 files, 34/34, 4.11 s) |
-| Post-run state check on `afldb_test` | **clean** — `leaked_fixture_rows = 0`; `has_table_privilege('afldb_auth','beta_access_codes','DELETE') = true` |
-| Migration 079 + `privileges.sql` applied to **dev** | **NOT DONE** |
-| Manual Revoke → Delete on dev `/admin/access` | **NOT DONE** |
-| Prod deploy | **NOT DONE** |
-| `CHANGELOG.md` entry | **done** — `Unreleased` |
+| `npx vitest run tests/admin-access-actions.test.ts` | **PASS — 1 file, 13/13** (was 11; +2 spent-code cases) |
+| `npx vitest run tests/integration/access-codes.test.ts` | **PASS — 1 file, 8/8** (was 4; +4 boundary cases) |
+| `npx vitest run tests/integration/privileges.test.ts` | **PASS — 1 file, 30/30** (unchanged) |
+| `npx tsc --noEmit` | **PASS, clean (exit 0)** |
+| Post-run state check on `afldb_test` | **clean — `leaked_fixture_rows = 0`** |
 
-**Totals: 45/45 tests passed across 3 files (11 unit + 4 + 30 integration). No failures, no
-skips.** Every one of the brief's eight validation requirements is exercised by a test that
-actually ran; the §4 coverage table maps each to its test name.
+**Round 2 total: 51/51 across 3 files. 0 failures, 0 skips.**
 
-### The one real defect found in validation, and its fix
+No migration, grant or privilege change was required by the widening: the rule is a `WHERE`
+clause, not a new capability. `afldb_dev` and `afldb_test` both already carry migration 079 and
+the reconciled `afldb_auth` DELETE grant, and neither was touched in round 2.
+
+### Round 1 — original revoked-only implementation (2026-08-31)
+
+| Command | Result |
+|---|---|
+| `npm ci` | PASS — 419 packages, 0 vulnerabilities |
+| `npx vitest run tests/admin-access-actions.test.ts` | PASS — 11/11 |
+| `npx tsc --noEmit` | PASS after the `postgres.ISql` fix recorded below |
+| `.env` supplied to this worktree | done — §4.1, copied from `afldb-issue-110` (55432 tunnel) |
+| `npm run db:migrate:test` | PASS — `applying 079_access_code_delete.sql ... ok (136 ms)` |
+| `npx vitest run tests/integration/access-codes.test.ts` | PASS — 4/4 |
+| `npx vitest run tests/integration/privileges.test.ts` | PASS — 30/30 |
+| Manual dev validation, Active → Revoke → Delete | **PASS** — and produced the §5 finding |
+
+### Deployment state
+
+| Item | State |
+|---|---|
+| Migration 079 on `afldb_test` | applied |
+| Migration 079 + `privileges.sql` on `afldb_dev` | applied (`grants applied on 34 of 34 tables, 29 other relations revoked`) |
+| Round-1 code deployed to dev | **yes** — `claude/issue-116` via `sync-dev.ps1 -RemoteRef claude/issue-116 -AllowDirtyServer`; dev is NOT on `dev`/`0c2100a` |
+| **Round-2 (§5) code deployed to dev** | **NO — working tree only, not committed, not pushed** |
+| Dev restored to `dev` @ `0c2100a` | **NO — still on the ISSUE-117 branch** |
+| Prod | **untouched** |
+| `CHANGELOG.md` entry | done — `Unreleased` |
+
+### The one real defect found in validation, and its fix (round 1)
 
 `npx tsc --noEmit` initially failed, and the failure was in this change:
 
@@ -215,19 +303,28 @@ Type 'Sql<{}> | TransactionSql<{}>' is not assignable to type 'Sql<{}>'.
 3.4.9 (`node_modules/postgres/types/index.d.ts:669,701,723`) `Sql` and `TransactionSql` are
 **siblings**: both extend `ISql`, and `TransactionSql` deliberately omits the pool-level members
 — `END`, `CLOSE`, `options`, `reserve`, and `begin` itself — precisely so a transaction handle
-cannot close the pool or open a nested connection. The pool's type therefore cannot describe
-both, and it was right that this did not compile.
+cannot close the pool or open a nested connection.
 
 **Fix:** annotate the handle as the shared base, `postgres.ISql`, which carries exactly the
-tagged-template call signature the `auth_audit_log` INSERT uses and nothing more. Both `Sql` and
-`TransactionSql` extend it, so this is ordinary widening — no cast, no `any`, no suppression,
-and the handle is *narrower* than before rather than looser: `write` can now only run queries,
-not manage a pool. The type-level statement matches what the helper actually needs.
+tagged-template call signature the `auth_audit_log` INSERT uses and nothing more. Ordinary
+widening — no cast, no `any`, no suppression — and the handle is *narrower* than before.
 
-**Exact next action:** apply §6 steps 1–2 to dev (`npm run db:migrate`, `npm run db:privileges`),
-deploy the code, and exercise Revoke → Delete by hand on dev `/admin/access` — including one
-attempt at deleting an active key, which must be refused. Then, and only then, resolve the issue
-in `issues.md` and `IssuesIndex.md` (open count 6 → 5) and move this file to `issues/closed/`.
+### Exact next action
 
-**Not resolved.** Automated validation is complete and green; the dev deploy and the manual
-lifecycle check are not, and prod is untouched.
+**Deploy the §5 widening to dev and re-validate by hand.** Dev currently runs the round-1 code,
+which still refuses to delete a spent code, so the new behaviour cannot be confirmed there yet.
+
+1. Commit and push the round-2 changes on `claude/issue-116`.
+2. `powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1 -RemoteRef claude/issue-116 -AllowDirtyServer`
+   — `-AllowDirtyServer` is required and precedented; see §6.
+3. Confirm `x-afldb-build` changed, then on `/admin/access` check all four states by hand:
+   a spent code offers **Delete** with no revoke first; a revoked code still offers Delete; an
+   active unused code offers **Revoke only**; and a partly-used code likewise offers Revoke only.
+4. Then restore dev: `sync-dev.ps1 -RemoteRef dev -AllowDirtyServer`. Migration 079 stays applied
+   (forward-only), and **do not** run `db:privileges` from the `dev` branch afterwards — its
+   spec lacks the DELETE and the reconciler is subtractive, so it would revoke the grant.
+5. Only then resolve: `issues.md` + `IssuesIndex.md` (open count 6 → 5) and move this file to
+   `issues/closed/`.
+
+**Not resolved.** Automated validation is complete and green for round 2; the dev deploy of the
+§5 change and its manual confirmation are not done, and prod is untouched.

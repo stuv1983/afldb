@@ -10978,7 +10978,7 @@ changed deliberately, not silently).
 
 ## AFLDB-ISSUE-117 — Revoked access keys cannot be removed from the admin UI
 
-- **Status:** Open — implemented and validated (45/45, 2026-08-31); awaiting dev deploy and manual lifecycle check
+- **Status:** Open — implemented incl. the revoked-or-spent widening; validated 51/51 (2026-08-31); awaiting dev deploy of that widening and its manual check
 - **Severity:** Medium
 - **Area:** Admin / Access management / Security
 - **Found:** 2026-08-31 (operator report)
@@ -11065,11 +11065,13 @@ Four things had to be established before a DELETE could be added at all.
 
 ### Validation
 
-**Run 2026-08-31 from `D:\dev\afldb-issue-116`. 45/45 passed across 3 files — 11 unit, 4 + 30
-integration — with 0 failures and 0 skips.** `npx tsc --noEmit` clean. Migration 079 applied to
-`afldb_test` (`applying 079_access_code_delete.sql ... ok (136 ms)`). Post-run check on that
-database: no fixture rows leaked, and `has_table_privilege('afldb_auth', 'beta_access_codes',
-'DELETE')` is true. Per-test coverage of the brief's eight requirements is in
+**Rerun 2026-08-31 after the widening: 51/51 passed across 3 files — 13 unit, 8 + 30
+integration — with 0 failures and 0 skips.** (The pre-widening round was 45/45.) `npx tsc
+--noEmit` clean. Migration 079 had been applied to `afldb_test` in the first round
+(`applying 079_access_code_delete.sql ... ok (136 ms)`); the widening needed no migration,
+grant or privilege change, because the rule is a `WHERE` clause and not a new capability.
+Post-run check on that database: no fixture rows leaked, and
+`has_table_privilege('afldb_auth', 'beta_access_codes', 'DELETE')` is true. Per-test coverage of the brief's eight requirements is in
 `issues/open/AFLDB-ISSUE-117.md` §4.
 
 `npx tsc --noEmit` **failed on the first run**, in this change, and the failure was real:
@@ -11093,20 +11095,47 @@ needs — ordinary widening, no cast or suppression, and a narrower handle than 
 - `tests/integration/privileges.test.ts` asserts `afldb_auth` holds `DELETE` on
   `beta_access_codes`, so a `privileges.sql` regression fails in CI rather than in the admin UI.
 
-### Known gap (deliberate, not fixed here)
+### Manual dev validation, and the rule it widened
 
-A **spent** or **expired** code has `revoked_at IS NULL`, so it is not deletable — and the
-existing UI offers Revoke only in the `live` state, so it cannot be revoked either. Such a code
-is therefore still undeletable after this change. That follows the brief exactly ("only revoked
-keys may expose the Delete action", "do not change the existing revoke semantics") and is
-recorded here rather than silently widened. Closing it means letting Revoke appear on `spent`
-and `expired` rows, which is a visibility change to the revoke path and an operator decision.
+Manual validation on dev passed for Active -> Revoke -> Delete, and confirmed the gap this entry
+had recorded as deliberate: a **spent** code (`use_count >= max_uses`) was undeletable, and since
+the admin table offers Revoke only in the `live` state it could be neither revoked nor deleted —
+it simply accumulated. Operator requirement: a spent code must be deletable **directly**, with no
+revoke that changes nothing.
+
+The predicate is now `revoked_at IS NOT NULL OR (max_uses IS NOT NULL AND use_count >= max_uses)`,
+and `deleteRevokedAccessCode` was renamed `deleteRetiredAccessCode` because a function still
+called `...Revoked` that also deletes spent codes is a trap for the next reader. The audit detail
+gained `reason` (`revoked` or `spent`, revoked winning when both), `useCount` and `maxUses`, and
+`revokedAt` is now nullable.
+
+**Why the widening is safe, and checkable:** every limb is a reason `redeemBetaCode`
+(`src/app/beta/actions.ts:80-88`) would refuse the code — it redeems only when `revoked_at IS
+NULL AND (expires_at IS NULL OR expires_at > now()) AND (max_uses IS NULL OR use_count <
+max_uses)`. "Revoked or spent" is therefore a **strict subset of "not redeemable"**: no code that
+could still admit someone became deletable. Two boundaries follow and are both tested — a
+**partly used** code stays refused (two of five uses spent still leaves three admissions), and an
+**unlimited** code is never spent (`max_uses IS NULL` makes the comparison NULL, not true), which
+is the case only real PostgreSQL three-valued logic settles.
+
+No migration, grant or privilege change was needed: the rule is a `WHERE` clause, not a new
+capability.
+
+### Still excluded: expiry
+
+An **expired** code is unredeemable but deliberately **not** deletable — expiry is a moving line
+that passes on its own, with nobody deciding anything, and deletion is irreversible. Consequence,
+unchanged: an expired unspent code is offered neither Revoke nor Delete and still cannot be
+disposed of. Operator decision; a one-limb change to `deleteRetiredAccessCode` if ever wanted.
 
 ### Next action
 
-Automated validation is complete and green. Remaining: deploy **migration 079 and
-`privileges.sql` before the application code** (`npm run db:migrate`, `npm run db:privileges`)
-— the reverse order leaves every delete failing closed on a permission error — then exercise
-Revoke -> Delete by hand on dev `/admin/access`, including one refused attempt on an active key.
-Dev before prod. Resolve only once that manual evidence is recorded in
-`issues/open/AFLDB-ISSUE-117.md` §7.
+Automated validation is complete and green (51/51). The database side is already deployed to
+`afldb_dev` (migration 079 + `privileges.sql`), and dev currently runs the **pre-widening**
+application code, which still refuses to delete a spent code. Remaining: commit/push the
+widening, redeploy `claude/issue-116` to dev (`sync-dev.ps1 -RemoteRef claude/issue-116
+-AllowDirtyServer` — the switch is required and precedented), then confirm all four states by
+hand on `/admin/access`: spent deletes directly, revoked deletes, active-unused offers Revoke
+only, partly-used offers Revoke only. Then restore dev to `dev`@`0c2100a` and **do not** run
+`db:privileges` from that branch — its spec lacks the DELETE and the reconciler is subtractive.
+Resolve only once that manual evidence is recorded in `issues/open/AFLDB-ISSUE-117.md` §7.

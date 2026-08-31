@@ -15,24 +15,32 @@ commit.
 
 ## [Unreleased]
 
-### AFLDB-ISSUE-117 — Revoked access keys can be permanently deleted from `/admin/access` - 31 August 2026
+### AFLDB-ISSUE-117 — Retired access keys can be permanently deleted from `/admin/access` - 31 August 2026
 
 - Beta access keys gain the last step of their lifecycle: **Active → Revoke → Delete**. Revoking
   still only sets `beta_access_codes.revoked_at` and keeps the record, which is what makes it the
-  right way to stop a key immediately; a revoked key can now also be removed once it is finished
-  with, instead of sitting in the admin list forever. Revoke's semantics and visibility are
-  unchanged.
+  right way to stop a key immediately; a key can now also be removed once it is finished with,
+  instead of sitting in the admin list forever. Revoke's semantics and visibility are unchanged.
+- **A key is deletable once it is *retired* — revoked, or spent.** A spent key
+  (`use_count >= max_uses`) deletes directly: requiring an admin to revoke something the database
+  already refuses was ceremony, and because Revoke is only offered while a key is `live`, a spent
+  key previously could be neither revoked nor deleted and simply accumulated. A key that could
+  still admit somebody is still refused — a **partly used** key has admissions left, and an
+  **unlimited** key (`max_uses IS NULL`, migration 036) is never spent and must be revoked first.
+  The rule is a strict subset of the redeem query's own refusal conditions, so widening what may
+  be deleted did not put a single live key at risk. An **expired** key stays undeletable by
+  design: expiry passes on its own, with nobody deciding anything, and deletion is irreversible.
 - **The revoked-only rule is in the statement, not the browser.**
-  `deleteRevokedAccessCode` (`src/db/queries/access-codes.ts`) carries
-  `WHERE id = … AND revoked_at IS NOT NULL`, so a request naming a live key's id matches no row
-  and deletes nothing. Hiding the button on an active key is presentation; this predicate is the
+  `deleteRetiredAccessCode` (`src/db/queries/access-codes.ts`) carries
+  `WHERE id = … AND (revoked_at IS NOT NULL OR (max_uses IS NOT NULL AND use_count >= max_uses))`,
+  so a request naming a still-redeemable key's id matches no row and deletes nothing. Hiding the button on an active key is presentation; this predicate is the
   rule. "Not revoked", "never existed" and "already deleted" return one message, so the endpoint
   cannot be used to discover which ids exist.
 - **The deletion cannot outlive its audit.** `access.code_deleted` is written inside the same
   `authSql.begin` as the DELETE, so a failed audit rolls the deletion back — the auth-pool
   counterpart of the guarantee `AFLDB-ISSUE-027` gave the import role. The trail records the
-  code's id, label and revocation time, which is enough to say what was destroyed, and no
-  secret: only the sha256 of the code was ever stored and it leaves with the row. `audit()` takes
+  code's id, label, use count and **which rule** made it disposable (`revoked` or `spent`), which
+  is enough to say what was destroyed and why it was allowed, and no secret: only the sha256 of the code was ever stored and it leaves with the row. `audit()` takes
   an optional transaction handle to make this possible and is unchanged for every existing
   caller.
 - **Migration 079** grants `afldb_auth` `DELETE` on `beta_access_codes` — a privilege it did not
@@ -47,10 +55,9 @@ commit.
   the signed claim alone and never look that id up. Deleting a key therefore ends no live session
   — and neither does revoking one; the epoch and the TTL remain the only ways to cut a beta
   session short. Ids are `GENERATED ALWAYS AS IDENTITY`, so a freed id is never reissued.
-- On a revoked row the admin UI shows **Delete…**, which opens an in-row confirmation naming the
-  key before anything is submitted, styled apart from Revoke with a new `.btn-danger`. A spent or
-  expired key still has `revoked_at IS NULL` and so remains undeletable — recorded as a known gap
-  in `issues/open/AFLDB-ISSUE-117.md` §5 rather than widened here.
+- On a revoked **or spent** row the admin UI shows **Delete…**, which opens an in-row
+  confirmation naming the key and its state before anything is submitted, styled apart from
+  Revoke with a new `.btn-danger`.
 
 ### AFLDB-ISSUE-115 — Data QA search composes related-domain cards on one anchor (Resolved) - 30 August 2026
 
