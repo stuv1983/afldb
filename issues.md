@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 7 tracked here — `AFLDB-ISSUE-102`, `-104`, `-110`, `-112`, `-113`, `-116`, `-117`.
+**Open issues:** 8 tracked here — `AFLDB-ISSUE-102`, `-104`, `-110`, `-112`, `-113`, `-116`, `-117`, `-119`.
 
 <!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
      the ISSUE-110 branch merged into dev on 2026-08-31 and its own ledger rows below are
@@ -15,6 +15,7 @@ created, reopened, resolved, or materially reclassified.
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
+| `AFLDB-ISSUE-119` | Medium | Admin / Security / NL search / Telemetry / Database | Stage 1 maps three NL relations plus the incoming app-health FK. Disposable log rows may be cleared; durable admin reviews, immutable reader feedback, their required log/ancestor context, app-health rows and audit history must remain. No implementation, migration, grant or database mutation has occurred. Runbook: `issues/open/AFLDB-ISSUE-119.md`. Renumbered from `AFLDB-ISSUE-118` on 2026-09-01: the Gridley corpus project holds committed ISSUE-118 on `opus/gridley-corpus`, while this claim was still uncommitted (runbook §0). | **APPROVED 2026-09-01 (§5.1). Fresh Stage 2 session starts with the selective DELETE migration — number derived per §7, since 080 is taken by the Gridley branch — plus restricted-role, rollback and the mandatory deeper-than-one-parent ancestry tests, before any action or UI.** |
 | `AFLDB-ISSUE-102` | Medium | Data acquisition / Import architecture | **PARENT.** Scope revised 2026-08-30 by operator decision from "record only" to parent architecture / dependency-inventory / child-coordination / acceptance record for legacy-free awards acquisition. `tools/migration/import_awards.py:1408` still requires `AFLDB_LEGACY_SQLITE` for six of seven groups (`under_22` is already legacy-free). `tools/db/rebuild-test.ts` has **no awards stage**, so a canonical rebuild leaves all six awards/honours tables at **zero rows**, ungated. ISSUE-102 does not implement loaders. | **No implementation. Coordinate `AFLDB-ISSUE-111` (Coleman derivation), `-112` (curated honours manifests) and `-113` (Brownlow season totals; outside this issue's closure boundary).** Closure criteria in `issues/open/AFLDB-ISSUE-102.md` §8. Next action is operator: authorise the read-only measurement gating ISSUE-112 G0, and decide the one-time extraction source (ISSUE-112 §11.1). `AFLDB-ISSUE-111` is **Resolved 2026-08-30** — Coleman is legacy-free by derivation and canonically rebuild-gated. |
 | `AFLDB-ISSUE-112` | Medium | Data acquisition / Import architecture / Data integrity | Replace the legacy SQLite input of the six legacy-dependent `import_awards.py` groups with checked-in, validated, reviewable curated manifests: All-Australian, Hall of Fame, honour teams, captaincies, Rising Star, club best-and-fairest, named medals (+ award definitions and the `person_links` bridge). Reuses `reload_keyed` unchanged — only the **input** changes. Scraping, HTML parsing, paid APIs and undocumented endpoints are **not** authorised. | **Blocked on gate G0** (per-family read-only coverage measurement) **and operator prerequisite §11.1** — where the one-time extraction comes from. Recommended phasing, smallest first: honour teams (113 rows) → Hall of Fame (343) → captaincies (1,375) → Rising Star (766) → All-Australian (2,158) → club B&F → named medals. Headline acceptance: `awards-reload-links.test.ts:205-1247` executes without `AFLDB_LEGACY_SQLITE`. |
 | `AFLDB-ISSUE-113` | Medium | Data acquisition / Import architecture / Data integrity | `brownlow_season_votes` has **no legacy-free writer** — sole writer `import_legacy_afl.py:684`. `rebuild_derived.py:23-26` and `db-health.ts:94` treat it as AUTHORITATIVE. Not reconstructible from round votes: season totals are complete 1924-1941 and 1946-2025 while round votes are complete only 1984-2025, and `vote_rank`/`eligible_rank`/`is_ineligible` are not computable from vote sums. **Silent-wrongness hazard:** with the table empty, `rebuild_derived.py`'s `season_brownlow` CTE falls every decided season to `not_applicable` — AFLDB would assert "no medal that season" for a century. | **Replacement source UNDECIDED and no selection is authorised.** Recommended next step, not a decision: a read-only probe of class B (a free structured season-summary source carrying rank **and** ineligibility) before committing to a 16,120-row manifest. Outside `AFLDB-ISSUE-102`'s closure boundary — 102 may resolve with this open. |
@@ -11255,3 +11256,46 @@ Implement F1 (per-IP limiter on the NL search entry, reusing
 `src/lib/auth/rate-limit.ts`, fail-open, friendly UI response) plus F2/F3 in one focused
 session per runbook §5; validate per §9. Binding launch precondition: close or explicitly
 re-adjudicate this issue before disabling `AFLDB_BETA_GATE` in production.
+
+## AFLDB-ISSUE-119 — Super Admin can clear NL search telemetry
+
+- **Status:** Approved — Stage 1 complete; §5/§6 retained-evidence boundary approved by the operator 2026-09-01; Stage 2 authorised but not started
+- **Renumbered:** 2026-09-01, from `AFLDB-ISSUE-118` — the Gridley compatibility-corpus project holds committed ISSUE-118 on branch `opus/gridley-corpus` (`9ecc6fc`, `28fdb2f`, `6e3b38a`); this issue's claim was still uncommitted. Evidence in `issues/open/AFLDB-ISSUE-119.md` §0. Branch `codex/issue-118` and its worktree were deliberately not renamed.
+- **Created:** 2026-08-31
+- **Resolved:** N/A
+- **Severity:** Medium
+- **Area:** Admin / Security / Natural-language search / Telemetry / Database
+- **Files:** `issues/open/AFLDB-ISSUE-119.md`, `IssuesIndex.md`, `issues.md`
+- **Runbook:** `issues/open/AFLDB-ISSUE-119.md` (authoritative Stage 1 inventory, retention/security/deletion contract, tests, acceptance criteria and Stage 2 gate)
+
+### Symptom
+
+The Super Admin NL dashboard can inspect, review and export accumulated search telemetry but has no governed way to retire disposable operational rows.
+
+### Expected
+
+A deliberate Super Admin-only action clears only disposable NL engine telemetry while preserving durable reviews, reader feedback, their required context, audit history, configuration/reference data and unrelated application data.
+
+### Actual
+
+No clear action exists. The `afldb_auth` role deliberately has no `DELETE` or `TRUNCATE` on `nl_search_log`, `nl_search_review` or `nl_search_feedback`.
+
+### Evidence
+
+Migrations 046/047/049 and `docs/search.md` establish three distinct meanings: engine telemetry, administrator conclusion and immutable reader feedback. `nl_search_review.search_log_id` is a `NO ACTION` FK to the log; feedback deliberately correlates by `client_ref` without an FK; `app_health_events.related_search_id` uses `ON DELETE SET NULL`. The current privilege reconciler grants log/feedback append-only access and review update access, never deletion. Full inventory and call paths are in the runbook.
+
+### Root cause
+
+Not a defect root cause. The original telemetry design intentionally provided append-only collection, Super Admin reporting/review and audited export, but no retention/reset capability.
+
+### Fix
+
+Not yet implemented. Stage 1 recommends a selective `DELETE` of unprotected log rows through one narrowly executable `afldb_auth` capability, with durable-evidence closure, same-transaction count-only audit, explicit writer locks, server-side Super Admin enforcement and typed confirmation. `TRUNCATE` and direct table DELETE grants are rejected.
+
+### Validation
+
+Stage 1 source/graph investigation only. No tests, builds, SQL, database mutations or production operations ran. Required Stage 2 validation is specified in the runbook. On 2026-09-01 the runbook's schema, grant and authorisation claims were re-verified directly against source (migrations 047/049/052, `tools/maintenance/privileges.sql`, `src/lib/auth/session.ts`, `src/app/admin/nl-search/`) and none required correction; one finding was recorded — `audit()` binds the module-level `authSql` and so cannot join a caller's transaction as written, confirming the transaction-aware variant the atomicity contract requires. The operator then approved the retention boundary and strengthened the validation contract so the recursive retained-ancestor test must cover a chain deeper than one parent.
+
+### Follow-up
+
+**Operator approved the §5/§6 boundary on 2026-09-01 exactly as documented; the Stage 2 gate is cleared.** A fresh Stage 2 session begins with the selective DELETE migration — number re-derived per runbook §7, since `080` is taken by the Gridley branch — and the restricted-function, rollback and mandatory deeper-than-one-parent recursive-ancestry tests before action or UI implementation. Do not invoke a real telemetry reset while ISSUE-110's incomplete validation evidence is under review.

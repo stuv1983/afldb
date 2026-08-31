@@ -7,9 +7,17 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-08-31
-**Open issues:** 7 tracked here — `AFLDB-ISSUE-102`, `AFLDB-ISSUE-104`,
+**Open issues:** 8 tracked here — `AFLDB-ISSUE-102`, `AFLDB-ISSUE-104`,
 `AFLDB-ISSUE-110`, `AFLDB-ISSUE-112`, `AFLDB-ISSUE-113`, `AFLDB-ISSUE-116`,
-`AFLDB-ISSUE-117`.
+`AFLDB-ISSUE-117`, `AFLDB-ISSUE-119`.
+
+<!-- ALLOCATION WARNING 2026-09-01: `AFLDB-ISSUE-118` is allocated and is NOT free.
+     It belongs to the Gridley compatibility-corpus project on branch `opus/gridley-corpus`,
+     which has committed Stage 0/1/2 under that ID. The NL-search telemetry issue below was
+     renumbered 118 -> 119 on 2026-09-01 because its claim was still uncommitted; see
+     `issues/open/AFLDB-ISSUE-119.md` §0. Next free issue ID is `AFLDB-ISSUE-120`.
+     NOTE: branch `codex/issue-118` and worktree `D:\dev\afldb-issue-118` still carry the
+     old number and were deliberately not renamed. -->
 
 <!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
      the ISSUE-110 branch merged into dev on 2026-08-31 and its own row below is now
@@ -30,6 +38,7 @@
 
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
+| `AFLDB-ISSUE-119` | Medium | Admin / Security / NL search / Telemetry / Database | **Stage 1 complete; §5/§6 boundary APPROVED by the operator 2026-09-01; Stage 2 authorised but not started.** The safe reset target is disposable `nl_search_log` only. Repository contracts make `nl_search_review` durable admin decisions and `nl_search_feedback` immutable reader facts, so both and their minimum log/parent-chain context must survive. Proposed mechanism: selective `DELETE` through one `afldb_auth`-executable, owner-defined fixed function; no direct DELETE/TRUNCATE grant, no sequence reset, mandatory same-transaction count-only `auth_audit_log` event, child-before-parent writer locks, typed confirmation, and test-only restricted-role proof. Runbook: `issues/open/AFLDB-ISSUE-119.md` (renumbered from 118 on 2026-09-01; `opus/gridley-corpus` holds committed ISSUE-118). Approval binds Stage 2 to the §5.1 obligation table and adds a mandatory recursive-ancestry test deeper than one parent (§13). **Next action: fresh Stage 2 session — derive the migration number (080 is taken by the Gridley branch), then the restricted DELETE function, exact grants and multi-level ancestry/rollback tests before any action or UI.** |
 <!-- RETIRED 2026-08-30 — `AFLDB-ISSUE-107` is **Resolved** and is NO LONGER an open issue.
      Its pre-resolution row and detail block are retired below; their "Only open gate" and
      "Exact next action" text is SUPERSEDED. Authoritative records: the `AFLDB-ISSUE-107`
