@@ -60,6 +60,7 @@ import psycopg  # noqa: E402
 
 from common import (  # noqa: E402
     Reporter,
+    check_population_drop,
     connect_legacy,
     connect_pg,
     import_batch,
@@ -78,6 +79,220 @@ SOURCE_KEY = "afltables"
 
 # A date outside this range is a parsing artefact, not a birth date.
 EARLIEST_PLAUSIBLE = date(1850, 1, 1)
+
+# AFLDB-ISSUE-090: shared shape for the versioned dob_conflict payload.
+# This pass owns the 'register' key of disputed_by; the club-list pass
+# (enrich_birth_dates_from_club_lists.py) owns 'club_list'. Neither pass
+# ever writes the other's key, and both read resolved history to avoid
+# refiling an adjudicated finding (D1). Kept duplicated rather than shared
+# via common.py: see issues/closed/AFLDB-ISSUE-090.md Sec 20 for the approved file list.
+CLUB_EXTERNAL_ID_RE = re.compile(r"^club-list:([a-z0-9-]+):")
+
+
+def _club_list_fp(club: str | None, external_id: str | None, asserted, existing) -> tuple:
+    return ("club_list", club, external_id, str(asserted), str(existing))
+
+
+def _register_fp(external_id: str | None, asserted, existing) -> tuple:
+    return ("register", external_id, str(asserted), str(existing))
+
+
+def _expand_resolved_fingerprints(
+    rows,
+) -> tuple[dict[int, set[tuple]], dict[int, set[tuple]]]:
+    """Resolved dob_conflict rows -> per-player fingerprint sets (D1, Sec 6.2).
+
+    Handles all three resolved-history shapes: legacy register (A), legacy
+    club-list (B, lossless), and v2 aggregate (C). A shape-A row cannot
+    contribute to the full set because it has no external_id -- the
+    documented reader asymmetry that ignores external_id on both sides
+    when comparing against a shape-A row.
+    """
+    full: dict[int, set[tuple]] = defaultdict(set)
+    register_partial: dict[int, set[tuple]] = defaultdict(set)
+    for entity_id, details in rows:
+        if not isinstance(details, dict):
+            continue
+        disputed_by = details.get("disputed_by")
+        if isinstance(disputed_by, dict):
+            for pass_key, assertions in disputed_by.items():
+                if not isinstance(assertions, list):
+                    continue
+                for a in assertions:
+                    if not isinstance(a, dict):
+                        continue
+                    if "asserted" not in a or "existing_at_detection" not in a:
+                        continue
+                    if pass_key == "club_list":
+                        full[entity_id].add(_club_list_fp(
+                            a.get("club"), a.get("external_id"),
+                            a["asserted"], a["existing_at_detection"]))
+                    elif pass_key == "register":
+                        full[entity_id].add(_register_fp(
+                            a.get("external_id"), a["asserted"], a["existing_at_detection"]))
+        elif "club_list" in details:
+            ext = details.get("external_id")
+            match = CLUB_EXTERNAL_ID_RE.match(ext or "")
+            club = match.group(1) if match else None
+            full[entity_id].add(_club_list_fp(club, ext, details.get("club_list"), details.get("existing")))
+        elif "register" in details:
+            register_partial[entity_id].add((str(details.get("register")), str(details.get("existing"))))
+    return full, register_partial
+
+
+def _assertion_sort_key(a: dict) -> tuple:
+    return (a.get("club") or "", a["external_id"], a["asserted"])
+
+
+def _build_v2_payload(disputed_by: dict) -> str:
+    """Deterministic JSON: sorted assertion arrays, sorted keys (Sec 5.1)."""
+    cleaned = {}
+    for pass_key in ("club_list", "register"):
+        assertions = disputed_by.get(pass_key) or []
+        if assertions:
+            cleaned[pass_key] = sorted(assertions, key=_assertion_sort_key)
+    payload = {"version": 2, "disputed_by": cleaned, "resolution": "manual review required"}
+    return json.dumps(payload, sort_keys=True)
+
+
+def _describe_dob_conflict(existing_dob, disputed_by: dict) -> str:
+    parts = []
+    for a in disputed_by.get("club_list") or []:
+        parts.append(f"the {a['club']} all-time club list ({a['external_id']}) reports {a['asserted']}")
+    for a in disputed_by.get("register") or []:
+        parts.append(f"the AFL Tables club register ({a['external_id']}) reports {a['asserted']}")
+    existing_text = str(existing_dob) if existing_dob is not None else "no recorded date"
+    return (
+        f"Existing date of birth {existing_text} disagrees with "
+        + "; ".join(parts)
+        + ". The existing value has been retained pending adjudication."
+    )
+
+
+def reconcile_register_conflicts(
+    pg,
+    to_fill: list[tuple[int, date, int, str]],
+    source_conflicts: list[tuple[int, date, date, str | None]],
+    internal_conflicts: list[tuple[int, list[date]]],
+    agreements: list[tuple[int, date, str | None]],
+) -> set[int]:
+    """Sec 8/10 reconciliation, scoped to this run's resolved population.
+
+    Owned population = every AFLDB player this run actually produced
+    evidence for (to_fill/source_conflicts/internal_conflicts/agreements).
+    A player carrying a register assertion but touched by none of those is
+    left alone -- absence from the resolved population is not authoritative
+    cessation (Sec 8). Runs inside the caller's already-open transaction.
+    Returns the set of player ids whose dob issue state changed, for the D5
+    dob_disputed recompute -- never a global sweep (Sec 13).
+    """
+    owned: set[int] = set()
+    owned.update(pid for pid, *_ in to_fill)
+    owned.update(pid for pid, *_ in source_conflicts)
+    owned.update(pid for pid, *_ in internal_conflicts)
+    owned.update(pid for pid, *_ in agreements)
+    if not owned:
+        return set()
+
+    with pg.cursor() as cur:
+        cur.execute(
+            """SELECT entity_id, details FROM data_issues
+                WHERE entity_type = 'player' AND issue_type = 'dob_conflict'
+                  AND resolved_at IS NOT NULL"""
+        )
+        resolved_rows = cur.fetchall()
+    r_full, r_register_partial = _expand_resolved_fingerprints(resolved_rows)
+
+    # D1, with the documented shape-A asymmetry: a shape-A resolved row
+    # carries no external_id, so suppression there ignores it on both
+    # sides (Sec 6.2).
+    mine: dict[int, dict] = {}
+    for pid, existing, asserted, ext in source_conflicts:
+        fp = _register_fp(ext, asserted, existing)
+        if fp in r_full.get(pid, set()):
+            continue
+        if (str(asserted), str(existing)) in r_register_partial.get(pid, set()):
+            continue
+        mine[pid] = {
+            "source": SOURCE_KEY, "external_id": ext,
+            "asserted": str(asserted), "existing_at_detection": str(existing),
+        }
+
+    with pg.cursor() as cur:
+        cur.execute(
+            """SELECT id, entity_id, details FROM data_issues
+                WHERE entity_type = 'player' AND issue_type = 'dob_conflict'
+                  AND resolved_at IS NULL AND entity_id = ANY(%s)
+                FOR UPDATE""",
+            (list(owned),),
+        )
+        existing_rows = cur.fetchall()
+    by_player = {entity_id: (issue_id, details) for issue_id, entity_id, details in existing_rows}
+
+    with pg.cursor() as cur:
+        cur.execute("SELECT id, dob FROM players WHERE id = ANY(%s)", (list(owned),))
+        current_dob = {pid: dob for pid, dob in cur.fetchall()}
+
+    affected: set[int] = set()
+    with pg.cursor() as cur:
+        for pid in owned:
+            issue_id, details = by_player.get(pid, (None, None))
+            disputed_by = (details or {}).get("disputed_by") or {}
+            club_list_assertions = disputed_by.get("club_list") or []  # never touched by this pass
+
+            register_assertion = mine.get(pid)
+            new_disputed_by = {}
+            if club_list_assertions:
+                new_disputed_by["club_list"] = club_list_assertions
+            if register_assertion is not None:
+                new_disputed_by["register"] = [register_assertion]
+
+            if not new_disputed_by:
+                if issue_id is not None:
+                    cur.execute("DELETE FROM data_issues WHERE id = %s", (issue_id,))
+                affected.add(pid)
+                continue
+
+            description = _describe_dob_conflict(current_dob.get(pid), new_disputed_by)
+            payload = _build_v2_payload(new_disputed_by)
+            if issue_id is not None:
+                cur.execute(
+                    "UPDATE data_issues SET details = %s, description = %s WHERE id = %s",
+                    (payload, description, issue_id),
+                )
+            else:
+                cur.execute(
+                    """INSERT INTO data_issues
+                         (entity_type, entity_id, issue_type, severity, description, details)
+                       VALUES ('player', %s, 'dob_conflict', 'warning', %s, %s)""",
+                    (pid, description, payload),
+                )
+            affected.add(pid)
+
+        # dob_internal_conflict: scoped delete-then-refile over the same
+        # owned population (Sec 10 step 6 / Sec 9) -- single writer, no
+        # aggregation need, the import-first-kick-goal.ts:1305-1312 idiom.
+        cur.execute(
+            """DELETE FROM data_issues
+                WHERE entity_type = 'player' AND issue_type = 'dob_internal_conflict'
+                  AND resolved_at IS NULL AND entity_id = ANY(%s)""",
+            (list(owned),),
+        )
+        for pid, dates in internal_conflicts:
+            cur.execute(
+                """INSERT INTO data_issues
+                     (entity_type, entity_id, issue_type, severity, description, details)
+                   VALUES ('player', %s, 'dob_internal_conflict', 'warning', %s, %s)""",
+                (
+                    pid,
+                    "The club register asserts more than one date of birth for this "
+                    "player across its rows. No date has been applied.",
+                    json.dumps({"dates": [str(d) for d in dates]}, sort_keys=True),
+                ),
+            )
+            affected.add(pid)
+
+    return affected
 
 
 def normalise_profile_url(url: str | None) -> str | None:
@@ -167,6 +382,15 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true",
                         help="Report what would change without writing.")
     parser.add_argument("--quiet", action="store_true")
+    # AFLDB-ISSUE-092: --source-key scopes every read/write/delete to one
+    # sources row, so a test/partial invocation can be structurally
+    # contained away from the real population. --acknowledge-population-drop
+    # is the explicit per-invocation bypass for the Sec 4 threshold check.
+    parser.add_argument("--source-key", default=SOURCE_KEY,
+                        help=f"sources.key to attribute this run to (default: {SOURCE_KEY}).")
+    parser.add_argument("--acknowledge-population-drop", action="store_true",
+                        help="Explicitly permit an external_identities drop above the "
+                             "fail-closed population-sanity threshold (AFLDB-ISSUE-092).")
     args = parser.parse_args()
 
     load_env()
@@ -195,14 +419,17 @@ def main() -> int:
             "WHERE legacy_player_id IS NOT NULL"
         )
         players = {legacy: (pid, dob) for legacy, pid, dob in cur.fetchall()}
-        cur.execute("SELECT id FROM sources WHERE key = %s", (SOURCE_KEY,))
-        source_id = cur.fetchone()[0]
+        cur.execute("SELECT id FROM sources WHERE key = %s", (args.source_key,))
+        source_row = cur.fetchone()
+        if source_row is None:
+            sys.exit(f"ERROR: no sources row with key {args.source_key!r}.")
+        source_id = source_row[0]
 
     # Classify before writing anything.
     internal_conflicts: list[tuple[int, list[date]]] = []
     to_fill: list[tuple[int, date, int, str]] = []      # afldb_id, dob, occurrences, key
-    source_conflicts: list[tuple[int, date, date]] = []  # afldb_id, existing, asserted
-    agreements = 0
+    source_conflicts: list[tuple[int, date, date, str | None]] = []  # afldb_id, existing, asserted, external_id
+    agreements: list[tuple[int, date, str | None]] = []  # afldb_id, asserted, external_id
     unknown_players = 0
 
     for legacy_id, dates in evidence.items():
@@ -211,6 +438,7 @@ def main() -> int:
             unknown_players += 1
             continue
         afldb_id, existing = entry
+        external_id = profile_urls.get(legacy_id)
 
         if len(dates) > 1:
             # The register itself disagrees. Do not choose.
@@ -221,18 +449,18 @@ def main() -> int:
         if existing is None:
             to_fill.append((afldb_id, asserted, occurrences, str(legacy_id)))
         elif existing == asserted:
-            agreements += 1
+            agreements.append((afldb_id, asserted, external_id))
         else:
-            source_conflicts.append((afldb_id, existing, asserted))
+            source_conflicts.append((afldb_id, existing, asserted, external_id))
 
     rep.result("players with evidence", len(evidence))
     rep.result("dates to fill", len(to_fill))
-    rep.result("agreements with existing data", agreements)
+    rep.result("agreements with existing data", len(agreements))
     if internal_conflicts:
         rep.warn(f"{len(internal_conflicts)} players have conflicting dates within the register")
     if source_conflicts:
         rep.warn(f"{len(source_conflicts)} players conflict with an existing AFLDB date")
-        for afldb_id, existing, asserted in source_conflicts:
+        for afldb_id, existing, asserted, _ext in source_conflicts:
             rep.warn(f"    player {afldb_id}: existing {existing} vs register {asserted}")
     if unknown_players:
         rep.warn(f"{unknown_players} legacy ids have no AFLDB player")
@@ -244,7 +472,7 @@ def main() -> int:
         pg.close()
         return 0
 
-    with import_batch(pg, SOURCE_KEY, "enrich_birth_dates.py",
+    with import_batch(pg, args.source_key, "enrich_birth_dates.py",
                       "player_birth_evidence") as batch:
         batch.records_read = rows_read
 
@@ -301,12 +529,37 @@ def main() -> int:
             # under the old key (the legacy row id) would otherwise survive
             # alongside the URL-keyed ones and double the count. Remove the
             # rows this pass owns that it is no longer asserting.
+            #
+            # AFLDB-ISSUE-092 Sec 4: that delete is correct only if this
+            # run's register is the complete population, which nothing above
+            # proves. Fail closed, before any delete, when the asserted
+            # population is empty or would drop more than the threshold of
+            # the stored population; import_batch's rollback-on-exception
+            # leaves nothing half-applied.
+            asserted_ids = [ext for _, ext, _ in identity_rows]
+            cur.execute(
+                """SELECT count(*),
+                          count(*) FILTER (WHERE external_id <> ALL(%s::text[]))
+                     FROM external_identities
+                    WHERE source_id = %s
+                      AND match_method = 'afltables_profile_url'""",
+                (asserted_ids, source_id),
+            )
+            stored_count, candidate_delete_count = cur.fetchone()
+            check_population_drop(
+                stored_count=stored_count,
+                asserted_count=len(identity_rows),
+                candidate_delete_count=candidate_delete_count,
+                label=f"external_identities ({args.source_key}/afltables_profile_url)",
+                acknowledged=args.acknowledge_population_drop,
+                reporter=rep,
+            )
             cur.execute(
                 """DELETE FROM external_identities
                     WHERE source_id = %s
                       AND match_method = 'afltables_profile_url'
-                      AND external_id <> ALL(%s)""",
-                (source_id, [ext for _, ext, _ in identity_rows]),
+                      AND external_id <> ALL(%s::text[])""",
+                (source_id, asserted_ids),
             )
 
             cur.executemany(
@@ -392,57 +645,27 @@ def main() -> int:
             )
             batch.records_updated = cur.rowcount if cur.rowcount > 0 else len(to_fill)
 
-            # 4. Flag disagreements rather than resolving them.
-            disputed = [pid for pid, _, _ in source_conflicts]
-            disputed += [pid for pid, _ in internal_conflicts]
-            if disputed:
-                cur.execute(
-                    "UPDATE players SET dob_disputed = true WHERE id = ANY(%s)",
-                    (disputed,),
-                )
-
-            # Re-running must not stack duplicate issues. Only UNRESOLVED
-            # ones this pass owns are cleared; anything already
-            # adjudicated is history and stays.
-            cur.execute(
-                """DELETE FROM data_issues
-                    WHERE entity_type = 'player'
-                      AND issue_type IN ('dob_conflict', 'dob_internal_conflict')
-                      AND resolved_at IS NULL"""
+            # 4. Reconcile dob_conflict/dob_internal_conflict against this
+            #    run's resolved population, scoped and idempotent
+            #    (AFLDB-ISSUE-090 Sec 8/10). Replaces the prior unscoped
+            #    DELETE, which erased unresolved club-list findings it did
+            #    not own.
+            affected = reconcile_register_conflicts(
+                pg, to_fill, source_conflicts, internal_conflicts, agreements,
             )
 
-            for afldb_id, existing, asserted in source_conflicts:
+            # D5: recompute dob_disputed only for players this run's
+            # reconciliation actually touched -- never a global sweep.
+            if affected:
                 cur.execute(
-                    """INSERT INTO data_issues
-                         (entity_type, entity_id, issue_type, severity,
-                          description, details)
-                       VALUES ('player', %s, 'dob_conflict', 'warning', %s, %s)""",
-                    (
-                        afldb_id,
-                        f"Existing date of birth {existing} disagrees with the AFL Tables "
-                        f"club register, which reports {asserted}. The existing value has "
-                        f"been retained pending adjudication.",
-                        json.dumps({
-                            "existing": str(existing),
-                            "register": str(asserted),
-                            "source": SOURCE_KEY,
-                            "resolution": "manual review required",
-                        }),
-                    ),
-                )
-
-            for afldb_id, dates in internal_conflicts:
-                cur.execute(
-                    """INSERT INTO data_issues
-                         (entity_type, entity_id, issue_type, severity,
-                          description, details)
-                       VALUES ('player', %s, 'dob_internal_conflict', 'warning', %s, %s)""",
-                    (
-                        afldb_id,
-                        "The club register asserts more than one date of birth for this "
-                        "player across its rows. No date has been applied.",
-                        json.dumps({"dates": [str(d) for d in dates]}),
-                    ),
+                    """UPDATE players p
+                          SET dob_disputed = EXISTS (
+                                SELECT 1 FROM data_issues d
+                                 WHERE d.entity_type = 'player' AND d.entity_id = p.id
+                                   AND d.issue_type IN ('dob_conflict', 'dob_internal_conflict')
+                                   AND d.resolved_at IS NULL)
+                        WHERE p.id = ANY(%s)""",
+                    (list(affected),),
                 )
 
         pg.commit()

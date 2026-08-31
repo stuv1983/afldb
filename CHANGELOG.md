@@ -15,6 +15,1057 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-110 — ranked career season-scope fail-closed guard - 31 August 2026
+
+- Parser version remains 32. Validation now refuses every non-predicate
+  `player_career` execution path carrying `seasonMin` or `seasonMax`, because
+  neither whole-career condition columns nor ranked career metric SQL consumes
+  those bounds. Questions such as `most career goals since 2000` and `most
+  career goals in 2000` therefore decline honestly instead of ranking
+  unrestricted all-time totals while displaying the requested period.
+- Direct-validator and realistic parser regressions cover lower-only,
+  upper-only, and exact-year bounds while preserving ordinary all-time career
+  rankings, unscoped career-condition lists, named-year/player-season queries,
+  generic-season thresholds, and supported club-scoped career rankings. The
+  focused parser/validator suites pass 182/182, the complete DB-free ISSUE-110
+  matrix passes 14 suites / 733 tests, and typecheck passes. The authoritative
+  post-final-revision operator gate passes 2 files / 46 tests in 20.65 s
+  (`nl-answers-game-season` 24/24; `nl-semantic-mapping` 22/22). ISSUE-110
+  remains open pending a fresh final independent code review.
+- Removed the three documented temporary ISSUE-110 artifacts only:
+  `tools/nl/issue110-classify.ts`, `tools/nl/issue110-node-preload.cjs`, and the
+  ignored `tests/nl-ui/.auth/state.json`.
+
+### AFLDB-ISSUE-110 — generic season ownership and player-season tie-policy gate - 31 August 2026
+
+- Parser version 32. A sole career-vocabulary threshold explicitly governed
+  by generic `in a season` now routes through the existing `player_season`
+  metric-condition machinery before game/scoped-total routing can steal it.
+  Goals, games, and Brownlow-vote comparators retain their exact operator and
+  value without inventing a named year. Compatible club scope remains valid;
+  opponent, venue, finals/match-type, round, and matchup combinations retain
+  their scope and decline through existing season validation rather than
+  answering a game, career, or unscoped season question.
+- Generic-season thresholds on columns with no player-season representation
+  now fail closed. Top-N plus a per-season threshold also declines rather than
+  silently becoming an unranked career list, because the current executor does
+  not define the combined ranking semantics.
+- `validatePlan` no longer accepts `tiePolicy: "first"` for `player_season`
+  while `answerPlayerSeason` always uses `rank()` and returns all ties;
+  `tiePolicy: "all"` remains valid. Focused parser/validator coverage is
+  179/179, the complete DB-free NL matrix is 14 suites / 730 tests, and
+  typecheck passes. The operator-run final post-change `_test` gate passed
+  **2 files / 46 tests in 19.30 s**: `nl-answers-game-season` 24/24 and
+  `nl-semantic-mapping` 22/22. ISSUE-110 remains open pending a fresh Codex
+  final independent code review; no large-scale validation may run first.
+
+### AFLDB-ISSUE-110 — season-scope fail-closed backstop, telemetry fallback narrowing - 31 August 2026
+
+- Parser version 31 (bounded revision after the final Codex review). A
+  `player_season` plan can no longer silently discard match-level scope its
+  executor never consumes: "players with more than 20 disposals in a season
+  against Carlton" (likewise venue, finals/match-type, and round variants) now
+  refuses honestly — "A season total cannot be scoped to a venue, opponent,
+  match type, or round." — instead of answering whole-season disposals with the
+  scope dropped. Legitimate season thresholds, named-year thresholds, and
+  club-scoped season leaderboards are unchanged; the gate mirrors the career
+  backstop added in parser version 30, so the fail-closed invariant now covers
+  both grains.
+- The NL telemetry non-request fallback in `logNlSearch` is narrowed to the one
+  error Next 16 defines for "no request scope exists" (verified against the
+  installed implementation); any other synchronous `after()` failure is
+  reported and isolated rather than misclassified as legitimate non-request
+  execution. Request-scope scheduling and telemetry-failure isolation are
+  unchanged.
+
+### AFLDB-ISSUE-110 — career-threshold scope fail-closed revision - 31 August 2026
+
+- Parser version 30 (revision after Codex review). A career-vocabulary threshold
+  can no longer silently discard explicit match scope: "players with more than 2
+  goals against Carlton" now routes to the scoped `player_game/sum` threshold
+  (the same scoped-total rule the ranked path uses) instead of a whole-career
+  plan whose compiler ignored the opponent; venue and match-type scope route the
+  same way. Combinations no game/season grain can represent — a `games`
+  threshold against an opponent, a season range beside career conditions, a
+  single-game cue beside an unconvertible mixed career condition — now fail
+  validation closed instead of answering a different question, and validation
+  refuses any career plan still carrying venue/opponent/match-type/round scope.
+- Grouped team-result thresholds and the wins/losses-against head-to-head guard
+  now understand number words ("exactly three wins against Carlton" is a
+  grouped `team_match` threshold, not a head-to-head record), reusing the
+  parser's existing counting vocabulary.
+- Capped player game/season threshold lists gained stable unique ordering
+  tie-breakers (match date/match id/player id; season/name/player id) so
+  repeated execution returns identical rows in identical order at the 100-row
+  cap.
+- New regression coverage: opponent/venue/match-type/season scope beside
+  career-vocabulary thresholds, mixed-condition fail-closed proof, strict `<`
+  DB-backed boundary, determinism under the cap, threshold description
+  headlines/interpretations, and two end-to-end natural-language questions
+  proven through parser → validation → execution → answer → description
+  against hand-written SQL.
+- NL telemetry (`logNlSearch`) is now safe outside a Next.js request scope:
+  inside a request the write is still deferred through Next 16's `after()`
+  unchanged; from a non-request server caller (integration tests, scripts) —
+  where `after()` throws synchronously — the same write now runs detached
+  instead of the throw escaping into `answerNlQuestion`. Telemetry is still
+  written in both paths and a logging failure still cannot alter or fail an
+  answer (new DB-free regression `tests/nl-search-log.test.ts`).
+
+### AFLDB-ISSUE-110 — typed NL metric thresholds, H2H wins/losses, Bulldogs alias - 31 August 2026
+
+- Parser version 29. A comparator on a player statistic now survives end to end
+  as a typed `metricCondition` on `player_game`/`player_season` plans instead of
+  being consumed and silently dropped: "players with at most 25 disposals
+  against North Melbourne" now answers with the qualifying set rather than an
+  unfiltered rank-one leader (or an `ambiguous_player` decline from the
+  stranded "most"). Single-performance thresholds filter each performance;
+  scoped totals and season thresholds filter after aggregation; NULL remains
+  "not recorded" and never qualifies. A threshold no compiler can represent, and
+  a player game/season list with no threshold, now fail validation closed.
+- Explicit scope controls grain before the goals-to-career fallback: "players
+  with more than 2 goals in 1989" is a season question and "players with fewer
+  than 3 goals in a game" a single-game one, while "more than 500 career goals"
+  keeps the career-condition path.
+- The explicit-zero matcher no longer reads "no more than N"/"no fewer than N"
+  as an equality-to-zero condition; genuine "no goals"/"never kicked a
+  goal"/"without a goal" zero conditions are unchanged. The comparator
+  vocabulary gains the missing "no less than"/"no greater than" forms.
+- Bare two-club "wins against"/"losses against" wording routes to the existing
+  typed head-to-head record answer, guarded so grouped thresholds ("teams with
+  more than 3 wins against ..."), team-match extrema ("biggest win against
+  ..."), and one-club questions keep their prior meanings.
+- "Bulldogs" resolves through the ordinary organization nickname path to the
+  same lineage as Dogs/Footscray/Western Bulldogs.
+- Telemetry only: player entity resolutions now log the resolved stable player
+  id(s) and the exact matched alias form (preserving Jr/Jnr/Snr evidence)
+  without any change to ranking, ambiguity, plan, or answer semantics.
+
+### NL telemetry grain schema contract - 31 August 2026
+
+- Added migration `079_nl_search_log_head_to_head_grain.sql` to align the
+  `nl_search_log.grain` CHECK with all eight current `NlGrain` values, restoring
+  silently dropped `head_to_head` telemetry and covering the also-missing
+  `team_streak` grain without changing search or telemetry outcome semantics.
+- Added a transactionally rolled-back PostgreSQL regression that inserts every
+  supported grain, including `head_to_head`, so the schema cannot drop an existing
+  valid grain without failing the focused integration gate.
+
+### AFLDB-ISSUE-110 — club-scoped career games semantics - 30 August 2026
+
+- Parser version 27 now maps unqualified club-leader shorthand such as `most games for
+  Geelong` to the existing typed `player_career/games` plan only when no match, season,
+  opponent, venue, player, or match-type cue competes. Explicit match and season wording keeps
+  its prior grain and fail-closed behaviour.
+- Club-scoped games thresholds now compare distinct appearances for the named organization
+  lineage across historical club identities. They no longer need to be refused to avoid the
+  incorrect whole-career-games-plus-club-membership interpretation; validation permits only
+  games-only unranked conditions the compiler can fully scope.
+- Added exact Problem Search, comparator, metamorphic club, match/season collision, mixed-scope
+  refusal, player-ambiguity, and database-fixture regression coverage. DB-free validation is
+  green (7 suites, 473 tests), typecheck is green, and focused DB integration passes 9/9.
+  Independent `_test` SQL agrees with every selected result set and classifies the grouped
+  opponent and 500/1000-game families as correct empty results. ISSUE-110 remains open because
+  multi-row club-threshold payloads still expose whole-career `games` under the UI's `Games`
+  column instead of the organization-scoped appearances used for qualification; rendered/UI
+  and decline benchmark gates remain pending.
+
+### AFLDB-ISSUE-115 — Data QA search composes related-domain cards on one anchor (Resolved) - 30 August 2026
+
+- `/admin/query-builder` (Data QA search, super-admin only) can now ask QA questions that span two
+  relations — *rows that exist in one relation but not in another*. The query root owns an
+  **anchor** (the five existing grains: players, player career stats, clubs, matches, player match
+  stats — `from` / `defaultSort` / `displayColumns` carried over byte-identical), which alone
+  decides the returned row and columns; each card owns a **domain**. An anchor-domain card compiles
+  through the untouched pre-115 path; a related-domain card compiles to one correlated
+  `EXISTS` / `NOT EXISTS (SELECT 1 FROM <target> WHERE <correlation> AND <conditions>)` boolean on
+  the anchor row, with quantifier `any` / `none`. Cross-card AND/OR is the unchanged left fold.
+- Curated 12-relationship catalogue reached by subject (`player` → `p`, `club` → `cl`,
+  `match` → `m`): `player.career`, `player.match_stats`, `player.clubs`, `player.draft_picks`,
+  `player.hall_of_fame`, `player.captaincies`, `player.awards`, `player.link_candidates`,
+  `club.club_seasons`, `club.matches`, `match.player_stats`, `match.clubs`. Depth is exactly 1;
+  club correlation is on `club_id`, never `organization_id`; `player_career_stats` ×
+  `player.career` is rejected as self-equivalent at parse and compile from one shared helper.
+  Absence is always `NOT EXISTS` (never a nullable outer join); no `DISTINCT`, no related
+  aggregates or counts; `NOT EXISTS` with a condition includes rows whose column is `NULL`
+  ("not recorded ≠ zero"). Related conditions resolve columns against the card's domain catalogue;
+  `sql.unsafe` still sees only catalogue constants and every user value stays a bound parameter.
+- New limits `maxRelatedCards = 4` (evidence-gated by the Stage 5 cost measurements) and
+  `maxRelationshipDepth = 1`; no existing limit weakened; `AFLDB_STATEMENT_TIMEOUT_MS` never raised.
+  Pre-115 share tokens carry no domain and compile to byte-identical SQL.
+- UI: the table select is relabelled as the anchor; each card gains a grouped domain select sourced
+  from `relationshipsForAnchor()`, a quantifier select, a hint line and a legend sentence; changing
+  a card's domain resets its conditions. The results header still reads the anchor's columns.
+- **Evidence-driven V1 boundary:** `player_match_stats` remains a valid results anchor for its own-row
+  filtering and results but hosts **no related-domain cards** in V1. The anchor's own pre-115 query
+  (`count(*) OVER ()` plus an index-ordered `LIMIT 50` over 685,471 rows) measures 1.05–1.44 s with
+  no card at all, so no related card under it can meet the 1 s target and four shapes hit the 5 s
+  ceiling. All twelve relationships stay available through the other four anchors; no relationship
+  was removed globally; no index, InitPlan compiler path, timeout, schema or privilege change was
+  made. The baseline itself is tracked separately as `AFLDB-ISSUE-116`.
+- `docs/search.md` §6 rewritten for the anchor/domain/relationship model, coverage matrix,
+  card-independence boundary, NULL rule and limits; the stale "not linked from the admin nav"
+  sentence corrected.
+- Validation, all operator-run against `afldb_test` at the normal 5 s statement timeout:
+  `tests/query-builder-spec.test.ts` 24/24 (DB-free) and `tests/integration/query-builder.test.ts`
+  23/23 including the T-C11 cost gate — every supported anchor × relationship pair, bare,
+  conditioned and 4-card composite, under 1000 ms (slowest bare pair
+  `matches × match.player_stats EXISTS` 132.7 ms; slowest conditioned shape 687.5 ms; players × 4
+  related cards 88.3 ms); pre-115 regression cases unchanged; `npx tsc --noEmit` clean.
+
+### AFLDB-ISSUE-111 — Coleman Medal derived from canonical AFLDB facts (Resolved) - 30 August 2026
+
+- Coleman Medal winners are now **derived from AFLDB's own canonical home-and-away match facts**
+  instead of being loaded from the legacy SQLite award scrape. The new `coleman` group in
+  `tools/migration/import_awards.py` sums `player_match_stats.goals` over `matches` where
+  `NOT is_final` — the exact home-and-away filter enforced by `matches_is_final_ck` — grouped by
+  `(season, player_id)`, and persists the per-season maximum to `award_winners`. It never reads
+  `player_season_stats.goals`, which includes finals and backs the separate `getSeasonGoalkickers()`
+  leading-goalkicker concept; that concept is unchanged.
+- Added `data/reference/coleman-derivation.json`, the single tracked declaration of the
+  derivation's boundaries — span (`first_season 1980`, preserving AFLDB's measured legacy award
+  contract rather than asserting when the medal began), method, excluded source, home-and-away rule,
+  completed-season rule, tie rule, club rule, provenance, key format, identity match rule and the
+  legacy transition contract. The loader, the rebuild gates and the tests all read it, so they
+  cannot silently diverge, and the gate code **refuses rather than guessing** if it cannot load.
+- Every player tied on the maximum qualifying total receives a winner row — no arbitrary
+  tie-break. A winner with home-and-away matches for more than one club records `club_id IS NULL`.
+  A season still in progress produces no row.
+- Winner rows are **born linked** under `afltables` provenance, never `draftguru`, and are keyed on
+  `coleman:<season>:<normalised AFL Tables profile path>` read from `external_identities`.
+  `players.id` is rejected as not rebuild-stable, and the loader **fails closed** — writing
+  nothing — when a winner has no profile identity, has an ambiguous one, or has a path containing
+  the key separator. Reloads keep the existing `reload_keyed` ownership contract, so row ids,
+  manual `linked` / `confirmed_unlinked` decisions and the source-name-change guard all survive.
+- Removed the operational legacy dependency for this family: `needs_legacy` was generalised from a
+  single `under_22` exemption to `LEGACY_FREE_GROUPS`, so a Coleman load runs with
+  `AFLDB_LEGACY_SQLITE` unset. Six of the eight `import_awards.py` groups still require it
+  (`AFLDB-ISSUE-112`).
+- Integrated into the canonical rebuild: a new `coleman` data stage runs after `derived` (so
+  `seasons.status` is already computed) and before the ladder witness, gated by seven Stage-9
+  checks — row count, season count, first season, unlinked rows, non-derived provenance, the
+  rejected numeric-id key form, and rows beyond the accepted last season.
+- Added a one-time `--rekey-coleman` transition that rekeys an existing legacy-loaded Coleman family
+  in place, preserving every `award_winners.id`, in a single fail-closed transaction that refuses a
+  mixed or unbridgeable state. **Deployment note:** it must be run once per existing environment
+  before the derived loader runs there — skipping it does not fail loudly, it silently duplicates
+  the family. `docs/deployment.md` §7 carries the sequence and the warning.
+- Validation, all operator-run: the destructive canonical rebuild of `afldb_test` completed with
+  **exit 0**, the Coleman stage reporting `46 winners (46 seasons, 0 updated, 46 inserted,
+  0 deleted)` and FINAL VALIDATION returning `AFLDB-FINAL-VALIDATION PASSED: 26 checks` with
+  `coleman_rows 46`, `coleman_seasons 46`, `coleman_first_season 1980`, `coleman_unlinked_rows 0`,
+  `coleman_rows_not_derived_from_afltables 0`, `coleman_rows_keyed_on_a_numeric_id 0`,
+  `coleman_after_accepted_last_season 0`; 29 of 29 ISSUE-111 integration cases against `afldb_test`,
+  including an independently shaped PostgreSQL oracle, tie / multi-club / in-progress /
+  finals-exclusion / span-boundary fixtures, the identity refusals, the legacy → derived transition
+  and its id preservation, a three-reload byte-identical fingerprint and the human-link-decision
+  survival audit; and 263 DB-free tests plus `npx tsc --noEmit` clean.
+
+### AFLDB-ISSUE-114 — ladder witness manifest binding repaired to its canonical LF hash (Resolved) - 30 August 2026
+
+- Re-pointed `datasets.ladder.accepted_witness.manifest_sha256` in
+  `tools/rebuild/fitzroy/fitzroy-contract.json` at the canonical LF hash of the same tracked
+  manifest (`604a8a16…8d3f`). The previously recorded value was the CRLF rendering of the identical
+  document, captured before `AFLDB-ISSUE-108` added `docs/rebuild-manifests/** text eol=lf`, so the
+  ladder witness integrity check failed closed on a correct manifest on every platform and blocked
+  the canonical rebuild's ladder gate regardless of the snapshot bytes.
+- No new bytes were accepted: the tracked manifest was not edited, `validate_ladder_witness.py` was
+  not normalised, no gate was relaxed, and `snapshot_label`, `manifest`, `files` (129), `rows`
+  (1,622) and all 129 per-file hashes are unchanged. Accepting different bytes from a fresh
+  acquisition remains an `AFLDB-ISSUE-101` successor-witness decision.
+- Added a value assertion binding the contract literal to the manifest's LF-normalised bytes,
+  rejecting the CRLF rendering of the same content and re-proving the 129 files / 1,622 rows, so the
+  binding can no longer rot silently behind the previous shape-only check.
+- Repaired one test-isolation defect exposed by the same run: the rebuild harness resolves the
+  Python interpreter from `process.env` by design, so the missing-interpreter case now saves,
+  clears and restores `AFLDB_PYTHON` as its siblings already did. Every assertion is unchanged and
+  no rebuild code was modified.
+- Validation, DB-free and operator-run: `npm test -- tests/db-test-rebuild.test.ts` — 214 passed,
+  0 failed.
+
+### AFLDB-ISSUE-109 — Data Editor durable overrides keep atomic least-privilege writes (Resolved) - 30 August 2026
+
+- Added forward migration `078_data_overrides_admin_write.sql` so the existing
+  `afldb_import` statistical-mutation transaction can persist the human-owned durable override
+  and required audit atomically. The exception is column-scoped and remains outside
+  `afldb_meta.import_writable_tables`: no `DELETE`, `TRUNCATE`, table-wide write, or sequence
+  reset privilege was added.
+- Updated the subtractive privilege reconciler to restore the same narrow grant shape rather
+  than stripping it after deployment.
+- Added DB-free grant-contract coverage, exact PostgreSQL catalogue privilege assertions, and
+  a restricted-role Data Editor integration case that exercises both override insert and
+  conflict-update paths, verifies the canonical row/override/audit, and restores its fixture.
+- Validation is green on `afldb_test`: migration 078 applied cleanly (78/78, 0 pending),
+  privilege reconciliation completed, the source contract passed 7/7, privilege catalogue
+  coverage passed 30/30, Data Editor integration passed 9/9 with zero skips including both
+  restricted-role paths, required atomic audit behaviour passed, and typecheck passed.
+- Completed authenticated `afldb_dev` runtime acceptance on dedicated retained match `17059`
+  (`2026|R30|2026-12-31|104|103`, Collingwood v Carlton). Save, hard reload/navigation,
+  durable override insert, conflict-path update, and UI restoration all passed without
+  permission, Server Action, page, or server errors. Final read-only evidence confirmed the
+  exact baseline in both canonical Notes and the one intentional active override. Append-only
+  audit rows 22–25 accurately retain creation, the mistaken first Notes input, its correction,
+  and restoration under admin user 4; no manual SQL mutation was used. All ISSUE-109 acceptance
+  gates are complete.
+
+### Repository root hygiene - 30 August 2026
+
+- Moved resolved issue runbooks, handoffs, and implementation reports from the repository root
+  to `issues/closed/`; reserved `issues/open/` for standalone documentation owned by the two
+  issues that remain open in the authoritative ledgers.
+- Moved the 2026 API acquisition runbook to `docs/acquisition/`, the contributor workflow to
+  `docs/development/`, and the superseded README to `docs/archive/`.
+- Updated active navigational and tooling references to the new paths. Application behaviour,
+  test output contracts, deployment paths, generated-output directories, and historical issue
+  conclusions are unchanged.
+
+### AFLDB-ISSUE-107 — Next.js 16 framework/runtime upgrade RESOLVED - 30 August 2026
+
+**Resolved.** Every gate ISSUE-107 owns is green. The last one outstanding was G2's guarded
+database integration, which was blocked by `AFLDB-ISSUE-108` and provably not framework
+attributable; `AFLDB-ISSUE-108`'s corrected test contract validated green on Linux at commit
+`673f0e3` (89 passed / 5 skipped test files, 2,515 passed / 104 skipped tests, 0 failures,
+122.21 s), so **G2 is PASS**.
+
+- Final gate state: **G0 PASS, G1 PASS, G2 PASS, G3 PASS, G4 PASS.** G5 (production
+  eligibility) is out of ISSUE-107's scope by design and is not a completion condition —
+  the production rollout receives its own review and is **not** authorised by this resolution.
+- The shipped closure is unchanged from the deployed one: Next 16.3.1 with Webpack, React and
+  ReactDOM held at 19.2.8, Node v22.23.2, standalone/systemd deployment and 4-worker / pool-10
+  controls preserved, BUILD_ID `uZReW8G1XnsGnG5FNYY-I` proven live via `x-afldb-build`, typecheck
+  0 errors, 17/17 focused live routes clean, and `AFLDB-ISSUE-068`'s 1,440-row hydration
+  acceptance passed with zero hydration and client errors.
+- `AFLDB-ISSUE-109` — the data editor's `data_overrides` write on a `SELECT`-only importer
+  connection, exposed while applying migration `073` to `afldb_dev` under this issue — remains
+  open and separate. It is not a regression from the upgrade.
+
+### AFLDB-ISSUE-108 — guarded test contract aligned to the canonical legacy-free baseline - 30 August 2026
+
+The guarded database integration suite had 33 stable failures against a `afldb_test` that is
+itself correct: it already matches the accepted canonical baseline `full-history-20260827` on
+every gated value. The failures were a **stale test contract** — `IMMUTABLE`-labelled
+assertions carried over from the retired legacy-SQLite import — plus one gitignored artefact,
+one test-fixture defect, one cross-platform line-ending defect, and shared-database
+parallelism. `afldb_test` was **not** rebuilt and no application semantics changed.
+
+- **Legacy-era expectations reconciled to the canonical baseline.** Re-pinned where the
+  accepted `measured` fingerprint supplies the value: `player_match_stats` 694,210 → 685,471;
+  attendance `complete` 15,376 → 15,187; players with a birth date 12,478 → 855 (evidence rows
+  and evidence-linked players likewise → 855, conflicts → 0); players with no date 883 →
+  12,422. Retired-with-a-tracked-gap where the canonical rebuild has no writer and zero/minimal
+  is a missing-acquisition gap rather than a fact: the season/career-grain Brownlow authority
+  gates (79,113) and the "zero Brownlow votes" cohorts (`AFLDB-ISSUE-090` §27.5), the
+  DraftGuru identity-link count (3,459 — needs Stage B3) and its matching-backlog gates, and
+  the 2026-provisional gates that assert current-season-import / legacy-ladder state
+  (`AFLDB-ISSUE-099`). Structural guarantees in the same blocks still run.
+- **Identity gates re-anchored off retired surrogate player IDs.** The canonical legacy-free
+  rebuild re-seeds `players.id` — `import_fitzroy_core.py` inserts players with no
+  `legacy_player_id` and resolves identity by the AFL Tables profile URL — so every legacy
+  `players.id` pinned in the guarded suite now addresses a different person (measured: 13,277
+  players, **0** with a `legacy_player_id`). The people those gates protect are intact, so this
+  was obsolete addressing rather than identity corruption, but two gates were *passing* on the
+  wrong players and proving nothing. The club-identity, name-collision and Gary Ablett search
+  gates now resolve their witness from the data — surname lookup discriminated by career facts —
+  so they fail if the person is wrong and survive the next rebuild. The "debuted in the 1960s
+  with exactly two clubs" exact-membership digest moves from a `players.id` set hash, which
+  changes on every rebuild regardless of membership, to a hash of the durable AFL Tables
+  identity (110 cohort players → 110 identity keys). No new surrogate IDs were substituted for
+  the old ones.
+- **Two advanced-search cohort counts re-pinned to the canonical dataset** — 200–249 games with
+  16+ finals 117 → 115, and 200+ games / 100+ goals / 15+ finals 222 → 219. These follow from
+  the accepted baseline rather than from current output: `player_career_stats` is an exact
+  aggregate of the accepted fact table (`sum(games)` 685,471 = `player_match_stats` rows;
+  `sum(finals)` 29,318 = player rows in final matches; `sum(goals)` 407,963), and 685,471 is the
+  accepted `measured.player_match_rows`. The retired 117/222 were entailed by the 694,210-row
+  legacy set. The decided-season "genuine zero Brownlow" gate is retired with the other Brownlow
+  gates rather than pinned to zero: `rebuild_derived.py` marks a season `complete` only where
+  `brownlow_season_votes` has a row, and the canonical rebuild writes none, so the assertion is
+  structurally unreachable until a season-grain writer exists (`AFLDB-ISSUE-090` §27.5).
+- **Accepted-baseline manifest hash made platform-independent.**
+  `data/reference/fitzroy-accepted-baselines.json`'s `manifest_sha256` was bound to the
+  Windows CRLF rendering of the acquisition manifest (`cc8aaf09…`); it now binds the canonical
+  LF content (`a42c6d5f…`). A new `.gitattributes` forces `eol=lf` on the rebuild manifests
+  and hash-bound reference JSON so `import_fitzroy_core.py`'s manifest check is byte-identical
+  on every platform, and the DB-free rebuild test normalises line endings before hashing.
+- **Database Health "missing career row" check scoped to players with match history.**
+  `player_career_stats` is derived from `player_match_stats`, so a DraftGuru-seeded canonical
+  shell for a drafted person who never played a senior game legitimately has no career row and
+  is no longer reported as reconciliation drift.
+- **Guarded integration runs serially.** `vitest.config.mts` sets `fileParallelism: false`:
+  every integration suite shares the one mutable `afldb_test`, and under file parallelism one
+  suite's fixture mutations were read by another's assertions (three failures that appear only
+  in parallel). A data-editor fixture that reversed a result by swapping only the score totals
+  now swaps goals and behinds too, satisfying `matches_score_components_ck`; the DraftGuru CSV
+  parity-oracle test skips when its gitignored corpus is absent.
+- **Validated green on Linux — RESOLVED.** The exact implementation commit `673f0e3` was run
+  serially against the `afldb_test` DSN on Node v22.23.2 / npm 10.9.8
+  (`npm test -- --no-file-parallelism`): **89 passed / 5 skipped test files (94 total), 2,515
+  passed / 104 skipped tests, 0 failures, 122.21 s.** Every residual is a deliberate skip with an
+  owning issue — Brownlow season/career authority (`AFLDB-ISSUE-090` §27.5), DraftGuru Stage B3
+  identity links, the 2026 provisional gates (`AFLDB-ISSUE-099`), the DOB conflict adjudication
+  already retired as acceptance, the gitignored DraftGuru CSV parity oracle, and the restricted
+  `afldb_import`-role parity cases that skip when `AFLDB_TEST_IMPORT_DATABASE_URL` is unset.
+  This closed `AFLDB-ISSUE-107`'s G2 gate. Known follow-up, deliberately not in scope:
+  `tools/validation/validate_migration.py` and `tests/fixtures/oracle_baseline.json` are still
+  bound to the retired legacy dataset and carry the same surrogate-ID defect; both sit outside
+  the guarded vitest gate.
+
+### AFLDB-ISSUE-068 — intermittent React hydration errors RESOLVED - 29 August 2026
+
+**Resolved.** The React #418 hydration defect was owned by the Next 15.5.23 framework dependency
+closure/runtime/client/serving path. The Next 16.3.1 framework closure eliminated the defect in
+matched Windows A/B testing, and the result is now confirmed on the real Linux development
+deployment with a clean 1,440-load acceptance. No exact internal Next.js function, commit or
+upstream bug ID is claimed, and none was required: React and ReactDOM resolved to 19.2.8 on both
+sides of the experiment, so they explain nothing. The fix shipped as `AFLDB-ISSUE-107`'s bounded
+framework upgrade, which retains React/ReactDOM 19.2.8 and Webpack.
+
+At that checkpoint `AFLDB-ISSUE-107` remained open, with `AFLDB-ISSUE-108` blocking its guarded
+database-integration gate, and `AFLDB-ISSUE-109` was open and separate. All three are now
+resolved, each under its own recorded acceptance evidence.
+
+- Ran the single 1,440-row acceptance sweep against the deployed Next 16.3.1 build
+  `uZReW8G1XnsGnG5FNYY-I` at four Playwright workers, pool 10, tracing on, JavaScript enabled and
+  no retries. **1,440 / 1,440 observations, every one carrying that build ID: zero hydration
+  errors, zero client errors, zero violations, zero metamorphic disagreements, zero HTTP and page
+  errors.** Hydration was zero on every cut the report makes — per worker, same- versus
+  cross-worker, and every RSC cluster. This is the deployed confirmation of the A/B finding that
+  the React #418 defect belonged to the Next 15.5.23 framework closure.
+- Semantic outcomes improved from `1,238 answered / 43 unanswerable / 159 absent` to
+  `1,440 / 0 / 0`. This is **not** attributable to the framework upgrade and is not reported as
+  such: the A/B held the application source constant, whereas this run is on `be2a963`, which
+  merged substantial later natural-language search work — head-to-head queries, the
+  qualifying-matches gate, semantic intents and team-match/player-career changes — covering
+  exactly the categories that previously failed.
+- Ran against the true 1,440-question corpus. The tracked copy is five rows short: a commit
+  merged after the A/B removed five ambiguous "most games in a game" questions. The complete
+  corpus survived on the development host and was proven a clean superset before use — stripping
+  those five ids reproduces the tracked file byte-for-byte — so no threshold was adjusted and no
+  row was fabricated.
+
+### Development database brought to 77/77 migrations - 29 August 2026
+
+- Applied the seven pending committed migrations `071`–`077` to `afldb_dev` through the normal
+  `npm run db:migrate` workflow, after confirming the target database server-side, the absence of
+  `AFLDB_PROD_DATABASE_URL` from both `.env` and the shell, and a 70/77 starting status. The
+  database is now **77/77 with 0 pending** and no checksum drift; a second run is a clean no-op.
+  This is deployment debt from already-merged issues — audit-link FK indexes, DOB conflict
+  ownership, `data_overrides`, the source-observation spine, afltables settle projections and AFL
+  API lineups — not a schema change of its own. No privileges reconciliation was required, and
+  production was not touched.
+- `/admin/data-editor` and `/admin/current-season` no longer fail on missing relations. Live
+  build identity, service process, worker count and pool settings were all unchanged by the
+  migration: no restart and no rebuild.
+- Recorded `AFLDB-ISSUE-109`. Applying `073` made a latent contradiction reachable: the data
+  editor's override save inserts into `data_overrides` on the `afldb_import` connection, which
+  that migration deliberately grants `SELECT` only. The failure moved from *relation does not
+  exist* to *permission denied*; it was not introduced here and is not fixed here, because grants
+  belong in a migration.
+
+### AFLDB-ISSUE-107 — Next.js 16 deployed to Linux development - 29 August 2026
+
+- Deployed the Next.js 16.3.1 / Webpack closure to the real Linux development runtime
+  (`arm@10.0.40.100`, commit `be2a963` on `dev`, Node v22.23.2). The build completed page data
+  collection, generated 1,499 static pages and produced complete standalone output;
+  **BUILD_ID `uZReW8G1XnsGnG5FNYY-I`** is proven live through the `x-afldb-build` response
+  header. The service runs four `next-server (v16.3.1)` workers at unchanged `AFLDB_WORKERS=4`
+  and `AFLDB_POOL_MAX=10`, with `AFLDB_TRACE_REQUESTS=on` and `/api/health` reporting
+  `{"status":"ok","database":"ok"}`. Focused live browser validation covered 17 routes across
+  the beta gate, admin protection, route handlers, SSG pages, advanced search, natural-language
+  search and the grid solver, with zero console, page and hydration errors. React and ReactDOM
+  remain 19.2.8 and no database migration was applied.
+- Repaired four defects in `deploy/sync-dev.ps1` that prevented `-Issue107Gate` from proving
+  what it reports. It now selects the nvm-managed Node the systemd unit pins, because nvm is
+  absent from a non-interactive SSH `PATH` and the deployment otherwise resolved Node 18.19.1,
+  below Next 16's floor. The remote script is sent base64-encoded, because PowerShell writes a
+  UTF-8 BOM into a native command's stdin pipe, which made the remote shell fail on
+  `set -Eeuo pipefail` and continue past failed stages while still able to exit 0. Six evidence
+  lines — including the `git status --porcelain` dirty-tree guard, the reported Node version and
+  the deployed revision — were double-quoted PowerShell strings that expanded `$(…)` on the
+  workstation and described the wrong machine; they now evaluate on the server. The restart step
+  falls back to terminating `MainPID` and letting systemd respawn the unit where `sudo` requires
+  a password, proving the respawn by a changed PID rather than assuming it.
+- Set `AFLDB_POOL_MAX=10` explicitly in the development host's `.env`. This changes no effective
+  value — it is already the default in `src/db/client.ts` — but makes the connection-pool control
+  provable in the running service rather than implied by a source default.
+- Closed the `/sitemap.xml` question. The Next 16 production build emits no duplicate-route
+  warning, and the route's 404 is the intended behaviour when `AFLDB_INDEXING` is not `on`, not a
+  regression. Nothing was repaired.
+
+Not yet green: the guarded database integration suite. 33 failures against `afldb_test` are
+database-content failures with no framework surface — recorded as `AFLDB-ISSUE-108` — so
+`AFLDB-ISSUE-107` remains Open on that gate alone, and `AFLDB-ISSUE-068`'s deployed 1,440-row
+hydration acceptance remains outstanding. Production was not deployed.
+
+### AFLDB-ISSUE-107 — Next.js 16 local upgrade and Linux-dev gate preparation - 29 August 2026
+
+- Upgraded the controlled framework/tooling closure from Next.js 15.5.23 to exactly 16.3.1
+  and eslint-config-next 16.3.1 while retaining React and ReactDOM 19.2.8. Development and
+  production build scripts explicitly select Webpack, and standalone preparation remains the
+  final build step; Turbopack is not part of this first upgrade.
+- Accepted and reproduced Next 16's framework-managed TypeScript controls (`jsx: react-jsx`,
+  production/development generated route-type includes, and import-style generated
+  `next-env.d.ts`). `npm run typecheck` now generates route types first, and the ESLint setup
+  uses Next 16's native flat exports instead of the incompatible legacy `FlatCompat` adapter.
+- Removed all eight pre-existing typecheck failures only where they became real production
+  build blockers: explicit numeric reduction typing in the season-rollover planner, a truthful
+  one-key environment contract for the rebuild harness, the missing guarded DraftGuru advisory
+  lock DSN, and an explicit observation-spine JSON fixture type. The resulting full typecheck
+  and focused 800-test compatibility/semantic set pass without changing AFLDB application or
+  NL-search semantics.
+- Preserved the existing Edge `middleware.ts` convention for the controlled upgrade because
+  Next 16's `proxy.ts` migration also changes that boundary to the Node runtime. The warning is
+  accepted for now rather than changing a second runtime axis. Next 16's incremental,
+  layout-deduplicated segment/prefetch serving shape is likewise treated as an expected
+  framework-path change; AFLDB's deliberate primary-navigation `prefetch={false}` remains.
+- Prepared the normal Linux development deployment path with an explicit ISSUE-107 gate:
+  Node >=20.9, unskipped clean install/Webpack build/systemd restart/health, unchanged
+  development worker 4/pool 10 controls, and equality between the standalone BUILD_ID and the
+  live `x-afldb-build` header. Request tracing remains development opt-in and is documented for
+  preservation through ISSUE-068 acceptance.
+- This is local implementation/preparation only. Database-backed page collection, complete
+  standalone output, guarded integration, live browser/E2E, Linux systemd validation and
+  ISSUE-068's final 1,440-row hydration sweep remain pending; neither issue is resolved and no
+  production deployment was performed.
+
+### Tooling — DraftGuru UTF-8 spawn helpers retain string output types - 29 August 2026
+
+- `tests/draftguru-acquisition.test.ts` now declares all six UTF-8 child-process helpers as
+  `SpawnSyncReturns<string>`, matching their explicit `encoding: "utf8"` calls. The former
+  `ReturnType<typeof spawnSync>` annotations widened `stdout` and `stderr` to
+  `string | Buffer` and produced typecheck errors at the existing string-only assertions.
+- This is a narrow test/tooling type repair carried forward onto current development source.
+  It restores no stale ISSUE-093 test content and is not an ISSUE-068 hydration fix.
+
+### AFLDB-ISSUE-106 — A match period-score target now requires published period evidence - 29 August 2026
+
+- **Target establishment now asks whether the source published anything.** In the AFL Tables
+  settle pass, `match_period_scores` exists for a record only where the source actually
+  published at least one period observation. `targetEstablishedBySource()` answers that from
+  the source projection alone, before identity is consulted — the same rule ISSUE-099's D2
+  established for `brownlow_round_votes`, of which this was the untreated sibling.
+- **No empty-array proposal can be created.** `proposedPeriodScoreValues()` returns `null`
+  when nothing was published rather than `{ period_scores: [] }`. An empty array would have
+  asserted that the canonical target should hold zero rows — a claim no AFL Tables results row
+  has ever made — and would have raised a review candidate with nothing in it to review.
+- **Absent, `null` and empty source data all read as one fact:** the source published no
+  period-score evidence. An absent or `null` `period_scores` in the projection is no longer a
+  hard read failure; a value that is present but is not an array is still refused.
+- **Published periods are preserved exactly.** Partial publication keeps only the quarters the
+  source carried, a NULL inside a published period stays NULL rather than becoming zero, and
+  no period 5+ is invented — the reader still refuses one outright.
+- **Rejected-record target accounting corrected deliberately.** A record the source emitter
+  rejected carries no projection, so it establishes `matches` alone and refuses only there;
+  it no longer manufactures a second refusal about period scores nobody published. The settle
+  integration expectations moved with it: 4 candidates rather than 5, 3 `import_rejections`
+  rows rather than 4, and `observationsUnchanged` — which counts reconciliation outcomes per
+  *established* target — 4 rather than 5 on an idempotent rerun. Idempotence itself is
+  unchanged, as are `matches`, `player_match_stats`, Brownlow and the `data_issues`
+  disagreement lifecycle.
+- **No schema migration**, no change to the canonical period-score representation, and no
+  source-specific workaround: the rule is stated against the payload shape, not against the
+  current snapshot, in which all 207 acquired 2026 matches happened to carry period scores.
+
+### AFLDB-ISSUE-105 — Import-batch bigint ids are typed truthfully at the driver boundary - 29 August 2026
+
+- **`import_batches.id` is now represented as what it actually is.** The column is
+  `bigint ... GENERATED ALWAYS AS IDENTITY` and postgres.js renders `int8` as decimal text
+  rather than risk a lossy `Number`, but six call sites declared the value `number`. Nothing
+  misbehaved — the id was only ever bound back into SQL — yet the declaration was untrue, and
+  any arithmetic, strict comparison or number-keyed lookup on it would have failed silently.
+- **One shared convention, in one place:** new `src/lib/import-batch-id.ts` exports the opaque
+  branded string `ImportBatchId` and the fail-closed decoder `asImportBatchId()`, which accepts
+  only the driver's decimal text and refuses a number, a bigint or a padded value rather than
+  coercing it. It sits beside `jsonb.ts` for the same reason that module exists: a driver
+  representation rule belongs in one unit-testable home, not rediscovered per call site.
+- **The ISSUE-098, ISSUE-099 and ISSUE-100 paths now use one representation**, along with the
+  shared migration-074 spine writer they all reach the database through: the current-season
+  refresh, the AFL Tables settle pass (`SettleRunResult.batchId`), the AFL API lineup staging
+  pass (`LineupPersistResult.batchId`), `persistSourceObservation` /
+  `markMissingObservationsAbsent`, the admin submission promote path (`PromoteResult.batchId`
+  and the dataset `promoteRow` context), the submission review page and the first-kick-goal
+  importer. Each `RETURNING id` is decoded once, at the boundary that produced it.
+- **The ad-hoc workarounds are gone.** The ISSUE-099 suite's `Number(result.batchId)`
+  normalisation and seven `bigint`→`int` SQL casts on batch-id columns were removed, not
+  replaced; a batch id is never narrowed to a JavaScript number and never cast to `int` in
+  SQL, either of which would trade a typing bug for an overflow on an unbounded identity
+  column. A lineup-store `let batchId = 0` sentinel was removed with them — the id is returned
+  out of the transaction that creates it.
+- **No runtime data-format change and no schema migration.** Every one of these values was
+  already a string at runtime, so no stored row, audit payload, API response or rendered page
+  differs; only the declared types changed. No migration was added or edited (migrations
+  through 077 remain frozen), no driver-wide postgres.js type override was introduced, and no
+  unrelated `bigint` identifier was refactored.
+
+### AFLDB-ISSUE-101 — End-of-season promotion / baseline rollover - 29 August 2026
+
+- **AFLDB can now move the completed-history boundary as one reviewed operation.** The
+  boundary between completed history and the in-progress season is declared across four
+  tracked JSON artefacts plus one TypeScript constant, and existing machinery cross-checks
+  them against each other — so moving one and forgetting another failed the rebuild only
+  after several files had been hand-edited. A new planner (`src/lib/rollover/
+  season-rollover.ts`) computes the entire successor state and proves it coherent under the
+  same rules the current state must satisfy, and a new CLI (`tools/db/rollover-season.ts`)
+  applies it. The planner is pure — it imports only `node:crypto`, with no filesystem, clock,
+  network or database — and the CLI owns all I/O.
+- **Dry run is the default, and applying is an explicit acknowledgement.** With no `--apply`
+  nothing reaches the filesystem; `--apply` additionally requires
+  `--acknowledge-season-complete`. **There is no automatic or date-based completion
+  detector**: the tool reads no clock and no calendar, `--rollover-date` is a required
+  explicit input for every stamped date, and completion is established by an acknowledged
+  operator decision backed by a validated full-history candidate.
+- **The successor state is validated before any tracked file is written.** The computed
+  successor contract and acceptance register are materialised in an OS temporary directory —
+  never inside the repository — and the repository's own validators are executed against
+  them. Each captured run is bound by the bytes read back from those files, so a gate that
+  adjudicated some other state is refused rather than read. Any failure means zero tracked
+  writes, and a dry run runs every gate and still writes nothing.
+- **Three executed pre-apply authorities**, identical in dry run and apply:
+  `import_fitzroy_core.py --validate-only --require-full-history` (re-hashes every artefact,
+  checks every CSV shape, resolves club and player identity, measures identity coverage);
+  the same importer with `--require-accepted-baseline` against the successor register (the
+  acceptance binding and fingerprint-drift gate); and
+  `validate_ladder_witness.py` offline (manifest binding, per-file hashes, per-season
+  structure, identity resolution). The two importer runs must also agree with each other.
+- **`measured` and `identity_scan` are derived from validator execution, never from an
+  operator.** Both are read out of the executed full-history gate's own stdout. There is no
+  flag that supplies a transcript, skips a run or asserts a verdict —
+  `--skip-validation`, `--no-validate`, `--force`, `--core-validator-output`,
+  `--assume-validated` and `--identity-scan` are all refused by name.
+- **New backward-compatible, offline-only validator path overrides** make that possible:
+  `--contract` and `--stat-availability` on `import_fitzroy_core.py` (both require
+  `--validate-only`, so no run that can reach PostgreSQL is redirectable), and `--contract`
+  and `--manifest-dir` on `validate_ladder_witness.py` (both refused with `--compare`).
+  **Every default is unchanged**, so the rebuild orchestrator, the Python contract scripts
+  and the in-season settle path behave exactly as before.
+- **Retired-baseline lifecycle is declared, not invented.** `retired` is the status a
+  previously accepted baseline takes, declared in the acceptance register as
+  `selection_policy.retired_statuses`. `accepted` may never appear in that list, `candidate`
+  is deliberately not valid for a baseline that *was* accepted, and a register declaring no
+  vocabulary refuses with the remedy named.
+- **`accepted_corrections` are reviewed per acquisition and never inherited.** Correction
+  decisions record what a specific acquisition's bytes were examined for, so carrying the
+  outgoing baseline's list forward would claim a review that never happened. The outgoing
+  record supplies category names only; "no corrections" is stated explicitly as the same
+  categories with empty arrays.
+- **Stat availability is reviewed, never fabricated.** `stat-availability.json` describes real
+  data availability, so a range mechanically dragged into a season nobody has played is
+  refused, as is any loss of recorded coverage for a completed season. The reviewed bytes are
+  written through verbatim, so the landed file is byte-identical to the file that was
+  reviewed.
+- **`CLUB_SEASONS_EXPECTED.rows` stays explicit reviewed evidence.** The operator states it
+  and the planner refuses unless it equals the ladder witness manifest's own row total, so a
+  rollover that advances the witness and forgets stage 9 fails loudly instead of agreeing
+  with itself. The stage-9 accepted-season boundary itself is untouched: it already derives
+  from `accepted.measured.seasons_last` and re-points itself.
+- **No canonical database write and no migration.** The CLI opens no database connection and
+  issues no SQL; completed-history supersession remains the existing clean rebuild from the
+  newly accepted baseline. All rollover state is tracked JSON plus one TypeScript constant.
+- **Only `validate_ladder_witness.py --compare` remains post-rebuild**, because it is the
+  bidirectional set equality against a rebuilt `club_seasons` and genuinely requires the
+  database. It was neither moved nor weakened.
+- **No season has been rolled.** The 2026 season is still in progress and the tracked boundary
+  is unchanged (accepted through 2025; `seasons.json` `last_season 2026`,
+  `in_progress_seasons [2026]`). This entry describes a reusable mechanism; executing a real
+  rollover is a future operator action once a season is formally complete and its
+  full-history candidate and ladder witness have genuinely been acquired.
+
+### AFLDB-ISSUE-100 — Staging-only AFL API lineup / team-announcement domain - 29 August 2026
+
+- **AFLDB can now record announced teams before a match is played.** A new bounded acquisition
+  path takes one explicit season and round from the AFL.com.au API via fitzRoy
+  (`tools/rebuild/afl_api/acquire_lineups.R`), writes a SHA-256-bound raw JSON artefact and
+  manifest, and emits a deterministic observation bundle
+  (`src/lib/acquisition/lineup-bundle.ts`). There is no implicit current season and no implicit
+  latest round: the adapter refuses rather than guessing a scope, because the scope is the
+  absence boundary. The artefact is JSON rather than CSV so NULL, `false`, `0` and `""` remain
+  four distinct values.
+- **Lineups are STAGING-ONLY and never become canonical participation.** Announced or selected
+  does not mean played; canonical participation remains the played match sheet
+  (`player_match_stats`), which this path neither reads nor writes.
+  `afl_api.lineup` carries `promotion_policy: never`, no promotion candidate is ever created,
+  and no public surface was added.
+- **New migration 077** registers the `afl_api` source **fail-closed** — idempotent on a
+  semantically identical row, and refusing rather than silently rewriting the provenance of a
+  conflicting pre-existing one — and creates `staging.afl_api_lineup`. Provider identity
+  (`provider_match_id`, `provider_team_id`, `provider_player_id`) owns the row;
+  `match_id`, `club_id` and `player_id` are nullable enrichment that participate in no key.
+  `match_id` is nullable by necessity: `matches` requires NOT NULL scores/result/margin, so an
+  unplayed fixture cannot exist there and a team announcement precedes it.
+- **Persistence reuses the existing observation spine rather than duplicating it**
+  (`src/lib/acquisition/lineup-store.ts`): every record goes through migration 074's
+  version history via the shared `persistSourceObservation()`, and the typed projection is
+  linked to the exact `version_seq` read back from PostgreSQL, all in one transaction. The
+  projection is maintained by keyed upsert; the path issues no DELETE or TRUNCATE, which is a
+  property of the code rather than of the grant, since `privileges.sql` gives `afldb_import`
+  both across the whole staging schema.
+- **Absence sweeping is disabled for this family, by decision.** Fixture-to-lineup match-set
+  completeness is proven, but row-grain completeness is not, so every enumeration is
+  `complete: false`, a missing player row is never read as a withdrawal, and `absent_since` is
+  never written.
+- **Validated against the real 2026 source.** Round 20 (468 rows × 20 columns, `lateChanges`
+  present) and round 25 (104 rows × 19 columns, `lateChanges` absent) were acquired, emitted,
+  and persisted under the restricted `afldb_import` role: 468 and 104 versions and projections
+  inserted, 0 absent, 0 canonical writes. **Identical replay produced no semantic revision** —
+  0 versions inserted, heads refreshed and projections updated in place, with version counts
+  unchanged at min = max = 1. Every `match_id`, `club_id` and `player_id` is NULL, which is the
+  expected staging state: no approved provider-ID mapping to a canonical match, club or player
+  exists, and enrichment is deferred rather than guessed. `player.captain` (`false` on every
+  observed row) and `lateChanges` (verbatim, never parsed or name-matched) are preserved as raw
+  observation evidence with no typed projection.
+
+### AFLDB-ISSUE-103 — Grid Solver finals-win predicates stay within the database timeout - 29 August 2026
+
+- Re-shaped `won_a_final` and `never_won_a_final` around a distinct winning-player scalar-array InitPlan, preserving the exact winning-side participation semantics and complement while eliminating the timeout-producing nested-loop semi/anti joins over a materialized relation. The normal five-second statement timeout remains in force; no index, schema, or data change was required.
+- Added an independent base-table SQL oracle for the exact three failing cells. The complete Grid Solver integration file now passes 131 / 131 under `AFLDB_STATEMENT_TIMEOUT_MS=5000`; post-fix analyzed execution times were 35.386 ms, 501.698 ms and 103.791 ms, and the resolved ISSUE-076 regression remained green.
+
+### AFLDB-ISSUE-099 — In-season AFL Tables acquisition, observation bundle and settle projections - 29 August 2026
+
+- **`acquire_core.R` gained an opt-in `--in-season` mode**, a third acquisition kind
+  (`in_season_partial`) alongside `core_snapshot` and `validation_witness`. It acquires exactly
+  one season, that season must be declared in-progress by `data/reference/seasons.json`, and it
+  is measured against its own `in_season` contract block rather than the 1897–2025 full-history
+  range. The full-history and validation-witness paths are unchanged.
+- **`import_fitzroy_core.py` gained `enforce_in_season()` and `--require-in-season`**, the
+  in-season adjudicator. It re-derives every gate from the contract, the season register and the
+  raw artefacts, exactly as the full-history gate does. The two gate families now **refuse each
+  other explicitly**: `--require-full-history` and `--require-accepted-baseline` reject an
+  `in_season_partial` snapshot for what it is rather than incidentally for its range, and
+  `--require-in-season` rejects anything that is not one. An in-season snapshot can therefore
+  never enter the historical fail-closed contract or the accepted-baseline register.
+  `--require-in-season` is also **offline-only**: it refuses before any database work, because
+  the canonical writers in that tool upsert with no ownership predicate and delete by match and
+  season.
+- **New `--emit-observations` writes a deterministic, versioned observation bundle** — the one
+  boundary between Python's AFL Tables interpretation and TypeScript's persistence. Presence is
+  enumerated **independently of projection**, so a row that was observed and then rejected is
+  still recorded as present and can never be mistaken for one the source withdrew; a row whose
+  identity cannot be established at all is recorded separately and marks its scope incomplete,
+  which disables absence sweeping there rather than guessing. New `--on-record-error` defaults
+  to `abort`, keeping the historical rebuild path unchanged, with `reject` opt-in and in-season
+  only.
+- **Player identity keys on the AFL Tables profile URL.** The fitzRoy numeric `ID` is enrichment
+  and is never required — 82 in-season rows carry none — and a name is never an identity key at
+  any grain. NULL stays distinct from zero throughout: an absent statistic, an unpublished
+  attendance and an NA Brownlow vote all remain NULL, and none can become a `0` or a fabricated
+  row.
+- **`data/reference/source-families.json` declares the two AFL Tables families** —
+  `afltables.match` (new) and `afltables.player_match_stats` (upgraded from identity-only) — with
+  proven column contracts and reviewed promotion. Their declared columns are pinned against the
+  emitter's own constants, so the registry and the emitter cannot drift apart.
+- **Migration 076** adds two typed staging projections, `staging.afltables_match` and
+  `staging.afltables_player_match`, plus `data_issues.issue_key` and a partial unique index so a
+  recurring disagreement refreshes one open row instead of stacking duplicates. Existing
+  `data_issues` writers are unaffected: rows without an `issue_key` are outside the index
+  entirely. Real foreign keys make resolved identity a database-enforced fact, and CHECK
+  constraints hold the score, period and attendance invariants at the store.
+- **The observation persistence layer was extracted, behaviour-preserving**, from the
+  current-season importer into `src/lib/acquisition/observation-store.ts`. The SQL, the row lock,
+  the decision call, the write order and the absence predicate are unchanged; only that one
+  importer's row shape became parameters, so a second family importer reaches the migration-074
+  spine through one contract instead of reimplementing it. Absence remains state, never a
+  deletion.
+- **New `src/lib/acquisition/settle-afltables.ts` and `tools/current-season/settle-afltables.ts`**
+  consume the observation bundle. The bundle is validated fail-closed and its manifest re-hashed
+  from disk **before any database connection is opened**, so an unverified snapshot cannot reach
+  PostgreSQL. The settle pass then runs in **one transaction**: every keyed record reaches the
+  observation spine whether or not it projects, a typed projection row is written only where
+  identity fully resolved, both canonical targets of each family are reconciled, and the result
+  is a `promotion_candidate` for a human. Absence is asserted only inside a scope the snapshot
+  proved complete. Review-first is the default — `--dry-run` needs no flag, `--apply` must be
+  explicit, and the dry run executes the identical write path against real constraints and
+  privileges before deliberately rolling back.
+- **No canonical data is written.** Migration 076 contains no DML, no trigger and no rule, and
+  modifies exactly one existing table (`data_issues`, additively). The settle pass writes
+  observations, typed staging projections, promotion candidates and import rejections, and
+  **nothing in this issue writes** `matches`, `match_period_scores`, `player_match_stats`,
+  `brownlow_round_votes` or any identity table — no player, club, venue or venue alias is ever
+  created. That is now proved at runtime rather than asserted: an integration suite brackets
+  every settle run with canonical fact-table row counts and then scans each of those tables for
+  any surviving row written by one of the settle transactions, identified by the transaction id
+  of the `import_batches` row it inserted. Both staging projections are maintained by upsert
+  alone — no statement the settle path sends deletes or truncates either one.
+- **A `data_issues` disagreement lifecycle, driven by evidence in both directions.** When AFL
+  Tables and an independent current-season provider disagree on a comparable field, the settle
+  pass opens one durable finding per record and target, keyed so a recurrence refreshes that same
+  row and preserves when it was first detected rather than stacking duplicates. It closes a
+  finding only on **positive current-run evidence** — the record present, its scope proven
+  complete, corroboration re-evaluated this run, at least one comparable provider agreeing and
+  none disagreeing. A disagreement that merely stops reappearing is never treated as resolved,
+  silence is never agreement, and a finding another writer owns is never touched. Findings are
+  resolved in place, never deleted.
+- **`--report` shows the review queue read-only** — pending promotion candidates by target, and
+  the open disagreements behind the ones that are blocked. It offers no path to accept, resolve
+  or retire anything: every mutation happens inside the settle transaction, on evidence.
+- **Validated end-to-end against the real 2026 season.** One bounded in-season acquisition (207
+  matches, rounds 1–25, 9,522 player-match rows, **no row missing its profile URL**), then a
+  first apply and an identical rerun on a test database under the restricted importer role. The
+  rerun created no second version, no second candidate and no second finding, and **both runs
+  wrote zero canonical rows**. Two defects were found by that run and fixed: an already-absolute
+  manifest path was being joined onto the project root a second time, which made the operator
+  path fail on Windows and would have resolved to the wrong file on Linux; and a target the
+  source had never published was being proposed whenever identity failed to resolve, which
+  raised 803 Brownlow candidates from a season whose Brownlow votes are entirely unpublished.
+  **An unpublished vote now means no `brownlow_round_votes` target at all** — no candidate, no
+  rejection, no projection and no invented value — while a published `0` remains a real vote.
+  Whether a target exists is decided from what the source published, before identity is
+  consulted, because it cannot depend on whether this database happens to know the player.
+- **Nothing is scheduled.** No cron entry and no timer is added by this work; running the settle
+  pass on a schedule is a separate decision.
+
+### AFLDB-ISSUE-076 — Grid Solver winning-final venue queries stay within the database timeout - 28 August 2026
+
+- Re-shaped `won_final_at_venue` membership so PostgreSQL computes the distinct winner-player IDs once as a scalar-array InitPlan instead of allowing an underestimated qualifying set to produce a repeatedly scanned materialised join shape. Venue, final and player-club winner semantics are unchanged; the normal five-second statement timeout remains intact, and no index or schema change was needed.
+- Added the exact historical concurrent 3x3 Grid Solver workload as a performance regression plus a structurally independent base-table oracle for all three implicated MCG cells. The final focused `afldb_test` run completed in 380 ms, while the captured representative production query completed in 172.621 ms under `EXPLAIN (ANALYZE, BUFFERS)` with a one-loop InitPlan and no historical materialised join-filter pathology.
+
+### AFLDB-ISSUE-097 — Current-season corroboration now counts independent evidence groups - 28 August 2026
+
+- Reworked current-season disagreement/corroboration planning to consume ISSUE-096's tracked
+  `(source_key, family) → independence.group` registry. Squiggle plus Kali's verbatim `/fixture`
+  proxy is one fixture witness, while Squiggle plus authenticated Kali `/matches` remains two
+  match witnesses; duplicate observations inside one group cannot manufacture agreement or
+  outvote another group. Concrete observations are now collapsed to one coherent value per group
+  before groups are compared; a group with internal proxy drift is reported and blocked but cannot
+  fabricate an independent disagreement against a group matching one of its concrete rows.
+- Dry-run and apply mode now share the same group-aware comparison for resolved updates and
+  missing-match inserts. `--source all` retains concrete per-source/provenance counts, adds
+  independence-group observation counts, reports proxy drift separately from genuine independent
+  disagreement, and preserves single-source behaviour. Deterministic current-season coverage is
+  green at 116/116, with the focused source-registry contract green at 1/1.
+
+### AFLDB-ISSUE-098 — Current-season observations retain evidence and cannot create partial canonical matches - 28 August 2026
+
+- Current-season venue absence now remains `null`; the importer no longer fabricates `venue_raw = 'Unknown'`. The unsafe missing-match INSERT has been removed because Squiggle/Kali do not own the complete canonical match family, so missing completed matches stay unresolved and requested promotion is rejected without absorbing attendance, period-score, lineup or player-stat acquisition.
+- Applied source records now enter the existing migration-074 observation spine before the legacy current-state projection is refreshed. Corrections append immutable ordered versions, the newest version remains identifiable, later source omission sets `absent_since` without deleting history or canonical data, and reappearance clears the absence state. No migration or privilege change was required.
+- Import results, CLI/admin output and batch validation now separate observations fetched/staged and observation versions from unique canonical matches resolved, canonical rows inserted/updated, unresolved observations, incomplete source records and rejected/conflicted work. Canonical counters no longer decrement, and ISSUE-097 independence-group disagreements still block unsafe missing-match work.
+- Added deterministic venue, correction-wiring, absence, canonical-boundary and counter regressions;
+  after layering the fix over ISSUE-097, the complete current-season importer suite passes 123/123,
+  the focused ISSUE-098 slice passes 13/13 and the focused ISSUE-097 corroboration slice passes 9/9.
+
+### AFLDB-ISSUE-095 — The season ladder is derived from canonical matches, not acquired from a legacy database - 28 August 2026
+
+- `club_seasons` had no legacy-free acquisition path: `rebuild_derived.py` built it solely from `staging.team_seasons`, whose only writer was `import_legacy_afl.py` under `AFLDB_LEGACY_SQLITE`. A canonical rebuild therefore produced **zero ladder rows**, leaving ladders, premiership and wooden-spoon flags, finals counts and club-season natural-language answers unavailable — and `recomputeClubSeasons` failing closed on every match create, delete and score edit.
+- The candidate external source was investigated rather than assumed. `fetch_ladder_afltables` was probed across every completed season (129/129, zero errors, 1,622 club-seasons) and the pinned fitzRoy 1.8.0 implementation was read: it does **not** scrape a published ladder. It calls `fetch_results_afltables`, keeps `Round.Type == "Regular"`, scores win=1/draw=0.5/loss=0, sets points = win*4, and sorts by points then percentage. Measured corroboration over its own output: percentage equals score_for/score_against exactly in all 129 seasons, and every season's points total is divisible by 4 with no bye, forfeit or deduction exception in 128 years. Importing those columns would have laundered a local recomputation into external-source provenance.
+- **AFLDB now derives the whole ladder from its own canonical match set** (home-and-away only; `NOT is_final` is CHECK-equivalent to the source's "Regular" filter). `premiership_points` uses an explicitly declared 4/2/0 rule; `percentage` is stored x100; `ladder_rank` ranks on premiership points then the exact points-for/against ratio. The wooden-spoon completion gate, the drawn-Grand-Final exclusion and finals counting are preserved verbatim. Provenance moved from the retired `sports_data_lab` registry key to `afltables`.
+- **Ties fail closed.** Two clubs exactly level on both points and ratio receive `ladder_rank = NULL` and no wooden spoon — never an order taken from club id, alphabet, insertion order or source row order. Audited by exact rational comparison across all 1,622 accepted club-seasons: **zero exact ties exist in 1897-2025**, so the branch is defence against a future score correction, and a Stage-9 gate turns any future tie into a loud rebuild failure.
+- **`recomputeClubSeasons` is in lockstep**, with its fail-closed guard re-pointed from "no staging ladder rows" to "no canonical home-and-away matches". Match create/delete/score-edit no longer throw on a canonically rebuilt database. A corrected score now correctly moves the ladder, because there is one definition rather than a published tally the derivation could not touch.
+- **Historical identity is proved, not forced.** The derivation reads `matches`, which already carry the historical identity, so it does not re-point through `afldb_identity_for_season`; a Stage-9 gate asserts the invariant instead, so a mis-attributed match fails the rebuild rather than being silently normalised away. A **fail-open** identity gap was found and closed: the existing `North Melbourne` 1999-2007 -> Kangaroos rule is scoped to the `results` dataset, and because North Melbourne's canonical span contains the Kangaroos era, a ladder-dataset lookup passed the era check and resolved silently to the modern identity. A `ladder`-scoped rule was added; Fitzroy, Brisbane Bears and Brisbane Lions remain three separate organizations.
+- The acquired ladder is kept as a **validation witness, never a fact source**: `tools/rebuild/fitzroy/validate_ladder_witness.py` proves the manifest binding, per-file SHA-256, row counts, schema and per-season structure offline, resolves all 1,622 source labels through the real `ClubResolver`, and — as a new tenth *validation* stage — cross-checks every derived club-season against the witness on points for/against, premiership points and ladder rank. Percentage is compared by exact decimal reconstruction from the witness's integers, never float to float. The four-stage **data** topology is unchanged.
+- Durability reuses the existing convention rather than inventing one: raw artefacts stay gitignored, the manifest is tracked and bound by SHA-256 in the source contract, and preflight refuses **before the destructive stage** when the bytes are absent or altered. Proven by execution.
+- Also repaired: the acquirer measured a witness-only acquisition against the core full-history contract, reporting `missing_seasons: [all 129]` for a run that acquired all 129 of its own seasons and directing the operator to a validator that could only fail. It now distinguishes core-snapshot from validation-witness completeness without weakening either. And the rebuild harness resolved Python to a hard-coded in-tree `.venv`, which no git worktree has; it now honours `AFLDB_PYTHON` and refuses with the selected interpreter path instead of a bare "The system cannot find the path specified."
+- Validated on a clean `afldb_test` rebuild: all stages passed, the 1,622-row witness comparison agreed on every compared field, and final validation passed **19/19** including six new `club_seasons` gates. Release gates went 42 -> **45/64** with **all nine club-organization/identity gates green**; the two ISSUE-095-owned failures are fixed and the remaining 19 are owned elsewhere (Brownlow acquisition, DraftGuru Stage B3, DOB enrichment, attendance baseline, current-season 2026) and were left untouched.
+
+### AFLDB-ISSUE-090 — DOB conflict writes are now pass-scoped, idempotent and structurally deduplicated - 28 August 2026
+
+- The two DOB enrichment passes had contradictory `dob_conflict` lifecycles. The club-list pass appended a fresh unresolved row on every rerun (entity 4347 held three copies of one logical conflict), and the register pass issued an unscoped `DELETE` over every unresolved `dob_conflict`/`dob_internal_conflict` row, destroying conflicts the other pass owned. Both passes write `SOURCE_KEY = 'afltables'`, so `details->>'source'` could not express ownership at all.
+- Ownership is now carried by the pass key inside a versioned `data_issues.details.disputed_by` map (`club_list` vs `register`), with one unresolved row per player aggregating every current assertion and each assertion recording its own `source`, `external_id`, `asserted` and `existing_at_detection`. Keys are serialised sorted, so a rerun writes a byte-identical payload and preserves the row's `id` and `detected_at`.
+- Each pass reconciles only the population it can prove it owns — the club-list pass by the source files it actually processed, the register pass by the players it produced evidence for in that run — under `SELECT ... FOR UPDATE` inside the caller's transaction. Every remaining delete is either row-scoped after reconciliation found the payload empty, or population-scoped by `entity_id = ANY(owned)`. **Neither pass can remove the other's assertions in either direction**, and absence from a run is no longer treated as authoritative cessation. Cleanup is evidence-based: a vanished record in a processed file is removed, a present-but-unmatchable record is retained, and an unprocessed file's scope is untouched.
+- An identical, previously adjudicated assertion is not refiled; a materially changed one is. Suppression is assertion-specific — never player-wide and never cross-pass.
+- Added `src/db/migrations/072_dob_conflict_ownership.sql`: it normalises legacy payload shapes to v2, merges duplicate unresolved groups losslessly (survivor `MIN(id)`, so first detection is kept), recomputes `players.dob_disputed` for the affected players only, and creates the partial unique index `uq_data_issues_open_dob_per_player` as the structural duplicate backstop — one open `dob_conflict` and one open `dob_internal_conflict` per player, resolved history unbounded, no other `data_issues` writer constrained. Fail-closed preconditions abort the migration on every unexpected shape.
+- No privilege change was required: `data_issues` is already in `afldb_meta.import_writable_tables`, so `afldb_import` holds the DML the reconciliation needs.
+- Validated against PostgreSQL on the canonically rebuilt `afldb_test`: `tests/integration/dob-enrichment-issues.test.ts` **27/27**, the canonical external-identity release assertion **1/1**, and `tests/integration/privileges.test.ts` **24/24** with no grant widened — `data_issues` was already in `afldb_meta.import_writable_tables`, so no privilege change was needed. The global duplicate-issue invariant in `tests/integration/release-gates.test.ts` — deliberately not fixture-scoped — is green.
+- Test-baseline repair, not a data change: the release gate `matches players on the profile URL rather than the name` is re-pinned from `12_472` to `13_275`. The canonical legacy-free rebuild of 2026-08-27 replaced the retired `AFLDB_LEGACY_SQLITE` register population with the AFL Tables profile-URL identity population; live `afldb_test`, the accepted baseline `full-history-20260827` (`measured.players`, `identity_scan.distinct_urls`) and the rebuild's own Stage 9 gate all agree at 13,275, with no source row missing or malformed a URL. The `player_birth_evidence` count is a different population and was **not** re-pinned.
+
+### AFLDB-ISSUE-092 — External-identity reconciliation now fails closed on an unproven-complete source - 28 August 2026
+
+- An importer that reconciles `external_identities` by deleting rows absent from its input can only be correct if that input is the complete current population. `enrich_birth_dates.py` never checked that, so a truncated, wrong or synthetic source silently deleted the identities it failed to assert — in any environment, production included.
+- Added the reusable fail-closed gate `check_population_drop()` / `PopulationDropRefused` / `POPULATION_DROP_THRESHOLD = 0.10` to `tools/migration/common.py`, called inside the transaction immediately before the destructive statement, on counts read prior to the run's own writes. Asserting an **empty** population against stored rows is refused unconditionally and has **no bypass**; a drop above the threshold is refused unless the caller passes the per-invocation `--acknowledge-population-drop`, which is logged as a warning so its use is visible in run output. The deletion is scoped to the rows the current source and pass own.
+- `enrich_birth_dates.py` gained `--source-key`, so a test or partial run can be contained to its own `sources` row and cannot intersect the shared AFL Tables identity population. The DOB enrichment suite exercises the **real** importer under a runtime-seeded fixture source rather than a migration or a mock, keeping the existing acceptance contract intact while making the invocation structurally harmless.
+- `import_fitzroy_core.py` reuses the same gate and flags for its own `external_identities` reconciliation, so the canonical rebuild imports under the same protection.
+- Validated against PostgreSQL: `tests/integration/dob-enrichment-issues.test.ts` passes **27/27**, covering fixture-source containment, the unbypassable empty-population refusal, threshold refusal and explicit acknowledgement, and the no-false-positive case for equal-or-larger populations and rebuild-from-empty.
+
+### AFLDB-ISSUE-086 — Durable admin overrides regain complete FK-index coverage (migration 075) - 28 August 2026
+
+- Added `src/db/migrations/075_data_overrides_fk_index.sql`, which creates `ix_data_overrides_admin_user_id ON data_overrides (admin_user_id)` — unconditional, non-unique, non-partial, following the migration-041/071 shape for a `NOT NULL` foreign-key column.
+- `data_overrides.admin_user_id` references `auth_users(id)` but had no index leading with that column, so a parent-side `auth_users` delete sequentially scanned the durable admin-override table. The table now has complete foreign-key index coverage.
+- Repaired forward-only: migration 073, which introduced `data_overrides`, is applied and checksum-baselined and was not edited.
+- Validated against the real PostgreSQL foreign-key catalogue: `tests/integration/fk-indexes.test.ts` passes 2/2, covering both every deletable-parent foreign key having a usable index and no stale exemption remaining.
+
+### AFLDB-ISSUE-096 — 2026+ API-first acquisition foundation - 28 August 2026
+
+- AFLDB now has a standing contract for acquiring a current or future season from external APIs, so each data family added later inherits one set of rules. A tracked source-family registry (`data/reference/source-families.json`) declares every family's column shape, hashing rules, identity keys and independence group, and a fail-closed typed parser refuses any payload that does not match the declared shape.
+- New migration `074_source_observation_spine.sql` adds the three-grain source observation spine — immutable payloads, ordered record versions and current-key state. Repeated polling of unchanged data stays idempotent, while an A → B → A source correction is retained as three ordered versions over two payload bodies, with exactly one open version enforced by a unique index. Absence is recorded as state on the record and is never a deletion; reappearance clears it without rewriting history.
+- The same migration adds the reviewed-promotion ledger: `promotion_candidates`, which permits one live proposal per record and target and supersedes rather than duplicates, and an append-only `promotion_decisions`. Its `SELECT`/`INSERT`-only grants are registered in `tools/maintenance/privileges.sql`, and the privileges suite now asserts that a reconcile cannot restore `UPDATE`, `DELETE` or `TRUNCATE` over the ledger.
+- Reconciliation and promotion-review semantics land as pure modules under `src/lib/acquisition/`: the reconciliation verb set with an exported precedence, an ownership predicate that fails closed on foreign *and* unreadable ownership before authority is consulted, a fail-closed manual-authority interface, and a review baseline hashed over exactly the proposed fields, so an unrelated canonical change does not stale a review while a proposed-field change does. Provider agreement never substitutes for authority, and no force, override, bypass or consensus path exists.
+- Migrations 074 and 075 are applied to `afldb_test` in that order (75 files, 75 applied, 0 pending, no drift) with privileges reconciled. Validation: DB-free contract 106/106, observation-spine schema suite 13/13, FK-index catalogue gate 2/2 — which also covers `AFLDB-ISSUE-086`'s `data_overrides(admin_user_id)` index added by migration 075 — and privileges 24/24; 145/145 in one combined run.
+- Deliberately **not** delivered here: no family-specific importer, no persistence layer and no canonical acceptance/write transaction, no automatic canonical promotion, and no admin review screen. Migration 074 created the tables; nothing writes to them yet, so no user-visible application behaviour changes.
+
+### AFLDB-ISSUE-059 — Safe qualifying-match drill-down - 28 August 2026
+
+- Grouped NL `Qualifying matches` counts can now open a dedicated drill-down that faithfully replays the supported grouped predicates instead of approximating them through Match Search.
+- The UI links only when the plan passes the qualifying-match safety gate and otherwise retains its plain-text fallback; the integration also preserves current head-to-head rendering.
+- Focused validation passed, including the new PostgreSQL exact-set regression. Three unrelated `club_season` failures remain owned by `AFLDB-ISSUE-095`.
+
+
+### AFLDB-ISSUE-094 — Typed real-user NL semantic mappings - 26 August 2026
+
+- Parser version 26 adds first-class head-to-head record, win-comparison, draw-count and
+  last-draw intents, with validated two-organization plans, an organization-lineage-aware
+  PostgreSQL compiler, a structured answer payload and dedicated UI rendering.
+- Grouped result thresholds now consume their full comparison phrase atomically and cover
+  `at most`, `no more than`, `at least`, `no fewer than`, `more than`, `less/fewer than`
+  and `exactly` without leaving `most` for player fallback.
+- Club career-games leaders now count appearances for the named club organization rather
+  than filtering players and ranking their whole-career totals. Player resolver suffix
+  variants keep junior/senior identity while accepting Jr/Jnr/Junior and Sr/Snr/Senior.
+- Rebound 50s now decline explicitly as unsupported in NL search and are no longer exposed
+  through its metric catalogue; Grid Solver definitions are unchanged.
+- Removed the five nonsensical generated `<player> most games in a game` rows from the
+  realistic product corpus (1,440 to 1,435). The focused 480-case semantic corpus and the
+  593-test NL unit gate pass. The initial PostgreSQL run's two failures were invalid
+  assumptions that the rebuilt test database contained incidental Richmond career rows
+  and both Gary Ablett identities, not implementation defects. The tests now use isolated
+  deterministic fixtures, independent SQL truth and targeted cleanup; the user-run guarded
+  `AFLDB_TEST_DATABASE_URL` gate passed 6/6 on 26 August 2026.
+
+### AFLDB-ISSUE-088 — Playwright runs have finite, harness-specific timeout policies - 27 August 2026
+
+- Ordinary E2E, the admin navigation diagnostic and the separate NL-UI stress harness now declare finite action, navigation, expect, test and whole-run timeouts instead of inheriting Playwright's zero action/navigation/global defaults. Each harness keeps limits derived from its own workload; NL batch timeouts and zero-retry observation semantics are unchanged.
+- NL-UI now rejects non-positive or invalid `NL_UI_TIMEOUT_MS` overrides, count-guards the optional answer heading, manually deadlines response-body/probe/DOM/page-close promises that Playwright action timeouts do not own, and explicitly deadlines forensic screenshots with corpus-labelled diagnostics.
+- New DB-free config/deadline coverage passes 6/6. Final real-browser liveness passes 2/2 in 5.2 seconds: both known-unanswerable rows complete promptly with no timeout, page error, client error or hydration error. ISSUE-088 is resolved; neither a full E2E run nor a full NL stress run is required for this tooling-only change.
+
+### AFLDB-ISSUE-085 — Captaincy reloads reconcile only Wikipedia-owned rows - 26 August 2026
+
+- `import_captaincies` now resolves the Wikipedia source through the fail-closed `require_source` helper and limits keyed reconciliation to that `source_id`, so foreign- and NULL-provenance captaincies remain outside its update/delete population while existing owned row ids and link decisions retain their stable keyed-reload semantics.
+- Because `captaincies_natural_uq (season, club_id, player_name_raw, role)` is globally source-blind, an incoming fact already held outside the Wikipedia scope is now refused with an explicit ownership collision before writes instead of being adopted, overwritten, deleted, or left to a raw uniqueness error. No schema migration or `reload_keyed` redesign was required.
+- Deterministic integration coverage uses a temporary captaincies-only SQLite fixture and explicitly seeded PostgreSQL rows, independent of historical `afldb_test` populations and the repository's legacy SQLite database. Focused validation passed 2/2 with 21 unrelated tests filtered/skipped.
+
+### AFLDB-ISSUE-077 — The selected frontend theme stays stable across site navigation - 26 August 2026
+
+- Saving site settings revalidated only `/`, `/aflw`, `/search` and `/admin/settings`, so every other statically generated page kept serving the previously cached root layout and its stale `data-site-theme`. Navigating between a revalidated and a stale page let the client router patch `<html>` from the older layout payload, so the theme appeared to change mid-session with no settings change.
+- `saveSiteSettings` now issues `revalidatePath('/', 'layout')`, invalidating the whole root-layout cache boundary in one operation so every page resolves the same theme on its next render. The persisted database setting remains the authoritative value. Covered by `tests/admin-settings-actions.test.ts` 1/1, which asserts that exact call and that it is the only revalidation issued.
+
+### AFLDB-ISSUE-093 — AFLDB rebuilds end to end from tracked sources, with no legacy database - 27 August 2026
+
+- **The first complete clean rebuild of `afldb_test` succeeded.** `npm run db:test:rebuild -- --acknowledge-destroy afldb_test` ran all nine stages — PRECHECK, DATABASE RESET, MIGRATIONS (72/72), PRIVILEGES, REFERENCE DATA, FITZROY CORE, DRAFTGURU, DERIVED, FINAL VALIDATION — and finished with `AFLDB-FINAL-VALIDATION PASSED: 13 checks`. AFLDB can now be reconstructed from tracked, hash-bound, reproducible sources with **zero `AFLDB_LEGACY_SQLITE` dependency**, which is the objective this issue was opened for.
+- Every data stage ran under the **restricted `afldb_import` role**, not owner: no `--allow-owner-import-dsn`, no owner fallback. The rebuild therefore proves grant sufficiency rather than assuming it.
+- Core source: accepted baseline `full-history-20260827` — men's VFL/AFL 1897–2025, 131 raw artefacts, 719,042 acquired rows, bound by manifest SHA256 `cc8aaf09…` and artefact-set SHA256 `8e14ce61…`. DraftGuru snapshot `annual-html-20260826`: 5,057 persons, 6,810 picks, 6 explicit ledger decisions.
+- Imported: venues 52, players 13,275, matches 16,838, match_period_scores 134,704, player_match_stats 685,471, brownlow_round_votes 320,861. Final validation confirmed each against the tracked acceptance register, including `matches_after_accepted_last_season = 0` — 2026 was correctly kept out of the historical core and remains owned by current-season ingestion.
+- **Two defects were exposed only by running the real thing under the real role**, and both are fixed: the reference loader's cascade guard demanded reads `afldb_import` is deliberately denied, and the fitzRoy importer's `stats` and `brownlow` phases had both lost the `corrections` parameter they still referenced. Each is described in its own entry below. No privilege was granted for either; `tools/maintenance/privileges.sql` is unchanged.
+- **`club_seasons` came back empty, and that is the expected result of a legacy-free rebuild.** The only writer of `staging.team_seasons` — which the derived rebuild selects from — is the legacy importer, under `AFLDB_LEGACY_SQLITE`. The ladder/team-season domain therefore has no canonical acquisition path yet and was never part of the nine-stage contract. Ladders, premiership and wooden-spoon flags, finals counts and club-season natural-language answers stay unavailable until that domain is migrated, which is tracked as **`AFLDB-ISSUE-095` — canonical legacy-free ladder / team-season acquisition** (runbook `issues/closed/AFLDB-ISSUE-095.md`) rather than as a defect in this rebuild. Stage 9 deliberately does not gate `club_seasons` until then. `AFLDB-ISSUE-095` links `AFLDB-ISSUE-015` — the existing per-season `recomputeClubSeasons` parity work — without absorbing it; note that guard fails closed on an empty `staging.team_seasons`, so match create/delete/score-edit throws on a canonically rebuilt database until the domain lands.
+- With that follow-up recorded, **`AFLDB-ISSUE-093` is Resolved — 27 August 2026**. AFLDB now has a deterministic, tracked, hash-bound rebuild path from upstream sources with no dependency on the legacy SQLite aggregation, which is the objective the issue was opened for.
+
+### AFLDB-ISSUE-093 — The reference loader's cascade guard no longer demands reads the import role is denied - 27 August 2026
+
+- **The first clean rebuild failed at the REFERENCE stage with `permission denied for table player_link_match_candidates`.** `guard_cascade()` in `tools/migration/load_reference_data.py` decided whether `TRUNCATE ... CASCADE` would destroy out-of-scope data by running `SELECT count(*)` over **every transitive foreign-key dependent** of its truncate roots. That closure is 30 relations and includes admin and link-review tables that `afldb_import` is deliberately denied, so the run died — after the destructive reset had already emptied the database.
+- The denial is correct behaviour, not a privilege bug. `tools/maintenance/privileges.sql` grants `afldb_import` SELECT on a **base table** only through `afldb_meta.import_writable_tables`; the app-readable registry is consulted only for views and matviews. Migration 045 seeded the writable registry from the tables that existed then, so any base table created afterwards is revoked unless its migration calls `afldb_meta.grant_import_write()`. Migration 067 registers the match-candidate cache app-readable only, which migration 070's commentary shows was a deliberate choice.
+- **A single grant would not have fixed it.** Two relations in that closure are unreadable to the import role — `player_link_match_candidates` (migration 067) and `player_match_period_stats` (migration 062, whose `club_id` references a truncate root directly) — and the guard iterates them in sorted order, so granting the first would simply have moved the failure to the second.
+- **The guard now asks the catalogue instead of the tables.** New `common.selectable()` classifies relations with `has_table_privilege()`, which needs no privilege on its argument, in one round trip. `guard_cascade()` counts rows only in dependents it has proven readable and **refuses** on any unreadable dependent, because a table it cannot read is a table it cannot prove empty — strictly more fail-closed than the unhandled exception it replaces.
+- **A truncate whose targets are already empty is now skipped.** `TRUNCATE a, b CASCADE` requires TRUNCATE privilege on the entire cascade set, not merely on the tables named, so the statement itself would have been denied on the same two relations even with the guard fixed. Truncating an empty table removes nothing, so new `reload_truncate()` skips it. On a clean rebuild the truncate roots are always empty, so no relation in the closure is read or locked and a table added by a future migration cannot reintroduce this failure.
+- **No privilege was granted and `tools/maintenance/privileges.sql` is unchanged** — asserted by a test. No new migration. Data writes remain under `afldb_import`, with no owner fallback.
+- 10 new DB-free tests in `tests/reference-data.test.ts` pin the failure class rather than the single table, including the complete list of post-045 tables that never registered import write, so a new one shows up as a source diff instead of a mid-rebuild surprise.
+- No canonical data had been loaded when the run failed: the guard refuses before any write, so `afldb_test` holds the migrated schema, reconciled privileges and zero rows.
+- **The first version of this fix was incomplete, and a bounded non-destructive proof caught it before any second rebuild.** It assumed a freshly migrated database is empty, so that the guard would short-circuit and read nothing. It is not: migrations 015 and 016 seed `stat_definitions` and `stat_availability`, and both are truncate roots of the loader's `coverage` group. The guard evaluated emptiness and took its cascade closure over the **union** of every group's truncate targets, while the truncate decision is made per group at call time — so the short circuit could never fire, and the closure of the *empty* `clubs`/`seasons` roots was adjudicated even though their truncates would have been skipped. The loader refused over a cascade that was never going to happen.
+- **The cascade closure is now taken only from roots that actually hold rows**, because a truncate that will be skipped cascades into nothing. On a freshly migrated database that is `stat_definitions` and `stat_availability`, whose only dependent is `stat_availability` itself — a table the loader rebuilds — so no out-of-scope relation is classified and neither denied table is touched.
+- **The guard and the truncate can no longer disagree about which roots are in play**, which was the underlying defect class. `guard_cascade()` records the roots whose cascade it adjudicated; `reload_truncate()` refuses to truncate anything outside that set, and refuses outright if the guard has not run.
+- **New `tests/python/reference_cascade_contract.py`: 19 database-free behavioural scenarios** that drive the real `guard_cascade()` and `reload_truncate()` against a fake connection which raises if the guard reads a relation the role may not SELECT. The earlier tests were source-string contracts: they asserted the shape of the short circuit and passed while it never fired. These assert what the code does, including that the closure query is issued for the seeded roots and nothing else.
+
+### AFLDB-ISSUE-093 — The clean test rebuild can now run on Windows, and its final validation stage actually validates - 27 August 2026
+
+- **The MIGRATIONS and PRIVILEGES stages of `npm run db:test:rebuild` could not run on a Windows host.** `db:migrate:test` set its target with a POSIX inline env assignment (`AFLDB_MIGRATE_TARGET=test tsx …`) and `db:privileges`/`db:privileges:test` interpolated the DSN with `"$VAR"`. npm runs package scripts under `cmd.exe` on Windows, where the first fails outright with `'AFLDB_MIGRATE_TARGET' is not recognized …` and the second hands psql the literal string `$AFLDB_TEST_DATABASE_URL` as a database name. Both are fail-closed failures rather than silent mis-targeting, but the destructive DATABASE RESET is stage 2 and MIGRATIONS is stage 3 — an unremedied run would have emptied `afldb_test` and then failed immediately.
+- `tools/db/migrate.ts` gained `--target <name>`, and `db:migrate:test` now uses it. `AFLDB_MIGRATE_TARGET` remains supported and unchanged for every documented invocation, including the production cutover; when both are supplied they must agree, and a disagreement is a refusal rather than a silent preference for one over the other.
+- **New `tools/db/privileges.ts`** resolves the privileges DSN in Node from the same explicitly named targets and passes it to psql as an argument, so no shell is involved. The psql invocation is otherwise unchanged — same binary, same flags, same `-f tools/maintenance/privileges.sql`, same exit status — and it deliberately does not route through `runPsql`, whose `--single-transaction -f -` envelope belongs to the destructive reset and would change how `privileges.sql` executes. No DSN is printed on any path. The script names `npm run db:privileges` and `npm run db:privileges:test` are unchanged, so existing runbooks stay correct.
+- **The rebuild's FINAL VALIDATION stage did nothing.** Stage 9 was declared `run: 'internal'` while `executeRebuild()` had no branch for `internal`: the loop logged the stage name, recorded it as executed and fell through, and the exported `FINGERPRINT_QUERIES` was never called by anything. `Rebuild complete.` was therefore printed on the strength of eight exit codes and nothing else, so a rebuild that produced the wrong dataset could not be detected by the rebuild.
+- Stage 9 is now a real `validate` stage with its own `deps.runValidation`, kept distinct from the destructive `runSql` so no single-field edit can route a validation stream into the destructive runner or the reset into the read-only one. Its expected values are read from the same tracked acceptance register the fitzRoy preflight validates against, so the offline gate and the database gate cannot drift apart; the DraftGuru counts come from the one constant the DraftGuru preflight already uses. It asserts the one thing the offline validator structurally cannot — that the database actually received the accepted dataset — across 13 gates, including that no match later than the accepted baseline's last season was imported. An unrecognised `measured` key in the register is a refusal, so the gate cannot silently shrink. The stream is read-only, reports every measured value whether it passes or fails, collects all failures together, and ends in `RAISE EXCEPTION` so a mismatch is a non-zero psql exit and a failed stage.
+- 16 new DB-free tests in `tests/db-test-rebuild.test.ts` (182 in the suite). The existing test asserting the repository's other psql callers keep off the `getopt_long` hazard was relocated to where the argv is now built, not weakened.
+- No database was created, modified or destroyed by this change, and no rebuild has been executed.
+
+### AFLDB-ISSUE-093 — The clean test rebuild's database reset now works, and can be proven without destroying anything - 27 August 2026
+
+- **The rebuild's DATABASE RESET stage never sent its SQL to PostgreSQL.** `tools/db/rebuild-test.ts` ran the reset as `void client.unsafe(sql)`; a postgres.js `Query` only executes when `.then`, `.catch`, `.finally`, `.execute()` or `.forEach()` is called, so nothing reached the server, the surrounding `try`/`catch` could never observe a failure, and the stage would have reported success against an untouched database — leaving MIGRATIONS to find every migration already applied and every data stage to load on top of the old data. The reset now runs through `psql -v ON_ERROR_STOP=1 --single-transaction -f -` under `spawnSync`: synchronous (as the stage graph is), a real exit code, and all-or-nothing.
+- **The reset's `pg_` internal-schema exclusion excluded nothing.** `NOT LIKE 'pg\\_%'` written inside a JavaScript template literal reaches PostgreSQL as `'pg\\_%'`, which matches only names beginning `pg\`. `pg_toast` is present in every database, so the first loop would have attempted `DROP SCHEMA IF EXISTS pg_toast CASCADE` and aborted on a pinned system schema. Now `!~ '^pg_'`.
+- Extension-membership guards (`pg_depend.deptype = 'e'`) now cover the schema, table and view loops as well as routines and types, so an extension-owned object in `public` can never be dropped by the reset; a new loop removes standalone sequences and foreign tables.
+- **`RESET_SQL` is now proven safe against live PostgreSQL — rebuild blocker 2 is closed.** The rollback-only proof passed against a reconstructed `afldb_test` (migrations 001–072, privileges reconciled, PostgreSQL 16.15): pre-reset and post-rollback catalog fingerprints identical at `a8a2a899…`, health 950 relations / 3 extensions, psql exit 3 (the deliberate abort), 1498 ms. Inside the aborted transaction every rebuild-owned object class was zero while the `public` schema, all 3 extensions and all 56 extension-owned objects survived. The full incident lineage that preceded it is retained in `issues/closed/AFLDB-ISSUE-093.md` §20 and summarised in the new FIRST CLEAN REBUILD HANDOFF §H3 — it is deliberately not tidied up.
+- **The reset now has a single execution path** (`tools/db/psql.ts`). The destructive rebuild stage and the new rollback-only proof both call one `runPsql` helper with one `psqlArgv` — same binary, same flags, same error handling — so proving the proof proves the mechanism the rebuild will actually use. Neither caller assembles psql flags of its own.
+- **New command `npm run db:test:prove-reset`** (`tools/db/prove-reset.ts`): sends the rebuild's exact `RESET_SQL` through that same psql path, inside psql's own single transaction, and always aborts. The stream's final statement is a deliberate `RAISE EXCEPTION`, reached only after every assertion has passed, so a commit is impossible twice over — psql does not commit an errored stream under `ON_ERROR_STOP=1`, and PostgreSQL rolls back an already-aborted transaction even if `COMMIT` were sent. A zero exit status is therefore reported as a failure.
+- The proof refuses before the reset if the server reports a database other than `afldb_test`, if `current_user` or `session_user` is anything but a non-superuser `afldb_owner`, if any other client session is connected, or if psql cannot be launched or cannot reach the database. It snapshots the extensions and every extension-owned object into temp tables inside the transaction and requires them member-for-member afterwards, asserts a clean slate in SQL and again in Node, and requires the post-rollback catalog fingerprint to equal the pre-reset fingerprint exactly.
+- **The first live rollback proof COMMITTED the reset and wiped `afldb_test` (2026-08-27).** The proof exited 0 without performing its deliberate abort, and read-only verification confirmed the database had been reset: pre-proof fingerprint `0229d62c…` → `f46ce34c…`, leaving `public` only, zero application relations, no migration bookkeeping, and all three extensions with all 56 extension-owned objects intact. That is exactly the intended clean slate, so `RESET_SQL`'s semantics are now validated against live PostgreSQL; the rollback containment is what failed. Production and `afldb_dev` were never targeted, and the loss was schema and privileges only — no import had ever been run against this database. **The psql argument vector now passes the DSN as `-d` rather than as a positional operand** (PostgreSQL's own non-permuting `getopt_long`, used on Windows, can otherwise swallow `--single-transaction` and `ON_ERROR_STOP=1` as operands, leaving psql to autocommit each statement and exit 0 regardless of errors); `db:privileges` and `db:privileges:test` were moved off the same shape. The proof also now detects autocommit and stops **before** the first destructive statement, and relays psql's output with connection strings redacted.
+- **Earlier that day, the first proof attempt had already failed once and the proof was hardened.** psql exited 0 instead of performing the deliberate abort, and the refusal reported only the exit status — discarding the evidence. The availability probe could not have caught it either: it ran `SELECT 1` and accepted exit 0, which an undelivered stdin also produces. The proof now arms a **server-side commit trap before the reset** (a deferred unique violation in a temp table, checked at COMMIT, so a truncated stream cannot commit whatever psql does), emits a delivery marker as its first statement, distinguishes "never began" from "began and stopped", always reports psql's own output, and uses a probe that proves stdin delivery, `ON_ERROR_STOP` and diagnostic propagation.
+- **New command `npm run db:test:fingerprint`** (`tools/db/fingerprint-test.ts`): read-only catalog fingerprint of `afldb_test`, optionally compared against a recorded digest with `--expect`. The fingerprint implementation moved to `tools/db/catalog-fingerprint.ts` so the verifier and the proof compute the same digest from one implementation. It puts the server into `default_transaction_read_only` before querying and can reach no reset path.
+- **The proof was refusing because of its own observer connection.** After the incident fixes, the hardened proof failed twice with "1 other client session(s) connected to `afldb_test`" while a standalone `pg_stat_activity` check saw none. The CLI held a single postgres.js connection open across the entire proof, so the psql process counted it as another client backend; the Node-side gate could not see itself. The proof now runs in three phases — observation session opened and closed, then psql alone, then a fresh session for the post-rollback fingerprint — and its dependency interface exposes a scoped `withSession` rather than a connection handle, so nothing can span the reset. The exclusivity gate itself is unchanged and no session is exempted by name, PID or role.
+- 96 new DB-free tests in `tests/db-test-rebuild.test.ts` cover execution-path parity (including a test that drives both callers through one recorded spawn and asserts identical argv), psql availability, every refusal, the absence of a commit path, and the proof's inability to continue into migrations, privileges, importers or the derived rebuild.
+- No database was created, modified or destroyed by this change, and no rebuild has been executed.
+### AFLDB-ISSUE-071 — V2 numeric-condition oracle keeps operators with their clauses - 27 August 2026
+
+- Corrected the V2 corpus-oracle checker so explicit numeric operators are associated with their generated condition noun, preventing same-valued clauses such as `3+ goals and exactly 3 clubs` from exchanging operators invisibly and being reported as parser `DROPPED_FILTER`/`EXTRA_FILTER` defects.
+- Added focused harness regressions for the stale swapped expectation and a correct same-valued control. Production NL parser, typed plan, confidence, coverage, and decline behaviour are unchanged; parser version remains 25.
+- Corrected the NL stress documentation to state that the existing DB-free `--report-only` mode is V1-only. Final DB-free validation passed 3/3 focused files and 382/382 tests (`nl-stress-v2` 58/58, `nl-regression-corpus` 163/163, `nl-parser` 161/161). The unavailable historical 250k rerun is optional aggregate rebaseline measurement, not a correctness or resolution blocker.
+
+### AFLDB-ISSUE-083 — Importer tests enforce production-role parity - 27 August 2026
+
+- Added the optional `AFLDB_TEST_IMPORT_DATABASE_URL` contract and a shared,
+  fail-closed integration harness that verifies the restricted credential uses
+  the same `_test` database as owner fixtures, authenticates as `afldb_import`,
+  and remains denied DELETE authority over `auth_users`.
+- Supported Under-22 awards, first-kick-goal and DOB-enrichment production
+  importer children now run with the restricted credential while setup,
+  assertions and cleanup remain owner-backed. Data Editor gained a bounded
+  restricted-role proof for the migration-066 transactional audit write path.
+  During integration after ISSUE-093, the retired legacy Draft seam remained
+  deleted and its restricted-role contract was ported to the supported canonical
+  DraftGuru importer suite instead.
+- Missing restricted credentials skip explicitly and never fall back to the
+  owner DSN. No PostgreSQL privilege or importer semantics changed.
+- The harness receives both DSNs through explicit dependency injection. Passing
+  `undefined` deliberately therefore models an absent restricted credential
+  even when the invoking shell has `AFLDB_TEST_IMPORT_DATABASE_URL` configured;
+  it can no longer be repopulated by a default parameter from ambient state.
+- Child-process callers supply partial environment overrides, which are merged
+  over `process.env` before the validated restricted import DSN is applied;
+  first-kick-goal parity uses one focused accepted-retirement execution so its
+  role proof does not inherit the historical semantic test's three full reloads;
+  focused import fixtures no longer need to fabricate unrelated required keys.
+- Awards parity now uses the production `under_22` group, whose PostgreSQL
+  identity resolution avoids the legacy honours loader's intentional coupling
+  to SQLite player surrogate ids while still exercising real importer reads,
+  upserts, batch/sequence writes, and completion accounting as `afldb_import`.
+- First-kick-goal integration setup now loads its canonical source rows
+  explicitly with the owner fixture credential and supplies one bounded linked
+  row when sparse test data cannot resolve any automatically. Focused parity
+  tests therefore no longer depend on an incidental prior FKG database load;
+  the production subprocess under assertion remains `afldb_import`.
+- Final validation against the privilege-reconciled rebuilt test database is
+  green: live harness 2/2, DB-free harness 4/4, and focused Data Editor,
+  first-kick-goal, Under-22 awards, club-list DOB and register DOB restricted
+  paths all passed. ISSUE-083 is resolved; coverage is intentionally scoped to
+  those supported paths rather than every historical importer in the tree.
+
+### AFLDB-ISSUE-091 — Migration checksums are deterministic across LF/CRLF checkouts - 25 August 2026
+
+- `tools/db/migrate.ts` checksum computation and drift comparison now use a new pure module (`tools/db/migration-checksum.ts`) that derives three bounded representations of a migration file's content — raw bytes, canonical all-LF, canonical all-CRLF — and accepts a stored ledger checksum matching any one of them.
+- Fixes a false-positive "modified since they ran" refusal that blocked `db:migrate`/`db:status` from applying any pending migration whenever a Windows CRLF checkout materialized different bytes than the LF-based checksum recorded in `afldb_meta.schema_migrations`.
+- A newly applied migration now always stores the canonical all-LF checksum, regardless of which platform applied it, so this checkout-dependence cannot recur going forward.
+- No historical migration file or `afldb_meta.schema_migrations` row was modified; migration execution SQL is unchanged. Real content edits to an already-applied migration are still detected and refused.
+
+### AFLDB-ISSUE-073 — FK-index gate now passes (migration 071) - 25 August 2026
+
+- Four audit/link foreign keys introduced by migrations 056 and 057 now have supporting indexes (`src/db/migrations/071_audit_link_fk_indexes.sql`).
+- `ix_data_edits_admin_user_id` and `ix_plr_admin_user_id` are unconditional indexes on `NOT NULL` columns; `ix_plr_player_id` and `ix_pls_resolved_by` use `WHERE col IS NOT NULL` partial indexes on nullable columns, following the migration-041/050 convention.
+- No `DELETE_FREE_PARENTS` exemption was added; `auth_users` and `players` are both genuinely deletable parents.
+- `tests/integration/fk-indexes.test.ts` (2 tests) now passes green.
+
+### AFLDB-ISSUE-082 - 25 August 2026
+- `confirmUnlinked` admin mutation now uses the `import`-role transaction and takes an authoritative row lock before writing.
+- `previous_status` is derived securely from the locked database row, completely ignoring the form-supplied state.
+- Draft sibling decisions are classified at the draft-person grain, mirroring the importer's effective latest-resolution-per-pick classification (`DISTINCT ON (target_id) ... ORDER BY created_at DESC, id DESC`).
+- Stale resolve/confirm races, identical duplicate `confirmUnlinked` submissions, and consistent existing decisions are strictly rejected as stale state.
+- Contradictory decisions (where effective sibling actions differ or point to different players) fail closed.
+- `confirmUnlinked` remains an audit-only operation and does not participate in the ISSUE-080 honour-team advisory-lock protocol.
+- A deterministic, database-backed PostgreSQL concurrency regression test (via `pg_blocking_pids`) covering all three interleavings has been permanently added to the integration suite.
+
+### Production Deployment of Player-Link Protections (Schema 070) - 24 August 2026
+
+- `AFLDB-ISSUE-084` (resolved) successfully rolled out the ISSUE-044/078/080 link-preserving loaders across all seven `LINK_TARGET_TABLES` families to the production database (`afldb_prod`). Production schema advanced from 057 to 070.
+- Production role privileges were reconciled, stripping invalid legacy grants and enforcing explicit `afldb_import` restrictions on audit and link-decision tables.
+- The one-time production first-kick-goal `--rekey` completed successfully (334 rows migrated in place, surrogate IDs preserved unchanged).
+- Both the Profile-B reload-safety audit and the clean post-migration player-link integrity audit passed without collisions, exposed rows, or dangling identities.
+
+### Validated Release Candidate Promoted to `main` - 24 August 2026
+
+- `origin/main` was fast-forwarded (non-force) from `9be7f26` (migration 061) to the fully validated release candidate `0da44f9` (migration 070) under `AFLDB-ISSUE-087` (resolved). This promotes the accumulated, previously dev-only release state through migration 070 to `main`; ISSUE-087 itself was a release-validation and promotion gate, not the implementation issue for the individual features contained in that candidate.
+- The promoted SHA was validated end-to-end on Linux before the push: provenance/topology proofs, full unit and integration gates with only the exact expected known-issue signatures, a fresh production-style standalone build, full E2E plus the nine-route matrix, and a complete 1,440-question NL UI acceptance sweep (hydration errors 8 = 0.56%, inside the frozen release band). Only the exact candidate SHA was promoted; the docs-only `dev` tip was not.
+- **No production deployment occurred:** production remains at checkout `a32a0a1` (migration 057) and was verified undisturbed after the push. Deploying this state to production is owned by `AFLDB-ISSUE-084` (still HALTed at P0.2), whose `main`-promotion prerequisite is now satisfied.
+
 ### Award and Honours Reloads Reconcile Only Rows They Own - 23 August 2026
 
 - Five reload paths in `tools/migration/import_awards.py` no longer delete rows they did not supply (`AFLDB-ISSUE-080`, resolved). Hall of Fame and honour-team reloads previously reconciled their **entire** table; the legacy-winner, All-Australian and Rising Star reloads reconciled by award domain alone. Any row inside those populations whose key the incoming extract could not produce — an admin-created `award_winners` row from the shipped `createAwardWinner` screen, an ingest-promoted `sports_data_lab` row, an admin honours row, or any provenance-unknown row — was classified as vanished and deleted (or, if it carried a manual player link, aborted the whole reload since `AFLDB-ISSUE-044`).

@@ -59,6 +59,18 @@ export type NlTeamAggregateRow = {
   value: number;
 };
 
+export type NlHeadToHeadRow = {
+  clubAId: number; clubAName: string; clubASlug: string;
+  clubBId: number; clubBName: string; clubBSlug: string;
+  clubAWins: number; clubBWins: number; draws: number; total: number;
+  lastMatchId: number | null; lastMatchDate: Date | null;
+  lastMatchSeason: number | null; lastMatchRoundType: string | null;
+  lastMatchRoundNumber: number | null;
+  lastDrawMatchId: number | null; lastDrawDate: Date | null;
+  lastDrawSeason: number | null; lastDrawRoundType: string | null;
+  lastDrawRoundNumber: number | null;
+};
+
 export type NlTeamStreakRow = {
   clubId: number; clubName: string; clubSlug: string;
   opponentId?: number; opponentName?: string; opponentSlug?: string;
@@ -92,6 +104,7 @@ export type NlAnswerPayload =
   | { kind: 'player_season'; lead: NlPlayerSeasonRow | null; rows: NlPlayerSeasonRow[]; total: number }
   | { kind: 'team_match'; lead: NlTeamMatchRow | null; rows: NlTeamMatchRow[]; total: number }
   | { kind: 'team_aggregate'; rows: NlTeamAggregateRow[]; total: number }
+  | { kind: 'head_to_head'; row: NlHeadToHeadRow | null }
   | { kind: 'team_streak'; lead: NlTeamStreakRow | null; rows: NlTeamStreakRow[]; total: number }
   | { kind: 'club_season'; lead: NlClubSeasonRow | null; rows: NlClubSeasonRow[]; total: number }
   | { kind: 'count'; value: number }

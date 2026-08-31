@@ -1,0 +1,8 @@
+{
+  "$comment": "Hand-curated venue-name canonicalisation (AFLDB-ISSUE-093 Phase 1). Ported verbatim from the VENUE_CANONICAL constant in tools/migration/import_legacy_afl.py. Only unambiguous expansions of abbreviated source venue names; fuller canonicalisation (city, state, capacity) is a later enrichment pass and the source string is always preserved as an alias. Data only in Phase 1: the venue table itself is populated by the future fitzRoy match-results import phase, which will consume this map. Not loaded by load_reference_data.py.",
+  "canonical_names": {
+    "M.C.G.": "Melbourne Cricket Ground",
+    "S.C.G.": "Sydney Cricket Ground",
+    "W.A.C.A.": "WACA Ground"
+  }
+}

@@ -62,6 +62,7 @@ import { fileURLToPath } from 'node:url';
 
 import postgres from 'postgres';
 
+import { asImportBatchId } from '../../src/lib/import-batch-id';
 import { resolveClub, resolvePlayer } from '../../src/lib/ingest/datasets';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -888,11 +889,14 @@ async function main(): Promise<void> {
       const [source] = await tx<{ id: number }[]>`SELECT id FROM sources WHERE key = ${SOURCE_KEY}`;
       if (!source) throw new Error(`Source ${SOURCE_KEY} is missing; run migration 053 first.`);
 
-      const [batch] = await tx<{ id: number }[]>`
+      const [batch] = await tx<{ id: string }[]>`
         INSERT INTO import_batches (source_id, tool, target_table, status, records_read)
         VALUES (${source.id}, 'tools/records/import-first-kick-goal.ts', 'player_achievements', 'running', ${rows.length})
         RETURNING id
       `;
+      // AFLDB-ISSUE-105: `import_batches.id` is bigint, which postgres.js
+      // delivers as decimal text. Decoded once, here, and opaque after.
+      const batchId = asImportBatchId(batch.id);
 
       // ---- The reload key -------------------------------------------
       // The stable id assigned in data/records/first-kick-goal-ids.csv,
@@ -1225,7 +1229,7 @@ async function main(): Promise<void> {
               kickless_matches_before_first_kick = ${r.row.markers.kicklessMatchesBeforeFirstKick},
               match_id = ${r.matchId},
               notes = ${values.notes},
-              import_batch_id = ${batch.id}
+              import_batch_id = ${batchId}
             WHERE id = ${match.id}
           `;
           rowIds.set(key, match.id);
@@ -1245,7 +1249,7 @@ async function main(): Promise<void> {
               ${r.row.markers.consecutiveGoalKicks}, ${r.row.markers.noFurtherCareerGoals},
               ${r.row.markers.noFurtherCareerKicks}, ${r.row.markers.kicklessMatchesBeforeFirstKick},
               ${r.matchId}, ${values.notes},
-              ${source.id}, ${key}, ${batch.id}
+              ${source.id}, ${key}, ${batchId}
             ) RETURNING id
           `;
           rowIds.set(key, inserted.id);
@@ -1336,11 +1340,11 @@ async function main(): Promise<void> {
         UPDATE import_batches
            SET completed_at = now(), status = 'completed',
                records_inserted = ${insertedKeys.length}, records_updated = ${updated}
-         WHERE id = ${batch.id}
+         WHERE id = ${batchId}
       `;
 
       console.log(
-        `\nReconciled ${ownedIds.length} rows as import batch ${batch.id}: `
+        `\nReconciled ${ownedIds.length} rows as import batch ${batchId}: `
         + `${updated} updated, ${insertedKeys.length} inserted, ${vanished.length} deleted.`,
       );
       if (carried.length > 0) {

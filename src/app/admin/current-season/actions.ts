@@ -45,7 +45,7 @@ export async function runCurrentSeasonAdminAction(
       ? ['kali'] as const
       : parseCurrentSeasonSources(String(formData.get('source') ?? 'kali'));
     const apply = mode === 'auto' || formData.get('apply') === 'on';
-    const insertMissingMatches = mode === 'auto' || formData.get('insertMissingMatches') === 'on';
+    const insertMissingMatches = false;
     const updateMatches = mode !== 'auto' && formData.get('updateMatches') === 'on';
 
     const result = await runCurrentSeasonRefresh({
@@ -64,16 +64,26 @@ export async function runCurrentSeasonAdminAction(
       apply,
       insertMissingMatches,
       updateMatches,
-      fetched: result.fetched,
-      staged: result.staged,
-      inserted: result.inserted,
-      resolved: result.resolved,
-      updated: result.updated,
-      unresolved: result.unresolved,
+      observationsFetched: result.observationsFetched,
+      sourceCounts: result.sourceCounts,
+      independenceGroupCounts: result.independenceGroupCounts,
+      completeObservations: result.completeObservations,
+      observationsWithScores: result.observationsWithScores,
+      observationsStaged: result.observationsStaged,
+      observationVersionsInserted: result.observationVersionsInserted,
+      observationsMarkedAbsent: result.observationsMarkedAbsent,
+      canonicalMatchesResolved: result.canonicalMatchesResolved,
+      canonicalRowsInserted: result.canonicalRowsInserted,
+      canonicalRowsUpdated: result.canonicalRowsUpdated,
+      unresolvedObservations: result.unresolvedObservations,
+      incompleteSourceRecords: result.incompleteSourceRecords,
+      rejectedOrConflicted: result.rejectedOrConflicted,
+      sourceDisagreements: result.sourceDisagreements,
+      sameGroupConflicts: result.sameGroupConflicts,
     }, { userId: admin.id, label: admin.email });
 
     revalidatePath('/admin/current-season');
-    if (result.inserted > 0 || result.updated > 0) {
+    if (result.canonicalRowsInserted > 0 || result.canonicalRowsUpdated > 0) {
       revalidatePath('/matches');
       revalidatePath('/matches/[id]', 'page');
       revalidatePath('/seasons');
@@ -84,8 +94,8 @@ export async function runCurrentSeasonAdminAction(
 
     return {
       message: result.applied
-        ? `Updated ${year}: staged ${result.staged}, inserted ${result.inserted}, resolved ${result.resolved}.`
-        : `Dry run for ${year}: fetched ${result.fetched}; nothing was written.`,
+        ? `Updated ${year}: staged ${result.observationsStaged} observations, resolved ${result.canonicalMatchesResolved} canonical matches, inserted ${result.canonicalRowsInserted} canonical rows.`
+        : `Dry run for ${year}: fetched ${result.observationsFetched} observations; nothing was written.`,
       result,
       report,
     };

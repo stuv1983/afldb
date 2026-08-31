@@ -346,3 +346,46 @@ describe('describeAnswer — achievement summary distributions', () => {
     expect(headline).toBe('1920s, 1960s — 41 each (tied)');
   });
 });
+
+// ------------------------------------------- metric-threshold descriptions
+
+describe('metric-threshold answers (AFLDB-ISSUE-110)', () => {
+  it('describes a single-game threshold as a qualifying-performance count with the bound restated', () => {
+    const rows = [
+      gameRow({ value: 7 }),
+      gameRow({ playerId: 2, playerName: 'Someone Else', value: 6, matchId: 101 }),
+    ];
+    const result = describeAnswer(
+      plan({ agg: { kind: 'list' }, limit: 100, metricCondition: { op: 'gte', value: 6 } }),
+      { kind: 'player_game', lead: rows[0], rows, total: 2 },
+    );
+    expect(result).toEqual({
+      headline: '2 qualifying performances',
+      interpretation: 'Single-game goals at least 6.',
+    });
+  });
+
+  it('describes a scoped-sum threshold as players qualifying on the aggregate', () => {
+    const rows = [gameRow({ value: 30, games: 10, matchId: null, matchDate: null, season: null })];
+    const result = describeAnswer(
+      plan({ mode: 'sum', agg: { kind: 'list' }, limit: 100, metricCondition: { op: 'gt', value: 25 } }),
+      { kind: 'player_game', lead: rows[0], rows, total: 1 },
+    );
+    expect(result).toEqual({
+      headline: '1 player qualifies',
+      interpretation: 'Total goals more than 25 across the matches in scope.',
+    });
+  });
+
+  it('describes a season threshold as qualifying player-seasons', () => {
+    const rows = [seasonRow({ value: 8 }), seasonRow({ playerId: 2, value: 9 }), seasonRow({ playerId: 3, value: 10 })];
+    const result = describeAnswer(
+      plan({ grain: 'player_season', mode: undefined, agg: { kind: 'list' }, limit: 100, metricCondition: { op: 'lte', value: 10 } }),
+      { kind: 'player_season', lead: rows[0], rows, total: 3 },
+    );
+    expect(result).toEqual({
+      headline: '3 qualifying player-seasons',
+      interpretation: 'Season goals at most 10.',
+    });
+  });
+});

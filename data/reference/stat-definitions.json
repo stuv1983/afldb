@@ -1,0 +1,29 @@
+{
+  "$comment": "AFLDB stat definitions (AFLDB-ISSUE-093 Phase 1). The final post-import state of stat_definitions: the 21 per-match statistic keys from import_legacy_afl.py's STAT_DEFINITIONS constant plus the three Brownlow grain keys from import_brownlow_availability(). The legacy generic 'brownlow' key is deliberately absent — the current importer deletes it after splitting the three grains, so it never survives into the final state. Keys are app-facing stable identifiers and must not be renamed. The display_order collision between rebounds (90) and brownlow_match_votes (90) exists in the current database and is preserved as-is.",
+  "definitions": [
+    { "key": "goals",                 "label": "Goals",                        "short_label": "G",        "unit": "count", "display_order": 10,  "description": null },
+    { "key": "behinds",               "label": "Behinds",                      "short_label": "B",        "unit": "count", "display_order": 20,  "description": null },
+    { "key": "kicks",                 "label": "Kicks",                        "short_label": "K",        "unit": "count", "display_order": 30,  "description": null },
+    { "key": "handballs",             "label": "Handballs",                    "short_label": "HB",       "unit": "count", "display_order": 40,  "description": null },
+    { "key": "disposals",             "label": "Disposals",                    "short_label": "D",        "unit": "count", "display_order": 50,  "description": null },
+    { "key": "marks",                 "label": "Marks",                        "short_label": "M",        "unit": "count", "display_order": 60,  "description": null },
+    { "key": "tackles",               "label": "Tackles",                      "short_label": "T",        "unit": "count", "display_order": 70,  "description": null },
+    { "key": "hitouts",               "label": "Hit-outs",                     "short_label": "HO",       "unit": "count", "display_order": 80,  "description": null },
+    { "key": "rebounds",              "label": "Rebound 50s",                  "short_label": "R50",      "unit": "count", "display_order": 90,  "description": null },
+    { "key": "inside50s",             "label": "Inside 50s",                   "short_label": "I50",      "unit": "count", "display_order": 100, "description": null },
+    { "key": "clearances",            "label": "Clearances",                   "short_label": "CL",       "unit": "count", "display_order": 110, "description": null },
+    { "key": "clangers",              "label": "Clangers",                     "short_label": "CG",       "unit": "count", "display_order": 120, "description": null },
+    { "key": "frees_for",             "label": "Frees For",                    "short_label": "FF",       "unit": "count", "display_order": 130, "description": null },
+    { "key": "frees_against",         "label": "Frees Against",                "short_label": "FA",       "unit": "count", "display_order": 140, "description": null },
+    { "key": "contested",             "label": "Contested Possessions",        "short_label": "CP",       "unit": "count", "display_order": 150, "description": null },
+    { "key": "uncontested",           "label": "Uncontested Possessions",      "short_label": "UP",       "unit": "count", "display_order": 160, "description": null },
+    { "key": "contested_marks",       "label": "Contested Marks",              "short_label": "CM",       "unit": "count", "display_order": 170, "description": null },
+    { "key": "marks_i50",             "label": "Marks Inside 50",              "short_label": "MI50",     "unit": "count", "display_order": 180, "description": null },
+    { "key": "one_percenters",        "label": "One Percenters",               "short_label": "1%",       "unit": "count", "display_order": 190, "description": null },
+    { "key": "bounces",               "label": "Bounces",                      "short_label": "BO",       "unit": "count", "display_order": 200, "description": null },
+    { "key": "goal_assists",          "label": "Goal Assists",                 "short_label": "GA",       "unit": "count", "display_order": 210, "description": null },
+    { "key": "brownlow_match_votes",  "label": "Brownlow Votes (per match)",   "short_label": "BV/match", "unit": "count", "display_order": 90,  "description": "Umpire votes recorded against an individual match. Home-and-away only; finals are never polled." },
+    { "key": "brownlow_round_votes",  "label": "Brownlow Votes (per round)",   "short_label": "BV/round", "unit": "count", "display_order": 91,  "description": "Umpire votes aggregated to a round." },
+    { "key": "brownlow_season_total", "label": "Brownlow Votes (season total)", "short_label": "BV",      "unit": "count", "display_order": 92,  "description": "Official season vote total. The authoritative figure for career and season aggregates." }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "$comment": "AFLDB-ISSUE-095 D5 — the club labels the fitzRoy ladder witness emits, and when. MEASURED by the exhaustive read-only probe of fetch_ladder_afltables across every completed season 1897-2025 (run 2026-08-28): 129/129 seasons, 1,622 club-season rows, 20 distinct labels. Stored compactly as span plus explicit gaps so the exact 1,622 (label, season) pairs regenerate deterministically and every gap is a reviewed statement rather than an accident. This is a SOURCE contract, not club identity: the labels are modernised, one per organization, and only ClubResolver plus source_club_normalisation turn them into AFLDB's time-bounded identities.",
+  "source": "AFL Tables via fitzRoy 1.8.0 fetch_ladder_afltables",
+  "measured_on": "2026-08-28",
+  "first_season": 1897,
+  "last_season": 2025,
+  "seasons_returned": 129,
+  "club_season_pairs": 1622,
+  "gap_note": "Every gap below is a genuine wartime withdrawal, not a source failure. 1916 the competition ran with four clubs only (Carlton, Collingwood, Fitzroy, Richmond); 1917 with six and 1918 with seven; Geelong stood down in 1942-1943. A club that did not play has NO ladder row and must have NO club_seasons row — absence, never a zero row.",
+  "labels": [
+    { "label": "Carlton",         "first": 1897, "last": 2025, "missing": [] },
+    { "label": "Collingwood",     "first": 1897, "last": 2025, "missing": [] },
+    { "label": "Essendon",        "first": 1897, "last": 2025, "missing": [1916, 1917] },
+    { "label": "Fitzroy",         "first": 1897, "last": 1996, "missing": [] },
+    { "label": "Geelong",         "first": 1897, "last": 2025, "missing": [1916, 1942, 1943] },
+    { "label": "Melbourne",       "first": 1897, "last": 2025, "missing": [1916, 1917, 1918] },
+    { "label": "St Kilda",        "first": 1897, "last": 2025, "missing": [1916, 1917] },
+    { "label": "Sydney",          "first": 1897, "last": 2025, "missing": [1916] },
+    { "label": "Richmond",        "first": 1908, "last": 2025, "missing": [] },
+    { "label": "University",      "first": 1908, "last": 1914, "missing": [] },
+    { "label": "Footscray",       "first": 1925, "last": 2025, "missing": [] },
+    { "label": "Hawthorn",        "first": 1925, "last": 2025, "missing": [] },
+    { "label": "North Melbourne", "first": 1925, "last": 2025, "missing": [] },
+    { "label": "Brisbane Lions",  "first": 1987, "last": 2025, "missing": [] },
+    { "label": "West Coast",      "first": 1987, "last": 2025, "missing": [] },
+    { "label": "Adelaide",        "first": 1991, "last": 2025, "missing": [] },
+    { "label": "Fremantle",       "first": 1995, "last": 2025, "missing": [] },
+    { "label": "Port Adelaide",   "first": 1997, "last": 2025, "missing": [] },
+    { "label": "Gold Coast",      "first": 2011, "last": 2025, "missing": [] },
+    { "label": "GWS",             "first": 2012, "last": 2025, "missing": [] }
+  ],
+  "modernised_labels": {
+    "$comment": "The four families where the emitted label is NOT the identity that traded that season. Proven from the probe, in both directions. 'Kangaroos' is never emitted at all.",
+    "Sydney": "emitted back to 1897; South Melbourne traded 1897-1981",
+    "Footscray": "emitted forward to 2025; Western Bulldogs has traded since 1997",
+    "Brisbane Lions": "emitted back to 1987; Brisbane Bears traded 1987-1996",
+    "North Melbourne": "emitted across 1999-2007, when the club traded as the Kangaroos"
+  }
+}

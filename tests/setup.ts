@@ -17,6 +17,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { validateImportRoleParityDsnTargets } from './integration/import-role-parity';
+
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // Load .env without adding a dotenv dependency.
@@ -53,4 +55,14 @@ if (testUrl) {
 
   // Everything imported from src/db/client.ts now targets afldb_test.
   process.env.DATABASE_URL = testUrl;
+}
+
+const restrictedImportTestUrl = process.env.AFLDB_TEST_IMPORT_DATABASE_URL;
+if (restrictedImportTestUrl) {
+  if (!testUrl) {
+    throw new Error(
+      'AFLDB_TEST_DATABASE_URL must be set when AFLDB_TEST_IMPORT_DATABASE_URL is configured.',
+    );
+  }
+  validateImportRoleParityDsnTargets(testUrl, restrictedImportTestUrl);
 }

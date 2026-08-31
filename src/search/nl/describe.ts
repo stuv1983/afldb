@@ -74,16 +74,19 @@ export function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { h
     return describePlayerCareerAnswer(plan, payload.lead, payload.rows, payload.total);
   }
   if (payload.kind === 'player_game') {
-    return describePlayerGameAnswer(plan, payload.lead, payload.rows);
+    return describePlayerGameAnswer(plan, payload.lead, payload.rows, payload.total);
   }
   if (payload.kind === 'player_season') {
-    return describePlayerSeasonAnswer(plan, payload.lead, payload.rows);
+    return describePlayerSeasonAnswer(plan, payload.lead, payload.rows, payload.total);
   }
   if (payload.kind === 'team_match') {
     return describeTeamMatchAnswer(plan, payload.lead, payload.rows);
   }
   if (payload.kind === 'team_aggregate') {
     return describeTeamAggregateAnswer(plan, payload.rows, payload.total);
+  }
+  if (payload.kind === 'head_to_head') {
+    return describeHeadToHeadAnswer(plan, payload.row);
   }
   if (payload.kind === 'team_streak') {
     return describeTeamStreakAnswer(plan, payload.lead, payload.rows);
@@ -100,6 +103,46 @@ export function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { h
 const COMPARE_WORDS = {
   gte: 'at least', lte: 'at most', gt: 'more than', lt: 'fewer than', eq: 'exactly',
 } as const;
+
+function describeHeadToHeadAnswer(
+  plan: NlQueryPlan,
+  row: Extract<NlAnswerPayload, { kind: 'head_to_head' }>['row'],
+): { headline: string; interpretation: string } {
+  if (!row) return { headline: 'No matching clubs found', interpretation: '' };
+  const matchup = `${row.clubAName} v ${row.clubBName}`;
+  const kind = plan.headToHead!.kind;
+  if (kind === 'draw_count') {
+    return {
+      headline: `${row.draws.toLocaleString('en-AU')} ${row.draws === 1 ? 'draw' : 'draws'}`,
+      interpretation: `${matchup}, across ${row.total.toLocaleString('en-AU')} matches.`,
+    };
+  }
+  if (kind === 'last_draw') {
+    if (row.lastDrawMatchId === null) {
+      return { headline: 'No drawn match found', interpretation: matchup };
+    }
+    const round = row.lastDrawRoundType
+      ? ` ${row.lastDrawRoundType.replace(/_/g, ' ')}${row.lastDrawRoundNumber ? ` ${row.lastDrawRoundNumber}` : ''}`
+      : '';
+    return {
+      headline: `Last draw: ${matchup}`,
+      interpretation: `${row.lastDrawSeason ?? 'Season not recorded'}${round}.`,
+    };
+  }
+  if (kind === 'compare_wins') {
+    const leader = row.clubAWins === row.clubBWins
+      ? `${row.clubAName} and ${row.clubBName} are level`
+      : `${row.clubAWins > row.clubBWins ? row.clubAName : row.clubBName} has won more`;
+    return {
+      headline: `${leader} — ${row.clubAWins.toLocaleString('en-AU')} to ${row.clubBWins.toLocaleString('en-AU')}`,
+      interpretation: `${row.clubAName} wins first; ${row.draws.toLocaleString('en-AU')} draws from ${row.total.toLocaleString('en-AU')} matches.`,
+    };
+  }
+  return {
+    headline: `${row.clubAName} ${row.clubAWins.toLocaleString('en-AU')}–${row.clubBWins.toLocaleString('en-AU')} ${row.clubBName}`,
+    interpretation: `${row.draws.toLocaleString('en-AU')} draws; ${row.total.toLocaleString('en-AU')} matches.`,
+  };
+}
 
 function rankWord(plan: NlQueryPlan): 'Highest' | 'Lowest' {
   return plan.agg.kind === 'min' ? 'Lowest' : 'Highest';
@@ -250,9 +293,25 @@ function describePlayerGameAnswer(
   plan: NlQueryPlan,
   lead: NlPlayerGameRow | null,
   rows: NlPlayerGameRow[],
+  total: number,
 ): { headline: string; interpretation: string } {
   if (!lead) return { headline: 'No matching performance found', interpretation: '' };
   const metricLabel = (plan.metric ?? '').replace(/_/g, ' ');
+  // A metric threshold is a qualifying list, never a leader: the headline
+  // is the count, and the interpretation restates the applied bound.
+  if (plan.metricCondition) {
+    const bound = `${COMPARE_WORDS[plan.metricCondition.op]} ${plan.metricCondition.value.toLocaleString('en-AU')}`;
+    if (plan.mode === 'sum') {
+      return {
+        headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'player qualifies' : 'players qualify'}`,
+        interpretation: `Total ${metricLabel} ${bound} across the matches in scope.`,
+      };
+    }
+    return {
+      headline: `${total.toLocaleString('en-AU')} qualifying ${total === 1 ? 'performance' : 'performances'}`,
+      interpretation: `Single-game ${metricLabel} ${bound}.`,
+    };
+  }
   // Identity is the player: two rows for the same player at the lead
   // value are the same record held twice, not two different holders.
   const labels = dedupeByIdentity(rows, lead.value, (r) => r.playerId, (r) => r.playerName);
@@ -276,9 +335,17 @@ function describePlayerSeasonAnswer(
   plan: NlQueryPlan,
   lead: NlPlayerSeasonRow | null,
   rows: NlPlayerSeasonRow[],
+  total: number,
 ): { headline: string; interpretation: string } {
   if (!lead) return { headline: 'No matching season found', interpretation: '' };
   const metricLabel = (plan.metric ?? '').replace(/_/g, ' ');
+  if (plan.metricCondition) {
+    const bound = `${COMPARE_WORDS[plan.metricCondition.op]} ${plan.metricCondition.value.toLocaleString('en-AU')}`;
+    return {
+      headline: `${total.toLocaleString('en-AU')} qualifying ${total === 1 ? 'player-season' : 'player-seasons'}`,
+      interpretation: `Season ${metricLabel} ${bound}.`,
+    };
+  }
   const labels = dedupeByIdentity(rows, lead.value, (r) => r.playerId, (r) => r.displayName);
   const { subject, tied } = tiedSubject(labels);
   return {
@@ -298,16 +365,19 @@ function describePlayerCareerAnswer(
   if (!plan.metric || lead === null || lead.value === null) {
     return {
       headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'player matches' : 'players match'}`,
-      interpretation: 'Players meeting every condition asked for.',
+      interpretation: plan.scope.clubFor
+        ? `Players matching every condition for ${plan.scope.clubFor.name}.`
+        : 'Players meeting every condition asked for.',
     };
   }
   const metricLabel = plan.metric.replace(/_/g, ' ');
+  const clubSuffix = plan.scope.clubFor ? ` for ${plan.scope.clubFor.name}` : '';
   const labels = dedupeByIdentity(rows, lead.value, (r) => r.playerId, (r) => r.displayName);
   const { subject, tied } = tiedSubject(labels);
   return {
     headline: `${subject} — ${lead.value.toLocaleString('en-AU')} ${metricLabel}${tied ? ' (tied)' : ''}`,
     interpretation: plan.agg.kind === 'top_n'
-      ? `Top ${plan.agg.n} ${rankWord(plan).toLowerCase()} by career ${metricLabel}.`
-      : `${rankWord(plan)} career ${metricLabel}.`,
+      ? `Top ${plan.agg.n} ${rankWord(plan).toLowerCase()} by career ${metricLabel}${clubSuffix}.`
+      : `${rankWord(plan)} career ${metricLabel}${clubSuffix}.`,
   };
 }

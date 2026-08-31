@@ -1,10 +1,15 @@
 import 'server-only';
 
 import { sql } from '@/db/client';
-import { NL_METRICS, type NlAggregation, type NlMatchScope, type NlMatchType, type NlQueryPlan } from '@/search/nl/plan';
+import { NL_METRICS, type NlAggregation, type NlCompareOp, type NlMatchScope, type NlMatchType, type NlQueryPlan } from '@/search/nl/plan';
 import type { NlAnswerPayload, NlPlayerGameRow } from '@/search/nl/answer-types';
 
 type SqlFragment = ReturnType<typeof sql>;
+
+/** Closed op -> SQL map, the same allowlist-then-bind discipline player-career.ts's COMPARE_SQL follows; the value is always a bound parameter. */
+const COMPARE_SQL: Record<NlCompareOp, string> = {
+  gte: '>=', lte: '<=', gt: '>', lt: '<', eq: '=',
+};
 
 /** player_game NL_METRICS entries are all 'column' kind with the bare player_match_stats column name (goals, disposals, brownlow_votes, ...) as `.column` -- there is no grain branching here, unlike player_career: every one of the 21 GRID_STATS is a real column on player_match_stats. */
 function metricColumn(metric: string): string {
@@ -76,6 +81,16 @@ function rankCutoff(agg: NlAggregation): number {
 }
 
 /**
+ * How deep the rank filter reaches. A metric-condition list wants EVERY
+ * qualifying row (the threshold is the filter; collapsing a list to rank
+ * one was the ISSUE-110 silent-threshold defect), so the cutoff opens to
+ * the display limit's own cap instead of 1.
+ */
+function rankDepth(plan: NlQueryPlan): number {
+  return plan.metricCondition ? 2147483647 : rankCutoff(plan.agg);
+}
+
+/**
  * Answers a player_game plan. Mode 'single' ranks individual match
  * performances (ties included, the same rank()-with-ties discipline as
  * every other grain here) -- "dusty's highest disposal game", "most goals
@@ -90,8 +105,16 @@ export async function answerPlayerGame(plan: NlQueryPlan, limit: number): Promis
 async function answerSingle(plan: NlQueryPlan, limit: number): Promise<NlAnswerPayload> {
   const value = sql`${sql.unsafe(`s.${metricColumn(plan.metric!)}`)}`;
   const direction = plan.agg.kind === 'min' ? sql.unsafe('ASC') : sql.unsafe('DESC');
-  const n = rankCutoff(plan.agg);
-  const where = foldAnd([...scopeClauses(plan.scope, plan.player?.id, plan.debutGame), sql`${value} IS NOT NULL`]);
+  const n = rankDepth(plan);
+  const clauses: SqlFragment[] = [...scopeClauses(plan.scope, plan.player?.id, plan.debutGame), sql`${value} IS NOT NULL`];
+  // Mode 'single': the threshold qualifies each individual performance.
+  // Applied inside the ranked CTE, before any ranking work, alongside the
+  // IS NOT NULL above -- a NULL statistic is "not recorded" and never
+  // qualifies, even against lte/lt/eq 0.
+  if (plan.metricCondition) {
+    clauses.push(sql`${value} ${sql.unsafe(COMPARE_SQL[plan.metricCondition.op])} ${plan.metricCondition.value}`);
+  }
+  const where = foldAnd(clauses);
 
   let statsTarget = sql`player_match_stats s`;
   if (plan.periodSplit && plan.periodSplit !== 'FULL_MATCH') {
@@ -127,7 +150,7 @@ async function answerSingle(plan: NlQueryPlan, limit: number): Promise<NlAnswerP
     SELECT r.*, count(*) OVER () AS total
       FROM ranked r
      WHERE r.rnk <= ${n}
-     ORDER BY r.value ${direction}, r."matchDate"
+     ORDER BY r.value ${direction}, r."matchDate", r."matchId", r."playerId"
      LIMIT ${limit}
   `;
   return toPayload(rows);
@@ -136,8 +159,15 @@ async function answerSingle(plan: NlQueryPlan, limit: number): Promise<NlAnswerP
 async function answerSum(plan: NlQueryPlan, limit: number): Promise<NlAnswerPayload> {
   const statColumn = sql.unsafe(metricColumn(plan.metric!));
   const direction = plan.agg.kind === 'min' ? sql.unsafe('ASC') : sql.unsafe('DESC');
-  const n = rankCutoff(plan.agg);
+  const n = rankDepth(plan);
   const where = foldAnd(scopeClauses(plan.scope, plan.player?.id, plan.debutGame));
+  // Mode 'sum': the threshold qualifies the player's aggregate across the
+  // fully scoped match set, so it is a HAVING predicate AFTER aggregation.
+  // A player with no non-NULL row in scope forms no group and can never
+  // qualify -- NULL stays "not recorded", not zero.
+  const having = plan.metricCondition
+    ? sql`HAVING sum(${statColumn}) ${sql.unsafe(COMPARE_SQL[plan.metricCondition.op])} ${plan.metricCondition.value}`
+    : sql``;
 
   let statsTarget = sql`player_match_stats s`;
   if (plan.periodSplit && plan.periodSplit !== 'FULL_MATCH') {
@@ -157,6 +187,7 @@ async function answerSum(plan: NlQueryPlan, limit: number): Promise<NlAnswerPayl
         JOIN matches m ON m.id = s.match_id
        WHERE ${where} AND ${statColumn} IS NOT NULL
        GROUP BY s.player_id
+       ${having}
     ),
     ranked AS (
       SELECT t.player_id, t.value, t.games,
@@ -173,7 +204,7 @@ async function answerSum(plan: NlQueryPlan, limit: number): Promise<NlAnswerPayl
       FROM ranked r
       JOIN players p ON p.id = r.player_id
      WHERE r.rnk <= ${n}
-     ORDER BY r.value ${direction}, p.sort_name
+     ORDER BY r.value ${direction}, p.sort_name, p.id
      LIMIT ${limit}
   `;
   return toPayload(rows);

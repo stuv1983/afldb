@@ -1,0 +1,54 @@
+{
+  "$comment": "AFLDB source registry (AFLDB-ISSUE-093 Phase 1). Ported verbatim from the SOURCES constant previously embedded in tools/migration/import_legacy_afl.py. Loaded by tools/migration/load_reference_data.py, which upserts by key so sources.id stays stable across reloads. The sports_data_lab row is retained as a registry/provenance record; the new rebuild path never reads from it.",
+  "sources": [
+    {
+      "key": "fitzroy_afldata",
+      "name": "fitzRoy afldata.rda (AFL Tables player stats)",
+      "url": "https://github.com/jimmyday12/fitzRoy_data",
+      "kind": "upstream_dataset",
+      "description": "Upstream player-game dataset; origin of the games fact table."
+    },
+    {
+      "key": "afltables",
+      "name": "AFL Tables",
+      "url": "https://afltables.com",
+      "kind": "scrape",
+      "description": "Brownlow votes, match details, venue and club records."
+    },
+    {
+      "key": "wikipedia",
+      "name": "Wikipedia",
+      "url": "https://en.wikipedia.org",
+      "kind": "scrape",
+      "description": "Awards, captaincies, hall of fame, football families."
+    },
+    {
+      "key": "wikipedia_22under22",
+      "name": "22 Under 22 team",
+      "url": "https://en.wikipedia.org/wiki/22_Under_22_team",
+      "kind": "scrape",
+      "description": "Annual AFL Players' Association 22 Under 22 team tables extracted from Wikipedia on 2026-08-20. The committed extract covers 2012–2026; the separate most-selections summary is excluded because it is derived and contains known omissions."
+    },
+    {
+      "key": "draftguru",
+      "name": "DraftGuru",
+      "url": "https://draftguru.com.au",
+      "kind": "scrape",
+      "description": "Draft and recruitment history."
+    },
+    {
+      "key": "footywire",
+      "name": "FootyWire",
+      "url": "https://footywire.com",
+      "kind": "scrape",
+      "description": "Rising Star nominations."
+    },
+    {
+      "key": "sports_data_lab",
+      "name": "Sports Data Lab legacy database",
+      "url": null,
+      "kind": "derived",
+      "description": "Legacy normalisation and derivation layer used as the migration source."
+    }
+  ]
+}

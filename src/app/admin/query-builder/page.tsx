@@ -33,11 +33,14 @@ export default async function QueryBuilderPage({
   const raw = params.q;
   const token = Array.isArray(raw) ? raw[0] : raw;
   const state = (token && parseQueryState(token)) || emptyState('players');
-  const hasConditions = state.cards.some((group) => group.card.conditions.length > 0);
+  // A related-domain card with no conditions is a complete question ("has /
+  // has no such row"); an anchor card with no conditions filters nothing.
+  // Same rule as the form's Search button.
+  const hasQuery = state.cards.some((group) => group.card.conditions.length > 0 || group.card.domain !== undefined);
 
   let results: QueryBuilderResult | null = null;
   let error: string | null = null;
-  if (hasConditions) {
+  if (hasQuery) {
     try {
       results = await runQueryBuilder(state);
     } catch (err) {
@@ -52,8 +55,10 @@ export default async function QueryBuilderPage({
       <div className="page-header">
         <h1>Data QA search</h1>
         <p className="subtitle">
-          Super-admin only. Pick a table, add conditions, chain them with AND/OR or group
-          them into cards -- for checking data, not for the public site.
+          Super-admin only. Choose what the results are, then build cards that filter on
+          that row or on a related domain (a player&apos;s career, match stats, clubs, draft
+          picks…) and chain them with AND/OR. Results always show the chosen table&apos;s
+          columns, one row each -- for checking data, not for the public site.
         </p>
       </div>
 

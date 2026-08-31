@@ -13,6 +13,7 @@ import {
   listConfirmedUnlinked,
   resolveLink,
 } from '@/db/queries/player-links';
+import { createImportRoleParityHarness } from './import-role-parity';
 
 /**
  * A first-kick-goal reload must not discard a human identity decision, must
@@ -21,7 +22,7 @@ import {
  * renamed player (AFLDB-ISSUE-078, first-kick-goal half).
  *
  * Its own file rather than an addition to awards-reload-links.test.ts or
- * draft-reload-links.test.ts: both of those drive a PYTHON importer through
+ * draftguru-import.test.ts: both of those drive a PYTHON importer through
  * the repo virtualenv and are scoped in their own docstrings to the honours
  * and draft ETL boundaries. This one drives a TypeScript importer through
  * tsx, against a different table, with fixtures — candidate extracts, a
@@ -39,10 +40,12 @@ import {
  * works on TEMP COPIES of both files via the importer's env overrides — the
  * real curated extract and the real tracked manifest are never modified.
  *
- * Every write lands in afldb_test: tests/setup.ts redirects DATABASE_URL,
- * and the two role URLs the product code opens for itself are redirected
- * below.
+ * Every write lands in afldb_test. Fixture setup/assertion connections remain
+ * owner-backed; only the real importer child is switched to the validated
+ * AFLDB_TEST_IMPORT_DATABASE_URL by the shared role-parity harness.
  */
+// In-process admin fixture paths still need the owner test credential. This is
+// deliberately separate from runTool(), whose child receives afldb_import.
 process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
 process.env.AFLDB_AUTH_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
 
@@ -51,8 +54,23 @@ const FIXTURE_EMAIL = 'issue-078-fkg-reload@example.test';
 const NOTE = 'AFLDB-ISSUE-078 first-kick-goal reload survival';
 const REAL_CSV = join(root, 'data', 'records', 'first-kick-goal.csv');
 
-const tsx = join(root, 'node_modules', '.bin', 'tsx');
-const canRunImporter = existsSync(REAL_CSV) && existsSync(tsx);
+const tsx = join(
+  root,
+  'node_modules',
+  '.bin',
+  process.platform === 'win32' ? 'tsx.cmd' : 'tsx'
+);
+const canSpawnImporter = existsSync(REAL_CSV) && existsSync(tsx);
+const importRole = createImportRoleParityHarness(
+  process.env.AFLDB_TEST_DATABASE_URL,
+  process.env.AFLDB_TEST_IMPORT_DATABASE_URL,
+);
+const canRunImporter = canSpawnImporter && importRole.isConfigured;
+const roleParitySuffix = importRole.isConfigured ? '' : ` — ${importRole.skipMessage}`;
+
+beforeAll(async () => {
+  if (canRunImporter) await importRole.validate();
+});
 
 // Temp copies the whole suite works on; created in beforeAll.
 let workDir = '';
@@ -61,12 +79,35 @@ let manifestPath = '';
 let pristineManifest = '';
 
 function runTool(args: string[]) {
-  return spawnSync(
+  return importRole.spawn(
     tsx,
     ['--conditions=react-server', 'tools/records/import-first-kick-goal.ts', ...args],
     {
       cwd: root,
+      shell: process.platform === 'win32',
+      env: {
+        AFLDB_FIRST_KICK_GOAL_CSV: extractPath,
+        AFLDB_FIRST_KICK_GOAL_MANIFEST: manifestPath,
+      },
+    },
+  );
+}
+
+const runImporter = (extra: string[] = []) => runTool(['--apply', ...extra]);
+
+/**
+ * Establish the canonical database fixture through the production loader while
+ * retaining the owner/restricted boundary: this is setup, never the execution
+ * whose role parity the tests assert.
+ */
+function runOwnerFixtureImporter() {
+  return spawnSync(
+    tsx,
+    ['--conditions=react-server', 'tools/records/import-first-kick-goal.ts', '--apply'],
+    {
+      cwd: root,
       encoding: 'utf8',
+      shell: process.platform === 'win32',
       env: {
         ...process.env,
         AFLDB_IMPORT_DATABASE_URL: process.env.AFLDB_TEST_DATABASE_URL,
@@ -77,10 +118,11 @@ function runTool(args: string[]) {
   );
 }
 
-const runImporter = (extra: string[] = []) => runTool(['--apply', ...extra]);
-
-function output(run: { stdout: unknown; stderr: unknown }): string {
-  return String(run.stdout ?? '') + String(run.stderr ?? '');
+function output(run: { stdout: unknown; stderr: unknown; error?: Error; signal?: string | null }): string {
+  let out = String(run.stdout ?? '') + String(run.stderr ?? '');
+  if (run.error) out += `\nError: ${run.error.message}`;
+  if (run.signal) out += `\nSignal: ${run.signal}`;
+  return out;
 }
 
 function editFile(path: string, from: string, to: string): void {
@@ -204,7 +246,7 @@ async function danglingResolutions(adminUserId: number): Promise<number[]> {
 }
 
 describe.skipIf(!canRunImporter)(
-  'first-kick-goal reloads preserve identity and manual links (AFLDB-ISSUE-078)',
+  `first-kick-goal reloads preserve identity and manual links (AFLDB-ISSUE-078)${roleParitySuffix}`,
   () => {
     let adminUserId = 0;
     let playerA = 0;
@@ -212,6 +254,15 @@ describe.skipIf(!canRunImporter)(
     let foreignSourceId = 0;
     let foreignRowId = 0;
     const used = new Set<number>();
+
+    it('keeps owner fixtures separate from the confined afldb_import runtime role', () => {
+      expect(importRole.validation).toMatchObject({
+        owner: { role: 'afldb_owner' },
+        restricted: { role: 'afldb_import' },
+        denial: { table: 'auth_users', operation: 'DELETE', sqlstate: '42501' },
+      });
+      expect(importRole.validation?.owner.database).toBe(importRole.validation?.restricted.database);
+    });
 
     beforeAll(async () => {
       // A dedicated fixture admin. Picking the first real admin by id is the
@@ -241,6 +292,46 @@ describe.skipIf(!canRunImporter)(
       const bootstrap = runTool(['--assign-ids']);
       expect(bootstrap.status, output(bootstrap)).toBe(0);
       pristineManifest = readFileSync(manifestPath, 'utf8');
+
+      // The historical suite used to assume afldb_test had already received a
+      // canonical FKG import. Populate that fixture explicitly as owner so a
+      // focused -t run does not depend on another test or manual preloading.
+      // Every subsequent production importer execution still goes through
+      // runTool()/importRole.spawn and therefore uses afldb_import.
+      const fixtureImport = runOwnerFixtureImporter();
+      expect(fixtureImport.status, output(fixtureImport)).toBe(0);
+
+      // A sparse rebuilt test database can contain the canonical source rows
+      // without enough historical evidence for any automatic player link.
+      // The retirement proof needs one linked source fact, not a particular
+      // player identity, so create that exact fixture state through the owner
+      // handle. afterAll's canonical restricted reload restores source-derived
+      // link state after the selected test.
+      const candidates = await sql<AchievementRow[]>`
+        SELECT ${COLUMNS} FROM player_achievements
+         WHERE achievement_type = 'first_kick_goal'
+           AND source_id = (
+             SELECT id FROM sources WHERE key = 'wikipedia_first_kick_goal'
+           )
+         ORDER BY id
+      `;
+      const extract = readFileSync(extractPath, 'utf8');
+      const manifest = readFileSync(manifestPath, 'utf8');
+      const candidate = candidates.find((row) =>
+        extract.split(row.nameClean).length === 2
+        && manifest.split(row.nameClean).length === 2
+      );
+      expect(candidate, 'canonical FKG fixture needs one unambiguous row').toBeDefined();
+      const linked = candidates.some((row) => row.playerId !== null
+        && extract.split(row.nameClean).length === 2
+        && manifest.split(row.nameClean).length === 2);
+      if (!linked) {
+        await sql`
+          UPDATE player_achievements
+             SET player_id = ${playerA}, link_status_value = 'resolved'
+           WHERE id = ${candidate!.id}
+        `;
+      }
 
       // A first-kick-goal row this importer does NOT own. No product path
       // creates one today — player_achievements has no admin INSERT — but
@@ -391,11 +482,11 @@ describe.skipIf(!canRunImporter)(
 
     it('keeps a confirmed-unlinked decision, with its audit target alive', async () => {
       const row = await takeSourceLinked(used);
+      await returnToQueue(row.id);
 
       const confirmed = await confirmUnlinked({
         targetTable: 'player_achievements',
         targetId: row.id,
-        previousStatus: 'ambiguous',
         adminUserId,
         note: NOTE,
       });
@@ -652,10 +743,11 @@ describe.skipIf(!canRunImporter)(
 
     it('a decided retirement is a decision loss, gated by --allow-link-loss alone', async () => {
       const row = await takeSourceLinked(used);
+      await returnToQueue(row.id);
+
       const confirmed = await confirmUnlinked({
         targetTable: 'player_achievements',
         targetId: row.id,
-        previousStatus: 'ambiguous',
         adminUserId,
         note: NOTE,
       });
@@ -827,6 +919,28 @@ describe.skipIf(!canRunImporter)(
                  GROUP BY 1, 2 HAVING count(*) > 1) d
       `;
       expect(issues.n).toBe(0);
+    }, 120_000);
+
+    it('runs the retirement preflight and accepted mutation as afldb_import (AFLDB-ISSUE-083)', async () => {
+      const row = await takeSourceLinked(used);
+      await sql`
+        INSERT INTO player_link_suggestions (target_table, target_id, suggested_name, note)
+        VALUES ('player_achievements', ${row.id}, 'Issue083 Tipster', ${NOTE})
+      `;
+
+      removeLineContaining(extractPath, row.nameClean);
+      const line = readFileSync(manifestPath, 'utf8')
+        .split('\n').find((candidate) => candidate.includes(`,${row.nameClean},`))!;
+      editFile(manifestPath, line, line.replace(/,active$/, ',retired'));
+
+      // One production execution is enough for ISSUE-083: the durable reader
+      // forces the SELECT-only preflight, while --accept-retirement allows the
+      // restricted process to reach and commit the legitimate mutation.
+      const accepted = runImporter(['--accept-retirement', row.sourceRecordId!]);
+      expect(accepted.status, output(accepted)).toBe(0);
+      expect(accepted.stdout).toContain('ACKNOWLEDGED durable references left behind');
+      expect(accepted.stdout).toContain('reader suggestions');
+      expect(await readById(row.id)).toBeUndefined();
     }, 120_000);
   },
 );

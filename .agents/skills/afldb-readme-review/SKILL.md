@@ -1,6 +1,6 @@
 ---
 name: afldb-readme-review
-description: Review the AFLDB codebase and replace README.md with a new README derived from the current repository. Preserve the existing README as README.old.md. Work only in the local working directory and do not make Git changes.
+description: Review the AFLDB codebase and replace README.md with a new README derived from the current repository. Preserve the existing README as docs/archive/README.old.md. Work only in the local working directory and do not make Git changes.
 ---
 
 # AFLDB README Review and Replacement
@@ -15,7 +15,7 @@ The task is to:
 
 1. Review the existing `README.md`.
 2. Review the current repository structure, source code, configuration, scripts, tests, deployment files, and documentation needed to understand the project.
-3. Rename the existing `README.md` to `README.old.md`.
+3. Rename the existing `README.md` to `docs/archive/README.old.md`.
 4. Create a new `README.md` based on the repository as it exists now.
 5. Preserve useful information from the old README only when it is still supported by the current codebase.
 
@@ -34,8 +34,8 @@ The existing README is a reference source only. Do not treat it as authoritative
 - Do not fix bugs discovered during the review.
 - Do not change package versions, configuration, tests, deployment files, database files, migrations, scripts, or generated artifacts.
 - Only rename the existing README and create the replacement README.
-- Do not delete the old README content. Preserve it as `README.old.md`.
-- Do not overwrite an existing `README.old.md` without first reporting that it already exists.
+- Do not delete the old README content. Preserve it as `docs/archive/README.old.md`.
+- Do not overwrite an existing `docs/archive/README.old.md` without first reporting that it already exists.
 - Do not invent features, commands, architecture, data coverage, deployment behavior, or environment variables.
 - If something cannot be verified from the repository, either omit it or label it clearly as unverified.
 - Never place passwords, access codes, API keys, database credentials, SMTP credentials, secrets, private URLs, or session material in the README.
@@ -118,10 +118,10 @@ The goal is a replacement README, not an annotated edit of the old README.
 Before creating the replacement:
 
 1. Confirm `README.md` exists.
-2. Confirm whether `README.old.md` already exists.
-3. If `README.old.md` does not exist:
-   - rename `README.md` to `README.old.md`.
-4. If `README.old.md` already exists:
+2. Confirm whether `docs/archive/README.old.md` already exists.
+3. If `docs/archive/README.old.md` does not exist:
+   - rename `README.md` to `docs/archive/README.old.md`.
+4. If `docs/archive/README.old.md` already exists:
    - stop before overwriting it;
    - report the conflict to the user.
 
@@ -129,7 +129,7 @@ Use a filesystem rename, not Git commands.
 
 After the rename:
 
-- `README.old.md` must contain the original README unchanged.
+- `docs/archive/README.old.md` must contain the original README unchanged.
 - create a new `README.md`.
 
 ## New README requirements
@@ -280,8 +280,8 @@ Avoid:
 
 After creating `README.md`, verify:
 
-1. `README.old.md` exists.
-2. `README.old.md` still contains the original README content unchanged.
+1. `docs/archive/README.old.md` exists.
+2. `docs/archive/README.old.md` still contains the original README content unchanged.
 3. New `README.md` exists.
 4. Commands shown in the README exist in `package.json` or the repository.
 5. Referenced paths exist.
@@ -298,7 +298,7 @@ Do not run broad application test suites merely to write documentation unless th
 
 At completion report:
 
-- that the existing README was preserved as `README.old.md`;
+- that the existing README was preserved as `docs/archive/README.old.md`;
 - that a new `README.md` was created;
 - the main areas reviewed;
 - any claims intentionally omitted because they could not be verified;
@@ -307,7 +307,7 @@ At completion report:
 Expected changed files:
 
 - `README.md`
-- `README.old.md`
+- `docs/archive/README.old.md`
 
 If anything else changed, stop and explain why before proceeding.
 

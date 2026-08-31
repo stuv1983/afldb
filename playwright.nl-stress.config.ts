@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+import { NL_UI_OPERATION_TIMEOUT_MS } from './tests/nl-ui/timeout-policy';
+
 /**
  * The 12,000-question NL UI sweep. A SEPARATE config from
  * playwright.config.ts, deliberately.
@@ -52,6 +54,8 @@ export default defineConfig({
    * individual navigation.
    */
   timeout: 30 * 60_000,
+  expect: { timeout: 5_000 },
+  globalTimeout: 2 * 60 * 60_000,
 
   reporter: [['list'], ['json', { outputFile: 'nl-ui-out/playwright.json' }]],
 
@@ -66,6 +70,8 @@ export default defineConfig({
 
   use: {
     baseURL,
+    actionTimeout: NL_UI_OPERATION_TIMEOUT_MS,
+    navigationTimeout: NL_UI_OPERATION_TIMEOUT_MS,
     /**
      * Traces and screenshots are off. At 12,000 navigations
      * `retain-on-failure` can still write thousands of traces if the

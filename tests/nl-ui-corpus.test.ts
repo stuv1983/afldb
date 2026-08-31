@@ -85,6 +85,12 @@ describe('readUiCorpus', () => {
     const path = corpusFile('id,category,question,expected_status,tags\nui_1,c,q,plan,t\n');
     expect(readUiCorpus(path)).toHaveLength(1);
   });
+
+  it('keeps the realistic product corpus free of impossible per-game games questions', () => {
+    const cases = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-1440-real-user-v3-20260822.csv');
+    expect(cases).toHaveLength(1435);
+    expect(cases.filter((row) => /\bmost games in a game\b/i.test(row.question))).toEqual([]);
+  });
 });
 
 // -------------------------------------------------------------------- cores
@@ -336,5 +342,34 @@ describe('hydration errors correlated by cluster worker', () => {
       errors: ['console: Failed to fetch RSC payload for /players/x. Falling back to browser navigation.'],
     })]);
     expect(report.totalHydrationErrors).toBe(0);
+  });
+});
+
+describe('nl-stress.spec.ts source contract', () => {
+  it('persists observations incrementally inside the batch loop, not as a post-loop bulk append', () => {
+    const { readFileSync } = require('node:fs');
+    const { join } = require('node:path');
+    const source = readFileSync(join(process.cwd(), 'tests', 'nl-ui', 'nl-stress.spec.ts'), 'utf8');
+
+    // Exactly one appendFileSync call exists in the file
+    const appendMatches = source.match(/appendFileSync\(/g) || [];
+    expect(appendMatches.length, 'should have exactly one appendFileSync call').toBe(1);
+
+    // The legacy bulk append is gone
+    expect(source, 'should not bulk-append the entire array').not.toMatch(/observations\.map\([^)]*\)\.join/);
+
+    // In-memory collection is preserved for the downstream crashes check
+    expect(source, 'must preserve in-memory collection').toMatch(/observations\.push\(observation\)/);
+
+    // Find the batch loop
+    const loopMatch = source.match(/for\s*\(\s*const\s+test_\s+of\s+batch\s*\)\s*\{([\s\S]*?)\n\s{4}\}/);
+    expect(loopMatch, 'should find the batch loop').toBeTruthy();
+    const loopBody = loopMatch![1];
+
+    // Inside the loop, it must observe first, then append
+    const observeIndex = loopBody.indexOf('await observe(');
+    const appendIndex = loopBody.indexOf('appendFileSync(');
+    expect(observeIndex, 'loop must call observe()').toBeGreaterThan(-1);
+    expect(appendIndex, 'loop must call appendFileSync() after observe()').toBeGreaterThan(observeIndex);
   });
 });

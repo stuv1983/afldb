@@ -186,6 +186,8 @@ function payloadTotal(payload: NlAnswerPayload): number {
     case 'player_game': case 'player_career': case 'player_season':
     case 'team_match': case 'team_aggregate': case 'club_season': case 'team_streak':
       return payload.total;
+    case 'head_to_head':
+      return payload.row ? 1 : 0;
     case 'count':
       return 1;
     case 'achievement_summary':

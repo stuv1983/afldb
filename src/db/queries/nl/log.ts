@@ -124,9 +124,19 @@ function jsonbOrNull(value: unknown) {
  * The reformulation link (parent_search_id) is resolved in the same
  * INSERT via a correlated subquery rather than a separate round trip:
  * the most recent row from the same session within 60 seconds, if any.
+ *
+ * answerNlQuestion is also called outside a Next.js request scope --
+ * vitest integration suites and server-side scripts -- where Next 16's
+ * after() throws synchronously. The row is still wanted there, so the
+ * write falls back to running detached -- but ONLY for that recognised
+ * no-request-scope failure. Any other synchronous after() exception is a
+ * scheduler invariant breaking inside a real request, not a legitimate
+ * non-request caller; it is reported and swallowed (never rethrown into
+ * the answer, never misread as permission to write detached). Either
+ * way write()'s own catch keeps a telemetry failure out of the answer.
  */
 export function logNlSearch(entry: NlSearchLogEntry): void {
-  after(async () => {
+  const write = async () => {
     try {
       const sessionId = isValidNlSessionId(entry.sessionId) ? entry.sessionId : null;
       await authSql`
@@ -163,5 +173,32 @@ export function logNlSearch(entry: NlSearchLogEntry): void {
     } catch (error) {
       console.error('failed to write nl_search_log row', error);
     }
-  });
+  };
+
+  try {
+    after(write);
+  } catch (error) {
+    if (isOutsideRequestScope(error)) {
+      void write();
+    } else {
+      console.error('unexpected synchronous after() failure scheduling nl_search_log write', error);
+    }
+  }
+}
+
+/**
+ * True only for the one synchronous error Next 16 defines to mean "no
+ * request scope exists": after() throws an Error with this exact message
+ * prefix and the non-enumerable error code E468 when neither work store
+ * is populated (node_modules/next/dist/server/after/after.js). Both
+ * characteristics of the installed implementation are accepted -- the
+ * code survives message edits across Next versions (codes are
+ * append-only), the prefix survives a code renumbering -- but nothing
+ * else does: an unrelated after() exception must not be classified as
+ * normal non-request execution.
+ */
+function isOutsideRequestScope(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (error as { __NEXT_ERROR_CODE?: unknown }).__NEXT_ERROR_CODE === 'E468'
+    || error.message.startsWith('`after` was called outside a request scope');
 }

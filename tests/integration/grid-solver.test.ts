@@ -9,6 +9,8 @@
  */
 import './guard';
 
+import { performance } from 'node:perf_hooks';
+
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
@@ -48,6 +50,161 @@ describe('every grid builder compiles and solves', () => {
 });
 
 describe('grid solver correctness', () => {
+  it('solves the mapped ISSUE-076 won-final grid within the four-second safety margin', async () => {
+    const [identity] = await sql<{
+      playerId: number; playerName: string;
+      fitzroyId: number; fitzroySlug: string;
+      gwsId: number; gwsSlug: string;
+      venueId: number; venueLegacyName: string; venueName: string;
+    }[]>`
+      WITH cerra AS (
+        SELECT ei.player_id
+          FROM external_identities ei
+          JOIN sources s ON s.id = ei.source_id
+         WHERE s.key = 'afltables'
+           AND ei.external_id = 'players/A/Adam_Cerra.html'
+           AND ei.status IN ('unique', 'resolved')
+      ), fitzroy AS (
+        SELECT id, slug FROM club_organizations WHERE slug = 'fitzroy'
+      ), gws AS (
+        SELECT id, slug FROM club_organizations WHERE slug = 'greater-western-sydney'
+      ), mcg AS (
+        SELECT id, legacy_name, canonical_name FROM venues WHERE legacy_name = 'M.C.G.'
+      )
+      SELECT cerra.player_id AS "playerId", p.display_name AS "playerName",
+             fitzroy.id AS "fitzroyId", fitzroy.slug AS "fitzroySlug",
+             gws.id AS "gwsId", gws.slug AS "gwsSlug",
+             mcg.id AS "venueId", mcg.legacy_name AS "venueLegacyName",
+             mcg.canonical_name AS "venueName"
+        FROM cerra
+        JOIN players p ON p.id = cerra.player_id
+        CROSS JOIN fitzroy
+        CROSS JOIN gws
+        CROSS JOIN mcg
+    `;
+    expect(identity).toMatchObject({
+      playerName: 'Adam Cerra',
+      fitzroySlug: 'fitzroy',
+      gwsSlug: 'greater-western-sydney',
+      venueLegacyName: 'M.C.G.',
+      venueName: 'Melbourne Cricket Ground',
+    });
+    expect(identity.playerId).toBeGreaterThan(0);
+    expect(identity.fitzroyId).toBeGreaterThan(0);
+    expect(identity.gwsId).toBeGreaterThan(0);
+    expect(identity.venueId).toBeGreaterThan(0);
+
+    const rows = [
+      { builder: 'games_at_multiple_clubs_min', params: { games: '50', clubs: '2' } },
+      { builder: 'teammate_of', params: { player: String(identity.playerId) } },
+      { builder: 'single_game_stat_min', params: { stat: 'kicks', x: '20' } },
+    ] as const satisfies readonly GridAxisState[];
+    const commonCols = [
+      { builder: 'played_for_club', params: { club: String(identity.fitzroyId) } },
+      { builder: 'played_for_club', params: { club: String(identity.gwsId) } },
+    ] as const satisfies readonly GridAxisState[];
+    const wonCols = [
+      ...commonCols,
+      { builder: 'won_final_at_venue', params: { venue: String(identity.venueId) } },
+    ] as const satisfies readonly GridAxisState[];
+    const started = performance.now();
+    const wonCells = await Promise.all(rows.map((row) => Promise.all(
+      wonCols.map((col) => solveCellSummary(row, col, 'games_asc')),
+    )));
+    const elapsedMs = performance.now() - started;
+
+    expect(elapsedMs).toBeLessThan(4_000);
+
+    const independentOracle = await sql<{
+      rowIndex: number;
+      eligible: number;
+      topId: number | null;
+      topName: string | null;
+    }[]>`
+      WITH qualifying_organization_stints AS (
+        SELECT pc.player_id, c.organization_id
+          FROM player_clubs pc
+          JOIN clubs c ON c.id = pc.club_id
+         GROUP BY pc.player_id, c.organization_id
+        HAVING sum(pc.games) >= 50
+      ), multi_club_players AS (
+        SELECT player_id
+          FROM qualifying_organization_stints
+         GROUP BY player_id
+        HAVING count(*) >= 2
+      ), cerra_seasons AS (
+        SELECT club_id, season
+          FROM player_club_season_stats
+         WHERE player_id = ${identity.playerId}
+      ), cerra_teammates AS (
+        SELECT DISTINCT pcs.player_id
+          FROM player_club_season_stats pcs
+          JOIN cerra_seasons cs
+            ON cs.club_id = pcs.club_id
+           AND cs.season = pcs.season
+         WHERE pcs.player_id <> ${identity.playerId}
+      ), twenty_kick_players AS (
+        SELECT DISTINCT player_id
+          FROM player_match_stats
+         WHERE kicks >= 20
+      ), mcg_final_winners AS (
+        SELECT DISTINCT pms.player_id
+          FROM player_match_stats pms
+          JOIN matches m ON m.id = pms.match_id
+         WHERE m.venue_id = ${identity.venueId}
+           AND m.is_final
+           AND m.winner_club_id = pms.club_id
+      ), row_memberships AS (
+        SELECT 0 AS row_index, player_id FROM multi_club_players
+        UNION ALL
+        SELECT 1 AS row_index, player_id FROM cerra_teammates
+        UNION ALL
+        SELECT 2 AS row_index, player_id FROM twenty_kick_players
+      ), eligible_players AS (
+        SELECT rm.row_index, rm.player_id
+          FROM row_memberships rm
+          JOIN mcg_final_winners winners ON winners.player_id = rm.player_id
+      ), row_keys(row_index) AS (
+        VALUES (0), (1), (2)
+      ), eligible_counts AS (
+        SELECT row_index, count(*)::int AS eligible
+          FROM eligible_players
+         GROUP BY row_index
+      )
+      SELECT keys.row_index AS "rowIndex",
+             coalesce(counts.eligible, 0) AS eligible,
+             top_player.id AS "topId",
+             top_player.display_name AS "topName"
+        FROM row_keys keys
+        LEFT JOIN eligible_counts counts USING (row_index)
+        LEFT JOIN LATERAL (
+          SELECT p.id, p.display_name
+            FROM eligible_players eligible
+            JOIN player_career_stats career ON career.player_id = eligible.player_id
+            JOIN players p ON p.id = eligible.player_id
+           WHERE eligible.row_index = keys.row_index
+           ORDER BY career.games ASC, p.sort_name
+           LIMIT 1
+        ) top_player ON true
+       ORDER BY keys.row_index
+    `;
+
+    expect(independentOracle).toHaveLength(rows.length);
+    for (const expected of independentOracle) {
+      const actual = wonCells[expected.rowIndex][2];
+      expect(actual.eligible).toBe(expected.eligible);
+      expect(actual.top?.id ?? null).toBe(expected.topId);
+      expect(actual.top?.displayName ?? null).toBe(expected.topName);
+      if (expected.eligible === 0) {
+        expect(expected.topId).toBeNull();
+        expect(expected.topName).toBeNull();
+      } else {
+        expect(expected.topId).not.toBeNull();
+        expect(expected.topName).not.toBeNull();
+      }
+    }
+  });
+
   it('22Under22 selection matches linked rows from the fixed award series', async () => {
     const summary = await solveCellSummary(
       { builder: 'under_22_selection', params: {} },
@@ -198,6 +355,120 @@ describe('grid solver correctness', () => {
       'games_asc',
     );
     expect(summary.eligible).toBe(0);
+  });
+
+  it('solves the three ISSUE-103 finals-win cells under one second with an independent oracle', async () => {
+    const [environment] = await sql<{ database: string; statementTimeout: string }[]>`
+      SELECT current_database() AS database,
+             current_setting('statement_timeout') AS "statementTimeout"
+    `;
+    expect(environment.database).toBe('afldb_test');
+    expect(environment.statementTimeout).toBe('5s');
+
+    const cases: Array<{
+      cell: string;
+      row: GridAxisState;
+      col: GridAxisState;
+    }> = [
+      {
+        cell: 'won_x_games_1',
+        row: { builder: 'won_a_final', params: {} },
+        col: { builder: 'career_games_min', params: { games: '1' } },
+      },
+      {
+        cell: 'never_won_x_games_1',
+        row: { builder: 'never_won_a_final', params: {} },
+        col: { builder: 'career_games_min', params: { games: '1' } },
+      },
+      {
+        cell: 'won_x_never_won',
+        row: { builder: 'won_a_final', params: {} },
+        col: { builder: 'never_won_a_final', params: {} },
+      },
+    ];
+
+    const actual = new Map<string, Awaited<ReturnType<typeof solveCellSummary>>>();
+    for (const cell of cases) {
+      const started = performance.now();
+      const summary = await solveCellSummary(cell.row, cell.col, 'games_asc');
+      const elapsedMs = performance.now() - started;
+      expect(elapsedMs, `${cell.cell} took ${elapsedMs.toFixed(1)} ms`).toBeLessThan(1000);
+      actual.set(cell.cell, summary);
+    }
+
+    // Structurally independent oracle: derive the unique winning-final set
+    // from base participation/match facts, derive its complement with a left
+    // anti join, then intersect those independent sets for the impossible
+    // third cell. This does not call compileAxis/solveCellSummary or reuse the
+    // generated production predicate.
+    const expected = await sql<{
+      cell: string;
+      eligible: string;
+      topId: number | null;
+      topName: string | null;
+    }[]>`
+      WITH winning_final_players AS (
+        SELECT pms.player_id
+          FROM player_match_stats pms
+          JOIN matches m
+            ON m.id = pms.match_id
+           AND m.winner_club_id = pms.club_id
+         WHERE m.is_final
+         GROUP BY pms.player_id
+      ),
+      never_winning_final_players AS (
+        SELECT p.id AS player_id
+          FROM players p
+          LEFT JOIN winning_final_players winners ON winners.player_id = p.id
+         WHERE winners.player_id IS NULL
+      ),
+      cell_members AS (
+        SELECT 'won_x_games_1'::text AS cell,
+               p.id AS player_id, p.display_name, p.sort_name, career.games
+          FROM winning_final_players winners
+          JOIN players p ON p.id = winners.player_id
+          JOIN player_career_stats career ON career.player_id = p.id
+         WHERE career.games >= 1
+        UNION ALL
+        SELECT 'never_won_x_games_1',
+               p.id, p.display_name, p.sort_name, career.games
+          FROM never_winning_final_players never_winners
+          JOIN players p ON p.id = never_winners.player_id
+          JOIN player_career_stats career ON career.player_id = p.id
+         WHERE career.games >= 1
+        UNION ALL
+        SELECT 'won_x_never_won',
+               p.id, p.display_name, p.sort_name, career.games
+          FROM winning_final_players winners
+          JOIN never_winning_final_players never_winners USING (player_id)
+          JOIN players p ON p.id = winners.player_id
+          JOIN player_career_stats career ON career.player_id = p.id
+      ),
+      cell_keys(cell, ordinal) AS (
+        VALUES ('won_x_games_1'::text, 1),
+               ('never_won_x_games_1'::text, 2),
+               ('won_x_never_won'::text, 3)
+      )
+      SELECT keys.cell,
+             count(members.player_id)::text AS eligible,
+             (array_agg(members.player_id ORDER BY members.games, members.sort_name)
+               FILTER (WHERE members.player_id IS NOT NULL))[1] AS "topId",
+             (array_agg(members.display_name ORDER BY members.games, members.sort_name)
+               FILTER (WHERE members.player_id IS NOT NULL))[1] AS "topName"
+        FROM cell_keys keys
+        LEFT JOIN cell_members members ON members.cell = keys.cell
+       GROUP BY keys.cell, keys.ordinal
+       ORDER BY keys.ordinal
+    `;
+
+    expect(expected).toHaveLength(cases.length);
+    for (const oracle of expected) {
+      const summary = actual.get(oracle.cell);
+      expect(summary, oracle.cell).toBeDefined();
+      expect(summary!.eligible, oracle.cell).toBe(Number(oracle.eligible));
+      expect(summary!.top?.id ?? null, oracle.cell).toBe(oracle.topId);
+      expect(summary!.top?.displayName ?? null, oracle.cell).toBe(oracle.topName);
+    }
   });
 
   it('lost_grand_final_against finds a real losing-side player against a real winning-side player', async () => {

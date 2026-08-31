@@ -20,6 +20,8 @@
 
 import {
   isNlAwardKey,
+  isNlCareerColumn,
+  isNlMetric,
   NL_ACHIEVEMENTS,
   NL_CONFIDENCE,
   NL_LIMITS,
@@ -35,12 +37,14 @@ import {
   type NlDeclineReason,
   type NlMatchScope,
   type NlMatchType,
+  type NlMetricCondition,
   type NlParse,
   type NlParseReport,
   type NlPlayerRef,
   type NlQueryPlan,
 } from '@/search/nl/plan';
 import type { GridAxisState } from '@/search/grid-solver-spec';
+import { extractHeadToHeadCue } from '@/search/nl/semantic-intents';
 import {
   findClub, findVenue, stripMatch,
   type NlClubDirectoryEntry, type NlEntityMatch, type NlVenueDirectoryEntry,
@@ -60,7 +64,17 @@ import {
   UNANSWERABLE_TOPICS, canonicalise, readCount,
 } from '@/search/nl/vocab';
 
-export type NlPlayerCandidate = { ref: NlPlayerRef; score: number };
+export type NlPlayerCandidate = {
+  /** Canonical player identity and display name -- what the plan carries. */
+  ref: NlPlayerRef;
+  score: number;
+  /**
+   * The name form the resolver actually matched (primary name or a stored
+   * alias). Optional so injected test resolvers and older callers stay
+   * valid; absent means the canonical name matched.
+   */
+  matchedName?: string;
+};
 
 export type NlParseContext = {
   clubs: NlClubDirectoryEntry[];
@@ -611,8 +625,16 @@ function extractCareerConditions(text: string): {
   // resulting plan still validated; it just answered a different
   // question than it was asked. The group makes the prefix bind to
   // every alternative, the way it was always meant to.
+  // "no" is a zero trigger ONLY when it is not the first word of a
+  // comparator phrase: "no more than 4 goals" / "no fewer than 12 goals"
+  // are COMPARE_OP_WORDS bounds (lte 4 / gte 12), and the broad span here
+  // used to swallow them whole as { op:'eq', value:0 } before the numeric
+  // loop below ever saw them. The lookahead excludes exactly the four
+  // "no <comparative> than" comparator phrases and nothing else, so
+  // genuine "no goals" / "never kicked a goal" / "without a goal" zero
+  // conditions are untouched.
   for (const [re, column] of negativeTargets) {
-    const negRe = new RegExp(`\\b(?:no|never|without)\\b[^.]{0,20}?(?:${re.source})`);
+    const negRe = new RegExp(`\\b(?:no(?!\\s+(?:more|fewer|less|greater)\\s+than\\b)|never|without)\\b[^.]{0,20}?(?:${re.source})`);
     const match = negRe.exec(working);
     if (match) {
       conditions.push({ kind: 'column', column, op: 'eq', value: 0 });
@@ -969,18 +991,31 @@ function extractHavingClause(text: string): {
       else {
         const digits = /\b(\d{1,4})\b/.exec(window);
         if (digits) { value = Number(digits[1]); countStr = digits[0]; }
+        else {
+          // The same number-word vocabulary the threshold extractors use
+          // ("exactly three wins against Carlton") -- digits win when both
+          // are present, mirroring readCount's rule.
+          for (const [word, n] of Object.entries(NUMBER_WORDS)) {
+            const wordMatch = new RegExp(`\\b${word}\\b`).exec(window);
+            if (wordMatch) { value = n; countStr = wordMatch[0]; break; }
+          }
+        }
       }
-      
+
       if (value !== null) {
-        if (/\bat least\b/.test(window)) op = 'gte';
-        else if (/\bat most\b/.test(window)) op = 'lte';
-        else if (/\bmore than\b/.test(window)) op = 'gt';
-        else if (/\bless than\b/.test(window)) op = 'lt';
-        else if (/\bexactly\b/.test(window)) op = 'eq';
-        
-        let consumed = [match[0], countStr];
+        let matchedOperator: string | null = null;
+        for (const [operatorPattern, parsedOp] of COMPARE_OP_WORDS) {
+          const operatorMatch = operatorPattern.exec(window);
+          if (!operatorMatch) continue;
+          op = parsedOp;
+          matchedOperator = operatorMatch[0];
+          break;
+        }
+
+        const consumed = [match[0], countStr, ...(matchedOperator ? [matchedOperator] : [])];
         working = stripMatch(working, match[0]);
         working = stripMatch(working, countStr);
+        if (matchedOperator) working = stripMatch(working, matchedOperator);
         return { text: working, havingClause: { metric, op, value }, consumed };
       }
     }
@@ -1020,6 +1055,86 @@ function extractPlayerMetric(text: string): { text: string; metric?: string; con
   return { text, consumed: [] };
 }
 
+/**
+ * A comparator/number governing a METRIC_WORDS stat -- "at most 25
+ * disposals", "more than 30 tackles", "40+ hitouts". Consumed ATOMICALLY:
+ * metric word, operator phrase, and number leave the text together, so no
+ * fragment ("most" out of "at most") can reach player-name resolution.
+ *
+ * The CAREER_STAT_WORDS stats (goals, games, ...) never reach this: their
+ * thresholds are claimed one step earlier by extractCareerConditions, and
+ * grain election decides whether that condition stays a career condition
+ * or becomes a game/season metricCondition. This function covers the
+ * player_match_stats vocabulary that has no career-condition path at all.
+ *
+ * Number lookback reuses extractCareerConditions' discipline: clipped at
+ * the nearest preceding clause boundary (comma or "and") so one clause's
+ * number search can never see a token that belongs to the clause before
+ * it. No number in the window means no match at all -- the caller falls
+ * through to plain metric extraction, and nothing here is half-consumed.
+ */
+function extractPlayerMetricThreshold(text: string): {
+  text: string; metric?: string; condition?: NlMetricCondition; consumed: string[];
+} {
+  let found: { match: RegExpExecArray; metric: string } | null = null;
+  for (const [re, metric] of METRIC_WORDS) {
+    const match = re.exec(text);
+    if (match) { found = { match, metric }; break; }
+  }
+  if (!found) return { text, consumed: [] };
+  const { match, metric } = found;
+  const idx = match.index;
+
+  const outerStart = Math.max(0, idx - 24);
+  const priorText = text.slice(outerStart, idx);
+  const lastAnd = priorText.toLowerCase().lastIndexOf(' and ');
+  const lastComma = priorText.lastIndexOf(',');
+  const boundaryEnd = Math.max(lastAnd >= 0 ? lastAnd + 5 : -1, lastComma >= 0 ? lastComma + 1 : -1);
+  const windowStart = boundaryEnd >= 0 ? outerStart + boundaryEnd : outerStart;
+  const window = text.slice(windowStart, idx + match[0].length);
+
+  let op: NlCompareOp = 'gte';
+  let value: number | null = null;
+  const spans: { start: number; end: number; text: string }[] = [
+    { start: idx, end: idx + match[0].length, text: match[0] },
+  ];
+  const spanFrom = (m: RegExpExecArray, source = m[0]) => ({
+    start: windowStart + m.index,
+    end: windowStart + m.index + m[0].length,
+    text: source,
+  });
+
+  const plus = NUMBER_PLUS_RE.exec(window);
+  if (plus) {
+    value = Number(plus[1]);
+    spans.push(spanFrom(plus, plus[0].replace(/\+$/, '')));
+  } else {
+    for (const [opRe, opKind] of COMPARE_OP_WORDS) {
+      const opMatch = opRe.exec(window);
+      if (opMatch) { op = opKind; spans.push(spanFrom(opMatch)); break; }
+    }
+    const digits = /\b(\d{1,4})\b/.exec(window);
+    if (digits) {
+      value = Number(digits[1]);
+      spans.push(spanFrom(digits, digits[1]));
+    } else {
+      for (const [word, n] of Object.entries(NUMBER_WORDS)) {
+        const wordMatch = new RegExp(`\\b${word}\\b`).exec(window);
+        if (wordMatch) { value = n; spans.push(spanFrom(wordMatch)); break; }
+      }
+    }
+  }
+  if (value === null) return { text, consumed: [] };
+
+  const consumed = spans.map((span) => span.text);
+  const stripped = spans
+    .sort((a, b) => b.start - a.start)
+    .reduce((t, span) => `${t.slice(0, span.start)} ${t.slice(span.end)}`, text)
+    .replace(/\s+/g, ' ')
+    .trim();
+  return { text: stripped, metric, condition: { op, value }, consumed };
+}
+
 // ---------------------------------------------------------- player mention
 
 /** "by a/an/the <words> player" names a generic player from a club, not a specific person -- must be read before candidate player-name scanning. */
@@ -1049,6 +1164,30 @@ function candidatePlayerSpan(text: string): string | null {
   const alphaRun = tokens.filter((t) => /^[a-z]+$/.test(t) && !STOPWORDS.has(t));
   if (alphaRun.length === 0) return null;
   return alphaRun.slice(0, 4).join(' ');
+}
+
+/** Player suffix spelling is part of identity, but common variants are equivalent for lookup. */
+function normalisePlayerSuffixes(name: string): string {
+  return name
+    .replace(/\b(?:jr|junior)\b/g, 'jnr')
+    .replace(/\b(?:sr|senior)\b/g, 'snr');
+}
+
+/**
+ * Every word a candidate can justify a mention token against: the words
+ * of its canonical name plus, when the resolver matched a different form
+ * (an alias), the words of that matched form. The alias is ADDITIONAL
+ * evidence -- "Gary Ablett Jnr" matched through an alias still justifies
+ * "gary" and "ablett" from the canonical name, and "jnr" only because the
+ * alias carries it. A token that neither form contains stays unjustified
+ * and is left in the text for the decline gate.
+ */
+function candidateNameWords(c: NlPlayerCandidate): string[] {
+  const words = new Set(normalisePlayerSuffixes(c.ref.name.toLowerCase()).split(/\s+/));
+  if (c.matchedName) {
+    for (const w of normalisePlayerSuffixes(c.matchedName.toLowerCase()).split(/\s+/)) words.add(w);
+  }
+  return [...words];
 }
 
 // -------------------------------------------------------------- main entry
@@ -1121,12 +1260,36 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   consumedTokens.push(...byClubPlayer.consumed);
 
   // 4. Club extraction (roles resolved by governing preposition).
-  const clubExtraction = extractClubs(text, ctx.clubs);
+  // Peek at a relationship cue first so the "to" inside "head to head"
+  // cannot govern a later club as though the reader wrote "lost to".
+  // The cue is committed only after two real clubs resolve.
+  const headToHeadResult = extractHeadToHeadCue(text);
+  const clubExtraction = extractClubs(headToHeadResult.cue ? headToHeadResult.text : text, ctx.clubs);
   text = clubExtraction.text;
   consumedTokens.push(...clubExtraction.consumed);
-  const clubFor = byClubPlayer.clubFor ?? clubExtraction.clubFor;
-  const clubAgainst = clubExtraction.clubAgainst;
-  const matchup = byClubPlayer.clubFor ? undefined : clubExtraction.matchup;
+  let clubFor = byClubPlayer.clubFor ?? clubExtraction.clubFor;
+  let clubAgainst = clubExtraction.clubAgainst;
+  let matchup = byClubPlayer.clubFor ? undefined : clubExtraction.matchup;
+
+  // Relationship-level language needs both real directory entities before
+  // it can become a plan. Once the pair is proven, normalize role-based
+  // extraction ("A record against B", "draws between A and B") to the same
+  // unordered matchup scope used by a literal "A v B".
+  let headToHead: NlQueryPlan['headToHead'];
+  if (headToHeadResult.cue && (matchup || (clubFor && clubAgainst))) {
+    if (!matchup && clubFor && clubAgainst) {
+      matchup = { clubA: clubFor, clubB: clubAgainst };
+    }
+    clubFor = undefined;
+    clubAgainst = undefined;
+    headToHead = { kind: headToHeadResult.cue.kind };
+    consumedTokens.push(...headToHeadResult.consumed);
+  } else if (headToHeadResult.cue) {
+    // One or zero clubs: restore the relationship words as meaningful
+    // leftovers so the confidence gate declines instead of answering a
+    // narrower question that silently discarded the missing participant.
+    text = `${text} ${headToHeadResult.cue.matchedText}`.trim();
+  }
   if (clubFor) report.entityResolution.push({ mention: clubFor.matchedText, resolvedTo: clubFor.entity.name, certainty: 1 });
   if (clubAgainst) report.entityResolution.push({ mention: clubAgainst.matchedText, resolvedTo: clubAgainst.entity.name, certainty: 1 });
   if (matchup) {
@@ -1345,6 +1508,9 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // NOT already fire, so "goals" in "biggest win" scope never
   // double-reads as a player stat too).
   let playerMetricResult: { text: string; metric?: string; consumed: string[] };
+  // Set when a comparator/number was consumed with the metric word; grain
+  // election below decides which typed representation honours it.
+  let pendingMetricCondition: NlMetricCondition | undefined;
   if (teamMetricResult.metric) {
     // Strip the matched word from the CURRENT text, not
     // teamMetricResult.text -- that snapshot was computed back at step 9,
@@ -1360,9 +1526,24 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   } else if (idiomMetric) {
     playerMetricResult = { text, metric: idiomMetric, consumed: [] };
   } else {
-    playerMetricResult = extractPlayerMetric(text);
-    text = playerMetricResult.text;
-    consumedTokens.push(...playerMetricResult.consumed);
+    // A comparator/number governing the metric is one atomic phrase --
+    // extracted BEFORE the plain metric word so "at most 25 disposals"
+    // can never strand "most"/"25" for later stages (the stranded "most"
+    // was reaching player-name resolution and declining as
+    // ambiguous_player). Whether the threshold survives as a typed
+    // metricCondition, converts to a career condition, or fails closed is
+    // grain election's decision below.
+    const thresholdResult = extractPlayerMetricThreshold(text);
+    if (thresholdResult.metric && thresholdResult.condition) {
+      pendingMetricCondition = thresholdResult.condition;
+      playerMetricResult = { text: thresholdResult.text, metric: thresholdResult.metric, consumed: thresholdResult.consumed };
+      text = thresholdResult.text;
+      consumedTokens.push(...thresholdResult.consumed);
+    } else {
+      playerMetricResult = extractPlayerMetric(text);
+      text = playerMetricResult.text;
+      consumedTokens.push(...playerMetricResult.consumed);
+    }
 
     // "most games without kicking a goal", "most finals played without a
     // premiership" -- games/finals/premierships/... are ranked career
@@ -1415,7 +1596,9 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     const nicknameKey = Object.hasOwn(PLAYER_NICKNAMES, candidateRaw)
       ? candidateRaw
       : Object.hasOwn(PLAYER_NICKNAMES, firstWord) ? firstWord : null;
-    const lookupName = nicknameKey !== null ? PLAYER_NICKNAMES[nicknameKey] : candidateRaw;
+    const lookupName = normalisePlayerSuffixes(
+      nicknameKey !== null ? PLAYER_NICKNAMES[nicknameKey] : candidateRaw,
+    );
     const candidates = await ctx.resolvePlayer(lookupName);
     const top = candidates[0];
     if (top && top.score >= PLAYER_ACCEPT_SCORE) {
@@ -1429,11 +1612,11 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       // consumed too, and answered at full confidence as though the
       // nonsense had never been typed. Now "banana" stays in the text as
       // a leftover, and the gate at the end declines rather than guesses.
-      const nameWords = top.ref.name.toLowerCase().split(/\s+/);
+      const nameWords = candidateNameWords(top);
       const nicknameTokens = new Set(nicknameKey !== null ? nicknameKey.split(' ') : []);
       const spanTokens = candidateRaw.split(' ');
       const justified = spanTokens.filter(
-        (t) => nicknameTokens.has(t) || nameWords.some((w) => w.startsWith(t)),
+        (t) => nicknameTokens.has(t) || nameWords.some((w) => w.startsWith(normalisePlayerSuffixes(t))),
       );
       const mention = justified.length > 0 ? justified.join(' ') : candidateRaw;
 
@@ -1448,14 +1631,25 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       // specific player by construction.
       const mentionTokens = justified.length > 0 ? justified : spanTokens;
       const nameMatches = nicknameKey !== null ? 1 : candidates.filter((c) => {
-        const words = c.ref.name.toLowerCase().split(/\s+/);
-        return mentionTokens.every((t) => words.some((w) => w.startsWith(t)));
+        const words = candidateNameWords(c);
+        return mentionTokens.every((t) => words.some((w) => w.startsWith(normalisePlayerSuffixes(t))));
       }).length;
 
       const second = candidates[1];
       const gapCertain = !second || top.score - second.score > 200;
       playerCertainty = nameMatches >= 2 ? 0.7 : gapCertain ? 1 : 0.7;
-      report.entityResolution.push({ mention, resolvedTo: top.ref.name, certainty: playerCertainty });
+      // playerId/matchedName are telemetry-only evidence (see
+      // NlEntityResolution): the canonical display name cannot tell two
+      // same-named players apart, and the matched alias preserves the
+      // Jr/Snr form that justified the resolution. Nothing downstream of
+      // the log reads them.
+      report.entityResolution.push({
+        mention,
+        resolvedTo: top.ref.name,
+        certainty: playerCertainty,
+        playerId: top.ref.id,
+        matchedName: top.matchedName ?? top.ref.name,
+      });
       for (const token of justified.length > 0 ? justified : spanTokens) {
         consumedTokens.push(token);
         text = stripMatch(text, token);
@@ -1478,7 +1672,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       // casting a wide net, not competing readings of the question.
       const lookupTokens = lookupName.split(' ');
       const plausible = candidates.filter((c) => {
-        const words = c.ref.name.toLowerCase().split(/\s+/);
+        const words = candidateNameWords(c);
         return lookupTokens.every((t) => words.some((w) => w.startsWith(t)));
       });
       if (plausible.length >= 2 && plausible.length <= NL_LIMITS.maxPlayerCandidates) {
@@ -1505,7 +1699,10 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
         const spanTokens = candidateRaw.split(' ');
         const mention = spanTokens.join(' ');
         report.entityResolution.push({
-          mention, resolvedTo: plausible.map((c) => c.ref.name).join(', '), certainty: 1,
+          mention,
+          resolvedTo: plausible.map((c) => c.ref.name).join(', '),
+          certainty: 1,
+          playerIds: plausible.map((c) => c.ref.id),
         });
         for (const token of spanTokens) {
           consumedTokens.push(token);
@@ -1526,6 +1723,20 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   let grain: NlQueryPlan['grain'];
   let metric: string | null = null;
   let mode: 'single' | 'sum' | undefined;
+  const clubCareerGamesShorthand = (
+    !player
+    && !!clubFor
+    && playerMetricResult.metric === 'games'
+    && aggResult.agg?.kind === 'max'
+    && !inOneGame
+    && !inOneSeason
+    && seasons.seasonMin === undefined
+    && seasons.seasonMax === undefined
+    && !venue
+    && !clubAgainst
+    && !matchup
+    && !matchTypeResult.matchType
+  );
 
   if (achievementResult.achievementKey && achievementResult.summaryKind) {
     // "which club has had the most players kick a goal with their first
@@ -1533,6 +1744,8 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     // Checked first: the summary cue only exists because the achievement
     // phrase matched, so nothing else can be competing for this question.
     grain = 'achievement_summary';
+  } else if (headToHead) {
+    grain = 'head_to_head';
   } else if (achievementResult.achievementKey) {
     grain = 'player_career';
   } else if (streakResult.streakDefinition) {
@@ -1562,6 +1775,16 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     } else if (inOneSeason) {
       grain = 'player_season';
       metric = playerMetricResult.metric;
+    } else if (
+      (overCareer || clubCareerGamesShorthand)
+      && clubFor && !venue && !clubAgainst && !matchup && !matchTypeResult.matchType
+      && playerMetricResult.metric === 'games'
+    ) {
+      // A career games leader FOR one club counts appearances for that
+      // organization lineage, not the player's whole-career total and not
+      // a fictitious per-game "games" statistic.
+      grain = 'player_career';
+      metric = 'games';
     } else if (overCareer && !scoped) {
       grain = 'player_career';
       metric = playerMetricResult.metric;
@@ -1659,6 +1882,152 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   }
 
   if (grain === 'player_game' && mode === undefined) mode = inOneGame ? 'single' : 'sum';
+
+  // --------------------------------------- typed metric-threshold routing
+  //
+  // AFLDB-ISSUE-110 workstream B. Two producers feed this:
+  //
+  //  1. extractCareerConditions claimed a goals/games threshold before
+  //     grain election could see the explicit scope. When the question's
+  //     own wording names a single game or an exact season, that scope
+  //     controls the grain -- "players with more than 2 goals in 1989" is
+  //     a season question, "players with fewer than 3 goals in a game" a
+  //     single-game one -- and the claimed condition becomes the typed
+  //     metricCondition of that grain. An explicit career cue keeps the
+  //     existing career-condition path ("more than 500 career goals"),
+  //     and anything wider than one clean convertible condition is left
+  //     exactly as it was.
+  //
+  //  2. extractPlayerMetricThreshold consumed a comparator on a
+  //     player_match_stats metric. If election lands on player_game or
+  //     player_season the condition rides the plan as metricCondition; if
+  //     it lands on player_career and the metric is a real career column
+  //     the condition becomes an ordinary career condition; otherwise it
+  //     STAYS on the plan so validatePlan refuses it honestly -- a parsed
+  //     threshold must never silently disappear.
+  let metricCondition = pendingMetricCondition;
+  const soleCareerCondition = careerResult.conditions.length === 1 && careerResult.conditions[0].kind === 'column'
+    ? careerResult.conditions[0]
+    : null;
+  // A retained generic "in a season" cue has no seasonMin/seasonMax field
+  // to survive on its own, so it must take ownership before the older
+  // game/scoped-total conversions below. A clean sole threshold on an
+  // existing player_season metric is fully representable, including a
+  // named player/candidate set and compatible clubFor scope. Any competing
+  // career meaning or multi-condition shape is not representable as one
+  // season metric: retain one parsed threshold as metricCondition on the
+  // career plan so validation fails closed rather than accepting a plan
+  // that consumed and discarded "in a season".
+  if (
+    grain === 'player_career' && metric === null && !metricCondition && inOneSeason
+    && careerResult.conditions.length > 0
+  ) {
+    const seasonCondition = careerResult.conditions.find(
+      (condition) => condition.kind === 'column' && isNlMetric('player_season', condition.column),
+    );
+    const fallbackCondition = careerResult.conditions.find((condition) => condition.kind === 'column');
+    if (
+      soleCareerCondition && !overCareer && careerResult.predicates.length === 0
+      && !boundary && !achievementResult.achievementKey && !debutPredicate
+      && isNlMetric('player_season', soleCareerCondition.column)
+    ) {
+      grain = 'player_season';
+      metric = soleCareerCondition.column;
+      metricCondition = { op: soleCareerCondition.op, value: soleCareerCondition.value };
+    } else {
+      const refusedCondition = seasonCondition?.kind === 'column' ? seasonCondition : fallbackCondition;
+      if (refusedCondition?.kind === 'column') {
+        metricCondition = { op: refusedCondition.op, value: refusedCondition.value };
+      }
+    }
+  }
+  if (
+    grain === 'player_career' && metric === null && !metricCondition
+    && !inOneSeason
+    && soleCareerCondition && !overCareer && !player && !ambiguousCandidateIds
+    && careerResult.predicates.length === 0 && !boundary && !achievementResult.achievementKey
+    // A debut window ("debuted in the 1990s with 300 games") OWNS the
+    // season range as its predicate parameter; the range must not be
+    // re-read as a season-aggregate scope.
+    && !debutPredicate
+  ) {
+    if (inOneGame && isNlMetric('player_game', soleCareerCondition.column)) {
+      grain = 'player_game';
+      mode = 'single';
+      metric = soleCareerCondition.column;
+      metricCondition = { op: soleCareerCondition.op, value: soleCareerCondition.value };
+    } else if (
+      !inOneGame
+      && (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined)
+      && !venue && !clubAgainst && !matchup && !matchTypeResult.matchType
+      && isNlMetric('player_season', soleCareerCondition.column)
+    ) {
+      grain = 'player_season';
+      metric = soleCareerCondition.column;
+      metricCondition = { op: soleCareerCondition.op, value: soleCareerCondition.value };
+    } else if (
+      // Explicit match-level scope beside a claimed career-vocabulary
+      // threshold: "players with more than 2 goals against Carlton" is a
+      // question about goals AGAINST CARLTON, and the career compiler
+      // consumes no opponent/venue/matchup scope at all -- routing it
+      // there answered whole-career goals and silently ignored the
+      // opponent. The same scoped-total rule the ranked path already
+      // follows ("dusty total goals against Carlton" -> player_game/sum)
+      // applies: the threshold qualifies the scoped aggregate. A
+      // match-type cue never reaches here -- it sets inOneGame, so the
+      // single-performance branch above owns it.
+      !inOneGame
+      && (venue || clubAgainst || matchup)
+      && isNlMetric('player_game', soleCareerCondition.column)
+    ) {
+      grain = 'player_game';
+      mode = 'sum';
+      metric = soleCareerCondition.column;
+      metricCondition = { op: soleCareerCondition.op, value: soleCareerCondition.value };
+    }
+  }
+  if (metricCondition && grain === 'player_career') {
+    if (metric !== null && isNlCareerColumn(metric)) {
+      careerResult.conditions.push({ kind: 'column', column: metric, op: metricCondition.op, value: metricCondition.value });
+      metric = null;
+      metricCondition = undefined;
+    }
+    // else: metricCondition stays on the plan and validatePlan fails it
+    // closed -- there is no career column to compile this threshold into.
+  }
+  // Fail-closed for what could NOT convert: a single-game cue beside
+  // career conditions that kept their career reading ("players with no
+  // more than 4 goals in a game and no premierships", "players with 300
+  // games in a game") has no representable home -- a game-grain condition
+  // cannot ride a career plan and a career condition cannot ride a game
+  // plan. The consumed "in a game" must not silently disappear, so the
+  // cued condition is hoisted onto the plan as a metricCondition, which no
+  // career grain can validate, and validatePlan refuses honestly. Runs
+  // AFTER the career conversion above so a hoisted condition can never be
+  // re-read as a threshold on an unrelated ranked career metric.
+  // idiomMetric ("30 disposal games") is its own career idiom, and a
+  // boundary/achievement plan owns its match-type words.
+  if (
+    grain === 'player_career' && inOneGame && !idiomMetric && !metricCondition
+    && !boundary && !achievementResult.achievementKey
+    && careerResult.conditions.length > 0
+  ) {
+    // The "in a game" cue governs the condition a game grain could have
+    // represented (a real per-match statistic); fall back to any column
+    // condition so the refusal cannot be dodged by wording order.
+    const gameIndex = careerResult.conditions.findIndex(
+      (c) => c.kind === 'column' && isNlMetric('player_game', c.column),
+    );
+    const hoistIndex = gameIndex >= 0
+      ? gameIndex
+      : careerResult.conditions.findIndex((c) => c.kind === 'column');
+    if (hoistIndex >= 0) {
+      const [hoisted] = careerResult.conditions.splice(hoistIndex, 1);
+      if (hoisted.kind === 'column') {
+        metricCondition = { op: hoisted.op, value: hoisted.value };
+      }
+    }
+  }
 
   const scope: NlMatchScope = emptyScope();
   if (clubFor) scope.clubFor = { organizationId: clubFor.entity.organizationId, slug: clubFor.entity.slug, name: clubFor.entity.name };
@@ -1774,14 +2143,25 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // list where the reader asked for all of them.
   const resolvedAgg = resolvePolarity(aggResult.agg, metric, aggResult.polarity);
   const structureOnly = careerConditions.length > 0 || careerPredicates.length > 0
-    || clubSeasonConditions.length > 0 || !!boundary || !!havingResult.havingClause;
+    || clubSeasonConditions.length > 0 || !!boundary || !!havingResult.havingClause || !!headToHead;
   // A max/min with NO metric and structure present is not a ranking at
   // all -- there is nothing to rank by, and the answer path already
   // degrades it to a list, only capped at maxTiedRows(25) instead of
   // maxListRows(100). "players WHO PLAYED on anzac day" is the shape:
   // AGG_WORDS reads "who played" as the "who played the most..." idiom,
   // but with no stat named the honest reading is the full list.
-  const agg: NlAggregation = havingResult.havingClause
+  const agg: NlAggregation = headToHead
+    ? { kind: 'count' }
+    : havingResult.havingClause
+    ? { kind: 'list' }
+    // A metric threshold answers with the qualifying set. "players with"
+    // already reads as list; a generic max cue ("who kicked more than 5
+    // goals in a game") coerces to the same list, since ranking one
+    // leader is exactly the shape the threshold exists to prevent. A
+    // min/top_n alongside a threshold is left alone for validatePlan to
+    // refuse honestly.
+    : metricCondition && (grain === 'player_game' || grain === 'player_season')
+      && (!resolvedAgg || resolvedAgg.kind === 'max' || resolvedAgg.kind === 'list')
     ? { kind: 'list' }
     : resolvedAgg && (resolvedAgg.kind === 'max' || resolvedAgg.kind === 'min')
       && metric === null && structureOnly
@@ -1796,12 +2176,14 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     agg,
     ...(player ? { player } : {}),
     scope,
+    ...(metricCondition ? { metricCondition } : {}),
     careerConditions,
     careerPredicates,
     clubSeasonConditions,
     ...(grain === 'achievement_summary' && achievementResult.achievementKey && achievementResult.summaryKind
       ? { achievementSummary: { achievementKey: achievementResult.achievementKey, kind: achievementResult.summaryKind } }
       : {}),
+    ...(headToHead ? { headToHead } : {}),
     ...(streakResult.streakDefinition ? { streakDefinition: streakResult.streakDefinition } : {}),
     ...(periodSplitResult.periodSplit ? { periodSplit: periodSplitResult.periodSplit } : {}),
     ...(scoreCheckpointResult.scoreCheckpoint ? { scoreCheckpoint: scoreCheckpointResult.scoreCheckpoint } : {}),
@@ -1827,7 +2209,8 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // correct in every other respect -- was declined as unrecognised.
   // An achievement_summary always carries its own descriptor, which
   // validatePlan requires, so reaching this point is itself the structure.
-  const structuralOk = grain === 'team_match' ? !!metric || !!havingResult.havingClause
+  const structuralOk = grain === 'head_to_head' ? !!headToHead && !!scope.matchup
+    : grain === 'team_match' ? !!metric || !!havingResult.havingClause
     : grain === 'team_streak' ? !!streakResult.streakDefinition
     : grain === 'club_season' ? clubSeasonCuePresent
     : grain === 'achievement_summary' ? true

@@ -290,6 +290,25 @@ BEGIN
     GRANT INSERT ON data_edits TO afldb_import;
     GRANT USAGE ON SEQUENCE data_edits_id_seq TO afldb_import;
   END IF;
+
+  -- Migrations 073 / 078 (AFLDB-ISSUE-086 / -109): destructive source
+  -- reloads read durable human override authority, while saveEdit writes
+  -- the override in the same mutation-role transaction as the canonical
+  -- edit and required audit. The table remains human-owned and outside
+  -- import_writable_tables: grant only the columns used by the upsert,
+  -- never DELETE, TRUNCATE, broad UPDATE, or sequence reset privileges.
+  IF to_regclass('public.data_overrides') IS NOT NULL THEN
+    GRANT SELECT ON data_overrides TO afldb_import;
+    GRANT INSERT (
+      entity_type, entity_key, field_group, override_values,
+      admin_user_id, is_active, updated_at
+    ) ON data_overrides TO afldb_import;
+    GRANT UPDATE (
+      override_values, admin_user_id, is_active, updated_at
+    ) ON data_overrides TO afldb_import;
+    GRANT USAGE ON SEQUENCE data_overrides_id_seq TO afldb_import;
+  END IF;
+
   IF to_regclass('public.player_link_resolutions') IS NOT NULL THEN
     GRANT INSERT ON player_link_resolutions TO afldb_import;
     GRANT USAGE ON SEQUENCE player_link_resolutions_id_seq TO afldb_import;
@@ -333,7 +352,8 @@ $$;
 
 -- ---------------------------------------------------------------------
 -- afldb_auth — the operational tables
---              (migrations 023, 024, 030, 032, 034, 037, 046, 047, 049, 052)
+--              (migrations 023, 024, 030, 032, 034, 037, 046, 047, 049, 052,
+--               056, 057, 067, 074)
 -- ---------------------------------------------------------------------
 -- Every one of these grants lives inside an `IF EXISTS (afldb_auth)`
 -- guard in its migration, so all of them are silently skipped when the
@@ -378,6 +398,13 @@ DECLARE
     -- Regenerated wholesale by the admin refresh action, so unlike the
     -- audit tables this one is fully writable (see migration 067).
     ['player_link_match_candidates', 'SELECT, INSERT, UPDATE, DELETE'], -- 067
+    -- Content immutable to the reviewer; the workflow columns get a
+    -- column-scoped UPDATE after this loop (see migration 074).
+    ['promotion_candidates',   'SELECT'],                            -- 074
+    -- Append-only by grant: no UPDATE, no DELETE (see migration 074).
+    -- NOT import-writable on purpose: grant_import_write() would hand
+    -- back UPDATE/DELETE/TRUNCATE on every reconcile.
+    ['promotion_decisions',    'SELECT, INSERT'],                    -- 074
     -- Read-only: validation resolves submitted names against these.
     ['players',                'SELECT'],                           -- 023
     ['player_clubs',           'SELECT'],                           -- 023
@@ -401,7 +428,7 @@ DECLARE
     'admin_invites', 'site_settings', 'site_media', 'nl_search_log', 'nl_search_review',
     'nl_search_feedback', 'app_health_events',
     'player_link_suggestions', 'player_link_resolutions', 'data_edits',
-    'player_link_match_candidates'
+    'player_link_match_candidates', 'promotion_decisions'
   ];
   named text[] := ARRAY[]::text[];
   i int;
@@ -429,6 +456,14 @@ BEGIN
   IF to_regclass('public.player_link_suggestions') IS NOT NULL THEN
     GRANT UPDATE (status, resolved_by, resolved_at)
       ON player_link_suggestions TO afldb_auth;
+  END IF;
+
+  -- Migration 074, same reasoning: a reviewer moves a promotion
+  -- candidate through its workflow but can never edit the proposal or
+  -- the source evidence behind it.
+  IF to_regclass('public.promotion_candidates') IS NOT NULL THEN
+    GRANT UPDATE (status, resolved_at, resolved_decision_id)
+      ON promotion_candidates TO afldb_auth;
   END IF;
 
   -- Everything else in `public`, including anything a future migration

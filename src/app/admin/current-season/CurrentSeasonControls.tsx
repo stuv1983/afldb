@@ -23,30 +23,38 @@ function ResultSummary({ state }: { state: CurrentSeasonAdminState }) {
           <table>
             <thead>
               <tr>
-                <th scope="col">Fetched</th>
-                <th scope="col">Complete</th>
-                <th scope="col">Has score fields</th>
-                <th scope="col">Staged</th>
-                <th scope="col">Inserted</th>
-                <th scope="col">Resolved</th>
-                <th scope="col">Updated</th>
-                <th scope="col">Unresolved</th>
-                <th scope="col">Incomplete</th>
+                <th scope="col">Observations fetched</th>
+                <th scope="col">Complete observations</th>
+                <th scope="col">Observations with scores</th>
+                <th scope="col">Observations staged</th>
+                <th scope="col">Versions inserted</th>
+                <th scope="col">Marked absent</th>
+                <th scope="col">Canonical matches resolved</th>
+                <th scope="col">Canonical rows inserted</th>
+                <th scope="col">Canonical rows updated</th>
+                <th scope="col">Unresolved observations</th>
+                <th scope="col">Incomplete source records</th>
+                <th scope="col">Rejected/conflicted</th>
                 <th scope="col">Disagreements</th>
+                <th scope="col">Within-group conflicts</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td className="num">{result.fetched}</td>
-                <td className="num">{result.complete}</td>
-                <td className="num">{result.withScores}</td>
-                <td className="num">{result.staged}</td>
-                <td className="num">{result.inserted}</td>
-                <td className="num">{result.resolved}</td>
-                <td className="num">{result.updated}</td>
-                <td className="num">{result.unresolved}</td>
-                <td className="num">{result.incompleteFixtures}</td>
+                <td className="num">{result.observationsFetched}</td>
+                <td className="num">{result.completeObservations}</td>
+                <td className="num">{result.observationsWithScores}</td>
+                <td className="num">{result.observationsStaged}</td>
+                <td className="num">{result.observationVersionsInserted}</td>
+                <td className="num">{result.observationsMarkedAbsent}</td>
+                <td className="num">{result.canonicalMatchesResolved}</td>
+                <td className="num">{result.canonicalRowsInserted}</td>
+                <td className="num">{result.canonicalRowsUpdated}</td>
+                <td className="num">{result.unresolvedObservations}</td>
+                <td className="num">{result.incompleteSourceRecords}</td>
+                <td className="num">{result.rejectedOrConflicted}</td>
                 <td className="num">{result.sourceDisagreements}</td>
+                <td className="num">{result.sameGroupConflicts}</td>
               </tr>
             </tbody>
           </table>
@@ -73,10 +81,10 @@ export function CurrentSeasonReportTable({
           <thead>
             <tr>
               <th scope="col">Source</th>
-              <th scope="col" className="num">Staged</th>
-              <th scope="col" className="num">Resolved</th>
-              <th scope="col" className="num">Complete</th>
-              <th scope="col" className="num">Has score fields</th>
+              <th scope="col" className="num">Current observations</th>
+              <th scope="col" className="num">Observations resolving to canonical</th>
+              <th scope="col" className="num">Complete observations</th>
+              <th scope="col" className="num">Observations with score fields</th>
               <th scope="col" className="num">Unresolved teams</th>
             </tr>
           </thead>
@@ -229,9 +237,6 @@ export function CurrentSeasonControls({
           </label>
           <label>
             <input name="apply" type="checkbox" /> Apply staging rows
-          </label>
-          <label>
-            <input name="insertMissingMatches" type="checkbox" /> Insert missing completed matches
           </label>
           <label>
             <input name="updateMatches" type="checkbox" /> Overwrite existing resolved final scores

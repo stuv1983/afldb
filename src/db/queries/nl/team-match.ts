@@ -281,3 +281,50 @@ async function answerTeamAggregate(plan: NlQueryPlan, limit: number): Promise<Nl
   const clean = rows.map(({ total: _total, ...row }) => row);
   return { kind: 'team_aggregate', rows: clean, total };
 }
+
+export async function answerTeamAggregateDrilldown(
+  plan: NlQueryPlan,
+  clubSlug: string,
+): Promise<{ rows: NlTeamMatchRow[]; total: number }> {
+  const having = plan.havingClause!;
+  const clauses = scopeClauses(plan.scope);
+  if (having.metric === 'wins') clauses.push(sql`t.winner_club_id = t.club_id`);
+  else if (having.metric === 'losses') clauses.push(sql`t.winner_club_id IS NOT NULL AND t.winner_club_id <> t.club_id`);
+  else clauses.push(sql`t.winner_club_id IS NULL`);
+
+  if (plan.matchFilter) {
+    const filterValue = metricValueExpr(plan.matchFilter.metric);
+    const filterOp = sql.unsafe(COMPARE_SQL[plan.matchFilter.op]);
+    clauses.push(sql`${filterValue} ${filterOp} ${plan.matchFilter.value}`);
+  }
+
+  // Drill-down constraint
+  clauses.push(sql`t.club_id IN (
+    SELECT id FROM clubs WHERE organization_id = (
+      SELECT organization_id FROM clubs WHERE slug = ${clubSlug} LIMIT 1
+    )
+  )`);
+
+  const where = foldAnd(clauses);
+  const rows = await sql<(NlTeamMatchRow & { total: string })[]>`
+    WITH sides AS (${SIDES})
+    SELECT t.match_id AS "matchId", t.season, t.round_type AS "roundType", t.round_number AS "roundNumber",
+           t.match_date AS "matchDate",
+           cl.name AS "clubName", cl.slug AS "clubSlug",
+           opp.name AS "opponentName", opp.slug AS "opponentSlug",
+           0 AS value,
+           t.score_for AS "clubScore", t.score_against AS "opponentScore",
+           COALESCE(v.canonical_name, m.venue_raw) AS "venueName",
+           count(*) OVER () AS total
+      FROM sides t
+      JOIN matches m ON m.id = t.match_id
+      JOIN clubs cl ON cl.id = t.club_id
+      JOIN clubs opp ON opp.id = t.opponent_id
+      LEFT JOIN venues v ON v.id = t.venue_id
+     WHERE ${where}
+     ORDER BY t.match_date DESC, t.match_id DESC
+  `;
+  const total = rows[0] ? Number(rows[0].total) : 0;
+  const clean = rows.map(({ total: _total, ...row }) => row);
+  return { rows: clean, total };
+}

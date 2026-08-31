@@ -9,10 +9,19 @@
  * database. This adds the requirement that it is set at all — which is
  * true of integration tests and deliberately not of the unit tests.
  */
+import { validateImportRoleParityDsnTargets } from './import-role-parity';
+
 if (!process.env.AFLDB_TEST_DATABASE_URL) {
   throw new Error(
     'AFLDB_TEST_DATABASE_URL must be set to run integration tests. '
     + 'Unit tests run without it; these do not.',
+  );
+}
+
+if (process.env.AFLDB_TEST_IMPORT_DATABASE_URL) {
+  validateImportRoleParityDsnTargets(
+    process.env.AFLDB_TEST_DATABASE_URL,
+    process.env.AFLDB_TEST_IMPORT_DATABASE_URL,
   );
 }
 

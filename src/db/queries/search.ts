@@ -54,11 +54,67 @@ export type SearchResult = {
   title: string;
   subtitle: string | null;
   rank: number;
+  /**
+   * The name form that actually matched the query, when the entity is
+   * searched by more than one form. For players this is the canonical
+   * display name when the primary name matched and the alias text (maiden
+   * name, alternate spelling, source variant, generational suffix) when a
+   * player_name_aliases row matched instead. `title` stays canonical in
+   * both cases; this is additional evidence for callers that must justify
+   * the reader's exact wording, never a replacement identity.
+   */
+  matchedName?: string;
 };
 
+/**
+ * Players are searched by every form they are known under: the primary
+ * `players.search_name` plus every `player_name_aliases.search_alias`
+ * (both are stored normalised and indexed). Each form is scored on its
+ * own relevance, the best form wins per player, and the career-prominence
+ * signal is added once per player after that choice, so a player is
+ * returned exactly once and ranked as if by their strongest name.
+ *
+ * Importers also write the primary name as an alias, so a canonical search
+ * routinely matches both forms with an identical score. The tie-break
+ * prefers the primary form, which keeps `matchedName === title` and the
+ * pre-alias ranking for ordinary canonical searches; an alias only becomes
+ * the matched form when it genuinely scores higher than the primary name.
+ */
 export async function searchPlayers(query: string, limit = 20): Promise<SearchResult[]> {
   return sql<SearchResult[]>`
-    WITH q AS (SELECT afldb_normalise_name(${likeSafe(query)}) AS term)
+    WITH q AS (SELECT afldb_normalise_name(${likeSafe(query)}) AS term),
+    matched AS (
+      SELECT p.id AS player_id,
+             p.display_name AS matched_name,
+             true AS is_primary,
+             (CASE WHEN p.search_name = q.term            THEN 1000
+                   WHEN p.search_name LIKE q.term || '%'  THEN 500
+                   WHEN p.search_name LIKE '%' || q.term || '%' THEN 250
+                   ELSE 0 END
+              + similarity(p.search_name, q.term) * 100)::float AS form_rank
+        FROM players p
+       CROSS JOIN q
+       WHERE p.search_name LIKE '%' || q.term || '%'
+          OR p.search_name % q.term
+      UNION ALL
+      SELECT a.player_id,
+             a.alias,
+             false,
+             (CASE WHEN a.search_alias = q.term            THEN 1000
+                   WHEN a.search_alias LIKE q.term || '%'  THEN 500
+                   WHEN a.search_alias LIKE '%' || q.term || '%' THEN 250
+                   ELSE 0 END
+              + similarity(a.search_alias, q.term) * 100)::float
+        FROM player_name_aliases a
+       CROSS JOIN q
+       WHERE a.search_alias LIKE '%' || q.term || '%'
+          OR a.search_alias % q.term
+    ),
+    best AS (
+      SELECT DISTINCT ON (player_id) player_id, matched_name, form_rank
+        FROM matched
+       ORDER BY player_id, form_rank DESC, is_primary DESC, matched_name
+    )
     SELECT 'player'::text AS type,
            p.id,
            p.slug,
@@ -77,17 +133,11 @@ export async function searchPlayers(query: string, limit = 20): Promise<SearchRe
                   || ' · ' || c.debut_season || '–' || c.final_season
                   || ' · ' || c.games || ' games'
            END AS subtitle,
-           (CASE WHEN p.search_name = q.term            THEN 1000
-                 WHEN p.search_name LIKE q.term || '%'  THEN 500
-                 WHEN p.search_name LIKE '%' || q.term || '%' THEN 250
-                 ELSE 0 END
-            + similarity(p.search_name, q.term) * 100
-            + LEAST(COALESCE(p.search_rank, 0), 400) / 10.0)::float AS rank
-      FROM players p
+           (b.form_rank + LEAST(COALESCE(p.search_rank, 0), 400) / 10.0)::float AS rank,
+           b.matched_name AS "matchedName"
+      FROM best b
+      JOIN players p ON p.id = b.player_id
       LEFT JOIN player_career_stats c ON c.player_id = p.id
-     CROSS JOIN q
-     WHERE p.search_name LIKE '%' || q.term || '%'
-        OR p.search_name % q.term
      ORDER BY rank DESC, COALESCE(c.games, 0) DESC, p.sort_name
      LIMIT ${limit}
   `;

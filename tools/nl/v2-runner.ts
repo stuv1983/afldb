@@ -313,10 +313,10 @@ function buildV2Report(
     );
     out.push('');
     out.push(
-      'The detection is conservative in both directions it can be: a value the question states no operator for '
-      + 'is skipped as unjudgeable, and a value stated with several operators counts as agreeing with any of '
-      + 'them -- so two same-valued clauses swapped between themselves are invisible here. Treat this count as '
-      + 'a floor.',
+      'The detection is conservative: a value the question states no operator for is skipped as unjudgeable, '
+      + 'and a condition noun outside the finite generator vocabulary is compared by value only when that value '
+      + 'has one unambiguous operator. Unknown same-valued clauses are skipped rather than guessed. Treat this '
+      + 'count as a floor.',
     );
     out.push('');
     out.push(table(['Contradiction', 'Rows'],

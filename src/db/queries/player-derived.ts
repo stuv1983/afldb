@@ -388,24 +388,33 @@ export async function recomputeSeasonBrownlowStatus(tx: Tx, season: number): Pro
  * Targeted per-season counterpart of REBUILDS["club_seasons"] in
  * tools/migration/rebuild_derived.py. Keep the two definitions in lockstep.
  *
- * Ladder tallies (played/wins/draws/losses/points_for/points_against,
- * premiership_points, percentage, ladder_rank) are canonical published values
- * from staging.team_seasons and are never derived from matches here. Only
- * is_premier, finals_played, and the completion-gated wooden_spoon are
- * refreshed from current match facts and season status, so this must run
- * after recomputeSeasonMetadata in the same transaction.
+ * AFLDB-ISSUE-095 changed what a ladder row IS. Every column is now derived
+ * from AFLDB's own canonical match set rather than copied from a published
+ * ladder in staging.team_seasons, whose only writer was the retired
+ * AFLDB_LEGACY_SQLITE importer. The ISSUE-015 decision that stood on the old
+ * shape — "score corrections do not recalculate published ladder tallies" —
+ * no longer has a published tally to preserve: there is one definition, and a
+ * corrected score now correctly moves the ladder. ISSUE-015 is not reopened.
  *
- * Fails closed: a season with no canonical staging ladder rows throws before
- * anything is deleted, so the surrounding mutation transaction rolls back
- * rather than silently emptying the stored ladder.
+ * premiership_points uses the DECLARED 4/2/0 rule and ladder_rank ranks on
+ * points then percentage, failing closed to NULL on an exact tie. See
+ * rebuild_derived.py for the full provenance record.
+ *
+ * Must run after recomputeSeasonMetadata in the same transaction, because the
+ * wooden-spoon completion gate reads seasons.status.
+ *
+ * Still fails closed, re-pointed at the new source: a season with no
+ * home-and-away matches throws before anything is deleted, so the surrounding
+ * mutation transaction rolls back rather than silently emptying the ladder.
  */
 export async function recomputeClubSeasons(tx: Tx, season: number): Promise<void> {
   const [{ count }] = await tx<[{ count: string }]>`
-    SELECT count(*) AS count FROM staging.team_seasons WHERE season = ${season}
+    SELECT count(*) AS count FROM matches
+     WHERE season = ${season} AND NOT is_final
   `;
   if (Number(count) === 0) {
     throw new Error(
-      `recomputeClubSeasons: no canonical staging.team_seasons rows for season ${season}; ` +
+      `recomputeClubSeasons: no canonical home-and-away matches for season ${season}; ` +
         'refusing to rebuild club_seasons from nothing',
     );
   }
@@ -417,32 +426,65 @@ export async function recomputeClubSeasons(tx: Tx, season: number): Promise<void
           (season, club_id, played, wins, draws, losses, points_for, points_against,
            premiership_points, percentage, ladder_rank, wooden_spoon, is_premier,
            finals_played, source_id)
-    WITH resolved AS (
-        SELECT
-            s.*,
-            se.status AS season_status,
-            COALESCE(
-                afldb_identity_for_season(rc.organization_id, s.season),
-                s.club_id
-            ) AS identity_id
-        FROM staging.team_seasons s
-        JOIN seasons se ON se.year = s.season
-        JOIN clubs   rc ON rc.id = s.club_id
-        WHERE s.season = ${season}
+    WITH sides AS (
+        SELECT season, home_club_id AS club_id,
+               home_score AS score_for, away_score AS score_against,
+               result = 'draw'               AS drew,
+               winner_club_id = home_club_id AS won
+          FROM matches WHERE NOT is_final AND season = ${season}
+        UNION ALL
+        SELECT season, away_club_id,
+               away_score, home_score,
+               result = 'draw',
+               winner_club_id = away_club_id
+          FROM matches WHERE NOT is_final AND season = ${season}
+    ),
+    tallies AS (
+        SELECT season, club_id,
+               count(*)                     AS played,
+               count(*) FILTER (WHERE won)  AS wins,
+               count(*) FILTER (WHERE drew) AS draws,
+               sum(score_for)               AS points_for,
+               sum(score_against)           AS points_against
+          FROM sides GROUP BY season, club_id
+    ),
+    rated AS (
+        SELECT t.season, t.club_id, t.played, t.wins, t.draws,
+               t.played - t.wins - t.draws AS losses,
+               t.points_for, t.points_against,
+               t.wins * 4 + t.draws * 2 AS premiership_points,
+               CASE WHEN t.points_against > 0
+                    THEN t.points_for::numeric / t.points_against
+               END AS ratio
+          FROM tallies t
+    ),
+    ranked AS (
+        SELECT r.*,
+               rank() OVER (PARTITION BY r.season
+                            ORDER BY r.premiership_points DESC,
+                                     r.ratio DESC NULLS LAST)       AS pos,
+               count(*) OVER (PARTITION BY r.season,
+                                           r.premiership_points,
+                                           r.ratio)                 AS tied,
+               count(*) OVER (PARTITION BY r.season)                AS clubs_in_season
+          FROM rated r
     )
     SELECT
-        r.season,
-        r.identity_id,
-        r.played, r.wins, r.draws, r.losses, r.points_for, r.points_against,
-        r.premiership_points, r.percentage, r.ladder_rank,
-        -- A wooden spoon is only awarded once a season has finished. The raw
-        -- ladder flags whoever is currently last, which for an in-progress
-        -- season is a standing, not an honour.
-        r.wooden_spoon AND r.season_status = 'complete',
+        k.season,
+        k.club_id,
+        k.played, k.wins, k.draws, k.losses, k.points_for, k.points_against,
+        k.premiership_points,
+        round(k.ratio * 100, 4),
+        -- No rank invented for an exact points-and-percentage tie.
+        CASE WHEN k.tied = 1 THEN k.pos END,
+        -- A wooden spoon is only awarded once a season has finished; before
+        -- that, last place is a standing, not an honour.
+        k.tied = 1 AND k.pos = k.clubs_in_season AND se.status = 'complete',
         COALESCE(gf.won, false),
         COALESCE(f.finals, 0),
-        (SELECT id FROM sources WHERE key = 'sports_data_lab')
-    FROM resolved r
+        (SELECT id FROM sources WHERE key = 'afltables')
+    FROM ranked k
+    JOIN seasons se ON se.year = k.season
     LEFT JOIN (
         -- winner_club_id is NULL for a drawn Grand Final, so the 1948, 1977
         -- and 2010 draws drop out and only the replays count.
@@ -450,7 +492,7 @@ export async function recomputeClubSeasons(tx: Tx, season: number): Promise<void
         FROM matches
         WHERE round_type = 'grand_final' AND winner_club_id IS NOT NULL
           AND season = ${season}
-    ) gf ON gf.season = r.season AND gf.club_id = r.identity_id
+    ) gf ON gf.season = k.season AND gf.club_id = k.club_id
     LEFT JOIN (
         SELECT season, club_id, count(*) AS finals FROM (
             SELECT season, home_club_id AS club_id FROM matches
@@ -459,7 +501,7 @@ export async function recomputeClubSeasons(tx: Tx, season: number): Promise<void
             SELECT season, away_club_id FROM matches
              WHERE is_final AND season = ${season}
         ) x GROUP BY season, club_id
-    ) f ON f.season = r.season AND f.club_id = r.identity_id
+    ) f ON f.season = k.season AND f.club_id = k.club_id
   `;
 }
 

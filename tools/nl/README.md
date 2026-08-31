@@ -100,8 +100,12 @@ generator emitted 4,536 numeric-condition rows whose surface text says
 parser **must** fail and an incorrect one could pass. Left in, they do
 worse than add noise: they make the suite reward wrong parsing.
 
-`oracleDefect()` reads the operator each clause states in plain English
-and compares it with what the expectation asserts. It is deliberately a
+`oracleDefect()` reads the operator and numeric-condition noun each clause
+states in plain English and compares that field/operator/value tuple with
+what the expectation asserts. This catches same-valued clauses such as
+`3+ goals and exactly 3 clubs`, where a generator can otherwise swap the
+two operators while still appearing correct under value-only matching.
+It is deliberately a
 **separate, dumber reader** than `src/search/nl` — sharing the parser's
 own vocabulary would let a parser bug excuse the very expectations it is
 being measured against.
@@ -113,11 +117,11 @@ defect that is not there). They are **reported, not deleted**: the ids
 live in `corpus-defects.jsonl` so a generator fix can be audited against
 the same cases, and `run.json` carries the count.
 
-The detection is conservative in both directions it can be, and the
-report says so: a value the question states no operator for is skipped as
-unjudgeable, and a value stated with several operators counts as agreeing
-with any of them — so two same-valued clauses swapped between themselves
-are invisible. Treat the count as a floor.
+The detection remains conservative: a value the question states no
+operator for is skipped as unjudgeable, and a condition noun outside the
+finite generator vocabulary is judged by value only when that value has
+one unambiguous operator. Unknown same-valued clauses are skipped rather
+than guessed. Treat the count as a floor.
 
 ## Why it scores meaning rather than answers
 
@@ -175,7 +179,7 @@ biggest clusters, run the identical file again, and the movement in
 | `--category <name>` | One corpus category only. Repeatable. |
 | `--parse-only` | Skip SQL execution and score interpretation alone. Minutes instead of an hour, and enough to find every parser bug. |
 | `--resume` | Skip ids already in `results.jsonl`. |
-| `--report-only` | Re-score and re-report an existing `results.jsonl`. No database needed — use it when the scoring rules themselves need correcting. |
+| `--report-only` | V1 only: re-score and re-report an existing `results.jsonl` without a database. V2 result rows do not currently retain the complete original expectations needed for re-scoring. |
 | `--allow-any-database` | Bypass the `_dev`/`_test` database-name guard. |
 
 ## Safety properties

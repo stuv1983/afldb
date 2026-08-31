@@ -114,6 +114,77 @@ def clean_text(value: Any) -> str | None:
 
 
 # --------------------------------------------------------------------------
+# Population reconciliation safety (AFLDB-ISSUE-092 Sec 4)
+# --------------------------------------------------------------------------
+
+# Legitimate run-to-run turnover of an effectively append-only external
+# population (the AFL Tables register) should be far below this.
+POPULATION_DROP_THRESHOLD = 0.10
+
+
+class PopulationDropRefused(RuntimeError):
+    """An authoritative reconciliation delete was refused fail-closed."""
+
+
+def check_population_drop(
+    *,
+    stored_count: int,
+    asserted_count: int,
+    candidate_delete_count: int,
+    label: str,
+    acknowledged: bool = False,
+    reporter: Any = None,
+    threshold: float = POPULATION_DROP_THRESHOLD,
+) -> None:
+    """Fail-closed population-sanity gate for authoritative reconciliation
+    deletes (AFLDB-ISSUE-092 Sec 4).
+
+    A reconciliation pass that deletes stored rows absent from its input is
+    correct only if that input is the complete current population. Callers
+    must invoke this before the delete, with counts read before this run's
+    writes:
+
+    * stored_count            existing rows in the owned population
+    * asserted_count          rows this run asserts as the population
+    * candidate_delete_count  stored rows the delete would remove
+
+    Check 1: asserting an empty population against existing rows is never
+    legitimate and is refused unconditionally (not bypassable). Check 2: a
+    drop of more than ``threshold`` of the stored population is refused
+    unless ``acknowledged`` (the caller's explicit per-invocation
+    ``--acknowledge-population-drop``), in which case the drop is reported
+    via ``reporter.warn`` so its use is visible in run output.
+    """
+    if stored_count <= 0:
+        return
+    if asserted_count == 0:
+        raise PopulationDropRefused(
+            f"{label}: this run asserts an EMPTY population against "
+            f"{stored_count} stored rows. Refusing the authoritative delete: "
+            "the supplied source cannot be the complete population. "
+            "This check is not bypassable."
+        )
+    if candidate_delete_count / stored_count > threshold:
+        if not acknowledged:
+            raise PopulationDropRefused(
+                f"{label}: this run would delete {candidate_delete_count} of "
+                f"{stored_count} stored rows "
+                f"({candidate_delete_count / stored_count:.1%}), above the "
+                f"{threshold:.0%} population-drop threshold. Refusing: the "
+                "supplied source is not proven complete. Re-run with "
+                "--acknowledge-population-drop only if this drop is genuinely "
+                "intended."
+            )
+        if reporter is not None:
+            reporter.warn(
+                f"{label}: acknowledged population drop of "
+                f"{candidate_delete_count} of {stored_count} stored rows "
+                f"({candidate_delete_count / stored_count:.1%}) via "
+                "--acknowledge-population-drop"
+            )
+
+
+# --------------------------------------------------------------------------
 # Import batch tracking
 # --------------------------------------------------------------------------
 
@@ -700,6 +771,43 @@ def cascade_dependents(conn: psycopg.Connection, tables: Sequence[str]) -> set[s
         return {normalise_table(r[0]) for r in cur.fetchall()}
 
 
+def selectable(conn: psycopg.Connection, tables: Sequence[str]) -> set[str]:
+    """Of `tables`, the ones the CURRENT role may SELECT.
+
+    AFLDB-ISSUE-093 §H12. Asked of the catalogue, not of the tables:
+    has_table_privilege() needs no privilege on its argument, so this can
+    classify a relation the caller is forbidden to read without provoking
+    the InsufficientPrivilege error it exists to avoid. One round trip,
+    whatever the size of the list.
+
+    A caller that instead probed each table with `SELECT count(*)` would
+    fail on the first revoked relation -- which is precisely how the first
+    clean rebuild died at the REFERENCE stage.
+    """
+    if not tables:
+        return set()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT t FROM unnest(%s::text[]) AS t WHERE has_table_privilege(t, 'SELECT')",
+            (list(tables),),
+        )
+        return {normalise_table(r[0]) for r in cur.fetchall()}
+
+
+def any_rows(conn: psycopg.Connection, tables: Sequence[str]) -> list[str]:
+    """Of `tables`, the ones that currently hold at least one row.
+
+    EXISTS, not count(*): the question is only ever "is this empty", and on
+    a large table the count is wasted work. The caller must have SELECT on
+    every table it passes -- use selectable() first.
+    """
+    populated: list[str] = []
+    for table in tables:
+        if scalar(conn, f"SELECT EXISTS (SELECT 1 FROM {table})"):
+            populated.append(table)
+    return populated
+
+
 def truncate(conn: psycopg.Connection, *tables: str) -> None:
     """Truncate tables, making reruns idempotent.
 
@@ -781,3 +889,145 @@ class Reporter:
 
     def warn(self, message: str) -> None:
         print(f"    WARNING: {message}", flush=True)
+
+def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
+    """Replay durable admin overrides for the given table over newly imported rows.
+
+    For DraftGuru integration (AFLDB-ISSUE-093), this helper can be called
+    directly by the new draft importer without redesign. The canonical DraftGuru importer
+    usage here is retained for historical compatibility on this branch.
+    """
+    with conn.cursor() as cur:
+        if table == "players":
+            # display_name is NOT NULL (explicit NULL forbidden), so COALESCE is safe.
+            # given_name, surname, dob, height_cm, weight_kg, notes are nullable (explicit NULL permitted),
+            # so they must use jsonb_exists to distinguish absent vs explicit JSON null.
+            cur.execute("""
+                WITH active_overrides AS (
+                    SELECT e.player_id, o.override_values
+                      FROM data_overrides o
+                      JOIN sources s ON s.key = split_part(o.entity_key, ':', 1)
+                      JOIN external_identities e ON e.external_id = substring(o.entity_key from position(':' in o.entity_key) + 1)
+                                                AND e.source_id = s.id
+                                                AND e.status IN ('unique', 'resolved')
+                     WHERE o.entity_type = 'players' AND o.is_active = true
+                )
+                UPDATE players p
+                   SET display_name = COALESCE(o.override_values->>'display_name', p.display_name),
+                       given_name = CASE WHEN jsonb_exists(o.override_values, 'given_name') THEN o.override_values->>'given_name' ELSE p.given_name END,
+                       surname = CASE WHEN jsonb_exists(o.override_values, 'surname') THEN o.override_values->>'surname' ELSE p.surname END,
+                       dob = CASE WHEN jsonb_exists(o.override_values, 'dob') THEN (o.override_values->>'dob')::date ELSE p.dob END,
+                       dob_confidence = COALESCE((o.override_values->>'dob_confidence')::value_confidence, p.dob_confidence),
+                       birth_year = CASE WHEN jsonb_exists(o.override_values, 'birth_year') THEN (o.override_values->>'birth_year')::smallint ELSE p.birth_year END,
+                       birth_year_min = CASE WHEN jsonb_exists(o.override_values, 'birth_year_min') THEN (o.override_values->>'birth_year_min')::smallint ELSE p.birth_year_min END,
+                       birth_year_max = CASE WHEN jsonb_exists(o.override_values, 'birth_year_max') THEN (o.override_values->>'birth_year_max')::smallint ELSE p.birth_year_max END,
+                       birth_year_confidence = COALESCE((o.override_values->>'birth_year_confidence')::value_confidence, p.birth_year_confidence),
+                       height_cm = CASE WHEN jsonb_exists(o.override_values, 'height_cm') THEN (o.override_values->>'height_cm')::smallint ELSE p.height_cm END,
+                       weight_kg = CASE WHEN jsonb_exists(o.override_values, 'weight_kg') THEN (o.override_values->>'weight_kg')::smallint ELSE p.weight_kg END,
+                       notes = CASE WHEN jsonb_exists(o.override_values, 'notes') THEN o.override_values->>'notes' ELSE p.notes END
+                  FROM active_overrides o
+                 WHERE p.id = o.player_id
+            """)
+            cur.execute("""
+                UPDATE players
+                   SET search_name = afldb_normalise_name(display_name),
+                       sort_name = CASE
+                           WHEN surname IS NULL THEN display_name
+                           WHEN given_name IS NULL THEN surname
+                           ELSE surname || ', ' || given_name
+                       END
+                 WHERE id IN (
+                    SELECT e.player_id
+                      FROM data_overrides o
+                      JOIN sources s ON s.key = split_part(o.entity_key, ':', 1)
+                      JOIN external_identities e ON e.external_id = substring(o.entity_key from position(':' in o.entity_key) + 1)
+                                                AND e.source_id = s.id
+                                                AND e.status IN ('unique', 'resolved')
+                     WHERE o.entity_type = 'players' AND o.is_active = true
+                 )
+            """)
+
+        elif table == "matches":
+            # home_goals, away_goals are NOT NULL. attendance is nullable.
+            cur.execute("""
+                UPDATE matches m
+                   SET attendance = CASE WHEN jsonb_exists(o.override_values, 'attendance') THEN (o.override_values->>'attendance')::integer ELSE m.attendance END,
+                       attendance_status = CASE
+                           WHEN jsonb_exists(o.override_values, 'attendance') THEN
+                               CASE WHEN (o.override_values->>'attendance') IS NULL THEN 'not_collected'::coverage_status ELSE 'complete'::coverage_status END
+                           ELSE m.attendance_status
+                       END,
+                       attendance_source_id = CASE
+                           WHEN jsonb_exists(o.override_values, 'attendance') THEN
+                               CASE WHEN (o.override_values->>'attendance') IS NULL THEN NULL ELSE (SELECT id FROM sources WHERE key = 'manual_admin_edit') END
+                           ELSE m.attendance_source_id
+                       END,
+                       match_time = CASE WHEN jsonb_exists(o.override_values, 'match_time') THEN o.override_values->>'match_time' ELSE m.match_time END,
+                       match_event = CASE WHEN jsonb_exists(o.override_values, 'match_event') THEN o.override_values->>'match_event' ELSE m.match_event END,
+                       notes = CASE WHEN jsonb_exists(o.override_values, 'notes') THEN o.override_values->>'notes' ELSE m.notes END,
+                       home_goals = COALESCE((o.override_values->>'home_goals')::smallint, m.home_goals),
+                       home_behinds = COALESCE((o.override_values->>'home_behinds')::smallint, m.home_behinds),
+                       away_goals = COALESCE((o.override_values->>'away_goals')::smallint, m.away_goals),
+                       away_behinds = COALESCE((o.override_values->>'away_behinds')::smallint, m.away_behinds)
+                  FROM data_overrides o
+                 WHERE o.entity_type = 'matches' AND o.entity_key = m.match_key AND o.is_active = true
+            """)
+            # Recalculate derived score fields for overridden matches
+            cur.execute("""
+                UPDATE matches m
+                   SET home_score = (home_goals * 6 + home_behinds)::smallint,
+                       away_score = (away_goals * 6 + away_behinds)::smallint,
+                       margin = abs((home_goals * 6 + home_behinds) - (away_goals * 6 + away_behinds))::smallint,
+                       result = CASE
+                           WHEN (home_goals * 6 + home_behinds) > (away_goals * 6 + away_behinds) THEN 'home_win'::match_result
+                           WHEN (home_goals * 6 + home_behinds) < (away_goals * 6 + away_behinds) THEN 'away_win'::match_result
+                           ELSE 'draw'::match_result
+                       END,
+                       winner_club_id = CASE
+                           WHEN (home_goals * 6 + home_behinds) > (away_goals * 6 + away_behinds) THEN home_club_id
+                           WHEN (home_goals * 6 + home_behinds) < (away_goals * 6 + away_behinds) THEN away_club_id
+                           ELSE NULL
+                       END
+                 WHERE m.match_key IN (
+                     SELECT entity_key FROM data_overrides
+                      WHERE entity_type = 'matches' AND field_group = 'score' AND is_active = true
+                 )
+            """)
+            # Period scores injection for score overrides
+            cur.execute("""
+                WITH overrides AS (
+                    SELECT m.id AS match_id, m.home_club_id, m.away_club_id,
+                           (o.override_values->>'home_goals')::int AS hg,
+                           (o.override_values->>'home_behinds')::int AS hb,
+                           (o.override_values->>'away_goals')::int AS ag,
+                           (o.override_values->>'away_behinds')::int AS ab,
+                           (SELECT GREATEST(COALESCE(max(period), 4), 4)::int FROM match_period_scores WHERE match_id = m.id) AS final_period
+                      FROM data_overrides o
+                      JOIN matches m ON m.match_key = o.entity_key
+                     WHERE o.entity_type = 'matches' AND o.field_group = 'score' AND o.is_active = true
+                )
+                INSERT INTO match_period_scores (match_id, club_id, period, goals, behinds, points)
+                SELECT match_id, home_club_id, final_period, hg, hb, (hg * 6 + hb) FROM overrides
+                UNION ALL
+                SELECT match_id, away_club_id, final_period, ag, ab, (ag * 6 + ab) FROM overrides
+                ON CONFLICT (match_id, club_id, period) DO UPDATE SET
+                  goals = EXCLUDED.goals,
+                  behinds = EXCLUDED.behinds,
+                  points = EXCLUDED.points
+            """)
+
+        elif table == "draft_picks":
+            cur.execute("""
+                UPDATE draft_picks d
+                   SET player_name_raw = COALESCE(o.override_values->>'player_name_raw', d.player_name_raw),
+                       original_club_raw = CASE WHEN jsonb_exists(o.override_values, 'original_club_raw') THEN o.override_values->>'original_club_raw' ELSE d.original_club_raw END,
+                       draft_age = CASE WHEN jsonb_exists(o.override_values, 'draft_age') THEN (o.override_values->>'draft_age')::integer ELSE d.draft_age END,
+                       height_cm = CASE WHEN jsonb_exists(o.override_values, 'height_cm') THEN (o.override_values->>'height_cm')::integer ELSE d.height_cm END,
+                       weight_kg = CASE WHEN jsonb_exists(o.override_values, 'weight_kg') THEN (o.override_values->>'weight_kg')::integer ELSE d.weight_kg END,
+                       pick_note = CASE WHEN jsonb_exists(o.override_values, 'pick_note') THEN o.override_values->>'pick_note' ELSE d.pick_note END,
+                       detail = CASE WHEN jsonb_exists(o.override_values, 'detail') THEN o.override_values->>'detail' ELSE d.detail END
+                  FROM data_overrides o
+                 WHERE o.entity_type = 'draft_picks'
+                   AND o.entity_key = d.source_id::text || '|' || d.player_url || '|' || d.draft_year::text || '|' || d.draft_kind
+                   AND o.is_active = true
+            """)

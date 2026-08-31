@@ -7,9 +7,10 @@ import {
   matchPath, playerPath, seasonPath,
 } from '@/lib/format';
 import type {
-  NlAnswer, NlClubSeasonRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
+  NlAnswer, NlClubSeasonRow, NlHeadToHeadRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
   NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '@/search/nl/answer-types';
+import { getQualifyingMatchesHref } from '@/search/nl/qualifying-matches-href';
 
 /**
  * Renders a natural-language answer at the top of /search: a lead-result
@@ -80,7 +81,9 @@ function renderPayload(answer: NlAnswer) {
     case 'team_match':
       return <TeamMatchTable rows={payload.rows} total={payload.total} />;
     case 'team_aggregate':
-      return <TeamAggregateTable rows={payload.rows} total={payload.total} />;
+      return <TeamAggregateTable rows={payload.rows} total={payload.total} planToken={answer.planToken} />;
+    case 'head_to_head':
+      return <HeadToHeadTable row={payload.row} />;
     case 'team_streak':
       return <TeamStreakTable rows={payload.rows} total={payload.total} />;
     case 'club_season':
@@ -95,6 +98,19 @@ function renderPayload(answer: NlAnswer) {
 }
 
 function renderLeadMatchLink(answer: NlAnswer) {
+  if (answer.payload.kind === 'head_to_head') {
+    const row = answer.payload.row;
+    if (!row || row.lastDrawMatchId === null || row.lastDrawRoundType === null) return null;
+    return (
+      <p className="muted" style={{ marginTop: '-0.25rem' }}>
+        Latest draw:{' '}
+        <Link href={matchPath(row.lastDrawMatchId)}>
+          {row.lastDrawSeason} {formatRoundShort(row.lastDrawRoundType, row.lastDrawRoundNumber)}
+        </Link>
+        {' '}<span>{formatDate(row.lastDrawDate)}</span>
+      </p>
+    );
+  }
   if (answer.payload.kind !== 'player_game') return null;
   const lead = answer.payload.lead;
   if (!lead || lead.matchId === null || lead.roundType === null) return null;
@@ -110,7 +126,37 @@ function renderLeadMatchLink(answer: NlAnswer) {
   );
 }
 
-function TeamAggregateTable({ rows, total }: { rows: NlTeamAggregateRow[]; total: number }) {
+function HeadToHeadTable({ row }: { row: NlHeadToHeadRow | null }) {
+  if (!row) return null;
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Club</th>
+            <th scope="col" className="num">Wins</th>
+            <th scope="col" className="num">Draws</th>
+            <th scope="col" className="num">Total matches</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td className="wide"><Link href={clubPath(row.clubASlug)}>{row.clubAName}</Link></td>
+            <td className="num">{formatNumber(row.clubAWins)}</td>
+            <td className="num" rowSpan={2}>{formatNumber(row.draws)}</td>
+            <td className="num" rowSpan={2}>{formatNumber(row.total)}</td>
+          </tr>
+          <tr>
+            <td className="wide"><Link href={clubPath(row.clubBSlug)}>{row.clubBName}</Link></td>
+            <td className="num">{formatNumber(row.clubBWins)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function TeamAggregateTable({ rows, total, planToken }: { rows: NlTeamAggregateRow[]; total: number; planToken?: string | null }) {
   if (rows.length === 0) return null;
   return (
     <>
@@ -124,12 +170,21 @@ function TeamAggregateTable({ rows, total }: { rows: NlTeamAggregateRow[]; total
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.organizationId}>
-                  <td className="wide"><Link href={clubPath(r.clubSlug)}>{r.clubName}</Link></td>
-                  <td className="num">{formatNumber(r.value)}</td>
-                </tr>
-              ))}
+              {rows.map((r) => {
+                const href = getQualifyingMatchesHref(planToken, r.clubSlug);
+                return (
+                  <tr key={r.organizationId}>
+                    <td className="wide"><Link href={clubPath(r.clubSlug)}>{r.clubName}</Link></td>
+                    <td className="num">
+                      {href ? (
+                        <Link href={href}>{formatNumber(r.value)}</Link>
+                      ) : (
+                        formatNumber(r.value)
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -190,7 +245,10 @@ function AchievementSummaryTable({
 }
 
 function PlayerCareerTable({ rows, total }: { rows: NlPlayerCareerRow[]; total: number }) {
-  if (rows.length <= 1) return null; // The headline already names the one answer.
+  // A ranked one-row answer is already named with its value in the headline.
+  // An unranked one-row list only has a count headline ("1 player matches"),
+  // so its player and scoped Games value still need the visible table.
+  if (rows.length === 0 || (rows.length === 1 && rows[0].value !== null)) return null;
   return (
     <>
       <CollapsibleTable title="Every matching player" note={`${formatNumber(total)} total`}>

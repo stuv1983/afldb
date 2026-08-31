@@ -11,6 +11,14 @@ export default defineConfig({
     testTimeout: 30_000,
     hookTimeout: 30_000,
     setupFiles: ['tests/setup.ts'],
+    // AFLDB-ISSUE-108: every integration suite shares the one mutable afldb_test.
+    // Under file parallelism one suite's fixture mutations (a transient season,
+    // in-flight draft links, moving canonical counts) are observed by another
+    // suite's assertions — the 3 failures that appear only in parallel and vanish
+    // under --no-file-parallelism. The guarded database gate must be serial, so it
+    // is the default here rather than a flag to remember. DB-free suites pay a
+    // small wall-clock cost for a deterministic gate.
+    fileParallelism: false,
   },
   resolve: {
     alias: {

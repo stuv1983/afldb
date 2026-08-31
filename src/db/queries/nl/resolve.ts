@@ -106,16 +106,23 @@ export async function buildVenueDirectory(): Promise<NlVenueDirectoryEntry[]> {
 /**
  * Player-name resolution: delegates to searchPlayers, whose ranking
  * (exact/prefix/substring plus trigram similarity plus career-games
- * prominence) already does exactly what a nickname-resolved candidate
- * name needs. PLAYER_NICKNAMES substitution ("dusty" -> "dustin
- * martin") happens in the parser itself, before this is called, since
- * it is a fixed text rewrite rather than a database lookup.
+ * prominence, across primary names and player_name_aliases) already does
+ * exactly what a nickname-resolved candidate name needs. PLAYER_NICKNAMES
+ * substitution ("dusty" -> "dustin martin") happens in the parser itself,
+ * before this is called, since it is a fixed text rewrite rather than a
+ * database lookup.
+ *
+ * `ref` keeps the canonical player identity and display name. The form
+ * that actually matched travels separately as `matchedName` so the parser
+ * can justify the reader's exact wording (a maiden name, a Jnr/Snr suffix,
+ * an alternate spelling) without the canonical name ever being replaced.
  */
 export async function resolvePlayer(name: string): Promise<NlPlayerCandidate[]> {
   const results = await searchPlayers(name, 5);
   return results.map((r) => ({
     ref: { id: r.id, slug: r.slug, name: r.title },
     score: r.rank,
+    matchedName: r.matchedName ?? r.title,
   }));
 }
 

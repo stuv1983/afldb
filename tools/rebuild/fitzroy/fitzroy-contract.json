@@ -1,0 +1,282 @@
+{
+  "$comment": "AFLDB-ISSUE-093 Phase 2 — fitzRoy acquisition contract. `pinned_version` is the approved fitzRoy version (§5 of issues/closed/AFLDB-ISSUE-093.md); acquire_core.R fails closed on any other installed version unless --allow-version-mismatch is passed, and every probe/manifest records the version actually used. Field `status` values: SUPPORTED, SUPPORTED_WITH_COVERAGE_LIMITATION, WRONG_GRAIN, MISSING, UNVERIFIED. All statuses start UNVERIFIED and are only promoted on probe/acquisition evidence — never on assumption.",
+  "contract_version": 1,
+  "source_row_corrections": {
+    "$comment": "AFLDB-ISSUE-093 — corrections to specific ACQUIRED SOURCE ROWS, each backed by direct AFL Tables evidence and bound to an exact row fingerprint. Not a matching rule, not a merge, not name-based: a rule names one artefact, one exact set of field values, and how many rows must match. If the raw bytes ever stop matching — because a later fitzRoy release fixes the defect, or the acquisition differs — the rule finds nothing, the expected count is not met, and the import FAILS VISIBLY rather than silently double-correcting or silently doing nothing. Removing a rule that upstream has fixed is then a deliberate, reviewed edit.",
+    "applies_to_source": "AFL Tables via fitzRoy",
+    "rules": [
+      {
+        "id": "1909-r10-jim-stewart-cartesian-a",
+        "dataset": "player_stats",
+        "file": "player_stats_1909.csv",
+        "action": "drop_row",
+        "expect_rows": 1,
+        "fingerprint": {
+          "Season": "1909",
+          "Round": "10",
+          "Date": "1909-07-03",
+          "Home.team": "St Kilda",
+          "Away.team": "Essendon",
+          "url": "https://afltables.com/afl/stats/players/J/Jim_Stewart0.html",
+          "ID": "5230",
+          "Age": "20.6652977412731",
+          "Career.Games": "1",
+          "Goals": "2"
+        },
+        "authority": "AFL Tables match page for St Kilda v Essendon, Round 10, 1909, and the two player profiles. Two DISTINCT players named Jim Stewart played: the older (players/J/Jim_Stewart0.html, born 16-Apr-1884, 85 career games) was aged 25y 78d in his 68th game and kicked 2 goals; the younger (players/J/Jim_Stewart1.html, born 2-Nov-1888, 3 career games) was aged 20y 243d on debut and kicked 0.",
+        "reason": "fitzRoy emitted the CARTESIAN PRODUCT of the two players' identities and the two players' biographies: 2 urls x 2 (Age, Career.Games) pairs = 4 rows where AFL Tables has 2. This row pairs the OLDER player's url, ID and goals with the YOUNGER player's age and career-game number, and corresponds to no real appearance. The two genuine rows are already correct and are untouched."
+      },
+      {
+        "id": "1909-r10-jim-stewart-cartesian-b",
+        "dataset": "player_stats",
+        "file": "player_stats_1909.csv",
+        "action": "drop_row",
+        "expect_rows": 1,
+        "fingerprint": {
+          "Season": "1909",
+          "Round": "10",
+          "Date": "1909-07-03",
+          "Home.team": "St Kilda",
+          "Away.team": "Essendon",
+          "url": "https://afltables.com/afl/stats/players/J/Jim_Stewart1.html",
+          "ID": "5685",
+          "Age": "25.2135523613963",
+          "Career.Games": "68",
+          "Goals": "0"
+        },
+        "authority": "Same AFL Tables match page and profiles as the rule above.",
+        "reason": "The mirror image of the other spurious row: the YOUNGER player's url, ID and goals paired with the OLDER player's age and career-game number. Corresponds to no real appearance."
+      }
+    ],
+    "not_corrected": {
+      "$comment": "Audited across the whole snapshot and found already correct, so deliberately left alone: the younger player's other appearances (1909 R11 career game 2, and 1911 R5 career game 3) already carry players/J/Jim_Stewart1.html with ID 5685, and the older player's 85 appearances (1905-1912) already carry players/J/Jim_Stewart0.html with ID 5230. No row anywhere needs re-attribution between the two, and no fitzRoy ID needed discarding or inventing: both IDs are internally consistent with their own careers."
+    }
+  },
+  "source_club_normalisation": {
+    "$comment": "AFLDB-ISSUE-093 — SOURCE normalisation, not club identity. fitzRoy emits one modern club string per organization, so a historical season can arrive labelled with a name that did not exist then. Where the organization is continuous (Footscray/Western Bulldogs, Kangaroos/North Melbourne, South Melbourne/Sydney) ClubResolver already remaps within the organization and needs no rule here. This block exists ONLY for the case the organization model deliberately refuses to bridge: a MERGER. Brisbane Bears (1987-1996) and Brisbane Lions (1997-) are separate organizations — migration 017: 'folding them into the Lions record would invent a history the club does not have' — so the org walk finds no candidate and fails closed, which is correct. A SECOND class was added later and is the more dangerous one: a NESTED era, where the modern identity's canonical span CONTAINS the historical identity's (North Melbourne 1925-present contains Kangaroos 1999-2007). There the era check succeeds, no organization walk is attempted, and the row resolves to the wrong identity SILENTLY — it fails open, not closed — so every dataset that carries the modernised label needs its own rule. These rules are scoped to this source, to an exact raw string, and to an exact season range. They add NO alias, so the two identities remain non-interchangeable everywhere else in AFLDB, and nothing outside a listed range is affected.",
+    "applies_to_source": "AFL Tables via fitzRoy",
+    "is_alias": false,
+    "dataset_scope": "A rule may name a `dataset` when the defect belongs to ONE fitzRoy dataset rather than to the source as a whole. A rule with no `dataset` applies to every dataset; a rule with one applies only there, so a correction written for results can never rewrite a player_stats row that happens to carry the same string.",
+    "rules": [
+      {
+        "raw": "Brisbane Lions",
+        "first_season": 1987,
+        "last_season": 1996,
+        "resolves_to_hist": "Brisbane Bears",
+        "reason": "fitzRoy labels the Brisbane Bears era with the modern Lions name. Measured on full-history-20260827: 222 match-sides across 1987-1996, and no other club string in 129 seasons needs a rule. 1997 onward is untouched and resolves to Brisbane Lions by the ordinary era rule.",
+        "evidence": "full-history-20260827 results.csv, 1,622 distinct (club string, season) pairs, 10 unresolved before this rule"
+      },
+      {
+        "dataset": "results",
+        "raw": "North Melbourne",
+        "first_season": 1999,
+        "last_season": 2007,
+        "resolves_to_hist": "Kangaroos",
+        "reason": "The two fitzRoy datasets disagree with each other for the Kangaroos era: player_stats uses 'Kangaroos' while results uses 'North Melbourne', so the same match resolves to two different historical identities and the match join fails. The club competed as the Kangaroos from 1999 to 2007 and migration 017 models the chain as North Melbourne (1925-) -> Kangaroos (1999-2007) -> North Melbourne, so results is the dataset carrying a label from the wrong era. Scoped to results ONLY: a player_stats row reading 'North Melbourne' is untouched, because outside 1999-2007 that string is correct and inside those seasons player_stats already says 'Kangaroos'. The ordinary era rule cannot repair this on its own — North Melbourne's canonical span (1925-present) overlaps the Kangaroos era, so era containment succeeds and no remap is attempted.",
+        "evidence": "full-history-20260827: 9,196 player_stats rows across 198 (season, home, away) match combinations, seasons 1999-2007, could not join results. The Footscray/Western Bulldogs disagreement in the same seasons needs no rule — Footscray's era ends in 1996, so the ordinary organization remap already resolves it."
+      },
+      {
+        "dataset": "ladder",
+        "raw": "North Melbourne",
+        "first_season": 1999,
+        "last_season": 2007,
+        "resolves_to_hist": "Kangaroos",
+        "reason": "AFLDB-ISSUE-095 D5. The ladder dataset needs the same repair as results, and needs it as its OWN rule: rule scoping means a `results`-scoped rule is skipped for a ladder lookup, and this is the one boundary that then FAILS OPEN rather than closed. North Melbourne's canonical span (1925-present) CONTAINS 1999-2007, so era containment succeeds, no organization walk is attempted, and the row resolves silently to the modern identity with no error. The other three boundary families are already safe without a ladder rule: Sydney<=1981 and Footscray>=1997 are era misses that the same-organization walk resolves to exactly one candidate, and Brisbane Lions 1987-1996 is caught by the unscoped Brisbane rule above. Adding this rule is what makes the ladder witness's identity resolution total.",
+        "evidence": "AFLDB-ISSUE-095 exhaustive probe, 2026-08-28: fetch_ladder_afltables emits ONE modernised label per organization across all time, in both directions — 'Sydney' back to 1897, 'Brisbane Lions' back to 1987, 'Footscray' forward to 2025 — and never emits 'Kangaroos' at all. 1,622 (label, season) pairs over 20 distinct labels, 1897-2025."
+      }
+    ],
+    "fail_closed": "A raw string/season combination outside these exact rules is never normalised here; it falls through to the ordinary era resolution and still fails closed if that cannot name exactly one identity."
+  },
+  "full_history": {
+    "$comment": "AFLDB-ISSUE-093 — what a CANONICAL full-history fitzRoy core snapshot must contain for `npm run db:test:rebuild`. Every value here is derived from tracked repository evidence, not from memory: the season bounds come from data/reference/seasons.json, the dataset list from the `datasets` block below, and the exclusions from the separate pipelines named in each reason. A snapshot earns `full_history: true` ONLY by passing every gate in `completeness_gates` — never by its label, and never by hand-editing the manifest.",
+    "contract_full_history_version": 1,
+    "competition": "VFL/AFL men's senior competition",
+    "required_datasets": ["player_stats", "player_details", "results"],
+    "season_range": {
+      "first_season": 1897,
+      "first_season_source": "data/reference/seasons.json first_season",
+      "last_season": 2025,
+      "last_season_rule": "the latest COMPLETED season: data/reference/seasons.json last_season (2026) minus every entry in in_progress_seasons ([2026])",
+      "resolved_on": "2026-08-27"
+    },
+    "current_season_excluded": {
+      "seasons": [2026],
+      "reason": "2026 is declared in-progress by data/reference/seasons.json and is owned by the separate current-season pipeline (npm run current-season:update -> tools/current-season/update-current-season.ts -> src/lib/external-afl/current-season-import). Including it here would double-load the season and give two writers one set of facts.",
+      "boundary_is_explicit": true
+    },
+    "aflw_excluded": {
+      "reason": "AFLW is a different source and a different pipeline entirely: tools/aflw/parse_aflw.py parses an aflwstats.com scrape into the staging_aflw schema (migration 025), loaded by tools/aflw/load_staging.py. fitzRoy is not involved, and no AFLW season belongs in this snapshot."
+    },
+    "approved_source_gaps": {
+      "$comment": "Seasons the source is KNOWN and APPROVED not to carry. Empty: no gap has been measured or approved yet. While this list is empty, ANY missing season in the required range is an acquisition FAILURE, never an absence. A gap may only be added here from measured acquisition evidence plus explicit review.",
+      "seasons": []
+    },
+    "per_season_datasets": ["player_stats"],
+    "whole_range_datasets": {
+      "$comment": "These are acquired in one call rather than per season, so they carry no per-season file accounting: player_details has no season argument, and results is fetched for the whole range at once.",
+      "datasets": ["player_details", "results"]
+    },
+    "completeness_gates": [
+      "every dataset in required_datasets is present in the manifest",
+      "every season in the required range has exactly one player_stats artefact, unless it is listed in approved_source_gaps",
+      "no season has more than one artefact for the same dataset",
+      "no artefact lies outside the required range",
+      "every artefact records a sha256 and that hash matches the file on disk",
+      "every artefact records a non-zero row_count",
+      "every artefact's column set is one of the accepted schema variants for its dataset",
+      "the acquisition recorded no failed season: a source failure is terminal and must not be written as an absence",
+      "fitzroy_version_installed equals pinned_version and fitzroy_version_match is true",
+      "requested_range equals the required range exactly"
+    ],
+    "completeness_values": {
+      "full_history": "every gate passed; the snapshot is admissible as the canonical core rebuild source",
+      "partial": "a deliberate subset (a trial, or an explicitly narrowed range); never admissible in normal rebuild mode",
+      "failed": "acquisition did not complete; no manifest should exist at all, and one that does must never be consumed"
+    },
+    "known_trial_labels": ["trial-2024"],
+    "identity_requirement": {
+      "$comment": "import_fitzroy_core.py builds players ONLY from player_stats rows and fails closed on any row lacking a stable ID or profile URL (:711-716). Historical coverage of the `url` column is UNVERIFIED — the contract's player_stats probe covered season 2024 only — so the offline validator measures it across every acquired season BEFORE any import is attempted.",
+      "required_columns": ["ID", "url"],
+      "rule": "every player_stats row must carry a non-empty ID and a non-empty url; identity is never inferred from a name",
+      "profile_url_shape": "^https?://afltables\\.com/afl/stats/players/[A-Za-z]/[^/]+\\.html$"
+    }
+  },
+  "in_season": {
+    "$comment": "AFLDB-ISSUE-099 — what an IN-SEASON partial AFL Tables snapshot is, and how it stays permanently distinguishable from a full-history core snapshot. An in-season acquisition covers exactly ONE season, that season must be declared in-progress by data/reference/seasons.json, and the result is a THIRD acquisition kind (`in_season_partial`) with its OWN adjudicator. It is NOT a narrowed core snapshot: no full-history gate is relaxed for it, and it can never be accepted as a rebuild baseline. As in the full_history block, nothing here is a verdict — acquire_core.R records what it measured, and import_fitzroy_core.py --require-in-season re-derives every gate from this contract and the raw artefacts.",
+    "contract_in_season_version": 1,
+    "acquisition_kind": "in_season_partial",
+    "competition": "VFL/AFL men's senior competition",
+    "single_season": true,
+    "season_source": "data/reference/seasons.json in_progress_seasons",
+    "season_rule": "--from must equal --to, and that season must be listed in data/reference/seasons.json in_progress_seasons; a completed season is acquired as a core snapshot, never in-season",
+    "required_datasets": ["player_stats", "results"],
+    "allowed_datasets": ["player_stats", "results"],
+    "excluded_datasets": {
+      "datasets": ["player_details", "ladder"],
+      "reason": "player_details is a whole-population dataset with no season argument and no stable AFL Tables ID (see its own field statuses), so it carries nothing an in-season settle may consume. `ladder` is a VALIDATION_WITNESS whose values fitzRoy computes locally from results (AFLDB-ISSUE-095), so it is never a fact source and never part of an in-season snapshot."
+    },
+    "completeness_gates": [
+      "acquisition_kind is exactly in_season_partial",
+      "requested_range covers exactly one season and from equals to",
+      "the acquired season is listed in data/reference/seasons.json in_progress_seasons",
+      "every dataset in required_datasets is present in the manifest",
+      "no dataset outside allowed_datasets is present in the manifest",
+      "the acquired season has exactly one player_stats artefact",
+      "no artefact lies outside the acquired season",
+      "every artefact records a sha256 and that hash matches the file on disk",
+      "every artefact records a non-zero row_count",
+      "every artefact's column set is one of the accepted schema variants for its dataset",
+      "the acquisition recorded no failed season: a source failure is terminal and must not be written as an absence",
+      "fitzroy_version_installed equals pinned_version and fitzroy_version_match is true"
+    ],
+    "never_admissible_for": {
+      "$comment": "An in-season snapshot is a partial observation of a season still being played. Admitting one to either gate below would weaken the historical fail-closed contract, so both adjudicators must refuse acquisition_kind in_season_partial EXPLICITLY, on top of their existing range checks — and --require-in-season must symmetrically refuse anything that is not in_season_partial.",
+      "gates": ["--require-full-history", "--require-accepted-baseline"],
+      "register": "data/reference/fitzroy-accepted-baselines.json"
+    },
+    "identity_requirement": {
+      "$comment": "AFLDB-ISSUE-099 §2.1, probe P5 (2026-08-28, 9,522 x 81 rows over 207 matches). In-season player_stats rows can arrive with a blank fitzRoy `ID` — 82 such rows across 5 profile URLs were measured in 2026, and none of those 5 URLs carries an ID anywhere in the season — so `ID` is ENRICHMENT ONLY here and must never be required. The stable identity is the AFL Tables profile `url`, which had ZERO NA values in the same measurement and was 1:1 with every populated ID (663 distinct pairs). This is the one place the in-season contract deliberately differs from full_history.identity_requirement, which requires both columns.",
+      "required_columns": ["url"],
+      "enrichment_columns": ["ID"],
+      "rule": "every player_stats row must carry a non-empty url; a populated ID must stay 1:1 with url; identity is never inferred from a name, at any grain",
+      "profile_url_shape": "^https?://afltables\\.com/afl/stats/players/[A-Za-z]/[^/]+\\.html$"
+    },
+    "verdict_authority": "tools/migration/import_fitzroy_core.py --validate-only --require-in-season"
+  },
+  "pinned_version": "1.8.0",
+  "pinned_version_evidence": "CRAN fitzRoy index page, checked 2026-08-25 (published 2026-08-23)",
+  "datasets": {
+    "player_stats": {
+      "fitzroy_function": "fetch_player_stats_afltables",
+      "grain": "player-match",
+      "probe_note": "Probe run 1 (2026-08-25) failed with \"object 'dictionary_afltables' not found\" when called via fitzRoy:: without attaching the package; probe run 2 (same day, after library(fitzRoy) attach in acquire_core.R) SUCCEEDED: 9,936 rows for season 2024, 78 columns. Statuses below are from probe run 2 evidence. Historical-era coverage is still to be measured at acquisition — a single 2024 probe cannot prove completeness.",
+      "fields": [
+        { "target": "player identity (stable AFL Tables ID)", "candidate_columns": ["ID"], "status": "SUPPORTED", "note": "Probe run 2: integer ID, 0 NA" },
+        { "target": "player name", "candidate_columns": ["First.name", "Surname", "Player"], "status": "SUPPORTED", "note": "Probe run 2: First.name, Surname and combined Player all present, 0 NA" },
+        { "target": "player DOB", "candidate_columns": ["DOB", "Date.of.birth"], "status": "SUPPORTED_WITH_COVERAGE_LIMITATION", "note": "Probe run 2: DOB present as character, 0 NA in 2024. Format and historical coverage still to verify at acquisition" },
+        { "target": "AFL Tables profile URL", "candidate_columns": ["Player.url", "url"], "status": "SUPPORTED", "note": "Probe run 2: url present, 0 NA" },
+        { "target": "per-match statistics (kicks, marks, handballs, goals, behinds, hitouts, tackles, rebounds, inside 50s, clearances, clangers, frees, contested/uncontested possessions, contested marks, marks inside 50, one percenters, bounces, goal assists, time on ground)", "candidate_columns": ["Kicks", "Marks", "Handballs", "Goals", "Behinds", "Hit.Outs", "Tackles", "Rebounds", "Inside.50s", "Clearances", "Clangers", "Frees.For", "Frees.Against", "Contested.Possessions", "Uncontested.Possessions", "Contested.Marks", "Marks.Inside.50", "One.Percenters", "Bounces", "Goal.Assists", "Time.on.Ground"], "status": "SUPPORTED_WITH_COVERAGE_LIMITATION", "note": "Probe run 2: all 21 columns present (actual name is Time.on.Ground, not Time.on.Ground..; Disposals also present as a derived extra). Era coverage limitations remain per data/reference/stat-availability.json; absent-era values must remain NA/NULL, never coerced to 0" },
+        { "target": "Brownlow match votes (brownlow_round_votes grain)", "candidate_columns": ["Brownlow.Votes"], "status": "SUPPORTED_WITH_COVERAGE_LIMITATION", "note": "Probe run 2: integer per-player-per-match, 414/9,936 NA in 2024 (votes not applicable e.g. finals stay NA, not 0) — correct grain for brownlow_round_votes; season/career totals derivable. Historical coverage (1897–1923/1942–1945 not_applicable, 1935–1983 gap) still to verify at acquisition. fetch_awards_brownlow() (FootyWire) remains the independent cross-check only, not acquired in Phase 2" },
+        { "target": "match linkage (season, round, date, venue, teams)", "candidate_columns": ["Season", "Round", "Date", "Venue", "Home.team", "Away.team", "Playing.for"], "status": "SUPPORTED", "note": "Probe run 2: all present, 0 NA; plus Local.start.time, Home.Away, quarter-by-quarter TEAM scores (HQ1G..AQ4P; ET columns NA when no extra time)" },
+        { "target": "attendance", "candidate_columns": ["Attendance"], "status": "SUPPORTED_WITH_COVERAGE_LIMITATION", "note": "Probe run 2: integer Attendance, 0 NA in 2024, carried at player-match grain (repeated per match row — dedupe by match at import). Absent from fetch_results_afltables entirely. Historical coverage still to verify; absent must remain NA/NULL, not 0" },
+        { "target": "player match period (quarter-by-quarter) stats", "candidate_columns": [], "status": "MISSING", "note": "No fitzRoy AFL Tables interface documents per-quarter per-player stats; recorded MISSING / later investigation per runbook §12.2 — deliberately not investigated in Phase 2" }
+      ]
+    },
+    "player_details": {
+      "fitzroy_function": "fetch_player_details_afltables",
+      "grain": "player",
+      "fields": [
+        { "target": "player identity/name", "candidate_columns": ["Player", "ID"], "status": "SUPPORTED_WITH_COVERAGE_LIMITATION", "note": "Probe 2026-08-25 (16,731 rows): `Player` name present; NO stable AFL Tables ID column in this dataset — identity is name+Team+Cap grain only. Stable-ID reconciliation must come from player_stats" },
+        { "target": "player DOB", "candidate_columns": ["DOB", "Date.of.birth"], "status": "MISSING", "note": "Probe 2026-08-25: no DOB column returned (columns: Player, Team, Cap, #, HT, WT, Games, Wins, Draws, Losses, Goals, Seasons, Debut, Last, date_accessed)" },
+        { "target": "debut/career span", "candidate_columns": ["Debut", "Seasons", "Games"], "status": "SUPPORTED", "note": "Probe 2026-08-25: Debut, Seasons, Games all returned, 0 NA" }
+      ]
+    },
+    "ladder": {
+      "fitzroy_function": "fetch_ladder_afltables",
+      "grain": "club-season (final home-and-away ladder)",
+      "role": "VALIDATION_WITNESS",
+      "$comment": "AFLDB-ISSUE-095. Deliberately NOT in full_history.required_datasets: this dataset is not the source of any club_seasons column, and the accepted full-history snapshots do not contain it. It is acquired under its own label and read only by the rebuild FINAL VALIDATION stage, as an independently computed cross-check on AFLDB own match set and is_final classification. Adding it to required_datasets would retroactively invalidate every accepted baseline.",
+      "provenance": {
+        "verdict": "LOCALLY_COMPUTED",
+        "$comment": [
+          "Established 2026-08-28 by reading the pinned fitzRoy 1.8.0 implementation and by",
+          "measuring its own output. The function does NOT scrape a published AFL Tables",
+          "ladder. It calls fetch_results_afltables(season), filters Round.Type == Regular,",
+          "derives the winner from Home.Points/Away.Points, scores win=1 / draw=0.5 / loss=0,",
+          "sets points = win * 4, cumulates season_points, score_for and score_against,",
+          "computes percentage = score_for / score_against, sorts by Season, Round.Number,",
+          "descending season_points then descending percentage, and assigns ladder_pos from",
+          "that local ordering. There is no further tie-break.",
+          "Independently corroborated by measurement over its own 1,622 rows: percentage",
+          "equals score_for/score_against exactly in all 129 seasons; every season points",
+          "total is divisible by 4 with no bye, forfeit or deduction exception in 128 years;",
+          "and the row population is identical to the 1,622 results-derived (club string,",
+          "season) pairs recorded in source_club_normalisation above.",
+          "CONSEQUENCE: Season.Points, Ladder.Position and Percentage are NOT independently",
+          "published observations and must never be imported as sourced facts."
+        ]
+      },
+      "accepted_witness": {
+        "$comment": "AFLDB-ISSUE-095 durability binding. The raw witness CSVs are gitignored like every other acquired snapshot (ISSUE-093 convention: bytes are reproduced by acquisition, only the manifest is tracked). This block pins WHICH acquisition is accepted and binds the tracked manifest byte-for-byte, so the per-file hash list inside it cannot be edited to cover for tampered bytes. tools/rebuild/fitzroy/validate_ladder_witness.py re-proves every file hash against this manifest before the witness may be used, and REFUSES when the manifest exists but its bytes do not. AFLDB-ISSUE-114: manifest_sha256 is the SHA-256 of the manifest's CANONICAL LF BYTES. The value recorded on 2026-08-28, 70cc17768685a3140a428d3eef796bf465ae2fd9dca71a66684f248cdde8b6df, was captured from a CRLF working copy of the SAME document; .gitattributes (AFLDB-ISSUE-108) renders docs/rebuild-manifests/** as eol=lf on every platform and this validator hashes raw bytes, so that literal failed closed on a correct manifest everywhere. The repair re-pointed the binding at the same document in its canonical form: same snapshot_label, same manifest, same 129 files / 1622 rows, same per-file hash list. Accepting DIFFERENT bytes from a fresh acquisition is a successor-witness decision (AFLDB-ISSUE-101), never an edit to this field.",
+        "snapshot_label": "ladder-20260828",
+        "manifest": "docs/rebuild-manifests/afltables_fitzroy_core/ladder-20260828.json",
+        "manifest_sha256": "604a8a162543e19060f426bd189222d32d07726a0b134bdf4f910175cb7a8d3f",
+        "files": 129,
+        "rows": 1622,
+        "acquired_on": "2026-08-28",
+        "validator": "tools/rebuild/fitzroy/validate_ladder_witness.py --label ladder-20260828",
+        "not_validated_by": "import_fitzroy_core.py --require-full-history is the CORE snapshot adjudicator and must never be pointed at a witness-only acquisition; doing so manufactures a false failure over datasets the witness never claimed."
+      },
+      "coverage": {
+        "$comment": "Exhaustive read-only probe, 1897-2025, run 2026-08-28. Zero call errors, zero zero-row seasons, zero schema drift, zero wrong-Season echoes, zero blank Team, zero duplicate-team seasons, zero missing or duplicated ladder positions, zero NA Season.Points.",
+        "first_season": 1897,
+        "last_season": 2025,
+        "seasons_returned": 129,
+        "club_season_rows": 1622,
+        "distinct_labels": 20,
+        "min_rows_season": { "season": 1916, "rows": 4 },
+        "max_rows_season": { "seasons": "2012-2025", "rows": 18 },
+        "exact_points_and_percentage_ties": 0
+      },
+      "fields": [
+        { "target": "club label (modernised, one per organization)", "candidate_columns": ["Team"], "status": "SUPPORTED", "note": "Requires season-aware identity resolution; see source_club_normalisation. Never a fact source." },
+        { "target": "season and round of the returned ladder", "candidate_columns": ["Season", "Round.Number"], "status": "SUPPORTED", "note": "Round.Number is a free parameter; unspecified returns the final home-and-away round" },
+        { "target": "points for / against (cross-check only)", "candidate_columns": ["Score.For", "Score.Against"], "status": "SUPPORTED", "note": "The gate that independently validates AFLDB home-and-away match set and is_final classification" },
+        { "target": "premiership points (cross-check only)", "candidate_columns": ["Season.Points"], "status": "SUPPORTED", "note": "Locally computed 4/2/0; cross-checked against AFLDB own declared rule, never imported" },
+        { "target": "ladder position (cross-check only)", "candidate_columns": ["Ladder.Position"], "status": "SUPPORTED", "note": "Locally sorted on points then percentage with no further tie-break; cross-check only" },
+        { "target": "percentage", "candidate_columns": ["Percentage"], "status": "SUPPORTED", "note": "Proven an exact recomputation of Score.For/Score.Against; a ratio, where AFLDB stores it x100" },
+        { "target": "wins / draws / losses", "candidate_columns": [], "status": "MISSING", "note": "The dataset carries no W/D/L columns at all. AFLDB derives them from matches." }
+      ]
+    },
+    "results": {
+      "fitzroy_function": "fetch_results_afltables",
+      "grain": "match",
+      "fields": [
+        { "target": "match identity (season + round + teams + date)", "candidate_columns": ["Season", "Round", "Round.Number", "Date", "Home.Team", "Away.Team", "Game"], "status": "SUPPORTED", "note": "Probe 2026-08-25 (season 2024, 216 rows): all seven candidates returned, 0 NA; Round.Type also present" },
+        { "target": "scores/results (goals/behinds/points per side, margin)", "candidate_columns": ["Home.Goals", "Home.Behinds", "Home.Points", "Away.Goals", "Away.Behinds", "Away.Points", "Margin"], "status": "SUPPORTED", "note": "Probe 2026-08-25: all seven candidates returned, 0 NA" },
+        { "target": "venue", "candidate_columns": ["Venue"], "status": "SUPPORTED", "note": "Probe 2026-08-25: Venue returned, 0 NA" },
+        { "target": "attendance", "candidate_columns": ["Attendance"], "status": "MISSING", "note": "Probe runs 1+2 2026-08-25: fetch_results_afltables returns NO Attendance column. Attendance is instead SUPPORTED (with coverage limitation) on the player_stats dataset — see that entry" }
+      ]
+    }
+  }
+}

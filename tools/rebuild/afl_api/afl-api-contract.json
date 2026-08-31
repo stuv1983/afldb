@@ -1,0 +1,59 @@
+{
+  "$comment": "AFLDB-ISSUE-100 L2 — the AFL.com.au API acquisition contract, reached through fitzRoy. This is a SEPARATE source contract, alongside tools/rebuild/fitzroy/fitzroy-contract.json and tools/rebuild/draftguru/draftguru-contract.json, because tools/rebuild/fitzroy/fitzroy-contract.json declares applies_to_source 'AFL Tables via fitzRoy' and all three of its acquisition kinds (core_snapshot, validation_witness, in_season_partial) are season-ranged AFL Tables snapshots gated on data/reference/fitzroy-accepted-baselines.json. A round-bounded AFL API lineup fetch is none of those, and adding a fourth kind there would misrepresent that contract's source. The manifest SHAPE is reused deliberately; the source contract is not.",
+  "contract_version": 1,
+  "applies_to_source": "AFL.com.au API via fitzRoy",
+  "source_key": "afl_api",
+  "adapter": "tools/rebuild/afl_api/acquire_lineups.R",
+  "adapter_schema_version": 1,
+  "pinned_version": "1.8.0",
+  "pinned_version_note": "fitzRoy 1.8.0 is the AFLDB-ISSUE-093 pinned contract version and the exact version under which P3 (2026-08-28) and P3b (2026-08-29) were measured.",
+  "risk": [
+    "This reads the AFL's own website API through a third-party package. It is free and unauthenticated today, but it is not a published contract with AFLDB and is revocable without notice.",
+    "That risk is why every family of this source is staging-only or corroborating and never the sole path to a canonical fact."
+  ],
+  "lineup": {
+    "$comment": "AFLDB-ISSUE-100 — what one bounded lineup acquisition is. Exactly one season and exactly one round, always explicit.",
+    "contract_lineup_version": 1,
+    "family": "lineup",
+    "endpoint": "fitzRoy::fetch_lineup_afl(season, round_number)",
+    "competition": "AFL men's senior competition (compSeason.shortName 'Premiership' in every measured row)",
+    "acquisition_kind": "round_lineup_snapshot",
+    "single_season": true,
+    "single_round": true,
+    "explicit_scope_only": true,
+    "scope_rule": "--season and --round are both REQUIRED. There is no implicit current season, no implicit latest round, and no default for either. The adapter refuses rather than guessing a scope.",
+    "scope_key_grammar": "season=<integer>;round=<integer>",
+    "required_columns": [
+      "providerId",
+      "teamId",
+      "player.playerId",
+      "status",
+      "teamStatus"
+    ],
+    "required_columns_rule": "Exactly the three identity fields plus the two announcement-state fields. P3b measured 0 NULLs across two rounds for several other useful columns, which establishes them as typed and usable but is NOT a provider guarantee that they can never be absent, so the acquisition fails closed on identity and source state only.",
+    "conditional_columns": {
+      "lateChanges": "Present only in a round where at least one match carried a late change; absent from the entire payload otherwise. P3b measured it present at round 20 (442 of 468 rows NA) and absent from round 25. Its absence is legal and must never be normalised into an empty string or a fabricated NULL."
+    },
+    "column_authority": "data/reference/source-families.json, source afl_api family lineup. The adapter measures and records the observed column set; the source-family contract is the one place that decides whether that set is projectable, and an undeclared column refuses there.",
+    "external_key": [
+      "providerId",
+      "teamId",
+      "player.playerId"
+    ],
+    "external_record_id_encoding": "providerId|teamId|player.playerId, in declared external_key order. FAMILY-LOCAL: '|' is not a universal AFLDB external-key encoder. afltables.match uses '|' because it inherits the canonical matches.match_key, and afltables.player_match_stats uses '@' around one. A component that is missing, blank, non-string or itself contains '|' REFUSES emission; the delimiter is never escaped, replaced or hashed, and player names are never a fallback.",
+    "absence": {
+      "sweepable": false,
+      "enumeration_complete": false,
+      "reason": "row-grain lineup completeness is not contractually established; afl_api.lineup is intentionally incomplete for absence purposes; absence sweeping is disabled for this family",
+      "evidence": "P3b (2026-08-29) proved exact fixture-to-lineup MATCH-SET equality for rounds 20 and 25, which proves every fixture was queried. It does NOT establish that the set of player rows returned for an individual team is complete on every future run. Enabling absence semantics requires an explicit durable row-grain completeness contract and belongs to a future issue."
+    },
+    "never_admissible_for": [
+      "canonical match participation",
+      "player_match_stats",
+      "any inference that an announced player played",
+      "promotion to any canonical table"
+    ],
+    "promotion_policy": "never",
+    "verdict_authority": "The acquirer does not adjudicate. It records what it measured and writes completeness 'unvalidated'; the source-family column contract and the bundle emitter decide what is projectable."
+  }
+}

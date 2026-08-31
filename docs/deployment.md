@@ -29,7 +29,7 @@ Deployment on the **development server**. Production cutover is a separate, deli
 |---|---|
 | Host | `arm@10.0.40.100` (`streamanator`), 24 cores, 31 GB RAM |
 | Project | `/home/arm/projects/afldb` |
-| Node | 22.23.2 via nvm (user-local, no root) |
+| Node | 22.23.2 via nvm (user-local, no root; Next.js 16 requires >=20.9) |
 | App port | **3100** (3000 was already in use) |
 | Proxy port | **8090** (deliberately not 80/443) |
 | Databases | `afldb_dev`, `afldb_test`, `afldb_restore_test` |
@@ -70,7 +70,51 @@ powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1
 Use `-WhatIf` to print the target without touching the server, and
 `-SkipMigrate`, `-SkipBuild` or `-SkipRestart` for narrower maintenance runs.
 
-`npm run build` runs `next build` then `tools/build/prepare-standalone.mjs`, which copies `.next/static` into the standalone bundle and creates `.next/cache`. **Both are required** — without them the site starts but every stylesheet 404s and ISR cannot persist.
+For AFLDB-ISSUE-107's controlled Next.js 16 deployment, first set
+`AFLDB_TRACE_REQUESTS=on` in the development host's `.env`, retain
+`AFLDB_WORKERS=4` and `AFLDB_POOL_MAX=10`, then run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1 -Issue107Gate
+```
+
+That mode refuses skipped install/build/restart/health steps, enforces Node >=20.9, checks the
+development 4-worker/10-connection-pool controls after the systemd restart, and fails unless
+`.next/standalone/.next/BUILD_ID` equals the live `x-afldb-build` response header.
+
+Three things about the remote side are worth knowing, because each was a silent failure before
+it was fixed:
+
+- **Node comes from nvm and is not on an SSH `PATH`.** A non-interactive *or* login SSH shell
+  resolves `/usr/bin/node`, which is 18.19.1 on the development host — below Next 16's floor.
+  The script sources nvm's default before checking, so the build runs on the same v22.23.2 the
+  systemd unit pins. A host without nvm keeps its `PATH` Node and is still held to the floor.
+- **The remote script is sent base64-encoded.** PowerShell writes a UTF-8 BOM into a native
+  command's stdin pipe, so piping the script straight into `bash -s` made the remote shell fail
+  on its first line — `set -Eeuo pipefail` — and then run on past failed stages, able to exit 0.
+  Base64 is plain ASCII and survives the pipe, CRLF and PowerShell's argument handling.
+- **Restart falls back to the unit's `Restart=` policy.** `sudo` needs a password here, so
+  `sudo -n systemctl restart afldb` cannot work over SSH and plain `systemctl restart` returns
+  *Interactive authentication required*. The unit runs as `arm` with `Restart=always`, so the
+  script terminates `MainPID` and lets **systemd** respawn the service from the unit, proving it
+  by a changed `MainPID`. systemd is not bypassed and `.env` is re-read.
+
+Build steps inside the remote script must be written as **single-quoted** PowerShell strings.
+A double-quoted one expands `$(…)` on the workstation, so a step meant to report the server's
+Node version, revision or working-tree state silently reports Windows instead.
+
+`npm run build` deliberately runs `next build --webpack` for the controlled Next.js 16
+upgrade, then `tools/build/prepare-standalone.mjs`, which copies `.next/static` into the
+standalone bundle and creates `.next/cache`. **Both are required** — without them the site
+starts but every stylesheet 404s and ISR cannot persist. Turbopack is not part of this first
+framework upgrade.
+
+Next.js 16's navigation cache deduplicates shared layouts and may issue more, smaller
+incremental prefetch requests than Next 15. The resulting RSC/static request and output shape
+is therefore not expected to be byte-for-byte identical. AFLDB retains its intentional
+`prefetch={false}` primary/mobile navigation links and otherwise uses the framework defaults;
+validate route semantics, console/hydration health and build identity rather than treating a
+different `.rsc`/segment layout as a regression by itself.
 
 ## 4. Service management
 
@@ -142,6 +186,55 @@ curl http://10.0.40.100:8090/api/health   # through the proxy
 
 Returns `{"status":"ok","database":"ok","latencyMs":N}`, or HTTP 503 with `"database":"unreachable"`. It deliberately reveals no version, hostname or connection detail. Caddy polls it every 30 s.
 
+## 6a. Clean test rebuild (`afldb_test`)
+
+The canonical clean rebuild of the **test** database is one command:
+
+```bash
+npm run db:test:rebuild -- --fitzroy-label <full-history-label> \
+                           --acknowledge-destroy afldb_test
+```
+
+Add `--plan` to print the stage graph and exit without touching anything.
+
+**It is destructive.** It drops every table, non-public schema, routine and type in
+`afldb_test` — a genuine clean slate, not a truncation — while preserving the `pg_trgm` and
+`unaccent` extensions, which are owned by another role. It refuses any target whose name is
+not exactly `afldb_test`, rejects `afldb_dev` and production by name, and requires you to
+name the database in `--acknowledge-destroy`.
+
+**Preflight runs before any destruction.** Every tracked DraftGuru input is checked and
+`import_draftguru.py --validate-only` must report 42 sha256-verified year pages, 5,057
+persons and 6,810 picks. A missing input fails while the database is still intact.
+
+Stage order (fixed):
+
+| # | Stage | Credential |
+|---|---|---|
+| 1 | preflight | none — no database contact |
+| 2 | database reset | `AFLDB_TEST_DATABASE_URL` (owner) |
+| 3 | migrations (`db:migrate:test`) | `AFLDB_TEST_DATABASE_URL` |
+| 4 | privileges (`db:privileges:test`) | `AFLDB_TEST_DATABASE_URL` |
+| 5 | reference data | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 6 | fitzRoy / AFL Tables core | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 7 | **DraftGuru** | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 8 | derived summaries | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 9 | fingerprints / row counts | `AFLDB_TEST_DATABASE_URL` |
+
+Data stages need `AFLDB_TEST_IMPORT_DATABASE_URL` — a restricted `afldb_import` DSN for the
+test database. The runner **fails closed** without it and never inherits the development
+`AFLDB_IMPORT_DATABASE_URL`, which points at `afldb_dev`. `--allow-owner-import-dsn` runs the
+data stages as owner deliberately, at the cost of the AFLDB-ISSUE-083 blind spot.
+
+`--fitzroy-label` is required and must name a manifest declaring `full_history`.
+`trial-2024` is a trial snapshot and can never satisfy full-history mode; use
+`--acknowledge-partial-fitzroy` to rebuild from partial core data on purpose.
+
+DraftGuru's canonical source is the accepted Stage A snapshot plus the tracked event/club
+contracts and the explicit-decision ledger. **It has no `AFLDB_LEGACY_SQLITE` dependency**,
+and the retired `tools/migration/import_draft.py` is never invoked. A Stage B3 person-page
+bridge is optional and absent by default; unbridged persons stay `unmatched`.
+
 ## 7. Data refresh
 
 Run in this order. Each step is idempotent and safe to repeat.
@@ -152,15 +245,37 @@ source .venv/bin/activate    # or use ./.venv/bin/python directly
 
 ./.venv/bin/python tools/migration/import_legacy_afl.py       # ~114s  core reload
 ./.venv/bin/python tools/migration/enrich_birth_dates.py      # ~6s    DOB recovery
-./.venv/bin/python tools/migration/import_draft.py            # ~2s    draft links
+./.venv/bin/python tools/rebuild/draftguru/import_draftguru.py  # draft rows and people
 ./.venv/bin/python tools/migration/import_awards.py           # awards and representative teams
 ./.venv/bin/python tools/migration/rebuild_derived.py         # ~30s   summaries
+./.venv/bin/python tools/migration/import_awards.py --groups coleman  # after season_metadata
 ./.venv/bin/python tools/validation/validate_migration.py     # every check must pass
 
 npm run build && sudo systemctl restart afldb                 # refresh cached pages
 ```
 
-The order matters. `rebuild_derived.py` must run last: it reads the tables the earlier steps write, and its first target, `season_metadata`, decides whether a season is still in progress — which in turn decides whether that season's Brownlow reads as a zero or as "not yet awarded".
+`import_draftguru.py` is the supported DraftGuru importer (AFLDB-ISSUE-093 Stage B2). It reads
+the accepted Stage A snapshot and the tracked reference/decision artefacts, and has **no**
+`AFLDB_LEGACY_SQLITE` dependency. `tools/migration/import_draft.py` is **retired** and now
+fails fast if invoked. Add `--validate-only` to check every input without touching the
+database, or `--dry-run` to run the whole transaction and roll it back.
+
+The order matters. `rebuild_derived.py` must run last of the summary builders: it reads the tables the earlier steps write, and its first target, `season_metadata`, decides whether a season is still in progress — which in turn decides whether that season's Brownlow reads as a zero or as "not yet awarded".
+
+The `coleman` group is the one awards group that runs **after** `rebuild_derived.py`, and it is repeated there deliberately. Unlike every other awards family it is *derived*, not acquired: it computes the leading home-and-away goalkicker from `player_match_stats` joined to `matches` (AFLDB-ISSUE-111), and it materialises a winner only for a season `season_metadata` has marked complete. Running it before that pass would read a stale season status and could name a winner for a season still being played. The second pass is idempotent — a reload by key, with the row ids preserved — so repeating it costs one query and removes the ordering hazard. Its boundaries (first season, tie rule, club rule, provenance, key format) live in `data/reference/coleman-derivation.json`, not in the loader.
+
+For a Coleman-only correction, run
+`./.venv/bin/python tools/migration/import_awards.py --groups coleman` after
+`rebuild_derived.py`. Like `under_22`, it needs no legacy SQLite database and
+rewrites no other award family.
+
+**One-time only, per database:** `./.venv/bin/python tools/migration/import_awards.py --rekey-coleman`
+re-owns the 46 pre-existing DraftGuru-sourced Coleman rows in place before the
+first derived load, preserving every `award_winners.id`. It runs a fail-closed
+1:1 preflight and writes nothing unless every count reconciles; it is retry-safe
+(already transitioned → verify and no-op) and refuses on a mixed state. Skipping
+it does not fail loudly — it silently duplicates the family, because the derived
+loader's ownership scope cannot see the legacy rows.
 
 For a 22 Under 22-only correction, run
 `./.venv/bin/python tools/migration/import_awards.py --groups under_22` after

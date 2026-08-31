@@ -13,12 +13,17 @@
  * SHA-256 checksum. Editing an already-applied migration is refused: schema
  * changes must be made by adding a new migration.
  */
-import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import postgres from 'postgres';
+
+import {
+  computeChecksumRepresentations,
+  matchesStoredChecksum,
+  type MigrationChecksumRepresentations,
+} from './migration-checksum';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -69,11 +74,45 @@ const TARGETS = {
 
 type Target = keyof typeof TARGETS;
 
-const requested = process.env.AFLDB_MIGRATE_TARGET ?? 'dev';
+/**
+ * `--target <name>` exists so the package scripts do not have to set the target
+ * through a shell env assignment (AFLDB-ISSUE-093 §H11 F1).
+ *
+ * `AFLDB_MIGRATE_TARGET=test tsx tools/db/migrate.ts` is POSIX-only, and npm on
+ * Windows runs package scripts under cmd.exe, where it fails outright with
+ * "'AFLDB_MIGRATE_TARGET' is not recognized …". That made the MIGRATIONS stage of
+ * `npm run db:test:rebuild` unrunnable on a Windows host — one stage AFTER the
+ * destructive reset had already emptied the database.
+ *
+ * The environment variable remains supported and unchanged for every documented
+ * invocation that already uses it. When both are supplied they must AGREE: silently
+ * preferring one over the other is exactly the "guess which database to alter"
+ * failure the explicit-target rule above exists to prevent.
+ */
+const targetFlagIndex = process.argv.indexOf('--target');
+const targetFlag = targetFlagIndex === -1 ? undefined : process.argv[targetFlagIndex + 1];
+
+if (targetFlagIndex !== -1 && !targetFlag) {
+  console.error('ERROR: --target needs a target name.'
+    + `\n       Valid targets: ${Object.keys(TARGETS).join(', ')}.`);
+  process.exit(1);
+}
+
+const envTarget = process.env.AFLDB_MIGRATE_TARGET;
+
+if (targetFlag && envTarget && targetFlag !== envTarget) {
+  console.error(
+    `ERROR: --target '${targetFlag}' and AFLDB_MIGRATE_TARGET '${envTarget}' disagree.`
+    + '\n       Supply one, or make them identical.',
+  );
+  process.exit(1);
+}
+
+const requested = targetFlag ?? envTarget ?? 'dev';
 
 if (!Object.hasOwn(TARGETS, requested)) {
   console.error(
-    `ERROR: unknown AFLDB_MIGRATE_TARGET '${requested}'.`
+    `ERROR: unknown migration target '${requested}'.`
     + `\n       Valid targets: ${Object.keys(TARGETS).join(', ')}.`,
   );
   process.exit(1);
@@ -98,7 +137,7 @@ function safeTarget(url: string): string {
   }
 }
 
-type Migration = { name: string; sql: string; checksum: string };
+type Migration = { name: string; sql: string; reps: MigrationChecksumRepresentations };
 
 function loadMigrations(): Migration[] {
   let files: string[];
@@ -112,7 +151,7 @@ function loadMigrations(): Migration[] {
     .sort()
     .map((name) => {
       const sql = readFileSync(join(MIGRATIONS_DIR, name), 'utf8');
-      return { name, sql, checksum: createHash('sha256').update(sql).digest('hex') };
+      return { name, sql, reps: computeChecksumRepresentations(sql) };
     });
 }
 
@@ -141,7 +180,7 @@ async function main() {
 
     // Refuse to run if an already-applied migration has been edited.
     const drifted = migrations.filter(
-      (m) => appliedByName.has(m.name) && appliedByName.get(m.name) !== m.checksum,
+      (m) => appliedByName.has(m.name) && !matchesStoredChecksum(appliedByName.get(m.name)!, m.reps),
     );
     if (drifted.length > 0) {
       console.error('ERROR: these applied migrations have been modified since they ran:');
@@ -174,7 +213,7 @@ async function main() {
           await tx.unsafe(m.sql);
           await tx`
             INSERT INTO afldb_meta.schema_migrations (name, checksum, duration_ms)
-            VALUES (${m.name}, ${m.checksum}, ${Date.now() - started})
+            VALUES (${m.name}, ${m.reps.canonicalLf}, ${Date.now() - started})
           `;
         });
         console.log(`ok (${Date.now() - started} ms)`);

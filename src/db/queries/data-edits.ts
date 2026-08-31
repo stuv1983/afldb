@@ -126,6 +126,38 @@ export type SaveEditResult =
  * Save one field group. Validates against the spec, applies the
  * entity-specific coupled recomputes, and writes the audit row.
  */
+async function getEntityNaturalKey(tx: Tx, entityKey: string, rowId: number): Promise<string | null> {
+  if (entityKey === 'matches') {
+    const [row] = await tx<{ match_key: string }[]>`SELECT match_key FROM matches WHERE id = ${rowId}`;
+    if (!row) throw new Error('Match not found');
+    return row.match_key;
+  }
+  if (entityKey === 'players') {
+    // Identity is profile-URL path through external_identities (afltables).
+    const [row] = await tx<{ external_id: string }[]>`
+      SELECT e.external_id
+        FROM external_identities e
+        JOIN sources s ON s.id = e.source_id
+       WHERE e.player_id = ${rowId}
+         AND s.key = 'afltables'
+         AND e.status IN ('unique', 'resolved')
+       LIMIT 1
+    `;
+    if (!row) return null; // Not source-owned or lacks stable identity
+    return `afltables:${row.external_id}`;
+  }
+  if (entityKey === 'draft_picks') {
+    // Draft picks natural key matching the supported DraftGuru importer reload key:
+    const [row] = await tx<{ source_id: number; player_url: string; draft_year: number; draft_kind: string }[]>`
+      SELECT source_id, player_url, draft_year, draft_kind
+        FROM draft_picks WHERE id = ${rowId}
+    `;
+    if (!row) throw new Error('Draft pick not found');
+    return `${row.source_id}|${row.player_url}|${row.draft_year}|${row.draft_kind}`;
+  }
+  throw new Error(`Unknown entity key for natural key: ${entityKey}`);
+}
+
 export async function saveEdit(input: {
   entityKey: string;
   rowId: number;
@@ -169,6 +201,9 @@ export async function saveEdit(input: {
     const applied = await importSql.begin(async (tx) => {
       const before = await readCurrent(tx, entity, group.fields, input.rowId);
       if (!before) return null;
+
+      const naturalKey = await getEntityNaturalKey(tx, input.entityKey, input.rowId);
+
       if (input.entityKey === 'players') {
         await applyPlayerEdit(tx, input.rowId, input.groupKey, values);
       } else if (input.entityKey === 'draft_picks') {
@@ -176,6 +211,34 @@ export async function saveEdit(input: {
       } else {
         await applyMatchEdit(tx, input.rowId, input.groupKey, values);
       }
+
+      if (naturalKey !== null) {
+        const [existing] = await tx<{ override_values: Record<string, any> }[]>`
+          SELECT override_values FROM data_overrides
+           WHERE entity_type = ${input.entityKey} AND entity_key = ${naturalKey} AND field_group = ${input.groupKey}
+        `;
+
+        const overrides: Record<string, any> = existing ? { ...existing.override_values } : {};
+        for (const field of group.fields) {
+          if (values[field] !== before[field]) {
+            overrides[field] = values[field];
+          }
+        }
+
+        // Upsert the active override so importers can replay it
+        if (Object.keys(overrides).length > 0) {
+          await tx`
+            INSERT INTO data_overrides (entity_type, entity_key, field_group, override_values, admin_user_id, is_active, updated_at)
+            VALUES (${input.entityKey}, ${naturalKey}, ${input.groupKey}, ${tx.json(overrides)}, ${input.adminUserId}, true, now())
+            ON CONFLICT (entity_type, entity_key, field_group) DO UPDATE SET
+              override_values = EXCLUDED.override_values,
+              admin_user_id = EXCLUDED.admin_user_id,
+              is_active = true,
+              updated_at = now()
+          `;
+        }
+      }
+
       // Required audit, same transaction: a failed insert rolls the
       // edit back (AFLDB-ISSUE-027).
       await recordDataEdit(tx, {

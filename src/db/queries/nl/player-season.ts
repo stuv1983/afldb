@@ -2,7 +2,7 @@ import 'server-only';
 
 import { sql } from '@/db/client';
 import { GRID_STATS } from '@/search/grid-solver-spec';
-import { NL_METRICS, type NlAggregation, type NlQueryPlan } from '@/search/nl/plan';
+import { NL_METRICS, type NlAggregation, type NlCompareOp, type NlQueryPlan } from '@/search/nl/plan';
 import type { NlAnswerPayload, NlPlayerSeasonRow } from '@/search/nl/answer-types';
 
 type SqlFragment = ReturnType<typeof sql>;
@@ -36,6 +36,20 @@ function rankCutoff(agg: NlAggregation): number {
   return agg.kind === 'top_n' ? agg.n : 1;
 }
 
+/** Closed op -> SQL map; same allowlist-then-bind discipline as player-career.ts's COMPARE_SQL. */
+const COMPARE_SQL: Record<NlCompareOp, string> = {
+  gte: '>=', lte: '<=', gt: '>', lt: '<', eq: '=',
+};
+
+/**
+ * A metric-condition list returns every qualifying season row, so the
+ * rank filter opens up instead of collapsing the list to one leader --
+ * the ISSUE-110 silent-threshold defect.
+ */
+function rankDepth(plan: NlQueryPlan): number {
+  return plan.metricCondition ? 2147483647 : rankCutoff(plan.agg);
+}
+
 function isLiveOnlyMetric(metric: string): boolean {
   const def = NL_METRICS.player_season[metric];
   return def.kind === 'column' && def.statKey !== undefined && GRID_STATS[def.statKey].grain === 'live_only';
@@ -54,7 +68,7 @@ export async function answerPlayerSeason(plan: NlQueryPlan, limit: number): Prom
   const value = metricValueExpr(plan.metric!);
   const liveOnly = isLiveOnlyMetric(plan.metric!);
   const direction = plan.agg.kind === 'min' ? sql.unsafe('ASC') : sql.unsafe('DESC');
-  const n = rankCutoff(plan.agg);
+  const n = rankDepth(plan);
 
   const clauses: SqlFragment[] = [];
   if (plan.player) clauses.push(sql`s.player_id = ${plan.player.id}`);
@@ -72,6 +86,15 @@ export async function answerPlayerSeason(plan: NlQueryPlan, limit: number): Prom
     )`);
   }
   clauses.push(liveOnly ? sql`mt.value IS NOT NULL` : sql`${value} IS NOT NULL`);
+  // The season threshold compares the player's SEASON AGGREGATE -- for a
+  // precomputed column that is the stored season total, for a live_only
+  // metric it is metric_totals' summed value, both already
+  // post-aggregation. NULL stays excluded by the IS NOT NULL above, so
+  // "not recorded" can never qualify as zero.
+  if (plan.metricCondition) {
+    const op = sql.unsafe(COMPARE_SQL[plan.metricCondition.op]);
+    clauses.push(sql`${liveOnly ? sql`mt.value` : value} ${op} ${plan.metricCondition.value}`);
+  }
   const where = clauses.reduce((acc, clause) => sql`${acc} AND ${clause}`, sql`TRUE`);
 
   if (liveOnly) {
@@ -108,7 +131,7 @@ export async function answerPlayerSeason(plan: NlQueryPlan, limit: number): Prom
       SELECT r.*, count(*) OVER () AS total
         FROM ranked r
        WHERE r.rnk <= ${n}
-       ORDER BY r.value ${direction}, r.season, r."displayName"
+       ORDER BY r.value ${direction}, r.season, r."displayName", r."playerId"
        LIMIT ${limit}
     `;
     const liveTotal = liveRows[0] ? Number(liveRows[0].total) : 0;
@@ -130,7 +153,7 @@ export async function answerPlayerSeason(plan: NlQueryPlan, limit: number): Prom
     SELECT r.*, count(*) OVER () AS total
       FROM ranked r
      WHERE r.rnk <= ${n}
-     ORDER BY r.value ${direction}, r.season, r."displayName"
+     ORDER BY r.value ${direction}, r.season, r."displayName", r."playerId"
      LIMIT ${limit}
   `;
   const total = rows[0] ? Number(rows[0].total) : 0;

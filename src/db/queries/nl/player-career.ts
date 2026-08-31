@@ -21,6 +21,14 @@ const COMPARE_SQL: Record<NlCompareOp, string> = {
   gte: '>=', lte: '<=', gt: '>', lt: '<', eq: '=',
 };
 
+/** Career appearances for one organization across all historical club identities. */
+function clubAppearanceCount(organizationId: number): SqlFragment {
+  return sql`(SELECT count(DISTINCT pms.match_id)::int
+                FROM player_match_stats pms
+                JOIN clubs pcl ON pcl.id = pms.club_id
+               WHERE pms.player_id = p.id AND pcl.organization_id = ${organizationId})`;
+}
+
 /**
  * The value expression for a player_career metric: a plain
  * player_career_stats column for the 8 precomputed stats
@@ -30,7 +38,9 @@ const COMPARE_SQL: Record<NlCompareOp, string> = {
  * proves out for the grid catalogue -- or a count of linked
  * award_winners rows for an award_count metric (NL_AWARDS).
  */
-function metricValueExpr(metric: string, periodSplit?: string): SqlFragment {
+function metricValueExpr(plan: NlQueryPlan): SqlFragment {
+  const metric = plan.metric!;
+  const periodSplit = plan.periodSplit;
   const def = NL_METRICS.player_career[metric];
   if (def.kind === 'award_count') {
     // count(*) is bigint in Postgres regardless of how small the count
@@ -56,6 +66,18 @@ function metricValueExpr(metric: string, periodSplit?: string): SqlFragment {
     const col = def.statKey ? sql.unsafe(def.statKey) : (def.kind === 'column' ? sql.unsafe(def.column) : sql.unsafe('0'));
     return sql`(SELECT sum(${col})::int FROM player_match_period_stats WHERE player_id = p.id AND ${periodCondition})`;
   }
+  if (plan.scope.clubFor) {
+    const organizationId = plan.scope.clubFor.organizationId;
+    if (metric === 'games') {
+      return clubAppearanceCount(organizationId);
+    }
+    if (def.statKey) {
+      return sql`(SELECT sum(pms.${sql.unsafe(def.statKey)})::int
+                    FROM player_match_stats pms
+                    JOIN clubs pcl ON pcl.id = pms.club_id
+                   WHERE pms.player_id = p.id AND pcl.organization_id = ${organizationId})`;
+    }
+  }
   if (def.statKey && GRID_STATS[def.statKey].grain === 'live_only') {
     // sum() over a smallint column is bigint too, same reason.
     return sql`(SELECT sum(${sql.unsafe(def.statKey)})::int FROM player_match_stats WHERE player_id = p.id)`;
@@ -64,9 +86,12 @@ function metricValueExpr(metric: string, periodSplit?: string): SqlFragment {
 }
 
 /** A single career condition compiled to a bound predicate -- the only path a condition's threshold reaches SQL. */
-function conditionSql(cond: NlCareerCondition): SqlFragment {
+function conditionSql(cond: NlCareerCondition, plan: NlQueryPlan): SqlFragment {
   const op = sql.unsafe(COMPARE_SQL[cond.op]);
   if (cond.kind === 'column') {
+    if (cond.column === 'games' && plan.scope.clubFor) {
+      return sql`${clubAppearanceCount(plan.scope.clubFor.organizationId)} ${op} ${cond.value}`;
+    }
     const column = sql.unsafe(NL_CAREER_COLUMNS[cond.column]);
     return sql`${column} ${op} ${cond.value}`;
   }
@@ -100,7 +125,7 @@ function boundarySql(boundary: NlBoundary): SqlFragment {
 }
 
 function conditionsWhere(plan: NlQueryPlan): SqlFragment[] {
-  const clauses: SqlFragment[] = plan.careerConditions.map(conditionSql);
+  const clauses: SqlFragment[] = plan.careerConditions.map((condition) => conditionSql(condition, plan));
   if (plan.boundary) clauses.push(boundarySql(plan.boundary));
   // A single named player ("Nick Dal Santo most games", "Dusty's debut
   // was a grand final"). Pre-existing gap, not new: player_career had no
@@ -118,6 +143,13 @@ function conditionsWhere(plan: NlQueryPlan): SqlFragment[] {
   // An ambiguous surname ("Ablett most goals") -- ranks across every
   // plausible candidate instead of declining. See NlMatchScope.playerIdIn.
   if (plan.scope.playerIdIn) clauses.push(sql`p.id = ANY(${plan.scope.playerIdIn})`);
+  if (plan.scope.clubFor && plan.careerPredicates.length === 0) {
+    clauses.push(sql`EXISTS (
+      SELECT 1 FROM player_match_stats pms
+      JOIN clubs pcl ON pcl.id = pms.club_id
+      WHERE pms.player_id = p.id AND pcl.organization_id = ${plan.scope.clubFor.organizationId}
+    )`);
+  }
   return clauses;
 }
 
@@ -126,13 +158,26 @@ function foldAnd(clauses: SqlFragment[]): SqlFragment {
   return clauses.reduce((acc, clause) => sql`${acc} AND ${clause}`);
 }
 
-const CAREER_ROW_SELECT = sql`
-  p.id AS "playerId", p.slug, p.display_name AS "displayName",
-  c.games, c.debut_season AS "debutSeason", c.final_season AS "finalSeason",
-  (SELECT string_agg(DISTINCT cl.short_name, ', ' ORDER BY cl.short_name)
-     FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id
-    WHERE pc.player_id = p.id) AS "clubNames"
-`;
+/**
+ * The `games` field is rendered directly under a visible Games heading.
+ * A club-scoped career row therefore carries appearances for that
+ * organization lineage; an unscoped row retains the whole-career total.
+ */
+function projectedGames(plan: NlQueryPlan): SqlFragment {
+  return plan.scope.clubFor
+    ? clubAppearanceCount(plan.scope.clubFor.organizationId)
+    : sql`c.games`;
+}
+
+function careerRowSelect(games: SqlFragment): SqlFragment {
+  return sql`
+    p.id AS "playerId", p.slug, p.display_name AS "displayName",
+    ${games} AS games, c.debut_season AS "debutSeason", c.final_season AS "finalSeason",
+    (SELECT string_agg(DISTINCT cl.short_name, ', ' ORDER BY cl.short_name)
+       FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id
+      WHERE pc.player_id = p.id) AS "clubNames"
+  `;
+}
 
 /**
  * Answers a player_career plan: a plain list when there is no ranking
@@ -160,18 +205,23 @@ export async function answerPlayerCareer(
   const extraWhere = foldAnd(clauses);
 
   if (!plan.metric) {
-    return answerList(extraWhere, limit);
+    return answerList(plan, extraWhere, limit);
   }
 
   return answerRanked(plan, extraWhere, limit);
 }
 
-async function answerList(extraWhere: SqlFragment, limit: number): Promise<NlAnswerPayload> {
+async function answerList(
+  plan: NlQueryPlan,
+  extraWhere: SqlFragment,
+  limit: number,
+): Promise<NlAnswerPayload> {
+  const games = projectedGames(plan);
   const rows = await sql<(NlPlayerCareerRow & { total: string })[]>`
-    SELECT ${CAREER_ROW_SELECT}, NULL::int AS value, count(*) OVER () AS total
+    SELECT ${careerRowSelect(games)}, NULL::int AS value, count(*) OVER () AS total
       FROM players p JOIN player_career_stats c ON c.player_id = p.id
      WHERE ${extraWhere}
-     ORDER BY c.games DESC, p.sort_name
+     ORDER BY ${games} DESC, p.sort_name
      LIMIT ${limit}
   `;
   const total = rows[0] ? Number(rows[0].total) : 0;
@@ -184,13 +234,14 @@ async function answerRanked(
   extraWhere: SqlFragment,
   limit: number,
 ): Promise<NlAnswerPayload> {
-  const value = metricValueExpr(plan.metric!, plan.periodSplit);
+  const value = metricValueExpr(plan);
+  const games = projectedGames(plan);
   const direction = plan.agg.kind === 'min' ? sql.unsafe('ASC') : sql.unsafe('DESC');
   const n = rankCutoff(plan.agg);
 
   const rows = await sql<(NlPlayerCareerRow & { total: string; rnk: number })[]>`
     WITH ranked AS (
-      SELECT ${CAREER_ROW_SELECT}, ${value} AS value,
+      SELECT ${careerRowSelect(games)}, ${value} AS value,
              rank() OVER (ORDER BY ${value} ${direction})::int AS rnk
         FROM players p JOIN player_career_stats c ON c.player_id = p.id
        WHERE ${extraWhere} AND ${value} IS NOT NULL

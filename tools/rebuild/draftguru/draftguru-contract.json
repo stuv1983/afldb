@@ -1,0 +1,240 @@
+{
+  "$comment": "AFLDB-ISSUE-093 §13.5 — DraftGuru annual-page acquisition contract (approved runbook: issues/closed/AFLDB-ISSUE-093-DRAFTGURU-ACQUISITION-HANDOFF.md). Pins the URL pattern, expected year set, intentional coverage gaps, canonical player_url form (U1, resolved 2026-08-26 against afldb_dev), accepted header variants, field classification and the CSV parity baseline. acquire_draft.py and parse_draft_snapshot.py fail closed on anything this contract does not accept. Statuses/baselines are measured evidence, never assumption.",
+  "contract_version": 1,
+  "adapter": "tools/rebuild/draftguru/acquire_draft.py",
+  "adapter_version": "1.0.0",
+  "adapter_schema_version": 1,
+  "parser_contract_version": 1,
+  "base_url": "https://www.draftguru.com.au",
+  "year_url_pattern": "{base_url}/years/{year}",
+  "expected_years": [1981, 1982, 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
+  "known_coverage_gaps": [
+    { "year": 1983, "reason": "no draft held" },
+    { "year": 1984, "reason": "no draft held" },
+    { "year": 1985, "reason": "no draft held" }
+  ],
+  "canonical_player_url": {
+    "form": "https://www.draftguru.com.au/players/<slug>/<ordinal>",
+    "regex": "^https://www\\.draftguru\\.com\\.au/players/[^/]+/[1-9][0-9]*$",
+    "href_source_form": "root-relative /players/<slug>/<ordinal> in server-rendered annual HTML (Step 2 probe, 2026-08-26)",
+    "trailing_slash": "forbidden",
+    "ordinal": "positive integer path segment; meaningful durable person identity — never stripped, collapsed or defaulted",
+    "evidence": "U1 RESOLVED 2026-08-26: read-only afldb_dev measurement — all 5,057 draft_persons.player_url values are absolute https://www.draftguru.com.au/players/<slug>/<ordinal>, 0 trailing slashes, all end in a numeric ordinal; anchors https://www.draftguru.com.au/players/brad_miller/1 and https://www.draftguru.com.au/players/brad_miller/2"
+  },
+  "identity_rules": {
+    "identity_field": "player_url",
+    "never_identity": ["Player display text", "any rendered name"],
+    "regression_anchor": {
+      "year": 2001,
+      "persons": [
+        { "player_url": "https://www.draftguru.com.au/players/brad_miller/1", "event": "National", "pick_number": 55, "club": "Melbourne" },
+        { "player_url": "https://www.draftguru.com.au/players/brad_miller/2", "event": "Rookie", "pick_number": 30, "club": "Richmond" }
+      ],
+      "note": "Identical rendered names, distinct hrefs — the proven-incorrect automatic convergence; must remain two persons through every stage"
+    }
+  },
+  "selection_column_header": "# ↧",
+  "csv_schema_variants": {
+    "A": {
+      "years": [1981, 1982, 1987],
+      "columns": ["Pick", "# ↧", "Club", "Detail", "Player", "Age", "Height", "Original Club", "Grade", "Games", "Goals", "Coaches", "Brownlow", "Awards"]
+    },
+    "B": {
+      "years": [1986, 1997, 1998],
+      "columns": ["Pick", "Draft", "# ↧", "Club", "Detail", "Player", "Age", "Height", "Original Club", "Grade", "Games", "Goals", "Coaches", "Brownlow", "Awards"]
+    },
+    "C": {
+      "years": [1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
+      "columns": ["Pick", "Draft", "# ↧", "Club", "Signing", "Player", "Age", "Height", "Original Club", "Grade", "Games", "Goals", "Coaches", "Brownlow", "Awards"]
+    }
+  },
+  "live_header_rule": "An accepted live annual-page header is the year's CSV variant header exactly, or that header with a single final 'Trade' column appended (measured live 2001: 16 columns = variant C + Trade; the browser export silently dropped that column). Any other header fails closed — never best-effort.",
+  "fields": {
+    "Pick": { "semantics": "special-pick LABEL (Priority/Compensation/FA Compensation/Inactive/Penalised), not a pick number", "role": "import", "downstream_note": "draft_picks.pick_note" },
+    "Draft": { "semantics": "event/transaction type — primary discriminator", "role": "import", "absent_years": [1981, 1982, 1987] },
+    "# ↧": { "semantics": "selection number within the event; blank means NOT-APPLICABLE (exactly Trade, Pre-Draft, Post-Draft, Free Agency), never 0 and never not-recorded", "role": "import", "type": "integer", "float_formatted_in_csv_15col": true },
+    "Club": { "semantics": "DESTINATION club under DraftGuru's modern identity — era-aware AFLDB resolution required downstream, failing closed on 'Brisbane'", "role": "import", "link_expected": true },
+    "Signing": { "semantics": "signing mechanism", "role": "import", "present_years_note": "1988-1996, 1999+" },
+    "Detail": { "semantics": "DISTINCT field from Signing — holds player names and 'Brisbane'", "role": "import-separately", "present_years": [1981, 1982, 1986, 1987, 1997, 1998] },
+    "Player": { "semantics": "display name only, NBSP-separated; NEVER identity — identity is the player href alone", "role": "import-as-raw-text" },
+    "Age": { "semantics": "age at transaction, 'NNyr'", "role": "import" },
+    "Height": { "semantics": "'NNNcm'", "role": "import" },
+    "Original Club": { "semantics": "recruiting PATHWAY, '/'-separated, ZWSP-delimited; never an FK, never previous AFL club", "role": "import-verbatim" },
+    "Grade": { "semantics": "DraftGuru editorial career grade", "role": "parity-only" },
+    "Games": { "semantics": "career figure coerced to 0 at source — violates NULL≠0 at source", "role": "parity-only-never-fact" },
+    "Goals": { "semantics": "career figure coerced to 0 at source", "role": "parity-only-never-fact" },
+    "Coaches": { "semantics": "Coaches Association votes, coerced to 0 at source", "role": "parity-only-never-fact" },
+    "Brownlow": { "semantics": "career Brownlow votes, coerced to 0 at source; AFLDB holds the authoritative grain", "role": "parity-only-never-fact" },
+    "Awards": { "semantics": "denormalised display string; awards domain later (§13.6)", "role": "parity-only" },
+    "Trade": { "semantics": "live-only column, semantics UNKNOWN — profiled across all 42 pages (runbook §9) before any database destination is assigned", "role": "profile-only", "live_only": true }
+  },
+  "event_type_baseline": {
+    "National": 2976,
+    "Rookie": 1209,
+    "Trade": 990,
+    "Pre-Season": 541,
+    "Pre-Draft": 370,
+    "Mid-Season": 280,
+    "Post-Draft": 188,
+    "Free Agency": 138,
+    "__no_draft_column__": 113,
+    "Mini-Draft": 4,
+    "Training Squad Selection": 1
+  },
+  "selection_blank_event_types": ["Free Agency", "Post-Draft", "Pre-Draft", "Trade"],
+  "special_pick_label_baseline": { "Priority": 42, "Compensation": 23, "FA Compensation": 21, "Inactive": 13, "Penalised": 2, "total": 101 },
+  "parity_baseline": {
+    "files": 42,
+    "total_rows": 6810,
+    "distinct_persons": 5057,
+    "selection_number_blank": 1686,
+    "note": "Live-source drift from this baseline is investigated and explicitly recorded, never silently accepted (runbook §7/§8, unresolved decision U5); --accept-baseline-drift is the explicit per-run human acknowledgement and records the measured delta"
+  },
+  "csv_artifact": {
+    "path": "data/sources/draftguru/full-history-20260826",
+    "filename_pattern": "^(\\d{4})_(VFL|AFL)_Draft_and_Trade_Period_Table_1\\.csv$",
+    "immutable": true,
+    "identity_complete": false,
+    "import_capable": false,
+    "role": "independent validation/parity oracle only — read-only; the export stripped player/club hyperlinks and the Trade column"
+  },
+  "snapshot": {
+    "root": "data/sources/draftguru",
+    "label_pattern": "^annual-html-[0-9]{8}$",
+    "manifest_dir": "docs/rebuild-manifests/draftguru"
+  },
+  "person_stage": {
+    "$comment": "AFLDB-ISSUE-093 Stage B1 (runbook §30) — DraftGuru PERSON-page profiling. Additive: no Stage A key above is changed. Stage B1 answers one question — does a person page carry a deterministic player_url -> AFL Tables identity bridge — and is PROFILING ONLY: it never writes the database and can never become an import source.",
+    "stage": "B1",
+    "adapter": "tools/rebuild/draftguru/acquire_persons.py",
+    "profiler": "tools/rebuild/draftguru/profile_person_pages.py",
+    "sample_tool": "tools/rebuild/draftguru/stage_b1_sample.py",
+    "person_url_pattern": "^https://www\\.draftguru\\.com\\.au/players/[^/]+/[1-9][0-9]*$",
+    "person_url_note": "identical to canonical_player_url.regex — the person page IS the player_url; identity is byte-exact and percent-encoding (%20, %C3%A1) is significant and never decoded",
+    "person_snapshot": {
+      "root": "data/sources/draftguru",
+      "label_pattern": "^person-html-[0-9]{8}$",
+      "manifest_dir": "docs/rebuild-manifests/draftguru",
+      "refused_labels": [
+        { "pattern": "^annual-html-[0-9]{8}$", "reason": "annual Stage A snapshot label — Stage A is accepted and immutable, and Stage B1 tooling must fail before any write" },
+        { "pattern": "^csv-export-[0-9]{8}$", "reason": "retrospective CSV manifest label, not an acquisition snapshot" },
+        { "pattern": "^full-history-[0-9]{8}$", "reason": "frozen browser-export CSV parity oracle" }
+      ],
+      "layout": {
+        "sample": "sample.json",
+        "residual_input": "input/residual_player_urls.txt",
+        "raw": "raw/persons/<slug>__<ordinal>.html",
+        "http": "http/persons/<slug>__<ordinal>.json",
+        "index": "http/persons_index.json",
+        "person_profile": "parsed/person_profile.jsonl",
+        "link_profile": "parsed/afltables_link_profile.json"
+      },
+      "filename_rule": "<slug>__<ordinal>.html is a storage name only — a filename is NEVER identity. http/persons_index.json maps every filename to its exact player_url.",
+      "slug_filename_charset": "^[A-Za-z0-9._%'~+-]+$"
+    },
+    "sample_contract": {
+      "total": 120,
+      "primary_cohorts": { "convergence": 8, "residual": 68, "decade_control": 30, "zero_game_control": 14 },
+      "mutual_exclusion": "cohorts are drawn in the fixed order convergence, residual, decade_control, zero_game_control, each excluding already-selected player_url values; every person carries exactly one primary_cohort",
+      "control_ordering": "sha256(player_url utf-8) hex ascending, first N — no randomness, never name-based",
+      "acquisition_ordering": "slug then ordinal, byte-identical across runs"
+    },
+    "afltables_link": {
+      "hosts": ["afltables.com", "www.afltables.com"],
+      "schemes": ["http", "https"],
+      "path_shape": "players/<A>/<Name>.html",
+      "path_regex": "^players/[A-Za-z]/[^/]+\\.html$",
+      "normalisation": {
+        "mirrors": "tools/migration/import_fitzroy_core.py normalise_profile_url()",
+        "steps": ["remove '../' segments", "strip the prefix ^https?://afltables\\.com/afl/stats/", "strip leading '/'"],
+        "strip_prefix_regex": "^https?://afltables\\.com/afl/stats/",
+        "www_host_reduces": false,
+        "www_host_rule": "a www. host does NOT reduce under the existing canonicaliser — that is a FINDING to report, never a silent repair or a broadened normalisation"
+      },
+      "identity_rule": "an AFL Tables identity is taken from the href alone; it is NEVER inferred from a rendered player name",
+      "collision_rule": "two DraftGuru persons resolving to one AFL Tables profile is a finding, never an instruction to merge"
+    },
+    "external_vocabulary_hosts": ["wikipedia.org", "en.wikipedia.org", "afl.com.au", "www.afl.com.au"],
+    "external_vocabulary_rule": "non-AFL-Tables external links are recorded as vocabulary only — never as identity",
+    "http_policy": "inherits the Stage A http_policy above unchanged: concurrency 1, 1.5s minimum pacing, 20s timeout, 3 retries at 2/4/8s on timeout/connection-error/5xx/429, same-host redirects only, robots.txt respected with /players/* explicitly checked",
+    "manifest": {
+      "identity_complete": false,
+      "import_capable": false,
+      "rule": "mandatory false/false — a profiling sample can never be promoted to an import source",
+      "written": "LAST, and only after all 120 identities carry terminal classifications and the profiler aggregate outputs exist",
+      "completion_rule": "fetched + failed = 120 completes the experiment even when failed > 0; fetched + failed < 120 is incomplete and receives NO manifest",
+      "probe_rule": "probe mode performs bounded acquisition only and MUST NOT write the accepted Stage B1 manifest"
+    },
+    "terminal_classification": {
+      "fetched": "a raw response file AND its HTTP metadata record both exist",
+      "failed": "the retry policy was exhausted or a deterministic terminal HTTP failure occurred, AND an HTTP record exists carrying the exact player_url, the classification, the HTTP status where available, the reason and the attempt evidence",
+      "resume": "successful raw+HTTP pairs and terminal failure records are both reused and never silently retried, rewritten or reclassified; retrying a terminal failure requires an explicit future decision"
+    }
+  },
+  "club_resolution": {
+    "$comment": "AFLDB-ISSUE-093 Stage B2-2b — completes the requirement fields.Club already states above ('era-aware AFLDB resolution required downstream, failing closed on Brisbane'). Additive: no Stage A or person_stage key is changed. Approved decision in issues/closed/AFLDB-ISSUE-093-DRAFTGURU-B2-HANDOFF.md §35.3 (G7 CLOSED). This block deliberately does NOT restate the 18 working mappings — data/reference/clubs.json already holds them and duplicating a slug list would create a second source of truth. It records only the rule, the one deliberate exception, and the measured reconciliation.",
+    "stage": "B2-2b",
+    "rule": "exact string equality: stage_a.club_slug == clubs.slug",
+    "source_of_truth": "data/reference/clubs.json (projected to the clubs table by tools/migration/load_reference_data.py; the runtime lookup key is clubs.slug)",
+    "new_mapping_table_required": false,
+    "forbidden_mechanisms": [
+      "club_aliases lookup",
+      "clubs.name or clubs.short_name lookup",
+      "import_draft.py's best-effort clubs.get(club_name_raw.lower()) fallback",
+      "historical era rewriting of a modernised label",
+      "draft_year + 1 destination-season inference",
+      "any fuzzy, similarity or name-based matching"
+    ],
+    "preserved_source_facts": ["club_name_raw", "club_slug", "club_href_raw"],
+    "deliberate_null": [
+      {
+        "club_slug": "brisbane",
+        "club_id": null,
+        "stage_a_rows": 422,
+        "first_draft_year": 1986,
+        "last_draft_year": 2025,
+        "reason": "One DraftGuru label spans Brisbane Bears (1987-1996) and Brisbane Lions (1997-), which clubs.json models as SEPARATE organizations joined by merger, not rename ('a merger is not a rename', migration 017). No tracked source distinguishes them, and Grid Solver resolves club_id at organization grain, so a wrong choice would silently attribute Bears draftees to the Lions. Measured: 'brisbane' matches no clubs.json slug, name, short_name or hist value.",
+        "policy": "NULL",
+        "not_a_defect": "Intentional fail-closed behaviour, and identical to what afldb_dev already stores. It stands until a tracked rule or source can distinguish the organization safely."
+      }
+    ],
+    "modernised_labels_not_era_rewritten": {
+      "slugs": ["western-bulldogs", "north-melbourne", "sydney"],
+      "note": "These map exactly to the CURRENT AFLDB identity and are never rewritten to Footscray / Kangaroos / South Melbourne. Each pair shares one organization (migration 017), so Grid Solver's organization-grain resolution is unaffected. Accepted consequence: identity-grain draft filtering will not reproduce the historical club label for those seasons."
+    },
+    "on_unknown_club_slug": "HALT",
+    "unknown_club_slug_note": "A club_slug that is neither an exact clubs.slug nor a listed deliberate_null entry is a HALT. It is never resolved by alias, name, similarity or year, and never silently written as NULL — an unknown slug and a reviewed exception must stay distinguishable.",
+    "measured": {
+      "$comment": "Measured against the accepted, immutable Stage A snapshot annual-html-20260826 and data/reference/clubs.json, 2026-08-26.",
+      "clubs_json_identities": 24,
+      "distinct_stage_a_club_slugs": 19,
+      "exact_mapped_slugs": 18,
+      "deliberate_null_slugs": 1,
+      "exact_mapped_rows": 6388,
+      "deliberate_null_rows": 422,
+      "total_rows": 6810,
+      "rows_with_null_club_field": 0,
+      "alias_or_fuzzy_mappings": 0,
+      "year_conditional_mappings": 0
+    }
+  },
+  "http_policy": {
+    "user_agent": "AFLDB-rebuild/1.0 (AFLDB source acquisition; contact: stuart.villanti@gmail.com)",
+    "timeout_seconds": 20,
+    "max_retries": 3,
+    "backoff_seconds": [2, 4, 8],
+    "retry_on": ["timeout", "connection-error", "http-5xx", "http-429"],
+    "min_delay_seconds": 1.5,
+    "redirects": "same-host-only",
+    "concurrency": 1,
+    "robots_txt": "fetched once, hash recorded; a disallow on the target paths stops the run"
+  },
+  "comparison_normalisation": {
+    "$comment": "Applied ONLY when comparing values for parity — never to raw/ bytes, never to stored raw text fields.",
+    "nbsp": "U+00A0 -> ASCII space",
+    "zwsp": "U+200B stripped",
+    "unicode": "NFC",
+    "whitespace": "runs collapsed to a single space, ends stripped",
+    "mojibake_repair": "CSV-side only, player names only: if the CP1252/Latin-1 mojibake signature U+00C3 is present, attempt s.encode('latin-1').decode('utf-8'); on failure keep the original. Every applied repair is enumerated in the parity report."
+  }
+}

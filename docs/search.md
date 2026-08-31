@@ -131,40 +131,205 @@ Career filters read `player_career_stats` (13,361 rows), never the 694,210-row f
 ## 6. Data QA search (internal, super-admin only)
 
 `/admin/query-builder` is a separate tool from everything above: not
-public, not linked from the admin nav, gated by `requireSuperAdmin()`.
-It exists for ad-hoc data QA — checking the underlying tables directly
-— rather than answering a fixed statistical question.
+public, linked from the admin nav as **Data QA search**
+(`src/app/admin/nav-model.ts`), gated by `requireSuperAdmin()`. It
+exists for ad-hoc data QA — checking the underlying tables directly —
+rather than answering a fixed statistical question.
 
 Modelled on `sports_data_lab`'s `query_builder.py` "Table filters" mode:
-pick a table, pick a column, set an operator and value, add it as a
-condition. A **card** holds any number of conditions combined by its own
-ALL (AND) / ANY (OR) rule; each card after the first says how it joins
-the accumulated result of the cards before it. That two-level shape —
-cards of conditions — is deliberately narrower than the reference's
-fully general nested-group AST or its drag-and-drop visual tree: neither
-was what was asked for, and a flatter shape is easier to review.
+pick a results anchor, pick a column, set an operator and value, add it
+as a condition. A **card** holds any number of conditions combined by
+its own ALL (AND) / ANY (OR) rule; each card after the first says how it
+joins the accumulated result of the cards before it. That two-level
+shape — cards of conditions — is deliberately narrower than the
+reference's fully general nested-group AST or its drag-and-drop visual
+tree: neither was what was asked for, and a flatter shape is easier to
+review.
 
 **Same security model as Advanced Search, extended across tables rather
 than discovered from the catalogue.** `src/search/query-builder-spec.ts`
-holds `QUERYABLE_TABLES`, a curated allowlist of table → column → kind,
+holds `QUERYABLE_TABLES`, a curated allowlist of anchor → column → kind,
 analogous to `FIELDS` above but spanning players, player career stats,
-clubs, matches and player match stats. This is deliberately **not**
-built on live `information_schema` introspection: a discovery-based tool
-would need an explicit denylist to keep `auth_users.password_hash` out
-of reach, and an allowlist cannot leak what was never listed.
-`src/db/queries/query-builder.ts` compiles the card AST to SQL through
-the identical allowlist-then-bind discipline as `advanced-search.ts` —
-`sql.unsafe` only for fragments the catalogue itself supplied, every
-value a bound parameter — and runs it through the same `afldb_app`
-client every public page uses, so even a compiler bug can only read
-statistics (and, since migration 031, cannot read the operational
-tables at all).
+clubs, matches and player match stats, and `RELATIONSHIPS`, a curated
+catalogue of the related domains a card may reach from each anchor
+(below). This is deliberately **not** built on live `information_schema`
+introspection: a discovery-based tool would need an explicit denylist to
+keep `auth_users.password_hash` out of reach, and an allowlist cannot
+leak what was never listed. A foreign key in the schema is not a licence
+to traverse either — only the catalogued relationships can be composed,
+with no user-chosen join key or path. `src/db/queries/query-builder.ts`
+compiles the card AST to SQL through the identical allowlist-then-bind
+discipline as `advanced-search.ts` — `sql.unsafe` only for fragments the
+catalogue itself supplied (anchor `from`, column expressions, a
+relationship's fixed subquery `FROM` and correlation predicate), every
+value a bound parameter, inside subqueries as much as outside — and runs
+it through the same `afldb_app` client every public page uses, so even a
+compiler bug can only read statistics (and, since migration 031, cannot
+read the operational tables at all). A relationship whose target table
+were ever unregistered for app read would fail closed at the database,
+not only at the allowlist.
 
 Query state lives in one `q` URL parameter (JSON, base64url — no
 compression, unlike the reference's zlib step: a handful of conditions
 does not need it), so a query built once is a shareable, reproducible
-link like every other search on the site. Limits: 6 cards, 8 conditions
-per card, 50 rows per page.
+link like every other search on the site.
+
+### Anchors, domains and relationships (AFLDB-ISSUE-115)
+
+A query has one **anchor** and up to six cards, and each card filters
+one **domain**: either the anchor's own row or one related domain
+reachable from that anchor.
+
+**The anchor determines the result grain and the columns.** The rows
+returned are always rows of the anchor relation — one per player, one
+per career-stats row, one per club, one per match, one per player-match
+row — and the results table always reads the anchor's own column set.
+A related card never adds rows, never adds columns, and never
+multiplies the result: the compiler never joins a related relation into
+the anchor's `FROM`, so no `DISTINCT` is needed and none may be added
+(a `DISTINCT` appearing in that compiler would be evidence that this
+invariant had been broken).
+
+**A related card qualifies anchor rows through `any` / `none`.** Every
+card compiles to one scalar boolean on the anchor row. An anchor-domain
+card is the pre-existing predicate through the unchanged path — a
+pre-ISSUE-115 share token carries no domain and emits byte-identical
+SQL. A related-domain card compiles to a correlated subquery, the same
+`EXISTS` idiom `advanced-search.ts` already uses for its club filter:
+
+| quantifier | conditions | compiles to | meaning |
+|---|---|---|---|
+| any | some | `EXISTS (… WHERE <correlation> AND <conditions>)` | some related row satisfies the card |
+| none | some | `NOT EXISTS (…)` | no related row satisfies the card |
+| any | none | `EXISTS (relation)` | has at least one related row |
+| none | none | `NOT EXISTS (relation)` | has no related row at all |
+
+An **empty related card is a complete question** — existence or
+non-existence of the relation — not the "filters nothing" convenience an
+empty anchor card keeps. "Missing relation" is always `NOT EXISTS`,
+never a nullable `LEFT JOIN … IS NULL`; that is the three-valued trap
+the design exists to avoid, and an integration test proves the compiled
+`NOT EXISTS` against an independently formulated absence oracle.
+
+**One card's conditions apply to the same related row; separate cards
+may be satisfied by different rows.** The card's own ALL/ANY rule
+combines conditions *within one related row*, crossed with the
+quantifier: `any` + ALL is "some related row satisfies A and B", `none`
++ OR is "no related row satisfies A or B". Two cards over the same
+relation are independent subquery scopes, so they are genuinely
+different questions from one card with two conditions — one card
+`any`, `goals ≥ 8 AND brownlow_votes = 3` means one game with both;
+two cards `EXISTS(goals ≥ 8) AND EXISTS(brownlow_votes = 3)` may be
+satisfied by two different games. The UI hint says so.
+
+**Cross-card AND/OR is unchanged**: the positional left fold
+`((A op B) op C)` with the accumulator parenthesised at every step, now
+with `EXISTS` in the operand position where a card is related. Because
+both operands are booleans on the same anchor row, mixing domains
+across an OR needs no special handling.
+
+**No related aggregates or counts.** V1 emits no aggregate over a
+related relation and no matched-row count; both would introduce
+aggregation semantics whose meaning is unclear under OR composition.
+Deferred, not planned.
+
+**NULL semantics — "not recorded" is not zero.** Inside a subquery a
+condition on a NULL column is UNKNOWN and the row does not qualify, so
+`EXISTS` is false and `NOT EXISTS` is true. "No related row with
+goals ≥ 5" therefore **includes** players whose per-game `goals` was
+never recorded — the same hazard the era-limited exclusion in §5 guards
+against, here left to the operator. The `is null` / `is not null`
+operators exist to ask precisely; the UI hint states the rule.
+
+**Relationships.** A relationship is declared from a **subject** an
+anchor provides — `player`, `club` or `match` — rather than per anchor,
+which is why `player_career_stats` (which already has the player in its
+`FROM`) inherits every player-side relationship. Each is a fixed
+one-hop subquery `FROM` plus a fixed correlation predicate against the
+anchor's canonical alias; the relationship's own columns (qualified
+with disjoint `r_` aliases, so a subquery can never shadow the anchor
+row) are what a related card's conditions resolve against. Every
+club-touching relationship correlates on `club_id`, the season-correct
+historical identity; none uses `clubs.organization_id`.
+
+| subject | relationship | related rows | notes |
+|---|---|---|---|
+| player | `player.career` | `player_career_stats` | 1:1; still compiled as `EXISTS`, never special-cased as a join |
+| player | `player.match_stats` | `player_match_stats` + match + club | |
+| player | `player.clubs` | `player_clubs` + club | historical club identities |
+| player | `player.draft_picks` | `draft_picks` (+ club) | |
+| player | `player.hall_of_fame` | `hall_of_fame` | linked rows only |
+| player | `player.captaincies` | `captaincies` + club | |
+| player | `player.awards` | `award_winners` + award | |
+| player | `player.link_candidates` | `player_link_match_candidates` | |
+| club | `club.club_seasons` | `club_seasons` | |
+| club | `club.matches` | `matches` | home or away |
+| match | `match.player_stats` | `player_match_stats` + player + club | includes the curated boolean `club_is_participant` — "club is one of the two competing clubs" |
+| match | `match.clubs` | `clubs` | the two participants |
+
+Which anchors host which relationships:
+
+| anchor | subjects | related domains offered |
+|---|---|---|
+| Players | player | all eight `player.*` |
+| Player career stats | player | seven — `player.career` is the anchor's own 1:1 row and is rejected as self-equivalent, not merely hidden |
+| Clubs | club | `club.club_seasons`, `club.matches` |
+| Matches | match | `match.player_stats`, `match.clubs` — deliberately *not* the club subject, since a match has two clubs |
+| Player match stats | *none* | **no related-domain cards in V1** (below) |
+
+`relationshipsForAnchor()` is the single source for both the UI's
+domain select and `parseQueryState`'s reachability check, so a
+hand-crafted URL naming an unreachable domain is rejected by the same
+code path that hides it. All twelve relationships are available through
+the anchors above.
+
+**`player_match_stats` hosts no related cards — an evidence-driven V1
+boundary, not a design choice.** It remains a valid results anchor with
+its own columns, grain and anchor-domain filtering, unchanged. Every
+related shape measured under that anchor was red against the cost
+contract — four exceeded the 5 s statement ceiling outright and none
+met the 1 s target — because the anchor's own pre-ISSUE-115 result
+materialisation (`count(*) OVER ()` plus an ordered `LIMIT` walked over
+685K rows) is already above 1 s with no card at all, and the planner
+then executes each related subquery once per anchor row. The cure is
+that baseline, which is separate follow-up work; related filtering at
+the player-match grain waits on it. No relationship was removed
+globally, no index was added, and the statement timeout was not raised.
+
+**Coverage of the motivating QA questions — stated honestly:**
+
+| # | question | V1 |
+|---|---|---|
+| 1 | players with 100+ career games but no player-match rows | ✅ Players · `player.career` any `games ≥ 100` · `player.match_stats` none |
+| 2 | players with no career row, or zero career games, that nevertheless have match statistics | ✅ Players · `player.career` none (or any `games = 0`) · `player.match_stats` any. Proves a career-vs-match contradiction only; nothing here establishes *link status* |
+| 3 | players with a draft record but no senior VFL/AFL games | ✅ Players · `player.draft_picks` any · `player.match_stats` none |
+| 4 | Hall of Fame entries whose linked player has no VFL/AFL career | ⚠️ **partial** — the linked-player reading only (Players · `player.hall_of_fame` any · `player.career` none). HoF rows with no `player_id` are invisible from a player anchor; the row-side reading needs a `hall_of_fame` anchor, which does not exist |
+| 5 | player-link records marked unmatched with a plausible matching player | ⚠️ **partial** — from the player side only (Players · `player.link_candidates` any `band = high`). The unresolved source row itself cannot be returned from a player anchor; that needs an honours-row anchor, which does not exist |
+| 6 | players whose career club identity disagrees with their match history | ⚠️ **partial** — `player_clubs` is derived from `player_match_stats`, so those two cannot disagree by construction. The expressible disagreement is against an independently sourced club: Players · `player.clubs` any `club = X` · `player.awards` / `player.captaincies` any `club ≠ X` |
+| 7 | matches with a player row whose club is neither participating club | ✅ Matches · `match.player_stats` any · `club_is_participant` is false |
+| 8 | clubs with matches in a season but no club-season record | ⚠️ **partial by design** — per fixed season only (Clubs · `club.matches` any `season = 1995` · `club.club_seasons` none `season = 1995`). "Some season, that same season" is not expressible — see the boundary below |
+| — | players with a bag-of-8 game and a separate 3-vote game | ✅ two `player.match_stats` cards |
+
+**Card-independence boundary.** *Anchor = the returned row. Card = a
+self-contained boolean predicate on that anchor row. Cross-card AND/OR
+combines booleans, never related rows.* Cards correlate with the anchor
+and never with each other: fixed-value correlation across cards works
+(*matches in 1995* and *no club-season in 1995*), existential same-row
+or same-season correlation across cards does not. Generic cross-card
+shared-variable correlation is deferred capability, not implemented
+and not planned under ISSUE-115.
+
+**Limits** (`QB_LIMITS`; none may be weakened): 6 cards, 8 conditions
+per card, at most **4** of the cards on a related domain (a limit the
+Stage 5 evidence supported — four related `player.match_stats` cards
+under Players ran in under 100 ms, planned as hashed subplans evaluated
+once each), relationship depth exactly 1 (a card reaches one hop from
+the anchor; chaining is not representable in the state model), 50 rows
+per page, 50 pages, 8,192 decoded characters of share token. Every
+query runs under the normal 5 s application statement timeout, which is
+never raised; an integration cost gate holds every supported
+anchor × relationship shape, in both `EXISTS` and `NOT EXISTS` form,
+under 1 s against the test database.
 
 ## 7. Grid solver (`/grid-solver`, audience configurable)
 

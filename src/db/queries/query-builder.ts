@@ -3,8 +3,9 @@ import 'server-only';
 import { sql } from '@/db/client';
 import { escapeLike } from '@/lib/like';
 import {
-  OPERATORS_BY_KIND, QB_LIMITS, QUERYABLE_TABLES,
-  type CardGroup, type CardSpec, type ConditionSpec, type QueryBuilderState,
+  OPERATORS_BY_KIND, QB_LIMITS, QUERYABLE_TABLES, domainColumns, relationshipForCard,
+  type CardGroup, type CardSpec, type ColumnDef, type ConditionSpec, type QueryBuilderState,
+  type RelationshipDef,
 } from '@/search/query-builder-spec';
 
 /**
@@ -20,9 +21,22 @@ import {
  * application-level promise.
  *
  * `sql.unsafe` is used only for fragments that came from
- * QUERYABLE_TABLES/OPERATORS_BY_KIND -- fixed catalogue entries, never a
- * request value -- exactly the rule advanced-search.ts already follows.
- * Every value (numbers, text, dates) is bound as a query parameter.
+ * QUERYABLE_TABLES/RELATIONSHIPS/OPERATORS_BY_KIND -- fixed catalogue
+ * entries, never a request value -- exactly the rule advanced-search.ts
+ * already follows. Every value (numbers, text, dates) is bound as a query
+ * parameter, inside a related-domain subquery as much as outside it.
+ *
+ * ISSUE-115 -- multi-domain cards. Every card compiles to ONE scalar
+ * boolean on the anchor row: an anchor-domain card is the pre-115
+ * predicate through the unchanged path; a related-domain card is a
+ * correlated `EXISTS` / `NOT EXISTS` over its relationship's subquery
+ * (compileRelatedCard). Because the compiler NEVER adds a relation to the
+ * anchor's FROM, the row set is exactly the anchor relation's rows,
+ * multiplication is impossible, and no DISTINCT is required -- none may
+ * be added. A DISTINCT appearing in this compiler in future is evidence
+ * that the column-ownership invariant (runbook §3, §6.6) was broken.
+ * Likewise no aggregate and no matched-row count (§6.7): V1 asks only
+ * "is there such a row" / "is there no such row".
  *
  * No separate bound-parameter budget (the reference's ParamBag total):
  * QB_LIMITS already caps cards x conditions-per-card at 48, each
@@ -55,11 +69,17 @@ const DATE_OP_SQL: Record<string, string> = {
  * condition is still mid-edit (a chosen column with no value yet) --
  * mirrors compile_condition in the reference: a half-built condition
  * filters nothing rather than erroring per keystroke.
+ *
+ * `columns` is the catalogue of the CARD's domain (domainColumns): the
+ * anchor's own columns for an anchor-domain card, the relationship's
+ * `r_`-aliased columns for a related-domain card. A column from any other
+ * domain is therefore unknown here and rejected, whichever card it is in.
  */
-function compileCondition(tableKey: string, spec: ConditionSpec): SqlFragment | null {
-  const table = QUERYABLE_TABLES[tableKey];
-  const col = table?.columns[spec.column];
-  if (!col) throw new Error(`Unknown column "${spec.column}" for table "${tableKey}".`);
+function compileCondition(
+  columns: Record<string, ColumnDef>, domainKey: string, spec: ConditionSpec,
+): SqlFragment | null {
+  const col = columns[spec.column];
+  if (!col) throw new Error(`Unknown column "${spec.column}" for table "${domainKey}".`);
   const ops = OPERATORS_BY_KIND[col.kind];
   if (!ops.includes(spec.op)) {
     throw new Error(`"${spec.op}" is not a valid operator for ${col.label}.`);
@@ -113,10 +133,19 @@ function compileCondition(tableKey: string, spec: ConditionSpec): SqlFragment | 
   throw new Error(`Unsupported text operator: ${spec.op}`);
 }
 
-/** One card's conditions AND/OR-ed together, parenthesised as a unit. */
-function compileCard(tableKey: string, card: CardSpec): SqlFragment | null {
+/**
+ * One card's conditions AND/OR-ed together, parenthesised as a unit.
+ *
+ * `domainKey` is the anchor key for an anchor-domain card (the pre-115
+ * path, unchanged) or the relationship key for a related-domain card, in
+ * which case the predicate is built for use INSIDE that relationship's
+ * correlated subquery -- `match` then applies within one related row.
+ */
+function compileCard(
+  columns: Record<string, ColumnDef>, domainKey: string, card: CardSpec,
+): SqlFragment | null {
   const parts = card.conditions
-    .map((cond) => compileCondition(tableKey, cond))
+    .map((cond) => compileCondition(columns, domainKey, cond))
     .filter((f): f is SqlFragment => f !== null);
   if (parts.length === 0) return null;
   if (parts.length === 1) return parts[0];
@@ -126,6 +155,60 @@ function compileCard(tableKey: string, card: CardSpec): SqlFragment | null {
     acc = card.match === 'OR' ? sql`${acc} OR ${parts[i]}` : sql`${acc} AND ${parts[i]}`;
   }
   return sql`(${acc})`;
+}
+
+/**
+ * A related-domain card -> one correlated `EXISTS` / `NOT EXISTS` on the
+ * anchor row (runbook §6.1), the idiom advanced-search.ts already uses for
+ * its club filter:
+ *
+ *   [NOT] EXISTS (SELECT 1 FROM <subqueryFrom> WHERE <correlation> [AND <cardPredicate>])
+ *
+ * `subqueryFrom` and `correlation` are fixed RELATIONSHIPS catalogue text
+ * (`r_` aliases only, so nothing inside can shadow the anchor row); every
+ * condition value is still a bound parameter. One rule for every
+ * cardinality -- a 1:1 relationship is not special-cased as a join (§6.3).
+ *
+ * Unlike an anchor-domain card, an empty related card is NOT "filters
+ * nothing": with no conditions it is the complete question "has at least
+ * one related row" / "has no related row at all" (§6.2), which is exactly
+ * what the missing-row QA cases need. Missing-row questions are always
+ * `NOT EXISTS`, never a nullable LEFT JOIN ... IS NULL (§6.8).
+ */
+function compileRelatedCard(rel: RelationshipDef, card: CardSpec): SqlFragment {
+  const predicate = compileCard(rel.columns, rel.key, card);
+  const body = predicate === null
+    ? sql`SELECT 1 FROM ${sql.unsafe(rel.subqueryFrom)} WHERE ${sql.unsafe(rel.correlation)}`
+    : sql`SELECT 1 FROM ${sql.unsafe(rel.subqueryFrom)} WHERE ${sql.unsafe(rel.correlation)} AND ${predicate}`;
+  return card.quantifier === 'none' ? sql`NOT EXISTS (${body})` : sql`EXISTS (${body})`;
+}
+
+/**
+ * Anchor/related dispatch for one card, deciding which of the two
+ * compilation paths applies. Fails closed, independently of parse-level
+ * validation, on anything domainColumns/relationshipForCard cannot
+ * resolve: an unknown domain, a domain unreachable from this anchor's
+ * subjects, or a self-equivalent domain (T-C6, T-C12).
+ *
+ * A card with no `domain` (every card in a pre-115 token) or whose domain
+ * IS the anchor provably takes the anchor path: it never consults the
+ * relationship catalogue and its SQL is byte-identical to pre-115.
+ */
+function compileOneCard(anchorKey: string, card: CardSpec): SqlFragment | null {
+  const isAnchorCard = card.domain === undefined || card.domain === anchorKey;
+  if (isAnchorCard) {
+    if (card.quantifier === 'none') {
+      throw new Error('Only a related-domain card may ask for "no such row".');
+    }
+    const columns = domainColumns(anchorKey, undefined);
+    if (!columns) throw new Error(`Unknown table: ${anchorKey}`);
+    return compileCard(columns, anchorKey, card);
+  }
+  const rel = relationshipForCard(anchorKey, card.domain);
+  if (!rel) {
+    throw new Error(`Domain "${card.domain}" cannot be queried from "${anchorKey}".`);
+  }
+  return compileRelatedCard(rel, card);
 }
 
 /**
@@ -139,15 +222,28 @@ function compileCard(tableKey: string, card: CardSpec): SqlFragment | null {
  * answered with different rows. The card itself needs no wrapping --
  * compileCard already parenthesises anything with more than one condition,
  * and a single condition is atomic.
+ *
+ * ISSUE-115 changes nothing here beyond dispatching each card on its
+ * domain (compileOneCard): a related card is one scalar `[NOT] EXISTS`
+ * boolean on the anchor row, so it sits in the operand position of the
+ * identical left fold, and mixing domains changes nothing about the
+ * fold, the FROM clause, the row count or the total (§6.5, §7).
  */
 function compileCards(tableKey: string, cardGroups: CardGroup[]): SqlFragment {
+  let relatedCards = 0;
   let acc: SqlFragment | null = null;
   for (const group of cardGroups) {
     if (group.card.conditions.length > QB_LIMITS.maxConditionsPerCard) {
       throw new Error(`A card may hold at most ${QB_LIMITS.maxConditionsPerCard} conditions.`);
     }
-    const compiled = compileCard(tableKey, group.card);
-    if (!compiled) continue; // an empty/half-built card filters nothing
+    if (group.card.domain !== undefined && group.card.domain !== tableKey) {
+      relatedCards += 1;
+      if (relatedCards > QB_LIMITS.maxRelatedCards) {
+        throw new Error(`A query may hold at most ${QB_LIMITS.maxRelatedCards} related-domain cards.`);
+      }
+    }
+    const compiled = compileOneCard(tableKey, group.card);
+    if (!compiled) continue; // an empty/half-built ANCHOR card filters nothing (a related card is never null)
     acc = acc === null
       ? compiled
       : (group.join === 'OR' ? sql`(${acc}) OR ${compiled}` : sql`(${acc}) AND ${compiled}`);

@@ -1,0 +1,29 @@
+{
+  "$comment": "AFLDB-ISSUE-093 section 13.5 -- retrospective manifest for the pre-existing DraftGuru browser-export CSV artifact (acquisition runbook section 11). identity_complete/import_capable are the refusal fields a validator checks without opening a file: this artifact is false/false and can NEVER become an import source. It is the independent validation/parity oracle for the identity-complete annual-HTML snapshot (runbook section 7), and it is frozen -- never renamed, rewritten, combined, normalised or deleted.",
+  "source": "DraftGuru (draftguru.com.au) annual draft/trade pages -- browser/table CSV export",
+  "snapshot_label": "csv-export-20260826",
+  "mode": "retrospective",
+  "extraction_date": "2026-08-26",
+  "acquisition_method": "manual browser table export of the 42 annual pages. The export stripped the player and destination-club hyperlinks (destroying the durable /players/<slug>/<ordinal> person identity the live HTML preserves), silently dropped the live-only Trade column, carried NBSP/ZWSP rendering artefacts into the text, and corrupted 6 player names with CP1252 mojibake.",
+  "working_directory": "data/sources/draftguru/full-history-20260826",
+  "file_count": 42,
+  "filename_pattern": "^(\\d{4})_(VFL|AFL)_Draft_and_Trade_Period_Table_1\\.csv$",
+  "expected_years": [1981, 1982, 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
+  "known_coverage_gaps": [
+    { "year": 1983, "reason": "no draft held" },
+    { "year": 1984, "reason": "no draft held" },
+    { "year": 1985, "reason": "no draft held" }
+  ],
+  "total_rows": 6810,
+  "schema_variants": {
+    "A": { "years": [1981, 1982, 1987], "columns": 14 },
+    "B": { "years": [1986, 1997, 1998], "columns": 15 },
+    "C": { "years": "1988-1996, 1999-2025", "columns": 15 }
+  },
+  "identity_fields_present": [],
+  "identity_complete": false,
+  "import_capable": false,
+  "immutable": true,
+  "role": "validation/parity oracle only (acquisition runbook section 7); never an import source",
+  "evidence": "Corpus facts measured 2026-08-26 (issues/closed/AFLDB-ISSUE-093-DRAFTGURU-INVESTIGATION-HANDOFF.md sections 1-2): 42 files, 6,810 rows, years 1981/1982/1986-2025; the browser export preserved rendered text only, so two same-name people (e.g. both 2001 Brad Millers) are indistinguishable in this artifact while the live annual HTML distinguishes them by href ordinal."
+}

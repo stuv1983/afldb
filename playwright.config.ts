@@ -13,9 +13,13 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'line' : [['list']],
   timeout: 30_000,
+  expect: { timeout: 5_000 },
+  globalTimeout: 30 * 60_000,
 
   use: {
     baseURL,
+    actionTimeout: 10_000,
+    navigationTimeout: 30_000,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

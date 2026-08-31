@@ -21,9 +21,13 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   timeout: 15 * 60_000,
+  expect: { timeout: 5_000 },
+  globalTimeout: 60 * 60_000,
   reporter: [['list']],
   use: {
     baseURL,
+    actionTimeout: 60_000,
+    navigationTimeout: 60_000,
     trace: 'off',
     screenshot: 'off',
     video: 'off',

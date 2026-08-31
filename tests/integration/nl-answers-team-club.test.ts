@@ -289,6 +289,78 @@ describe('team_match matches hand-written SQL', () => {
       .toEqual(new Map(expected.map((r) => [r.organizationId, r.value])));
     expect(actual.total).toBe(expected.length);
   });
+
+  it('drilldown preserves and executes a combined complex predicate exact set', async () => {
+    // We want to prove team perspective (wins against opponent), venue, season range, and round.
+    // We dynamically find an opponent, venue, and valid parameters using a match to ensure rows exist.
+    const [sample] = await sql<{
+      matchId: number; venueId: number; season: number; roundNumber: number;
+      winnerClubId: number; loserClubId: number; winnerOrgId: number; loserOrgId: number;
+      margin: number; is_final: boolean;
+    }[]>`
+      SELECT m.id AS "matchId", m.venue_id AS "venueId", m.season, m.round_number AS "roundNumber",
+             m.winner_club_id AS "winnerClubId",
+             CASE WHEN m.winner_club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END AS "loserClubId",
+             win_cl.organization_id AS "winnerOrgId", lose_cl.organization_id AS "loserOrgId",
+             abs(m.home_score - m.away_score) AS margin, m.is_final
+        FROM matches m
+        JOIN clubs win_cl ON win_cl.id = m.winner_club_id
+        JOIN clubs lose_cl ON lose_cl.id = CASE WHEN m.winner_club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END
+       WHERE m.winner_club_id IS NOT NULL AND m.venue_id IS NOT NULL
+       LIMIT 1
+    `;
+
+    // 1, 2, 4, 5, 7, 8. Combined complex plan proving team perspective + win result + opponent + venue + season + round + margin + matchType
+    const plan = basePlan({
+      metric: null, agg: { kind: 'list' },
+      havingClause: { metric: 'wins', op: 'gte', value: 1 },
+      matchFilter: { metric: 'win_margin', op: 'gte', value: sample.margin - 1 },
+      scope: {
+        clubAgainst: { organizationId: sample.loserOrgId, slug: 'x', name: 'x' },
+        venue: { id: sample.venueId, slug: 'x', name: 'x' },
+        seasonMin: sample.season, seasonMax: sample.season,
+        roundNumber: sample.roundNumber,
+        matchType: sample.is_final ? 'finals' : 'home_and_away',
+      }
+    });
+
+    const { answerTeamAggregateDrilldown } = await import('@/db/queries/nl/team-match');
+    const agg = await teamAggregate(plan);
+    const row = agg.rows.find((r) => r.organizationId === sample.winnerOrgId)!;
+
+    // Prove the drilldown count strictly matches the aggregate row count
+    const drilldown = await answerTeamAggregateDrilldown(plan, row.clubSlug);
+
+    // 6. Aggregate count equals the COMPLETE drill-down population, not truncated
+    expect(drilldown.total).toBe(row.value);
+    expect(drilldown.rows.length).toBe(row.value);
+
+    // Prove the destination SQL behaviour applies the predicates
+    const matchIds = drilldown.rows.map(r => r.matchId);
+    expect(matchIds.length).toBeGreaterThan(0);
+    const dbMatches = await sql<{
+      winnerOrgId: number; loserOrgId: number; venueId: number; season: number; roundNumber: number;
+      margin: number; is_final: boolean;
+    }[]>`
+      SELECT win_cl.organization_id AS "winnerOrgId", lose_cl.organization_id AS "loserOrgId",
+             m.venue_id AS "venueId", m.season, m.round_number AS "roundNumber",
+             abs(m.home_score - m.away_score) AS margin, m.is_final
+        FROM matches m
+        JOIN clubs win_cl ON win_cl.id = m.winner_club_id
+        JOIN clubs lose_cl ON lose_cl.id = CASE WHEN m.winner_club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END
+       WHERE m.id = ANY(${matchIds})
+    `;
+
+    for (const m of dbMatches) {
+      expect(m.winnerOrgId).toBe(sample.winnerOrgId); // Result = win, perspective = winner
+      expect(m.loserOrgId).toBe(sample.loserOrgId);   // Opponent
+      expect(m.venueId).toBe(sample.venueId);         // Venue
+      expect(m.season).toBe(sample.season);           // Season
+      expect(m.roundNumber).toBe(sample.roundNumber); // Round
+      expect(m.is_final).toBe(sample.is_final);       // Match Type
+      expect(m.margin).toBeGreaterThanOrEqual(sample.margin - 1); // Margin
+    }
+  });
 });
 
 describe('club_season matches hand-written SQL', () => {

@@ -1,0 +1,354 @@
+{
+  "adapter": "tools/rebuild/draftguru/acquire_persons.py",
+  "adapter_schema_version": 1,
+  "adapter_version": "1.0.0",
+  "afltables_link_profile": {
+    "$comment": "AFLDB-ISSUE-093 Stage B1 aggregate AFL Tables link profile (runbook \u00a730.8). Profiling evidence only -- never an import source, never a merge instruction. Timestamp-free so re-profiling is byte-identical.",
+    "$external_vocabulary_note": "measurement only \u2014 no external host other than the AFL Tables vocabulary can ever yield an identity",
+    "$missing_from_sample": [],
+    "collisions": [],
+    "convergence_pairs": [
+      {
+        "$note": "these pairs are proven DIFFERENT people; a shared AFL Tables identity would contradict the source, not the AFLDB model",
+        "both_resolved": false,
+        "distinct_identities": null,
+        "members": [
+          {
+            "afltables_identity": "players/A/Adam_Houlihan.html",
+            "ordinal": 1,
+            "player_url": "https://www.draftguru.com.au/players/adam_houlihan/1",
+            "reason": null,
+            "terminal_classification": "fetched"
+          },
+          {
+            "afltables_identity": null,
+            "ordinal": 2,
+            "player_url": "https://www.draftguru.com.au/players/adam_houlihan/2",
+            "reason": "no AFL Tables href on the page",
+            "terminal_classification": "fetched"
+          }
+        ],
+        "slug": "adam_houlihan"
+      },
+      {
+        "$note": "these pairs are proven DIFFERENT people; a shared AFL Tables identity would contradict the source, not the AFLDB model",
+        "both_resolved": false,
+        "distinct_identities": null,
+        "members": [
+          {
+            "afltables_identity": null,
+            "ordinal": 1,
+            "player_url": "https://www.draftguru.com.au/players/andrew_hill/1",
+            "reason": "no AFL Tables href on the page",
+            "terminal_classification": "fetched"
+          },
+          {
+            "afltables_identity": "players/A/Andrew_Hill.html",
+            "ordinal": 2,
+            "player_url": "https://www.draftguru.com.au/players/andrew_hill/2",
+            "reason": null,
+            "terminal_classification": "fetched"
+          }
+        ],
+        "slug": "andrew_hill"
+      },
+      {
+        "$note": "these pairs are proven DIFFERENT people; a shared AFL Tables identity would contradict the source, not the AFLDB model",
+        "both_resolved": false,
+        "distinct_identities": null,
+        "members": [
+          {
+            "afltables_identity": "players/B/Brad_Miller.html",
+            "ordinal": 1,
+            "player_url": "https://www.draftguru.com.au/players/brad_miller/1",
+            "reason": null,
+            "terminal_classification": "fetched"
+          },
+          {
+            "afltables_identity": null,
+            "ordinal": 2,
+            "player_url": "https://www.draftguru.com.au/players/brad_miller/2",
+            "reason": "no AFL Tables href on the page",
+            "terminal_classification": "fetched"
+          }
+        ],
+        "slug": "brad_miller"
+      },
+      {
+        "$note": "these pairs are proven DIFFERENT people; a shared AFL Tables identity would contradict the source, not the AFLDB model",
+        "both_resolved": false,
+        "distinct_identities": null,
+        "members": [
+          {
+            "afltables_identity": "players/M/Michael_Brown.html",
+            "ordinal": 1,
+            "player_url": "https://www.draftguru.com.au/players/michael_brown/1",
+            "reason": null,
+            "terminal_classification": "fetched"
+          },
+          {
+            "afltables_identity": null,
+            "ordinal": 2,
+            "player_url": "https://www.draftguru.com.au/players/michael_brown/2",
+            "reason": "no AFL Tables href on the page",
+            "terminal_classification": "fetched"
+          }
+        ],
+        "slug": "michael_brown"
+      }
+    ],
+    "counts": {
+      "failed": 0,
+      "fetched": 120,
+      "malformed_links": 0,
+      "multiple_candidates": 0,
+      "non_reducing_host": 0,
+      "parse_errors": 0,
+      "profiled": 120,
+      "requested": 120,
+      "self_link_disagreement": 0,
+      "with_afltables_identity": 100,
+      "without_afltables_link": 20
+    },
+    "coverage": {
+      "by_primary_cohort": {
+        "convergence": {
+          "coverage_pct": 50.0,
+          "fetched": 8,
+          "persons": 8,
+          "with_afltables_identity": 4
+        },
+        "decade_control": {
+          "coverage_pct": 100.0,
+          "fetched": 30,
+          "persons": 30,
+          "with_afltables_identity": 30
+        },
+        "residual": {
+          "coverage_pct": 97.06,
+          "fetched": 68,
+          "persons": 68,
+          "with_afltables_identity": 66
+        },
+        "zero_game_control": {
+          "coverage_pct": 0.0,
+          "fetched": 14,
+          "persons": 14,
+          "with_afltables_identity": 0
+        }
+      },
+      "overall_pct_of_fetched": 83.33,
+      "overall_pct_of_requested": 83.33
+    },
+    "external_vocabulary_hosts": {
+      "en.wikipedia.org": 54,
+      "www.footywire.com": 19
+    },
+    "external_vocabulary_hosts_outside_contract": [
+      "www.footywire.com"
+    ],
+    "failures": [],
+    "identity_complete": false,
+    "import_capable": false,
+    "profile_contract_version": 1,
+    "profiler": "tools/rebuild/draftguru/profile_person_pages.py",
+    "profiler_version": "1.0.0",
+    "residual_bridge": {
+      "$question": "how many of the 68 residual identities gain a usable AFL Tables identity directly from DraftGuru?",
+      "coverage_pct": 97.06,
+      "fetched": 68,
+      "persons": 68,
+      "with_afltables_identity": 66
+    },
+    "sample_basis": {
+      "by_primary_cohort": {
+        "convergence": 8,
+        "decade_control": 30,
+        "residual": 68,
+        "zero_game_control": 14
+      },
+      "residual_input_sha256": "df6c9a7559bceb649e8e28e457fbe91d3351d8c1737a9042f233b1f1e3c5e841",
+      "stage_a_label": "annual-html-20260826",
+      "stage_a_manifest_sha256": "d06bf6be358663ad3c44a56066c9096fbc4bdf4760349ed181a642476d374652",
+      "total": 120
+    },
+    "snapshot_label": "person-html-20260826",
+    "stage": "B1",
+    "unresolved_identities": [
+      {
+        "player_url": "https://www.draftguru.com.au/players/adam_houlihan/2",
+        "primary_cohort": "convergence",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/aisake_o'hailpin/1",
+        "primary_cohort": "zero_game_control",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/andrew_hill/1",
+        "primary_cohort": "convergence",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/angus_styles/1",
+        "primary_cohort": "zero_game_control",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/brad_miller/2",
+        "primary_cohort": "convergence",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/chris_palmer/1",
+        "primary_cohort": "zero_game_control",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/emil_parthenides/1",
+        "primary_cohort": "zero_game_control",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/fred_rodriguez/1",
+        "primary_cohort": "residual",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/glenn_wilkins/1",
+        "primary_cohort": "zero_game_control",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/james_billington/1",
+        "primary_cohort": "zero_game_control",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/joshua_jaska/1",
+        "primary_cohort": "zero_game_control",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/luke_lavender/1",
+        "primary_cohort": "zero_game_control",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/matthew_taylor/1",
+        "primary_cohort": "zero_game_control",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/matthew_wadewitz/1",
+        "primary_cohort": "zero_game_control",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/michael_bawden/1",
+        "primary_cohort": "zero_game_control",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/michael_brown/2",
+        "primary_cohort": "convergence",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/rhys_nicholls/1",
+        "primary_cohort": "zero_game_control",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/riley_onley/1",
+        "primary_cohort": "residual",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/thomas_matthews/2",
+        "primary_cohort": "zero_game_control",
+        "reason": "no AFL Tables href on the page"
+      },
+      {
+        "player_url": "https://www.draftguru.com.au/players/tom_wallis/2",
+        "primary_cohort": "zero_game_control",
+        "reason": "no AFL Tables href on the page"
+      }
+    ],
+    "url_form_vocabulary": {
+      "http://afltables.com [canonical]": 100
+    },
+    "zero_game_bridge": {
+      "coverage_pct": 0.0,
+      "fetched": 14,
+      "persons": 14,
+      "with_afltables_identity": 0
+    }
+  },
+  "base_url": "https://www.draftguru.com.au",
+  "extraction_completed_utc": "2026-08-26T09:23:12Z",
+  "extraction_date": "2026-08-26",
+  "extraction_started_utc": "2026-08-26T09:20:10Z",
+  "identity_complete": false,
+  "identity_fields_present": [
+    "player_url"
+  ],
+  "identity_rules": {
+    "byte_exact": true,
+    "filename_is_identity": false,
+    "filename_map": "http/persons_index.json",
+    "identity_field": "player_url",
+    "never_identity": "any rendered name",
+    "percent_encoding": "significant \u2014 never decoded for identity"
+  },
+  "immutable": true,
+  "import_capable": false,
+  "mode": "acquire-persons",
+  "parsed_outputs": {
+    "afltables_link_profile": {
+      "path": "parsed/afltables_link_profile.json",
+      "sha256": "d608e6f2291bba5d9c2cb0308d15674be7db81ed8145fbffa688f7113ef3ed60"
+    },
+    "person_profile": {
+      "path": "parsed/person_profile.jsonl",
+      "records": 120,
+      "sha256": "2a40399a9e5d74765c9a134b68743a319d0c20655b25d753a3c48cb68825aca2"
+    }
+  },
+  "person_pages": {
+    "completion_rule": "fetched + failed = requested, every identity terminally classified; page failures are findings, not incompleteness",
+    "failed": [],
+    "fetched": 120,
+    "requested": 120,
+    "reused_on_resume": {
+      "failed": 0,
+      "fetched": 2
+    },
+    "sample_basis": "frozen 120-person Stage B1 sample (sha256 d8d743fbcfca39a4c9e708a1198c7e34592270d32628d4fc0003aea88068db28)",
+    "stage": "B1"
+  },
+  "profiler": "tools/rebuild/draftguru/profile_person_pages.py",
+  "profiler_version": "1.0.0",
+  "purpose": "PROFILING ONLY \u2014 measures whether a person page exposes a deterministic player_url -> AFL Tables identity bridge. This snapshot is never an import source.",
+  "robots_txt_sha256": "d3bdd06996b60f3806e7ebe732d8c12951b9a4b640706bbbfb77d258a695413b",
+  "sample_basis": {
+    "by_primary_cohort": {
+      "convergence": 8,
+      "decade_control": 30,
+      "residual": 68,
+      "zero_game_control": 14
+    },
+    "residual_input_sha256": "df6c9a7559bceb649e8e28e457fbe91d3351d8c1737a9042f233b1f1e3c5e841",
+    "sample_file": "sample.json",
+    "sample_sha256": "d8d743fbcfca39a4c9e708a1198c7e34592270d32628d4fc0003aea88068db28",
+    "selection": "sha256(player_url utf-8) hex ascending, first N -- no randomness, no name-based selection",
+    "stage_a_label": "annual-html-20260826",
+    "stage_a_manifest_sha256": "d06bf6be358663ad3c44a56066c9096fbc4bdf4760349ed181a642476d374652",
+    "total": 120
+  },
+  "snapshot_label": "person-html-20260826",
+  "source": "DraftGuru (draftguru.com.au) person pages",
+  "stage": "B1",
+  "working_directory": "data/sources/draftguru/person-html-20260826"
+}

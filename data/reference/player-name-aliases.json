@@ -1,0 +1,35 @@
+{
+  "$comment": [
+    "AFLDB-ISSUE-110 — curated player name aliases keyed by STABLE EXTERNAL IDENTITY.",
+    "",
+    "Each entry names a source registry key (data/reference/sources.json) plus that",
+    "source's stable external identity for one person, exactly as stored in",
+    "external_identities.external_id. For `afltables` that is the canonical profile path",
+    "(`players/A/Name.html`) registered under match_method `afltables_profile_url`.",
+    "Entries are NEVER keyed by players.id: the surrogate is re-seeded by a clean rebuild.",
+    "",
+    "Loaded by tools/migration/import_fitzroy_core.py (group `aliases`) into",
+    "player_name_aliases, resolving each identity through external_identities to exactly",
+    "one player and failing closed when it resolves to none or to more than one.",
+    "search_alias is derived by afldb_normalise_name() in SQL. Loading is idempotent and",
+    "only ever inserts: it never deletes or rewrites other alias rows.",
+    "",
+    "These are established identity facts, recorded by hand. Nothing here is inferred",
+    "from chronology, age, games, IDs or duplicate ordering, and the loader contains no",
+    "player-specific logic."
+  ],
+  "aliases": [
+    {
+      "source": "afltables",
+      "external_id": "players/G/Gary_Ablett0.html",
+      "alias": "Gary Ablett Snr",
+      "note": "Gary Ablett (Hawthorn/Geelong, 1982-1996). AFL Tables profile Gary_Ablett0."
+    },
+    {
+      "source": "afltables",
+      "external_id": "players/G/Gary_Ablett1.html",
+      "alias": "Gary Ablett Jnr",
+      "note": "Gary Ablett (Geelong/Gold Coast, 2002-2020). AFL Tables profile Gary_Ablett1."
+    }
+  ]
+}

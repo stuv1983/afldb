@@ -17,8 +17,10 @@ import {
   DEFAULT_GRID_AUDIENCE,
   DEFAULT_HOME_LAYOUT,
   DEFAULT_HOME_RECORD,
+  DEFAULT_PAGE_INTROS,
   DEFAULT_PLACEHOLDER_INTERVAL,
   DEFAULT_SEARCH_ANIMATION,
+  DEFAULT_SITE_THEME,
   EARLY_ACCESS_LIMITS,
   HOME_SECTIONS,
   SETTING_KEYS,
@@ -135,6 +137,8 @@ describe('parseSiteSettings', () => {
       searchPlaceholdersAflw: DEFAULT_AFLW_PLACEHOLDERS,
       searchPlaceholderInterval: DEFAULT_PLACEHOLDER_INTERVAL,
       searchPlaceholderAnimation: DEFAULT_SEARCH_ANIMATION,
+      pageIntros: DEFAULT_PAGE_INTROS,
+      frontendTheme: DEFAULT_SITE_THEME,
     });
   });
 
