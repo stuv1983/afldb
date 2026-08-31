@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { authSql } from '@/db/authClient';
+import { deleteRevokedAccessCode } from '@/db/queries/access-codes';
 import { generateToken, sha256Hex } from '@/lib/auth/crypto';
 import { audit, requireAdmin } from '@/lib/auth/session';
 import { parseIntInRange } from '@/lib/params';
@@ -78,6 +79,58 @@ export async function revokeAccessCode(
     { userId: admin.id, label: admin.email });
   revalidatePath('/admin/access');
   return { message: `Code “${row.label}” revoked. Existing sessions expire with the epoch or TTL.` };
+}
+
+/**
+ * Permanently delete a REVOKED access code (AFLDB-ISSUE-117).
+ *
+ * The last step of Active -> Revoke -> Delete, and the only one that
+ * destroys anything. Three things make that safe, and none of them is
+ * the button being hidden:
+ *
+ *   1. requireAdmin(), as every action in this file does. It re-checks
+ *      the database row, so a revoked or disabled admin's cookie buys
+ *      nothing here either.
+ *   2. `revoked_at IS NOT NULL` inside the DELETE itself
+ *      (deleteRevokedAccessCode). A live code named by a hand-rolled
+ *      POST matches no row and is refused, so revocation is a genuine
+ *      precondition rather than a convention of the UI.
+ *   3. The audit row is written inside the same transaction as the
+ *      delete, so there is no window in which the code is gone and the
+ *      trail does not say who removed it. The detail carries the id,
+ *      the label and when the code had been revoked -- enough to
+ *      reconstruct what was destroyed. It cannot carry the code: only
+ *      the sha256 was ever stored, and that goes with the row.
+ */
+export async function deleteAccessCode(
+  _previous: AccessState,
+  formData: FormData,
+): Promise<AccessState> {
+  const admin = await requireAdmin();
+  const id = Number(formData.get('id'));
+  if (!Number.isInteger(id)) return { error: 'Bad code id.' };
+
+  const deleted = await authSql.begin(async (tx) => {
+    const row = await deleteRevokedAccessCode(tx, id);
+    if (!row) return null;
+
+    await audit(
+      'access.code_deleted',
+      { codeId: row.id, label: row.label, revokedAt: row.revokedAt.toISOString() },
+      { userId: admin.id, label: admin.email },
+      tx,
+    );
+    return row;
+  });
+
+  // One message for "not revoked", "never existed" and "someone else
+  // just deleted it". Distinguishing them would tell an unauthenticated
+  // caller which ids are real, and an admin who can see the table does
+  // not need the endpoint to tell them.
+  if (!deleted) return { error: 'Only a revoked code can be deleted. Revoke it first.' };
+
+  revalidatePath('/admin/access');
+  return { message: `Code “${deleted.label}” permanently deleted.` };
 }
 
 export async function addAllowedEmail(

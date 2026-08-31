@@ -9,6 +9,7 @@ import {
   addAllowedEmail,
   approveJoinRequest,
   createAccessCode,
+  deleteAccessCode,
   denyJoinRequest,
   revokeAccessCode,
   revokeAllowedEmail,
@@ -37,6 +38,65 @@ type JoinRequestRow = {
   answers: { label: string; value: string; orphaned: boolean }[];
 };
 
+/**
+ * Delete, behind a deliberate second click.
+ *
+ * Revoke and Delete sit in the same cell, and only one of them can be
+ * undone by cutting another code. So Delete does not submit on the
+ * first press: it opens an in-row confirmation naming the code, in the
+ * same shape DeleteMatchButton uses for the other destructive control
+ * in the admin. The button is coloured with --loss to say, before the
+ * click, that this one is not like its neighbour.
+ *
+ * The confirmation is a courtesy to the admin, not a security control.
+ * Nothing here decides whether the code may be deleted -- the action
+ * re-checks the session and the DELETE matches only a row whose
+ * revoked_at is set, so skipping this component entirely changes
+ * nothing about what the server will accept.
+ */
+function DeleteCodeButton({
+  code, action,
+}: {
+  code: CodeRow;
+  action: (formData: FormData) => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        className="btn btn-secondary btn-danger"
+        onClick={() => setConfirming(true)}
+      >
+        Delete…
+      </button>
+    );
+  }
+
+  return (
+    <div className="delete-confirm">
+      <p className="delete-confirm-note">
+        Permanently delete “{code.label}”? The record goes for good; only the
+        audit trail will remember it.
+      </p>
+      <div className="delete-confirm-actions">
+        <form action={action}>
+          <input type="hidden" name="id" value={code.id} />
+          <button className="btn btn-danger" type="submit">Delete permanently</button>
+        </form>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => setConfirming(false)}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function AccessManager({
   codes, emails, requests,
 }: {
@@ -46,6 +106,8 @@ export function AccessManager({
     useActionState<AccessState, FormData>(createAccessCode, {});
   const [revokeCodeState, revokeCodeAction] =
     useActionState<AccessState, FormData>(revokeAccessCode, {});
+  const [deleteCodeState, deleteCodeAction] =
+    useActionState<AccessState, FormData>(deleteAccessCode, {});
   const [addEmailState, addEmailAction, addingEmail] =
     useActionState<AccessState, FormData>(addAllowedEmail, {});
   const [revokeEmailState, revokeEmailAction] =
@@ -190,6 +252,8 @@ export function AccessManager({
         {createState.error && <p className="notice" role="alert">{createState.error}</p>}
         {revokeCodeState.message && <p className="notice">{revokeCodeState.message}</p>}
         {revokeCodeState.error && <p className="notice" role="alert">{revokeCodeState.error}</p>}
+        {deleteCodeState.message && <p className="notice">{deleteCodeState.message}</p>}
+        {deleteCodeState.error && <p className="notice" role="alert">{deleteCodeState.error}</p>}
 
         <CollapsibleTable title="Existing codes">
         <div className="table-wrap">
@@ -235,6 +299,12 @@ export function AccessManager({
                             <input type="hidden" name="id" value={code.id} />
                             <button className="btn btn-secondary" type="submit">Revoke</button>
                           </form>
+                        )}
+                        {/* Revoked is the only state that offers Delete, and
+                            the server enforces that independently: this is
+                            which control to show, not which rule applies. */}
+                        {state === 'revoked' && (
+                          <DeleteCodeButton code={code} action={deleteCodeAction} />
                         )}
                       </td>
                     </tr>

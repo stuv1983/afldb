@@ -287,6 +287,12 @@ describe('afldb_auth is confined to the operational tables', () => {
                 ('auth_sessions',        'INSERT'),
                 ('auth_audit_log',       'INSERT'),
                 ('beta_access_codes',    'SELECT'),
+                -- Permanent deletion of a REVOKED code (079,
+                -- AFLDB-ISSUE-117). The role holds no DELETE without
+                -- it and the admin action fails closed; the
+                -- revoked-only rule is enforced by the statement's
+                -- WHERE clause, not by this grant.
+                ('beta_access_codes',    'DELETE'),
                 ('beta_login_tokens',    'INSERT'),
                 ('beta_join_requests',   'SELECT'),
                 ('admin_invites',        'INSERT'),

@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 5 tracked here — `AFLDB-ISSUE-102`, `-104`, `-112`, `-113`, `-116`.
+**Open issues:** 6 tracked here — `AFLDB-ISSUE-102`, `-104`, `-112`, `-113`, `-116`, `-117`.
 
 > **`AFLDB-ISSUE-110` is allocated and is NOT free.** It belongs to active NL semantic-mapping
 > work that is **not merged into this worktree** (baseline `95819a3`). No row is written for it
@@ -23,6 +23,7 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-113` | Medium | Data acquisition / Import architecture / Data integrity | `brownlow_season_votes` has **no legacy-free writer** — sole writer `import_legacy_afl.py:684`. `rebuild_derived.py:23-26` and `db-health.ts:94` treat it as AUTHORITATIVE. Not reconstructible from round votes: season totals are complete 1924-1941 and 1946-2025 while round votes are complete only 1984-2025, and `vote_rank`/`eligible_rank`/`is_ineligible` are not computable from vote sums. **Silent-wrongness hazard:** with the table empty, `rebuild_derived.py`'s `season_brownlow` CTE falls every decided season to `not_applicable` — AFLDB would assert "no medal that season" for a century. | **Replacement source UNDECIDED and no selection is authorised.** Recommended next step, not a decision: a read-only probe of class B (a free structured season-summary source carrying rank **and** ineligibility) before committing to a 16,120-row manifest. Outside `AFLDB-ISSUE-102`'s closure boundary — 102 may resolve with this open. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
 | `AFLDB-ISSUE-116` | Low | Admin tooling / Data QA / Query performance | The `player_match_stats` anchor of `/admin/query-builder` costs **1.05–1.44 s with no card at all** (T-C11 1056–1072 ms; `EXPLAIN ANALYZE` 1441 ms) — a pre-`AFLDB-ISSUE-115` baseline. `runQueryBuilder` emits `count(*) OVER ()` with an index-ordered `ORDER BY m.match_date DESC LIMIT 50`; the planner costs it as a fast-start plan (`Limit cost=4.41..577`) but the window aggregate must consume all 685,471 rows and spills to temp. Under that plan every related card became a per-row correlated Nested Loop Semi/Anti Join (685,471 executions for 13,275 distinct keys), so ISSUE-115 excluded related-domain cards under this anchor as an evidence-driven V1 boundary. Above the 1 s target, below the 5 s ceiling; own-row filtering still works. | **Separate work, not started.** Fix the anchor baseline (e.g. take the total count off the paged query, or a two-step keyset/count shape) **without** raising `AFLDB_STATEMENT_TIMEOUT_MS`, adding an index or changing schema; re-measure with the T-C11 harness; only then reconsider re-admitting related cards under `player_match_stats` (`QUERYABLE_TABLES.player_match_stats.subjects`, currently `[]`). Do not reopen ISSUE-115. |
+| `AFLDB-ISSUE-117` | Medium | Admin / Access management / Security | Revoked beta access codes cannot be removed from `/admin/access`: revocation sets `beta_access_codes.revoked_at` and the row then stays in the list forever, so obsolete codes accumulate with no disposal path. **Implemented; automated validation PASSED 45/45 on 2026-08-31 (11 unit + 4 + 30 integration, 0 failures). Not yet deployed.** Active → Revoke → Delete, with the revoked-only rule inside the DELETE statement (`deleteRevokedAccessCode`) rather than in the browser, and the `access.code_deleted` audit row written in the same transaction as the delete so the row cannot outlive its trail. Migration **079** grants `afldb_auth` the DELETE it did not hold; `tools/maintenance/privileges.sql` is subtractive, so its spec is updated in the same change or the next restore silently revokes the grant. No foreign key references `beta_access_codes`, and the beta session cookie's `code:<id>` subject is never looked up, so deletion ends no session that revocation would not. | **Validation done (45/45, 0 failures); deploy remains.** **Deploy order is load-bearing:** apply migration 079 and `privileges.sql` BEFORE the code, or every delete fails closed on a permission error. Steps, evidence slots and the known spent/expired-code gap: `issues/open/AFLDB-ISSUE-117.md`. |
 
 ---
 
@@ -10972,3 +10973,140 @@ Not started. When taken up: reproduce with the T-C11 anchor-alone reference poin
 plan, choose and implement a page/count shape, re-measure, and only then decide on re-admission
 under ISSUE-115's existing tests (T-B8/T-A1 assert the current `subjects: []` exactly and must be
 changed deliberately, not silently).
+
+---
+
+## AFLDB-ISSUE-117 — Revoked access keys cannot be removed from the admin UI
+
+- **Status:** Open — implemented and validated (45/45, 2026-08-31); awaiting dev deploy and manual lifecycle check
+- **Severity:** Medium
+- **Area:** Admin / Access management / Security
+- **Found:** 2026-08-31 (operator report)
+- **Files:** `src/app/admin/access/actions.ts` (`deleteAccessCode`);
+  `src/db/queries/access-codes.ts` (`deleteRevokedAccessCode`, new);
+  `src/app/admin/access/AccessManager.tsx` (`DeleteCodeButton`);
+  `src/lib/auth/session.ts` (`audit` gained an optional transaction handle);
+  `src/db/migrations/079_access_code_delete.sql` (new);
+  `tools/maintenance/privileges.sql`; `src/styles/globals.css`;
+  `tests/admin-access-actions.test.ts` (new); `tests/integration/access-codes.test.ts` (new);
+  `tests/integration/privileges.test.ts`
+- **Related:** `AFLDB-ISSUE-027` (required audits commit atomically with their mutation — the
+  same guarantee, obtained here on the auth pool rather than via migration 066, because the
+  delete and its audit already share the `afldb_auth` role)
+- **Runbook:** `issues/open/AFLDB-ISSUE-117.md`
+
+> **ID note.** The operator brief for this work was written as "AFLDB-ISSUE-116" and the branch
+> is `claude/issue-116`. `AFLDB-ISSUE-116` was already allocated, on this baseline, to the
+> `player_match_stats` Data QA anchor, and `AFLDB-ISSUE-115`'s **Resolution** record cites 116 as
+> its follow-up. Renumbering that would falsify a closed issue's history, so this work took the
+> next free id, **117**. `AFLDB-ISSUE-110` remains allocated and unmerged; 117 does not collide
+> with it.
+
+### Problem
+
+`/admin/access` can revoke an access key but never remove one. `revokeAccessCode` sets
+`beta_access_codes.revoked_at` and the row survives, which is correct — revocation is meant to
+disable a key immediately while keeping its record — but nothing then disposes of a key that is
+finished with. The list at `src/app/admin/access/page.tsx` selects every code with no state
+filter, so revoked rows accumulate in the admin UI permanently.
+
+The wanted lifecycle is **Active → Revoke → Delete**, with deletion offered only on the revoked
+state and refused on the server, not merely hidden in the browser.
+
+### Investigation
+
+Four things had to be established before a DELETE could be added at all.
+
+1. **No foreign key references `beta_access_codes`.** Searched every migration for
+   `REFERENCES beta_access_codes`: no hits. Deleting a row orphans no child rows and needs no
+   cascade, so the brief's "stop if durable references make deletion unsafe" gate is passed on
+   evidence rather than on assumption.
+2. **Two soft references exist, and both are safe.** The redeem path
+   (`src/app/beta/actions.ts:81-98`) mints a beta session whose claim subject is `code:<id>`.
+   `hasBetaAccess()` and `src/middleware.ts:136` verify that claim's signature, kind, expiry and
+   epoch and **never look the id up**, so deleting a code ends no live session — exactly as
+   revoking one does not. The epoch and the TTL remain the only ways to cut a beta session
+   short, so deletion is not a weaker path than the revocation that must precede it.
+   `auth_audit_log` also carries `codeId` in its `beta.code_redeemed` detail, which keeps
+   redemption history readable after the row is gone. `id` is `GENERATED ALWAYS AS IDENTITY`,
+   so a freed id is never reissued and no later code can inherit a deleted one's subject.
+3. **`afldb_auth` held no DELETE on the table.** Migration 023 granted
+   `SELECT, INSERT, UPDATE`, and `tools/maintenance/privileges.sql:376` mirrored exactly that.
+   Without a new grant the feature would have failed closed in production on a permission error
+   while passing every test that did not connect as that role.
+4. **`privileges.sql`'s `afldb_auth` section is subtractive.** A grant made only by a migration,
+   and not added to that spec, is revoked by the next reconcile or restore. Both had to change.
+
+### Fix
+
+- **Migration 079** grants `afldb_auth` `DELETE` on `beta_access_codes` and nothing else, under
+  the usual `IF EXISTS (afldb_auth)` role guard. The precedent for a narrow DELETE on an
+  afldb_auth table is `data_submission_rows` (023) and `site_media` (037).
+- **`tools/maintenance/privileges.sql`** now specifies `SELECT, INSERT, UPDATE, DELETE` for the
+  table, so the reconciler preserves the grant instead of revoking it.
+- **`src/db/queries/access-codes.ts`** holds the one destructive statement.
+  `revoked_at IS NOT NULL` lives in its `WHERE` clause, so a forged POST naming a live code's id
+  matches no row and deletes nothing. It takes a transaction handle rather than a pool, the same
+  contract `recordDataEdit` carries.
+- **`deleteAccessCode`** calls `requireAdmin()` first (as every action in that file does; the
+  page's existing guard is deliberately not changed), then runs the delete and its
+  `access.code_deleted` audit inside one `authSql.begin`. An audit failure aborts the deletion
+  with it, so the database cannot hold the removal without the record of who made it. The detail
+  carries `codeId`, `label` and `revokedAt` — enough to say what was destroyed, and no secret,
+  since only the sha256 was ever stored and it leaves with the row. "Not revoked", "never
+  existed" and "already deleted" all return one message, so the endpoint is not an oracle for
+  which ids exist.
+- **UI.** A revoked row now offers **Delete…**, which opens an in-row confirmation naming the
+  code before anything is submitted — the shape `DeleteMatchButton` already uses for the admin's
+  other destructive control. The new `.btn-danger` is coloured with `--loss`, which is defined in
+  both themes, rather than the `--color-warn` that `DeleteMatchButton` references and which
+  resolves to nothing (pre-existing, cosmetic, out of scope here). Revoke's own semantics and
+  visibility are untouched.
+
+### Validation
+
+**Run 2026-08-31 from `D:\dev\afldb-issue-116`. 45/45 passed across 3 files — 11 unit, 4 + 30
+integration — with 0 failures and 0 skips.** `npx tsc --noEmit` clean. Migration 079 applied to
+`afldb_test` (`applying 079_access_code_delete.sql ... ok (136 ms)`). Post-run check on that
+database: no fixture rows leaked, and `has_table_privilege('afldb_auth', 'beta_access_codes',
+'DELETE')` is true. Per-test coverage of the brief's eight requirements is in
+`issues/open/AFLDB-ISSUE-117.md` §4.
+
+`npx tsc --noEmit` **failed on the first run**, in this change, and the failure was real:
+`audit()`'s write handle was annotated `typeof authSql` on the assumption that `TransactionSql`
+extends `Sql`. In postgres.js 3.4.9 it does not — `Sql` and `TransactionSql` are siblings that
+both extend `ISql`, and `TransactionSql` deliberately omits `END`, `CLOSE`, `options`, `reserve`
+and `begin` so a transaction handle cannot close the pool or nest a connection. Corrected to
+`postgres.ISql`, the shared base carrying exactly the tagged-template signature the audit INSERT
+needs — ordinary widening, no cast or suppression, and a narrower handle than before.
+
+- `tests/admin-access-actions.test.ts` (no database): the DELETE carries the revoked-only
+  predicate; a miss neither audits nor revalidates; unknown and live ids get identical answers;
+  a non-integer id is rejected before any statement runs; `requireAdmin` gates every statement;
+  a hit audits `access.code_deleted` with the acting admin and no secret; the audit receives
+  **the transaction handle** rather than the pool; `/admin/access` is revalidated; and
+  `revokeAccessCode` still issues its original one-shot UPDATE on the pool.
+- `tests/integration/access-codes.test.ts` (real PostgreSQL): a revoked code is deleted and
+  leaves the table; an active code is refused and survives; a repeated delete returns null
+  rather than throwing; and the statement removes exactly one row, which is what catches a lost
+  `id =` predicate.
+- `tests/integration/privileges.test.ts` asserts `afldb_auth` holds `DELETE` on
+  `beta_access_codes`, so a `privileges.sql` regression fails in CI rather than in the admin UI.
+
+### Known gap (deliberate, not fixed here)
+
+A **spent** or **expired** code has `revoked_at IS NULL`, so it is not deletable — and the
+existing UI offers Revoke only in the `live` state, so it cannot be revoked either. Such a code
+is therefore still undeletable after this change. That follows the brief exactly ("only revoked
+keys may expose the Delete action", "do not change the existing revoke semantics") and is
+recorded here rather than silently widened. Closing it means letting Revoke appear on `spent`
+and `expired` rows, which is a visibility change to the revoke path and an operator decision.
+
+### Next action
+
+Automated validation is complete and green. Remaining: deploy **migration 079 and
+`privileges.sql` before the application code** (`npm run db:migrate`, `npm run db:privileges`)
+— the reverse order leaves every delete failing closed on a permission error — then exercise
+Revoke -> Delete by hand on dev `/admin/access`, including one refused attempt on an active key.
+Dev before prod. Resolve only once that manual evidence is recorded in
+`issues/open/AFLDB-ISSUE-117.md` §7.

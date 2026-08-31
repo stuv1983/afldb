@@ -15,6 +15,43 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-117 — Revoked access keys can be permanently deleted from `/admin/access` - 31 August 2026
+
+- Beta access keys gain the last step of their lifecycle: **Active → Revoke → Delete**. Revoking
+  still only sets `beta_access_codes.revoked_at` and keeps the record, which is what makes it the
+  right way to stop a key immediately; a revoked key can now also be removed once it is finished
+  with, instead of sitting in the admin list forever. Revoke's semantics and visibility are
+  unchanged.
+- **The revoked-only rule is in the statement, not the browser.**
+  `deleteRevokedAccessCode` (`src/db/queries/access-codes.ts`) carries
+  `WHERE id = … AND revoked_at IS NOT NULL`, so a request naming a live key's id matches no row
+  and deletes nothing. Hiding the button on an active key is presentation; this predicate is the
+  rule. "Not revoked", "never existed" and "already deleted" return one message, so the endpoint
+  cannot be used to discover which ids exist.
+- **The deletion cannot outlive its audit.** `access.code_deleted` is written inside the same
+  `authSql.begin` as the DELETE, so a failed audit rolls the deletion back — the auth-pool
+  counterpart of the guarantee `AFLDB-ISSUE-027` gave the import role. The trail records the
+  code's id, label and revocation time, which is enough to say what was destroyed, and no
+  secret: only the sha256 of the code was ever stored and it leaves with the row. `audit()` takes
+  an optional transaction handle to make this possible and is unchanged for every existing
+  caller.
+- **Migration 079** grants `afldb_auth` `DELETE` on `beta_access_codes` — a privilege it did not
+  hold, so without this the feature fails closed on a permission error. `tools/maintenance/
+  privileges.sql` is updated in step, because its `afldb_auth` section is subtractive and would
+  otherwise revoke the grant at the next reconcile or restore, and
+  `tests/integration/privileges.test.ts` now asserts the grant so that regression fails in CI
+  rather than in the admin UI.
+  **Deploy order is load-bearing: apply migration 079 and `privileges.sql` before the code.**
+- Checked before introducing the DELETE: no foreign key references `beta_access_codes`, and while
+  a beta session's claim subject embeds `code:<id>`, `hasBetaAccess()` and the middleware verify
+  the signed claim alone and never look that id up. Deleting a key therefore ends no live session
+  — and neither does revoking one; the epoch and the TTL remain the only ways to cut a beta
+  session short. Ids are `GENERATED ALWAYS AS IDENTITY`, so a freed id is never reissued.
+- On a revoked row the admin UI shows **Delete…**, which opens an in-row confirmation naming the
+  key before anything is submitted, styled apart from Revoke with a new `.btn-danger`. A spent or
+  expired key still has `revoked_at IS NULL` and so remains undeletable — recorded as a known gap
+  in `issues/open/AFLDB-ISSUE-117.md` §5 rather than widened here.
+
 ### AFLDB-ISSUE-115 — Data QA search composes related-domain cards on one anchor (Resolved) - 30 August 2026
 
 - `/admin/query-builder` (Data QA search, super-admin only) can now ask QA questions that span two

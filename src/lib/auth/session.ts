@@ -2,6 +2,7 @@ import 'server-only';
 
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import type postgres from 'postgres';
 import { cache } from 'react';
 
 import { authSql } from '@/db/authClient';
@@ -327,13 +328,38 @@ export async function destroyAdminSession(): Promise<void> {
 
 // --- Audit ---
 
+/**
+ * Append one row to the administrative activity trail.
+ *
+ * Called with no `tx` this is the long-standing best-effort log: the
+ * mutation has already committed on its own, and a failure here is a
+ * missing trail entry rather than a rolled-back action.
+ *
+ * Pass the `authSql.begin` handle instead when the action is
+ * DESTRUCTIVE and the trail is the only record that will survive it.
+ * The INSERT then joins the mutation's transaction, so an audit failure
+ * aborts the deletion with it and the database cannot hold the one
+ * without the other — the auth-pool counterpart of the guarantee
+ * migration 066 gave the import role (src/db/queries/audit-log.ts).
+ * This works only because auth_audit_log and the operational tables
+ * share the afldb_auth role; do not pass a handle from another pool.
+ */
 export async function audit(
   action: string,
   detail: Record<string, unknown> | null,
   actor: { userId?: number; label?: string },
+  tx?: postgres.TransactionSql,
 ): Promise<void> {
   const ip = await requestIp();
-  await authSql`
+  // postgres.js makes Sql and TransactionSql SIBLINGS, not parent and
+  // child: both extend ISql, and TransactionSql deliberately lacks the
+  // pool-level members (END, CLOSE, options, reserve, begin) because a
+  // transaction handle must not be able to close the pool or open a
+  // nested connection. So the pool's own type cannot describe both.
+  // ISql is the shared base, and it is precisely the tagged-template
+  // call signature this INSERT needs and nothing more.
+  const write: postgres.ISql = tx ?? authSql;
+  await write`
     INSERT INTO auth_audit_log (actor_user_id, actor_label, action, detail, ip)
     VALUES (${actor.userId ?? null}, ${actor.label ?? null}, ${action},
             ${detail ? JSON.stringify(detail) : null}, ${ip})

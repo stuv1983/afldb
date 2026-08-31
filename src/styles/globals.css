@@ -667,6 +667,52 @@ label {
   color: var(--text);
   border-color: var(--accent);
 }
+/* Permanent deletion (AFLDB-ISSUE-117). The one button family on an admin
+   page that destroys a row rather than changing its state, so it is the one
+   that does not look like its neighbours. --loss is the palette's existing
+   "this went badly" colour and is defined in both themes, unlike the
+   --color-warn that DeleteMatchButton reaches for and never resolves.
+   Paired with btn-secondary it is an outline; alone it is filled, which is
+   how the second, committing click differs from the first. */
+.btn-danger {
+  border-color: var(--loss);
+  color: var(--loss);
+}
+.btn-danger:hover {
+  background: var(--loss);
+  border-color: var(--loss);
+  color: var(--bg);
+}
+.btn.btn-danger:not(.btn-secondary) {
+  background: var(--loss);
+  border-color: var(--loss);
+  color: var(--bg);
+}
+.btn.btn-danger:not(.btn-secondary):hover {
+  filter: brightness(1.1);
+}
+
+/* The in-row confirmation the Delete button opens. Kept narrow so it does
+   not stretch the table cell it lives in. */
+.delete-confirm {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 22rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--loss);
+  border-radius: var(--radius);
+  background: var(--bg-hover);
+}
+.delete-confirm-note {
+  margin: 0;
+  font-size: 0.8rem;
+}
+.delete-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 /* A pager end-stop. The control already says so with aria-disabled; this
    is the same fact in the stylesheet rather than in a style attribute. */
 .btn[aria-disabled='true'] {
