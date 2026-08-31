@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 6 tracked here — `AFLDB-ISSUE-102`, `-104`, `-110`, `-112`, `-113`, `-116`.
+**Open issues:** 7 tracked here — `AFLDB-ISSUE-102`, `-104`, `-110`, `-112`, `-113`, `-116`, `-117`.
 
 <!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
      the ISSUE-110 branch merged into dev on 2026-08-31 and its own ledger rows below are
@@ -20,6 +20,7 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-113` | Medium | Data acquisition / Import architecture / Data integrity | `brownlow_season_votes` has **no legacy-free writer** — sole writer `import_legacy_afl.py:684`. `rebuild_derived.py:23-26` and `db-health.ts:94` treat it as AUTHORITATIVE. Not reconstructible from round votes: season totals are complete 1924-1941 and 1946-2025 while round votes are complete only 1984-2025, and `vote_rank`/`eligible_rank`/`is_ineligible` are not computable from vote sums. **Silent-wrongness hazard:** with the table empty, `rebuild_derived.py`'s `season_brownlow` CTE falls every decided season to `not_applicable` — AFLDB would assert "no medal that season" for a century. | **Replacement source UNDECIDED and no selection is authorised.** Recommended next step, not a decision: a read-only probe of class B (a free structured season-summary source carrying rank **and** ineligibility) before committing to a 16,120-row manifest. Outside `AFLDB-ISSUE-102`'s closure boundary — 102 may resolve with this open. |
 | `AFLDB-ISSUE-110` | Medium | Natural-language search / deterministic semantics | NL semantic-mapping fixes, merged into dev 2026-08-31; parser v32 including the ranked-career season-bound fail-closed validator revision. Standing evidence: focused parser/validator **182/182**; expanded focused **345/345**; complete DB-free ISSUE-110 matrix **14 suites, 733/733**; typecheck passed; authoritative post-final-revision operator DB gate **2 files, 46/46 in 20.65 s, started 18:52:45** (24/24 + 22/22) — distinct from the earlier pre-revision 17:47 run. The three documented temporary artifacts were removed exactly. Durable record: `issues/open/AFLDB-ISSUE-110.md`. **Latest independent review verdict: REVISE — NOT READY FOR LARGE-SCALE VALIDATION**, with two unresolved HIGH findings: (A) career-predicate season ownership — a career predicate can exist without consuming `seasonMin`/`seasonMax`, so e.g. `players with at least 3 grand finals since 2000` silently ignores the requested period; (B) `clubFor` ownership with career predicates — e.g. `Carlton players who debuted since 2000`: execution bypasses the generic club filter merely because `careerPredicates` exist. | **Fix findings A and B fail-closed, then a fresh independent re-review.** For A, replace the blanket career-predicate exemption with explicit period ownership — only predicates that actually consume the relevant period bounds may permit them. For B, allow the `clubFor` bypass only when a predicate explicitly owns the relevant club semantics; otherwise reject or correctly compile the club constraint. No 480, 1,435/1,440, 100k, telemetry reset, or other large-scale validation before APPROVE; the 22,607-search run remains incomplete. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
+| `AFLDB-ISSUE-117` | Medium | Security / Production reliability / NL search / Telemetry | The public NL `/search` pipeline has **no rate limit** (`src/app/search/page.tsx:71` → `globalSearch` → one `nl_search_log` INSERT per hit), unlike every comparable public surface (autocomplete 60/min, feedback 12/15 min, health-event 120/min). Exposure is currently bounded by the beta gate (`middleware.ts:117`), so this is a credible pre-launch risk, not a live defect. Secondary LOW hardening: `/api/health-event` buffers an unbounded `request.json()` body (`route.ts:64`; the Caddy 32KB cap covers only the early-access path), and two prototype-key lookups (`records.ts:159`, `aflw.ts:786-793`) can 500 on a crafted key like `constructor` — robustness only, provably not SQL injection. Found by the 2026-08-31 full-codebase review; the same review confirmed all ~90 `sql.unsafe` sites are allowlist-bound and every admin action/route carries its own authz guard. Runbook: `issues/open/AFLDB-ISSUE-117.md`. | **Implement F1 (per-IP limiter on the NL search entry, reusing `src/lib/auth/rate-limit.ts`) plus the two small F2/F3 hardening edits in one focused session** (runbook §5, validation §9). Must be closed or explicitly re-adjudicated before `AFLDB_BETA_GATE` is disabled in production. |
 | `AFLDB-ISSUE-116` | Low | Admin tooling / Data QA / Query performance | The `player_match_stats` anchor of `/admin/query-builder` costs **1.05–1.44 s with no card at all** (T-C11 1056–1072 ms; `EXPLAIN ANALYZE` 1441 ms) — a pre-`AFLDB-ISSUE-115` baseline. `runQueryBuilder` emits `count(*) OVER ()` with an index-ordered `ORDER BY m.match_date DESC LIMIT 50`; the planner costs it as a fast-start plan (`Limit cost=4.41..577`) but the window aggregate must consume all 685,471 rows and spills to temp. Under that plan every related card became a per-row correlated Nested Loop Semi/Anti Join (685,471 executions for 13,275 distinct keys), so ISSUE-115 excluded related-domain cards under this anchor as an evidence-driven V1 boundary. Above the 1 s target, below the 5 s ceiling; own-row filtering still works. | **Separate work, not started.** Fix the anchor baseline (e.g. take the total count off the paged query, or a two-step keyset/count shape) **without** raising `AFLDB_STATEMENT_TIMEOUT_MS`, adding an index or changing schema; re-measure with the T-C11 harness; only then reconsider re-admitting related cards under `player_match_stats` (`QUERYABLE_TABLES.player_match_stats.subjects`, currently `[]`). Do not reopen ISSUE-115. |
 
 ---
@@ -11199,3 +11200,58 @@ ISSUE-110 remains **Open**. The ISSUE-110 branch merged into `dev` on 2026-08-31
 and B fail-closed, then a fresh independent re-review. No 480, 1,435/1,440, 100k, telemetry
 reset, or other large-scale validation may run before that review returns APPROVE; the
 22,607-search run remains incomplete.
+
+**2026-08-31 independent adjudication (full-codebase review): findings A and B both
+CONFIRMED** by direct source inspection of `main`. A: `grand_finals_played_min` predicate
+(`parser.ts:749-750`) consumes no season bounds, `scope.seasonMin` retained
+(`parser.ts:2042`), blanket `careerPredicates` exemption validates it (`plan.ts:1197-1202`),
+career compiler never reads season bounds — whole-career count answers the period question.
+B: `debuted_between` carries no club param (`parser.ts:1455-1466`), club gate applies only
+when `careerPredicates.length === 0` (`plan.ts:1158`), and the compiler's generic `clubFor`
+EXISTS filter is skipped whenever predicates exist (`player-career.ts:146`) — all-club results
+render under a club-scoped Games column (`games = 0` rows). Full mechanism, required
+ownership invariant, fix sites and regression controls: runbook 2026-08-31 adjudication
+section. Next action unchanged.
+
+---
+
+## AFLDB-ISSUE-117 — Public-surface abuse hardening before launch: NL /search has no rate limit; two minor input-robustness gaps
+
+- **Status:** Open
+- **Created:** 2026-08-31 (full-codebase review)
+- **Severity:** Medium (primary); secondary findings Low
+- **Area:** Security / Production reliability / NL search / Telemetry
+- **Runbook:** `issues/open/AFLDB-ISSUE-117.md` (authoritative — problem statement,
+  evidence, invariant, minimum scope, tests, operator validation, next action)
+
+### Summary
+
+**F1 (MEDIUM):** every GET to `/search?q=` runs the full NL pipeline and one
+`nl_search_log` INSERT with **no per-IP rate limit** (`src/app/search/page.tsx:71`,
+`src/db/queries/nl/log.ts:138`), while every comparable public surface is limited
+(autocomplete 60/min at `route.ts:14`, feedback 12/15 min, health-event 120/min).
+Currently shielded by the beta gate (`middleware.ts:117`) — a credible pre-launch risk,
+not a live defect: once `AFLDB_BETA_GATE` is off, one anonymous source can drive
+unbounded telemetry growth and DB pool pressure.
+
+**F2 (LOW):** `/api/health-event` buffers an unbounded `request.json()` body
+(`route.ts:64`); the deploy-level 32KB Caddy cap covers only the early-access path.
+Fields are truncated before insert and the route is rate limited, so the residual is
+transient memory only.
+
+**F3 (LOW):** `CAREER_COLUMNS[category]` (`src/db/queries/records.ts:159`) and
+`AFLW_MATCH_OUTCOME_FILTERS[outcome]` (`aflw.ts:786-793`) index plain object literals
+without `Object.hasOwn`; a crafted key like `constructor` passes the falsy guard and
+produces a 500 via a fixed-text SQL syntax error. Provably not injection —
+`records.ts:130` shows the correct pattern.
+
+Context from the same review: all ~90 `sql.unsafe` sites in `src/db/queries` resolve from
+module-constant allowlists with bound values; every admin server action and admin route
+handler performs its own authz check; no hardcoded secrets in `src/` or `deploy/`.
+
+### Next action
+
+Implement F1 (per-IP limiter on the NL search entry, reusing
+`src/lib/auth/rate-limit.ts`, fail-open, friendly UI response) plus F2/F3 in one focused
+session per runbook §5; validate per §9. Binding launch precondition: close or explicitly
+re-adjudicate this issue before disabling `AFLDB_BETA_GATE` in production.
