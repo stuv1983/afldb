@@ -350,6 +350,26 @@ BEGIN
     GRANT SELECT ON player_link_suggestions TO afldb_import;
   END IF;
 
+  -- Migration 080 (AFLDB-ISSUE-118): the external grid corpus is captured
+  -- historical evidence, so it is deliberately outside
+  -- import_writable_tables -- that registry's loop grants UPDATE, DELETE
+  -- and TRUNCATE, which is precisely the power a corpus of immutable
+  -- captures must not hand out. Append-only by grant, on the 066/073/078
+  -- pattern: read, INSERT, and the one column that supersedes a revision.
+  -- The platform registry is seeded by the migration and is read only.
+  IF to_regclass('public.external_grid_sources') IS NOT NULL THEN
+    GRANT SELECT ON external_grid_sources TO afldb_import;
+  END IF;
+  IF to_regclass('public.external_grids') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON external_grids TO afldb_import;
+    GRANT UPDATE (is_current) ON external_grids TO afldb_import;
+    GRANT USAGE, SELECT ON SEQUENCE external_grids_id_seq TO afldb_import;
+  END IF;
+  IF to_regclass('public.external_grid_axes') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON external_grid_axes TO afldb_import;
+    GRANT USAGE, SELECT ON SEQUENCE external_grid_axes_id_seq TO afldb_import;
+  END IF;
+
   -- Staging is the importer's own workspace and holds no operational
   -- table, so it keeps its blanket grants and its default privileges.
   IF to_regnamespace('staging') IS NOT NULL THEN

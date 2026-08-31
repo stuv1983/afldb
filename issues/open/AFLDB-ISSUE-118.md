@@ -580,6 +580,12 @@ Notes:
   since migration 039, and `privileges.sql` must be reconciled.
 - Nothing here is created during Stage 0.
 
+> **CORRECTED IN STAGE 1 — see §20.2.** Two parts of the sketch above are wrong as written
+> and were changed with evidence, not preference: the uniqueness keys must include
+> `provenance` (otherwise §10.1 and §12B are unimplementable), and `fetched_at` must be
+> nullable (the archive records no capture time). The rest of §11 was implemented as
+> specified.
+
 ---
 
 ## 12. Proposed import design — Stage 0K
@@ -764,7 +770,7 @@ historical backfill**, because Gridley still serves it (§10.1).
 
 ---
 
-## 19. Exact next action for Stage 1
+## 19. Stage 1 as originally specified (superseded by §20)
 
 Create the migration implementing §11 — `external_grid_sources`, `external_grids`,
 `external_grid_axes` (defer `external_grid_answers` to Stage 6) — as the next sequential
@@ -784,3 +790,489 @@ against all 1,123 rows before any write.
 multi-file implementation against an approved runbook). High reasoning was sufficient for Stage
 0; XHigh is not required. Stage 3 and Stage 5 involve genuine semantic judgement and should be
 re-assessed for Opus at that point.
+
+---
+
+## 20. Stage 1 — persistence and legacy importer: IMPLEMENTED
+
+**Status: COMPLETE. The operator gate passed on 31 August 2026 (§20.8).** Migration 080 is
+applied to `afldb_dev`, grants are reconciled, and all 1,123 rescued boards are imported with
+idempotency proved by an immediate rerun. Stage 1 is finished; ISSUE-118 stays **Open** because
+Stages 2–7 remain.
+
+| Field | Value |
+|---|---|
+| Branch / worktree | `opus/gridley-corpus` / `D:\dev\afldb-gridley` |
+| HEAD at session start | `9ecc6fc` — Document Gridley corpus Stage 0 |
+| Working tree at start | clean |
+| Model / effort | Opus 5, High |
+| Commits made | **none** — Git is operator-operated (`CLAUDE.md` §12) |
+
+### 20.1 Files changed
+
+| File | Change |
+|---|---|
+| `src/db/migrations/080_external_grids.sql` | **new** — `external_grid_sources`, `external_grids`, `external_grid_axes`, the `gridley` registry rows, and the grant model |
+| `tools/migration/import_external_grids.py` | **new** — read-only legacy SQLite importer with `--dry-run` and `--no-db` |
+| `tools/maintenance/privileges.sql` | reconciler re-grants the corpus's narrow append-only set after its revoke loop |
+| `tests/external-grids-import.test.ts` | **new** — the Stage 1 contract suite (migration SQL + importer behaviour), DB-free |
+| `issues/open/AFLDB-ISSUE-118.md` | this section; §11 correction marker; §19 marked superseded |
+| `IssuesIndex.md`, `issues.md` | state and next action moved from Stage 0 to Stage 2 |
+| `CHANGELOG.md` | `Unreleased` entry for the schema and importer |
+
+Nothing else was touched. `AFLDB-ISSUE-117` was not opened or modified. The legacy SQLite
+archive and its scraper were not modified; the archive was proved byte-identical before and
+after every run (§20.6).
+
+### 20.2 FINDING — §11's uniqueness keys contradict §10.1 and §12B
+
+§11 specified:
+
+```
+UNIQUE (source_id, board_number, revision)
+UNIQUE (source_id, board_date, revision)
+CREATE UNIQUE INDEX ... ON external_grids (source_id, board_number) WHERE is_current;
+```
+
+§10.1 requires the rescued archive to be imported **as well as** the Gridley backfill — "an
+independent provenance record captured at the time" and "a cross-check on the re-acquired
+history" — and §12B says "where both exist, the Gridley row is authoritative for detail and the
+SQLite row is the cross-check". Both statements require the two captures of a board to exist
+**at the same time**.
+
+With `provenance` absent from the key, they cannot. Board #1 captured from `legacy_sqlite` and
+board #1 captured from `gridley_api` are two rows with the same `(source_id, board_number)`, so
+the partial unique index admits only one as current. The Gridley backfill could then land only
+by superseding the archive row — the cross-check destroying the thing it exists to check. The
+`payload_sha256` conflict rule compounds it: the two paths produce structurally different
+payloads by construction, so every backfilled board would also be reported as a content
+conflict against an archive row that is not in conflict with it at all.
+
+**Resolution.** `provenance` is part of the revision key:
+
+```sql
+UNIQUE (source_id, provenance, board_number, revision)
+CREATE UNIQUE INDEX ux_external_grids_current_number
+  ON external_grids (source_id, provenance, board_number) WHERE is_current;
+CREATE UNIQUE INDEX ux_external_grids_current_date
+  ON external_grids (source_id, provenance, board_date)   WHERE is_current;
+```
+
+Each acquisition path keeps its own revision chain, both captures of a board coexist, and
+comparing them is an ordinary query rather than a constraint violation.
+`tests/external-grids-import.test.ts` asserts the provenance-scoped key positively **and**
+asserts the narrower key's absence, so a regression to §11's original form fails.
+
+`UNIQUE (source_id, board_date, revision)` was **not** carried across in that form. Revision
+numbers are per board, so that constraint cannot catch two different boards sharing a date
+(they would sit at different revision numbers), while it *can* forbid a legitimate correction
+that re-dates a board. The invariant that matters — board number and date are 1:1 — is asserted
+where it is true and enforceable, over current revisions, by `ux_external_grids_current_date`.
+
+### 20.3 Schema decisions actually made
+
+Beyond §20.2, and all recorded in the migration's own comments:
+
+* **`fetched_at` is nullable, with no `now()` default.** §11 had `NOT NULL DEFAULT now()`. The
+  legacy archive records no capture timestamp (§3 — the table has seven columns and none is a
+  time), so `now()` would stamp a board captured in 2023 with a 2026 capture time. That is a
+  fabricated provenance claim in the one table whose entire purpose is provenance. NULL means
+  "the capture did not record it", consistent with AFLDB's NULL-is-not-zero discipline.
+* **`payload_sha256` is `char(64)` with a `~ '^[0-9a-f]{64}$'` CHECK**, matching migration 074's
+  `source_payloads.payload_hash` rather than §11's bare `text`.
+* **The hash recipe is stated, not assumed**: SHA-256 over
+  `json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)` as UTF-8.
+  jsonb normalises key order and whitespace on the way in, so a value read back out of
+  PostgreSQL and re-serialised the same way reproduces the hash. The stored hash is therefore
+  checkable, not merely stored.
+* **`raw_payload` holds the archive row verbatim** — the JSON columns stay as the exact strings
+  SQLite returned, not as reparsed arrays — under `{"source", "table", "row"}`. Nothing
+  machine-specific (no file path, no timestamp) is in the hashed payload, so the hash is
+  reproducible on any host.
+* **`external_grid_sources` gained `ingest_source_id smallint NOT NULL UNIQUE REFERENCES sources(id)`.**
+  `import_batches.source_id` requires a `sources` row, and AFLDB's provenance convention ties
+  every ingested fact to that registry. The FK stops the grid registry and the ingest registry
+  from disagreeing about who published a board. One `sources` row (`key = 'gridley'`,
+  `kind = 'scrape'`) covers both acquisition paths; the path is recorded per row in
+  `external_grids.provenance`, not as a second dataset.
+* **`external_grid_answers` and `external_grid_criterion_map` were not created**, per §19 and
+  §18 (Stage 6 and Stage 3). The suite asserts their absence, so a mapping cannot be smuggled
+  into the evidence schema.
+
+### 20.4 FINDING — the corpus is deliberately NOT import-writable
+
+`afldb_meta.grant_import_write()` grants `SELECT, INSERT, UPDATE, DELETE, TRUNCATE`, and
+`privileges.sql` regenerates that whole set from `import_writable_tables` on every reconcile.
+Registering the corpus there would mean a hand `REVOKE` is silently undone at the next
+`npm run db:privileges`, and the corpus would stop being immutable (§10.4) without anyone
+editing a file. That is exactly the reasoning migration 074 applied to `promotion_decisions` and
+066/073/078 applied to `data_edits` / `data_overrides`.
+
+So the grant model is:
+
+| Role | `external_grid_sources` | `external_grids` | `external_grid_axes` |
+|---|---|---|---|
+| `afldb_app` | SELECT (registered via `grant_app_read`) | SELECT | SELECT |
+| `afldb_import` | SELECT | SELECT, INSERT, **UPDATE (is_current) only** | SELECT, INSERT |
+| `afldb_auth` | — | — | — |
+
+No `DELETE`, no `TRUNCATE`, and no `UPDATE` of any captured byte, for any role that writes.
+`is_current` is the single mutable column because superseding a revision is additive history,
+not a rewrite; Stage 1 issues no UPDATE at all. `privileges.sql` restates these after its
+`afldb_import` revoke loop, which is what makes them survive a reconcile — that is the "matching
+`privileges.sql` reconciliation" §19.2 asks for. **No registry list was hand-edited**: the
+app-read and import-write registries are data, and `npm run db:privileges` needs no file change
+for a newly registered readable table.
+
+### 20.5 Importer decisions actually made
+
+`tools/migration/import_external_grids.py`, per §12A:
+
+* **Read-only twice over**: `sqlite3.connect("file:...?mode=ro", uri=True)` plus
+  `PRAGMA query_only=ON`. The file contains no SQLite statement that could mutate the archive,
+  and the suite asserts that.
+* **Source validation before any row is read**: the `historic_grids` table must exist, carry all
+  seven expected columns, and hold `source = 'Gridley'` and nothing else. A foreign game's rows
+  are a **refusal**, not a filter — silently importing them under Gridley provenance would be a
+  lie about who published a board.
+* **Two-phase, fail-closed**: the whole archive is parsed and validated before the first
+  `INSERT`. If any row is rejected, **nothing at all** is written. A partial rescue with the
+  defect unrecorded is the failure mode worth preventing.
+* **Every rejection is named**, never repaired: `rows_json_malformed`, `cols_json_not_array`,
+  `rows_json_wrong_length`, `cols_json_non_string`, `cols_json_blank`, `rows_json_missing`,
+  `date_not_iso`, `date_invalid`, `date_missing`, `grid_num_not_integer`,
+  `unsupported_json_malformed`, `duplicate_grid_num`, `duplicate_date`. No trimming, padding,
+  case folding or coercion anywhere on the path.
+* **Dates must be ISO extended.** `date.fromisoformat` accepts `20230718` on Python 3.11+, which
+  would silently admit a differently-formatted archive, so an explicit `^\d{4}-\d{2}-\d{2}$`
+  gate runs first.
+* **Criterion text is preserved byte-for-byte** — leading/trailing whitespace, case and emoji
+  included. Normalisation is an analysis step (§4), and normalising during import would rewrite
+  the evidence before anyone classified it.
+* **`unsupported_json` and `note` are validated, not ignored.** Both are vestigial across all
+  1,123 rows, but malformed content in them is a rejection, any content is preserved verbatim in
+  `raw_payload`, and non-empty occurrences are counted in the report. Surfaced, never dropped.
+* **Idempotent by classification**: `inserted` / `unchanged` / `conflict`. An identical board is
+  a no-op, so a rerun is safe and restartable. A board whose stored content differs is a
+  **conflict**: refused, reported, recorded against the import batch via `import_rejections`,
+  and the run continues. A date already held by a different captured board is also a conflict,
+  detected before the write rather than surfacing as a unique-index violation part-way through.
+* **`--dry-run` cannot write.** It opens no `ImportBatch` — creating one is itself a committed
+  `INSERT` — issues no `INSERT`, and rolls its read transaction back. It does still *read*
+  PostgreSQL, to classify each board, so it needs a DSN and the psycopg driver. **`--no-db` is
+  the DB-free mode**: `--dry-run --no-db` never contacts PostgreSQL and never imports the
+  driver. See §20.7.
+* **`--limit` is dry-run only.** A partial rescue that prints "OK" is how a half-imported corpus
+  gets mistaken for a complete one.
+* **`psycopg` and `common` are imported lazily**, inside the database path. Every other importer
+  in `tools/migration/` imports them at module scope because every other importer needs a
+  database; this one has a contractual DB-free mode — `--dry-run --no-db`, and only that — and a
+  module-scope import would make it unrunnable on exactly the machines it exists for. `load_env`
+  is a ten-line copy of `common.load_env` for the same reason, marked as such. Note the limit of
+  this: `common.py` still imports `psycopg` at module scope, so every mode that reaches
+  PostgreSQL needs the driver (the AFLDB venv), which is what §20.7's step 5 uses.
+
+Deferred to Stage 2 by design: no `data_issues` write (§12A's contract is "report and continue";
+raising data issues belongs to §13's acquisition path), and no revision creation — Stage 1 only
+ever inserts revision 1.
+
+### 20.6 Validation executed
+
+Everything below was run in this session. **No SQL, psql, migration, Git or deployment command
+was executed**, and no database was contacted.
+
+**V-S1.1 — full-archive dry run (the mandatory Stage 1 milestone).**
+
+```
+python tools/migration/import_external_grids.py --dry-run --no-db \
+  --sqlite "D:/dev/sports_data_lab/data/afl/afl.db"
+```
+
+```
+Source
+  table                : historic_grids (1123 row(s))
+  rows read            : 1123
+  boards parsed        : 1123
+  rows rejected        : 0
+  board number range   : #1 - #1123
+  board date range     : 2023-07-17 - 2026-08-12
+  distinct numbers     : 1123
+  distinct dates       : 1123
+  axis occurrences     : 6738
+  distinct raw labels  : 788
+  gaps in number range : 0
+  duplicate numbers    : 0
+  duplicate dates      : 0
+  rows with unsupported: 0
+  rows with a note     : 0
+
+OK: 1123 board(s) validated. No database was contacted.
+```
+
+Exit 0. **All 1,123 rows validated, zero rejections.** The importer independently reproduces
+Stage 0's headline figures — 6,738 axis occurrences and 788 distinct raw criteria (§3, §4) —
+from a separate implementation, which is corroboration rather than restatement.
+
+**V-S1.2 — importer behaviour, 33 checks, all PASS.** Throwaway SQLite fixtures built and torn
+down per case; the real archive untouched.
+
+| Group | Proven |
+|---|---|
+| Source refusal | missing `historic_grids`; a non-Gridley `source` value refused **before** any row is parsed |
+| Structural rejection (12 cases) | malformed JSON; object instead of array; 2- and 4-element axes; non-string element; blank element; NULL axis column; `18/07/2023`; `20230718`; `2023-02-30`; NULL date; malformed `unsupported_json` — each named, each leaving nothing written |
+| Corpus integrity | two boards on one date rejected as `duplicate_date`; a gap in the number sequence reported but **not** fatal |
+| Determinism | byte-identical stdout across two runs; canonical JSON is sorted and compact; the hash is key-order independent |
+| Read-only | source archive SHA-256 identical before and after; no `-journal`, `-wal` or `-shm` created beside it |
+| Fidelity | criterion text preserved verbatim including surrounding whitespace and emoji |
+| Idempotency / immutability | fresh → insert; identical → **unchanged**; different content → **conflict, refuses overwrite**; date held by another board → conflict; axes ordered `row 0-2` then `col 0-2` |
+| CLI guards | `--no-db` without `--dry-run` → exit 2; `--limit` without `--dry-run` → exit 2 |
+| Lazy import | module imports and runs with `psycopg` unavailable |
+
+**V-S1.3 — migration, privileges and importer source contracts, 87 checks, all PASS.** Every
+non-Python assertion in `tests/external-grids-import.test.ts` was executed against the real files
+by an equivalent plain-Node mirror (`node_modules` is absent from this worktree; see §20.7).
+Covers: exactly three tables created; `external_grid_answers` / `external_grid_criterion_map`
+absent; no FK into any canonical table; no trigger or rule; no Grid Solver builder reference;
+both registry rows seeded; provenance-scoped revision key present and the §11 key absent; both
+partial unique indexes; `fetched_at` nullable with no `now()` default; `payload_sha256`,
+`raw_payload` and their CHECKs; the axis shape constraints; all three `grant_app_read` calls;
+`grant_import_write` absent; no `DELETE` or `TRUNCATE` granted; the column-scoped `is_current`
+UPDATE as the only UPDATE; the `privileges.sql` re-grant block; `afldb_auth` untouched; the
+importer's read-only and lazy-import contracts; and the dry-run branch reaching neither an
+import batch nor an `INSERT`.
+
+**V-S1.4 — the test file parses.** `node --experimental-strip-types` parsed
+`tests/external-grids-import.test.ts` successfully; it failed only at `vitest` module
+resolution, which is §20.7's gate.
+
+### 20.7 The operator gate — commands as they must actually be run
+
+**EXECUTED AND PASSED — results in §20.8.** Kept here because it is the reproducible procedure,
+corrected against what the operator actually hit. At authoring time this worktree had no
+`node_modules`, and `CLAUDE.md` §9 reserves package-manager, migration and SQL commands for the
+operator.
+
+**Prerequisites, each of which stopped a first attempt:**
+
+| Prerequisite | Why | Symptom when missing |
+|---|---|---|
+| `AFLDB_OWNER_DATABASE_URL` | `db:migrate` targets the owner DSN; this worktree has no `.env` of its own (load the repository-standard one from `D:\dev\afldb\.env`) | migrate stops **before** connecting; nothing applied |
+| The PostgreSQL SSH tunnel | the DSN is `127.0.0.1:5432` through the tunnel | `ECONNREFUSED 127.0.0.1:5432`; nothing applied |
+| `psql` on `PATH` | `db:privileges` shells out to it (`C:\Program Files\PostgreSQL\16\bin`) | script refuses and reports "Nothing has been executed." |
+| The AFLDB venv, `D:\dev\afldb\.venv` (psycopg 3.3.4) | **any** importer mode that touches PostgreSQL | `ModuleNotFoundError: psycopg`, raised by `common.py` |
+
+Each of those failed closed with nothing half-done — which is the behaviour to want, and worth
+recording as evidence rather than as friction.
+
+```powershell
+# 1. Dependencies for this worktree (once)
+npm ci
+
+# 2. The Stage 1 suite, then the wider gates
+npx vitest run tests/external-grids-import.test.ts
+npm run typecheck
+npx eslint tests/external-grids-import.test.ts   # scoped: see §20.8 on repo-wide lint debt
+
+# 3. Apply the migration to dev, then reconcile grants.
+#    ORDER MATTERS: privileges.sql revokes every public table absent from the
+#    registries, so it must run AFTER the migration, never before.
+npm run db:migrate
+npm run db:privileges
+
+# 4. Source-side validation with NO database and NO driver required.
+#    --no-db is the DB-free mode. Plain --dry-run is NOT: it classifies against
+#    PostgreSQL, so it imports common.py and therefore needs psycopg.
+python tools/migration/import_external_grids.py --dry-run --no-db --sqlite "D:/dev/sports_data_lab/data/afl/afl.db"
+
+# 5. Dry run against the real database — classification, still no write.
+#    Needs the venv interpreter.
+D:\dev\afldb\.venv\Scripts\python.exe tools/migration/import_external_grids.py --dry-run --sqlite "D:/dev/sports_data_lab/data/afl/afl.db"
+
+# 6. The import itself (expect: 1123 inserted, 0 unchanged, 0 conflicts)
+D:\dev\afldb\.venv\Scripts\python.exe tools/migration/import_external_grids.py --sqlite "D:/dev/sports_data_lab/data/afl/afl.db"
+
+# 7. Rerun it. Idempotency means 0 inserted, 1123 unchanged, 0 conflicts.
+D:\dev\afldb\.venv\Scripts\python.exe tools/migration/import_external_grids.py --sqlite "D:/dev/sports_data_lab/data/afl/afl.db"
+```
+
+Steps 5–7 need `AFLDB_IMPORT_DATABASE_URL` (and `AFLDB_LEGACY_SQLITE`, if `--sqlite` is omitted).
+The importer runs as `afldb_import`, so step 3 must have completed or every INSERT fails closed.
+
+**Correction — which mode is DB-free.** Only `--dry-run --no-db` is. Plain `--dry-run` validates
+the source and then classifies each board against `external_grids`, so it imports `common.py`,
+which imports `psycopg` at module scope; on an interpreter without the driver it fails **after**
+source validation and before any classification. That is the correct failure — it never writes —
+but it is not a DB-free mode and must not be documented as one. Every DB-free claim in this
+runbook (§20.5, §20.6 V-S1.1) is about `--dry-run --no-db`.
+
+**Storage check for R8**, worth running once after the import — the legacy payloads are ~250
+bytes each, so the archive should land in well under 1 MB, far below the ~50 MB §10.3 anticipates
+for Gridley's richer payloads:
+
+```sql
+SELECT count(*) AS boards,
+       pg_size_pretty(pg_total_relation_size('external_grids')) AS grids_size,
+       pg_size_pretty(pg_total_relation_size('external_grid_axes')) AS axes_size
+  FROM external_grids;
+```
+
+### 20.8 Operator gate — EXECUTED AND PASSED, 31 August 2026
+
+Run by the operator on Windows against `afldb_dev`. Results as reported, not as predicted.
+
+#### Build and static gates
+
+| Gate | Result |
+|---|---|
+| `npm ci` | **PASS** — 419 packages added, 420 audited, **0 vulnerabilities** |
+| `npx vitest run tests/external-grids-import.test.ts` | **PASS** — 1 file, **47/47 tests passed** |
+| `npm run typecheck` | **PASS** — route types generated, no TypeScript errors |
+| `npx eslint tests/external-grids-import.test.ts` | **PASS** — zero output |
+| `npm run lint` (repository-wide) | **FAIL — pre-existing, unrelated debt.** 270 problems (188 errors, 82 warnings) across existing application, test, scratch and tooling files |
+
+**The repository-wide lint failure is not owned by ISSUE-118 and was deliberately not fixed.**
+Every file this issue added or touched is clean: the scoped ESLint run over
+`tests/external-grids-import.test.ts` produced no output at all. Recording an unrelated lint
+baseline rather than absorbing it follows the precedent set by ISSUE-099's runbook. Touching 188
+unrelated errors inside a data-acquisition issue would put unreviewable churn in this branch's
+diff and hide the Stage 1 change; the debt needs its own scope and its own decision.
+
+#### Migration
+
+Two first attempts failed closed with **nothing applied**, each for a missing prerequisite now
+recorded in §20.7: `AFLDB_OWNER_DATABASE_URL` unset in this worktree (stopped before connecting),
+then `ECONNREFUSED 127.0.0.1:5432` because the PostgreSQL SSH tunnel was down. Neither reached
+the database.
+
+After loading the repository-standard DSN from `D:\dev\afldb\.env` and restoring the tunnel:
+
+```
+npm run db:migrate          PASS, exit 0
+target: dev (afldb_owner@127.0.0.1:5432/afldb_dev)
+80 migration files, 79 previously applied
+applied:
+  079_nl_search_log_head_to_head_grain.sql — ok, 221 ms
+  080_external_grids.sql                   — ok, 254 ms
+Applied 2 migrations.
+```
+
+`080_external_grids.sql` applied cleanly on the first attempt. Its checksum is now frozen in
+`afldb_meta.schema_migrations`, so **the file must not be edited**; any correction is a new
+forward-only migration.
+
+Two notes on that output, neither a defect in this work:
+
+* **079 is not part of ISSUE-118.** It is the NL search-log head-to-head grain migration carried
+  in from `main`, and `afldb_dev` simply had not had it applied yet. It rode along in the same
+  run.
+* The header line as transcribed ("80 files, 79 previously applied") is arithmetically
+  inconsistent with "Applied 2 migrations" — 78 would fit. This looks like a transcription slip
+  in the reported output rather than a runner defect, and it is **unverified**; it is noted here
+  only so a later reader does not treat the figure as evidence.
+
+#### Privileges
+
+The first attempt stopped **before executing anything** because `psql` was not on `PATH`, and
+said so explicitly: *"Nothing has been executed."* That is the reconciler failing closed, which
+matters — a partial privilege reconcile is far worse than none. After adding
+`C:\Program Files\PostgreSQL\16\bin` to `PATH`:
+
+```
+npm run db:privileges       PASS, exit 0
+afldb_app    : 46 public relations readable, 20 revoked
+afldb_import : 40 registered tables writable, 26 relations revoked
+afldb_auth   : grants applied on 34 of 34 tables, 32 other relations revoked
+afldb_backup : pg_read_all_data needs a superuser; unchanged
+```
+
+The corpus grants survived the reconcile, which is the specific thing §20.4 was designed for:
+`external_grids` and `external_grid_axes` are **not** in `import_writable_tables` (so they are
+among the "relations revoked" by the registry loop) and are re-granted their narrow append-only
+set immediately afterwards by the block added to `privileges.sql`. Had that block been omitted,
+this reconcile would have silently stripped the importer's access and the import below would have
+failed closed.
+
+#### Import
+
+Source-side validation, DB-free, on the system interpreter:
+
+```
+python tools/migration/import_external_grids.py --dry-run --no-db --sqlite "D:/dev/sports_data_lab/data/afl/afl.db"
+PASS, exit 0
+1123 boards validated, 0 rejected, #1-#1123, 2023-07-17 through 2026-08-12,
+6738 axis occurrences, 788 distinct raw labels,
+0 number gaps, 0 duplicate numbers, 0 duplicate dates
+"OK: 1123 board(s) validated. No database was contacted."
+```
+
+The plain `--dry-run` form documented in the earlier draft of §20.7 validated the source and then
+failed on `ModuleNotFoundError: psycopg`, because it classifies against PostgreSQL and therefore
+imports `common.py`. That is correct behaviour — it wrote nothing — but the wording was wrong and
+is corrected in §20.5 and §20.7. The real imports used the established AFLDB venv at
+`D:\dev\afldb\.venv` (psycopg 3.3.4).
+
+**First real import:**
+
+```
+inserted   : 1123
+unchanged  : 0
+conflicts  : 0
+rejected   : 0
+exit 0 — "OK: 1123 board(s) inserted, 0 already captured."
+```
+
+**Immediate idempotency rerun:**
+
+```
+inserted   : 0
+unchanged  : 1123
+conflicts  : 0
+rejected   : 0
+exit 0 — "OK: 0 board(s) inserted, 1123 already captured."
+```
+
+The rerun is the strongest single piece of Stage 1 evidence. Every board was recognised by
+`payload_sha256` as already captured, so the importer took the `unchanged` branch 1,123 times out
+of 1,123 and issued no write: the hash recipe is reproducible across processes, the classifier is
+correct, and a rerun cannot damage captured evidence. Zero conflicts also confirms that no board
+number and no board date collided under the provenance-scoped unique indexes of §20.2.
+
+#### What this establishes
+
+* Migration 080 is **applied to `afldb_dev`** and its checksum is frozen.
+* Grants are reconciled and the corpus's append-only model survives `npm run db:privileges`.
+* All **1,123** rescued boards and their **6,738** axes are persisted with provenance
+  `legacy_sqlite`, revision 1, `fetched_at` NULL.
+* The import is **idempotent and restartable**, proved by execution rather than by argument.
+
+Not established, and still open by design: nothing has been imported from Gridley itself
+(Stage 2), no criterion is mapped (Stage 3), and no cell has been executed against the Grid
+Solver (Stages 6–7). Storage (R8) was not measured; the query is in §20.7 and is cheap to run at
+any time.
+
+### 20.9 What Stage 1 did NOT do
+
+No criterion was mapped, normalised or classified. `played_for_club` was not touched, weakened
+or referenced. No predicate was added. No Grid Solver file was opened for edit. No Stage 3
+operator SQL (V1–V3) was executed — those gate Stage 3, not Stage 1. No live Gridley request was
+made. Nothing was committed, merged, rebased or pushed.
+
+### 20.10 Exact next action
+
+**Stage 1 is finished and the operator gate has passed (§20.8). Nothing in Stage 1 is
+outstanding.** The work is uncommitted: the eight changed files listed in §20.1 sit in the
+`opus/gridley-corpus` worktree, and committing them is the operator's call (`CLAUDE.md` §12).
+
+**Next: Stage 2, in a fresh session** (§18) — the Gridley JSON client and the full historical
+backfill. Provenance `gridley_api`, preserving the criterion `id`, the title/subtitle split,
+`description` and `type` that the rescued archive lost; the rolling-window acquisition and the
+revision/conflict policy of §13; rate-limited at ≥1 s.
+
+The persistence path Stage 2 needs now exists **and is applied**, and it is provenance-scoped
+(§20.2), so the backfill lands **alongside** the 1,123 rescued boards rather than displacing
+them — and the two become the cross-check §10.1 asks for. Storage (R8) should be measured after
+the backfill, when the payloads are Gridley's own at ~40 KB each rather than the archive's ~250
+bytes.
+
+A fresh session is recommended: Stage 2 is acquisition and parsing work, not semantic judgement.
+Stage 3 remains gated on operator queries V1–V3 (§15.2), which are still unrun.
