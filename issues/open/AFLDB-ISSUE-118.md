@@ -1276,3 +1276,773 @@ bytes.
 
 A fresh session is recommended: Stage 2 is acquisition and parsing work, not semantic judgement.
 Stage 3 remains gated on operator queries V1–V3 (§15.2), which are still unrun.
+
+---
+
+## 21. Stage 2 — Gridley acquisition and backfill: COMPLETE
+
+**Status at 1 September 2026: Stage 2 is complete.** The code is implemented and the whole
+operator gate — §21.10 steps 1–11 — has been executed and passed. The full 1,143-board Gridley
+history is captured on disk and independently audited (§21.13), and all 1,143 boards are now
+imported into `afldb_dev` under provenance `gridley_api`, with the immediate re-run proving
+idempotency and the archive-vs-Gridley six-label cross-check returning zero divergence
+(§21.16). Nothing is committed: the milestone is ready for an operator commit.
+
+`AFLDB-ISSUE-118` itself remains **open** — Stage 3 onward are still to do.
+
+| Field | Value |
+|---|---|
+| Branch / worktree | `opus/gridley-corpus` / `D:\dev\afldb-gridley` |
+| HEAD at session start | `28fdb2f` — Implement Gridley corpus Stage 1 |
+| Working tree at start | clean |
+| Model / effort | Opus 5, High |
+| Commits made | **none** — Git is operator-operated (`CLAUDE.md` §12) |
+| Live network requests, implementation sessions | **none** — every live request was made by the operator (§21.13, §21.16) |
+| Database commands, implementation sessions | **none** — every database command was run by the operator (§21.16) |
+
+### 21.1 Files changed
+
+| File | Change |
+|---|---|
+| `tools/migration/acquire_gridley_boards.py` | **new** — the network half: Gridley JSON → an immutable on-disk snapshot. No PostgreSQL in any mode |
+| `tools/migration/import_gridley_boards.py` | **new** — the database half: snapshot → `external_grids` / `external_grid_axes` with provenance `gridley_api` |
+| `tests/gridley-acquisition.test.ts` | **new** — the Stage 2 contract suite, 45 tests, no network and no database |
+| `tests/fixtures/gridley/board-0001-2023-07-17.json` | **new** — Gridley #1, the exact response bytes |
+| `tests/fixtures/gridley/board-1139-2026-08-28.json` | **new** — a recent board, the exact response bytes |
+| `.gitattributes` | `tests/fixtures/gridley/*.json  -text` — the fixtures are hash-pinned captures, so git must not rewrite a byte |
+| `issues/open/AFLDB-ISSUE-118.md` | this section |
+| `IssuesIndex.md`, `issues.md` | state and next action moved from Stage 2 to the Stage 2 operator gate |
+| `CHANGELOG.md` | `Unreleased` entry for the acquisition path and the API importer |
+
+Nothing else was touched. **Migration 080 was not edited** and no new migration was created:
+Stage 2 needs no schema change (§21.6). `AFLDB-ISSUE-117`, the legacy SQLite archive,
+`fetch_grids.py` and every Grid Solver file were left alone.
+
+### 21.2 DECISION — acquisition and import are two tools, not one
+
+§12B described "the Gridley backfill importer" as a single job. Implementation splits it: a
+network tool that writes files, and a database tool that reads them. The reasons are the
+requirements themselves.
+
+* **Partial network failure must not corrupt persisted boards.** With one tool, a connection
+  dropped at board 700 of ~1,150 leaves a half-loaded corpus whose completeness cannot be
+  established afterwards. With two, a failed run can only ever leave *files* — a visible,
+  resumable state that has touched no table.
+* **Byte-level forensic preservation.** `jsonb` normalises key order and whitespace, so the
+  database cannot hold the response bytes. The snapshot does, and the row records the body's
+  SHA-256, so a stored board can be tied back to the exact bytes it was parsed from.
+* **Re-parsing must never mean re-fetching** (§10.3). A parsing change replays the snapshot
+  offline.
+* **It is testable without the source.** Every acquisition behaviour below is proved by running
+  the tool against a loopback server, so Gridley is never contacted by CI.
+
+This is also the repository's existing shape for external acquisition:
+`tools/rebuild/draftguru/acquire_draft.py` → snapshot → `import_draftguru.py`. Stage 2 follows
+its HTTP policy numbers exactly rather than inventing a second manner of retrieval.
+
+### 21.3 Snapshot format
+
+```
+data/sources/gridley/<label>/          (label defaults to `history`; git-ignored under /data/*)
+  raw/<YYYY-MM-DD>__<sha16>.json       exact response bytes
+  http/<YYYY-MM-DD>__<sha16>.json      url, status, fetched_at, byte size, body sha256, level
+  rejected/<YYYY-MM-DD>__<stamp>.json  a response that did not validate, body included
+  runs/<stamp>.json                    one record per run: policy, counts, per-date outcomes
+```
+
+**A capture is named by its own content.** That is what makes the store immutable rather than
+merely intended to be, and it is the direct answer to §6.1's anti-pattern:
+
+- re-fetching a date whose bytes are unchanged resolves to a filename that already exists, so
+  the run does nothing;
+- re-fetching a date whose bytes have **changed** writes a **new** file beside the first;
+- every write uses `open(path, "xb")`, so overwriting is refused by the filesystem rather than
+  by a check a later edit could remove. There is no `w`, no `unlink`, no `rmtree` anywhere in
+  the file, and the suite asserts their absence.
+
+### 21.4 Acquisition behaviour
+
+| Requirement | How |
+|---|---|
+| Deterministic | dates processed ascending; captures ordered by (date, `fetched_at`, hash) |
+| Resumable | a date whose capture is complete on disk is `skipped` without a request |
+| Idempotent | identical bytes resolve to an existing filename; nothing is rewritten |
+| Bounded | `--max-requests` (default **200**) caps a run and prints where to resume |
+| Rate limited | `--delay` ≥ 1.5 s default, enforced between every request including retries |
+| Retry policy | 3 retries at 2/4/8 s, on timeouts, connection errors, HTTP 5xx and 429 **only** |
+| 404 | `unavailable`, never retried; `--require-complete` makes it a failure |
+| Redirects | same host only; a cross-host redirect is refused |
+| robots.txt | fetched once, recorded in the snapshot, honoured. **There is no override flag** |
+| Failure | named as one of nine outcomes; the four failure outcomes exit non-zero |
+| Malformed | written to `rejected/` with the body and the reason; **never** into `raw/` |
+| Dry run | `--dry-run` makes no request at all, not even robots.txt |
+
+Selection is `--days N` (the §13 rolling window), `--from/--to`, `--date` (repeatable) or
+`--all`. A date before 2023-07-17 is refused: there is no board.
+
+### 21.5 FINDING — the response cannot be trusted to be the board that was requested
+
+The endpoint is keyed by date and **the payload carries no date of its own** — only `level`.
+Nothing in a response says which URL produced it. An endpoint that answered every date with the
+current board would therefore fill the snapshot with ~1,150 copies of one board, and no field in
+the data would say so.
+
+The one available check is the publisher relationship `level = (board_date − 2023-07-16).days`,
+which holds across all 1,123 rescued boards and was re-verified this session against all 21
+Stage 0 probe payloads. Acquisition and import each enforce it independently and reject a
+mismatch by default; `--allow-level-drift` accepts it, records both the received and the expected
+level, and exists for the day the publisher legitimately changes the relationship. The schema
+still does not encode the relationship (migration 080 was right not to) — it is a validation of
+the request/response pairing, not a rule about boards.
+
+### 21.6 FINDING — Stage 2 needs no schema or privilege change
+
+Checked rather than assumed:
+
+* `external_grids` and `external_grid_axes` already carry every field Stage 2 populates.
+  `criterion_key`, `raw_title`, `raw_subtitle`, `raw_description` and `item_type` are exactly the
+  columns migration 080 left nullable for archive rows.
+* The revision chain is already provenance-scoped (§20.2), so `gridley_api` captures land
+  **beside** the 1,123 `legacy_sqlite` rows rather than displacing them. The importer never
+  reads, updates or supersedes a `legacy_sqlite` row, and every statement is scoped to
+  `provenance = %s`.
+* `afldb_import` already holds `SELECT, INSERT` on both tables plus `UPDATE (is_current)` — which
+  is precisely and only what a revision needs: demote the previous row, insert the new one.
+* `data_issues` is in `afldb_meta.import_writable_tables` (seeded by migration 045, never
+  revoked since), so recording a revision as a data issue needs no new grant.
+
+**Nothing in the Stage 1 privilege model was weakened, and migration 080 was not edited.**
+
+### 21.7 Persistence decisions
+
+* **The stored payload is an envelope, and it is content only:**
+  `{"source": "gridley_api", "url", "board_date", "body_sha256", "payload": <the response>}`.
+  `fetched_at` is deliberately **outside** it, in its own column. Inside the hashed envelope it
+  would make every re-fetch of an unchanged board look like new content, and the change oracle
+  would be worthless. Nothing host-specific is in it, so the hash is reproducible anywhere.
+* **One hash recipe.** `canonical_json` and `payload_hash` are imported from
+  `import_external_grids` rather than restated, so both provenances are hashed identically. The
+  suite recomputes a capture's hash **in TypeScript** from the returned envelope and asserts it
+  matches — a stored hash only its own writer can reproduce is not a checkable hash.
+* **`fetched_at` is truthful or the capture is refused.** It comes from the snapshot's request
+  record. A capture with no record, or a record with no `fetched_at`, is a **rejection** — the
+  same discipline §20.3 applied to the archive's absent capture time, from the other direction.
+* **The snapshot is re-validated, never trusted.** The importer re-parses the raw bytes,
+  recomputes the body hash, checks it against both the filename and the request record, and
+  refuses a mismatch. A snapshot edited after capture cannot import.
+* **`raw_title`/`raw_subtitle`/`raw_description`/`item_type` are the source strings verbatim** —
+  unstripped, un-normalised, `null` preserved as NULL. A non-string where a string is expected is
+  a rejection, not a `str()` coercion: coercing would store a plausible-looking description as
+  though Gridley had said it.
+* **`raw_label` reproduces the lossy legacy rule exactly**, including its `or`-fallback to `id`
+  and its `strip()`. It is the *only* field the two provenances share, so a "better" label would
+  silently break the cross-check they exist for. **Verified this session**: the reproduction is
+  byte-identical to the rescued archive on both boards the Stage 0 probe overlaps (#1 and #1123),
+  rows = `vItems` and cols = `hItems`, and the CI suite pins board #1's six labels.
+* **The answer key is preserved in `raw_payload`, and no answer table is created.**
+  `correctAnswersPlayerMap`, `correctGuesses`, `scoreMap`, `emoji`, `theme`, `imgUrl` and
+  `showOnLaunch` are all kept verbatim inside the envelope. `external_grid_answers` is Stage 6 and
+  `tests/external-grids-import.test.ts` asserts its absence; extracting the oracle into columns
+  before the Gridley-player-id bridge exists (risk R4) would be Stage 6 work smuggled into
+  Stage 2. The importer counts and reports answer cells and player references so the oracle's
+  presence is visible without being modelled.
+* **Two-phase and fail closed**, as Stage 1 is over the archive: the whole snapshot is parsed and
+  validated before the first INSERT, and one rejection means nothing at all is written.
+  Acquisition already refuses to put an invalid response into `raw/`, so a rejection at import
+  time means the snapshot changed after capture — a reason to stop, not to import the rest.
+* **A revision demotes before it inserts**, inside one transaction. The partial unique index
+  admits one current revision per board per provenance, so the order is a correctness
+  requirement. `is_current` is the only column the file ever updates.
+
+### 21.8 FINDING — comparing only against the current revision breaks the re-run
+
+Found by running it, not by reading it. A snapshot **accumulates** captures: once a board has
+been revised, the snapshot permanently holds the superseded capture as well as the current one.
+The first implementation classified `unchanged` against the current revision only, so on the
+next run the superseded capture looked like new content and became yet another revision — a
+completed backfill would have grown one revision per board per re-run, forever. That is exactly
+the "rerunning a completed backfill must not create duplicate current revisions" requirement,
+failing.
+
+**Resolution.** `unchanged` is decided against the **whole** revision chain for that board, and
+`load_current_state` returns every hash a board has ever been captured under. Proven by test:
+first import of a two-capture board gives 1 inserted + 1 revised; re-running the same snapshot
+gives 0 inserted / 0 revised / 2 unchanged and no conflict.
+
+That leaves one case the per-capture rule cannot see: upstream serving content it served before,
+after serving something else in between. A per-board pass catches it — if the **newest** capture
+is not the revision that ends up current, the board is refused and reported as a revert rather
+than silently renumbered. Whether a revert should become a further revision is a decision about
+historical evidence, not one an importer should settle.
+
+### 21.9 Validation executed
+
+Everything below was run in this session. **No live Gridley request, no SQL, no psql, no
+migration, no Git and no deployment command was executed**, and no database was contacted.
+
+**V-S2.1 — Stage 2 suite.** `npx vitest run tests/gridley-acquisition.test.ts` — **45 passed**.
+
+**V-S2.2 — Stage 1 suite unchanged.**
+`npx vitest run tests/external-grids-import.test.ts tests/gridley-acquisition.test.ts` —
+**92 passed (2 files)**, 40 s. Stage 1's 47 assertions are untouched and still hold.
+
+**V-S2.3 — typecheck.** `npm run typecheck` — clean (one real error found and fixed: the stub
+server's reply union did not discriminate on `status`).
+
+**V-S2.4 — scoped lint.** `npx eslint tests/gridley-acquisition.test.ts` — clean. Repo-wide
+`npm run lint` has pre-existing unrelated debt and is not ISSUE-118 scope (§20.6).
+
+**V-S2.5 — label reproduction against the rescued archive.** The legacy `gridley_label()` rule
+was re-derived from `fetch_grids.py` and applied to the Stage 0 probe payloads, then compared
+with `historic_grids` for the two overlapping dates. The SQLite file was opened
+`file:...?mode=ro` with `PRAGMA query_only=ON` and **was not modified**.
+
+```
+2023-07-17  archive #1     payload level 1     rows match: True   cols match: True
+2026-08-12  archive #1123  payload level 1123  rows match: True   cols match: True
+```
+
+**V-S2.6 — board-number anchor.** `level = (board_date − 2023-07-16).days` holds for all 21
+Stage 0 probe payloads without exception.
+
+**V-S2.7 — the acquisition path, end to end, offline.** Driven against a loopback server serving
+the committed fixtures. Proved by execution: exact-byte capture; a request record whose
+`body_sha256`, `level`, `expected_level` and `byte_size` match the bytes; resume without a
+request; `--refresh` on unchanged content as a no-op; `--refresh` on changed content keeping
+**both** captures with the original byte-identical; 404 → `unavailable` with one request and no
+retry; `--require-complete` making it a failure; 403 → `http_error` with no retry; 503, 503, 200
+→ retried and saved after 3 requests; malformed JSON → `rejected/` with the body and nothing in
+`raw/`; a valid board served under the wrong date → refused, and accepted only under
+`--allow-level-drift`; a 2-item axis and a blank criterion id → refused; robots `Disallow`
+stopping the run after exactly one request; pacing enforced; `--max-requests 1` stopping after
+one board and naming the next date; `--dry-run` making **zero** requests.
+
+**V-S2.8 — the import path, offline.** `--dry-run --no-db` over a two-board snapshot:
+
+```
+capture files read   : 2      captures parsed      : 2      captures rejected : 0
+board number range   : #1 - #1139
+axis occurrences     : 12     distinct criterion ids: 11    axes with description : 12
+axes with subtitle   : 4      axes with item type   : 1
+captures with answer key: 2 of 2    answer-key cells: 18    answer-key player refs: 810
+```
+
+Field-level preservation is asserted against the fixture itself: criterion ids in source order,
+`raw_title`/`raw_subtitle`/`raw_description`/`item_type` identical to the payload's strings,
+`null` preserved as NULL, `type: "player"` carried through, row = `vItems` and col = `hItems` at
+positions 0–2, the envelope's `payload` deep-equal to the original response, and the envelope
+carrying no `fetched_at`.
+
+**V-S2.9 — tamper and omission.** A raw file edited after capture → `capture_name_mismatch` /
+`http_record_mismatch`, exit 1, nothing written. A deleted request record → `http_record_missing`.
+A record with `fetched_at` removed → `fetched_at_missing`. An absent snapshot → exit 1.
+`--no-db` without `--dry-run` and `--limit` without `--dry-run` → exit 2.
+
+**V-S2.10 — revision, idempotency and revert.** See §21.8. Also proved: a changed capture chains
+inside a single run (`inserted` rev 1 then `revised` rev 2, the second superseding a row the run
+has not written yet, resolved at write time).
+
+**V-S2.11 — a killed run recovers.** A raw file whose request record is missing is no longer
+counted as held: the next run re-requests the date, completes the record with a truthful
+timestamp, reports `INCOMPLETE: 1 capture(s)`, and the snapshot imports cleanly again. Found
+while reviewing the write ordering, then covered by test.
+
+### 21.10 The operator gate — commands as they must actually be run
+
+**Every step has been executed and passed — steps 1–6 in §21.13, steps 6b–11 in §21.16.** The
+block is kept as the record of what was run, and as the recipe for a later re-acquisition.
+
+Steps 1, 2 and 3 are entirely offline: step 3 is `--dry-run`, which the tool proves makes no
+request at all, not even for `robots.txt`. **Step 4 is the first live contact with Gridley.**
+Steps 4, 6 and 6b make live requests to an external service; steps 7 onward write to or read
+`afldb_dev`. Both are operator-reserved (`CLAUDE.md` §9, §11).
+
+**Database environment variables.** This environment has **no `AFLDB_DATABASE_URL`** — an earlier
+version of steps 10 and 11 named it, psql therefore received an empty DSN, fell back to its
+local default connection and failed authentication as the Windows user (corrected, §21.15 item 4).
+The DSN variables present in the operator's session, loaded from `D:\dev\afldb\.env`, were
+`AFLDB_OWNER_DATABASE_URL`, `AFLDB_IMPORT_DATABASE_URL`, `AFLDB_AUTH_DATABASE_URL`,
+`AFLDB_BACKUP_DATABASE_URL` and `AFLDB_TEST_DATABASE_URL`. `.env.example` documents the same
+names (plus `AFLDB_TEST_IMPORT_DATABASE_URL` and a commented `AFLDB_PROD_DATABASE_URL`) and
+**contains no `AFLDB_DATABASE_URL` anywhere** — checked in this worktree, so the correction is
+established from repository evidence and not only from the failed attempt. The read-only steps 10 and 11 were run under `AFLDB_OWNER_DATABASE_URL`. Steps 7–9 name no DSN
+at all: `import_gridley_boards.py` connects through `tools/migration/common.py`, which requires
+**`AFLDB_IMPORT_DATABASE_URL`** — the least-privileged role that can do the job, which is the
+point of the split.
+**Never print a DSN or echo one into this file**; name the variable, never its value. In
+PowerShell the variables are `$env:AFLDB_OWNER_DATABASE_URL`, and psql needs the DSN and `-c`
+passed as separate arguments — see the §21.16 step 10 note on the shell-quoting trap.
+
+```bash
+# 1. DONE 2026-08-31. Node dependencies for this worktree (once).
+#    419 packages added, 420 audited, 0 vulnerabilities.
+npm ci
+
+# 1b. Python interpreter. Do NOT create a .venv in this worktree: the
+#     established AFLDB environment already has what the DB steps need, and a
+#     second one is another thing to keep in step for no benefit. Only the
+#     DB-touching steps (7, 8, 9) need it at all; every step before them runs
+#     on any Python 3.11+.
+#         D:\dev\afldb\.venv   (psycopg 3.3.4, confirmed 2026-08-31)
+#     Referred to below as $AFLDB_PY:
+#         $AFLDB_PY = D:\dev\afldb\.venv\Scripts\python.exe
+
+# 2. DONE 2026-08-31. 91 passed + 1 skipped, typecheck clean (§21.13).
+#    No network, no database.
+npx vitest run tests/gridley-acquisition.test.ts tests/external-grids-import.test.ts
+npm run typecheck
+
+# 3. DONE 2026-08-31. Offline: 1,143 dates planned, nothing written.
+python tools/migration/acquire_gridley_boards.py --all --dry-run
+
+# 4. DONE 2026-08-31. FIRST LIVE CONTACT. A small window, to confirm the
+#    endpoint and the policy before any historical crawl. Writes files only;
+#    no database is touched. Result: 3 saved, 0 failures, 4 requests.
+python tools/migration/acquire_gridley_boards.py --days 3
+
+# 5. DONE 2026-08-31. 3 captures parsed, 0 rejected, no database contacted.
+python tools/migration/import_gridley_boards.py --dry-run --no-db
+
+# 6. DONE 2026-08-31, in six bounded runs (200/200/200/200/200/140).
+#    All 1,143 dates are captured; 0 failures of any kind. Re-running is
+#    always safe and is now a no-op.
+python tools/migration/acquire_gridley_boards.py --all
+
+# 6b. DONE 2026-09-01. Completeness verification: "0 to request", all 1,143
+#     dates skipped, 1 request (robots.txt only), exit 0. Read what that does
+#     and does not prove: every date is already captured, so each is skipped
+#     BEFORE any board request and only robots.txt is fetched. It therefore
+#     asserts that the SNAPSHOT is whole — a capture exists for every planned
+#     date — and not that Gridley still serves them. --require-complete matters
+#     here as the standing rule for later runs, where a clean 404 becomes a
+#     failure instead of a quiet gap. Cheap re-assertion, not a second crawl.
+#     A non-zero exit at this point would mean a capture has gone missing
+#     from disk since step 6, which is worth stopping for.
+python tools/migration/acquire_gridley_boards.py --all --require-complete
+
+# 7. DONE 2026-09-01. Classify the whole snapshot against the real database.
+#    Still no write. Needs $AFLDB_PY (step 1b): the DB path imports psycopg.
+#    Result: 1,143 would be inserted / 0 revised / 0 unchanged / 0 conflicts.
+D:\dev\afldb\.venv\Scripts\python.exe tools/migration/import_gridley_boards.py --dry-run
+
+# 8. DONE 2026-09-01. The import itself. Result: 1,143 inserted / 0 revised /
+#    0 unchanged / 0 conflicts / 0 rejected.
+D:\dev\afldb\.venv\Scripts\python.exe tools/migration/import_gridley_boards.py
+
+# 9. DONE 2026-09-01. Rerun it. Idempotency: 0 inserted, 0 revised,
+#    1,143 unchanged, 0 conflicts.
+D:\dev\afldb\.venv\Scripts\python.exe tools/migration/import_gridley_boards.py
+
+# 10. DONE 2026-09-01. R8 in the database, now that the payloads are Gridley's
+#     own and not the archive's. Read-only. Result: gridley_api 1,143 revisions
+#     / 9,813 kB, legacy_sqlite 1,123 revisions / 373 kB. That is a PostgreSQL
+#     pg_column_size(raw_payload) aggregate and is NOT the same measurement as
+#     the 42.9 MB raw on-disk snapshot (§21.13) — different representations.
+#     NOTE: use a DSN variable that exists. There is no AFLDB_DATABASE_URL.
+#     PowerShell: $env:AFLDB_OWNER_DATABASE_URL, passed as its own argument.
+psql "$AFLDB_OWNER_DATABASE_URL" -c "SELECT provenance, count(*) AS revisions,
+  pg_size_pretty(sum(pg_column_size(raw_payload))) AS payload_bytes
+  FROM external_grids GROUP BY provenance ORDER BY provenance;"
+
+# 11. DONE 2026-09-01. The cross-check the two provenances exist for: where do
+#     the archive and Gridley disagree about a board's six labels? Read-only.
+#     Result: ZERO rows, over the 1,123 boards both provenances hold —
+#     1,123 x 6 = 6,738 overlapping board-axis positions agree exactly.
+psql "$AFLDB_OWNER_DATABASE_URL" -c "
+  SELECT g.board_number, a.orientation, a.position, a.raw_label AS gridley,
+         b.raw_label AS archive
+    FROM external_grids g
+    JOIN external_grid_axes a ON a.grid_id = g.id
+    JOIN external_grids h ON h.source_id = g.source_id
+     AND h.board_number = g.board_number
+     AND h.provenance = 'legacy_sqlite' AND h.is_current
+    JOIN external_grid_axes b ON b.grid_id = h.id
+     AND b.orientation = a.orientation AND b.position = a.position
+   WHERE g.provenance = 'gridley_api' AND g.is_current
+     AND a.raw_label IS DISTINCT FROM b.raw_label
+   ORDER BY g.board_number, a.orientation, a.position LIMIT 50;"
+```
+
+**Step 11 is the point of Stage 2.** §10.1 wanted the rescued archive as an independent
+cross-check on a re-acquired history; after step 8 that check is an ordinary query, and any row
+it returns is a finding about one of the two captures. **It returned no rows** (§21.16): the
+rescued archive and the re-acquired history agree on every label they both hold.
+
+### 21.11 What Stage 2 has NOT done
+
+Stage 2's own database work **is** done: `external_grids` now holds the 1,123 `legacy_sqlite`
+rows beside 1,143 `gridley_api` rows, R8 is measured in the database, and the archive-vs-Gridley
+cross-check §10.1 wants the two provenances for has been run over all 1,123 shared boards
+(§21.16). What follows is what Stage 2 deliberately left for later stages.
+
+No criterion was mapped, normalised or classified; `external_grid_criterion_map` and
+`external_grid_answers` still do not exist. The Gridley-player-id bridge (R4) was not built.
+`played_for_club` was not touched or referenced, no predicate was added, no Grid Solver file was
+opened for edit, and no AFLDB answer was compared against `correctAnswersPlayerMap`. Operator
+queries V1–V3 remain unrun; they gate Stage 3. Nothing was committed, merged, rebased or pushed.
+
+### 21.12 Exact next action
+
+**The Stage 2 operator gate is finished (§21.13, §21.16). The exact next action is the operator
+commit of this milestone, then Stage 3 in a fresh session**, beginning from this runbook and
+re-assessing reasoning effort before the deterministic mapping work starts.
+
+Stage 3 is deterministic mappings for the 202 `EXACT_EXISTING` criteria only, into
+`external_grid_criterion_map`, still gated on operator queries V1–V3 (§15.2). Stage 3 involves
+semantic judgement, so re-assess model and effort at that point (§19) rather than inheriting this
+session's settings.
+
+Both of the questions this checkpoint opened for the gate are now answered:
+
+1. **Is the history complete?** Yes. `--require-complete` passed over all 1,143 dates with no
+   board request made (§21.16 step 6b).
+2. **What does the six-label cross-check return?** Zero rows, over all 6,738 overlapping
+   board-axis positions (§21.16 step 11). The rescued archive and the re-acquired history give
+   the corpus one consistent reading, so Stage 3 maps criteria without a provenance conflict to
+   resolve first.
+
+One question remains open and is deliberately **not** resolved here:
+
+3. **Should the change oracle hash the whole payload, or only the board?** See §21.14. It is an
+   evidenced design question, it did not block the import, and it must be settled — with
+   `--refresh` evidence in hand — before any recurring acquisition is scheduled. Changing the
+   recipe re-hashes the whole corpus, so it is not a side-effect edit.
+
+**Issue-number collision, for reconciliation elsewhere.** A separate worktree,
+`D:\dev\afldb-issue-118` on branch `codex/issue-118`, independently allocated
+`AFLDB-ISSUE-118` for unrelated NL-search telemetry work. That worktree was not inspected,
+edited or reconciled here, and neither issue was renumbered: resolving the duplicate allocation
+is its own task, to be done after this Stage 2 milestone is committed.
+
+### 21.13 Operator gate — acquisition EXECUTED AND PASSED, 31 August 2026
+
+Run by the operator in `D:\dev\afldb-gridley`. Recorded here verbatim, then independently
+audited from the snapshot on disk (V-OP.7 below). **Steps 7–11 were not run and no database was
+contacted.**
+
+#### Step 1 — dependencies
+
+`npm ci` — **PASS**: 419 packages added, 420 audited, 0 vulnerabilities, an `eslint@9.39.5`
+deprecation warning only.
+
+**No worktree `.venv` was created, deliberately.** The established AFLDB environment at
+`D:\dev\afldb\.venv` already carries psycopg 3.3.4 and remains the intended interpreter for the
+DB-touching steps. §21.10 step 1 has been corrected to say so; its earlier `python -m venv .venv`
+line was wrong and would have created a second environment to keep in step for no benefit.
+
+#### Step 2 — focused tests and typecheck
+
+```
+npx vitest run tests/gridley-acquisition.test.ts tests/external-grids-import.test.ts
+```
+
+**PASS — 2/2 files. 91 passed + 1 SKIPPED = 92 total**, 40.41 s. Stage 2: 45/45 passed.
+Stage 1: 47 total, 46 passed + 1 skipped.
+
+**The skip is real and is recorded as a skip, not as a pass.** The Stage 1 suite's optional
+legacy-archive validation looks for `/home/arm/projects/sports_data_lab/data/afl/afl.db`; the
+Windows archive is at `D:\dev\sports_data_lab\data\afl\afl.db`, so the case did not run. Not a
+blocker: that archive was independently validated during Stage 1 (§20.6, §20.8) and this session
+re-read it read-only for V-S2.5. **Do not restate this run as 92/92 passed.** A hard-coded POSIX
+path in a suite that otherwise runs on both platforms is worth fixing on its own, but it is
+Stage 1 hygiene and not Stage 2 scope.
+
+`npm run typecheck` — **PASS**: `next typegen` generated route types, `tsc --noEmit` reported no
+errors.
+
+#### Step 3 — offline plan
+
+`acquire_gridley_boards.py --all --dry-run` — **PASS**, and explicitly reported that no request
+was made and nothing was written.
+
+| Field | Value |
+|---|---|
+| Source | `https://gridleygame.com/data/grids/YYYY-MM-DD.json` |
+| Snapshot | `D:\dev\afldb-gridley\data\sources\gridley\history` |
+| Range | 2023-07-17 → 2026-09-01, **1,143 dates** |
+| State | 0 captured, 1,143 to request |
+| Policy | ≥1.5 s pacing, 3 retries at 2/4/8 s, 20 s timeout, default bound 200 |
+| First / last of batch 1 | 2023-07-17 / 2024-02-01 |
+
+#### Step 4 — FIRST LIVE CONTACT
+
+`acquire_gridley_boards.py --days 3` over 2026-08-30 → 2026-09-01 — **PASS**.
+
+**3 saved.** revised 0, unchanged 0, skipped 0, unavailable 0, http_error 0, network_error 0,
+malformed_json 0, shape_invalid 0. Dates considered 3; **requests made 4**.
+
+The operator flagged the 4th request as consistent-but-unproven. **It is now proven from
+repository evidence**: `check_robots()` is called once per run before any board is requested, and
+across all seven runs the totals are 1,143 board requests + 7 robots requests = 1,150 (V-OP.7).
+The one robots response is stored once, content-addressed, at
+`http/robots__90d24bc3bf698ac1.{txt,json}`.
+
+#### Step 5 — DB-free validation of the first captures
+
+`import_gridley_boards.py --dry-run --no-db` — **PASS**, PostgreSQL explicitly skipped.
+
+```
+capture files read 3   captures parsed 3   captures rejected 0
+board numbers #1141-#1143   dates 2026-08-30 - 2026-09-01
+distinct boards 3   distinct dates 3   dates with >1 capture 0   number gaps 0
+axis occurrences 18   distinct criterion ids 18   axes with description 18
+axes with subtitle 13   axes with item type 3
+captures with answer key 3/3   answer-key cells 27   answer-key player refs 3,469
+```
+
+#### Step 6 — bounded historical acquisition
+
+Six runs at the default 200-request bound. Every run: 0 revised, 0 unchanged, 0 unavailable, and
+0 across all four failure categories.
+
+| Run | Captured at start | To request | Saved | Skipped | Requests | Remaining | Next date |
+|---|---:|---:|---:|---:|---:|---:|---|
+| 1 | 3 | 1,140 | 200 | 3 | 201 | 940 | 2024-02-02 |
+| 2 | 203 | 940 | 200 | 203 | 201 | 740 | 2024-08-20 |
+| 3 | 403 | 740 | 200 | 403 | 201 | 540 | 2025-03-08 |
+| 4 | 603 | 540 | 200 | 603 | 201 | 340 | 2025-09-24 |
+| 5 | 803 | 340 | 200 | 803 | 201 | 140 | 2026-04-12 |
+| 6 | 1,003 | 140 | 140 | 1,003 | 141 | 0 | — |
+
+The `skipped` column is the resumability contract working: each run re-listed every date and
+requested only the ones it did not already hold.
+
+#### V-OP.7 — independent audit of the snapshot (this session, read-only)
+
+Not taken on trust. Every capture on disk was re-read and re-hashed; no file was written, no
+request was made, no database was contacted.
+
+| Check | Result |
+|---|---|
+| Raw captures | **1,143** |
+| Date range | **2023-07-17 → 2026-09-01** |
+| Calendar span | **1,143 days — one board per day, no missing date** |
+| Board number range | **#1 – #1143**, 0 gaps, 0 duplicates |
+| Dates with >1 capture | **0** — no board was revised during first acquisition |
+| Bytes re-hashed against filename | **1,143 / 1,143 match**, 0 mismatches |
+| Request records | **1,143 present, 0 orphans**, every one carries `fetched_at` and a `body_sha256` equal to the bytes |
+| Level drift (`level` vs the date's implied number) | **0** |
+| Rejected responses | **0** |
+| Run records | **7**, all `status: completed` |
+| Total HTTP requests | **1,150** = 1,143 boards + 7 robots |
+| Declared user agent | `AFLDB-corpus/1.0 (AFLDB Grid Solver compatibility corpus; contact: …)` |
+| Pacing recorded in every run | 1.5 s |
+| Raw payload on disk | **42.9 MB**, mean **38.4 KB** per board |
+
+`robots.txt` as served and stored (sha256 `90d24bc3…`):
+
+```
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Disallow:
+```
+
+An empty `Disallow` allows everything, so the crawl was permitted rather than merely
+unobjected-to. The response is retained in the snapshot as the record of that.
+
+**Cross-session fidelity.** Board #1 (`2023-07-17`) as acquired live is **byte-identical** to the
+Stage 0 probe capture committed at `tests/fixtures/gridley/board-0001-2023-07-17.json`, taken on
+a different day by a different tool. R8's premise holds and board #1 is stable at three years
+old.
+
+### 21.14 FINDING — the payload mixes the board with live play counters
+
+Found by comparing the live capture of board #1139 (`2026-08-28`) against the Stage 0 probe of
+the same board taken three days earlier. **Both are 200s, both are the same board, and their
+bytes differ.**
+
+| Field | Stage 0 probe | Live capture | |
+|---|---|---|---|
+| `hItems`, `vItems` | — | — | **identical** |
+| `level`, `social` | — | — | **identical** |
+| `started` | 3,422 | 3,431 | changed |
+| `completed` | 2,437 | 2,444 | changed |
+| `correctGuesses` | — | — | changed, all 9 cells |
+| `scoreMap` | — | — | changed |
+| `correctAnswersPlayerMap` | — | — | changed — **counts only** |
+
+The answer key deserves its own line: **the qualifying player SET is identical in all nine
+cells** — 0 players added, 0 removed — and only the per-player guess counts moved. Board #1, three
+years old and no longer being played, was byte-identical over the same interval.
+
+So the payload is two things at once: an **immutable board definition plus answer key**, and a
+**live popularity counter** that ticks for as long as people keep playing.
+
+**Consequences, recorded rather than acted on:**
+
+* Nothing in this checkpoint is wrong because of it. First acquisition fetched each date once, so
+  0 revisions were created, and preserving the counters is correct — they are real captured
+  evidence of what the source served at that moment (§10.3).
+* But `payload_sha256` is computed over the whole envelope, so **any `--refresh` of a board people
+  are still playing will legitimately produce a new revision**, and `data_issues` will record a
+  divergence, for a board whose criteria and answer key have not changed at all. The §13 rolling
+  window will do this routinely for recent dates.
+* For Stage 6 the important half is stable: the oracle is the player set, and the player set did
+  not move.
+
+**Open question for a later stage — not this one.** Should the revision oracle hash the whole
+payload, or a board-identity projection (`hItems`, `vItems`, `level`, and the answer key's player
+sets) with the counters preserved in `raw_payload` but outside the hash? The second would make a
+revision mean "the board or its answer key changed", which is what a compatibility corpus
+actually cares about. **Do not change it as a side effect of resuming the import**: the current
+behaviour is defensible, it is what the 1,143 captures on disk were hashed under, and changing
+the recipe would re-hash the whole corpus. Decide it explicitly, with `--refresh` evidence in
+hand, before scheduling any recurring acquisition.
+
+### 21.15 Documentation corrections made at this checkpoint
+
+1. **§21.10 said "Steps 3 onward make live requests"** — wrong. Step 3 is `--dry-run` and makes no
+   request at all, which the suite proves. Corrected: steps 1–3 are offline, **step 4 is the first
+   live contact**.
+2. **§21.10 step 1 told the operator to create a worktree `.venv`** — corrected to use the
+   established `D:\dev\afldb\.venv` (psycopg 3.3.4), and steps 7–9 now name that interpreter.
+   Only steps 7–9 need it.
+3. **The reported mojibake is NOT in the file.** Checked rather than assumed, and deliberately
+   described here by codepoint rather than quoted, so this paragraph does not itself become
+   the thing a future encoding check trips over. `issues/open/AFLDB-ISSUE-118.md` decodes as
+   valid UTF-8 with no BOM; it stores the em dash correctly as the bytes `e2 80 94` and the
+   section sign as `c2 a7`; and it contains no U+00E2/U+20AC or U+00C2/U+00A7 pair of the kind
+   that a double-decode produces. The garbled em dashes and section signs are a console
+   rendering artefact
+   — Windows PowerShell decoding UTF-8 as cp1252. **Nothing was rewritten.** To read it correctly:
+   `chcp 65001` first, or `Get-Content -Encoding utf8 <file>`, or read it in an editor.
+
+Made at the 1 September finalisation, after the rest of the gate was run:
+
+4. **§21.10 steps 10 and 11 told the operator to use `$AFLDB_DATABASE_URL`** — that variable does
+   not exist in this environment. Found by running it: psql received an empty DSN, fell back to
+   its default local connection, prompted for the Windows user `stuar` and failed
+   authentication. **The SQL never ran and nothing was written.** This is a runbook defect, not a
+   database or tooling defect. Corrected to `AFLDB_OWNER_DATABASE_URL`, which is what the two
+   read-only steps were then run under, with the full list of DSN variables that do exist now
+   recorded in §21.10 so the next operator does not have to discover them.
+5. **§21.10 steps 7–9 named the interpreter as `...\.venv\Scripts\python`** — corrected to
+   `python.exe`, which is what was actually invoked.
+6. **§21 status, §21.10 step markers, §21.11 and §21.12 said the import was outstanding** —
+   corrected throughout: steps 6b–11 are done and recorded in §21.16, and the next action is the
+   operator commit followed by Stage 3 in a fresh session.
+
+### 21.16 Operator gate — steps 6b–11 EXECUTED AND PASSED, 1 September 2026
+
+Run by the operator in `D:\dev\afldb-gridley`, against `afldb_dev` over the restored SSH tunnel
+on `127.0.0.1:5432`, with the environment loaded from `D:\dev\afldb\.env` and the established
+interpreter `D:\dev\afldb\.venv\Scripts\python.exe`. Recorded here verbatim. **No credential was
+printed and none is recorded here.** With §21.13 this completes §21.10 steps 1–11.
+
+#### Step 6b — completeness verification
+
+`acquire_gridley_boards.py --all --require-complete` — **PASS**.
+
+| Field | Value |
+|---|---|
+| Date range | 2023-07-17 → 2026-09-01, **1,143 dates** |
+| Already captured | **1,143** |
+| To request | **0** — bound 0 board requests |
+| saved / revised / unchanged | 0 / 0 / 0 |
+| skipped | **1,143** |
+| unavailable, http_error, network_error, malformed_json, shape_invalid | **0 each** |
+| Dates considered | 1,143 |
+| Requests made | **1** |
+
+`OK: 0 captures written, 1,143 already on disk.` The single request is the per-run `robots.txt`
+fetch established by the V-OP.7 audit; **no board payload was re-fetched**. The run record is on
+disk as the eighth entry in `data/sources/gridley/history/runs/`, `status: completed`, and its
+counts match the above.
+
+#### Step 7 — classify the complete snapshot against `afldb_dev`, without writing
+
+`import_gridley_boards.py --dry-run` — **PASS, exit 0.**
+
+```
+capture files read    : 1,143     captures parsed : 1,143   captures rejected : 0
+board number range    : #1 - #1143          board dates : 2023-07-17 - 2026-09-01
+distinct boards       : 1,143     distinct dates  : 1,143
+dates with >1 capture : 0         gaps in number range : 0
+axis occurrences      : 6,858     distinct criterion ids : 839
+axes with description : 6,851     axes with subtitle : 3,900   axes with item type : 1,066
+captures with answer key : 1,143 of 1,143
+answer-key cells      : 10,287    answer-key player refs : 1,512,436
+```
+
+PostgreSQL classification: **1,143 would be inserted, 0 revised, 0 unchanged, 0 conflicts.**
+
+`OK: 1143 capture(s) validated, 1143 would be inserted, 0 would become new revisions, 0 already
+captured. Nothing was written.`
+
+#### Step 8 — the real `gridley_api` import
+
+`import_gridley_boards.py` — **PASS, exit 0.**
+
+**1,143 inserted, 0 revised, 0 unchanged, 0 conflicts, 0 rejected.**
+
+`OK: 1143 board(s) inserted, 0 new revision(s), 0 already captured.`
+
+`afldb_dev` now holds the whole Gridley history under `gridley_api`, beside the 1,123
+`legacy_sqlite` rows Stage 1 imported. Neither provenance touched the other.
+
+#### Step 9 — immediate idempotency re-run
+
+The same command again, immediately — **PASS, exit 0.**
+
+**0 inserted, 0 revised, 1,143 unchanged, 0 conflicts, 0 rejected.**
+
+`OK: 0 board(s) inserted, 0 new revision(s), 1143 already captured.`
+
+This is §21.8's fix proved against the real database and the complete snapshot, not a fixture:
+re-running a finished backfill creates nothing.
+
+#### Step 10 — R8 measured in the database
+
+Read-only, under `AFLDB_OWNER_DATABASE_URL`.
+
+| provenance | revisions | payload_bytes |
+|---|---:|---|
+| `gridley_api` | 1,143 | **9,813 kB** |
+| `legacy_sqlite` | 1,123 | **373 kB** |
+
+**These are PostgreSQL `pg_column_size(raw_payload)` aggregates and are a different measurement
+from the 42.9 MB raw on-disk snapshot in §21.13** — a different representation of the same
+captures, not a discrepancy. Do not present one as a correction of the other. R8 is answered:
+the richer Gridley payloads cost single-digit megabytes in the database.
+
+**Two operator notes, neither a defect in the code.**
+
+* The first attempt used the runbook's `$AFLDB_DATABASE_URL`, which does not exist. psql got an
+  empty DSN, fell back to a default local connection, prompted for Windows user `stuar` and
+  failed authentication. **The query did not run and nothing was written.** The runbook was
+  wrong; §21.10 and §21.15 item 4 record the correction.
+* Passing the DSN and `-c "<sql>"` through PowerShell in one go had psql read the SQL as a
+  surplus command-line argument and drop into interactive mode. The connection to `afldb_dev`
+  itself succeeded over SSL, and the query was then run inside that authenticated session. A
+  shell-quoting trap, not a database or tooling problem.
+
+#### Step 11 — `legacy_sqlite` versus `gridley_api`, the six-label cross-check
+
+Read-only, under `AFLDB_OWNER_DATABASE_URL`, the query exactly as §21.10 step 11 gives it.
+
+```
+ board_number | orientation | position | gridley | archive
+--------------+-------------+----------+---------+---------
+(0 rows)
+```
+
+**PASS — zero rows.** The two provenances overlap on 1,123 boards of six axes each, so this
+establishes **no `raw_label` divergence across 1,123 × 6 = 6,738 overlapping board-axis
+positions**. This is the cross-check §10.1 wanted the rescued archive for, and the answer is that
+the archive and the re-acquired history read the corpus identically. §21.9 V-S2.5 had compared
+two boards; this compares every board they share.
+
+#### What this establishes
+
+* The Gridley history is acquired in full and is whole on disk: 1,143 of 1,143 dates,
+  2023-07-17 → 2026-09-01, boards #1–#1143 with no gap and no duplicate, every stored byte
+  matching its recorded hash (§21.13).
+* It is persisted in `afldb_dev` in full under `gridley_api`, with zero conflicts and zero
+  rejections, and re-running the import is a proven no-op.
+* The corpus has one consistent reading across both provenances.
+* Storage in the database is measured and modest.
+* **No Stage 3 work was performed.** No criterion was mapped, no solver semantics or mappings
+  were changed, migration 080 was not edited, no migration was added, and the hashing/revision
+  recipe was not touched. §21.14 remains open, deliberately.
+* Nothing was committed, merged, rebased, pushed or deployed. The Stage 2 milestone is ready for
+  the operator commit.
