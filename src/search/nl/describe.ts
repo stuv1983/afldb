@@ -74,10 +74,10 @@ export function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { h
     return describePlayerCareerAnswer(plan, payload.lead, payload.rows, payload.total);
   }
   if (payload.kind === 'player_game') {
-    return describePlayerGameAnswer(plan, payload.lead, payload.rows);
+    return describePlayerGameAnswer(plan, payload.lead, payload.rows, payload.total);
   }
   if (payload.kind === 'player_season') {
-    return describePlayerSeasonAnswer(plan, payload.lead, payload.rows);
+    return describePlayerSeasonAnswer(plan, payload.lead, payload.rows, payload.total);
   }
   if (payload.kind === 'team_match') {
     return describeTeamMatchAnswer(plan, payload.lead, payload.rows);
@@ -293,9 +293,25 @@ function describePlayerGameAnswer(
   plan: NlQueryPlan,
   lead: NlPlayerGameRow | null,
   rows: NlPlayerGameRow[],
+  total: number,
 ): { headline: string; interpretation: string } {
   if (!lead) return { headline: 'No matching performance found', interpretation: '' };
   const metricLabel = (plan.metric ?? '').replace(/_/g, ' ');
+  // A metric threshold is a qualifying list, never a leader: the headline
+  // is the count, and the interpretation restates the applied bound.
+  if (plan.metricCondition) {
+    const bound = `${COMPARE_WORDS[plan.metricCondition.op]} ${plan.metricCondition.value.toLocaleString('en-AU')}`;
+    if (plan.mode === 'sum') {
+      return {
+        headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'player qualifies' : 'players qualify'}`,
+        interpretation: `Total ${metricLabel} ${bound} across the matches in scope.`,
+      };
+    }
+    return {
+      headline: `${total.toLocaleString('en-AU')} qualifying ${total === 1 ? 'performance' : 'performances'}`,
+      interpretation: `Single-game ${metricLabel} ${bound}.`,
+    };
+  }
   // Identity is the player: two rows for the same player at the lead
   // value are the same record held twice, not two different holders.
   const labels = dedupeByIdentity(rows, lead.value, (r) => r.playerId, (r) => r.playerName);
@@ -319,9 +335,17 @@ function describePlayerSeasonAnswer(
   plan: NlQueryPlan,
   lead: NlPlayerSeasonRow | null,
   rows: NlPlayerSeasonRow[],
+  total: number,
 ): { headline: string; interpretation: string } {
   if (!lead) return { headline: 'No matching season found', interpretation: '' };
   const metricLabel = (plan.metric ?? '').replace(/_/g, ' ');
+  if (plan.metricCondition) {
+    const bound = `${COMPARE_WORDS[plan.metricCondition.op]} ${plan.metricCondition.value.toLocaleString('en-AU')}`;
+    return {
+      headline: `${total.toLocaleString('en-AU')} qualifying ${total === 1 ? 'player-season' : 'player-seasons'}`,
+      interpretation: `Season ${metricLabel} ${bound}.`,
+    };
+  }
   const labels = dedupeByIdentity(rows, lead.value, (r) => r.playerId, (r) => r.displayName);
   const { subject, tied } = tiedSubject(labels);
   return {
@@ -341,16 +365,19 @@ function describePlayerCareerAnswer(
   if (!plan.metric || lead === null || lead.value === null) {
     return {
       headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'player matches' : 'players match'}`,
-      interpretation: 'Players meeting every condition asked for.',
+      interpretation: plan.scope.clubFor
+        ? `Players matching every condition for ${plan.scope.clubFor.name}.`
+        : 'Players meeting every condition asked for.',
     };
   }
   const metricLabel = plan.metric.replace(/_/g, ' ');
+  const clubSuffix = plan.scope.clubFor ? ` for ${plan.scope.clubFor.name}` : '';
   const labels = dedupeByIdentity(rows, lead.value, (r) => r.playerId, (r) => r.displayName);
   const { subject, tied } = tiedSubject(labels);
   return {
     headline: `${subject} — ${lead.value.toLocaleString('en-AU')} ${metricLabel}${tied ? ' (tied)' : ''}`,
     interpretation: plan.agg.kind === 'top_n'
-      ? `Top ${plan.agg.n} ${rankWord(plan).toLowerCase()} by career ${metricLabel}.`
-      : `${rankWord(plan)} career ${metricLabel}.`,
+      ? `Top ${plan.agg.n} ${rankWord(plan).toLowerCase()} by career ${metricLabel}${clubSuffix}.`
+      : `${rankWord(plan)} career ${metricLabel}${clubSuffix}.`,
   };
 }

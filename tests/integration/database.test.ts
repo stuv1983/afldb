@@ -11,6 +11,18 @@ import './guard';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
+import type { NlGrain } from '@/search/nl/plan';
+
+const SUPPORTED_NL_GRAINS = {
+  player_career: true,
+  player_game: true,
+  player_season: true,
+  team_match: true,
+  club_season: true,
+  team_streak: true,
+  head_to_head: true,
+  achievement_summary: true,
+} satisfies Record<NlGrain, true>;
 
 afterAll(async () => {
   await sql.end();
@@ -64,6 +76,33 @@ describe('schema', () => {
     expect(row.a).toBe('anthony mcdonald tipungwuti');
     expect(row.b).toBe('jack obrien');
     expect(row.c).toBe('nic naitanui');
+  });
+
+  it('accepts every supported NL telemetry grain including head_to_head', async () => {
+    const grains = Object.keys(SUPPORTED_NL_GRAINS) as NlGrain[];
+    const inserted: NlGrain[] = [];
+
+    await expect(
+      sql.begin(async (tx) => {
+        const database = tx as unknown as typeof sql;
+        for (const grain of grains) {
+          const [row] = await database<{ grain: NlGrain }[]>`
+            INSERT INTO nl_search_log (
+              question, outcome, grain, result_count, duration_ms
+            )
+            VALUES (
+              ${`NL grain schema contract: ${grain}`}, 'answered', ${grain}, 1, 0
+            )
+            RETURNING grain
+          `;
+          inserted.push(row.grain);
+        }
+        throw new Rollback('accepted NL grain rows');
+      }),
+    ).rejects.toThrow('accepted NL grain rows');
+
+    expect(inserted.sort()).toEqual([...grains].sort());
+    expect(inserted).toContain('head_to_head');
   });
 
   it('refuses a match whose margin disagrees with its scores', async () => {

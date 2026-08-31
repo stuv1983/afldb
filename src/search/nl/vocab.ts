@@ -473,6 +473,13 @@ export const RIVALRY_WORDS: [RegExp, [string, string]][] = [
 export const COMPARE_OP_WORDS: [RegExp, NlCompareOp][] = [
   [/\bno more than\b/, 'lte'],
   [/\bno fewer than\b/, 'gte'],
+  // The remaining two "no <comparative> than" forms. Listed before the
+  // bare "less than" entry below because this loop takes the first ENTRY
+  // that matches anywhere, not the leftmost text match -- "no less than 12"
+  // means >= 12, and letting "less than" claim it would silently invert
+  // the bound.
+  [/\bno less than\b/, 'gte'],
+  [/\bno greater than\b/, 'lte'],
   [/\bat least\b/, 'gte'],
   [/\bat most\b/, 'lte'],
   [/\bmore than\b/, 'gt'],
@@ -761,6 +768,11 @@ export const CLUB_NICKNAMES: Record<string, string> = {
   tigers: 'richmond',
   dogs: 'western bulldogs',
   doggies: 'western bulldogs',
+  // Bare "bulldogs" -- neither reference identity (Footscray, Western
+  // Bulldogs) supplies it as a maintained short name, so without this
+  // entry the commonest form of the club's own nickname resolved to
+  // nothing at all. Same organization lineage as "dogs"/"doggies".
+  bulldogs: 'western bulldogs',
   cats: 'geelong',
   hawks: 'hawthorn',
   dees: 'melbourne',

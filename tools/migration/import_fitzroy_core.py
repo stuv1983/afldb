@@ -95,6 +95,10 @@ SEASONS_JSON = REPO_ROOT / "data" / "reference" / "seasons.json"
 ACCEPTED_BASELINES_PATH = REPO_ROOT / "data" / "reference" / "fitzroy-accepted-baselines.json"
 VENUES_JSON = REPO_ROOT / "data" / "reference" / "venue-canonical.json"
 AVAILABILITY_JSON = REPO_ROOT / "data" / "reference" / "stat-availability.json"
+# AFLDB-ISSUE-110. Curated player aliases keyed by (source key, stable external
+# identity), never players.id. Loaded by the `aliases` group.
+PLAYER_ALIASES_JSON = REPO_ROOT / "data" / "reference" / "player-name-aliases.json"
+PLAYER_ALIAS_TYPE = "alternate"
 
 ADAPTER_SCHEMA_VERSION = 1
 
@@ -2311,6 +2315,136 @@ def import_players(pg, rep, players: dict[str, PlayerFact], args, refs: dict) ->
     rep.result("players", len(players))
 
 
+def load_player_alias_reference(path: Path | None = None) -> list[dict]:
+    """Read and validate data/reference/player-name-aliases.json (AFLDB-ISSUE-110).
+
+    Every entry is keyed by a source registry key plus that source's STABLE
+    external identity — for `afltables`, the canonical profile path exactly as
+    external_identities stores it. A surrogate players.id is never accepted:
+    the rebuild re-seeds it. A malformed or duplicated entry refuses the whole
+    file, mirroring how ClubResolver refuses an inconsistent tracked rule.
+    """
+    ref_path = path or PLAYER_ALIASES_JSON
+    data = json.loads(ref_path.read_text(encoding="utf-8"))
+    entries = data.get("aliases") if isinstance(data, dict) else None
+    if not isinstance(entries, list):
+        raise ValueError(f"{ref_path.name}: top-level `aliases` must be a list")
+
+    out: list[dict] = []
+    seen: set[tuple[str, str, str]] = set()
+    for i, entry in enumerate(entries):
+        where = f"{ref_path.name} aliases[{i}]"
+        if not isinstance(entry, dict):
+            raise ValueError(f"{where}: entry must be an object")
+        for forbidden in ("player_id", "players_id", "id"):
+            if forbidden in entry:
+                raise ValueError(
+                    f"{where}: `{forbidden}` is not a stable identity — key entries "
+                    "by `source` + `external_id`")
+        for key in ("source", "external_id", "alias"):
+            value = entry.get(key)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{where}: `{key}` must be a non-empty string")
+            if value != value.strip() or re.search(r"\s{2,}", value):
+                raise ValueError(f"{where}: `{key}` has stray whitespace: {value!r}")
+        source, external_id, alias = entry["source"], entry["external_id"], entry["alias"]
+        if source == SOURCE_KEY_AFLTABLES and normalise_profile_url(external_id) != external_id:
+            raise ValueError(
+                f"{where}: afltables external_id must be the canonical profile path "
+                f"(players/A/Name.html), got {external_id!r}")
+        dedupe_key = (source, external_id, alias.casefold())
+        if dedupe_key in seen:
+            raise ValueError(f"{where}: duplicate alias {alias!r} for {source}:{external_id}")
+        seen.add(dedupe_key)
+        out.append({"source": source, "external_id": external_id, "alias": alias})
+    return out
+
+
+def resolve_alias_identities(entries: list[dict],
+                             identity_rows) -> dict[tuple[str, str], int]:
+    """Map each referenced (source, external_id) to exactly one players.id.
+
+    `identity_rows` are (source_key, external_id, player_id) tuples from
+    external_identities with a resolved player. Fail closed: an identity that
+    resolves to no player, or to more than one, refuses the whole load. There
+    is no name matching and no chronological, age or ordering inference.
+    """
+    candidates: dict[tuple[str, str], set[int]] = defaultdict(set)
+    for source, external_id, player_id in identity_rows:
+        if player_id is not None:
+            candidates[(source, external_id)].add(int(player_id))
+    resolved: dict[tuple[str, str], int] = {}
+    for key in sorted({(e["source"], e["external_id"]) for e in entries}):
+        found = candidates.get(key, set())
+        if not found:
+            raise RuntimeError(
+                f"player alias reference: no resolved external identity for "
+                f"{key[0]}:{key[1]} — refusing to load; register the identity first")
+        if len(found) > 1:
+            raise RuntimeError(
+                f"player alias reference: identity {key[0]}:{key[1]} resolves to "
+                f"{len(found)} players {sorted(found)} — refusing to load; "
+                "resolve the identity manually before rerunning")
+        resolved[key] = next(iter(found))
+    return resolved
+
+
+def apply_player_name_aliases(pg, entries: list[dict]) -> int:
+    """Insert the curated aliases; returns rows inserted. Does not commit.
+
+    Idempotent and insert-only: ON CONFLICT (player_id, alias) DO NOTHING, no
+    DELETE, no update of any existing alias row, so manual and source_string
+    aliases are preserved. search_alias is derived by afldb_normalise_name()
+    in SQL, the same function the search queries use.
+    """
+    if not entries:
+        return 0
+    sources = sorted({e["source"] for e in entries})
+    external_ids = sorted({e["external_id"] for e in entries})
+    with pg.cursor() as cur:
+        cur.execute("SELECT key FROM sources WHERE key = ANY(%s)", (sources,))
+        known = {r[0] for r in cur.fetchall()}
+        missing = sorted(set(sources) - known)
+        if missing:
+            raise RuntimeError(
+                f"player alias reference: no sources row for {missing!r} — run "
+                "tools/migration/load_reference_data.py first")
+        cur.execute(
+            """SELECT s.key, ei.external_id, ei.player_id
+                 FROM external_identities ei
+                 JOIN sources s ON s.id = ei.source_id
+                WHERE s.key = ANY(%s) AND ei.external_id = ANY(%s)
+                  AND ei.status IN ('unique','resolved')
+                  AND ei.player_id IS NOT NULL""",
+            (sources, external_ids))
+        resolved = resolve_alias_identities(entries, cur.fetchall())
+        inserted = 0
+        for entry in entries:
+            cur.execute(
+                """INSERT INTO player_name_aliases
+                     (player_id, alias, search_alias, alias_type)
+                   VALUES (%s, %s, afldb_normalise_name(%s), %s)
+                   ON CONFLICT (player_id, alias) DO NOTHING""",
+                (resolved[(entry["source"], entry["external_id"])],
+                 entry["alias"], entry["alias"], PLAYER_ALIAS_TYPE))
+            inserted += cur.rowcount
+    return inserted
+
+
+def import_player_name_aliases(pg, rep, args) -> None:
+    """The `aliases` group: load the tracked curated aliases (AFLDB-ISSUE-110)."""
+    from common import import_batch
+
+    entries = load_player_alias_reference()
+    with import_batch(pg, args.source_key, "import_fitzroy_core.py",
+                      "player_name_aliases") as batch:
+        batch.records_read = len(entries)
+        batch.records_inserted = apply_player_name_aliases(pg, entries)
+        pg.commit()
+    rep.result("player_name_aliases", batch.records_inserted,
+               f"inserted of {len(entries)} tracked")
+
+
 def load_player_map(pg, args) -> dict[str, int]:
     with pg.cursor() as cur:
         cur.execute("SELECT id FROM sources WHERE key = %s", (args.source_key,))
@@ -2574,7 +2708,7 @@ def import_brownlow_round_votes(pg, rep, files: list[SnapshotFile],
 # Driver
 # ---------------------------------------------------------------------------
 
-GROUPS = ["venues", "players", "matches", "stats", "brownlow"]
+GROUPS = ["venues", "players", "aliases", "matches", "stats", "brownlow"]
 
 
 def main() -> int:
@@ -2844,6 +2978,11 @@ def main() -> int:
             import_players(pg, rep, players, args, refs)
             from common import replay_admin_overrides
             replay_admin_overrides(pg, "players")
+        elif group == "aliases":
+            # AFLDB-ISSUE-110. Runs after `players` so freshly registered
+            # identities resolve; separately selectable (--groups aliases) so
+            # the curated aliases can be loaded without re-importing players.
+            import_player_name_aliases(pg, rep, args)
         elif group == "matches":
             import_matches(pg, rep, matches, clubs, refs)
             replay_admin_overrides(pg, "matches")

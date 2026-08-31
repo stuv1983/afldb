@@ -7,20 +7,18 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 5 tracked here — `AFLDB-ISSUE-102`, `-104`, `-112`, `-113`, `-116`.
+**Open issues:** 6 tracked here — `AFLDB-ISSUE-102`, `-104`, `-110`, `-112`, `-113`, `-116`.
 
-> **`AFLDB-ISSUE-110` is allocated and is NOT free.** It belongs to active NL semantic-mapping
-> work that is **not merged into this worktree** (baseline `95819a3`). No row is written for it
-> here because its content is unknown at this baseline and must not be invented. When these
-> branches merge, ISSUE-110's own ledger rows are authoritative and must be preserved — do not
-> let this file's open-issue count or table overwrite them. Merge-sensitive; see
-> `issues/open/AFLDB-ISSUE-102-HANDOFF.md`.
+<!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
+     the ISSUE-110 branch merged into dev on 2026-08-31 and its own ledger rows below are
+     now authoritative, as that warning required. -->
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
 | `AFLDB-ISSUE-102` | Medium | Data acquisition / Import architecture | **PARENT.** Scope revised 2026-08-30 by operator decision from "record only" to parent architecture / dependency-inventory / child-coordination / acceptance record for legacy-free awards acquisition. `tools/migration/import_awards.py:1408` still requires `AFLDB_LEGACY_SQLITE` for six of seven groups (`under_22` is already legacy-free). `tools/db/rebuild-test.ts` has **no awards stage**, so a canonical rebuild leaves all six awards/honours tables at **zero rows**, ungated. ISSUE-102 does not implement loaders. | **No implementation. Coordinate `AFLDB-ISSUE-111` (Coleman derivation), `-112` (curated honours manifests) and `-113` (Brownlow season totals; outside this issue's closure boundary).** Closure criteria in `issues/open/AFLDB-ISSUE-102.md` §8. Next action is operator: authorise the read-only measurement gating ISSUE-112 G0, and decide the one-time extraction source (ISSUE-112 §11.1). `AFLDB-ISSUE-111` is **Resolved 2026-08-30** — Coleman is legacy-free by derivation and canonically rebuild-gated. |
 | `AFLDB-ISSUE-112` | Medium | Data acquisition / Import architecture / Data integrity | Replace the legacy SQLite input of the six legacy-dependent `import_awards.py` groups with checked-in, validated, reviewable curated manifests: All-Australian, Hall of Fame, honour teams, captaincies, Rising Star, club best-and-fairest, named medals (+ award definitions and the `person_links` bridge). Reuses `reload_keyed` unchanged — only the **input** changes. Scraping, HTML parsing, paid APIs and undocumented endpoints are **not** authorised. | **Blocked on gate G0** (per-family read-only coverage measurement) **and operator prerequisite §11.1** — where the one-time extraction comes from. Recommended phasing, smallest first: honour teams (113 rows) → Hall of Fame (343) → captaincies (1,375) → Rising Star (766) → All-Australian (2,158) → club B&F → named medals. Headline acceptance: `awards-reload-links.test.ts:205-1247` executes without `AFLDB_LEGACY_SQLITE`. |
 | `AFLDB-ISSUE-113` | Medium | Data acquisition / Import architecture / Data integrity | `brownlow_season_votes` has **no legacy-free writer** — sole writer `import_legacy_afl.py:684`. `rebuild_derived.py:23-26` and `db-health.ts:94` treat it as AUTHORITATIVE. Not reconstructible from round votes: season totals are complete 1924-1941 and 1946-2025 while round votes are complete only 1984-2025, and `vote_rank`/`eligible_rank`/`is_ineligible` are not computable from vote sums. **Silent-wrongness hazard:** with the table empty, `rebuild_derived.py`'s `season_brownlow` CTE falls every decided season to `not_applicable` — AFLDB would assert "no medal that season" for a century. | **Replacement source UNDECIDED and no selection is authorised.** Recommended next step, not a decision: a read-only probe of class B (a free structured season-summary source carrying rank **and** ineligibility) before committing to a 16,120-row manifest. Outside `AFLDB-ISSUE-102`'s closure boundary — 102 may resolve with this open. |
+| `AFLDB-ISSUE-110` | Medium | Natural-language search / deterministic semantics | NL semantic-mapping fixes, merged into dev 2026-08-31; parser v32 including the ranked-career season-bound fail-closed validator revision. Standing evidence: focused parser/validator **182/182**; expanded focused **345/345**; complete DB-free ISSUE-110 matrix **14 suites, 733/733**; typecheck passed; authoritative post-final-revision operator DB gate **2 files, 46/46 in 20.65 s, started 18:52:45** (24/24 + 22/22) — distinct from the earlier pre-revision 17:47 run. The three documented temporary artifacts were removed exactly. Durable record: `issues/open/AFLDB-ISSUE-110.md`. **Latest independent review verdict: REVISE — NOT READY FOR LARGE-SCALE VALIDATION**, with two unresolved HIGH findings: (A) career-predicate season ownership — a career predicate can exist without consuming `seasonMin`/`seasonMax`, so e.g. `players with at least 3 grand finals since 2000` silently ignores the requested period; (B) `clubFor` ownership with career predicates — e.g. `Carlton players who debuted since 2000`: execution bypasses the generic club filter merely because `careerPredicates` exist. | **Fix findings A and B fail-closed, then a fresh independent re-review.** For A, replace the blanket career-predicate exemption with explicit period ownership — only predicates that actually consume the relevant period bounds may permit them. For B, allow the `clubFor` bypass only when a predicate explicitly owns the relevant club semantics; otherwise reject or correctly compile the club constraint. No 480, 1,435/1,440, 100k, telemetry reset, or other large-scale validation before APPROVE; the 22,607-search run remains incomplete. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
 | `AFLDB-ISSUE-116` | Low | Admin tooling / Data QA / Query performance | The `player_match_stats` anchor of `/admin/query-builder` costs **1.05–1.44 s with no card at all** (T-C11 1056–1072 ms; `EXPLAIN ANALYZE` 1441 ms) — a pre-`AFLDB-ISSUE-115` baseline. `runQueryBuilder` emits `count(*) OVER ()` with an index-ordered `ORDER BY m.match_date DESC LIMIT 50`; the planner costs it as a fast-start plan (`Limit cost=4.41..577`) but the window aggregate must consume all 685,471 rows and spills to temp. Under that plan every related card became a per-row correlated Nested Loop Semi/Anti Join (685,471 executions for 13,275 distinct keys), so ISSUE-115 excluded related-domain cards under this anchor as an evidence-driven V1 boundary. Above the 1 s target, below the 5 s ceiling; own-row filtering still works. | **Separate work, not started.** Fix the anchor baseline (e.g. take the total count off the paged query, or a two-step keyset/count shape) **without** raising `AFLDB_STATEMENT_TIMEOUT_MS`, adding an index or changing schema; re-measure with the T-C11 harness; only then reconsider re-admitting related cards under `player_match_stats` (`QUERYABLE_TABLES.player_match_stats.subjects`, currently `[]`). Do not reopen ISSUE-115. |
 
@@ -9309,7 +9307,8 @@ decisions of record: `issues/open/AFLDB-ISSUE-102.md`.
   issue's closure boundary**; ISSUE-102 may be Resolved while ISSUE-113 remains Open, and the
   resolution must say so explicitly so the residual dependency is not mistaken for an oversight.
 
-`AFLDB-ISSUE-110` is allocated to unmerged NL semantic-mapping work and is **not** a child.
+`AFLDB-ISSUE-110` is NL semantic-mapping work (merged into dev 2026-08-31, tracked in its own
+entry) and is **not** a child.
 
 ### Closure criteria
 ISSUE-102 must not close until: ISSUE-111 and ISSUE-112 are both Resolved; `import_awards.py` no
@@ -10972,3 +10971,231 @@ Not started. When taken up: reproduce with the T-C11 anchor-alone reference poin
 plan, choose and implement a page/count shape, re-measure, and only then decide on re-admission
 under ISSUE-115's existing tests (T-B8/T-A1 assert the current `subjects: []` exactly and must be
 changed deliberately, not silently).
+
+## AFLDB-ISSUE-110 — Problem Search semantic triage and club-career games
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Natural-language search / deterministic semantics
+- **Found:** 2026-08-30
+
+The 2026-08-29 Problem Search export contains 543 data rows, 225 unique exact questions,
+and 22 deduplicated semantic families over 2026-08-22 through 2026-08-29. Systematic replay
+cadence and 318 repeated observations mean raw rows are not independent incidents. The export
+lacks parser/build/run identity, so current source reproduction is authoritative.
+
+At investigation start, parser v26 reproduced two high-value defects. `most games for Geelong` resolves the
+club and metric at confidence 1.0 but elects `player_game/sum`, then validation refuses the
+invalid per-game `games` metric. `players with at least 200 games for Collingwood` correctly
+produces a `player_career` list with `games gte 200` and Collingwood organization scope, but
+validation refuses it because the career-condition SQL compares whole-career columns. The
+ranked career metric path already has a lineage-aware distinct-match expression; the condition
+path does not.
+
+Historical head-to-head, compare-wins, draw-count, latest-draw, explicit club-career leader,
+player suffix, and club-player phrasing rows reproduce as fixed. Bare Gary Ablett remains safely
+ambiguous, and inside 50s in 1900 remains a truthful coverage refusal.
+
+The test target is `afldb_test` at port 55432 with migrations 78/78 applied. Focused DB
+integration passes 9/9. Independent distinct-match SQL proves Tom Hawkins leads Geelong with
+359 appearances; Collingwood has 39 players at least 200, 38 over 200, and Josh Fraser alone at
+exactly 200. The current compiler returns exactly those sets. Opponent thresholds are correct
+empty results because the observed minima are 5 wins and 8 losses against Richmond and 4 wins
+against Geelong. Brent Harvey's 432 is the global career maximum, so every 500/1000 threshold
+is also a correct empty result.
+
+Implementation is now retained under parser version 27. Bare `most games for <club>` elects
+the existing `player_career/games` plan only without a competing match/season/opponent/venue/
+player cue. Club-scoped games conditions use the same organization-lineage distinct-match
+expression as the ranked metric path; validation permits only games-only unranked conditions
+that path can fully honour. Mixed conditions remain a safe refusal.
+
+The exact Problem Search wording and comparator/collision/ambiguity controls pass. The focused
+NL parser/plan/description/regression corpus and adjacent acceptance/query-intent matrix is green
+at 7 suites / 473 tests, and typecheck is green. ISSUE-110 stays **Open** because DB acceptance
+found one remaining wrong-scope presentation value: unranked club-threshold rows qualify by
+club appearances but expose whole-career `games`, and `PlayerCareerTable` labels that field
+`Games`. This projection/rendering defect must be corrected before rendered wording, realistic
+UI, decline, and resolution gates.
+
+### 2026-08-31 — Codex review of the incomplete 22k audit sample
+
+The intended 100,000-question stress baseline did not complete. The harness terminated under
+resource pressure/timeouts after 22,607 searches had been logged. Sonnet audited that available
+sample, and Codex independently reviewed the findings against current parser, vocabulary, plan,
+validation, executor/compiler, answer, telemetry, and focused regression code. The sample is
+useful evidence but must not be described as a completed 22k or 100k baseline.
+
+Codex confirmed four coding workstreams. First, `no more than` and `no fewer than` already exist
+in comparator vocabulary; the earlier explicit-zero matcher incorrectly consumes them as
+`eq/0` and must be narrowly guarded. Second, `at most` also already exists in vocabulary; its
+decline, stranded `most`, goals-grain errors, and `answered_caveat` predicate loss share one
+root defect: `player_game`/`player_season` thresholds have no typed, validated, compiler-consumed
+plan representation. The threshold loss is code-proven and does not require answer-payload
+evidence before implementation. Third, guarded two-club `wins against`/`losses against` wording
+belongs to existing typed H2H `record` semantics. Fourth, bare `Bulldogs` belongs in the existing
+club nickname mechanism and must resolve through the normal organization path.
+
+Gary Ablett suffix identity in telemetry and `empty_result` versus `coverage_unavailable`
+classification remain observability/evidence-gated work, not confirmed semantic routing
+defects. Threshold single-performance result-row identity also requires the existing product
+contract or an explicit fail-closed decision. Broad parser rewrites, global quantifier/player
+fallback changes, unsupported metric expansion, production work, telemetry reset, and a 100k
+rerun are deferred.
+
+The authoritative implementation and minimum-test contract is appended to
+`issues/open/AFLDB-ISSUE-110.md` under **2026-08-31 next implementation pass — confirmed from
+22k audit**. The exact next action is a fresh Fable session implementing only that confirmed
+contract, followed by focused parser/plan/validation and `_test` answer proof, justified broader
+NL validation and typecheck, then a stop for review. No corpus, database, production, Git, code,
+or test operation was performed during this documentation update.
+
+### 2026-08-31 — bounded revision after the final Codex REVISE (parser v31)
+
+The confirmed A–D contract was implemented (parser v29), revised once for Codex's first REVISE
+(v30), and the Next 16 `after()` logging boundary was fixed, reaching DB-free 14 suites /
+697 tests, typecheck green, and an operator-run DB gate of 46/46. Codex's FINAL review then
+returned **REVISE** with three bounded findings, all closed the same day (parser v31):
+
+1. **HIGH — player_season silently discarded match-level scope.** Explicit `in a season`
+   wording elects `player_season` before opponent/venue/match-type/round scope is accounted
+   for, and `answerPlayerSeason` consumes none of those, so
+   `players with more than 20 disposals in a season against Carlton` validated and answered
+   whole-season disposals with Carlton discarded. Fixed fail-closed: `validatePlan` refuses any
+   `player_season` plan carrying `venue`/`clubAgainst`/`matchType`/`roundNumber` (mirroring the
+   v30 career gate); a field-by-field executor audit confirms every other typed plan field is
+   consumed or grain-gated. Parser/validator regressions cover all four review wordings plus
+   direct-validator defence-in-depth; legitimate season thresholds and clubFor leaderboards are
+   unchanged. Residual recorded, not patched: `more than 50 goals in a season` still loses the
+   season cue to an unscoped career-condition plan at parse time (parser routing work, outside
+   the bounded scope).
+2. **LOW — logNlSearch caught every synchronous after() error.** The fallback now runs only
+   for Next 16's exact no-request-scope failure (message prefix `` `after` was called outside
+   a request scope `` / non-enumerable `__NEXT_ERROR_CODE` `E468`, verified in the installed
+   `next/dist/server/after/after.js`); any other synchronous `after()` exception is reported
+   via `console.error` and isolated — never rethrown into the answer, never treated as
+   non-request execution. `tests/nl-search-log.test.ts` grew to 5 tests covering both the
+   recognition and the misclassification boundary.
+3. **LOW — scratch artifacts.** The three zero-byte untracked root files (`0`,
+   `consumedSet.has(t)`, `rest)`) were verified harmless and removed.
+
+Validation this pass: DB-free NL matrix **14 suites, 708/708** (697 + 11 new, nothing
+weakened); typecheck **passed**; DB-backed gate
+(`npx vitest run tests/integration/nl-answers-game-season.test.ts
+tests/integration/nl-semantic-mapping.test.ts`) **PASSED 2026-08-31, operator-run: 2 files,
+46/46 tests, 20.07 s** — the bounded revision changed no integration outcome. The season-cue
+residual is explicitly preserved for adjudication in the final review: it is lost at parse
+time before the backstop can see a season plan, so any fix is parser-routing work; Codex must
+determine whether it is a release-blocking semantic defect or separate follow-up scope. Exact
+next action: **FINAL CODE REVIEW — Codex**; no 480-case, 1,435-question, 100k, or other
+large-scale corpus, and no telemetry reset, before independent approval. The issue remains
+Open; the 22,607-search run remains incomplete.
+
+### 2026-08-31 — generic-season ownership and tie-policy bounded revision (parser v32)
+
+Codex implemented the release-blocking residual from the immediately preceding final review.
+`extractCareerConditions` had already removed a sole goals/games/Brownlow threshold, and the
+parser had already consumed generic `in a season`, but sole-condition conversion recognised
+only explicit game and named-year evidence. The season cue therefore disappeared before
+validation and the accepted plan could answer a career or scoped game question instead.
+
+Generic `inOneSeason` now owns the sole career threshold before game/scoped-total routing. An
+existing player-season metric becomes the plan metric plus the existing `metricCondition`,
+preserving comparator and value exactly with no invented year; goals, games, and Brownlow
+votes are supported. `clubFor` remains compatible. Opponent, venue, finals/match-type, round,
+and reachable matchup evidence remains on the season plan and reaches the established
+validation refusals. A non-season-capable career column retains an unconsumable threshold so
+validation fails closed. Top-N plus a season threshold preserves both requested fields and is
+rejected by the existing unsupported-combination gate rather than becoming an unranked career
+list.
+
+The same revision rejects `tiePolicy: "first"` for `player_season` until the executor supports
+it; `"all"` remains valid and no first-tie SQL was added. Parser version changed **31 → 32**.
+
+Validation: focused parser/validator **179/179**; complete DB-free NL matrix **14 suites,
+730/730**; typecheck passed. The operator then ran the required final parser-v32 DB gate with
+`npx vitest run tests/integration/nl-answers-game-season.test.ts
+tests/integration/nl-semantic-mapping.test.ts`: **2 files passed, 46/46 tests passed in
+19.30 s** (`nl-answers-game-season` 24/24; `nl-semantic-mapping` 22/22).
+
+ISSUE-110 remains Open. Exact next action: **FRESH CODEX CHAT — FINAL INDEPENDENT CODE
+REVIEW**. The reviewer must independently verify generic `in a season` ownership;
+goals/games/Brownlow season thresholds; every comparator variant; opponent/venue/finals/round
+fail-closed behaviour; top-N plus generic-season handling; the `player_season` tie-policy
+contract; and preservation of every previously fixed ISSUE-110 behaviour. No 480, 1,435/1,440,
+100k, telemetry reset, or other large-scale validation may run before independent approval.
+
+### 2026-08-31 — final bounded revision after independent REVISE (parser remains v32)
+
+The independent final review found one remaining HIGH silent-scope path. Explicit `career`
+wording elects `player_career`; named-period extraction retains `scope.seasonMin` and/or
+`scope.seasonMax`; ranked career plans carry no `careerConditions`, so the existing
+condition-only season guard did not fire. `answerPlayerCareer` then ranked unrestricted
+whole-career totals because neither `metricValueExpr` nor the ranked SQL consumes season
+bounds. The description could nevertheless display the requested period.
+
+The bounded correction consolidates the validator invariant: every `player_career` plan with
+no career predicates now refuses if it carries either season bound. Career-predicate plans
+remain exempt because those predicates own their period as builder parameters. Parser routing,
+career SQL, parser-v32 generic-season ownership, and `PARSER_VERSION` are unchanged. Both
+`most career goals since 2000` and `most career goals in 2000` retain their parsed period and
+now fail validation before execution; ordinary `most career goals` remains valid.
+
+Regression evidence:
+
+- Red baseline after adding the focused tests: **2 files, 4 failed / 178 passed**. Both exact
+  ranked wordings validated incorrectly, and the two existing condition-path assertions exposed
+  the consolidated error contract.
+- Focused parser/validator after the fix: **2 files, 182/182 passed**.
+- Expanded focused set including the coverage regression: **3 files, 345/345 passed**.
+- The first complete matrix run exposed one obsolete direct fixture that validated an all-time
+  career Brownlow ranking while attaching a 1950 scope the executor ignored. The test was
+  strengthened, not weakened: it now asserts `nlCoverageFor('player_career',
+  'brownlow_votes')` directly and validates the career ranking only when genuinely unscoped.
+- Final complete DB-free ISSUE-110 matrix: **14 suites, 733/733 passed**.
+- Typecheck (`next typegen` + `tsc --noEmit`): **passed**.
+- Authoritative post-final-revision operator DB gate: **2 files, 46/46 passed in 20.65 s**,
+  started at **18:52:45**. `tests/integration/nl-answers-game-season.test.ts` passed **24/24**
+  in **9.460 s** and `tests/integration/nl-semantic-mapping.test.ts` passed **22/22** in
+  **10.302 s**. This is distinct from and supersedes the earlier pre-revision 46/46 run at
+  17:47 for final-readiness purposes.
+
+The three temporary artifacts documented in the runbook were verified by exact path and
+content/shape, their needed Gary Ablett evidence was confirmed durable in the runbook, and
+exactly these files were removed: `tools/nl/issue110-classify.ts`,
+`tools/nl/issue110-node-preload.cjs`, and ignored `tests/nl-ui/.auth/state.json`. All three paths
+were then verified absent; no broad cleanup command or other untracked/ignored deletion ran.
+
+ISSUE-110 remains Open. Exact next action: **FRESH CODEX MEDIUM CHAT — FINAL INDEPENDENT CODE
+REVIEW** of the current final revision, including the ranked `player_career` plus season-bound
+fail-closed invariant, its regressions, and preservation of parser-v32 fixes. Do not start the
+480 UI corpus or any larger corpus unless that review returns APPROVE.
+
+### 2026-08-31 — final independent review returned REVISE (recorded at merge into dev)
+
+The fresh independent code review of the final ranked-career season-bound revision returned
+**REVISE — NOT READY FOR LARGE-SCALE VALIDATION**. Two HIGH findings remain unresolved and are
+the exact next work:
+
+- **A. Career-predicate season ownership.** Example: `players with at least 3 grand finals
+  since 2000`. A career predicate can exist without consuming `seasonMin`/`seasonMax`, allowing
+  the requested period to be silently ignored. Required correction: replace the blanket
+  career-predicate exemption with explicit period ownership — only predicates that actually
+  consume the relevant period bounds may permit them.
+- **B. `clubFor` ownership with career predicates.** Example: `Carlton players who debuted
+  since 2000`. `clubFor` can be carried in the plan while execution bypasses the generic club
+  filter merely because `careerPredicates` exist. Required correction: allow the `clubFor`
+  bypass only when a predicate explicitly owns the relevant club semantics; otherwise reject or
+  correctly compile the club constraint.
+
+The authoritative standing validation evidence is unchanged: parser v32; focused
+parser/validator 182/182; expanded focused 345/345; full DB-free ISSUE-110 matrix 14 suites,
+733/733; typecheck passed; authoritative post-final-revision operator DB gate 46/46 in 20.65 s,
+started 18:52:45 (after the final ranked-career season-bound validator revision — the earlier
+17:47 46/46 run is not the final gate).
+
+ISSUE-110 remains **Open**. The ISSUE-110 branch merged into `dev` on 2026-08-31 (merge
+`codex/issue-110`); the merge changed no verdict. Exact next action: implement corrections A
+and B fail-closed, then a fresh independent re-review. No 480, 1,435/1,440, 100k, telemetry
+reset, or other large-scale validation may run before that review returns APPROVE; the
+22,607-search run remains incomplete.
