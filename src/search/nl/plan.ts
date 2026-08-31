@@ -236,8 +236,61 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    plan/answer path; club-scoped career games are explicit; player
  *    suffix variants resolve without losing identity; rebound 50s decline
  *    as an unsupported NL metric.
+ * 27: bare club-career games shorthand ("most games for Geelong") elects
+ *    player_career only when no match or season cue competes, and an
+ *    unranked games threshold can be validated for one organization when
+ *    every career condition is a games condition the compiler can scope.
+ * 28: player resolution is alias-aware. searchPlayers matches
+ *    player_name_aliases as well as the primary name and reports the
+ *    matched form as matchedName; the parser justifies and consumes
+ *    mention tokens against that matched form as additional evidence, so
+ *    an alias/suffix mention ("Jnr", a maiden name, an alternate spelling)
+ *    can resolve where 27 declined. The plan still carries the canonical
+ *    player identity and display name.
+ * 29: typed player game/season metric thresholds (AFLDB-ISSUE-110). A
+ *    comparator on the selected player metric now survives end to end as
+ *    plan.metricCondition instead of being consumed and silently dropped
+ *    -- "players with at most 25 disposals against North Melbourne" was
+ *    answering as the unfiltered rank-one leader (list collapsed to a
+ *    cutoff of 1) or stranding "most" into player-name resolution.
+ *    Explicit scope now controls the grain before the goals-to-career
+ *    fallback ("more than 2 goals in 1989" is player_season; "fewer than
+ *    3 goals in a game" is player_game/single), the explicit-zero matcher
+ *    no longer swallows "no more than N"/"no fewer than N" as eq-0,
+ *    bare two-club "wins against"/"losses against" route to the typed
+ *    head_to_head record, and "bulldogs" joins the organization nickname
+ *    seed. A player game/season list without a threshold now fails
+ *    validation instead of quietly returning one ranked leader.
+ * 30: career-vocabulary thresholds stopped silently discarding explicit
+ *    match scope (AFLDB-ISSUE-110 revision). "Players with more than 2
+ *    goals against Carlton" now routes to the scoped player_game/sum
+ *    threshold instead of a whole-career plan that ignored the opponent;
+ *    validation refuses any career plan still carrying venue/opponent/
+ *    match-type/round scope, or a season range beside career conditions,
+ *    that its compiler cannot consume. A single-game cue beside
+ *    unconvertible career conditions ("no more than 4 goals in a game and
+ *    no premierships") fails closed instead of dropping "in a game".
+ *    Grouped team-result thresholds and the wins/losses-against
+ *    head-to-head guard understand number words ("exactly three wins
+ *    against Carlton"), and capped threshold lists gained stable unique
+ *    ordering tie-breakers.
+ * 31: the season grain gained the same scope backstop the career grain got
+ *    in 30 (AFLDB-ISSUE-110 final review). Explicit "in a season" wording
+ *    elects player_season before match-level scope is accounted for, and
+ *    answerPlayerSeason consumes only player/candidate-set/season-range/
+ *    clubFor/metricCondition -- so "players with more than 20 disposals
+ *    in a season against Carlton" validated, dropped Carlton, and answered
+ *    whole-season disposals. Validation now refuses any player_season
+ *    plan still carrying venue/opponent/match-type/round scope.
+ * 32: a retained generic "in a season" cue now owns a sole
+ *    career-vocabulary threshold before game/scoped-total routing. Goals,
+ *    games, and Brownlow-vote bounds become player_season metricCondition
+ *    plans; incompatible match scope reaches the existing season backstop,
+ *    and non-season-capable columns fail closed instead of answering at
+ *    career grain. player_season also rejects tiePolicy "first" until its
+ *    rank()-based executor deliberately supports first-tie selection.
  */
-export const PARSER_VERSION = 26;
+export const PARSER_VERSION = 32;
 
 // ------------------------------------------------------------------ grain
 
@@ -440,6 +493,21 @@ export function isNlAwardKey(value: string): value is NlAwardKey {
 export type NlCareerCondition =
   | { kind: 'column'; column: NlCareerColumn; op: NlCompareOp; value: number }
   | { kind: 'award_count'; awardKey: NlAwardKey; op: NlCompareOp; value: number };
+
+// ---------------------------------------------------------- metric condition
+
+/**
+ * A threshold on the plan's own selected metric, for the two grains whose
+ * compilers aggregate live rows rather than read a career column --
+ * "players with at most 25 disposals against North Melbourne", "players
+ * with more than 2 goals in 1989". Applied at the layer the grain's
+ * semantics require: a raw-row predicate for player_game mode 'single',
+ * a post-aggregation predicate for player_game mode 'sum' and for
+ * player_season. Deliberately NOT an NlCareerCondition (those read
+ * player_career_stats and are valid only at career grain) and never
+ * stored in clubSeasonConditions.
+ */
+export type NlMetricCondition = { op: NlCompareOp; value: number };
 
 // -------------------------------------------------------------- metrics
 
@@ -721,6 +789,12 @@ export type NlQueryPlan = {
   /** The question's subject player, e.g. "dusty's highest disposal game". */
   player?: NlPlayerRef;
   scope: NlMatchScope;
+  /**
+   * player_game/player_season only: qualify the selected metric against a
+   * threshold instead of ranking it. Requires agg 'list' -- the answer is
+   * the qualifying set, never a rank-one leader. See NlMetricCondition.
+   */
+  metricCondition?: NlMetricCondition;
   /** player_career only. */
   careerConditions: NlCareerCondition[];
   /** player_career only; each compiled by grid-solver's compileAxis. */
@@ -849,7 +923,7 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
     if (
       raw.player || raw.scope.playerIdIn || raw.scope.clubFor || raw.scope.clubAgainst
       || raw.careerConditions.length > 0 || raw.careerPredicates.length > 0
-      || raw.clubSeasonConditions.length > 0 || raw.streakDefinition
+      || raw.metricCondition || raw.clubSeasonConditions.length > 0 || raw.streakDefinition
       || raw.achievementSummary || raw.boundary || raw.havingClause || raw.matchFilter
       || raw.periodSplit || raw.scoreCheckpoint || raw.resultFilter || raw.debutGame
     ) {
@@ -896,6 +970,33 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   // question shape to fall back to.
   if (raw.metric === null && (raw.grain === 'player_game' || raw.grain === 'player_season' || (raw.grain === 'team_match' && !raw.havingClause))) {
     return { error: 'This kind of question needs a statistic to rank by.' };
+  }
+
+  // A metric threshold is honoured only where a compiler actually consumes
+  // it (player-game.ts, player-season.ts). Rejecting every other shape is
+  // what keeps a parsed threshold from validating and then silently
+  // disappearing downstream -- the ISSUE-110 answered_caveat defect.
+  if (raw.metricCondition !== undefined) {
+    if (raw.grain !== 'player_game' && raw.grain !== 'player_season') {
+      return { error: 'This statistic cannot currently be filtered by that threshold.' };
+    }
+    if (!COMPARE_OPS.includes(raw.metricCondition.op)) return { error: 'Unknown comparison.' };
+    if (!Number.isFinite(raw.metricCondition.value) || raw.metricCondition.value < 0) {
+      return { error: 'A statistic threshold must be a non-negative number.' };
+    }
+    if (raw.agg.kind !== 'list') {
+      return { error: 'A statistic threshold lists every qualifying result rather than ranking one.' };
+    }
+  }
+  // The complementary gate: a player game/season LIST with no threshold has
+  // nothing to qualify against. The compilers used to reinterpret that
+  // shape as a rank-one superlative -- the reader asked for a thresholded
+  // list and got a single unfiltered leader -- so it fails closed instead.
+  if (
+    (raw.grain === 'player_game' || raw.grain === 'player_season')
+    && raw.agg.kind === 'list' && raw.metricCondition === undefined
+  ) {
+    return { error: 'Listing player results needs a qualifying threshold.' };
   }
 
   const compareOps: readonly NlCompareOp[] = ['gte', 'lte', 'gt', 'lt', 'eq'];
@@ -1056,7 +1157,12 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   if (againstErr) return againstErr;
   if (raw.grain === 'player_career' && raw.scope.clubFor && raw.careerPredicates.length === 0) {
     const def = raw.metric ? NL_METRICS.player_career[raw.metric] : undefined;
-    if (!raw.metric || (raw.metric !== 'games' && !(def?.kind === 'column' && def.statKey))) {
+    const scopedGamesConditions = raw.metric === null
+      && raw.careerConditions.length > 0
+      && raw.careerConditions.every((condition) => condition.kind === 'column' && condition.column === 'games');
+    const scopedRankedMetric = raw.metric !== null
+      && (raw.metric === 'games' || (def?.kind === 'column' && !!def.statKey));
+    if (!scopedGamesConditions && !scopedRankedMetric) {
       return { error: 'This career statistic cannot currently be totalled for one club.' };
     }
     if (
@@ -1065,6 +1171,50 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
     ) {
       return { error: 'A club-scoped career total cannot also use match or season scope.' };
     }
+  }
+  // The career compiler consumes clubFor and NOTHING else in match scope:
+  // no opponent, venue, match type, or round ever reaches its SQL. A
+  // career plan carrying one of those would validate and then answer a
+  // different, wider question than the one asked ("players with more than
+  // 100 games against Carlton" answering whole-career games) -- the
+  // ISSUE-110 scope-discarding defect. The parser routes representable
+  // shapes to player_game/player_season before this point; whatever still
+  // carries the scope at career grain is unrepresentable and fails closed.
+  if (
+    raw.grain === 'player_career'
+    && (raw.scope.venue || raw.scope.clubAgainst || raw.scope.matchType !== undefined
+      || raw.scope.roundNumber !== undefined)
+  ) {
+    return { error: 'A career question cannot be scoped to a venue, opponent, match type, or round.' };
+  }
+  // Same principle for every non-predicate career execution path: neither
+  // whole-career condition columns nor ranked metricValueExpr totals consume
+  // scope.seasonMin/seasonMax. Both "players with more than 500 career goals
+  // since 2000" and "most career goals since 2000" must therefore refuse
+  // rather than quietly answer the all-time question. A career-predicate plan
+  // is exempt -- its predicates own their season range as a builder parameter
+  // (debut windows, achievement windows).
+  if (
+    raw.grain === 'player_career' && raw.careerPredicates.length === 0
+    && (raw.scope.seasonMin !== undefined || raw.scope.seasonMax !== undefined)
+  ) {
+    return { error: 'A career question cannot be restricted to a season range.' };
+  }
+  // Same invariant at season grain: answerPlayerSeason consumes player /
+  // playerIdIn / the season range / clubFor / metricCondition and NOTHING
+  // else in match scope -- season totals cannot be recomputed per
+  // opponent, venue, match type, or round. Explicit "in a season" wording
+  // elects player_season BEFORE match-level scope is accounted for, so
+  // "players with more than 20 disposals in a season against Carlton"
+  // would otherwise validate, drop Carlton, and answer whole-season
+  // disposals -- the same silent-scope defect as the career gate above.
+  // (matchup is already gated to match-level grains further down.)
+  if (
+    raw.grain === 'player_season'
+    && (raw.scope.venue || raw.scope.clubAgainst || raw.scope.matchType !== undefined
+      || raw.scope.roundNumber !== undefined)
+  ) {
+    return { error: 'A season total cannot be scoped to a venue, opponent, match type, or round.' };
   }
   if (raw.scope.matchup !== undefined) {
     if (typeof raw.scope.matchup !== 'object' || raw.scope.matchup === null) {
@@ -1126,6 +1276,9 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   }
 
   if (!['all', 'first'].includes(raw.tiePolicy)) return { error: 'Unknown tie policy.' };
+  if (raw.grain === 'player_season' && raw.tiePolicy === 'first') {
+    return { error: 'Player-season questions do not support first-tie selection.' };
+  }
 
   // Clamp rather than reject: an oversized N or limit is the reader
   // asking for more than the display supports, not a malformed question.
@@ -1236,10 +1389,17 @@ export function describePlan(plan: NlQueryPlan): string[] {
   if (plan.scope.seasonMin !== undefined || plan.scope.seasonMax !== undefined) {
     lines.push(`Seasons: ${plan.scope.seasonMin ?? '…'}-${plan.scope.seasonMax ?? '…'}.`);
   }
+  if (plan.metricCondition) {
+    const label = metricLabelOf(plan.grain, plan.metric) ?? 'value';
+    lines.push(`Condition: ${label.toLowerCase()} ${OP_WORDS[plan.metricCondition.op]} ${plan.metricCondition.value}.`);
+  }
   for (const cond of plan.careerConditions) {
     const opWord = OP_WORDS[cond.op];
     if (cond.kind === 'column') {
-      lines.push(`Condition: ${NL_CAREER_COLUMNS[cond.column]} ${opWord} ${cond.value}.`);
+      const columnLabel = cond.column === 'games' && plan.scope.clubFor
+        ? `games for ${plan.scope.clubFor.name}`
+        : NL_CAREER_COLUMNS[cond.column];
+      lines.push(`Condition: ${columnLabel} ${opWord} ${cond.value}.`);
     } else {
       lines.push(`Condition: ${NL_AWARDS[cond.awardKey].label} ${opWord} ${cond.value}.`);
     }
@@ -1287,7 +1447,25 @@ export function decodePlanToken(token: string): NlQueryPlan | null {
 
 // -------------------------------------------------------------- reports
 
-export type NlEntityResolution = { mention: string; resolvedTo: string; certainty: number };
+/**
+ * `playerId`/`playerIds`/`matchedName` are telemetry-only enrichment
+ * (AFLDB-ISSUE-110): the canonical `resolvedTo` display name cannot
+ * distinguish two players sharing it (both Gary Abletts render as
+ * "Gary Ablett"), and the matched alias form preserves the Jr/Jnr/Snr
+ * evidence that justified the resolution. Present only for player
+ * resolutions; never read back by parsing, planning, or answering.
+ */
+export type NlEntityResolution = {
+  mention: string;
+  resolvedTo: string;
+  certainty: number;
+  /** Stable players.id the mention resolved to (single-candidate resolutions). */
+  playerId?: number;
+  /** Stable ids for a deliberately multi-candidate resolution (scope.playerIdIn). */
+  playerIds?: number[];
+  /** The name form that actually matched -- a stored alias when it differs from the canonical name. */
+  matchedName?: string;
+};
 
 /**
  * The factors `confidence` was multiplied/penalised by, kept alongside the

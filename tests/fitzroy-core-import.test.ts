@@ -1531,3 +1531,276 @@ describe('accepted corrections threading (§H14)', () => {
     }
   });
 });
+
+/*
+ * AFLDB-ISSUE-110 Stage 2 — curated player aliases keyed by STABLE EXTERNAL IDENTITY.
+ *
+ * data/reference/player-name-aliases.json records established alias facts (Gary Ablett
+ * Snr/Jnr) keyed by source key + the source's stable external identity — for afltables
+ * the canonical profile path — never by players.id, which a clean rebuild re-seeds.
+ * The `aliases` import group resolves each identity through external_identities to
+ * exactly one player, derives search_alias with afldb_normalise_name() in SQL, and is
+ * insert-only and idempotent. Missing, unresolved, or multiply-resolved identities
+ * refuse the whole load before any row is written. There is no name matching and no
+ * chronological/age/ordering inference: the fixture players below carry IDENTICAL
+ * canonical names, so only the external identity can tell them apart.
+ *
+ * The database-backed block runs against AFLDB_TEST_DATABASE_URL inside one
+ * transaction that is always rolled back, under a fixture sources row, so it leaves
+ * afldb_test untouched and never reads or writes the real afltables population.
+ */
+const aliasReferencePath = join(root, 'data', 'reference', 'player-name-aliases.json');
+const aliasReference = JSON.parse(readFileSync(aliasReferencePath, 'utf8'));
+const sourceRegistry = JSON.parse(readFileSync(
+  join(root, 'data', 'reference', 'sources.json'), 'utf8'));
+
+function hasPsycopg(): boolean {
+  const probe = spawnSync(python, ['-c', 'import psycopg'], { encoding: 'utf8' });
+  return !probe.error && probe.status === 0;
+}
+const aliasTestDsn = process.env.AFLDB_TEST_DATABASE_URL;
+const canRunAliasDb = canSpawn && !!aliasTestDsn && hasPsycopg();
+
+/** Run load_player_alias_reference() on a document; ACCEPTED:<entries> or REFUSED:<msg>. */
+function readAliasReference(document: unknown): string {
+  const dir = mkdtempSync(join(tmpdir(), 'issue110-alias-ref-'));
+  tempDirs.push(dir);
+  const path = join(dir, 'player-name-aliases.json');
+  writeFileSync(path, JSON.stringify(document));
+  const script = `
+import json, sys, pathlib
+sys.path.insert(0, "tools/migration"); sys.argv = ["x"]
+import import_fitzroy_core as ifc
+try:
+    print("ACCEPTED:" + json.dumps(ifc.load_player_alias_reference(pathlib.Path(${JSON.stringify(path)}))))
+except Exception as exc:
+    print("REFUSED:" + str(exc))
+`;
+  const run = spawnSync(python, ['-c', script], { cwd: root, encoding: 'utf8' });
+  if (run.status !== 0) throw new Error(run.stderr || 'alias reference spawn failed');
+  return run.stdout.trim().split('\n').pop() as string;
+}
+
+describe('curated player alias reference (AFLDB-ISSUE-110 Stage 2)', () => {
+  it('keys every tracked entry by source + stable external identity, never players.id', () => {
+    expect(Array.isArray(aliasReference.aliases)).toBe(true);
+    expect(aliasReference.aliases.length).toBeGreaterThan(0);
+    const sourceKeys = new Set(sourceRegistry.sources.map((s: { key: string }) => s.key));
+    for (const entry of aliasReference.aliases) {
+      expect(Object.keys(entry)).not.toContain('player_id');
+      expect(Object.keys(entry)).not.toContain('id');
+      expect(sourceKeys.has(entry.source)).toBe(true);
+      expect(typeof entry.alias).toBe('string');
+      if (entry.source === 'afltables') {
+        // The canonical profile path is exactly what external_identities stores
+        // under match_method afltables_profile_url.
+        expect(entry.external_id).toMatch(/^players\/[A-Z]\/[^/]+\.html$/);
+      }
+    }
+    const byIdentity = Object.fromEntries(
+      aliasReference.aliases.map((e: any) => [`${e.source}:${e.external_id}`, e.alias]));
+    expect(byIdentity['afltables:players/G/Gary_Ablett0.html']).toBe('Gary Ablett Snr');
+    expect(byIdentity['afltables:players/G/Gary_Ablett1.html']).toBe('Gary Ablett Jnr');
+  });
+
+  it('loads as its own import group after players, insert-only, with no player-specific logic', () => {
+    expect(importerSource).toContain(
+      'GROUPS = ["venues", "players", "aliases", "matches", "stats", "brownlow"]');
+    expect(importerSource).toContain('data" / "reference" / "player-name-aliases.json"');
+    expect(importerSource).toContain('ON CONFLICT (player_id, alias) DO NOTHING');
+    expect(importerSource).not.toContain('DELETE FROM player_name_aliases');
+    expect(importerSource).not.toMatch(/UPDATE player_name_aliases/);
+    expect(importerSource).not.toMatch(/Ablett/);
+    // Resolution goes through the fail-closed resolver before any INSERT.
+    const applyStart = importerSource.indexOf('def apply_player_name_aliases(');
+    const applyBody = importerSource.slice(applyStart,
+      importerSource.indexOf('def import_player_name_aliases('));
+    expect(applyBody.indexOf('resolve_alias_identities(')).toBeGreaterThan(-1);
+    expect(applyBody.indexOf('resolve_alias_identities('))
+      .toBeLessThan(applyBody.indexOf('INSERT INTO player_name_aliases'));
+    expect(applyBody).toContain('afldb_normalise_name(%s)');
+  });
+
+  it.skipIf(!canSpawn)('accepts the tracked reference file exactly as written', () => {
+    const result = readAliasReference(aliasReference);
+    expect(result.startsWith('ACCEPTED:'), result).toBe(true);
+    const entries = JSON.parse(result.slice('ACCEPTED:'.length));
+    expect(entries).toHaveLength(aliasReference.aliases.length);
+    expect(entries.map((e: any) => e.external_id).sort()).toEqual(
+      ['players/G/Gary_Ablett0.html', 'players/G/Gary_Ablett1.html']);
+  });
+
+  it.skipIf(!canSpawn)('refuses malformed, surrogate-keyed, and duplicate entries', () => {
+    const ok = { source: 'afltables', external_id: 'players/G/Gary_Ablett0.html',
+      alias: 'Gary Ablett Snr' };
+    expect(readAliasReference({ aliases: [{ ...ok, player_id: 4242 }] }))
+      .toContain('not a stable identity');
+    expect(readAliasReference({ aliases: [{ ...ok,
+      external_id: 'https://afltables.com/afl/stats/players/G/Gary_Ablett0.html' }] }))
+      .toContain('canonical profile path');
+    expect(readAliasReference({ aliases: [ok, { ...ok, alias: 'gary ablett snr' }] }))
+      .toContain('duplicate alias');
+    expect(readAliasReference({ aliases: [{ ...ok, alias: '  ' }] }))
+      .toContain('non-empty string');
+    expect(readAliasReference({ aliases: [{ ...ok, alias: 'Gary  Ablett Snr' }] }))
+      .toContain('stray whitespace');
+    expect(readAliasReference({ aliases: [{ source: 'afltables', alias: 'Gary Ablett Snr' }] }))
+      .toContain('`external_id` must be a non-empty string');
+    expect(readAliasReference({ aliases: { source: 'afltables' } }))
+      .toContain('must be a list');
+    // Two different aliases for one identity, and one alias shared by two
+    // identities, are both legitimate (the bare shared name is the whole point).
+    expect(readAliasReference({ aliases: [ok, { ...ok, alias: 'Gary Ablett Sr' },
+      { ...ok, external_id: 'players/G/Gary_Ablett1.html', alias: 'Gary Ablett Snr' }] }))
+      .toMatch(/^ACCEPTED:/);
+  });
+
+  it.skipIf(!canSpawn)('refuses an identity that resolves to more than one player', () => {
+    // external_identities_uq makes this state unreachable through the table, so
+    // the fail-closed decision is proven on the resolver itself with the rows it
+    // would otherwise have to trust.
+    const script = `
+import json, sys
+sys.path.insert(0, "tools/migration"); sys.argv = ["x"]
+import import_fitzroy_core as ifc
+entries = [{"source": "afltables", "external_id": "players/X/X0.html", "alias": "X Snr"}]
+out = []
+for rows in ([("afltables", "players/X/X0.html", 7)],
+             [("afltables", "players/X/X0.html", 7), ("afltables", "players/X/X0.html", 8)],
+             [("afltables", "players/X/X1.html", 7)],
+             [("other_source", "players/X/X0.html", 7)]):
+    try:
+        out.append("RESOLVED:" + json.dumps(sorted(ifc.resolve_alias_identities(entries, rows).values())))
+    except RuntimeError as exc:
+        out.append("REFUSED:" + str(exc))
+print(json.dumps(out))
+`;
+    const run = spawnSync(python, ['-c', script], { cwd: root, encoding: 'utf8' });
+    if (run.status !== 0) throw new Error(run.stderr || 'resolver spawn failed');
+    const [unique, multiple, wrongId, wrongSource] = JSON.parse(
+      run.stdout.trim().split('\n').pop() as string);
+    expect(unique).toBe('RESOLVED:[7]');
+    expect(multiple).toContain('resolves to 2 players [7, 8]');
+    expect(wrongId).toContain('no resolved external identity');
+    expect(wrongSource).toContain('no resolved external identity');
+  });
+
+  it.skipIf(!canRunAliasDb)(
+    'loads through external identity into player_name_aliases: normalised, idempotent, '
+    + 'preserving, fail-closed (rolled back)', () => {
+      const script = `
+import json, os, sys
+from urllib.parse import urlparse
+sys.path.insert(0, "tools/migration"); sys.argv = ["x"]
+import import_fitzroy_core as ifc
+from common import connect_pg
+dsn = os.environ["AFLDB_TEST_DATABASE_URL"]
+if not urlparse(dsn).path.rstrip("/").endswith("_test"):
+    raise SystemExit("refusing: AFLDB_TEST_DATABASE_URL does not name a _test database")
+SRC = "afltables_issue110_fixture"
+ID0, ID1, IDC = ("players/I/Issue110_Fixture0.html", "players/I/Issue110_Fixture1.html",
+                 "players/I/Issue110_Control0.html")
+pg = connect_pg(dsn)
+out = {}
+try:
+    with pg.cursor() as cur:
+        cur.execute("INSERT INTO sources (key, name, kind) VALUES (%s, %s, 'manual') RETURNING id",
+                    (SRC, "AFLDB-ISSUE-110 alias fixture source"))
+        src_id = cur.fetchone()[0]
+        def player(display, slug):
+            cur.execute("""INSERT INTO players (display_name, sort_name, search_name, slug)
+                           VALUES (%s, %s, afldb_normalise_name(%s), %s) RETURNING id""",
+                        (display, display, display, slug))
+            return cur.fetchone()[0]
+        # Production shape: identical canonical names, distinguishable ONLY by identity.
+        elder = player("Issue110 Fixture O'Elder", "issue110-fixture-oelder-0")
+        younger = player("Issue110 Fixture O'Elder", "issue110-fixture-oelder-1")
+        control = player("Issue110 Fixture Control", "issue110-fixture-control")
+        for ext, pid in ((ID0, elder), (ID1, younger), (IDC, control)):
+            cur.execute("""INSERT INTO external_identities
+                             (source_id, external_id, player_id, status, match_method)
+                           VALUES (%s, %s, %s, 'unique', %s)""",
+                        (src_id, ext, pid, ifc.MATCH_METHOD))
+        # Unresolved identity: registered, but trusted player link absent.
+        cur.execute("""INSERT INTO external_identities (source_id, external_id, status)
+                       VALUES (%s, 'players/I/Issue110_Unresolved0.html', 'ambiguous')""", (src_id,))
+        # Pre-existing aliases that must survive untouched.
+        cur.execute("""INSERT INTO player_name_aliases (player_id, alias, search_alias, alias_type)
+                       VALUES (%s, 'Issue110 Manual Alias', afldb_normalise_name('Issue110 Manual Alias'), 'manual')""",
+                    (elder,))
+        cur.execute("""INSERT INTO player_name_aliases (player_id, alias, search_alias, alias_type)
+                       SELECT id, display_name, search_name, 'source_string' FROM players WHERE id = %s""",
+                    (younger,))
+        cur.execute("SELECT count(*) FROM player_name_aliases")
+        before = cur.fetchone()[0]
+    entries = [
+        {"source": SRC, "external_id": ID0, "alias": "Issue110 Fixture O'Elder Snr"},
+        {"source": SRC, "external_id": ID1, "alias": "Issue110 Fixture O'Elder Jnr"},
+    ]
+    out["first"] = ifc.apply_player_name_aliases(pg, entries)
+    out["second"] = ifc.apply_player_name_aliases(pg, entries)
+    def refused(batch):
+        try:
+            ifc.apply_player_name_aliases(pg, batch)
+            return "ACCEPTED"
+        except RuntimeError as exc:
+            return str(exc)
+    out["missing"] = refused([{"source": SRC, "external_id": "players/I/Issue110_Missing0.html",
+                               "alias": "Issue110 Missing Alias"}])
+    out["partial"] = refused([
+        {"source": SRC, "external_id": ID0, "alias": "Issue110 Partial Alias"},
+        {"source": SRC, "external_id": "players/I/Issue110_Missing0.html", "alias": "Issue110 Missing Alias"}])
+    out["unresolved"] = refused([{"source": SRC, "external_id": "players/I/Issue110_Unresolved0.html",
+                                  "alias": "Issue110 Unresolved Alias"}])
+    out["unknown_source"] = refused([{"source": "issue110_no_such_source", "external_id": ID0,
+                                      "alias": "Issue110 Unknown Source Alias"}])
+    with pg.cursor() as cur:
+        cur.execute("SELECT count(*) FROM player_name_aliases")
+        out["delta"] = cur.fetchone()[0] - before
+        cur.execute("""SELECT player_id, alias, search_alias, alias_type FROM player_name_aliases
+                       WHERE player_id = ANY(%s) ORDER BY player_id, alias""",
+                    ([elder, younger, control],))
+        out["rows"] = [list(r) for r in cur.fetchall()]
+    out["ids"] = {"elder": elder, "younger": younger, "control": control}
+finally:
+    pg.rollback()
+    pg.close()
+print(json.dumps(out))
+`;
+      const run = spawnSync(python, ['-c', script], {
+        cwd: root, encoding: 'utf8',
+        env: { ...process.env, AFLDB_TEST_DATABASE_URL: aliasTestDsn as string },
+      });
+      expect(run.status, `${run.stdout}\n${run.stderr}`).toBe(0);
+      const out = JSON.parse(run.stdout.trim().split('\n').pop() as string);
+      const { elder, younger } = out.ids;
+
+      // Resolution by external identity, with identical canonical names.
+      expect(out.first).toBe(2);
+      expect(out.rows).toContainEqual(
+        [elder, "Issue110 Fixture O'Elder Snr", 'issue110 fixture oelder snr', 'alternate']);
+      expect(out.rows).toContainEqual(
+        [younger, "Issue110 Fixture O'Elder Jnr", 'issue110 fixture oelder jnr', 'alternate']);
+      // search_alias came from afldb_normalise_name(): lower-cased, apostrophe dropped.
+      for (const [, alias, searchAlias] of out.rows) {
+        expect(searchAlias).toBe(searchAlias.toLowerCase());
+        expect(searchAlias).not.toContain("'");
+        expect(alias.toLowerCase().replace(/'/g, '')).toBe(searchAlias);
+      }
+      // Idempotent: the second load inserts nothing and the table grew by exactly two.
+      expect(out.second).toBe(0);
+      expect(out.delta).toBe(2);
+      // Unrelated manual and source_string aliases survive; the control player is untouched.
+      expect(out.rows).toContainEqual(
+        [elder, 'Issue110 Manual Alias', 'issue110 manual alias', 'manual']);
+      expect(out.rows).toContainEqual(
+        [younger, "Issue110 Fixture O'Elder", 'issue110 fixture oelder', 'source_string']);
+      expect(out.rows.filter((r: any[]) => r[0] === out.ids.control)).toHaveLength(0);
+      // Fail closed, all-or-nothing: no partial row was written alongside a refusal.
+      expect(out.missing).toContain('no resolved external identity');
+      expect(out.partial).toContain('no resolved external identity');
+      expect(out.unresolved).toContain('no resolved external identity');
+      expect(out.unknown_source).toContain('no sources row');
+      expect(out.rows.map((r: any[]) => r[1])).not.toContain('Issue110 Partial Alias');
+    });
+});

@@ -15,6 +15,161 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-110 — ranked career season-scope fail-closed guard - 31 August 2026
+
+- Parser version remains 32. Validation now refuses every non-predicate
+  `player_career` execution path carrying `seasonMin` or `seasonMax`, because
+  neither whole-career condition columns nor ranked career metric SQL consumes
+  those bounds. Questions such as `most career goals since 2000` and `most
+  career goals in 2000` therefore decline honestly instead of ranking
+  unrestricted all-time totals while displaying the requested period.
+- Direct-validator and realistic parser regressions cover lower-only,
+  upper-only, and exact-year bounds while preserving ordinary all-time career
+  rankings, unscoped career-condition lists, named-year/player-season queries,
+  generic-season thresholds, and supported club-scoped career rankings. The
+  focused parser/validator suites pass 182/182, the complete DB-free ISSUE-110
+  matrix passes 14 suites / 733 tests, and typecheck passes. The authoritative
+  post-final-revision operator gate passes 2 files / 46 tests in 20.65 s
+  (`nl-answers-game-season` 24/24; `nl-semantic-mapping` 22/22). ISSUE-110
+  remains open pending a fresh final independent code review.
+- Removed the three documented temporary ISSUE-110 artifacts only:
+  `tools/nl/issue110-classify.ts`, `tools/nl/issue110-node-preload.cjs`, and the
+  ignored `tests/nl-ui/.auth/state.json`.
+
+### AFLDB-ISSUE-110 — generic season ownership and player-season tie-policy gate - 31 August 2026
+
+- Parser version 32. A sole career-vocabulary threshold explicitly governed
+  by generic `in a season` now routes through the existing `player_season`
+  metric-condition machinery before game/scoped-total routing can steal it.
+  Goals, games, and Brownlow-vote comparators retain their exact operator and
+  value without inventing a named year. Compatible club scope remains valid;
+  opponent, venue, finals/match-type, round, and matchup combinations retain
+  their scope and decline through existing season validation rather than
+  answering a game, career, or unscoped season question.
+- Generic-season thresholds on columns with no player-season representation
+  now fail closed. Top-N plus a per-season threshold also declines rather than
+  silently becoming an unranked career list, because the current executor does
+  not define the combined ranking semantics.
+- `validatePlan` no longer accepts `tiePolicy: "first"` for `player_season`
+  while `answerPlayerSeason` always uses `rank()` and returns all ties;
+  `tiePolicy: "all"` remains valid. Focused parser/validator coverage is
+  179/179, the complete DB-free NL matrix is 14 suites / 730 tests, and
+  typecheck passes. The operator-run final post-change `_test` gate passed
+  **2 files / 46 tests in 19.30 s**: `nl-answers-game-season` 24/24 and
+  `nl-semantic-mapping` 22/22. ISSUE-110 remains open pending a fresh Codex
+  final independent code review; no large-scale validation may run first.
+
+### AFLDB-ISSUE-110 — season-scope fail-closed backstop, telemetry fallback narrowing - 31 August 2026
+
+- Parser version 31 (bounded revision after the final Codex review). A
+  `player_season` plan can no longer silently discard match-level scope its
+  executor never consumes: "players with more than 20 disposals in a season
+  against Carlton" (likewise venue, finals/match-type, and round variants) now
+  refuses honestly — "A season total cannot be scoped to a venue, opponent,
+  match type, or round." — instead of answering whole-season disposals with the
+  scope dropped. Legitimate season thresholds, named-year thresholds, and
+  club-scoped season leaderboards are unchanged; the gate mirrors the career
+  backstop added in parser version 30, so the fail-closed invariant now covers
+  both grains.
+- The NL telemetry non-request fallback in `logNlSearch` is narrowed to the one
+  error Next 16 defines for "no request scope exists" (verified against the
+  installed implementation); any other synchronous `after()` failure is
+  reported and isolated rather than misclassified as legitimate non-request
+  execution. Request-scope scheduling and telemetry-failure isolation are
+  unchanged.
+
+### AFLDB-ISSUE-110 — career-threshold scope fail-closed revision - 31 August 2026
+
+- Parser version 30 (revision after Codex review). A career-vocabulary threshold
+  can no longer silently discard explicit match scope: "players with more than 2
+  goals against Carlton" now routes to the scoped `player_game/sum` threshold
+  (the same scoped-total rule the ranked path uses) instead of a whole-career
+  plan whose compiler ignored the opponent; venue and match-type scope route the
+  same way. Combinations no game/season grain can represent — a `games`
+  threshold against an opponent, a season range beside career conditions, a
+  single-game cue beside an unconvertible mixed career condition — now fail
+  validation closed instead of answering a different question, and validation
+  refuses any career plan still carrying venue/opponent/match-type/round scope.
+- Grouped team-result thresholds and the wins/losses-against head-to-head guard
+  now understand number words ("exactly three wins against Carlton" is a
+  grouped `team_match` threshold, not a head-to-head record), reusing the
+  parser's existing counting vocabulary.
+- Capped player game/season threshold lists gained stable unique ordering
+  tie-breakers (match date/match id/player id; season/name/player id) so
+  repeated execution returns identical rows in identical order at the 100-row
+  cap.
+- New regression coverage: opponent/venue/match-type/season scope beside
+  career-vocabulary thresholds, mixed-condition fail-closed proof, strict `<`
+  DB-backed boundary, determinism under the cap, threshold description
+  headlines/interpretations, and two end-to-end natural-language questions
+  proven through parser → validation → execution → answer → description
+  against hand-written SQL.
+- NL telemetry (`logNlSearch`) is now safe outside a Next.js request scope:
+  inside a request the write is still deferred through Next 16's `after()`
+  unchanged; from a non-request server caller (integration tests, scripts) —
+  where `after()` throws synchronously — the same write now runs detached
+  instead of the throw escaping into `answerNlQuestion`. Telemetry is still
+  written in both paths and a logging failure still cannot alter or fail an
+  answer (new DB-free regression `tests/nl-search-log.test.ts`).
+
+### AFLDB-ISSUE-110 — typed NL metric thresholds, H2H wins/losses, Bulldogs alias - 31 August 2026
+
+- Parser version 29. A comparator on a player statistic now survives end to end
+  as a typed `metricCondition` on `player_game`/`player_season` plans instead of
+  being consumed and silently dropped: "players with at most 25 disposals
+  against North Melbourne" now answers with the qualifying set rather than an
+  unfiltered rank-one leader (or an `ambiguous_player` decline from the
+  stranded "most"). Single-performance thresholds filter each performance;
+  scoped totals and season thresholds filter after aggregation; NULL remains
+  "not recorded" and never qualifies. A threshold no compiler can represent, and
+  a player game/season list with no threshold, now fail validation closed.
+- Explicit scope controls grain before the goals-to-career fallback: "players
+  with more than 2 goals in 1989" is a season question and "players with fewer
+  than 3 goals in a game" a single-game one, while "more than 500 career goals"
+  keeps the career-condition path.
+- The explicit-zero matcher no longer reads "no more than N"/"no fewer than N"
+  as an equality-to-zero condition; genuine "no goals"/"never kicked a
+  goal"/"without a goal" zero conditions are unchanged. The comparator
+  vocabulary gains the missing "no less than"/"no greater than" forms.
+- Bare two-club "wins against"/"losses against" wording routes to the existing
+  typed head-to-head record answer, guarded so grouped thresholds ("teams with
+  more than 3 wins against ..."), team-match extrema ("biggest win against
+  ..."), and one-club questions keep their prior meanings.
+- "Bulldogs" resolves through the ordinary organization nickname path to the
+  same lineage as Dogs/Footscray/Western Bulldogs.
+- Telemetry only: player entity resolutions now log the resolved stable player
+  id(s) and the exact matched alias form (preserving Jr/Jnr/Snr evidence)
+  without any change to ranking, ambiguity, plan, or answer semantics.
+
+### NL telemetry grain schema contract - 31 August 2026
+
+- Added migration `079_nl_search_log_head_to_head_grain.sql` to align the
+  `nl_search_log.grain` CHECK with all eight current `NlGrain` values, restoring
+  silently dropped `head_to_head` telemetry and covering the also-missing
+  `team_streak` grain without changing search or telemetry outcome semantics.
+- Added a transactionally rolled-back PostgreSQL regression that inserts every
+  supported grain, including `head_to_head`, so the schema cannot drop an existing
+  valid grain without failing the focused integration gate.
+
+### AFLDB-ISSUE-110 — club-scoped career games semantics - 30 August 2026
+
+- Parser version 27 now maps unqualified club-leader shorthand such as `most games for
+  Geelong` to the existing typed `player_career/games` plan only when no match, season,
+  opponent, venue, player, or match-type cue competes. Explicit match and season wording keeps
+  its prior grain and fail-closed behaviour.
+- Club-scoped games thresholds now compare distinct appearances for the named organization
+  lineage across historical club identities. They no longer need to be refused to avoid the
+  incorrect whole-career-games-plus-club-membership interpretation; validation permits only
+  games-only unranked conditions the compiler can fully scope.
+- Added exact Problem Search, comparator, metamorphic club, match/season collision, mixed-scope
+  refusal, player-ambiguity, and database-fixture regression coverage. DB-free validation is
+  green (7 suites, 473 tests), typecheck is green, and focused DB integration passes 9/9.
+  Independent `_test` SQL agrees with every selected result set and classifies the grouped
+  opponent and 500/1000-game families as correct empty results. ISSUE-110 remains open because
+  multi-row club-threshold payloads still expose whole-career `games` under the UI's `Games`
+  column instead of the organization-scoped appearances used for qualification; rendered/UI
+  and decline benchmark gates remain pending.
+
 ### AFLDB-ISSUE-109 — Data Editor durable overrides keep atomic least-privilege writes (Resolved) - 30 August 2026
 
 - Added forward migration `078_data_overrides_admin_write.sql` so the existing

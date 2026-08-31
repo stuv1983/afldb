@@ -245,7 +245,10 @@ function AchievementSummaryTable({
 }
 
 function PlayerCareerTable({ rows, total }: { rows: NlPlayerCareerRow[]; total: number }) {
-  if (rows.length <= 1) return null; // The headline already names the one answer.
+  // A ranked one-row answer is already named with its value in the headline.
+  // An unranked one-row list only has a count headline ("1 player matches"),
+  // so its player and scoped Games value still need the visible table.
+  if (rows.length === 0 || (rows.length === 1 && rows[0].value !== null)) return null;
   return (
     <>
       <CollapsibleTable title="Every matching player" note={`${formatNumber(total)} total`}>

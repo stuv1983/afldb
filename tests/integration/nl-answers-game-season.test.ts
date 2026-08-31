@@ -11,7 +11,13 @@ import './guard';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
+// answerNlQuestion's telemetry write (logNlSearch) runs detached outside a
+// request scope; point the lazy auth pool at afldb_test so those rows land
+// in the test database, the same redirect email-intake.test.ts uses.
+process.env.AFLDB_AUTH_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
+
 import { sql } from '@/db/client';
+import { answerNlQuestion } from '@/db/queries/nl/answer';
 import { answerPlayerGame } from '@/db/queries/nl/player-game';
 import { answerPlayerSeason } from '@/db/queries/nl/player-season';
 import { validatePlan, type NlQueryPlan } from '@/search/nl/plan';
@@ -19,7 +25,15 @@ import type {
   NlAnswerPayload, NlPlayerGameRow, NlPlayerSeasonRow,
 } from '@/search/nl/answer-types';
 
+const E2E_RUN_TAG = 'issue-110-revision-e2e-test';
+
 afterAll(async () => {
+  // Waits out any detached telemetry write still in flight, then removes
+  // this run's tagged rows so repeated runs don't accumulate telemetry.
+  // end() must reach the real pooled client, not the lazy authSql Proxy
+  // (datasets.test.ts explains the `this`-binding hazard).
+  await globalThis.__afldbAuthSql?.end({ timeout: 5 });
+  await sql`DELETE FROM nl_search_log WHERE run_tag = ${E2E_RUN_TAG}`;
   await sql.end();
 });
 
@@ -260,6 +274,248 @@ describe('player_game mode "sum" matches hand-written SQL', () => {
       ) t
     `;
     expect(lead!.value).toBe(Number(expected.max));
+  });
+});
+
+describe('AFLDB-ISSUE-110 metric thresholds are actually applied', () => {
+  it('a single-game gte threshold returns every qualifying performance, not one ranked leader', async () => {
+    // The second-highest distinct single-game goals value: guarantees at
+    // least two qualifying performances, so the old list-to-rank-one
+    // collapse (which returned only the leader) fails this test.
+    const [second] = await sql<{ value: number }[]>`
+      SELECT DISTINCT goals AS value FROM player_match_stats
+       WHERE goals IS NOT NULL ORDER BY goals DESC OFFSET 1 LIMIT 1
+    `;
+    const { rows, total } = await game({
+      metric: 'goals', agg: { kind: 'list' }, limit: 100,
+      metricCondition: { op: 'gte', value: second.value },
+    }, 100);
+
+    const expected = await sql<{ playerId: number; matchId: number; goals: number }[]>`
+      SELECT player_id AS "playerId", match_id AS "matchId", goals
+        FROM player_match_stats WHERE goals >= ${second.value}
+    `;
+    expect(expected.length).toBeGreaterThan(1);
+    expect(total).toBe(expected.length);
+    expect(rows).toHaveLength(Math.min(expected.length, 100));
+    for (const row of rows) {
+      expect(row.value).not.toBeNull();
+      expect(row.value!).toBeGreaterThanOrEqual(second.value);
+      expect(expected.some((e) => e.playerId === row.playerId && e.matchId === row.matchId)).toBe(true);
+    }
+  });
+
+  it('a single-game lte threshold excludes the non-qualifying record holder', async () => {
+    const [pick] = await sql<{ season: number; max: number }[]>`
+      SELECT m.season, max(s.goals) AS max
+        FROM player_match_stats s JOIN matches m ON m.id = s.match_id
+       WHERE s.goals IS NOT NULL
+       GROUP BY m.season ORDER BY count(*) DESC LIMIT 1
+    `;
+    const bound = pick.max - 1;
+    const { rows, total } = await game({
+      metric: 'goals', agg: { kind: 'list' }, limit: 100,
+      scope: { seasonMin: pick.season, seasonMax: pick.season },
+      metricCondition: { op: 'lte', value: bound },
+    }, 100);
+
+    const [expected] = await sql<{ count: number }[]>`
+      SELECT count(*)::int AS count
+        FROM player_match_stats s JOIN matches m ON m.id = s.match_id
+       WHERE m.season = ${pick.season} AND s.goals <= ${bound}
+    `;
+    expect(expected.count).toBeGreaterThan(1);
+    expect(total).toBe(expected.count);
+    // NULL is "not recorded", never zero: no NULL row can qualify, and
+    // the season's record performance is above the bound and excluded.
+    expect(rows.every((r) => r.value !== null && r.value <= bound)).toBe(true);
+  });
+
+  it('a scoped-sum threshold qualifies the aggregate after aggregation, per player', async () => {
+    const [org] = await sql<{ id: number }[]>`SELECT id FROM club_organizations ORDER BY id LIMIT 1`;
+    const totals = await sql<{ playerId: number; value: number }[]>`
+      SELECT s.player_id AS "playerId", sum(s.goals)::int AS value
+        FROM player_match_stats s JOIN matches m ON m.id = s.match_id
+       WHERE (CASE WHEN m.home_club_id = s.club_id THEN m.away_club_id ELSE m.home_club_id END)
+               IN (SELECT id FROM clubs WHERE organization_id = ${org.id})
+         AND s.goals IS NOT NULL
+       GROUP BY s.player_id
+       ORDER BY value DESC
+    `;
+    expect(totals.length).toBeGreaterThan(3);
+    const bound = totals[2].value; // at least three qualifying players
+    const expectedIds = totals.filter((t) => t.value >= bound).map((t) => t.playerId);
+
+    const { rows, total } = await game({
+      metric: 'goals', agg: { kind: 'list' }, mode: 'sum', limit: 100,
+      scope: { clubAgainst: { organizationId: org.id, slug: 'x', name: 'x' } },
+      metricCondition: { op: 'gte', value: bound },
+    }, 100);
+
+    expect(total).toBe(expectedIds.length);
+    expect(new Set(rows.map((r) => r.playerId))).toEqual(new Set(expectedIds.slice(0, 100)));
+    expect(rows.every((r) => r.value !== null && r.value >= bound)).toBe(true);
+  });
+
+  it('a season-aggregate threshold matches a hand-written filter over season totals', async () => {
+    const [yr] = await sql<{ season: number }[]>`
+      SELECT season FROM player_season_stats WHERE goals IS NOT NULL
+       GROUP BY season ORDER BY count(*) DESC LIMIT 1
+    `;
+    const [third] = await sql<{ value: number }[]>`
+      SELECT DISTINCT goals AS value FROM player_season_stats
+       WHERE season = ${yr.season} AND goals IS NOT NULL
+       ORDER BY goals DESC OFFSET 2 LIMIT 1
+    `;
+    const { rows, total } = await season({
+      metric: 'goals', agg: { kind: 'list' }, limit: 100,
+      scope: { seasonMin: yr.season, seasonMax: yr.season },
+      metricCondition: { op: 'gt', value: third.value },
+    }, 100);
+
+    const expected = await sql<{ playerId: number; goals: number }[]>`
+      SELECT player_id AS "playerId", goals FROM player_season_stats
+       WHERE season = ${yr.season} AND goals > ${third.value}
+       ORDER BY goals DESC
+    `;
+    expect(expected.length).toBeGreaterThan(1);
+    expect(total).toBe(expected.length);
+    expect(new Set(rows.map((r) => r.playerId))).toEqual(new Set(expected.map((e) => e.playerId)));
+    expect(rows.every((r) => r.value !== null && r.value > third.value)).toBe(true);
+  });
+
+  it('a strict less-than threshold excludes the boundary value itself', async () => {
+    // lt was the one comparator the suite did not prove against SQL. The
+    // bound is the season's record value, so lt excludes the record rows
+    // that lte would include -- the strict boundary is what's under test.
+    const [pick] = await sql<{ season: number; max: number }[]>`
+      SELECT m.season, max(s.goals) AS max
+        FROM player_match_stats s JOIN matches m ON m.id = s.match_id
+       WHERE s.goals IS NOT NULL
+       GROUP BY m.season ORDER BY count(*) DESC LIMIT 1
+    `;
+    const { rows, total } = await game({
+      metric: 'goals', agg: { kind: 'list' }, limit: 100,
+      scope: { seasonMin: pick.season, seasonMax: pick.season },
+      metricCondition: { op: 'lt', value: pick.max },
+    }, 100);
+
+    const [expected] = await sql<{ strict: number; inclusive: number }[]>`
+      SELECT count(*) FILTER (WHERE s.goals < ${pick.max})::int AS strict,
+             count(*) FILTER (WHERE s.goals <= ${pick.max})::int AS inclusive
+        FROM player_match_stats s JOIN matches m ON m.id = s.match_id
+       WHERE m.season = ${pick.season} AND s.goals IS NOT NULL
+    `;
+    expect(expected.strict).toBeGreaterThan(0);
+    expect(expected.strict).toBeLessThan(expected.inclusive); // < genuinely excludes the boundary
+    expect(total).toBe(expected.strict);
+    expect(rows.every((r) => r.value !== null && r.value < pick.max)).toBe(true);
+  });
+
+  it('a capped threshold list with ties returns identical row identities and order on repeated execution', async () => {
+    // A common exact value gives well over 100 tied qualifying rows, so
+    // the 100-row display cap is exercised and only the deterministic
+    // final tie-breakers (matchDate, matchId, playerId) decide which rows
+    // appear and in what order.
+    const [pick] = await sql<{ goals: number }[]>`
+      SELECT goals FROM player_match_stats
+       WHERE goals IS NOT NULL AND goals > 0
+       GROUP BY goals HAVING count(*) > 150
+       ORDER BY goals DESC LIMIT 1
+    `;
+    const overrides = {
+      metric: 'goals', agg: { kind: 'list' }, limit: 100,
+      metricCondition: { op: 'eq', value: pick.goals },
+    } as const;
+    const first = await game(overrides, 100);
+    const second = await game(overrides, 100);
+
+    expect(first.total).toBeGreaterThan(100);
+    expect(first.rows).toHaveLength(100);
+    const identity = (r: { playerId: number; matchId: number | null }) => `${r.playerId}:${r.matchId}`;
+    expect(second.rows.map(identity)).toEqual(first.rows.map(identity));
+    expect(second.total).toBe(first.total);
+  });
+
+  it('an exact-value season threshold returns exactly the eq set', async () => {
+    const [pick] = await sql<{ season: number; goals: number; count: number }[]>`
+      SELECT season, goals, count(*)::int AS count FROM player_season_stats
+       WHERE goals IS NOT NULL AND goals > 0
+       GROUP BY season, goals HAVING count(*) >= 2
+       ORDER BY goals DESC LIMIT 1
+    `;
+    const { rows, total } = await season({
+      metric: 'goals', agg: { kind: 'list' }, limit: 100,
+      scope: { seasonMin: pick.season, seasonMax: pick.season },
+      metricCondition: { op: 'eq', value: pick.goals },
+    }, 100);
+    expect(total).toBe(pick.count);
+    expect(rows.every((r) => r.value === pick.goals)).toBe(true);
+  });
+});
+
+describe('AFLDB-ISSUE-110 end-to-end natural-language threshold proof', () => {
+  const RUN_TAG = E2E_RUN_TAG;
+
+  it('answers an exact question through parser -> validation -> execution -> description', async () => {
+    // The bound is the second-highest distinct single-game goals value, so
+    // several performances qualify and the old rank-one collapse (or a
+    // dropped predicate) cannot produce the same rows/total/headline.
+    const [second] = await sql<{ value: number }[]>`
+      SELECT DISTINCT goals AS value FROM player_match_stats
+       WHERE goals IS NOT NULL ORDER BY goals DESC OFFSET 1 LIMIT 1
+    `;
+    const answer = await answerNlQuestion(`players with at least ${second.value} goals in a game`, null, RUN_TAG);
+    expect(answer).not.toBeNull();
+    if (!answer || answer.payload.kind !== 'player_game') throw new Error('expected a player_game answer');
+
+    const expected = await sql<{ playerId: number; matchId: number }[]>`
+      SELECT player_id AS "playerId", match_id AS "matchId"
+        FROM player_match_stats WHERE goals >= ${second.value}
+    `;
+    expect(expected.length).toBeGreaterThan(1);
+    expect(answer.payload.total).toBe(expected.length);
+    expect(answer.payload.rows).toHaveLength(Math.min(expected.length, 100));
+    for (const row of answer.payload.rows) {
+      expect(row.value !== null && row.value >= second.value).toBe(true);
+      expect(expected.some((e) => e.playerId === row.playerId && e.matchId === row.matchId)).toBe(true);
+    }
+    expect(answer.headline).toBe(
+      `${expected.length.toLocaleString('en-AU')} qualifying ${expected.length === 1 ? 'performance' : 'performances'}`,
+    );
+    expect(answer.interpretation).toBe(`Single-game goals at least ${second.value.toLocaleString('en-AU')}.`);
+  });
+
+  it('answers the review\'s exact opponent-scoped wording without discarding the opponent', async () => {
+    // "players with more than 2 goals against Carlton" is the HIGH
+    // scope-discarding wording: it must qualify each player's aggregate
+    // goals AGAINST CARLTON, never whole-career goals.
+    const [carlton] = await sql<{ id: number }[]>`SELECT id FROM club_organizations WHERE slug = 'carlton'`;
+    const answer = await answerNlQuestion('players with more than 2 goals against Carlton', null, RUN_TAG);
+    expect(answer).not.toBeNull();
+    if (!answer || answer.payload.kind !== 'player_game') throw new Error('expected a player_game answer');
+
+    const truth = await sql<{ playerId: number; value: number }[]>`
+      SELECT s.player_id AS "playerId", sum(s.goals)::int AS value
+        FROM player_match_stats s JOIN matches m ON m.id = s.match_id
+       WHERE (CASE WHEN m.home_club_id = s.club_id THEN m.away_club_id ELSE m.home_club_id END)
+               IN (SELECT id FROM clubs WHERE organization_id = ${carlton.id})
+         AND s.goals IS NOT NULL
+       GROUP BY s.player_id
+      HAVING sum(s.goals) > 2
+    `;
+    expect(truth.length).toBeGreaterThan(1);
+    expect(answer.payload.total).toBe(truth.length);
+    const truthIds = new Set(truth.map((t) => t.playerId));
+    for (const row of answer.payload.rows) {
+      expect(row.value !== null && row.value > 2).toBe(true);
+      expect(truthIds.has(row.playerId)).toBe(true);
+      expect(row.games).not.toBeNull(); // sum-mode rows: a scoped total, not one match
+    }
+    expect(answer.headline).toBe(
+      `${truth.length.toLocaleString('en-AU')} ${truth.length === 1 ? 'player qualifies' : 'players qualify'}`,
+    );
+    expect(answer.interpretation).toBe('Total goals more than 2 across the matches in scope.');
   });
 });
 

@@ -52,6 +52,214 @@ describe('validatePlan', () => {
     expect('error' in ok).toBe(false);
   });
 
+  describe('metric conditions (AFLDB-ISSUE-110)', () => {
+    it.each([
+      ['player_game single', { grain: 'player_game', metric: 'goals', mode: 'single' }],
+      ['player_game sum', { grain: 'player_game', metric: 'disposals', mode: 'sum' }],
+      ['player_season', { grain: 'player_season', metric: 'goals' }],
+    ] as const)('accepts a %s list qualified by a metric condition', (_label, shape) => {
+      for (const op of ['gte', 'lte', 'gt', 'lt', 'eq'] as const) {
+        const result = validatePlan(basePlan({
+          ...shape, agg: { kind: 'list' }, limit: 100, metricCondition: { op, value: 5 },
+        }));
+        expect('error' in result, `${_label} ${op}`).toBe(false);
+      }
+    });
+
+    it('rejects a metric condition on a grain whose compiler cannot consume it', () => {
+      expect(validatePlan(basePlan({
+        metricCondition: { op: 'gte', value: 5 }, agg: { kind: 'list' }, metric: null,
+        careerConditions: [{ kind: 'column', column: 'games', op: 'gte', value: 1 }],
+      }))).toHaveProperty('error');
+      expect(validatePlan(basePlan({
+        grain: 'team_match', metric: 'win_margin',
+        metricCondition: { op: 'gte', value: 5 },
+      }))).toHaveProperty('error');
+    });
+
+    it('rejects a malformed comparator or value', () => {
+      expect(validatePlan(basePlan({
+        grain: 'player_game', metric: 'goals', mode: 'single', agg: { kind: 'list' },
+        metricCondition: { op: 'between' as never, value: 5 },
+      }))).toHaveProperty('error');
+      expect(validatePlan(basePlan({
+        grain: 'player_game', metric: 'goals', mode: 'single', agg: { kind: 'list' },
+        metricCondition: { op: 'gte', value: Number.NaN },
+      }))).toHaveProperty('error');
+      expect(validatePlan(basePlan({
+        grain: 'player_game', metric: 'goals', mode: 'single', agg: { kind: 'list' },
+        metricCondition: { op: 'gte', value: -1 },
+      }))).toHaveProperty('error');
+    });
+
+    it('rejects a ranked aggregation alongside a metric condition', () => {
+      expect(validatePlan(basePlan({
+        grain: 'player_game', metric: 'goals', mode: 'single', agg: { kind: 'max' },
+        metricCondition: { op: 'gte', value: 5 },
+      }))).toHaveProperty('error');
+    });
+
+    it('still requires mode on a player_game metric-condition plan', () => {
+      expect(validatePlan(basePlan({
+        grain: 'player_game', metric: 'goals', agg: { kind: 'list' },
+        metricCondition: { op: 'gte', value: 5 },
+      }))).toHaveProperty('error');
+    });
+
+    it('fails a player game/season list with no threshold closed instead of collapsing it to a leader', () => {
+      expect(validatePlan(basePlan({ grain: 'player_game', metric: 'goals', mode: 'single', agg: { kind: 'list' } })))
+        .toEqual({ error: 'Listing player results needs a qualifying threshold.' });
+      expect(validatePlan(basePlan({ grain: 'player_season', metric: 'goals', agg: { kind: 'list' } })))
+        .toEqual({ error: 'Listing player results needs a qualifying threshold.' });
+    });
+
+    it('rejects a metric condition smuggled into a head-to-head plan', () => {
+      expect(validatePlan(basePlan({
+        grain: 'head_to_head', metric: null, agg: { kind: 'count' },
+        headToHead: { kind: 'record' },
+        scope: {
+          matchup: {
+            clubA: { organizationId: 1, slug: 'a', name: 'A' },
+            clubB: { organizationId: 2, slug: 'b', name: 'B' },
+          },
+        },
+        metricCondition: { op: 'gte', value: 1 },
+      }))).toHaveProperty('error');
+    });
+
+    it('describes the applied threshold in the plan trace', () => {
+      const plan = validatePlan(basePlan({
+        grain: 'player_game', metric: 'disposals', mode: 'sum', agg: { kind: 'list' }, limit: 100,
+        metricCondition: { op: 'lte', value: 25 },
+      }));
+      if ('error' in plan) throw new Error(plan.error);
+      expect(describePlan(plan)).toContain('Condition: disposals at most 25.');
+    });
+  });
+
+  describe('career-grain scope backstop (AFLDB-ISSUE-110 revision)', () => {
+    const SCOPE_ERROR = 'A career question cannot be scoped to a venue, opponent, match type, or round.';
+    const SEASON_ERROR = 'A career question cannot be restricted to a season range.';
+    const carlton = { organizationId: 2, slug: 'carlton', name: 'Carlton' };
+
+    it('rejects a career-condition plan carrying opponent scope its compiler cannot consume', () => {
+      // The exact scope-discarding shape: "players with more than 100
+      // games against Carlton" used to validate and answer whole-career
+      // games with the opponent silently ignored.
+      expect(validatePlan(basePlan({
+        metric: null, agg: { kind: 'list' },
+        careerConditions: [{ kind: 'column', column: 'games', op: 'gt', value: 100 }],
+        scope: { clubAgainst: carlton },
+      }))).toEqual({ error: SCOPE_ERROR });
+    });
+
+    it('rejects venue, match-type, and round scope on any career plan', () => {
+      expect(validatePlan(basePlan({ scope: { venue: { id: 1, slug: 'mcg', name: 'MCG' } } })))
+        .toEqual({ error: SCOPE_ERROR });
+      expect(validatePlan(basePlan({ scope: { matchType: 'finals' } })))
+        .toEqual({ error: SCOPE_ERROR });
+      expect(validatePlan(basePlan({ scope: { roundNumber: 5 } })))
+        .toEqual({ error: SCOPE_ERROR });
+    });
+
+    it('rejects season bounds on every non-predicate career execution path', () => {
+      expect(validatePlan(basePlan({
+        metric: null, agg: { kind: 'list' },
+        careerConditions: [{ kind: 'column', column: 'goals', op: 'gt', value: 500 }],
+        scope: { seasonMin: 2000 },
+      }))).toEqual({ error: SEASON_ERROR });
+      expect(validatePlan(basePlan({
+        metric: 'goals', agg: { kind: 'max' },
+        scope: { seasonMin: 2000 },
+      }))).toEqual({ error: SEASON_ERROR });
+      expect(validatePlan(basePlan({
+        metric: 'goals', agg: { kind: 'max' },
+        scope: { seasonMax: 1999 },
+      }))).toEqual({ error: SEASON_ERROR });
+      expect(validatePlan(basePlan({
+        metric: 'goals', agg: { kind: 'max' },
+        scope: { seasonMin: 2000, seasonMax: 2000 },
+      }))).toEqual({ error: SEASON_ERROR });
+    });
+
+    it('still accepts unscoped all-time, condition-list, and clubFor career shapes', () => {
+      expect('error' in validatePlan(basePlan({
+        metric: 'goals', agg: { kind: 'max' }, scope: {},
+      }))).toBe(false);
+      expect('error' in validatePlan(basePlan({
+        metric: null, agg: { kind: 'list' },
+        careerConditions: [{ kind: 'column', column: 'goals', op: 'gt', value: 500 }],
+      }))).toBe(false);
+      expect('error' in validatePlan(basePlan({
+        metric: 'games', agg: { kind: 'max' },
+        scope: { clubFor: carlton },
+      }))).toBe(false);
+    });
+  });
+
+  describe('season-grain scope backstop (AFLDB-ISSUE-110 final review)', () => {
+    // answerPlayerSeason consumes player/playerIdIn/season-range/clubFor/
+    // metricCondition and nothing else in match scope: a player_season
+    // plan carrying any of these four would validate and then silently
+    // answer the whole-season question with the scope discarded.
+    const SCOPE_ERROR = 'A season total cannot be scoped to a venue, opponent, match type, or round.';
+    const carlton = { organizationId: 2, slug: 'carlton', name: 'Carlton' };
+    const seasonThreshold = (scope: NlQueryPlan['scope']) => basePlan({
+      grain: 'player_season', metric: 'disposals', agg: { kind: 'list' },
+      metricCondition: { op: 'gt', value: 20 },
+      scope,
+    });
+
+    it('rejects opponent scope on a season threshold list its executor cannot consume', () => {
+      // The exact HIGH-finding shape: "players with more than 20
+      // disposals in a season against Carlton" must not become
+      // whole-season disposals against every opponent.
+      expect(validatePlan(seasonThreshold({ clubAgainst: carlton }))).toEqual({ error: SCOPE_ERROR });
+    });
+
+    it('rejects venue, match-type, and round scope on a season threshold list', () => {
+      expect(validatePlan(seasonThreshold({ venue: { id: 30, slug: 'mcg', name: 'MCG' } })))
+        .toEqual({ error: SCOPE_ERROR });
+      expect(validatePlan(seasonThreshold({ matchType: 'grand_final' }))).toEqual({ error: SCOPE_ERROR });
+      expect(validatePlan(seasonThreshold({ roundNumber: 5 }))).toEqual({ error: SCOPE_ERROR });
+    });
+
+    it('rejects the same scope on a ranked season leaderboard, not just threshold lists', () => {
+      expect(validatePlan(basePlan({
+        grain: 'player_season', metric: 'goals', agg: { kind: 'max' },
+        scope: { matchType: 'finals' },
+      }))).toEqual({ error: SCOPE_ERROR });
+      expect(validatePlan(basePlan({
+        grain: 'player_season', metric: 'goals', agg: { kind: 'max' },
+        scope: { clubAgainst: carlton },
+      }))).toEqual({ error: SCOPE_ERROR });
+    });
+
+    it('still accepts the season shapes the executor genuinely consumes', () => {
+      expect('error' in validatePlan(seasonThreshold({}))).toBe(false);
+      expect('error' in validatePlan(seasonThreshold({ seasonMin: 1989, seasonMax: 1989 }))).toBe(false);
+      expect('error' in validatePlan(seasonThreshold({ clubFor: carlton }))).toBe(false);
+      expect('error' in validatePlan(basePlan({
+        grain: 'player_season', metric: 'goals', agg: { kind: 'max' },
+        scope: { clubFor: carlton, seasonMin: 2017, seasonMax: 2017 },
+      }))).toBe(false);
+    });
+  });
+
+  describe('player-season tie policy (AFLDB-ISSUE-110)', () => {
+    it('keeps the executor-supported all-ties policy valid', () => {
+      expect(validatePlan(basePlan({
+        grain: 'player_season', metric: 'goals', agg: { kind: 'max' }, tiePolicy: 'all',
+      }))).not.toHaveProperty('error');
+    });
+
+    it('rejects first-tie selection until the player-season executor supports it', () => {
+      expect(validatePlan(basePlan({
+        grain: 'player_season', metric: 'goals', agg: { kind: 'max' }, tiePolicy: 'first',
+      }))).toEqual({ error: 'Player-season questions do not support first-tie selection.' });
+    });
+  });
+
   it('rejects career conditions on a non-career grain', () => {
     const result = validatePlan(basePlan({
       grain: 'player_game', metric: 'goals', mode: 'single',

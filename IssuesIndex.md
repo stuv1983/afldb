@@ -6,8 +6,8 @@
 > `issues.md` disagree, trust `issues.md` and immediately synchronize this file
 > and the Open Issues table at the top of `issues.md`.
 
-**Last updated:** 2026-08-30
-**Open issues:** 2 — `AFLDB-ISSUE-102`, `AFLDB-ISSUE-104`
+**Last updated:** 2026-08-31
+**Open issues:** 3 — `AFLDB-ISSUE-102`, `AFLDB-ISSUE-104`, `AFLDB-ISSUE-110`
 
 ## How Claude should use this file
 
@@ -155,6 +155,7 @@
 |---|---|---|---|
 | `AFLDB-ISSUE-102` | Medium | Data acquisition / Import architecture | `import_awards.py:1408` still requires `AFLDB_LEGACY_SQLITE` — the awards sibling of the ISSUE-095 gap. **Record only; do not design the replacement.** |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key)` carries **no owner**, so the `data_issues` refresh upsert could update a foreign-owned open row. Resolution *is* ownership-scoped; refresh is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. Key files: `076_afltables_settle_projections.sql` (**frozen — never edit**), `settle-afltables.ts`. Next action: **nothing until a second `issue_key` writer is proposed**; ownership must enter the dedup contract before one ships. |
+| `AFLDB-ISSUE-110` | Medium | Natural-language search / deterministic semantics | Final bounded implementation after the independent REVISE is complete; parser remains v32. `validatePlan` now refuses every non-predicate `player_career` path carrying season bounds, closing the ranked `most career goals since/in 2000` silent-scope path without parser or SQL changes. Ordinary all-time career rankings and all parser-v32 generic-season behaviour remain valid. Standing evidence: focused parser/validator **182/182**; expanded focused **345/345**; complete DB-free matrix **14 suites, 733/733**; typecheck passed; authoritative post-final-revision operator DB gate **2 files, 46/46 passed in 20.65 s** (`nl-answers-game-season` 24/24; `nl-semantic-mapping` 22/22). The three documented temporary artifacts were removed exactly. Durable record: `issues/open/AFLDB-ISSUE-110.md`. **Exact next action: FRESH CODEX MEDIUM CHAT — FINAL INDEPENDENT CODE REVIEW** of the current final revision, ranked career/season-bound invariant, regressions, and parser-v32 preservation. No 480, 1,435/1,440, 100k, telemetry reset, or other large-scale run before APPROVE. Issue remains Open; the 22,607-search run remains incomplete. |
 <!-- RETIRED 2026-08-29 — `AFLDB-ISSUE-105` is **Resolved** and is NO LONGER an open issue.
      Do not read the commented-out row below as current: it is the pre-resolution index row,
      kept only as lineage, and its "NOT yet validated" / "next action" text is SUPERSEDED.
@@ -171,8 +172,8 @@
 -->
 
 <!-- No open rows follow. Everything below is retired lineage only: ISSUE-106 (retired
-     2026-08-29) and ISSUE-093 (retired 2026-08-27). The two open issues are ISSUE-102 and
-     ISSUE-104, listed above. -->
+     2026-08-29) and ISSUE-093 (retired 2026-08-27). The three open issues are ISSUE-102,
+     ISSUE-104, and ISSUE-110, listed above. -->
 
 <!-- RETIRED 2026-08-29 — `AFLDB-ISSUE-106` is **Resolved** and is NO LONGER an open issue.
      Do not read the commented-out row below as current: it is the pre-resolution index row,

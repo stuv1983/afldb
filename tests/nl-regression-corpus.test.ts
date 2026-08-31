@@ -20,7 +20,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseNlQuestion, type NlParseContext, type NlPlayerCandidate } from '@/search/nl/parser';
-import { validatePlan, type NlParse, type NlQueryPlan } from '@/search/nl/plan';
+import { nlCoverageFor, validatePlan, type NlParse, type NlQueryPlan } from '@/search/nl/plan';
 import type { NlClubDirectoryEntry, NlVenueDirectoryEntry } from '@/search/nl/entities';
 
 const CLUBS: NlClubDirectoryEntry[] = [
@@ -885,8 +885,12 @@ describe('NL-022: "ambiguous" means two plausible players, not one weak match', 
     expect(result.status).toBe('plan');
     expect(result.report.ambiguousPlayer).toBeUndefined();
     expect(result.report.unsupportedTerms).not.toContain('ablett');
+    // playerIds is the ISSUE-110 telemetry enrichment: the stable ids of a
+    // deliberately multi-candidate resolution, which the joined display
+    // names alone cannot recover.
     expect(result.report.entityResolution).toContainEqual({
       mention: 'ablett', resolvedTo: 'Gary Ablett Snr, Gary Ablett Jnr', certainty: 1,
+      playerIds: [300, 301],
     });
   });
 
@@ -963,8 +967,9 @@ describe('NL-023: a scope with no recorded data is refused, not footnoted', () =
   // exist for every year the medal has been awarded, and a bare
   // NL_COVERAGE[metric] lookup would wrongly give them the same hole.
   it('a career Brownlow-vote total is unaffected by the per-game gap', () => {
+    expect(nlCoverageFor('player_career', 'brownlow_votes')).toBeNull();
     const result = validatePlan({
-      ...brownlowGame({ seasonMin: 1950, seasonMax: 1950 }),
+      ...brownlowGame({}),
       grain: 'player_career',
       mode: undefined,
     });
