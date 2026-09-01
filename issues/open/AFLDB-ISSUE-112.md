@@ -327,8 +327,8 @@ table, it would require `afldb_meta.grant_import_write()` — raise it as a deci
 
 ## 13. Status
 
-Design recorded 2026-08-30. **Not implemented. No manifest built, no code written, no data
-acquired.**
+Design recorded 2026-08-30. **Slice 1 (honour teams) IMPLEMENTED 2026-09-01 — Pass 7, §16. The
+other six families remain not implemented.**
 
 - Operator prerequisite §11.1 (extraction source) — **DECIDED 2026-09-01**: the legacy-loaded
   AFLDB PostgreSQL state, not a fresh scrape.
@@ -345,9 +345,17 @@ acquired.**
   collisions on `(name, inducted_year)`, `hall_of_fame.name` alone, `(team_name, player_name_raw)`
   and `(team_name, player_id)`. Only the rename-is-link-losing property remains as an operator
   policy acknowledgement (§14.5 item 2).
-- **Still open before a merge:** the `source_citation` granularity choice (§14.5 item 1) — the
-  one systemic gap, operator decision, no scrape proposed.
-- **Implementation phasing (§11.2) may now begin — honour teams first.**
+- **`source_citation` granularity — DECIDED 2026-09-01 (operator, Pass 7):** source-granularity
+  provenance from the canonical source identity. For the honour-teams slice the value is
+  `wikipedia` for all 113 rows. This is explicitly **not** a per-row page/edition citation;
+  PostgreSQL does not retain that, and legacy SQLite is not being reopened to reconstruct it.
+- **Implementation phasing (§11.2) — honour teams (slice 1 of 7) IMPLEMENTED 2026-09-01.** See
+  §16. **Real DB-backed integration validation EXECUTED and GREEN 2026-09-01 — see §17**: 6/6
+  focused tests passed against real `afldb_test` under the restricted `afldb_import` role
+  (113-row parity, idempotent reload, link-decision survival, unlinked-row preservation,
+  `manual_admin_edit` protection, other-family non-interference). The remaining six families
+  (Hall of Fame, captaincies, Rising Star, All-Australian, club best-and-fairest, named medals)
+  are unstarted.
 
 ---
 
@@ -700,6 +708,164 @@ file and no database row was changed.**
 The `db = 'afldb_dev' AND txn_read_only = 'on'` precondition was satisfied before any measurement
 query ran. `afldb_test` was **not** used.
 
+---
+
+## 16. Pass 7 — 2026-09-01: implementation slice 1 (HONOUR TEAMS) — COMPLETE
+
+**Scope:** unblock and complete the honour-teams slice per Pass 6's §15 spec, under two new
+operator decisions supplied this pass: (1) the bootstrap connection is now reachable — a
+dedicated SSH key `~/.ssh/afldb_dev` (distinct from the `dev`/`streamanator` alias's default
+key) authenticates to `arm@10.0.40.100`, refuting Pass 6's "SSH key auth refused" finding; (2)
+`source_citation` = `wikipedia` for every honour-teams row (source-granularity provenance, §13).
+
+### 16.1 Bootstrap extraction — executed, read-only, proven
+
+Same connection-proof discipline as Pass 5 (§14.6): `BEGIN TRANSACTION READ ONLY`, step-0 guard
+(`current_database() = 'afldb_dev'`, `transaction_read_only = 'on'`), the full §15.5 query set
+piped over `psql` stdin via SSH, then `ROLLBACK`. Observed: `db = afldb_dev`,
+`role = afldb_import`, `host = 127.0.0.1:5432`, `txn_read_only = on`, PostgreSQL 16.15. No file
+written to the server; nothing committed.
+
+Measured results matched G0 exactly: **113 rows**, 5 teams (AFL/VFL Team of the Century 22,
+Greek Team of the Century 20, Indigenous Team of the Century 24, Italian Team of the Century 23,
+Queensland Team of the 20th Century 24), provenance **100% `wikipedia`**, natural-key probes
+`(team_name, player_name_raw)` and `(team_name, player_id)` both **zero duplicates**, exactly
+**one** `player_link_resolutions` decision (`target_id` = the Ted Whitten row, `action = linked`,
+`decided_player_id` = the row's current `player_id` — no drift), and the §15.5 rebuild-stability
+probe: of the 89 linked rows, 85 resolve to exactly one `afltables_profile_url` identity, 4 have
+none, 0 have more than one (carried forward per §16.3, not a slice blocker).
+
+### 16.2 Manifest — `data/awards/honour-teams.csv`
+
+Built directly from the extraction's ordered result set (`ORDER BY team_name, sort_order,
+player_name_raw, id` — the `id` column is the extraction tie-break only and does not appear in
+the file). `source_key` minted once as `honourteam:<team-slug>:<seq>`, `<team-slug>` via the
+byte-identical `import_awards.py` `slugify()` rule, `<seq>` 1-based within each team in file
+order. `source_citation` set to the literal `wikipedia` for all 113 rows per the operator
+decision. 114 lines (header + 113), exact §15.4 column order. `.gitignore` whitelisted
+(`!/data/awards/honour-teams.csv`, alongside the existing `22-under-22.csv` entry).
+
+### 16.3 Loader — `tools/migration/honour_teams.py` + `import_awards.py`
+
+New `tools/migration/honour_teams.py`, in the `under_22.py` mould: `HonourTeamsSourceError`,
+frozen `HonourTeamMember` dataclass, `load_honour_teams()` that fully validates before
+constructing any row (no best-effort coercion), `summary()`/`main()` giving a DB-free `--check`.
+Refuses: malformed header; unknown `team_name`/`position`/`role`/`link_status`; a
+`source_citation` other than the one decided value; `link_status` disagreeing with `player_id`
+presence (the migration 019/053 invariant, enforced here rather than left to the database);
+malformed `source_key` or a slug not matching `slugify(team_name)`; a `source_key` seq out of
+sequence for its team; rows out of the file's declared deterministic order (team blocks
+non-contiguous or non-ascending; within a team, `sort_order`/`player` non-ascending); duplicate
+`source_key`; duplicate natural identity `(team_name, player)`; duplicate linked identity
+`(team_name, player_id)`; a total row count or per-team distribution not matching the declared
+113/5-team contract. The duplicate-`source_key` check is deliberately ordered **before** the
+seq-sequencing check — a literal key repeat is always also seq-invalid under sequential minting,
+so checking duplication first keeps that failure mode distinctly reported rather than masked as
+an ordering error.
+
+`import_awards.py`: added `from honour_teams import HonourTeamMember, load_honour_teams`.
+`import_honour_teams()` lost its `lite` parameter; its body now calls `load_honour_teams()`
+instead of `lite.execute("SELECT ... FROM team_selections ...")`, mapping the parsed rows onto
+the same `prepared` tuple shape the loader already built (still passed through the existing
+`link_status()` invariant call for defense-in-depth). The advisory lock take, the §4.3/§4.4
+`_refuse_honour_team_identity_collisions` preflight and the `reload_keyed(...)` call — key
+`["team_name", "player_name_raw"]`, the same 11-column value list, `scope_column="source_id"`,
+`allow_link_loss` — are **byte-identical** to before. `"honour_teams"` added to
+`LEGACY_FREE_GROUPS`; `BATCH_SOURCE_KEYS["honour_teams"] = "wikipedia"` added so its
+`import_batch` records against `wikipedia` rather than the `sports_data_lab` default. The call
+site drops the `lite` argument. No other group, `GROUPS`, `GROUP_ORDER` or `GROUP_REQUIRES`
+entry changed. No migration, no privilege change.
+
+**Carried-forward risk, unchanged from Pass 6 (§15.3), not a slice-1 blocker:** the manifest
+carries the 89 linked rows' `player_id` verbatim from `afldb_dev`. That reproduces the family
+exactly in a database sharing `afldb_dev`'s player numbering (which is what `afldb_test` for this
+suite already assumes — every pre-existing `hall_of_fame`/`honour_team_members` test in this file
+relies on the same property for the real legacy-loaded data). It is **not** durable across a
+from-scratch canonical rebuild that re-seeds `players.id` (ISSUE-111 G5) — 4 of the 89 linked
+rows do not even carry a unique `afltables_profile_url` today (§16.1), so a rebuild-stable
+re-resolution step could not cover all 89 without a separate adjudication. This risk is recorded
+against the deferred canonical-rebuild AWARDS/HONOURS stage (§7), per instruction, not solved
+here. `source_key` — not `player_id` — is the manifest's durable identity.
+
+### 16.4 Tests
+
+**DB-free — `tests/honour-teams-source.test.ts` (new, 22 cases, all passing):** the full 113-row
+manifest parses with the exact G0-measured shape (`row_count: 113`, `linked_count: 89`,
+`unlinked_count: 24`, the 5 per-team counts); two representative rows (Ted Whitten's decided
+row, an `unmatched` row) round-trip verbatim; every row's `source_citation` is `wikipedia`; and
+one test each for: malformed header; unknown `team_name`/invalid `position`/invalid `role`/
+invalid `link_status`; a `source_citation` outside the decided value (both a wrong source key and
+a page-URL-shaped value); `link_status` disagreeing with `player_id` presence (both directions);
+malformed `source_key`; slug mismatch; seq-out-of-sequence; duplicate `source_key`; duplicate
+natural identity; duplicate linked identity; out-of-order rows within a team; team blocks out of
+order; total row count short of 113; a team missing entirely. Negative cases use a quote-aware
+CSV cell replacer (the real manifest has commas inside quoted club-list fields) and a minimal
+synthetic valid row for cases whose failure fires during per-row validation, before the
+113-row completeness check would ever run.
+
+**Integration — `tests/integration/awards-reload-links.test.ts` (new describe block, gated
+`canRunHonourTeamsImporter`, legacy-free like the existing `canRunUnder22Importer` block):**
+reloads the full 113-row manifest with `AFLDB_LEGACY_SQLITE` forced unset and asserts the
+`import_batches` row (`records_read = 113`, `records_rejected = 0`, target `honour_teams`) and
+the resulting split (`total 113, linked 89, unlinked 24, teams 5`); three consecutive reloads
+produce a byte-identical `(id, team_name, player_name_raw, player_id)` fingerprint; the Ted
+Whitten row's id and `player_id` survive an additional reload with `link_status = 'resolved'`;
+all 24 unlinked rows stay unlinked; a synthetic `manual_admin_edit`-sourced row survives a reload
+untouched; `hall_of_fame`/`captaincies`/`award_winners`/`award_nominations` row counts are
+unchanged by a `honour_teams`-only run. The top-level `beforeAll`/`afterAll` in this file (role
+validation gate, honours-table advisory lock, connection pool) needed no change — the new block
+reuses `runImporter`/`countRows`/`sql` exactly as the existing blocks do, passing `undefined` as
+`runImporter`'s third argument to force `AFLDB_LEGACY_SQLITE` unset regardless of this process's
+own environment.
+
+### 16.5 Validation — exact results
+
+1. **DB-free:** `npx vitest run tests/honour-teams-source.test.ts` — **22/22 passed.**
+2. **Typecheck:** `npx tsc --noEmit` — **clean**, before and after the integration-test addition.
+3. **Integration:** the file was executed against the **real `afldb_test`** on the streamanator
+   host (owner-role DSN, via an SSH tunnel to `10.0.40.100:5432`, opened and closed within this
+   pass) to prove the new describe block loads and is wired correctly. Result: **the whole file
+   self-skips (59 tests skipped, 0 run)** — `AFLDB_TEST_IMPORT_DATABASE_URL` (the restricted
+   `afldb_import` test-role DSN `canRunHonourTeamsImporter`/`canRunUnder22Importer`/
+   `canRunFixtureImporter` all require) is not configured anywhere reachable from this worktree or
+   the streamanator host's committed `.env`. This is **not new**: every pre-existing
+   legacy-gated block in this file (ISSUE-044, ISSUE-080, ISSUE-085, ISSUE-111, the existing
+   `canRunUnder22Importer` block) skips for the identical reason in this same environment — it
+   predates this pass. The new block's skip message and behaviour are indistinguishable from its
+   neighbours', confirming it is wired the same way, but its actual reload/idempotency/
+   link-survival assertions have **not executed against a live database this pass.** Provisioning
+   a restricted `afldb_import` test-role credential is outside this pass's authorisation
+   (database role/grant creation) and is the concrete next action for real DB-backed validation.
+4. **`git diff --check`:** clean (only benign CRLF-on-checkout warnings for the two new
+   LF-authored files, exit 0).
+
+### 16.6 Files changed this pass
+
+`.gitignore` (new whitelist line), `data/awards/honour-teams.csv` (new, 114 lines),
+`tools/migration/honour_teams.py` (new), `tools/migration/import_awards.py` (import,
+`import_honour_teams` signature/body, `LEGACY_FREE_GROUPS`, `BATCH_SOURCE_KEYS`, call site),
+`tests/honour-teams-source.test.ts` (new), `tests/integration/awards-reload-links.test.ts`
+(new describe block plus the `canRunHonourTeamsImporter` gate and its `beforeAll` wiring),
+`issues/open/AFLDB-ISSUE-112.md`, `issues/open/AFLDB-ISSUE-102-HANDOFF.md`, `IssuesIndex.md`.
+No `CHANGELOG.md` entry — nothing has been deployed or run against a live application database;
+`import_awards.py`'s behaviour for the other six still-legacy-dependent groups is unchanged.
+ISSUE-111 / ISSUE-113 untouched. `D:\dev\afldb` not accessed. `afldb_dev` was read-only for the
+§16.1 extraction only, never written. No Git command run.
+
+### 16.7 Exact next action
+
+1. **Real DB-backed validation.** Provision (or point at an existing) `AFLDB_TEST_IMPORT_DATABASE_URL`
+   for a `_test`-suffixed database's `afldb_import` role, then run
+   `npx vitest run tests/integration/awards-reload-links.test.ts -t "honour-teams manifest reload"`.
+   This also transitively re-validates that the pre-existing ISSUE-044/080/085/111 blocks in the
+   same file still pass unchanged (no other family's behaviour was touched).
+2. **G1–G4 for the honour-teams family specifically** (not the whole of ISSUE-112): once (1)
+   passes, this family's slice satisfies the `AFLDB-ISSUE-112.md` §10 gates in isolation — it
+   does **not** close G2/G3 for ISSUE-112 as a whole, which require all seven families.
+3. **Phase 2**, per the §11.2 order: Hall of Fame (343 rows) next.
+4. Do **not** resolve ISSUE-112. Do not add the canonical-rebuild AWARDS/HONOURS stage yet (§7)
+   — record the §16.3 rebuild-stable-identity risk against it when that stage is designed.
+
 **`link_status` enum labels (observed):** `unique`, `resolved`, `ambiguous`, `unmatched`,
 `implausible`.
 
@@ -769,3 +935,308 @@ further, per the G0 boundary.
 ISSUE-112. No `CHANGELOG.md` change (measurement-only). No Git command run. No manifest created,
 no loader written, no `import_awards.py` run, no migration, no scrape, no production contact,
 ISSUE-111 / ISSUE-113 untouched.
+
+---
+
+## 17. Pass 8 — 2026-09-01: real DB-backed validation EXECUTED, GREEN
+
+**Scope:** Pass 7's §16.7 exact next action — provision the restricted `afldb_import` test-role
+credential and run the new integration block for real. Operator constraint this pass: do not sync
+or modify anything on the streamanator checkout; use streamanator **only** as the PostgreSQL
+endpoint, reached from `D:\dev\afldb-issue-102` over a temporary SSH local port-forward
+(`arm@10.0.40.100`, key `~/.ssh/afldb_dev`), opened and closed within this pass.
+
+**Outcome: GREEN. The honour-teams describe block executed for real against `afldb_test`, not
+skipped.**
+
+### 17.1 DSN safety proof
+
+| DSN | Role/source | Proven `current_database()` | Proven `current_user` |
+|---|---|---|---|
+| `AFLDB_TEST_DATABASE_URL` (existing, from streamanator `.env`) | owner-role test DSN | `afldb_test` | `afldb_owner` |
+| `AFLDB_TEST_IMPORT_DATABASE_URL` (**not configured anywhere reachable** — same finding as Pass 7 §16.5) | derived ephemerally, in-process only, from `AFLDB_IMPORT_DATABASE_URL` by substituting only the database name (`afldb_dev` → `afldb_test`); never written to disk | `afldb_test` | `afldb_import` |
+
+Both proofs were obtained through the local tunnel before any test ran. No password or full DSN
+was printed at any point in this pass.
+
+### 17.2 Local execution blocker found and resolved
+
+The suite spawns `tools/migration/import_awards.py` as a Python child process
+(`runImporter`/`spawnSync`). Windows `python` (3.12.10) in this worktree had no `psycopg`
+installed, which would make `hasPsycopg()` / `canSpawnPython` false and self-skip the entire file
+regardless of DSN configuration — a different cause from Pass 7's skip (which was DSN-absence with
+`canSpawnPython` never reached). Installed `psycopg[binary]` locally via `pip install --user`
+(local machine only; no repository file, no server file, no `requirements.txt` — none exists —
+touched).
+
+### 17.3 Test execution
+
+```
+npx vitest run tests/integration/awards-reload-links.test.ts -t "honour-teams manifest reload"
+```
+
+**Result: 6/6 passed, 0 failed** (53 other pre-existing tests in the file excluded by the `-t`
+filter — ordinary vitest filtering, not a restricted-role skip).
+
+| Requirement | Test | Result |
+|---|---|---|
+| 113-row parity | `reloads the full 113-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset` | PASS — `import_batches` `records_read=113`, `records_rejected=0`, `status=completed`; `honour_team_members` split `total=113, linked=89, unlinked=24, teams=5` |
+| Idempotent reload | `is idempotent across three consecutive reloads with a byte-identical row-id fingerprint` | PASS |
+| Explicit link-decision survival | `keeps the one explicit honour_team_members link decision (Ted Whitten) resolved across a reload` | PASS |
+| 24 unlinked rows preserved | `leaves all 24 unlinked observations unlinked` | PASS |
+| `manual_admin_edit` protection | `does not touch a manual_admin_edit honour_team_members row` | PASS |
+| Other-family non-interference | `does not change hall_of_fame, captaincies, award_winners or award_nominations row counts` | PASS |
+
+`git diff --check`: clean.
+
+### 17.4 Files changed this pass
+
+`issues/open/AFLDB-ISSUE-112.md` §17 (this section), `issues/open/AFLDB-ISSUE-102-HANDOFF.md`,
+`IssuesIndex.md`. **No file on the streamanator host was created, modified or deleted** — verified
+the honour-teams slice files remain absent from `/home/arm/projects/afldb` both before and after
+this pass. No migration run. No `afldb_dev` contact. No production contact. No Git command run.
+Hall of Fame not started. ISSUE-111 / ISSUE-113 untouched.
+
+### 17.5 Exact next action
+
+Honour-teams family-specific G1–G4 (§10) are satisfied by this pass's evidence — **for the
+honour-teams family only**; this does not close G2/G3 for ISSUE-112 as a whole, which need all
+seven families. Phase 2 — Hall of Fame (343 rows) — is the next implementation slice, per the
+§11.2 order. **Do not resolve ISSUE-112.**
+
+---
+
+## 15. Pass 6 — 2026-09-01: implementation slice 1 (HONOUR TEAMS) — BLOCKED, spec handed off
+
+**Scope of the pass:** the first ISSUE-112 implementation slice, honour teams only (§11.2).
+No other family. Authorised: READ ONLY bootstrap extraction from `afldb_dev` with the
+connection *proven* to be `afldb_dev` first; focused DB-free tests; `npx tsc --noEmit`;
+focused `afldb_test`-only integration tests; `git diff --check`. Prohibited: any scrape, any
+`afldb_dev` mutation, any production contact, ISSUE-111 / ISSUE-113 edits, `D:\dev\afldb`.
+
+**Outcome: BLOCKED. No manifest built, no loader change, no test added. Fail-closed, as in
+Pass 4.** The slice cannot be completed from this worktree because its one input — the
+per-row honour-team facts — is not reachable here, and one contract-required manifest column
+still has no authorised value.
+
+### 15.1 Blocker 1 — no proven read-only path to the bootstrap source (same as Pass 4 §14.1)
+
+Operator decision §11.1 fixes the bootstrap source as **the legacy-loaded AFLDB PostgreSQL
+state** (`afldb_dev.honour_team_members`, 113 rows). Building the manifest needs the *contents*
+of those 113 rows (team, verbatim name, position, role, raw club, sort order, link state,
+note). The G0 pass measured only *aggregates* (§14.4); the row contents were never extracted
+and are **not in the repository**:
+
+| Checked in `D:\dev\afldb-issue-102` @ `78380eb` | Result |
+|---|---|
+| `.env` in the worktree | absent — only `.env.example` |
+| `AFLDB_*` / `PG*` / `DATABASE*` env vars | none set |
+| `psql` / `pg_isready` on PATH | not installed |
+| listening PostgreSQL / tunnel port (5432/5433/6543/15432/54320) | none |
+| legacy SQLite (`*.db` / `*.sqlite` / `team_selections` fixture) anywhere in the tree | none |
+| `data/awards/` | only `22-under-22.csv` |
+| SSH `dev` / `streamanator` (`10.0.40.100`, in `~/.ssh/config`, host key known) | key auth **refused** — `Permission denied (publickey,password)`; no non-interactive path |
+
+Pass 5 reached `afldb_dev` "via the streamanator development server" as an **operator-run /
+operator-assisted** SSH session (§14.6). That path is not available to this session: the SSH
+key is not accepted and an interactive password cannot be supplied non-interactively.
+
+**Database safety proof — NOT ESTABLISHED.** No connection was attempted beyond the failed SSH
+handshake; `current_database()` / `transaction_read_only` were never observed. Fail-closed as
+the pass authorisation requires.
+
+### 15.2 Blocker 2 — `source_citation` has no authorised value (runbook §14.5 item 1)
+
+§4.2 makes `source_citation` a **common, required** manifest column. §14.3 / §14.6 proved
+PostgreSQL retains citation only at *source* granularity (`wikipedia`); there is no per-row
+`source_url` on `honour_team_members`. The value policy is an **open operator decision** and
+this pass "MUST NOT silently weaken or invent" it (pass instruction 8). So even with the row
+contents in hand, the honour-teams manifest cannot be finalised until the operator picks one
+of §14.5 item 1's options (accept source-granularity `wikipedia`; read `source_url` from the
+legacy SQLite file; reconstruct from `docs/acquisition/`). **The missing field is
+`source_citation`.**
+
+### 15.3 Carried-forward design risk (not a slice-1 blocker) — rebuild-stable identity carry
+
+`import_honour_teams` today passes the legacy `player_id` straight through — there is **no
+resolver** in that group (unlike `under_22`). Only **1 of the 89 linked** rows is in
+`player_link_resolutions`; the other 88 links are bare `player_id` values with no ledger.
+Carrying `player_id` verbatim in the manifest reproduces the 113-row family exactly **in the
+legacy-loaded database** (G1), so it is acceptable for this slice. But `players.id` is **not
+rebuild-stable** (ISSUE-111 G5): under `npm run db:test:rebuild` those 88 ids would be wrong.
+Settling this needs the §15.5 rebuild-stability probe and, most likely, an operator decision —
+adding an `afltables_profile_url` re-resolution step to `import_honour_teams` (the Coleman
+pattern) is outside "replace only the input" and must not be done silently. **Record the risk
+against the canonical-rebuild integration step (§7), which the runbook already defers until
+"once the manifests exist".**
+
+### 15.4 Finalised honour-teams manifest design (ready to populate)
+
+Everything below is derived from `import_awards.py:1721-1785` (`import_honour_teams` +
+`reload_keyed` call), migration 005/042/059 schema, and the §14.4 measurements. Nothing here
+needs the row contents; only the CSV body does.
+
+**Path:** `data/awards/honour-teams.csv` (CSV, header row, one row per `honour_team_members`
+row = 113).
+
+**`.gitignore`:** after `!/data/awards/22-under-22.csv` (line 40) add
+`!/data/awards/honour-teams.csv` — same whitelist pattern.
+
+**Header (exact column order):**
+
+```
+source_key,team_name,player,position,role,club,sort_order,player_id,link_status,note,source_citation
+```
+
+| Column | Provenance / rule |
+|---|---|
+| `source_key` | **minted once** `honourteam:<team_slug>:<seq>`. `<team_slug>` = `slugify(team_name)` (`import_awards.py:280` rule). `<seq>` = 1-based index of the row **within its team** in the deterministic order below. Unique within the file; never regenerated; a rename of a decided row needs an explicit `--accept-rename`, a removal an explicit `--accept-retirement` (first-kick-goal mould). Not derived from `player_id` or any DB surrogate id. |
+| `team_name` | `honour_team_members.team_name` verbatim. Must be one of the 5 measured teams (declared vocabulary — §5 rule 6). |
+| `player` | `honour_team_members.player_name_raw` **verbatim** — this is what `reload_keyed`'s name guard compares (`common.py:586`). |
+| `position` | `honour_team_members.position`; nullable (empty field = NULL). Vocabulary from §15.5 probe. |
+| `role` | `honour_team_members.role`; nullable. Vocabulary from §15.5 probe. |
+| `club` | `honour_team_members.club_name_raw`; nullable. The **raw source spelling**, retained verbatim — `import_honour_teams` does *not* resolve it to a `club_id` and there is no such column. |
+| `sort_order` | `honour_team_members.sort_order`; integer ≥ 0; `0` is legal (schema default). |
+| `player_id` | `honour_team_members.player_id`; nullable integer. 89 linked rows carry it, 24 unlinked are empty. See §15.3 risk. |
+| `link_status` | `honour_team_members.link_status_value::text`; one of the enum labels (`unique`,`resolved`,`ambiguous`,`unmatched`,`implausible`). The parser must apply `import_awards.py:link_status()`'s invariant: a row with `player_id` set resolves to `unique`/`resolved`; a row without one never does. |
+| `note` | `honour_team_members.note`; nullable. |
+| `source_citation` | **BLOCKED — §15.2.** Column is in the header because §4.2 requires it; the value awaits the operator decision. Do not populate with `wikipedia` as if that were the decision. |
+
+**Deterministic ordering (file order and `<seq>` basis):** `ORDER BY team_name, sort_order,
+player_name_raw, id`. (`id` only as a final tie-break during extraction; it must not appear in
+the file and `<seq>` must not depend on it once minted.)
+
+**Parser module:** `tools/migration/honour_teams.py`, in the `tools/migration/under_22.py`
+mould — `HonourTeamsSourceError(ValueError)`, a frozen `HonourTeamMember` dataclass, a
+`load_honour_teams(path)` that fully validates or raises with no best-effort coercion, a
+`summary()` and a `main()` giving a DB-free `--check` (JSON out, exit 1 on error).
+
+**§5 refusals to implement (one test each, DB-free):** duplicate `source_key`; duplicate
+natural identity `(team_name, player)`; duplicate linked identity `(team_name, player_id)`;
+null/empty `team_name` or `player`; `team_name` / `position` / `role` / `link_status` outside
+its declared vocabulary; `link_status` disagreeing with `player_id` presence; malformed
+`source_key` (not `honourteam:<slug>:<int>`, or slug ≠ `slugify(team_name)`); a per-team
+row-count / total-count expectation not met (the `EXPECTED_SEASONS` analogue — declare the 5
+team sizes and the total 113 once the §15.5 probe gives them); a `player` change on a row that
+already carries a `player_link_resolutions` decision surfaced before any write.
+
+**Loader change (when the CSV exists):** in `import_awards.py`, replace only the
+`lite.execute("SELECT ... FROM team_selections ...")` block in `import_honour_teams` with
+`load_honour_teams()`; keep the advisory-lock take, `_refuse_honour_team_identity_collisions`,
+and the `reload_keyed(... ["team_name","player_name_raw"] ...)` call **byte-identical** in key,
+column list, scopes and flags. Add `"honour_teams"` to `LEGACY_FREE_GROUPS`
+(`import_awards.py:1913`) and give it a `BATCH_SOURCE_KEYS` entry of `"wikipedia"` (matching
+its `require_source(sources, "wikipedia")` provenance) so its `import_batch` is no longer
+recorded as `sports_data_lab`. `import_honour_teams`'s signature loses `lite`. `GROUPS`,
+`GROUP_ORDER`, `GROUP_REQUIRES` unchanged. No migration; no privilege change.
+
+### 15.5 Exact read-only bootstrap extraction (for the operator, or a pass with a proven connection)
+
+Run as one `BEGIN TRANSACTION READ ONLY; … ROLLBACK;` against a database **proven** to be
+`afldb_dev`. Every statement is `SELECT`. This is the entire remaining input to slice 1.
+
+```sql
+BEGIN TRANSACTION READ ONLY;
+
+-- Step 0 — connection proof. REQUIRE db='afldb_dev' AND txn_read_only='on', else ROLLBACK.
+SELECT current_database() AS db,
+       current_user       AS role,
+       current_setting('transaction_read_only') AS txn_read_only;
+
+-- (1) Manifest body — 113 rows, in the manifest's deterministic order.
+SELECT m.id                      AS db_surrogate_id,   -- extraction tie-break only; NOT in the file
+       m.team_name,
+       m.player_name_raw         AS player,
+       m.position,
+       m.role,
+       m.club_name_raw           AS club,
+       m.sort_order,
+       m.player_id,
+       m.link_status_value::text AS link_status,
+       m.note,
+       s.key                     AS source            -- expect 'wikipedia' on every row
+  FROM honour_team_members m
+  LEFT JOIN sources s ON s.id = m.source_id
+ ORDER BY m.team_name, m.sort_order, m.player_name_raw, m.id;
+
+-- (2) Provenance sanity — expect exactly one group: ('wikipedia', 113).
+SELECT s.key, count(*) AS n
+  FROM honour_team_members m LEFT JOIN sources s ON s.id = m.source_id
+ GROUP BY s.key ORDER BY s.key;
+
+-- (3) The single linked player_link_resolutions decision — expect exactly 1 row.
+SELECT r.id, r.target_id, r.action, r.player_id AS decided_player_id, r.created_at,
+       m.team_name, m.player_name_raw, m.player_id AS current_row_player_id
+  FROM player_link_resolutions r
+  JOIN honour_team_members m ON m.id = r.target_id
+ WHERE r.target_table = 'honour_team_members'
+ ORDER BY r.target_id, r.created_at DESC;
+
+-- (4) Natural-key re-proof for the manifest — expect 0 rows from each.
+SELECT team_name, player_name_raw, count(*) FROM honour_team_members
+ GROUP BY 1,2 HAVING count(*) > 1;
+SELECT team_name, player_id, count(*) FROM honour_team_members
+ WHERE player_id IS NOT NULL GROUP BY 1,2 HAVING count(*) > 1;
+
+-- (5) Field completeness + per-team sizes — sets the parser's nullability and count gates.
+SELECT count(*) AS rows,
+       count(*) FILTER (WHERE position      IS NOT NULL) AS position_present,
+       count(*) FILTER (WHERE role          IS NOT NULL) AS role_present,
+       count(*) FILTER (WHERE club_name_raw IS NOT NULL) AS club_present,
+       count(*) FILTER (WHERE note          IS NOT NULL) AS note_present,
+       count(*) FILTER (WHERE sort_order <> 0)           AS sort_order_nonzero,
+       count(*) FILTER (WHERE player_id IS NOT NULL)     AS linked,
+       count(*) FILTER (WHERE player_id IS NULL)         AS unlinked
+  FROM honour_team_members;
+SELECT team_name, count(*) AS n, min(sort_order) AS min_so, max(sort_order) AS max_so
+  FROM honour_team_members GROUP BY team_name ORDER BY team_name;
+
+-- (6) Value vocabularies — the strict validator's declared domains.
+SELECT DISTINCT position               FROM honour_team_members ORDER BY 1;
+SELECT DISTINCT role                   FROM honour_team_members ORDER BY 1;
+SELECT DISTINCT team_name              FROM honour_team_members ORDER BY 1;
+SELECT DISTINCT link_status_value::text FROM honour_team_members ORDER BY 1;
+
+-- (7) §15.3 rebuild-stability probe for the 89 linked identities (carried-forward risk).
+SELECT count(*)                                         AS linked_members,
+       count(*) FILTER (WHERE ei.n = 1)                 AS exactly_one_profile_url,
+       count(*) FILTER (WHERE coalesce(ei.n, 0) = 0)    AS no_profile_url,
+       count(*) FILTER (WHERE ei.n > 1)                 AS multi_profile_url
+  FROM honour_team_members m
+  LEFT JOIN LATERAL (
+      SELECT count(*) AS n FROM external_identities e
+       WHERE e.player_id = m.player_id
+         AND e.match_method = 'afltables_profile_url'
+         AND e.status = 'unique'
+  ) ei ON TRUE
+ WHERE m.player_id IS NOT NULL;
+
+ROLLBACK;
+```
+
+### 15.6 Exact next action
+
+1. **Operator** supplies a proven read-only `afldb_dev` connection (worktree `.env` + tunnel,
+   or an assisted SSH session as in Pass 5) **or** runs §15.5 and returns the output; **and**
+   settles the `source_citation` value policy (§14.5 item 1) for the honour-teams slice.
+2. A pass then: writes `data/awards/honour-teams.csv` from §15.5 output in the §15.4 schema
+   and deterministic order; mints the `honourteam:<slug>:<seq>` ids once; adds the
+   `.gitignore` whitelist line; writes `tools/migration/honour_teams.py` (under_22 mould) with
+   `--check`; rewires only the `import_honour_teams` input per §15.4; adds
+   `"honour_teams"` to `LEGACY_FREE_GROUPS` and a `"wikipedia"` `BATCH_SOURCE_KEYS` entry;
+   adds `tests/honour-teams-source.test.ts` (DB-free, the §15.4 refusal list) and extends
+   `tests/integration/awards-reload-links.test.ts` for the honour-teams slice only
+   (113-row parity, idempotent reload, the 1 decision survives, 24 unlinked stay unlinked,
+   `manual_admin_edit` untouched, no other family changed, `canRunImporter` no longer needs
+   `AFLDB_LEGACY_SQLITE` for this group).
+3. Validation order: DB-free tests → `npx tsc --noEmit` → focused `awards-reload-links`
+   integration on `afldb_test` under the restricted import role → `git diff --check`.
+4. Do **not** resolve ISSUE-112. Do not touch ISSUE-111 / ISSUE-113. Do not add the
+   canonical-rebuild AWARDS/HONOURS stage yet (§7 — deferred until multiple manifests exist);
+   record the §15.3 rebuild-stable-identity risk against that step.
+
+**Files changed this pass:** `issues/open/AFLDB-ISSUE-112.md`,
+`issues/open/AFLDB-ISSUE-102-HANDOFF.md`, `IssuesIndex.md` (ISSUE-112 next-action text only).
+No `CHANGELOG.md` change. No Git command run. No manifest, no loader change, no test, no
+`import_awards.py` run, no migration, no `afldb_dev` connection, no scrape, no production
+contact. ISSUE-111 / ISSUE-113 untouched. `D:\dev\afldb` not accessed.

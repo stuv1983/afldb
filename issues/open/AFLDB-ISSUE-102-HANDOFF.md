@@ -251,6 +251,151 @@ stdin, then `ROLLBACK`. No server-side file written, no database row changed.
 
 ---
 
+## CHECKPOINT — pass 6 (2026-09-01): ISSUE-112 slice 1 (HONOUR TEAMS) — BLOCKED, spec handed off
+
+Scope: the first ISSUE-112 implementation slice, **honour teams only**. Read-only bootstrap
+extraction from `afldb_dev` authorised on proof of connection; DB-free tests / `tsc` /
+`afldb_test`-only integration / `git diff --check` authorised. No scrape, no `afldb_dev`
+mutation, no production, ISSUE-111 / ISSUE-113 untouched, `D:\dev\afldb` not accessed, no Git.
+
+**Outcome: BLOCKED, fail-closed (as Pass 4). No manifest, no loader change, no test written.**
+Full detail in `AFLDB-ISSUE-112.md` §15.
+
+- **Blocker 1 — no reachable bootstrap source.** The manifest needs the *contents* of the 113
+  `afldb_dev.honour_team_members` rows; G0 measured only aggregates and the rows are not in the
+  repo. This worktree @ `78380eb` has no `.env`, no `AFLDB_*`/`PG*` env vars, no `psql`, no
+  listening tunnel port, no legacy SQLite / fixture anywhere, and `data/awards/` holds only
+  `22-under-22.csv`. `~/.ssh/config` has a `dev` / `streamanator` host (`10.0.40.100`, host key
+  known) but key auth is **refused** (`Permission denied (publickey,password)`) and no
+  non-interactive password path exists. Pass 5's `afldb_dev` read was an operator-assisted SSH
+  session; that path is not available now. Database safety proof NOT established — no connection
+  made.
+- **Blocker 2 — `source_citation` value undecided.** §4.2 requires the column; PostgreSQL
+  retains citation only at source granularity (`wikipedia`); the value policy is an open
+  operator decision (§14.5 item 1) this pass must not invent. Missing field: **`source_citation`**.
+- **Carried-forward risk (not a slice-1 blocker):** `import_honour_teams` has no resolver and
+  only 1 of 89 linked rows is in `player_link_resolutions`; carrying `player_id` verbatim
+  reproduces the family in the legacy-loaded DB (G1) but `players.id` is not rebuild-stable
+  (ISSUE-111 G5). Record against the deferred canonical-rebuild stage (§7).
+- **Delivered instead (repo-only, no DB):** `AFLDB-ISSUE-112.md` §15 now carries the finalised
+  honour-teams manifest design (path `data/awards/honour-teams.csv`, exact 11-column header and
+  order, `honourteam:<slug>:<seq>` mint rule, deterministic ordering, parser module shape, the
+  full §5 refusal list, and the exact `import_awards.py` loader edit), plus §15.5 — the
+  complete read-only bootstrap extraction SQL (one `BEGIN TRANSACTION READ ONLY` block, step-0
+  connection guard, manifest body + provenance + the 1 link decision + natural-key re-proof +
+  field completeness + value vocabularies + the §15.3 rebuild-stability probe).
+- **Files changed this pass:** `issues/open/AFLDB-ISSUE-112.md`,
+  `issues/open/AFLDB-ISSUE-102-HANDOFF.md`, `IssuesIndex.md` (ISSUE-112 next-action text only).
+  No `CHANGELOG.md` change.
+- **Exact next action:** operator supplies a proven read-only `afldb_dev` connection (or runs
+  §15.5 and returns output) **and** settles the `source_citation` policy; a pass then populates
+  the CSV, writes `tools/migration/honour_teams.py`, rewires only `import_honour_teams`'s input,
+  adds `"honour_teams"` to `LEGACY_FREE_GROUPS` + a `"wikipedia"` `BATCH_SOURCE_KEYS` entry, and
+  adds the DB-free + honour-teams-slice integration tests. Validation: DB-free → `tsc` →
+  focused `awards-reload-links` on `afldb_test` under the restricted role → `git diff --check`.
+  Do not resolve ISSUE-112; do not add the canonical-rebuild stage yet.
+
+---
+
+## CHECKPOINT — pass 7 (2026-09-01): ISSUE-112 slice 1 (HONOUR TEAMS) — IMPLEMENTED
+
+Scope: complete the honour-teams slice Pass 6 left blocked. Two new operator decisions unblocked
+it: a dedicated SSH key (`~/.ssh/afldb_dev`, distinct from the `dev` host alias's default key)
+authenticates to the streamanator server where Pass 6 found auth refused; and `source_citation`
+is decided as source-granularity `wikipedia` for every honour-teams row.
+
+- **Bootstrap extraction executed, read-only, proven** — same `BEGIN TRANSACTION READ ONLY`
+  step-0 guard discipline as Pass 5, over SSH to `arm@10.0.40.100`, `psql` reading
+  `AFLDB_IMPORT_DATABASE_URL` from `/home/arm/projects/afldb/.env`. Proven `db=afldb_dev`,
+  `role=afldb_import`, `txn_read_only=on`. 113 rows extracted, matching G0 exactly; zero
+  natural-key collisions re-confirmed; the one `player_link_resolutions` decision (Ted Whitten)
+  confirmed consistent with the live row.
+- **Manifest built:** `data/awards/honour-teams.csv` (114 lines), `source_key` minted
+  `honourteam:<slug>:<seq>`, `source_citation = wikipedia` throughout, whitelisted in
+  `.gitignore`.
+- **Loader wired:** new `tools/migration/honour_teams.py` (validating parser, DB-free `--check`,
+  no best-effort coercion); `import_awards.py`'s `import_honour_teams()` now calls
+  `load_honour_teams()` instead of reading legacy SQLite `team_selections` — `lite` dropped from
+  its signature; `reload_keyed` call, the advisory lock and the §4.3/§4.4 collision preflight are
+  byte-identical to before; `"honour_teams"` added to `LEGACY_FREE_GROUPS`;
+  `BATCH_SOURCE_KEYS["honour_teams"] = "wikipedia"` added. No other group touched.
+- **Tests added:** `tests/honour-teams-source.test.ts` (22 DB-free cases, all passing) and a new
+  legacy-free describe block in `tests/integration/awards-reload-links.test.ts` (113-row parity,
+  3x idempotent reload fingerprint, the one link decision survives, 24 unlinked stay unlinked,
+  `manual_admin_edit` row untouched, no other family's row counts change).
+- **Validation:** DB-free 22/22 passed; `npx tsc --noEmit` clean; `git diff --check` clean. The
+  integration file was executed against the **real `afldb_test`** on streamanator (owner DSN via
+  a temporary SSH tunnel) to prove the new block loads and is wired correctly — it **self-skips**
+  along with every other legacy-gated block in that file (59 skipped, 0 run), because
+  `AFLDB_TEST_IMPORT_DATABASE_URL` (the restricted `afldb_import` test-role credential every one
+  of these blocks requires) is not configured anywhere reachable. This is a pre-existing
+  environment gap, not introduced by this pass — provisioning that credential is the concrete
+  next action for real DB-backed validation.
+- **Carried-forward risk (not a slice-1 blocker, unchanged from Pass 6 §15.3):** the manifest
+  carries `player_id` verbatim from `afldb_dev` for the 89 linked rows; `players.id` is not
+  rebuild-stable (ISSUE-111 G5), and 4 of the 89 linked rows do not even carry a unique
+  `afltables_profile_url` today, so a rebuild-stable re-resolution step could not cover all 89
+  without a fresh adjudication. Recorded against the deferred canonical-rebuild AWARDS/HONOURS
+  stage (§7); `source_key`, not `player_id`, is the manifest's durable identity.
+- **Files changed this pass:** `.gitignore`, `data/awards/honour-teams.csv` (new),
+  `tools/migration/honour_teams.py` (new), `tools/migration/import_awards.py`,
+  `tests/honour-teams-source.test.ts` (new), `tests/integration/awards-reload-links.test.ts`,
+  `issues/open/AFLDB-ISSUE-112.md` §16, this file, `IssuesIndex.md`. No `CHANGELOG.md` entry —
+  nothing has been deployed or run against a live application database. No Git command run.
+  `afldb_dev` was read-only. ISSUE-111 / ISSUE-113 untouched. `D:\dev\afldb` not accessed.
+- **Exact next action:** provision `AFLDB_TEST_IMPORT_DATABASE_URL` for a `_test` database's
+  `afldb_import` role and run the new integration block for real; then phase 2 (Hall of Fame,
+  343 rows), per the §11.2 order. Do not resolve ISSUE-112.
+
+---
+
+## CHECKPOINT — pass 8 (2026-09-01): ISSUE-112 slice 1 (HONOUR TEAMS) — real DB-backed validation EXECUTED, GREEN
+
+Scope: Pass 7's exact next action — provision the restricted `afldb_import` test-role credential
+and run the new integration block for real, without persisting credentials or touching the
+streamanator checkout. Executed entirely from `D:\dev\afldb-issue-102`; streamanator used only as
+the PostgreSQL endpoint over a temporary SSH local port-forward (`arm@10.0.40.100`, key
+`~/.ssh/afldb_dev`), opened and closed within this pass. No file was written to or modified on the
+streamanator host.
+
+- **DSN safety proof (both, over the tunnel, before any test ran):** `AFLDB_TEST_DATABASE_URL` →
+  `current_database()=afldb_test`, `current_user=afldb_owner`. `AFLDB_TEST_IMPORT_DATABASE_URL`
+  did not exist anywhere reachable (confirmed absent from the streamanator `.env`, same finding as
+  Pass 7) — derived ephemerally in-process from `AFLDB_IMPORT_DATABASE_URL` by substituting only
+  the database name (`afldb_dev` → `afldb_test`), never written to disk; proof:
+  `current_database()=afldb_test`, `current_user=afldb_import`. No password or full DSN printed at
+  any point.
+- **Local blocker found and resolved:** the suite spawns `import_awards.py` as a Python child
+  process; Windows `python` (3.12.10) lacked `psycopg`, which would have made `canSpawnPython`
+  false and self-skipped the whole file regardless of DSN configuration — a different cause than
+  Pass 7's skip. Installed `psycopg[binary]` locally via `pip install --user` (local machine only;
+  no repository or server file touched).
+- **Executed:** `npx vitest run tests/integration/awards-reload-links.test.ts -t "honour-teams
+  manifest reload"` — **6/6 passed**, 0 failed (53 other pre-existing tests excluded by the `-t`
+  filter, not restricted-role skips). Results:
+  - 113-row parity: `import_batches` records `records_read=113`, `records_rejected=0`,
+    `status=completed`; `honour_team_members` split `total=113, linked=89, unlinked=24, teams=5`.
+  - Idempotent: three consecutive reloads produce a byte-identical `(id, team_name,
+    player_name_raw, player_id)` fingerprint.
+  - The one explicit `player_link_resolutions` decision (Ted Whitten) stays resolved across a
+    reload.
+  - All 24 unlinked rows stay unlinked.
+  - A synthetic `manual_admin_edit`-sourced row survives a reload untouched.
+  - `hall_of_fame`, `captaincies`, `award_winners`, `award_nominations` row counts unchanged by a
+    `honour_teams`-only run.
+- **`git diff --check`:** clean.
+- **Files changed this pass:** `issues/open/AFLDB-ISSUE-112.md` §17, this file, `IssuesIndex.md`.
+  No server file touched (streamanator checkout unchanged — verified before and after: the
+  honour-teams slice files remain absent there). No migration run. No production contact. No
+  `afldb_dev` contact. No Git command run. Hall of Fame not started. ISSUE-112 not resolved.
+- **Exact next action:** honour-teams family-specific G1–G4 (`AFLDB-ISSUE-112.md` §10) are now
+  satisfied by this pass's evidence — but this closes G1–G4 **for the honour-teams family only**,
+  not for ISSUE-112 as a whole (six families remain unstarted; G2/G3 need all seven). Phase 2 —
+  Hall of Fame (343 rows) — is the next implementation slice, per the §11.2 order. Do not resolve
+  ISSUE-112.
+
+---
+
 ## Confirmed source findings
 
 Each verified by direct read at baseline `95819a3`.

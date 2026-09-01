@@ -47,6 +47,7 @@ const root = process.cwd();
 const FIXTURE_EMAIL = 'issue-044-reload@example.test';
 const NOTE = 'AFLDB-ISSUE-044 reload survival';
 const UNDER_22_CSV = join(root, 'data', 'awards', '22-under-22.csv');
+const HONOUR_TEAMS_CSV = join(root, 'data', 'awards', 'honour-teams.csv');
 
 // The dev host keeps psycopg in the repo virtualenv; a bare python3 there
 // cannot import it.
@@ -78,11 +79,18 @@ const canRunImporter = Boolean(legacySqlite)
 const canRunUnder22Importer = canSpawnPython
   && existsSync(UNDER_22_CSV)
   && importRole.isConfigured;
+// AFLDB-ISSUE-112 honour-teams slice: legacy-free like under_22, gated the
+// same way and deliberately independent of canRunImporter/legacySqlite.
+const canRunHonourTeamsImporter = canSpawnPython
+  && existsSync(HONOUR_TEAMS_CSV)
+  && importRole.isConfigured;
 const roleParitySuffix = importRole.isConfigured ? '' : ` — ${importRole.skipMessage}`;
 
-// One connection pool for the whole file: both describe blocks share `sql`.
+// One connection pool for the whole file: every describe block shares `sql`.
 beforeAll(async () => {
-  if (canRunFixtureImporter || canRunUnder22Importer) await importRole.validate();
+  if (canRunFixtureImporter || canRunUnder22Importer || canRunHonourTeamsImporter) {
+    await importRole.validate();
+  }
 });
 beforeAll(() => lockHonoursTables(integrationDsn), 300_000);
 afterAll(async () => {
@@ -513,6 +521,194 @@ describe.skipIf(!canRunImporter)(
       },
       300_000,
     );
+  },
+);
+
+/**
+ * AFLDB-ISSUE-112 honour-teams slice: the checked-in manifest
+ * (data/awards/honour-teams.csv) replaces team_selections as the sole input
+ * to the honour_teams group. Legacy-free like under_22 — deliberately run
+ * with AFLDB_LEGACY_SQLITE forced unset, proving the group no longer needs
+ * it, on top of the reload/link-preservation guarantees the ISSUE-080 block
+ * above already covers generically for this table.
+ */
+describe.skipIf(!canRunHonourTeamsImporter)(
+  `honour-teams manifest reload (AFLDB-ISSUE-112)${roleParitySuffix}`,
+  () => {
+    const FIXTURE_EMAIL_112 = 'issue-112-honour-teams@example.test';
+    let wikipediaId = 0;
+    let manualId = 0;
+    let adminUserId = 0;
+
+    beforeAll(async () => {
+      const sourceRows = await sql<{ key: string; id: number }[]>`
+        SELECT key, id FROM sources WHERE key IN ('wikipedia', 'manual_admin_edit')
+      `;
+      const byKey = new Map(sourceRows.map((row) => [row.key, row.id]));
+      wikipediaId = byKey.get('wikipedia') ?? 0;
+      manualId = byKey.get('manual_admin_edit') ?? 0;
+      expect(wikipediaId, 'wikipedia source must exist').toBeGreaterThan(0);
+      expect(manualId, 'manual_admin_edit source must exist').toBeGreaterThan(0);
+
+      const [admin] = await sql<{ id: number }[]>`
+        INSERT INTO auth_users (email, role)
+        VALUES (${FIXTURE_EMAIL_112}, 'admin')
+        ON CONFLICT (email) DO UPDATE SET role = 'admin'
+        RETURNING id
+      `;
+      adminUserId = admin.id;
+    });
+
+    afterAll(async () => {
+      await sql`DELETE FROM auth_users WHERE id = ${adminUserId}`;
+    });
+
+    it('reloads the full 113-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset', async () => {
+      const [before] = await sql<{ id: string }[]>`
+        SELECT coalesce(max(id), 0)::text AS id FROM import_batches
+      `;
+
+      // The third argument forces AFLDB_LEGACY_SQLITE unset regardless of
+      // this process's own environment — the headline ISSUE-112 acceptance.
+      const run = runImporter(['honour_teams'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+
+      const [batch] = await sql<{
+        status: string;
+        recordsRead: string;
+        recordsRejected: string;
+      }[]>`
+        SELECT status::text AS status,
+               records_read::text AS "recordsRead",
+               records_rejected::text AS "recordsRejected"
+          FROM import_batches
+         WHERE id > ${before.id}::bigint
+           AND tool = 'import_awards.py'
+           AND target_table = 'honour_teams'
+         ORDER BY id DESC
+         LIMIT 1
+      `;
+      expect(batch, 'the honour_teams batch must be recorded').toBeDefined();
+      expect(batch.status).toBe('completed');
+      expect(Number(batch.recordsRead)).toBe(113);
+      expect(Number(batch.recordsRejected)).toBe(0);
+
+      const [counts] = await sql<{
+        total: number; linked: number; unlinked: number; teams: number;
+      }[]>`
+        SELECT count(*)::int AS total,
+               count(*) FILTER (WHERE player_id IS NOT NULL)::int AS linked,
+               count(*) FILTER (WHERE player_id IS NULL)::int AS unlinked,
+               count(DISTINCT team_name)::int AS teams
+          FROM honour_team_members
+         WHERE source_id = ${wikipediaId}
+      `;
+      expect(counts).toEqual({ total: 113, linked: 89, unlinked: 24, teams: 5 });
+    }, 120_000);
+
+    it('is idempotent across three consecutive reloads with a byte-identical row-id fingerprint', async () => {
+      async function fingerprint(): Promise<string> {
+        const [row] = await sql<{ fp: string }[]>`
+          SELECT md5(string_agg(
+                   id || ':' || team_name || ':' || player_name_raw || ':'
+                     || coalesce(player_id::text, '-'), ',' ORDER BY id
+                 )) AS fp
+            FROM honour_team_members WHERE source_id = ${wikipediaId}
+        `;
+        return row.fp;
+      }
+
+      const first = runImporter(['honour_teams'], [], undefined);
+      expect(first.status, importRole.diagnostics(first)).toBe(0);
+      const fp1 = await fingerprint();
+
+      const second = runImporter(['honour_teams'], [], undefined);
+      expect(second.status, importRole.diagnostics(second)).toBe(0);
+      expect(await fingerprint()).toBe(fp1);
+
+      const third = runImporter(['honour_teams'], [], undefined);
+      expect(third.status, importRole.diagnostics(third)).toBe(0);
+      expect(await fingerprint()).toBe(fp1);
+    }, 180_000);
+
+    it('keeps the one explicit honour_team_members link decision (Ted Whitten) resolved across a reload', async () => {
+      const prime = runImporter(['honour_teams'], [], undefined);
+      expect(prime.status, importRole.diagnostics(prime)).toBe(0);
+
+      const [before] = await sql<{ id: number; playerId: number | null; status: string }[]>`
+        SELECT id, player_id AS "playerId", link_status_value::text AS status
+          FROM honour_team_members
+         WHERE team_name = 'AFL/VFL Team of the Century'
+           AND player_name_raw = 'Ted Whitten'
+           AND source_id = ${wikipediaId}
+      `;
+      expect(before, 'Ted Whitten must resolve under the manifest natural key').toBeDefined();
+      expect(before.status).toBe('resolved');
+      expect(before.playerId).not.toBeNull();
+
+      const run = runImporter(['honour_teams'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+
+      const [after] = await sql<{ id: number; playerId: number | null; status: string }[]>`
+        SELECT id, player_id AS "playerId", link_status_value::text AS status
+          FROM honour_team_members WHERE id = ${before.id}
+      `;
+      expect(after.id).toBe(before.id);
+      expect(after.playerId).toBe(before.playerId);
+      expect(after.status).toBe('resolved');
+    });
+
+    it('leaves all 24 unlinked observations unlinked', async () => {
+      const run = runImporter(['honour_teams'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+
+      const [{ n }] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n
+          FROM honour_team_members
+         WHERE source_id = ${wikipediaId} AND player_id IS NULL
+      `;
+      expect(n).toBe(24);
+    });
+
+    it('does not touch a manual_admin_edit honour_team_members row', async () => {
+      const [fixture] = await sql<{ id: number }[]>`
+        INSERT INTO honour_team_members
+          (team_name, player_name_raw, link_status_value, source_id)
+        VALUES
+          ('AFLDB-ISSUE-112 Team', 'AFLDB-ISSUE-112 Member', 'unmatched', ${manualId})
+        RETURNING id
+      `;
+      try {
+        const before = await countRows('honour_team_members');
+        const run = runImporter(['honour_teams'], [], undefined);
+        expect(run.status, importRole.diagnostics(run)).toBe(0);
+
+        const after = await sql<{ id: number; name: string; sourceId: number | null }[]>`
+          SELECT id, player_name_raw AS name, source_id AS "sourceId"
+            FROM honour_team_members WHERE id = ${fixture.id}
+        `;
+        expect(after[0]).toEqual({
+          id: fixture.id, name: 'AFLDB-ISSUE-112 Member', sourceId: manualId,
+        });
+        expect(await countRows('honour_team_members')).toBe(before);
+      } finally {
+        await sql`DELETE FROM honour_team_members WHERE id = ${fixture.id}`;
+      }
+    });
+
+    it('does not change hall_of_fame, captaincies, award_winners or award_nominations row counts', async () => {
+      const before = await Promise.all([
+        countRows('hall_of_fame'), countRows('captaincies'),
+        countRows('award_winners'), countRows('award_nominations'),
+      ]);
+      const run = runImporter(['honour_teams'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+      const after = await Promise.all([
+        countRows('hall_of_fame'), countRows('captaincies'),
+        countRows('award_winners'), countRows('award_nominations'),
+      ]);
+      expect(after).toEqual(before);
+    });
   },
 );
 
