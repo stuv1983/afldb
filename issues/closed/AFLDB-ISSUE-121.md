@@ -1,11 +1,14 @@
 # AFLDB-ISSUE-121 — `auth_audit_log.detail` stores JSON objects as JSONB strings
 
-**Status: Open. Code fix written and validated DB-free. Migration written and unapplied.**
+**Status: Resolved 2026-09-01. Code fix committed (`54c7a31`); migration `082` applied to `afldb_test` and `afldb_dev`; historical row 632 repaired to a JSONB object; `auth_audit_log_detail_is_object_ck` live. See §14.**
 **Severity:** Medium — **Area:** Admin / Security / Audit trail / Database.
 **Created:** 2026-09-01 (during `AFLDB-ISSUE-119` live dev acceptance).
-**Blocks:** `AFLDB-ISSUE-119` final **live dev** acceptance. ISSUE-119's own
-resolution (guarded `_test` deployment, 9/9) stands and is not reopened.
-**Migration:** `082_auth_audit_log_jsonb_repair.sql` — allocated, **not applied anywhere**.
+**Resolved:** 2026-09-01.
+**Unblocks:** `AFLDB-ISSUE-119` final **live dev** acceptance — its audit row 632 now reads
+structurally (`jsonb_typeof = 'object'`, `detail->>'deletedLogRows' = 4953`). ISSUE-119's own
+resolution (guarded `_test` deployment, 9/9) always stood and was never reopened.
+**Migration:** `082_auth_audit_log_jsonb_repair.sql` — applied to `afldb_test` and `afldb_dev`
+on 2026-09-01. Not applied to production; it ships with the `54c7a31` code fix, never before it (R1).
 
 ---
 
@@ -388,3 +391,99 @@ and no writer can produce one) would become an object. Accepted.
 - No re-run of the ISSUE-119 destructive clear.
 - No production deployment, and no `afldb_dev` migration, as part of this issue's
   write-up.
+
+---
+
+## 14. Resolution — 2026-09-01
+
+Documentation-only close-out. No implementation, test, migration or privilege
+file was changed in this step; the code fix and migration `082` are the ones
+committed at `54c7a31` ("Fix auth audit JSONB encoding").
+
+### 14.1 `afldb_test` integration evidence
+
+`tests/integration/auth-audit-jsonb.test.ts` ran against `afldb_test` and passed
+**8/8**. Migration `082` was applied to `afldb_test` first
+(`082_auth_audit_log_jsonb_repair.sql ... ok`); the migration runner then reported
+**82 already applied / schema up to date** with no pending files. The suite — which
+reads `082` from disk and executes it verbatim inside an always-rolled-back
+transaction, DDL included — covered:
+
+- a historically double-encoded object repaired to a JSONB object;
+- an already-correct object left byte- and `xmin`-identical (not rewritten);
+- `NULL` preserved as valid;
+- an idempotent re-run that repairs nothing and re-adds nothing;
+- refusal to transform a string that is not a JSON object;
+- CHECK rejection of a future double-encoded string and of any other scalar;
+- object-shaped JSONB stored through the real `audit()` and
+  `auditInTransaction()` writers.
+
+This clears §8's "Not validated against a database" gap and §10 step 2. The DB-free
+suites recorded in §8 (43/43 and 76/76, `tsc --noEmit` clean, the regression case
+proven to fail against the old binding) are unchanged.
+
+### 14.2 Deployment ordering — observed, and correct
+
+The load-bearing order in §12 R1 (code fix with or before the migration, never the
+migration alone, or the CHECK constraint fails every audited admin action closed)
+was followed on `afldb_dev`:
+
+1. `afldb_dev` was rebuilt and restarted on code commit `54c7a31` **before**
+   migration `082` was applied. Post-restart health:
+   `{"status":"ok","database":"ok","latencyMs":28}`.
+2. Migration `082` was then applied to `afldb_dev`:
+   `applying 082_auth_audit_log_jsonb_repair.sql ... ok`.
+
+So the constraint met an application that already binds `sql.json(detail)`, and no
+admin action failed closed. This mirrors the `AFLDB-ISSUE-027` / migration `066`
+ordering hazard the runbook cites.
+
+### 14.3 Historical row 632 repair — live `afldb_dev` evidence
+
+The row that exposed this issue (the `AFLDB-ISSUE-119` live dev clear's audit row),
+after migration `082`:
+
+    SELECT jsonb_typeof(detail) FROM auth_audit_log WHERE id = 632;
+    -->  object
+
+    SELECT detail->>'deletedLogRows' FROM auth_audit_log WHERE id = 632;
+    -->  4953
+
+    detail =
+      {
+        "deletedLogRows": 4953,
+        "retainedLogRows": 0,
+        "retainedReviewRows": 0,
+        "retainedFeedbackRows": 0,
+        "detachedAppHealthLinks": 14
+      }
+
+The five keys and values match the counts `AFLDB-ISSUE-119`'s clear returned
+exactly. No count changed; the surplus encoding layer was removed and the payload
+now reads structurally.
+
+### 14.4 CHECK constraint — live
+
+    auth_audit_log_detail_is_object_ck
+    CHECK (detail IS NULL OR jsonb_typeof(detail) = 'object')
+
+present on `auth_audit_log` on `afldb_dev` after `082`. `NULL` stays valid; any
+future double-encoded or scalar `detail` is rejected at the database.
+
+### 14.5 Final validation conclusion
+
+- Code fix (`insertAuditRow()` → `sql.json(detail)`) committed at `54c7a31`,
+  fixing `audit()` and `auditInTransaction()` together.
+- Migration `082` applied to `afldb_test` (integration suite 8/8) and to `afldb_dev`
+  (row 632 repaired, constraint live).
+- No audit data was lost; the repair was exact and idempotent; no privilege, grant,
+  retention or append-only behaviour changed; no other table was touched.
+- `AFLDB-ISSUE-119`'s final live dev acceptance is unblocked — its audit row is now
+  legible to SQL, reached by re-reading row 632, **not** by re-running the
+  destructive clear.
+
+### 14.6 Outstanding — production only
+
+Migration `082` is not applied to production. It must be applied **with or after**
+the `54c7a31` code fix, never before it (§12 R1). This is the only remaining step
+and it is ordinary deployment, not ISSUE-121 work.

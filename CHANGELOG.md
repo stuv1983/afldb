@@ -46,7 +46,10 @@ commit.
 - Focused suites pass 43/43 and the wider audit-touching set 76/76, with a
   regression test proving an object payload binds as a JSONB object rather than a
   JSONB string; typecheck clean. The PostgreSQL integration suite for the
-  migration and the constraint is written but has not yet been run.
+  migration and the constraint passes 8/8 against `afldb_test`. Migration `082` is
+  applied to `afldb_test` and `afldb_dev`; the pre-existing `auth_audit_log` row
+  that exposed the defect now reads `jsonb_typeof(detail) = 'object'` with its
+  recorded counts intact. Not yet applied to production.
 
 ### AFLDB-ISSUE-120 — public-surface abuse hardening before launch - 1 September 2026
 

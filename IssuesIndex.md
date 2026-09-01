@@ -7,9 +7,8 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-09-01
-**Open issues:** 7 tracked here — `AFLDB-ISSUE-102`, `AFLDB-ISSUE-104`,
-`AFLDB-ISSUE-110`, `AFLDB-ISSUE-112`, `AFLDB-ISSUE-113`, `AFLDB-ISSUE-116`,
-`AFLDB-ISSUE-121`.
+**Open issues:** 6 tracked here — `AFLDB-ISSUE-102`, `AFLDB-ISSUE-104`,
+`AFLDB-ISSUE-110`, `AFLDB-ISSUE-112`, `AFLDB-ISSUE-113`, `AFLDB-ISSUE-116`.
 
 <!-- ALLOCATION WARNING 2026-09-01: `AFLDB-ISSUE-118` is allocated and is NOT free.
      It belongs to the Gridley compatibility-corpus project on branch `opus/gridley-corpus`,
@@ -22,12 +21,12 @@
      MIGRATION NUMBERS 2026-09-01: `080_external_grids.sql` belongs to `opus/gridley-corpus`;
      `081_nl_search_telemetry_clear.sql` is allocated to `AFLDB-ISSUE-119`, committed on
      `codex/issue-119`, applied to `afldb_test` and now validated end to end there.
-     UPDATE 2026-09-01: `082_auth_audit_log_jsonb_repair.sql` is now ALLOCATED to `AFLDB-ISSUE-121`
-     (written on `dev`, uncommitted, applied to NO database). The number was re-derived immediately
-     before allocation: `git log --all --name-only` finds no `082_*` in any local or remote ref's
-     history. `AFLDB-ISSUE-121` is likewise now ALLOCATED and is NOT free; next free issue ID is
-     `AFLDB-ISSUE-122`, and the next free migration number is `083`. `claude/issue-116` must re-scan every live branch tip and derive its
-     own number immediately before renumbering its competing `079_access_code_delete.sql`. -->
+     UPDATE 2026-09-01: `082_auth_audit_log_jsonb_repair.sql` is committed on `dev` (`54c7a31`) and
+     APPLIED to `afldb_test` and `afldb_dev`; it is NOT yet applied to production (ships with or
+     after the code fix, never before it). `AFLDB-ISSUE-121` is **Resolved 2026-09-01** and is no
+     longer an open issue; its number stays allocated. Next free issue ID is `AFLDB-ISSUE-122`, and
+     the next free migration number is `083`. `claude/issue-116` must re-scan every live branch tip
+     and derive its own number immediately before renumbering its competing `079_access_code_delete.sql`. -->
 
 <!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
      the ISSUE-110 branch merged into dev on 2026-08-31 and its own row below is now
@@ -48,7 +47,6 @@
 
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
-| `AFLDB-ISSUE-121` | Medium | Admin / Security / Audit trail / Database | `auth_audit_log.detail` is `jsonb`, but every row ever written holds a jsonb **string scalar** — `insertAuditRow()` bound `${JSON.stringify(detail)}` and postgres.js re-encoded it with its own jsonb serializer. Live dev evidence: id 632, `jsonb_typeof(detail) = 'string'`, `detail->>'deletedLogRows'` NULL. Affects **every** `auth_audit_log` payload (one writer, both `audit()` and `auditInTransaction()`); no data lost. Code fix + migration `082` written, DB-free tests green (43/43 and 76/76, tsc clean); **nothing applied, nothing committed**. Blocks `AFLDB-ISSUE-119`'s final LIVE DEV acceptance only — 119 itself stays Resolved. **Next: commit, run `tests/integration/auth-audit-jsonb.test.ts` where `AFLDB_TEST_DATABASE_URL` exists (this worktree has no `.env`), then apply `082` to `afldb_test` and `afldb_dev` and re-read row 632. Code must land with or before the migration — its CHECK constraint fails admin actions closed otherwise.** |
 <!-- RETIRED 2026-09-01 — `AFLDB-ISSUE-119` is **Resolved** and is NO LONGER an
      open issue. Final guarded Playwright acceptance passed 9/9 against the
      disposable loopback `afldb_test` deployment. Authoritative records:
@@ -265,37 +263,15 @@
 
 ---
 
-## AFLDB-ISSUE-121 — `auth_audit_log.detail` stores JSON objects as JSONB strings
-
-- **Severity:** Medium
-- **Area:** Admin / Security / Audit trail / Database
-- **Current state:** Diagnosed, fixed in code, migration written. **Nothing applied to any
-  database and nothing committed.** `insertAuditRow()` bound `${JSON.stringify(detail)}`;
-  postgres.js learns the parameter is `jsonb` from the server's `ParameterDescription` and
-  then encodes it again with its own `JSON.stringify` serializer, so the column has always
-  held a jsonb string scalar. Live dev proof: `auth_audit_log` id 632
-  (`nl_search.telemetry_cleared`), `jsonb_typeof(detail) = 'string'`,
-  `detail->>'deletedLogRows'` NULL on a clear that really did delete 4,953 rows. Blast radius
-  is every `auth_audit_log` detail payload — `insertAuditRow()` is the table's only writer in
-  `src/`, so `audit()` and `auditInTransaction()` are equally affected. Migration `048`
-  diagnosed the same defect in `nl_search_log` and deliberately deferred this column.
-  **No data was lost**; unwrapping is exact. DB-free validation green: 43/43 and 76/76,
-  `tsc --noEmit` clean, the new regression case proven to fail against the old binding.
-- **Key files:** `src/lib/auth/session.ts` (binding now `sql.json(detail)`), `tests/auth.test.ts`,
-  `src/db/migrations/082_auth_audit_log_jsonb_repair.sql` (new, unapplied),
-  `tests/integration/auth-audit-jsonb.test.ts` (new, unexecuted).
-  Runbook: `issues/open/AFLDB-ISSUE-121.md`.
-- **Relationship to ISSUE-119:** ISSUE-119 stays **Resolved** — its `_test` acceptance (9/9)
-  is untouched and its live dev clear succeeded. Only ISSUE-119's final **live dev** audit-payload
-  confirmation is pending this repair, and it needs a re-read, **not** a re-run of the clear.
-- **Exact next action:** commit the four changed files; then
-  `npx vitest run tests/integration/auth-audit-jsonb.test.ts` on a host with
-  `AFLDB_TEST_DATABASE_URL` (this worktree has no `.env` and no DB credentials, so the guard
-  refuses it); then `npm run db:migrate:test`, then operator-decided `npm run db:migrate` for
-  `afldb_dev`, then `SELECT jsonb_typeof(detail), detail->>'deletedLogRows' FROM auth_audit_log
-  WHERE id = 632` expecting `object`/`4953`. **Deployment order is load-bearing:** `082`'s CHECK
-  constraint rejects the old shape, so the migration must never land before the code fix — the
-  same hazard `AFLDB-ISSUE-027` recorded for migration `066`.
+<!-- RETIRED 2026-09-01 — `AFLDB-ISSUE-121` is **Resolved** (2026-09-01) and is NO LONGER an
+     open issue. Its pre-resolution detail block is removed. Authoritative records: the
+     `AFLDB-ISSUE-121` entry in `issues.md` (Resolution, 2026-09-01) and
+     `issues/closed/AFLDB-ISSUE-121.md` §14. Closing evidence: code fix committed at `54c7a31`;
+     `tests/integration/auth-audit-jsonb.test.ts` 8/8 against `afldb_test`; migration `082`
+     applied to `afldb_test` and `afldb_dev`; historical `auth_audit_log` row 632 repaired to a
+     JSONB object (`detail->>'deletedLogRows' = 4953`); `auth_audit_log_detail_is_object_ck` live.
+     Migration `082` is NOT yet applied to production — it ships with or after the `54c7a31` code
+     fix, never before it. `AFLDB-ISSUE-119`'s final live dev acceptance is thereby unblocked. -->
 
 ---
 
