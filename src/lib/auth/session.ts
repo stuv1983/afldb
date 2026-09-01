@@ -2,6 +2,7 @@ import 'server-only';
 
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import type postgres from 'postgres';
 import { cache } from 'react';
 
 import { authSql } from '@/db/authClient';
@@ -327,15 +328,78 @@ export async function destroyAdminSession(): Promise<void> {
 
 // --- Audit ---
 
-export async function audit(
+/**
+ * Who an audit row names: the signed-in admin's id where there is one,
+ * and the email label. Both are optional because the trail also records
+ * events that happen before or instead of a session — a failed login, an
+ * invite accepted by an email that has no user row yet.
+ */
+export type AuditActor = { userId?: number; label?: string };
+
+/**
+ * The one auth_audit_log INSERT.
+ *
+ * Both exported forms below funnel through here, so the row shape, the
+ * actor columns and the request IP cannot drift apart between the pooled
+ * path and the transactional one — an audit trail whose two writers
+ * disagree is worse than one writer.
+ *
+ * `postgres.ISql` is the interface that both `Sql` (the authSql pool) and
+ * `TransactionSql` (an authSql.begin() handle) extend. It carries the
+ * tagged-template call and the query helpers and nothing else, so this
+ * function cannot open a transaction, take a savepoint or end the pool
+ * with whichever handle it is handed; it can only write the row.
+ */
+async function insertAuditRow(
+  sql: postgres.ISql,
   action: string,
   detail: Record<string, unknown> | null,
-  actor: { userId?: number; label?: string },
+  actor: AuditActor,
 ): Promise<void> {
   const ip = await requestIp();
-  await authSql`
+  await sql`
     INSERT INTO auth_audit_log (actor_user_id, actor_label, action, detail, ip)
     VALUES (${actor.userId ?? null}, ${actor.label ?? null}, ${action},
             ${detail ? JSON.stringify(detail) : null}, ${ip})
   `;
+}
+
+/**
+ * The administrative activity trail, written on the auth pool.
+ *
+ * This is the form nearly every admin action wants: the audit row is a
+ * record of something that has already happened and stands on its own.
+ */
+export async function audit(
+  action: string,
+  detail: Record<string, unknown> | null,
+  actor: AuditActor,
+): Promise<void> {
+  await insertAuditRow(authSql, action, detail, actor);
+}
+
+/**
+ * The same audit row, written on a caller's transaction
+ * (AFLDB-ISSUE-119 §8/§9; the same requirement AFLDB-ISSUE-027 met for
+ * statistical mutations in src/db/queries/audit-log.ts).
+ *
+ * CONTRACT: pass a handle from authSql.begin(), never the pool. This
+ * form exists for a mutation whose audit row must not be able to exist
+ * without it, or the mutation without the audit row: the INSERT commits
+ * with the mutation or rolls back with it. audit() above cannot do that
+ * job, because it binds the module-level pool and so commits on its own
+ * connection whatever the caller's transaction goes on to do.
+ *
+ * Deliberately no try/catch, matching src/db/queries/audit-log.ts: a
+ * failed audit INSERT propagates, aborts the caller's transaction and
+ * rolls the mutation back with it. That is the point. A best-effort
+ * warning here would recreate exactly the gap this form removes.
+ */
+export async function auditInTransaction(
+  tx: postgres.TransactionSql,
+  action: string,
+  detail: Record<string, unknown> | null,
+  actor: AuditActor,
+): Promise<void> {
+  await insertAuditRow(tx, action, detail, actor);
 }

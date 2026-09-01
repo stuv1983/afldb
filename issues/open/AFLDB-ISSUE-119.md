@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-119 — Super Admin can clear NL search telemetry
 
-- **Status:** In progress — the Stage 2 **database layer is now fully validated end to end** (§25). Migration `081` (§20) is applied to `afldb_test` (§23), the `privileges.sql` reconciliation (§21) has run against it, `tests/integration/privileges.test.ts` passes 34/34 (§24), and `tests/integration/nl-search-telemetry-clear.test.ts` now passes **9/9 with 0 skipped** — the clear function has been executed for the first time. `AFLDB_TEST_AUTH_DATABASE_URL` is established (§25.2), so the restricted describe **ran rather than skipped**: `afldb_auth` successfully invokes the function while its direct `DELETE`/`TRUNCATE` are refused live with SQLSTATE `42501`. Acceptance criterion 5 is fully evidenced at the database layer. The **query layer now exists and is validated** (§26, §27): `src/db/queries/nl-search-telemetry-clear.ts` wraps the function on a required transaction handle and converts all five `bigint` counts through a rejecting `toCount()`. `npx vitest run tests/nl-search-log.test.ts` passes **16/16**, of which the `clearNlSearchTelemetry count boundary` describe is **11/11**, and `npm run typecheck` passes (final output `Types generated successfully`). **Risk R3 is therefore evidenced at the typed query boundary**: the driver's `bigint`/string counts are explicitly converted, or rejected, before they can enter the application result type or the §9 audit contract. The helper nonetheless still has **no production caller** — it is reachable from nothing but its own tests. **Transaction-aware audit helper, Server Action and UI not started** — criteria 3, 4, 6 and 9 remain open
+- **Status:** In progress — the Stage 2 **database layer is now fully validated end to end** (§25). Migration `081` (§20) is applied to `afldb_test` (§23), the `privileges.sql` reconciliation (§21) has run against it, `tests/integration/privileges.test.ts` passes 34/34 (§24), and `tests/integration/nl-search-telemetry-clear.test.ts` now passes **9/9 with 0 skipped** — the clear function has been executed for the first time. `AFLDB_TEST_AUTH_DATABASE_URL` is established (§25.2), so the restricted describe **ran rather than skipped**: `afldb_auth` successfully invokes the function while its direct `DELETE`/`TRUNCATE` are refused live with SQLSTATE `42501`. Acceptance criterion 5 is fully evidenced at the database layer. The **query layer now exists and is validated** (§26, §27): `src/db/queries/nl-search-telemetry-clear.ts` wraps the function on a required transaction handle and converts all five `bigint` counts through a rejecting `toCount()`. `npx vitest run tests/nl-search-log.test.ts` passes **16/16**, of which the `clearNlSearchTelemetry count boundary` describe is **11/11**, and `npm run typecheck` passes (final output `Types generated successfully`). **Risk R3 is therefore evidenced at the typed query boundary**: the driver's `bigint`/string counts are explicitly converted, or rejected, before they can enter the application result type or the §9 audit contract. The **transaction-aware audit helper now exists and is validated** (§28): `src/lib/auth/session.ts` extracts its single `auth_audit_log` INSERT into one private writer typed on `postgres.ISql` — the genuine common supertype of the `authSql` pool and a `begin()` handle, which is what makes this type-safe with no cast and no suppression — leaving `audit()` unchanged on the pool and adding `auditInTransaction(tx, …)` for §8's atomic clear-plus-audit. `npx vitest run tests/auth.test.ts` passes **31/31**, of which the new DB-free `auth_audit_log writer` describe is **6/6**, and `npm run typecheck` passes, compiling all **67** existing `audit()` call sites against the refactored signature. Neither helper yet has a **production caller** — both are reachable from nothing but their own tests. **Server Action and UI not started** — criteria 3, 4, 6 and 9 remain open
 - **Created:** 2026-08-31
 - **Severity:** Medium
 - **Area:** Admin / Security / Natural-language search / Telemetry / Database
@@ -260,11 +260,12 @@ Exports are live route queries. No public page reads these relations. If current
 | `src/db/migrations/081_nl_search_telemetry_clear.sql` (number assigned per §7 and §20.1) | **Written 2026-09-01; untracked and unapplied.** Restricted function, locks, retained closure, selective delete and exact grants. |
 | `tools/maintenance/privileges.sql` | **Written 2026-09-01 (§21); unexecuted.** Reconciles function owner, `REVOKE ALL` from `PUBLIC` and `EXECUTE` to `afldb_auth`, and revokes any direct DELETE/TRUNCATE on the three NL tables. |
 | `src/db/queries/nl-search-log.ts` | Typed function invocation/result, or a new narrowly named maintenance module if clearer. |
-| `src/lib/auth/session.ts` | Transaction-aware audit helper preserving existing callers. |
+| `src/lib/auth/session.ts` | **Written and validated 2026-09-01 (§28).** The `auth_audit_log` INSERT extracted into one private writer typed on `postgres.ISql`; `audit()` unchanged on the pool; new `auditInTransaction(tx, …)` for the atomic clear. |
 | `src/app/admin/nl-search/actions.ts` | Guard, server phrase check, atomic clear+audit, revalidation and result state. |
 | `src/app/admin/nl-search/ClearTelemetryForm.tsx` | Typed confirmation, cancel/pending/result UI. |
 | `src/app/admin/nl-search/page.tsx` | Render control and qualify current absolute read-only/append-only copy. |
 | `.env.example` | **Written 2026-09-01 (§22).** Guarded `AFLDB_TEST_AUTH_DATABASE_URL`; same `_test` DB, never fallback. |
+| `tests/auth.test.ts` | **Extended and validated 2026-09-01 (§28).** DB-free `auth_audit_log writer` describe: transaction-bound write, value shape, unchanged `audit()`, identical SQL from both forms, failure propagation. |
 | `tests/admin-nl-search-actions.test.ts` | Server Action auth/confirmation/audit/revalidation tests. |
 | `tests/integration/nl-search-telemetry-clear.test.ts` | **Written 2026-09-01 (§22); never executed.** Rolled-back safety, atomicity, FK, concurrency and restricted-role tests. |
 | `tests/integration/privileges.test.ts` | **Extended 2026-09-01 (§22); never executed.** Exact function and no-widening catalogue assertions. |
@@ -1162,10 +1163,155 @@ No source, SQL, migration, test, `.env`, `CHANGELOG.md` or configuration file wa
 
 ### 27.7 Exact next action
 
+**DONE 2026-09-01 — the helper exists and is validated; see §28. The live instruction is §28.9.**
+
 **The transaction-aware canonical audit helper in `src/lib/auth/session.ts`** (§9, §12; the finding recorded in §18).
 
 `audit()` at `:330-341` binds the module-level `authSql`, so it cannot join a caller's transaction as written — which is precisely what §8 requires, because the `auth_audit_log` insert must commit with the deletion or roll back with it. Add a variant that accepts the `tx` handle, following `src/db/queries/audit-log.ts:41-43` (the ISSUE-027 required-audit helper: transaction handle first, no connection of its own, no try/catch so a failure propagates and rolls the mutation back). **Every existing `audit()` caller must be preserved unchanged.**
 
 Then, in order: the Server Action (§6, §8) — `requireSuperAdmin()` before parsing confirmation input or opening the transaction, and it must open and hold `authSql.begin()`, since R5 makes the caller's transaction load-bearing for the cutoff and D6 means `clearNlSearchTelemetry` will accept nothing else; then the UI (§10), `docs/search.md` and `CHANGELOG.md`.
+
+Do not re-run or edit migration `081`. `npm run db:privileges:test` remains idempotent and safe to re-run at any point.
+
+## 28. Session record — 2026-09-01 (Stage 2, step 8: the transaction-aware audit helper)
+
+### 28.1 Starting point
+
+Branch `codex/issue-119` at `5893821` ("Add ISSUE-119 telemetry clear query helper"), **clean worktree** — all three confirmed with read-only Git metadata before anything else. Scope for this step was exactly §27.7's first item and nothing beyond it: a transaction-aware form of the canonical `auth_audit_log` writer, preserving every existing `audit()` caller. The Server Action, UI, `docs/search.md` and `CHANGELOG.md` were deliberately **not** started.
+
+### 28.2 Source review before writing anything
+
+| Question | Finding |
+|---|---|
+| What exactly does `audit()` do today? | `src/lib/auth/session.ts:330-341` (now `:373-379`, delegating to `insertAuditRow` at `:353-370`): `await requestIp()`, then one `INSERT INTO auth_audit_log (actor_user_id, actor_label, action, detail, ip)` on the **module-level `authSql`** pool, with `actor.userId ?? null`, `actor.label ?? null`, `action`, `detail ? JSON.stringify(detail) : null` and the IP. No try/catch. §18's finding is confirmed exactly: the pool binding is what makes it unable to join a caller's transaction. |
+| How many callers must survive? | **67 `await audit(...)` call sites across 22 files** in `src/app/admin/**` (access, admins, content, current-season, data-editor, invite, login, logout, nl-search, password, player-links, settings, submissions) plus `src/app/admin/content/media/route.ts`. All use the same three-argument shape. |
+| Is there a house pattern for a transaction-bound audit? | **Yes, and §27.7 names it.** `src/db/queries/audit-log.ts:41-43` — `recordDataEdit(tx: postgres.TransactionSql, input)`: transaction handle first, no connection of its own, and a contract comment stating there is deliberately no try/catch so a failed audit propagates and rolls the mutation back (AFLDB-ISSUE-027). |
+| Can one parameter type accept both the pool and a transaction handle? | **Yes — `postgres.ISql`, and this was the load-bearing check.** In `node_modules/postgres/types/index.d.ts`, `Sql<TTypes> extends ISql<TTypes>` (`:701`) and `TransactionSql<TTypes> extends ISql<TTypes>` (`:723`) are **siblings**, not parent and child. A shared parameter typed `postgres.Sql` would therefore **not** accept a `TransactionSql` and would have forced exactly the cast the operator's constraints forbid. `ISql` carries the tagged-template call signatures and the query helpers and nothing else — no `begin`, no `savepoint`, no `end`. |
+| Where does `requestIp()` come from, and is it safe inside a transaction? | `session.ts:59-66` in the same module. It `try`/`catch`es `headers()` and returns `null` outside a request scope, which its own comment records as the behaviour `audit()` depends on. It contacts no database, so calling it inside the caller's transaction adds no statement and cannot deadlock. |
+| Is there a DB-free unit-test home for `src/lib/auth/*`? | **Yes: `tests/auth.test.ts`** — crypto, TOTP, signed claims, line input, CSV. Extended rather than duplicated, per CLAUDE.md §10. No existing test imports the real `src/lib/auth/session.ts`; the five that mention it all `vi.mock` it away. |
+
+### 28.3 What was implemented
+
+`src/lib/auth/session.ts` only, as a **refactor-and-add**, not a second copy of the SQL.
+
+| Element | Implementation |
+|---|---|
+| `AuditActor` | New exported type alias for the previously inline `{ userId?: number; label?: string }`. Structural, so every existing caller and every existing call site type-checks unchanged; it exists so the actor shape is stated once rather than three times. |
+| `insertAuditRow(sql: postgres.ISql, action, detail, actor)` | **Private.** The one `INSERT INTO auth_audit_log` in the codebase, moved verbatim out of `audit()` — same columns, same order, same `?? null` handling, same `JSON.stringify` of a non-null detail, same `await requestIp()` immediately before it. Both public forms funnel through it, so the pooled and transactional paths cannot drift apart. |
+| `audit(action, detail, actor)` | **Signature and behaviour unchanged.** Body is now one line: `await insertAuditRow(authSql, action, detail, actor)`. Still `Promise<void>`, still no try/catch, still on the `authSql` pool. |
+| `auditInTransaction(tx: postgres.TransactionSql, action, detail, actor)` | **New.** Same three arguments after the handle, so the two forms read alike at a call site. `postgres.TransactionSql` is the parameter type — not `ISql` — so nothing but a `begin()` handle satisfies it and the pool cannot be passed by accident. No `authSql` fallback exists in the function. Deliberately no try/catch, matching `audit-log.ts`. |
+| Import | `import type postgres from 'postgres';`, type-only, so it erases at compile time exactly as in `audit-log.ts`. Placed alphabetically between `next/navigation` and `react`. |
+| Documentation | The contract is recorded in the code: why `ISql` is the shared type and what it withholds (no `begin`, no `savepoint`, no `end`); why `audit()` cannot do the transactional job; and why the absence of a try/catch is the point rather than an omission to be "fixed" later. |
+
+**`tests/auth.test.ts` (extended).** New describe `auth_audit_log writer`, six tests, **DB-free**: `@/db/authClient` and `next/headers` are mocked at file scope and the transaction is a fake tagged template, so what the suite observes is *which handle the row is written on and what lands in it*. This is the first test anywhere to exercise the real `src/lib/auth/session.ts`.
+
+| Test | Proves |
+|---|---|
+| Writes on the caller's transaction, never on the pool | One `INSERT INTO auth_audit_log` on the given handle; the mocked pool records **zero** queries. This is the whole reason the variant exists. |
+| Preserves actor id, email label, action, detail and request IP | The five bound values are exactly `[9, 'super@example.test', 'nl_search.telemetry_cleared', '{"deletedLogRows":412}', '198.51.100.7']` — the IP taken from the **last** `X-Forwarded-For` hop, i.e. Caddy's own observation and not the client's claim. |
+| Nulls actor, detail and an unavailable IP | `[null, null, 'admin.logout', null, null]` with `headers()` throwing "called outside a request scope", the case `requestIp()` exists to absorb. A missing log column must not fail the action it records. |
+| `audit()` is unchanged | It still writes on the pool with the same five values, and issues nothing on any transaction. |
+| Both forms emit identical SQL | The captured template strings **and** bound values are asserted equal between the two paths — the mechanical check that the INSERT was not duplicated, and that a future edit to one path cannot silently diverge. |
+| A failed insert propagates | A rejecting handle makes `auditInTransaction` reject, so the caller's transaction aborts and the mutation rolls back rather than committing without its audit row. |
+
+### 28.4 Source review of the change itself
+
+Reviewed against §8, §9, §12 and the operator's six constraints for this step.
+
+| Constraint | Finding |
+|---|---|
+| No unsafe casts | **Met.** The production change contains no `as` at all. `postgres.ISql` is the genuine common supertype (§28.2), which is precisely what removes the need for one. The single `as unknown as postgres.TransactionSql` is in the **test's** fake handle, the same idiom `tests/nl-search-log.test.ts:137-145` already uses and §26/§27 accepted. |
+| No TypeScript suppression | **Met.** No `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck` or `eslint-disable` was added anywhere. |
+| No duplicated or ad-hoc audit SQL | **Met, and mechanically checked.** `grep -c "INSERT INTO auth_audit_log" src/lib/auth/session.ts` = **1**, and a repository-wide grep finds that string in no other source file. The "identical SQL from both forms" test asserts it from the outside as well. |
+| Actor id, email label, request IP, action and detail behaviour preserved | **Met.** The statement was moved, not rewritten: same column list, same value expressions, same `requestIp()` call in the same position. The three value-shape tests assert it rather than assuming it. |
+| The caller's transaction is genuinely used | **Met.** `auditInTransaction` issues its INSERT on the `tx` it is handed and holds no reference to `authSql`; the first test fails if a single statement reaches the pool. `postgres.TransactionSql` as the parameter type means a pool is a compile error, not a silent fallback (D6, the same choice `clearNlSearchTelemetry` made). |
+| Existing `audit()` behaviour unchanged | **Met.** Same exported name, same three parameters, same structural actor type, same return type, same pool, same absence of a try/catch. All 67 call sites are untouched and `npm run typecheck` passes over them. |
+| Fail-closed | **Met.** No try/catch in either form. A failed audit inside the clear transaction aborts it and rolls the deletion back — §8's "an audit failure rolls back deletion. … No best-effort audit warning is acceptable." |
+| Audit surface is §9's five counts | **Met at this layer by omission**: this helper takes whatever `detail` it is given. It is the Server Action, next, that must pass exactly `NlTelemetryClearCounts` — whose five keys are the only facts `clearNlSearchTelemetry` makes available (§26.3). |
+| No widening of the auth pool's grants | **Met.** `auth_audit_log` is written today by `audit()` on the same role; the transactional form uses the same table and the same role. No migration, grant or privilege change is required by this step, and none was made. |
+
+### 28.5 Deviations
+
+- **D7 (new).** §12 words the change as "transaction-aware audit helper preserving existing callers". Implemented by **extracting** the shared writer rather than adding a second function alongside the existing one. The alternative — a new function carrying its own copy of the INSERT — would have satisfied the literal wording while creating exactly the duplicated audit SQL the operator's constraints forbid. `audit()`'s observable behaviour is unchanged, which is what "preserving existing callers" protects.
+- **D8 (new).** The actor shape is now the exported type `AuditActor` instead of an inline object type. Structurally identical, so no caller changed; it exists so the three signatures state it once. Exported because the Server Action will want to name it.
+- D1–D6 from §22.5 and §26.5 are **unchanged** by this step.
+
+### 28.6 Validation performed
+
+**Claude-executed under the operator's explicit instruction for this task** ("validate this unit with the narrowest relevant tests plus typecheck", and the closing `git diff --check` / `git status --short`) — as in §25, and unlike §24/§27. The outputs below are raw terminal output observed directly.
+
+```text
+> npx vitest run tests/auth.test.ts --reporter=verbose
+ Test Files  1 passed (1)
+      Tests  31 passed (31)
+
+ ✓ auth_audit_log writer > writes the row on the caller's transaction and never on the pool
+ ✓ auth_audit_log writer > preserves actor id, email label, action, detail and request IP
+ ✓ auth_audit_log writer > nulls the actor columns, the detail and an unavailable IP, as the pooled form does
+ ✓ auth_audit_log writer > leaves audit() writing on the pool, unchanged
+ ✓ auth_audit_log writer > emits identical SQL from both forms, because there is only one INSERT
+ ✓ auth_audit_log writer > propagates a failed insert instead of swallowing it, so the caller rolls back
+
+> npm run typecheck
+> next typegen && tsc --noEmit
+Generating route types...
+✓ Types generated successfully
+
+> npx eslint src/lib/auth/session.ts tests/auth.test.ts
+✖ 2 problems (0 errors, 2 warnings)
+```
+
+**31/31** is the whole file: **6** are the new describe and the other **25** are the pre-existing crypto/TOTP/claims/line-input/CSV suites, which the file-scope mocks added for this describe therefore demonstrably did not disturb.
+
+**`npm run typecheck` passing is the load-bearing check for "preserve all existing callers".** It compiles all **67** `audit()` call sites against the refactored signature, and it is what proves `postgres.ISql` genuinely accepts both `authSql` and a `TransactionSql` without a cast — a claim that could not be evidenced any other way.
+
+The two lint warnings were then resolved to their true state: one (`tests/auth.test.ts`, an unused destructured `tx`) was **mine and is fixed**, after which `npx eslint tests/auth.test.ts` reports nothing and the suite re-ran **31/31**. The other (`src/lib/auth/session.ts:154`, `'email' is defined but never used` in `createAdminSession`) is **pre-existing** — confirmed present in `git show HEAD:src/lib/auth/session.ts` at the same code — and is out of scope, so it was deliberately not touched.
+
+`git diff --check` clean; `git status --short` reported in §28.8. No SQL, database, migration, privilege, build, deployment or production command ran, and no database was queried. **Nothing was committed.**
+
+### 28.7 Risks and blockers
+
+- **R7 is unchanged and now applies here too.** That `tx` is a genuine open transaction is a TypeScript claim, not a runtime one — `authSql` cast to `TransactionSql` would compile. Accepted for the same reason as in `audit-log.ts` and `clearNlSearchTelemetry`: the Server Action tests (§12) are what assert the transaction is actually opened and that both statements ride it.
+- **R8 (new, low).** `auth_audit_log` writes now travel two paths on the same role and pool. They cannot disagree about SQL — there is one INSERT and a test asserts both forms emit it identically — but a future caller could pick the wrong form. The pooled form is correct for an event that stands on its own; the transactional form is for a mutation whose audit row must not be able to exist without it. Both contracts are recorded at the functions. Not a tracked-issue candidate.
+- **Nothing in this step ran against a database**, so no claim here rests on `afldb_test` state. §25's integration evidence and §24's catalogue evidence are untouched.
+- Risks **R4**, **R5** and **R6** are untouched. **R1**, **R2** and **R3** remain closed.
+- `081` remains **checksum-locked** in `afldb_meta.schema_migrations` (§23.6): any repair is a new migration or a test-database rebuild, never an in-place edit. Nothing in this step touched it.
+- **Blockers: none.**
+
+### 28.8 Files changed this step
+
+| File | State |
+|---|---|
+| `src/lib/auth/session.ts` | Modified: type-only `postgres` import; new exported `AuditActor`; the `auth_audit_log` INSERT extracted into the private `insertAuditRow(sql: postgres.ISql, …)`; `audit()` delegating to it, behaviour unchanged; new `auditInTransaction(tx: postgres.TransactionSql, …)`. |
+| `tests/auth.test.ts` | Modified: file-scope `@/db/authClient` and `next/headers` mocks, a type-only `postgres` import, and the `auth_audit_log writer` describe (six tests). Pure addition; the five pre-existing describes are untouched. |
+| `issues/open/AFLDB-ISSUE-119.md` | Modified: header `Status`, §12 `session.ts` row, §27.7 discharged, and this §28. |
+| `IssuesIndex.md` | Modified: current-state and next-action wording only. |
+| `issues.md` | Modified: Open Issues row current state and next action, ledger `Files`, `Status` and `Validation`. |
+
+`git status --short` at the end of this step:
+
+```text
+ M IssuesIndex.md
+ M issues.md
+ M issues/open/AFLDB-ISSUE-119.md
+ M src/lib/auth/session.ts
+ M tests/auth.test.ts
+```
+
+No SQL, migration, `.env`, `CHANGELOG.md` or configuration file was changed. `CHANGELOG.md` stays untouched deliberately, for the fourth step running: `auditInTransaction` has no caller either, so no retained application behaviour has changed yet. **Nothing was committed.**
+
+### 28.9 Exact next action
+
+**The Server Action** (§6, §8, §11), in `src/app/admin/nl-search/actions.ts` beside the existing `saveReview()`:
+
+1. `requireSuperAdmin()` **first** — before parsing the confirmation input and before opening any transaction, so a forged direct invocation stops at the guard (§6, criterion 3).
+2. Then validate the exact phrase `CLEAR SEARCH TELEMETRY` server-side, independently of the client (§10, criterion 4). A wrong or missing phrase must open no transaction, delete nothing and audit nothing.
+3. Then **one** `authSql.begin()` transaction holding both statements, because R5 makes the caller's transaction load-bearing for §8's lock cutoff and D6 means `clearNlSearchTelemetry` accepts nothing else:
+   - `clearNlSearchTelemetry(tx)`;
+   - `auditInTransaction(tx, 'nl_search.telemetry_cleared', counts, { userId: admin.id, label: admin.email })` — the action string §9 fixes, and the payload is exactly the five returned counts and nothing more.
+4. On committed success only: `revalidatePath('/admin/nl-search', 'layout')` and `revalidatePath('/admin/app-health')` (§11). Note the known Next 15.5 hazard recorded for this repository — `revalidatePath` called inside an action has hung a client on other admin surfaces; verify the behaviour rather than assuming it.
+5. Return deleted/retained counts as result state for the UI to report (§10), never a claim that the dashboard is empty.
+
+Then `tests/admin-nl-search-actions.test.ts` (§12): the authorisation cases, forged invocation, wrong/missing phrase performing no mutation, the audit riding the same transaction, and the revalidation calls. Then the UI (§10), `docs/search.md` and `CHANGELOG.md`.
 
 Do not re-run or edit migration `081`. `npm run db:privileges:test` remains idempotent and safe to re-run at any point.
