@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-120 — Public-surface abuse hardening before launch: NL /search has no rate limit; two minor input-robustness gaps
 
-- **Status:** Open
+- **Status:** Resolved 2026-09-01 — static/unit closure (§12–§15); dev live end-to-end acceptance (§16)
 - **Created:** 2026-08-31 (full-codebase review)
 - **Severity:** Medium (primary finding); the two secondary findings are Low
 - **Area:** Security / Production reliability / NL search / Telemetry
@@ -110,6 +110,12 @@ reduces worst-case DB load; no steady-state performance effect.
 After implementation on dev: loop >limit NL searches from one IP and confirm the
 friendly limit response plus no further `nl_search_log` rows for that IP within the
 window; confirm normal browsing is unaffected.
+
+Fulfilled on dev 2026-09-01 — evidence in §16. This must be run through an
+authenticated beta browser session against the site origin
+(`http://10.0.40.100:8090/search?q=…`); an unauthenticated request to the app
+origin is 307-redirected by the beta gate before the NL rate-limit boundary
+executes and does **not** validate F1 (§16.1).
 
 ## 10. Safety constraints
 
@@ -296,4 +302,122 @@ F1, F2 and F3 are complete.
 - No schema, migration, privilege, beta-gate or NL-semantics changes were made.
 
 ISSUE-120 is resolved.
+
+> **Scope of this checkpoint:** §12–§15 record unit, typecheck and static-analysis
+> evidence only. The §9 operator validation — a real over-limit loop against the
+> deployed `/search` page plus a telemetry check — had **not** been performed at
+> the time of this closure. It was completed on dev on 2026-09-01 and is recorded
+> in §16; §12–§15 are left unchanged as the earlier static-closure checkpoints.
+
+## 16. Post-closure dev live acceptance — F1 end-to-end, F2 413 (2026-09-01)
+
+Performed against deployed dev commit `21d7c60` ("Merge AFLDB-ISSUE-120 public
+surface hardening"). F1 and F2 now have true end-to-end live acceptance. §12–§15
+remain the earlier static/unit closure checkpoints and are unchanged.
+
+### 16.1 The first live F1 attempt was invalid — the requests never reached the NL search path
+
+The initial attempt sent requests directly to the app origin:
+
+    http://127.0.0.1:3100/search?q=Who%20has%20played%20the%20most%20games%3F
+
+- 140 requests; tally `normal=140`, `limited=0`, `errors=0` — the limiter appeared
+  never to trigger.
+
+Investigation proved these requests never reached `src/app/search/page.tsx`:
+
+- a direct `curl` of that URL returned:
+
+      HTTP/1.1 307 Temporary Redirect
+      location: http://10.0.40.100:8090/beta?from=%2Fsearch
+
+- the service request trace showed `status=307 method=GET url=/search?q=Who...`;
+- the beta gate (`middleware.ts:117`) intercepts unauthenticated requests **before**
+  `runNlSearchWithRateLimit()` executes, so the NL branch and its per-IP limiter
+  were never exercised;
+- the test client (`urllib`) silently followed the 307, so every "normal" HTTP 200
+  in the 140-request tally was a redirected hit on the beta landing page, not a
+  search response.
+
+The 140-request run therefore proves nothing about F1 and is retained here only as
+the record of an invalid methodology. Any earlier reading of it as a passing F1
+live test is withdrawn.
+
+### 16.2 Correct F1 live methodology — authenticated beta browser session
+
+F1 was then validated from a real beta-authenticated browser session against the
+site origin (through the beta gate, not around it):
+
+    http://10.0.40.100:8090/search?q=Who%20has%20played%20the%20most%20games%3F
+
+- browser `fetch` loop; `credentials: same-origin`, `cache: no-store`;
+- requests routed through the authenticated normal site path so they reach
+  `src/app/search/page.tsx` → `runNlSearchWithRateLimit()`;
+- denial detected by the response body marker `Too many searches`.
+
+### 16.3 F1 live result — denied exactly at the configured threshold
+
+- requests 1–30: HTTP 200, `limited=false`;
+- request 31: HTTP 200, `limited=true`;
+- final tally: `limitedAt: 31`, `hits: {4: 31}`.
+
+This confirms end-to-end that:
+
+- the requests reached the real `/search` page and executed the NL rate-limit boundary;
+- limiter state persisted in a single worker (worker 4) across the loop;
+- the 31st request in the window was denied at exactly the configured
+  30-requests / 60-seconds budget;
+- the friendly denial path is HTTP 200 with body text `Too many searches`, never a
+  500 — matching §10 and the §7 friendly-UI positive control.
+
+### 16.4 F1 telemetry acceptance — the denied request wrote no row
+
+Verified read-only via `AFLDB_OWNER_DATABASE_URL`. `nl_search_log` columns used:
+`at`, `question`.
+
+    SELECT
+      COUNT(*) AS matching_rows,
+      MIN(at)  AS first_seen,
+      MAX(at)  AS last_seen
+    FROM nl_search_log
+    WHERE question = 'Who has played the most games?'
+      AND at >= NOW() - INTERVAL '10 minutes';
+
+Result:
+
+    matching_rows = 30
+    first_seen    = 2026-09-01 18:49:35.616095+10
+    last_seen     = 2026-09-01 18:49:44.079766+10
+
+Exactly 30 rows for 31 requests: the denied 31st request returned before
+`globalSearch()` and created no `nl_search_log` row, confirming the §5 / §7
+invariant that a limited request does not execute the NL pipeline or its deferred
+telemetry write.
+
+### 16.5 F2 live acceptance — oversized body rejected with 413
+
+An oversized `POST /api/health-event` on deployed dev returned **HTTP 413**,
+confirming the §13 32 KiB streaming body cap on the live service.
+
+### 16.6 Instrumentation hygiene
+
+Temporary diagnostic instrumentation used during the 16.1 investigation was **never
+committed**: it was removed from the running dev checkout, and dev was rebuilt and
+restarted cleanly afterwards. Post-restart dev health:
+
+    {"status":"ok","database":"ok","latencyMs":29}
+
+No implementation, test, schema or database change resulted from this
+live-acceptance work.
+
+### 16.7 Status after live acceptance
+
+- **F1** — per-IP NL `/search` rate limit: **dev live end-to-end acceptance complete**
+  (16.2–16.4).
+- **F2** — `/api/health-event` 32 KiB body cap: **dev live acceptance complete** (16.5).
+- **F3** — prototype-key hardening: unit negative/positive controls in §14; not part
+  of this live-acceptance pass and unchanged.
+
+ISSUE-120 remains resolved; this section adds the live acceptance that §12–§15 did
+not include.
 

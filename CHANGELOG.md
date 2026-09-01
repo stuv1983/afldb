@@ -15,6 +15,28 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-120 — public-surface abuse hardening before launch - 1 September 2026
+
+- The public natural-language `/search` path now enforces a per-worker, per-IP
+  rate limit of 30 requests per 60 seconds ahead of the NL pipeline. A limited
+  request returns the friendly "Too many searches / Please try again shortly."
+  response without running `globalSearch()` or writing an `nl_search_log` row,
+  and limiter or client-IP resolution failures fail open so search availability
+  is never traded for limiting. AFLW search is unaffected.
+- `/api/health-event` bounds the request body to 32 KiB, checking `Content-Length`
+  and enforcing the same cap while streaming, and returns HTTP 413 for oversized
+  bodies before JSON parsing. Malformed JSON still returns 400; normal events are
+  unchanged.
+- Request-derived catalogue keys for career records
+  (`CAREER_COLUMNS`) and AFLW match outcomes (`AFLW_MATCH_OUTCOME_FILTERS`) are
+  now checked with `Object.hasOwn`, so crafted prototype keys such as
+  `constructor` resolve to a clean empty/404 result instead of a 500.
+- No schema, migration, privilege, beta-gate or NL-semantics changes. Focused
+  suites pass 19/19 and typecheck passes. Authenticated dev live acceptance
+  confirmed the 31st search from one IP on the same worker is limited
+  (`limitedAt: 31`) while exactly 30 `nl_search_log` rows are written for the 31
+  requests, and an oversized `/api/health-event` body returns 413.
+
 ### AFLDB-ISSUE-110 — ranked career season-scope fail-closed guard - 31 August 2026
 
 - Parser version remains 32. Validation now refuses every non-predicate
