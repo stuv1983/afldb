@@ -19,6 +19,9 @@ import {
   RebuildRefused,
   assertDestructiveAcknowledgement,
   assertDraftguruPreflight,
+  AWARDS_HONOURS_EXPECTED,
+  AWARDS_HONOURS_GROUPS,
+  awardsHonoursChecks,
   buildFinalValidationSql,
   executeRebuild,
   finalValidationChecks,
@@ -609,21 +612,64 @@ describe('stage graph', () => {
     // nothing new imports. See 'ladder witness cross-check' below.
     expect(idsOf(stages)).toEqual([
       'precheck', 'recreate', 'migrations', 'privileges',
-      'reference', 'fitzroy', 'draftguru', 'derived',
+      'reference', 'fitzroy', 'draftguru', 'awards-honours', 'derived',
       'coleman', 'ladder-witness', 'fingerprints',
     ]);
   });
 
-  it('adds exactly one data stage beyond the four, and it derives rather than acquires', () => {
+  it('adds exactly two data stages beyond the four, neither of which acquires', () => {
     // AFLDB-ISSUE-111. 'coleman' is the fifth DATA stage. It is admitted because it
     // acquires nothing: no legacy SQLite, no manifest, no network — it reads AFLDB's own
     // canonical match facts and writes the award they imply.
+    // AFLDB-ISSUE-112. 'awards-honours' is the sixth. It acquires nothing either: every
+    // family reads a tracked manifest checked in under data/awards/, and the legacy
+    // SQLite source is never wired back in (operator decision 8).
     expect(idsOf(stages.filter((s) => s.kind === 'data')))
-      .toEqual(['reference', 'fitzroy', 'draftguru', 'derived', 'coleman']);
+      .toEqual(['reference', 'fitzroy', 'draftguru', 'awards-honours', 'derived',
+                'coleman']);
     const coleman = stages.find((s) => s.id === 'coleman')!;
     expect(coleman.argv).toEqual([
       resolvePython(), 'tools/migration/import_awards.py', '--groups', 'coleman',
     ]);
+  });
+
+  describe('awards & honours (AFLDB-ISSUE-112 §7/§24)', () => {
+    const awards = stages.find((s) => s.id === 'awards-honours')!;
+
+    it('runs after DraftGuru and before DERIVED', () => {
+      const ids = idsOf(stages);
+      // Every family carries player links, so the canonical players population
+      // must be complete before it runs.
+      expect(ids.indexOf('draftguru')).toBeLessThan(ids.indexOf('awards-honours'));
+      expect(ids.indexOf('awards-honours')).toBeLessThan(ids.indexOf('derived'));
+    });
+
+    it('runs every legacy-free manifest group and nothing else', () => {
+      expect(awards.argv).toEqual([
+        resolvePython(), 'tools/migration/import_awards.py', '--groups',
+        ...AWARDS_HONOURS_GROUPS,
+      ]);
+      // 'awards' is the legacy re-extract and is the one group that still needs
+      // AFLDB_LEGACY_SQLITE; 'coleman' is derived and has its own stage after
+      // `derived`, where season_metadata has decided which seasons are complete.
+      expect(AWARDS_HONOURS_GROUPS).not.toContain('awards');
+      expect(AWARDS_HONOURS_GROUPS).not.toContain('coleman');
+    });
+
+    it('runs only groups import_awards.py declares legacy-free', () => {
+      const src = readFileSync(
+        join(root, 'tools', 'migration', 'import_awards.py'), 'utf8');
+      const declared = src.slice(src.indexOf('LEGACY_FREE_GROUPS = {'),
+                                 src.indexOf('BATCH_SOURCE_KEYS'));
+      for (const group of AWARDS_HONOURS_GROUPS) {
+        expect(declared).toContain(`"${group}"`);
+      }
+    });
+
+    it('carries no legacy source in its own environment', () => {
+      expect(JSON.stringify(awards)).not.toContain('AFLDB_LEGACY_SQLITE');
+      expect(awards.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: IMPORT });
+    });
   });
 
   describe('ladder witness cross-check (AFLDB-ISSUE-095 D7)', () => {
@@ -1130,6 +1176,59 @@ describe('final validation', () => {
         'coleman_rows_keyed_on_a_numeric_id', 'coleman_after_accepted_last_season',
       ]) {
         expect(sql).toContain(key);
+      }
+    });
+  });
+
+  describe('awards & honours gates (AFLDB-ISSUE-112)', () => {
+    const gate = (key: string) =>
+      finalValidationChecks(measuredRegister({ matches: 1, seasons_last: 2025 }))
+        .find((c) => c.key === key);
+
+    it('gates every manifest family at its measured row count', () => {
+      const e = AWARDS_HONOURS_EXPECTED;
+      const expected: Record<string, number> = {
+        honour_team_members_rows: e.honourTeamMembers,
+        hall_of_fame_rows: e.hallOfFame,
+        captaincies_rows: e.captaincies,
+        rising_star_nomination_rows: e.risingStarNominations,
+        rising_star_winner_rows: e.risingStarWinners,
+        all_australian_rows: e.allAustralian,
+        club_best_and_fairest_rows: e.clubBestAndFairest,
+        named_medal_rows: e.namedMedals,
+        under_22_rows: e.under22,
+        award_definitions_rows: e.awardDefinitions,
+      };
+      for (const [key, value] of Object.entries(expected)) {
+        expect(gate(key)?.expected, key).toBe(value);
+      }
+    });
+
+    it('gates ROW counts, never link counts', () => {
+      // A row whose player cannot be re-resolved loads present and unlinked
+      // (AFLDB-ISSUE-112 §24.5). A linked-count gate here would turn that into
+      // a rebuild failure and hide the row that actually needs a curator.
+      for (const check of awardsHonoursChecks(2025)) {
+        expect(check.sql).not.toContain('player_id IS NOT NULL');
+      }
+    });
+
+    it('refuses an honours row with no provenance', () => {
+      expect(gate('award_winners_without_a_source')?.expected).toBe(0);
+    });
+
+    it('excludes the current season by the accepted baseline, not a hard-coded year', () => {
+      expect(gate('award_winners_after_accepted_last_season')?.sql)
+        .toContain('season > 2025');
+      expect(awardsHonoursChecks(2026)
+        .find((c) => c.key === 'award_winners_after_accepted_last_season')?.sql)
+        .toContain('season > 2026');
+    });
+
+    it('renders every awards gate into the executed stream', () => {
+      const sql = finalValidationSql();
+      for (const check of awardsHonoursChecks(2025)) {
+        expect(sql).toContain(check.key);
       }
     });
   });

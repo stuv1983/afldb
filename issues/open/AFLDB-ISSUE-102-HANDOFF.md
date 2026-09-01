@@ -934,6 +934,162 @@ no Git command.
 
 ---
 
+## CHECKPOINT — pass 15 (2026-09-02): ISSUE-112 CLOSEOUT attempted — major fix landed, ISSUE-112 STAYS OPEN
+
+Scope: the ISSUE-112 closeout only. Full detail in `AFLDB-ISSUE-112.md` §24.
+Read-only `afldb_dev` measurement + bootstrap extraction; DB-free tests; `tsc`;
+`afldb_test`-only integration and importer runs under the restricted
+`afldb_import` role; `git diff --check`. No scrape, no `afldb_dev` mutation, no
+production, no migration, no privilege change, ISSUE-113 untouched,
+`D:\dev\afldb` not accessed, streamanator checkout not modified, no Git command.
+
+**Outcome: NOT RESOLVED — and the pass found a correctness defect, not just a
+gap.**
+
+- **The recorded legacy boundary was wrong.** §23.1 item 15 said the legacy
+  `awards` group's winner reload "matches 0 rows, a proven no-op". It did not:
+  `rising-star` was the one award still inside its scope, and `afldb_dev` holds
+  **33 `rising-star` `award_winners` rows** (1993-2025, all `draftguru`) that no
+  manifest owned. The legacy group was also the sole creator of exactly **two**
+  definitions — `all-australian` and `rising-star` (not four: `22-under-22` is
+  the `under_22` group's, `coleman` is ISSUE-111's create-if-missing).
+- **`players.id` is not "not rebuild-stable" — the carried ids were WRONG.**
+  `afldb_test` is a canonically rebuilt database. Comparing each id's AFL Tables
+  profile URL against `afldb_dev`: **0 of 12,392** shared ids denote the same
+  footballer. The loaders' guard ("does a row with this id exist?") kept every
+  link, so **5,141 of 5,194 links would have been silently attached to a
+  different player** by the canonical rebuild — and Hall of Fame, honour teams
+  and captaincies, which had no guard at all, were already loading wrong links
+  into `afldb_test` in Passes 8-14.
+- **Fixed:** `data/awards/player-identity.csv` (1,738 censused players) bridges
+  each bootstrap id to the normalised AFL Tables profile path in
+  `external_identities`; `import_awards.PlayerResolver` resolves through it and
+  fails closed — refuses on an uncensused id, loads unlinked and *reports* a
+  player with no identity or one this database does not carry, never falls back
+  to the bootstrap id, never matches on a name. No manifest and no manifest
+  parser was rewritten. Result on the rebuilt database: **5,138 of 5,194 links
+  preserved (98.9%)**, 56 lost and every one enumerated in the run output —
+  captaincies 1,375/1,375, All-Australian 1,065/1,078, Rising Star 750/766,
+  club B&F 735/744, named medals 856/863, Hall of Fame 239/246, honour teams
+  85/89.
+- **Also landed:** `data/awards/award-definitions.csv` (the two shared
+  definitions, one file, two disjoint slug-scoped writers — no double
+  ownership); `data/awards/rising-star-winners.csv` (the 33 rows, with a
+  cross-file `validate_family` on player identity per decided season);
+  `RISING_STAR_SLUG` added to `other_group_awards`, so the legacy winner reload
+  now genuinely matches nothing; the `awards-honours` stage in
+  `tools/db/rebuild-test.ts` between DraftGuru and DERIVED with Stage-9
+  per-family row gates; `docs/deployment.md` §6/§7 rewritten legacy-free.
+- **Gates:** G1 PASS · **G2 PASS** (one run over all eight manifest groups,
+  `AFLDB_LEGACY_SQLITE` unset, 61 s, no self-skip) · **G3 PARTIAL** (86 passed /
+  21 skipped / 0 failed — the 21 are the pre-existing legacy-*fixture* blocks,
+  not ISSUE-112 paths) · **G4 PASS** (3× byte-identical fingerprints over six
+  tables) · **G5 PASS in shape, vacuous in ledger** (`afldb_test` carries no
+  `player_link_resolutions`) · **G6 BLOCKED** · **G7 PASS** · **G8 PASS**
+  (privileges 34/34 unchanged).
+- **Blocker 1 (G6):** the canonical rebuild cannot be executed here. Proven:
+  `import_draftguru.py --validate-only` → `REFUSED: snapshot directory not
+  found: data/sources/draftguru/annual-html-20260826`;
+  `validate_ladder_witness.py` → `REFUSED: … acquired bytes are absent from
+  data/sources/afltables/fitzroy_core/full-history-20260827`. Neither snapshot
+  exists in the worktree or on streamanator (which holds only `trial-2024`), and
+  re-acquiring them is a scrape, which ISSUE-112 §12 forbids.
+- **Blocker 2:** 19 players (37 manifest rows) have no rebuild-stable identity
+  in the bootstrap source and load unlinked. Accepting that, or adjudicating
+  each, is an operator decision — the alternative is name matching, which the
+  fix deliberately does not do.
+- **Other validation:** DB-free **606 passed / 6 skipped** across 15 suites;
+  `tests/db-test-rebuild.test.ts` **223/223**; `tests/integration/release-gates.test.ts`
+  51 passed / 14 skipped; `npx tsc --noEmit` clean; `git diff --check` clean;
+  ISSUE-111 not regressed (Coleman 46 rows intact, its stage and ordering
+  unchanged, `coleman-derivation.test.ts` green).
+- **Exact next action:** (1) operator supplies the accepted snapshot bytes and
+  runs `npm run db:test:rebuild -- --fitzroy-label full-history-20260827
+  --acknowledge-destroy afldb_test`, confirming Stage 8 and the new Stage-12
+  gates → closes G6; (2) operator decides the 19 unidentified players;
+  (3) decide whether G3's 21 legacy-fixture blocks are inside ISSUE-112's
+  closure contract at all; (4) only then resolve ISSUE-112. ISSUE-102 closes
+  after 111 + 112; 113 is outside its boundary.
+
+---
+
+## CHECKPOINT — pass 16 (2026-09-02): ISSUE-112 closeout reviewed — STILL OPEN
+
+Full evidence and gate interpretation are in `AFLDB-ISSUE-112.md` §25.
+
+- `PlayerResolver` remains the correct architecture: census key → AFL Tables
+  profile identity → current database player. It never trusts the bootstrap
+  `player_id` or a name. The review tightened it to accept only `unique` or
+  `resolved` external identities and exactly one distinct target.
+- The census remains complete for all 1,738 distinct non-null player references
+  carried by the eight manifests. An existing adjudicated DraftGuru decision
+  supplies Matthew Rendell's stable AFL Tables identity, restoring four intended
+  links on the next DB-backed load. The unresolved gap is now **18 players / 33
+  manifest rows**; all stay unlinked and reported. No tracked deterministic
+  identity was found for the remaining 18.
+- The two shared definitions now enforce exact DraftGuru provenance. Rising
+  Star's 33 winner rows remain owned in `rising_star.py`; the requested
+  `rising_star_winners.py` path does not exist in this checkout.
+- G3's 21 skips are not exempt under the literal runbook. The two fixture blocks
+  are now manifest-driven and no longer legacy-gated, with their original
+  decision/ownership/idempotency assertions preserved. They still require a
+  DB-backed rerun; the needed test DSNs were not configured in this pass.
+- G5's empty-ledger audit is vacuous and is not accepted as closure evidence.
+  The ported fixtures provide deterministic non-vacuous decision replay without
+  modifying dev/production data once executed; a populated global before/after
+  audit remains required if applying G5 literally to every decision.
+- G6 remains blocked solely by the absent accepted DraftGuru, fitzRoy core and
+  ladder-witness bytes. The runbook has no waiver for prior rebuild evidence,
+  so ISSUE-112 and ISSUE-102 remain OPEN.
+- Validation this checkpoint: `player_identity.py`, `award_definitions.py` and
+  `rising_star.py` pass; 14 relevant DB-free awards source/rebuild Vitest suites
+  **578/578**;
+  `npm run typecheck` passes. No rebuild, migration, scrape, production contact,
+  server-checkout modification or commit.
+- Exact next action: run all 107 awards reload/link integration tests against
+  `afldb_test` with ephemeral test/import DSNs and no legacy variable; complete
+  non-vacuous G5 evidence; then supply the exact retained accepted snapshots and
+  run G6's canonical rebuild. Resolve ISSUE-112 only after all three gates pass.
+
+---
+
+## CHECKPOINT — pass 17 (2026-09-02): ISSUE-112 G3 + non-vacuous G5 — PASS; G6 STILL BLOCKED
+
+Scope was exactly the next Pass-16 gate: the full awards reload/link integration
+file and decision-bearing G5 fixtures against `afldb_test`. G6 was not run; no
+snapshot acquisition, scrape, production contact, streamanator-checkout change,
+commit or legacy SQLite variable.
+
+- Temporary SSH forwarding reused `arm@10.0.40.100` with
+  `~/.ssh/afldb_dev`. Before testing, live SQL proved the process-local owner
+  DSN was `afldb_test` / `afldb_owner`, the restricted DSN was `afldb_test` /
+  `afldb_import`, and `AFLDB_LEGACY_SQLITE` was unset. No password/full DSN was
+  printed or persisted.
+- Exact command `npm.cmd test -- --run
+  tests/integration/awards-reload-links.test.ts` passed **107/107, 0 skipped,
+  0 failed** (one file, 180.05 s). Therefore the formerly skipped 6-test and
+  15-test blocks are **21/21 executed and green**.
+- Non-vacuous G5: the ported fixtures created **9 distinct decisions before
+  their relevant reloads — 8 linked + 1 confirmed_unlinked**. Seven linked
+  decisions replayed/persisted on the same live row id and intended player;
+  the eighth proved default fail-closed protection and was discarded only by
+  the explicit, itemised `--allow-link-loss` invocation. The confirmed-unlinked
+  decision stayed on its live row with `player_id NULL`. Zero retained orphans,
+  zero target/player mismatches, zero unexpected link loss. Manual/NULL/
+  promoted ownership, row-id stability, idempotence, collision refusal,
+  advisory locking and cross-family isolation all passed.
+- The wrapper encountered only a post-Vitest OpenSSH control-socket cleanup
+  error. The exact remaining temporary tunnel process was stopped and the
+  follow-up count was zero; it does not affect the successful Vitest result.
+
+**Gate state:** G3 PASS; G5 PASS; ISSUE-112 and ISSUE-102 stay OPEN because G6
+is still blocked by the absent accepted DraftGuru, fitzRoy core and ladder
+witness bytes. **Exact next action:** operator supplies those exact retained
+accepted snapshots, then runs ISSUE-112 §24.8's canonical rebuild command.
+Do not reacquire, scrape or substitute.
+
+---
+
 ## Confirmed source findings
 
 Each verified by direct read at baseline `95819a3`.

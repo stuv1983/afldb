@@ -68,6 +68,10 @@ from common import (  # noqa: E402
     to_int,
 )
 from all_australian import AllAustralianSelection, load_all_australian  # noqa: E402
+from award_definitions import (  # noqa: E402
+    definition_for as award_definition_for,
+    load_award_definitions,
+)
 from captaincies import Captaincy, load_captaincies  # noqa: E402
 from club_best_and_fairest import (  # noqa: E402
     load_club_best_and_fairest,
@@ -76,13 +80,19 @@ from club_best_and_fairest import (  # noqa: E402
 )
 from hall_of_fame import HallOfFameInductee, load_hall_of_fame  # noqa: E402
 from honour_teams import HonourTeamMember, load_honour_teams  # noqa: E402
+from player_identity import load_player_identities  # noqa: E402
 from named_medals import (  # noqa: E402
     AWARD_SLUGS as NAMED_MEDAL_SLUGS,
     load_named_medals,
     load_named_medals_definitions,
     validate_family as validate_named_medals_family,
 )
-from rising_star import RisingStarNomination, load_rising_star  # noqa: E402
+from rising_star import (  # noqa: E402
+    RisingStarNomination,
+    load_rising_star,
+    load_rising_star_winners,
+    validate_family as validate_rising_star_family,
+)
 from under_22 import Under22Selection, load_under_22  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -252,6 +262,101 @@ class ClubResolver:
         return (identity["id"] if identity else club["id"]), raw
 
 
+class PlayerResolver:
+    """Maps a manifest's bootstrap ``player_id`` onto THIS database's player.
+
+    AFLDB-ISSUE-112 §24.5. Every awards/honours manifest carries a
+    ``player_id`` taken verbatim from the legacy-loaded bootstrap source. That
+    integer is **not** a target-database id: the canonical rebuild re-seeds
+    ``players.id`` (AFLDB-ISSUE-108 §9.4 / AFLDB-ISSUE-111 G5), and the
+    disagreement is total. Measured 2026-09-02 against a canonically rebuilt
+    ``afldb_test``: **0 of 12,392** ids present in both databases denoted the
+    same footballer.
+
+    The guard these loaders used before — keep ``player_id`` when the target
+    database has a row with that id — therefore protected nothing. Every id
+    existed, so every link was kept, and 5,141 of 5,194 links would have been
+    silently attached to a different player.
+
+    Resolution goes through the identity the rebuild actually preserves: the
+    AFL Tables profile URL in ``external_identities``, bridged by the tracked
+    ``data/awards/player-identity.csv`` census. It fails closed in every
+    direction and never falls back to the bootstrap id, and it never matches
+    on a name.
+    """
+
+    def __init__(self, pg, identities=None):
+        self._identities = (
+            identities if identities is not None else load_player_identities()
+        )
+        by_url: dict[str, set[int]] = {}
+        with pg.cursor() as cur:
+            cur.execute(
+                """SELECT ei.external_id, ei.player_id
+                     FROM external_identities ei
+                     JOIN sources s ON s.id = ei.source_id
+                    WHERE s.key = 'afltables'
+                      AND ei.match_method = 'afltables_profile_url'
+                      AND ei.status IN ('unique', 'resolved')
+                      AND ei.player_id IS NOT NULL"""
+            )
+            for url, player_id in cur.fetchall():
+                by_url.setdefault(url, set()).add(player_id)
+        self._by_url = by_url
+        self.resolved = 0
+        self.no_identity: set[int] = set()
+        self.unresolvable: set[int] = set()
+
+    def resolve(self, bootstrap_id: int | None) -> int | None:
+        if bootstrap_id is None:
+            return None
+
+        identity = self._identities.get(bootstrap_id)
+        if identity is None:
+            # The census and the manifests disagree. Guessing here is exactly
+            # the failure this class exists to prevent, so refuse the run.
+            raise RuntimeError(
+                f"player_id {bootstrap_id} is referenced by an awards manifest "
+                f"but is absent from data/awards/player-identity.csv. Re-census "
+                f"the manifests before loading; this loader will not guess an "
+                f"identity."
+            )
+
+        url = identity.afltables_profile_url
+        if url is None:
+            # An enumerated, tracked exception (18 players / 33 rows). The row
+            # loads unlinked and is reported, never inferred from the name.
+            self.no_identity.add(bootstrap_id)
+            return None
+
+        candidates = self._by_url.get(url) or set()
+        if len(candidates) != 1:
+            self.unresolvable.add(bootstrap_id)
+            return None
+
+        self.resolved += 1
+        return next(iter(candidates))
+
+    def report(self, rep: Reporter, family: str) -> None:
+        if self.no_identity:
+            rep.warn(
+                f"{family}: {len(self.no_identity)} censused player(s) carry no "
+                f"AFL Tables profile identity in the bootstrap source, so their "
+                f"rows load unlinked: "
+                + ", ".join(
+                    f"{pid} ({self._identities[pid].display_name})"
+                    for pid in sorted(self.no_identity)
+                )
+            )
+        if self.unresolvable:
+            rep.warn(
+                f"{family}: {len(self.unresolvable)} censused player(s) have an "
+                f"AFL Tables profile identity this database does not carry "
+                f"uniquely, so their rows load unlinked: "
+                + ", ".join(str(pid) for pid in sorted(self.unresolvable))
+            )
+
+
 # ---------------------------------------------------------------------------
 # Award definitions
 # ---------------------------------------------------------------------------
@@ -336,6 +441,63 @@ AWARD_DESCRIPTIONS = {
         "Awarded to the fairest and best player of the season. AFLDB holds "
         "the full vote history separately, from 1924.",
 }
+
+
+def reconcile_shared_definition(pg, batch, slug: str) -> int:
+    """Reconcile ONE shared award definition from the tracked manifest.
+
+    AFLDB-ISSUE-112 §24. ``all-australian`` and ``rising-star`` were the last
+    two ``awards`` rows created only by the legacy ``awards`` group reading
+    ``AFLDB_LEGACY_SQLITE``; both families previously only *guarded* that the
+    row existed and told the operator to "run the 'awards' group first", so
+    neither could be loaded into a canonically rebuilt database at all.
+
+    The reload is scoped to the caller's own slug and nothing else. That is
+    what keeps the two families' scopes disjoint even though they read one
+    shared manifest file: neither can delete or rewrite the other's row, and
+    neither touches any of the 38 definitions another owner already has. The
+    legacy group still co-emits both rows from the same slug key when it runs
+    at all, id-preserving and in agreement — the same full-refresh
+    consistency belt ``club_bf`` and ``named_medals`` already rely on.
+
+    Keying on ``slug`` is what keeps ``awards.id`` stable, and with it every
+    ``award_winners`` / ``award_nominations`` row that references it through
+    an ON DELETE CASCADE foreign key.
+    """
+    definition = award_definition_for(slug)
+
+    def build_definition():
+        batch.records_read += 1
+        yield (
+            definition.slug, definition.name, definition.category,
+            definition.competition, None,
+            AWARD_DESCRIPTIONS.get(definition.slug),
+            definition.first_season, definition.last_season,
+        )
+
+    # An award definition carries no player link of its own, so no resolution
+    # is read here (link_columns=None).
+    reload_keyed(
+        pg, "awards", ["slug"],
+        ["slug", "name", "category", "competition", "club_id",
+         "description", "first_season", "last_season"],
+        build_definition(), batch,
+        link_columns=None,
+        scope_column="slug", scope_values=[definition.slug], scope_exclude=False,
+    )
+    # No commit: the caller's own reload can still raise LinkDecisionLoss or
+    # ReloadOwnershipCollision before writing a row, and import_batch's
+    # rollback must then undo this definition too. The SELECT below sees the
+    # uncommitted row — same transaction, same connection.
+    with pg.cursor() as cur:
+        cur.execute("SELECT id FROM awards WHERE slug = %s", (definition.slug,))
+        row = cur.fetchone()
+    if row is None:
+        raise RuntimeError(
+            f"award definition {definition.slug!r} is missing after its own "
+            f"manifest reload"
+        )
+    return row[0]
 
 
 # ---------------------------------------------------------------------------
@@ -437,8 +599,14 @@ def import_awards(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
     # the legacy group ever inserting, updating or deleting a Coleman winner
     # again — without it the derived loader's separate ownership scope would
     # leave the legacy rows in place and duplicate the family.
+    # AFLDB-ISSUE-112 §24 adds RISING_STAR_SLUG: the 33 rising-star season
+    # winners are loaded by the legacy-free 'rising_star' group from
+    # data/awards/rising-star-winners.csv. They were the LAST winner rows this
+    # legacy reload still owned; with them excluded its winner scope matches
+    # no row at all and build_winners() is a proven no-op.
     other_group_awards = [
-        award_ids[slug] for slug in (UNDER_22_SLUG, ALL_AUSTRALIAN_SLUG, COLEMAN_SLUG)
+        award_ids[slug] for slug in (UNDER_22_SLUG, ALL_AUSTRALIAN_SLUG, COLEMAN_SLUG,
+                                     RISING_STAR_SLUG)
         if slug in award_ids
     ]
     # Club best-and-fairest winners are loaded by the legacy-free 'club_bf'
@@ -557,25 +725,21 @@ def import_all_australian(pg, rep: Reporter, batch, clubs: ClubResolver,
     the domain-and-provenance ownership scope and every AFLDB-ISSUE-080
     protection are unchanged; only the row source is different.
     """
+    # AFLDB-ISSUE-112 §24: the definition is this group's own, reconciled from
+    # data/awards/award-definitions.csv, so the family no longer needs the
+    # legacy 'awards' group to have created it first.
+    award_id = reconcile_shared_definition(pg, batch, ALL_AUSTRALIAN_SLUG)
+
     with pg.cursor() as cur:
-        cur.execute("SELECT id FROM awards WHERE slug = %s", (ALL_AUSTRALIAN_SLUG,))
-        row = cur.fetchone()
-        if row is None:
-            raise RuntimeError(
-                "the all-australian award definition is missing; "
-                "run the 'awards' group first"
-            )
-        award_id = row[0]
         cur.execute("SELECT year FROM seasons")
         valid_seasons = {r[0] for r in cur.fetchall()}
-        cur.execute("SELECT id FROM players")
-        valid_players = {r[0] for r in cur.fetchall()}
 
     rows = load_all_australian()
 
     draftguru_id = require_source(sources, "draftguru")
     wikipedia_id = require_source(sources, "wikipedia")
     source_ids = {"draftguru": draftguru_id, "wikipedia": wikipedia_id}
+    players = PlayerResolver(pg)
 
     def build():
         for r in rows:
@@ -584,7 +748,7 @@ def import_all_australian(pg, rep: Reporter, batch, clubs: ClubResolver,
                 batch.reject(r.source_key, "unknown season",
                              {"season": r.season, "player": r.player})
                 continue
-            player_id = r.player_id if r.player_id in valid_players else None
+            player_id = players.resolve(r.player_id)
             status = link_status(r.link_status, player_id)
             # The manifest's club string is exactly what the legacy loader
             # passed here; re-resolving it reproduces club_id and the stored
@@ -617,6 +781,7 @@ def import_all_australian(pg, rep: Reporter, batch, clubs: ClubResolver,
         allow_link_loss=allow_link_loss,
     )
     report_reload(rep, "all_australian", stats)
+    players.report(rep, "all_australian")
 
     with pg.cursor() as cur:
         cur.execute(
@@ -684,8 +849,6 @@ def import_club_best_and_fairest(pg, rep: Reporter, batch, clubs: ClubResolver,
     with pg.cursor() as cur:
         cur.execute("SELECT year FROM seasons")
         valid_seasons = {r[0] for r in cur.fetchall()}
-        cur.execute("SELECT id FROM players")
-        valid_players = {r[0] for r in cur.fetchall()}
 
     def build_definitions():
         for d in definitions:
@@ -728,6 +891,7 @@ def import_club_best_and_fairest(pg, rep: Reporter, batch, clubs: ClubResolver,
             + ", ".join(missing)
         )
     bf_award_ids = sorted(award_ids.values())
+    players = PlayerResolver(pg)
 
     def build_winners():
         for w in winners:
@@ -736,7 +900,7 @@ def import_club_best_and_fairest(pg, rep: Reporter, batch, clubs: ClubResolver,
                 batch.reject(w.source_key, "unknown season",
                              {"season": w.season, "player": w.player})
                 continue
-            player_id = w.player_id if w.player_id in valid_players else None
+            player_id = players.resolve(w.player_id)
             status = link_status(w.link_status, player_id)
             # The manifest's club string is exactly what the legacy loader
             # passed here; re-resolving it reproduces club_id and the stored
@@ -765,6 +929,7 @@ def import_club_best_and_fairest(pg, rep: Reporter, batch, clubs: ClubResolver,
     )
     pg.commit()
     report_reload(rep, "club_best_and_fairest", stats)
+    players.report(rep, "club_bf")
 
     total = scalar(
         pg, "SELECT count(*) FROM award_winners WHERE award_id = ANY(%s)",
@@ -841,8 +1006,6 @@ def import_named_medals(pg, rep: Reporter, batch, clubs: ClubResolver,
     with pg.cursor() as cur:
         cur.execute("SELECT year FROM seasons")
         valid_seasons = {r[0] for r in cur.fetchall()}
-        cur.execute("SELECT id FROM players")
-        valid_players = {r[0] for r in cur.fetchall()}
 
     def build_definitions():
         for d in definitions:
@@ -885,6 +1048,7 @@ def import_named_medals(pg, rep: Reporter, batch, clubs: ClubResolver,
             + ", ".join(missing)
         )
     named_medal_award_ids = sorted(award_ids.values())
+    players = PlayerResolver(pg)
 
     def build_winners():
         for w in winners:
@@ -893,7 +1057,7 @@ def import_named_medals(pg, rep: Reporter, batch, clubs: ClubResolver,
                 batch.reject(w.source_key, "unknown season",
                              {"season": w.season, "player": w.player})
                 continue
-            player_id = w.player_id if w.player_id in valid_players else None
+            player_id = players.resolve(w.player_id)
             status = link_status(w.link_status, player_id)
             # The manifest's club string is exactly what the legacy loader
             # passed here; re-resolving it reproduces club_id and the stored
@@ -923,6 +1087,7 @@ def import_named_medals(pg, rep: Reporter, batch, clubs: ClubResolver,
     )
     pg.commit()
     report_reload(rep, "named_medals", stats)
+    players.report(rep, "named_medals")
 
     total = scalar(
         pg, "SELECT count(*) FROM award_winners WHERE award_id = ANY(%s)",
@@ -1818,23 +1983,22 @@ def import_rising_star(pg, rep: Reporter, batch, clubs: ClubResolver,
     exact FootyWire statistic object, loaded losslessly through the same
     ``jsonb`` column; the three rows without statistics stay NULL.
     """
+    rows = load_rising_star()
+    winner_rows = load_rising_star_winners()
+    validate_rising_star_family(rows, winner_rows)
+
+    # AFLDB-ISSUE-112 §24: the definition is this group's own, reconciled from
+    # data/awards/award-definitions.csv, so the family no longer needs the
+    # legacy 'awards' group to have created it first.
+    award_id = reconcile_shared_definition(pg, batch, RISING_STAR_SLUG)
+
     with pg.cursor() as cur:
-        cur.execute("SELECT id FROM awards WHERE slug = %s", (RISING_STAR_SLUG,))
-        row = cur.fetchone()
-        if row is None:
-            raise RuntimeError(
-                "the rising-star award definition is missing; "
-                "run the 'awards' group first"
-            )
-        award_id = row[0]
         cur.execute("SELECT year FROM seasons")
         valid_seasons = {r[0] for r in cur.fetchall()}
-        cur.execute("SELECT id FROM players")
-        valid_players = {r[0] for r in cur.fetchall()}
-
-    rows = load_rising_star()
 
     source_id = require_source(sources, "footywire")
+    winner_source_id = require_source(sources, "draftguru")
+    players = PlayerResolver(pg)
 
     def build():
         for r in rows:
@@ -1844,7 +2008,7 @@ def import_rising_star(pg, rep: Reporter, batch, clubs: ClubResolver,
                              {"season": r.season, "player": r.player})
                 continue
 
-            player_id = r.player_id if r.player_id in valid_players else None
+            player_id = players.resolve(r.player_id)
             status = link_status(r.link_status, player_id)
             club_id, _ = clubs.resolve(r.club, r.season)
             opponent_id, _ = clubs.resolve(r.opponent, r.season)
@@ -1883,8 +2047,47 @@ def import_rising_star(pg, rep: Reporter, batch, clubs: ClubResolver,
         scopes=[("source_id", [source_id], False)],
         allow_link_loss=allow_link_loss,
     )
-    pg.commit()
     report_reload(rep, "award_nominations", stats)
+
+    # The 33 season winners (AFLDB-ISSUE-112 §24). A different record from the
+    # is_winner nomination above: a different table, a different reload key
+    # and a different provenance — these came from the DraftGuru award scrape
+    # and were the last winner rows the legacy 'awards' group still owned.
+    def build_winners():
+        for w in winner_rows:
+            batch.records_read += 1
+            if w.season not in valid_seasons:
+                batch.reject(w.source_key, "unknown season",
+                             {"season": w.season, "player": w.player})
+                continue
+            player_id = players.resolve(w.player_id)
+            status = link_status(w.link_status, player_id)
+            club_id, club_raw = clubs.resolve(w.club, w.season)
+            yield (
+                award_id, w.season, player_id, w.player, status,
+                w.candidate_count,
+                club_id, club_raw, w.votes,
+                None, False, False, None,
+                winner_source_id, w.source_key, batch.id,
+            )
+
+    winner_stats = reload_keyed(
+        pg, "award_winners", ["source_id", "source_record_id"],
+        ["award_id", "season", "player_id", "player_name_raw", "link_status_value",
+         "candidate_count", "club_id", "club_name_raw", "votes", "position",
+         "is_captain", "is_vice_captain", "note", "source_id", "source_record_id",
+         "import_batch_id"],
+        build_winners(), batch,
+        target_table="award_winners",
+        scope_column="award_id", scope_values=[award_id],
+        # Domain AND provenance (AFLDB-ISSUE-080): an admin or ingest-pipeline
+        # row on this award is not this loader's to reconcile.
+        scopes=[("source_id", [winner_source_id], False)],
+        allow_link_loss=allow_link_loss,
+    )
+    pg.commit()
+    report_reload(rep, "rising_star winners", winner_stats)
+    players.report(rep, "rising_star")
 
     total = scalar(pg, "SELECT count(*) FROM award_nominations")
     linked = scalar(pg, "SELECT count(*) FROM award_nominations WHERE player_id IS NOT NULL")
@@ -1892,6 +2095,11 @@ def import_rising_star(pg, rep: Reporter, batch, clubs: ClubResolver,
     winners = scalar(pg, "SELECT count(*) FROM award_nominations WHERE is_winner")
     rep.result("award_nominations", total, f"({seasons} seasons, {linked} linked)")
     rep.result("  of which season winners", winners)
+    rep.result(
+        "rising_star winner rows",
+        scalar(pg, "SELECT count(*) FROM award_winners WHERE award_id = %s",
+               (award_id,)),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1906,6 +2114,7 @@ def import_hall_of_fame(pg, rep: Reporter, batch, sources: dict[str, int],
     rows: list[HallOfFameInductee] = load_hall_of_fame()
 
     source_id = require_source(sources, "wikipedia")
+    players = PlayerResolver(pg)
 
     def build():
         for r in rows:
@@ -1913,9 +2122,10 @@ def import_hall_of_fame(pg, rep: Reporter, batch, sources: dict[str, int],
             # link_status() re-checks the migration 019/053 invariant the
             # manifest parser already enforces — defence in depth, as in
             # import_honour_teams.
-            status = link_status(r.link_status, r.player_id)
+            player_id = players.resolve(r.player_id)
+            status = link_status(r.link_status, player_id)
             yield (
-                r.name, r.player_id, status,
+                r.name, player_id, status,
                 r.category, r.inducted_year,
                 r.is_legend, r.legend_year,
                 r.club, r.state,
@@ -1947,6 +2157,7 @@ def import_hall_of_fame(pg, rep: Reporter, batch, sources: dict[str, int],
     )
     pg.commit()
     report_reload(rep, "hall_of_fame", stats)
+    players.report(rep, "hall_of_fame")
 
     rep.result("hall_of_fame", scalar(pg, "SELECT count(*) FROM hall_of_fame"),
                f"({scalar(pg, 'SELECT count(*) FROM hall_of_fame WHERE is_legend')} legends, "
@@ -2047,13 +2258,15 @@ def import_honour_teams(pg, rep: Reporter, batch, sources: dict[str, int],
     rows: list[HonourTeamMember] = load_honour_teams()
 
     source_id = require_source(sources, "wikipedia")
+    players = PlayerResolver(pg)
 
     prepared: list[tuple] = []
     for row in rows:
         batch.records_read += 1
-        status = link_status(row.link_status, row.player_id)
+        player_id = players.resolve(row.player_id)
+        status = link_status(row.link_status, player_id)
         prepared.append((
-            row.team_name, row.player_id, row.player, status,
+            row.team_name, player_id, row.player, status,
             row.position, row.role, row.club, row.sort_order,
             row.note, source_id, batch.id,
         ))
@@ -2093,6 +2306,7 @@ def import_honour_teams(pg, rep: Reporter, batch, sources: dict[str, int],
     )
     pg.commit()
     report_reload(rep, "honour_team_members", stats)
+    players.report(rep, "honour_teams")
 
     rep.result("honour_team_members", scalar(pg, "SELECT count(*) FROM honour_team_members"),
                f"({scalar(pg, 'SELECT count(DISTINCT team_name) FROM honour_team_members')} teams)")
@@ -2169,6 +2383,7 @@ def import_captaincies(pg, rep: Reporter, batch, clubs: ClubResolver,
         valid_seasons = {r[0] for r in cur.fetchall()}
 
     source_id = require_source(sources, "wikipedia")
+    players = PlayerResolver(pg)
     prepared: list[tuple] = []
     for row in rows:
         batch.records_read += 1
@@ -2183,9 +2398,10 @@ def import_captaincies(pg, rep: Reporter, batch, clubs: ClubResolver,
             batch.reject(row.source_key, f"club not resolved: {club_raw!r}",
                          {"club": row.club, "season": row.season})
             continue
-        status = link_status(row.link_status, row.player_id)
+        player_id = players.resolve(row.player_id)
+        status = link_status(row.link_status, player_id)
         prepared.append((
-            row.season, club_id, row.player_id, row.player, status,
+            row.season, club_id, player_id, row.player, status,
             row.role, row.period, row.note,
             source_id, row.source_key, batch.id,
         ))
@@ -2203,6 +2419,7 @@ def import_captaincies(pg, rep: Reporter, batch, clubs: ClubResolver,
     )
     pg.commit()
     report_reload(rep, "captaincies", stats)
+    players.report(rep, "captaincies")
 
     rep.result("captaincies", scalar(pg, "SELECT count(*) FROM captaincies"),
                f"({scalar(pg, 'SELECT count(*) FROM captaincies WHERE player_id IS NOT NULL')} linked)")
@@ -2212,7 +2429,9 @@ def import_captaincies(pg, rep: Reporter, batch, clubs: ClubResolver,
 # Orchestration
 # ---------------------------------------------------------------------------
 GROUPS = {
-    "awards":         ("Award definitions and winners", ["awards", "award_winners"]),
+    # Compatibility-only since AFLDB-ISSUE-112 §24 — see LEGACY_FREE_GROUPS.
+    "awards":         ("Award definitions and winners (legacy re-extract; "
+                       "compatibility-only)", ["awards", "award_winners"]),
     "all_australian": ("All-Australian teams", ["award_winners"]),
     "under_22":       ("AFLPA 22 Under 22 teams", ["awards", "award_winners"]),
     COLEMAN_GROUP:    ("Coleman Medal, derived from canonical home-and-away facts",
@@ -2231,9 +2450,20 @@ GROUPS = {
 # honour_teams, hall_of_fame, captaincies, rising_star, club_bf and named_medals
 # each load a tracked manifest; coleman derives from AFLDB's own canonical match
 # facts. Any of them can therefore run in a canonically rebuilt database with
-# AFLDB_LEGACY_SQLITE unset. club_bf and named_medals additionally track their
-# own award definitions (data/awards/*-definitions.csv), so they need no prior
-# legacy 'awards' run to create them.
+# AFLDB_LEGACY_SQLITE unset. club_bf and named_medals track their own award
+# definitions (data/awards/*-definitions.csv); all_australian and rising_star
+# reconcile theirs from the shared data/awards/award-definitions.csv, each
+# scoped to its own slug (AFLDB-ISSUE-112 §24). under_22 upserts its own and
+# coleman creates its own if missing (AFLDB-ISSUE-111). So no group needs a
+# prior legacy 'awards' run to create a definition any more.
+#
+# 'awards' is the ONE group still outside this set. After §24 it creates no
+# definition and no winner row that another group does not own — its winner
+# reload matches nothing and its definition reload is a full-refresh
+# consistency belt over rows their own owners also write, id-preserving and in
+# agreement. It is retained as COMPATIBILITY-ONLY for an operator running a
+# full legacy re-extract; it is NOT part of the canonical rebuild or of any
+# routine refresh, and it still requires AFLDB_LEGACY_SQLITE.
 LEGACY_FREE_GROUPS = {
     "all_australian", "under_22", COLEMAN_GROUP, "hall_of_fame", "honour_teams",
     "captaincies", "rising_star", "club_bf", "named_medals",
@@ -2380,10 +2610,13 @@ def main() -> int:
             lite.close()
         if "all_australian" in selected:
             aa_rows = load_all_australian()
+            aa_definition = award_definition_for(ALL_AUSTRALIAN_SLUG)
             rep.result(
                 "All-Australian source",
                 len(aa_rows),
-                f"({len({row.season for row in aa_rows})} seasons)",
+                f"({len({row.season for row in aa_rows})} seasons, "
+                f"definition {aa_definition.first_season}-"
+                f"{aa_definition.last_season})",
             )
         if "under_22" in selected:
             under_22_rows = load_under_22()
@@ -2400,6 +2633,16 @@ def main() -> int:
                 len(cbf_rows),
                 f"({len({row.season for row in cbf_rows})} seasons, "
                 f"{len(cbf_defs)} awards)",
+            )
+        if "rising_star" in selected:
+            rs_winners = load_rising_star_winners()
+            rs_definition = award_definition_for(RISING_STAR_SLUG)
+            rep.result(
+                "Rising Star winners source",
+                len(rs_winners),
+                f"({len({row.season for row in rs_winners})} decided seasons, "
+                f"definition {rs_definition.first_season}-"
+                f"{rs_definition.last_season})",
             )
         if "named_medals" in selected:
             nm_rows = load_named_medals()

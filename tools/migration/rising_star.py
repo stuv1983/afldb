@@ -35,6 +35,19 @@ those cells are left empty and load back as NULL.
 whose values are integers. Three rows carry no statistics; those cells
 are empty and load back as NULL. Malformed JSON, a non-object, an unknown
 key or a non-integer value is rejected — never coerced, never inferred.
+
+AFLDB-ISSUE-112 closeout (§24) adds the family's SECOND tracked file,
+``data/awards/rising-star-winners.csv``: the 33 ``award_winners`` rows for
+the ``rising-star`` award, one per decided season 1993-2025. These are a
+different record from the ``is_winner`` nomination above — a different
+table, a different reload key and a different provenance (``draftguru``,
+the legacy award scrape, not FootyWire) — and they were the last winner
+rows the legacy ``awards`` group still owned. Tracking them here is what
+makes its ``build_winners()`` reload a genuine no-op and lets the whole
+awards family rebuild with ``AFLDB_LEGACY_SQLITE`` unset. ``validate_family``
+cross-checks the two files: the same 33 seasons, and the same decided
+``player_id`` per season. The two sources' *name spellings* legitimately
+differ on five seasons, so the cross-check is on player identity, not text.
 """
 
 from __future__ import annotations
@@ -131,6 +144,60 @@ _SOURCE_KEY = re.compile(r"^[0-9a-f]{24}$")
 _BOOLEANS = {"true": True, "false": False}
 
 
+# ---------------------------------------------------------------------------
+# The award_winners half of the family (AFLDB-ISSUE-112 §24)
+# ---------------------------------------------------------------------------
+DEFAULT_WINNERS_CSV_PATH = (
+    Path(__file__).resolve().parents[2] / "data" / "awards"
+    / "rising-star-winners.csv"
+)
+WINNERS_HEADER = (
+    "source_key",
+    "season",
+    "club",
+    "player",
+    "player_id",
+    "link_status",
+    "candidate_count",
+    "votes",
+    "source_citation",
+)
+
+# Declared coverage, measured read-only against afldb_dev: one winner row
+# per decided season, every one linked and clubbed.
+EXPECTED_WINNER_ROWS = LAST_DECIDED_SEASON - MIN_SEASON + 1        # 33
+WINNERS_MIN_SEASON = MIN_SEASON                                    # 1993
+WINNERS_MAX_SEASON = LAST_DECIDED_SEASON                           # 2025
+
+# The winning vote tally is recorded from 1997 on; the first four seasons
+# carry none. Enforced in both directions so a stray value or a missing one
+# is caught rather than loaded through.
+VOTES_FIRST_SEASON = 1997
+EXPECTED_WINNER_VOTES_PRESENT = WINNERS_MAX_SEASON - VOTES_FIRST_SEASON + 1  # 29
+
+# The winners' club strings are the DraftGuru scrape's own spellings
+# (award_winners.club_name_raw), NOT the canonical clubs.name the
+# nominations file carries — "Brisbane" here covers both the Bears (1993,
+# 1994) and the Lions (2009, 2014), and the loader's season-aware
+# ClubResolver picks the right era identity. Measured collision-free
+# round-trip on all 33 rows.
+WINNER_CLUBS = {
+    "Adelaide", "Brisbane", "Carlton", "Collingwood", "Essendon", "Fremantle",
+    "Geelong", "Gold Coast", "Hawthorn", "Melbourne", "North Melbourne",
+    "Port Adelaide", "Richmond", "St Kilda", "Sydney", "West Coast",
+}
+
+# Winner-row provenance. Deliberately different from the nominations'
+# footywire: these rows came from the DraftGuru award scrape and their
+# source_id is what scopes the reload, so getting this wrong would move the
+# ownership boundary (AFLDB-ISSUE-080).
+WINNER_SOURCE_CITATIONS = {"draftguru"}
+
+_MAX_CANDIDATE_COUNT = 9
+_WINNER_SOURCE_KEY = re.compile(r"^rising-star:([0-9]{4}):([0-9]+)$")
+_VOTES = re.compile(r"^[0-9]{1,3}\.[0-9]{2}$")
+
+
 class RisingStarSourceError(ValueError):
     """Raised when the canonical source violates its data contract."""
 
@@ -150,6 +217,19 @@ class RisingStarNomination:
     ineligible_reason: str | None
     votes: int | None
     stat_line: dict[str, int] | None
+    source_citation: str
+
+
+@dataclass(frozen=True)
+class RisingStarWinner:
+    source_key: str
+    season: int
+    club: str
+    player: str
+    player_id: int | None
+    link_status: str
+    candidate_count: int
+    votes: str | None
     source_citation: str
 
 
@@ -480,6 +560,260 @@ def _validate_complete(rows: Sequence[RisingStarNomination]) -> None:
         )
 
 
+def load_rising_star_winners(
+    path: str | Path = DEFAULT_WINNERS_CSV_PATH,
+) -> list[RisingStarWinner]:
+    """Load the complete canonical winners file or fail without partial data."""
+
+    csv_path = Path(path)
+    rows: list[RisingStarWinner] = []
+    source_keys: set[str] = set()
+    natural_keys: set[tuple[int, str]] = set()
+    last_source_key: str | None = None
+
+    try:
+        with csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle, strict=True)
+            actual_header = tuple(reader.fieldnames or ())
+            if actual_header != WINNERS_HEADER:
+                raise RisingStarSourceError(
+                    "invalid winners header: expected "
+                    f"{','.join(WINNERS_HEADER)!r}, got "
+                    f"{','.join(actual_header)!r}"
+                )
+
+            for raw in reader:
+                line = reader.line_num
+                if None in raw:
+                    raise RisingStarSourceError(f"line {line}: too many columns")
+
+                source_key = _required_text(raw.get("source_key"), "source_key", line)
+                season = _int(raw.get("season"), "season", line)
+                club = _required_text(raw.get("club"), "club", line)
+                player = _required_text(raw.get("player"), "player", line)
+                player_id = _optional_positive_int(
+                    raw.get("player_id"), "player_id", line
+                )
+                link_status = _required_text(
+                    raw.get("link_status"), "link_status", line
+                )
+                candidate_count = _int(
+                    raw.get("candidate_count"), "candidate_count", line
+                )
+                votes = _optional_text(raw.get("votes"), "votes", line)
+                source_citation = _required_text(
+                    raw.get("source_citation"), "source_citation", line
+                )
+
+                match = _WINNER_SOURCE_KEY.fullmatch(source_key)
+                if match is None:
+                    raise RisingStarSourceError(
+                        f"line {line}: invalid source_key {source_key!r} "
+                        f"(expected rising-star:<season>:<row_no>)"
+                    )
+                if int(match.group(1)) != season:
+                    raise RisingStarSourceError(
+                        f"line {line}: source_key {source_key!r} embeds season "
+                        f"{match.group(1)} but the row's season is {season}"
+                    )
+                if not (WINNERS_MIN_SEASON <= season <= WINNERS_MAX_SEASON):
+                    raise RisingStarSourceError(
+                        f"line {line}: season {season} is outside the declared "
+                        f"decided range {WINNERS_MIN_SEASON}-{WINNERS_MAX_SEASON}"
+                    )
+                if club not in WINNER_CLUBS:
+                    raise RisingStarSourceError(
+                        f"line {line}: unknown club {club!r} (not a measured "
+                        f"Rising Star winner club string)"
+                    )
+                if link_status not in LINK_STATUSES:
+                    raise RisingStarSourceError(
+                        f"line {line}: invalid link_status {link_status!r}"
+                    )
+                if not (0 <= candidate_count <= _MAX_CANDIDATE_COUNT):
+                    raise RisingStarSourceError(
+                        f"line {line}: candidate_count {candidate_count} is outside "
+                        f"the plausible range 0-{_MAX_CANDIDATE_COUNT}"
+                    )
+
+                is_linked_status = link_status in LINKED_STATUSES
+                if is_linked_status and player_id is None:
+                    raise RisingStarSourceError(
+                        f"line {line}: link_status {link_status!r} requires player_id"
+                    )
+                if not is_linked_status and player_id is not None:
+                    raise RisingStarSourceError(
+                        f"line {line}: link_status {link_status!r} must not carry "
+                        f"player_id"
+                    )
+
+                if source_citation not in WINNER_SOURCE_CITATIONS:
+                    raise RisingStarSourceError(
+                        f"line {line}: source_citation {source_citation!r} must be "
+                        f"one of {sorted(WINNER_SOURCE_CITATIONS)} "
+                        f"(source-granularity provenance)"
+                    )
+
+                # The winning tally is recorded from 1997 on. Both directions,
+                # so neither a stray value on a pre-1997 row nor a missing one
+                # after it can load through.
+                if season >= VOTES_FIRST_SEASON:
+                    if votes is None:
+                        raise RisingStarSourceError(
+                            f"line {line}: season {season} must carry the winner's "
+                            f"vote tally (recorded from {VOTES_FIRST_SEASON})"
+                        )
+                elif votes is not None:
+                    raise RisingStarSourceError(
+                        f"line {line}: no vote tally is recorded before "
+                        f"{VOTES_FIRST_SEASON} (got {votes!r} for {season})"
+                    )
+                if votes is not None and _VOTES.fullmatch(votes) is None:
+                    raise RisingStarSourceError(
+                        f"line {line}: votes {votes!r} is not of the measured "
+                        f"form 'NN.NN'"
+                    )
+
+                # Checked before the ordering rule so a literal repeat is
+                # reported as a duplicate rather than masked as disorder.
+                if source_key in source_keys:
+                    raise RisingStarSourceError(
+                        f"line {line}: duplicate source_key {source_key!r}"
+                    )
+                if last_source_key is not None and source_key <= last_source_key:
+                    raise RisingStarSourceError(
+                        f"line {line}: source_key {source_key!r} is out of "
+                        f"deterministic order (expected strictly ascending, "
+                        f"previous was {last_source_key!r})"
+                    )
+                last_source_key = source_key
+
+                natural_key = (season, player)
+                if natural_key in natural_keys:
+                    raise RisingStarSourceError(
+                        f"line {line}: duplicate natural identity "
+                        f"(season, player) = {natural_key!r}"
+                    )
+
+                source_keys.add(source_key)
+                natural_keys.add(natural_key)
+
+                rows.append(
+                    RisingStarWinner(
+                        source_key=source_key,
+                        season=season,
+                        club=club,
+                        player=player,
+                        player_id=player_id,
+                        link_status=link_status,
+                        candidate_count=candidate_count,
+                        votes=votes,
+                        source_citation=source_citation,
+                    )
+                )
+    except RisingStarSourceError:
+        raise
+    except (OSError, UnicodeError, csv.Error) as exc:
+        raise RisingStarSourceError(f"cannot read {csv_path}: {exc}") from exc
+
+    _validate_winners_complete(rows)
+    return rows
+
+
+def _validate_winners_complete(rows: Sequence[RisingStarWinner]) -> None:
+    if len(rows) != EXPECTED_WINNER_ROWS:
+        raise RisingStarSourceError(
+            f"expected {EXPECTED_WINNER_ROWS} Rising Star winner rows, "
+            f"got {len(rows)}"
+        )
+
+    seasons = {row.season for row in rows}
+    if len(seasons) != EXPECTED_WINNER_ROWS:
+        raise RisingStarSourceError(
+            f"expected one winner row per decided season "
+            f"({EXPECTED_WINNER_ROWS}), got {len(seasons)} distinct seasons"
+        )
+    if min(seasons) != WINNERS_MIN_SEASON or max(seasons) != WINNERS_MAX_SEASON:
+        raise RisingStarSourceError(
+            f"winner season span {min(seasons)}-{max(seasons)} does not match "
+            f"the declared {WINNERS_MIN_SEASON}-{WINNERS_MAX_SEASON}"
+        )
+
+    unlinked = [row.source_key for row in rows if row.player_id is None]
+    if unlinked:
+        raise RisingStarSourceError(
+            f"every Rising Star winner is linked in the measured source; "
+            f"{len(unlinked)} row(s) carry no player_id ({unlinked[:3]})"
+        )
+
+    votes_present = sum(1 for row in rows if row.votes is not None)
+    if votes_present != EXPECTED_WINNER_VOTES_PRESENT:
+        raise RisingStarSourceError(
+            f"expected {EXPECTED_WINNER_VOTES_PRESENT} winner rows with a vote "
+            f"tally, got {votes_present}"
+        )
+
+    citations = {row.source_citation for row in rows}
+    if citations != set(WINNER_SOURCE_CITATIONS):
+        raise RisingStarSourceError(
+            f"winner source_citation vocabulary {sorted(citations)} does not "
+            f"match the declared {sorted(WINNER_SOURCE_CITATIONS)}"
+        )
+
+
+def validate_family(
+    nominations: Sequence[RisingStarNomination],
+    winners: Sequence[RisingStarWinner],
+) -> None:
+    """Cross-check the two tracked files against each other.
+
+    The award_winners row and the ``is_winner`` nomination are different
+    records from different sources, but they describe the same fact, so a
+    disagreement is a curation error rather than something to resolve
+    silently at load time. The check is on **player identity**, not on the
+    name text: the DraftGuru and FootyWire spellings legitimately differ on
+    five of the thirty-three seasons.
+    """
+    decided = {row.season: row for row in nominations if row.is_winner}
+    by_season = {row.season: row for row in winners}
+
+    if set(decided) != set(by_season):
+        only_nomination = sorted(set(decided) - set(by_season))
+        only_winner = sorted(set(by_season) - set(decided))
+        raise RisingStarSourceError(
+            f"the decided seasons disagree between the two files "
+            f"(nominations only {only_nomination}, winners only {only_winner})"
+        )
+
+    for season in sorted(by_season):
+        nomination = decided[season]
+        winner = by_season[season]
+        if nomination.player_id != winner.player_id:
+            raise RisingStarSourceError(
+                f"season {season}: the winning nomination resolves to player "
+                f"{nomination.player_id} but the winner row carries "
+                f"{winner.player_id}"
+            )
+
+
+def winners_summary(
+    rows: Sequence[RisingStarWinner], path: str | Path
+) -> dict[str, object]:
+    seasons = [row.season for row in rows]
+    statuses = Counter(row.link_status for row in rows)
+    return {
+        "path": str(Path(path).resolve()),
+        "row_count": len(rows),
+        "linked_count": sum(1 for row in rows if row.player_id is not None),
+        "season_min": min(seasons),
+        "season_max": max(seasons),
+        "distinct_seasons": len(set(seasons)),
+        "votes_present": sum(1 for row in rows if row.votes is not None),
+        "distinct_clubs": len({row.club for row in rows}),
+        "link_status": {name: statuses[name] for name in sorted(statuses)},
+    }
+
+
 def summary(
     rows: Sequence[RisingStarNomination], path: str | Path
 ) -> dict[str, object]:
@@ -511,9 +845,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=DEFAULT_CSV_PATH,
         help=f"canonical source path (default: {DEFAULT_CSV_PATH})",
     )
+    parser.add_argument(
+        "--winners",
+        type=Path,
+        default=DEFAULT_WINNERS_CSV_PATH,
+        help=f"canonical winners path (default: {DEFAULT_WINNERS_CSV_PATH})",
+    )
     args = parser.parse_args(argv)
     try:
         rows = load_rising_star(args.csv)
+        winners = load_rising_star_winners(args.winners)
+        validate_family(rows, winners)
     except RisingStarSourceError as exc:
         print(
             json.dumps(
@@ -523,7 +865,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 1
 
-    print(json.dumps(summary(rows, args.csv), sort_keys=True))
+    report = summary(rows, args.csv)
+    # NOT "winners": summary() already reports the is_winner nomination count
+    # under that key, and the two are different records.
+    report["winner_rows"] = winners_summary(winners, args.winners)
+    print(json.dumps(report, sort_keys=True))
     return 0
 
 

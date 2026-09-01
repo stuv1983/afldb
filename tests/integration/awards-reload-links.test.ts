@@ -84,34 +84,31 @@ const importRole = createImportRoleParityHarness(
 );
 
 const canRunFixtureImporter = canSpawnPython && importRole.isConfigured;
-const canRunImporter = Boolean(legacySqlite)
-  && existsSync(legacySqlite as string)
-  && canRunFixtureImporter;
 const canRunUnder22Importer = canSpawnPython
   && existsSync(UNDER_22_CSV)
   && importRole.isConfigured;
 // AFLDB-ISSUE-112 honour-teams slice: legacy-free like under_22, gated the
-// same way and deliberately independent of canRunImporter/legacySqlite.
+// same way and deliberately independent of legacySqlite.
 const canRunHonourTeamsImporter = canSpawnPython
   && existsSync(HONOUR_TEAMS_CSV)
   && importRole.isConfigured;
 // AFLDB-ISSUE-112 phase 2: Hall of Fame is legacy-free like honour_teams,
-// gated the same way and independent of canRunImporter/legacySqlite.
+// gated the same way and independent of legacySqlite.
 const canRunHallOfFameImporter = canSpawnPython
   && existsSync(HALL_OF_FAME_CSV)
   && importRole.isConfigured;
 // AFLDB-ISSUE-112 phase 3: captaincies is legacy-free like the two slices
-// above, gated the same way and independent of canRunImporter/legacySqlite.
+// above, gated the same way and independent of legacySqlite.
 const canRunCaptainciesImporter = canSpawnPython
   && existsSync(CAPTAINCIES_CSV)
   && importRole.isConfigured;
 // AFLDB-ISSUE-112 phase 4: Rising Star is legacy-free like the three slices
-// above, gated the same way and independent of canRunImporter/legacySqlite.
+// above, gated the same way and independent of legacySqlite.
 const canRunRisingStarImporter = canSpawnPython
   && existsSync(RISING_STAR_CSV)
   && importRole.isConfigured;
 // AFLDB-ISSUE-112 phase 5: All-Australian is legacy-free like the four
-// slices above, gated the same way and independent of canRunImporter/legacySqlite.
+// slices above, gated the same way and independent of legacySqlite.
 const canRunAllAustralianImporter = canSpawnPython
   && existsSync(ALL_AUSTRALIAN_CSV)
   && importRole.isConfigured;
@@ -166,6 +163,66 @@ function runImporter(
       },
     },
   );
+}
+
+// --- AFLDB-ISSUE-112 §24.5: bootstrap id -> the identity a rebuild preserves --
+//
+// Every manifest's `player_id` is a BOOTSTRAP id from the legacy-loaded source,
+// not a target-database id: the canonical rebuild re-seeds `players.id` and the
+// disagreement is total (measured: 0 of 12,392 shared ids denote the same
+// footballer). `data/awards/player-identity.csv` bridges each bootstrap id to
+// the AFL Tables profile URL, and the loaders resolve through
+// `external_identities`. These helpers do the same, so the expectations below
+// stay correct in a legacy-loaded AND a canonically rebuilt database rather
+// than pinning ids that only one of them holds.
+const PLAYER_IDENTITY_CSV = join(root, 'data', 'awards', 'player-identity.csv');
+
+const bootstrapUrl = new Map<number, string>(
+  readFileSync(PLAYER_IDENTITY_CSV, 'utf8').trimEnd().split(/\r?\n/).slice(1)
+    .map((line) => splitCsv(line))
+    .filter((cells) => cells[2] !== '')
+    .map((cells) => [Number(cells[0]), cells[2]] as [number, string]),
+);
+
+let resolvedByBootstrap: Map<number, number> | null = null;
+
+/** bootstrap player_id -> this database's player id, or absent if unresolvable. */
+async function playerIdentityMap(): Promise<Map<number, number>> {
+  if (resolvedByBootstrap) return resolvedByBootstrap;
+  const rows = await sql<{ externalId: string; playerId: number }[]>`
+    SELECT ei.external_id AS "externalId", ei.player_id AS "playerId"
+      FROM external_identities ei
+      JOIN sources s ON s.id = ei.source_id
+     WHERE s.key = 'afltables'
+       AND ei.match_method = 'afltables_profile_url'
+       AND ei.status IN ('unique', 'resolved')
+       AND ei.player_id IS NOT NULL
+  `;
+  const byUrl = new Map<string, Set<number>>();
+  for (const row of rows) {
+    const candidates = byUrl.get(row.externalId) ?? new Set<number>();
+    candidates.add(row.playerId);
+    byUrl.set(row.externalId, candidates);
+  }
+  const resolved = new Map<number, number>();
+  for (const [bootstrapId, url] of bootstrapUrl) {
+    const candidates = byUrl.get(url) ?? new Set<number>();
+    const candidate = candidates.values().next();
+    if (candidates.size === 1 && !candidate.done) resolved.set(bootstrapId, candidate.value);
+  }
+  resolvedByBootstrap = resolved;
+  return resolved;
+}
+
+/** What the loader must link a manifest row carrying this bootstrap id to. */
+async function resolvedPlayerId(bootstrapId: number): Promise<number | null> {
+  return (await playerIdentityMap()).get(bootstrapId) ?? null;
+}
+
+/** How many of these manifest rows can still carry a link after a rebuild. */
+async function countResolvable(bootstrapIds: number[]): Promise<number> {
+  const resolved = await playerIdentityMap();
+  return bootstrapIds.filter((id) => resolved.has(id)).length;
 }
 
 type HonoursRow = {
@@ -263,7 +320,7 @@ describe.skipIf(!canRunUnder22Importer)(
   },
 );
 
-describe.skipIf(!canRunImporter)(
+describe.skipIf(!canRunFixtureImporter)(
   `honours reloads preserve manual player links (AFLDB-ISSUE-044)${roleParitySuffix}`,
   () => {
     let adminUserId = 0;
@@ -508,8 +565,9 @@ describe.skipIf(!canRunImporter)(
     it(
       'keeps an award-winner link across the full legacy awards reload',
       async () => {
-        // Deliberately outside the 22 Under 22 award: that group owns its own
-        // rows and is asserted separately below.
+        const [aa] = await sql<{ id: number }[]>`
+          SELECT id FROM awards WHERE slug = 'all-australian'
+        `;
         const [u22] = await sql<{ id: number }[]>`
           SELECT id FROM awards WHERE slug = '22-under-22'
         `;
@@ -518,7 +576,7 @@ describe.skipIf(!canRunImporter)(
                  w.link_status_value::text AS status
             FROM award_winners w
            WHERE w.link_status_value::text IN ('ambiguous', 'unmatched', 'implausible')
-             AND w.award_id IS DISTINCT FROM ${u22?.id ?? null}
+             AND w.award_id = ${aa.id}
            ORDER BY w.id
            LIMIT 40
         `;
@@ -552,9 +610,10 @@ describe.skipIf(!canRunImporter)(
             FROM award_winners WHERE award_id = ${u22?.id ?? null}
         `;
 
-        // 'awards' closes over all_australian, under_22 and rising_star: the
-        // whole destructive family in one run.
-        const run = runImporter(['awards']);
+        // Drive the tracked All-Australian manifest directly. This proves the
+        // same decision replay and cross-family isolation without the
+        // compatibility-only legacy `awards` group (ISSUE-112 G3).
+        const run = runImporter(['all_australian'], [], undefined);
         expect(run.status, run.stdout + run.stderr).toBe(0);
 
         const after = await readRow('award_winners', row.id);
@@ -656,7 +715,18 @@ describe.skipIf(!canRunHonourTeamsImporter)(
           FROM honour_team_members
          WHERE source_id = ${wikipediaId}
       `;
-      expect(counts).toEqual({ total: 113, linked: 89, unlinked: 24, teams: 5 });
+      // 89 rows carry a bootstrap player_id; a link survives only where that
+      // id resolves through the tracked identity census (§24.5).
+      const honourTeamsLinked = await countResolvable(
+        readFileSync(HONOUR_TEAMS_CSV, 'utf8').trimEnd().split(/\r?\n/).slice(1)
+          .map((line) => splitCsv(line)[7])
+          .filter((cell) => cell !== '')
+          .map(Number),
+      );
+      expect(counts).toEqual({
+        total: 113, linked: honourTeamsLinked, unlinked: 113 - honourTeamsLinked,
+        teams: 5,
+      });
     }, 120_000);
 
     it('is idempotent across three consecutive reloads with a byte-identical row-id fingerprint', async () => {
@@ -711,16 +781,26 @@ describe.skipIf(!canRunHonourTeamsImporter)(
       expect(after.status).toBe('resolved');
     });
 
-    it('leaves all 24 unlinked observations unlinked', async () => {
+    it('leaves every unlinked observation unlinked, and unlinks no resolvable one', async () => {
       const run = runImporter(['honour_teams'], [], undefined);
       expect(run.status, importRole.diagnostics(run)).toBe(0);
+
+      const bootstrapIds = readFileSync(HONOUR_TEAMS_CSV, 'utf8')
+        .trimEnd().split(/\r?\n/).slice(1)
+        .map((line) => splitCsv(line)[7])
+        .filter((cell) => cell !== '')
+        .map(Number);
+      const resolvable = await countResolvable(bootstrapIds);
 
       const [{ n }] = await sql<{ n: number }[]>`
         SELECT count(*)::int AS n
           FROM honour_team_members
          WHERE source_id = ${wikipediaId} AND player_id IS NULL
       `;
-      expect(n).toBe(24);
+      // The 24 the source never linked, plus any whose bootstrap identity has
+      // no AFL Tables profile to re-resolve through (§24.5) — reported by the
+      // loader, never silently inferred from a name.
+      expect(n).toBe(113 - resolvable);
     });
 
     it('does not touch a manual_admin_edit honour_team_members row', async () => {
@@ -855,7 +935,17 @@ describe.skipIf(!canRunHallOfFameImporter)(
           FROM hall_of_fame
          WHERE source_id = ${wikipediaId}
       `;
-      expect(counts).toEqual({ total: 343, linked: 246, unlinked: 97, legends: 34 });
+      // 246 rows carry a bootstrap player_id; a link survives only where that
+      // id resolves through the tracked identity census (§24.5).
+      const hofBootstrapIds = readFileSync(HALL_OF_FAME_CSV, 'utf8')
+        .trimEnd().split(/\r?\n/).slice(1)
+        .map((line) => splitCsv(line)[10])
+        .filter((cell) => cell !== '')
+        .map(Number);
+      const hofLinked = await countResolvable(hofBootstrapIds);
+      expect(counts).toEqual({
+        total: 343, linked: hofLinked, unlinked: 343 - hofLinked, legends: 34,
+      });
     }, 120_000);
 
     it('is idempotent across three consecutive reloads with a byte-identical row-id fingerprint', async () => {
@@ -901,7 +991,12 @@ describe.skipIf(!canRunHallOfFameImporter)(
         expect(before, `${decided.name} must resolve under the manifest natural key`)
           .toBeDefined();
         expect(before.status).toBe('resolved');
-        expect(before.playerId).toBe(decided.player);
+        // decided.player is the bootstrap id the decision was made against;
+        // the row must carry the player it resolves to here (§24.5).
+        const decidedPlayer = await resolvedPlayerId(decided.player);
+        expect(decidedPlayer, `${decided.name} must have a stable identity`)
+          .not.toBeNull();
+        expect(before.playerId).toBe(decidedPlayer);
 
         const run = runImporter(['hall_of_fame'], [], undefined);
         expect(run.status, importRole.diagnostics(run)).toBe(0);
@@ -911,12 +1006,12 @@ describe.skipIf(!canRunHallOfFameImporter)(
             FROM hall_of_fame WHERE id = ${before.id}
         `;
         expect(after.id).toBe(before.id);
-        expect(after.playerId).toBe(decided.player);
+        expect(after.playerId).toBe(decidedPlayer);
         expect(after.status).toBe('resolved');
       }
     }, 180_000);
 
-    it('leaves all 97 name-only observations unlinked', async () => {
+    it('leaves every name-only observation unlinked', async () => {
       const run = runImporter(['hall_of_fame'], [], undefined);
       expect(run.status, importRole.diagnostics(run)).toBe(0);
 
@@ -925,7 +1020,12 @@ describe.skipIf(!canRunHallOfFameImporter)(
           FROM hall_of_fame
          WHERE source_id = ${wikipediaId} AND player_id IS NULL
       `;
-      expect(n).toBe(97);
+      const hofBootstrapIds = readFileSync(HALL_OF_FAME_CSV, 'utf8')
+        .trimEnd().split(/\r?\n/).slice(1)
+        .map((line) => splitCsv(line)[10])
+        .filter((cell) => cell !== '')
+        .map(Number);
+      expect(n).toBe(343 - await countResolvable(hofBootstrapIds));
     });
 
     it('does not touch a manual_admin_edit hall_of_fame row', async () => {
@@ -1137,7 +1237,11 @@ describe.skipIf(!canRunCaptainciesImporter)(
       `;
       expect(before, 'the resolved captaincy row must load').toBeDefined();
       expect(before.status).toBe('resolved');
-      expect(before.playerId).toBe(RESOLVED_ROW.playerId);
+      // RESOLVED_ROW.playerId is the BOOTSTRAP id; the row must carry the
+      // player it resolves to in this database (§24.5).
+      const resolvedRowPlayer = await resolvedPlayerId(RESOLVED_ROW.playerId);
+      expect(resolvedRowPlayer).not.toBeNull();
+      expect(before.playerId).toBe(resolvedRowPlayer);
 
       const run = runImporter(['captaincies'], [], undefined);
       expect(run.status, importRole.diagnostics(run)).toBe(0);
@@ -1147,7 +1251,7 @@ describe.skipIf(!canRunCaptainciesImporter)(
           FROM captaincies WHERE id = ${before.id}
       `;
       expect(after.id).toBe(before.id);
-      expect(after.playerId).toBe(RESOLVED_ROW.playerId);
+      expect(after.playerId).toBe(resolvedRowPlayer);
       expect(after.status).toBe('resolved');
     });
 
@@ -1367,11 +1471,10 @@ describe.skipIf(!canRunRisingStarImporter)(
       const manifestPlayerIds = readFileSync(RISING_STAR_CSV, 'utf8')
         .trimEnd().split(/\r?\n/).slice(1)
         .map((line) => Number(line.split(',')[6]));
-      const presentRows = await sql<{ id: number }[]>`
-        SELECT id FROM players WHERE id = ANY(${manifestPlayerIds})
-      `;
-      const present = new Set(presentRows.map((row) => row.id));
-      expectedLinked = manifestPlayerIds.filter((id) => present.has(id)).length;
+      // AFLDB-ISSUE-112 §24.5: a link survives only where the bootstrap id
+      // RESOLVES to this database's player through the tracked identity
+      // census — not merely where some row happens to hold that integer.
+      expectedLinked = await countResolvable(manifestPlayerIds);
       expect(expectedLinked).toBeGreaterThan(740);
     });
 
@@ -1410,7 +1513,8 @@ describe.skipIf(!canRunRisingStarImporter)(
       `;
       expect(batch, 'the rising_star batch must be recorded').toBeDefined();
       expect(batch.status).toBe('completed');
-      expect(Number(batch.recordsRead)).toBe(766);
+      // 766 nominations + 33 winner rows + the 1 award definition (§24).
+      expect(Number(batch.recordsRead)).toBe(800);
       expect(Number(batch.recordsRejected)).toBe(0);
 
       const [counts] = await sql<{
@@ -1550,7 +1654,11 @@ describe.skipIf(!canRunRisingStarImporter)(
       `;
       expect(before, 'the resolved nomination row must load').toBeDefined();
       expect(before.status).toBe('resolved');
-      expect(before.playerId).toBe(RESOLVED_ROW.playerId);
+      // RESOLVED_ROW.playerId is the BOOTSTRAP id; the row must carry the
+      // player it resolves to in this database (§24.5).
+      const resolvedRowPlayer = await resolvedPlayerId(RESOLVED_ROW.playerId);
+      expect(resolvedRowPlayer).not.toBeNull();
+      expect(before.playerId).toBe(resolvedRowPlayer);
 
       const run = runImporter(['rising_star'], [], undefined);
       expect(run.status, importRole.diagnostics(run)).toBe(0);
@@ -1560,7 +1668,7 @@ describe.skipIf(!canRunRisingStarImporter)(
           FROM award_nominations WHERE id = ${before.id}
       `;
       expect(after.id).toBe(before.id);
-      expect(after.playerId).toBe(RESOLVED_ROW.playerId);
+      expect(after.playerId).toBe(resolvedRowPlayer);
       expect(after.status).toBe('resolved');
     });
 
@@ -1768,11 +1876,10 @@ describe.skipIf(!canRunAllAustralianImporter)(
         .filter((cell) => cell !== '')
         .map(Number);
       expect(manifestPlayerIds).toHaveLength(1078);
-      const presentRows = await sql<{ id: number }[]>`
-        SELECT id FROM players WHERE id = ANY(${manifestPlayerIds})
-      `;
-      const present = new Set(presentRows.map((row) => row.id));
-      expectedLinked = manifestPlayerIds.filter((id) => present.has(id)).length;
+      // AFLDB-ISSUE-112 §24.5: a link survives only where the bootstrap id
+      // RESOLVES to this database's player through the tracked identity
+      // census — not merely where some row happens to hold that integer.
+      expectedLinked = await countResolvable(manifestPlayerIds);
       expect(expectedLinked).toBeGreaterThan(1040);
     });
 
@@ -1843,7 +1950,8 @@ describe.skipIf(!canRunAllAustralianImporter)(
       `;
       expect(batch, 'the all_australian batch must be recorded').toBeDefined();
       expect(batch.status).toBe('completed');
-      expect(Number(batch.recordsRead)).toBe(1158);
+      // 1,158 selections + the 1 award definition (§24).
+      expect(Number(batch.recordsRead)).toBe(1159);
       expect(Number(batch.recordsRejected)).toBe(0);
 
       const counts = await scopedCount();
@@ -1903,8 +2011,10 @@ describe.skipIf(!canRunAllAustralianImporter)(
       expect(kennedy).toHaveLength(2);
       const kById = new Map(kennedy.map((k) => [k.srid, k.playerId]));
       for (const k of KENNEDY_2016) {
-        // Only assert identity where this DB actually has that player.
-        if (kById.get(k.srid) !== null) expect(kById.get(k.srid)).toBe(k.playerId);
+        // k.playerId is the BOOTSTRAP id; assert the identity it resolves to
+        // here, and only where this DB can resolve it at all (§24.5).
+        const expected = await resolvedPlayerId(k.playerId);
+        if (expected !== null) expect(kById.get(k.srid)).toBe(expected);
       }
       // Two different footballers.
       expect(kennedy[0].playerId).not.toBe(kennedy[1].playerId);
@@ -1955,7 +2065,8 @@ describe.skipIf(!canRunAllAustralianImporter)(
          WHERE award_id = ${allAustralianAwardId}
            AND source_record_id = ${LINKED_DECISION_ROW.srid}
       `;
-      expect(decided.playerId).toBe(LINKED_DECISION_ROW.playerId);
+      expect(decided.playerId)
+        .toBe(await resolvedPlayerId(LINKED_DECISION_ROW.playerId));
       expect(decided.status).toBe('resolved');
 
       const [confirmed] = await sql<{ playerId: number | null; status: string }[]>`
@@ -1974,7 +2085,7 @@ describe.skipIf(!canRunAllAustralianImporter)(
         SELECT id, player_id AS "playerId" FROM award_winners WHERE id = ${decided.id}
       `;
       expect(after.id).toBe(decided.id);
-      expect(after.playerId).toBe(LINKED_DECISION_ROW.playerId);
+      expect(after.playerId).toBe(await resolvedPlayerId(LINKED_DECISION_ROW.playerId));
     }, 120_000);
 
     it('is idempotent across three consecutive reloads with a byte-identical row-id fingerprint', async () => {
@@ -2166,11 +2277,10 @@ describe.skipIf(!canRunClubBfImporter)(
         .filter((cell) => cell !== '')
         .map(Number);
       expect(manifestPlayerIds).toHaveLength(744);
-      const presentRows = await sql<{ id: number }[]>`
-        SELECT id FROM players WHERE id = ANY(${manifestPlayerIds})
-      `;
-      const present = new Set(presentRows.map((row) => row.id));
-      expectedLinked = manifestPlayerIds.filter((id) => present.has(id)).length;
+      // AFLDB-ISSUE-112 §24.5: a link survives only where the bootstrap id
+      // RESOLVES to this database's player through the tracked identity
+      // census — not merely where some row happens to hold that integer.
+      expectedLinked = await countResolvable(manifestPlayerIds);
       expect(expectedLinked).toBeGreaterThan(700);
     });
 
@@ -2365,7 +2475,7 @@ describe.skipIf(!canRunClubBfImporter)(
          WHERE award_id = ANY(${bfAwardIds})
            AND source_record_id = ${LINKED_ROW.srid}
       `;
-      expect(linked.playerId).toBe(LINKED_ROW.playerId);
+      expect(linked.playerId).toBe(await resolvedPlayerId(LINKED_ROW.playerId));
       expect(linked.status).toBe('resolved');
 
       const [unlinked] = await sql<{ playerId: number | null; status: string }[]>`
@@ -2384,7 +2494,7 @@ describe.skipIf(!canRunClubBfImporter)(
         SELECT id, player_id AS "playerId" FROM award_winners WHERE id = ${linked.id}
       `;
       expect(after.id).toBe(linked.id);
-      expect(after.playerId).toBe(LINKED_ROW.playerId);
+      expect(after.playerId).toBe(await resolvedPlayerId(LINKED_ROW.playerId));
     }, 120_000);
 
     it('is idempotent across three consecutive reloads with a byte-identical row-id fingerprint', async () => {
@@ -2583,11 +2693,10 @@ describe.skipIf(!canRunNamedMedalsImporter)(
         .filter((cell) => cell !== '')
         .map(Number);
       expect(manifestPlayerIds).toHaveLength(863);
-      const presentRows = await sql<{ id: number }[]>`
-        SELECT id FROM players WHERE id = ANY(${manifestPlayerIds})
-      `;
-      const present = new Set(presentRows.map((row) => row.id));
-      expectedLinked = manifestPlayerIds.filter((id) => present.has(id)).length;
+      // AFLDB-ISSUE-112 §24.5: a link survives only where the bootstrap id
+      // RESOLVES to this database's player through the tracked identity
+      // census — not merely where some row happens to hold that integer.
+      expectedLinked = await countResolvable(manifestPlayerIds);
       expect(expectedLinked).toBeGreaterThan(700);
     });
 
@@ -2805,7 +2914,7 @@ describe.skipIf(!canRunNamedMedalsImporter)(
          WHERE award_id = ANY(${nmAwardIds})
            AND source_record_id = ${LINKED_ROW.srid}
       `;
-      expect(linked.playerId).toBe(LINKED_ROW.playerId);
+      expect(linked.playerId).toBe(await resolvedPlayerId(LINKED_ROW.playerId));
       expect(linked.status).toBe('resolved');
       expect(linked.votes).toBe(LINKED_ROW.votes);
 
@@ -2825,7 +2934,7 @@ describe.skipIf(!canRunNamedMedalsImporter)(
         SELECT id, player_id AS "playerId" FROM award_winners WHERE id = ${linked.id}
       `;
       expect(after.id).toBe(linked.id);
-      expect(after.playerId).toBe(LINKED_ROW.playerId);
+      expect(after.playerId).toBe(await resolvedPlayerId(LINKED_ROW.playerId));
     }, 120_000);
 
     it('is idempotent across three consecutive reloads with a byte-identical row-id fingerprint', async () => {
@@ -2958,7 +3067,7 @@ type MemberRow = {
   status: string;
 };
 
-describe.skipIf(!canRunImporter)(
+describe.skipIf(!canRunFixtureImporter)(
   `honours reloads reconcile only rows they own (AFLDB-ISSUE-080)${roleParitySuffix}`,
   () => {
     let adminUserId = 0;
@@ -3137,12 +3246,10 @@ describe.skipIf(!canRunImporter)(
     });
 
     it(
-      'keeps foreign-owned award rows across the full legacy awards reload',
+      'keeps foreign-owned award rows across manifest award reloads',
       async () => {
-        const [legacyAward] = await sql<{ id: number }[]>`
-          SELECT id FROM awards
-           WHERE slug NOT IN ('22-under-22', 'all-australian')
-           ORDER BY id LIMIT 1
+        const [namedMedalAward] = await sql<{ id: number }[]>`
+          SELECT id FROM awards WHERE slug = 'brownlow-medal'
         `;
         const [aaAward] = await sql<{ id: number }[]>`
           SELECT id FROM awards WHERE slug = 'all-australian'
@@ -3160,7 +3267,7 @@ describe.skipIf(!canRunImporter)(
         const [manualWinner] = await sql<{ id: number }[]>`
           INSERT INTO award_winners
             (award_id, season, player_name_raw, link_status_value, source_id, source_record_id)
-          VALUES (${legacyAward.id}, ${year}, 'AFLDB-ISSUE-080 Manual Winner', 'unmatched',
+          VALUES (${namedMedalAward.id}, ${year}, 'AFLDB-ISSUE-080 Manual Winner', 'unmatched',
                   ${manualId}, 'award_winner:issue-080-fixture')
           RETURNING id
         `;
@@ -3196,7 +3303,9 @@ describe.skipIf(!canRunImporter)(
         const winnersBefore = await countRows('award_winners');
         const nominationsBefore = await countRows('award_nominations');
 
-        const run = runImporter(['awards']);
+        const run = runImporter(
+          ['named_medals', 'all_australian', 'rising_star'], [], undefined,
+        );
         expect(run.status, run.stdout + run.stderr).toBe(0);
         expect(run.stdout).not.toContain('cannot survive');
 

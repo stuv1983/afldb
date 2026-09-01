@@ -363,7 +363,7 @@ describe('Coleman derivation contract (AFLDB-ISSUE-111)', () => {
     it('stops the legacy awards group from ever writing a Coleman winner again', () => {
       const legacyGroup = between(importer, 'def import_awards(', '\n\n\n# ----');
       expect(legacyGroup).toContain(
-        'for slug in (UNDER_22_SLUG, ALL_AUSTRALIAN_SLUG, COLEMAN_SLUG)',
+        'for slug in (UNDER_22_SLUG, ALL_AUSTRALIAN_SLUG, COLEMAN_SLUG,',
       );
       expect(legacyGroup).toContain(
         'scope_column="award_id", scope_values=other_group_awards, scope_exclude=True',

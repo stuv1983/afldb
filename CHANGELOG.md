@@ -15,6 +15,51 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-112 — awards and honours load from tracked manifests, and their player links survive a rebuild - 2 September 2026
+
+- **Awards and honours no longer read the legacy SQLite database.** All nine
+  families — All-Australian, 22 Under 22, Rising Star, club best-and-fairest,
+  named medals, Hall of Fame, honour teams, captaincies and Coleman — now load
+  from checked-in manifests under `data/awards/`, or derive from AFLDB's own
+  match facts. A single `import_awards.py --groups …` run over the eight
+  manifest groups completes with `AFLDB_LEGACY_SQLITE` unset. The last two
+  award definitions that only the legacy `awards` group created,
+  `all-australian` and `rising-star`, are now tracked in
+  `data/awards/award-definitions.csv`, and the 33 `rising-star` winner rows —
+  which no manifest owned and which the legacy reload still wrote — in
+  `data/awards/rising-star-winners.csv`.
+- **Corrected: a manifest's `player_id` no longer decides a player link.** That
+  integer belongs to the database the manifest was bootstrapped from, and the
+  canonical rebuild re-seeds `players.id`. Measured against a canonically
+  rebuilt database, **none of the 12,392 ids present in both denoted the same
+  footballer**, and the loaders' existence check kept every link — so 5,141 of
+  5,194 awards links would have been attached to a different player. Links now
+  resolve through `data/awards/player-identity.csv` and the AFL Tables profile
+  identity in `external_identities`, failing closed: an uncensused id refuses
+  the run, and a player with no such identity loads **unlinked and named in the
+  output**, never guessed from a name. The resolver now also excludes ambiguous
+  identity rows and accepts exactly one distinct `unique`/`resolved` target.
+  The prior DB-backed closeout run preserved 5,138 of 5,194 links and enumerated
+  56 unresolved rows.
+- An already-adjudicated tracked DraftGuru link decision now supplies Matthew
+  Rendell's AFL Tables identity, covering four additional manifest links without
+  name matching. The remaining repository identity gap is 18 players / 33
+  manifest rows, all fail-closed; the improved DB count awaits the next reload.
+- **The canonical test rebuild has an awards-and-honours restoration stage.**
+  `tools/db/rebuild-test.ts` gains an AWARDS & HONOURS stage between DraftGuru
+  and DERIVED, carrying no legacy source, with per-family row-count gates in
+  final validation. Coleman keeps its own later stage, unchanged. End-to-end
+  execution remains blocked on the absent accepted raw snapshots.
+- The 21 previously legacy-gated reload/link fixtures now exercise manifest
+  groups while preserving their decision replay, ownership, idempotency and
+  cross-family assertions. Their DB-backed rerun is still required before G3
+  or the non-vacuous G5 contract can pass.
+- The legacy `awards` group is retained as **compatibility-only** for a
+  deliberate full re-extract; it is no longer part of the rebuild or of the
+  standing refresh sequence, and `docs/deployment.md` names the manifest groups
+  explicitly instead.
+- No migration and no privilege change.
+
 ### AFLDB-ISSUE-121 — administrative audit payloads are stored as JSONB objects - 1 September 2026
 
 - `auth_audit_log.detail` now stores a real JSONB **object**. Every row ever

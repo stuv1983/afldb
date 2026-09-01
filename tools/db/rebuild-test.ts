@@ -460,6 +460,36 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       envOverlay: dataEnv,
     },
     {
+      // AFLDB-ISSUE-112 §7/§24. Awards and honours, every family from a tracked
+      // manifest in data/awards/ and never from the retired legacy SQLite
+      // source, which is deliberately absent from this stage's environment
+      // (operator decision 8: it is never wired back into the rebuild).
+      //
+      // It must follow `draftguru`, which is where the canonical `players`
+      // population is complete — every family carries player links, and a link
+      // is dropped rather than mis-resolved when its player is absent. It runs
+      // before `derived` because that is the runbook's declared position; no
+      // derived summary reads an award today, so this is ordering discipline
+      // rather than a data dependency.
+      //
+      // `coleman` is NOT in this list. It is derived, not acquired, and has its
+      // own stage after `derived` because season_metadata must first decide
+      // which seasons are complete (AFLDB-ISSUE-111). Running it here would
+      // duplicate that ownership and break the ordering that gate depends on.
+      //
+      // The legacy `awards` group is NOT in this list either. Since §24 it
+      // creates no definition and no winner row another group does not own, it
+      // is compatibility-only, and it is the one group that still requires the
+      // retired legacy source.
+      id: 'awards-honours',
+      name: 'AWARDS & HONOURS — tracked manifests, no legacy source',
+      kind: 'data',
+      run: 'command',
+      argv: [python, 'tools/migration/import_awards.py', '--groups',
+             ...AWARDS_HONOURS_GROUPS],
+      envOverlay: dataEnv,
+    },
+    {
       id: 'derived',
       name: 'DERIVED — recomputed summaries',
       kind: 'data',
@@ -504,6 +534,114 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       run: 'validate',
       sql: finalValidationSql(),
     },
+  ];
+}
+
+/**
+ * The awards/honours groups the rebuild runs, in `import_awards.py`'s own
+ * GROUP_ORDER. Every one is in that module's LEGACY_FREE_GROUPS: each loads a
+ * tracked manifest from `data/awards/` and reads no legacy SQLite.
+ *
+ * `awards` (the legacy re-extract) and `coleman` (derived, its own stage) are
+ * deliberately absent — see the stage comment.
+ */
+export const AWARDS_HONOURS_GROUPS = [
+  'all_australian', 'under_22', 'rising_star', 'club_bf', 'named_medals',
+  'hall_of_fame', 'honour_teams', 'captaincies',
+] as const;
+
+/**
+ * The per-family row counts the AWARDS & HONOURS stage must produce, measured
+ * read-only from `afldb_dev` (AFLDB-ISSUE-112 §14.4, re-confirmed per slice in
+ * §17-§24) and equal to the tracked manifests' own declared row counts, which
+ * their parsers gate offline. Two derivations of the same number, so a drift
+ * means a manifest changed without its contract changing.
+ *
+ * These are ROW counts, not link counts. A row loads whether or not its player
+ * resolves, so this gate is independent of the player-link question recorded in
+ * §24.5 — a link that cannot be re-resolved leaves the row present and
+ * unlinked, which this gate must not mask by also asserting a linked count.
+ */
+export const AWARDS_HONOURS_EXPECTED = {
+  honourTeamMembers: 113,
+  hallOfFame: 343,
+  captaincies: 1375,
+  risingStarNominations: 766,
+  risingStarWinners: 33,
+  allAustralian: 1158,
+  clubBestAndFairest: 752,
+  namedMedals: 979,
+  under22: 330,
+  /** bf-* (19) + named medals (17) + all-australian + rising-star + 22-under-22. */
+  awardDefinitions: 39,
+};
+
+/**
+ * Structural invariants for the manifest-loaded awards and honours families.
+ * Read-only scalar counts, in the clubSeasonChecks/colemanChecks mould.
+ *
+ * Added together with the AWARDS & HONOURS stage, never before it: a gate whose
+ * data source does not yet exist would fail every rebuild (the ISSUE-093
+ * §H15.5 rule).
+ */
+export function awardsHonoursChecks(acceptedLastSeason: number): FinalCheck[] {
+  const winners = (predicate: string) =>
+    'SELECT count(*) FROM award_winners w JOIN awards a ON a.id = w.award_id'
+    + ` WHERE ${predicate}`;
+  const e = AWARDS_HONOURS_EXPECTED;
+  return [
+    { key: 'honour_team_members_rows',
+      sql: 'SELECT count(*) FROM honour_team_members',
+      expected: e.honourTeamMembers },
+
+    { key: 'hall_of_fame_rows', sql: 'SELECT count(*) FROM hall_of_fame',
+      expected: e.hallOfFame },
+
+    { key: 'captaincies_rows', sql: 'SELECT count(*) FROM captaincies',
+      expected: e.captaincies },
+
+    { key: 'rising_star_nomination_rows',
+      sql: 'SELECT count(*) FROM award_nominations n JOIN awards a ON a.id = n.award_id'
+         + " WHERE a.slug = 'rising-star'",
+      expected: e.risingStarNominations },
+
+    { key: 'rising_star_winner_rows', sql: winners("a.slug = 'rising-star'"),
+      expected: e.risingStarWinners },
+
+    { key: 'all_australian_rows', sql: winners("a.slug = 'all-australian'"),
+      expected: e.allAustralian },
+
+    { key: 'club_best_and_fairest_rows',
+      sql: winners("a.category = 'club_best_and_fairest'"),
+      expected: e.clubBestAndFairest },
+
+    { key: 'named_medal_rows',
+      sql: winners("a.category IN ('award', 'draft_pick')"
+                   + " AND a.slug NOT IN ('rising-star', 'coleman')"),
+      expected: e.namedMedals },
+
+    { key: 'under_22_rows', sql: winners("a.slug = '22-under-22'"),
+      expected: e.under22 },
+
+    // Every family's parent row exists. A missing definition is not a smaller
+    // awards table — ON DELETE CASCADE means it is a silently emptied family.
+    { key: 'award_definitions_rows',
+      sql: "SELECT count(*) FROM awards WHERE slug <> 'coleman'",
+      expected: e.awardDefinitions },
+
+    // The whole point of the stage: no honours row may be left without its
+    // provenance, and none may claim a source the manifests do not carry.
+    { key: 'award_winners_without_a_source',
+      sql: 'SELECT count(*) FROM award_winners WHERE source_id IS NULL',
+      expected: 0 },
+
+    // 2026 belongs to the current-season pipeline. The Rising Star manifest
+    // deliberately carries 2026 nominations, so this is scoped to the winner
+    // and honour families the historical core owns.
+    { key: 'award_winners_after_accepted_last_season',
+      sql: 'SELECT count(*) FROM award_winners w JOIN awards a ON a.id = w.award_id'
+         + ` WHERE a.slug <> '22-under-22' AND w.season > ${acceptedLastSeason}`,
+      expected: 0 },
   ];
 }
 
@@ -690,6 +828,12 @@ export function finalValidationChecks(
   // whose data source does not yet exist would fail every rebuild (the ISSUE-093 §H15.5
   // rule).
   for (const check of colemanChecks(Number(measured.seasons_last))) checks.push(check);
+
+  // AFLDB-ISSUE-112. Added together with the AWARDS & HONOURS stage, for the
+  // same §H15.5 reason as the Coleman gates above.
+  for (const check of awardsHonoursChecks(Number(measured.seasons_last))) {
+    checks.push(check);
+  }
 
   return checks;
 }

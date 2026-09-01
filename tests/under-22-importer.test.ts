@@ -121,7 +121,7 @@ describe('22 Under 22 awards import contract', () => {
     );
     expect(legacyAwardsLoader).toContain('other_group_awards = [');
     expect(legacyAwardsLoader).toContain(
-      'for slug in (UNDER_22_SLUG, ALL_AUSTRALIAN_SLUG, COLEMAN_SLUG)',
+      'for slug in (UNDER_22_SLUG, ALL_AUSTRALIAN_SLUG, COLEMAN_SLUG,',
     );
     expect(legacyAwardsLoader).toMatch(
       /reload_keyed\([\s\S]*?"award_winners", \["source_id", "source_record_id"\][\s\S]*?scope_column="award_id", scope_values=other_group_awards, scope_exclude=True/,

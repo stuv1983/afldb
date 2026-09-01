@@ -218,8 +218,18 @@ Stage order (fixed):
 | 5 | reference data | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 6 | fitzRoy / AFL Tables core | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 7 | **DraftGuru** | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 8 | derived summaries | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 9 | fingerprints / row counts | `AFLDB_TEST_DATABASE_URL` |
+| 8 | **awards & honours** (tracked manifests) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 9 | derived summaries | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 10 | Coleman (derived) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 11 | ladder witness cross-check | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 12 | fingerprints / row counts | `AFLDB_TEST_DATABASE_URL` |
+
+The awards & honours stage (AFLDB-ISSUE-112) runs the eight manifest-backed
+groups and carries **no** `AFLDB_LEGACY_SQLITE` in its environment; the legacy
+`awards` group is deliberately not in it. It follows DraftGuru because every
+family carries player links and the canonical `players` population must be
+complete first. Coleman keeps its own later stage because it is derived and
+must run after `season_metadata` (AFLDB-ISSUE-111).
 
 Data stages need `AFLDB_TEST_IMPORT_DATABASE_URL` — a restricted `afldb_import` DSN for the
 test database. The runner **fails closed** without it and never inherits the development
@@ -246,7 +256,9 @@ source .venv/bin/activate    # or use ./.venv/bin/python directly
 ./.venv/bin/python tools/migration/import_legacy_afl.py       # ~114s  core reload
 ./.venv/bin/python tools/migration/enrich_birth_dates.py      # ~6s    DOB recovery
 ./.venv/bin/python tools/rebuild/draftguru/import_draftguru.py  # draft rows and people
-./.venv/bin/python tools/migration/import_awards.py           # awards and representative teams
+./.venv/bin/python tools/migration/import_awards.py --groups \
+    all_australian under_22 rising_star club_bf named_medals \
+    hall_of_fame honour_teams captaincies                     # awards and honours, manifest-backed
 ./.venv/bin/python tools/migration/rebuild_derived.py         # ~30s   summaries
 ./.venv/bin/python tools/migration/import_awards.py --groups coleman  # after season_metadata
 ./.venv/bin/python tools/validation/validate_migration.py     # every check must pass
@@ -259,6 +271,43 @@ the accepted Stage A snapshot and the tracked reference/decision artefacts, and 
 `AFLDB_LEGACY_SQLITE` dependency. `tools/migration/import_draft.py` is **retired** and now
 fails fast if invoked. Add `--validate-only` to check every input without touching the
 database, or `--dry-run` to run the whole transaction and roll it back.
+
+### Awards and honours no longer need the legacy SQLite database
+
+`import_awards.py` used to require `AFLDB_LEGACY_SQLITE` for every group but
+`under_22`. Since AFLDB-ISSUE-112 all nine award and honour families load from
+tracked manifests under `data/awards/`, or derive from AFLDB's own canonical
+facts, and the refresh step above names them explicitly so **no step in this
+sequence reads a legacy SQLite database**:
+
+| Group | Source |
+|---|---|
+| `all_australian` | `data/awards/all-australian.csv` + `award-definitions.csv` |
+| `under_22` | `data/awards/22-under-22.csv` |
+| `rising_star` | `data/awards/rising-star.csv`, `rising-star-winners.csv` + `award-definitions.csv` |
+| `club_bf` | `data/awards/club-best-and-fairest{,-definitions}.csv` |
+| `named_medals` | `data/awards/named-medals{,-definitions}.csv` |
+| `hall_of_fame` | `data/awards/hall-of-fame.csv` |
+| `honour_teams` | `data/awards/honour-teams.csv` |
+| `captaincies` | `data/awards/captaincies.csv` |
+| `coleman` | derived from `player_match_stats` (AFLDB-ISSUE-111) |
+
+Every manifest family that carries a bootstrap `player_id` re-resolves it
+through `data/awards/player-identity.csv` and an adjudicated `unique` or
+`resolved` AFL Tables profile identity in `external_identities`. It never trusts
+the integer itself: that integer belongs to the database the manifest was
+bootstrapped from, and a canonical rebuild re-seeds `players.id`. A row whose
+identity is missing or does not resolve to exactly one current player loads
+**unlinked** and is named in the run's output; it is never guessed from a name.
+The 22 Under 22 manifest and Coleman derivation do not carry those bootstrap
+player ids and keep their own existing identity contracts.
+
+The bare `./.venv/bin/python tools/migration/import_awards.py` (no `--groups`)
+still selects the legacy `awards` group and therefore still demands
+`AFLDB_LEGACY_SQLITE`. **That group is compatibility-only.** It now creates no
+award definition and no winner row that another group does not already own, and
+it is not part of the canonical rebuild or of this refresh sequence. Run it only
+for a deliberate full re-extract from a legacy database you still hold.
 
 The order matters. `rebuild_derived.py` must run last of the summary builders: it reads the tables the earlier steps write, and its first target, `season_metadata`, decides whether a season is still in progress — which in turn decides whether that season's Brownlow reads as a zero or as "not yet awarded".
 

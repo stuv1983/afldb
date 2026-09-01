@@ -10425,23 +10425,28 @@ the ownership scope entirely. `--allow-link-loss` stays a deliberate, itemised o
 never enter a routine invocation.
 
 ### Canonical rebuild
-`tools/db/rebuild-test.ts` has no awards stage, so a canonical rebuild leaves these tables at zero
-rows. ISSUE-112 adds a stage after DRAFTGURU and before DERIVED, plus Stage-9 gates added **only
-once the manifests exist**. `tests/db-test-rebuild.test.ts:716` must still pass — the legacy source
-must never be wired back in.
+`tools/db/rebuild-test.ts` now has the legacy-free `awards-honours` stage after DRAFTGURU and
+before DERIVED, plus Stage-9 per-family row gates. Its actual canonical rebuild execution is still
+blocked because the accepted DraftGuru, fitzRoy core and ladder-witness snapshot bytes are absent;
+re-acquiring them would be a forbidden scrape. The legacy source is not wired into the plan.
 
 ### Validation
-None yet — design only. Gates G0-G8 in the runbook. Headline acceptance: the
-`tests/integration/awards-reload-links.test.ts:205-1247` matrix executes without
-`AFLDB_LEGACY_SQLITE`.
+G1/G2/G3/G4/G5/G7/G8 PASS; G6 BLOCKED. On 2026-09-02 Pass 17, with process-local
+owner/import DSNs proven as `afldb_test` / `afldb_owner` and `afldb_test` /
+`afldb_import` and with `AFLDB_LEGACY_SQLITE` unset, the exact full integration command passed
+**107/107, 0 skipped, 0 failed**. The formerly gated 21 fixtures all executed. Their non-vacuous
+G5 evidence comprised **9 decisions (8 linked + 1 confirmed_unlinked)**: seven linked decisions
+replayed/persisted on the same live row id and intended player; one linked rename case refused by
+default and discarded only under explicit itemised `--allow-link-loss`; the confirmed-unlinked
+decision stayed on its live row with `player_id NULL`; zero retained orphans, target/player
+mismatches or unexpected link loss; ownership/manual-admin protection, stable ids, idempotence,
+collision refusal, advisory locking and cross-family isolation all passed. Full record: runbook
+§26.
 
 ### Next action
-Gate G0 — per-family read-only coverage measurement (row counts, season spans, linked/unlinked
-splits, distinct award slugs) from a database that still holds the legacy-loaded data. Then the
-operator prerequisite: decide where the one-time extraction comes from (recommended: a read-only
-export of the already-loaded rows, which is not currently authorised). Recommended phasing,
-smallest first: honour teams → Hall of Fame → captaincies → Rising Star → All-Australian →
-club B&F → named medals.
+Keep ISSUE-112 OPEN. The operator supplies the exact retained accepted snapshot directories named
+in runbook §24.8, then runs the canonical rebuild gate to close G6. Do not reacquire, scrape,
+substitute snapshots or contact production. ISSUE-102 stays open until ISSUE-112 closes.
 
 ## AFLDB-ISSUE-113 — Replace legacy `brownlow_season_votes` acquisition
 

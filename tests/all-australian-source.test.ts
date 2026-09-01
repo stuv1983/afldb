@@ -451,10 +451,16 @@ describe('all_australian group is legacy-SQLite-free (AFLDB-ISSUE-112 phase 5)',
     expect(block).toContain('"awards": {"all_australian", "under_22", "rising_star", "club_bf", "named_medals"}');
   });
 
-  it('keeps a fail-loud guard for the missing award definition', () => {
+  it('owns its award definition instead of guarding that another group made it', () => {
+    // AFLDB-ISSUE-112 §24 replaced the "run the 'awards' group first" refusal
+    // — which made a canonical, legacy-free rebuild of this family impossible
+    // — with a slug-scoped id-preserving reload from the tracked
+    // data/awards/award-definitions.csv. It still fails loud, but on its own
+    // manifest rather than on somebody else's legacy run.
     expect(source).toContain(
-      'the all-australian award definition is missing; ',
-    );
+      'award_id = reconcile_shared_definition(pg, batch, ALL_AUSTRALIAN_SLUG)');
+    expect(source).not.toContain('the all-australian award definition is missing; ');
+    expect(source).toContain('is missing after its own ');
   });
 
   it('keeps the reload key, column list and ownership scope byte-identical', () => {

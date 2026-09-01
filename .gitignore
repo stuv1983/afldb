@@ -47,6 +47,9 @@ next-env.d.ts
 !/data/awards/club-best-and-fairest-definitions.csv
 !/data/awards/named-medals.csv
 !/data/awards/named-medals-definitions.csv
+!/data/awards/award-definitions.csv
+!/data/awards/rising-star-winners.csv
+!/data/awards/player-identity.csv
 !/data/records/
 /data/records/*
 !/data/records/first-kick-goal-ids.csv
