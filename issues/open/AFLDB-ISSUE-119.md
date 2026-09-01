@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-119 — Super Admin can clear NL search telemetry
 
-- **Status:** In progress — Stage 2 started 2026-09-01. The **database security boundary is now validated** (§24): migration `081` (§20) is applied to `afldb_test` (§23), the `privileges.sql` reconciliation (§21) has run against it, and `tests/integration/privileges.test.ts` passes 34/34, proving owner, `SECURITY DEFINER`, pinned `search_path`, the exact two-grantee ACL and the absence of any direct `DELETE`/`TRUNCATE`. **The clear function's runtime behaviour is still entirely unexecuted** — `tests/integration/nl-search-telemetry-clear.test.ts` has never run and the function has never been called. `AFLDB_TEST_AUTH_DATABASE_URL` is still undefined, so restricted-role end-to-end execution is **pending, not passed**. Server Action and UI not started
+- **Status:** In progress — the Stage 2 **database layer is now fully validated end to end** (§25). Migration `081` (§20) is applied to `afldb_test` (§23), the `privileges.sql` reconciliation (§21) has run against it, `tests/integration/privileges.test.ts` passes 34/34 (§24), and `tests/integration/nl-search-telemetry-clear.test.ts` now passes **9/9 with 0 skipped** — the clear function has been executed for the first time. `AFLDB_TEST_AUTH_DATABASE_URL` is established (§25.2), so the restricted describe **ran rather than skipped**: `afldb_auth` successfully invokes the function while its direct `DELETE`/`TRUNCATE` are refused live with SQLSTATE `42501`. Acceptance criterion 5 is fully evidenced at the database layer. **Query layer, transaction-aware audit helper, Server Action and UI not started** — criteria 3, 4, 6, 9 and risk R3 remain open
 - **Created:** 2026-08-31
 - **Severity:** Medium
 - **Area:** Admin / Security / Natural-language search / Telemetry / Database
@@ -338,7 +338,7 @@ After implementation, supply one command at a time: focused DB-free action/compo
 ## 15. Blockers / deviations
 
 - **SUPERSEDED 2026-09-01.** Stage 1 recorded "no ISSUE-118 collision exists". That was true of `main` and of this worktree, but Stage 1 did not scan other branches. A collision did exist on `opus/gridley-corpus`, which had committed its own `AFLDB-ISSUE-118`. This issue is now `AFLDB-ISSUE-119`; see §0.
-- **Open operator action:** branch `codex/issue-118` and worktree `D:\dev\afldb-issue-118` still carry the old number. Renaming them was deliberately not attempted in this session.
+- ~~**Open operator action:** branch `codex/issue-118` and worktree `D:\dev\afldb-issue-118` still carry the old number.~~ **CLOSED 2026-09-01** — both renamed to `codex/issue-119` / `D:\dev\afldb-issue-119` (see §24.1).
 - ~~**Migration number is no longer fixed.**~~ **CLOSED 2026-09-01.** `080` belongs to Gridley; `081` was re-derived and taken (§20.1). `claude/issue-116`'s duplicate `079` still has to renumber on merge. `082` was the next free migration number as of the 2026-09-01 scan and is **not reserved**: ISSUE-116 must re-scan the relevant live refs and worktrees and derive the next free number itself, immediately before it renumbers its competing migration.
 - No source, migration, grant, test or runtime behaviour changed in Stage 1.
 - No database, test, build, package, deployment or production command ran.
@@ -862,7 +862,136 @@ No source, SQL, migration, test, `CHANGELOG.md` or configuration file was change
 
 ### 24.8 Exact next action
 
+**BOTH STEPS DISCHARGED 2026-09-01 — see §25. The live instruction is §25.10.**
+
 1. **Establish the restricted `_test` auth DSN.** Set `AFLDB_TEST_AUTH_DATABASE_URL` in the worktree `.env` to the **same endpoint and same `_test` database** as `AFLDB_TEST_DATABASE_URL` (`127.0.0.1:5432/afldb_test`) but with role **`afldb_auth`** and its own password. Never the owner credential, never `afldb_dev`, never production. This requires an `afldb_auth` password on the test cluster. The suite validates endpoint/database/`_test` parity statically at module load and then re-checks `current_user`/`current_database()` at runtime (§22.3), so a mismatched DSN fails rather than silently misreporting.
 2. **Then run only** `npx vitest run tests/integration/nl-search-telemetry-clear.test.ts`. This is the first execution of the clear function itself and the proof of everything in §24.6's first bullet. Confirm from the output that the restricted describe **ran** rather than skipped — that is the whole point of step 1.
 
 Analyse failures against §20.4 and §22.6 before touching any SQL, remembering the checksum lock. Only after that evidence passes: the query layer (casting the five `bigint` counts per R3), the transaction-aware audit helper, the Server Action, the UI, `docs/search.md` and `CHANGELOG.md`, in that order.
+
+## 25. Session record — 2026-09-01 (Stage 2, step 6: restricted credential established; clear function executed for the first time)
+
+### 25.1 Starting point
+
+Branch `codex/issue-119` at `19886c4` ("Record ISSUE-119 privilege validation"), **clean worktree** — all three confirmed with read-only Git metadata before anything else ran. Scope for this step was exactly §24.8: establish `AFLDB_TEST_AUTH_DATABASE_URL` safely, then run one test file. No Server Action, no UI, no SQL change, no migration, no privilege command.
+
+**This step was Claude-executed under explicit operator authorisation for this task only** (contrast §24.2, where the operator ran the commands). The outputs quoted below are raw terminal output Claude observed directly.
+
+### 25.2 How the restricted credential was established — and why it is safe
+
+`AFLDB_TEST_AUTH_DATABASE_URL` needed an `afldb_auth` password on the test cluster (§24.8). No new password was set and no role was altered. The credential already existed in the worktree `.env` as `AFLDB_AUTH_DATABASE_URL` — role `afldb_auth`, endpoint `127.0.0.1:5432`, database `afldb_dev`. **PostgreSQL role passwords are cluster-level, not per-database**, and `afldb_dev` and `afldb_test` are the same cluster at the same endpoint, so the same secret authenticates to either. The DSN was therefore derived by changing **only the database name**, `afldb_dev` to `afldb_test`.
+
+The derivation ran as a script that asserted every safety property **before** it opened a connection, and again before it wrote anything, refusing outright rather than falling back:
+
+| Assertion | Result |
+|---|---|
+| Source DSN's role is `afldb_auth` | pass |
+| Owner DSN's role is `afldb_owner` (so the two are distinguishable) | pass |
+| Derived password is not equal to the owner DSN's password — **never reuse the owner credential** | pass |
+| Endpoint equals `AFLDB_TEST_DATABASE_URL`'s endpoint | pass (`127.0.0.1:5432`) |
+| Target database equals `AFLDB_TEST_DATABASE_URL`'s database | pass (`afldb_test`) |
+| Target database matches `/_test$/` | pass |
+| Target database is **not** `afldb_dev` | pass (explicit refusal branch) |
+
+A connectivity probe was then run **before** `.env` was modified, so a failure could not leave a broken or unsafe DSN behind. It reported:
+
+```text
+candidate target : afldb_auth@127.0.0.1:5432/afldb_test
+owner target     : afldb_owner@127.0.0.1:5432/afldb_test
+CONNECTED AS     : afldb_auth / current_database=afldb_test
+```
+
+Only then was the variable written into the worktree `.env`, inserted after `AFLDB_TEST_DATABASE_URL` with the `.env.example:62-73` never-fallback wording, preserving the file's existing LF line endings. No password, DSN literal or secret was printed, echoed, logged or written to any tracked file at any point; every inspection above extracted structure only. `.env` is untracked and gitignored (`.gitignore:24`), so this does not appear in the diff and **does not propagate to any other worktree** — §23.3 B1 recurs for each new one.
+
+No `afldb_dev` and no production endpoint was contacted. `AFLDB_PROD_DATABASE_URL` is not present in this worktree's `.env` at all.
+
+### 25.3 The command and its exact result
+
+```text
+> npx vitest run tests/integration/nl-search-telemetry-clear.test.ts
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Duration  16.90s
+```
+
+**9 passed, 0 failed, 0 skipped.** Re-run with `--reporter=verbose` to satisfy §24.8's "confirm it ran rather than skipped" requirement by name rather than by inference:
+
+```text
+ ✓ retention contract > retains the full ancestor chain above a reviewed leaf, to arbitrary depth, and deletes the mid-chain sibling  2354ms
+ ✓ retention contract > keeps every feedback row — matched with its ancestry, and orphaned — and every review                        2371ms
+ ✓ retention contract > preserves every app-health row and detaches only the links to deleted logs                                   2153ms
+ ✓ retention contract > touches nothing unrelated, and the identity sequence is not reset                                            2012ms
+ ✓ retention contract > rolls back completely: an aborted clearing transaction leaves no trace                                       1900ms
+ ✓ cutoff and concurrency > blocks a telemetry writer for the life of the clearing transaction, then the writer proceeds untouched   2459ms
+ ✓ restricted afldb_auth credential (AFLDB_TEST_AUTH_DATABASE_URL) > executes the clear end to end as the application role           1725ms
+ ✓ restricted afldb_auth credential (AFLDB_TEST_AUTH_DATABASE_URL) > still cannot DELETE any NL table directly                        190ms
+ ✓ restricted afldb_auth credential (AFLDB_TEST_AUTH_DATABASE_URL) > still cannot TRUNCATE any NL table                              571ms
+```
+
+**The restricted describe ran.** All three of its tests are listed as executed, not skipped. `describe.skipIf(!authDsn)` (`:478`) would have omitted them entirely had the DSN been unset, and the describe's `beforeAll` (`:481-501`) throws unless a live `SELECT current_user, current_database()` on that connection returns exactly `afldb_auth` on the same `_test` database the owner DSN names — so a green run is itself independent runtime proof that the credential authenticated **as `afldb_auth`, on `afldb_test`**, and is not the owner credential in disguise.
+
+### 25.4 Retention evidence now proven by execution
+
+Every claim below was an unexecuted assertion until this step (§24.6, first bullet). Each ran against the applied migration `081` in `afldb_test`, inside a transaction that was **always rolled back** — no real `afldb_test` telemetry was destroyed.
+
+- **Arbitrary-depth ancestry (§13/§16.2, the mandatory operator fixture).** A four-level chain — great-grandparent, grandparent, parent, reviewed leaf, with only the leaf protected directly — survives **in full**, while a disposable **sibling hanging off the mid-chain grandparent** and a disposable **child of the leaf** are both deleted. This is the assertion a non-recursive one-hop join could not pass, and it is the one that proves retention follows *ancestry* rather than the whole connected component. The `WITH RECURSIVE` closure in `081` is now executed, not merely parsed.
+- **Durable evidence preserved.** Reviews and feedback — matched *and* orphaned — are byte-checked unchanged after the clear; the review's FK held through the `DELETE` without deferral, and the global zero-orphan review assertion passed.
+- **App health.** No `app_health_events` row is deleted; only the link to a deleted log becomes `NULL`; the link to a protected log is intact.
+- **Nothing unrelated touched, no sequence reset.** `auth_audit_log`, `auth_users`, `players` and `matches` counts unchanged, and a post-clear insert takes an id above the pre-clear maximum.
+- **Whole-clear rollback.** An aborted clearing transaction leaves log count and non-NULL health-link count exactly at baseline — the deletes *and* the `SET NULL` detachments both roll back.
+
+### 25.5 Concurrency evidence
+
+The cutoff test passed: transaction A holds the function's `SHARE ROW EXCLUSIVE` lock set while writer B, on a **second dedicated backend**, provably blocks — established via `pg_blocking_pids()`, not by sleeping — and then proceeds once A ends, surviving as post-clear telemetry. Both roll back (deviation **D2**, §22.5: A is rolled back rather than committed; B's row is still definitionally post-`DELETE` because the delete ran before B unblocked).
+
+§8's lock ordering and cutoff semantics are therefore executed and proven at the database layer. **§16.7 is not yet fully accepted**: risk **R5** stands — in production the *caller's* transaction is what holds these locks, so the Server Action must open and hold one, and that code does not exist yet.
+
+### 25.6 Security evidence — the live half of the boundary
+
+§24.5 proved catalogue state on the owner connection. This step proves the same boundary **as the actual credential the application will hold**:
+
+| Property | Evidence |
+|---|---|
+| `afldb_auth` can authenticate, connect and **successfully invoke** the function | The end-to-end test seeded its own disposable row on the restricted connection, invoked `public.nl_search_telemetry_clear()`, and observed the row gone. `EXECUTE` on the `SECURITY DEFINER` function is the **entire** capability the role holds here. |
+| `afldb_auth` still cannot `DELETE` directly | `DELETE ... WHERE false` refused with SQLSTATE **`42501`** on `nl_search_log`, `nl_search_review` **and** `nl_search_feedback`. `WHERE false` keeps the probe harmless even against a regressed grant. |
+| `afldb_auth` still cannot `TRUNCATE` | Refused with SQLSTATE **`42501`** on all three tables, **each probe in its own rolled-back transaction**, so a regressed grant would have been contained rather than destructive. |
+
+This closes §24.6's second and third bullets. **Acceptance criterion 5 is now fully evidenced** at the database layer: both the grant-side half (§24.5) and the execution-side half (here). The restricted-role halves of criteria **5** and **10** are **passed**, no longer pending.
+
+### 25.7 What is still unproven — and must not be counted as passed
+
+- **Criterion 5's application half remains open.** That the *application* connects as `afldb_auth` is still an architectural intent, not evidence: the Server Action does not exist. Criteria **3**, **4**, **6**, **9** and the UI/authorisation half of **10** are untouched by this step.
+- **Risk R3 is NOT resolved and this run does not bear on it.** `runClear` (`:124-135`) casts all five counts `::int` **inside the test's own query**, so the suite never observes the raw `bigint`. `postgres.js` returns `int8` as a **string**; the production query layer must cast explicitly or it will compare and render strings. The test sidesteps R3 rather than proving anything about it.
+- **Deviation D3 stands.** "No success audit on failure" cannot be asserted yet: the function records no audit (§9 places it in the caller's transaction), so there is nothing to assert until the Server Action exists. Criterion **6** is unstarted.
+- **Deviation D1 stands.** The restricted DSN's static parity validation still lives in the test file rather than in `tests/setup.ts` / `guard.ts`. It has one consumer; wire it into the shared guard when the Server Action tests share the credential.
+- **R4** (`claude/issue-116`'s competing `079` must renumber on merge) and **R6** (Gridley's `080` merging later) are untouched.
+- `081` remains **checksum-locked** in `afldb_meta.schema_migrations` (§23.6). Any repair is a new migration or a test-database rebuild, **never an in-place edit**.
+
+### 25.8 Blockers and deviations this step
+
+**Blockers: none.** §24.6's `AFLDB_TEST_AUTH_DATABASE_URL` blocker is **resolved** (§25.2).
+
+**Deviations: none from the runbook.** One process note: unlike §24.2, Claude executed both commands under explicit operator authorisation scoped to this step; the evidence above is directly observed output rather than an operator report.
+
+### 25.9 Files changed this step
+
+| File | State |
+|---|---|
+| `issues/open/AFLDB-ISSUE-119.md` | Modified: header `Status`, §15 operator action closed, §24.8 struck, and this §25. |
+| `IssuesIndex.md` | Modified: current-state and next-action wording only. |
+| `issues.md` | Modified: Open Issues row next action, ledger `Status` and `Validation`. |
+| `.env` (worktree, untracked/gitignored) | `AFLDB_TEST_AUTH_DATABASE_URL` added (§25.2). Not part of the diff. |
+
+No source, SQL, migration, test or configuration file under version control was changed. `CHANGELOG.md` stays untouched deliberately: no retained application behaviour has changed yet — the feature still has no caller. **Nothing was committed.**
+
+### 25.10 Exact next action
+
+The database layer is now fully evidenced and the next work is application code. Start with the **query layer**:
+
+1. Add the query helper wrapping `public.nl_search_telemetry_clear()` in `src/db/queries/`, **casting all five `bigint` counts explicitly** (`::int`, or `Number()` on the returned strings) — R3 is live for this code, and the test's own cast proves nothing about it.
+2. Then the transaction-aware audit helper (§9), so the `auth_audit_log` insert can share the caller's transaction.
+3. Then the Server Action (§6, §8) — `requireSuperAdmin()` before parsing confirmation input or opening the transaction; it must open and hold the transaction, since R5 makes the caller's transaction load-bearing for the §8 cutoff.
+4. Then the UI (§10), `docs/search.md`, and `CHANGELOG.md`, in that order.
+
+Do not re-run the migration or edit `081`; it is checksum-locked. `npm run db:privileges:test` remains idempotent and safe to re-run at any point.
