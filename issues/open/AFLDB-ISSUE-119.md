@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-119 — Super Admin can clear NL search telemetry
 
-- **Status:** In progress — Stage 2 started 2026-09-01. Migration `081` (§20) and the `privileges.sql` reconciliation (§21) are written and source-reviewed but **never executed**; tests, Server Action and UI not started
+- **Status:** In progress — Stage 2 started 2026-09-01. Migration `081` (§20), the `privileges.sql` reconciliation (§21) and the guarded database/integration tests (§22) are written and source-reviewed but **never executed**; Server Action and UI not started
 - **Created:** 2026-08-31
 - **Severity:** Medium
 - **Area:** Admin / Security / Natural-language search / Telemetry / Database
@@ -264,10 +264,10 @@ Exports are live route queries. No public page reads these relations. If current
 | `src/app/admin/nl-search/actions.ts` | Guard, server phrase check, atomic clear+audit, revalidation and result state. |
 | `src/app/admin/nl-search/ClearTelemetryForm.tsx` | Typed confirmation, cancel/pending/result UI. |
 | `src/app/admin/nl-search/page.tsx` | Render control and qualify current absolute read-only/append-only copy. |
-| `.env.example` | Guarded `AFLDB_TEST_AUTH_DATABASE_URL`; same `_test` DB, never fallback. |
+| `.env.example` | **Written 2026-09-01 (§22).** Guarded `AFLDB_TEST_AUTH_DATABASE_URL`; same `_test` DB, never fallback. |
 | `tests/admin-nl-search-actions.test.ts` | Server Action auth/confirmation/audit/revalidation tests. |
-| `tests/integration/nl-search-telemetry-clear.test.ts` | Rolled-back safety, atomicity, FK, concurrency and restricted-role tests. |
-| `tests/integration/privileges.test.ts` | Exact function and no-widening catalogue assertions. |
+| `tests/integration/nl-search-telemetry-clear.test.ts` | **Written 2026-09-01 (§22); never executed.** Rolled-back safety, atomicity, FK, concurrency and restricted-role tests. |
+| `tests/integration/privileges.test.ts` | **Extended 2026-09-01 (§22); never executed.** Exact function and no-widening catalogue assertions. |
 | `tests/admin-nav/` or dedicated guarded Playwright files | Real confirmation/cancel/success only against a disposable `_test` deployment. |
 | `docs/search.md` | Validated retention, audit and Super Admin workflow. |
 | issue/index/changelog files | Stage 2 closeout state and Unreleased feature entry after validation. |
@@ -633,7 +633,71 @@ Static review only. `git diff --check` clean; the `privileges.sql` diff is a pur
 
 ### 21.8 Exact next action
 
-1. Write the guarded PostgreSQL integration test from §13 — the mandatory ancestry fixture **deeper than one parent** with a mid-chain disposable sibling that must be deleted, plus unmatched feedback, app-health detachment, sequence non-reset, restricted-role success and the rollback/atomicity cases. `_test` DSNs only; success-path destructive assertions inside an always-rolled-back transaction.
-2. Extend `tests/integration/privileges.test.ts` with the function assertions §13 requires: owner `afldb_owner`, `SECURITY DEFINER`, fixed `search_path`, schema qualification, exact ACL (`afldb_auth` only, `PUBLIC` absent, `afldb_app`/`afldb_import`/`afldb_backup` unable to execute), and no direct `DELETE`/`TRUNCATE` for `afldb_auth` on the three NL tables after reconciliation.
+1. ~~Write the guarded PostgreSQL integration test from §13 — the mandatory ancestry fixture **deeper than one parent** with a mid-chain disposable sibling that must be deleted, plus unmatched feedback, app-health detachment, sequence non-reset, restricted-role success and the rollback/atomicity cases. `_test` DSNs only; success-path destructive assertions inside an always-rolled-back transaction.~~ **Done 2026-09-01 — see §22.**
+2. ~~Extend `tests/integration/privileges.test.ts` with the function assertions §13 requires: owner `afldb_owner`, `SECURITY DEFINER`, fixed `search_path`, schema qualification, exact ACL (`afldb_auth` only, `PUBLIC` absent, `afldb_app`/`afldb_import`/`afldb_backup` unable to execute), and no direct `DELETE`/`TRUNCATE` for `afldb_auth` on the three NL tables after reconciliation.~~ **Done 2026-09-01 — see §22. §22.7 is the live list.**
 3. Then, and only then, the first execution of any of this SQL: `npm run db:migrate:test`, then the privilege reconciliation against `afldb_test`, then the focused suites. Nothing before that point proves either file even parses.
 4. The query layer, transaction-aware audit helper, Server Action, UI, `docs/search.md` and `CHANGELOG.md` remain unstarted, in that order after the above.
+
+## 22. Session record — 2026-09-01 (Stage 2, step 3: guarded integration tests)
+
+### 22.1 Starting point
+
+Branch `codex/issue-118` at `2b6c2b2` ("Reconcile ISSUE-119 telemetry clear privileges"), clean worktree. Migration `081` and the `privileges.sql` reconciliation are committed and still **unexecuted**.
+
+### 22.2 Source review before writing tests
+
+| Question | Finding |
+|---|---|
+| `_test` DSN safety pattern | `tests/setup.ts` allowlists `_test`-suffixed databases and redirects `DATABASE_URL`; `tests/integration/guard.ts` makes the variable mandatory for integration files; `tests/integration/import-role-parity.ts` is the house pattern for a second restricted DSN — static endpoint/database/`_test` parity, then a runtime `current_user`/`current_database()` identity check, an explicit skip message when unset, and **no owner fallback ever**. |
+| Rolled-back destructive assertions | `tests/integration/database.test.ts` establishes the `class Rollback extends Error` idiom: run inside `sql.begin`, throw `Rollback` after the assertions, `expect(...).rejects.toThrow(...)`. Reused verbatim. |
+| Blocking proof | `tests/integration/player-link-concurrency.test.ts` proves lock waits with dedicated `postgres(url, { max: 1 })` connections and an observer polling `pg_blocking_pids()` — no sleep-based inference. Reused. |
+| Migration 081 re-review from the test perspective | One candidate defect examined and cleared: `RETURNS TABLE` creates OUT variables named `deleted_log_rows` … `detached_app_health_links`, which would make any body query referencing a same-named column ambiguous — no body query does. Recursive term confirmed upward-only; `GET DIAGNOSTICS` reads the top-level `DELETE`. **No defect; the migration is untouched.** |
+| Fixture schema facts | `nl_search_log` requires only `question`/`outcome` (046); `parent_search_id`, `client_ref`, `run_tag` nullable (047/049/051); `nl_search_review.search_log_id NOT NULL UNIQUE` (047); `nl_search_feedback.client_ref NOT NULL UNIQUE` + `verdict` (049); `app_health_events.event_type` from a fixed list, `related_search_id` nullable `ON DELETE SET NULL` (052); `auth_audit_log.action NOT NULL` (023). |
+
+### 22.3 What was implemented
+
+Three files; no SQL, migration or runtime code changed.
+
+**`tests/integration/nl-search-telemetry-clear.test.ts` (new).** Guarded by `./guard`; fails loudly (not skips) when `nl_search_telemetry_clear()` is absent, naming `npm run db:migrate:test`. Every destructive path is inside an always-rolled-back transaction.
+
+| Suite | Coverage |
+|---|---|
+| Retention: ancestry | The mandatory §13/§16.2 fixture: reviewed leaf → parent → grandparent → great-grandparent, only the leaf protected directly; all four survive. A disposable **sibling off the mid-chain grandparent** and a disposable **child of the leaf** are both deleted, proving retention follows ancestry, not the connected component. Review row byte-checked afterwards; global zero-orphan review assertion. |
+| Retention: feedback | Feedback-matched log plus its otherwise-disposable parent survive; matched and **orphaned** feedback rows byte-checked; global feedback/review counts unchanged and equal to the function's returned retained counts; plain and synthetic (`run_tag`) disposables deleted. |
+| App health | Three seeded rows (linked-to-disposable, linked-to-protected, unlinked): none deleted; only the disposable link becomes `NULL`; the protected link intact; `detached_app_health_links ≥ 1`. |
+| Unrelated + sequences | Pre-seeded `auth_audit_log` sentinel and `auth_audit_log`/`auth_users`/`players`/`matches` counts unchanged; a post-clear insert takes an id above the pre-clear maximum, proving no identity restart. |
+| Atomicity | A clear plus its `SET NULL` detachments inside an aborted transaction leave log count and non-NULL health-link count exactly at baseline. |
+| Cutoff/concurrency | Transaction A holds the function's locks; writer B on a second backend provably blocks (`pg_blocking_pids`), then proceeds after A ends. Both roll back. |
+| Restricted role | Skipped explicitly without `AFLDB_TEST_AUTH_DATABASE_URL` (static endpoint/database/`_test` parity at module load; runtime identity must be `afldb_auth` on the same `_test` database). As `afldb_auth`: seeds its own disposable row, EXECUTEs the function, sees the row gone (rolled back); direct `DELETE` refused with SQLSTATE `42501` on all three NL tables; `TRUNCATE` refused likewise, each probe in its own rolled-back transaction so even a regressed grant could not destroy state. |
+
+**`tests/integration/privileges.test.ts` (extended).** New describe `nl_search_telemetry_clear() is the only NL deletion capability`: owner `afldb_owner`, `SECURITY DEFINER`, `VOLATILE`, zero parameters, `proconfig` exactly `search_path=pg_catalog, pg_temp`; `has_function_privilege` true for `afldb_auth`, false for `afldb_app`/`afldb_import` (and `afldb_backup` when the role exists); the `aclexplode` grantee list asserted **outright** as `{afldb_auth, afldb_owner}` because a NULL function ACL — the `pg_restore --no-privileges` state §21.2 identified — is EXECUTE-to-PUBLIC yet satisfies every boolean check; `prosrc` (comment lines stripped) contains no `EXECUTE`, `CASCADE`, `TRUNCATE` or unqualified NL/app-health relation reference; `afldb_auth` holds no `DELETE`/`TRUNCATE` on any of the three NL tables — closing the `nl_search_review` gap §21.2 noted.
+
+**`.env.example`.** Guarded `AFLDB_TEST_AUTH_DATABASE_URL` documented beside `AFLDB_TEST_IMPORT_DATABASE_URL` with the same never-fallback wording.
+
+### 22.4 Source review of the tests themselves
+
+**One defect was found and fixed during review, before anything was recorded.** The concurrency test's fail-fast guards (`Promise.race` against the transaction promise) created rejection chains that also reject after the race is already won — an unhandled rejection that can fail the suite spuriously. Both guards are now explicitly marked handled.
+
+### 22.5 Deviations
+
+None touches the §5.1 obligations.
+
+- **D1.** The `AFLDB_TEST_AUTH_DATABASE_URL` static parity validation lives in the test file, not in `tests/setup.ts`/`guard.ts` where the import-parity DSN's does. It has exactly one consumer today and nothing can touch the DSN before the check runs; wiring into the shared guard is the right move if/when the Server Action tests share the credential.
+- **D2.** §13's cutoff case says "commit A, then prove B survives". Implemented with A **rolled back**: B's block, release and successful insert are all proven, and B's row is definitionally post-`DELETE` because the delete ran before B unblocked — while the success-path-rolled-back rule stays unbroken and no real `afldb_test` telemetry is destroyed.
+- **D3.** The "no success audit on failure" half of §13 atomicity is deferred to the Server Action stage: the function records no audit (§9 puts that in the caller's transaction), so there is nothing to assert yet. The database half — deletes and `SET NULL` all roll back — is covered.
+- **D4.** §13's "start a review/feedback writer before the clear lock where practical" is not implemented separately: the retained-closure fixtures already prove a committed durable fact protects its log, and the cutoff test proves the lock semantics. Recorded as the "where practical" judgement, revisitable if operator evidence demands it.
+
+### 22.6 Validation performed, risks, blockers
+
+`git diff --check` clean. Static review only: **no test, typecheck, build, SQL, database, migration, deployment or production command ran; none of the three SQL/test artefacts has ever been executed** (20.4 R1 still open). Risks: the suite's first run is also the first parse/execution proof of migration 081 and the reconciliation; the privilege ACL assertions require the migration (with roles present) or `npm run db:privileges:test` to have run against `afldb_test`; the restricted describe needs an `afldb_auth` password on the test cluster or it skips. Blockers: **none.**
+
+### 22.7 Exact next action
+
+The first execution of any ISSUE-119 SQL, one command at a time, operator-run:
+
+1. `npm run db:migrate:test`
+2. `npm run db:privileges:test`
+3. `npx vitest run tests/integration/nl-search-telemetry-clear.test.ts` (with `AFLDB_TEST_DATABASE_URL`, and `AFLDB_TEST_AUTH_DATABASE_URL` set so the restricted describe runs rather than skips)
+4. `npx vitest run tests/integration/privileges.test.ts`
+
+Analyse failures against §20.4/§22.6 before touching any SQL. Then the query layer, transaction-aware audit helper, Server Action, UI, `docs/search.md` and `CHANGELOG.md`, in that order.
