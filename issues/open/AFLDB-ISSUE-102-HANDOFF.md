@@ -154,6 +154,103 @@ child implementation to begin.
 
 ---
 
+## CHECKPOINT — pass 4 (2026-09-01): ISSUE-112 G0 — operator decision recorded, measurement BLOCKED
+
+Scope of the pass: ISSUE-112 G0 only. Read-only. No implementation, no manifests, no scrape;
+ISSUE-111 and ISSUE-113 untouched; `D:\dev\afldb` not accessed; no Git command.
+
+- **Operator decision recorded** (`AFLDB-ISSUE-112.md` §11.1, §13): the one-time curated-manifest
+  bootstrap extraction source is the **existing legacy-loaded AFLDB PostgreSQL state**, not a
+  fresh upstream scrape. Prerequisite §11.1 is now **DECIDED**.
+- **G0 per-family measurement — BLOCKED, failed closed.** The worktree has no proven path to
+  `afldb_dev`: no `.env`, no `AFLDB_*`/`PG*` env vars (Git Bash and PowerShell both checked), no
+  `psql`/`pg_isready`, no listening tunnel port. The pass was authorised only on condition the
+  connection be *proven* `afldb_dev` first; it could not be, so no connection was made and no
+  query ran. Database safety proof — NOT ESTABLISHED.
+- **Delivered instead (repository-only, no DB):** `AFLDB-ISSUE-112.md` §14 now carries the exact
+  reproducible G0 measurement contract per family (§14.2, `SELECT`-only, with a step-0 connection
+  guard), and the structure-only lossless-export assessment against the chosen PostgreSQL source
+  (§14.3), derived from the applied schema (migrations 005/042/059/061) and `import_awards.py`.
+- **Key lossless finding (structural, needs the measured values to finalise):** the §4.2 common
+  manifest column **`source_citation`** cannot be extracted from PostgreSQL at per-row page
+  granularity for any of the five link-target tables — none has a `source_url`/`source_citation`
+  column and the loader drops the legacy per-row URL. Recoverable only at *source* granularity
+  (`draftguru`/`wikipedia`/`footywire`). One operator choice needed (accept source-granularity /
+  read `source_url` from the legacy SQLite file / reconstruct from `docs/acquisition/`). **No
+  scrape proposed — the pass stops at stating the gap.** Secondary: `hall_of_fame` and
+  `honour_team_members` persist no stable id (ids minted once at bootstrap, already the §4.2
+  design); `captaincies` and Rising Star club/opponent are reconstructed from `club_id`
+  (deterministic, total) rather than carried verbatim.
+- **Files changed this pass:** `issues/open/AFLDB-ISSUE-112.md`, `issues/open/AFLDB-ISSUE-102-HANDOFF.md`,
+  `IssuesIndex.md` (next-action lines for ISSUE-102 and ISSUE-112 only). No `CHANGELOG.md` change.
+- **Exact next action:** operator supplies a proven `afldb_dev` connection (tunnel + worktree
+  `.env`, or run §14.2 and return output); a fresh session records the measured values, sets G0
+  PASS/FAIL per family against the existing §5/§10 contract, and resolves the §14.3 pending items
+  (`source_citation` granularity, §11.3 ledger coverage, §11.4 natural-key decision). Only then
+  does §11.2 phasing (honour teams first) begin.
+
+---
+
+## CHECKPOINT — pass 5 (2026-09-01): ISSUE-112 G0 measurement EXECUTED — all families PASS
+
+Scope: ISSUE-112 G0 only. Read-only. No implementation, no manifests, no scrape; ISSUE-111 and
+ISSUE-113 untouched; `D:\dev\afldb` not accessed; no Git command.
+
+**The G0 measurement blocked in pass 4 was run.** Path used: **SSH to the streamanator
+development server** (`arm@10.0.40.100`, `/home/arm/projects/afldb`), DSN read from that
+checkout's `.env` (`AFLDB_IMPORT_DATABASE_URL`, password never printed), a single `psql` session
+opened as `BEGIN TRANSACTION READ ONLY`, the full `AFLDB-ISSUE-112.md` §14.2 contract piped over
+stdin, then `ROLLBACK`. No server-side file written, no database row changed.
+
+- **Connection / read-only safety proof (observed):** `current_database() = 'afldb_dev'`,
+  `current_user = 'afldb_import'` (chosen so the link tables are SELECT-visible — `afldb_app`
+  cannot read `player_link_resolutions` / `player_link_suggestions`),
+  host `127.0.0.1:5432`, `transaction_read_only = 'on'`, PostgreSQL 16.15. The
+  `db='afldb_dev' AND txn_read_only='on'` precondition passed before any measurement query.
+  `afldb_test` not used.
+- **G0 PASS for all nine families (A, 1–7, L).** Full measured matrix now in
+  `AFLDB-ISSUE-112.md` §14.4; full pass log in §14.6. Headlines:
+  - Every `season`-bearing family (1, 4, 5, 6, 7): **`source_record_id` NULL = 0 and
+    distinct = row count** — the §14.2 completeness/uniqueness verdict PASSes for all five.
+    Families 2 & 3 have no such column by design (ids minted `hof:<seq>` /
+    `honourteam:<team-slug>:<seq>` at bootstrap).
+  - **Every natural-key probe returned zero true collisions** — HoF `(name, inducted_year)` and
+    `name` alone (343 rows, 45 with NULL year); honour teams `(team_name, player_name_raw)` and
+    `(team_name, player_id)`; captaincies `(season, club_id, player_name_raw, role)`.
+    All-Australian's 10 `(season, player_name_raw)` pairs are the 1984 state/club dual selection
+    (9) + one genuine same-name (1), and don't touch the `(source_id, source_record_id)` key.
+  - Row counts: A 40 defs · 1 AA 1,158 (1953–2025) · 2 HoF 343 · 3 honour teams 113 ·
+    4 captaincies 1,375 (all linked) · 5 Rising Star 766 (1993–2026, 1 winner/decided season) ·
+    6 club B&F 752 (19 `bf-*`) · 7 named medals 979 (17 slugs).
+  - **Family L link ledger:** `player_link_resolutions` 74 awards-scoped rows (`award_winners`
+    68, `hall_of_fame` 5, `honour_team_members` 1; `award_nominations` 0, `captaincies` 0).
+    **Orphan check clean — 0 missing target rows, 0 `linked`-decision player mismatches.**
+    `player_link_suggestions` empty.
+- **PostgreSQL bootstrap completeness:** every manifest field is present or deterministically
+  reconstructable, with exactly the three §14.3-predicted gaps and no new one — (1)
+  `source_citation` only at *source* granularity (`draftguru`/`wikipedia`/`footywire`); (2) HoF /
+  honour-team ids minted at bootstrap; (3) captaincies raw club + Rising Star club/opponent
+  reconstructed from `club_id`.
+- **§11.3 (person-link ledger) — partially resolved.** `data/reference/draftguru-link-decisions.json`
+  holds **6 explicit decisions**; 94.5% of `draftguru` award links (2,567 / 2,716) are automatic
+  and regenerated by the scorer. Row-by-row coverage proof is a **G1** item (`award_winners`
+  drops the `player_url` bridge key).
+- **§11.4 (natural keys) — measurement supports keeping them.** Zero collisions on every
+  relevant key. Only the rename-is-link-losing property remains, as an operator policy
+  acknowledgement.
+- **Still an operator decision, no scrape proposed:** `source_citation` granularity
+  (accept source-granularity / read `source_url` from the legacy SQLite file / reconstruct from
+  `docs/acquisition/`). Recorded as explicitly pending — **not** decided by this pass.
+- **Files changed this pass:** `issues/open/AFLDB-ISSUE-112.md`,
+  `issues/open/AFLDB-ISSUE-102-HANDOFF.md`, `IssuesIndex.md` (ISSUE-112 next-action text only).
+  No `CHANGELOG.md` change.
+- **Exact next action:** ISSUE-112 implementation phasing (§11.2) begins — **honour teams first**
+  (113 rows, minted ids, natural key proven collision-free). Operator settles the
+  `source_citation` granularity choice and acknowledges the §11.4 rename property before a merge;
+  neither blocks starting honour teams. Then G1 (manifest round-trips to the same row set).
+
+---
+
 ## Confirmed source findings
 
 Each verified by direct read at baseline `95819a3`.
@@ -260,7 +357,7 @@ seeded `afldb_meta.import_writable_tables`. `player_link_resolutions` is SELECT+
 |---|---|---|---|
 | `AFLDB-ISSUE-102` | Awards/honours legacy-SQLite acquisition dependency | `issues/open/AFLDB-ISSUE-102.md` | **PARENT**, Open, coordination only |
 | `AFLDB-ISSUE-111` | Coleman Medal derivation from canonical AFLDB facts | `issues/open/AFLDB-ISSUE-111.md` | Open, design complete, **blocked on gate G0** |
-| `AFLDB-ISSUE-112` | Replace legacy SQLite honours acquisition with curated manifests | `issues/open/AFLDB-ISSUE-112.md` | Open, design complete, **blocked on gate G0 + operator prerequisite §11.1** |
+| `AFLDB-ISSUE-112` | Replace legacy SQLite honours acquisition with curated manifests | `issues/open/AFLDB-ISSUE-112.md` | Open, design complete. **G0 PASS (all families, 2026-09-01)**; §11.1 DECIDED. Implementation phasing (honour teams first) may begin; `source_citation` granularity + §11.4 rename acknowledgement are pre-merge operator items, not start blockers |
 | `AFLDB-ISSUE-113` | Replace legacy `brownlow_season_votes` acquisition | `issues/open/AFLDB-ISSUE-113.md` | Open, design complete, **source undecided**; outside 102's closure boundary |
 
 **`AFLDB-ISSUE-110` is allocated to unmerged NL semantic-mapping work.** It does not exist in this
@@ -296,11 +393,21 @@ Genuinely open. Do not invent answers.
 3. **ISSUE-111 G5** — whether a `player_id`-bearing stable key is acceptable given that a canonical
    rebuild re-seeds `players.id` (ISSUE-108 §9.4).
 4. **ISSUE-111 G6** — the retirement policy for the existing legacy `draftguru` Coleman rows.
-5. **ISSUE-112 G0** — per-family read-only coverage measurement.
-6. **ISSUE-112 §11.1** — where the one-time manifest extraction comes from. Recommended: a
-   read-only export of the already-loaded rows. **Not currently authorised.**
+5. **ISSUE-112 G0** — per-family read-only coverage measurement. **DONE 2026-09-01 (Pass 5):**
+   executed read-only against `afldb_dev` via the streamanator dev server, connection proven,
+   transaction rolled back. **All nine families PASS** (`AFLDB-ISSUE-112.md` §14.4, §14.6).
+   No longer blocking.
+6. **ISSUE-112 §11.1** — where the one-time manifest extraction comes from. **DECIDED 2026-09-01:**
+   the existing legacy-loaded AFLDB PostgreSQL state, not a fresh scrape. **Follow-on choice still
+   open: `source_citation` granularity** — G0-confirmed there is no per-row page citation in any
+   of the five link-target tables; recoverable only at source granularity
+   (`draftguru`/`wikipedia`/`footywire`). Operator picks: accept source-granularity / read
+   `source_url` from the legacy SQLite file / reconstruct from `docs/acquisition/`. No scrape
+   proposed. (`AFLDB-ISSUE-112.md` §14.5 item 1.)
 7. **ISSUE-112 §11.4** — whether `hall_of_fame` and `honour_team_members` stay on name-based
-   natural reload keys.
+   natural reload keys. **G0-measured 2026-09-01: data-safe** (zero collisions on every relevant
+   key). Residual is only the operator's acknowledgement that a curated rename of a decided row
+   stays link-losing (`AFLDB-ISSUE-112.md` §14.5 item 2).
 8. **ISSUE-113 §4** — the replacement source class. Recommended next step (not a decision): a
    read-only probe of class B, a free structured season-summary source carrying `vote_rank`,
    `eligible_rank` and `is_ineligible`. **No probe performed; it needs separate authorisation.**
