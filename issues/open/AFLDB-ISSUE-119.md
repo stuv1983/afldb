@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-119 — Super Admin can clear NL search telemetry
 
-- **Status:** In progress — Stage 2 started 2026-09-01. Migration `081` (§20), the `privileges.sql` reconciliation (§21) and the guarded database/integration tests (§22) are written and source-reviewed but **never executed**; Server Action and UI not started
+- **Status:** In progress — Stage 2 started 2026-09-01. Migration `081` (§20) is **applied to `afldb_test`** as of 2026-09-01 (§23) — its first execution anywhere. The `privileges.sql` reconciliation (§21) and the guarded database/integration tests (§22) are written and source-reviewed but **still never executed**; Server Action and UI not started
 - **Created:** 2026-08-31
 - **Severity:** Medium
 - **Area:** Admin / Security / Natural-language search / Telemetry / Database
@@ -530,7 +530,7 @@ Reviewed against §5.1's binding obligations, §6's authorisation model, §7's d
 
 **Risks carried forward:**
 
-- **R1. The SQL has never been executed.** No database, migration, test, build or typecheck command ran this session. Its first execution must be `npm run db:migrate:test` against `afldb_test`; that run is the proof of the `WITH RECURSIVE … DELETE` form, `GET DIAGNOSTICS`, the `RETURNS TABLE` shape and both `DO` blocks. Do not apply to `afldb_dev` or production before the §13 tests pass.
+- **R1. The SQL has never been executed.** **PARTLY CLOSED 2026-09-01 by §23** — migration `081` applied cleanly to `afldb_test`, which proves the file parses and every statement in it runs. It does **not** prove the ownership or `EXECUTE` grant landed (§23.5) and it proves nothing about the function's runtime behaviour, which remains for §22.7 steps 2-4. Original finding: No database, migration, test, build or typecheck command ran this session. Its first execution must be `npm run db:migrate:test` against `afldb_test`; that run is the proof of the `WITH RECURSIVE … DELETE` form, `GET DIAGNOSTICS`, the `RETURNS TABLE` shape and both `DO` blocks. Do not apply to `afldb_dev` or production before the §13 tests pass.
 - **R2. `privileges.sql` is not yet reconciled** — **CLOSED 2026-09-01 by §21**, which adds the function section and the targeted DELETE/TRUNCATE revoke described below; it is written but unexecuted. Original finding, retained because §21's design rests on it: Its subtractive `afldb_auth` loop revokes on **relations** only — `relkind IN ('r','p','v','m','f')`, `tools/maintenance/privileges.sql:470-481` — so it will not strip the function `EXECUTE`. But neither will it re-establish it: on a role-after-migration install the guarded `DO` block skips the grant silently and the feature fails closed. The same gap applies to ownership. The §12 `privileges.sql` change should therefore reconcile **both** `EXECUTE` and owner, not `EXECUTE` alone as §12 currently words it.
 - **R3. `postgres.js` returns `int8` as a JavaScript string.** All five returned counts are `bigint`, so the query layer must cast `::int` (or coerce in TypeScript) or the audit will record string counts and any arithmetic on them will concatenate silently.
 - **R4. Migration-number contention persists.** `tools/db/migrate.ts` keys `afldb_meta.schema_migrations` by **filename** and applies pending files in name order, so it enforces no contiguity — the 080 gap on this branch is harmless — but it also cannot detect a duplicate **number**: two files numbered 079 would both apply. `082` was only the next free migration number as of the 2026-09-01 scan and is **not reserved**: `claude/issue-116` must re-scan the relevant live refs and worktrees and derive the next free number itself, immediately before renumbering its competing migration.
@@ -695,9 +695,102 @@ None touches the §5.1 obligations.
 
 The first execution of any ISSUE-119 SQL, one command at a time, operator-run:
 
-1. `npm run db:migrate:test`
+1. ~~`npm run db:migrate:test`~~ **Done 2026-09-01 — see §23. Steps 2-4 stand; §23.8 is the live list.**
 2. `npm run db:privileges:test`
 3. `npx vitest run tests/integration/nl-search-telemetry-clear.test.ts` (with `AFLDB_TEST_DATABASE_URL`, and `AFLDB_TEST_AUTH_DATABASE_URL` set so the restricted describe runs rather than skips)
 4. `npx vitest run tests/integration/privileges.test.ts`
 
 Analyse failures against §20.4/§22.6 before touching any SQL. Then the query layer, transaction-aware audit helper, Server Action, UI, `docs/search.md` and `CHANGELOG.md`, in that order.
+
+## 23. Session record — 2026-09-01 (Stage 2, step 4: first execution of migration `081`)
+
+### 23.1 Starting point
+
+Branch `codex/issue-118` at `2e5ae70` ("Add ISSUE-119 telemetry clear integration tests"), **clean worktree** — all three confirmed with read-only Git metadata commands before anything else ran. Scope for this step was one command only: the first execution of `081_nl_search_telemetry_clear.sql` against `afldb_test`. No privilege script, no test suite, no Server Action, no UI.
+
+### 23.2 Test-database safety evidence
+
+Established **before** any command touched a database. No password, DSN literal or credential was printed, echoed or written anywhere; every inspection below extracted only structure (role, host, port, database name) with the password field replaced.
+
+| Question | Evidence |
+|---|---|
+| What does the runner use for `--target test`? | `tools/db/migrate.ts:71` — `test: 'AFLDB_TEST_DATABASE_URL'`. `package.json:14` runs `tsx tools/db/migrate.ts --target test`. An unset variable is a hard refusal at `:125-128`, and a `--target`/`AFLDB_MIGRATE_TARGET` disagreement is refused at `:103-109`. |
+| Where does that variable come from here? | `loadEnv()` (`:40-56`) reads **`<PROJECT_ROOT>/.env` only**, and `PROJECT_ROOT` is the worktree (`:29`). The main checkout's `.env` is not consulted. An already-exported variable wins over the file. |
+| Does the runner itself refuse a non-`_test` database? | **No.** `tests/setup.ts:48` enforces the `/_test$/` rule for **vitest**, not for the migration runner. `migrate.ts` migrates whatever the named target's DSN points at. The DSN proof below is therefore the only safeguard at this layer, which is why it was established first rather than assumed. |
+| Repository-approved shape | `.env.example:60` — `AFLDB_TEST_DATABASE_URL=postgresql://afldb_owner:CHANGE_ME@localhost:5432/afldb_test`. `afldb_owner` is the **intended** role for this DSN: migrations create objects and `081` must `ALTER FUNCTION … OWNER TO afldb_owner`. |
+| Actual `AFLDB_TEST_DATABASE_URL` (worktree `.env`, re-verified immediately before the run) | `user=afldb_owner  host=127.0.0.1  port=5432  db=afldb_test` — database name ends in `_test`; **not** `afldb_dev`, not a production endpoint. Matches `.env.example:60` exactly. |
+| Actual `AFLDB_TEST_AUTH_DATABASE_URL` | **NOT DEFINED** — absent from the process environment, from the User and Machine environment scopes, and from the worktree `.env`. |
+| Is that absence safe? | **Yes, and it is the safe state.** `.env.example:68-73` documents it as optional; `tests/integration/nl-search-telemetry-clear.test.ts` skips its restricted describe explicitly when it is unset and never falls back to the owner credential (§22.3). Nothing was substituted for it: no `afldb_dev`, production or owner credential was placed in that variable, and the migration runner does not read it. |
+| Was any other DSN in scope? | No. `AFLDB_OWNER_DATABASE_URL`, `AFLDB_PROD_DATABASE_URL` and `DATABASE_URL` were confirmed unset in the process environment; `--target test` could not have resolved to any of them regardless. |
+| Was the endpoint live? | A TCP connect to `127.0.0.1:5432` succeeded before the run, so a refusal would have been a genuine result rather than an unreachable host. |
+
+### 23.3 Environment blockers found and resolved
+
+Both were worktree-provisioning gaps, not repository defects. Neither is a tracked-issue candidate; both are recorded because they will recur in every fresh AFLDB worktree.
+
+- **B1 — no `.env` in this worktree.** `D:\dev\afldb-issue-118\.env` did not exist, so `loadEnv()` returned silently and the run would have aborted at `migrate.ts:125-128` with `ERROR: AFLDB_TEST_DATABASE_URL is not set (target 'test')`. The main checkout `D:\dev\afldb` has one; a Git worktree does not inherit it because `.env` is untracked and gitignored (`.gitignore:24`). **Resolved by the operator**, who provisioned the worktree `.env`; the DSNs were then re-verified from that file, and the §23.2 values are the re-verified ones.
+- **B2 — no `node_modules` in this worktree.** The first invocation failed with `'tsx' is not recognized`. Dependencies had never been installed here. **Resolved by the operator** with `npm ci`, which installs the committed `package-lock.json` exactly and does not rewrite it.
+
+Neither blocker was worked around, and no substitute DSN or alternative runner was used.
+
+### 23.4 The command and its exact result
+
+Exactly one state-changing command ran this session, the one authorised:
+
+```text
+> npm run db:migrate:test
+> tsx tools/db/migrate.ts --target test
+
+AFLDB migrations -> test (afldb_owner@127.0.0.1:5432/afldb_test)
+  80 migration file(s), 80 already applied
+
+  applying 081_nl_search_telemetry_clear.sql ... ok (240 ms)
+
+Applied 1 migration(s).
+```
+
+Applied migration state after the run: **81 of 81**, with `081_nl_search_telemetry_clear.sql` the only migration applied in this run and the only one that was pending. The runner's own redacted target line independently confirms the database that was altered: `afldb_owner@127.0.0.1:5432/afldb_test`. No failure, no rollback, no drift refusal — the checksum guard at `:182-190` passed for all 80 previously applied files, so nothing already applied had been edited.
+
+### 23.5 What this proves — and what it does not
+
+**Proved.** The file parses and every statement in it executes. `CREATE FUNCTION public.nl_search_telemetry_clear()` was accepted with its `RETURNS TABLE` shape, `WITH RECURSIVE` closure, `GET DIAGNOSTICS`, `SHARE ROW EXCLUSIVE` lock list and `SET search_path` — the syntax proof §20.4 R1 demanded. Both migration-time `DO` blocks ran without raising. The unconditional `REVOKE ALL ON FUNCTION … FROM PUBLIC` executed without error, since a failure there would have aborted the whole migration (`migrate.ts:212-218` wraps each file in a transaction). No pre-existing function of that name blocked the plain `CREATE` (§20.3).
+
+**Not proved, and specifically not to be assumed.** `migrate.ts:159` constructs the client with `onnotice: () => {}`, so **every `NOTICE` this migration can raise was silently discarded**. Both of the file's guarded blocks degrade to a `NOTICE`:
+
+- `ALTER FUNCTION … OWNER TO afldb_owner` falls back to a `NOTICE` when `afldb_owner` is absent or the running role lacks membership in it — so the function's **actual owner is unverified**, and with it the definer identity the whole security model rests on;
+- `GRANT EXECUTE … TO afldb_auth` sits inside a role-existence guard that emits a `NOTICE` and skips when the role is absent — so **whether `afldb_auth` can execute the function is unverified**, and the feature would fail closed rather than loudly if it did not land.
+
+A clean apply therefore says nothing about the ACL or the owner. Those are exactly what `npm run db:privileges:test` and the new capability describe in `tests/integration/privileges.test.ts` assert (§21, §22.3), which is why they are the next two steps and not optional.
+
+Also unproved: every runtime behaviour of the function. It has never been **called**. The retained closure, arbitrary-depth ancestry, sibling non-retention, the five counts, the lock cutoff, app-health detachment and sequence non-reset all remain unexecuted claims until `tests/integration/nl-search-telemetry-clear.test.ts` runs.
+
+### 23.6 Consequences, deviations and risks
+
+- **`081` is now immutable on `afldb_test`.** Its checksum is recorded in `afldb_meta.schema_migrations`, and `migrate.ts:182-190` refuses to run once an applied file has been edited. Any repair to the function must be a **new** migration, or the test database must be rebuilt — the SQL file must not be edited in place. This is the practical cost of the first execution and applies from now on.
+- **`afldb_test` is deliberately mid-sequence.** It holds the function while the `privileges.sql` reconciliation has not run. Harmless: no query layer, Server Action or UI can call it, and no other consumer exists.
+- **Deviation from the literal instruction, operator-authorised.** Two commands beyond the single authorised one were needed to reach it; both were put to the operator and both were performed by the operator (`.env` provisioning, `npm ci`). Claude executed only `npm run db:migrate:test` plus read-only inspections (env-variable structure, file presence, a TCP reachability check, Git metadata). No privilege script, test, build, typecheck, `afldb_dev`, production or deployment command ran, and no SQL was issued outside the runner.
+- **`AFLDB_TEST_AUTH_DATABASE_URL` remains undefined**, so §22.7 step 3 will *skip* its restricted describe rather than run it. Setting it requires an `afldb_auth` password on the test cluster. Until it is set, the restricted-role half of acceptance criterion 5 and 10 is unevidenced — a skip is not a pass.
+- Risks **R3** (`postgres.js` returns the five `bigint` counts as strings), **R4** (migration-number contention for `claude/issue-116`), **R5** (the caller's transaction is load-bearing for the cutoff) and **R6** (Gridley's `080` merging later) are unchanged by this step.
+
+**Blockers: none outstanding.** B1 and B2 are resolved.
+
+### 23.7 Files changed this step
+
+| File | State |
+|---|---|
+| `issues/open/AFLDB-ISSUE-119.md` | Modified: header `Status`, §20.4 R1 partial closure, §22.7 step 1 struck, and this §23. |
+| `IssuesIndex.md` | Modified: current-state and next-action wording only. |
+| `issues.md` | Modified: Open Issues next action, ledger `Status`, `Validation` and `Follow-up`. |
+
+No source, SQL, migration, test, `CHANGELOG.md` or configuration file was changed — `081_nl_search_telemetry_clear.sql` is byte-identical to the committed version, as the runner's checksum acceptance independently confirms. The worktree `.env` is untracked and gitignored and is not a repository change. **Nothing was committed.**
+
+### 23.8 Exact next action
+
+Operator-run, one command at a time, analysing each result before the next:
+
+1. `npm run db:privileges:test` — reconciles the function's owner, its `PUBLIC` revoke and its single `afldb_auth` `EXECUTE` against `afldb_test`. This is the first execution of the §21 reconciliation, and given §23.5 it is also the step that establishes the owner/ACL state the migration's suppressed `NOTICE`s left unknown.
+2. `npx vitest run tests/integration/privileges.test.ts` — the catalogue assertions that *prove* that state, rather than assuming the reconciliation worked.
+3. `npx vitest run tests/integration/nl-search-telemetry-clear.test.ts` — the first execution of the function itself. Set `AFLDB_TEST_AUTH_DATABASE_URL` (same `_test` database and endpoint, role `afldb_auth`, never the owner credential) or the restricted describe skips.
+4. Only after that evidence passes: the query layer (casting the five `bigint` counts per R3), the transaction-aware audit helper, the Server Action, the UI, `docs/search.md` and `CHANGELOG.md`, in that order.
+
+Steps 2 and 3 are ordered privileges-first here, unlike §22.7, because the telemetry-clear suite's restricted describe depends on the `EXECUTE` grant that step 1 reconciles.
