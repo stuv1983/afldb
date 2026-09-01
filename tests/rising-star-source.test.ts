@@ -404,6 +404,6 @@ describe('rising_star group is legacy-SQLite-free (AFLDB-ISSUE-112 phase 4)', ()
     );
     expect(block).not.toContain('"rising_star": {"awards"}');
     // The reverse direction stays: a full awards refresh still reloads it.
-    expect(block).toContain('"awards": {"all_australian", "under_22", "rising_star", "club_bf"}');
+    expect(block).toContain('"awards": {"all_australian", "under_22", "rising_star", "club_bf", "named_medals"}');
   });
 });

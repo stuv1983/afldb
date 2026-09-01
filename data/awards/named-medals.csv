@@ -1,0 +1,980 @@
+source_key,award_slug,season,club,player,player_id,link_status,candidate_count,votes,note,source_citation
+aflca-best-young-player:2003:1,aflca-best-young-player,2003,West Coast,Chris Judd,1122,resolved,1,,Recruited from East Sandringham / Caulfield Grammar / Sandringham U18,draftguru
+aflca-best-young-player:2004:2,aflca-best-young-player,2004,North Melbourne,Daniel Wells,1427,resolved,1,,Recruited from Kwinana / Peel,draftguru
+aflca-best-young-player:2005:3,aflca-best-young-player,2005,Western Bulldogs,Adam Cooney,3940,resolved,1,,Recruited from Flagstaff Hill / West Adelaide,draftguru
+aflca-best-young-player:2006:4,aflca-best-young-player,2006,Western Bulldogs,Ryan Griffen,4080,resolved,1,,Recruited from Goolwa-Port Elliot / South Adelaide,draftguru
+aflca-best-young-player:2007:5,aflca-best-young-player,2007,Collingwood,Scott Pendlebury,4182,resolved,1,,Recruited from Sale / Gippsland U18,draftguru
+aflca-best-young-player:2008:6,aflca-best-young-player,2008,Geelong,Joel Selwood,11538,resolved,1,,Recruited from Sandhurst / Catholic College Bendigo / Bendigo U18,draftguru
+aflca-best-young-player:2009:7,aflca-best-young-player,2009,Hawthorn,Cyril Rioli,11632,resolved,1,,Recruited from St Marys / Scotch College,draftguru
+aflca-best-young-player:2010:8,aflca-best-young-player,2010,Fremantle,Stephen Hill,11716,resolved,1,,Recruited from Quinns Districts / West Perth,draftguru
+aflca-best-young-player:2011:9,aflca-best-young-player,2011,Fremantle,Nathan Fyfe,11834,resolved,0,,Recruited from Lake Grace-Pingrup / Aquinas College (WA) / Claremont,draftguru
+aflca-best-young-player:2012:10,aflca-best-young-player,2012,Essendon,Dyson Heppell,11896,resolved,1,,Recruited from Leongatha / Gippsland U18,draftguru
+aflca-best-young-player:2013:11,aflca-best-young-player,2013,GWS,Jeremy Cameron,12017,resolved,1,,Recruited from Dartmoor / North Ballarat U18,draftguru
+aflca-best-young-player:2014:12,aflca-best-young-player,2014,Gold Coast,Jaeger O'Meara,12141,resolved,1,,Recruited from Dongara / Perth,draftguru
+aflca-best-young-player:2015:13,aflca-best-young-player,2015,Western Bulldogs,Marcus Bontempelli,12269,resolved,1,,Recruited from Eltham / Marcellin College / Northern U18,draftguru
+aflca-best-young-player:2016:14,aflca-best-young-player,2016,Sydney,Isaac Heeney,12326,resolved,1,,Recruited from Cardiff / NSW-ACT U18 / Sydney (NEAFL),draftguru
+aflca-best-young-player:2017:15,aflca-best-young-player,2017,Melbourne,Clayton Oliver,12410,resolved,1,,Recruited from Mooroopna / Bendigo U18 / Murray U18 / Richmond (VFL),draftguru
+aflca-best-young-player:2018:16,aflca-best-young-player,2018,Geelong,Tom Stewart,12505,resolved,1,,Recruited from South Barwon / Geelong U18 / Geelong (VFL),draftguru
+aflca-best-young-player:2019:17,aflca-best-young-player,2019,Geelong,Tim Kelly,12595,resolved,1,,Recruited from Palmyra JFC / South Fremantle,draftguru
+aflca-best-young-player:2020:18,aflca-best-young-player,2020,Carlton,Sam Walsh,12684,resolved,1,,Recruited from St Joseph's / Geelong U18,draftguru
+aflca-best-young-player:2021:19,aflca-best-young-player,2021,Fremantle,Caleb Serong,12786,resolved,1,,Recruited from Warragul / Geelong Grammar / Gippsland U18,draftguru
+aflca-best-young-player:2021:20,aflca-best-young-player,2021,Gold Coast,Noah Anderson,12767,resolved,1,,Recruited from Boroondara Hawks JFC / Hawthorn Citizens / Carey Grammar / Oakleigh U18,draftguru
+aflca-best-young-player:2022:21,aflca-best-young-player,2022,Hawthorn,Jai Newcombe,12915,resolved,1,,Recruited from Poowong / Gippsland U18 / Box Hill,draftguru
+aflca-best-young-player:2023:22,aflca-best-young-player,2023,Collingwood,Nick Daicos,12943,resolved,1,,Recruited from Balwyn Greythorn / Kew Rovers / Carey Grammar / Oakleigh U18,draftguru
+aflca-best-young-player:2024:23,aflca-best-young-player,2024,North Melbourne,Harry Sheezel,13034,resolved,1,,Recruited from Ajax / Sandringham U18,draftguru
+aflca-best-young-player:2025:24,aflca-best-young-player,2025,Geelong,Shaun Mannagh,13104,resolved,1,,Recruited from Lavington / North Albury / Richmond (VFL) / Werribee,draftguru
+aflca-champion:2003:25,aflca-champion,2003,Collingwood,Nathan Buckley,217,resolved,1,,Recruited from Southern Districts / Ainslie / Port Adelaide (SANFL),draftguru
+aflca-champion:2004:26,aflca-champion,2004,Port Adelaide,Warren Tredrea,831,resolved,1,,Recruited from St Michael's College (SA) / Port Adelaide (SANFL),draftguru
+aflca-champion:2005:27,aflca-champion,2005,Sydney,Barry Hall,953,resolved,1,,Recruited from Broadford / Murray U18,draftguru
+aflca-champion:2006:28,aflca-champion,2006,Sydney,Adam Goodes,1012,resolved,1,,Recruited from Horsham FC / North Ballarat U18,draftguru
+aflca-champion:2006:29,aflca-champion,2006,Adelaide,Simon Goodwin,51,resolved,1,,Recruited from Unley HS / South Adelaide,draftguru
+aflca-champion:2007:30,aflca-champion,2007,Geelong,Gary Ablett,1105,resolved,2,,Recruited from Modewarre / Geelong U18,draftguru
+aflca-champion:2008:31,aflca-champion,2008,Geelong,Gary Ablett,1105,resolved,2,,Recruited from Modewarre / Geelong U18,draftguru
+aflca-champion:2009:32,aflca-champion,2009,Geelong,Gary Ablett,1105,resolved,2,,Recruited from Modewarre / Geelong U18,draftguru
+aflca-champion:2010:33,aflca-champion,2010,Collingwood,Dane Swan,1460,resolved,1,,Recruited from Westmeadows / St Bernard's College / Calder U18,draftguru
+aflca-champion:2011:34,aflca-champion,2011,Carlton,Marc Murphy,4148,resolved,1,,Recruited from Beverley Hills / Doncaster / Whitefriars College / Oakleigh U18,draftguru
+aflca-champion:2012:35,aflca-champion,2012,Richmond,Trent Cotchin,11666,resolved,1,,Recruited from West Preston / Parade College / PEGS / Northern U18,draftguru
+aflca-champion:2013:36,aflca-champion,2013,Collingwood,Scott Pendlebury,4182,resolved,1,,Recruited from Sale / Gippsland U18,draftguru
+aflca-champion:2014:37,aflca-champion,2014,Port Adelaide,Robbie Gray,11578,resolved,1,,Recruited from East Burwood / Oakleigh U18,draftguru
+aflca-champion:2015:38,aflca-champion,2015,Sydney,Dan Hannebery,11783,resolved,1,,Recruited from Kew Rovers / Xavier College / Oakleigh U18,draftguru
+aflca-champion:2016:39,aflca-champion,2016,Geelong,Patrick Dangerfield,11700,resolved,1,,Recruited from Anglesea / Geelong U18,draftguru
+aflca-champion:2017:40,aflca-champion,2017,Richmond,Dustin Martin,11794,resolved,1,,Recruited from Castlemaine / Bendigo U18,draftguru
+aflca-champion:2018:41,aflca-champion,2018,Melbourne,Max Gawn,11966,resolved,1,,Recruited from Ormond / McKinnon SC / Sandringham U18,draftguru
+aflca-champion:2019:42,aflca-champion,2019,Western Bulldogs,Marcus Bontempelli,12269,resolved,1,,Recruited from Eltham / Marcellin College / Northern U18,draftguru
+aflca-champion:2020:43,aflca-champion,2020,Brisbane,Lachie Neale,12055,resolved,1,,Recruited from Kybybolite / St Peter's College (SA) / Glenelg,draftguru
+aflca-champion:2021:44,aflca-champion,2021,Melbourne,Clayton Oliver,12410,resolved,1,,Recruited from Mooroopna / Bendigo U18 / Murray U18 / Richmond (VFL),draftguru
+aflca-champion:2022:45,aflca-champion,2022,Melbourne,Clayton Oliver,12410,resolved,1,,Recruited from Mooroopna / Bendigo U18 / Murray U18 / Richmond (VFL),draftguru
+aflca-champion:2022:46,aflca-champion,2022,Gold Coast,Touk Miller,12331,resolved,1,,Recruited from Maribyrnong Park / St Kevin's College / Calder U18,draftguru
+aflca-champion:2023:47,aflca-champion,2023,Port Adelaide,Zak Butters,12698,resolved,1,,Recruited from Darley / Maribyrnong College / Western U18,draftguru
+aflca-champion:2024:48,aflca-champion,2024,Collingwood,Nick Daicos,12943,resolved,1,,Recruited from Balwyn Greythorn / Kew Rovers / Carey Grammar / Oakleigh U18,draftguru
+aflca-champion:2025:49,aflca-champion,2025,Geelong,Bailey Smith,12692,resolved,1,,Recruited from East Malvern / Old Xavs / Xavier College / Sandringham U18,draftguru
+aflca-champion:2025:50,aflca-champion,2025,Gold Coast,Noah Anderson,12767,resolved,1,,Recruited from Boroondara Hawks JFC / Hawthorn Citizens / Carey Grammar / Oakleigh U18,draftguru
+aflpa-best-first-year-player:1998:51,aflpa-best-first-year-player,1998,Port Adelaide,Nick Stevens,842,resolved,1,,Recruited from St Mary's (NFL) / Northern U18,draftguru
+aflpa-best-first-year-player:1999:52,aflpa-best-first-year-player,1999,Sydney,Adam Goodes,1012,resolved,1,,Recruited from Horsham FC / North Ballarat U18,draftguru
+aflpa-best-first-year-player:2000:53,aflpa-best-first-year-player,2000,Fremantle,Paul Hasleby,542,resolved,1,,Recruited from Northampton / Mazenod College (WA) / East Fremantle,draftguru
+aflpa-best-first-year-player:2001:54,aflpa-best-first-year-player,2001,West Coast,Daniel Kerr,1077,resolved,1,,Recruited from Melville JFC / Aquinas College (WA),draftguru
+aflpa-best-first-year-player:2002:55,aflpa-best-first-year-player,2002,West Coast,Chris Judd,1122,resolved,1,,Recruited from East Sandringham / Caulfield Grammar / Sandringham U18,draftguru
+aflpa-best-first-year-player:2003:56,aflpa-best-first-year-player,2003,North Melbourne,Daniel Wells,1427,resolved,1,,Recruited from Kwinana / Peel,draftguru
+aflpa-best-first-year-player:2004:57,aflpa-best-first-year-player,2004,Melbourne,Aaron Davey,3943,resolved,1,,Recruited from Port Melbourne,draftguru
+aflpa-best-first-year-player:2005:58,aflpa-best-first-year-player,2005,Richmond,Brett Deledio,4068,resolved,1,,Recruited from Kyabram / Murray U18,draftguru
+aflpa-best-first-year-player:2006:59,aflpa-best-first-year-player,2006,Carlton,Marc Murphy,4148,resolved,1,,Recruited from Beverley Hills / Doncaster / Whitefriars College / Oakleigh U18,draftguru
+aflpa-best-first-year-player:2007:60,aflpa-best-first-year-player,2007,Geelong,Joel Selwood,11538,resolved,1,,Recruited from Sandhurst / Catholic College Bendigo / Bendigo U18,draftguru
+aflpa-best-first-year-player:2008:61,aflpa-best-first-year-player,2008,Fremantle,Rhys Palmer,11641,resolved,1,,Recruited from Bullcreek Leeming JFC / East Fremantle,draftguru
+aflpa-best-first-year-player:2009:62,aflpa-best-first-year-player,2009,Brisbane,Daniel Rich,11725,resolved,1,,Recruited from Sorrento Duncraig JFC / Sacred Heart College (WA) / Subiaco,draftguru
+aflpa-best-first-year-player:2010:63,aflpa-best-first-year-player,2010,Fremantle,Michael Barlow,11809,resolved,1,,Recruited from Assumption College / Shepparton United / Werribee,draftguru
+aflpa-best-first-year-player:2011:64,aflpa-best-first-year-player,2011,Essendon,Dyson Heppell,11896,resolved,1,,Recruited from Leongatha / Gippsland U18,draftguru
+aflpa-best-first-year-player:2012:65,aflpa-best-first-year-player,2012,GWS,Jeremy Cameron,12017,resolved,1,,Recruited from Dartmoor / North Ballarat U18,draftguru
+aflpa-best-first-year-player:2013:66,aflpa-best-first-year-player,2013,Gold Coast,Jaeger O'Meara,12141,resolved,1,,Recruited from Dongara / Perth,draftguru
+aflpa-best-first-year-player:2014:67,aflpa-best-first-year-player,2014,Western Bulldogs,Marcus Bontempelli,12269,resolved,1,,Recruited from Eltham / Marcellin College / Northern U18,draftguru
+aflpa-best-first-year-player:2015:68,aflpa-best-first-year-player,2015,Sydney,Isaac Heeney,12326,resolved,1,,Recruited from Cardiff / NSW-ACT U18 / Sydney (NEAFL),draftguru
+aflpa-best-first-year-player:2016:69,aflpa-best-first-year-player,2016,Sydney,Callum Mills,12413,resolved,1,,Recruited from Mosman / North Shore (NSW) / NSW-ACT U18 / Sydney (NEAFL),draftguru
+aflpa-best-first-year-player:2017:70,aflpa-best-first-year-player,2017,Essendon,Andrew McGrath,12491,resolved,1,,Recruited from Brighton Grammar / East Brighton / Sandringham U18,draftguru
+aflpa-best-first-year-player:2018:71,aflpa-best-first-year-player,2018,Geelong,Tim Kelly,12595,resolved,1,,Recruited from Palmyra JFC / South Fremantle,draftguru
+aflpa-best-first-year-player:2019:72,aflpa-best-first-year-player,2019,Carlton,Sam Walsh,12684,resolved,1,,Recruited from St Joseph's / Geelong U18,draftguru
+aflpa-best-first-year-player:2020:73,aflpa-best-first-year-player,2020,Fremantle,Caleb Serong,12786,resolved,1,,Recruited from Warragul / Geelong Grammar / Gippsland U18,draftguru
+aflpa-best-first-year-player:2021:74,aflpa-best-first-year-player,2021,Sydney,Errol Gulden,12862,resolved,1,,Recruited from Maroubra,draftguru
+aflpa-best-first-year-player:2022:75,aflpa-best-first-year-player,2022,Collingwood,Nick Daicos,12943,resolved,1,,Recruited from Balwyn Greythorn / Kew Rovers / Carey Grammar / Oakleigh U18,draftguru
+aflpa-best-first-year-player:2023:76,aflpa-best-first-year-player,2023,North Melbourne,Harry Sheezel,13034,resolved,1,,Recruited from Ajax / Sandringham U18,draftguru
+aflpa-best-first-year-player:2024:77,aflpa-best-first-year-player,2024,West Coast,Harley Reid,13111,resolved,1,,Recruited from Tongala / St Joseph's College (Echuca) / Bendigo U18,draftguru
+aflpa-best-first-year-player:2025:78,aflpa-best-first-year-player,2025,Fremantle,Murphy Reid,13180,resolved,1,,Recruited from South Melbourne Districts / Caulfield Grammar / Sandringham U18,draftguru
+aflpa-mvp:1982:79,aflpa-mvp,1982,Hawthorn,Leigh Matthews,1949,unique,1,,,draftguru
+aflpa-mvp:1983:80,aflpa-mvp,1983,Essendon,Terry Daniher,1311,unique,1,,,draftguru
+aflpa-mvp:1984:81,aflpa-mvp,1984,Hawthorn,Russell Greene,1767,unique,1,,,draftguru
+aflpa-mvp:1985:82,aflpa-mvp,1985,Geelong,Greg Williams,142,resolved,1,,Recruited from Golden Square,draftguru
+aflpa-mvp:1986:83,aflpa-mvp,1986,Fitzroy,Paul Roos,985,resolved,1,,Recruited from Beverley Hills,draftguru
+aflpa-mvp:1987:84,aflpa-mvp,1987,St Kilda,Tony Lockett,990,resolved,1,,Recruited from Ballarat Grammar / North Ballarat,draftguru
+aflpa-mvp:1988:85,aflpa-mvp,1988,Sydney,Gerard Healy,1366,resolved,1,,Recruited from Edithvale-Aspendale / St Bede's College,draftguru
+aflpa-mvp:1989:86,aflpa-mvp,1989,Essendon,Tim Watson,1162,resolved,1,,Recruited from Dimboola,draftguru
+aflpa-mvp:1990:87,aflpa-mvp,1990,Collingwood,Darren Millane,1292,unique,1,,,draftguru
+aflpa-mvp:1991:88,aflpa-mvp,1991,Melbourne,Jim Stynes,702,unique,1,,Recruited from County Dublin,draftguru
+aflpa-mvp:1992:89,aflpa-mvp,1992,Hawthorn,Jason Dunstall,632,unique,1,,Recruited from Anglican Church Grammar / Coorparoo,draftguru
+aflpa-mvp:1993:90,aflpa-mvp,1993,Geelong,Gary Ablett,567,resolved,2,,Recruited from Drouin,draftguru
+aflpa-mvp:1994:91,aflpa-mvp,1994,Carlton,Greg Williams,142,resolved,1,,Recruited from Golden Square,draftguru
+aflpa-mvp:1995:92,aflpa-mvp,1995,North Melbourne,Wayne Carey,766,resolved,1,,Recruited from Wagga / North Adelaide,draftguru
+aflpa-mvp:1996:93,aflpa-mvp,1996,North Melbourne,Corey McKernan,775,resolved,1,,Recruited from Gladstone Park SC / Westmeadows,draftguru
+aflpa-mvp:1997:94,aflpa-mvp,1997,St Kilda,Robert Harvey,930,unique,1,,Recruited from Seaford,draftguru
+aflpa-mvp:1998:95,aflpa-mvp,1998,North Melbourne,Wayne Carey,766,resolved,1,,Recruited from Wagga / North Adelaide,draftguru
+aflpa-mvp:1999:96,aflpa-mvp,1999,Hawthorn,Shane Crawford,633,resolved,1,,Recruited from Finley / Assumption College,draftguru
+aflpa-mvp:2000:97,aflpa-mvp,2000,Carlton,Anthony Koutoufides,144,unique,1,,Recruited from Lalor,draftguru
+aflpa-mvp:2001:98,aflpa-mvp,2001,Adelaide,Andrew McLeod,30,resolved,1,,Recruited from Darwin FC / Port Adelaide (SANFL),draftguru
+aflpa-mvp:2002:100,aflpa-mvp,2002,Brisbane,Michael Voss,102,unique,1,,Recruited from Morningside,draftguru
+aflpa-mvp:2002:99,aflpa-mvp,2002,Western Bulldogs,Luke Darcy,436,resolved,1,,Recruited from Rostrevor College / South Adelaide,draftguru
+aflpa-mvp:2003:101,aflpa-mvp,2003,Brisbane,Michael Voss,102,unique,1,,Recruited from Morningside,draftguru
+aflpa-mvp:2004:102,aflpa-mvp,2004,St Kilda,Nick Riewoldt,981,resolved,1,,Recruited from Broadbeach / Southport,draftguru
+aflpa-mvp:2005:103,aflpa-mvp,2005,West Coast,Ben Cousins,1051,resolved,1,,Recruited from Bullcreek Leeming JFC / Wesley College (WA) / East Fremantle,draftguru
+aflpa-mvp:2006:104,aflpa-mvp,2006,West Coast,Chris Judd,1122,resolved,1,,Recruited from East Sandringham / Caulfield Grammar / Sandringham U18,draftguru
+aflpa-mvp:2007:105,aflpa-mvp,2007,Geelong,Gary Ablett,1105,resolved,2,,Recruited from Modewarre / Geelong U18,draftguru
+aflpa-mvp:2008:106,aflpa-mvp,2008,Geelong,Gary Ablett,1105,resolved,2,,Recruited from Modewarre / Geelong U18,draftguru
+aflpa-mvp:2009:107,aflpa-mvp,2009,Geelong,Gary Ablett,1105,resolved,2,,Recruited from Modewarre / Geelong U18,draftguru
+aflpa-mvp:2010:108,aflpa-mvp,2010,Collingwood,Dane Swan,1460,resolved,1,,Recruited from Westmeadows / St Bernard's College / Calder U18,draftguru
+aflpa-mvp:2011:109,aflpa-mvp,2011,Carlton,Chris Judd,1122,resolved,1,,Recruited from East Sandringham / Caulfield Grammar / Sandringham U18,draftguru
+aflpa-mvp:2012:110,aflpa-mvp,2012,Gold Coast,Gary Ablett,1105,resolved,2,,Recruited from Modewarre / Geelong U18,draftguru
+aflpa-mvp:2013:111,aflpa-mvp,2013,Gold Coast,Gary Ablett,1105,resolved,2,,Recruited from Modewarre / Geelong U18,draftguru
+aflpa-mvp:2014:112,aflpa-mvp,2014,Fremantle,Nathan Fyfe,11834,resolved,0,,Recruited from Lake Grace-Pingrup / Aquinas College (WA) / Claremont,draftguru
+aflpa-mvp:2015:113,aflpa-mvp,2015,Fremantle,Nathan Fyfe,11834,resolved,0,,Recruited from Lake Grace-Pingrup / Aquinas College (WA) / Claremont,draftguru
+aflpa-mvp:2016:114,aflpa-mvp,2016,Geelong,Patrick Dangerfield,11700,resolved,1,,Recruited from Anglesea / Geelong U18,draftguru
+aflpa-mvp:2017:115,aflpa-mvp,2017,Richmond,Dustin Martin,11794,resolved,1,,Recruited from Castlemaine / Bendigo U18,draftguru
+aflpa-mvp:2018:116,aflpa-mvp,2018,Hawthorn,Tom Mitchell,12196,resolved,1,,Recruited from Ashburton / Carey Grammar / Hale School / Claremont,draftguru
+aflpa-mvp:2019:117,aflpa-mvp,2019,Carlton,Patrick Cripps,12261,resolved,1,,Recruited from Northampton / East Fremantle,draftguru
+aflpa-mvp:2020:118,aflpa-mvp,2020,Brisbane,Lachie Neale,12055,resolved,1,,Recruited from Kybybolite / St Peter's College (SA) / Glenelg,draftguru
+aflpa-mvp:2021:119,aflpa-mvp,2021,Western Bulldogs,Marcus Bontempelli,12269,resolved,1,,Recruited from Eltham / Marcellin College / Northern U18,draftguru
+aflpa-mvp:2022:120,aflpa-mvp,2022,Fremantle,Andrew Brayshaw,12589,resolved,1,,Recruited from Hampton Rovers / Haileybury College / Sandringham U18,draftguru
+aflpa-mvp:2023:121,aflpa-mvp,2023,Western Bulldogs,Marcus Bontempelli,12269,resolved,1,,Recruited from Eltham / Marcellin College / Northern U18,draftguru
+aflpa-mvp:2024:122,aflpa-mvp,2024,Western Bulldogs,Marcus Bontempelli,12269,resolved,1,,Recruited from Eltham / Marcellin College / Northern U18,draftguru
+aflpa-mvp:2025:123,aflpa-mvp,2025,Collingwood,Nick Daicos,12943,resolved,1,,Recruited from Balwyn Greythorn / Kew Rovers / Carey Grammar / Oakleigh U18,draftguru
+all-australian-squad:2007:124,all-australian-squad,2007,Port Adelaide,Brett Ebert,3955,resolved,1,,Recruited from St Michael's College (SA) / Port Adelaide (SANFL),draftguru
+all-australian-squad:2007:125,all-australian-squad,2007,Sydney,Brett Kirk,1015,resolved,1,,Recruited from North Albury,draftguru
+all-australian-squad:2007:126,all-australian-squad,2007,North Melbourne,Corey Jones,808,resolved,1,,Recruited from Wycheproof-Narraport / Bendigo U18 / Sturt,draftguru
+all-australian-squad:2007:127,all-australian-squad,2007,Sydney,Craig Bolton,1090,resolved,1,,Recruited from Eastlake / NSW-ACT U18,draftguru
+all-australian-squad:2007:128,all-australian-squad,2007,North Melbourne,Hamish McIntosh,4087,resolved,1,,Recruited from Lavington / Murray U18,draftguru
+all-australian-squad:2007:129,all-australian-squad,2007,Brisbane,Jed Adcock,3976,resolved,1,,Recruited from Maryborough FC / North Ballarat U18,draftguru
+all-australian-squad:2007:130,all-australian-squad,2007,Hawthorn,Lance Franklin,4065,resolved,1,,Recruited from Dowerin / Wesley College (WA) / Perth,draftguru
+all-australian-squad:2007:131,all-australian-squad,2007,Hawthorn,Luke Hodge,1134,resolved,1,,Recruited from Colac / Geelong U18,draftguru
+all-australian-squad:2007:132,all-australian-squad,2007,Richmond,Matthew Richardson,870,resolved,1,,Recruited from Devonport,draftguru
+all-australian-squad:2007:133,all-australian-squad,2007,Richmond,Nathan Foley,4112,resolved,1,,Recruited from Geelong U18,draftguru
+all-australian-squad:2007:134,all-australian-squad,2007,St Kilda,Nick Dal Santo,1132,resolved,1,,Recruited from Mandurang JFC / Kennington-Sandhurst JFC / Bendigo U18,draftguru
+all-australian-squad:2007:135,all-australian-squad,2007,Sydney,Nick Malceski,4117,resolved,1,,Recruited from North Ringwood / Aquinas College (Vic) / Eastern U18,draftguru
+all-australian-squad:2007:136,all-australian-squad,2007,St Kilda,Nick Riewoldt,981,resolved,1,,Recruited from Broadbeach / Southport,draftguru
+all-australian-squad:2007:137,all-australian-squad,2007,Brisbane,Nigel Lappin,100,resolved,1,,Recruited from Chiltern,draftguru
+all-australian-squad:2007:138,all-australian-squad,2007,Fremantle,Roger Hayden,1205,resolved,1,,Recruited from South Fremantle,draftguru
+all-australian-squad:2007:139,all-australian-squad,2007,St Kilda,Sam Fisher,3975,resolved,1,,Recruited from Barmera-Monash / West Adelaide,draftguru
+all-australian-squad:2007:140,all-australian-squad,2007,Hawthorn,Sam Mitchell,1135,resolved,1,,Recruited from Mooroolbark / Eastern U18 / Box Hill,draftguru
+all-australian-squad:2007:141,all-australian-squad,2007,Essendon,Scott Lucas,339,resolved,1,,Recruited from Camperdown / Mercy Regional College / St Bernard's College / Geelong U18,draftguru
+all-australian-squad:2008:142,all-australian-squad,2008,Geelong,Andrew Mackie,3958,resolved,1,,Recruited from Sacred Heart College / Glenelg,draftguru
+all-australian-squad:2008:143,all-australian-squad,2008,Richmond,Brett Deledio,4068,resolved,1,,Recruited from Kyabram / Murray U18,draftguru
+all-australian-squad:2008:144,all-australian-squad,2008,Sydney,Brett Kirk,1015,resolved,1,,Recruited from North Albury,draftguru
+all-australian-squad:2008:145,all-australian-squad,2008,Brisbane,Daniel Bradshaw,134,resolved,1,,Recruited from Wodonga FC,draftguru
+all-australian-squad:2008:146,all-australian-squad,2008,Western Bulldogs,Daniel Cross,1153,resolved,1,,Recruited from Albury FC / Murray U18,draftguru
+all-australian-squad:2008:147,all-australian-squad,2008,Port Adelaide,Daniel Motlop,814,resolved,1,,Recruited from Wanderers / North Adelaide,draftguru
+all-australian-squad:2008:148,all-australian-squad,2008,North Melbourne,Daniel Pratt,3982,resolved,1,,Recruited from Aspley / Northern Eagles,draftguru
+all-australian-squad:2008:149,all-australian-squad,2008,Geelong,Darren Milburn,590,resolved,1,,Recruited from Kilmore / Calder U18,draftguru
+all-australian-squad:2008:150,all-australian-squad,2008,North Melbourne,Drew Petrie,806,resolved,1,,Recruited from St Patrick's College / Ballarat FC / North Ballarat U18,draftguru
+all-australian-squad:2008:151,all-australian-squad,2008,Geelong,Joel Selwood,11538,resolved,1,,Recruited from Sandhurst / Catholic College Bendigo / Bendigo U18,draftguru
+all-australian-squad:2008:152,all-australian-squad,2008,Brisbane,Jonathan Brown,1092,resolved,1,,Recruited from Emmanuel Hawks JFC / Emmanuel College (Warrnambool) / South Warrnambool / Geelong U18,draftguru
+all-australian-squad:2008:153,all-australian-squad,2008,St Kilda,Lenny Hayes,966,resolved,1,,Recruited from Pennant Hills / NSW-ACT U18,draftguru
+all-australian-squad:2008:154,all-australian-squad,2008,Fremantle,Luke McPharlin,677,resolved,1,,Recruited from Bullcreek Leeming JFC / Christ Church Grammar / East Fremantle,draftguru
+all-australian-squad:2008:155,all-australian-squad,2008,St Kilda,Max Hudghton,955,resolved,1,,Recruited from Diamond Creek / Northern U18 / West Brisbane,draftguru
+all-australian-squad:2008:156,all-australian-squad,2008,Western Bulldogs,Robert Murphy,468,resolved,1,,Recruited from Warragul / Gippsland U18,draftguru
+all-australian-squad:2008:157,all-australian-squad,2008,Sydney,Ryan O'Keefe,1024,resolved,0,,Recruited from St Kevin's College / Calder U18,draftguru
+all-australian-squad:2008:158,all-australian-squad,2008,Hawthorn,Sam Mitchell,1135,resolved,1,,Recruited from Mooroolbark / Eastern U18 / Box Hill,draftguru
+all-australian-squad:2008:159,all-australian-squad,2008,Brisbane,Simon Black,1083,resolved,1,,Recruited from East Fremantle,draftguru
+all-australian-squad:2009:160,all-australian-squad,2009,Collingwood,Alan Didak,301,resolved,1,,Recruited from Blackfriars / Port Adelaide (SANFL),draftguru
+all-australian-squad:2009:161,all-australian-squad,2009,Geelong,Andrew Mackie,3958,resolved,1,,Recruited from Sacred Heart College / Glenelg,draftguru
+all-australian-squad:2009:162,all-australian-squad,2009,Adelaide,Bernie Vince,4151,resolved,1,,Recruited from CMS Crows / Prince Alfred College / Border Districts / Woodville-West Torrens,draftguru
+all-australian-squad:2009:163,all-australian-squad,2009,Hawthorn,Brad Sewell,3959,resolved,1,,Recruited from North Ballarat U18,draftguru
+all-australian-squad:2009:164,all-australian-squad,2009,Essendon,Dustin Fletcher,304,resolved,1,,Recruited from PEGS / Western U18,draftguru
+all-australian-squad:2009:165,all-australian-squad,2009,North Melbourne,Hamish McIntosh,4087,resolved,1,,Recruited from Lavington / Murray U18,draftguru
+all-australian-squad:2009:166,all-australian-squad,2009,Adelaide,Jason Porplyzia,4158,resolved,1,,Recruited from Happy Valley / Sacred Heart College / West Adelaide,draftguru
+all-australian-squad:2009:167,all-australian-squad,2009,Geelong,Jimmy Bartel,1106,resolved,1,,Recruited from Bell Park / St Joseph's College / Geelong U18,draftguru
+all-australian-squad:2009:168,all-australian-squad,2009,Hawthorn,Lance Franklin,4065,resolved,1,,Recruited from Dowerin / Wesley College (WA) / Perth,draftguru
+all-australian-squad:2009:169,all-australian-squad,2009,Carlton,Marc Murphy,4148,resolved,1,,Recruited from Beverley Hills / Doncaster / Whitefriars College / Oakleigh U18,draftguru
+all-australian-squad:2009:170,all-australian-squad,2009,West Coast,Mark LeCras,4114,resolved,1,,Recruited from Cervantes / Whitford JFC / Aquinas College (WA) / West Perth,draftguru
+all-australian-squad:2009:171,all-australian-squad,2009,Brisbane,Mitch Clark,4146,resolved,1,,Recruited from Rossmoyne JFC / Riverton JFC / East Fremantle,draftguru
+all-australian-squad:2009:172,all-australian-squad,2009,Western Bulldogs,Ryan Hargrave,1113,resolved,1,,Recruited from Perth,draftguru
+all-australian-squad:2009:173,all-australian-squad,2009,St Kilda,Sam Gilbert,4178,resolved,1,,Recruited from Coolangatta Tweed Heads / Southport,draftguru
+all-australian-squad:2009:174,all-australian-squad,2009,Collingwood,Scott Pendlebury,4182,resolved,1,,Recruited from Sale / Gippsland U18,draftguru
+all-australian-squad:2009:175,all-australian-squad,2009,Collingwood,Simon Prestigiacomo,249,resolved,1,,Recruited from Research / Northern U18,draftguru
+all-australian-squad:2009:176,all-australian-squad,2009,St Kilda,Stephen Milne,978,resolved,1,,Recruited from Dandenong U18,draftguru
+all-australian-squad:2009:177,all-australian-squad,2009,Geelong,Steve Johnson,1140,resolved,1,,Recruited from Wangaratta Tigers JFC / Wangaratta FC / Murray U18,draftguru
+all-australian-squad:2010:178,all-australian-squad,2010,Western Bulldogs,Adam Cooney,3940,resolved,1,,Recruited from Flagstaff Hill / West Adelaide,draftguru
+all-australian-squad:2010:179,all-australian-squad,2010,Sydney,Adam Goodes,1012,resolved,1,,Recruited from Horsham FC / North Ballarat U18,draftguru
+all-australian-squad:2010:180,all-australian-squad,2010,North Melbourne,Andrew Swallow,4176,resolved,1,,Recruited from Rossmoyne JFC / East Fremantle,draftguru
+all-australian-squad:2010:181,all-australian-squad,2010,Melbourne,Brad Green,748,resolved,1,,Recruited from North Launceston / Tasmania U18,draftguru
+all-australian-squad:2010:182,all-australian-squad,2010,North Melbourne,Brady Rawlings,799,resolved,1,,Recruited from Devonport / Tasmania U18,draftguru
+all-australian-squad:2010:183,all-australian-squad,2010,North Melbourne,Brent Harvey,788,resolved,1,,Recruited from Preston RSL / Northern U18,draftguru
+all-australian-squad:2010:184,all-australian-squad,2010,Richmond,Brett Deledio,4068,resolved,1,,Recruited from Kyabram / Murray U18,draftguru
+all-australian-squad:2010:185,all-australian-squad,2010,Collingwood,Darren Jolly,753,resolved,1,,Recruited from Damascus College / North Ballarat,draftguru
+all-australian-squad:2010:186,all-australian-squad,2010,Fremantle,David Mundy,4088,resolved,1,,Recruited from Seymour / Murray U18,draftguru
+all-australian-squad:2010:187,all-australian-squad,2010,Essendon,Dustin Fletcher,304,resolved,1,,Recruited from PEGS / Western U18,draftguru
+all-australian-squad:2010:188,all-australian-squad,2010,Geelong,James Kelly,1141,resolved,1,,Recruited from Rupertswood / Calder U18,draftguru
+all-australian-squad:2010:189,all-australian-squad,2010,Essendon,Jobe Watson,1461,resolved,1,,Recruited from East Sandringham / Xavier College / Sandringham U18,draftguru
+all-australian-squad:2010:190,all-australian-squad,2010,St Kilda,Lenny Hayes,966,resolved,1,,Recruited from Pennant Hills / NSW-ACT U18,draftguru
+all-australian-squad:2010:191,all-australian-squad,2010,Western Bulldogs,Matthew Boyd,1450,resolved,1,,Recruited from Narre Warren / Mazenod College / Dandenong U18 / Frankston,draftguru
+all-australian-squad:2010:192,all-australian-squad,2010,Fremantle,Matthew Pavlich,544,resolved,1,,Recruited from Sacred Heart College / Woodville-West Torrens,draftguru
+all-australian-squad:2010:193,all-australian-squad,2010,St Kilda,Nick Dal Santo,1132,resolved,1,,Recruited from Mandurang JFC / Kennington-Sandhurst JFC / Bendigo U18,draftguru
+all-australian-squad:2010:194,all-australian-squad,2010,Sydney,Nick Malceski,4117,resolved,1,,Recruited from North Ringwood / Aquinas College (Vic) / Eastern U18,draftguru
+all-australian-squad:2010:195,all-australian-squad,2010,Sydney,Shane Mumford,11656,resolved,1,,Recruited from Bunyip / Geelong (VFL),draftguru
+all-australian-squad:2011:196,all-australian-squad,2011,West Coast,Andrew Embley,1065,resolved,1,,Recruited from Bassendean / Trinity College (WA) / Swan Districts,draftguru
+all-australian-squad:2011:197,all-australian-squad,2011,North Melbourne,Andrew Swallow,4176,resolved,1,,Recruited from Rossmoyne JFC / East Fremantle,draftguru
+all-australian-squad:2011:198,all-australian-squad,2011,Richmond,Brett Deledio,4068,resolved,1,,Recruited from Kyabram / Murray U18,draftguru
+all-australian-squad:2011:199,all-australian-squad,2011,North Melbourne,Daniel Wells,1427,resolved,1,,Recruited from Kwinana / Peel,draftguru
+all-australian-squad:2011:200,all-australian-squad,2011,Carlton,Eddie Betts,4060,resolved,1,,Recruited from Templestowe / Calder U18,draftguru
+all-australian-squad:2011:201,all-australian-squad,2011,Hawthorn,Grant Birchall,4149,resolved,1,,Recruited from Devonport / Tasmania U18,draftguru
+all-australian-squad:2011:202,all-australian-squad,2011,Geelong,Harry Taylor,11643,resolved,1,,Recruited from Geraldton Rovers / East Fremantle,draftguru
+all-australian-squad:2011:203,all-australian-squad,2011,Carlton,Heath Scotland,280,resolved,1,,Recruited from Darley / Western U18,draftguru
+all-australian-squad:2011:204,all-australian-squad,2011,Geelong,Joel Selwood,11538,resolved,1,,Recruited from Sandhurst / Catholic College Bendigo / Bendigo U18,draftguru
+all-australian-squad:2011:205,all-australian-squad,2011,Hawthorn,Josh Gibson,4145,resolved,1,,Recruited from East Burwood / Trinity Grammar / Oakleigh U18 / Eastern U18 / Port Melbourne,draftguru
+all-australian-squad:2011:206,all-australian-squad,2011,West Coast,Josh Kennedy,4169,resolved,2,,Recruited from Northampton / East Fremantle,draftguru
+all-australian-squad:2011:207,all-australian-squad,2011,Fremantle,Luke McPharlin,677,resolved,1,,Recruited from Bullcreek Leeming JFC / Christ Church Grammar / East Fremantle,draftguru
+all-australian-squad:2011:208,all-australian-squad,2011,West Coast,Matt Priddis,4186,resolved,1,,Recruited from Sorrento Duncraig JFC / Subiaco,draftguru
+all-australian-squad:2011:209,all-australian-squad,2011,Fremantle,Nathan Fyfe,11834,resolved,0,,Recruited from Lake Grace-Pingrup / Aquinas College (WA) / Claremont,draftguru
+all-australian-squad:2011:210,all-australian-squad,2011,St Kilda,Sam Fisher,3975,resolved,1,,Recruited from Barmera-Monash / West Adelaide,draftguru
+all-australian-squad:2011:211,all-australian-squad,2011,Adelaide,Scott Thompson,755,resolved,2,,Recruited from North Haven / St Michael's College (SA) / Port Adelaide (SANFL),draftguru
+all-australian-squad:2011:212,all-australian-squad,2011,Geelong,Steve Johnson,1140,resolved,1,,Recruited from Wangaratta Tigers JFC / Wangaratta FC / Murray U18,draftguru
+all-australian-squad:2011:213,all-australian-squad,2011,North Melbourne,Todd Goldstein,11686,resolved,1,,Recruited from Trinity Grammar / Oakleigh U18,draftguru
+all-australian-squad:2012:214,all-australian-squad,2012,North Melbourne,Andrew Swallow,4176,resolved,1,,Recruited from Rossmoyne JFC / East Fremantle,draftguru
+all-australian-squad:2012:215,all-australian-squad,2012,Adelaide,Brent Reilly,1204,resolved,1,,Recruited from Calder U18,draftguru
+all-australian-squad:2012:216,all-australian-squad,2012,Geelong,Corey Enright,621,resolved,1,,Recruited from Kimba / Port Adelaide (SANFL),draftguru
+all-australian-squad:2012:217,all-australian-squad,2012,North Melbourne,Drew Petrie,806,resolved,1,,Recruited from St Patrick's College / Ballarat FC / North Ballarat U18,draftguru
+all-australian-squad:2012:218,all-australian-squad,2012,Carlton,Eddie Betts,4060,resolved,1,,Recruited from Templestowe / Calder U18,draftguru
+all-australian-squad:2012:219,all-australian-squad,2012,Geelong,Harry Taylor,11643,resolved,1,,Recruited from Geraldton Rovers / East Fremantle,draftguru
+all-australian-squad:2012:220,all-australian-squad,2012,Richmond,Ivan Maric,4165,resolved,1,,Recruited from Keilor / Calder U18,draftguru
+all-australian-squad:2012:221,all-australian-squad,2012,Richmond,Jack Riewoldt,11576,resolved,1,,Recruited from Clarence / Tasmania U18,draftguru
+all-australian-squad:2012:222,all-australian-squad,2012,Geelong,Joel Selwood,11538,resolved,1,,Recruited from Sandhurst / Catholic College Bendigo / Bendigo U18,draftguru
+all-australian-squad:2012:223,all-australian-squad,2012,Sydney,Kieren Jack,11546,resolved,1,,Recruited from Oakhill College / Pennant Hills / NSW-ACT U18,draftguru
+all-australian-squad:2012:224,all-australian-squad,2012,St Kilda,Lenny Hayes,966,resolved,1,,Recruited from Pennant Hills / NSW-ACT U18,draftguru
+all-australian-squad:2012:225,all-australian-squad,2012,Sydney,Lewis Jetta,11804,resolved,1,,Recruited from Bridgetown / Swan Districts,draftguru
+all-australian-squad:2012:226,all-australian-squad,2012,Fremantle,Matthew Pavlich,544,resolved,1,,Recruited from Sacred Heart College / Woodville-West Torrens,draftguru
+all-australian-squad:2012:227,all-australian-squad,2012,St Kilda,Nick Riewoldt,981,resolved,1,,Recruited from Broadbeach / Southport,draftguru
+all-australian-squad:2012:228,all-australian-squad,2012,Adelaide,Sam Jacobs,11708,resolved,1,,Recruited from Ardrossan / Woodville-West Torrens,draftguru
+all-australian-squad:2012:229,all-australian-squad,2012,Hawthorn,Sam Mitchell,1135,resolved,1,,Recruited from Mooroolbark / Eastern U18 / Box Hill,draftguru
+all-australian-squad:2012:230,all-australian-squad,2012,Adelaide,Taylor Walker,11713,resolved,1,,Recruited from North Broken Hill / NSW-ACT U18,draftguru
+all-australian-squad:2012:231,all-australian-squad,2012,Geelong,Tom Lonergan,4110,resolved,1,,Recruited from Yarrawonga / Murray U18 / Assumption College / Calder U18,draftguru
+all-australian-squad:2013:232,all-australian-squad,2013,Fremantle,Chris Mayne,11642,resolved,1,,Recruited from Belmont (WA) / Perth,draftguru
+all-australian-squad:2013:233,all-australian-squad,2013,North Melbourne,Daniel Wells,1427,resolved,1,,Recruited from Kwinana / Peel,draftguru
+all-australian-squad:2013:234,all-australian-squad,2013,Fremantle,David Mundy,4088,resolved,1,,Recruited from Seymour / Murray U18,draftguru
+all-australian-squad:2013:235,all-australian-squad,2013,West Coast,Eric Mackenzie,11596,resolved,1,,Recruited from Christ Church Grammar / Claremont,draftguru
+all-australian-squad:2013:236,all-australian-squad,2013,St Kilda,Jack Steven,11791,resolved,1,,Recruited from Lorne / Geelong U18,draftguru
+all-australian-squad:2013:237,all-australian-squad,2013,Hawthorn,Josh Gibson,4145,resolved,1,,Recruited from East Burwood / Trinity Grammar / Oakleigh U18 / Eastern U18 / Port Melbourne,draftguru
+all-australian-squad:2013:238,all-australian-squad,2013,Sydney,Josh Kennedy,11672,resolved,2,,Recruited from Ashburton / East Sandringham / Xavier College / Sandringham U18,draftguru
+all-australian-squad:2013:239,all-australian-squad,2013,West Coast,Josh Kennedy,4169,resolved,2,,Recruited from Northampton / East Fremantle,draftguru
+all-australian-squad:2013:240,all-australian-squad,2013,Hawthorn,Lance Franklin,4065,resolved,1,,Recruited from Dowerin / Wesley College (WA) / Perth,draftguru
+all-australian-squad:2013:241,all-australian-squad,2013,North Melbourne,Lindsay Thomas,11540,resolved,2,,Recruited from Mallee Park / Port Adelaide (SANFL),draftguru
+all-australian-squad:2013:242,all-australian-squad,2013,Hawthorn,Luke Hodge,1134,resolved,1,,Recruited from Colac / Geelong U18,draftguru
+all-australian-squad:2013:243,all-australian-squad,2013,Fremantle,Michael Walters,11763,resolved,1,,Recruited from Midvale / Swan Districts,draftguru
+all-australian-squad:2013:244,all-australian-squad,2013,Fremantle,Nathan Fyfe,11834,resolved,0,,Recruited from Lake Grace-Pingrup / Aquinas College (WA) / Claremont,draftguru
+all-australian-squad:2013:245,all-australian-squad,2013,Sydney,Nick Malceski,4117,resolved,1,,Recruited from North Ringwood / Aquinas College (Vic) / Eastern U18,draftguru
+all-australian-squad:2013:246,all-australian-squad,2013,St Kilda,Nick Riewoldt,981,resolved,1,,Recruited from Broadbeach / Southport,draftguru
+all-australian-squad:2013:247,all-australian-squad,2013,Adelaide,Richard Douglas,2381,resolved,1,,Recruited from Broadford / Assumption College / Calder U18,draftguru
+all-australian-squad:2013:248,all-australian-squad,2013,Geelong,Steven Motlop,11818,resolved,1,,Recruited from Wanderers,draftguru
+all-australian-squad:2013:249,all-australian-squad,2013,North Melbourne,Todd Goldstein,11686,resolved,1,,Recruited from Trinity Grammar / Oakleigh U18,draftguru
+all-australian-squad:2014:250,all-australian-squad,2014,Richmond,Brandon Ellis,12034,resolved,1,,Recruited from West Coburg / Calder U18,draftguru
+all-australian-squad:2014:251,all-australian-squad,2014,North Melbourne,Brent Harvey,788,resolved,1,,Recruited from Preston RSL / Northern U18,draftguru
+all-australian-squad:2014:252,all-australian-squad,2014,Carlton,Bryce Gibbs,11535,resolved,1,,Recruited from Plympton / Glenelg,draftguru
+all-australian-squad:2014:253,all-australian-squad,2014,GWS,Callan Ward,11677,resolved,1,,Recruited from Spotswood / Western U18,draftguru
+all-australian-squad:2014:254,all-australian-squad,2014,Collingwood,Dayne Beams,11728,resolved,1,,Recruited from Carrara / Southport,draftguru
+all-australian-squad:2014:255,all-australian-squad,2014,Richmond,Dustin Martin,11794,resolved,1,,Recruited from Castlemaine / Bendigo U18,draftguru
+all-australian-squad:2014:256,all-australian-squad,2014,Adelaide,Eddie Betts,4060,resolved,1,,Recruited from Templestowe / Calder U18,draftguru
+all-australian-squad:2014:257,all-australian-squad,2014,West Coast,Eric Mackenzie,11596,resolved,1,,Recruited from Christ Church Grammar / Claremont,draftguru
+all-australian-squad:2014:258,all-australian-squad,2014,Geelong,Harry Taylor,11643,resolved,1,,Recruited from Geraldton Rovers / East Fremantle,draftguru
+all-australian-squad:2014:259,all-australian-squad,2014,Hawthorn,Jack Gunston,11845,resolved,1,,Recruited from Beaumaris / Haileybury College / Sandringham U18,draftguru
+all-australian-squad:2014:260,all-australian-squad,2014,Port Adelaide,Jay Schulz,1451,resolved,1,,Recruited from Central Yorke / Concordia College / Woodville-West Torrens,draftguru
+all-australian-squad:2014:261,all-australian-squad,2014,Sydney,Luke Parker,11953,resolved,1,,Recruited from Langwarrin / Dandenong U18,draftguru
+all-australian-squad:2014:262,all-australian-squad,2014,West Coast,Matt Priddis,4186,resolved,1,,Recruited from Sorrento Duncraig JFC / Subiaco,draftguru
+all-australian-squad:2014:263,all-australian-squad,2014,Adelaide,Sam Jacobs,11708,resolved,1,,Recruited from Ardrossan / Woodville-West Torrens,draftguru
+all-australian-squad:2014:264,all-australian-squad,2014,Hawthorn,Shaun Burgoyne,1126,resolved,1,,Recruited from Mallee Park / Adelaide HS / Port Adelaide (SANFL),draftguru
+all-australian-squad:2014:265,all-australian-squad,2014,Geelong,Tom Hawkins,11548,resolved,1,,Recruited from Finley / Melbourne Grammar / Sandringham U18,draftguru
+all-australian-squad:2014:266,all-australian-squad,2014,Western Bulldogs,Tom Liberatore,11898,resolved,1,,Recruited from St Bernard's College / St Kevin's College / Calder U18,draftguru
+all-australian-squad:2014:267,all-australian-squad,2014,Geelong,Tom Lonergan,4110,resolved,1,,Recruited from Yarrawonga / Murray U18 / Assumption College / Calder U18,draftguru
+all-australian-squad:2015:268,all-australian-squad,2015,Collingwood,Dane Swan,1460,resolved,1,,Recruited from Westmeadows / St Bernard's College / Calder U18,draftguru
+all-australian-squad:2015:269,all-australian-squad,2015,Richmond,Dustin Martin,11794,resolved,1,,Recruited from Castlemaine / Bendigo U18,draftguru
+all-australian-squad:2015:270,all-australian-squad,2015,Fremantle,Garrick Ibbotson,11580,resolved,1,,Recruited from Bullcreek Leeming JFC / East Fremantle,draftguru
+all-australian-squad:2015:271,all-australian-squad,2015,Hawthorn,Jack Gunston,11845,resolved,1,,Recruited from Beaumaris / Haileybury College / Sandringham U18,draftguru
+all-australian-squad:2015:272,all-australian-squad,2015,GWS,Jeremy Cameron,12017,resolved,1,,Recruited from Dartmoor / North Ballarat U18,draftguru
+all-australian-squad:2015:273,all-australian-squad,2015,West Coast,Jeremy McGovern,12273,resolved,1,,Recruited from North Albany / Claremont,draftguru
+all-australian-squad:2015:274,all-australian-squad,2015,Hawthorn,Jordan Lewis,4077,resolved,1,,Recruited from Warrnambool FC / Emmanuel College (Warrnambool) / Geelong U18,draftguru
+all-australian-squad:2015:275,all-australian-squad,2015,Sydney,Josh Kennedy,11672,resolved,2,,Recruited from Ashburton / East Sandringham / Xavier College / Sandringham U18,draftguru
+all-australian-squad:2015:276,all-australian-squad,2015,Fremantle,Lachie Neale,12055,resolved,1,,Recruited from Kybybolite / St Peter's College (SA) / Glenelg,draftguru
+all-australian-squad:2015:277,all-australian-squad,2015,Western Bulldogs,Luke Dahlhaus,11974,resolved,1,,Recruited from Leopold / St Joseph's College / Geelong U18,draftguru
+all-australian-squad:2015:278,all-australian-squad,2015,Western Bulldogs,Matthew Boyd,1450,resolved,1,,Recruited from Narre Warren / Mazenod College / Dandenong U18 / Frankston,draftguru
+all-australian-squad:2015:279,all-australian-squad,2015,West Coast,Nic Naitanui,11768,resolved,1,,Recruited from Midvale / Swan Districts,draftguru
+all-australian-squad:2015:280,all-australian-squad,2015,Adelaide,Rory Laird,12165,resolved,1,,Recruited from Kenilworth / Scotch College (SA) / West Adelaide,draftguru
+all-australian-squad:2015:281,all-australian-squad,2015,Collingwood,Scott Pendlebury,4182,resolved,1,,Recruited from Sale / Gippsland U18,draftguru
+all-australian-squad:2015:282,all-australian-squad,2015,Hawthorn,Shaun Burgoyne,1126,resolved,1,,Recruited from Mallee Park / Adelaide HS / Port Adelaide (SANFL),draftguru
+all-australian-squad:2015:283,all-australian-squad,2015,North Melbourne,Shaun Higgins,4180,resolved,1,,Recruited from Newtown & Chilwell / St Joseph's College / Geelong U18,draftguru
+all-australian-squad:2015:284,all-australian-squad,2015,Fremantle,Stephen Hill,11716,resolved,1,,Recruited from Quinns Districts / West Perth,draftguru
+all-australian-squad:2015:285,all-australian-squad,2015,Adelaide,Taylor Walker,11713,resolved,1,,Recruited from North Broken Hill / NSW-ACT U18,draftguru
+all-australian-squad:2016:286,all-australian-squad,2016,Collingwood,Adam Treloar,12054,resolved,1,,Recruited from Noble Park / Dandenong U18,draftguru
+all-australian-squad:2016:287,all-australian-squad,2016,West Coast,Andrew Gaff,11904,resolved,1,,Recruited from Kew Comets / Carey Grammar / Oakleigh U18,draftguru
+all-australian-squad:2016:288,all-australian-squad,2016,GWS,Callan Ward,11677,resolved,1,,Recruited from Spotswood / Western U18,draftguru
+all-australian-squad:2016:289,all-australian-squad,2016,Hawthorn,Jack Gunston,11845,resolved,1,,Recruited from Beaumaris / Haileybury College / Sandringham U18,draftguru
+all-australian-squad:2016:290,all-australian-squad,2016,St Kilda,Jack Steven,11791,resolved,1,,Recruited from Lorne / Geelong U18,draftguru
+all-australian-squad:2016:291,all-australian-squad,2016,Port Adelaide,Jasper Pittard,11885,resolved,1,,Recruited from Flemington / Torquay / St Joseph's College / Geelong U18,draftguru
+all-australian-squad:2016:292,all-australian-squad,2016,Adelaide,Josh Jenkins,12074,resolved,1,,Recruited from Tyntynder / Lake Boga / Frankston,draftguru
+all-australian-squad:2016:293,all-australian-squad,2016,Carlton,Kade Simpson,1456,resolved,1,,Recruited from Emerald / Eastern U18,draftguru
+all-australian-squad:2016:294,all-australian-squad,2016,Fremantle,Lachie Neale,12055,resolved,1,,Recruited from Kybybolite / St Peter's College (SA) / Glenelg,draftguru
+all-australian-squad:2016:295,all-australian-squad,2016,West Coast,Luke Shuey,11805,resolved,1,,Recruited from Bulleen-Templestowe / Marcellin College / Oakleigh U18,draftguru
+all-australian-squad:2016:296,all-australian-squad,2016,North Melbourne,Robbie Tarrant,11859,resolved,1,,Recruited from South Mildura / Xavier College / Bendigo U18,draftguru
+all-australian-squad:2016:297,all-australian-squad,2016,Adelaide,Rory Laird,12165,resolved,1,,Recruited from Kenilworth / Scotch College (SA) / West Adelaide,draftguru
+all-australian-squad:2016:298,all-australian-squad,2016,Carlton,Sam Docherty,12170,resolved,1,,Recruited from Phillip Island / Gippsland U18,draftguru
+all-australian-squad:2016:299,all-australian-squad,2016,Hawthorn,Sam Mitchell,1135,resolved,1,,Recruited from Mooroolbark / Eastern U18 / Box Hill,draftguru
+all-australian-squad:2016:300,all-australian-squad,2016,Collingwood,Scott Pendlebury,4182,resolved,1,,Recruited from Sale / Gippsland U18,draftguru
+all-australian-squad:2016:301,all-australian-squad,2016,GWS,Stephen Coniglio,12028,resolved,1,,Recruited from Upper Swan / Swan Districts,draftguru
+all-australian-squad:2016:302,all-australian-squad,2016,Adelaide,Tom Lynch,11865,resolved,2,,Recruited from Beaumaris / Haileybury College / Sandringham U18,draftguru
+all-australian-squad:2016:303,all-australian-squad,2016,GWS,Tom Scully,11802,resolved,1,,Recruited from Narre Warren / Haileybury College / Dandenong U18,draftguru
+all-australian-squad:2017:304,all-australian-squad,2017,Collingwood,Adam Treloar,12054,resolved,1,,Recruited from Noble Park / Dandenong U18,draftguru
+all-australian-squad:2017:305,all-australian-squad,2017,North Melbourne,Ben Brown,12289,resolved,1,,Recruited from Devonport / Tasmania U18 / Glenorchy / Werribee,draftguru
+all-australian-squad:2017:306,all-australian-squad,2017,St Kilda,Dylan Roberton,11839,resolved,1,,Recruited from Frankston YCW / McClelland College / Dandenong U18,draftguru
+all-australian-squad:2017:307,all-australian-squad,2017,Adelaide,Jake Lever,12351,resolved,1,,Recruited from Romsey / Calder U18,draftguru
+all-australian-squad:2017:308,all-australian-squad,2017,Melbourne,Jeff Garlett,11711,resolved,1,,Recruited from Burracoppin / Trinity College (WA) / Swan Districts,draftguru
+all-australian-squad:2017:309,all-australian-squad,2017,Collingwood,Jeremy Howe,11967,resolved,1,,Recruited from Dodges Ferry / Hobart FC / Tasmania U18,draftguru
+all-australian-squad:2017:310,all-australian-squad,2017,Sydney,Josh Kennedy,11672,resolved,2,,Recruited from Ashburton / East Sandringham / Xavier College / Sandringham U18,draftguru
+all-australian-squad:2017:311,all-australian-squad,2017,Western Bulldogs,Marcus Bontempelli,12269,resolved,1,,Recruited from Eltham / Marcellin College / Northern U18,draftguru
+all-australian-squad:2017:312,all-australian-squad,2017,Carlton,Matthew Kreuzer,11645,resolved,1,,Recruited from Bundoora / Loyola College / Northern U18,draftguru
+all-australian-squad:2017:313,all-australian-squad,2017,Melbourne,Neville Jetta,11723,resolved,1,,Recruited from Carey Park / Swan Districts,draftguru
+all-australian-squad:2017:314,all-australian-squad,2017,Adelaide,Rory Sloane,11792,resolved,1,,Recruited from Upwey-Tecoma / Eastern U18,draftguru
+all-australian-squad:2017:315,all-australian-squad,2017,Adelaide,Sam Jacobs,11708,resolved,1,,Recruited from Ardrossan / Woodville-West Torrens,draftguru
+all-australian-squad:2017:316,all-australian-squad,2017,St Kilda,Sebastian Ross,12132,resolved,1,,Recruited from Horsham FC / Ballarat Clarendon College / North Ballarat U18 / North Ballarat,draftguru
+all-australian-squad:2017:317,all-australian-squad,2017,Adelaide,Taylor Walker,11713,resolved,1,,Recruited from North Broken Hill / NSW-ACT U18,draftguru
+all-australian-squad:2017:318,all-australian-squad,2017,GWS,Toby Greene,12025,resolved,1,,Recruited from Ashburton / Wesley College / Oakleigh U18,draftguru
+all-australian-squad:2017:319,all-australian-squad,2017,Port Adelaide,Tom Jonas,12002,resolved,1,,Recruited from Rostrevor College / Norwood,draftguru
+all-australian-squad:2017:320,all-australian-squad,2017,Adelaide,Tom Lynch,11865,resolved,2,,Recruited from Beaumaris / Haileybury College / Sandringham U18,draftguru
+all-australian-squad:2017:321,all-australian-squad,2017,GWS,Tom Scully,11802,resolved,1,,Recruited from Narre Warren / Haileybury College / Dandenong U18,draftguru
+all-australian-squad:2018:322,all-australian-squad,2018,North Melbourne,Ben Brown,12289,resolved,1,,Recruited from Devonport / Tasmania U18 / Glenorchy / Werribee,draftguru
+all-australian-squad:2018:323,all-australian-squad,2018,GWS,Callan Ward,11677,resolved,1,,Recruited from Spotswood / Western U18,draftguru
+all-australian-squad:2018:324,all-australian-squad,2018,Brisbane,Dayne Beams,11728,resolved,1,,Recruited from Carrara / Southport,draftguru
+all-australian-squad:2018:325,all-australian-squad,2018,Essendon,Devon Smith,12029,resolved,1,,Recruited from Lara / Geelong Grammar / Geelong U18,draftguru
+all-australian-squad:2018:326,all-australian-squad,2018,Richmond,Dylan Grimes,11879,resolved,1,,Recruited from Hurstbridge / Loyola College / Northern U18,draftguru
+all-australian-squad:2018:327,all-australian-squad,2018,West Coast,Elliot Yeo,12087,resolved,1,,Recruited from Booragoon / Aquinas College (WA) / East Fremantle,draftguru
+all-australian-squad:2018:328,all-australian-squad,2018,Brisbane,Harris Andrews,12340,resolved,1,,Recruited from Padua College (Qld) / Queensland U18 / Aspley / Brisbane (NEAFL),draftguru
+all-australian-squad:2018:329,all-australian-squad,2018,Western Bulldogs,Jack Macrae,12166,resolved,1,,Recruited from Kew Rovers / Carey Grammar / Oakleigh U18,draftguru
+all-australian-squad:2018:330,all-australian-squad,2018,Sydney,Jake Lloyd,12268,resolved,1,,Recruited from Horsham FC / North Ballarat U18 / North Ballarat,draftguru
+all-australian-squad:2018:331,all-australian-squad,2018,Collingwood,Jordan De Goey,12318,resolved,1,,Recruited from Ashburton / St Kevin's College / Oakleigh U18,draftguru
+all-australian-squad:2018:332,all-australian-squad,2018,Richmond,Josh Caddy,12010,resolved,1,,Recruited from Eltham / Marcellin College / Northern U18,draftguru
+all-australian-squad:2018:333,all-australian-squad,2018,Richmond,Kane Lambert,12333,resolved,1,,Recruited from Preston JFC / Northern U18 / Northern Bullants / Northern Blues / Williamstown,draftguru
+all-australian-squad:2018:334,all-australian-squad,2018,Fremantle,Lachie Neale,12055,resolved,1,,Recruited from Kybybolite / St Peter's College (SA) / Glenelg,draftguru
+all-australian-squad:2018:335,all-australian-squad,2018,Geelong,Mark Blicavs,12153,resolved,1,,Recruited from Sunbury FC / Athletics,draftguru
+all-australian-squad:2018:336,all-australian-squad,2018,Collingwood,Scott Pendlebury,4182,resolved,1,,Recruited from Sale / Gippsland U18,draftguru
+all-australian-squad:2018:337,all-australian-squad,2018,Geelong,Tom Hawkins,11548,resolved,1,,Recruited from Finley / Melbourne Grammar / Sandringham U18,draftguru
+all-australian-squad:2018:338,all-australian-squad,2018,Port Adelaide,Tom Jonas,12002,resolved,1,,Recruited from Rostrevor College / Norwood,draftguru
+all-australian-squad:2018:339,all-australian-squad,2018,Richmond,Trent Cotchin,11666,resolved,1,,Recruited from West Preston / Parade College / PEGS / Northern U18,draftguru
+all-australian-squad:2019:340,all-australian-squad,2019,Collingwood,Adam Treloar,12054,resolved,1,,Recruited from Noble Park / Dandenong U18,draftguru
+all-australian-squad:2019:341,all-australian-squad,2019,West Coast,Andrew Gaff,11904,resolved,1,,Recruited from Kew Comets / Carey Grammar / Oakleigh U18,draftguru
+all-australian-squad:2019:342,all-australian-squad,2019,North Melbourne,Ben Brown,12289,resolved,1,,Recruited from Devonport / Tasmania U18 / Glenorchy / Werribee,draftguru
+all-australian-squad:2019:343,all-australian-squad,2019,North Melbourne,Ben Cunnington,11835,resolved,1,,Recruited from Cobden / Geelong U18,draftguru
+all-australian-squad:2019:344,all-australian-squad,2019,West Coast,Brad Sheppard,11843,resolved,1,,Recruited from Attadale JFC / Wesley College (WA) / East Fremantle,draftguru
+all-australian-squad:2019:345,all-australian-squad,2019,Sydney,Dane Rampe,12140,resolved,1,,Recruited from Newington College / Williamstown / UNSW-Eastern Suburbs / Sydney (NEAFL),draftguru
+all-australian-squad:2019:346,all-australian-squad,2019,Adelaide,Daniel Talia,11989,resolved,1,,Recruited from Greenvale / Assumption College / Calder U18,draftguru
+all-australian-squad:2019:347,all-australian-squad,2019,Brisbane,Dayne Zorko,12076,resolved,1,,Recruited from Surfers Paradise / Broadbeach,draftguru
+all-australian-squad:2019:348,all-australian-squad,2019,Richmond,Dion Prestia,11917,resolved,1,,Recruited from West Lalor / Assumption College / Calder U18,draftguru
+all-australian-squad:2019:349,all-australian-squad,2019,Richmond,Dustin Martin,11794,resolved,1,,Recruited from Castlemaine / Bendigo U18,draftguru
+all-australian-squad:2019:350,all-australian-squad,2019,Geelong,Gary Ablett,1105,resolved,2,,Recruited from Modewarre / Geelong U18,draftguru
+all-australian-squad:2019:351,all-australian-squad,2019,Brisbane,Hugh McCluggage,12518,resolved,1,,Recruited from South Warrnambool / Ballarat Clarendon College / North Ballarat U18,draftguru
+all-australian-squad:2019:352,all-australian-squad,2019,Hawthorn,James Sicily,12332,resolved,1,,Recruited from Keilor / Western U18 / Williamstown,draftguru
+all-australian-squad:2019:353,all-australian-squad,2019,Western Bulldogs,Josh Dunkley,12408,resolved,1,,Recruited from Sale / Gippsland U18 / Richmond (VFL),draftguru
+all-australian-squad:2019:354,all-australian-squad,2019,West Coast,Luke Shuey,11805,resolved,1,,Recruited from Bulleen-Templestowe / Marcellin College / Oakleigh U18,draftguru
+all-australian-squad:2019:355,all-australian-squad,2019,Geelong,Mark Blicavs,12153,resolved,1,,Recruited from Sunbury FC / Athletics,draftguru
+all-australian-squad:2019:356,all-australian-squad,2019,GWS,Nick Haynes,12091,resolved,1,,Recruited from Frankston Bombers / Dandenong U18,draftguru
+all-australian-squad:2019:357,all-australian-squad,2019,Port Adelaide,Travis Boak,11583,resolved,1,,Recruited from Torquay / Geelong U18,draftguru
+all-australian-squad:2020:358,all-australian-squad,2020,West Coast,Andrew Gaff,11904,resolved,1,,Recruited from Kew Comets / Carey Grammar / Oakleigh U18,draftguru
+all-australian-squad:2020:359,all-australian-squad,2020,Collingwood,Brayden Maynard,12371,resolved,1,,Recruited from Hampton Rovers / De La Salle College / Sandringham U18,draftguru
+all-australian-squad:2020:360,all-australian-squad,2020,Melbourne,Clayton Oliver,12410,resolved,1,,Recruited from Mooroopna / Bendigo U18 / Murray U18 / Richmond (VFL),draftguru
+all-australian-squad:2020:361,all-australian-squad,2020,St Kilda,Dan Butler,12490,resolved,1,,Recruited from Lake Wendouree / St Patrick's College / North Ballarat U18 / North Ballarat,draftguru
+all-australian-squad:2020:362,all-australian-squad,2020,Richmond,Dylan Grimes,11879,resolved,1,,Recruited from Hurstbridge / Loyola College / Northern U18,draftguru
+all-australian-squad:2020:363,all-australian-squad,2020,Brisbane,Hugh McCluggage,12518,resolved,1,,Recruited from South Warrnambool / Ballarat Clarendon College / North Ballarat U18,draftguru
+all-australian-squad:2020:364,all-australian-squad,2020,Hawthorn,Jack Gunston,11845,resolved,1,,Recruited from Beaumaris / Haileybury College / Sandringham U18,draftguru
+all-australian-squad:2020:365,all-australian-squad,2020,Carlton,Jacob Weitering,12402,resolved,1,,Recruited from Mount Martha / Mount Eliza / Peninsula Grammar / Dandenong U18,draftguru
+all-australian-squad:2020:366,all-australian-squad,2020,Essendon,Jordan Ridley,12631,resolved,1,,Recruited from Knox / Box Hill HS / Oakleigh U18,draftguru
+all-australian-squad:2020:367,all-australian-squad,2020,Geelong,Mark Blicavs,12153,resolved,1,,Recruited from Sunbury FC / Athletics,draftguru
+all-australian-squad:2020:368,all-australian-squad,2020,Fremantle,Matthew Taberner,12205,resolved,1,,Recruited from Myrtleford / Alpine Eagles / Murray U18,draftguru
+all-australian-squad:2020:369,all-australian-squad,2020,Fremantle,Nathan Fyfe,11834,resolved,0,,Recruited from Lake Grace-Pingrup / Aquinas College (WA) / Claremont,draftguru
+all-australian-squad:2020:370,all-australian-squad,2020,Richmond,Nick Vlastuin,12174,resolved,1,,Recruited from Eltham / Northern U18,draftguru
+all-australian-squad:2020:371,all-australian-squad,2020,Geelong,Sam Menegola,12464,resolved,1,,Recruited from Attadale JFC / East Fremantle,draftguru
+all-australian-squad:2020:372,all-australian-squad,2020,Collingwood,Scott Pendlebury,4182,resolved,1,,Recruited from Sale / Gippsland U18,draftguru
+all-australian-squad:2020:373,all-australian-squad,2020,Port Adelaide,Tom Jonas,12002,resolved,1,,Recruited from Rostrevor College / Norwood,draftguru
+all-australian-squad:2020:374,all-australian-squad,2020,Sydney,Tom Papley,12412,resolved,1,,Recruited from Bunyip / Gippsland U18 / Casey,draftguru
+all-australian-squad:2020:375,all-australian-squad,2020,Port Adelaide,Zak Butters,12698,resolved,1,,Recruited from Darley / Maribyrnong College / Western U18,draftguru
+all-australian-squad:2021:376,all-australian-squad,2021,Melbourne,Bayley Fritsch,12598,resolved,1,,Recruited from Coldstream / Casey,draftguru
+all-australian-squad:2021:377,all-australian-squad,2021,Sydney,Callum Mills,12413,resolved,1,,Recruited from Mosman / North Shore (NSW) / NSW-ACT U18 / Sydney (NEAFL),draftguru
+all-australian-squad:2021:378,all-australian-squad,2021,Brisbane,Charlie Cameron,12277,resolved,4,,Recruited from Marist College Ashgrove / Newman Saints / Aquinas College (WA) / Swan Districts,draftguru
+all-australian-squad:2021:379,all-australian-squad,2021,Melbourne,Christian Salem,12272,resolved,1,,Recruited from Hampton Rovers / Brighton Grammar / Sandringham U18,draftguru
+all-australian-squad:2021:380,all-australian-squad,2021,Fremantle,David Mundy,4088,resolved,1,,Recruited from Seymour / Murray U18,draftguru
+all-australian-squad:2021:381,all-australian-squad,2021,Brisbane,Dayne Zorko,12076,resolved,1,,Recruited from Surfers Paradise / Broadbeach,draftguru
+all-australian-squad:2021:382,all-australian-squad,2021,Brisbane,Hugh McCluggage,12518,resolved,1,,Recruited from South Warrnambool / Ballarat Clarendon College / North Ballarat U18,draftguru
+all-australian-squad:2021:383,all-australian-squad,2021,GWS,Jacob Hopper,12440,resolved,1,,Recruited from Leeton-Whitton / St Patrick's College / NSW-ACT U18 / North Ballarat U18,draftguru
+all-australian-squad:2021:384,all-australian-squad,2021,Carlton,Jacob Weitering,12402,resolved,1,,Recruited from Mount Martha / Mount Eliza / Peninsula Grammar / Dandenong U18,draftguru
+all-australian-squad:2021:385,all-australian-squad,2021,Essendon,Jake Stringer,12167,resolved,1,,Recruited from Eaglehawk / Sandhurst / Bendigo U18 / Bendigo Gold,draftguru
+all-australian-squad:2021:386,all-australian-squad,2021,Brisbane,Jarryd Lyons,12067,resolved,1,,Recruited from St Peters / De La Salle College / Sandringham U18,draftguru
+all-australian-squad:2021:387,all-australian-squad,2021,Port Adelaide,Karl Amon,12357,resolved,1,,Recruited from East Sandringham / Hampton Rovers / Haileybury College / Sandringham U18,draftguru
+all-australian-squad:2021:388,all-australian-squad,2021,Sydney,Lance Franklin,4065,resolved,1,,Recruited from Dowerin / Wesley College (WA) / Perth,draftguru
+all-australian-squad:2021:389,all-australian-squad,2021,Sydney,Luke Parker,11953,resolved,1,,Recruited from Langwarrin / Dandenong U18,draftguru
+all-australian-squad:2021:390,all-australian-squad,2021,Adelaide,Paul Seedsman,12035,resolved,1,,Recruited from Rowville / Caulfield Grammar / Eastern U18,draftguru
+all-australian-squad:2021:391,all-australian-squad,2021,Adelaide,Rory Laird,12165,resolved,1,,Recruited from Kenilworth / Scotch College (SA) / West Adelaide,draftguru
+all-australian-squad:2021:392,all-australian-squad,2021,Fremantle,Sean Darcy,12547,resolved,1,,Recruited from Cobden / Mercy Regional College / Xavier College / Geelong U18,draftguru
+all-australian-squad:2021:393,all-australian-squad,2021,Hawthorn,Tom Mitchell,12196,resolved,1,,Recruited from Ashburton / Carey Grammar / Hale School / Claremont,draftguru
+all-australian-squad:2022:394,all-australian-squad,2022,Melbourne,Angus Brayshaw,12322,resolved,1,,Recruited from Hampton Rovers / Haileybury College / Sandringham U18,draftguru
+all-australian-squad:2022:395,all-australian-squad,2022,Melbourne,Bayley Fritsch,12598,resolved,1,,Recruited from Coldstream / Casey,draftguru
+all-australian-squad:2022:396,all-australian-squad,2022,Fremantle,Brennan Cox,12544,resolved,1,,Recruited from Woodville South / Woodville-West Torrens,draftguru
+all-australian-squad:2022:397,all-australian-squad,2022,St Kilda,Callum Wilkie,12703,resolved,1,,Recruited from Walkerville / Rostrevor College / North Adelaide,draftguru
+all-australian-squad:2022:398,all-australian-squad,2022,Sydney,Chad Warner,12797,resolved,1,,Recruited from Willetton JFC / Aquinas College (WA) / East Fremantle,draftguru
+all-australian-squad:2022:399,all-australian-squad,2022,Brisbane,Charlie Cameron,12277,resolved,4,,Recruited from Marist College Ashgrove / Newman Saints / Aquinas College (WA) / Swan Districts,draftguru
+all-australian-squad:2022:400,all-australian-squad,2022,Richmond,Daniel Rioli,12403,resolved,1,,Recruited from St Marys / East Point / St Patrick's College / North Ballarat U18,draftguru
+all-australian-squad:2022:401,all-australian-squad,2022,Brisbane,Hugh McCluggage,12518,resolved,1,,Recruited from South Warrnambool / Ballarat Clarendon College / North Ballarat U18,draftguru
+all-australian-squad:2022:402,all-australian-squad,2022,Collingwood,Jack Crisp,12061,resolved,1,,Recruited from Myrtleford / Murray U18,draftguru
+all-australian-squad:2022:403,all-australian-squad,2022,Western Bulldogs,Jack Macrae,12166,resolved,1,,Recruited from Kew Rovers / Carey Grammar / Oakleigh U18,draftguru
+all-australian-squad:2022:404,all-australian-squad,2022,Carlton,Jacob Weitering,12402,resolved,1,,Recruited from Mount Martha / Mount Eliza / Peninsula Grammar / Dandenong U18,draftguru
+all-australian-squad:2022:405,all-australian-squad,2022,Hawthorn,James Sicily,12332,resolved,1,,Recruited from Keilor / Western U18 / Williamstown,draftguru
+all-australian-squad:2022:406,all-australian-squad,2022,Gold Coast,Jarrod Witts,12177,resolved,1,,Recruited from St Ives / Sydney University / NSW-ACT U18 / Collingwood (VFL),draftguru
+all-australian-squad:2022:407,all-australian-squad,2022,Collingwood,Josh Daicos,12573,resolved,1,,Recruited from Camberwell Grammar / Bulleen-Templestowe / Oakleigh U18,draftguru
+all-australian-squad:2022:408,all-australian-squad,2022,GWS,Josh Kelly,12255,resolved,1,,Recruited from East Brighton / Brighton Grammar / Sandringham U18,draftguru
+all-australian-squad:2022:409,all-australian-squad,2022,Western Bulldogs,Marcus Bontempelli,12269,resolved,1,,Recruited from Eltham / Marcellin College / Northern U18,draftguru
+all-australian-squad:2022:410,all-australian-squad,2022,Adelaide,Rory Laird,12165,resolved,1,,Recruited from Kenilworth / Scotch College (SA) / West Adelaide,draftguru
+all-australian-squad:2022:411,all-australian-squad,2022,Carlton,Sam Walsh,12684,resolved,1,,Recruited from St Joseph's / Geelong U18,draftguru
+all-australian-squad:2022:412,all-australian-squad,2022,Adelaide,Taylor Walker,11713,resolved,1,,Recruited from North Broken Hill / NSW-ACT U18,draftguru
+all-australian-squad:2022:413,all-australian-squad,2022,West Coast,Tom Barrass,12383,resolved,1,,Recruited from Hale School / Claremont,draftguru
+all-australian-squad:2022:414,all-australian-squad,2022,Richmond,Tom Lynch,11948,resolved,2,,Recruited from Sorrento / Padua College / Dandenong U18,draftguru
+all-australian-squad:2022:415,all-australian-squad,2022,Sydney,Tom Papley,12412,resolved,1,,Recruited from Bunyip / Gippsland U18 / Casey,draftguru
+all-australian-squad:2023:416,all-australian-squad,2023,Richmond,Dustin Martin,11794,resolved,1,,Recruited from Castlemaine / Bendigo U18,draftguru
+all-australian-squad:2023:417,all-australian-squad,2023,Brisbane,Harris Andrews,12340,resolved,1,,Recruited from Padua College (Qld) / Queensland U18 / Aspley / Brisbane (NEAFL),draftguru
+all-australian-squad:2023:418,all-australian-squad,2023,Collingwood,Isaac Quaynor,12740,resolved,1,,Recruited from Beverley Hills / Bulleen-Templestowe / East Doncaster / East Doncaster SC / Oakleigh U18,draftguru
+all-australian-squad:2023:419,all-australian-squad,2023,Melbourne,Jack Viney,12147,resolved,1,,Recruited from Ashburton / Prince Alfred College / North Adelaide / Carey Grammar / Oakleigh U18 / Casey,draftguru
+all-australian-squad:2023:420,all-australian-squad,2023,Carlton,Jacob Weitering,12402,resolved,1,,Recruited from Mount Martha / Mount Eliza / Peninsula Grammar / Dandenong U18,draftguru
+all-australian-squad:2023:421,all-australian-squad,2023,Hawthorn,Jai Newcombe,12915,resolved,1,,Recruited from Poowong / Gippsland U18 / Box Hill,draftguru
+all-australian-squad:2023:422,all-australian-squad,2023,Brisbane,Joe Daniher,12199,resolved,1,,Recruited from Aberfeldie / St Bernard's College / Calder U18,draftguru
+all-australian-squad:2023:423,all-australian-squad,2023,Collingwood,Jordan De Goey,12318,resolved,1,,Recruited from Ashburton / St Kevin's College / Oakleigh U18,draftguru
+all-australian-squad:2023:424,all-australian-squad,2023,Essendon,Kyle Langford,12349,resolved,1,,Recruited from Macleod / Ivanhoe Grammar / Old Ivanhoe / Northern U18,draftguru
+all-australian-squad:2023:425,all-australian-squad,2023,Brisbane,Lachie Neale,12055,resolved,1,,Recruited from Kybybolite / St Peter's College (SA) / Glenelg,draftguru
+all-australian-squad:2023:426,all-australian-squad,2023,Hawthorn,Luke Breust,11954,resolved,1,,Recruited from Temora / NSW-ACT U18,draftguru
+all-australian-squad:2023:427,all-australian-squad,2023,Fremantle,Luke Jackson,12779,resolved,1,,Recruited from Willetton JFC / Bullcreek Leeming JFC / East Fremantle,draftguru
+all-australian-squad:2023:428,all-australian-squad,2023,Fremantle,Luke Ryan,12542,resolved,1,,Recruited from Moonee Valley / Calder U18 / Maribyrnong Park / Coburg,draftguru
+all-australian-squad:2023:429,all-australian-squad,2023,Essendon,Mason Redman,12437,resolved,1,,Recruited from Millicent / Glenelg,draftguru
+all-australian-squad:2023:430,all-australian-squad,2023,Sydney,Nick Blakey,12699,resolved,1,,Recruited from UNSW-Eastern Suburbs / NSW-ACT U18 / Sydney (NEAFL),draftguru
+all-australian-squad:2023:431,all-australian-squad,2023,Gold Coast,Noah Anderson,12767,resolved,1,,Recruited from Boroondara Hawks JFC / Hawthorn Citizens / Carey Grammar / Oakleigh U18,draftguru
+all-australian-squad:2023:432,all-australian-squad,2023,West Coast,Oscar Allen,12655,resolved,1,,Recruited from Whitford JFC / West Perth,draftguru
+all-australian-squad:2023:433,all-australian-squad,2023,Carlton,Patrick Cripps,12261,resolved,1,,Recruited from Northampton / East Fremantle,draftguru
+all-australian-squad:2023:434,all-australian-squad,2023,St Kilda,Rowan Marshall,12564,resolved,1,,Recruited from Heathmere / Portland / North Ballarat U18 / North Ballarat,draftguru
+all-australian-squad:2023:435,all-australian-squad,2023,GWS,Stephen Coniglio,12028,resolved,1,,Recruited from Upper Swan / Swan Districts,draftguru
+all-australian-squad:2023:436,all-australian-squad,2023,GWS,Tom Green,12770,resolved,2,,Recruited from Eastlake / Marist College (ACT) / Greater Western Sydney (NEAFL),draftguru
+all-australian-squad:2023:437,all-australian-squad,2023,Western Bulldogs,Tom Liberatore,11898,resolved,1,,Recruited from St Bernard's College / St Kevin's College / Calder U18,draftguru
+all-australian-squad:2024:438,all-australian-squad,2024,Fremantle,Andrew Brayshaw,12589,resolved,1,,Recruited from Hampton Rovers / Haileybury College / Sandringham U18,draftguru
+all-australian-squad:2024:439,all-australian-squad,2024,Western Bulldogs,Bailey Dale,12354,resolved,1,,Recruited from Edithvale-Aspendale / John Paul College / Dandenong U18,draftguru
+all-australian-squad:2024:440,all-australian-squad,2024,GWS,Brent Daniels,12656,resolved,1,,Recruited from Nyah-Nyah West United / Bendigo U18 / Geelong (VFL),draftguru
+all-australian-squad:2024:441,all-australian-squad,2024,Brisbane,Cam Rayner,12592,resolved,1,,Recruited from Hillside / Doutta Stars / PEGS / Western U18,draftguru
+all-australian-squad:2024:442,all-australian-squad,2024,Carlton,Charlie Curnow,12421,resolved,1,,Recruited from Torquay / Geelong College / Geelong U18,draftguru
+all-australian-squad:2024:443,all-australian-squad,2024,Collingwood,Darcy Cameron,12660,resolved,1,,Recruited from North Albany / Hale School / Claremont,draftguru
+all-australian-squad:2024:444,all-australian-squad,2024,Brisbane,Harris Andrews,12340,resolved,1,,Recruited from Padua College (Qld) / Queensland U18 / Aspley / Brisbane (NEAFL),draftguru
+all-australian-squad:2024:445,all-australian-squad,2024,Carlton,Harry McKay,12566,resolved,1,,Recruited from Warragul / Gippsland U18,draftguru
+all-australian-squad:2024:446,all-australian-squad,2024,North Melbourne,Harry Sheezel,13034,resolved,1,,Recruited from Ajax / Sandringham U18,draftguru
+all-australian-squad:2024:447,all-australian-squad,2024,Fremantle,Hayden Young,12777,resolved,1,,Recruited from Somerville / Mornington SC / Dandenong U18,draftguru
+all-australian-squad:2024:448,all-australian-squad,2024,St Kilda,Jack Sinclair,12325,resolved,1,,Recruited from Kew Comets / Scotch College / Oakleigh U18 / Old Scotch / Port Melbourne,draftguru
+all-australian-squad:2024:449,all-australian-squad,2024,Hawthorn,James Sicily,12332,resolved,1,,Recruited from Keilor / Western U18 / Williamstown,draftguru
+all-australian-squad:2024:450,all-australian-squad,2024,Port Adelaide,Jason Horne-Francis,12956,resolved,1,,Recruited from Christies Beach / South Adelaide,draftguru
+all-australian-squad:2024:451,all-australian-squad,2024,Brisbane,Joe Daniher,12199,resolved,1,,Recruited from Aberfeldie / St Bernard's College / Calder U18,draftguru
+all-australian-squad:2024:452,all-australian-squad,2024,Fremantle,Jordan Clark,12688,resolved,1,,Recruited from Albany Railways / Guildford Grammar / Claremont,draftguru
+all-australian-squad:2024:453,all-australian-squad,2024,Hawthorn,Massimo D'Ambrosio,,unmatched,0,,Recruited from Point Cook / Western U18 / Richmond (VFL),draftguru
+all-australian-squad:2024:454,all-australian-squad,2024,Geelong,Max Holmes,12881,resolved,1,,Recruited from East Malvern / Melbourne Grammar / Sandringham U18,draftguru
+all-australian-squad:2024:455,all-australian-squad,2024,Gold Coast,Noah Anderson,12767,resolved,1,,Recruited from Boroondara Hawks JFC / Hawthorn Citizens / Carey Grammar / Oakleigh U18,draftguru
+all-australian-squad:2024:456,all-australian-squad,2024,Gold Coast,Sam Collins,12444,resolved,1,,Recruited from Donvale / Oakleigh U18 / Box Hill,draftguru
+all-australian-squad:2024:457,all-australian-squad,2024,North Melbourne,Tristan Xerri,12788,resolved,1,,Recruited from Caroline Springs / Lakeview SC / Western U18 / Werribee,draftguru
+all-australian-squad:2024:458,all-australian-squad,2024,Geelong,Tyson Stengle,12552,resolved,1,,Recruited from Portland Thunder / Woodville-West Torrens,draftguru
+all-australian-squad:2024:459,all-australian-squad,2024,Essendon,Zach Merrett,12241,resolved,1,,Recruited from Cobden / Melbourne Grammar / Sandringham U18,draftguru
+all-australian-squad:2025:460,all-australian-squad,2025,Fremantle,Andrew Brayshaw,12589,resolved,1,,Recruited from Hampton Rovers / Haileybury College / Sandringham U18,draftguru
+all-australian-squad:2025:461,all-australian-squad,2025,Gold Coast,Ben King,12728,resolved,1,,Recruited from East Sandringham / Old Haileybury / Haileybury College / Sandringham U18,draftguru
+all-australian-squad:2025:462,all-australian-squad,2025,Gold Coast,Ben Long,12521,resolved,1,,Recruited from St Marys / Melbourne Grammar / NT U18 / Northern U18 / Footscray (VFL),draftguru
+all-australian-squad:2025:463,all-australian-squad,2025,Sydney,Brodie Grundy,12217,resolved,1,,Recruited from Unley / Cabra Dominican / Sturt,draftguru
+all-australian-squad:2025:464,all-australian-squad,2025,Brisbane,Dayne Zorko,12076,resolved,1,,Recruited from Surfers Paradise / Broadbeach,draftguru
+all-australian-squad:2025:465,all-australian-squad,2025,GWS,Finn Callaghan,12969,resolved,1,,Recruited from Mordialloc-Braeside / St Bede's College / Sandringham U18,draftguru
+all-australian-squad:2025:466,all-australian-squad,2025,Adelaide,Izak Rankine,12798,resolved,1,,Recruited from Flinders Park / West Adelaide,draftguru
+all-australian-squad:2025:467,all-australian-squad,2025,Collingwood,Jamie Elliott,12083,resolved,2,,Recruited from Euroa / Murray U18,draftguru
+all-australian-squad:2025:468,all-australian-squad,2025,Collingwood,Josh Daicos,12573,resolved,1,,Recruited from Camberwell Grammar / Bulleen-Templestowe / Oakleigh U18,draftguru
+all-australian-squad:2025:469,all-australian-squad,2025,Brisbane,Josh Dunkley,12408,resolved,1,,Recruited from Sale / Gippsland U18 / Richmond (VFL),draftguru
+all-australian-squad:2025:470,all-australian-squad,2025,Adelaide,Josh Worrell,12912,resolved,1,,Recruited from Bentleigh / Haileybury College / Sandringham U18,draftguru
+all-australian-squad:2025:471,all-australian-squad,2025,GWS,Lachie Ash,12782,resolved,1,,Recruited from Shepparton FC / Notre Dame College (Shepparton) / Murray U18,draftguru
+all-australian-squad:2025:472,all-australian-squad,2025,Fremantle,Luke Jackson,12779,resolved,1,,Recruited from Willetton JFC / Bullcreek Leeming JFC / East Fremantle,draftguru
+all-australian-squad:2025:473,all-australian-squad,2025,Adelaide,Mark Keane,12809,resolved,1,,Recruited from County Cork,draftguru
+all-australian-squad:2025:474,all-australian-squad,2025,Geelong,Max Holmes,12881,resolved,1,,Recruited from East Malvern / Melbourne Grammar / Sandringham U18,draftguru
+all-australian-squad:2025:475,all-australian-squad,2025,Port Adelaide,Mitch Georgiades,12766,resolved,1,,Recruited from Marist JFC / Hale School / Subiaco,draftguru
+all-australian-squad:2025:476,all-australian-squad,2025,Richmond,Nick Vlastuin,12174,resolved,1,,Recruited from Eltham / Northern U18,draftguru
+all-australian-squad:2025:477,all-australian-squad,2025,Gold Coast,Sam Collins,12444,resolved,1,,Recruited from Donvale / Oakleigh U18 / Box Hill,draftguru
+all-australian-squad:2025:478,all-australian-squad,2025,Western Bulldogs,Sam Darcy,13021,resolved,1,,Recruited from Glen Iris / Scotch College / Oakleigh U18,draftguru
+all-australian-squad:2025:479,all-australian-squad,2025,GWS,Tom Green,12770,resolved,2,,Recruited from Eastlake / Marist College (ACT) / Greater Western Sydney (NEAFL),draftguru
+all-australian-squad:2025:480,all-australian-squad,2025,Western Bulldogs,Tom Liberatore,11898,resolved,1,,Recruited from St Bernard's College / St Kevin's College / Calder U18,draftguru
+all-australian-squad:2025:481,all-australian-squad,2025,Port Adelaide,Zak Butters,12698,resolved,1,,Recruited from Darley / Maribyrnong College / Western U18,draftguru
+brownlow-medal:1980:482,brownlow-medal,1980,Western Bulldogs,Kelvin Templeton,2210,unique,1,23.00,,draftguru
+brownlow-medal:1981:483,brownlow-medal,1981,South Melbourne,Barry Round,2131,resolved,1,22.00,,draftguru
+brownlow-medal:1981:484,brownlow-medal,1981,Fitzroy,Bernie Quinlan,2091,unique,1,22.00,,draftguru
+brownlow-medal:1982:485,brownlow-medal,1982,Melbourne,Brian Wilson,1362,resolved,2,23.00,,draftguru
+brownlow-medal:1983:486,brownlow-medal,1983,North Melbourne,Ross Glendinning,1757,unique,1,24.00,,draftguru
+brownlow-medal:1984:487,brownlow-medal,1984,Melbourne,Peter Moore,2000,unique,1,24.00,,draftguru
+brownlow-medal:1985:488,brownlow-medal,1985,Western Bulldogs,Brad Hardie,1300,resolved,1,22.00,,draftguru
+brownlow-medal:1986:489,brownlow-medal,1986,Sydney,Greg Williams,142,resolved,1,17.00,,draftguru
+brownlow-medal:1986:490,brownlow-medal,1986,Hawthorn,Robert DiPierdomenico,1350,unique,1,17.00,,draftguru
+brownlow-medal:1987:491,brownlow-medal,1987,Hawthorn,John Platten,636,resolved,1,20.00,,draftguru
+brownlow-medal:1987:492,brownlow-medal,1987,St Kilda,Tony Lockett,990,resolved,1,20.00,,draftguru
+brownlow-medal:1988:493,brownlow-medal,1988,Sydney,Gerard Healy,1366,resolved,1,20.00,,draftguru
+brownlow-medal:1989:494,brownlow-medal,1989,Geelong,Paul Couch,565,unique,1,22.00,,draftguru
+brownlow-medal:1990:495,brownlow-medal,1990,Western Bulldogs,Tony Liberatore,426,resolved,1,18.00,,draftguru
+brownlow-medal:1991:496,brownlow-medal,1991,Melbourne,Jim Stynes,702,unique,1,25.00,,draftguru
+brownlow-medal:1992:497,brownlow-medal,1992,Western Bulldogs,Scott Wynd,424,unique,1,20.00,,draftguru
+brownlow-medal:1993:498,brownlow-medal,1993,Essendon,Gavin Wanganeen,303,resolved,1,18.00,,draftguru
+brownlow-medal:1994:499,brownlow-medal,1994,Carlton,Greg Williams,142,resolved,1,30.00,,draftguru
+brownlow-medal:1995:500,brownlow-medal,1995,Sydney,Paul Kelly,993,unique,1,21.00,,draftguru
+brownlow-medal:1996:501,brownlow-medal,1996,Essendon,James Hird,312,resolved,1,21.00,,draftguru
+brownlow-medal:1996:502,brownlow-medal,1996,Brisbane,Michael Voss,102,unique,1,21.00,,draftguru
+brownlow-medal:1997:503,brownlow-medal,1997,St Kilda,Robert Harvey,930,unique,1,26.00,,draftguru
+brownlow-medal:1998:504,brownlow-medal,1998,St Kilda,Robert Harvey,930,unique,1,32.00,,draftguru
+brownlow-medal:1999:505,brownlow-medal,1999,Hawthorn,Shane Crawford,633,resolved,1,28.00,,draftguru
+brownlow-medal:2000:506,brownlow-medal,2000,Melbourne,Shane Woewodin,725,resolved,1,24.00,,draftguru
+brownlow-medal:2001:507,brownlow-medal,2001,Brisbane,Jason Akermanis,119,resolved,1,23.00,,draftguru
+brownlow-medal:2002:508,brownlow-medal,2002,Brisbane,Simon Black,1083,resolved,1,25.00,,draftguru
+brownlow-medal:2003:509,brownlow-medal,2003,Sydney,Adam Goodes,1012,resolved,1,22.00,,draftguru
+brownlow-medal:2003:510,brownlow-medal,2003,Adelaide,Mark Ricciuto,4,resolved,1,22.00,,draftguru
+brownlow-medal:2003:511,brownlow-medal,2003,Collingwood,Nathan Buckley,217,resolved,1,22.00,,draftguru
+brownlow-medal:2004:512,brownlow-medal,2004,West Coast,Chris Judd,1122,resolved,1,30.00,,draftguru
+brownlow-medal:2005:513,brownlow-medal,2005,West Coast,Ben Cousins,1051,resolved,1,20.00,,draftguru
+brownlow-medal:2006:514,brownlow-medal,2006,Sydney,Adam Goodes,1012,resolved,1,26.00,,draftguru
+brownlow-medal:2007:515,brownlow-medal,2007,Geelong,Jimmy Bartel,1106,resolved,1,29.00,,draftguru
+brownlow-medal:2008:516,brownlow-medal,2008,Western Bulldogs,Adam Cooney,3940,resolved,1,24.00,,draftguru
+brownlow-medal:2009:517,brownlow-medal,2009,Geelong,Gary Ablett,1105,resolved,2,30.00,,draftguru
+brownlow-medal:2010:518,brownlow-medal,2010,Carlton,Chris Judd,1122,resolved,1,30.00,,draftguru
+brownlow-medal:2011:519,brownlow-medal,2011,Collingwood,Dane Swan,1460,resolved,1,34.00,,draftguru
+brownlow-medal:2012:520,brownlow-medal,2012,Hawthorn,Sam Mitchell,1135,resolved,1,26.00,,draftguru
+brownlow-medal:2012:521,brownlow-medal,2012,Richmond,Trent Cotchin,11666,resolved,1,26.00,,draftguru
+brownlow-medal:2013:522,brownlow-medal,2013,Gold Coast,Gary Ablett,1105,resolved,2,28.00,,draftguru
+brownlow-medal:2014:523,brownlow-medal,2014,West Coast,Matt Priddis,4186,resolved,1,26.00,,draftguru
+brownlow-medal:2015:524,brownlow-medal,2015,Fremantle,Nathan Fyfe,11834,resolved,0,31.00,,draftguru
+brownlow-medal:2016:525,brownlow-medal,2016,Geelong,Patrick Dangerfield,11700,resolved,1,35.00,,draftguru
+brownlow-medal:2017:526,brownlow-medal,2017,Richmond,Dustin Martin,11794,resolved,1,36.00,,draftguru
+brownlow-medal:2018:527,brownlow-medal,2018,Hawthorn,Tom Mitchell,12196,resolved,1,28.00,,draftguru
+brownlow-medal:2019:528,brownlow-medal,2019,Fremantle,Nathan Fyfe,11834,resolved,0,33.00,,draftguru
+brownlow-medal:2020:529,brownlow-medal,2020,Brisbane,Lachie Neale,12055,resolved,1,31.00,,draftguru
+brownlow-medal:2021:530,brownlow-medal,2021,Port Adelaide,Ollie Wines,12150,resolved,1,36.00,,draftguru
+brownlow-medal:2022:531,brownlow-medal,2022,Carlton,Patrick Cripps,12261,resolved,1,29.00,,draftguru
+brownlow-medal:2023:532,brownlow-medal,2023,Brisbane,Lachie Neale,12055,resolved,1,31.00,,draftguru
+brownlow-medal:2024:533,brownlow-medal,2024,Carlton,Patrick Cripps,12261,resolved,1,45.00,,draftguru
+brownlow-medal:2025:534,brownlow-medal,2025,Gold Coast,Matt Rowell,12768,resolved,1,39.00,,draftguru
+gardiner-medal:1980:581,gardiner-medal,1980,Essendon,Bill Valli,2240,unique,1,,,draftguru
+gardiner-medal:1981:582,gardiner-medal,1981,Richmond,Daryl Vernon,2241,unique,1,,,draftguru
+gardiner-medal:1981:583,gardiner-medal,1981,Geelong,Malcolm Reed,2101,unique,1,,,draftguru
+gardiner-medal:1982:584,gardiner-medal,1982,Essendon,Roger Merrett,107,unique,1,,Recruited from Kaniva,draftguru
+gardiner-medal:1983:585,gardiner-medal,1983,Western Bulldogs,John Taylor,11195,unique,1,,,draftguru
+gardiner-medal:1985:586,gardiner-medal,1985,Hawthorn,Greg Dear,871,resolved,1,,Recruited from Churchill / Traralgon,draftguru
+gardiner-medal:1985:587,gardiner-medal,1985,Hawthorn,James Bennett,11238,unique,1,,Recruited from Wesley College / Collegians,draftguru
+gardiner-medal:1986:588,gardiner-medal,1986,Western Bulldogs,Tony Liberatore,426,resolved,1,,Recruited from Brunswick City / North Melbourne U19s / North Melbourne Reserves,draftguru
+gardiner-medal:1987:589,gardiner-medal,1987,St Kilda,Bradley Gotch,1410,unique,1,,Recruited from Whitefriars College / East Doncaster,draftguru
+gardiner-medal:1988:590,gardiner-medal,1988,Western Bulldogs,Tony Liberatore,426,resolved,1,,Recruited from Brunswick City / North Melbourne U19s / North Melbourne Reserves,draftguru
+gardiner-medal:1989:591,gardiner-medal,1989,Geelong,Michael Kol,1900,unique,1,,,draftguru
+gardiner-medal:1990:592,gardiner-medal,1990,Melbourne,Rod Keogh,926,resolved,1,,Recruited from Castlemaine,draftguru
+gardiner-medal:1991:593,gardiner-medal,1991,Collingwood,Stephen Anderson,11501,resolved,1,,Recruited from South Warrnambool / Central District,draftguru
+gardiner-medal:1992:594,gardiner-medal,1992,St Kilda,Mick Dwyer,406,resolved,1,,Recruited from Lyndale,draftguru
+gardiner-medal:1993:595,gardiner-medal,1993,,Rod Keogh,926,resolved,1,,Recruited from Castlemaine,draftguru
+gardiner-medal:1994:596,gardiner-medal,1994,Fitzroy,David Bain,1172,resolved,1,,Recruited from East Perth,draftguru
+gardiner-medal:1995:597,gardiner-medal,1995,Hawthorn,Simon Crawshay,646,resolved,1,,Recruited from Melbourne Grammar,draftguru
+gardiner-medal:1996:598,gardiner-medal,1996,North Melbourne,Trent Nichols,765,resolved,1,,Recruited from Sandy Bay,draftguru
+gardiner-medal:1997:599,gardiner-medal,1997,,Brad Lloyd,661,resolved,1,,Recruited from Williamstown,draftguru
+gardiner-medal:1998:600,gardiner-medal,1998,Sydney,Simon Arnott,605,resolved,1,,Recruited from Wesley College / Collegians,draftguru
+gardiner-medal:1999:601,gardiner-medal,1999,St Kilda,Daniel Healy,954,resolved,1,,Recruited from Hamley Bridge / Central District,draftguru
+gary-ayres-award:2016:602,gary-ayres-award,2016,Sydney,Josh Kennedy,11672,resolved,2,,Recruited from Ashburton / East Sandringham / Xavier College / Sandringham U18,draftguru
+gary-ayres-award:2017:603,gary-ayres-award,2017,Richmond,Dustin Martin,11794,resolved,1,,Recruited from Castlemaine / Bendigo U18,draftguru
+gary-ayres-award:2018:604,gary-ayres-award,2018,Collingwood,Steele Sidebottom,11751,resolved,1,,Recruited from Congupna / Murray U18,draftguru
+gary-ayres-award:2019:605,gary-ayres-award,2019,Richmond,Dustin Martin,11794,resolved,1,,Recruited from Castlemaine / Bendigo U18,draftguru
+gary-ayres-award:2020:606,gary-ayres-award,2020,Richmond,Dustin Martin,11794,resolved,1,,Recruited from Castlemaine / Bendigo U18,draftguru
+gary-ayres-award:2021:607,gary-ayres-award,2021,Western Bulldogs,Jack Macrae,12166,resolved,1,,Recruited from Kew Rovers / Carey Grammar / Oakleigh U18,draftguru
+gary-ayres-award:2022:608,gary-ayres-award,2022,Geelong,Patrick Dangerfield,11700,resolved,1,,Recruited from Anglesea / Geelong U18,draftguru
+gary-ayres-award:2023:609,gary-ayres-award,2023,Carlton,Sam Walsh,12684,resolved,1,,Recruited from St Joseph's / Geelong U18,draftguru
+gary-ayres-award:2024:610,gary-ayres-award,2024,Brisbane,Lachie Neale,12055,resolved,1,,Recruited from Kybybolite / St Peter's College (SA) / Glenelg,draftguru
+gary-ayres-award:2025:611,gary-ayres-award,2025,Brisbane,Will Ashcroft,13040,resolved,1,,Recruited from Southport / Sandringham U18,draftguru
+geoff-christian-medal:1999:612,geoff-christian-medal,1999,Fremantle,Adrian Fletcher,101,resolved,1,,Recruited from Glenorchy,draftguru
+geoff-christian-medal:2000:613,geoff-christian-medal,2000,Fremantle,Paul Hasleby,542,resolved,1,,Recruited from Northampton / Mazenod College (WA) / East Fremantle,draftguru
+geoff-christian-medal:2000:614,geoff-christian-medal,2000,Fremantle,Troy Cook,540,resolved,1,,Recruited from Perth,draftguru
+geoff-christian-medal:2001:615,geoff-christian-medal,2001,West Coast,Ben Cousins,1051,resolved,1,,Recruited from Bullcreek Leeming JFC / Wesley College (WA) / East Fremantle,draftguru
+geoff-christian-medal:2002:616,geoff-christian-medal,2002,Fremantle,Matthew Pavlich,544,resolved,1,,Recruited from Sacred Heart College / Woodville-West Torrens,draftguru
+geoff-christian-medal:2003:617,geoff-christian-medal,2003,Fremantle,Peter Bell,486,resolved,2,,Recruited from Kojonup / Aquinas College (WA) / South Fremantle,draftguru
+geoff-christian-medal:2004:618,geoff-christian-medal,2004,Fremantle,Paul Hasleby,542,resolved,1,,Recruited from Northampton / Mazenod College (WA) / East Fremantle,draftguru
+geoff-christian-medal:2005:619,geoff-christian-medal,2005,Fremantle,Matthew Pavlich,544,resolved,1,,Recruited from Sacred Heart College / Woodville-West Torrens,draftguru
+geoff-christian-medal:2006:620,geoff-christian-medal,2006,West Coast,Chris Judd,1122,resolved,1,,Recruited from East Sandringham / Caulfield Grammar / Sandringham U18,draftguru
+geoff-christian-medal:2007:621,geoff-christian-medal,2007,West Coast,Daniel Kerr,1077,resolved,1,,Recruited from Melville JFC / Aquinas College (WA),draftguru
+geoff-christian-medal:2008:622,geoff-christian-medal,2008,Fremantle,Matthew Pavlich,544,resolved,1,,Recruited from Sacred Heart College / Woodville-West Torrens,draftguru
+geoff-christian-medal:2009:623,geoff-christian-medal,2009,Fremantle,Aaron Sandilands,1421,resolved,1,,Recruited from Mt Barker (WA) / East Fremantle,draftguru
+geoff-christian-medal:2010:624,geoff-christian-medal,2010,West Coast,Beau Waters,3960,resolved,1,,Recruited from Happy Valley / West Adelaide,draftguru
+geoff-christian-medal:2011:625,geoff-christian-medal,2011,West Coast,Matt Priddis,4186,resolved,1,,Recruited from Sorrento Duncraig JFC / Subiaco,draftguru
+geoff-christian-medal:2012:626,geoff-christian-medal,2012,West Coast,Daniel Kerr,1077,resolved,1,,Recruited from Melville JFC / Aquinas College (WA),draftguru
+geoff-christian-medal:2013:627,geoff-christian-medal,2013,Fremantle,Nathan Fyfe,11834,resolved,0,,Recruited from Lake Grace-Pingrup / Aquinas College (WA) / Claremont,draftguru
+geoff-christian-medal:2014:628,geoff-christian-medal,2014,West Coast,Matt Priddis,4186,resolved,1,,Recruited from Sorrento Duncraig JFC / Subiaco,draftguru
+geoff-christian-medal:2015:629,geoff-christian-medal,2015,Fremantle,Nathan Fyfe,11834,resolved,0,,Recruited from Lake Grace-Pingrup / Aquinas College (WA) / Claremont,draftguru
+geoff-christian-medal:2016:630,geoff-christian-medal,2016,Fremantle,Lachie Neale,12055,resolved,1,,Recruited from Kybybolite / St Peter's College (SA) / Glenelg,draftguru
+geoff-christian-medal:2017:631,geoff-christian-medal,2017,Fremantle,Nathan Fyfe,11834,resolved,0,,Recruited from Lake Grace-Pingrup / Aquinas College (WA) / Claremont,draftguru
+geoff-christian-medal:2018:632,geoff-christian-medal,2018,Fremantle,Lachie Neale,12055,resolved,1,,Recruited from Kybybolite / St Peter's College (SA) / Glenelg,draftguru
+geoff-christian-medal:2019:633,geoff-christian-medal,2019,Fremantle,Nathan Fyfe,11834,resolved,0,,Recruited from Lake Grace-Pingrup / Aquinas College (WA) / Claremont,draftguru
+geoff-christian-medal:2021:634,geoff-christian-medal,2021,Fremantle,Andrew Brayshaw,12589,resolved,1,,Recruited from Hampton Rovers / Haileybury College / Sandringham U18,draftguru
+geoff-christian-medal:2022:635,geoff-christian-medal,2022,Fremantle,Andrew Brayshaw,12589,resolved,1,,Recruited from Hampton Rovers / Haileybury College / Sandringham U18,draftguru
+geoff-christian-medal:2023:636,geoff-christian-medal,2023,Fremantle,Caleb Serong,12786,resolved,1,,Recruited from Warragul / Geelong Grammar / Gippsland U18,draftguru
+geoff-christian-medal:2024:637,geoff-christian-medal,2024,West Coast,Elliot Yeo,12087,resolved,1,,Recruited from Booragoon / Aquinas College (WA) / East Fremantle,draftguru
+geoff-christian-medal:2025:638,geoff-christian-medal,2025,Fremantle,Caleb Serong,12786,resolved,1,,Recruited from Warragul / Geelong Grammar / Gippsland U18,draftguru
+hunter-harrison-medal:1992:639,hunter-harrison-medal,1992,,Michael Voss,102,unique,1,,Recruited from Morningside,draftguru
+hunter-harrison-medal:1993:640,hunter-harrison-medal,1993,,Mark Ryan,,unmatched,0,,,draftguru
+hunter-harrison-medal:1994:641,hunter-harrison-medal,1994,,Michael Martin,438,resolved,1,,Recruited from Hobart FC,draftguru
+hunter-harrison-medal:1995:642,hunter-harrison-medal,1995,,Steven Koops,517,resolved,1,,Recruited from Southern Districts / West Perth,draftguru
+hunter-harrison-medal:1996:643,hunter-harrison-medal,1996,,Matthew Bernes,,unmatched,0,,,draftguru
+hunter-harrison-medal:1997:644,hunter-harrison-medal,1997,,Fred Campbell,970,resolved,1,,Recruited from Alice Springs Pioneers / Powelltown / Bendigo U18,draftguru
+hunter-harrison-medal:1998:645,hunter-harrison-medal,1998,,Derek Murray,848,resolved,1,,Recruited from Murray U18,draftguru
+hunter-harrison-medal:1998:646,hunter-harrison-medal,1998,,Shane Young,,unmatched,0,,,draftguru
+hunter-harrison-medal:1999:647,hunter-harrison-medal,1999,,Brad Green,748,resolved,1,,Recruited from North Launceston / Tasmania U18,draftguru
+hunter-harrison-medal:2000:648,hunter-harrison-medal,2000,,Ian Callinan,11985,resolved,1,,Recruited from Lauderdale / Clarence / Tasmania (VFL) / Central District,draftguru
+hunter-harrison-medal:2001:649,hunter-harrison-medal,2001,,Tom Davidson,3953,resolved,1,,Recruited from Geelong U18,draftguru
+hunter-harrison-medal:2002:650,hunter-harrison-medal,2002,,Anthony Corrie,3952,resolved,1,,Recruited from Nightcliff / Southern Districts,draftguru
+hunter-harrison-medal:2003:651,hunter-harrison-medal,2003,,Jake Furfaro,,unmatched,0,,Recruited from Mount Gravatt,draftguru
+hunter-harrison-medal:2004:652,hunter-harrison-medal,2004,,Richard Tambling,4091,resolved,1,,Recruited from Southern Districts,draftguru
+hunter-harrison-medal:2005:653,hunter-harrison-medal,2005,,Grant Birchall,4149,resolved,1,,Recruited from Devonport / Tasmania U18,draftguru
+hunter-harrison-medal:2006:654,hunter-harrison-medal,2006,,Ricky Petterd,11561,resolved,1,,Recruited from Surfers Paradise / Broadbeach,draftguru
+hunter-harrison-medal:2007:655,hunter-harrison-medal,2007,,Craig Bird,11635,resolved,1,,Recruited from Nelson Bay / NSW-ACT U18,draftguru
+hunter-harrison-medal:2008:656,hunter-harrison-medal,2008,,Mitch Robinson,11710,resolved,1,,Recruited from Lauderdale / Tasmania U18 / Tasmania (VFL),draftguru
+hunter-harrison-medal:2009:657,hunter-harrison-medal,2009,,Dylan McNeil,,unmatched,0,,Recruited from Lavington / NSW-ACT U18 / Murray U18,draftguru
+hunter-harrison-medal:2010:658,hunter-harrison-medal,2010,,Sam Darley,12081,resolved,1,,Recruited from Hobart FC,draftguru
+hunter-harrison-medal:2011:659,hunter-harrison-medal,2011,,John McKenzie,,implausible,1,,Recruited from South Launceston / Tasmania U18,draftguru
+hunter-harrison-medal:2012:660,hunter-harrison-medal,2012,,Jake Neade,12151,resolved,1,,Recruited from Elliott / East Point / St Patrick's College / North Ballarat U18 / Greater Western Sydney (NEAFL),draftguru
+hunter-harrison-medal:2013:661,hunter-harrison-medal,2013,,Kade Kolodjashnij,12256,resolved,1,,Recruited from Prospect / Launceston / Tasmania U18,draftguru
+hunter-harrison-medal:2013:662,hunter-harrison-medal,2013,,Liam Dawson,12358,resolved,1,,Recruited from Aspley / Queensland U18 / Brisbane (NEAFL),draftguru
+hunter-harrison-medal:2013:663,hunter-harrison-medal,2013,,Toby Nankervis,12374,resolved,1,,Recruited from George Town / North Launceston / Tasmania U18,draftguru
+hunter-harrison-medal:2014:664,hunter-harrison-medal,2014,,Isaac Heeney,12326,resolved,1,,Recruited from Cardiff / NSW-ACT U18 / Sydney (NEAFL),draftguru
+hunter-harrison-medal:2015:665,hunter-harrison-medal,2015,,Ben Keays,12434,resolved,1,,Recruited from St Joseph's College (Terrace) / Morningside / Queensland U18 / Redland / Brisbane (NEAFL),draftguru
+hunter-harrison-medal:2016:666,hunter-harrison-medal,2016,,Jack Bowes,12499,resolved,1,,Recruited from Manunda / Cairns FC / Surfers Paradise / Queensland U18 / Gold Coast (NEAFL),draftguru
+hunter-harrison-medal:2017:667,hunter-harrison-medal,2017,,Nick Blakey,12699,resolved,1,,Recruited from UNSW-Eastern Suburbs / NSW-ACT U18 / Sydney (NEAFL),draftguru
+hunter-harrison-medal:2018:668,hunter-harrison-medal,2018,,Tarryn Thomas,12707,resolved,1,,Recruited from North Launceston / Tasmania U18 / North Melbourne (VFL),draftguru
+hunter-harrison-medal:2019:669,hunter-harrison-medal,2019,,Connor Budarick,12769,resolved,1,,Recruited from Labrador / Gold Coast (NEAFL),draftguru
+hunter-harrison-medal:2022:670,hunter-harrison-medal,2022,,Jaspa Fletcher,13072,resolved,1,,Recruited from Coorparoo / Brisbane (NEAFL),draftguru
+hunter-harrison-medal:2023:671,hunter-harrison-medal,2023,,Ethan Read,13121,resolved,1,,Recruited from St Andrews Lutheran College / Palm Beach Currumbin,draftguru
+hunter-harrison-medal:2024:672,hunter-harrison-medal,2024,,Zeke Uwland,13278,resolved,1,,Recruited from Burleigh,draftguru
+hunter-harrison-medal:2025:673,hunter-harrison-medal,2025,,Taj Murray,,unmatched,0,,Recruited from Nightcliff / NT U18,draftguru
+larke-medal:1976:674,larke-medal,1976,,Mick Woods,,unmatched,0,,,draftguru
+larke-medal:1977:675,larke-medal,1977,,Rodney Watts,,unmatched,0,,,draftguru
+larke-medal:1978:676,larke-medal,1978,,Mark Weideman,,implausible,1,,,draftguru
+larke-medal:1979:677,larke-medal,1979,,Grant Campbell,,unmatched,0,,,draftguru
+larke-medal:1980:678,larke-medal,1980,,Darryl Murphy,,unmatched,0,,,draftguru
+larke-medal:1981:679,larke-medal,1981,,Paul Salmon,314,resolved,1,,Recruited from North Ringwood,draftguru
+larke-medal:1982:680,larke-medal,1982,,Michael Phyland,,implausible,1,,,draftguru
+larke-medal:1983:681,larke-medal,1983,,Greg Anderson,24,resolved,1,,Recruited from St Michael's College (SA) / Port Adelaide (SANFL),draftguru
+larke-medal:1984:682,larke-medal,1984,,David Condon,,unmatched,0,,,draftguru
+larke-medal:1985:683,larke-medal,1985,,Jason Kerr,,unmatched,0,,,draftguru
+larke-medal:1986:684,larke-medal,1986,,Stephen Lawrence,,implausible,1,,Recruited from Morningside,draftguru
+larke-medal:1987:685,larke-medal,1987,,Steven Kolyniuk,428,unique,1,,Recruited from St Albans (WRFL),draftguru
+larke-medal:1988:686,larke-medal,1988,,Robbie Wright,,unmatched,0,,,draftguru
+larke-medal:1989:687,larke-medal,1989,,Ray Windsor,3995,unique,1,,Recruited from Western Districts,draftguru
+larke-medal:1990:688,larke-medal,1990,,Paul Williams,215,resolved,1,,Recruited from North Hobart,draftguru
+larke-medal:1991:689,larke-medal,1991,,Robert Neill,947,resolved,1,,Recruited from Southern District (ACT),draftguru
+larke-medal:1992:690,larke-medal,1992,,Daniel Southern,431,resolved,1,,Recruited from Claremont,draftguru
+larke-medal:1993:691,larke-medal,1993,,Shaun McManus,504,resolved,1,,Recruited from East Fremantle,draftguru
+larke-medal:1994:692,larke-medal,1994,,Daniel Harford,648,resolved,1,,Recruited from St Mary's (NFL) / Parade College / Northern U18,draftguru
+larke-medal:1995:693,larke-medal,1995,,Ben Setchell,,unmatched,0,,,draftguru
+larke-medal:1995:694,larke-medal,1995,,Luke Godden,258,resolved,1,,Recruited from Yarrambat / Northern U18,draftguru
+larke-medal:1996:695,larke-medal,1996,,Paddy Steinfort,,unmatched,0,,Recruited from Mazenod Old Collegians / Oakleigh U18,draftguru
+larke-medal:1997:696,larke-medal,1997,,Tim Finocchiaro,597,resolved,1,,Recruited from Warrandyte / Eastern U18,draftguru
+larke-medal:1998:697,larke-medal,1998,,Garth Taylor,533,resolved,1,,Recruited from Swan Districts,draftguru
+larke-medal:1999:698,larke-medal,1999,,Paul Hasleby,542,resolved,1,,Recruited from Northampton / Mazenod College (WA) / East Fremantle,draftguru
+larke-medal:2000:699,larke-medal,2000,,Kayne Pettifer,917,resolved,1,,Recruited from Kyabram / Murray U18,draftguru
+larke-medal:2001:700,larke-medal,2001,,Sam Power,1212,resolved,1,,Recruited from Balwyn / Trinity Grammar / Oakleigh U18,draftguru
+larke-medal:2001:701,larke-medal,2001,,Steven Armstrong,1118,resolved,1,,Recruited from Perth,draftguru
+larke-medal:2002:702,larke-medal,2002,,Byron Schammer,1422,resolved,1,,Recruited from West Adelaide,draftguru
+larke-medal:2003:703,larke-medal,2003,,Kepler Bradley,3937,resolved,1,,Recruited from Kingsley JFC / West Perth,draftguru
+larke-medal:2004:704,larke-medal,2004,,Jesse Smith,4103,resolved,2,,Recruited from Calder U18,draftguru
+larke-medal:2005:705,larke-medal,2005,,Marc Murphy,4148,resolved,1,,Recruited from Beverley Hills / Doncaster / Whitefriars College / Oakleigh U18,draftguru
+larke-medal:2006:706,larke-medal,2006,,Tom Hawkins,11548,resolved,1,,Recruited from Finley / Melbourne Grammar / Sandringham U18,draftguru
+larke-medal:2007:707,larke-medal,2007,,Cale Morton,11628,resolved,1,,Recruited from Lake Grace-Pingrup / Hale School / Claremont,draftguru
+larke-medal:2008:708,larke-medal,2008,,Jack Watts,11765,resolved,1,,Recruited from East Sandringham / Brighton Grammar / Sandringham U18,draftguru
+larke-medal:2009:709,larke-medal,2009,,Andrew Hooper,11881,resolved,1,,Recruited from North Ballarat U18,draftguru
+larke-medal:2009:710,larke-medal,2009,,David Swallow,11919,resolved,1,,Recruited from Rossmoyne JFC / East Fremantle,draftguru
+larke-medal:2010:711,larke-medal,2010,,Harley Bennell,11916,resolved,1,,Recruited from Pinjarra / Peel,draftguru
+larke-medal:2011:712,larke-medal,2011,,Stephen Coniglio,12028,resolved,1,,Recruited from Upper Swan / Swan Districts,draftguru
+larke-medal:2012:713,larke-medal,2012,,Lachie Whitfield,12143,resolved,1,,Recruited from Mornington / Mount Martha / Peninsula Grammar / Dandenong U18,draftguru
+larke-medal:2013:714,larke-medal,2013,,Dom Sheed,12253,resolved,1,,Recruited from Mines Rovers / Subiaco,draftguru
+larke-medal:2014:715,larke-medal,2014,,Christian Petracca,12430,resolved,1,,Recruited from Park Orchards / Warrandyte / Beverley Hills / Whitefriars College / Eastern U18,draftguru
+larke-medal:2015:716,larke-medal,2015,,Josh Schache,12416,resolved,1,,Recruited from Seymour / Murray U18,draftguru
+larke-medal:2016:717,larke-medal,2016,,Jack Graham,12576,resolved,3,,Recruited from Tea Tree Gully / North Adelaide,draftguru
+larke-medal:2017:718,larke-medal,2017,,Oscar Allen,12655,resolved,1,,Recruited from Whitford JFC / West Perth,draftguru
+larke-medal:2018:719,larke-medal,2018,,Sam Walsh,12684,resolved,1,,Recruited from St Joseph's / Geelong U18,draftguru
+larke-medal:2019:720,larke-medal,2019,,Deven Robertson,12774,resolved,1,,Recruited from Manning JFC / Aquinas College (WA) / Perth,draftguru
+larke-medal:2022:721,larke-medal,2022,,Will Ashcroft,13040,resolved,1,,Recruited from Southport / Sandringham U18,draftguru
+larke-medal:2023:722,larke-medal,2023,,Ryley Sanders,13103,resolved,1,,Recruited from North Launceston / Tasmania U18 / Melbourne Grammar / Sandringham U18,draftguru
+larke-medal:2024:723,larke-medal,2024,,Harvey Langford,13184,resolved,1,,Recruited from Mount Martha / Mornington SC / Dandenong U18,draftguru
+larke-medal:2024:724,larke-medal,2024,,Leo Lombard,13232,resolved,1,,Recruited from Varsity College / Burleigh,draftguru
+larke-medal:2025:725,larke-medal,2025,,Dyson Sharp,13283,resolved,1,,Recruited from Barossa / Central District,draftguru
+liston-trophy:1980:726,liston-trophy,1980,,Stephen Allender,1483,unique,1,,,draftguru
+liston-trophy:1981:727,liston-trophy,1981,,Vic Aanensen,,implausible,1,,,draftguru
+liston-trophy:1982:728,liston-trophy,1982,,Bill Swan,,unmatched,0,,,draftguru
+liston-trophy:1982:729,liston-trophy,1982,,David Wenn,,unmatched,0,,,draftguru
+liston-trophy:1982:730,liston-trophy,1982,,Geoff Austen,,unmatched,0,,,draftguru
+liston-trophy:1983:731,liston-trophy,1983,,Bill Swan,,unmatched,0,,,draftguru
+liston-trophy:1984:732,liston-trophy,1984,,Peter Geddes,,unmatched,0,,,draftguru
+liston-trophy:1985:733,liston-trophy,1985,,Neil MacLeod,,implausible,1,,,draftguru
+liston-trophy:1986:734,liston-trophy,1986,,Tony West,,implausible,1,,,draftguru
+liston-trophy:1987:735,liston-trophy,1987,,Barry Round,2131,resolved,1,,,draftguru
+liston-trophy:1988:736,liston-trophy,1988,,Brett McTaggart,,unmatched,0,,,draftguru
+liston-trophy:1988:737,liston-trophy,1988,,Gary Sheldon,,unmatched,0,,,draftguru
+liston-trophy:1989:738,liston-trophy,1989,,Saade Ghazi,,unmatched,0,,Recruited from Williamstown / Central District,draftguru
+liston-trophy:1990:739,liston-trophy,1990,,Joe Garbuio,,unmatched,0,,,draftguru
+liston-trophy:1990:740,liston-trophy,1990,,Matthew Burrows,,unmatched,0,,,draftguru
+liston-trophy:1990:741,liston-trophy,1990,,Steven Harkins,,unmatched,0,,,draftguru
+liston-trophy:1990:742,liston-trophy,1990,,Stuart Nicol,11411,unique,1,,,draftguru
+liston-trophy:1991:743,liston-trophy,1991,,Anthony Eames,,unmatched,0,,,draftguru
+liston-trophy:1992:744,liston-trophy,1992,,Joe Rugolo,,unmatched,0,,Recruited from St Peters / Assumption College,draftguru
+liston-trophy:1993:745,liston-trophy,1993,,Michael Sinni,,unmatched,0,,,draftguru
+liston-trophy:1994:746,liston-trophy,1994,,Cory Young,11434,resolved,1,,,draftguru
+liston-trophy:1995:747,liston-trophy,1995,,Paul Satterley,,unmatched,0,,Recruited from Western U18,draftguru
+liston-trophy:1996:748,liston-trophy,1996,,Paul Dooley,458,resolved,1,,Recruited from St Peters / Williamstown,draftguru
+liston-trophy:1997:749,liston-trophy,1997,,Justin Crough,,unmatched,0,,Recruited from Bungaree,draftguru
+liston-trophy:1998:750,liston-trophy,1998,,Michael Frost,53,resolved,1,,Recruited from Swan Hill,draftguru
+liston-trophy:1999:751,liston-trophy,1999,,John Georgiou,,implausible,1,,Recruited from Parkmore / St Bedes Mentone (VAFA),draftguru
+liston-trophy:2000:752,liston-trophy,2000,,David Robbins,,unmatched,0,,Recruited from Springvale,draftguru
+liston-trophy:2001:753,liston-trophy,2001,,Brett Backwell,190,resolved,1,,Recruited from Zillmere,draftguru
+liston-trophy:2001:754,liston-trophy,2001,,Ezra Poyas,906,resolved,1,,Recruited from Caulfield Grammar / Sandringham U18,draftguru
+liston-trophy:2002:755,liston-trophy,2002,,Sam Mitchell,1135,resolved,1,,Recruited from Mooroolbark / Eastern U18 / Box Hill,draftguru
+liston-trophy:2003:756,liston-trophy,2003,,David Robbins,,unmatched,0,,Recruited from Springvale,draftguru
+liston-trophy:2004:757,liston-trophy,2004,,Julian Field,,unmatched,0,,,draftguru
+liston-trophy:2005:758,liston-trophy,2005,,Ian Callinan,11985,resolved,1,,Recruited from Lauderdale / Clarence / Tasmania (VFL) / Central District,draftguru
+liston-trophy:2005:759,liston-trophy,2005,,Paul Johnson,1446,resolved,2,,Recruited from Dandenong U18,draftguru
+liston-trophy:2006:760,liston-trophy,2006,,Aaron Edwards,4118,resolved,1,,Recruited from Hampton Park / Seaford / Dandenong U18,draftguru
+liston-trophy:2007:761,liston-trophy,2007,,James Byrne,77,resolved,1,,Recruited from Assumption College / Calder U18,draftguru
+liston-trophy:2008:762,liston-trophy,2008,,James Podsiadly,11823,resolved,1,,Recruited from Yarraville / Emmanuel College / Western U18 / Werribee / Geelong (VFL),draftguru
+liston-trophy:2009:763,liston-trophy,2009,,Myles Sewell,,unmatched,0,,Recruited from North Ballarat,draftguru
+liston-trophy:2010:764,liston-trophy,2010,,Shane Valenti,11668,resolved,1,,Recruited from Haileybury College / Sandringham U18 / Sandringham,draftguru
+liston-trophy:2010:765,liston-trophy,2010,,Steve Clifton,12113,resolved,1,,Recruited from St Patrick's College / North Ballarat,draftguru
+liston-trophy:2011:766,liston-trophy,2011,,Shane Valenti,11668,resolved,1,,Recruited from Haileybury College / Sandringham U18 / Sandringham,draftguru
+liston-trophy:2012:767,liston-trophy,2012,,Ben Ross,11649,resolved,1,,Recruited from Bunyip / Gippsland U18,draftguru
+liston-trophy:2013:768,liston-trophy,2013,,Jordan Schroder,12089,resolved,1,,Recruited from St Bernard's College / Calder U18,draftguru
+liston-trophy:2013:769,liston-trophy,2013,,Mitch Hallahan,12271,resolved,1,,Recruited from Sorrento / Padua College / Dandenong U18,draftguru
+liston-trophy:2013:770,liston-trophy,2013,,Steve Clifton,12113,resolved,1,,Recruited from St Patrick's College / North Ballarat,draftguru
+liston-trophy:2014:771,liston-trophy,2014,,Alex Woodward,12298,resolved,1,,Recruited from Dingley / Noble Park / Mazenod College / Sandringham U18,draftguru
+liston-trophy:2015:772,liston-trophy,2015,,Nick Rippon,,unmatched,0,,Recruited from East Point / East Ballarat / North Ballarat U18,draftguru
+liston-trophy:2016:773,liston-trophy,2016,,Michael Gibbons,12685,resolved,1,,Recruited from Lavington / Murray U18 / Williamstown,draftguru
+liston-trophy:2017:774,liston-trophy,2017,,Jacob Townsend,12023,resolved,1,,Recruited from Leeton-Whitton / NSW-ACT U18,draftguru
+liston-trophy:2018:775,liston-trophy,2018,,Anthony Miles,12059,resolved,1,,Recruited from North Albury / NSW-ACT U18 / Murray U18 / Greater Western Sydney (NEAFL),draftguru
+liston-trophy:2018:776,liston-trophy,2018,,Michael Gibbons,12685,resolved,1,,Recruited from Lavington / Murray U18 / Williamstown,draftguru
+liston-trophy:2019:777,liston-trophy,2019,,Tom Gribble,,unmatched,0,,Recruited from Geelong West / Geelong U18 / Geelong (VFL) / Newtown & Chilwell,draftguru
+liston-trophy:2022:778,liston-trophy,2022,,Tom Gribble,,unmatched,0,,Recruited from Geelong West / Geelong U18 / Geelong (VFL) / Newtown & Chilwell,draftguru
+liston-trophy:2023:779,liston-trophy,2023,,Jarryd Lyons,12067,resolved,1,,Recruited from St Peters / De La Salle College / Sandringham U18,draftguru
+liston-trophy:2024:780,liston-trophy,2024,,Dominic Brew,,unmatched,0,,,draftguru
+liston-trophy:2025:781,liston-trophy,2025,,Jacob Dawson,12648,resolved,1,,Recruited from Burleigh / Palm Beach Currumbin / Queensland U18 / Gold Coast (NEAFL),draftguru
+magarey-medal:1980:782,magarey-medal,1980,,Russell Ebert,1697,unique,1,,,draftguru
+magarey-medal:1981:783,magarey-medal,1981,,Michael Aish,,unmatched,0,,,draftguru
+magarey-medal:1982:784,magarey-medal,1982,,Tony McGuinness,18,resolved,1,,Recruited from Brighton HS (SA) / Glenelg,draftguru
+magarey-medal:1983:785,magarey-medal,1983,,Tony Antrobus,1376,resolved,1,,Recruited from Ingle Farm / North Adelaide,draftguru
+magarey-medal:1984:786,magarey-medal,1984,,John Platten,636,resolved,1,,Recruited from Elizabeth / Central District,draftguru
+magarey-medal:1985:787,magarey-medal,1985,,Grantley Fielke,1316,resolved,1,,Recruited from Loxton / West Adelaide,draftguru
+magarey-medal:1986:788,magarey-medal,1986,,Greg Anderson,24,resolved,1,,Recruited from St Michael's College (SA) / Port Adelaide (SANFL),draftguru
+magarey-medal:1987:789,magarey-medal,1987,,Andrew Jarman,8,resolved,1,,Recruited from Gaza / North Adelaide,draftguru
+magarey-medal:1988:790,magarey-medal,1988,,Gregory Whittlesea,11499,resolved,1,,Recruited from Yankalilla / Sturt,draftguru
+magarey-medal:1989:791,magarey-medal,1989,,Gilbert McAdam,113,resolved,1,,Recruited from South Alice Springs / Central District,draftguru
+magarey-medal:1990:792,magarey-medal,1990,,Scott Hodges,42,resolved,1,,Recruited from Salisbury West JFC / Port Adelaide (SANFL),draftguru
+magarey-medal:1991:793,magarey-medal,1991,,Mark Naley,1334,resolved,1,,Recruited from Colonel Light Gardens / Sacred Heart College / South Adelaide,draftguru
+magarey-medal:1992:794,magarey-medal,1992,,Nathan Buckley,217,resolved,1,,Recruited from Southern Districts / Ainslie / Port Adelaide (SANFL),draftguru
+magarey-medal:1993:795,magarey-medal,1993,,Brenton Phillips,1379,resolved,1,,Recruited from Gepps Cross / North Adelaide,draftguru
+magarey-medal:1994:796,magarey-medal,1994,,Garry McIntosh,,unmatched,0,,Recruited from Hope Valley / Norwood,draftguru
+magarey-medal:1995:797,magarey-medal,1995,,Garry McIntosh,,unmatched,0,,Recruited from Hope Valley / Norwood,draftguru
+magarey-medal:1995:798,magarey-medal,1995,,Glenn Kilpatrick,588,resolved,1,,Recruited from Studfield,draftguru
+magarey-medal:1996:799,magarey-medal,1996,,Josh Francou,819,resolved,1,,Recruited from Pulteney Grammar / North Adelaide,draftguru
+magarey-medal:1997:800,magarey-medal,1997,,Andrew Jarman,8,resolved,1,,Recruited from Gaza / North Adelaide,draftguru
+magarey-medal:1997:801,magarey-medal,1997,,Brodie Atkinson,67,resolved,1,,Recruited from Risdon / North Adelaide,draftguru
+magarey-medal:1998:802,magarey-medal,1998,,Andrew Osborn,,unmatched,0,,Recruited from Reynella / Cardjin College / South Adelaide,draftguru
+magarey-medal:1999:803,magarey-medal,1999,,Damian Squire,823,resolved,1,,Recruited from North Adelaide,draftguru
+magarey-medal:2000:804,magarey-medal,2000,,Damian Squire,823,resolved,1,,Recruited from North Adelaide,draftguru
+magarey-medal:2001:805,magarey-medal,2001,,Ryan O'Connor,,unmatched,0,,Recruited from Ulverstone,draftguru
+magarey-medal:2001:806,magarey-medal,2001,,Tony Brown,941,resolved,1,,Recruited from Leopold / Geelong U18,draftguru
+magarey-medal:2002:807,magarey-medal,2002,,Jade Sheedy,,unmatched,0,,Recruited from Mildura Imperials,draftguru
+magarey-medal:2002:808,magarey-medal,2002,,Tim Weatherald,,unmatched,0,,,draftguru
+magarey-medal:2003:809,magarey-medal,2003,,Brett Ebert,3955,resolved,1,,Recruited from St Michael's College (SA) / Port Adelaide (SANFL),draftguru
+magarey-medal:2004:810,magarey-medal,2004,,Paul Thomas,4062,resolved,1,,Recruited from Central District,draftguru
+magarey-medal:2005:811,magarey-medal,2005,,Jeremy Clayton,1426,resolved,1,,Recruited from Warracknabeal / North Ballarat U18,draftguru
+magarey-medal:2006:812,magarey-medal,2006,,Brett Backwell,190,resolved,1,,Recruited from Zillmere,draftguru
+magarey-medal:2007:813,magarey-medal,2007,,James Allan,,unmatched,0,,Recruited from Geelong U18,draftguru
+magarey-medal:2008:814,magarey-medal,2008,,Luke Crane,,unmatched,0,,Recruited from George Town,draftguru
+magarey-medal:2009:815,magarey-medal,2009,,James Ezard,4177,resolved,1,,Recruited from Calder U18,draftguru
+magarey-medal:2010:816,magarey-medal,2010,,James Allan,,unmatched,0,,Recruited from Geelong U18,draftguru
+magarey-medal:2011:817,magarey-medal,2011,,James Allan,,unmatched,0,,Recruited from Geelong U18,draftguru
+magarey-medal:2012:818,magarey-medal,2012,,Brad Symes,3978,resolved,1,,Recruited from Trinity College (SA) / Central District,draftguru
+magarey-medal:2012:819,magarey-medal,2012,,Joel Cross,,unmatched,0,,Recruited from Kew Rovers,draftguru
+magarey-medal:2013:820,magarey-medal,2013,,Matt Thomas,4193,resolved,1,,Recruited from Melbourne Grammar / Sandringham U18,draftguru
+magarey-medal:2014:821,magarey-medal,2014,,Zane Kirkwood,,unmatched,0,,Recruited from Pooraka,draftguru
+magarey-medal:2015:822,magarey-medal,2015,,Joel Cross,,unmatched,0,,Recruited from Kew Rovers,draftguru
+magarey-medal:2016:823,magarey-medal,2016,,Zane Kirkwood,,unmatched,0,,Recruited from Pooraka,draftguru
+magarey-medal:2017:824,magarey-medal,2017,,Mitch Grigg,12216,resolved,1,,Recruited from Athelstone / Norwood,draftguru
+magarey-medal:2018:825,magarey-medal,2018,,Mitch Grigg,12216,resolved,1,,Recruited from Athelstone / Norwood,draftguru
+magarey-medal:2019:826,magarey-medal,2019,,Luke Partington,12569,resolved,1,,Recruited from Tumby Bay / Immanuel College / Port Adelaide (SANFL) / Norwood,draftguru
+magarey-medal:2020:827,magarey-medal,2020,,Campbell Combe,,unmatched,0,,,draftguru
+magarey-medal:2021:828,magarey-medal,2021,,Bryce Gibbs,11535,resolved,1,,Recruited from Plympton / Glenelg,draftguru
+magarey-medal:2021:829,magarey-medal,2021,,James Tsitas,13009,resolved,1,,Recruited from Grovedale / Geelong U18,draftguru
+magarey-medal:2022:830,magarey-medal,2022,,Aaron Young,12068,resolved,1,,Recruited from Wantirna South / Yarra Valley Grammar / Eastern U18,draftguru
+magarey-medal:2023:831,magarey-medal,2023,,Harry Grant,,unmatched,0,,,draftguru
+magarey-medal:2024:832,magarey-medal,2024,,Harry Boyd,13192,resolved,1,,Recruited from Shepparton FC / Murray U18 / Werribee / Norwood,draftguru
+magarey-medal:2024:833,magarey-medal,2024,,Will Snelling,12484,resolved,1,,Recruited from Goodwood / West Adelaide,draftguru
+magarey-medal:2025:834,magarey-medal,2025,,Tom Lewis,,unmatched,0,,Recruited from Meningie / Sturt,draftguru
+morrish-medal:1980:835,morrish-medal,1980,,Peter Lane,,unmatched,0,,Recruited from Essendon U19s,draftguru
+morrish-medal:1981:836,morrish-medal,1981,,Adrian Battiston,1515,unique,1,,Recruited from Tatura / Melbourne U19s,draftguru
+morrish-medal:1982:837,morrish-medal,1982,,Les Bamblett,1506,unique,1,,Recruited from Shepparton Swans / Melbourne U19s,draftguru
+morrish-medal:1983:838,morrish-medal,1983,,Greg Healy,1408,unique,1,,Recruited from Edithvale-Aspendale / St Bede's College / Melbourne U19s,draftguru
+morrish-medal:1984:839,morrish-medal,1984,,Tony Liberatore,426,resolved,1,,Recruited from Brunswick City / North Melbourne U19s / North Melbourne Reserves,draftguru
+morrish-medal:1985:840,morrish-medal,1985,,Frank Zocalli,,unmatched,0,,Recruited from Essendon U19s,draftguru
+morrish-medal:1986:841,morrish-medal,1986,,David Ross,,unmatched,0,,Recruited from North Melbourne U19s,draftguru
+morrish-medal:1987:842,morrish-medal,1987,,Wayne Schwass,764,resolved,1,,Recruited from South Warrnambool / Trinity Grammar / North Melbourne U19s,draftguru
+morrish-medal:1988:843,morrish-medal,1988,,Tim McGrath,558,resolved,1,,Recruited from North Dandenong / North Melbourne U19s,draftguru
+morrish-medal:1989:844,morrish-medal,1989,,Brad Davies,,unmatched,0,,Recruited from Essendon U19s,draftguru
+morrish-medal:1990:845,morrish-medal,1990,,Brendan Robertson,,unmatched,0,,Recruited from Carlton U19s,draftguru
+morrish-medal:1990:846,morrish-medal,1990,,Clinton Watson,,unmatched,0,,Recruited from North Melbourne U19s,draftguru
+morrish-medal:1991:847,morrish-medal,1991,,Gary Stevens,4035,resolved,1,,Recruited from Waaia / Sydney U19s,draftguru
+morrish-medal:1992:848,morrish-medal,1992,,Brad Smith,,implausible,1,,Recruited from Northern U18,draftguru
+morrish-medal:1993:849,morrish-medal,1993,,Dean Watson,,unmatched,0,,Recruited from Dandenong U18,draftguru
+morrish-medal:1994:850,morrish-medal,1994,,Gary Moorcroft,331,resolved,1,,Recruited from Reservoir / Preston / Northern U18,draftguru
+morrish-medal:1995:851,morrish-medal,1995,,Paul Hood,,unmatched,0,,Recruited from Geelong U18,draftguru
+morrish-medal:1996:852,morrish-medal,1996,,Nathan Brown,452,resolved,3,,Recruited from Golden Square / Bendigo U18,draftguru
+morrish-medal:1997:853,morrish-medal,1997,,Derek Murray,848,resolved,1,,Recruited from Murray U18,draftguru
+morrish-medal:1998:854,morrish-medal,1998,,Lenny Hayes,966,resolved,1,,Recruited from Pennant Hills / NSW-ACT U18,draftguru
+morrish-medal:1999:855,morrish-medal,1999,,Matthew Stolarczyk,,unmatched,0,,Recruited from Traralgon / Gippsland U18,draftguru
+morrish-medal:2000:856,morrish-medal,2000,,David Rodan,1104,resolved,1,,Recruited from Oak Park / Penola College (Vic) / Calder U18,draftguru
+morrish-medal:2001:857,morrish-medal,2001,,David Rodan,1104,resolved,1,,Recruited from Oak Park / Penola College (Vic) / Calder U18,draftguru
+morrish-medal:2002:858,morrish-medal,2002,,Luke Shackleton,4050,resolved,1,,Recruited from Burnie / Tasmania U18,draftguru
+morrish-medal:2003:859,morrish-medal,2003,,Mungara Brown,,unmatched,0,,Recruited from Alphington / Northern U18,draftguru
+morrish-medal:2004:860,morrish-medal,2004,,Matthew Bate,4160,resolved,1,,Recruited from Croydon / Eastern U18,draftguru
+morrish-medal:2005:861,morrish-medal,2005,,Fortunato Caruso,,unmatched,0,,Recruited from Fawkner Park / Calder U18,draftguru
+morrish-medal:2006:862,morrish-medal,2006,,Fortunato Caruso,,unmatched,0,,Recruited from Fawkner Park / Calder U18,draftguru
+morrish-medal:2007:863,morrish-medal,2007,,Matthew Kreuzer,11645,resolved,1,,Recruited from Bundoora / Loyola College / Northern U18,draftguru
+morrish-medal:2008:864,morrish-medal,2008,,Farran Priest,,unmatched,0,,Recruited from Wangaratta FC / Murray U18,draftguru
+morrish-medal:2008:865,morrish-medal,2008,,Jarryd Blair,11855,resolved,1,,Recruited from Wonthaggi / Gippsland U18,draftguru
+morrish-medal:2009:866,morrish-medal,2009,,Anton Woods,,unmatched,0,,Recruited from Diamond Creek / Northern U18,draftguru
+morrish-medal:2010:867,morrish-medal,2010,,Dyson Heppell,11896,resolved,1,,Recruited from Leongatha / Gippsland U18,draftguru
+morrish-medal:2010:868,morrish-medal,2010,,Jackson Sketcher,,unmatched,0,,Recruited from Noble Park / Springvale Districts / Sandringham U18,draftguru
+morrish-medal:2011:869,morrish-medal,2011,,Alex Benbow,,unmatched,0,,Recruited from Beaconsfield / Dandenong U18,draftguru
+morrish-medal:2012:870,morrish-medal,2012,,Nick Graham,12222,resolved,1,,Recruited from Traralgon Tyers United / Traralgon / Gippsland U18,draftguru
+morrish-medal:2013:871,morrish-medal,2013,,Ben Cavarra,12764,resolved,1,,Recruited from Ferntree Gully / Eastern U18 / Frankston / Williamstown,draftguru
+morrish-medal:2013:872,morrish-medal,2013,,George Cameron,,unmatched,0,,Recruited from Newtown & Chilwell / Geelong College / Geelong U18,draftguru
+morrish-medal:2013:873,morrish-medal,2013,,Jacob Chisari,,unmatched,0,,Recruited from South Mildura / Bendigo U18,draftguru
+morrish-medal:2013:874,morrish-medal,2013,,Josh Scott,,unmatched,0,,Recruited from Lakes Entrance / Gippsland U18,draftguru
+morrish-medal:2014:875,morrish-medal,2014,,Alex Carr,,unmatched,0,,Recruited from Maffra / Gippsland U18,draftguru
+morrish-medal:2015:876,morrish-medal,2015,,Clayton Oliver,12410,resolved,1,,Recruited from Mooroopna / Bendigo U18 / Murray U18 / Richmond (VFL),draftguru
+morrish-medal:2016:877,morrish-medal,2016,,Hugh McCluggage,12518,resolved,1,,Recruited from South Warrnambool / Ballarat Clarendon College / North Ballarat U18,draftguru
+morrish-medal:2017:878,morrish-medal,2017,,Jack Higgins,12609,resolved,1,,Recruited from East Malvern / Caulfield Grammar / Oakleigh U18,draftguru
+morrish-medal:2018:879,morrish-medal,2018,,Liam Stocker,12721,resolved,1,,Recruited from East Sandringham / Haileybury College / Old Haileybury / Sandringham U18,draftguru
+morrish-medal:2019:880,morrish-medal,2019,,Lucas Rocci,,unmatched,0,,Recruited from Werribee Districts / Western U18 / Werribee,draftguru
+morrish-medal:2021:881,morrish-medal,2021,,Flynn Lakey,,unmatched,0,,Recruited from Gisborne / Calder U18,draftguru
+morrish-medal:2021:882,morrish-medal,2021,,Josh Rentsch,,unmatched,0,,Recruited from Penshurst / North Ballarat U18,draftguru
+morrish-medal:2022:883,morrish-medal,2022,,Lachie Cowan,,unmatched,0,,Recruited from Devonport / Tasmania U18,draftguru
+morrish-medal:2022:884,morrish-medal,2022,,Taj Campbell-Farrell,,unmatched,0,,Recruited from Rye / Dandenong U18,draftguru
+morrish-medal:2023:885,morrish-medal,2023,,Colby McKercher,13107,resolved,1,,Recruited from Launceston College / Launceston / Tasmania U18,draftguru
+morrish-medal:2023:886,morrish-medal,2023,,Patrick Hughes,,unmatched,0,,Recruited from Torquay / Geelong U18,draftguru
+morrish-medal:2024:887,morrish-medal,2024,,Xavier Lindsay,13185,resolved,1,,Recruited from Inverloch-Kongwak / MacKillop College Leongatha / Gippsland U18,draftguru
+morrish-medal:2025:888,morrish-medal,2025,,Brodie Atkins,,unmatched,0,,Recruited from Drouin / Gippsland U18,draftguru
+national-draft-pick-1:1981:1769,national-draft-pick-1,1981,Melbourne,Alan Johnson,1337,resolved,1,,"B&F : 1983, 1989",draftguru
+national-draft-pick-1:1982:1770,national-draft-pick-1,1982,Western Bulldogs,Andrew Purser,2088,resolved,1,,B&F : 1984,draftguru
+national-draft-pick-1:1986:1771,national-draft-pick-1,1986,Brisbane,Martin Leslie,124,resolved,1,,AA : 1988; B&F : 1990 · Recruited from Ethelton / Port Adelaide (SANFL),draftguru
+national-draft-pick-1:1987:1772,national-draft-pick-1,1987,Richmond,Richard Lounder,11430,resolved,1,,Recruited from Salisbury West JFC / Central District,draftguru
+national-draft-pick-1:1988:1773,national-draft-pick-1,1988,Hawthorn,Alex McDonald,243,resolved,1,,Recruited from St Patrick's College / Ballarat YCW,draftguru
+national-draft-pick-1:1989:1774,national-draft-pick-1,1989,Richmond,Anthony Banik,619,resolved,1,,Recruited from Won Wron Woodside,draftguru
+national-draft-pick-1:1990:1775,national-draft-pick-1,1990,Geelong,Stephen Hooper,4012,resolved,1,,Recruited from East Perth,draftguru
+national-draft-pick-1:1991:1776,national-draft-pick-1,1991,Brisbane,John Hutton,503,resolved,1,,Recruited from Claremont,draftguru
+national-draft-pick-1:1992:1777,national-draft-pick-1,1992,West Coast,Drew Banfield,1031,resolved,1,,"Priority · B&F : 1996; Prem : 1994, 2006 · Recruited from Scotch College (WA) / Subiaco",draftguru
+national-draft-pick-1:1993:1778,national-draft-pick-1,1993,Sydney,Darren Gaspar,886,resolved,1,,"Priority · AA : 2000, 2001; B&F : 2001 · Recruited from South Fremantle",draftguru
+national-draft-pick-1:1994:1779,national-draft-pick-1,1994,Fremantle,Jeff White,502,resolved,1,,Priority · AA : 2004; B&F : 2004 · Recruited from Frankston YCW / Dandenong U18,draftguru
+national-draft-pick-1:1995:1780,national-draft-pick-1,1995,Fremantle,Clive Waterhouse,515,resolved,1,,Recruited from Port Adelaide (SANFL),draftguru
+national-draft-pick-1:1996:1781,national-draft-pick-1,1996,West Coast,Michael Gardiner,1056,resolved,2,,Comp · AA : 2003 · Recruited from Albany Royals / Wesley College (WA) / Hale School / Claremont,draftguru
+national-draft-pick-1:1997:1782,national-draft-pick-1,1997,Melbourne,Travis Johnstone,732,resolved,1,,Priority · B&F : 2005 · Recruited from Chelsea / Dandenong U18,draftguru
+national-draft-pick-1:1998:1783,national-draft-pick-1,1998,Brisbane,Des Headland,1089,resolved,1,,Prem : 2002 · Recruited from Subiaco,draftguru
+national-draft-pick-1:1999:1784,national-draft-pick-1,1999,Collingwood,Josh Fraser,285,resolved,1,,Priority · Recruited from Healesville / Seville / Mansfield / Murray U18,draftguru
+national-draft-pick-1:2000:1785,national-draft-pick-1,2000,St Kilda,Nick Riewoldt,981,resolved,1,,"Priority · AA : 2004, 2006, 2008, 2009, 2014; Rising Star : 2002; MVP : 2004; B&F : 2002, 2004, 2006, 2007, 2009, 2014; AA40 : 2007, 2012, 2013 · Recruited from Broadbeach / Southport",draftguru
+national-draft-pick-1:2001:1786,national-draft-pick-1,2001,Hawthorn,Luke Hodge,1134,resolved,1,,"Priority · AA : 2005, 2008, 2010; B&F : 2005, 2010; Norm Smith : 2008, 2014; AA40 : 2007, 2013; Prem : 2008, 2013, 2014, 2015 · Recruited from Colac / Geelong U18",draftguru
+national-draft-pick-1:2002:1787,national-draft-pick-1,2002,St Kilda,Brendon Goddard,1443,resolved,1,,"AA : 2009, 2010; B&F : 2013 · Recruited from Traralgon / Caulfield Grammar / Gippsland U18",draftguru
+national-draft-pick-1:2003:1788,national-draft-pick-1,2003,Western Bulldogs,Adam Cooney,3940,resolved,1,,Priority · AA : 2008; Brownlow : 2008; AFLCA Young : 2005; AA40 : 2010 · Recruited from Flagstaff Hill / West Adelaide,draftguru
+national-draft-pick-1:2004:1789,national-draft-pick-1,2004,Richmond,Brett Deledio,4068,resolved,1,,"Priority · AA : 2012, 2015; Rising Star : 2005; B&F : 2008, 2009; AFLPA 1st : 2005; AA40 : 2008, 2010, 2011 · Recruited from Kyabram / Murray U18",draftguru
+national-draft-pick-1:2005:1790,national-draft-pick-1,2005,Carlton,Marc Murphy,4148,resolved,1,,"Priority · AA : 2011; AFLCA : 2011; B&F : 2011, 2017; AFLPA 1st : 2006; AA40 : 2009 · Recruited from Beverley Hills / Doncaster / Whitefriars College / Oakleigh U18",draftguru
+national-draft-pick-1:2006:1791,national-draft-pick-1,2006,Carlton,Bryce Gibbs,11535,resolved,1,,B&F : 2014; Magarey : 2021; AA40 : 2014 · Recruited from Plympton / Glenelg,draftguru
+national-draft-pick-1:2007:1792,national-draft-pick-1,2007,Carlton,Matthew Kreuzer,11645,resolved,1,,Priority · AA40 : 2017 · Recruited from Bundoora / Loyola College / Northern U18,draftguru
+national-draft-pick-1:2008:1793,national-draft-pick-1,2008,Melbourne,Jack Watts,11765,resolved,1,,Recruited from East Sandringham / Brighton Grammar / Sandringham U18,draftguru
+national-draft-pick-1:2009:1794,national-draft-pick-1,2009,Melbourne,Tom Scully,11802,resolved,1,,"Priority · AA40 : 2016, 2017 · Recruited from Narre Warren / Haileybury College / Dandenong U18",draftguru
+national-draft-pick-1:2010:1795,national-draft-pick-1,2010,Gold Coast,David Swallow,11919,resolved,1,,B&F : 2014 · Recruited from Rossmoyne JFC / East Fremantle,draftguru
+national-draft-pick-1:2011:1796,national-draft-pick-1,2011,GWS,Jonathon Patton,12096,resolved,1,,Recruited from Scoresby / Nazareth College / St Simons / Eastern U18,draftguru
+national-draft-pick-1:2012:1797,national-draft-pick-1,2012,GWS,Lachie Whitfield,12143,resolved,1,,"AA : 2018, 2024; B&F : 2018, 2020 · Recruited from Mornington / Mount Martha / Peninsula Grammar / Dandenong U18",draftguru
+national-draft-pick-1:2013:1798,national-draft-pick-1,2013,GWS,Tom Boyd,12270,resolved,1,,Prem : 2016 · Recruited from Norwood (Vic) / Luther College / Eastern U18,draftguru
+national-draft-pick-1:2014:1799,national-draft-pick-1,2014,St Kilda,Paddy McCartin,12339,resolved,1,,Recruited from St Joseph's / St Joseph's College / Geelong Grammar / Geelong U18,draftguru
+national-draft-pick-1:2015:1800,national-draft-pick-1,2015,Carlton,Jacob Weitering,12402,resolved,1,,"AA : 2024; B&F : 2020, 2023; AA40 : 2020, 2021, 2022, 2023 · Recruited from Mount Martha / Mount Eliza / Peninsula Grammar / Dandenong U18",draftguru
+national-draft-pick-1:2016:1801,national-draft-pick-1,2016,Essendon,Andrew McGrath,12491,resolved,1,,Rising Star : 2017; AFLPA 1st : 2017 · Recruited from Brighton Grammar / East Brighton / Sandringham U18,draftguru
+national-draft-pick-1:2017:1802,national-draft-pick-1,2017,Brisbane,Cam Rayner,12592,resolved,1,,"AA40 : 2024; Prem : 2024, 2025 · Recruited from Hillside / Doutta Stars / PEGS / Western U18",draftguru
+national-draft-pick-1:2018:1803,national-draft-pick-1,2018,Carlton,Sam Walsh,12684,resolved,1,,AA : 2021; Rising Star : 2019; B&F : 2021; Ayres : 2023; AFLCA Young : 2020; AFLPA 1st : 2019; AA40 : 2022 · Recruited from St Joseph's / Geelong U18,draftguru
+national-draft-pick-1:2019:1804,national-draft-pick-1,2019,Gold Coast,Matt Rowell,12768,resolved,1,,AA : 2025; Brownlow : 2025; B&F : 2025 · Recruited from Boroondara Hawks JFC / Canterbury / Carey Grammar / Oakleigh U18,draftguru
+national-draft-pick-1:2020:1805,national-draft-pick-1,2020,Western Bulldogs,Jamarra Ugle-Hagan,12923,resolved,1,,Recruited from South Warrnambool / Scotch College / Oakleigh U18,draftguru
+national-draft-pick-1:2021:1806,national-draft-pick-1,2021,North Melbourne,Jason Horne-Francis,12956,resolved,1,,AA40 : 2024 · Recruited from Christies Beach / South Adelaide,draftguru
+national-draft-pick-1:2022:1807,national-draft-pick-1,2022,GWS,Aaron Cadman,13054,resolved,1,,Recruited from Darley / North Ballarat U18,draftguru
+national-draft-pick-1:2023:1808,national-draft-pick-1,2023,West Coast,Harley Reid,13111,resolved,1,,AFLPA 1st : 2024 · Recruited from Tongala / St Joseph's College (Echuca) / Bendigo U18,draftguru
+national-draft-pick-1:2024:1809,national-draft-pick-1,2024,Richmond,Sam Lalor,13190,resolved,1,,Recruited from Bacchus Marsh / Geelong Grammar / North Ballarat U18,draftguru
+national-draft-pick-1:2025:1810,national-draft-pick-1,2025,West Coast,Willem Duursma,13292,resolved,1,,Recruited from Foster / Gippsland U18,draftguru
+norm-smith-medal:1979:889,norm-smith-medal,1979,Carlton,Wayne Harmes,1790,unique,1,,,draftguru
+norm-smith-medal:1980:890,norm-smith-medal,1980,Richmond,Kevin Bartlett,1509,unique,1,,,draftguru
+norm-smith-medal:1981:891,norm-smith-medal,1981,Carlton,Bruce Doull,1680,unique,1,,,draftguru
+norm-smith-medal:1982:892,norm-smith-medal,1982,Richmond,Maurice Rioli,2113,resolved,2,,,draftguru
+norm-smith-medal:1983:893,norm-smith-medal,1983,Hawthorn,Colin Robertson,2123,unique,1,,,draftguru
+norm-smith-medal:1984:894,norm-smith-medal,1984,Essendon,Bill Duckworth,1405,resolved,2,,,draftguru
+norm-smith-medal:1985:895,norm-smith-medal,1985,Essendon,Simon Madden,1302,unique,1,,Recruited from St Bernard's College,draftguru
+norm-smith-medal:1986:896,norm-smith-medal,1986,Hawthorn,Gary Ayres,1257,unique,1,,,draftguru
+norm-smith-medal:1987:897,norm-smith-medal,1987,Carlton,David Rhys-Jones,2108,unique,1,,Recruited from Oakleigh District,draftguru
+norm-smith-medal:1988:898,norm-smith-medal,1988,Hawthorn,Gary Ayres,1257,unique,1,,,draftguru
+norm-smith-medal:1989:899,norm-smith-medal,1989,Geelong,Gary Ablett,567,resolved,2,,Recruited from Drouin,draftguru
+norm-smith-medal:1990:900,norm-smith-medal,1990,Collingwood,Tony Shaw,1166,unique,1,,Recruited from Reservoir Lakeside,draftguru
+norm-smith-medal:1991:901,norm-smith-medal,1991,Hawthorn,Paul Dear,641,unique,1,,Recruited from Churchill,draftguru
+norm-smith-medal:1992:902,norm-smith-medal,1992,West Coast,Peter Matera,1040,resolved,1,,Recruited from South Fremantle,draftguru
+norm-smith-medal:1993:903,norm-smith-medal,1993,Essendon,Michael Long,313,resolved,1,,Recruited from St Marys / West Torrens,draftguru
+norm-smith-medal:1994:904,norm-smith-medal,1994,West Coast,Dean Kemp,1028,resolved,1,,Recruited from Subiaco,draftguru
+norm-smith-medal:1995:905,norm-smith-medal,1995,Carlton,Greg Williams,142,resolved,1,,Recruited from Golden Square,draftguru
+norm-smith-medal:1996:906,norm-smith-medal,1996,North Melbourne,Glenn Archer,777,unique,1,,Recruited from Noble Park,draftguru
+norm-smith-medal:1997:907,norm-smith-medal,1997,Adelaide,Andrew McLeod,30,resolved,1,,Recruited from Darwin FC / Port Adelaide (SANFL),draftguru
+norm-smith-medal:1998:908,norm-smith-medal,1998,Adelaide,Andrew McLeod,30,resolved,1,,Recruited from Darwin FC / Port Adelaide (SANFL),draftguru
+norm-smith-medal:1999:909,norm-smith-medal,1999,North Melbourne,Shannon Grant,794,resolved,1,,Recruited from Flemington / St Joseph's College (North Melbourne) / Western U18,draftguru
+norm-smith-medal:2000:910,norm-smith-medal,2000,Essendon,James Hird,312,resolved,1,,Recruited from Ainslie,draftguru
+norm-smith-medal:2001:911,norm-smith-medal,2001,Brisbane,Shaun Hart,111,resolved,1,,Recruited from Shepparton United,draftguru
+norm-smith-medal:2002:912,norm-smith-medal,2002,Collingwood,Nathan Buckley,217,resolved,1,,Recruited from Southern Districts / Ainslie / Port Adelaide (SANFL),draftguru
+norm-smith-medal:2003:913,norm-smith-medal,2003,Brisbane,Simon Black,1083,resolved,1,,Recruited from East Fremantle,draftguru
+norm-smith-medal:2004:914,norm-smith-medal,2004,Port Adelaide,Byron Pickett,791,resolved,1,,Recruited from Port Adelaide (SANFL),draftguru
+norm-smith-medal:2005:915,norm-smith-medal,2005,West Coast,Chris Judd,1122,resolved,1,,Recruited from East Sandringham / Caulfield Grammar / Sandringham U18,draftguru
+norm-smith-medal:2006:916,norm-smith-medal,2006,West Coast,Andrew Embley,1065,resolved,1,,Recruited from Bassendean / Trinity College (WA) / Swan Districts,draftguru
+norm-smith-medal:2007:917,norm-smith-medal,2007,Geelong,Steve Johnson,1140,resolved,1,,Recruited from Wangaratta Tigers JFC / Wangaratta FC / Murray U18,draftguru
+norm-smith-medal:2008:918,norm-smith-medal,2008,Hawthorn,Luke Hodge,1134,resolved,1,,Recruited from Colac / Geelong U18,draftguru
+norm-smith-medal:2009:919,norm-smith-medal,2009,Geelong,Paul Chapman,614,resolved,1,,Recruited from North Coburg / Calder U18,draftguru
+norm-smith-medal:2010:920,norm-smith-medal,2010,St Kilda,Lenny Hayes,966,resolved,1,,Recruited from Pennant Hills / NSW-ACT U18,draftguru
+norm-smith-medal:2010:921,norm-smith-medal,2010,Collingwood,Scott Pendlebury,4182,resolved,1,,Recruited from Sale / Gippsland U18,draftguru
+norm-smith-medal:2011:922,norm-smith-medal,2011,Geelong,Jimmy Bartel,1106,resolved,1,,Recruited from Bell Park / St Joseph's College / Geelong U18,draftguru
+norm-smith-medal:2012:923,norm-smith-medal,2012,Sydney,Ryan O'Keefe,1024,resolved,0,,Recruited from St Kevin's College / Calder U18,draftguru
+norm-smith-medal:2013:924,norm-smith-medal,2013,Hawthorn,Brian Lake,1217,resolved,1,,Recruited from Woodville-West Torrens,draftguru
+norm-smith-medal:2014:925,norm-smith-medal,2014,Hawthorn,Luke Hodge,1134,resolved,1,,Recruited from Colac / Geelong U18,draftguru
+norm-smith-medal:2015:926,norm-smith-medal,2015,Hawthorn,Cyril Rioli,11632,resolved,1,,Recruited from St Marys / Scotch College,draftguru
+norm-smith-medal:2016:927,norm-smith-medal,2016,Western Bulldogs,Jason Johannisen,12122,resolved,1,,Recruited from Willetton / East Fremantle,draftguru
+norm-smith-medal:2017:928,norm-smith-medal,2017,Richmond,Dustin Martin,11794,resolved,1,,Recruited from Castlemaine / Bendigo U18,draftguru
+norm-smith-medal:2018:929,norm-smith-medal,2018,West Coast,Luke Shuey,11805,resolved,1,,Recruited from Bulleen-Templestowe / Marcellin College / Oakleigh U18,draftguru
+norm-smith-medal:2019:930,norm-smith-medal,2019,Richmond,Dustin Martin,11794,resolved,1,,Recruited from Castlemaine / Bendigo U18,draftguru
+norm-smith-medal:2020:931,norm-smith-medal,2020,Richmond,Dustin Martin,11794,resolved,1,,Recruited from Castlemaine / Bendigo U18,draftguru
+norm-smith-medal:2021:932,norm-smith-medal,2021,Melbourne,Christian Petracca,12430,resolved,1,,Recruited from Park Orchards / Warrandyte / Beverley Hills / Whitefriars College / Eastern U18,draftguru
+norm-smith-medal:2022:933,norm-smith-medal,2022,Geelong,Isaac Smith,11941,resolved,1,,Recruited from Temora / East Wagga-Kooringal / Wagga / NSW-ACT U18 / Redan / North Ballarat,draftguru
+norm-smith-medal:2023:934,norm-smith-medal,2023,Collingwood,Bobby Hill,12744,resolved,1,,Recruited from Northam Barons JFC / South Perth JFC / Wesley College (WA) / Perth,draftguru
+norm-smith-medal:2024:935,norm-smith-medal,2024,Brisbane,Will Ashcroft,13040,resolved,1,,Recruited from Southport / Sandringham U18,draftguru
+norm-smith-medal:2025:936,norm-smith-medal,2025,Brisbane,Will Ashcroft,13040,resolved,1,,Recruited from Southport / Sandringham U18,draftguru
+sandover-medal:1980:970,sandover-medal,1980,,Stephen Michael,,unmatched,0,,Recruited from Kojonup,draftguru
+sandover-medal:1981:971,sandover-medal,1981,,Stephen Michael,,unmatched,0,,Recruited from Kojonup,draftguru
+sandover-medal:1982:972,sandover-medal,1982,,Phil Narkle,2024,resolved,1,,,draftguru
+sandover-medal:1983:973,sandover-medal,1983,,Bryan Cousins,1626,resolved,1,,,draftguru
+sandover-medal:1984:974,sandover-medal,1984,,Steve Malaxos,,unmatched,0,,Recruited from Claremont,draftguru
+sandover-medal:1985:975,sandover-medal,1985,,Murray Wrensted,1382,resolved,1,,,draftguru
+sandover-medal:1986:976,sandover-medal,1986,,Mark Bairstow,1201,unique,1,,Recruited from Lake Grace-Pingrup,draftguru
+sandover-medal:1987:977,sandover-medal,1987,,Mark Watson,,unmatched,0,,,draftguru
+sandover-medal:1988:978,sandover-medal,1988,,David Bain,1172,resolved,1,,Recruited from East Perth,draftguru
+sandover-medal:1989:979,sandover-medal,1989,,Craig Edwards,,unmatched,0,,Recruited from Mt Lawley,draftguru
+sandover-medal:1990:980,sandover-medal,1990,,Mick Grasso,,unmatched,0,,Recruited from Bunbury,draftguru
+sandover-medal:1991:981,sandover-medal,1991,,Ian Dargie,11425,resolved,1,,Recruited from Subiaco,draftguru
+sandover-medal:1992:982,sandover-medal,1992,,Robert West,1219,resolved,1,,Recruited from Wodonga FC,draftguru
+sandover-medal:1993:983,sandover-medal,1993,,Neil Mildenhall,505,resolved,1,,Recruited from West Perth,draftguru
+sandover-medal:1994:984,sandover-medal,1994,,Ian Dargie,11425,resolved,1,,Recruited from Subiaco,draftguru
+sandover-medal:1995:985,sandover-medal,1995,,Craig Treleven,651,resolved,1,,Recruited from East Fremantle,draftguru
+sandover-medal:1996:986,sandover-medal,1996,,Jeremy Wasley,,unmatched,0,,,draftguru
+sandover-medal:1997:987,sandover-medal,1997,,Brady Anderson,793,resolved,1,,Recruited from East Perth,draftguru
+sandover-medal:1998:988,sandover-medal,1998,,Adrian Bromage,,unmatched,0,,Recruited from Bairnsdale,draftguru
+sandover-medal:1999:989,sandover-medal,1999,,Gus Seebeck,,unmatched,0,,Recruited from Prahran U18,draftguru
+sandover-medal:2000:990,sandover-medal,2000,,Richard Ambrose,4036,resolved,1,,Recruited from Wanganui Park SC,draftguru
+sandover-medal:2001:991,sandover-medal,2001,,Ryan Turnbull,1043,resolved,1,,Recruited from Karrinyup JFC / Christ Church Grammar / University (WAAFL) / Claremont,draftguru
+sandover-medal:2002:992,sandover-medal,2002,,Allistair Pickett,,unmatched,0,,Recruited from Narrogin Eagles,draftguru
+sandover-medal:2003:993,sandover-medal,2003,,Shane Beros,,unmatched,0,,Recruited from West Coast Cowan,draftguru
+sandover-medal:2004:994,sandover-medal,2004,,Allistair Pickett,,unmatched,0,,Recruited from Narrogin Eagles,draftguru
+sandover-medal:2005:995,sandover-medal,2005,,Jaxon Crabb,1061,resolved,1,,Recruited from South Bunbury / Christ Church Grammar / Claremont,draftguru
+sandover-medal:2006:996,sandover-medal,2006,,Matt Priddis,4186,resolved,1,,Recruited from Sorrento Duncraig JFC / Subiaco,draftguru
+sandover-medal:2007:997,sandover-medal,2007,,Anthony Jones,497,resolved,1,,Recruited from Claremont,draftguru
+sandover-medal:2008:998,sandover-medal,2008,,Hayden Ballantyne,11770,resolved,1,,Recruited from Baldivis / Peel,draftguru
+sandover-medal:2009:999,sandover-medal,2009,,Ross Young,11563,resolved,1,,Recruited from Northern Bullants,draftguru
+sandover-medal:2010:1000,sandover-medal,2010,,Andrew Krakouer,915,resolved,2,,Recruited from South Fremantle,draftguru
+sandover-medal:2011:1001,sandover-medal,2011,,Luke Blackwell,4175,resolved,1,,Recruited from Mazenod College (WA) / Swan Districts,draftguru
+sandover-medal:2012:1002,sandover-medal,2012,,Kane Mitchell,12152,resolved,1,,Recruited from Marist JFC / Claremont,draftguru
+sandover-medal:2013:1003,sandover-medal,2013,,Rory O'Brien,,unmatched,0,,Recruited from Pinjarra JFC,draftguru
+sandover-medal:2014:1004,sandover-medal,2014,,Aaron Black,12963,resolved,2,,Recruited from Kingsley JFC / Kingsley,draftguru
+sandover-medal:2015:1005,sandover-medal,2015,,Aidan Tropiano,,unmatched,0,,Recruited from Geraldton Brigades,draftguru
+sandover-medal:2016:1006,sandover-medal,2016,,Jye Bolton,,unmatched,0,,Recruited from Leopold,draftguru
+sandover-medal:2017:1007,sandover-medal,2017,,Haiden Schloithe,,unmatched,0,,Recruited from Katanning / South Fremantle,draftguru
+sandover-medal:2018:1008,sandover-medal,2018,,Jye Bolton,,unmatched,0,,Recruited from Leopold,draftguru
+sandover-medal:2019:1009,sandover-medal,2019,,Lachlan Delahunty,,unmatched,0,,Recruited from Frankston,draftguru
+sandover-medal:2020:1010,sandover-medal,2020,,Sam Fisher,,implausible,1,,Recruited from Marist College (ACT) / Ainslie / Canberra / NSW-ACT U18 / Western Sydney University,draftguru
+sandover-medal:2021:1011,sandover-medal,2021,,Bailey Rogers,,unmatched,0,,Recruited from Marist JFC,draftguru
+sandover-medal:2022:1012,sandover-medal,2022,,Blaine Boekhorst,12341,resolved,1,,Recruited from Port Hedland / Wesley College (WA) / Swan Districts,draftguru
+sandover-medal:2023:1013,sandover-medal,2023,,Hamish Brayshaw,12845,resolved,1,,Recruited from Hampton Rovers / Haileybury College / Sandringham U18 / Sandringham,draftguru
+sandover-medal:2024:1014,sandover-medal,2024,,Callan England,,unmatched,0,,Recruited from Wembley Downs JFC / Hale School / Claremont,draftguru
+sandover-medal:2024:1015,sandover-medal,2024,,Nik Rokahr,,unmatched,0,,Recruited from Shepparton FC / Southern Districts / Bell Park,draftguru
+sandover-medal:2025:1016,sandover-medal,2025,,Charlie Constable,12687,resolved,1,,Recruited from East Sandringham / Haileybury College / Sandringham U18,draftguru

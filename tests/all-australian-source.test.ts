@@ -448,7 +448,7 @@ describe('all_australian group is legacy-SQLite-free (AFLDB-ISSUE-112 phase 5)',
     );
     expect(block).not.toContain('"all_australian": {"awards"}');
     // The reverse direction stays: a full awards refresh still reloads it.
-    expect(block).toContain('"awards": {"all_australian", "under_22", "rising_star", "club_bf"}');
+    expect(block).toContain('"awards": {"all_australian", "under_22", "rising_star", "club_bf", "named_medals"}');
   });
 
   it('keeps a fail-loud guard for the missing award definition', () => {

@@ -439,7 +439,7 @@ describe('club_bf group is legacy-SQLite-free (AFLDB-ISSUE-112 phase 6)', () => 
     );
     expect(block).not.toMatch(/^\s*"club_bf":/m);
     expect(block).toContain(
-      '"awards": {"all_australian", "under_22", "rising_star", "club_bf"}',
+      '"awards": {"all_australian", "under_22", "rising_star", "club_bf", "named_medals"}',
     );
   });
 

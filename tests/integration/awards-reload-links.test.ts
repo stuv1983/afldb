@@ -55,6 +55,10 @@ const CLUB_BF_CSV = join(root, 'data', 'awards', 'club-best-and-fairest.csv');
 const CLUB_BF_DEFS_CSV = join(
   root, 'data', 'awards', 'club-best-and-fairest-definitions.csv',
 );
+const NAMED_MEDALS_CSV = join(root, 'data', 'awards', 'named-medals.csv');
+const NAMED_MEDALS_DEFS_CSV = join(
+  root, 'data', 'awards', 'named-medals-definitions.csv',
+);
 
 // The dev host keeps psycopg in the repo virtualenv; a bare python3 there
 // cannot import it.
@@ -117,6 +121,12 @@ const canRunClubBfImporter = canSpawnPython
   && existsSync(CLUB_BF_CSV)
   && existsSync(CLUB_BF_DEFS_CSV)
   && importRole.isConfigured;
+// AFLDB-ISSUE-112 phase 7: named medals is legacy-free like club_bf, and
+// likewise tracks its own 17 award definitions.
+const canRunNamedMedalsImporter = canSpawnPython
+  && existsSync(NAMED_MEDALS_CSV)
+  && existsSync(NAMED_MEDALS_DEFS_CSV)
+  && importRole.isConfigured;
 const roleParitySuffix = importRole.isConfigured ? '' : ` — ${importRole.skipMessage}`;
 
 // One connection pool for the whole file: every describe block shares `sql`.
@@ -130,6 +140,7 @@ beforeAll(async () => {
     || canRunRisingStarImporter
     || canRunAllAustralianImporter
     || canRunClubBfImporter
+    || canRunNamedMedalsImporter
   ) {
     await importRole.validate();
   }
@@ -2474,6 +2485,448 @@ describe.skipIf(!canRunClubBfImporter)(
         SELECT count(*)::int AS n
           FROM award_winners w JOIN awards a ON a.id = w.award_id
          WHERE a.category <> 'club_best_and_fairest'
+      `;
+      const after = await Promise.all([
+        countRows('hall_of_fame'), countRows('honour_team_members'),
+        countRows('captaincies'), countRows('award_nominations'),
+      ]);
+      expect(otherAfter.n).toBe(otherBefore.n);
+      expect(after).toEqual(before);
+    });
+  },
+);
+
+/**
+ * AFLDB-ISSUE-112 phase 7 — named medals & other award/draft_pick winners,
+ * the last legacy-dependent awards family. Legacy-free like club_bf: it
+ * loads a 979-row winners manifest and its own 17 award definitions with
+ * AFLDB_LEGACY_SQLITE forced unset. It shares award_winners' ownership
+ * scope with the legacy 'awards' group (which still creates the
+ * all-australian / rising-star / coleman definitions), so this block also
+ * proves those tables and the other awards families are untouched by a
+ * named_medals-only run. The Brownlow medallist rows here carry the
+ * winning votes tally and are distinct from brownlow_season_votes
+ * (AFLDB-ISSUE-113 — never sourced here).
+ */
+describe.skipIf(!canRunNamedMedalsImporter)(
+  `named-medals manifest reload (AFLDB-ISSUE-112)${roleParitySuffix}`,
+  () => {
+    const FIXTURE_EMAIL_112_NM = 'issue-112-named-medals@example.test';
+    // Era-identity rows: the manifest carries the winner's own AFL club
+    // string and the loader re-resolves it season-aware.
+    const ERA_ROWS = [
+      { srid: 'brownlow-medal:1981:483', slug: 'south-melbourne' },
+      { srid: 'brownlow-medal:1980:482', slug: 'footscray' },
+      { srid: 'brownlow-medal:1990:495', slug: 'footscray' },
+      { srid: 'brownlow-medal:1996:502', slug: 'brisbane-bears' },
+      { srid: 'aflpa-mvp:2002:100', slug: 'brisbane-lions' },
+      { srid: 'aflpa-best-first-year-player:2003:56', slug: 'kangaroos' },
+      { srid: 'all-australian-squad:2007:126', slug: 'kangaroos' },
+    ];
+    // A resolved Brownlow medallist row whose player_id (Mark Ricciuto)
+    // is low enough to exist in any afldb_test; it carries a votes tally.
+    const LINKED_ROW = { srid: 'brownlow-medal:2003:510', playerId: 4, votes: '22.00' };
+    // An unlinked state-league row — no player_id, no club, no votes.
+    const UNLINKED_ROW = 'hunter-harrison-medal:1993:640';
+    // The 2003 Brownlow: three medallists, three keys, three players.
+    const TIED_2003 = [
+      'brownlow-medal:2003:509', 'brownlow-medal:2003:510', 'brownlow-medal:2003:511',
+    ];
+
+    const namedMedalSlugs = readFileSync(NAMED_MEDALS_DEFS_CSV, 'utf8')
+      .trimEnd().split(/\r?\n/).slice(1)
+      .map((line) => splitCsv(line)[0]);
+
+    let draftguruId = 0;
+    let manualId = 0;
+    let adminUserId = 0;
+    let nmAwardIds: number[] = [];
+    // How many of the manifest's 863 linked rows this fixture DB can
+    // resolve: the manifest carries afldb_dev's player_id verbatim, so a
+    // staler players table is missing some — those load unlinked via the
+    // preserved valid-player guard. Parity is stated against this number.
+    let expectedLinked = 0;
+    // Whether this block created the 17 named-medal award definitions (a
+    // canonically rebuilt afldb_test carries none). If so, afterAll removes
+    // them and ON DELETE CASCADE clears the winners this block loaded.
+    let seededDefinitions = false;
+
+    beforeAll(async () => {
+      const sourceRows = await sql<{ key: string; id: number }[]>`
+        SELECT key, id FROM sources
+         WHERE key IN ('draftguru', 'manual_admin_edit')
+      `;
+      const byKey = new Map(sourceRows.map((row) => [row.key, row.id]));
+      draftguruId = byKey.get('draftguru') ?? 0;
+      manualId = byKey.get('manual_admin_edit') ?? 0;
+      expect(draftguruId, 'draftguru source must exist').toBeGreaterThan(0);
+      expect(manualId, 'manual_admin_edit source must exist').toBeGreaterThan(0);
+
+      const existing = await sql<{ id: number }[]>`
+        SELECT id FROM awards WHERE slug = ANY(${namedMedalSlugs})
+      `;
+      seededDefinitions = existing.length === 0;
+
+      const [admin] = await sql<{ id: number }[]>`
+        INSERT INTO auth_users (email, role)
+        VALUES (${FIXTURE_EMAIL_112_NM}, 'admin')
+        ON CONFLICT (email) DO UPDATE SET role = 'admin'
+        RETURNING id
+      `;
+      adminUserId = admin.id;
+
+      // player_id is column 5; source_key (0), player (4) and note (9) may
+      // be CSV-quoted, so a quote-aware split is required.
+      const manifestPlayerIds = readFileSync(NAMED_MEDALS_CSV, 'utf8')
+        .trimEnd().split(/\r?\n/).slice(1)
+        .map((line) => splitCsv(line)[5])
+        .filter((cell) => cell !== '')
+        .map(Number);
+      expect(manifestPlayerIds).toHaveLength(863);
+      const presentRows = await sql<{ id: number }[]>`
+        SELECT id FROM players WHERE id = ANY(${manifestPlayerIds})
+      `;
+      const present = new Set(presentRows.map((row) => row.id));
+      expectedLinked = manifestPlayerIds.filter((id) => present.has(id)).length;
+      expect(expectedLinked).toBeGreaterThan(700);
+    });
+
+    afterAll(async () => {
+      await sql`DELETE FROM auth_users WHERE id = ${adminUserId}`;
+      if (seededDefinitions) {
+        await sql`DELETE FROM awards WHERE slug = ANY(${namedMedalSlugs})`;
+      }
+    });
+
+    async function loadNamedMedalAwardIds(): Promise<number[]> {
+      const rows = await sql<{ id: number }[]>`
+        SELECT id FROM awards WHERE slug = ANY(${namedMedalSlugs}) ORDER BY id
+      `;
+      return rows.map((row) => row.id);
+    }
+
+    async function scopedCount(): Promise<{
+      total: number; awards: number; seasons: number;
+      linked: number; unlinked: number; tiedSeasons: number;
+    }> {
+      const [row] = await sql<{
+        total: number; awards: number; seasons: number;
+        linked: number; unlinked: number;
+      }[]>`
+        SELECT count(*)::int AS total,
+               count(DISTINCT award_id)::int AS awards,
+               count(DISTINCT season)::int AS seasons,
+               count(*) FILTER (WHERE player_id IS NOT NULL)::int AS linked,
+               count(*) FILTER (WHERE player_id IS NULL)::int AS unlinked
+          FROM award_winners
+         WHERE award_id = ANY(${nmAwardIds})
+           AND source_id = ${draftguruId}
+      `;
+      const [{ tied }] = await sql<{ tied: number }[]>`
+        SELECT count(*)::int AS tied FROM (
+          SELECT 1 FROM award_winners
+           WHERE award_id = ANY(${nmAwardIds})
+             AND source_id = ${draftguruId}
+           GROUP BY award_id, season
+          HAVING count(*) > 1) t
+      `;
+      return { ...row, tiedSeasons: tied };
+    }
+
+    it('reloads the full 979-row manifest plus 17 definitions with AFLDB_LEGACY_SQLITE unset', async () => {
+      const [before] = await sql<{ id: string }[]>`
+        SELECT coalesce(max(id), 0)::text AS id FROM import_batches
+      `;
+
+      const run = runImporter(['named_medals'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+
+      nmAwardIds = await loadNamedMedalAwardIds();
+      expect(nmAwardIds).toHaveLength(17);
+
+      const [batch] = await sql<{
+        status: string; recordsRejected: string;
+      }[]>`
+        SELECT status::text AS status,
+               records_rejected::text AS "recordsRejected"
+          FROM import_batches
+         WHERE id > ${before.id}::bigint
+           AND tool = 'import_awards.py'
+           AND target_table = 'named_medals'
+         ORDER BY id DESC
+         LIMIT 1
+      `;
+      expect(batch, 'the named_medals batch must be recorded').toBeDefined();
+      expect(batch.status).toBe('completed');
+      expect(Number(batch.recordsRejected)).toBe(0);
+
+      // Every definition resolves and its declared span matches its winners.
+      const defs = await sql<{ slug: string; first: number; last: number }[]>`
+        SELECT slug, first_season AS first, last_season AS last
+          FROM awards WHERE slug = ANY(${namedMedalSlugs})
+      `;
+      expect(defs).toHaveLength(17);
+      for (const def of defs) {
+        const [span] = await sql<{ mn: number; mx: number }[]>`
+          SELECT min(season)::int AS mn, max(season)::int AS mx
+            FROM award_winners w JOIN awards a ON a.id = w.award_id
+           WHERE a.slug = ${def.slug}
+        `;
+        expect([def.first, def.last]).toEqual([span.mn, span.mx]);
+      }
+
+      const counts = await scopedCount();
+      expect(counts).toMatchObject({ total: 979, awards: 17, seasons: 50 });
+      expect(counts.tiedSeasons).toBeGreaterThanOrEqual(6);
+      expect(counts.linked).toBe(expectedLinked);
+      expect(counts.unlinked).toBe(979 - expectedLinked);
+    }, 120_000);
+
+    it('re-resolves each era identity from the source club string, season-aware', async () => {
+      const run = runImporter(['named_medals'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+      nmAwardIds = await loadNamedMedalAwardIds();
+
+      for (const era of ERA_ROWS) {
+        const [row] = await sql<{ slug: string }[]>`
+          SELECT c.slug
+            FROM award_winners w
+            JOIN clubs c ON c.id = w.club_id
+           WHERE w.award_id = ANY(${nmAwardIds})
+             AND w.source_record_id = ${era.srid}
+        `;
+        expect(row, `${era.srid} must load with a club`).toBeDefined();
+        expect(row.slug).toBe(era.slug);
+      }
+    });
+
+    it('resolves a club_id for every row that carries a club string, NULL for the rest (680 / 299)', async () => {
+      const run = runImporter(['named_medals'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+      nmAwardIds = await loadNamedMedalAwardIds();
+
+      const [row] = await sql<{
+        withClub: number; withoutClub: number; rawNoId: number; idNoRaw: number;
+      }[]>`
+        SELECT count(*) FILTER (WHERE club_name_raw IS NOT NULL AND club_id IS NOT NULL)::int AS "withClub",
+               count(*) FILTER (WHERE club_name_raw IS NULL AND club_id IS NULL)::int AS "withoutClub",
+               count(*) FILTER (WHERE club_name_raw IS NOT NULL AND club_id IS NULL)::int AS "rawNoId",
+               count(*) FILTER (WHERE club_name_raw IS NULL AND club_id IS NOT NULL)::int AS "idNoRaw"
+          FROM award_winners
+         WHERE award_id = ANY(${nmAwardIds})
+           AND source_id = ${draftguruId}
+      `;
+      expect(row.withClub).toBe(680);
+      expect(row.withoutClub).toBe(299);
+      expect(row.rawNoId).toBe(0);
+      expect(row.idNoRaw).toBe(0);
+    });
+
+    it('keeps the 2003 Brownlow as three distinct winner rows, each with its votes tally', async () => {
+      const run = runImporter(['named_medals'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+      nmAwardIds = await loadNamedMedalAwardIds();
+
+      const tied = await sql<{
+        srid: string; playerId: number | null; season: number; votes: string | null;
+      }[]>`
+        SELECT source_record_id AS srid, player_id AS "playerId", season,
+               votes::text AS votes
+          FROM award_winners
+         WHERE award_id = ANY(${nmAwardIds})
+           AND source_record_id = ANY(${TIED_2003})
+         ORDER BY source_record_id
+      `;
+      expect(tied).toHaveLength(3);
+      for (const row of tied) {
+        expect(row.season).toBe(2003);
+        expect(row.votes).toMatch(/^\d+\.\d{2}$/);
+      }
+      expect(new Set(tied.map((r) => r.playerId)).size).toBe(3);
+    });
+
+    it('carries the Brownlow votes tally on exactly those rows and nowhere else', async () => {
+      const run = runImporter(['named_medals'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+      nmAwardIds = await loadNamedMedalAwardIds();
+
+      const [row] = await sql<{
+        brownlowWithVotes: number; brownlowTotal: number; otherWithVotes: number;
+      }[]>`
+        SELECT count(*) FILTER (WHERE a.slug = 'brownlow-medal' AND w.votes IS NOT NULL)::int AS "brownlowWithVotes",
+               count(*) FILTER (WHERE a.slug = 'brownlow-medal')::int AS "brownlowTotal",
+               count(*) FILTER (WHERE a.slug <> 'brownlow-medal' AND w.votes IS NOT NULL)::int AS "otherWithVotes"
+          FROM award_winners w JOIN awards a ON a.id = w.award_id
+         WHERE w.award_id = ANY(${nmAwardIds})
+           AND w.source_id = ${draftguruId}
+      `;
+      expect(row.brownlowTotal).toBe(53);
+      expect(row.brownlowWithVotes).toBe(53);
+      expect(row.otherWithVotes).toBe(0);
+    });
+
+    it('preserves carried link state and any player_link_resolutions decision (G5 shape)', async () => {
+      const run = runImporter(['named_medals'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+      nmAwardIds = await loadNamedMedalAwardIds();
+
+      // afldb_dev carries 19 linked + 8 confirmed_unlinked decisions on
+      // these awards; a rebuilt afldb_test carries none. Whatever the test
+      // DB has: no decision orphaned, no linked decision's row now carrying
+      // a different player.
+      const [{ badLinked, badUnlinked }] = await sql<{
+        badLinked: number; badUnlinked: number;
+      }[]>`
+        SELECT count(*) FILTER (
+                 WHERE r.action = 'linked'
+                   AND (w.id IS NULL OR w.player_id IS DISTINCT FROM r.player_id)
+               )::int AS "badLinked",
+               count(*) FILTER (
+                 WHERE r.action = 'confirmed_unlinked'
+                   AND (w.id IS NULL OR w.player_id IS NOT NULL)
+               )::int AS "badUnlinked"
+          FROM player_link_resolutions r
+          JOIN award_winners w
+            ON w.id = r.target_id AND w.award_id = ANY(${nmAwardIds})
+         WHERE r.target_table = 'award_winners'
+      `;
+      expect(badLinked).toBe(0);
+      expect(badUnlinked).toBe(0);
+
+      // The manifest's own carried link state loads: the resolved Brownlow
+      // row lands linked to its player with its votes tally, an unlinked
+      // row stays unlinked.
+      const [linked] = await sql<{
+        id: number; playerId: number | null; status: string; votes: string | null;
+      }[]>`
+        SELECT id, player_id AS "playerId", link_status_value::text AS status,
+               votes::text AS votes
+          FROM award_winners
+         WHERE award_id = ANY(${nmAwardIds})
+           AND source_record_id = ${LINKED_ROW.srid}
+      `;
+      expect(linked.playerId).toBe(LINKED_ROW.playerId);
+      expect(linked.status).toBe('resolved');
+      expect(linked.votes).toBe(LINKED_ROW.votes);
+
+      const [unlinked] = await sql<{ playerId: number | null; status: string }[]>`
+        SELECT player_id AS "playerId", link_status_value::text AS status
+          FROM award_winners
+         WHERE award_id = ANY(${nmAwardIds})
+           AND source_record_id = ${UNLINKED_ROW}
+      `;
+      expect(unlinked.playerId).toBeNull();
+      expect(unlinked.status).toBe('unmatched');
+
+      // id stability across another reload.
+      const rerun = runImporter(['named_medals'], [], undefined);
+      expect(rerun.status, importRole.diagnostics(rerun)).toBe(0);
+      const [after] = await sql<{ id: number; playerId: number | null }[]>`
+        SELECT id, player_id AS "playerId" FROM award_winners WHERE id = ${linked.id}
+      `;
+      expect(after.id).toBe(linked.id);
+      expect(after.playerId).toBe(LINKED_ROW.playerId);
+    }, 120_000);
+
+    it('is idempotent across three consecutive reloads with a byte-identical row-id fingerprint', async () => {
+      async function fingerprint(): Promise<string> {
+        const [row] = await sql<{ fp: string }[]>`
+          SELECT md5(string_agg(
+                   id || ':' || source_record_id || ':' || season || ':'
+                     || coalesce(club_id::text, '-') || ':'
+                     || coalesce(player_id::text, '-') || ':'
+                     || candidate_count || ':' || coalesce(votes::text, '-')
+                     || ':' || coalesce(note, '-'),
+                   ',' ORDER BY id
+                 )) AS fp
+            FROM award_winners
+           WHERE award_id = ANY(${nmAwardIds})
+             AND source_id = ${draftguruId}
+        `;
+        return row.fp;
+      }
+
+      const first = runImporter(['named_medals'], [], undefined);
+      expect(first.status, importRole.diagnostics(first)).toBe(0);
+      nmAwardIds = await loadNamedMedalAwardIds();
+      const fp1 = await fingerprint();
+
+      const second = runImporter(['named_medals'], [], undefined);
+      expect(second.status, importRole.diagnostics(second)).toBe(0);
+      expect(await fingerprint()).toBe(fp1);
+
+      const third = runImporter(['named_medals'], [], undefined);
+      expect(third.status, importRole.diagnostics(third)).toBe(0);
+      expect(await fingerprint()).toBe(fp1);
+    }, 180_000);
+
+    it('drops a link only where the player_id cannot be resolved — never otherwise', async () => {
+      const run = runImporter(['named_medals'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+      nmAwardIds = await loadNamedMedalAwardIds();
+
+      const unlinked = await sql<{ status: string }[]>`
+        SELECT link_status_value::text AS status
+          FROM award_winners
+         WHERE award_id = ANY(${nmAwardIds})
+           AND source_id = ${draftguruId}
+           AND player_id IS NULL
+      `;
+      expect(unlinked).toHaveLength(979 - expectedLinked);
+      for (const row of unlinked) {
+        expect(['unmatched', 'implausible', 'ambiguous']).toContain(row.status);
+      }
+    });
+
+    it('does not touch a manual_admin_edit award_winners row (AFLDB-ISSUE-080)', async () => {
+      nmAwardIds = await loadNamedMedalAwardIds();
+      const [fixture] = await sql<{ id: number }[]>`
+        INSERT INTO award_winners
+          (award_id, season, player_name_raw, link_status_value,
+           source_id, source_record_id)
+        VALUES
+          (${nmAwardIds[0]}, 1999, 'AFLDB-ISSUE-112 Foreign Medal',
+           'unmatched', ${manualId}, 'issue-112:foreign-named-medal')
+        RETURNING id
+      `;
+      try {
+        const before = await countRows('award_winners');
+        const run = runImporter(['named_medals'], [], undefined);
+        expect(run.status, importRole.diagnostics(run)).toBe(0);
+
+        const [after] = await sql<{
+          id: number; name: string; sourceId: number | null;
+        }[]>`
+          SELECT id, player_name_raw AS name, source_id AS "sourceId"
+            FROM award_winners WHERE id = ${fixture.id}
+        `;
+        expect(after).toEqual({
+          id: fixture.id, name: 'AFLDB-ISSUE-112 Foreign Medal',
+          sourceId: manualId,
+        });
+        expect(await countRows('award_winners')).toBe(before);
+      } finally {
+        await sql`DELETE FROM award_winners WHERE id = ${fixture.id}`;
+      }
+    }, 120_000);
+
+    it('does not change other award families or the other honours tables', async () => {
+      nmAwardIds = await loadNamedMedalAwardIds();
+      const [otherBefore] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n
+          FROM award_winners
+         WHERE NOT (award_id = ANY(${nmAwardIds}))
+      `;
+      const before = await Promise.all([
+        countRows('hall_of_fame'), countRows('honour_team_members'),
+        countRows('captaincies'), countRows('award_nominations'),
+      ]);
+      const run = runImporter(['named_medals'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+      const [otherAfter] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n
+          FROM award_winners
+         WHERE NOT (award_id = ANY(${nmAwardIds}))
       `;
       const after = await Promise.all([
         countRows('hall_of_fame'), countRows('honour_team_members'),
