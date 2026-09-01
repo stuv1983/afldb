@@ -329,7 +329,9 @@ table, it would require `afldb_meta.grant_import_write()` — raise it as a deci
 
 Design recorded 2026-08-30. **Slice 1 (honour teams) IMPLEMENTED 2026-09-01 — Pass 7, §16;
 DB-validated Pass 8, §17. Slice 2 (Hall of Fame) IMPLEMENTED and DB-validated 2026-09-01 —
-Pass 9, §18. The other five families remain not implemented.**
+Pass 9, §18. Slice 3 (captaincies) IMPLEMENTED and DB-validated 2026-09-01 — Pass 10, §19.
+The other four families (Rising Star, All-Australian, club best-and-fairest, named medals)
+remain not implemented.**
 
 - Operator prerequisite §11.1 (extraction source) — **DECIDED 2026-09-01**: the legacy-loaded
   AFLDB PostgreSQL state, not a fresh scrape.
@@ -364,8 +366,25 @@ Pass 9, §18. The other five families remain not implemented.**
   `hall-of-fame manifest reload (AFLDB-ISSUE-112)` integration block **6/6 GREEN** against real
   `afldb_test` under `afldb_import` (343-row parity, 3× idempotent fingerprint, all five
   `player_link_resolutions` decisions survive, all 97 name-only rows stay unlinked,
-  `manual_admin_edit` protection, other-family non-interference). The remaining five families
-  (captaincies, Rising Star, All-Australian, club best-and-fairest, named medals) are unstarted.
+  `manual_admin_edit` protection, other-family non-interference).
+- **Implementation phasing (§11.2) — captaincies (slice 3 of 7) IMPLEMENTED and DB-validated
+  2026-09-01.** See §19. 1,375-row bootstrap extracted read-only from `afldb_dev` (proven),
+  matching G0 exactly. `data/awards/captaincies.csv` + `tools/migration/captaincies.py`
+  (validating DB-free parser). `import_captaincies()` reads the manifest instead of legacy
+  SQLite and **lost its `lite` parameter**; `source_record_id` is **preserved verbatim** as the
+  manifest `source_key` (not re-minted); `reload_keyed` key `(source_id, source_record_id)` /
+  columns / scope / `allow_link_loss`, `_refuse_captaincy_natural_key_collisions()` and
+  `captaincies_natural_uq` semantics all **byte-identical / unchanged**; `club` is the canonical
+  `clubs.name` re-resolved season-aware via `ClubResolver` (all 1,375 rows proved to round-trip
+  — a rebuild-stable club identity, not a frozen `club_id`); `"captaincies"` added to
+  `LEGACY_FREE_GROUPS` + `BATCH_SOURCE_KEYS`. DB-free 22/22, `tsc` clean, `git diff --check`
+  clean; new `captaincies manifest reload (AFLDB-ISSUE-112)` integration block **8/8 GREEN**
+  against real `afldb_test` under `afldb_import` (1,375-row parity, era re-resolution, 3×
+  idempotent fingerprint, resolved-link id-stability, all rows stay linked, `manual_admin_edit`
+  protection + natural-key collision fail-closed — both carrying the retired synthetic-SQLite
+  fixture's AFLDB-ISSUE-085 coverage, manifest-driven — other-family non-interference); combined
+  ISSUE-112 regression 20/20 (slices 1 & 2 not regressed). The remaining four families (Rising
+  Star, All-Australian, club best-and-fairest, named medals) are unstarted.
 
 ---
 
@@ -1209,6 +1228,249 @@ accessed.
    natural key), so its manifest shape differs from the two natural-keyed slices done so far.
 3. Do **not** resolve ISSUE-112. Do **not** add the canonical-rebuild AWARDS/HONOURS stage yet
    (§7) — record the §18.3 rebuild-stable-identity risk against it when that stage is designed.
+
+---
+
+## 19. Pass 10 — 2026-09-01: implementation slice 3 (CAPTAINCIES) — IMPLEMENTED and DB-validated
+
+**Scope:** the third ISSUE-112 implementation slice, **captaincies only** (§11.2 phase 3). No
+other family. Authorised: read-only bootstrap extraction from `afldb_dev` (connection proven
+`afldb_dev` + `transaction_read_only = on` first); DB-free tests; `npx tsc --noEmit`; focused
+`afldb_test`-only integration under the restricted `afldb_import` role; combined ISSUE-112
+manifest-reload regression; `git diff --check`. No scrape, no `afldb_dev` mutation, no
+production, ISSUE-111 / ISSUE-113 untouched, `D:\dev\afldb` not accessed, no Git command, no
+migration, no privilege change, the streamanator checkout not modified.
+
+**Outcome: COMPLETE and GREEN.** Manifest built, loader rewired, DB-free + real-DB integration
+tests written and passing.
+
+### 19.1 Bootstrap extraction — executed, read-only, proven
+
+Same discipline as Passes 5/7/9: one `psql` script, step-0 connection guard (a `DO` block that
+`RAISE EXCEPTION`s unless `current_database() = 'afldb_dev'` and
+`current_setting('transaction_read_only') = 'on'`, under `ON_ERROR_STOP=1`), piped over SSH
+stdin (`arm@10.0.40.100`, key `~/.ssh/afldb_dev`, DSN read from `/home/arm/projects/afldb/.env`
+`AFLDB_IMPORT_DATABASE_URL`, password never printed), whole run inside
+`BEGIN TRANSACTION READ ONLY; … ROLLBACK;`. **Observed:** `current_database() = afldb_dev`,
+`current_user = afldb_import`, host `127.0.0.1:5432`, `transaction_read_only = on`,
+PostgreSQL 16.15. No server-side file written; nothing committed.
+
+Measured results matched G0 (§14.4) exactly:
+
+| Fact | Value |
+|---|---|
+| rows | **1,375**, provenance **`wikipedia`** for all |
+| `source_record_id` | NULL = 0, distinct = 1,375 = rows; **every value is `^[0-9a-f]{24}$`** (a 24-hex digest from the legacy scrape), min_len = max_len = 24, no whitespace |
+| season | 1897–2026, **130 distinct**, span exactly 130 → contiguous, no gap season |
+| linked / unlinked | **1,375 / 0** — `player_id` NOT NULL on every row |
+| `club_id` | NOT NULL on every row; **18 distinct clubs**, all canonical AFL/VFL clubs |
+| `role` vocabulary | the single value **`Captain`** |
+| `period` | present on all 1,375; `notes` present on 178 (NULL on 1,197, no empty strings) |
+| natural key `(season, club_id, player_name_raw, role)` duplicates | **0** (`captaincies_natural_uq` re-proved) |
+| `player_link_resolutions` (captaincies) | **0 rows** (matches G0 §14.4) |
+| `player_link_suggestions` (captaincies) | **0 rows** |
+| text hygiene | 0 rows with leading/trailing whitespace or a control character in `player_name_raw` / `period` / `notes` |
+| **club_id round-trip** | for **all 1,375 rows**, the stored `club_id` equals `identity_for_season(organization_of(club_id), season)` — i.e. re-resolving the canonical `clubs.name` season-aware reproduces the exact stored `club_id`. Zero mismatches. Era-pair boundaries line up cleanly: Footscray ≤ 1996 / Western Bulldogs ≥ 1997; South Melbourne ≤ 1981 / Sydney ≥ 1982; Kangaroos 1999–2007 inside North Melbourne. |
+| rebuild-stability probe | of the 444 distinct linked `player_id`s, **444** resolve to exactly one `afltables_profile_url` identity, **0** to none, **0** to more than one (carried-forward risk §19.3) |
+
+### 19.2 Manifest — `data/awards/captaincies.csv`
+
+1,376 lines (header + 1,375). Exact column order:
+
+```
+source_key,season,club,player,player_id,link_status,role,period,note,source_citation
+```
+
+- **`source_key`** — the **preserved** `captaincies.source_record_id`, carried **verbatim**. This
+  is the durable row identity and the database reload key half `(source_id, source_record_id)`.
+  It is **not** re-minted (unlike the honour-teams `honourteam:<slug>:<seq>` and Hall of Fame
+  `hof:<seq>` internal keys, which those tables have no persisted id for). The parser validates
+  `^[0-9a-f]{24}$`, global uniqueness, and strictly-ascending file order.
+- **Deterministic order** — `source_key` ascending under `COLLATE "C"` (all characters `[0-9a-f]`,
+  so byte order is unambiguous and collation-independent). The parser enforces strict ascent.
+- **`club`** — the canonical `clubs.name` for the row's **era identity** (e.g. `Footscray`,
+  `Western Bulldogs`, `Kangaroos`), extracted by joining `club_id → clubs`. It is **not** a
+  frozen `club_id`: the loader re-resolves it through `import_awards.ClubResolver.resolve(club,
+  season)` — the exact season-aware path the legacy loader used for its raw club string — so the
+  manifest carries a **rebuild-stable club identity**. §19.1 proved all 1,375 rows round-trip.
+  Validated against an 18-name `KNOWN_CLUBS` vocabulary.
+- **`player`** — `player_name_raw` verbatim; this is what `reload_keyed`'s `name_column`
+  guard compares.
+- **`player_id`** — carried verbatim for all 1,375 linked rows (deferred rebuild risk §19.3).
+- **`link_status`** — `unique` (1,315) or `resolved` (60); both linked statuses. The parser
+  enforces the migration 019/053 invariant (linked status ⟺ `player_id` present) and a
+  completeness check that **every** row is linked.
+- **`role`** — `Captain` for all rows; `ROLES = {"Captain"}` vocabulary.
+- **`period`** — text, present on all rows (contains en-dash `–` and free text such as
+  `(co-captain)`; UTF-8).
+- **`note`** — `captaincies.notes` verbatim, optional (178 present); commas inside are
+  CSV-quoted.
+- **`source_citation`** — the literal `wikipedia` for all 1,375 rows, per the source-granularity
+  operator policy (§13); **not** a per-row page citation.
+- `.gitignore` whitelisted (`!/data/awards/captaincies.csv`, alongside `22-under-22.csv`,
+  `honour-teams.csv`, `hall-of-fame.csv`).
+
+### 19.3 Loader — `tools/migration/captaincies.py` + `import_awards.py`
+
+New `tools/migration/captaincies.py`, in the `hall_of_fame.py` / `honour_teams.py` /
+`under_22.py` mould: `CaptainciesSourceError(ValueError)`, a frozen `Captaincy` dataclass,
+`load_captaincies()` that fully validates before constructing any row (no best-effort
+coercion), `summary()` / `main()` giving a DB-free `--check` (JSON out, exit 1 on error).
+Refuses: malformed header; missing required field (`source_key`, `season`, `club`, `player`,
+`link_status`, `role`, `period`, `source_citation`); leading/trailing whitespace or a control
+character in any text field; `season` not an integer or outside the declared `1897–2026`;
+`source_key` not `^[0-9a-f]{24}$`; a `club` not in the 18-name vocabulary; a `role` not
+`Captain`; a `link_status` outside the 5-value enum; `link_status` disagreeing with `player_id`
+presence (both directions); a `source_citation` other than `wikipedia`; duplicate `source_key`
+(checked **before** the ordering rule — a literal repeat is always also an ordering violation,
+so checking duplication first keeps that failure distinctly reported); `source_key` rows out of
+strictly-ascending order; duplicate natural identity `(season, club, player, role)`; a total
+row count ≠ 1,375, a season span ≠ 1897–2026, a distinct-season count ≠ 130, a distinct-club
+count ≠ 18, any unlinked row, or a role vocabulary ≠ `{Captain}`.
+
+`import_awards.py`: added `from captaincies import Captaincy, load_captaincies`.
+`import_captaincies()` **lost its `lite` parameter**; its body now calls `load_captaincies()`
+instead of `lite.execute("SELECT … FROM captaincies …")`, mapping the parsed rows onto the same
+11-tuple the loader already built (`row.role` / `row.period` / `row.note` straight from the
+manifest; `row.player_id` straight through; `status` still via the existing `link_status()`
+invariant call for defence in depth). **The `_refuse_captaincy_natural_key_collisions(pg,
+prepared, source_id)` call and the function itself are byte-identical** — the positional tuple
+shape it reads (`[0]` season, `[1]` club_id, `[3]` player_name_raw, `[5]` role) is preserved.
+**The `reload_keyed(...)` call — key `["source_id", "source_record_id"]`, the same 11-column
+value list, `scope_column="source_id"`, `scope_values=[source_id]`, `allow_link_loss` — is
+byte-identical to before.** `captaincies_natural_uq` semantics are untouched. `"captaincies"`
+added to `LEGACY_FREE_GROUPS`; `BATCH_SOURCE_KEYS["captaincies"] = "wikipedia"` added so its
+`import_batch` records against `wikipedia` rather than the `sports_data_lab` default. The
+`main()` dispatch drops the `lite` argument for this group. `GROUPS`, `GROUP_ORDER`,
+`GROUP_REQUIRES`, and the `--dry-run` legacy-table list (which still names `hall_of_fame` /
+`team_selections` / `captaincies` — left untouched, consistent with slices 1 & 2) are unchanged.
+No migration, no privilege change.
+
+**Carried-forward risk, unchanged in kind from slices 1 & 2 (§16.3 / §18.3), not a slice-3
+blocker:** the manifest carries the 1,375 rows' `player_id` verbatim from `afldb_dev`. That
+reproduces the family exactly in a database sharing `afldb_dev`'s player numbering (which every
+pre-existing captaincy test already assumes). It is **not** durable across a from-scratch
+canonical rebuild that re-seeds `players.id` (ISSUE-111 G5). **Better than the earlier slices:**
+all 444 distinct linked players resolve to exactly one `afltables_profile_url` today (0 with
+none), so a rebuild-stable re-resolution step *could* cover every captaincy row — but building
+it is the deferred §7 canonical-rebuild AWARDS/HONOURS stage's job, not this slice's; the
+pattern is kept consistent. **The club identity, by contrast, is already rebuild-stable** —
+re-resolved from the canonical `clubs.name` through the season-aware `ClubResolver`, which the
+§7 stage feeds with canonically rebuilt `clubs` / `club_aliases` (it runs after DRAFTGURU).
+`source_key` (= `source_record_id`) is the manifest's durable row identity.
+
+### 19.4 Tests
+
+**DB-free — `tests/captaincies-source.test.ts` (new, 22 cases, all passing):** the full
+1,375-row manifest parses with the exact G0-measured shape (`row_count: 1375`,
+`linked_count: 1375`, `unlinked_count: 0`, `season_min/max: 1897/2026`, `distinct_seasons: 130`,
+`distinct_clubs: 18`, `notes_present: 178`, `roles: {Captain: 1375}`); three representative
+rows round-trip verbatim (a `resolved`-status row with a note, a row whose note contains commas
+and is CSV-quoted, the first row in deterministic order); every row's `source_citation` is
+`wikipedia`; every `source_key` is 24 hex chars, unique, strictly ascending. One test each for:
+malformed header; a `source_key` that is not a 24-hex digest; `source_key` rows out of
+ascending order; duplicate `source_key`; duplicate natural identity `(season, club, player,
+role)`; season outside coverage; unknown club; role outside `{Captain}`; invalid `link_status`;
+`unique`/`resolved` without `player_id`; a non-linked status carrying `player_id`; a
+`source_citation` outside `wikipedia`; a missing required field (empty `period`); a `player`
+field with edge whitespace; a total row count short of 1,375. A second `describe` block reads
+`import_awards.py` as text and asserts `captaincies` is in `LEGACY_FREE_GROUPS`,
+`BATCH_SOURCE_KEYS["captaincies"] = "wikipedia"`, and that `import_captaincies` no longer
+threads a legacy SQLite handle.
+
+**Integration — `tests/integration/awards-reload-links.test.ts` (new `describe` block, gated
+`canRunCaptainciesImporter`, legacy-free like the `canRunHallOfFameImporter` block):** reloads
+the full 1,375-row manifest with `AFLDB_LEGACY_SQLITE` forced unset and asserts the
+`import_batches` row (`records_read = 1375`, `records_rejected = 0`, target `captaincies`,
+`status = completed`) and the resulting split (`total 1375, linked 1375, unlinked 0, clubs 18,
+seasons 130` for `source_id = wikipedia`); **re-resolves each era identity from the canonical
+club name season-aware** (five `source_record_id → clubs.slug` assertions across the three
+era-pairs); three consecutive reloads produce a byte-identical
+`(id, source_record_id, season, club_id, player_id)` fingerprint; a `resolved`-status captaincy
+keeps its `id` and `player_id` across an extra reload; every wikipedia-owned row stays linked;
+a synthetic `manual_admin_edit` captaincy row survives untouched **(AFLDB-ISSUE-085)**; and —
+**AFLDB-ISSUE-085 collision refusal, manifest-driven** — flipping the real Percy Bentley 1939
+Richmond row to `manual_admin_edit` ownership makes the next reload fail closed
+(`_refuse_captaincy_natural_key_collisions`: exit 1, `natural key(s)`, `does not own`,
+`id=<row>`), writes nothing, and leaves the foreign row untouched; then restores a clean
+wikipedia-owned population. `hall_of_fame` / `honour_team_members` / `award_winners` /
+`award_nominations` row counts are unchanged by a `captaincies`-only run.
+
+**Retired:** the synthetic-SQLite captaincy fixture `buildCaptaincyFixtureDb` and the
+`describe('captaincies reload reconciles only wikipedia-owned rows (AFLDB-ISSUE-085)')` block
+that drove it — `import_captaincies` no longer reads a legacy SQLite handle, so the fixture is
+unreachable. Its two ownership protections (foreign-owned row untouched; natural-key collision
+fail-closed) are **preserved, manifest-driven**, inside the new ISSUE-112 block, with the same
+`natural key(s)` / `does not own` / `id=` assertions. The now-unused `CaptaincyRow` type and the
+`node:os` / `mkdtempSync` / `rmSync` imports were removed with it. Coverage is not weakened —
+the manifest block adds idempotency, id-stability, era re-resolution and 1,375-row parity on
+top.
+
+### 19.5 Validation — exact results
+
+1. **DB-free:** `npx vitest run tests/captaincies-source.test.ts` — **22/22 passed**;
+   `captaincies.py` against the real manifest prints `ok: true` with the G0 shape
+   (`row_count 1375`, `distinct_seasons 130`, `distinct_clubs 18`, `roles {Captain: 1375}`).
+2. **Typecheck:** `npx tsc --noEmit` — **clean**, after the ISSUE-085-block removal and import
+   cleanup.
+3. **Integration — EXECUTED FOR REAL, GREEN.** Run from `D:\dev\afldb-issue-102` with
+   streamanator used only as the PostgreSQL endpoint over a temporary SSH local port-forward
+   (`arm@10.0.40.100:5432 → localhost:5433`, key `~/.ssh/afldb_dev`), opened and closed within
+   the pass. **DSN safety proof (before any test):** `AFLDB_TEST_DATABASE_URL` →
+   `current_database() = afldb_test`, `current_user = afldb_owner`;
+   `AFLDB_TEST_IMPORT_DATABASE_URL` does not exist anywhere reachable (same finding as Passes
+   8/9) — derived ephemerally in-process from `AFLDB_IMPORT_DATABASE_URL` by rewriting only the
+   host:port to the tunnel and the database name `afldb_dev → afldb_test`, never written to
+   disk, proven `current_database() = afldb_test`, `current_user = afldb_import`. No password or
+   full DSN printed. Local `psycopg` 3.3.5 present (Pass 8). Results:
+   - `npx vitest run tests/integration/awards-reload-links.test.ts -t "captaincies manifest reload"`
+     — **8/8 passed, 0 failed** (63 filtered out by `-t`).
+   - Combined ISSUE-112 regression
+     `-t "manifest reload .AFLDB-ISSUE-112."` — **20/20 passed** (honour teams 6 + Hall of Fame
+     6 + captaincies 8), confirming slices 1 & 2 are **not regressed**.
+   - Whole file `npx vitest run tests/integration/awards-reload-links.test.ts` — **50 passed,
+     21 skipped, 0 failed**. The 21 skips are the pre-existing `AFLDB_LEGACY_SQLITE`-gated
+     blocks (ISSUE-044 etc.), which skip because the legacy file is deliberately unset — not
+     introduced by this pass. The `canRunFixtureImporter` blocks (ISSUE-080, ISSUE-111, …) all
+     ran and passed.
+4. **`git diff --check`:** clean (only benign CRLF-on-checkout warnings for the LF-authored new
+   files, exit 0).
+
+The temporary tunnel was torn down and the two ephemeral DSN scratch files deleted at the end
+of the pass; nothing was persisted.
+
+### 19.6 Files changed this pass
+
+`.gitignore` (new whitelist line), `data/awards/captaincies.csv` (new, 1,376 lines),
+`tools/migration/captaincies.py` (new), `tools/migration/import_awards.py` (import,
+`import_captaincies` signature/body, `LEGACY_FREE_GROUPS`, `BATCH_SOURCE_KEYS`, `main()` call
+site, one comment), `tests/captaincies-source.test.ts` (new),
+`tests/integration/awards-reload-links.test.ts` (new `describe` block +
+`canRunCaptainciesImporter` gate + `beforeAll` condition + `CAPTAINCIES_CSV`; retired the
+ISSUE-085 SQLite fixture block and its now-dead helpers/imports),
+`issues/open/AFLDB-ISSUE-112.md` (§13, this §19), `issues/open/AFLDB-ISSUE-102-HANDOFF.md`,
+`IssuesIndex.md`. No `CHANGELOG.md` entry — nothing deployed or run against a live application
+database; `import_awards.py`'s behaviour for the four still-legacy-dependent groups
+(`awards`, `all_australian`, `rising_star`) is unchanged. One stray 0-byte tooling-artefact
+file in the worktree root (`tuple[list[str]`) was removed; never tracked. No Git command run.
+`afldb_dev` read-only for the §19.1 extraction only. No migration. No production contact. The
+streamanator checkout was not modified. ISSUE-111 / ISSUE-113 untouched. `D:\dev\afldb` not
+accessed.
+
+### 19.7 Exact next action
+
+1. Captaincies family-specific G1–G4 (§10) are satisfied by this pass's evidence — **for the
+   captaincies family only**; this does not close G2/G3 for ISSUE-112 as a whole, which need
+   all seven families.
+2. **Phase 4 — Rising Star (766 rows)** — is the next implementation slice, per the §11.2
+   order (Rising Star → All-Australian → club best-and-fairest → named medals). Rising Star
+   reloads on `(source_id, source_record_id)` like captaincies, targets `award_nominations`,
+   carries a `stat_line` jsonb and a round grain, and needs the `awards` definition to exist
+   first.
+3. Do **not** resolve ISSUE-112. Do **not** add the canonical-rebuild AWARDS/HONOURS stage yet
+   (§7) — record the §19.3 rebuild-stable-identity (player_id) risk against it when that stage
+   is designed; note the club identity is already rebuild-stable via `ClubResolver`
+   re-resolution.
 
 ---
 

@@ -1,8 +1,7 @@
 import './guard';
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -49,6 +48,7 @@ const NOTE = 'AFLDB-ISSUE-044 reload survival';
 const UNDER_22_CSV = join(root, 'data', 'awards', '22-under-22.csv');
 const HONOUR_TEAMS_CSV = join(root, 'data', 'awards', 'honour-teams.csv');
 const HALL_OF_FAME_CSV = join(root, 'data', 'awards', 'hall-of-fame.csv');
+const CAPTAINCIES_CSV = join(root, 'data', 'awards', 'captaincies.csv');
 
 // The dev host keeps psycopg in the repo virtualenv; a bare python3 there
 // cannot import it.
@@ -90,6 +90,11 @@ const canRunHonourTeamsImporter = canSpawnPython
 const canRunHallOfFameImporter = canSpawnPython
   && existsSync(HALL_OF_FAME_CSV)
   && importRole.isConfigured;
+// AFLDB-ISSUE-112 phase 3: captaincies is legacy-free like the two slices
+// above, gated the same way and independent of canRunImporter/legacySqlite.
+const canRunCaptainciesImporter = canSpawnPython
+  && existsSync(CAPTAINCIES_CSV)
+  && importRole.isConfigured;
 const roleParitySuffix = importRole.isConfigured ? '' : ` — ${importRole.skipMessage}`;
 
 // One connection pool for the whole file: every describe block shares `sql`.
@@ -99,6 +104,7 @@ beforeAll(async () => {
     || canRunUnder22Importer
     || canRunHonourTeamsImporter
     || canRunHallOfFameImporter
+    || canRunCaptainciesImporter
   ) {
     await importRole.validate();
   }
@@ -929,6 +935,296 @@ describe.skipIf(!canRunHallOfFameImporter)(
 );
 
 /**
+ * AFLDB-ISSUE-112 phase 3: the checked-in manifest
+ * (data/awards/captaincies.csv) replaces the legacy SQLite `captaincies`
+ * table as the sole input to the captaincies group. Legacy-free like
+ * honour_teams / hall_of_fame — deliberately run with AFLDB_LEGACY_SQLITE
+ * forced unset, proving the group no longer needs it.
+ *
+ * Captaincies differs from the two natural-keyed slices: it reloads on
+ * (source_id, source_record_id), source_record_id is preserved verbatim
+ * (not re-minted), and `club` is the canonical clubs.name re-resolved by
+ * the season-aware ClubResolver rather than a frozen club_id. This block
+ * also carries the AFLDB-ISSUE-085 ownership protections that the retired
+ * synthetic-SQLite captaincy fixture used to prove — foreign-owned rows
+ * untouched, and _refuse_captaincy_natural_key_collisions() failing closed
+ * on an incoming natural key held by a row this loader does not own.
+ */
+describe.skipIf(!canRunCaptainciesImporter)(
+  `captaincies manifest reload (AFLDB-ISSUE-112)${roleParitySuffix}`,
+  () => {
+    const FIXTURE_EMAIL_112_CAP = 'issue-112-captaincies@example.test';
+    // A resolved link_status row measured read-only from afldb_dev (§19):
+    // captaincies carries no player_link_resolutions rows, so the decision
+    // under test is the row's own resolved link, which must survive a
+    // reload with its id and player_id intact.
+    const RESOLVED_ROW = {
+      sourceRecordId: '066e8905ca84a59c1efd8e65',
+      season: 1939, clubSlug: 'richmond', player: 'Percy Bentley', playerId: 2546,
+    };
+    // Era-identity pairs: the manifest carries the canonical clubs.name and
+    // the loader re-resolves it season-aware, so each of these must land on
+    // the right era identity, not merely the right organisation.
+    const ERA_ROWS = [
+      { sourceRecordId: '94bbb520bd76ee8914df97f9', slug: 'footscray' },
+      { sourceRecordId: 'e3f3009b4a7733e213c29c97', slug: 'western-bulldogs' },
+      { sourceRecordId: '73ffabd0ff761da06c915426', slug: 'south-melbourne' },
+      { sourceRecordId: 'd8fbedba08e26f9fc14a501a', slug: 'sydney' },
+      { sourceRecordId: 'c6dcc2fa163957ff34591a86', slug: 'kangaroos' },
+    ];
+    let wikipediaId = 0;
+    let manualId = 0;
+    let adminUserId = 0;
+
+    beforeAll(async () => {
+      const sourceRows = await sql<{ key: string; id: number }[]>`
+        SELECT key, id FROM sources WHERE key IN ('wikipedia', 'manual_admin_edit')
+      `;
+      const byKey = new Map(sourceRows.map((row) => [row.key, row.id]));
+      wikipediaId = byKey.get('wikipedia') ?? 0;
+      manualId = byKey.get('manual_admin_edit') ?? 0;
+      expect(wikipediaId, 'wikipedia source must exist').toBeGreaterThan(0);
+      expect(manualId, 'manual_admin_edit source must exist').toBeGreaterThan(0);
+
+      const [admin] = await sql<{ id: number }[]>`
+        INSERT INTO auth_users (email, role)
+        VALUES (${FIXTURE_EMAIL_112_CAP}, 'admin')
+        ON CONFLICT (email) DO UPDATE SET role = 'admin'
+        RETURNING id
+      `;
+      adminUserId = admin.id;
+    });
+
+    afterAll(async () => {
+      await sql`DELETE FROM auth_users WHERE id = ${adminUserId}`;
+    });
+
+    it('reloads the full 1,375-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset', async () => {
+      const [before] = await sql<{ id: string }[]>`
+        SELECT coalesce(max(id), 0)::text AS id FROM import_batches
+      `;
+
+      // The third argument forces AFLDB_LEGACY_SQLITE unset regardless of
+      // this process's own environment — the headline ISSUE-112 acceptance.
+      const run = runImporter(['captaincies'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+
+      const [batch] = await sql<{
+        status: string;
+        recordsRead: string;
+        recordsRejected: string;
+      }[]>`
+        SELECT status::text AS status,
+               records_read::text AS "recordsRead",
+               records_rejected::text AS "recordsRejected"
+          FROM import_batches
+         WHERE id > ${before.id}::bigint
+           AND tool = 'import_awards.py'
+           AND target_table = 'captaincies'
+         ORDER BY id DESC
+         LIMIT 1
+      `;
+      expect(batch, 'the captaincies batch must be recorded').toBeDefined();
+      expect(batch.status).toBe('completed');
+      expect(Number(batch.recordsRead)).toBe(1375);
+      expect(Number(batch.recordsRejected)).toBe(0);
+
+      const [counts] = await sql<{
+        total: number; linked: number; unlinked: number;
+        clubs: number; seasons: number;
+      }[]>`
+        SELECT count(*)::int AS total,
+               count(*) FILTER (WHERE player_id IS NOT NULL)::int AS linked,
+               count(*) FILTER (WHERE player_id IS NULL)::int AS unlinked,
+               count(DISTINCT club_id)::int AS clubs,
+               count(DISTINCT season)::int AS seasons
+          FROM captaincies
+         WHERE source_id = ${wikipediaId}
+      `;
+      expect(counts).toEqual({
+        total: 1375, linked: 1375, unlinked: 0, clubs: 18, seasons: 130,
+      });
+    }, 120_000);
+
+    it('re-resolves each era identity from the canonical club name, season-aware', async () => {
+      const run = runImporter(['captaincies'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+
+      for (const era of ERA_ROWS) {
+        const [row] = await sql<{ slug: string }[]>`
+          SELECT c.slug
+            FROM captaincies e
+            JOIN clubs c ON c.id = e.club_id
+           WHERE e.source_id = ${wikipediaId}
+             AND e.source_record_id = ${era.sourceRecordId}
+        `;
+        expect(row, `${era.sourceRecordId} must load`).toBeDefined();
+        expect(row.slug).toBe(era.slug);
+      }
+    });
+
+    it('is idempotent across three consecutive reloads with a byte-identical row-id fingerprint', async () => {
+      async function fingerprint(): Promise<string> {
+        const [row] = await sql<{ fp: string }[]>`
+          SELECT md5(string_agg(
+                   id || ':' || source_record_id || ':' || season || ':'
+                     || club_id || ':' || coalesce(player_id::text, '-'),
+                   ',' ORDER BY id
+                 )) AS fp
+            FROM captaincies WHERE source_id = ${wikipediaId}
+        `;
+        return row.fp;
+      }
+
+      const first = runImporter(['captaincies'], [], undefined);
+      expect(first.status, importRole.diagnostics(first)).toBe(0);
+      const fp1 = await fingerprint();
+
+      const second = runImporter(['captaincies'], [], undefined);
+      expect(second.status, importRole.diagnostics(second)).toBe(0);
+      expect(await fingerprint()).toBe(fp1);
+
+      const third = runImporter(['captaincies'], [], undefined);
+      expect(third.status, importRole.diagnostics(third)).toBe(0);
+      expect(await fingerprint()).toBe(fp1);
+    }, 180_000);
+
+    it('keeps a resolved captaincy link stable across a reload', async () => {
+      const prime = runImporter(['captaincies'], [], undefined);
+      expect(prime.status, importRole.diagnostics(prime)).toBe(0);
+
+      const [before] = await sql<{ id: number; playerId: number | null; status: string }[]>`
+        SELECT id, player_id AS "playerId", link_status_value::text AS status
+          FROM captaincies
+         WHERE source_id = ${wikipediaId}
+           AND source_record_id = ${RESOLVED_ROW.sourceRecordId}
+      `;
+      expect(before, 'the resolved captaincy row must load').toBeDefined();
+      expect(before.status).toBe('resolved');
+      expect(before.playerId).toBe(RESOLVED_ROW.playerId);
+
+      const run = runImporter(['captaincies'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+
+      const [after] = await sql<{ id: number; playerId: number | null; status: string }[]>`
+        SELECT id, player_id AS "playerId", link_status_value::text AS status
+          FROM captaincies WHERE id = ${before.id}
+      `;
+      expect(after.id).toBe(before.id);
+      expect(after.playerId).toBe(RESOLVED_ROW.playerId);
+      expect(after.status).toBe('resolved');
+    });
+
+    it('leaves every wikipedia-owned captaincy linked (none dropped to unlinked)', async () => {
+      const run = runImporter(['captaincies'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+
+      const [{ n }] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n
+          FROM captaincies
+         WHERE source_id = ${wikipediaId} AND player_id IS NULL
+      `;
+      expect(n).toBe(0);
+    });
+
+    it('does not touch a manual_admin_edit captaincy row (AFLDB-ISSUE-085)', async () => {
+      const [ref] = await sql<{ season: number; clubId: number }[]>`
+        SELECT s.year::int AS season, c.id AS "clubId"
+          FROM clubs c
+          JOIN seasons s
+            ON (c.first_season IS NULL OR s.year >= c.first_season)
+           AND (c.last_season IS NULL OR s.year <= c.last_season)
+         WHERE c.slug = 'adelaide'
+         ORDER BY s.year DESC
+         LIMIT 1
+      `;
+      const [fixture] = await sql<{ id: number }[]>`
+        INSERT INTO captaincies
+          (season, club_id, player_name_raw, link_status_value, role, period,
+           notes, source_id, source_record_id)
+        VALUES
+          (${ref.season}, ${ref.clubId}, 'AFLDB-ISSUE-112 Foreign Captaincy',
+           'unmatched', 'Captain', 'fixture period', 'foreign row unchanged',
+           ${manualId}, 'issue-112:foreign-captaincy')
+        RETURNING id
+      `;
+      try {
+        const before = await countRows('captaincies');
+        const run = runImporter(['captaincies'], [], undefined);
+        expect(run.status, importRole.diagnostics(run)).toBe(0);
+
+        const [after] = await sql<{
+          id: number; name: string; sourceId: number | null; notes: string | null;
+        }[]>`
+          SELECT id, player_name_raw AS name, source_id AS "sourceId", notes
+            FROM captaincies WHERE id = ${fixture.id}
+        `;
+        expect(after).toEqual({
+          id: fixture.id, name: 'AFLDB-ISSUE-112 Foreign Captaincy',
+          sourceId: manualId, notes: 'foreign row unchanged',
+        });
+        expect(await countRows('captaincies')).toBe(before);
+      } finally {
+        await sql`DELETE FROM captaincies WHERE id = ${fixture.id}`;
+      }
+    }, 120_000);
+
+    it('fails closed when an incoming natural key is held by a foreign-owned row (AFLDB-ISSUE-085)', async () => {
+      // Prime so the real Percy Bentley 1939 Richmond row exists and is
+      // wikipedia-owned, then flip it to manual_admin_edit ownership. The
+      // next reload's incoming manifest row for the same source_record_id
+      // carries the natural key (1939, Richmond, 'Percy Bentley', 'Captain')
+      // now held by a row this loader does not own —
+      // _refuse_captaincy_natural_key_collisions must refuse before any write.
+      const prime = runImporter(['captaincies'], [], undefined);
+      expect(prime.status, importRole.diagnostics(prime)).toBe(0);
+
+      const [target] = await sql<{ id: number }[]>`
+        SELECT id FROM captaincies
+         WHERE source_record_id = ${RESOLVED_ROW.sourceRecordId}
+           AND source_id = ${wikipediaId}
+      `;
+      expect(target, 'the Percy Bentley 1939 row must exist after a reload').toBeDefined();
+
+      await sql`UPDATE captaincies SET source_id = ${manualId} WHERE id = ${target.id}`;
+      try {
+        const before = await countRows('captaincies');
+        const run = runImporter(['captaincies'], [], undefined);
+        expect(run.status, 'the reload must fail closed').toBe(1);
+        expect(run.stdout).toContain('natural key(s)');
+        expect(run.stdout).toContain('does not own');
+        expect(run.stdout).toContain(`id=${target.id}`);
+        expect(await countRows('captaincies')).toBe(before);
+
+        const [row] = await sql<{ sourceId: number | null }[]>`
+          SELECT source_id AS "sourceId" FROM captaincies WHERE id = ${target.id}
+        `;
+        expect(row.sourceId, 'the colliding foreign row is untouched').toBe(manualId);
+      } finally {
+        await sql`UPDATE captaincies SET source_id = ${wikipediaId} WHERE id = ${target.id}`;
+        // Reinstate a clean wikipedia-owned population for later blocks.
+        const restore = runImporter(['captaincies'], [], undefined);
+        expect(restore.status, importRole.diagnostics(restore)).toBe(0);
+      }
+    }, 180_000);
+
+    it('does not change hall_of_fame, honour_team_members, award_winners or award_nominations row counts', async () => {
+      const before = await Promise.all([
+        countRows('hall_of_fame'), countRows('honour_team_members'),
+        countRows('award_winners'), countRows('award_nominations'),
+      ]);
+      const run = runImporter(['captaincies'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+      const after = await Promise.all([
+        countRows('hall_of_fame'), countRows('honour_team_members'),
+        countRows('award_winners'), countRows('award_nominations'),
+      ]);
+      expect(after).toEqual(before);
+    });
+  },
+);
+
+/**
  * A source reload reconciles only the rows its own source supplies
  * (AFLDB-ISSUE-080). Rows created by an administrator, promoted from the
  * ingest pipeline, or of unknown provenance are outside every reload's
@@ -1616,203 +1912,17 @@ describe.skipIf(!canRunImporter)(
   },
 );
 
-type CaptaincyRow = {
-  id: number;
-  season: number;
-  clubId: number;
-  playerId: number | null;
-  name: string;
-  status: string;
-  role: string;
-  period: string | null;
-  notes: string | null;
-  sourceId: number | null;
-  recordId: string | null;
-};
-
-const CAPTAINCY_FIXTURE_NAME = 'AFLDB-ISSUE-085 Fixture Captain';
-const CAPTAINCY_FIXTURE_RECORD_ID = 'issue-085:owned-captaincy';
-
-function buildCaptaincyFixtureDb(
-  path: string,
-  row: { season: number; club: string },
-): void {
-  const script = [
-    'import json, sqlite3',
-    `con = sqlite3.connect(${JSON.stringify(path)})`,
-    'cur = con.cursor()',
-    'cur.execute("""CREATE TABLE person_links (dg_person_id INTEGER, player_id INTEGER, match_status TEXT, candidate_count INTEGER)""")',
-    'cur.execute("""CREATE TABLE captaincies (source_row_id TEXT, season INTEGER, club TEXT, player TEXT, role TEXT, source_period TEXT, source_notes TEXT, player_id INTEGER, match_status TEXT, candidate_count INTEGER, source_url TEXT)""")',
-    `row = json.loads(${JSON.stringify(JSON.stringify(row))})`,
-    'cur.execute("""INSERT INTO captaincies VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",',
-    `    (${JSON.stringify(CAPTAINCY_FIXTURE_RECORD_ID)}, row["season"], row["club"],`,
-    `     ${JSON.stringify(CAPTAINCY_FIXTURE_NAME)}, "Captain", "fixture period",`,
-    '     "fixture source notes", None, "unmatched", 0, "https://example.test/issue-085"))',
-    'con.commit()',
-    'con.close()',
-  ].join('\n');
-  const result = spawnSync(python, ['-c', script], { encoding: 'utf8' });
-  if (result.status !== 0) {
-    throw new Error(`failed to build ISSUE-085 SQLite fixture: ${result.stderr}`);
-  }
-}
-
-describe.skipIf(!canRunFixtureImporter)(
-  'captaincies reload reconciles only wikipedia-owned rows (AFLDB-ISSUE-085)',
-  () => {
-    let wikipediaId = 0;
-    let manualId = 0;
-    let season = 0;
-    let clubId = 0;
-    let clubName = '';
-    let ownedId = 0;
-    let fixtureDirectory = '';
-    let fixtureSqlite = '';
-
-    async function readCaptaincy(id: number): Promise<CaptaincyRow | undefined> {
-      const [row] = await sql<CaptaincyRow[]>`
-        SELECT id, season, club_id AS "clubId", player_id AS "playerId",
-               player_name_raw AS name, link_status_value::text AS status,
-               role, period, notes, source_id AS "sourceId",
-               source_record_id AS "recordId"
-          FROM captaincies
-         WHERE id = ${id}
-      `;
-      return row;
-    }
-
-    beforeAll(async () => {
-      const sources = await sql<{ key: string; id: number }[]>`
-        SELECT key, id FROM sources
-         WHERE key IN ('wikipedia', 'manual_admin_edit')
-      `;
-      const byKey = new Map(sources.map((row) => [row.key, row.id]));
-      wikipediaId = byKey.get('wikipedia') ?? 0;
-      manualId = byKey.get('manual_admin_edit') ?? 0;
-      expect(wikipediaId, 'wikipedia source must exist').toBeGreaterThan(0);
-      expect(manualId, 'manual_admin_edit source must exist').toBeGreaterThan(0);
-
-      const [reference] = await sql<{
-        season: number; clubId: number; clubName: string;
-      }[]>`
-        SELECT s.year::int AS season, c.id AS "clubId", c.name AS "clubName"
-          FROM clubs c
-          JOIN seasons s
-            ON (c.first_season IS NULL OR s.year >= c.first_season)
-           AND (c.last_season IS NULL OR s.year <= c.last_season)
-         WHERE c.slug = 'adelaide'
-         ORDER BY s.year DESC
-         LIMIT 1
-      `;
-      expect(reference, 'afldb_test needs the reference Adelaide club and one valid season')
-        .toBeDefined();
-      season = reference.season;
-      clubId = reference.clubId;
-      clubName = reference.clubName;
-
-      fixtureDirectory = mkdtempSync(join(tmpdir(), 'afldb-issue085-'));
-      fixtureSqlite = join(fixtureDirectory, 'captaincies.sqlite');
-      buildCaptaincyFixtureDb(fixtureSqlite, { season, club: clubName });
-
-      const [owned] = await sql<{ id: number }[]>`
-        INSERT INTO captaincies
-          (season, club_id, player_name_raw, link_status_value, role, period,
-           notes, source_id, source_record_id)
-        VALUES
-          (${season}, ${clubId}, ${CAPTAINCY_FIXTURE_NAME}, 'unmatched',
-           'Captain', 'stale stored period', 'stale stored notes',
-           ${wikipediaId}, ${CAPTAINCY_FIXTURE_RECORD_ID})
-        RETURNING id
-      `;
-      ownedId = owned.id;
-    });
-
-    afterAll(async () => {
-      if (ownedId > 0) {
-        await sql`DELETE FROM captaincies WHERE id = ${ownedId}`;
-      }
-      if (fixtureDirectory) {
-        rmSync(fixtureDirectory, { recursive: true, force: true });
-      }
-    });
-
-    it('reconciles its own row, preserves a foreign row, and remains idempotent', async () => {
-      const countBefore = await countRows('captaincies');
-      const [foreign] = await sql<{ id: number }[]>`
-        INSERT INTO captaincies
-          (season, club_id, player_name_raw, link_status_value, role, period,
-           notes, source_id, source_record_id)
-        VALUES
-          (${season}, ${clubId}, 'AFLDB-ISSUE-085 Foreign Captaincy',
-           'unmatched', 'Captain', 'fixture period', 'foreign row unchanged',
-           ${manualId}, 'issue-085:foreign-captaincy')
-        RETURNING id
-      `;
-
-      try {
-        const first = runImporter(['captaincies'], [], fixtureSqlite);
-        expect(first.status, first.stdout + first.stderr).toBe(0);
-        const expectedOwned: CaptaincyRow = {
-          id: ownedId,
-          season,
-          clubId,
-          playerId: null,
-          name: CAPTAINCY_FIXTURE_NAME,
-          status: 'unmatched',
-          role: 'Captain',
-          period: 'fixture period',
-          notes: 'fixture source notes',
-          sourceId: wikipediaId,
-          recordId: CAPTAINCY_FIXTURE_RECORD_ID,
-        };
-        const expectedForeign: CaptaincyRow = {
-          id: foreign.id,
-          season,
-          clubId,
-          playerId: null,
-          name: 'AFLDB-ISSUE-085 Foreign Captaincy',
-          status: 'unmatched',
-          role: 'Captain',
-          period: 'fixture period',
-          notes: 'foreign row unchanged',
-          sourceId: manualId,
-          recordId: 'issue-085:foreign-captaincy',
-        };
-        expect(await readCaptaincy(ownedId), 'owned row is refreshed under the same id')
-          .toEqual(expectedOwned);
-        expect(await readCaptaincy(foreign.id), 'foreign row is neither adopted nor mutated')
-          .toEqual(expectedForeign);
-        expect(await countRows('captaincies')).toBe(countBefore + 1);
-
-        const second = runImporter(['captaincies'], [], fixtureSqlite);
-        expect(second.status, second.stdout + second.stderr).toBe(0);
-        expect(await readCaptaincy(ownedId)).toEqual(expectedOwned);
-        expect(await readCaptaincy(foreign.id)).toEqual(expectedForeign);
-        expect(await countRows('captaincies')).toBe(countBefore + 1);
-      } finally {
-        await sql`DELETE FROM captaincies WHERE id = ${foreign.id}`;
-      }
-    }, 300_000);
-
-    it('refuses a foreign-owned row occupying an incoming natural key', async () => {
-      await sql`UPDATE captaincies SET source_id = ${manualId} WHERE id = ${ownedId}`;
-      try {
-        const before = await countRows('captaincies');
-        const beforeRow = await readCaptaincy(ownedId);
-        const run = runImporter(['captaincies'], [], fixtureSqlite);
-        expect(run.status, 'the reload must fail closed').toBe(1);
-        expect(run.stdout).toContain('natural key(s)');
-        expect(run.stdout).toContain('does not own');
-        expect(run.stdout).toContain(`id=${ownedId}`);
-        expect(await countRows('captaincies')).toBe(before);
-        expect(await readCaptaincy(ownedId), 'the colliding foreign row is untouched')
-          .toEqual(beforeRow);
-      } finally {
-        await sql`UPDATE captaincies SET source_id = ${wikipediaId} WHERE id = ${ownedId}`;
-      }
-    });
-  },
-);
+// AFLDB-ISSUE-112 phase 3 retired the synthetic-SQLite captaincy fixture
+// (buildCaptaincyFixtureDb) and the AFLDB-ISSUE-085 describe block that drove
+// it: import_captaincies no longer reads a legacy SQLite handle. The two
+// ownership protections that block proved — a foreign-owned (manual_admin_edit)
+// captaincy row left untouched by a reload, and
+// _refuse_captaincy_natural_key_collisions() failing closed on an incoming
+// natural key held by a row this loader does not own — are now exercised
+// manifest-driven inside the "captaincies manifest reload (AFLDB-ISSUE-112)"
+// block above ("does not touch a manual_admin_edit captaincy row
+// (AFLDB-ISSUE-085)" and "fails closed when an incoming natural key is held by
+// a foreign-owned row (AFLDB-ISSUE-085)").
 
 // ---------------------------------------------------------------------------
 // AFLDB-ISSUE-111 — the Coleman Medal derivation, against a real database

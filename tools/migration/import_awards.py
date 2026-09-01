@@ -67,6 +67,7 @@ from common import (  # noqa: E402
     set_reload_scope,
     to_int,
 )
+from captaincies import Captaincy, load_captaincies  # noqa: E402
 from hall_of_fame import HallOfFameInductee, load_hall_of_fame  # noqa: E402
 from honour_teams import HonourTeamMember, load_honour_teams  # noqa: E402
 from under_22 import Under22Selection, load_under_22  # noqa: E402
@@ -1828,39 +1829,42 @@ def _refuse_captaincy_natural_key_collisions(
         )
 
 
-def import_captaincies(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
+def import_captaincies(pg, rep: Reporter, batch, clubs: ClubResolver,
                        sources: dict[str, int], allow_link_loss: bool = False) -> None:
+    # AFLDB-ISSUE-112 phase 3: the checked-in manifest replaces the legacy
+    # SQLite `captaincies` table as the sole input. source_record_id is
+    # preserved verbatim (the manifest's source_key), so the reload key
+    # `(source_id, source_record_id)`, the ownership scope and the
+    # natural-key collision refusal are all unchanged; only the row source
+    # is different. `club` is the canonical clubs.name for the era identity
+    # and is re-resolved through the same season-aware ClubResolver the
+    # legacy loader used, so club_id is reconstructed, not frozen.
+    rows: list[Captaincy] = load_captaincies()
+
     with pg.cursor() as cur:
         cur.execute("SELECT year FROM seasons")
         valid_seasons = {r[0] for r in cur.fetchall()}
 
-    rows = lite.execute(
-        """SELECT source_row_id, season, club, player, role, source_period,
-                  source_notes, player_id, match_status, candidate_count, source_url
-             FROM captaincies ORDER BY club, season, player"""
-    ).fetchall()
-
     source_id = require_source(sources, "wikipedia")
     prepared: list[tuple] = []
-    for r in rows:
+    for row in rows:
         batch.records_read += 1
-        player = clean_text(r["player"])
-        if not player or r["season"] not in valid_seasons:
-            batch.reject(r["source_row_id"], "missing player or unknown season", dict(r))
+        if row.season not in valid_seasons:
+            batch.reject(row.source_key, "unknown season",
+                         {"season": row.season, "player": row.player})
             continue
         # club_id is NOT NULL here: a captaincy with no club is not a
         # fact AFLDB can state, so it is rejected rather than guessed.
-        club_id, club_raw = clubs.resolve(r["club"], r["season"])
+        club_id, club_raw = clubs.resolve(row.club, row.season)
         if club_id is None:
-            batch.reject(r["source_row_id"], f"club not resolved: {club_raw!r}", dict(r))
+            batch.reject(row.source_key, f"club not resolved: {club_raw!r}",
+                         {"club": row.club, "season": row.season})
             continue
-        status = link_status(r["match_status"], r["player_id"])
+        status = link_status(row.link_status, row.player_id)
         prepared.append((
-            r["season"], club_id, r["player_id"], player, status,
-            clean_text(r["role"]) or "Captain",
-            clean_text(r["source_period"]),
-            clean_text(r["source_notes"]),
-            source_id, r["source_row_id"], batch.id,
+            row.season, club_id, row.player_id, row.player, status,
+            row.role, row.period, row.note,
+            source_id, row.source_key, batch.id,
         ))
 
     _refuse_captaincy_natural_key_collisions(pg, prepared, source_id)
@@ -1896,11 +1900,13 @@ GROUPS = {
     "captaincies":    ("Club captains by season", ["captaincies"]),
 }
 
-# Groups that read no legacy SQLite database at all. under_22 and honour_teams
-# each load a tracked manifest; coleman derives from AFLDB's own canonical
-# match facts. Any of them can therefore run in a canonically rebuilt database
-# with AFLDB_LEGACY_SQLITE unset.
-LEGACY_FREE_GROUPS = {"under_22", COLEMAN_GROUP, "hall_of_fame", "honour_teams"}
+# Groups that read no legacy SQLite database at all. under_22, honour_teams,
+# hall_of_fame and captaincies each load a tracked manifest; coleman derives
+# from AFLDB's own canonical match facts. Any of them can therefore run in a
+# canonically rebuilt database with AFLDB_LEGACY_SQLITE unset.
+LEGACY_FREE_GROUPS = {
+    "under_22", COLEMAN_GROUP, "hall_of_fame", "honour_teams", "captaincies",
+}
 
 # The provenance each group's import_batch is recorded against. Everything not
 # named here is a legacy-SQLite extract, recorded as sports_data_lab.
@@ -1909,6 +1915,7 @@ BATCH_SOURCE_KEYS = {
     COLEMAN_GROUP: "afltables",
     "hall_of_fame": "wikipedia",
     "honour_teams": "wikipedia",
+    "captaincies": "wikipedia",
 }
 
 # all_australian and rising_star both need the legacy award definitions, so
@@ -2154,7 +2161,7 @@ def main() -> int:
                     import_honour_teams(pg, rep, batch, sources,
                                         allow_link_loss=args.allow_link_loss)
                 elif key == "captaincies":
-                    import_captaincies(pg, lite, rep, batch, clubs, sources,
+                    import_captaincies(pg, rep, batch, clubs, sources,
                                        allow_link_loss=args.allow_link_loss)
 
         analyze(pg, "awards", "award_winners", "award_nominations", "hall_of_fame",

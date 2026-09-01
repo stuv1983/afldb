@@ -470,6 +470,90 @@ checkout not modified, no Git command.
 
 ---
 
+## CHECKPOINT — pass 10 (2026-09-01): ISSUE-112 slice 3 (CAPTAINCIES) — IMPLEMENTED and DB-validated
+
+Scope: the third ISSUE-112 implementation slice, **captaincies only** (§11.2 phase 3). Full
+detail in `AFLDB-ISSUE-112.md` §19. Read-only `afldb_dev` bootstrap authorised on proof of
+connection; DB-free tests / `tsc` / `afldb_test`-only integration under the restricted
+`afldb_import` role / combined ISSUE-112 regression / `git diff --check` authorised. No scrape,
+no `afldb_dev` mutation, no production, no migration, no privilege change, ISSUE-111 / ISSUE-113
+untouched, `D:\dev\afldb` not accessed, streamanator checkout not modified, no Git command.
+
+**Outcome: COMPLETE and GREEN.**
+
+- **Bootstrap extraction executed, read-only, proven** — same `BEGIN TRANSACTION READ ONLY`
+  step-0 guard as Passes 5/7/9, over SSH to `arm@10.0.40.100` (`psql` reading
+  `AFLDB_IMPORT_DATABASE_URL` from the streamanator `.env`, password never printed). Proven
+  `current_database() = afldb_dev`, `current_user = afldb_import`, `transaction_read_only = on`,
+  host `127.0.0.1:5432`, PostgreSQL 16.15. 1,375 rows extracted, matching G0 exactly: provenance
+  `wikipedia` for all; `source_record_id` all `^[0-9a-f]{24}$`, distinct = 1,375, none null;
+  season 1897–2026, 130 distinct (contiguous); linked 1,375 / unlinked 0; `club_id` NOT NULL,
+  18 distinct clubs; role vocabulary `{Captain}`; `period` on all, `notes` on 178; natural key
+  `(season, club_id, player_name_raw, role)` dup 0; **`player_link_resolutions` and
+  `player_link_suggestions` for captaincies both 0**. **New probe:** all 1,375 rows verified to
+  round-trip — stored `club_id` equals `identity_for_season(org, season)`, so re-resolving the
+  canonical `clubs.name` season-aware reproduces every `club_id` exactly (0 mismatches). All 444
+  distinct linked `player_id`s resolve to exactly one `afltables_profile_url` (0 with none).
+- **Manifest:** `data/awards/captaincies.csv` (1,376 lines). Columns
+  `source_key,season,club,player,player_id,link_status,role,period,note,source_citation`.
+  **`source_key` = the preserved `source_record_id`, carried verbatim — NOT re-minted** (the key
+  difference from slices 1 & 2, which mint internal ids because their tables have no persisted
+  id). Deterministic order: `source_key` ascending under `COLLATE "C"`. `club` = canonical
+  `clubs.name`, re-resolved by the loader's season-aware `ClubResolver` → a rebuild-stable club
+  identity, not a frozen `club_id`. `source_citation = wikipedia` throughout (source-granularity
+  operator policy). `.gitignore` whitelisted.
+- **Loader:** new `tools/migration/captaincies.py` (validating DB-free `--check` parser, no
+  best-effort coercion). `import_awards.py`'s `import_captaincies()` now calls
+  `load_captaincies()` instead of reading legacy SQLite — **`lite` dropped from its signature
+  and its `main()` call**. `_refuse_captaincy_natural_key_collisions()` (function and call) and
+  the `reload_keyed(...)` call (key `(source_id, source_record_id)`, 11-column value list,
+  `scope_column="source_id"`, `allow_link_loss`) are **byte-identical**; `captaincies_natural_uq`
+  semantics untouched. `"captaincies"` added to `LEGACY_FREE_GROUPS`;
+  `BATCH_SOURCE_KEYS["captaincies"] = "wikipedia"` added. `GROUPS` / `GROUP_ORDER` /
+  `GROUP_REQUIRES` / `--dry-run` list unchanged. No migration, no privilege change.
+- **Tests:** `tests/captaincies-source.test.ts` (new, 22 DB-free cases, all passing) and a new
+  legacy-free `describe` block in `tests/integration/awards-reload-links.test.ts`
+  (`canRunCaptainciesImporter`): 1,375-row parity, per-era-identity club re-resolution, 3×
+  idempotent fingerprint, resolved-link id/player stability, all-linked preservation,
+  `manual_admin_edit` protection **(AFLDB-ISSUE-085)** and natural-key collision fail-closed
+  **(AFLDB-ISSUE-085)**, other-family non-interference. The synthetic-SQLite
+  `buildCaptaincyFixtureDb` + the `describe('captaincies reload reconciles only wikipedia-owned
+  rows (AFLDB-ISSUE-085)')` block were **retired** (the importer no longer reads a legacy SQLite
+  handle) — their two protections are **preserved manifest-driven** in the new block; the dead
+  `CaptaincyRow` type and `node:os`/`mkdtempSync`/`rmSync` imports were removed with them.
+- **Validation:** DB-free 22/22; `npx tsc --noEmit` clean; `git diff --check` clean. Integration
+  **executed for real against `afldb_test`** under the restricted `afldb_import` role, over a
+  temporary SSH local port-forward to streamanator's PostgreSQL (opened and closed within the
+  pass; `AFLDB_TEST_IMPORT_DATABASE_URL` derived ephemerally in-process — host:port to the
+  tunnel, `afldb_dev → afldb_test` — never persisted, since it is still unconfigured anywhere
+  reachable, same finding as Passes 8/9). DSN safety proved (`afldb_test`/`afldb_owner` and
+  `afldb_test`/`afldb_import`) before any test ran; no password or full DSN printed. Results:
+  **captaincies block 8/8 green**; **combined ISSUE-112 regression (honour teams + Hall of Fame
+  + captaincies) 20/20**, confirming slices 1 & 2 not regressed; **whole
+  `awards-reload-links.test.ts` file 50 passed / 21 skipped / 0 failed** (the 21 skips are the
+  pre-existing `AFLDB_LEGACY_SQLITE`-gated blocks — unchanged by this pass).
+- **Carried-forward risk (not a slice-3 blocker, same kind as Pass 7/9):** the manifest carries
+  `player_id` verbatim; `players.id` is not rebuild-stable (ISSUE-111 G5). *Better than earlier
+  slices:* every linked captaincy player has a unique `afltables_profile_url`, so a
+  rebuild-stable re-resolution is possible — but it is the deferred §7 stage's job. **The club
+  identity is already rebuild-stable** via `ClubResolver` re-resolution. Recorded against §7.
+- **Files changed this pass:** `.gitignore`, `data/awards/captaincies.csv` (new),
+  `tools/migration/captaincies.py` (new), `tools/migration/import_awards.py`,
+  `tests/captaincies-source.test.ts` (new), `tests/integration/awards-reload-links.test.ts`,
+  `issues/open/AFLDB-ISSUE-112.md` (§13, §19), this file, `IssuesIndex.md`. No `CHANGELOG.md`
+  entry — nothing deployed or run against a live application database. One stray 0-byte
+  tooling-artefact file in the worktree root (`tuple[list[str]`) was removed; never tracked. No
+  Git command run. `afldb_dev` read-only for the §19.1 extraction only. No migration. No
+  production contact. The streamanator checkout was not modified. ISSUE-111 / ISSUE-113
+  untouched. `D:\dev\afldb` not accessed.
+- **Exact next action:** phase 4 — **Rising Star (766 rows)**, per the §11.2 order (Rising Star
+  → All-Australian → club best-and-fairest → named medals). Rising Star reloads on
+  `(source_id, source_record_id)` like captaincies, targets `award_nominations`, carries a
+  `stat_line` jsonb + round grain, and needs the `awards` definition present first. Do not
+  resolve ISSUE-112; do not add the canonical-rebuild AWARDS/HONOURS stage yet.
+
+---
+
 ## Confirmed source findings
 
 Each verified by direct read at baseline `95819a3`.
@@ -576,7 +660,7 @@ seeded `afldb_meta.import_writable_tables`. `player_link_resolutions` is SELECT+
 |---|---|---|---|
 | `AFLDB-ISSUE-102` | Awards/honours legacy-SQLite acquisition dependency | `issues/open/AFLDB-ISSUE-102.md` | **PARENT**, Open, coordination only |
 | `AFLDB-ISSUE-111` | Coleman Medal derivation from canonical AFLDB facts | `issues/open/AFLDB-ISSUE-111.md` | Open, design complete, **blocked on gate G0** |
-| `AFLDB-ISSUE-112` | Replace legacy SQLite honours acquisition with curated manifests | `issues/open/AFLDB-ISSUE-112.md` | Open, design complete. **G0 PASS (all families, 2026-09-01)**; §11.1 DECIDED. Implementation phasing (honour teams first) may begin; `source_citation` granularity + §11.4 rename acknowledgement are pre-merge operator items, not start blockers |
+| `AFLDB-ISSUE-112` | Replace legacy SQLite honours acquisition with curated manifests | `issues/open/AFLDB-ISSUE-112.md` | Open. **G0 PASS (all families)**; §11.1 DECIDED. **Slices 1–3 of 7 IMPLEMENTED + DB-validated 2026-09-01** (honour teams §16/§17, Hall of Fame §18, captaincies §19). Next: phase 4 — Rising Star. `source_citation` granularity + §11.4 rename acknowledgement remain pre-merge operator items |
 | `AFLDB-ISSUE-113` | Replace legacy `brownlow_season_votes` acquisition | `issues/open/AFLDB-ISSUE-113.md` | Open, design complete, **source undecided**; outside 102's closure boundary |
 
 **`AFLDB-ISSUE-110` is allocated to unmerged NL semantic-mapping work.** It does not exist in this
