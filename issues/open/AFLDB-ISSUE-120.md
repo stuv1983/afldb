@@ -1,4 +1,4 @@
-# AFLDB-ISSUE-117 — Public-surface abuse hardening before launch: NL /search has no rate limit; two minor input-robustness gaps
+# AFLDB-ISSUE-120 — Public-surface abuse hardening before launch: NL /search has no rate limit; two minor input-robustness gaps
 
 - **Status:** Open
 - **Created:** 2026-08-31 (full-codebase review)
