@@ -25,7 +25,12 @@ vi.mock('@/db/authClient', () => {
   return { authSql: sql };
 });
 
+import type postgres from 'postgres';
+
+import { clearNlSearchTelemetry } from '@/db/queries/nl-search-telemetry-clear';
 import { logNlSearch, type NlSearchLogEntry } from '@/db/queries/nl/log';
+
+type TransactionSql = postgres.TransactionSql;
 
 /** The exact synchronous error the installed Next 16 throws when no request scope exists (dist/server/after/after.js): message prefix plus non-enumerable __NEXT_ERROR_CODE E468. */
 const OUTSIDE_REQUEST_SCOPE = Object.defineProperty(
@@ -112,5 +117,111 @@ describe('logNlSearch request-scope boundary', () => {
       'unexpected synchronous after() failure scheduling nl_search_log write',
       schedulerFailure,
     );
+  });
+});
+
+/**
+ * Telemetry-clear count boundary (AFLDB-ISSUE-119 risk R3).
+ *
+ * clearNlSearchTelemetry() is the query layer over migration 081's
+ * public.nl_search_telemetry_clear(). Its five returned counts are
+ * bigint, and postgres.js hands int8 back as a string, so the whole job
+ * of these tests is proving no string reaches the caller: those counts
+ * become the audit event, and a concatenated or silently-zeroed total is
+ * a false audit record. The integration suite proves the function; this
+ * proves the conversion, which the integration suite deliberately
+ * sidesteps by casting ::int in its own query.
+ */
+describe('clearNlSearchTelemetry count boundary', () => {
+  /** Stands in for a postgres.js transaction handle: one tagged-template call, one result set. */
+  function fakeTx(rows: unknown[]): { tx: TransactionSql; calls: number } {
+    const state = { calls: 0 };
+    const tx = ((_strings: TemplateStringsArray, ..._values: unknown[]) => {
+      state.calls += 1;
+      return Promise.resolve(rows);
+    }) as unknown as TransactionSql;
+    return { tx, get calls() { return state.calls; } };
+  }
+
+  const stringRow = {
+    deletedLogRows: '412',
+    retainedLogRows: '38',
+    retainedReviewRows: '7',
+    retainedFeedbackRows: '11',
+    detachedAppHealthLinks: '3',
+  };
+
+  it('converts the driver\'s int8 strings to numbers', async () => {
+    const { tx } = fakeTx([stringRow]);
+
+    const counts = await clearNlSearchTelemetry(tx);
+
+    expect(counts).toEqual({
+      deletedLogRows: 412,
+      retainedLogRows: 38,
+      retainedReviewRows: 7,
+      retainedFeedbackRows: 11,
+      detachedAppHealthLinks: 3,
+    });
+    // The bug this exists to prevent: "412" + "38" === "41238".
+    expect(counts.deletedLogRows + counts.retainedLogRows).toBe(450);
+    for (const value of Object.values(counts)) expect(typeof value).toBe('number');
+  });
+
+  it('accepts zero counts and a bigint-typed driver result', async () => {
+    const { tx } = fakeTx([{
+      deletedLogRows: '0',
+      retainedLogRows: 0,
+      retainedReviewRows: 0n,
+      retainedFeedbackRows: '0',
+      detachedAppHealthLinks: '0',
+    }]);
+
+    // A clear that deleted nothing is a legitimate outcome and must be
+    // auditable as 0, not rejected alongside the unreadable values below.
+    await expect(clearNlSearchTelemetry(tx)).resolves.toEqual({
+      deletedLogRows: 0,
+      retainedLogRows: 0,
+      retainedReviewRows: 0,
+      retainedFeedbackRows: 0,
+      detachedAppHealthLinks: 0,
+    });
+  });
+
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+    ['empty string', ''],
+    ['non-numeric text', 'many'],
+    ['negative', '-1'],
+    ['fractional', '1.5'],
+  ])('refuses to audit a count it cannot read: %s', async (_label, value) => {
+    const { tx } = fakeTx([{ ...stringRow, deletedLogRows: value }]);
+
+    // Number(null) and Number('') are both 0, so coercion here would
+    // report a real deletion as "deleted 0 rows" in the audit trail.
+    await expect(clearNlSearchTelemetry(tx)).rejects.toThrow(/deletedLogRows/);
+  });
+
+  it('refuses an empty result set rather than reporting no deletion', async () => {
+    const { tx } = fakeTx([]);
+
+    await expect(clearNlSearchTelemetry(tx)).rejects.toThrow(/expected exactly 1/);
+  });
+
+  it('refuses a multi-row result set rather than reading the first row', async () => {
+    const { tx } = fakeTx([stringRow, stringRow]);
+
+    await expect(clearNlSearchTelemetry(tx)).rejects.toThrow(/expected exactly 1/);
+  });
+
+  it('issues exactly one statement on the transaction it is given', async () => {
+    const handle = fakeTx([stringRow]);
+
+    await clearNlSearchTelemetry(handle.tx);
+
+    // No second connection, no pool fallback: the caller's transaction is
+    // load-bearing for both the lock cutoff and the atomic clear+audit.
+    expect(handle.calls).toBe(1);
   });
 });

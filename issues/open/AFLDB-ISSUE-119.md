@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-119 — Super Admin can clear NL search telemetry
 
-- **Status:** In progress — the Stage 2 **database layer is now fully validated end to end** (§25). Migration `081` (§20) is applied to `afldb_test` (§23), the `privileges.sql` reconciliation (§21) has run against it, `tests/integration/privileges.test.ts` passes 34/34 (§24), and `tests/integration/nl-search-telemetry-clear.test.ts` now passes **9/9 with 0 skipped** — the clear function has been executed for the first time. `AFLDB_TEST_AUTH_DATABASE_URL` is established (§25.2), so the restricted describe **ran rather than skipped**: `afldb_auth` successfully invokes the function while its direct `DELETE`/`TRUNCATE` are refused live with SQLSTATE `42501`. Acceptance criterion 5 is fully evidenced at the database layer. **Query layer, transaction-aware audit helper, Server Action and UI not started** — criteria 3, 4, 6, 9 and risk R3 remain open
+- **Status:** In progress — the Stage 2 **database layer is now fully validated end to end** (§25). Migration `081` (§20) is applied to `afldb_test` (§23), the `privileges.sql` reconciliation (§21) has run against it, `tests/integration/privileges.test.ts` passes 34/34 (§24), and `tests/integration/nl-search-telemetry-clear.test.ts` now passes **9/9 with 0 skipped** — the clear function has been executed for the first time. `AFLDB_TEST_AUTH_DATABASE_URL` is established (§25.2), so the restricted describe **ran rather than skipped**: `afldb_auth` successfully invokes the function while its direct `DELETE`/`TRUNCATE` are refused live with SQLSTATE `42501`. Acceptance criterion 5 is fully evidenced at the database layer. The **query layer now exists and is validated** (§26, §27): `src/db/queries/nl-search-telemetry-clear.ts` wraps the function on a required transaction handle and converts all five `bigint` counts through a rejecting `toCount()`. `npx vitest run tests/nl-search-log.test.ts` passes **16/16**, of which the `clearNlSearchTelemetry count boundary` describe is **11/11**, and `npm run typecheck` passes (final output `Types generated successfully`). **Risk R3 is therefore evidenced at the typed query boundary**: the driver's `bigint`/string counts are explicitly converted, or rejected, before they can enter the application result type or the §9 audit contract. The helper nonetheless still has **no production caller** — it is reachable from nothing but its own tests. **Transaction-aware audit helper, Server Action and UI not started** — criteria 3, 4, 6 and 9 remain open
 - **Created:** 2026-08-31
 - **Severity:** Medium
 - **Area:** Admin / Security / Natural-language search / Telemetry / Database
@@ -989,9 +989,183 @@ No source, SQL, migration, test or configuration file under version control was 
 
 The database layer is now fully evidenced and the next work is application code. Start with the **query layer**:
 
-1. Add the query helper wrapping `public.nl_search_telemetry_clear()` in `src/db/queries/`, **casting all five `bigint` counts explicitly** (`::int`, or `Number()` on the returned strings) — R3 is live for this code, and the test's own cast proves nothing about it.
+1. ~~Add the query helper wrapping `public.nl_search_telemetry_clear()` in `src/db/queries/`, **casting all five `bigint` counts explicitly** (`::int`, or `Number()` on the returned strings) — R3 is live for this code, and the test's own cast proves nothing about it.~~ **Written 2026-09-01 — see §26; unvalidated. Steps 2-4 stand; §26.8 is the live list.**
 2. Then the transaction-aware audit helper (§9), so the `auth_audit_log` insert can share the caller's transaction.
 3. Then the Server Action (§6, §8) — `requireSuperAdmin()` before parsing confirmation input or opening the transaction; it must open and hold the transaction, since R5 makes the caller's transaction load-bearing for the §8 cutoff.
 4. Then the UI (§10), `docs/search.md`, and `CHANGELOG.md`, in that order.
 
 Do not re-run the migration or edit `081`; it is checksum-locked. `npm run db:privileges:test` remains idempotent and safe to re-run at any point.
+
+## 26. Session record — 2026-09-01 (Stage 2, step 7: the typed query helper)
+
+### 26.1 Starting point
+
+Branch `codex/issue-119` at `544b3b5` ("Record ISSUE-119 runtime validation"), **clean worktree** — all three confirmed with read-only Git metadata before anything else. Scope for this step was exactly §25.10 step 1 and nothing beyond it: the query helper wrapping `public.nl_search_telemetry_clear()`, with the five `bigint` counts handled explicitly so risk **R3** cannot leak into the application contract. The transaction-aware audit helper, Server Action, UI, `docs/search.md` and `CHANGELOG.md` were deliberately **not** started.
+
+### 26.2 Source review of existing patterns before writing anything
+
+| Question | Finding |
+|---|---|
+| Is there a house pattern for a query helper that must run in the caller's transaction? | **Yes, and it is the exact shape needed.** `src/db/queries/audit-log.ts:41-43` takes `tx: postgres.TransactionSql` as its first parameter, acquires no connection of its own, and states in a contract comment that it must be passed a `sql.begin` handle and never a pool, with no try/catch so a failure propagates and rolls the mutation back. That is AFLDB-ISSUE-027's required-audit helper; ISSUE-119 has the same atomicity requirement, so it takes the same form. |
+| How does the codebase handle `bigint` from this driver? | `src/db/queries/nl-search-log.ts:23-27` states the rule in its own header — *"every `count(*)` comes back from the driver as a string, so each one is cast at the SQL boundary or `Number()`-ed on the way out. Getting this wrong shows up as `"12" + 5 = "125"`… which is exactly the class of bug this codebase has hit three times in the NL work already."* The module then does it 33 times: rows typed as `string`, `Number()` on the way out. R3 is a known, named, repeatedly-hit defect class here, not a hypothetical. |
+| Where does the helper belong? | §12 permits either `src/db/queries/nl-search-log.ts` or *"a new narrowly named maintenance module if clearer"*. **New module.** `nl-search-log.ts` documents itself as read-only reporting *"plus the one write path for `nl_search_review`"*, and its `saveNlSearchReview` comment leans on `nl_search_log` being append-only by grant. Putting the deletion capability in that file would contradict the file's own stated contract in two places. |
+| What exactly does the function return? | `081:82-88` — `RETURNS TABLE (deleted_log_rows, retained_log_rows, retained_review_rows, retained_feedback_rows, detached_app_health_links)`, all `bigint`, no parameters; the body ends in a single `RETURN QUERY` over a one-row `SELECT` (`081:177-184`). Exactly the five facts §9 permits the audit event to record. |
+| Is there a DB-free unit-test home for NL telemetry query code? | **Yes.** `tests/nl-search-log.test.ts` unit-tests `src/db/queries/nl/log.ts` with a fake tagged-template `sql`, no database. Extended rather than duplicated, per CLAUDE.md §10. |
+
+### 26.3 What was implemented
+
+**`src/db/queries/nl-search-telemetry-clear.ts` (new, 133 lines).** One exported function and one exported type; nothing else in the repository was modified other than the test file below.
+
+| Element | Implementation |
+|---|---|
+| Signature | `clearNlSearchTelemetry(tx: postgres.TransactionSql): Promise<NlTelemetryClearCounts>` — transaction handle **required**, no `authSql` import, no pool fallback, no parameters of its own to pass through. The function takes no arguments, so there is no predicate, mode or flag by which a caller could widen what is deleted (§24.5), and the helper adds none. |
+| Result type | `NlTelemetryClearCounts` = `deletedLogRows`, `retainedLogRows`, `retainedReviewRows`, `retainedFeedbackRows`, `detachedAppHealthLinks`, all `number`. Keys match §9's permitted audit payload **one for one**, so the Server Action maps them without renaming and cannot accidentally reach a sixth fact — none is available here. |
+| R3 handling | The row type declares all five columns `unknown` — what the driver actually hands back, not what the SQL type suggests — and each goes through `toCount()`. That helper accepts a digit-only string (`/^\d+$/`), a `number`, or a `bigint`, rejects everything else, and then requires `Number.isSafeInteger(n) && n >= 0`. A rejected value **throws**, aborting the caller's transaction and rolling the deletion back. |
+| Why reject rather than coerce | `Number(null)`, `Number(undefined)` and `Number('')` are `NaN`, `NaN` and **`0`** respectively. A bare `Number()` would therefore turn an unreadable count into a confident `0` and write it to the audit trail as fact — a clear that deleted 412 rows recorded as having deleted none, indistinguishable from the truth after the fact. The regex is what makes a leaked string impossible rather than merely unlikely. |
+| Why not `::int` in the SQL | A count above `int4` range would make PostgreSQL raise inside the deletion transaction. Converting in TypeScript keeps the decision here and keeps one conversion site instead of two. `Number.isSafeInteger` is the equivalent guard, at a far higher ceiling. |
+| Row-count guard | `rows.length !== 1` throws. `RETURN QUERY` over a single-row `SELECT` always yields exactly one row, so anything else means the installed function is not the one this file was written against — and by then the `DELETE` has already run, which is precisely when the caller must roll back rather than audit a guess. |
+| Contract comment | Records that the transaction is load-bearing twice over: **R5** (the `SHARE ROW EXCLUSIVE` locks defining §8's cutoff are released at statement end on a pool) and §8's atomicity (the audit row must commit with the deletion). Also records deliberately having no try/catch, matching `audit-log.ts`. |
+
+**`tests/nl-search-log.test.ts` (extended).** New describe `clearNlSearchTelemetry count boundary`: six `it` declarations, one of them an `it.each` over six unreadable values, so **11 test cases as vitest counts them** (§27 corrects this step's original "seven"). No database and no module mock — the helper takes its transaction as a parameter, so a fake tagged-template handle is injected directly.
+
+| Test | Proves |
+|---|---|
+| Converts the driver's `int8` strings | `{'412','38','7','11','3'}` becomes numbers; asserts `412 + 38 === 450` explicitly, the `"41238"` concatenation being the exact defect R3 names; every returned value is `typeof 'number'`. |
+| Zero counts and a `bigint`-typed result | A clear that deleted nothing audits as `0` and is not rejected alongside the unreadable values; a driver configured to return real `bigint`s is handled too. |
+| Refuses six unreadable values | `null`, `undefined`, `''`, `'many'`, `'-1'`, `'1.5'` each throw naming the offending column. `null` and `''` are the two that a bare `Number()` would silently turn into `0`. |
+| Refuses a result set that is not exactly one row | Empty and two-row results both throw rather than reporting no deletion or reading the first row. |
+| Issues exactly one statement on the given transaction | No second connection and no pool fallback. |
+
+### 26.4 Source review of the change itself
+
+Reviewed against §6, §8, §9, §24.5 and R3/R5.
+
+- **No widening.** The helper adds no parameter, no interpolation and no identifier from any caller; the SQL is a constant with a schema-qualified call. Nothing a Server Action passes can change which rows are deleted, because there is nothing to pass.
+- **Schema qualification** — `public.nl_search_telemetry_clear()`, matching the discipline the function itself is held to (§24.5), rather than relying on the connection's `search_path`.
+- **Fail-closed on every unreadable path.** Both guards throw inside the caller's transaction, so the deletion rolls back. Neither returns a partial or defaulted result, and neither logs-and-continues.
+- **Audit surface is exactly §9's five counts.** No question, plan, session id, client ref or deleted id is fetched, so none can be logged downstream by mistake.
+- **`transform: { undefined: null }`** on the auth pool (`src/db/authClient.ts:48`) affects parameters, not results, and this query has no parameters — noted so the `undefined` rejection branch is not later "simplified" away as unreachable. It is reachable through a missing column alias, which is a real failure mode.
+- **`import 'server-only'`** as every `src/db/queries/*` module does; the type-only `postgres` import erases at compile time, exactly as in `audit-log.ts`.
+
+### 26.5 Deviations
+
+- **D5 (new).** §12 lists the query layer under `src/db/queries/nl-search-log.ts`; it is instead a new module, `src/db/queries/nl-search-telemetry-clear.ts`. §12 explicitly permits this ("or a new narrowly named maintenance module if clearer") and states the split is organisational only. Reason in §26.2: `nl-search-log.ts` documents itself as read-only reporting plus one review write, and its `saveNlSearchReview` comment relies on `nl_search_log` being append-only by grant. **No SQL or security contract changed.**
+- **D6 (new).** The helper requires a transaction and offers no pool overload. §25.10 did not demand this, but R5 does: on a pool the locks release at statement end and §8's cutoff evaporates silently. Making the transaction a type error to omit is cheaper than a comment asking callers to remember. Follows `audit-log.ts`.
+- D1 (restricted-DSN parity lives in the test file), D2, D3, D4 from §22.5 are **unchanged** by this step.
+
+### 26.6 Validation performed
+
+**Static and source review only *in this step*. Nothing was executed here except read-only Git metadata** — the validation that followed is recorded in §27, which this subsection's annotations point to.
+
+- `git diff --check` — **clean, exit 0.** The new query module is untracked; a `--no-index` whitespace check of it reports nothing beyond git's expected LF→CRLF notice.
+- `git status --short` reported below (§26.8). Nothing was committed.
+- **No test, typecheck, build, lint, SQL, database, migration, deployment or production command ran in this step, and no database was queried.** ~~The helper has **never been executed** and its new tests have **never run** — this is the same class of gap §20.4 R1 carried for the migration, now applying to the query layer, and it is the first item in §26.9.~~ **SUPERSEDED 2026-09-01 by §27:** both were run and both passed — `tests/nl-search-log.test.ts` 16/16 (the clear-helper describe 11/11) and `npm run typecheck` clean. The gap this step recorded is closed for the query layer; the original wording is struck rather than deleted because it was accurate when written.
+
+### 26.7 Risks and blockers
+
+- **R3 — CLOSED 2026-09-01 at the typed query boundary (§27).** `toCount()` and its **11** test cases have now run and passed, so the counts `postgres.js` hands back as `int8` strings are explicitly converted — or rejected outright — before they can enter `NlTelemetryClearCounts` or the §9 audit payload. The closure is bounded to that boundary: it says nothing about a caller that has not been written. Original finding, retained because §26.3's design rests on it: addressed in code but not yet evidenced; `toCount()` and its tests existed but neither had run.
+- **R7 (new, low).** The helper's contract that `tx` is a real transaction is enforced by TypeScript, not at runtime — a `postgres.Sql` cast to `TransactionSql` would compile. Accepted: the same is true of `audit-log.ts`, and the Server Action tests (§12) assert the transaction is opened. Not a tracked-issue candidate.
+- Risks **R4**, **R5** and **R6** are untouched by this step. **R1** and **R2** remain closed.
+- `081` remains **checksum-locked** in `afldb_meta.schema_migrations` (§23.6): any repair is a new migration or a test-database rebuild, never an in-place edit. Nothing in this step touched it.
+- **Blockers: none.**
+
+### 26.8 Files changed this step
+
+| File | State |
+|---|---|
+| `src/db/queries/nl-search-telemetry-clear.ts` | **New, untracked.** The typed helper, its result type and the explicit count conversion. |
+| `tests/nl-search-log.test.ts` | Modified: two imports, a local `TransactionSql` alias, and the `clearNlSearchTelemetry count boundary` describe (six `it` declarations, **11 test cases**). Pure addition; the ISSUE-110 `logNlSearch` describe is untouched. |
+| `issues/open/AFLDB-ISSUE-119.md` | Modified: header `Status`, §25.10 step 1 struck, and this §26. |
+| `IssuesIndex.md` | Modified: current-state and next-action wording only. |
+| `issues.md` | Modified: Open Issues row next action, ledger `Files` and `Status`. |
+
+No SQL, migration, `.env`, `CHANGELOG.md` or configuration file was changed. `CHANGELOG.md` stays untouched deliberately: the helper still has no caller, so no retained application behaviour has changed.
+
+### 26.9 Exact next action
+
+**DONE 2026-09-01 — step 1 is discharged; the live list is §27.5.**
+
+1. ~~**Validate this step before building on it**, one command at a time:~~ **Done — see §27.**
+   - ~~`npx vitest run tests/nl-search-log.test.ts` — the first execution of the helper and of the R3 conversion. DB-free; needs no DSN.~~ **Passed 16/16; the clear-helper describe 11/11.**
+   - ~~`npm run typecheck` — the helper's `postgres.TransactionSql` typing and the test's fake-handle cast are compile-time claims that nothing has checked.~~ **Passed.**
+2. Then the **transaction-aware audit helper** (§9, §12): `src/lib/auth/session.ts`'s `audit()` binds the module-level `authSql` (`:330-341`) and so cannot join a caller's transaction as written — the finding recorded in §18. Add a variant that takes the `tx` handle, preserving every existing caller unchanged.
+3. Then the **Server Action** (§6, §8): `requireSuperAdmin()` before parsing confirmation input or opening the transaction; it must open and hold `authSql.begin()`, because R5 makes the caller's transaction load-bearing for the §8 cutoff and, per D6, `clearNlSearchTelemetry` will not accept anything else.
+4. Then the **UI** (§10), `docs/search.md` and `CHANGELOG.md`, in that order.
+
+Do not re-run or edit migration `081`. `npm run db:privileges:test` remains idempotent and safe to re-run at any point.
+
+## 27. Validation checkpoint — 2026-09-01 (Stage 2, step 7 validated)
+
+### 27.1 Why this section exists
+
+§26 was written and its work left in the worktree, but the session that produced it ended **before the operator-run validation results were persisted**. §26.6, §26.7 and §26.9 therefore recorded the query layer as unexecuted after it had in fact been executed and passed. This section is the persistence of that evidence, and the annotations now carried in §26.3, §26.6, §26.7, §26.8 and §26.9 are the corrections it authorises. No code, SQL, test or configuration file was changed to produce it.
+
+### 27.2 Evidentiary basis
+
+**Operator-run and operator-reported**, as in §24.2 and unlike §25. Claude executed no test, typecheck, build, SQL, database, migration or deployment command in this step and observed no raw terminal output. What is recorded below is the operator's report, plus the assertions that report necessarily satisfied, established by reading `tests/nl-search-log.test.ts:135-224` in source. The distinction matters: §27.4's claims are derived from what the passing tests assert, not from output Claude inspected.
+
+### 27.3 The commands and their reported results
+
+```text
+> npx vitest run tests/nl-search-log.test.ts
+  1 test file passed
+  16/16 tests passed
+  ('clearNlSearchTelemetry count boundary' 11/11)
+
+> npm run typecheck
+  passed — final output: Types generated successfully
+```
+
+**16/16** is the whole file. **11** of those are the ISSUE-119 describe; the other 5 are the pre-existing ISSUE-110 `logNlSearch` suite, which the §26 change did not touch — so a green run also evidences that the extension regressed nothing in its host file.
+
+The 11 reconcile with §26.3's six `it` declarations because one is an `it.each` over six unreadable values (`null`, `undefined`, `''`, `'many'`, `'-1'`, `'1.5'`), which vitest counts individually: 5 + 6 = 11. §26.3's original "seven" was a miscount of the same describe, corrected in place rather than left to be re-derived.
+
+### 27.4 What is now evidenced — and its exact boundary
+
+**Risk R3 is closed at the typed query boundary.** `postgres.js` returns `int8` as a JavaScript string, and all five counts the function returns are `bigint`. The passing describe proves that `clearNlSearchTelemetry` converts or refuses every one of them before it becomes a value the application can hold:
+
+| Property | Proven by |
+|---|---|
+| `int8` strings become real numbers | `{'412','38','7','11','3'}` becomes numbers, with `412 + 38 === 450` asserted explicitly — `"412" + "38" === "41238"` being the exact defect R3 names — and `typeof === 'number'` checked on every field. |
+| A legitimate zero clear audits as `0` | `'0'`, `0` and `0n` all accepted, so a clear that deleted nothing is not rejected alongside the unreadable values. Real `bigint` results are handled too, not only strings. |
+| An unreadable count **throws** rather than coercing | `null`, `undefined`, `''`, `'many'`, `'-1'` and `'1.5'` each reject, naming the offending column. `Number(null)` is `NaN` and `Number('')` is **`0`** — a bare coercion would have written "deleted 0 rows" into `auth_audit_log` for a clear that deleted hundreds, indistinguishable from the truth afterwards. This is the assertion that makes §26.3's reject-don't-coerce decision evidence rather than intent. |
+| A result set that is not exactly one row throws | Empty and two-row results both reject, instead of reporting no deletion or silently reading the first row after the `DELETE` has already run. |
+| Exactly one statement on the caller's handle | The fake transaction records one call: no second connection, no pool fallback (D6, R5). |
+
+**`npm run typecheck` passing** discharges the compile-time half §26.9 flagged: the helper's `postgres.TransactionSql` parameter typing, the `NlTelemetryClearCounts` result type and the test's fake-handle cast are checked, not merely asserted. It also confirms the new untracked module does not break the project's type graph.
+
+**The boundary of this closure, stated so it is not over-read.** R3 is evidenced *for the conversion*, and nothing further:
+
+- **The helper has no production caller.** Nothing in `src/` imports it. It is reachable only from its own DB-free tests, so no application behaviour has changed — which is why `CHANGELOG.md` stays untouched, for the same reason as §25.9 and §26.8.
+- **These tests are DB-free.** They inject a fake tagged-template handle; no database was contacted and the real function was not invoked in this step. The function's own runtime proof remains §25's integration run.
+- **R7 stands.** That `tx` is a genuine transaction is a TypeScript claim, not a runtime one; the Server Action tests (§12) are what will assert the transaction is actually opened.
+
+### 27.5 State after this checkpoint
+
+- **Database layer:** fully validated end to end on `afldb_test` (§23–§25). Criteria 1, 2, 5, 7 and 8 are evidenced at that layer.
+- **Query layer:** written **and validated** (§26, this section). R3 closed at the typed boundary; R1 and R2 remain closed.
+- **Open risks:** **R4** (`claude/issue-116`'s competing `079` must renumber on merge), **R5** (the caller's transaction is load-bearing for the §8 cutoff — the Server Action must open and hold it), **R6** (Gridley's `080` merging later), **R7** (low; `tx` enforced at compile time only). Deviations **D1**–**D6** unchanged.
+- **Unstarted:** transaction-aware audit helper, Server Action, UI, `docs/search.md`, `CHANGELOG.md`. Acceptance criteria **3**, **4**, **6**, **9** and the UI/authorisation half of **10** remain open.
+- `081` remains **checksum-locked** in `afldb_meta.schema_migrations` (§23.6): any repair is a new migration or a test-database rebuild, never an in-place edit.
+
+**Blockers: none.**
+
+### 27.6 Files changed this step
+
+| File | State |
+|---|---|
+| `issues/open/AFLDB-ISSUE-119.md` | Modified: header `Status`; §26.3 test count corrected; §26.6 unexecuted claim struck and superseded; §26.7 R3 closed; §26.8 test count corrected; §26.9 step 1 discharged; this §27. |
+| `IssuesIndex.md` | Modified: current-state and next-action wording only. |
+| `issues.md` | Modified: Open Issues row current state and next action, ledger `Status` and `Validation`. |
+
+No source, SQL, migration, test, `.env`, `CHANGELOG.md` or configuration file was changed. The §26 working-tree artefacts — `src/db/queries/nl-search-telemetry-clear.ts` (untracked) and the `tests/nl-search-log.test.ts` extension — are byte-identical to the versions the operator validated. **Nothing was committed.**
+
+### 27.7 Exact next action
+
+**The transaction-aware canonical audit helper in `src/lib/auth/session.ts`** (§9, §12; the finding recorded in §18).
+
+`audit()` at `:330-341` binds the module-level `authSql`, so it cannot join a caller's transaction as written — which is precisely what §8 requires, because the `auth_audit_log` insert must commit with the deletion or roll back with it. Add a variant that accepts the `tx` handle, following `src/db/queries/audit-log.ts:41-43` (the ISSUE-027 required-audit helper: transaction handle first, no connection of its own, no try/catch so a failure propagates and rolls the mutation back). **Every existing `audit()` caller must be preserved unchanged.**
+
+Then, in order: the Server Action (§6, §8) — `requireSuperAdmin()` before parsing confirmation input or opening the transaction, and it must open and hold `authSql.begin()`, since R5 makes the caller's transaction load-bearing for the cutoff and D6 means `clearNlSearchTelemetry` will accept nothing else; then the UI (§10), `docs/search.md` and `CHANGELOG.md`.
+
+Do not re-run or edit migration `081`. `npm run db:privileges:test` remains idempotent and safe to re-run at any point.
