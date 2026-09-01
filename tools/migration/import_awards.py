@@ -67,6 +67,7 @@ from common import (  # noqa: E402
     set_reload_scope,
     to_int,
 )
+from all_australian import AllAustralianSelection, load_all_australian  # noqa: E402
 from captaincies import Captaincy, load_captaincies  # noqa: E402
 from hall_of_fame import HallOfFameInductee, load_hall_of_fame  # noqa: E402
 from honour_teams import HonourTeamMember, load_honour_teams  # noqa: E402
@@ -498,17 +499,28 @@ def import_awards(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
 # ---------------------------------------------------------------------------
 # Group: All-Australian
 # ---------------------------------------------------------------------------
-def import_all_australian(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
-                          sources: dict[str, int], person_links: dict[int, tuple],
-                          allow_link_loss: bool = False) -> None:
-    """Load the All-Australian teams from both legacy sources.
+def import_all_australian(pg, rep: Reporter, batch, clubs: ClubResolver,
+                          sources: dict[str, int], allow_link_loss: bool = False) -> None:
+    """Load the All-Australian teams from the tracked manifest.
 
-    ``all_australian`` is draftguru's 1979-2025 table and carries position
-    and captaincy; ``all_australian_history`` is the Wikipedia scrape and
-    reaches back to the 1953 carnival team. Neither is complete on its
-    own — the history table is missing 2025 and the draftguru table is
-    missing eleven earlier seasons — so the richer row wins where both
-    describe a season, and the other fills the gaps.
+    AFLDB-ISSUE-112 phase 5: the checked-in ``data/awards/all-australian.csv``
+    replaces the legacy SQLite ``all_australian`` + ``all_australian_history``
+    tables as the sole input. Those two tables were merged at the original
+    load; the manifest is the flat, already-merged result (1,158 rows), so
+    there is no merge logic here — each row carries its own ``source``
+    (``draftguru`` or ``wikipedia``), which selects the reload ``source_id``,
+    and its preserved ``source_record_id`` (the manifest ``source_key``,
+    ``aa:...`` or ``aah:...``), carried verbatim. ``club`` is the source's
+    own verbatim club string, re-resolved season-aware through the same
+    ``ClubResolver`` the legacy loader used, so ``club_id`` is reconstructed
+    (rebuild-stable) and ``club_name_raw`` round-trips byte-for-byte; a
+    state-league or interstate side with no AFLDB club resolves to NULL,
+    deterministically. ``player_id`` / ``link_status`` / ``candidate_count``
+    are carried verbatim; a ``player_id`` absent from this database is
+    dropped by the preserved valid-player guard, exactly as in
+    ``import_rising_star``. The reload key ``(source_id, source_record_id)``,
+    the domain-and-provenance ownership scope and every AFLDB-ISSUE-080
+    protection are unchanged; only the row source is different.
     """
     with pg.cursor() as cur:
         cur.execute("SELECT id FROM awards WHERE slug = %s", (ALL_AUSTRALIAN_SLUG,))
@@ -519,73 +531,44 @@ def import_all_australian(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
                 "run the 'awards' group first"
             )
         award_id = row[0]
+        cur.execute("SELECT year FROM seasons")
+        valid_seasons = {r[0] for r in cur.fetchall()}
+        cur.execute("SELECT id FROM players")
+        valid_players = {r[0] for r in cur.fetchall()}
 
-    detailed = lite.execute(
-        """SELECT season, player, club, position, is_captain, is_vice_captain,
-                  times_aa, source_url, source_row, dg_person_id
-             FROM all_australian ORDER BY season, player"""
-    ).fetchall()
-    detailed_seasons = {r["season"] for r in detailed}
-
-    history = lite.execute(
-        """SELECT season, player_source, club_source, player_id, match_status,
-                  candidate_count, source_url
-             FROM all_australian_history ORDER BY season, player_source"""
-    ).fetchall()
+    rows = load_all_australian()
 
     draftguru_id = require_source(sources, "draftguru")
     wikipedia_id = require_source(sources, "wikipedia")
+    source_ids = {"draftguru": draftguru_id, "wikipedia": wikipedia_id}
 
     def build():
-        # Source record ids are namespaced per source: draftguru's
-        # source_row repeats across seasons, so it cannot stand alone.
-        for row_no, r in enumerate(detailed, start=1):
+        for r in rows:
             batch.records_read += 1
-            player = clean_text(r["player"])
-            if not player:
+            if r.season not in valid_seasons:
+                batch.reject(r.source_key, "unknown season",
+                             {"season": r.season, "player": r.player})
                 continue
-            linked = person_links.get(r["dg_person_id"]) if r["dg_person_id"] else None
-            player_id = linked[0] if linked else None
-            status = link_status(linked[1] if linked else None, player_id)
-            club_id, club_raw = clubs.resolve(r["club"], r["season"])
-            times = to_int(r["times_aa"])
+            player_id = r.player_id if r.player_id in valid_players else None
+            status = link_status(r.link_status, player_id)
+            # The manifest's club string is exactly what the legacy loader
+            # passed here; re-resolving it reproduces club_id and the stored
+            # club_name_raw without freezing a surrogate id.
+            club_id, club_raw = clubs.resolve(r.club, r.season)
             yield (
-                award_id, r["season"], player_id, player, status,
-                linked[2] if linked else 0,
+                award_id, r.season, player_id, r.player, status,
+                r.candidate_count,
                 club_id, club_raw, None,
-                clean_text(r["position"]),
-                bool(r["is_captain"]), bool(r["is_vice_captain"]),
-                f"{times} time All-Australian" if times else None,
-                draftguru_id, f"aa:{r['season']}:{row_no}", batch.id,
+                r.position,
+                r.is_captain, r.is_vice_captain,
+                r.note,
+                source_ids[r.source], r.source_key, batch.id,
             )
 
-        for r in history:
-            if r["season"] in detailed_seasons:
-                continue  # the draftguru row already covers this season
-            batch.records_read += 1
-            # The Wikipedia scrape marks the era's selections with an
-            # asterisk; it is a footnote, not part of the name.
-            player = clean_text((r["player_source"] or "").rstrip("*"))
-            if not player:
-                continue
-            player_id = r["player_id"]
-            status = link_status(r["match_status"], player_id)
-            club_id, club_raw = clubs.resolve(r["club_source"], r["season"])
-            # (season, player_source, club_source) is the source table's
-            # own unique key.
-            yield (
-                award_id, r["season"], player_id, player, status,
-                to_int(r["candidate_count"]) or 0,
-                club_id, club_raw, None,
-                None, False, False, None,
-                wikipedia_id,
-                f"aah:{r['season']}:{r['player_source']}:{r['club_source'] or ''}", batch.id,
-            )
-
-    # Scoped to this one award AND to the two legacy sources that supply it:
-    # the legacy awards group above deliberately leaves the award alone, and
-    # rows the ingest pipeline promoted under sports_data_lab are not this
-    # loader's to reconcile (AFLDB-ISSUE-080).
+    # Scoped to this one award AND to the two sources that supply it: the
+    # legacy awards group deliberately leaves the award alone, and rows the
+    # ingest pipeline promoted under sports_data_lab are not this loader's to
+    # reconcile (AFLDB-ISSUE-080).
     stats = reload_keyed(
         pg, "award_winners", ["source_id", "source_record_id"],
         ["award_id", "season", "player_id", "player_name_raw", "link_status_value",
@@ -1901,19 +1884,23 @@ GROUPS = {
     "captaincies":    ("Club captains by season", ["captaincies"]),
 }
 
-# Groups that read no legacy SQLite database at all. under_22, honour_teams,
-# hall_of_fame, captaincies and rising_star each load a tracked manifest;
-# coleman derives from AFLDB's own canonical match facts. Any of them can
-# therefore run in a canonically rebuilt database with AFLDB_LEGACY_SQLITE
-# unset.
+# Groups that read no legacy SQLite database at all. all_australian, under_22,
+# honour_teams, hall_of_fame, captaincies and rising_star each load a tracked
+# manifest; coleman derives from AFLDB's own canonical match facts. Any of
+# them can therefore run in a canonically rebuilt database with
+# AFLDB_LEGACY_SQLITE unset.
 LEGACY_FREE_GROUPS = {
-    "under_22", COLEMAN_GROUP, "hall_of_fame", "honour_teams", "captaincies",
-    "rising_star",
+    "all_australian", "under_22", COLEMAN_GROUP, "hall_of_fame", "honour_teams",
+    "captaincies", "rising_star",
 }
 
 # The provenance each group's import_batch is recorded against. Everything not
 # named here is a legacy-SQLite extract, recorded as sports_data_lab.
+# all_australian draws on two sources per row (draftguru + wikipedia); the
+# per-row source_id is set from the manifest, and the batch is recorded
+# against draftguru, its majority source.
 BATCH_SOURCE_KEYS = {
+    "all_australian": "draftguru",
     "under_22": UNDER_22_SOURCE_KEY,
     COLEMAN_GROUP: "afltables",
     "hall_of_fame": "wikipedia",
@@ -1922,28 +1909,26 @@ BATCH_SOURCE_KEYS = {
     "rising_star": "footywire",
 }
 
-# all_australian needs the legacy award definitions, so 'awards' always runs
-# first for it. under_22, coleman and rising_star can also run alone —
-# under_22 upserts only its own definition and rows, coleman owns only its
-# own derived rows, and rising_star (AFLDB-ISSUE-112 phase 4) loads a tracked
-# manifest and only guards that the 'rising-star' definition already exists.
-# All three run after 'awards' when a full refresh is requested so a
-# legacy-loaded database supplies the existing definition rather than having
-# one created underneath it.
+# under_22, coleman, rising_star and — since AFLDB-ISSUE-112 phase 5 —
+# all_australian can each run alone: under_22 upserts only its own definition
+# and rows, coleman owns only its own derived rows, and all_australian /
+# rising_star load a tracked manifest and only guard that their award
+# definition already exists. All run after 'awards' when a full refresh is
+# requested so a legacy-loaded database supplies the existing definition
+# rather than having one created underneath it.
 GROUP_ORDER = ["awards", "all_australian", "under_22", COLEMAN_GROUP, "rising_star",
                "hall_of_fame", "honour_teams", "captaincies"]
 
 # Groups that cannot be run without another.
 #
-# 'awards' and 'all_australian' share the award-definition/winner tables, so a
-# legacy-family refresh must close over both. A full awards refresh also
-# includes independently sourced under_22 and rising_star so their current
-# manifests are applied, while their rows and durable IDs are excluded from
-# the legacy deletes. under_22 and rising_star are deliberately asymmetric and
-# may each run alone as a scoped, legacy-free reload.
+# A full 'awards' refresh shares the award-definition/winner tables with the
+# independently sourced all_australian, under_22 and rising_star manifests, so
+# it closes over all three to re-apply them, while their rows and durable IDs
+# are excluded from the legacy deletes. The reverse is deliberately asymmetric:
+# all_australian, under_22 and rising_star may each run alone as a scoped,
+# legacy-free manifest reload, so none is a GROUP_REQUIRES key.
 GROUP_REQUIRES = {
     "awards": {"all_australian", "under_22", "rising_star"},
-    "all_australian": {"awards"},
 }
 
 
@@ -2043,6 +2028,13 @@ def main() -> int:
                           "captaincies"):
                 rep.result(table, lite.execute(f"SELECT count(*) FROM {table}").fetchone()[0])
             lite.close()
+        if "all_australian" in selected:
+            aa_rows = load_all_australian()
+            rep.result(
+                "All-Australian source",
+                len(aa_rows),
+                f"({len({row.season for row in aa_rows})} seasons)",
+            )
         if "under_22" in selected:
             under_22_rows = load_under_22()
             rep.result(
@@ -2145,7 +2137,7 @@ def main() -> int:
                     import_awards(pg, lite, rep, batch, clubs, sources, person_links,
                                   allow_link_loss=args.allow_link_loss)
                 elif key == "all_australian":
-                    import_all_australian(pg, lite, rep, batch, clubs, sources, person_links,
+                    import_all_australian(pg, rep, batch, clubs, sources,
                                           allow_link_loss=args.allow_link_loss)
                 elif key == "under_22":
                     import_under_22(

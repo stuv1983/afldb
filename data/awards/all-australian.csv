@@ -1,0 +1,1159 @@
+source_key,source,season,club,player,player_id,link_status,candidate_count,position,is_captain,is_vice_captain,note,votes,source_citation
+aa:1979:1,draftguru,1979,,Brian Peake,2063,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1979:10,draftguru,1979,North Melbourne,Graham Cornes,10988,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1979:11,draftguru,1979,Hawthorn,Kelvin Moore,1999,resolved,2,,false,false,1 time All-Australian,,draftguru
+aa:1979:12,draftguru,1979,,Ken Hunter,1826,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1979:13,draftguru,1979,,Kym Hodgeman,,implausible,1,,false,false,1 time All-Australian,,draftguru
+aa:1979:14,draftguru,1979,Richmond,Michael Roach,2114,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1979:15,draftguru,1979,Hawthorn,Michael Tuck,1319,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1979:16,draftguru,1979,Geelong,Michael Turner,2230,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1979:17,draftguru,1979,,Peter Carey,,unmatched,0,,false,false,1 time All-Australian,,draftguru
+aa:1979:18,draftguru,1979,,Peter Jonas,,implausible,1,,false,false,1 time All-Australian,,draftguru
+aa:1979:19,draftguru,1979,Collingwood,Peter Moore,2000,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1979:2,draftguru,1979,Carlton,Bruce Doull,1680,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1979:20,draftguru,1979,,Tony Buhagiar,,implausible,1,,false,false,1 time All-Australian,,draftguru
+aa:1979:3,draftguru,1979,Richmond,Bruce Monteath,1997,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1979:4,draftguru,1979,North Melbourne,Darryl Sutton,2200,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1979:5,draftguru,1979,Richmond,David Cloke,1286,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1979:6,draftguru,1979,,Des James,,unmatched,0,,false,false,1 time All-Australian,,draftguru
+aa:1979:7,draftguru,1979,Fitzroy,Garry Wilson,2274,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1979:8,draftguru,1979,Geelong,Gary Malarkey,1936,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1979:9,draftguru,1979,,Geoff Morris,,unmatched,0,,false,false,1 time All-Australian,,draftguru
+aa:1980:21,draftguru,1980,,Brian Peake,2063,resolved,1,,false,false,2 time All-Australian,,draftguru
+aa:1980:22,draftguru,1980,St Kilda,Bruce Duperouzel,1691,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1980:23,draftguru,1980,North Melbourne,Darryl Sutton,2200,unique,1,,false,false,2 time All-Australian,,draftguru
+aa:1980:24,draftguru,1980,Fitzroy,Garry Wilson,2274,unique,1,,false,false,2 time All-Australian,,draftguru
+aa:1980:25,draftguru,1980,Richmond,Geoff Raines,2092,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1980:26,draftguru,1980,Carlton,Geoff Southby,2183,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1980:27,draftguru,1980,,Graham Cornes,10988,unique,1,,false,false,2 time All-Australian,,draftguru
+aa:1980:28,draftguru,1980,,Greg Phillips,,implausible,1,,false,false,1 time All-Australian,,draftguru
+aa:1980:29,draftguru,1980,Geelong,Ian Nankervis,2023,resolved,2,,false,false,1 time All-Australian,,draftguru
+aa:1980:30,draftguru,1980,Richmond,Jim Jess,1845,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1980:31,draftguru,1980,South Melbourne,John Roberts,2122,resolved,2,,false,false,1 time All-Australian,,draftguru
+aa:1980:32,draftguru,1980,,Keith Kuhlmann,,unmatched,0,,false,false,1 time All-Australian,,draftguru
+aa:1980:33,draftguru,1980,,Ken Hunter,1826,resolved,1,,false,false,2 time All-Australian,,draftguru
+aa:1980:34,draftguru,1980,Richmond,Mark Lee,1363,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1980:35,draftguru,1980,,Mark Williams,2281,resolved,4,,false,false,1 time All-Australian,,draftguru
+aa:1980:36,draftguru,1980,,Peter Carey,,unmatched,0,,false,false,2 time All-Australian,,draftguru
+aa:1980:37,draftguru,1980,,Rick Davies,1658,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1980:38,draftguru,1980,Carlton,Robbert Klomp,1881,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1980:39,draftguru,1980,Melbourne,Robert Flower,1725,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1980:40,draftguru,1980,,Ron Stubbs,,implausible,1,,false,false,1 time All-Australian,,draftguru
+aa:1983:41,draftguru,1983,,Craig Bradley,151,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1983:42,draftguru,1983,,Craig Williams,,implausible,1,,false,false,1 time All-Australian,,draftguru
+aa:1983:43,draftguru,1983,Hawthorn,Gary Buckenara,1387,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1983:44,draftguru,1983,North Melbourne,Keith Greig,1765,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1983:45,draftguru,1983,,Kevin Taylor,2208,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1983:46,draftguru,1983,Richmond,Mark Lee,1363,unique,1,,false,false,2 time All-Australian,,draftguru
+aa:1983:47,draftguru,1983,Fitzroy,Matt Rendell,1347,resolved,0,,false,false,1 time All-Australian,,draftguru
+aa:1983:48,draftguru,1983,Richmond,Maurice Rioli,2113,resolved,2,,false,false,1 time All-Australian,,draftguru
+aa:1983:49,draftguru,1983,,Michael Aish,,unmatched,0,,false,false,1 time All-Australian,,draftguru
+aa:1983:50,draftguru,1983,Collingwood,Michael Richardson,1354,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1983:51,draftguru,1983,Hawthorn,Michael Tuck,1319,unique,1,,false,false,2 time All-Australian,,draftguru
+aa:1983:52,draftguru,1983,,Peter Motley,2009,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1983:53,draftguru,1983,Melbourne,Robert Flower,1725,unique,1,,false,false,2 time All-Australian,,draftguru
+aa:1983:54,draftguru,1983,North Melbourne,Ross Glendinning,1757,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1983:55,draftguru,1983,Essendon,Simon Madden,1302,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1983:56,draftguru,1983,,Stephen Curtis,,unmatched,0,,false,false,1 time All-Australian,,draftguru
+aa:1983:57,draftguru,1983,North Melbourne,Stephen McCann,1956,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1983:58,draftguru,1983,,Stephen Michael,,unmatched,0,,false,false,1 time All-Australian,,draftguru
+aa:1983:59,draftguru,1983,Essendon,Terry Daniher,1311,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1983:60,draftguru,1983,,Tony Giles,,unmatched,0,,false,false,1 time All-Australian,,draftguru
+aa:1985:61,draftguru,1985,,Craig Bradley,151,resolved,1,,false,false,2 time All-Australian,,draftguru
+aa:1985:62,draftguru,1985,Richmond,Dale Weightman,1256,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1985:63,draftguru,1985,Hawthorn,Dermott Brereton,234,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1985:64,draftguru,1985,Essendon,Garry Foulds,1736,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1985:65,draftguru,1985,Hawthorn,Gary Buckenara,1387,unique,1,,false,false,2 time All-Australian,,draftguru
+aa:1985:66,draftguru,1985,Fitzroy,Gary Pert,210,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1985:67,draftguru,1985,Collingwood,Geoff Raines,2092,unique,1,,false,false,2 time All-Australian,,draftguru
+aa:1985:68,draftguru,1985,,John Platten,636,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1985:69,draftguru,1985,Essendon,Leon Baker,1503,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1985:70,draftguru,1985,,Malcolm Blight,,implausible,1,,false,false,1 time All-Australian,,draftguru
+aa:1985:71,draftguru,1985,Essendon,Mark Harvey,321,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1985:72,draftguru,1985,Richmond,Mark Lee,1363,unique,1,,false,false,3 time All-Australian,,draftguru
+aa:1985:73,draftguru,1985,,Michael Mitchell,,implausible,1,,false,false,1 time All-Australian,,draftguru
+aa:1985:74,draftguru,1985,Fitzroy,Paul Roos,985,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1985:75,draftguru,1985,,Peter Motley,2009,resolved,1,,false,false,2 time All-Australian,,draftguru
+aa:1985:76,draftguru,1985,Hawthorn,Rod Lester-Smith,1398,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1985:77,draftguru,1985,Essendon,Roger Merrett,107,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1985:78,draftguru,1985,Hawthorn,Russell Greene,1767,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1985:79,draftguru,1985,,Stephen Kernahan,148,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1985:80,draftguru,1985,Essendon,Terry Daniher,1311,unique,1,,false,false,2 time All-Australian,,draftguru
+aa:1986:100,draftguru,1986,St Kilda,Phil Narkle,2024,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1986:101,draftguru,1986,,Robert Wiley,2280,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1986:102,draftguru,1986,Carlton,Stephen Kernahan,148,unique,1,,false,false,2 time All-Australian,,draftguru
+aa:1986:103,draftguru,1986,,Steve Malaxos,,unmatched,0,,false,false,1 time All-Australian,,draftguru
+aa:1986:81,draftguru,1986,,Andrew Jarman,8,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1986:82,draftguru,1986,,Andrew MacNish,1262,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1986:83,draftguru,1986,Western Bulldogs,Brad Hardie,1300,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1986:84,draftguru,1986,,Brian Peake,2063,resolved,1,,false,false,3 time All-Australian,,draftguru
+aa:1986:85,draftguru,1986,Western Bulldogs,Brian Royal,1277,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1986:86,draftguru,1986,,Chris McDermott,17,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1986:87,draftguru,1986,Carlton,Craig Bradley,151,resolved,1,,false,false,3 time All-Australian,,draftguru
+aa:1986:88,draftguru,1986,Richmond,Dale Weightman,1256,unique,1,,false,false,2 time All-Australian,,draftguru
+aa:1986:89,draftguru,1986,Hawthorn,Gary Buckenara,1387,unique,1,,false,false,3 time All-Australian,,draftguru
+aa:1986:90,draftguru,1986,Sydney,Gerard Healy,1366,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1986:91,draftguru,1986,Sydney,Greg Williams,142,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1986:92,draftguru,1986,Hawthorn,John Platten,636,resolved,1,,false,false,2 time All-Australian,,draftguru
+aa:1986:93,draftguru,1986,Essendon,Kevin Walsh,1392,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1986:94,draftguru,1986,,Laurie Keene,1414,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1986:95,draftguru,1986,,Mark Naley,1334,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1986:96,draftguru,1986,Richmond,Maurice Rioli,2113,resolved,2,,false,false,2 time All-Australian,,draftguru
+aa:1986:97,draftguru,1986,,Michael Aish,,unmatched,0,,false,false,2 time All-Australian,,draftguru
+aa:1986:98,draftguru,1986,,Michael Mitchell,,implausible,1,,false,false,2 time All-Australian,,draftguru
+aa:1986:99,draftguru,1986,,Peter Wilson,1033,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1987:104,draftguru,1987,Geelong,Andrew Bews,94,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1987:105,draftguru,1987,,Andrew Jarman,8,resolved,1,,false,false,2 time All-Australian,,draftguru
+aa:1987:106,draftguru,1987,,Andrew Rogers,1325,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1987:107,draftguru,1987,Sydney,Bernard Toohey,1313,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1987:108,draftguru,1987,Geelong,Bruce Lindner,1921,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1987:109,draftguru,1987,Hawthorn,Chris Langford,639,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1987:110,draftguru,1987,,Chris McDermott,17,resolved,1,,false,false,2 time All-Australian,,draftguru
+aa:1987:111,draftguru,1987,Sydney,Craig Holden,1814,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1987:112,draftguru,1987,Sydney,Gerard Healy,1366,resolved,1,,false,false,2 time All-Australian,,draftguru
+aa:1987:113,draftguru,1987,Sydney,Greg Williams,142,resolved,1,,false,false,2 time All-Australian,,draftguru
+aa:1987:114,draftguru,1987,Hawthorn,John Platten,636,resolved,1,,false,false,3 time All-Australian,,draftguru
+aa:1987:115,draftguru,1987,Geelong,Mark Bairstow,1201,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1987:116,draftguru,1987,Carlton,Mark Naley,1334,resolved,1,,false,false,2 time All-Australian,,draftguru
+aa:1987:117,draftguru,1987,Fitzroy,Matt Rendell,1347,resolved,0,,false,false,2 time All-Australian,,draftguru
+aa:1987:118,draftguru,1987,Brisbane,Matthew Campbell,1281,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1987:119,draftguru,1987,Fitzroy,Paul Roos,985,resolved,1,,false,false,2 time All-Australian,,draftguru
+aa:1987:120,draftguru,1987,Essendon,Paul Salmon,314,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1987:121,draftguru,1987,West Coast,Phil Narkle,2024,resolved,1,,false,false,2 time All-Australian,,draftguru
+aa:1987:122,draftguru,1987,Hawthorn,Russell Morris,1188,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1987:123,draftguru,1987,,Scott Salisbury,,unmatched,0,,false,false,1 time All-Australian,,draftguru
+aa:1987:124,draftguru,1987,Essendon,Simon Madden,1302,unique,1,,false,false,2 time All-Australian,,draftguru
+aa:1988:125,draftguru,1988,Geelong,Bruce Lindner,1921,resolved,1,,false,false,2 time All-Australian,,draftguru
+aa:1988:126,draftguru,1988,Richmond,Dale Weightman,1256,unique,1,,false,false,3 time All-Australian,,draftguru
+aa:1988:127,draftguru,1988,St Kilda,Danny Frawley,918,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1988:128,draftguru,1988,Melbourne,Danny Hughes,1394,resolved,2,,false,false,1 time All-Australian,,draftguru
+aa:1988:129,draftguru,1988,Sydney,David Murphy,1341,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1988:130,draftguru,1988,Sydney,Gerard Healy,1366,resolved,1,,false,false,3 time All-Australian,,draftguru
+aa:1988:131,draftguru,1988,,Gregory Whittlesea,11499,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1988:132,draftguru,1988,Hawthorn,John Platten,636,resolved,1,,false,false,4 time All-Australian,,draftguru
+aa:1988:133,draftguru,1988,Brisbane,Mark Mickan,1308,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1988:134,draftguru,1988,,Martin Leslie,124,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1988:135,draftguru,1988,,Maurice Rioli,2113,resolved,2,,false,false,3 time All-Australian,,draftguru
+aa:1988:136,draftguru,1988,,Michael Long,313,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1988:137,draftguru,1988,Western Bulldogs,Michael McLean,99,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1988:138,draftguru,1988,Fitzroy,Paul Roos,985,resolved,1,,false,false,3 time All-Australian,,draftguru
+aa:1988:139,draftguru,1988,Essendon,Paul Salmon,314,resolved,1,,false,false,2 time All-Australian,,draftguru
+aa:1988:140,draftguru,1988,Essendon,Simon Madden,1302,unique,1,,false,false,3 time All-Australian,,draftguru
+aa:1988:141,draftguru,1988,Carlton,Stephen Kernahan,148,unique,1,,false,false,3 time All-Australian,,draftguru
+aa:1988:142,draftguru,1988,West Coast,Steve Malaxos,,unmatched,0,,false,false,2 time All-Australian,,draftguru
+aa:1988:143,draftguru,1988,Essendon,Terry Daniher,1311,unique,1,,false,false,3 time All-Australian,,draftguru
+aa:1988:144,draftguru,1988,Western Bulldogs,Terry Wallace,1371,unique,1,,false,false,1 time All-Australian,,draftguru
+aa:1988:145,draftguru,1988,Hawthorn,Tony Hall,13,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1988:146,draftguru,1988,Western Bulldogs,Tony McGuinness,18,resolved,1,,false,false,1 time All-Australian,,draftguru
+aa:1991:147,draftguru,1991,Essendon,Anthony Daniher,1238,unique,1,FB,false,false,1 time All-Australian,,draftguru
+aa:1991:148,draftguru,1991,Sydney,Barry Mitchell,157,resolved,1,Ro,false,false,1 time All-Australian,,draftguru
+aa:1991:149,draftguru,1991,Geelong,Bill Brownless,564,unique,1,IC,false,false,1 time All-Australian,,draftguru
+aa:1991:150,draftguru,1991,West Coast,Chris Mainwaring,1029,unique,1,W,false,false,1 time All-Australian,,draftguru
+aa:1991:151,draftguru,1991,West Coast,Craig Turley,717,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:1991:152,draftguru,1991,St Kilda,David Grant,716,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:1991:153,draftguru,1991,Geelong,Garry Hocking,577,unique,1,FP,false,false,1 time All-Australian,,draftguru
+aa:1991:154,draftguru,1991,Collingwood,Gavin Brown,216,unique,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:1991:155,draftguru,1991,West Coast,Guy McKenna,1032,unique,1,BP,false,false,1 time All-Australian,,draftguru
+aa:1991:156,draftguru,1991,Melbourne,Jim Stynes,702,unique,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:1991:157,draftguru,1991,Geelong,Ken Hinkley,559,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:1991:158,draftguru,1991,Geelong,Mark Bairstow,1201,unique,1,RR,false,false,2 time All-Australian,,draftguru
+aa:1991:159,draftguru,1991,St Kilda,Nicky Winmar,461,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:1991:160,draftguru,1991,Adelaide,Nigel Smart,5,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:1991:161,draftguru,1991,Geelong,Paul Couch,565,unique,1,C,false,false,1 time All-Australian,,draftguru
+aa:1991:162,draftguru,1991,Fitzroy,Paul Roos,985,resolved,1,CHB,true,false,4 time All-Australian,,draftguru
+aa:1991:163,draftguru,1991,West Coast,Peter Matera,1040,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:1991:164,draftguru,1991,St Kilda,Stewart Loewe,927,unique,1,CHF,false,false,1 time All-Australian,,draftguru
+aa:1991:165,draftguru,1991,Collingwood,Tony Francis,238,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:1991:166,draftguru,1991,St Kilda,Tony Lockett,990,resolved,1,FF,false,false,1 time All-Australian,,draftguru
+aa:1992:167,draftguru,1992,Geelong,Barry Stoneham,584,unique,1,CHB,false,false,1 time All-Australian,,draftguru
+aa:1992:168,draftguru,1992,Adelaide,Ben Hart,22,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:1992:169,draftguru,1992,Adelaide,Chris McDermott,17,resolved,1,RR,false,false,3 time All-Australian,,draftguru
+aa:1992:170,draftguru,1992,Hawthorn,Darren Jarman,36,resolved,1,C,false,false,1 time All-Australian,,draftguru
+aa:1992:171,draftguru,1992,West Coast,Dean Kemp,1028,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:1992:172,draftguru,1992,Geelong,Gary Ablett,567,resolved,2,HFF,false,false,1 time All-Australian,,draftguru
+aa:1992:173,draftguru,1992,Essendon,Gavin Wanganeen,303,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:1992:174,draftguru,1992,Hawthorn,Jason Dunstall,632,unique,1,FF,false,false,1 time All-Australian,,draftguru
+aa:1992:175,draftguru,1992,Hawthorn,John Platten,636,resolved,1,Ro,false,false,5 time All-Australian,,draftguru
+aa:1992:176,draftguru,1992,Geelong,Ken Hinkley,559,resolved,1,HBF,false,false,2 time All-Australian,,draftguru
+aa:1992:177,draftguru,1992,Geelong,Mark Bairstow,1201,unique,1,IC,false,false,3 time All-Australian,,draftguru
+aa:1992:178,draftguru,1992,Collingwood,Mick McGuane,174,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:1992:179,draftguru,1992,Carlton,Mil Hanna,146,unique,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:1992:180,draftguru,1992,Fitzroy,Paul Roos,985,resolved,1,FB,true,false,5 time All-Australian,,draftguru
+aa:1992:181,draftguru,1992,St Kilda,Robert Harvey,930,unique,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:1992:182,draftguru,1992,Western Bulldogs,Scott Wynd,424,unique,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:1992:183,draftguru,1992,Carlton,Stephen Kernahan,148,unique,1,IC,false,false,4 time All-Australian,,draftguru
+aa:1992:184,draftguru,1992,St Kilda,Stewart Loewe,927,unique,1,CHF,false,false,2 time All-Australian,,draftguru
+aa:1992:185,draftguru,1992,St Kilda,Tony Lockett,990,resolved,1,FP,false,false,2 time All-Australian,,draftguru
+aa:1992:186,draftguru,1992,Adelaide,Tony McGuinness,18,resolved,1,FP,false,false,2 time All-Australian,,draftguru
+aa:1993:187,draftguru,1993,Fitzroy,Alastair Lynch,104,resolved,1,FB,false,false,1 time All-Australian,,draftguru
+aa:1993:188,draftguru,1993,Carlton,Andrew McKay,140,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:1993:189,draftguru,1993,Hawthorn,Ben Allan,481,resolved,1,RR,false,false,1 time All-Australian,,draftguru
+aa:1993:190,draftguru,1993,Adelaide,Ben Hart,22,resolved,1,BP,false,false,2 time All-Australian,,draftguru
+aa:1993:191,draftguru,1993,Carlton,Craig Bradley,151,resolved,1,HFF,false,false,4 time All-Australian,,draftguru
+aa:1993:192,draftguru,1993,Geelong,Garry Hocking,577,unique,1,FP,false,false,2 time All-Australian,,draftguru
+aa:1993:193,draftguru,1993,Melbourne,Garry Lyon,695,unique,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:1993:194,draftguru,1993,Geelong,Gary Ablett,567,resolved,2,FF,false,false,2 time All-Australian,,draftguru
+aa:1993:195,draftguru,1993,Essendon,Gavin Wanganeen,303,resolved,1,BP,false,false,2 time All-Australian,,draftguru
+aa:1993:196,draftguru,1993,Adelaide,Greg Anderson,24,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:1993:197,draftguru,1993,Carlton,Greg Williams,142,resolved,1,C,false,false,3 time All-Australian,,draftguru
+aa:1993:198,draftguru,1993,West Coast,Guy McKenna,1032,unique,1,HBF,false,false,2 time All-Australian,,draftguru
+aa:1993:199,draftguru,1993,Melbourne,Jim Stynes,702,unique,1,Ru,false,false,2 time All-Australian,,draftguru
+aa:1993:200,draftguru,1993,Essendon,Mark Harvey,321,unique,1,CHB,false,false,2 time All-Australian,,draftguru
+aa:1993:201,draftguru,1993,St Kilda,Nathan Burke,919,unique,1,IC,false,false,1 time All-Australian,,draftguru
+aa:1993:202,draftguru,1993,Adelaide,Nigel Smart,5,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:1993:203,draftguru,1993,West Coast,Peter Matera,1040,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:1993:204,draftguru,1993,Adelaide,Tony McGuinness,18,resolved,1,Ro,false,false,3 time All-Australian,,draftguru
+aa:1993:205,draftguru,1993,Adelaide,Tony Modra,14,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:1993:206,draftguru,1993,North Melbourne,Wayne Carey,766,resolved,1,CHF,true,false,1 time All-Australian,,draftguru
+aa:1994:207,draftguru,1994,Hawthorn,Ben Allan,481,resolved,1,FP,false,false,2 time All-Australian,,draftguru
+aa:1994:208,draftguru,1994,Hawthorn,Chris Langford,639,unique,1,BP,false,false,2 time All-Australian,,draftguru
+aa:1994:209,draftguru,1994,Carlton,Craig Bradley,151,resolved,1,IC,false,false,5 time All-Australian,,draftguru
+aa:1994:210,draftguru,1994,West Coast,David Hart,1041,unique,1,BP,false,false,1 time All-Australian,,draftguru
+aa:1994:211,draftguru,1994,Geelong,Garry Hocking,577,unique,1,Ro,false,false,3 time All-Australian,,draftguru
+aa:1994:212,draftguru,1994,Melbourne,Garry Lyon,695,unique,1,HFF,false,false,2 time All-Australian,,draftguru
+aa:1994:213,draftguru,1994,Geelong,Gary Ablett,567,resolved,2,FF,false,false,3 time All-Australian,,draftguru
+aa:1994:214,draftguru,1994,Collingwood,Gavin Brown,216,unique,1,HFF,false,false,2 time All-Australian,,draftguru
+aa:1994:215,draftguru,1994,West Coast,Glen Jakovich,1038,resolved,1,CHB,false,false,1 time All-Australian,,draftguru
+aa:1994:216,draftguru,1994,Carlton,Greg Williams,142,resolved,1,C,true,false,4 time All-Australian,,draftguru
+aa:1994:217,draftguru,1994,West Coast,Guy McKenna,1032,unique,1,HBF,false,false,3 time All-Australian,,draftguru
+aa:1994:218,draftguru,1994,Hawthorn,Jason Dunstall,632,unique,1,FP,false,false,2 time All-Australian,,draftguru
+aa:1994:219,draftguru,1994,Adelaide,Mark Ricciuto,4,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:1994:220,draftguru,1994,Geelong,Michael Mansfield,198,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:1994:221,draftguru,1994,West Coast,Peter Matera,1040,resolved,1,W,false,false,3 time All-Australian,,draftguru
+aa:1994:222,draftguru,1994,St Kilda,Robert Harvey,930,unique,1,RR,false,false,2 time All-Australian,,draftguru
+aa:1994:223,draftguru,1994,Adelaide,Shaun Rehn,16,resolved,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:1994:224,draftguru,1994,Carlton,Stephen Kernahan,148,unique,1,IC,false,false,5 time All-Australian,,draftguru
+aa:1994:225,draftguru,1994,Carlton,Stephen Silvagni,136,unique,1,FB,false,false,1 time All-Australian,,draftguru
+aa:1994:226,draftguru,1994,Melbourne,Stephen Tingay,693,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:1994:227,draftguru,1994,North Melbourne,Wayne Carey,766,resolved,1,CHF,false,false,2 time All-Australian,,draftguru
+aa:1995:228,draftguru,1995,Carlton,Ang Christou,138,unique,1,BP,false,false,1 time All-Australian,,draftguru
+aa:1995:229,draftguru,1995,Carlton,Anthony Koutoufides,144,unique,1,IC,false,false,1 time All-Australian,,draftguru
+aa:1995:230,draftguru,1995,Carlton,Craig Bradley,151,resolved,1,Ro,false,false,6 time All-Australian,,draftguru
+aa:1995:231,draftguru,1995,Hawthorn,Darren Jarman,36,resolved,1,FP,false,false,2 time All-Australian,,draftguru
+aa:1995:232,draftguru,1995,Melbourne,David Neitz,689,unique,1,IC,false,false,1 time All-Australian,,draftguru
+aa:1995:233,draftguru,1995,Melbourne,Garry Lyon,695,unique,1,HFF,false,false,3 time All-Australian,,draftguru
+aa:1995:234,draftguru,1995,Geelong,Gary Ablett,567,resolved,2,FF,true,false,4 time All-Australian,,draftguru
+aa:1995:235,draftguru,1995,Essendon,Gavin Wanganeen,303,resolved,1,BP,false,false,3 time All-Australian,,draftguru
+aa:1995:236,draftguru,1995,West Coast,Glen Jakovich,1038,resolved,1,CHB,false,false,2 time All-Australian,,draftguru
+aa:1995:237,draftguru,1995,Essendon,James Hird,312,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:1995:238,draftguru,1995,Carlton,Justin Madden,150,unique,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:1995:239,draftguru,1995,Essendon,Michael Long,313,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:1995:240,draftguru,1995,Geelong,Michael Mansfield,198,resolved,1,HBF,false,false,2 time All-Australian,,draftguru
+aa:1995:241,draftguru,1995,St Kilda,Nicky Winmar,461,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:1995:242,draftguru,1995,Geelong,Paul Couch,565,unique,1,C,false,false,2 time All-Australian,,draftguru
+aa:1995:243,draftguru,1995,Sydney,Paul Kelly,993,unique,1,IC,false,false,1 time All-Australian,,draftguru
+aa:1995:244,draftguru,1995,St Kilda,Robert Harvey,930,unique,1,RR,false,false,3 time All-Australian,,draftguru
+aa:1995:245,draftguru,1995,Carlton,Stephen Silvagni,136,unique,1,FB,false,false,2 time All-Australian,,draftguru
+aa:1995:246,draftguru,1995,Sydney,Tony Lockett,990,resolved,1,FP,false,false,3 time All-Australian,,draftguru
+aa:1995:247,draftguru,1995,Richmond,Wayne Campbell,869,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:1995:248,draftguru,1995,North Melbourne,Wayne Carey,766,resolved,1,CHF,false,false,3 time All-Australian,,draftguru
+aa:1996:249,draftguru,1996,West Coast,Chris Mainwaring,1029,unique,1,W,false,false,2 time All-Australian,,draftguru
+aa:1996:250,draftguru,1996,North Melbourne,Corey McKernan,775,resolved,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:1996:251,draftguru,1996,Brisbane,Craig Lambert,123,resolved,1,Ro,false,false,1 time All-Australian,,draftguru
+aa:1996:252,draftguru,1996,Adelaide,Darren Jarman,36,resolved,1,FP,false,false,3 time All-Australian,,draftguru
+aa:1996:253,draftguru,1996,Geelong,Garry Hocking,577,unique,1,IC,false,false,4 time All-Australian,,draftguru
+aa:1996:254,draftguru,1996,North Melbourne,Glenn Archer,777,unique,1,IC,false,false,1 time All-Australian,,draftguru
+aa:1996:255,draftguru,1996,Essendon,James Hird,312,resolved,1,HFF,false,false,2 time All-Australian,,draftguru
+aa:1996:256,draftguru,1996,Richmond,Matthew Richardson,870,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:1996:257,draftguru,1996,Carlton,Michael Sexton,137,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:1996:258,draftguru,1996,Brisbane,Michael Voss,102,unique,1,FP,false,false,1 time All-Australian,,draftguru
+aa:1996:259,draftguru,1996,West Coast,Mitchell White,620,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:1996:260,draftguru,1996,Collingwood,Nathan Buckley,217,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:1996:261,draftguru,1996,St Kilda,Nathan Burke,919,unique,1,BP,false,false,2 time All-Australian,,draftguru
+aa:1996:262,draftguru,1996,Sydney,Paul Kelly,993,unique,1,C,true,false,2 time All-Australian,,draftguru
+aa:1996:263,draftguru,1996,Sydney,Paul Roos,985,resolved,1,CHB,false,false,6 time All-Australian,,draftguru
+aa:1996:264,draftguru,1996,West Coast,Peter Matera,1040,resolved,1,HBF,false,false,4 time All-Australian,,draftguru
+aa:1996:265,draftguru,1996,St Kilda,Robert Harvey,930,unique,1,RR,false,false,4 time All-Australian,,draftguru
+aa:1996:266,draftguru,1996,Hawthorn,Shane Crawford,633,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:1996:267,draftguru,1996,Carlton,Stephen Silvagni,136,unique,1,FB,false,false,3 time All-Australian,,draftguru
+aa:1996:268,draftguru,1996,Sydney,Tony Lockett,990,resolved,1,FF,false,false,4 time All-Australian,,draftguru
+aa:1996:269,draftguru,1996,North Melbourne,Wayne Carey,766,resolved,1,CHF,false,false,4 time All-Australian,,draftguru
+aa:1997:270,draftguru,1997,Port Adelaide,Adam Heuskes,829,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:1997:271,draftguru,1997,St Kilda,Austinn Jones,929,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:1997:272,draftguru,1997,Western Bulldogs,Chris Grant,422,resolved,1,CHF,false,false,1 time All-Australian,,draftguru
+aa:1997:273,draftguru,1997,Carlton,Craig Bradley,151,resolved,1,C,false,false,7 time All-Australian,,draftguru
+aa:1997:274,draftguru,1997,Sydney,Daryn Cresswell,992,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:1997:275,draftguru,1997,North Melbourne,David King,759,resolved,2,BP,false,false,1 time All-Australian,,draftguru
+aa:1997:276,draftguru,1997,West Coast,Fraser Gehrig,976,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:1997:277,draftguru,1997,Adelaide,Mark Ricciuto,4,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:1997:278,draftguru,1997,Sydney,Michael O'Loughlin,,unmatched,0,HFF,false,false,1 time All-Australian,,draftguru
+aa:1997:279,draftguru,1997,Carlton,Michael Sexton,137,resolved,1,CHB,false,false,2 time All-Australian,,draftguru
+aa:1997:280,draftguru,1997,Collingwood,Nathan Buckley,217,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:1997:281,draftguru,1997,St Kilda,Nathan Burke,919,unique,1,Ro,false,false,3 time All-Australian,,draftguru
+aa:1997:282,draftguru,1997,Sydney,Paul Kelly,993,unique,1,FP,true,false,3 time All-Australian,,draftguru
+aa:1997:283,draftguru,1997,Sydney,Paul Roos,985,resolved,1,BP,false,false,7 time All-Australian,,draftguru
+aa:1997:284,draftguru,1997,Hawthorn,Paul Salmon,314,resolved,1,Ru,false,false,3 time All-Australian,,draftguru
+aa:1997:285,draftguru,1997,St Kilda,Peter Everitt,922,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:1997:286,draftguru,1997,West Coast,Peter Matera,1040,resolved,1,HBF,false,false,5 time All-Australian,,draftguru
+aa:1997:287,draftguru,1997,St Kilda,Robert Harvey,930,unique,1,RR,false,false,5 time All-Australian,,draftguru
+aa:1997:288,draftguru,1997,Western Bulldogs,Rohan Smith,429,resolved,2,HFF,false,false,1 time All-Australian,,draftguru
+aa:1997:289,draftguru,1997,Carlton,Stephen Silvagni,136,unique,1,FB,false,false,4 time All-Australian,,draftguru
+aa:1997:290,draftguru,1997,Adelaide,Tony Modra,14,resolved,1,FF,false,false,2 time All-Australian,,draftguru
+aa:1998:291,draftguru,1998,Adelaide,Andrew McLeod,30,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:1998:292,draftguru,1998,North Melbourne,Anthony Stevens,772,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:1998:293,draftguru,1998,West Coast,Ashley McIntosh,1034,resolved,1,FB,false,false,1 time All-Australian,,draftguru
+aa:1998:294,draftguru,1998,West Coast,Ben Cousins,1051,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:1998:295,draftguru,1998,Western Bulldogs,Chris Grant,422,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:1998:296,draftguru,1998,North Melbourne,David King,759,resolved,2,BP,false,false,2 time All-Australian,,draftguru
+aa:1998:297,draftguru,1998,North Melbourne,Glenn Archer,777,unique,1,BP,false,false,2 time All-Australian,,draftguru
+aa:1998:298,draftguru,1998,Adelaide,Mark Ricciuto,4,resolved,1,HFF,false,false,3 time All-Australian,,draftguru
+aa:1998:299,draftguru,1998,Richmond,Matthew Knights,865,unique,1,W,false,false,1 time All-Australian,,draftguru
+aa:1998:300,draftguru,1998,Essendon,Matthew Lloyd,336,resolved,2,FP,false,false,1 time All-Australian,,draftguru
+aa:1998:301,draftguru,1998,Collingwood,Nathan Buckley,217,resolved,1,HBF,false,false,3 time All-Australian,,draftguru
+aa:1998:302,draftguru,1998,Adelaide,Nigel Smart,5,resolved,1,HBF,false,false,3 time All-Australian,,draftguru
+aa:1998:303,draftguru,1998,Western Bulldogs,Paul Hudson,451,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:1998:304,draftguru,1998,St Kilda,Peter Everitt,922,resolved,1,Ru,false,false,2 time All-Australian,,draftguru
+aa:1998:305,draftguru,1998,St Kilda,Robert Harvey,930,unique,1,Ro,false,false,6 time All-Australian,,draftguru
+aa:1998:306,draftguru,1998,Western Bulldogs,Scott West,418,unique,1,C,false,false,1 time All-Australian,,draftguru
+aa:1998:307,draftguru,1998,Essendon,Sean Wellman,10,resolved,1,CHB,false,false,1 time All-Australian,,draftguru
+aa:1998:308,draftguru,1998,Hawthorn,Shane Crawford,633,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:1998:309,draftguru,1998,Adelaide,Shaun Rehn,16,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:1998:310,draftguru,1998,Melbourne,Todd Viney,700,unique,1,RR,false,false,1 time All-Australian,,draftguru
+aa:1998:311,draftguru,1998,Sydney,Tony Lockett,990,resolved,1,FF,false,false,5 time All-Australian,,draftguru
+aa:1998:312,draftguru,1998,North Melbourne,Wayne Carey,766,resolved,1,CHF,true,false,5 time All-Australian,,draftguru
+aa:1999:313,draftguru,1999,Carlton,Andrew McKay,140,resolved,1,HBF,false,false,2 time All-Australian,,draftguru
+aa:1999:314,draftguru,1999,West Coast,Ben Cousins,1051,resolved,1,FP,false,false,2 time All-Australian,,draftguru
+aa:1999:315,draftguru,1999,Adelaide,Ben Hart,22,resolved,1,BP,false,false,3 time All-Australian,,draftguru
+aa:1999:316,draftguru,1999,Western Bulldogs,Brad Johnson,421,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:1999:317,draftguru,1999,North Melbourne,Byron Pickett,791,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:1999:318,draftguru,1999,Western Bulldogs,Chris Grant,422,resolved,1,IC,false,false,3 time All-Australian,,draftguru
+aa:1999:319,draftguru,1999,Brisbane,Jason Akermanis,119,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:1999:320,draftguru,1999,Brisbane,Justin Leppitsch,98,resolved,1,FB,false,false,1 time All-Australian,,draftguru
+aa:1999:321,draftguru,1999,Essendon,Mark Mercuri,310,unique,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:1999:322,draftguru,1999,Carlton,Matthew Allan,153,resolved,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:1999:323,draftguru,1999,Essendon,Matthew Lloyd,336,resolved,2,FF,false,false,2 time All-Australian,,draftguru
+aa:1999:324,draftguru,1999,Richmond,Matthew Richardson,870,resolved,1,FP,false,false,2 time All-Australian,,draftguru
+aa:1999:325,draftguru,1999,Brisbane,Michael Voss,102,unique,1,HFF,false,false,2 time All-Australian,,draftguru
+aa:1999:326,draftguru,1999,Collingwood,Nathan Buckley,217,resolved,1,C,false,false,4 time All-Australian,,draftguru
+aa:1999:327,draftguru,1999,St Kilda,Nathan Burke,919,unique,1,IC,false,false,4 time All-Australian,,draftguru
+aa:1999:328,draftguru,1999,North Melbourne,Peter Bell,486,resolved,2,IC,false,false,1 time All-Australian,,draftguru
+aa:1999:329,draftguru,1999,St Kilda,Robert Harvey,930,unique,1,RR,false,false,7 time All-Australian,,draftguru
+aa:1999:330,draftguru,1999,Hawthorn,Shane Crawford,633,resolved,1,Ro,false,false,3 time All-Australian,,draftguru
+aa:1999:331,draftguru,1999,Carlton,Stephen Silvagni,136,unique,1,CHB,false,false,5 time All-Australian,,draftguru
+aa:1999:332,draftguru,1999,Richmond,Wayne Campbell,869,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:1999:333,draftguru,1999,North Melbourne,Wayne Carey,766,resolved,1,CHF,true,false,6 time All-Australian,,draftguru
+aa:1999:334,draftguru,1999,Sydney,Wayne Schwass,764,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2000:335,draftguru,2000,Richmond,Andrew Kellaway,899,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2000:336,draftguru,2000,Carlton,Andrew McKay,140,resolved,1,HBF,false,false,3 time All-Australian,,draftguru
+aa:2000:337,draftguru,2000,Adelaide,Andrew McLeod,30,resolved,1,HFF,false,false,2 time All-Australian,,draftguru
+aa:2000:338,draftguru,2000,Carlton,Anthony Koutoufides,144,unique,1,RR,false,false,2 time All-Australian,,draftguru
+aa:2000:339,draftguru,2000,Western Bulldogs,Brad Johnson,421,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2000:340,draftguru,2000,North Melbourne,Brent Harvey,788,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2000:341,draftguru,2000,Carlton,Brett Ratten,135,unique,1,C,false,false,1 time All-Australian,,draftguru
+aa:2000:342,draftguru,2000,Essendon,Damien Hardwick,324,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2000:343,draftguru,2000,Richmond,Darren Gaspar,886,resolved,1,CHB,false,false,1 time All-Australian,,draftguru
+aa:2000:344,draftguru,2000,Essendon,Dustin Fletcher,304,resolved,1,FB,false,false,1 time All-Australian,,draftguru
+aa:2000:345,draftguru,2000,Essendon,James Hird,312,resolved,1,HFF,false,false,3 time All-Australian,,draftguru
+aa:2000:346,draftguru,2000,Melbourne,Jeff Farmer,703,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2000:347,draftguru,2000,Carlton,Lance Whitnall,173,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2000:348,draftguru,2000,Adelaide,Mark Ricciuto,4,resolved,1,IC,false,false,4 time All-Australian,,draftguru
+aa:2000:349,draftguru,2000,Essendon,Matthew Lloyd,336,resolved,2,FF,false,false,3 time All-Australian,,draftguru
+aa:2000:350,draftguru,2000,Sydney,Michael O'Loughlin,,unmatched,0,FP,false,false,2 time All-Australian,,draftguru
+aa:2000:351,draftguru,2000,Collingwood,Nathan Buckley,217,resolved,1,Ro,false,false,5 time All-Australian,,draftguru
+aa:2000:352,draftguru,2000,Carlton,Scott Camporeale,143,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2000:353,draftguru,2000,Western Bulldogs,Scott West,418,unique,1,W,false,false,2 time All-Australian,,draftguru
+aa:2000:354,draftguru,2000,Adelaide,Simon Goodwin,51,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2000:355,draftguru,2000,Geelong,Steven King,587,resolved,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:2000:356,draftguru,2000,North Melbourne,Wayne Carey,766,resolved,1,CHF,true,false,7 time All-Australian,,draftguru
+aa:2001:357,draftguru,2001,Carlton,Andrew McKay,140,resolved,1,HBF,false,false,4 time All-Australian,,draftguru
+aa:2001:358,draftguru,2001,Adelaide,Andrew McLeod,30,resolved,1,Ro,false,false,3 time All-Australian,,draftguru
+aa:2001:359,draftguru,2001,West Coast,Ben Cousins,1051,resolved,1,FP,false,false,3 time All-Australian,,draftguru
+aa:2001:360,draftguru,2001,Richmond,Brad Ottens,897,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2001:361,draftguru,2001,Carlton,Brett Ratten,135,unique,1,C,false,false,2 time All-Australian,,draftguru
+aa:2001:362,draftguru,2001,Richmond,Darren Gaspar,886,resolved,1,BP,false,false,2 time All-Australian,,draftguru
+aa:2001:363,draftguru,2001,Port Adelaide,Gavin Wanganeen,303,resolved,1,BP,false,false,4 time All-Australian,,draftguru
+aa:2001:364,draftguru,2001,Essendon,James Hird,312,resolved,1,HFF,true,false,4 time All-Australian,,draftguru
+aa:2001:365,draftguru,2001,Brisbane,Jason Akermanis,119,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:2001:366,draftguru,2001,Essendon,Jason Johnson,346,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2001:367,draftguru,2001,Hawthorn,Joel Smith,672,resolved,2,HBF,false,false,1 time All-Australian,,draftguru
+aa:2001:368,draftguru,2001,Hawthorn,Jonathan Hay,659,resolved,1,FB,false,false,1 time All-Australian,,draftguru
+aa:2001:369,draftguru,2001,Essendon,Matthew Lloyd,336,resolved,2,FF,false,false,4 time All-Australian,,draftguru
+aa:2001:370,draftguru,2001,Port Adelaide,Matthew Primus,407,resolved,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:2001:371,draftguru,2001,Brisbane,Michael Voss,102,unique,1,HFF,false,false,3 time All-Australian,,draftguru
+aa:2001:372,draftguru,2001,Western Bulldogs,Nathan Brown,452,resolved,3,IC,false,false,1 time All-Australian,,draftguru
+aa:2001:373,draftguru,2001,Collingwood,Nathan Buckley,217,resolved,1,W,false,false,6 time All-Australian,,draftguru
+aa:2001:374,draftguru,2001,Brisbane,Nigel Lappin,100,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2001:375,draftguru,2001,Essendon,Sean Wellman,10,resolved,1,CHB,false,false,2 time All-Australian,,draftguru
+aa:2001:376,draftguru,2001,Brisbane,Simon Black,1083,resolved,1,RR,false,false,1 time All-Australian,,draftguru
+aa:2001:377,draftguru,2001,Adelaide,Simon Goodwin,51,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2001:378,draftguru,2001,Port Adelaide,Warren Tredrea,831,resolved,1,CHF,false,false,1 time All-Australian,,draftguru
+aa:2002:379,draftguru,2002,North Melbourne,Adam Simpson,780,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2002:380,draftguru,2002,Melbourne,Adem Yze,714,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2002:381,draftguru,2002,West Coast,Ben Cousins,1051,resolved,1,Ro,false,false,4 time All-Australian,,draftguru
+aa:2002:382,draftguru,2002,Adelaide,Ben Hart,22,resolved,1,HBF,false,false,4 time All-Australian,,draftguru
+aa:2002:383,draftguru,2002,Western Bulldogs,Brad Johnson,421,resolved,1,HFF,false,false,3 time All-Australian,,draftguru
+aa:2002:384,draftguru,2002,Port Adelaide,Brett Montgomery,454,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2002:385,draftguru,2002,Brisbane,Chris Johnson,385,resolved,2,BP,false,false,1 time All-Australian,,draftguru
+aa:2002:386,draftguru,2002,Melbourne,David Neitz,689,unique,1,FF,false,false,2 time All-Australian,,draftguru
+aa:2002:387,draftguru,2002,North Melbourne,Glenn Archer,777,unique,1,BP,false,false,3 time All-Australian,,draftguru
+aa:2002:388,draftguru,2002,Brisbane,Jason Akermanis,119,resolved,1,W,false,false,3 time All-Australian,,draftguru
+aa:2002:389,draftguru,2002,Port Adelaide,Josh Francou,819,resolved,1,RR,false,false,1 time All-Australian,,draftguru
+aa:2002:390,draftguru,2002,Brisbane,Justin Leppitsch,98,resolved,1,CHB,false,false,2 time All-Australian,,draftguru
+aa:2002:391,draftguru,2002,Western Bulldogs,Luke Darcy,436,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2002:392,draftguru,2002,Adelaide,Mark Ricciuto,4,resolved,1,IC,false,false,5 time All-Australian,,draftguru
+aa:2002:393,draftguru,2002,Fremantle,Matthew Pavlich,544,resolved,1,FB,false,false,1 time All-Australian,,draftguru
+aa:2002:394,draftguru,2002,Port Adelaide,Matthew Primus,407,resolved,1,Ru,false,false,2 time All-Australian,,draftguru
+aa:2002:395,draftguru,2002,Brisbane,Michael Voss,102,unique,1,HFF,true,false,4 time All-Australian,,draftguru
+aa:2002:396,draftguru,2002,Western Bulldogs,Nathan Brown,452,resolved,3,FP,false,false,2 time All-Australian,,draftguru
+aa:2002:397,draftguru,2002,Brisbane,Nigel Lappin,100,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2002:398,draftguru,2002,Hawthorn,Shane Crawford,633,resolved,1,IC,false,false,4 time All-Australian,,draftguru
+aa:2002:399,draftguru,2002,Brisbane,Simon Black,1083,resolved,1,C,false,false,2 time All-Australian,,draftguru
+aa:2002:400,draftguru,2002,Port Adelaide,Warren Tredrea,831,resolved,1,CHF,false,false,2 time All-Australian,,draftguru
+aa:2003:401,draftguru,2003,Sydney,Adam Goodes,1012,resolved,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:2003:402,draftguru,2003,Collingwood,Chris Tarrant,264,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2003:403,draftguru,2003,Port Adelaide,Gavin Wanganeen,303,resolved,1,BP,false,false,5 time All-Australian,,draftguru
+aa:2003:404,draftguru,2003,Essendon,James Hird,312,resolved,1,IC,false,false,5 time All-Australian,,draftguru
+aa:2003:405,draftguru,2003,Hawthorn,Joel Smith,672,resolved,2,BP,false,false,2 time All-Australian,,draftguru
+aa:2003:406,draftguru,2003,Brisbane,Justin Leppitsch,98,resolved,1,CHB,false,false,3 time All-Australian,,draftguru
+aa:2003:407,draftguru,2003,St Kilda,Lenny Hayes,966,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2003:408,draftguru,2003,Adelaide,Mark Ricciuto,4,resolved,1,HFF,false,false,6 time All-Australian,,draftguru
+aa:2003:409,draftguru,2003,Essendon,Matthew Lloyd,336,resolved,2,FF,false,false,5 time All-Australian,,draftguru
+aa:2003:410,draftguru,2003,Fremantle,Matthew Pavlich,544,resolved,1,HFF,false,false,2 time All-Australian,,draftguru
+aa:2003:411,draftguru,2003,Geelong,Matthew Scarlett,604,resolved,1,FB,false,false,1 time All-Australian,,draftguru
+aa:2003:412,draftguru,2003,West Coast,Michael Gardiner,1056,resolved,2,IC,false,false,1 time All-Australian,,draftguru
+aa:2003:413,draftguru,2003,Brisbane,Michael Voss,102,unique,1,C,true,false,5 time All-Australian,,draftguru
+aa:2003:414,draftguru,2003,Collingwood,Nathan Buckley,217,resolved,1,RR,false,false,7 time All-Australian,,draftguru
+aa:2003:415,draftguru,2003,Brisbane,Nigel Lappin,100,resolved,1,HBF,false,false,3 time All-Australian,,draftguru
+aa:2003:416,draftguru,2003,Fremantle,Paul Hasleby,542,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2003:417,draftguru,2003,Sydney,Paul Williams,215,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2003:418,draftguru,2003,Fremantle,Peter Bell,486,resolved,2,Ro,false,false,2 time All-Australian,,draftguru
+aa:2003:419,draftguru,2003,West Coast,Phillip Matera,1052,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2003:420,draftguru,2003,St Kilda,Robert Harvey,930,unique,1,IC,false,false,8 time All-Australian,,draftguru
+aa:2003:421,draftguru,2003,Western Bulldogs,Rohan Smith,429,resolved,2,HBF,false,false,2 time All-Australian,,draftguru
+aa:2003:422,draftguru,2003,Port Adelaide,Warren Tredrea,831,resolved,1,CHF,false,false,3 time All-Australian,,draftguru
+aa:2004:423,draftguru,2004,Essendon,Adam McPhee,551,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2004:424,draftguru,2004,St Kilda,Austinn Jones,929,resolved,1,HBF,false,false,2 time All-Australian,,draftguru
+aa:2004:425,draftguru,2004,Sydney,Barry Hall,953,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2004:426,draftguru,2004,Sydney,Brett Kirk,1015,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2004:427,draftguru,2004,Port Adelaide,Chad Cornes,847,resolved,1,CHB,false,false,1 time All-Australian,,draftguru
+aa:2004:428,draftguru,2004,West Coast,Chad Fletcher,1067,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2004:429,draftguru,2004,Brisbane,Chris Johnson,385,resolved,2,BP,false,false,2 time All-Australian,,draftguru
+aa:2004:430,draftguru,2004,West Coast,Chris Judd,1122,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2004:431,draftguru,2004,St Kilda,Fraser Gehrig,976,resolved,1,FF,false,false,2 time All-Australian,,draftguru
+aa:2004:432,draftguru,2004,Collingwood,James Clement,299,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2004:433,draftguru,2004,Brisbane,Jason Akermanis,119,resolved,1,HFF,false,false,4 time All-Australian,,draftguru
+aa:2004:434,draftguru,2004,Melbourne,Jeff White,502,resolved,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:2004:435,draftguru,2004,Sydney,Leo Barry,1003,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2004:436,draftguru,2004,Brisbane,Luke Power,1084,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2004:437,draftguru,2004,Adelaide,Mark Ricciuto,4,resolved,1,RR,true,false,7 time All-Australian,,draftguru
+aa:2004:438,draftguru,2004,Carlton,Matthew Lappin,191,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2004:439,draftguru,2004,Geelong,Matthew Scarlett,604,resolved,1,FB,false,false,2 time All-Australian,,draftguru
+aa:2004:440,draftguru,2004,St Kilda,Nick Riewoldt,981,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:2004:441,draftguru,2004,Brisbane,Nigel Lappin,100,resolved,1,W,false,false,4 time All-Australian,,draftguru
+aa:2004:442,draftguru,2004,Western Bulldogs,Scott West,418,unique,1,Ro,false,false,3 time All-Australian,,draftguru
+aa:2004:443,draftguru,2004,Brisbane,Simon Black,1083,resolved,1,C,false,false,3 time All-Australian,,draftguru
+aa:2004:444,draftguru,2004,Port Adelaide,Warren Tredrea,831,resolved,1,CHF,false,false,4 time All-Australian,,draftguru
+aa:2005:445,draftguru,2005,Sydney,Barry Hall,953,resolved,1,FF,false,false,2 time All-Australian,,draftguru
+aa:2005:446,draftguru,2005,West Coast,Ben Cousins,1051,resolved,1,Ro,false,true,5 time All-Australian,,draftguru
+aa:2005:447,draftguru,2005,Adelaide,Ben Rutten,2305,resolved,1,FB,false,false,1 time All-Australian,,draftguru
+aa:2005:448,draftguru,2005,Western Bulldogs,Brad Johnson,421,resolved,1,FP,false,false,4 time All-Australian,,draftguru
+aa:2005:449,draftguru,2005,North Melbourne,Brent Harvey,788,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2005:450,draftguru,2005,West Coast,David Wirrpanda,1053,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2005:451,draftguru,2005,West Coast,Dean Cox,1079,resolved,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:2005:452,draftguru,2005,Collingwood,James Clement,299,resolved,1,BP,false,false,2 time All-Australian,,draftguru
+aa:2005:453,draftguru,2005,Richmond,Joel Bowden,890,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2005:454,draftguru,2005,Port Adelaide,Kane Cornes,857,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2005:455,draftguru,2005,St Kilda,Lenny Hayes,966,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:2005:456,draftguru,2005,Sydney,Leo Barry,1003,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2005:457,draftguru,2005,St Kilda,Luke Ball,1430,resolved,1,RR,false,false,1 time All-Australian,,draftguru
+aa:2005:458,draftguru,2005,Hawthorn,Luke Hodge,1134,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2005:459,draftguru,2005,Adelaide,Mark Ricciuto,4,resolved,1,HFF,true,false,8 time All-Australian,,draftguru
+aa:2005:460,draftguru,2005,Fremantle,Matthew Pavlich,544,resolved,1,CHF,false,false,3 time All-Australian,,draftguru
+aa:2005:461,draftguru,2005,St Kilda,Nick Dal Santo,1132,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2005:462,draftguru,2005,Hawthorn,Peter Everitt,922,resolved,1,FP,false,false,3 time All-Australian,,draftguru
+aa:2005:463,draftguru,2005,Western Bulldogs,Scott West,418,unique,1,C,false,false,4 time All-Australian,,draftguru
+aa:2005:464,draftguru,2005,North Melbourne,Shannon Grant,794,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:2005:465,draftguru,2005,Adelaide,Simon Goodwin,51,resolved,1,IC,false,false,3 time All-Australian,,draftguru
+aa:2005:466,draftguru,2005,Hawthorn,Trent Croad,660,resolved,1,CHB,false,false,1 time All-Australian,,draftguru
+aa:2006:467,draftguru,2006,Sydney,Adam Goodes,1012,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:2006:468,draftguru,2006,Collingwood,Alan Didak,301,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:2006:469,draftguru,2006,Adelaide,Andrew McLeod,30,resolved,1,HBF,false,false,4 time All-Australian,,draftguru
+aa:2006:470,draftguru,2006,Sydney,Barry Hall,953,resolved,1,CHF,false,true,3 time All-Australian,,draftguru
+aa:2006:471,draftguru,2006,West Coast,Ben Cousins,1051,resolved,1,Ro,false,false,6 time All-Australian,,draftguru
+aa:2006:472,draftguru,2006,Western Bulldogs,Brad Johnson,421,resolved,1,FP,true,false,5 time All-Australian,,draftguru
+aa:2006:473,draftguru,2006,Carlton,Brendan Fevola,196,resolved,1,FF,false,false,1 time All-Australian,,draftguru
+aa:2006:474,draftguru,2006,Port Adelaide,Brendon Lade,822,resolved,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:2006:475,draftguru,2006,West Coast,Chris Judd,1122,resolved,1,RR,false,false,2 time All-Australian,,draftguru
+aa:2006:476,draftguru,2006,Sydney,Craig Bolton,1090,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2006:477,draftguru,2006,West Coast,Darren Glass,1068,resolved,1,FB,false,false,1 time All-Australian,,draftguru
+aa:2006:478,draftguru,2006,West Coast,Dean Cox,1079,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2006:479,draftguru,2006,Melbourne,James McDonald,730,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2006:480,draftguru,2006,Richmond,Joel Bowden,890,resolved,1,CHB,false,false,2 time All-Australian,,draftguru
+aa:2006:481,draftguru,2006,Western Bulldogs,Lindsay Gilbee,471,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2006:482,draftguru,2006,Fremantle,Matthew Pavlich,544,resolved,1,IC,false,false,4 time All-Australian,,draftguru
+aa:2006:483,draftguru,2006,Adelaide,Nathan Bassett,56,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2006:484,draftguru,2006,St Kilda,Nick Riewoldt,981,resolved,1,FP,false,false,2 time All-Australian,,draftguru
+aa:2006:485,draftguru,2006,Sydney,Ryan O'Keefe,1024,resolved,0,HFF,false,false,1 time All-Australian,,draftguru
+aa:2006:486,draftguru,2006,Western Bulldogs,Scott West,418,unique,1,C,false,false,5 time All-Australian,,draftguru
+aa:2006:487,draftguru,2006,Port Adelaide,Shaun Burgoyne,1126,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2006:488,draftguru,2006,Adelaide,Simon Goodwin,51,resolved,1,W,false,false,4 time All-Australian,,draftguru
+aa:2007:489,draftguru,2007,Adelaide,Andrew McLeod,30,resolved,1,HBF,true,false,5 time All-Australian,,draftguru
+aa:2007:490,draftguru,2007,Western Bulldogs,Brad Johnson,421,resolved,1,FP,false,false,6 time All-Australian,,draftguru
+aa:2007:491,draftguru,2007,Port Adelaide,Brendon Lade,822,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2007:492,draftguru,2007,North Melbourne,Brent Harvey,788,resolved,1,HFF,false,false,3 time All-Australian,,draftguru
+aa:2007:493,draftguru,2007,Geelong,Cameron Ling,617,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2007:494,draftguru,2007,Geelong,Cameron Mooney,615,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2007:495,draftguru,2007,Hawthorn,Campbell Brown,1156,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2007:496,draftguru,2007,Port Adelaide,Chad Cornes,847,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:2007:497,draftguru,2007,West Coast,Daniel Kerr,1077,resolved,1,RR,false,false,1 time All-Australian,,draftguru
+aa:2007:498,draftguru,2007,West Coast,Darren Glass,1068,resolved,1,FB,false,false,2 time All-Australian,,draftguru
+aa:2007:499,draftguru,2007,Geelong,Darren Milburn,590,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2007:500,draftguru,2007,West Coast,Dean Cox,1079,resolved,1,Ru,false,false,3 time All-Australian,,draftguru
+aa:2007:501,draftguru,2007,Essendon,Dustin Fletcher,304,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2007:502,draftguru,2007,Geelong,Gary Ablett,1105,resolved,2,Ro,false,false,1 time All-Australian,,draftguru
+aa:2007:503,draftguru,2007,Geelong,Jimmy Bartel,1106,resolved,1,C,false,false,1 time All-Australian,,draftguru
+aa:2007:504,draftguru,2007,Geelong,Joel Corey,616,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2007:505,draftguru,2007,Brisbane,Jonathan Brown,1092,resolved,1,CHF,false,true,1 time All-Australian,,draftguru
+aa:2007:506,draftguru,2007,Port Adelaide,Kane Cornes,857,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:2007:507,draftguru,2007,Geelong,Matthew Egan,4064,resolved,1,CHB,false,false,1 time All-Australian,,draftguru
+aa:2007:508,draftguru,2007,Fremantle,Matthew Pavlich,544,resolved,1,FF,false,false,5 time All-Australian,,draftguru
+aa:2007:509,draftguru,2007,Geelong,Matthew Scarlett,604,resolved,1,BP,false,false,3 time All-Australian,,draftguru
+aa:2007:510,draftguru,2007,Geelong,Steve Johnson,1140,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:2008:511,draftguru,2008,Fremantle,Aaron Sandilands,1421,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2008:512,draftguru,2008,Western Bulldogs,Adam Cooney,3940,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2008:513,draftguru,2008,Carlton,Brendan Fevola,196,resolved,1,FP,false,false,2 time All-Australian,,draftguru
+aa:2008:514,draftguru,2008,North Melbourne,Brent Harvey,788,resolved,1,HFF,false,false,4 time All-Australian,,draftguru
+aa:2008:515,draftguru,2008,Carlton,Chris Judd,1122,resolved,1,RR,true,false,3 time All-Australian,,draftguru
+aa:2008:516,draftguru,2008,Geelong,Corey Enright,621,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2008:517,draftguru,2008,Western Bulldogs,Dale Morris,4084,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2008:518,draftguru,2008,West Coast,Dean Cox,1079,resolved,1,Ru,false,false,4 time All-Australian,,draftguru
+aa:2008:519,draftguru,2008,Geelong,Gary Ablett,1105,resolved,2,Ro,false,false,2 time All-Australian,,draftguru
+aa:2008:520,draftguru,2008,Geelong,Jimmy Bartel,1106,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:2008:521,draftguru,2008,Geelong,Joel Corey,616,resolved,1,C,false,false,2 time All-Australian,,draftguru
+aa:2008:522,draftguru,2008,Hawthorn,Lance Franklin,4065,resolved,1,FF,false,false,1 time All-Australian,,draftguru
+aa:2008:523,draftguru,2008,Hawthorn,Luke Hodge,1134,resolved,1,HBF,false,false,2 time All-Australian,,draftguru
+aa:2008:524,draftguru,2008,Fremantle,Matthew Pavlich,544,resolved,1,IC,false,false,6 time All-Australian,,draftguru
+aa:2008:525,draftguru,2008,Richmond,Matthew Richardson,870,resolved,1,IC,false,false,3 time All-Australian,,draftguru
+aa:2008:526,draftguru,2008,Geelong,Matthew Scarlett,604,resolved,1,FB,false,false,4 time All-Australian,,draftguru
+aa:2008:527,draftguru,2008,Adelaide,Nathan Bock,3968,resolved,1,CHB,false,false,1 time All-Australian,,draftguru
+aa:2008:528,draftguru,2008,St Kilda,Nick Riewoldt,981,resolved,1,CHF,false,false,3 time All-Australian,,draftguru
+aa:2008:529,draftguru,2008,Collingwood,Paul Medhurst,1109,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2008:530,draftguru,2008,St Kilda,Sam Fisher,3975,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2008:531,draftguru,2008,Geelong,Steve Johnson,1140,resolved,1,HFF,false,false,2 time All-Australian,,draftguru
+aa:2008:532,draftguru,2008,Geelong,Tom Harley,608,resolved,1,BP,false,true,1 time All-Australian,,draftguru
+aa:2009:533,draftguru,2009,Fremantle,Aaron Sandilands,1421,resolved,1,Ru,false,false,2 time All-Australian,,draftguru
+aa:2009:534,draftguru,2009,Sydney,Adam Goodes,1012,resolved,1,IC,false,false,3 time All-Australian,,draftguru
+aa:2009:535,draftguru,2009,Carlton,Brendan Fevola,196,resolved,1,FF,false,false,3 time All-Australian,,draftguru
+aa:2009:536,draftguru,2009,St Kilda,Brendon Goddard,1443,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2009:537,draftguru,2009,Western Bulldogs,Brian Lake,1217,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2009:538,draftguru,2009,Carlton,Chris Judd,1122,resolved,1,RR,false,true,4 time All-Australian,,draftguru
+aa:2009:539,draftguru,2009,Geelong,Corey Enright,621,resolved,1,BP,false,false,2 time All-Australian,,draftguru
+aa:2009:540,draftguru,2009,Sydney,Craig Bolton,1090,resolved,1,CHB,false,false,2 time All-Australian,,draftguru
+aa:2009:541,draftguru,2009,Collingwood,Dane Swan,1460,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:2009:542,draftguru,2009,Geelong,Gary Ablett,1105,resolved,2,Ro,false,false,3 time All-Australian,,draftguru
+aa:2009:543,draftguru,2009,Geelong,Joel Selwood,11538,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2009:544,draftguru,2009,Brisbane,Jonathan Brown,1092,resolved,1,FP,false,false,2 time All-Australian,,draftguru
+aa:2009:545,draftguru,2009,St Kilda,Leigh Montagna,1137,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2009:546,draftguru,2009,St Kilda,Lenny Hayes,966,resolved,1,C,false,false,3 time All-Australian,,draftguru
+aa:2009:547,draftguru,2009,Collingwood,Leon Davis,284,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2009:548,draftguru,2009,Western Bulldogs,Matthew Boyd,1450,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2009:549,draftguru,2009,Geelong,Matthew Scarlett,604,resolved,1,FB,false,false,5 time All-Australian,,draftguru
+aa:2009:550,draftguru,2009,St Kilda,Nick Dal Santo,1132,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2009:551,draftguru,2009,Collingwood,Nick Maxwell,3980,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2009:552,draftguru,2009,St Kilda,Nick Riewoldt,981,resolved,1,CHF,true,false,4 time All-Australian,,draftguru
+aa:2009:553,draftguru,2009,Geelong,Paul Chapman,614,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:2009:554,draftguru,2009,Adelaide,Simon Goodwin,51,resolved,1,HBF,false,false,5 time All-Australian,,draftguru
+aa:2010:555,draftguru,2010,Fremantle,Aaron Sandilands,1421,resolved,1,Ru,false,false,3 time All-Australian,,draftguru
+aa:2010:556,draftguru,2010,Collingwood,Alan Didak,301,resolved,1,HFF,false,false,2 time All-Australian,,draftguru
+aa:2010:557,draftguru,2010,Western Bulldogs,Barry Hall,953,resolved,1,FP,false,false,4 time All-Australian,,draftguru
+aa:2010:558,draftguru,2010,St Kilda,Brendon Goddard,1443,resolved,1,HBF,false,false,2 time All-Australian,,draftguru
+aa:2010:559,draftguru,2010,Western Bulldogs,Brian Lake,1217,resolved,1,FB,false,false,2 time All-Australian,,draftguru
+aa:2010:560,draftguru,2010,Carlton,Chris Judd,1122,resolved,1,IC,false,false,5 time All-Australian,,draftguru
+aa:2010:561,draftguru,2010,Geelong,Corey Enright,621,resolved,1,BP,false,false,3 time All-Australian,,draftguru
+aa:2010:562,draftguru,2010,Collingwood,Dane Swan,1460,resolved,1,RR,false,false,2 time All-Australian,,draftguru
+aa:2010:563,draftguru,2010,Geelong,Gary Ablett,1105,resolved,2,Ro,false,true,4 time All-Australian,,draftguru
+aa:2010:564,draftguru,2010,Geelong,Harry Taylor,11643,resolved,1,CHB,false,false,1 time All-Australian,,draftguru
+aa:2010:565,draftguru,2010,Collingwood,Heritier Lumumba,4134,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2010:566,draftguru,2010,Richmond,Jack Riewoldt,11576,resolved,1,FF,false,false,1 time All-Australian,,draftguru
+aa:2010:567,draftguru,2010,Melbourne,James Frawley,11575,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2010:568,draftguru,2010,Geelong,Joel Selwood,11538,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:2010:569,draftguru,2010,Hawthorn,Lance Franklin,4065,resolved,1,CHF,false,false,2 time All-Australian,,draftguru
+aa:2010:570,draftguru,2010,St Kilda,Leigh Montagna,1137,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:2010:571,draftguru,2010,Hawthorn,Luke Hodge,1134,resolved,1,C,true,false,3 time All-Australian,,draftguru
+aa:2010:572,draftguru,2010,Melbourne,Mark Jamar,1425,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2010:573,draftguru,2010,West Coast,Mark LeCras,4114,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2010:574,draftguru,2010,Geelong,Paul Chapman,614,resolved,1,HFF,false,false,2 time All-Australian,,draftguru
+aa:2010:575,draftguru,2010,Collingwood,Scott Pendlebury,4182,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2010:576,draftguru,2010,Geelong,Steve Johnson,1140,resolved,1,IC,false,false,3 time All-Australian,,draftguru
+aa:2011:577,draftguru,2011,Sydney,Adam Goodes,1012,resolved,1,FP,false,false,4 time All-Australian,,draftguru
+aa:2011:578,draftguru,2011,Collingwood,Ben Reid,11589,resolved,1,CHB,false,false,1 time All-Australian,,draftguru
+aa:2011:579,draftguru,2011,Carlton,Chris Judd,1122,resolved,1,RR,false,true,6 time All-Australian,,draftguru
+aa:2011:580,draftguru,2011,Geelong,Corey Enright,621,resolved,1,BP,false,false,4 time All-Australian,,draftguru
+aa:2011:581,draftguru,2011,Collingwood,Dale Thomas,4152,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2011:582,draftguru,2011,Collingwood,Dane Swan,1460,resolved,1,HFF,false,false,3 time All-Australian,,draftguru
+aa:2011:583,draftguru,2011,West Coast,Darren Glass,1068,resolved,1,FB,false,false,3 time All-Australian,,draftguru
+aa:2011:584,draftguru,2011,West Coast,Dean Cox,1079,resolved,1,Ru,false,false,5 time All-Australian,,draftguru
+aa:2011:585,draftguru,2011,North Melbourne,Drew Petrie,806,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2011:586,draftguru,2011,Gold Coast,Gary Ablett,1105,resolved,2,Ro,true,false,5 time All-Australian,,draftguru
+aa:2011:587,draftguru,2011,Geelong,James Kelly,1141,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2011:588,draftguru,2011,Hawthorn,Lance Franklin,4065,resolved,1,FF,false,false,3 time All-Australian,,draftguru
+aa:2011:589,draftguru,2011,Collingwood,Leon Davis,284,resolved,1,HBF,false,false,2 time All-Australian,,draftguru
+aa:2011:590,draftguru,2011,Carlton,Marc Murphy,4148,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:2011:591,draftguru,2011,Western Bulldogs,Matthew Boyd,1450,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2011:592,draftguru,2011,Geelong,Matthew Scarlett,604,resolved,1,BP,false,false,6 time All-Australian,,draftguru
+aa:2011:593,draftguru,2011,St Kilda,Nick Dal Santo,1132,resolved,1,IC,false,false,3 time All-Australian,,draftguru
+aa:2011:594,draftguru,2011,Western Bulldogs,Robert Murphy,468,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2011:595,draftguru,2011,Hawthorn,Sam Mitchell,1135,resolved,1,C,false,false,1 time All-Australian,,draftguru
+aa:2011:596,draftguru,2011,Collingwood,Scott Pendlebury,4182,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:2011:597,draftguru,2011,St Kilda,Stephen Milne,978,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2011:598,draftguru,2011,Collingwood,Travis Cloke,4086,resolved,1,CHF,false,false,1 time All-Australian,,draftguru
+aa:2012:599,draftguru,2012,West Coast,Beau Waters,3960,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2012:600,draftguru,2012,Richmond,Brett Deledio,4068,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2012:601,draftguru,2012,Hawthorn,Cyril Rioli,11632,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:2012:602,draftguru,2012,Collingwood,Dane Swan,1460,resolved,1,IC,false,false,4 time All-Australian,,draftguru
+aa:2012:603,draftguru,2012,West Coast,Darren Glass,1068,resolved,1,BP,true,false,4 time All-Australian,,draftguru
+aa:2012:604,draftguru,2012,Collingwood,Dayne Beams,11728,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2012:605,draftguru,2012,West Coast,Dean Cox,1079,resolved,1,FP,false,false,6 time All-Australian,,draftguru
+aa:2012:606,draftguru,2012,Gold Coast,Gary Ablett,1105,resolved,2,Ro,false,true,6 time All-Australian,,draftguru
+aa:2012:607,draftguru,2012,Hawthorn,Grant Birchall,4149,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2012:608,draftguru,2012,Essendon,Jobe Watson,1461,resolved,1,C,false,false,1 time All-Australian,,draftguru
+aa:2012:609,draftguru,2012,Sydney,Josh Kennedy,11672,resolved,2,IC,false,false,1 time All-Australian,,draftguru
+aa:2012:610,draftguru,2012,Hawthorn,Lance Franklin,4065,resolved,1,CHF,false,false,4 time All-Australian,,draftguru
+aa:2012:611,draftguru,2012,Fremantle,Luke McPharlin,677,resolved,1,FB,false,false,1 time All-Australian,,draftguru
+aa:2012:612,draftguru,2012,West Coast,Nic Naitanui,11768,resolved,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:2012:613,draftguru,2012,Adelaide,Patrick Dangerfield,11700,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:2012:614,draftguru,2012,Collingwood,Scott Pendlebury,4182,resolved,1,IC,false,false,3 time All-Australian,,draftguru
+aa:2012:615,draftguru,2012,Adelaide,Scott Thompson,755,resolved,2,RR,false,false,1 time All-Australian,,draftguru
+aa:2012:616,draftguru,2012,St Kilda,Sean Dempster,4073,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2012:617,draftguru,2012,St Kilda,Stephen Milne,978,resolved,1,FP,false,false,2 time All-Australian,,draftguru
+aa:2012:618,draftguru,2012,Sydney,Ted Richards,1119,resolved,1,CHB,false,false,1 time All-Australian,,draftguru
+aa:2012:619,draftguru,2012,Geelong,Tom Hawkins,11548,resolved,1,FF,false,false,1 time All-Australian,,draftguru
+aa:2012:620,draftguru,2012,Richmond,Trent Cotchin,11666,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2013:621,draftguru,2013,Geelong,Andrew Mackie,3958,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2013:622,draftguru,2013,Port Adelaide,Chad Wingard,12047,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2013:623,draftguru,2013,Geelong,Corey Enright,621,resolved,1,BP,false,false,5 time All-Australian,,draftguru
+aa:2013:624,draftguru,2013,Sydney,Dan Hannebery,11783,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2013:625,draftguru,2013,Collingwood,Dane Swan,1460,resolved,1,RR,false,false,5 time All-Australian,,draftguru
+aa:2013:626,draftguru,2013,Gold Coast,Gary Ablett,1105,resolved,2,Ro,false,true,7 time All-Australian,,draftguru
+aa:2013:627,draftguru,2013,Geelong,Harry Taylor,11643,resolved,1,CHB,false,false,2 time All-Australian,,draftguru
+aa:2013:628,draftguru,2013,Sydney,Jarrad McVeigh,3950,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2013:629,draftguru,2013,Hawthorn,Jarryd Roughead,4078,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2013:630,draftguru,2013,GWS,Jeremy Cameron,12017,resolved,1,FF,false,false,1 time All-Australian,,draftguru
+aa:2013:631,draftguru,2013,Essendon,Jobe Watson,1461,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2013:632,draftguru,2013,Geelong,Joel Selwood,11538,resolved,1,C,true,false,3 time All-Australian,,draftguru
+aa:2013:633,draftguru,2013,Sydney,Kieren Jack,11546,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:2013:634,draftguru,2013,Fremantle,Michael Johnson,4083,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2013:635,draftguru,2013,Adelaide,Patrick Dangerfield,11700,resolved,1,HFF,false,false,2 time All-Australian,,draftguru
+aa:2013:636,draftguru,2013,Western Bulldogs,Ryan Griffen,4080,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2013:637,draftguru,2013,Hawthorn,Sam Mitchell,1135,resolved,1,HBF,false,false,2 time All-Australian,,draftguru
+aa:2013:638,draftguru,2013,Collingwood,Scott Pendlebury,4182,resolved,1,W,false,false,4 time All-Australian,,draftguru
+aa:2013:639,draftguru,2013,North Melbourne,Scott Thompson,11636,resolved,2,FB,false,false,1 time All-Australian,,draftguru
+aa:2013:640,draftguru,2013,Port Adelaide,Travis Boak,11583,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2013:641,draftguru,2013,Collingwood,Travis Cloke,4086,resolved,1,CHF,false,false,2 time All-Australian,,draftguru
+aa:2013:642,draftguru,2013,Western Bulldogs,Will Minson,2332,resolved,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:2014:643,draftguru,2014,Fremantle,Aaron Sandilands,1421,resolved,1,Ru,false,false,4 time All-Australian,,draftguru
+aa:2014:644,draftguru,2014,Richmond,Alex Rance,11733,resolved,1,CHB,false,false,1 time All-Australian,,draftguru
+aa:2014:645,draftguru,2014,Adelaide,Brodie Smith,11891,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2014:646,draftguru,2014,Essendon,Cale Hooker,11702,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2014:647,draftguru,2014,Adelaide,Daniel Talia,11989,resolved,1,FB,false,false,1 time All-Australian,,draftguru
+aa:2014:648,draftguru,2014,Essendon,Dyson Heppell,11896,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2014:649,draftguru,2014,Gold Coast,Gary Ablett,1105,resolved,2,Ro,false,false,8 time All-Australian,,draftguru
+aa:2014:650,draftguru,2014,Fremantle,Hayden Ballantyne,11770,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2014:651,draftguru,2014,Hawthorn,Jarryd Roughead,4078,resolved,1,FP,false,false,2 time All-Australian,,draftguru
+aa:2014:652,draftguru,2014,Geelong,Joel Selwood,11538,resolved,1,RR,true,false,4 time All-Australian,,draftguru
+aa:2014:653,draftguru,2014,Hawthorn,Jordan Lewis,4077,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2014:654,draftguru,2014,Sydney,Josh Kennedy,11672,resolved,2,C,false,false,2 time All-Australian,,draftguru
+aa:2014:655,draftguru,2014,Sydney,Lance Franklin,4065,resolved,1,FF,false,false,5 time All-Australian,,draftguru
+aa:2014:656,draftguru,2014,Hawthorn,Luke Breust,11954,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:2014:657,draftguru,2014,Fremantle,Nathan Fyfe,11834,resolved,0,W,false,false,1 time All-Australian,,draftguru
+aa:2014:658,draftguru,2014,Sydney,Nick Malceski,4117,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2014:659,draftguru,2014,St Kilda,Nick Riewoldt,981,resolved,1,CHF,false,true,5 time All-Australian,,draftguru
+aa:2014:660,draftguru,2014,Sydney,Nick Smith,11653,resolved,2,BP,false,false,1 time All-Australian,,draftguru
+aa:2014:661,draftguru,2014,Port Adelaide,Robbie Gray,11578,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:2014:662,draftguru,2014,Collingwood,Scott Pendlebury,4182,resolved,1,IC,false,false,5 time All-Australian,,draftguru
+aa:2014:663,draftguru,2014,Brisbane,Tom Rockliff,11787,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2014:664,draftguru,2014,Port Adelaide,Travis Boak,11583,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2015:665,draftguru,2015,Richmond,Alex Rance,11733,resolved,1,FB,false,false,2 time All-Australian,,draftguru
+aa:2015:666,draftguru,2015,West Coast,Andrew Gaff,11904,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2015:667,draftguru,2015,Richmond,Brett Deledio,4068,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2015:668,draftguru,2015,Port Adelaide,Chad Wingard,12047,resolved,1,HFF,false,false,2 time All-Australian,,draftguru
+aa:2015:669,draftguru,2015,Hawthorn,Cyril Rioli,11632,resolved,1,HFF,false,false,2 time All-Australian,,draftguru
+aa:2015:670,draftguru,2015,Sydney,Dan Hannebery,11783,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:2015:671,draftguru,2015,Fremantle,David Mundy,4088,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2015:672,draftguru,2015,Western Bulldogs,Easton Wood,11788,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2015:673,draftguru,2015,Adelaide,Eddie Betts,4060,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2015:674,draftguru,2015,GWS,Heath Shaw,4132,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2015:675,draftguru,2015,Richmond,Jack Riewoldt,11576,resolved,1,CHF,false,false,2 time All-Australian,,draftguru
+aa:2015:676,draftguru,2015,Western Bulldogs,Jake Stringer,12167,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2015:677,draftguru,2015,Hawthorn,Josh Gibson,4145,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2015:678,draftguru,2015,West Coast,Josh Kennedy,4169,resolved,2,FF,false,true,1 time All-Australian,,draftguru
+aa:2015:679,draftguru,2015,West Coast,Matt Priddis,4186,resolved,1,C,false,false,1 time All-Australian,,draftguru
+aa:2015:680,draftguru,2015,Essendon,Michael Hurley,11715,resolved,1,CHB,false,false,1 time All-Australian,,draftguru
+aa:2015:681,draftguru,2015,Fremantle,Nathan Fyfe,11834,resolved,0,RR,false,false,2 time All-Australian,,draftguru
+aa:2015:682,draftguru,2015,Adelaide,Patrick Dangerfield,11700,resolved,1,Ro,false,false,3 time All-Australian,,draftguru
+aa:2015:683,draftguru,2015,Port Adelaide,Robbie Gray,11578,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2015:684,draftguru,2015,Western Bulldogs,Robert Murphy,468,resolved,1,HBF,true,false,2 time All-Australian,,draftguru
+aa:2015:685,draftguru,2015,Hawthorn,Sam Mitchell,1135,resolved,1,IC,false,false,3 time All-Australian,,draftguru
+aa:2015:686,draftguru,2015,North Melbourne,Todd Goldstein,11686,resolved,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:2016:687,draftguru,2016,Richmond,Alex Rance,11733,resolved,1,FB,false,false,3 time All-Australian,,draftguru
+aa:2016:688,draftguru,2016,Geelong,Corey Enright,621,resolved,1,HBF,false,false,6 time All-Australian,,draftguru
+aa:2016:689,draftguru,2016,Hawthorn,Cyril Rioli,11632,resolved,1,HFF,false,false,3 time All-Australian,,draftguru
+aa:2016:690,draftguru,2016,Sydney,Dan Hannebery,11783,resolved,1,W,false,false,3 time All-Australian,,draftguru
+aa:2016:691,draftguru,2016,Sydney,Dane Rampe,12140,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2016:692,draftguru,2016,Adelaide,Daniel Talia,11989,resolved,1,CHB,false,false,2 time All-Australian,,draftguru
+aa:2016:693,draftguru,2016,Richmond,Dustin Martin,11794,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2016:694,draftguru,2016,Adelaide,Eddie Betts,4060,resolved,1,FP,false,false,2 time All-Australian,,draftguru
+aa:2016:695,draftguru,2016,GWS,Heath Shaw,4132,resolved,1,HBF,false,false,2 time All-Australian,,draftguru
+aa:2016:696,draftguru,2016,West Coast,Jeremy McGovern,12273,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2016:697,draftguru,2016,Geelong,Joel Selwood,11538,resolved,1,Ro,true,false,5 time All-Australian,,draftguru
+aa:2016:698,draftguru,2016,Sydney,Josh Kennedy,11672,resolved,2,C,false,false,3 time All-Australian,,draftguru
+aa:2016:699,draftguru,2016,West Coast,Josh Kennedy,4169,resolved,2,FF,false,false,2 time All-Australian,,draftguru
+aa:2016:700,draftguru,2016,Sydney,Lance Franklin,4065,resolved,1,CHF,false,false,6 time All-Australian,,draftguru
+aa:2016:701,draftguru,2016,Sydney,Luke Parker,11953,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2016:702,draftguru,2016,Western Bulldogs,Marcus Bontempelli,12269,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2016:703,draftguru,2016,Western Bulldogs,Matthew Boyd,1450,resolved,1,IC,false,false,3 time All-Australian,,draftguru
+aa:2016:704,draftguru,2016,Melbourne,Max Gawn,11966,resolved,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:2016:705,draftguru,2016,Geelong,Patrick Dangerfield,11700,resolved,1,RR,false,false,4 time All-Australian,,draftguru
+aa:2016:706,draftguru,2016,Adelaide,Rory Sloane,11792,resolved,1,W,false,true,1 time All-Australian,,draftguru
+aa:2016:707,draftguru,2016,GWS,Toby Greene,12025,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:2016:708,draftguru,2016,Gold Coast,Tom Lynch,11948,resolved,2,FP,false,false,1 time All-Australian,,draftguru
+aa:2017:709,draftguru,2017,Richmond,Alex Rance,11733,resolved,1,FB,true,false,4 time All-Australian,,draftguru
+aa:2017:710,draftguru,2017,Brisbane,Dayne Zorko,12076,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:2017:711,draftguru,2017,Richmond,Dustin Martin,11794,resolved,1,C,false,false,2 time All-Australian,,draftguru
+aa:2017:712,draftguru,2017,GWS,Dylan Shiel,12022,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2017:713,draftguru,2017,Adelaide,Eddie Betts,4060,resolved,1,FP,false,false,3 time All-Australian,,draftguru
+aa:2017:714,draftguru,2017,West Coast,Elliot Yeo,12087,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2017:715,draftguru,2017,West Coast,Jeremy McGovern,12273,resolved,1,BP,false,false,2 time All-Australian,,draftguru
+aa:2017:716,draftguru,2017,Essendon,Joe Daniher,12199,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2017:717,draftguru,2017,Geelong,Joel Selwood,11538,resolved,1,IC,false,false,6 time All-Australian,,draftguru
+aa:2017:718,draftguru,2017,GWS,Josh Kelly,12255,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2017:719,draftguru,2017,West Coast,Josh Kennedy,4169,resolved,2,FF,false,true,3 time All-Australian,,draftguru
+aa:2017:720,draftguru,2017,Sydney,Lance Franklin,4065,resolved,1,CHF,false,false,7 time All-Australian,,draftguru
+aa:2017:721,draftguru,2017,Adelaide,Matt Crouch,12258,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2017:722,draftguru,2017,Melbourne,Michael Hibberd,11938,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2017:723,draftguru,2017,Essendon,Michael Hurley,11715,resolved,1,CHB,false,false,2 time All-Australian,,draftguru
+aa:2017:724,draftguru,2017,Port Adelaide,Paddy Ryder,4144,resolved,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:2017:725,draftguru,2017,Geelong,Patrick Dangerfield,11700,resolved,1,RR,false,false,5 time All-Australian,,draftguru
+aa:2017:726,draftguru,2017,Port Adelaide,Robbie Gray,11578,resolved,1,HFF,false,false,3 time All-Australian,,draftguru
+aa:2017:727,draftguru,2017,Adelaide,Rory Laird,12165,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2017:728,draftguru,2017,Carlton,Sam Docherty,12170,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2017:729,draftguru,2017,Hawthorn,Tom Mitchell,12196,resolved,1,Ro,false,false,1 time All-Australian,,draftguru
+aa:2017:730,draftguru,2017,Essendon,Zach Merrett,12241,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2018:731,draftguru,2018,Richmond,Alex Rance,11733,resolved,1,FB,false,false,5 time All-Australian,,draftguru
+aa:2018:732,draftguru,2018,West Coast,Andrew Gaff,11904,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:2018:733,draftguru,2018,Collingwood,Brodie Grundy,12217,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2018:734,draftguru,2018,Melbourne,Clayton Oliver,12410,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2018:735,draftguru,2018,Richmond,Dustin Martin,11794,resolved,1,C,false,false,3 time All-Australian,,draftguru
+aa:2018:736,draftguru,2018,Hawthorn,Jack Gunston,11845,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2018:737,draftguru,2018,Richmond,Jack Riewoldt,11576,resolved,1,FF,false,false,3 time All-Australian,,draftguru
+aa:2018:738,draftguru,2018,West Coast,Jeremy McGovern,12273,resolved,1,CHB,false,false,3 time All-Australian,,draftguru
+aa:2018:739,draftguru,2018,GWS,Lachie Whitfield,12143,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2018:740,draftguru,2018,Sydney,Lance Franklin,4065,resolved,1,CHF,true,false,8 time All-Australian,,draftguru
+aa:2018:741,draftguru,2018,Hawthorn,Luke Breust,11954,resolved,1,FP,false,false,2 time All-Australian,,draftguru
+aa:2018:742,draftguru,2018,Melbourne,Max Gawn,11966,resolved,1,Ru,false,false,2 time All-Australian,,draftguru
+aa:2018:743,draftguru,2018,Carlton,Patrick Cripps,12261,resolved,1,RR,false,false,1 time All-Australian,,draftguru
+aa:2018:744,draftguru,2018,Geelong,Patrick Dangerfield,11700,resolved,1,HFF,false,true,6 time All-Australian,,draftguru
+aa:2018:745,draftguru,2018,Port Adelaide,Robbie Gray,11578,resolved,1,HFF,false,false,4 time All-Australian,,draftguru
+aa:2018:746,draftguru,2018,Adelaide,Rory Laird,12165,resolved,1,BP,false,false,2 time All-Australian,,draftguru
+aa:2018:747,draftguru,2018,Richmond,Shane Edwards,11557,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2018:748,draftguru,2018,West Coast,Shannon Hurn,4162,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2018:749,draftguru,2018,North Melbourne,Shaun Higgins,4180,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2018:750,draftguru,2018,Collingwood,Steele Sidebottom,11751,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2018:751,draftguru,2018,Hawthorn,Tom Mitchell,12196,resolved,1,Ro,false,false,2 time All-Australian,,draftguru
+aa:2018:752,draftguru,2018,Geelong,Tom Stewart,12505,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2019:753,draftguru,2019,Richmond,Bachar Houli,11566,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2019:754,draftguru,2019,Collingwood,Brodie Grundy,12217,resolved,1,Ru,false,false,2 time All-Australian,,draftguru
+aa:2019:755,draftguru,2019,Brisbane,Charlie Cameron,12277,resolved,4,FP,false,false,1 time All-Australian,,draftguru
+aa:2019:756,draftguru,2019,Richmond,Dylan Grimes,11879,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2019:757,draftguru,2019,West Coast,Elliot Yeo,12087,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2019:758,draftguru,2019,Brisbane,Harris Andrews,12340,resolved,1,FB,false,false,1 time All-Australian,,draftguru
+aa:2019:759,draftguru,2019,West Coast,Jack Darling,11905,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2019:760,draftguru,2019,Western Bulldogs,Jack Macrae,12166,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2019:761,draftguru,2019,GWS,Jeremy Cameron,12017,resolved,1,CHF,false,false,2 time All-Australian,,draftguru
+aa:2019:762,draftguru,2019,West Coast,Jeremy McGovern,12273,resolved,1,CHB,false,false,4 time All-Australian,,draftguru
+aa:2019:763,draftguru,2019,Brisbane,Lachie Neale,12055,resolved,1,Ro,false,false,1 time All-Australian,,draftguru
+aa:2019:764,draftguru,2019,Western Bulldogs,Marcus Bontempelli,12269,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:2019:765,draftguru,2019,Melbourne,Max Gawn,11966,resolved,1,IC,false,false,3 time All-Australian,,draftguru
+aa:2019:766,draftguru,2019,Fremantle,Michael Walters,11763,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:2019:767,draftguru,2019,Fremantle,Nathan Fyfe,11834,resolved,0,RR,true,false,3 time All-Australian,,draftguru
+aa:2019:768,draftguru,2019,Carlton,Patrick Cripps,12261,resolved,1,C,false,false,2 time All-Australian,,draftguru
+aa:2019:769,draftguru,2019,Geelong,Patrick Dangerfield,11700,resolved,1,HFF,false,false,7 time All-Australian,,draftguru
+aa:2019:770,draftguru,2019,Collingwood,Scott Pendlebury,4182,resolved,1,IC,false,false,6 time All-Australian,,draftguru
+aa:2019:771,draftguru,2019,West Coast,Shannon Hurn,4162,resolved,1,HBF,false,true,2 time All-Australian,,draftguru
+aa:2019:772,draftguru,2019,Geelong,Tim Kelly,12595,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2019:773,draftguru,2019,Geelong,Tom Hawkins,11548,resolved,1,FF,false,false,2 time All-Australian,,draftguru
+aa:2019:774,draftguru,2019,Geelong,Tom Stewart,12505,resolved,1,BP,false,false,2 time All-Australian,,draftguru
+aa:2020:775,draftguru,2020,West Coast,Brad Sheppard,11843,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2020:776,draftguru,2020,Western Bulldogs,Caleb Daniel,12373,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2020:777,draftguru,2020,Geelong,Cameron Guthrie,11884,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2020:778,draftguru,2020,Port Adelaide,Charlie Dixon,11914,resolved,1,CHF,false,false,1 time All-Australian,,draftguru
+aa:2020:779,draftguru,2020,Melbourne,Christian Petracca,12430,resolved,1,RR,false,false,1 time All-Australian,,draftguru
+aa:2020:780,draftguru,2020,Port Adelaide,Darcy Byrne-Jones,12422,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2020:781,draftguru,2020,Collingwood,Darcy Moore,12372,resolved,1,CHB,false,false,1 time All-Australian,,draftguru
+aa:2020:782,draftguru,2020,Richmond,Dustin Martin,11794,resolved,1,FP,false,false,4 time All-Australian,,draftguru
+aa:2020:783,draftguru,2020,Brisbane,Harris Andrews,12340,resolved,1,FB,false,false,2 time All-Australian,,draftguru
+aa:2020:784,draftguru,2020,Western Bulldogs,Jack Macrae,12166,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:2020:785,draftguru,2020,St Kilda,Jack Steele,12368,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2020:786,draftguru,2020,Brisbane,Lachie Neale,12055,resolved,1,Ro,false,false,2 time All-Australian,,draftguru
+aa:2020:787,draftguru,2020,West Coast,Liam Ryan,12600,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2020:788,draftguru,2020,Fremantle,Luke Ryan,12542,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2020:789,draftguru,2020,Western Bulldogs,Marcus Bontempelli,12269,resolved,1,HFF,false,false,3 time All-Australian,,draftguru
+aa:2020:790,draftguru,2020,Melbourne,Max Gawn,11966,resolved,1,IC,false,false,4 time All-Australian,,draftguru
+aa:2020:791,draftguru,2020,West Coast,Nic Naitanui,11768,resolved,1,Ru,false,false,2 time All-Australian,,draftguru
+aa:2020:792,draftguru,2020,GWS,Nick Haynes,12091,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2020:793,draftguru,2020,Geelong,Patrick Dangerfield,11700,resolved,1,HFF,true,false,8 time All-Australian,,draftguru
+aa:2020:794,draftguru,2020,Collingwood,Taylor Adams,12066,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2020:795,draftguru,2020,Geelong,Tom Hawkins,11548,resolved,1,FF,false,false,3 time All-Australian,,draftguru
+aa:2020:796,draftguru,2020,Port Adelaide,Travis Boak,11583,resolved,1,C,false,true,3 time All-Australian,,draftguru
+aa:2021:797,draftguru,2021,Port Adelaide,Aliir Aliir,12433,resolved,1,CHB,false,false,1 time All-Australian,,draftguru
+aa:2021:798,draftguru,2021,Western Bulldogs,Bailey Dale,12354,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2021:799,draftguru,2021,Melbourne,Christian Petracca,12430,resolved,1,HFF,false,false,2 time All-Australian,,draftguru
+aa:2021:800,draftguru,2021,Melbourne,Clayton Oliver,12410,resolved,1,Ro,false,false,2 time All-Australian,,draftguru
+aa:2021:801,draftguru,2021,Brisbane,Daniel Rich,11725,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2021:802,draftguru,2021,Essendon,Darcy Parish,12406,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2021:803,draftguru,2021,Carlton,Harry McKay,12566,resolved,1,FF,false,false,1 time All-Australian,,draftguru
+aa:2021:804,draftguru,2021,Western Bulldogs,Jack Macrae,12166,resolved,1,RR,false,false,3 time All-Australian,,draftguru
+aa:2021:805,draftguru,2021,St Kilda,Jack Steele,12368,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2021:806,draftguru,2021,Melbourne,Jake Lever,12351,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2021:807,draftguru,2021,Western Bulldogs,Marcus Bontempelli,12269,resolved,1,HFF,false,true,4 time All-Australian,,draftguru
+aa:2021:808,draftguru,2021,Melbourne,Max Gawn,11966,resolved,1,Ru,true,false,5 time All-Australian,,draftguru
+aa:2021:809,draftguru,2021,West Coast,Nic Naitanui,11768,resolved,1,IC,false,false,3 time All-Australian,,draftguru
+aa:2021:810,draftguru,2021,Port Adelaide,Ollie Wines,12150,resolved,1,C,false,false,1 time All-Australian,,draftguru
+aa:2021:811,draftguru,2021,Carlton,Sam Walsh,12684,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2021:812,draftguru,2021,Melbourne,Steven May,11940,resolved,1,FB,false,false,1 time All-Australian,,draftguru
+aa:2021:813,draftguru,2021,GWS,Toby Greene,12025,resolved,1,FP,false,false,2 time All-Australian,,draftguru
+aa:2021:814,draftguru,2021,Geelong,Tom Hawkins,11548,resolved,1,CHF,false,false,4 time All-Australian,,draftguru
+aa:2021:815,draftguru,2021,Sydney,Tom Papley,12412,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2021:816,draftguru,2021,Geelong,Tom Stewart,12505,resolved,1,BP,false,false,3 time All-Australian,,draftguru
+aa:2021:817,draftguru,2021,Gold Coast,Touk Miller,12331,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2021:818,draftguru,2021,Essendon,Zach Merrett,12241,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:2022:819,draftguru,2022,Carlton,Adam Saad,12330,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2022:820,draftguru,2022,Fremantle,Andrew Brayshaw,12589,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2022:821,draftguru,2022,Collingwood,Brayden Maynard,12371,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2022:822,draftguru,2022,Sydney,Callum Mills,12413,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2022:823,draftguru,2022,Carlton,Charlie Curnow,12421,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2022:824,draftguru,2022,Melbourne,Christian Petracca,12430,resolved,1,HFF,false,false,3 time All-Australian,,draftguru
+aa:2022:825,draftguru,2022,Melbourne,Clayton Oliver,12410,resolved,1,C,false,false,3 time All-Australian,,draftguru
+aa:2022:826,draftguru,2022,Port Adelaide,Connor Rozee,12697,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2022:827,draftguru,2022,Sydney,Isaac Heeney,12326,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2022:828,draftguru,2022,St Kilda,Jack Sinclair,12325,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2022:829,draftguru,2022,Geelong,Jeremy Cameron,12017,resolved,1,CHF,false,false,3 time All-Australian,,draftguru
+aa:2022:830,draftguru,2022,Brisbane,Lachie Neale,12055,resolved,1,Ro,false,false,3 time All-Australian,,draftguru
+aa:2022:831,draftguru,2022,Geelong,Mark Blicavs,12153,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2022:832,draftguru,2022,Melbourne,Max Gawn,11966,resolved,1,Ru,false,false,6 time All-Australian,,draftguru
+aa:2022:833,draftguru,2022,Carlton,Patrick Cripps,12261,resolved,1,RR,false,true,3 time All-Australian,,draftguru
+aa:2022:834,draftguru,2022,GWS,Sam Taylor,12644,resolved,1,CHB,false,false,1 time All-Australian,,draftguru
+aa:2022:835,draftguru,2022,Richmond,Shai Bolton,12535,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:2022:836,draftguru,2022,Melbourne,Steven May,11940,resolved,1,FB,false,false,2 time All-Australian,,draftguru
+aa:2022:837,draftguru,2022,Geelong,Tom Hawkins,11548,resolved,1,FF,true,false,5 time All-Australian,,draftguru
+aa:2022:838,draftguru,2022,Geelong,Tom Stewart,12505,resolved,1,BP,false,false,4 time All-Australian,,draftguru
+aa:2022:839,draftguru,2022,Gold Coast,Touk Miller,12331,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:2022:840,draftguru,2022,Geelong,Tyson Stengle,12552,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2023:841,draftguru,2023,Fremantle,Caleb Serong,12786,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2023:842,draftguru,2023,St Kilda,Callum Wilkie,12703,resolved,1,FB,false,false,1 time All-Australian,,draftguru
+aa:2023:843,draftguru,2023,Brisbane,Charlie Cameron,12277,resolved,4,FP,false,false,2 time All-Australian,,draftguru
+aa:2023:844,draftguru,2023,Carlton,Charlie Curnow,12421,resolved,1,FF,false,false,2 time All-Australian,,draftguru
+aa:2023:845,draftguru,2023,Melbourne,Christian Petracca,12430,resolved,1,HFF,false,false,4 time All-Australian,,draftguru
+aa:2023:846,draftguru,2023,Port Adelaide,Connor Rozee,12697,resolved,1,HFF,false,false,2 time All-Australian,,draftguru
+aa:2023:847,draftguru,2023,Port Adelaide,Dan Houston,12495,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2023:848,draftguru,2023,Collingwood,Darcy Moore,12372,resolved,1,CHB,false,false,2 time All-Australian,,draftguru
+aa:2023:849,draftguru,2023,Sydney,Errol Gulden,12862,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2023:850,draftguru,2023,St Kilda,Jack Sinclair,12325,resolved,1,HBF,false,false,2 time All-Australian,,draftguru
+aa:2023:851,draftguru,2023,Hawthorn,James Sicily,12332,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2023:852,draftguru,2023,Adelaide,Jordan Dawson,12516,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2023:853,draftguru,2023,Collingwood,Josh Daicos,12573,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2023:854,draftguru,2023,Western Bulldogs,Marcus Bontempelli,12269,resolved,1,C,false,true,5 time All-Australian,,draftguru
+aa:2023:855,draftguru,2023,Collingwood,Nick Daicos,12943,resolved,1,Ro,false,false,1 time All-Australian,,draftguru
+aa:2023:856,draftguru,2023,North Melbourne,Nick Larkey,12563,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2023:857,draftguru,2023,Adelaide,Taylor Walker,11713,resolved,1,CHF,false,false,1 time All-Australian,,draftguru
+aa:2023:858,draftguru,2023,Western Bulldogs,Tim English,12537,resolved,1,Ru,false,false,1 time All-Australian,,draftguru
+aa:2023:859,draftguru,2023,GWS,Toby Greene,12025,resolved,1,FP,true,false,3 time All-Australian,,draftguru
+aa:2023:860,draftguru,2023,Geelong,Tom Stewart,12505,resolved,1,BP,false,false,5 time All-Australian,,draftguru
+aa:2023:861,draftguru,2023,Essendon,Zach Merrett,12241,resolved,1,IC,false,false,3 time All-Australian,,draftguru
+aa:2023:862,draftguru,2023,Port Adelaide,Zak Butters,12698,resolved,1,RR,false,false,1 time All-Australian,,draftguru
+aa:2024:863,draftguru,2024,Western Bulldogs,Adam Treloar,12054,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2024:864,draftguru,2024,Fremantle,Caleb Serong,12786,resolved,1,Ro,false,false,2 time All-Australian,,draftguru
+aa:2024:865,draftguru,2024,Sydney,Chad Warner,12797,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aa:2024:866,draftguru,2024,Port Adelaide,Dan Houston,12495,resolved,1,HBF,false,false,2 time All-Australian,,draftguru
+aa:2024:867,draftguru,2024,Brisbane,Dayne Zorko,12076,resolved,1,HBF,false,false,2 time All-Australian,,draftguru
+aa:2024:868,draftguru,2024,Hawthorn,Dylan Moore,12710,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2024:869,draftguru,2024,Sydney,Errol Gulden,12862,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:2024:870,draftguru,2024,Sydney,Isaac Heeney,12326,resolved,1,HFF,false,false,2 time All-Australian,,draftguru
+aa:2024:871,draftguru,2024,Carlton,Jacob Weitering,12402,resolved,1,FB,false,false,1 time All-Australian,,draftguru
+aa:2024:872,draftguru,2024,West Coast,Jake Waterman,12601,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2024:873,draftguru,2024,Geelong,Jeremy Cameron,12017,resolved,1,CHF,false,false,4 time All-Australian,,draftguru
+aa:2024:874,draftguru,2024,West Coast,Jeremy McGovern,12273,resolved,1,CHB,false,false,5 time All-Australian,,draftguru
+aa:2024:875,draftguru,2024,GWS,Jesse Hogan,12321,resolved,1,FF,false,false,1 time All-Australian,,draftguru
+aa:2024:876,draftguru,2024,Brisbane,Lachie Neale,12055,resolved,1,IC,false,false,4 time All-Australian,,draftguru
+aa:2024:877,draftguru,2024,GWS,Lachie Whitfield,12143,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2024:878,draftguru,2024,Fremantle,Luke Ryan,12542,resolved,1,BP,false,false,2 time All-Australian,,draftguru
+aa:2024:879,draftguru,2024,Western Bulldogs,Marcus Bontempelli,12269,resolved,1,C,true,false,6 time All-Australian,,draftguru
+aa:2024:880,draftguru,2024,Melbourne,Max Gawn,11966,resolved,1,Ru,false,false,7 time All-Australian,,draftguru
+aa:2024:881,draftguru,2024,Sydney,Nick Blakey,12699,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2024:882,draftguru,2024,Collingwood,Nick Daicos,12943,resolved,1,W,false,false,2 time All-Australian,,draftguru
+aa:2024:883,draftguru,2024,Carlton,Patrick Cripps,12261,resolved,1,RR,false,true,4 time All-Australian,,draftguru
+aa:2024:884,draftguru,2024,Port Adelaide,Zak Butters,12698,resolved,1,IC,false,false,2 time All-Australian,,draftguru
+aa:2025:885,draftguru,2025,Western Bulldogs,Bailey Dale,12354,resolved,1,HBF,false,false,2 time All-Australian,,draftguru
+aa:2025:886,draftguru,2025,Geelong,Bailey Smith,12692,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2025:887,draftguru,2025,Fremantle,Caleb Serong,12786,resolved,1,IC,false,false,3 time All-Australian,,draftguru
+aa:2025:888,draftguru,2025,Western Bulldogs,Ed Richards,12605,resolved,1,Ro,false,false,1 time All-Australian,,draftguru
+aa:2025:889,draftguru,2025,Brisbane,Harris Andrews,12340,resolved,1,CHB,false,false,3 time All-Australian,,draftguru
+aa:2025:890,draftguru,2025,Brisbane,Hugh McCluggage,12518,resolved,1,W,false,false,1 time All-Australian,,draftguru
+aa:2025:891,draftguru,2025,Sydney,Isaac Heeney,12326,resolved,1,HFF,false,false,3 time All-Australian,,draftguru
+aa:2025:892,draftguru,2025,Hawthorn,Jack Gunston,11845,resolved,1,FP,false,false,2 time All-Australian,,draftguru
+aa:2025:893,draftguru,2025,Geelong,Jeremy Cameron,12017,resolved,1,CHF,false,false,5 time All-Australian,,draftguru
+aa:2025:894,draftguru,2025,Fremantle,Jordan Clark,12688,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2025:895,draftguru,2025,Adelaide,Jordan Dawson,12516,resolved,1,C,false,true,2 time All-Australian,,draftguru
+aa:2025:896,draftguru,2025,Hawthorn,Josh Battle,12558,resolved,1,BP,false,false,1 time All-Australian,,draftguru
+aa:2025:897,draftguru,2025,Melbourne,Kysaiah Pickett,12771,resolved,1,FP,false,false,1 time All-Australian,,draftguru
+aa:2025:898,draftguru,2025,Western Bulldogs,Marcus Bontempelli,12269,resolved,1,IC,false,false,7 time All-Australian,,draftguru
+aa:2025:899,draftguru,2025,Gold Coast,Matt Rowell,12768,resolved,1,IC,false,false,1 time All-Australian,,draftguru
+aa:2025:900,draftguru,2025,Melbourne,Max Gawn,11966,resolved,1,Ru,false,false,8 time All-Australian,,draftguru
+aa:2025:901,draftguru,2025,St Kilda,Nasiah Wanganeen-Milera,12950,resolved,1,HBF,false,false,1 time All-Australian,,draftguru
+aa:2025:902,draftguru,2025,Collingwood,Nick Daicos,12943,resolved,1,IC,false,false,3 time All-Australian,,draftguru
+aa:2025:903,draftguru,2025,Gold Coast,Noah Anderson,12767,resolved,1,RR,false,false,1 time All-Australian,,draftguru
+aa:2025:904,draftguru,2025,Adelaide,Riley Thilthorpe,12892,resolved,1,FF,false,false,1 time All-Australian,,draftguru
+aa:2025:905,draftguru,2025,GWS,Sam Taylor,12644,resolved,1,FB,false,false,2 time All-Australian,,draftguru
+aa:2025:906,draftguru,2025,Brisbane,Zac Bailey,12610,resolved,1,HFF,false,false,1 time All-Australian,,draftguru
+aah:1953:Bernie Smith*:Geelong,wikipedia,1953,Geelong,Bernie Smith,2175,resolved,1,,false,false,,,wikipedia
+aah:1953:Bill Hutchison*:Essendon,wikipedia,1953,Essendon,Bill Hutchison,1828,resolved,1,,false,false,,,wikipedia
+aah:1953:Bob Hank*:West Torrens,wikipedia,1953,West Torrens,Bob Hank,,unmatched,0,,false,false,,,wikipedia
+aah:1953:Bob Rose*:Collingwood,wikipedia,1953,Collingwood,Bob Rose,2129,resolved,1,,false,false,,,wikipedia
+aah:1953:Clayton Thompson*:Sturt,wikipedia,1953,Sturt,Clayton Thompson,2214,resolved,1,,false,false,,,wikipedia
+aah:1953:Des Healey*:Collingwood,wikipedia,1953,Collingwood,Des Healey,1800,resolved,1,,false,false,,,wikipedia
+aah:1953:Frank Johnson*:Port Melbourne,wikipedia,1953,Port Melbourne,Frank Johnson,,ambiguous,3,,false,false,,,wikipedia
+aah:1953:Frank Sparrow*:Swan Dists,wikipedia,1953,Swan Dists,Frank Sparrow,,unmatched,0,,false,false,,,wikipedia
+aah:1953:Jack Howell*:Carlton,wikipedia,1953,Carlton,Jack Howell,1819,resolved,2,,false,false,,,wikipedia
+aah:1953:Jack Lynch*:West Adelaide,wikipedia,1953,West Adelaide,Jack Lynch,,ambiguous,2,,false,false,,,wikipedia
+"aah:1953:Jack, E. Clarke*:Essendon",wikipedia,1953,Essendon,"Jack, E. Clarke",,unmatched,0,,false,false,,,wikipedia
+"aah:1953:Jack, K. Clarke*:East Fremantle",wikipedia,1953,East Fremantle,"Jack, K. Clarke",,unmatched,0,,false,false,,,wikipedia
+aah:1953:John Coleman*:Essendon,wikipedia,1953,Essendon,John Coleman,1614,resolved,1,,false,false,,,wikipedia
+aah:1953:John Leedham*:North Launceston,wikipedia,1953,North Launceston,John Leedham,,unmatched,0,,false,false,,,wikipedia
+aah:1953:John Marriott*:Norwood,wikipedia,1953,Norwood,John Marriott,,unmatched,0,,false,false,,,wikipedia
+aah:1953:Len Fitzgerald*:Sturt,wikipedia,1953,Sturt,Len Fitzgerald,2882,unique,1,,false,false,,,wikipedia
+aah:1953:Merv McIntosh*:Perth,wikipedia,1953,Perth,Merv McIntosh,,unmatched,0,,false,false,,,wikipedia
+aah:1953:Neil Davies*:Glenelg,wikipedia,1953,Glenelg,Neil Davies,9539,unique,1,,false,false,,,wikipedia
+aah:1953:Steve Marsh*:South Fremantle,wikipedia,1953,South Fremantle,Steve Marsh,,unmatched,0,,false,false,,,wikipedia
+aah:1953:Ted Henrys*:Preston,wikipedia,1953,Preston,Ted Henrys,,unmatched,0,,false,false,,,wikipedia
+aah:1956:Barry Strange*:New Town,wikipedia,1956,New Town,Barry Strange,,unmatched,0,,false,false,,,wikipedia
+aah:1956:Bill Hutchison*:Essendon,wikipedia,1956,Essendon,Bill Hutchison,1828,resolved,1,,false,false,,,wikipedia
+aah:1956:Cliff Hillier*:South Fremantle,wikipedia,1956,South Fremantle,Cliff Hillier,,unmatched,0,,false,false,,,wikipedia
+aah:1956:Des Rowe*:Richmond,wikipedia,1956,Richmond,Des Rowe,2132,resolved,1,,false,false,,,wikipedia
+aah:1956:Frank Johnson*:Port Melbourne,wikipedia,1956,Port Melbourne,Frank Johnson,,ambiguous,3,,false,false,,,wikipedia
+aah:1956:Geoff Long*:City,wikipedia,1956,City,Geoff Long,,unmatched,0,,false,false,,,wikipedia
+aah:1956:Graham Farmer*:East Perth,wikipedia,1956,East Perth,Graham Farmer,2861,unique,1,,false,false,,,wikipedia
+aah:1956:Haydn Bunton jnr*:North Adelaide,wikipedia,1956,North Adelaide,Haydn Bunton jnr,1466,unique,1,,false,false,,,wikipedia
+"aah:1956:Jack, E. Clarke*:Essendon",wikipedia,1956,Essendon,"Jack, E. Clarke",,unmatched,0,,false,false,,,wikipedia
+"aah:1956:Jack, K. Clarke*:East Fremantle",wikipedia,1956,East Fremantle,"Jack, K. Clarke",,unmatched,0,,false,false,,,wikipedia
+aah:1956:John Abley*:Port Adelaide,wikipedia,1956,Port Adelaide,John Abley,,unmatched,0,,false,false,,,wikipedia
+aah:1956:John Chick*:Carlton,wikipedia,1956,Carlton,John Chick,2682,resolved,1,,false,false,,,wikipedia
+aah:1956:John Gerovich*:South Fremantle,wikipedia,1956,South Fremantle,John Gerovich,,unmatched,0,,false,false,,,wikipedia
+aah:1956:Keith Harper*:Perth,wikipedia,1956,Perth,Keith Harper,,unmatched,0,,false,false,,,wikipedia
+aah:1956:Lindsay Head*:West Torr,wikipedia,1956,West Torr,Lindsay Head,,unmatched,0,,false,false,,,wikipedia
+aah:1956:Peter Pianto*:Geelong,wikipedia,1956,Geelong,Peter Pianto,2075,resolved,1,,false,false,,,wikipedia
+aah:1956:Ron Barassi*:Melbourne,wikipedia,1956,Melbourne,Ron Barassi,2521,resolved,2,,false,false,,,wikipedia
+aah:1956:Roy Wright*:Richmond,wikipedia,1956,Richmond,Roy Wright,2296,resolved,1,,false,false,,,wikipedia
+aah:1956:Stan Costello*:West Adelaide,wikipedia,1956,West Adelaide,Stan Costello,,unmatched,0,,false,false,,,wikipedia
+aah:1956:Ted Whitten snr*:Footscray,wikipedia,1956,Footscray,Ted Whitten snr,2268,resolved,2,,false,false,,,wikipedia
+aah:1958:Alan Preen*:East Fremantle,wikipedia,1958,East Fremantle,Alan Preen,,unmatched,0,,false,false,,,wikipedia
+aah:1958:Allen Aylett*:North Melbourne,wikipedia,1958,North Melbourne,Allen Aylett,1498,resolved,1,,false,false,,,wikipedia
+aah:1958:Barry Metcalfe*:Mordialloc,wikipedia,1958,Mordialloc,Barry Metcalfe,9747,resolved,1,,false,false,,,wikipedia
+aah:1958:Bob Davis*:Geelong,wikipedia,1958,Geelong,Bob Davis,1967,resolved,1,,false,false,,,wikipedia
+aah:1958:Don Gale*:Wynyard,wikipedia,1958,Wynyard,Don Gale,,unmatched,0,,false,false,,,wikipedia
+aah:1958:Graham Farmer*:East Perth,wikipedia,1958,East Perth,Graham Farmer,2861,unique,1,,false,false,,,wikipedia
+"aah:1958:Jack, E. Clarke*:Essendon",wikipedia,1958,Essendon,"Jack, E. Clarke",,unmatched,0,,false,false,,,wikipedia
+"aah:1958:Jack, K. Clarke*:East Fremantle",wikipedia,1958,East Fremantle,"Jack, K. Clarke",,unmatched,0,,false,false,,,wikipedia
+aah:1958:Jim Ross*:North Launceston,wikipedia,1958,North Launceston,Jim Ross,2128,unique,1,,false,false,,,wikipedia
+aah:1958:John Abley*:Port Adelaide,wikipedia,1958,Port Adelaide,John Abley,,unmatched,0,,false,false,,,wikipedia
+aah:1958:John Dugdale*:North Melbourne,wikipedia,1958,North Melbourne,John Dugdale,2808,resolved,1,,false,false,,,wikipedia
+aah:1958:Kevin Murray*:Fitzroy,wikipedia,1958,Fitzroy,Kevin Murray,2018,resolved,1,,false,false,,,wikipedia
+aah:1958:Neil Roberts*:St Kilda,wikipedia,1958,St Kilda,Neil Roberts,2116,resolved,1,,false,false,,,wikipedia
+aah:1958:Norm Rogers*:East Fremantle,wikipedia,1958,East Fremantle,Norm Rogers,,unmatched,0,,false,false,,,wikipedia
+aah:1958:Owen Abrahams*:Fitzroy,wikipedia,1958,Fitzroy,Owen Abrahams,2453,resolved,1,,false,false,,,wikipedia
+aah:1958:Ray Sorrell*:East Fremantle,wikipedia,1958,East Fremantle,Ray Sorrell,,unmatched,0,,false,false,,,wikipedia
+aah:1958:Reg Burgess*:Essendon,wikipedia,1958,Essendon,Reg Burgess,2617,resolved,1,,false,false,,,wikipedia
+aah:1958:Ron Barassi*:Melbourne,wikipedia,1958,Melbourne,Ron Barassi,2521,resolved,2,,false,false,,,wikipedia
+aah:1958:Stuart Spencer*:Melbourne,wikipedia,1958,Melbourne,Stuart Spencer,2184,resolved,1,,false,false,,,wikipedia
+aah:1958:Ted Whitten snr*:Footscray,wikipedia,1958,Footscray,Ted Whitten snr,2268,resolved,2,,false,false,,,wikipedia
+aah:1961:Allen Aylett*:North Melbourne,wikipedia,1961,North Melbourne,Allen Aylett,1498,resolved,1,,false,false,,,wikipedia
+aah:1961:Bill Wedding*:Norwood,wikipedia,1961,Norwood,Bill Wedding,,unmatched,0,,false,false,,,wikipedia
+aah:1961:Bob Shearman*:West Torr,wikipedia,1961,West Torr,Bob Shearman,3688,resolved,1,,false,false,,,wikipedia
+aah:1961:Bob Withers*:North Launceston,wikipedia,1961,North Launceston,Bob Withers,,unmatched,0,,false,false,,,wikipedia
+aah:1961:Brian Dixon*:Melbourne,wikipedia,1961,Melbourne,Brian Dixon,2787,resolved,1,,false,false,,,wikipedia
+aah:1961:Darrel Baldock*:Latrobe,wikipedia,1961,Latrobe,Darrel Baldock,2518,resolved,1,,false,false,,,wikipedia
+aah:1961:Don Lindner*:North Adelaide,wikipedia,1961,North Adelaide,Don Lindner,,unmatched,0,,false,false,,,wikipedia
+aah:1961:Don Roach*:West Adelaide,wikipedia,1961,West Adelaide,Don Roach,3594,unique,1,,false,false,,,wikipedia
+aah:1961:Geoff Kingston*:West Torr,wikipedia,1961,West Torr,Geoff Kingston,,unmatched,0,,false,false,,,wikipedia
+aah:1961:Graham Farmer*:East Perth,wikipedia,1961,East Perth,Graham Farmer,2861,resolved,1,,false,false,,,wikipedia
+"aah:1961:Jack, K. Clarke*:East Fremantle",wikipedia,1961,East Fremantle,"Jack, K. Clarke",,unmatched,0,,false,false,,,wikipedia
+aah:1961:John Abley*:Port Adelaide,wikipedia,1961,Port Adelaide,John Abley,,unmatched,0,,false,false,,,wikipedia
+aah:1961:John Halbert*:Sturt,wikipedia,1961,Sturt,John Halbert,,unmatched,0,,false,false,,,wikipedia
+aah:1961:John Schultz*:Footscray,wikipedia,1961,Footscray,John Schultz,9788,resolved,2,,false,false,,,wikipedia
+aah:1961:John Todd*:South Fremantle,wikipedia,1961,South Fremantle,John Todd,,unmatched,0,,false,false,,,wikipedia
+aah:1961:Neil Kerley*:West Adelaide,wikipedia,1961,West Adelaide,Neil Kerley,,unmatched,0,,false,false,,,wikipedia
+aah:1961:Ray Gabelich*:West Perth,wikipedia,1961,West Perth,Ray Gabelich,2906,resolved,1,,false,false,,,wikipedia
+aah:1961:Ray Sorrell*:East Fremantle,wikipedia,1961,East Fremantle,Ray Sorrell,,unmatched,0,,false,false,,,wikipedia
+aah:1961:Ron Barassi*:Melbourne,wikipedia,1961,Melbourne,Ron Barassi,2521,resolved,2,,false,false,,,wikipedia
+aah:1961:Ted Whitten snr*:Footscray,wikipedia,1961,Footscray,Ted Whitten snr,2268,resolved,2,,false,false,,,wikipedia
+aah:1966:Barry Cable*:Perth,wikipedia,1966,Perth,Barry Cable,2327,unique,1,,false,false,,,wikipedia
+aah:1966:Brenton Adcock*:Sturt,wikipedia,1966,Sturt,Brenton Adcock,,unmatched,0,,false,false,,,wikipedia
+aah:1966:Brian Sarre*:Subiaco,wikipedia,1966,Subiaco,Brian Sarre,,unmatched,0,,false,false,,,wikipedia
+aah:1966:Darrel Baldock*:St Kilda,wikipedia,1966,St Kilda,Darrel Baldock,2518,resolved,1,,false,false,,,wikipedia
+aah:1966:Denis Marshall*:Geelong,wikipedia,1966,Geelong,Denis Marshall,1264,resolved,1,,false,false,,,wikipedia
+aah:1966:Graeme John*:South Melbourne,wikipedia,1966,South Melbourne,Graeme John,3133,resolved,1,,false,false,,,wikipedia
+aah:1966:Graeme Lee*:Launceston,wikipedia,1966,Launceston,Graeme Lee,3206,unique,1,,false,false,,,wikipedia
+aah:1966:Hassa Mann*:Melbourne,wikipedia,1966,Melbourne,Hassa Mann,3261,resolved,1,,false,false,,,wikipedia
+aah:1966:Ian Bryant*:Footscray,wikipedia,1966,Footscray,Ian Bryant,2609,resolved,1,,false,false,,,wikipedia
+aah:1966:Ian Stewart*:St Kilda,wikipedia,1966,St Kilda,Ian Stewart,2193,resolved,1,,false,false,,,wikipedia
+aah:1966:John Goold*:Carlton,wikipedia,1966,Carlton,John Goold,2946,resolved,1,,false,false,,,wikipedia
+aah:1966:John McIntosh*:Claremont,wikipedia,1966,Claremont,John McIntosh,3314,unique,1,,false,false,,,wikipedia
+aah:1966:John Nicholls*:Carlton,wikipedia,1966,Carlton,John Nicholls,3422,resolved,1,,false,false,,,wikipedia
+aah:1966:Keith Doncon*:East Perth,wikipedia,1966,East Perth,Keith Doncon,,unmatched,0,,false,false,,,wikipedia
+aah:1966:Kevin Murray*:East Perth,wikipedia,1966,East Perth,Kevin Murray,2018,resolved,1,,false,false,,,wikipedia
+aah:1966:Neville Crowe*:Richmond,wikipedia,1966,Richmond,Neville Crowe,2737,resolved,1,,false,false,,,wikipedia
+aah:1966:Noel Teasdale*:North Melbourne,wikipedia,1966,North Melbourne,Noel Teasdale,3772,resolved,1,,false,false,,,wikipedia
+aah:1966:Peter Hudson*:New Norfolk,wikipedia,1966,New Norfolk,Peter Hudson,1822,resolved,1,,false,false,,,wikipedia
+aah:1966:Rick Schoff*:Sturt,wikipedia,1966,Sturt,Rick Schoff,,unmatched,0,,false,false,,,wikipedia
+aah:1966:Robert Day*:West Adelaide,wikipedia,1966,West Adelaide,Robert Day,10668,unique,1,,false,false,,,wikipedia
+aah:1969:Alex Jesaulenko*:Carlton,wikipedia,1969,Carlton,Alex Jesaulenko,1844,resolved,1,,false,false,,,wikipedia
+aah:1969:Barry Cable*:Perth,wikipedia,1969,Perth,Barry Cable,2327,resolved,1,,false,false,,,wikipedia
+aah:1969:Bill Walker*:Swan Dists,wikipedia,1969,Swan Dists,Bill Walker,,ambiguous,3,,false,false,,,wikipedia
+aah:1969:Bob Keddie*:Hawthorn,wikipedia,1969,Hawthorn,Bob Keddie,2373,resolved,1,,false,false,,,wikipedia
+aah:1969:Bob Murray*:St Kilda,wikipedia,1969,St Kilda,Bob Murray,2393,resolved,1,,false,false,,,wikipedia
+aah:1969:Brian Colbey*:Glenelg,wikipedia,1969,Glenelg,Brian Colbey,,unmatched,0,,false,false,,,wikipedia
+aah:1969:Graham Molloy*:Norwood,wikipedia,1969,Norwood,Graham Molloy,2388,resolved,1,,false,false,,,wikipedia
+aah:1969:Greg Brehaut*:Perth,wikipedia,1969,Perth,Greg Brehaut,,unmatched,0,,false,false,,,wikipedia
+aah:1969:John Cahill*:Port Adelaide,wikipedia,1969,Port Adelaide,John Cahill,,unmatched,0,,false,false,,,wikipedia
+aah:1969:John McIntosh*:Claremont,wikipedia,1969,Claremont,John McIntosh,3314,resolved,1,,false,false,,,wikipedia
+aah:1969:John Newman*:Geelong,wikipedia,1969,Geelong,John Newman,,unmatched,0,,false,false,,,wikipedia
+aah:1969:John Nicholls*:Carlton,wikipedia,1969,Carlton,John Nicholls,3422,resolved,1,,false,false,,,wikipedia
+aah:1969:Peter Darley*:South Adelaide,wikipedia,1969,South Adelaide,Peter Darley,,unmatched,0,,false,false,,,wikipedia
+aah:1969:Peter Eakins*:Subiaco,wikipedia,1969,Subiaco,Peter Eakins,2823,resolved,1,,false,false,,,wikipedia
+aah:1969:Peter Hudson*:Hawthorn,wikipedia,1969,Hawthorn,Peter Hudson,1822,resolved,1,,false,false,,,wikipedia
+aah:1969:Peter Steward*:North Melbourne,wikipedia,1969,North Melbourne,Peter Steward,3743,resolved,1,,false,false,,,wikipedia
+aah:1969:Rick Schoff*:Sturt,wikipedia,1969,Sturt,Rick Schoff,,unmatched,0,,false,false,,,wikipedia
+aah:1969:Ricky Watt*:Collingwood,wikipedia,1969,Collingwood,Ricky Watt,3858,resolved,1,,false,false,,,wikipedia
+aah:1969:Royce Hart*:Richmond,wikipedia,1969,Richmond,Royce Hart,2367,resolved,1,,false,false,,,wikipedia
+aah:1969:Terry Waters*:Collingwood,wikipedia,1969,Collingwood,Terry Waters,3857,resolved,1,,false,false,,,wikipedia
+aah:1972:Alan Watling*:West Perth,wikipedia,1972,West Perth,Alan Watling,,unmatched,0,,false,false,,,wikipedia
+aah:1972:Alex Jesaulenko*:Carlton,wikipedia,1972,Carlton,Alex Jesaulenko,1844,resolved,1,,false,false,,,wikipedia
+aah:1972:Anthony Burgan*:Sturt,wikipedia,1972,Sturt,Anthony Burgan,,unmatched,0,,false,false,,,wikipedia
+aah:1972:Bob Beecroft*:Swan Dists,wikipedia,1972,Swan Dists,Bob Beecroft,1898,unique,1,,false,false,,,wikipedia
+aah:1972:Brian Ciccotosto*:South Fremantle,wikipedia,1972,South Fremantle,Brian Ciccotosto,,unmatched,0,,false,false,,,wikipedia
+aah:1972:David Clarke*:Geelong,wikipedia,1972,Geelong,David Clarke,1895,resolved,2,,false,false,,,wikipedia
+aah:1972:David Thorpe*:Footscray,wikipedia,1972,Footscray,David Thorpe,2216,resolved,1,,false,false,,,wikipedia
+aah:1972:Gary Dempsey*:Footscray,wikipedia,1972,Footscray,Gary Dempsey,1667,resolved,1,,false,false,,,wikipedia
+aah:1972:Gary Hardeman*:Melbourne,wikipedia,1972,Melbourne,Gary Hardeman,1789,resolved,1,,false,false,,,wikipedia
+aah:1972:George Young*:Subiaco,wikipedia,1972,Subiaco,George Young,2299,resolved,2,,false,false,,,wikipedia
+aah:1972:Ian Miller*:Perth,wikipedia,1972,Perth,Ian Miller,2386,unique,1,,false,false,,,wikipedia
+aah:1972:Jim Leitch*:Scottsdale,wikipedia,1972,Scottsdale,Jim Leitch,3208,unique,1,,false,false,,,wikipedia
+aah:1972:John Williams*:Essendon,wikipedia,1972,Essendon,John Williams,2277,resolved,3,,false,false,,,wikipedia
+aah:1972:Ken McAullay*:East Perth,wikipedia,1972,East Perth,Ken McAullay,,unmatched,0,,false,false,,,wikipedia
+aah:1972:Leigh Matthews*:Hawthorn,wikipedia,1972,Hawthorn,Leigh Matthews,1949,resolved,1,,false,false,,,wikipedia
+aah:1972:Len Thompson*:Collingwood,wikipedia,1972,Collingwood,Len Thompson,2215,resolved,1,,false,false,,,wikipedia
+aah:1972:Malcolm Blight*:Woodville,wikipedia,1972,Woodville,Malcolm Blight,1534,unique,1,,false,false,,,wikipedia
+aah:1972:Malcolm Brown*:East Perth,wikipedia,1972,East Perth,Malcolm Brown,10785,unique,1,,false,false,,,wikipedia
+aah:1972:Peter McKenna*:Collingwood,wikipedia,1972,Collingwood,Peter McKenna,1969,resolved,1,,false,false,,,wikipedia
+aah:1972:Travis Payze*:St Kilda,wikipedia,1972,St Kilda,Travis Payze,2062,resolved,1,,false,false,,,wikipedia
+aah:1982:Barry Rowlings:Richmond,wikipedia,1982,Richmond,Barry Rowlings,2133,resolved,1,,false,false,,,wikipedia
+aah:1982:Brian Wilson:Melbourne,wikipedia,1982,Melbourne,Brian Wilson,1362,resolved,2,,false,false,,,wikipedia
+aah:1982:David Ackerly:Sydney Swans,wikipedia,1982,Sydney Swans,David Ackerly,1478,resolved,1,,false,false,,,wikipedia
+aah:1982:David O'Halloran:Hawthorn,wikipedia,1982,Hawthorn,David O'Halloran,2041,resolved,1,,false,false,,,wikipedia
+aah:1982:Gary Dempsey:North Melbourne,wikipedia,1982,North Melbourne,Gary Dempsey,1667,resolved,1,,false,false,,,wikipedia
+aah:1982:Gerard Healy:Melbourne,wikipedia,1982,Melbourne,Gerard Healy,1366,resolved,1,,false,false,,,wikipedia
+aah:1982:Greg Smith:Sydney Swans,wikipedia,1982,Sydney Swans,Greg Smith,2179,resolved,1,,false,false,,,wikipedia
+aah:1982:Jim Buckley:Carlton,wikipedia,1982,Carlton,Jim Buckley,1564,resolved,1,,false,false,,,wikipedia
+aah:1982:Kelvin Moore:Hawthorn,wikipedia,1982,Hawthorn,Kelvin Moore,1999,resolved,2,,false,false,,,wikipedia
+aah:1982:Ken Hunter:Carlton,wikipedia,1982,Carlton,Ken Hunter,1826,resolved,1,,false,false,,,wikipedia
+aah:1982:Leigh Matthews:Hawthorn,wikipedia,1982,Hawthorn,Leigh Matthews,1949,resolved,1,,false,false,,,wikipedia
+aah:1982:Malcolm Blight:North Melbourne,wikipedia,1982,North Melbourne,Malcolm Blight,1534,resolved,1,,false,false,,,wikipedia
+aah:1982:Mike Fitzpatrick:Carlton,wikipedia,1982,Carlton,Mike Fitzpatrick,1722,resolved,1,,false,false,,,wikipedia
+aah:1982:Paul Vander Haar:Essendon,wikipedia,1982,Essendon,Paul Vander Haar,1335,resolved,1,,false,false,,,wikipedia
+aah:1982:Peter Daicos:Collingwood,wikipedia,1982,Collingwood,Peter Daicos,1253,resolved,1,,false,false,,,wikipedia
+aah:1982:Robert Flower:Melbourne,wikipedia,1982,Melbourne,Robert Flower,1725,resolved,1,,false,false,,,wikipedia
+aah:1982:Rod Ashman:Carlton,wikipedia,1982,Carlton,Rod Ashman,1492,resolved,1,,false,false,,,wikipedia
+aah:1982:Ross Glendinning:North Melbourne,wikipedia,1982,North Melbourne,Ross Glendinning,1757,resolved,1,,false,false,,,wikipedia
+aah:1982:Steven Icke:Melbourne,wikipedia,1982,Melbourne,Steven Icke,,unmatched,0,,false,false,,,wikipedia
+aah:1982:Terry Wallace:Hawthorn,wikipedia,1982,Hawthorn,Terry Wallace,1371,resolved,1,,false,false,,,wikipedia
+aah:1984:Allen Daniels*:WA,wikipedia,1984,WA,Allen Daniels,11275,resolved,1,,false,false,,,wikipedia
+aah:1984:Andrew Purser:Footscray,wikipedia,1984,Footscray,Andrew Purser,2088,resolved,1,,false,false,,,wikipedia
+aah:1984:Bernie Evans:Sydney Swans,wikipedia,1984,Sydney Swans,Bernie Evans,1710,resolved,1,,false,false,,,wikipedia
+aah:1984:Bernie Quinlan:Fitzroy,wikipedia,1984,Fitzroy,Bernie Quinlan,2091,resolved,1,,false,false,,,wikipedia
+aah:1984:Brad Hardie*:WA,wikipedia,1984,WA,Brad Hardie,1300,resolved,1,,false,false,,,wikipedia
+aah:1984:Bruce Doull:Carlton,wikipedia,1984,Carlton,Bruce Doull,1680,resolved,1,,false,false,,,wikipedia
+aah:1984:Chris Mew:Hawthorn,wikipedia,1984,Hawthorn,Chris Mew,1326,resolved,1,,false,false,,,wikipedia
+aah:1984:Craig Bradley*:SA,wikipedia,1984,SA,Craig Bradley,151,unique,1,,false,false,,,wikipedia
+aah:1984:David Ackerly*:Vic,wikipedia,1984,Vic,David Ackerly,1478,resolved,1,,false,false,,,wikipedia
+aah:1984:David Ackerly:Sydney Swans,wikipedia,1984,Sydney Swans,David Ackerly,1478,resolved,1,,false,false,,,wikipedia
+aah:1984:Denis Banks:Collingwood,wikipedia,1984,Collingwood,Denis Banks,1507,resolved,1,,false,false,,,wikipedia
+aah:1984:Doug Hawkins:Footscray,wikipedia,1984,Footscray,Doug Hawkins,380,resolved,1,,false,false,,,wikipedia
+aah:1984:Garry McIntosh*:SA,wikipedia,1984,SA,Garry McIntosh,,unmatched,0,,false,false,,,wikipedia
+aah:1984:Gary Ablett snr*:Vic,wikipedia,1984,Vic,Gary Ablett snr,567,resolved,2,,false,false,,,wikipedia
+aah:1984:Gary Ablett snr:Geelong,wikipedia,1984,Geelong,Gary Ablett snr,567,resolved,2,,false,false,,,wikipedia
+aah:1984:Gerard Healy*:Vic,wikipedia,1984,Vic,Gerard Healy,1366,resolved,1,,false,false,,,wikipedia
+aah:1984:Gerard Healy:Melbourne,wikipedia,1984,Melbourne,Gerard Healy,1366,resolved,1,,false,false,,,wikipedia
+aah:1984:Greg Burns:St Kilda,wikipedia,1984,St Kilda,Greg Burns,1570,resolved,1,,false,false,,,wikipedia
+aah:1984:John Platten*:SA,wikipedia,1984,SA,John Platten,636,unique,1,,false,false,,,wikipedia
+aah:1984:Kym Hodgeman:North Melbourne,wikipedia,1984,North Melbourne,Kym Hodgeman,1812,resolved,1,,false,false,,,wikipedia
+"aah:1984:Lee, Mark:Richmond",wikipedia,1984,Richmond,"Lee, Mark",1363,resolved,1,,false,false,,,wikipedia
+aah:1984:Leon Baker*:WA,wikipedia,1984,WA,Leon Baker,1503,resolved,1,,false,false,,,wikipedia
+aah:1984:Leon Baker:Essendon,wikipedia,1984,Essendon,Leon Baker,1503,resolved,1,,false,false,,,wikipedia
+aah:1984:Michael Tuck*:Vic,wikipedia,1984,Vic,Michael Tuck,1319,resolved,1,,false,false,,,wikipedia
+aah:1984:Murray Rance*:WA,wikipedia,1984,WA,Murray Rance,2096,unique,1,,false,false,,,wikipedia
+aah:1984:Paul Harding*:WA,wikipedia,1984,WA,Paul Harding,1163,unique,1,,false,false,,,wikipedia
+aah:1984:Peter Moore:Melbourne,wikipedia,1984,Melbourne,Peter Moore,2000,resolved,1,,false,false,,,wikipedia
+aah:1984:Peter Motley*:SA,wikipedia,1984,SA,Peter Motley,2009,unique,1,,false,false,,,wikipedia
+"aah:1984:Rioli, Maurice*:NT",wikipedia,1984,NT,"Rioli, Maurice",2113,resolved,2,,false,false,,,wikipedia
+aah:1984:Robert DiPierdomenico:Hawthorn,wikipedia,1984,Hawthorn,Robert DiPierdomenico,1350,resolved,1,,false,false,,,wikipedia
+aah:1984:Robert Flower*:Vic,wikipedia,1984,Vic,Robert Flower,1725,resolved,1,,false,false,,,wikipedia
+aah:1984:Robert Flower:Melbourne,wikipedia,1984,Melbourne,Robert Flower,1725,resolved,1,,false,false,,,wikipedia
+aah:1984:Robert Wiley*:WA,wikipedia,1984,WA,Robert Wiley,2280,resolved,1,,false,false,,,wikipedia
+aah:1984:Rod Ashman:Carlton,wikipedia,1984,Carlton,Rod Ashman,1492,resolved,1,,false,false,,,wikipedia
+aah:1984:Roger Merrett*:Vic,wikipedia,1984,Vic,Roger Merrett,107,resolved,1,,false,false,,,wikipedia
+aah:1984:Ross Glendinning*:WA,wikipedia,1984,WA,Ross Glendinning,1757,resolved,1,,false,false,,,wikipedia
+aah:1984:Ross Glendinning:North Melbourne,wikipedia,1984,North Melbourne,Ross Glendinning,1757,resolved,1,,false,false,,,wikipedia
+aah:1984:Ross Thornton:Fitzroy,wikipedia,1984,Fitzroy,Ross Thornton,2219,resolved,1,,false,false,,,wikipedia
+aah:1984:Russell Greene*:Vic,wikipedia,1984,Vic,Russell Greene,1767,resolved,1,,false,false,,,wikipedia
+aah:1984:Russell Greene:Hawthorn,wikipedia,1984,Hawthorn,Russell Greene,1767,resolved,1,,false,false,,,wikipedia
+aah:1984:Simon Madden*:Vic,wikipedia,1984,Vic,Simon Madden,1302,resolved,1,,false,false,,,wikipedia
+aah:1984:Simon Madden:Essendon,wikipedia,1984,Essendon,Simon Madden,1302,resolved,1,,false,false,,,wikipedia
+aah:1984:Stephen Kernahan*:SA,wikipedia,1984,SA,Stephen Kernahan,148,unique,1,,false,false,,,wikipedia
+aah:1984:Steve Malaxos*:WA,wikipedia,1984,WA,Steve Malaxos,1370,resolved,1,,false,false,,,wikipedia
+aah:1984:Terry Daniher*:NSW,wikipedia,1984,NSW,Terry Daniher,1311,resolved,1,,false,false,,,wikipedia
+aah:1984:Terry Daniher:Essendon,wikipedia,1984,Essendon,Terry Daniher,1311,resolved,1,,false,false,,,wikipedia
+aah:1984:Tony Shaw:Collingwood,wikipedia,1984,Collingwood,Tony Shaw,1166,resolved,1,,false,false,,,wikipedia
+aah:1984:Wayne Johnston*:Vic,wikipedia,1984,Vic,Wayne Johnston,1849,resolved,1,,false,false,,,wikipedia
+aah:1989:Alan Johnson:Melbourne,wikipedia,1989,Melbourne,Alan Johnson,1337,resolved,1,,false,false,,,wikipedia
+aah:1989:Andrew Bews:Geelong,wikipedia,1989,Geelong,Andrew Bews,94,resolved,1,,false,false,,,wikipedia
+aah:1989:Barry Stoneham:Geelong,wikipedia,1989,Geelong,Barry Stoneham,584,resolved,1,,false,false,,,wikipedia
+aah:1989:Brett Lovett:Melbourne,wikipedia,1989,Melbourne,Brett Lovett,706,resolved,1,,false,false,,,wikipedia
+aah:1989:Chris Langford:Hawthorn,wikipedia,1989,Hawthorn,Chris Langford,639,resolved,1,,false,false,,,wikipedia
+aah:1989:Darrin Pritchard:Hawthorn,wikipedia,1989,Hawthorn,Darrin Pritchard,630,resolved,1,,false,false,,,wikipedia
+aah:1989:Garry Lyon:Melbourne,wikipedia,1989,Melbourne,Garry Lyon,695,resolved,1,,false,false,,,wikipedia
+aah:1989:Gary Ablett snr:Geelong,wikipedia,1989,Geelong,Gary Ablett snr,567,resolved,2,,false,false,,,wikipedia
+aah:1989:Gary Pert:Fitzroy,wikipedia,1989,Fitzroy,Gary Pert,210,resolved,1,,false,false,,,wikipedia
+aah:1989:Gavin Brown:Collingwood,wikipedia,1989,Collingwood,Gavin Brown,216,resolved,1,,false,false,,,wikipedia
+aah:1989:Greg Williams:Sydney Swans,wikipedia,1989,Sydney Swans,Greg Williams,142,resolved,1,,false,false,,,wikipedia
+aah:1989:Guy McKenna:West Coast,wikipedia,1989,West Coast,Guy McKenna,1032,resolved,1,,false,false,,,wikipedia
+aah:1989:Jason Dunstall:Hawthorn,wikipedia,1989,Hawthorn,Jason Dunstall,632,resolved,1,,false,false,,,wikipedia
+aah:1989:John Platten:Hawthorn,wikipedia,1989,Hawthorn,John Platten,636,resolved,1,,false,false,,,wikipedia
+aah:1989:Mark Bairstow:Geelong,wikipedia,1989,Geelong,Mark Bairstow,1201,resolved,1,,false,false,,,wikipedia
+aah:1989:Mark Bayes:Sydney Swans,wikipedia,1989,Sydney Swans,Mark Bayes,988,resolved,1,,false,false,,,wikipedia
+aah:1989:Nicky Winmar:St Kilda,wikipedia,1989,St Kilda,Nicky Winmar,461,resolved,1,,false,false,,,wikipedia
+aah:1989:Paul Couch:Geelong,wikipedia,1989,Geelong,Paul Couch,565,resolved,1,,false,false,,,wikipedia
+aah:1989:Simon Madden:Essendon,wikipedia,1989,Essendon,Simon Madden,1302,resolved,1,,false,false,,,wikipedia
+aah:1989:Stephen Kernahan:Carlton,wikipedia,1989,Carlton,Stephen Kernahan,148,resolved,1,,false,false,,,wikipedia
+aah:1989:Terry Daniher:Essendon,wikipedia,1989,Essendon,Terry Daniher,1311,resolved,1,,false,false,,,wikipedia
+aah:1989:Tim Watson:Essendon,wikipedia,1989,Essendon,Tim Watson,1162,resolved,1,,false,false,,,wikipedia
+aah:1990:Andrew Collins:Hawthorn,wikipedia,1990,Hawthorn,Andrew Collins,625,resolved,2,,false,false,,,wikipedia
+aah:1990:Brett Lovett:Melbourne,wikipedia,1990,Melbourne,Brett Lovett,706,resolved,1,,false,false,,,wikipedia
+aah:1990:Chris Lewis:West Coast,wikipedia,1990,West Coast,Chris Lewis,1039,resolved,1,,false,false,,,wikipedia
+aah:1990:Darren Millane:Collingwood,wikipedia,1990,Collingwood,Darren Millane,1292,resolved,1,,false,false,,,wikipedia
+aah:1990:Garry Lyon:Melbourne,wikipedia,1990,Melbourne,Garry Lyon,695,resolved,1,,false,false,,,wikipedia
+aah:1990:Gary Ablett snr:Geelong,wikipedia,1990,Geelong,Gary Ablett snr,567,resolved,2,,false,false,,,wikipedia
+aah:1990:Gary O'Donnell:Essendon,wikipedia,1990,Essendon,Gary O'Donnell,318,resolved,1,,false,false,,,wikipedia
+aah:1990:Graham Wright:Collingwood,wikipedia,1990,Collingwood,Graham Wright,235,resolved,1,,false,false,,,wikipedia
+aah:1990:John Longmire:North Melbourne,wikipedia,1990,North Melbourne,John Longmire,760,resolved,1,,false,false,,,wikipedia
+aah:1990:John Worsfold:West Coast,wikipedia,1990,West Coast,John Worsfold,1037,resolved,1,,false,false,,,wikipedia
+aah:1990:Mark Thompson:Essendon,wikipedia,1990,Essendon,Mark Thompson,326,resolved,1,,false,false,,,wikipedia
+aah:1990:Michael Tuck:Hawthorn,wikipedia,1990,Hawthorn,Michael Tuck,1319,resolved,1,,false,false,,,wikipedia
+aah:1990:Mick McGuane:Collingwood,wikipedia,1990,Collingwood,Mick McGuane,174,resolved,1,,false,false,,,wikipedia
+aah:1990:Peter Daicos:Collingwood,wikipedia,1990,Collingwood,Peter Daicos,1253,resolved,1,,false,false,,,wikipedia
+aah:1990:Scott Russell:Collingwood,wikipedia,1990,Collingwood,Scott Russell,218,resolved,1,,false,false,,,wikipedia
+aah:1990:Simon Madden:Essendon,wikipedia,1990,Essendon,Simon Madden,1302,resolved,1,,false,false,,,wikipedia
+aah:1990:Stephen Kernahan:Carlton,wikipedia,1990,Carlton,Stephen Kernahan,148,resolved,1,,false,false,,,wikipedia
+aah:1990:Stephen Silvagni:Carlton,wikipedia,1990,Carlton,Stephen Silvagni,136,resolved,1,,false,false,,,wikipedia
+aah:1990:Stewart Loewe:St Kilda,wikipedia,1990,St Kilda,Stewart Loewe,927,resolved,1,,false,false,,,wikipedia
+aah:1990:Tony Liberatore:Footscray,wikipedia,1990,Footscray,Tony Liberatore,426,resolved,1,,false,false,,,wikipedia
+aah:1990:Tony McGuinness:Footscray,wikipedia,1990,Footscray,Tony McGuinness,18,resolved,1,,false,false,,,wikipedia
+aah:1990:Tony Shaw:Collingwood,wikipedia,1990,Collingwood,Tony Shaw,1166,resolved,1,,false,false,,,wikipedia

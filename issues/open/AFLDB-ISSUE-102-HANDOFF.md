@@ -655,6 +655,89 @@ checkout not modified, no Git command.
 
 ---
 
+## CHECKPOINT — pass 12 (2026-09-02): ISSUE-112 slice 5 (ALL-AUSTRALIAN) — IMPLEMENTED and DB-validated
+
+Scope: the fifth ISSUE-112 implementation slice, **All-Australian only** (§11.2 phase 5). Full
+detail in `AFLDB-ISSUE-112.md` §21. Read-only `afldb_dev` G0 re-measurement authorised on proof
+of connection; DB-free tests / `tsc` / `afldb_test`-only integration under the restricted
+`afldb_import` role / whole `awards-reload-links.test.ts` / `git diff --check` authorised. No
+scrape, no `afldb_dev` mutation, no production, no migration, no privilege change, ISSUE-111 /
+ISSUE-113 untouched, `D:\dev\afldb` not accessed, streamanator checkout not modified, no Git
+command.
+
+**Outcome: COMPLETE and GREEN.**
+
+- **G0 re-measured read-only, proven** — same `BEGIN TRANSACTION READ ONLY` + step-0 guard
+  discipline as Passes 5/7/9/10/11, over SSH to `arm@10.0.40.100`. Proven
+  `current_database() = afldb_dev`, `current_user = afldb_import`, `transaction_read_only = on`,
+  PostgreSQL 16.15. **The prompt's warning held: "2,158" is the legacy raw-table sum; the
+  post-merge `award_winners` count is 1,158.** Every authoritative earlier G0 fact re-confirmed
+  exactly — 1,158 rows, 1953–2025, 53 seasons, linked 1,078 / unlinked 80, `source_record_id`
+  NULL 0 / distinct 1,158, provenance **draftguru 906 + wikipedia 252**, 10 `(season, player)`
+  dup pairs (9× 1984 club/state dual + Josh Kennedy 2016), 1984 = 48 rows / 24 `*` state keys,
+  Kennedy 2016 = `aa:2016:698` Sydney/11672 + `aa:2016:699` West Coast/4169. **No discrepancy.**
+  Plus: `(season, player, club)` measured collision-free (safe identity, doesn't reject the dup
+  pairs); `player_link_resolutions` for AA = 20 `linked` + 3 `confirmed_unlinked`, 0 orphan/
+  mismatch; `player_link_suggestions` 0; `candidate_count` 0–4; `position` 14-value vocab, all
+  draftguru; `note` `^\d+ time All-Australian$` on every draftguru row; 55 distinct raw club
+  strings; 10 of 549 linked players lack a unique `afltables_profile_url` (deferred §7).
+- **Manifest:** `data/awards/all-australian.csv` (1,159 lines).
+  `source_key,source,season,club,player,player_id,link_status,candidate_count,position,is_captain,is_vice_captain,note,votes,source_citation`.
+  `source_key` = the **preserved** `award_winners.source_record_id` verbatim (`aa:YYYY:n` /
+  `aah:YYYY:player:club`, `*` marker kept), **not re-minted**. **Two provenance sources kept
+  distinct** — per-row `source` (`draftguru` 906 / `wikipedia` 252) selects `source_id` and
+  `source_citation == source`. `club` = the source's own verbatim club string
+  (= `award_winners.club_name_raw`), re-resolved season-aware by `ClubResolver` → rebuild-stable
+  `club_id`, byte-identical `club_name_raw`. Deterministic order: `source_key` ascending
+  `COLLATE "C"`. `.gitignore` whitelisted. sha256
+  `d602a74ab7e33e025cfede1038006fc35a18d32ef208bbe87a575ad65a99dd51`.
+- **Loader:** new `tools/migration/all_australian.py` (validating DB-free `--check` parser).
+  `import_awards.py`'s `import_all_australian()` **lost its `lite` and `person_links`
+  parameters**; the two-legacy-table merge is gone (the manifest is the flat merged result);
+  the `reload_keyed(...)` call (key `(source_id, source_record_id)`, 16-column list,
+  `scope_column="award_id"`, `scopes=[("source_id", [draftguru_id, wikipedia_id], False)]`,
+  `allow_link_loss`) and the post-reload `UPDATE awards SET first_season/last_season` are
+  **byte-identical**; the fail-loud definition guard kept; `valid_players` guard added
+  (rising_star pattern; 0 rows dropped this pass). `"all_australian"` added to
+  `LEGACY_FREE_GROUPS` + `BATCH_SOURCE_KEYS` (`"draftguru"`, batch-record only). `GROUP_REQUIRES`
+  `"all_australian": {"awards"}` **removed** so `--groups all_australian` runs legacy-free; the
+  reverse `"awards": {…, "all_australian", …}` closure stays. No migration, no privilege change.
+- **Tests:** `tests/all-australian-source.test.ts` (new, 40 DB-free cases) and a new legacy-free
+  `describe` block in `tests/integration/awards-reload-links.test.ts` (`canRunAllAustralianImporter`);
+  `tests/under-22-importer.test.ts` `expand_groups` contract updated.
+- **Validation:** DB-free 40/40 (191/191 across the touched suites); `npx tsc --noEmit` clean;
+  `git diff --check` clean. Integration **executed for real against `afldb_test`** under the
+  restricted `afldb_import` role over a temporary SSH port-forward (opened/closed within the
+  pass; `AFLDB_TEST_IMPORT_DATABASE_URL` derived ephemerally, never persisted). DSN safety
+  proved (`afldb_test`/`afldb_owner` and `afldb_test`/`afldb_import`) before any test ran; no
+  password or full DSN printed. Results: **all-australian block 8/8 GREEN**; **whole
+  `awards-reload-links.test.ts` 67 passed / 21 skipped / 0 failed** — **+8** over Pass 11's 59,
+  slices 1–4 not regressed. `afldb_test` carries no `all-australian` definition, no AA
+  `award_winners`, and an empty `player_link_resolutions` table (whole-table) — the block seeds/
+  tears down the definition; decision-survival checked vacuously + via the manifest's carried
+  link state. `players` 13,277 vs `afldb_dev` 13,363, but every manifest `player_id` ≤ 12,950 →
+  **0** dropped, exact 1,078 / 80 parity.
+- **Carried-forward risk (not a slice-5 blocker):** `player_id` carried verbatim; not
+  rebuild-stable (ISSUE-111 G5); 10 of 549 linked players have no unique
+  `afltables_profile_url`. Club identity is already rebuild-stable via `ClubResolver`. Recorded
+  against the deferred §7 AWARDS/HONOURS stage; `source_key` is the durable row identity.
+- **Files changed this pass:** `.gitignore`, `data/awards/all-australian.csv` (new),
+  `tools/migration/all_australian.py` (new), `tools/migration/import_awards.py`,
+  `tests/all-australian-source.test.ts` (new), `tests/integration/awards-reload-links.test.ts`,
+  `tests/under-22-importer.test.ts`, `issues/open/AFLDB-ISSUE-112.md` (§13, §21), this file,
+  `IssuesIndex.md`. No `CHANGELOG.md` entry — nothing deployed or run against a live application
+  database; `import_awards.py`'s behaviour for the two still-legacy groups (club B&F + named
+  medals, inside `import_awards()`) is unchanged. A stray 0-byte artefact (`tuple[list[str]`) in
+  the worktree root was removed; never tracked. No Git command run. `afldb_dev` read-only for
+  the §21.1 measurement only. No production contact. ISSUE-111 / ISSUE-113 untouched.
+- **Exact next action:** phase 6 — **club best-and-fairest**, then named medals (§11.2 order).
+  Families 6 and 7 both live *inside* the `awards` group (`import_awards()`), which also owns the
+  award definitions — decoupling them splits the definition load out of the legacy `awards`
+  reader and is where the family-A / §7 canonical-rebuild definitions step becomes unavoidable.
+  Do not resolve ISSUE-112; do not add the canonical-rebuild AWARDS/HONOURS stage yet.
+
+---
+
 ## Confirmed source findings
 
 Each verified by direct read at baseline `95819a3`.

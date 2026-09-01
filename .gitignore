@@ -42,6 +42,7 @@ next-env.d.ts
 !/data/awards/hall-of-fame.csv
 !/data/awards/captaincies.csv
 !/data/awards/rising-star.csv
+!/data/awards/all-australian.csv
 !/data/records/
 /data/records/*
 !/data/records/first-kick-goal-ids.csv

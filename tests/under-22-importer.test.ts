@@ -83,16 +83,17 @@ describe('22 Under 22 awards import contract', () => {
     expect(dependencies).toContain(
       '"awards": {"all_australian", "under_22", "rising_star"}',
     );
-    expect(dependencies).toContain('"all_australian": {"awards"}');
-    // under_22 and — since AFLDB-ISSUE-112 phase 4 — rising_star are both
-    // independently sourced legacy-free reloads: a full 'awards' refresh
-    // still closes over them, but neither is a GROUP_REQUIRES key, so each
-    // may run alone without dragging in the legacy 'awards' group.
+    // all_australian (AFLDB-ISSUE-112 phase 5), under_22 and rising_star
+    // (phase 4) are all independently sourced legacy-free manifest reloads:
+    // a full 'awards' refresh still closes over them, but none is a
+    // GROUP_REQUIRES key, so each may run alone without dragging in the
+    // legacy 'awards' group.
+    expect(dependencies).not.toMatch(/^\s*"all_australian":/m);
     expect(dependencies).not.toMatch(/^\s*"under_22":/m);
     expect(dependencies).not.toMatch(/^\s*"rising_star":/m);
     const shared = ['awards', 'all_australian', 'under_22', 'rising_star'];
     expect(expandGroups('awards')).toEqual(shared);
-    expect(expandGroups('all_australian')).toEqual(shared);
+    expect(expandGroups('all_australian')).toEqual(['all_australian']);
     expect(expandGroups('rising_star')).toEqual(['rising_star']);
     expect(expandGroups('under_22')).toEqual(['under_22']);
     const legacyAwardsLoader = between(
