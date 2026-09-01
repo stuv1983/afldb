@@ -37,6 +37,27 @@ commit.
   (`limitedAt: 31`) while exactly 30 `nl_search_log` rows are written for the 31
   requests, and an oversized `/api/health-event` body returns 413.
 
+### AFLDB-ISSUE-119 — Super Admin can clear NL search telemetry - 1 September 2026
+
+- Added a Super Admin-only control on `/admin/nl-search` to permanently
+  delete disposable `nl_search_log` rows — telemetry with no admin review
+  and no matching reader feedback. Every review and every piece of reader
+  feedback is retained unconditionally, along with the log rows they
+  reference to the full recursive `parent_search_id` depth; only the
+  schema's own `app_health_events.related_search_id` links to deleted rows
+  are detached, never the health rows themselves. Identity sequences are
+  not reset.
+- The operator must type the exact phrase `CLEAR SEARCH TELEMETRY`, checked
+  again on the server before anything runs. Deletion happens through a new
+  restricted database capability, `public.nl_search_telemetry_clear()`
+  (migration 081) — a `SECURITY DEFINER` function owned by `afldb_owner`
+  that `afldb_auth` may only `EXECUTE`; the application role still holds no
+  direct `DELETE`/`TRUNCATE` on `nl_search_log`, `nl_search_review` or
+  `nl_search_feedback`. Deletion and its count-only `auth_audit_log` row
+  (`nl_search.telemetry_cleared`) commit atomically; an audit failure rolls
+  the deletion back, and logging resumes immediately after the cutoff.
+- `docs/search.md` documents the retention guarantees and the audit trail.
+
 ### AFLDB-ISSUE-110 — ranked career season-scope fail-closed guard - 31 August 2026
 
 - Parser version remains 32. Validation now refuses every non-predicate

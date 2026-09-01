@@ -10,6 +10,20 @@
 **Open issues:** 6 tracked here — `AFLDB-ISSUE-102`, `AFLDB-ISSUE-104`,
 `AFLDB-ISSUE-110`, `AFLDB-ISSUE-112`, `AFLDB-ISSUE-113`, `AFLDB-ISSUE-116`.
 
+<!-- ALLOCATION WARNING 2026-09-01: `AFLDB-ISSUE-118` is allocated and is NOT free.
+     It belongs to the Gridley compatibility-corpus project on branch `opus/gridley-corpus`,
+     which has committed Stage 0/1/2 under that ID. The NL-search telemetry issue below was
+     renumbered 118 -> 119 on 2026-09-01 because its claim was still uncommitted; see
+     `issues/closed/AFLDB-ISSUE-119.md` §0. Next free issue ID is `AFLDB-ISSUE-121`.
+     NOTE: the branch and worktree have since been renamed to `codex/issue-119` /
+     `D:\dev\afldb-issue-119`, so the ID now matches; runbook §21.1/§22.1/§23.1 record the
+     former `codex/issue-118` name and are accurate as of their dates.
+     MIGRATION NUMBERS 2026-09-01: `080_external_grids.sql` belongs to `opus/gridley-corpus`;
+     `081_nl_search_telemetry_clear.sql` is allocated to `AFLDB-ISSUE-119`, committed on
+     `codex/issue-119`, applied to `afldb_test` and now validated end to end there. `082` was the next free migration number as of the 2026-09-01 scan; it is
+     not reserved for anyone. `claude/issue-116` must re-scan every live branch tip and derive its
+     own number immediately before renumbering its competing `079_access_code_delete.sql`. -->
+
 <!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
      the ISSUE-110 branch merged into dev on 2026-08-31 and its own row below is now
      authoritative. -->
@@ -29,6 +43,11 @@
 
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
+<!-- RETIRED 2026-09-01 — `AFLDB-ISSUE-119` is **Resolved** and is NO LONGER an
+     open issue. Final guarded Playwright acceptance passed 9/9 against the
+     disposable loopback `afldb_test` deployment. Authoritative records:
+     `issues.md` (Resolution, 2026-09-01) and
+     `issues/closed/AFLDB-ISSUE-119.md` §34. -->
 <!-- RETIRED 2026-08-30 — `AFLDB-ISSUE-107` is **Resolved** and is NO LONGER an open issue.
      Its pre-resolution row and detail block are retired below; their "Only open gate" and
      "Exact next action" text is SUPERSEDED. Authoritative records: the `AFLDB-ISSUE-107`
@@ -281,6 +300,11 @@
 
 -->
 
+<!-- RETIRED 2026-09-01 — `AFLDB-ISSUE-119` is **Resolved** and is NO LONGER an
+     open issue. Final guarded Playwright acceptance passed 9/9 against the
+     disposable loopback `afldb_test` deployment. Authoritative records:
+     `issues.md` (Resolution, 2026-09-01) and
+     `issues/closed/AFLDB-ISSUE-119.md` §34. -->
 <!-- RETIRED 2026-08-30 — `AFLDB-ISSUE-107` and `AFLDB-ISSUE-108` are both **Resolved** and are
      NO LONGER open issues. The two detail blocks below are retained as lineage only; their
      "Current state", "Only open gate" and "Exact next action" text is SUPERSEDED. Authoritative

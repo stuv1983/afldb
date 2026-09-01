@@ -471,6 +471,152 @@ describe('afldb_auth is confined to the operational tables', () => {
   });
 });
 
+/*
+ * AFLDB-ISSUE-119 — the telemetry-clear capability boundary.
+ *
+ * Migration 081 hands afldb_auth exactly one way to delete NL telemetry:
+ * EXECUTE on public.nl_search_telemetry_clear(), a SECURITY DEFINER
+ * function owned by afldb_owner with a pinned search_path. The whole
+ * design collapses if any single property drifts — a superuser owner is a
+ * wider capability than designed, a NULL ACL after pg_restore
+ * --no-privileges silently reverts to EXECUTE-to-PUBLIC, and a direct
+ * DELETE grant on the tables makes the function pointless — so each is
+ * asserted from the applied catalogue, not the migration text.
+ */
+describe('nl_search_telemetry_clear() is the only NL deletion capability (AFLDB-ISSUE-119)', () => {
+  const CLEAR_FN = 'public.nl_search_telemetry_clear()';
+  const NL_TABLES = ['nl_search_log', 'nl_search_review', 'nl_search_feedback'];
+
+  beforeAll(async () => {
+    const [fn] = await sql<{ present: boolean }[]>`
+      SELECT to_regprocedure(${CLEAR_FN}) IS NOT NULL AS present
+    `;
+    if (!fn?.present) {
+      throw new Error(
+        `${CLEAR_FN} is absent from this database, so the ISSUE-119 capability `
+        + 'boundary cannot be verified. Run npm run db:migrate:test rather than '
+        + 'skipping: an unverifiable invariant is not a passing one.',
+      );
+    }
+  });
+
+  it('is SECURITY DEFINER, owned by afldb_owner, with the pinned safe search_path', async () => {
+    const [fn] = await sql<{
+      owner: string; definer: boolean; volatility: string; config: string[] | null; args: number;
+    }[]>`
+      SELECT pg_get_userbyid(p.proowner) AS owner,
+             p.prosecdef                 AS definer,
+             p.provolatile               AS volatility,
+             p.proconfig                 AS config,
+             p.pronargs::int             AS args
+        FROM pg_proc p
+       WHERE p.oid = to_regprocedure(${CLEAR_FN})
+    `;
+    // The owner IS the security boundary: SECURITY DEFINER executes as
+    // it, so a function left owned by the migrating superuser is a far
+    // wider capability than the one migration 081 describes.
+    expect(fn, 'run tools/maintenance/privileges.sql to reconcile owner and ACL').toEqual({
+      owner: 'afldb_owner',
+      definer: true,
+      volatility: 'v',
+      // pg_temp last so a temp object can shadow nothing; public absent
+      // so an unqualified name fails loudly instead of resolving.
+      config: ['search_path=pg_catalog, pg_temp'],
+      // No parameters: there is no input to subvert.
+      args: 0,
+    });
+  });
+
+  it('may be executed by afldb_auth and by no other application role', async () => {
+    const [held] = await sql<{ auth: boolean; app: boolean; imp: boolean }[]>`
+      SELECT has_function_privilege(${AUTH_ROLE},   to_regprocedure(${CLEAR_FN}), 'EXECUTE') AS auth,
+             has_function_privilege(${APP_ROLE},    to_regprocedure(${CLEAR_FN}), 'EXECUTE') AS app,
+             has_function_privilege(${IMPORT_ROLE}, to_regprocedure(${CLEAR_FN}), 'EXECUTE') AS imp
+    `;
+    // app/import false also proves PUBLIC lost EXECUTE: neither role is
+    // granted anything here directly, so a PUBLIC grant is the only way
+    // either could answer true.
+    expect(held, 'run tools/maintenance/privileges.sql').toEqual({
+      auth: true,
+      app: false,
+      imp: false,
+    });
+
+    // afldb_backup exists only on hosts that take backups; asserted when
+    // present rather than invented when not.
+    const [backup] = await sql<{ rolname: string }[]>`
+      SELECT rolname FROM pg_roles WHERE rolname = 'afldb_backup'
+    `;
+    if (backup) {
+      const [b] = await sql<{ held: boolean }[]>`
+        SELECT has_function_privilege('afldb_backup', to_regprocedure(${CLEAR_FN}), 'EXECUTE') AS held
+      `;
+      expect(b.held, 'afldb_backup must not execute the clear').toBe(false);
+    }
+
+    // The grantee list outright, because the boolean checks above cannot
+    // distinguish "PUBLIC revoked" from "ACL is NULL" -- and a NULL
+    // function ACL (pg_restore --no-privileges) IS EXECUTE-to-PUBLIC.
+    const grantees = await sql<{ grantee: string; privilege: string }[]>`
+      SELECT CASE WHEN a.grantee = 0 THEN 'PUBLIC'
+                  ELSE pg_get_userbyid(a.grantee) END AS grantee,
+             a.privilege_type AS privilege
+        FROM pg_proc p
+       CROSS JOIN LATERAL aclexplode(p.proacl) AS a
+       WHERE p.oid = to_regprocedure(${CLEAR_FN})
+       ORDER BY 1
+    `;
+    expect(
+      grantees,
+      'exactly the owner and afldb_auth; an empty list means a NULL ACL, which '
+      + 'grants EXECUTE to PUBLIC -- run tools/maintenance/privileges.sql',
+    ).toEqual([
+      { grantee: 'afldb_auth', privilege: 'EXECUTE' },
+      { grantee: 'afldb_owner', privilege: 'EXECUTE' },
+    ]);
+  });
+
+  it('contains no dynamic SQL, no CASCADE, no TRUNCATE and no unqualified relation', async () => {
+    const [{ src }] = await sql<{ src: string }[]>`
+      SELECT p.prosrc AS src FROM pg_proc p WHERE p.oid = to_regprocedure(${CLEAR_FN})
+    `;
+    // Comments are prose and may mention anything; the executable text is
+    // what the reviewed contract (runbook §13) constrains.
+    const executable = src
+      .split('\n')
+      .map((line) => line.replace(/--.*$/, ''))
+      .join('\n');
+    expect(executable).not.toMatch(/\bEXECUTE\b/i);
+    expect(executable).not.toMatch(/\bCASCADE\b/i);
+    expect(executable).not.toMatch(/\bTRUNCATE\b/i);
+    // Every relation reference must be public.-qualified: with public
+    // absent from search_path, an unqualified name would not merely
+    // resolve somewhere unintended -- it would fail at runtime.
+    expect(executable).not.toMatch(
+      /(?<!public\.)\b(nl_search_log|nl_search_review|nl_search_feedback|app_health_events)\b/,
+    );
+  });
+
+  it('leaves afldb_auth without DELETE or TRUNCATE on any NL table', async () => {
+    // nl_search_log and nl_search_feedback are asserted above with the
+    // rest of the append-only family; nl_search_review is legitimately
+    // UPDATE-able, so its DELETE/TRUNCATE absence is only enforced here.
+    // This is the negative half of the ISSUE-119 boundary: were any of
+    // these held, the function would not be the ONLY deletion capability.
+    const rows = await sql<{ name: string; privilege: string }[]>`
+      SELECT t.name, p.privilege
+        FROM unnest(${NL_TABLES}::text[]) AS t(name)
+       CROSS JOIN LATERAL (VALUES ('DELETE'), ('TRUNCATE')) AS p(privilege)
+       WHERE has_table_privilege(${AUTH_ROLE}, t.name, p.privilege)
+       ORDER BY 1, 2
+    `;
+    expect(
+      rows,
+      'run tools/maintenance/privileges.sql: its ISSUE-119 section revokes exactly this',
+    ).toEqual([]);
+  });
+});
+
 describe('afldb_import is confined to the statistical tables', () => {
   beforeAll(async () => {
     const [role] = await sql<{ rolname: string }[]>`
