@@ -23,6 +23,38 @@ export const dynamic = 'force-dynamic';
  */
 const REPORT_LIMIT = new RateLimiter(120, 60_000);
 
+const MAX_BODY_BYTES = 32 * 1024;
+
+async function readBounded(request: Request): Promise<string | null> {
+  const declared = Number(request.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return null;
+
+  if (!request.body) return '';
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      total += value.byteLength;
+      if (total > MAX_BODY_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+
+      chunks.push(value);
+    }
+  } catch {
+    return null;
+  }
+
+  return Buffer.concat(chunks).toString('utf8');
+}
+
 let cachedBuildVersion: string | null | undefined;
 
 /**
@@ -59,9 +91,14 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 429 });
   }
 
+  const raw = await readBounded(request);
+  if (raw === null) {
+    return new NextResponse(null, { status: 413 });
+  }
+
   let body: unknown;
   try {
-    body = await request.json();
+    body = JSON.parse(raw);
   } catch {
     return new NextResponse(null, { status: 400 });
   }

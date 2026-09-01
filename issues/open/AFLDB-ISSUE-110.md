@@ -2003,3 +2003,70 @@ including the ranked `player_career` plus season-bound fail-closed invariant, it
 and preservation of parser-v32 fixes. ISSUE-110 remains Open. Do not start the 480 UI corpus,
 1,435/1,440 corpus, 100k corpus, telemetry reset, or any other large-scale validation unless
 that review returns APPROVE.
+
+## 2026-08-31 Independent adjudication of the two open HIGH findings (full-codebase review)
+
+Performed as part of a whole-repository audit, by direct source inspection of `main`
+(post-merge, parser v32). No code was changed and no large-scale validation was run.
+
+### Finding A — career-predicate season ownership: **CONFIRMED**
+
+`players with at least 3 grand finals since 2000` silently ignores the requested period and
+counts Grand Finals over the whole career. Exact mechanism, each link verified in current
+source:
+
+1. `src/search/nl/parser.ts:669-680, 749-750` — "grand finals" with a preceding qualifier
+   produces a `grand_finals_played_min` career **predicate** (`GridAxisState`, param
+   `times` only — no season params exist for this builder).
+2. `src/search/nl/parser.ts:2042-2043` — `scope.seasonMin`/`seasonMax` are set from the
+   extracted "since 2000" range unconditionally; nothing removes them when a
+   non-season-owning predicate is present. (Only `debuted_between`,
+   `first_kick_goal_between` and the marquee gate interact with the season range; the
+   marquee predicates refuse to attach when a range exists, `parser.ts:2108-2114`.)
+3. `src/search/nl/plan.ts:1197-1202` — the season-bound refusal exempts **any** plan with
+   `careerPredicates.length > 0`, regardless of whether any predicate consumes the bounds.
+4. `src/db/queries/nl/player-career.ts` — `conditionsWhere()` and `compileAxis()`
+   (`grid-solver.ts:186`, `grand_finals_played_min` branch) never read
+   `scope.seasonMin`/`seasonMax`; the count is whole-career.
+
+Consequence: a valid-looking answer to a different (wider) question — the plausible-but-wrong
+class. The plan description can still render the period, making the wrong answer look right.
+
+### Finding B — `clubFor` ownership with career predicates: **CONFIRMED**
+
+`Carlton players who debuted since 2000` returns players of **all** clubs who debuted since
+2000. Exact mechanism:
+
+1. `src/search/nl/parser.ts:1455-1466` — `debuted_between` predicate carries `from`/`to`
+   only; no club parameter exists for this builder.
+2. `src/search/nl/parser.ts:2032-2033` — `scope.clubFor` is set unconditionally; only the
+   first-kick achievement path folds the club into a predicate
+   (`first_kick_goal_for_club`, `parser.ts:2081-2084`), and even then `scope.clubFor` is
+   also retained (harmless there because the predicate owns it).
+3. `src/search/nl/plan.ts:1158` — the club-scoped-career validation gate applies only when
+   `careerPredicates.length === 0`, so the plan validates.
+4. `src/db/queries/nl/player-career.ts:146-152` — the generic `clubFor` EXISTS filter is
+   emitted only when `plan.careerPredicates.length === 0`; with the debut predicate present
+   the club constraint reaches no SQL at all.
+
+Aggravating detail: `projectedGames()` (`player-career.ts:166-170`) still club-scopes the
+visible Games column, so non-Carlton players in the wrongly-unfiltered list render with
+`games = 0` for Carlton — visibly incoherent output on top of the wrong membership. The same
+mechanism applies to any mixture of `clubFor` with a non-club-owning predicate
+(`grand_finals_played_min`, marquee predicates, mixed condition+predicate plans), not just
+debut windows.
+
+### Required invariant (restating the review's remedy, now source-anchored)
+
+Replace both blanket `careerPredicates.length === 0` exemptions with explicit ownership:
+a plan field (`seasonMin`/`seasonMax`, `clubFor`) may survive career-grain validation only if
+some predicate in the plan **provably consumes it** (`debuted_between`/
+`first_kick_goal_between` for the season range; `first_kick_goal_for_club` for the club) or
+the compiler emits it. Otherwise refuse, or fold the field into the predicate parameters at
+parse time the way the first-kick path already does. Fix sites: `plan.ts:1158`,
+`plan.ts:1197-1202`, `player-career.ts:146`. Regression controls: the two questions above as
+red tests; `players who kicked a goal with their first kick for Carlton in the 1940s` and
+`players who debuted in the 1990s` as green positive controls.
+
+Verdicts: **A CONFIRMED, B CONFIRMED.** The recorded next action (fix A and B fail-closed,
+then fresh independent re-review) stands unchanged.
