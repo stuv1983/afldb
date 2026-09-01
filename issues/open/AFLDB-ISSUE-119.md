@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-119 — Super Admin can clear NL search telemetry
 
-- **Status:** In progress — the Stage 2 database and query/audit layers are validated end to end (§25, §27, §28; unchanged this step). The **Server Action now exists** (§29): `clearTelemetry()` in `src/app/admin/nl-search/actions.ts` calls `requireSuperAdmin()` before parsing the confirmation phrase or opening a transaction, checks the exact server-side phrase `CLEAR SEARCH TELEMETRY`, then opens one `authSql.begin()` transaction that runs `clearNlSearchTelemetry(tx)` followed by `auditInTransaction(tx, 'nl_search.telemetry_cleared', result, actor)` on the same handle — `result` is the query layer's `NlTelemetryClearCounts`, so only the five approved counts can reach the audit row. Neither call is wrapped in try/catch, so a clear or audit failure propagates and rolls the transaction back with no success revalidation. On committed success it revalidates `/admin/nl-search` (`'layout'`) and `/admin/app-health`, then returns the counts. `tests/admin-nl-search-actions.test.ts` (11 DB-free cases) is written and **now executed and passing**: `npx vitest run tests/admin-nl-search-actions.test.ts` → 11/11 passed, and `npm run typecheck` → passed (`Types generated successfully`) — see §29.7. This evidences, at the action level: Super Admin guard ordering (guard before phrase parse, before transaction), exact confirmation-phrase gating with no transaction/clear/audit on mismatch, one shared transaction handle for `clearNlSearchTelemetry` and `auditInTransaction`, an audit payload restricted to exactly the five approved counts, failure propagation from either call with no revalidation, correct returned counts, and success-only two-path revalidation. **UI/end-to-end browser confirmation remains unimplemented.** **UI, page wiring, `docs/search.md` and `CHANGELOG.md` not started** — criteria 4 (client half), 9 (UI) and 10-11 remain open; exact next action is the UI step per §29.5 (`ClearTelemetryForm.tsx`, page wiring, `docs/search.md`, `CHANGELOG.md`).
+- **Status:** In progress — database, query/audit and Server Action layers remain validated end to end (§25, §27, §28, §29.7; unchanged this step). **UI/docs/changelog now implemented** (§30): `ClearTelemetryForm.tsx` follows `DeleteMatchButton`'s reveal-warning-confirm-cancel pattern, gates submit on an exact client-side match of `CLEAR SEARCH TELEMETRY` (the server re-checks independently per §6), disables the field and both buttons while pending, and on committed success (`state.counts` set) collapses back to the initial button and reports the returned `NlTelemetryClearCounts` — deleted/retained log rows in the action's own message, plus retained review/feedback counts and detached app-health links rendered directly from the counts object. Wired into `/admin/nl-search` beside the period/export controls per §10. The page's former unqualified "append-only" subtitle claim is corrected to describe the new Super Admin capability while stating reviews/feedback are retained regardless. `docs/search.md` gained a "Clearing telemetry" paragraph documenting the retention guarantees, phrase confirmation, restricted function and atomic audit. `CHANGELOG.md` gained an `Unreleased` entry now that user-facing behaviour exists. `npx vitest run tests/admin-nl-search-actions.test.ts` (unchanged by this step) → 11/11 passed; `npm run typecheck` → passed. **No new component test file was added** — this repository has no React-rendering test convention (`vitest.config.mts` runs `environment: 'node'` and includes only `tests/**/*.test.ts`, and the closest analogous destructive-action component, `DeleteMatchButton`, has no test file); see §30.4 for the reasoning and what remains for real browser coverage. Criteria 4, 9, 10 (except guarded Playwright) and 11 are now satisfied; criteria 3, 5-8 unchanged, and their database/execution evidence already stands from §24 (`tests/integration/privileges.test.ts`, 34/34) and §25 (`tests/integration/nl-search-telemetry-clear.test.ts`, 9/9, restricted describe proven to run rather than skip) — both guarded integration suites were executed and passed there, not merely written; §30's earlier draft of this line incorrectly called them unexecuted and has been corrected. **Remaining before Stage 2 can close:** guarded Playwright UI coverage (confirm/cancel/pending/success/refresh) against a disposable `_test` deployment is the only acceptance evidence left unexecuted. **The guarded Playwright harness itself is now written (§31)** — `playwright.telemetry-clear.config.ts` + `tests/admin-nl-search-clear/` (target guard, two-account TOTP auth setup, deterministic wipe-and-reseed fixture, and the acceptance spec). It is **unexecuted**, blocked on two operator prerequisites: a real non-super plain-admin account (`AFLDB_E2E_PLAIN_ADMIN_*`) and a disposable loopback `_test` deployment of this branch. Exact run command and setup are in §31. **Validation checkpoint (§32):** `npm run typecheck` → passed, final output `✓ Types generated successfully`; the UI/docs integration and the guarded Playwright harness are now type-validated. Playwright itself has still not been executed; the remaining acceptance blockers are operator prerequisites only — plain-admin credentials, a disposable loopback `_test` deployment, and a Chromium install if needed. Exact next action: checkpoint this milestone, then run the guarded Playwright acceptance against the disposable `_test` deployment.
 - **Created:** 2026-08-31
 - **Severity:** Medium
 - **Area:** Admin / Security / Natural-language search / Telemetry / Database
@@ -1403,3 +1403,223 @@ At the Server Action level, this run evidences:
 No blocker and no deviation from the approved §6/§8/§9 contract. **UI/end-to-end browser confirmation is still unimplemented** — these are DB-free unit-level guarantees on the Server Action, not proof the confirmation flow works through a real browser or a real database.
 
 **Exact next action:** the UI step per §28.9/§29.5 — `ClearTelemetryForm.tsx` (typed confirmation, cancel/pending/result UI), wire it into `page.tsx`'s existing warning copy, then `docs/search.md` and `CHANGELOG.md`. Criteria 4 (client half), 9, 10 and 11 remain open until that step lands.
+
+## 30. Session record — 2026-09-01 (Stage 2, step: UI/docs/changelog)
+
+### 30.1 Scope of this step
+
+Followed §29.5's live instruction: implement the client confirmation component, wire it into `page.tsx`, update `docs/search.md`, and add the `CHANGELOG.md` entry now that retained user-facing behaviour exists. No migration, privilege, query-helper, audit-helper or Server Action change was made — `git status --short` at the end of this step shows only the four files below, and `actions.ts` is not among them.
+
+### 30.2 What was implemented
+
+| File | Change |
+|---|---|
+| `src/app/admin/nl-search/ClearTelemetryForm.tsx` | New. Client component, `'use client'`. Source-reviewed `DeleteMatchButton.tsx` (reveal → warning box → confirm/cancel, `useActionState`, inline styles, no CSS modules) and `ReviewForm.tsx` (same-directory `useActionState` action import) first and followed both. Reveal state (`isConfirming`) starts closed. The warning box states permanence, names exactly what is retained (reviews, feedback, and the log rows they reference), and states logging is not paused. A controlled text `input` (`confirmation`) is compared with `===` against `NL_TELEMETRY_CLEAR_PHRASE` (imported from `./actions`, not re-declared) to gate the submit button (`disabled={isPending \|\| !phraseMatches}`); the input, submit button and Cancel button are all `disabled` while `isPending`. Cancel resets both `isConfirming` and `confirmation` to their initial values and submits nothing (`type="button"`, no `formAction`). A `useEffect` keyed on `state.counts` — set only on committed success, never alongside `state.error` — collapses the panel and clears the typed text once the action actually commits, so a failed submission leaves the form open with the error visible instead of silently resetting. The success report renders `state.message` (the action's own deleted/retained-log sentence) plus a second line built directly from `state.counts.retainedReviewRows`, `retainedFeedbackRows` and `detachedAppHealthLinks` via `@/lib/format`'s `formatNumber`, so the two counts the action's message text does not mention are still surfaced from the returned counts object rather than only implied. |
+| `src/app/admin/nl-search/page.tsx` | Imported `ClearTelemetryForm` (`@/app/admin/nl-search/ClearTelemetryForm`, matching `EditorForm.tsx`'s same-directory alias-import precedent for `DeleteMatchButton`) and rendered `<ClearTelemetryForm />` directly after the page-header block and before the period-selector paragraph — beside the period/export controls, per §10's "natural location". The subtitle's prior unqualified claim ("Read-only telemetry: `nl_search_log` is append-only …") is corrected to: `nl_search_log` is "otherwise-append-only telemetry" and a Super Admin can clear disposable rows below, while every review and every piece of reader feedback — and the log rows they reference — is retained regardless. This satisfies the runbook's "does not imply reviews/feedback will be deleted" instruction by stating the opposite affirmatively rather than merely removing the old claim. |
+| `docs/search.md` | One new paragraph, "Clearing telemetry (AFLDB-ISSUE-119, migration 081)", inserted between the existing `/admin/nl-search` paragraph and the closing "Nothing here auto-promotes anything" paragraph. States the retention guarantees (reviews, feedback, recursive ancestry, app-health rows, sequences), the phrase-confirmation requirement, the restricted `SECURITY DEFINER` function and its `EXECUTE`-only grant, the same-transaction audit row, and that logging resumes immediately post-cutoff. No other line in the file was changed. |
+| `CHANGELOG.md` | New `### AFLDB-ISSUE-119 …` entry added at the top of `## [Unreleased]`, above the existing ISSUE-110 entries, dated 1 September 2026. Describes the user-facing capability (what is deleted, what is retained, the typed confirmation), the restricted database capability backing it, and the atomic audit — no SQL/internal implementation detail beyond what a changelog reader needs. |
+
+### 30.3 Source reviewed before writing code
+
+Per CLAUDE.md's Next.js addendum, `node_modules/next/dist/docs/01-app/02-guides/forms.md` was read for current Server Action/`useActionState`/pending-state guidance before writing the component; nothing in it contradicts the pattern already used by `ReviewForm.tsx`/`DeleteMatchButton.tsx`, so no deviation from those existing patterns was needed. `DeleteMatchButton.tsx`, `EditorForm.tsx` and `ReviewForm.tsx` were read in full; `actions.ts` and `nl-search-telemetry-clear.ts` were re-read to confirm the exact `NlClearTelemetryState`/`NlTelemetryClearCounts` shapes this component depends on; `src/lib/format.ts` was read for `formatNumber`'s null-handling contract (irrelevant here since every count is a non-null `number`, but confirmed before use). `globals.css`/`themes.css` were grepped, not fully read, to confirm `--color-warn`, `--bg-raised`, `.btn-secondary` and `.notice` already exist and this step defines no new class.
+
+### 30.4 Component test — deliberately not added, and why
+
+The runbook and this step's operating instruction both ask for "focused UI/component tests using existing repository conventions where practical." This repository has no React-rendering test convention to extend: `vitest.config.mts` sets `environment: 'node'` and `include: ['tests/**/*.test.ts']` (not `.tsx`), no `@testing-library/react`, `jsdom` or `happy-dom` is a dependency, and a repository-wide `grep` for `testing-library`/`render(`/`jsdom` across `tests/` and config returned nothing. The closest existing analogue — `DeleteMatchButton.tsx`, the destructive-action component this one's pattern is modelled on — itself has no test file. §12's own file table places real confirm/cancel/success UI coverage in guarded Playwright against a disposable `_test` deployment, not in a `vitest` component test, which matches this finding: the repository's established practice is to unit-test extracted pure logic (e.g. `match-lineup-editor.test.ts` against `src/lib/match-lineup-editor.ts`) and to leave interactive JSX to Playwright. `ClearTelemetryForm.tsx` has no pure logic of its own to extract beyond a single `===` phrase comparison against the same `NL_TELEMETRY_CLEAR_PHRASE` constant already exercised by `tests/admin-nl-search-actions.test.ts`. Adding a rendering harness (a new `jsdom`/`happy-dom` devDependency, a `vitest.config.mts` environment/include change, `@testing-library/react`) to cover one component would be a repository-wide testing-infrastructure change outside this step's scope and was not attempted. This is recorded as a deliberate, reasoned decision, not a silent gap — real interactive coverage (confirm/cancel/pending/success/refresh) remains the guarded Playwright work item already scoped in §12/§13/§16 criterion 10.
+
+### 30.5 Validation performed this session
+
+```text
+npx vitest run tests/admin-nl-search-actions.test.ts   → 11/11 passed (file unchanged by this step; re-run to confirm nothing regressed)
+npm run typecheck                                      → passed ("Types generated successfully")
+git diff --check                                       → clean
+```
+
+No SQL, migration, privilege, database, build, lint, Playwright, deployment or production command ran this session. `npm run build`, `npm run lint` and the guarded PostgreSQL/Playwright suites were deliberately not run — narrower evidence already answers this step's own scope, and CLAUDE.md §10/§11 reserve the broader commands for when targeted checks are insufficient or the user requests them.
+
+### 30.6 Files changed this step
+
+```text
+ M CHANGELOG.md
+ M docs/search.md
+ M src/app/admin/nl-search/page.tsx
+?? src/app/admin/nl-search/ClearTelemetryForm.tsx
+```
+
+`issues/open/AFLDB-ISSUE-119.md` (this file) is also modified, recording this step. Nothing was committed.
+
+### 30.7 Blockers / deviations
+
+None. No contradiction between current source and the approved §6/§10/§11 contract was found. The one open judgement call — omitting a new component test file — is a scoped, documented decision (§30.4), not a defect or a silent redesign, and does not touch any settled database/security/audit/action decision.
+
+### 30.8 Acceptance criteria status (§16)
+
+Criteria 1, 2, 6, 7, 8 (retained closure, audit, concurrency): unchanged, resting on the already-**executed** §25 evidence (9/9, run against applied migration `081` inside always-rolled-back transactions), not re-verified this step. Criterion 5 (DB role): both halves already **passed** — grant-side in §24 (34/34, catalogue-level), execution-side in §25 (restricted `afldb_auth` credential invoked the function successfully and was refused direct `DELETE`/`TRUNCATE`). Criterion 3 (caller): unchanged from §29.7. Criterion 4 (confirmation): **now fully satisfied** — client gate added this step, server gate proven in §29.7. Criterion 9 (revalidation): unchanged from §29.7 at the action level; this step adds no new revalidation path. Criterion 10 (tests): DB-free action tests and typecheck evidence stand (§29.7); the guarded PostgreSQL integration suites are **already executed and passed** (§24, §25) — the only piece of criterion 10 still unexecuted is guarded Playwright UI coverage. Criterion 11 (tracking): this file, updated this step; `IssuesIndex.md`/`issues.md` re-checked against current state and corrected in §30.9 below — an earlier draft of this section and of the header status line above incorrectly described the integration suites as unexecuted, which has been fixed in place before this file was left.
+
+### 30.9 IssuesIndex.md / issues.md sync check — corrected
+
+Both were re-read narrowly (the ISSUE-119 row/entry only) and found **materially stale**, not current as this section originally (incorrectly) claimed: both still said the UI was not started and both pointed the next action at writing it. Both have now been updated in place to record that the UI/docs/changelog step landed this session (§30), that `tests/admin-nl-search-actions.test.ts` (11/11) and `npm run typecheck` were re-confirmed, that no component test file was added and why, and that the sole remaining acceptance evidence is guarded Playwright UI coverage — not the PostgreSQL integration suites, which §24/§25 already ran and passed. `issues.md`'s ledger `Status` line and `IssuesIndex.md`'s glance-table row were both edited; `issues.md`'s `Fix`/`Validation`/`Follow-up` prose was left as previously written (already accurate about §24/§25) rather than re-padded further.
+
+### 30.10 Exact next action
+
+The database, security, audit and Server Action layers are already fully evidenced by execution (§24, §25, §29.7) — do not re-run `tests/integration/nl-search-telemetry-clear.test.ts` or `tests/integration/privileges.test.ts`; they already passed 9/9 and 34/34 respectively and nothing this step touched can have changed that. The one acceptance-criterion gap left is guarded Playwright UI coverage (§12, §13 "UI", §16 criterion 10): run the guarded Playwright suite (`tests/admin-nav/` or a dedicated file per §12) against a disposable `_test` deployment to prove real confirm/cancel/pending/success/refresh behaviour for `ClearTelemetryForm` — initial action non-destructive; wrong/partial phrase disabled client-side and refused server-side; Cancel performs no request; pending prevents double submit; success reports counts and refreshes NL admin/feedback/detail and app-health data; a plain-admin/unauthenticated session cannot reach the page or action. If it passes: Stage 2 is ready for closure — update this issue's `Status` to resolved, move it out of `IssuesIndex.md`/the `issues.md` Open Issues table, and confirm the `CHANGELOG.md` entry added this step needs no revision. If it fails: the failure is this step's blocker — fix only what it implicates (the component, the action, or a genuine contradiction with the approved §6/§10/§11 contract, which must stop and be escalated rather than be silently redesigned).
+
+## 31. Session record — 2026-09-01 (Stage 2, step: guarded Playwright acceptance harness)
+
+### 31.1 Scope of this step
+
+Followed §30.10 / the Playwright investigation recorded in this session's opening findings: **write** the guarded Playwright acceptance harness for `ClearTelemetryForm`, as a dedicated config + test directory rather than folded into `tests/admin-nav/`. Nothing was executed — the harness is unrunnable until two operator prerequisites exist (§31.6). No migration, privilege, query-helper, audit-helper, Server Action or existing integration/unit test was touched; `git status --short` at the end of this step shows only the six harness files below plus the three tracking files. No contradiction with the approved §5/§6/§10/§11 contract was found, so this step did not stop early.
+
+### 31.2 Files added
+
+| File | Purpose |
+|---|---|
+| `playwright.telemetry-clear.config.ts` | Separate Playwright config (sibling of `playwright.admin-nav.config.ts` / `playwright.nl-stress.config.ts`), **not** wired into any `npm` script. `workers: 1`, `retries: 0`, `fullyParallel: false`, no `webServer` block. Calls `assertDisposableTestTarget()` at module load, so `playwright test --config playwright.telemetry-clear.config.ts` aborts before launching a browser unless the target is safe. Two projects: `setup` (`auth.setup.ts`) and `clear` (`telemetry-clear.spec.ts`, `dependencies: ['setup']`). |
+| `tests/admin-nl-search-clear/target-guard.ts` | The load-bearing safety module, imported by the config, the setup, the spec and the seed. `assertDisposableTestTarget()` refuses unless `AFLDB_E2E_BASE_URL` is set (no default), is a bare `http(s)` origin, resolves to a loopback host (`127.0.0.1` / `localhost` / `::1`), is **not** `10.0.40.100` (named and refused with a specific message), and `AFLDB_E2E_TELEMETRY_CLEAR_CONFIRM` is set and ends in `_test`. `assertDisposableTestDatabase()` refuses unless `AFLDB_TEST_DATABASE_URL` names a database ending in `_test`, not `afldb_dev` and not matching `/prod/i`, and `AFLDB_E2E_TELEMETRY_CLEAR_CONFIRM` equals that exact database name. No `??` fallback anywhere; every failure is a thrown sentence. |
+| `tests/admin-nl-search-clear/seed.ts` | Deterministic disposable fixture over `postgres` (own single-connection client on the validated `AFLDB_TEST_DATABASE_URL`, **not** `@/db/client`). `reseed()` DELETEs every row from `nl_search_review`, `app_health_events`, `nl_search_feedback`, `nl_search_log` (FK-safe order, `DELETE` not `TRUNCATE`, no sequence reset) then inserts the fixture in §31.4; returns fixture ids + post-seed table counts. `readCounts()`, `survivingLogIds()`, `plantTargetMarker()`/`removeTargetMarker()`, `close()`. Calls `assertDisposableTestDatabase()` at import. |
+| `tests/admin-nl-search-clear/auth.setup.ts` | Two real logins through `/admin/login` with a freshly computed TOTP (reuses `../admin-nav/totp.ts`). `AFLDB_E2E_ADMIN_*` → `super.json`; `AFLDB_E2E_PLAIN_ADMIN_*` → `plain.json`. Each login is role-checked: the super account must reach `/admin/nl-search` (heading visible); the plain account must be redirected off it to `/admin` (a hollow negative test otherwise). Re-calls `assertDisposableTestTarget()`. |
+| `tests/admin-nl-search-clear/telemetry-clear.spec.ts` | The acceptance spec — projects/describes in §31.5. |
+| `tests/admin-nl-search-clear/.gitignore` | `.auth/` (the saved storage states are live signed admin sessions — same treatment as `tests/admin-nav/.gitignore` and the root ignore of `tests/nl-ui/.auth/`). |
+
+### 31.3 Layered destructive-target safety (source review)
+
+The same two questions — *is the deployment a throwaway loopback box?* and *is the database a `_test` one the operator explicitly named?* — are asked at four independent points, so running any single file with any `--config` still cannot reach dev/prod:
+
+1. **Config load** (`playwright.telemetry-clear.config.ts`) → `assertDisposableTestTarget()`. A bad `AFLDB_E2E_BASE_URL` or missing ack aborts `playwright test` before a browser starts.
+2. **Setup file** (`auth.setup.ts`) re-calls `assertDisposableTestTarget()` at import.
+3. **Spec file** (`telemetry-clear.spec.ts`) re-calls `assertDisposableTestTarget()` at import **and** restates the loopback host assertion as a visible expectation inside the "target is the disposable _test deployment" test.
+4. **Seed module** (`seed.ts`) calls `assertDisposableTestDatabase()` at import — the stricter check: DB name must end `_test`, must not be `afldb_dev`/`*prod*`, and `AFLDB_E2E_TELEMETRY_CLEAR_CONFIRM` must equal that exact name, so a stale ack from another project cannot arm a wipe.
+
+`10.0.40.100` (the shared dev server) is refused by name with a dedicated message even though the generic non-loopback branch would also catch it. There is no default for `AFLDB_E2E_BASE_URL`, `AFLDB_TEST_DATABASE_URL` or `AFLDB_E2E_TELEMETRY_CLEAR_CONFIRM` — each unset value is a hard failure. The config has no `webServer` block, so the runner never starts a fallback server.
+
+**In-browser proof the deployment and the seed share one database** (not just an assertion about env vars): the first test plants one uniquely-worded disposable row through the seed's owner connection, then fetches `/admin/nl-search/export?dataset=searches&days=7` as the real super-admin session and asserts the marker string is in the CSV. If the deployment were pointed at a different database, the marker would be absent and every destructive test is then known-invalid. The marker row is removed in a `finally`.
+
+### 31.4 The deterministic fixture and why the counts are exact
+
+`reseed()` wipes the four tables first — deliberately, because `nl_search_telemetry_clear()` returns **table-wide** `retained_*` counts (`SELECT count(*) FROM nl_search_review`, etc.), so a deterministic assertion on the five returned counts is only possible from a known-empty start. That full wipe is safe here and nowhere else precisely because §31.3 gates it to an operator-named disposable `_test` database. It is `DELETE`, not `TRUNCATE`, and resets no sequence.
+
+Fixture (ids returned by `reseed()`):
+
+- **retained (6)** — `gp → grandparent → parent → leaf` (a depth-4 `parent_search_id` chain; only `leaf` carries a review), plus `fbParent → fbMatched` (`fbMatched.client_ref` matched by a feedback row).
+- **disposable (5)** — `sibling` (off mid-chain `grandparent`), `childOfLeaf` (child of the retained leaf), `plain1`, `plain2`, `synthetic` (`run_tag = 'issue-119-e2e'`).
+- **feedback (2)** — one matching `fbMatched`, one orphan (`client_ref` matches no log).
+- **review (1)** — on `leaf`.
+- **app_health_events (3)** — linked to `plain1` (disposable → link detached, row kept), linked to `leaf` (retained → link kept), unlinked.
+
+Expected clear result, asserted both through the UI success panel and directly via `seed.*`:
+
+| Count | Value | Reason |
+|---|---|---|
+| `deletedLogRows` | 5 | the 5 disposable rows; the sibling/child prove retention follows ancestry, not the connected component |
+| `retainedLogRows` | 6 | 2 directly protected + full 4-deep ancestry |
+| `retainedReviewRows` | 1 | never deleted |
+| `retainedFeedbackRows` | 2 | matched **and** orphan both kept |
+| `detachedAppHealthLinks` | 1 | only the link to `plain1`; the health row itself survives |
+
+UI strings asserted verbatim: `Cleared 5 disposable search log rows.` / `6 log rows retained, alongside every review and feedback row.` (the action's message) and `Retained: 1 review, 2 feedback rows.` / `1 app-health link detached from cleared rows.` (the component's second line, from `NlTelemetryClearCounts`).
+
+**Cleanup / reseed determinism:** every state-dependent test calls `seed.reseed()` itself, so order does not matter and a re-run is clean. A successful destructive run leaves the 6 retained rows behind; a second clear with no reseed would report `deletedLogRows = 0` — hence "safe to repeat only after reseeding", which the harness enforces by reseeding at the top of each destructive test. `seed.close()` ends the pool in a file-scope `afterAll`. The `.auth/*.json` states are gitignored and regenerated by the `setup` project each run.
+
+### 31.5 Acceptance flows covered
+
+All in `telemetry-clear.spec.ts`, `clear` project, run serially on one worker:
+
+| Runbook flow | Test | How |
+|---|---|---|
+| Target is the disposable `_test` deployment | `the deployment under test reads the same _test database the seed writes` | loopback host assertion + seeded-marker round-trip through the real super-admin CSV export |
+| Reveal / cancel | `reveal then cancel collapses the panel, sends no action, changes nothing` | reveal → warning + input visible, submit disabled → Cancel → panel gone, reveal button back; asserts **zero** POSTs to `/admin/nl-search` and `readCounts()` byte-equal to the just-seeded counts |
+| Exact phrase gating | `the submit button stays disabled until the exact phrase is typed` | empty / `CLEAR SEARCH` / wrong-case / trailing-space / one-char-short all leave submit `disabled`; only the exact phrase enables it (client-side; the server re-check is already proven in §29.7) |
+| Successful clear + returned counts | `clears only disposable rows, retains reviews and feedback, reports five counts` (DESTRUCTIVE) | reseed → reveal → type phrase → submit → assert the four UI strings, panel collapse, then DB-side: `survivingLogIds(disposable) == []`, `survivingLogIds(retained) == retained`, `readCounts() == {logs:6, reviews:1, feedback:2, healthRows:3, attachedLinks:1}` |
+| Retained review/feedback messaging | same test | the `Retained: 1 review, 2 feedback rows.` / `1 app-health link detached…` line, plus the DB check that both feedback rows and the review are still present |
+| Super Admin-only access | `a plain admin` describe (`plain.json`): redirected off `/admin/nl-search` to `/admin`, reveal button count 0, and the `export` route returns a 3xx redirect; `an unauthenticated visitor` describe (empty storage state): bounced to `/admin/login`, reveal button count 0 | — |
+
+Forged direct Server Action invocation is **not** re-covered here — it is already evidenced DB-free in `tests/admin-nl-search-actions.test.ts` (§29.7); Playwright covers the surface reachability that the unit tests cannot.
+
+### 31.6 Blockers / operator prerequisites
+
+The harness cannot run until the operator establishes, on the Linux host:
+
+1. **A real non-super plain-admin account** and its `AFLDB_E2E_PLAIN_ADMIN_EMAIL` / `_PASSWORD` / `_TOTP_SECRET`. The existing `AFLDB_E2E_ADMIN_*` diagnostic account (super) is reused for `super.json`.
+2. **A disposable loopback `_test` deployment of this branch**: a standalone build (`npm run build`) run bound to `127.0.0.1`, its `DATABASE_URL` and `AFLDB_AUTH_DATABASE_URL` pointed at the `afldb_test` database (migration `081` already applied and privileges reconciled there per §23–§25), and `AFLDB_BETA_GATE=off` so `/admin/*` is reachable. Its process env must **not** carry any `afldb_dev`/production DSN.
+3. `AFLDB_TEST_DATABASE_URL` (owner DSN for that same `afldb_test`) available to the Playwright process for `seed.ts` — it is already in the worktree `.env` from §23.
+4. `AFLDB_E2E_TELEMETRY_CLEAR_CONFIRM=afldb_test` (or the exact disposable DB name, if different).
+
+Neither prerequisite is Claude's to create (a real credential; a Linux runtime deployment), consistent with CLAUDE.md §9/§11.
+
+### 31.7 Exact run command / setup
+
+On the Linux host, from the worktree:
+
+```
+# one-time (already done in §23–§25 — re-run only to re-verify; both are no-ops / idempotent)
+npm run db:migrate:test
+npm run db:privileges:test
+
+# shell A — the disposable deployment, loopback only, pointed at afldb_test
+npm run build
+DATABASE_URL="$AFLDB_TEST_DATABASE_URL_APP" \
+AFLDB_AUTH_DATABASE_URL="$AFLDB_TEST_AUTH_DATABASE_URL" \
+AFLDB_ENV=development AFLDB_BETA_GATE=off PORT=3400 \
+  node .next/standalone/server.js
+#   AFLDB_TEST_DATABASE_URL_APP = same host/db as AFLDB_TEST_DATABASE_URL, user afldb_app
+
+# shell B — run the guarded harness against ONLY that deployment
+AFLDB_E2E_BASE_URL=http://127.0.0.1:3400 \
+AFLDB_E2E_TELEMETRY_CLEAR_CONFIRM=afldb_test \
+AFLDB_E2E_ADMIN_EMAIL=…        AFLDB_E2E_ADMIN_PASSWORD=…        AFLDB_E2E_ADMIN_TOTP_SECRET=… \
+AFLDB_E2E_PLAIN_ADMIN_EMAIL=…  AFLDB_E2E_PLAIN_ADMIN_PASSWORD=…  AFLDB_E2E_PLAIN_ADMIN_TOTP_SECRET=… \
+  npx playwright test --config playwright.telemetry-clear.config.ts
+```
+
+`AFLDB_TEST_DATABASE_URL` must also be visible to shell B (from `.env`). Chromium must be installed (`npx playwright install chromium`). The spec reseeds itself, so it is safe to re-run; to fully reset the disposable DB afterwards, `npm run db:test:rebuild`.
+
+### 31.8 Validation performed this step
+
+Static source review only, consistent with the CLAUDE.md execution boundary and the "do not run Playwright yet" instruction:
+
+- **Destructive-target safety** — traced every env read in `target-guard.ts`: no `??`/`||` default on any of the three variables; loopback allow-list is a closed `Set`; `10.0.40.100` refused by name; `assertDisposableTestDatabase()` pins the ack to the exact DB name and rejects `afldb_dev` / `/prod/i` / any non-`_test` suffix. Confirmed all four call sites (config, setup, spec, seed) invoke a guard at import.
+- **Deterministic reseed / cleanup** — hand-checked the fixture against migration `081`'s `WITH RECURSIVE` closure: retained = {leaf, parent, grandparent, gp, fbMatched, fbParent}; deleted = {sibling, childOfLeaf, plain1, plain2, synthetic}; `detached = v_linked_before(2) − v_linked_after(1) = 1`. Wipe order respects the `nl_search_review → nl_search_log` `NO ACTION` FK. Every state-dependent test calls `reseed()`; `plantTargetMarker()` is paired with a `finally` `removeTargetMarker()`; `seed.close()` runs in `afterAll`.
+- **Playwright API / selectors** — `revealButton` uses an anchored regex (`/^(🗑\s*)?clear search telemetry$/i`) that cannot also match the `Yes, clear search telemetry` submit button or the `Clearing…` pending label; success-string assertions rely on `getByText` resolving to the smallest element fully containing the string (the `<strong>` / `<span class="muted">`), which is unambiguous here; `page.request.get(…, { maxRedirects: 0 })` is used for the plain-admin export 3xx check.
+- **Not run:** `npm run typecheck`, `npx eslint`, and Playwright itself — not authorised this step. `npm run typecheck` is the recommended first operator action before the run (the new files are under `tsconfig` `**/*.ts`); the harness mirrors `tests/admin-nav/` conventions (import order, `test as setup`, non-null assertions after `expect`) which already pass lint/typecheck in this repo.
+
+### 31.9 Untouched, and confirmed still consistent
+
+`src/db/migrations/081_nl_search_telemetry_clear.sql`, `tools/maintenance/privileges.sql`, `src/db/queries/nl-search-telemetry-clear.ts`, `src/lib/auth/session.ts`, `src/app/admin/nl-search/actions.ts`, `tests/integration/nl-search-telemetry-clear.test.ts`, `tests/integration/privileges.test.ts` — none modified. The harness consumes their established contract (the five `NlTelemetryClearCounts` keys, the `CLEAR SEARCH TELEMETRY` phrase, `requireSuperAdmin()`'s plain-admin `redirect('/admin')`, the `.notice` success panel) and found no contradiction with it.
+
+### 31.10 Exact next action
+
+Operator establishes the two prerequisites in §31.6, then runs the command in §31.7. If it passes: Stage 2 is ready for closure — set this issue's `Status` to resolved, move it out of `IssuesIndex.md` and the `issues.md` Open Issues table, and confirm the §30 `CHANGELOG.md` entry needs no revision. If it fails: fix only what the failure implicates — the harness files, or (if the failure exposes a genuine contradiction with the approved §6/§10/§11 contract or the migration `081` behaviour) stop and escalate rather than redesign. Do not re-run the §24/§25 PostgreSQL integration suites; they are unaffected by this step.
+
+## 32. Validation checkpoint — 2026-09-01 (Stage 2, step: UI/docs/harness type-validated)
+
+### 32.1 Why this section exists
+
+§31 wrote the guarded Playwright acceptance harness and left it in the worktree with static source review only; §31.8 explicitly recorded `npm run typecheck` as **not run** and named it "the recommended first operator action before the run". This section persists that check now that it has been executed. No migration, privilege, query-helper, audit-helper, Server Action, component, integration test or harness file was changed to produce it — this checkpoint is evidence persistence only, and `git status --short` still shows the same working set as §31 (the six harness files plus the three tracking files, alongside the earlier `M src/app/admin/nl-search/page.tsx` / `?? ClearTelemetryForm.tsx` / `M CHANGELOG.md` / `M docs/search.md` from §30).
+
+### 32.2 Evidentiary basis
+
+**Operator-run and operator-reported**, as in §24.2 and §27.2. Claude executed no test, typecheck, build, SQL, database, migration or deployment command in this step and inspected no raw terminal output beyond the reported result line.
+
+### 32.3 The command and its reported result
+
+```text
+> npm run typecheck
+  passed — final output: ✓ Types generated successfully
+```
+
+### 32.4 What is now evidenced — and its exact boundary
+
+- The §30 UI/docs integration (`ClearTelemetryForm.tsx`, the `page.tsx` wiring and corrected subtitle) and the §31 guarded Playwright harness (`playwright.telemetry-clear.config.ts` + `tests/admin-nl-search-clear/`) are **type-valid** against the repository `tsconfig` (`**/*.ts` includes the new harness files). The harness consumes the established contracts — the five `NlTelemetryClearCounts` keys, the `CLEAR SEARCH TELEMETRY` phrase, `requireSuperAdmin()`'s plain-admin `redirect('/admin')`, the `.notice` success panel — with no type error at those seams.
+- This is a compile-time check only. **Playwright itself has still not been executed**; no browser, no real login, no seed, no clear has run through the harness.
+
+### 32.5 Remaining acceptance blockers — operator prerequisites only
+
+No further Claude-side work is outstanding before the guarded Playwright run. What remains is entirely operator infrastructure, per §31.6:
+
+1. a real **non-super plain-admin** account and its `AFLDB_E2E_PLAIN_ADMIN_EMAIL` / `_PASSWORD` / `_TOTP_SECRET`;
+2. a disposable **loopback `_test` deployment** of this branch (`AFLDB_BETA_GATE=off`, `DATABASE_URL` / `AFLDB_AUTH_DATABASE_URL` → `afldb_test`, no `afldb_dev`/production DSN in its env);
+3. **Chromium installed** for Playwright if not already present (`npx playwright install chromium`).
+
+### 32.6 Exact next action
+
+Checkpoint this milestone, then run the guarded Playwright acceptance (§31.7 command) against the disposable `_test` deployment once the §32.5 prerequisites exist. On a green run, close Stage 2 per §31.10.
