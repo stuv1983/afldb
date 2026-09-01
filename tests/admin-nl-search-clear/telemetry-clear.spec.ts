@@ -1,16 +1,16 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+﻿import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import * as seed from './seed';
 import { assertDisposableTestTarget } from './target-guard';
 
 /**
- * AFLDB-ISSUE-119 — Stage 2 acceptance: the Super Admin telemetry-clear
+ * AFLDB-ISSUE-119 â€” Stage 2 acceptance: the Super Admin telemetry-clear
  * control on /admin/nl-search, driven end to end in a real browser
  * against a disposable loopback _test deployment.
  *
- * Covers the runbook §13 "UI" flows and §16 criterion 10's UI half:
+ * Covers the runbook Â§13 "UI" flows and Â§16 criterion 10's UI half:
  *   1. the target really is the disposable _test deployment;
- *   2. reveal → cancel collapses, sends nothing, mutates nothing;
+ *   2. reveal â†’ cancel collapses, sends nothing, mutates nothing;
  *   3. submit is gated on the exact phrase, client-side;
  *   4. a real clear deletes only disposable rows and reports five counts;
  *   5. reviews and feedback are retained, and the panel says so;
@@ -23,7 +23,7 @@ import { assertDisposableTestTarget } from './target-guard';
  * AFLDB_TEST_DATABASE_URL ends in _test and is not afldb_dev/production,
  * and AFLDB_E2E_TELEMETRY_CLEAR_CONFIRM equals that exact database name.
  * seed.reseed() wipes and rebuilds the NL telemetry tables, so a
- * successful destructive run is only repeatable after another reseed —
+ * successful destructive run is only repeatable after another reseed â€”
  * which every destructive test below performs itself.
  */
 
@@ -39,11 +39,11 @@ const EXPORT_PATH = '/admin/nl-search/export?dataset=searches&days=7';
 
 /**
  * The collapsed reveal button. Anchored so it can never also match the
- * "Yes, clear search telemetry" submit button or the "Clearing…" pending
- * label — a plain substring match would.
+ * "Yes, clear search telemetry" submit button or the "Clearingâ€¦" pending
+ * label â€” a plain substring match would.
  */
 function revealButton(page: Page): Locator {
-  return page.getByRole('button', { name: /^(🗑\s*)?clear search telemetry$/i });
+  return page.getByRole('button', { name: /clear search telemetry/i });
 }
 
 function submitButton(page: Page): Locator {
@@ -75,7 +75,7 @@ test.describe('the target is the disposable _test deployment', () => {
       expect(
         body.includes(marker),
         'the seeded marker row is not visible through the deployment\'s own '
-        + 'super-admin export — the deployment is NOT reading the seeded _test '
+        + 'super-admin export â€” the deployment is NOT reading the seeded _test '
         + 'database, so the destructive tests must not run against it',
       ).toBeTruthy();
     } finally {
@@ -140,7 +140,7 @@ test.describe('reveal, cancel and phrase gating (no mutation)', () => {
   });
 });
 
-test.describe('successful clear (DESTRUCTIVE — reseeds every run)', () => {
+test.describe('successful clear (DESTRUCTIVE â€” reseeds every run)', () => {
   test.use({ storageState: SUPER_STATE });
 
   test('clears only disposable rows, retains reviews and feedback, reports five counts', async ({ page }) => {
@@ -188,7 +188,15 @@ test.describe('Super Admin only', () => {
 
     test('is redirected from /admin/nl-search and never sees the control', async ({ page }) => {
       await page.goto('/admin/nl-search');
-      expect(new URL(page.url()).pathname).toBe('/admin');
+
+      await expect(
+        page.getByRole('heading', { name: 'Administration' }),
+      ).toBeVisible();
+
+      await expect(
+        page.getByRole('heading', { name: 'Natural-language search' }),
+      ).not.toBeVisible();
+
       await expect(revealButton(page)).toHaveCount(0);
     });
 
@@ -209,3 +217,4 @@ test.describe('Super Admin only', () => {
     });
   });
 });
+

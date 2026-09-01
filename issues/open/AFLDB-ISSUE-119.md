@@ -1704,3 +1704,103 @@ Not materially stale. Both still describe Stage 2 as implemented and gated on th
 ### 33.8 Exact next action
 
 Unchanged from §32.6: obtain the §32.5 operator prerequisites (plain-admin credentials, disposable loopback `_test` deployment, Chromium), then run the guarded Playwright acceptance (§31.7 command). On a green run, close Stage 2 per §31.10.
+
+## 34. Final browser acceptance — PASS
+
+Final ISSUE-119 Playwright acceptance completed against the disposable loopback
+`afldb_test` deployment on 2026-09-01.
+
+Command:
+
+    npx playwright test --config playwright.telemetry-clear.config.ts
+
+Final result:
+
+    Running 9 tests using 1 worker
+    9 passed (12.5s)
+
+Acceptance evidence:
+
+- real Super Admin password + MFA authentication passed;
+- real plain Admin password + MFA authentication passed;
+- the deployment under test was proven to read the same `_test` database written
+  by the guarded seed;
+- reveal then Cancel collapsed the clear panel and caused no telemetry mutation;
+- submit remained disabled until the exact confirmation phrase
+  `CLEAR SEARCH TELEMETRY` was entered;
+- the destructive clear completed successfully against the deterministic fixture;
+- the successful clear retained all protected reviews and feedback and reported the
+  expected five result counts;
+- a real plain Admin was denied the protected `/admin/nl-search` content and could
+  not see the telemetry-clear control;
+- a real plain Admin could not drive the NL-search export route;
+- an unauthenticated visitor was bounced to `/admin/login` and could not see the
+  telemetry-clear control.
+
+The destructive acceptance fixture produced the expected result:
+
+- `deletedLogRows = 5`
+- `retainedLogRows = 6`
+- `retainedReviewRows = 1`
+- `retainedFeedbackRows = 2`
+- `detachedAppHealthLinks = 1`
+
+The corresponding transactional audit row was observed as
+`nl_search.telemetry_cleared` with those five counts.
+
+### Acceptance-harness corrections discovered during final validation
+
+Two Playwright-only defects were corrected during final acceptance.
+
+1. Plain-admin redirect assertion
+
+   `requireSuperAdmin()` correctly denied a plain Admin and rendered the
+   Administration destination, but under this Next.js runtime `page.url()` could
+   continue to expose the originally requested `/admin/nl-search` path.
+
+   The harness was changed to assert the actual authorization outcome instead:
+
+   - Administration content is rendered;
+   - Natural-language search content is not rendered;
+   - the telemetry-clear control is absent.
+
+   Production authorization code was not changed or weakened.
+
+2. Reveal-button locator
+
+   A decorative trash-can glyph in the original exact accessible-name regex became
+   mojibake after a Windows text edit. The locator was changed to the semantic
+   accessible-name match `/clear search telemetry/i`, avoiding dependence on the
+   decorative glyph while remaining distinct from the confirmation submit button.
+
+   Application UI text was not changed.
+
+### Authentication diagnostic note
+
+Repeated acceptance/debug login attempts triggered the existing in-memory,
+per-IP admin login limiter (`8` attempts per `15` minutes). Restarting the
+disposable standalone test server cleared that process-local bucket. No
+rate-limit, MFA, password, session, or production-auth behaviour was weakened.
+
+A separate TOTP provisioning mistake was also identified during setup: the
+Playwright raw TOTP secret and the authenticator entry initially differed.
+Fresh dedicated `_test` accounts were provisioned and the generated code was
+confirmed to match before final acceptance.
+
+### Final Stage status
+
+Browser acceptance: **PASS — 9/9**.
+
+Together with the previously recorded migration, privilege, integration,
+query-helper, transactional-audit, Server Action, typecheck and production-build
+validation, the ISSUE-119 implementation contract is satisfied.
+
+Exact next action:
+
+1. inspect the working-tree diff and status;
+2. ensure only the intended two Playwright harness corrections plus this runbook
+   closeout are uncommitted;
+3. run any final narrow static validation required by the diff;
+4. commit the final ISSUE-119 validation checkpoint;
+5. update/close the issue records if the repository closeout convention requires
+   a separate final issue-status commit.

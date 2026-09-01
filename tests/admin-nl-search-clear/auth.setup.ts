@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+﻿import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import { expect, test as setup, type Page } from '@playwright/test';
@@ -7,17 +7,17 @@ import { totpCode } from '../admin-nav/totp';
 import { assertDisposableTestTarget } from './target-guard';
 
 /**
- * AFLDB-ISSUE-119 — real authenticated sessions for the telemetry-clear
+ * AFLDB-ISSUE-119 â€” real authenticated sessions for the telemetry-clear
  * acceptance harness.
  *
  * Two accounts, two saved storage states:
  *
- *   super.json  a real super_admin — drives the clear, sees the control.
- *   plain.json  a real NON-super admin — used only to prove it is bounced
+ *   super.json  a real super_admin â€” drives the clear, sees the control.
+ *   plain.json  a real NON-super admin â€” used only to prove it is bounced
  *               from /admin/nl-search and never sees the control.
  *
  * Both sign in through the real /admin/login form with a freshly computed
- * TOTP code (../admin-nav/totp.ts — the helper the admin-nav diagnostic
+ * TOTP code (../admin-nav/totp.ts â€” the helper the admin-nav diagnostic
  * uses). Nothing in the auth path is bypassed or weakened; credentials
  * arrive only via environment variables.
  *
@@ -73,7 +73,7 @@ setup('super admin session', async ({ page }) => {
   await page.goto('/admin/nl-search');
   await expect(
     page.getByRole('heading', { name: 'Natural-language search' }),
-    'AFLDB_E2E_ADMIN_* did not reach /admin/nl-search — it must be a super_admin.',
+    'AFLDB_E2E_ADMIN_* did not reach /admin/nl-search â€” it must be a super_admin.',
   ).toBeVisible();
 
   mkdirSync(dirname(SUPER_STATE), { recursive: true });
@@ -83,15 +83,27 @@ setup('super admin session', async ({ page }) => {
 setup('plain admin session', async ({ page }) => {
   await signIn(page, credsOrThrow('AFLDB_E2E_PLAIN_ADMIN'));
 
-  // Sanity: this account must NOT be a super admin. requireSuperAdmin()
-  // redirects a plain admin from /admin/nl-search to /admin; if it stays,
-  // the account is misconfigured and the negative test would be hollow.
+  // Sanity: this account must NOT be a super admin.
+  // Assert the rendered authorization outcome rather than relying on
+  // the browser URL changing after the server-side redirect.
   await page.goto('/admin/nl-search');
-  expect(
-    new URL(page.url()).pathname,
-    'AFLDB_E2E_PLAIN_ADMIN_* reached /admin/nl-search — it must be a NON-super admin.',
-  ).toBe('/admin');
+
+  await expect(
+    page.getByRole('heading', { name: 'Administration' }),
+    'AFLDB_E2E_PLAIN_ADMIN_* did not render the admin dashboard after being denied /admin/nl-search.',
+  ).toBeVisible();
+
+  await expect(
+    page.getByRole('heading', { name: 'Natural-language search' }),
+    'AFLDB_E2E_PLAIN_ADMIN_* rendered the protected NL Search page.',
+  ).not.toBeVisible();
+
+  await expect(
+    page.getByText('Clear search telemetry', { exact: false }),
+    'AFLDB_E2E_PLAIN_ADMIN_* can see the Super-Admin-only telemetry clear control.',
+  ).not.toBeVisible();
 
   mkdirSync(dirname(PLAIN_STATE), { recursive: true });
   await page.context().storageState({ path: PLAIN_STATE });
 });
+
