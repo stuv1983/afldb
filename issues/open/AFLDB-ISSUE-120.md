@@ -177,3 +177,41 @@ F2 and F3 remain unimplemented.
 Exact next action: checkpoint F1 in Git, then implement F2 ? bound
 `/api/health-event` request bodies to 32KB before JSON parsing, preserving the
 normal health-event positive path.
+
+## 13. F2 implementation checkpoint ? complete
+
+Completed 2026-09-01 on branch `codex/issue-120`.
+
+### Implementation
+
+`/api/health-event` now bounds request bodies to 32 KiB before JSON parsing.
+
+- reuses the early-access route's streaming `readBounded` pattern;
+- checks an honest oversized `Content-Length` immediately;
+- independently enforces the same limit while reading the stream, so chunked
+  or dishonest requests cannot force the whole body to be buffered first;
+- oversized input returns HTTP 413;
+- malformed in-bound JSON continues to return HTTP 400;
+- normal valid health-event handling is otherwise unchanged;
+- no schema, migration, privilege or Caddy changes were required.
+
+### Validation
+
+Operator-run:
+
+    npx vitest run tests/health-event-route.test.ts
+    3/3 passed
+
+The focused suite proves:
+
+- an oversized body is rejected with 413 and never reaches `logAppHealthEvent()`;
+- the streaming limit still rejects oversized input when no Content-Length is present;
+- a normal valid event retains the existing 204 response and write path.
+
+### Remaining ISSUE-120 work
+
+F3 remains unimplemented.
+
+Exact next action: checkpoint F2 in Git, then harden the two prototype-key lookups
+with `Object.hasOwn` guards and focused positive/negative controls.
+
