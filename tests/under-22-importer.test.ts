@@ -81,21 +81,23 @@ describe('22 Under 22 awards import contract', () => {
   it('makes every destructive awards reload restore the independent team data', () => {
     const dependencies = between(importer, 'GROUP_REQUIRES = {', '\n\n\ndef expand_groups');
     expect(dependencies).toContain(
-      '"awards": {"all_australian", "under_22", "rising_star"}',
+      '"awards": {"all_australian", "under_22", "rising_star", "club_bf"}',
     );
-    // all_australian (AFLDB-ISSUE-112 phase 5), under_22 and rising_star
-    // (phase 4) are all independently sourced legacy-free manifest reloads:
-    // a full 'awards' refresh still closes over them, but none is a
-    // GROUP_REQUIRES key, so each may run alone without dragging in the
-    // legacy 'awards' group.
+    // all_australian (AFLDB-ISSUE-112 phase 5), club_bf (phase 6), under_22
+    // and rising_star (phase 4) are all independently sourced legacy-free
+    // manifest reloads: a full 'awards' refresh still closes over them, but
+    // none is a GROUP_REQUIRES key, so each may run alone without dragging in
+    // the legacy 'awards' group.
     expect(dependencies).not.toMatch(/^\s*"all_australian":/m);
     expect(dependencies).not.toMatch(/^\s*"under_22":/m);
     expect(dependencies).not.toMatch(/^\s*"rising_star":/m);
-    const shared = ['awards', 'all_australian', 'under_22', 'rising_star'];
+    expect(dependencies).not.toMatch(/^\s*"club_bf":/m);
+    const shared = ['awards', 'all_australian', 'under_22', 'rising_star', 'club_bf'];
     expect(expandGroups('awards')).toEqual(shared);
     expect(expandGroups('all_australian')).toEqual(['all_australian']);
     expect(expandGroups('rising_star')).toEqual(['rising_star']);
     expect(expandGroups('under_22')).toEqual(['under_22']);
+    expect(expandGroups('club_bf')).toEqual(['club_bf']);
     const legacyAwardsLoader = between(
       importer,
       'def import_awards(',

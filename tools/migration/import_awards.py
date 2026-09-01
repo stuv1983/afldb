@@ -69,6 +69,11 @@ from common import (  # noqa: E402
 )
 from all_australian import AllAustralianSelection, load_all_australian  # noqa: E402
 from captaincies import Captaincy, load_captaincies  # noqa: E402
+from club_best_and_fairest import (  # noqa: E402
+    load_club_best_and_fairest,
+    load_club_best_and_fairest_definitions,
+    validate_family as validate_club_best_and_fairest_family,
+)
 from hall_of_fame import HallOfFameInductee, load_hall_of_fame  # noqa: E402
 from honour_teams import HonourTeamMember, load_honour_teams  # noqa: E402
 from rising_star import RisingStarNomination, load_rising_star  # noqa: E402
@@ -430,6 +435,18 @@ def import_awards(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
         award_ids[slug] for slug in (UNDER_22_SLUG, ALL_AUSTRALIAN_SLUG, COLEMAN_SLUG)
         if slug in award_ids
     ]
+    # Club best-and-fairest winners are loaded by the legacy-free 'club_bf'
+    # group (AFLDB-ISSUE-112 phase 6) from data/awards/club-best-and-fairest.csv,
+    # so the 19 bf-* awards are out of this reload's winner scope too — exactly
+    # as under_22, all_australian and coleman are. Their definitions stay in
+    # build_definitions() above (reconciled on the same slug key by both
+    # groups, id-stable), so nothing about the named-medal definitions here
+    # changes.
+    other_group_awards += [
+        award_ids[entry["slug"]]
+        for entry in definitions.values()
+        if entry["category"] == "club_best_and_fairest" and entry["slug"] in award_ids
+    ]
 
     def build_winners():
         for row_no, r in enumerate(rows, start=1):
@@ -604,6 +621,152 @@ def import_all_australian(pg, rep: Reporter, batch, clubs: ClubResolver,
         pg, "SELECT count(DISTINCT season) FROM award_winners WHERE award_id = %s", (award_id,)
     )
     rep.result("all_australian selections", total, f"({seasons} seasons, {linked} linked)")
+
+
+# ---------------------------------------------------------------------------
+# Group: club best-and-fairest
+# ---------------------------------------------------------------------------
+def import_club_best_and_fairest(pg, rep: Reporter, batch, clubs: ClubResolver,
+                                 sources: dict[str, int],
+                                 allow_link_loss: bool = False) -> None:
+    """Load the club best-and-fairest awards and winners from tracked manifests.
+
+    AFLDB-ISSUE-112 phase 6: ``data/awards/club-best-and-fairest.csv`` (752
+    winner rows) and ``data/awards/club-best-and-fairest-definitions.csv``
+    (the 19 ``bf-*`` award rows) replace the
+    ``award_category = 'club_best_and_fairest'`` slice of the legacy SQLite
+    ``awards`` table as the sole input, so this family runs with
+    ``AFLDB_LEGACY_SQLITE`` unset.
+
+    Two reloads, both keyed and id-preserving:
+
+    * the 19 definitions on ``slug``, scoped to exactly those slugs. The
+      still-legacy ``awards`` group also lists them in its own definition
+      build, keyed the same way, so a full refresh has the two paths agree
+      (and the named-medal definitions there are untouched);
+    * the winners on ``(source_id, source_record_id)``, scoped to the 19
+      ``bf-*`` awards AND to ``draftguru`` provenance (AFLDB-ISSUE-080) — the
+      legacy group now excludes these ``award_id`` values from its own winner
+      reload, and an admin or ingest-pipeline row on one of these awards is
+      not this loader's to reconcile.
+
+    ``club`` is the source's own verbatim string, re-resolved season-aware
+    through the same ``ClubResolver`` the legacy loader used, so ``club_id``
+    is reconstructed (rebuild-stable) and ``club_name_raw`` round-trips
+    byte-for-byte. ``player_id`` / ``link_status`` / ``candidate_count`` are
+    carried verbatim; a ``player_id`` absent from this database is dropped by
+    the same valid-player guard ``import_all_australian`` uses.
+    """
+    definitions = load_club_best_and_fairest_definitions()
+    winners = load_club_best_and_fairest()
+    validate_club_best_and_fairest_family(winners, definitions)
+
+    source_id = require_source(sources, "draftguru")
+
+    with pg.cursor() as cur:
+        cur.execute("SELECT year FROM seasons")
+        valid_seasons = {r[0] for r in cur.fetchall()}
+        cur.execute("SELECT id FROM players")
+        valid_players = {r[0] for r in cur.fetchall()}
+
+    def build_definitions():
+        for d in definitions:
+            batch.records_read += 1
+            # A club award belongs to the club as it is now; each winner row
+            # still carries the identity of its own season.
+            club_id, _ = clubs.resolve(d.club, d.last_season)
+            yield (
+                d.slug, d.name, d.category, None, club_id,
+                AWARD_DESCRIPTIONS.get(d.slug),
+                d.first_season, d.last_season,
+            )
+
+    # An award definition carries no player link of its own, so no
+    # resolution is read. Keying on the slug keeps awards.id stable, and with
+    # it every award_winners row that references it through an ON DELETE
+    # CASCADE foreign key.
+    reload_keyed(
+        pg, "awards", ["slug"],
+        ["slug", "name", "category", "competition", "club_id",
+         "description", "first_season", "last_season"],
+        build_definitions(), batch,
+        link_columns=None,
+        scope_column="slug", scope_values=[d.slug for d in definitions],
+        scope_exclude=False,
+    )
+    # No commit here: the winners reload below can still raise LinkDecisionLoss
+    # / ReloadOwnershipCollision before it writes a row, and import_batch's
+    # rollback must then undo the definitions too. The SELECT sees the
+    # uncommitted rows — same transaction, same connection.
+    with pg.cursor() as cur:
+        cur.execute(
+            "SELECT slug, id FROM awards WHERE category = 'club_best_and_fairest'"
+        )
+        award_ids = dict(cur.fetchall())
+    missing = sorted({d.slug for d in definitions} - award_ids.keys())
+    if missing:
+        raise RuntimeError(
+            "club best-and-fairest award definition(s) missing after reload: "
+            + ", ".join(missing)
+        )
+    bf_award_ids = sorted(award_ids.values())
+
+    def build_winners():
+        for w in winners:
+            batch.records_read += 1
+            if w.season not in valid_seasons:
+                batch.reject(w.source_key, "unknown season",
+                             {"season": w.season, "player": w.player})
+                continue
+            player_id = w.player_id if w.player_id in valid_players else None
+            status = link_status(w.link_status, player_id)
+            # The manifest's club string is exactly what the legacy loader
+            # passed here; re-resolving it reproduces club_id and the stored
+            # club_name_raw without freezing a surrogate id.
+            club_id, club_raw = clubs.resolve(w.club, w.season)
+            yield (
+                award_ids[w.award_slug], w.season, player_id, w.player, status,
+                w.candidate_count,
+                club_id, club_raw, None,
+                None, False, False,
+                w.note,
+                source_id, w.source_key, batch.id,
+            )
+
+    stats = reload_keyed(
+        pg, "award_winners", ["source_id", "source_record_id"],
+        ["award_id", "season", "player_id", "player_name_raw", "link_status_value",
+         "candidate_count", "club_id", "club_name_raw", "votes", "position",
+         "is_captain", "is_vice_captain", "note", "source_id", "source_record_id",
+         "import_batch_id"],
+        build_winners(), batch,
+        target_table="award_winners",
+        scope_column="award_id", scope_values=bf_award_ids,
+        scopes=[("source_id", [source_id], False)],
+        allow_link_loss=allow_link_loss,
+    )
+    pg.commit()
+    report_reload(rep, "club_best_and_fairest", stats)
+
+    total = scalar(
+        pg, "SELECT count(*) FROM award_winners WHERE award_id = ANY(%s)",
+        (bf_award_ids,),
+    )
+    linked = scalar(
+        pg,
+        "SELECT count(*) FROM award_winners "
+        "WHERE award_id = ANY(%s) AND player_id IS NOT NULL",
+        (bf_award_ids,),
+    )
+    seasons = scalar(
+        pg,
+        "SELECT count(DISTINCT season) FROM award_winners WHERE award_id = ANY(%s)",
+        (bf_award_ids,),
+    )
+    rep.result(
+        "club best-and-fairest", total,
+        f"({seasons} seasons, {linked} linked, {len(bf_award_ids)} awards)",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1879,19 +2042,23 @@ GROUPS = {
     COLEMAN_GROUP:    ("Coleman Medal, derived from canonical home-and-away facts",
                        ["awards", "award_winners"]),
     "rising_star":    ("Rising Star nominations", ["award_nominations"]),
+    "club_bf":        ("Club best-and-fairest awards and winners",
+                       ["awards", "award_winners"]),
     "hall_of_fame":   ("Australian Football Hall of Fame", ["hall_of_fame"]),
     "honour_teams":   ("Teams of the century and similar", ["honour_team_members"]),
     "captaincies":    ("Club captains by season", ["captaincies"]),
 }
 
 # Groups that read no legacy SQLite database at all. all_australian, under_22,
-# honour_teams, hall_of_fame, captaincies and rising_star each load a tracked
-# manifest; coleman derives from AFLDB's own canonical match facts. Any of
-# them can therefore run in a canonically rebuilt database with
-# AFLDB_LEGACY_SQLITE unset.
+# honour_teams, hall_of_fame, captaincies, rising_star and club_bf each load a
+# tracked manifest; coleman derives from AFLDB's own canonical match facts. Any
+# of them can therefore run in a canonically rebuilt database with
+# AFLDB_LEGACY_SQLITE unset. club_bf additionally tracks its 19 bf-* award
+# definitions (data/awards/club-best-and-fairest-definitions.csv), so it needs
+# no prior legacy 'awards' run to create them.
 LEGACY_FREE_GROUPS = {
     "all_australian", "under_22", COLEMAN_GROUP, "hall_of_fame", "honour_teams",
-    "captaincies", "rising_star",
+    "captaincies", "rising_star", "club_bf",
 }
 
 # The provenance each group's import_batch is recorded against. Everything not
@@ -1907,28 +2074,31 @@ BATCH_SOURCE_KEYS = {
     "honour_teams": "wikipedia",
     "captaincies": "wikipedia",
     "rising_star": "footywire",
+    "club_bf": "draftguru",
 }
 
-# under_22, coleman, rising_star and — since AFLDB-ISSUE-112 phase 5 —
-# all_australian can each run alone: under_22 upserts only its own definition
-# and rows, coleman owns only its own derived rows, and all_australian /
+# under_22, coleman, rising_star and — since AFLDB-ISSUE-112 phase 5/6 —
+# all_australian and club_bf can each run alone: under_22 upserts only its own
+# definition and rows, coleman owns only its own derived rows, all_australian /
 # rising_star load a tracked manifest and only guard that their award
-# definition already exists. All run after 'awards' when a full refresh is
-# requested so a legacy-loaded database supplies the existing definition
-# rather than having one created underneath it.
+# definition already exists, and club_bf loads both its 19 definitions and its
+# winners from tracked manifests. All run after 'awards' when a full refresh is
+# requested so a legacy-loaded database supplies the existing definitions
+# rather than having them created underneath it.
 GROUP_ORDER = ["awards", "all_australian", "under_22", COLEMAN_GROUP, "rising_star",
-               "hall_of_fame", "honour_teams", "captaincies"]
+               "club_bf", "hall_of_fame", "honour_teams", "captaincies"]
 
 # Groups that cannot be run without another.
 #
 # A full 'awards' refresh shares the award-definition/winner tables with the
-# independently sourced all_australian, under_22 and rising_star manifests, so
-# it closes over all three to re-apply them, while their rows and durable IDs
-# are excluded from the legacy deletes. The reverse is deliberately asymmetric:
-# all_australian, under_22 and rising_star may each run alone as a scoped,
-# legacy-free manifest reload, so none is a GROUP_REQUIRES key.
+# independently sourced all_australian, under_22, rising_star and club_bf
+# manifests, so it closes over all four to re-apply them, while their rows and
+# durable IDs are excluded from the legacy deletes. The reverse is deliberately
+# asymmetric: all_australian, under_22, rising_star and club_bf may each run
+# alone as a scoped, legacy-free manifest reload, so none is a GROUP_REQUIRES
+# key.
 GROUP_REQUIRES = {
-    "awards": {"all_australian", "under_22", "rising_star"},
+    "awards": {"all_australian", "under_22", "rising_star", "club_bf"},
 }
 
 
@@ -2042,6 +2212,15 @@ def main() -> int:
                 len(under_22_rows),
                 f"({len({row.season for row in under_22_rows})} seasons)",
             )
+        if "club_bf" in selected:
+            cbf_rows = load_club_best_and_fairest()
+            cbf_defs = load_club_best_and_fairest_definitions()
+            rep.result(
+                "Club best-and-fairest source",
+                len(cbf_rows),
+                f"({len({row.season for row in cbf_rows})} seasons, "
+                f"{len(cbf_defs)} awards)",
+            )
         if COLEMAN_GROUP in selected:
             contract = load_coleman_contract()
             rep.step(
@@ -2152,6 +2331,9 @@ def main() -> int:
                 elif key == "rising_star":
                     import_rising_star(pg, rep, batch, clubs, sources,
                                        allow_link_loss=args.allow_link_loss)
+                elif key == "club_bf":
+                    import_club_best_and_fairest(pg, rep, batch, clubs, sources,
+                                                 allow_link_loss=args.allow_link_loss)
                 elif key == "hall_of_fame":
                     import_hall_of_fame(pg, rep, batch, sources,
                                         allow_link_loss=args.allow_link_loss)

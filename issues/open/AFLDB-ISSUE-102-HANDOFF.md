@@ -738,6 +738,105 @@ command.
 
 ---
 
+## CHECKPOINT — pass 13 (2026-09-02): ISSUE-112 slice 6 (CLUB BEST-AND-FAIREST) — IMPLEMENTED and DB-validated
+
+Scope: the sixth ISSUE-112 implementation slice, **club best-and-fairest only** (§11.2 phase 6).
+Named medals (family 7) NOT started. Full detail in `AFLDB-ISSUE-112.md` §22. Read-only
+`afldb_dev` G0 re-measurement + bootstrap extraction authorised on proof of connection; DB-free
+tests / `tsc` / `afldb_test`-only integration under the restricted `afldb_import` role / whole
+`awards-reload-links.test.ts` / `git diff --check` authorised. No scrape, no `afldb_dev`
+mutation, no production, no migration, no privilege change, ISSUE-111 / ISSUE-113 untouched,
+`D:\dev\afldb` not accessed, streamanator checkout not modified, no Git command.
+
+**Outcome: COMPLETE and GREEN.**
+
+- **G0 re-measured read-only, proven** — same `BEGIN TRANSACTION READ ONLY` + `DO`-block step-0
+  guard discipline as Passes 5/7/9/10/11/12, over SSH to `arm@10.0.40.100`. Proven
+  `current_database() = afldb_dev`, `current_user = afldb_import`, `transaction_read_only = on`,
+  PostgreSQL 16.15. **Every authoritative earlier G0 fact re-confirmed exactly — no
+  discrepancy:** 752 rows, 1980–2025, 46 seasons, 19 `bf-*` slugs, linked 744 (`resolved` 590 +
+  `unique` 154) / unlinked 8 (`unmatched` 4 + `implausible` 4), `source_record_id` NULL 0 /
+  distinct 752 / all matching `^bf-[a-z0-9-]+:[0-9]{4}:[0-9]+$`, provenance draftguru for all,
+  `votes` empty on all, `club_id` + `club_name_raw` present on all. Plus: `(award_slug, season)`
+  has 25 legitimate tied-season "collisions" so the parser guards `(award_slug, season, player)`
+  not `(award_slug, season)`; `player_link_resolutions` = 17 `linked` rows on `bf-*` winners,
+  0 orphan / 0 mismatch, `player_link_suggestions` 0; 427 of 434 linked players have a unique
+  `afltables_profile_url` (7 don't — deferred §7); the 19 `bf-*` definitions (ids 136–154) are
+  currently derived by the legacy `awards` group with no hardcoded fallback.
+- **Manifests:** `data/awards/club-best-and-fairest.csv` (752 winner rows; `source_key` = the
+  preserved `source_record_id` verbatim; `club` = the source's verbatim string re-resolved
+  season-aware by `ClubResolver` → rebuild-stable `club_id` + byte-identical `club_name_raw`;
+  `votes` refused; `source_citation` = `draftguru`; deterministic `source_key COLLATE "C"`
+  order; sha256 `cc3491a7372c6c7fe554d36f7c5ef5d1bed16afe22b6986bc2979676a552267c`) and
+  `data/awards/club-best-and-fairest-definitions.csv` (19 rows: `slug,name,category,club,
+  first_season,last_season,source_citation`; `club` = modern club string, loader does
+  `clubs.resolve(club, last_season)` → reproduces `awards.club_id`; sha256
+  `74ae3e57ed338c62090be2380046fb82d4ebb597290cace77ad123e8cb3a7cf1`). Both `.gitignore`
+  whitelisted.
+- **Award-definition decoupling decision (§22.2):** a tracked definitions manifest owned by the
+  new legacy-free `club_bf` group, reconciled with a slug-scoped id-preserving `reload_keyed` on
+  `awards`. The legacy `awards` group's shared `build_definitions()` and its `reload_keyed`
+  scope are left **byte-identical** — `bf-*` entries still emitted there, two id-stable writers
+  agree (exactly as the `all-australian` definition already has two writers) — so **named-medal
+  definition semantics are provably untouched**. This is the minimum safe boundary; the full
+  family-A decoupling (families 6 + 7 together, into the §7 canonical-rebuild stage) is the
+  named-medals pass's job. No named-medal semantics changed, so this pass proceeded rather than
+  stopping.
+- **Loader:** new `tools/migration/club_best_and_fairest.py` (validating DB-free `--check`
+  parser for both files + `validate_family()` cross-check). `import_awards.py` gains
+  `import_club_best_and_fairest()` (definitions reload keyed on `slug` scoped to the 19 slugs;
+  winners reload keyed on `(source_id, source_record_id)` scoped to the 19 `bf-*` `award_id`s
+  AND `source_id = draftguru` — the exact `import_all_australian` shape). `import_awards()`
+  extends `other_group_awards` with the `bf-*` `award_id`s (the `under_22` / `all_australian` /
+  `coleman` mechanism); the list-comprehension line and both shared `reload_keyed` calls are
+  byte-identical. `"club_bf"` added to `GROUPS` / `LEGACY_FREE_GROUPS` / `BATCH_SOURCE_KEYS`
+  (`"draftguru"`) / `GROUP_ORDER` (after `rising_star`) / the `GROUP_REQUIRES["awards"]` closure
+  (not the reverse). `main()` dispatch + a `--dry-run` line. No migration, no privilege change.
+- **Tests:** `tests/club-best-and-fairest-source.test.ts` (new, 37 DB-free cases) and a new
+  legacy-free `describe` block in `tests/integration/awards-reload-links.test.ts`
+  (`canRunClubBfImporter`). `tests/all-australian-source.test.ts` /
+  `tests/rising-star-source.test.ts` / `tests/under-22-importer.test.ts` — the three suites that
+  hard-code the `GROUP_REQUIRES["awards"]` closure literal / `expand_groups` contract — updated
+  for the added `"club_bf"`.
+- **Validation:** DB-free 37/37 (240/240 across touched suites); `npx tsc --noEmit` clean;
+  `git diff --check` clean. Integration **executed for real against `afldb_test`** under the
+  restricted `afldb_import` role over a temporary SSH local port-forward
+  (`arm@10.0.40.100:5432 → 127.0.0.1:5434`, opened/closed within the pass;
+  `AFLDB_TEST_IMPORT_DATABASE_URL` derived ephemerally in-process, never persisted — same
+  finding as Passes 8–12). DSN safety proved (`afldb_test`/`afldb_owner` and
+  `afldb_test`/`afldb_import`) before any test ran; no password or full DSN printed. Results:
+  **club best-and-fairest block 9/9 GREEN**; **whole `awards-reload-links.test.ts` 76 passed /
+  21 skipped / 0 failed** — **+9** over Pass 12's 67, slices 1–5 not regressed. The 21 skips are
+  the pre-existing `AFLDB_LEGACY_SQLITE`-gated blocks.
+- **Carried-forward risk (not a slice-6 blocker):** `player_id` carried verbatim; not
+  rebuild-stable (ISSUE-111 G5); 7 of 434 linked players lack a unique `afltables_profile_url`.
+  Club identity is already rebuild-stable via `ClubResolver`. Recorded against the deferred §7
+  AWARDS/HONOURS stage; `source_key` is the durable row identity.
+- **Files changed this pass:** `.gitignore`, `data/awards/club-best-and-fairest.csv` (new),
+  `data/awards/club-best-and-fairest-definitions.csv` (new),
+  `tools/migration/club_best_and_fairest.py` (new), `tools/migration/import_awards.py`,
+  `tests/club-best-and-fairest-source.test.ts` (new),
+  `tests/integration/awards-reload-links.test.ts`, `tests/all-australian-source.test.ts`,
+  `tests/rising-star-source.test.ts`, `tests/under-22-importer.test.ts`,
+  `issues/open/AFLDB-ISSUE-112.md` (§13, §22), this file, `IssuesIndex.md`. No `CHANGELOG.md`
+  entry — nothing deployed or run against a live application database; `import_awards.py`'s
+  behaviour for the one still-legacy family (named medals, inside `import_awards()`) is
+  unchanged. Two stray 0-byte tooling-artefact files in the worktree root (`(player_id`,
+  `operator`) were removed; never tracked. No Git command run. `afldb_dev` read-only for the
+  §22.1 measurement + bootstrap extraction only. No migration. No production contact. The
+  streamanator checkout was not modified. ISSUE-111 / ISSUE-113 untouched. `D:\dev\afldb` not
+  accessed.
+- **Exact next action:** phase 7 — **named medals** (the last family: 979 rows / 17 slugs,
+  §14.4). It shares the `import_awards()` `build_winners()` loop and the definitions
+  `reload_keyed` this pass deliberately left byte-identical; the named-medals pass is where the
+  legacy `build_definitions()` finally sheds its remaining families and the §7 canonical-rebuild
+  AWARDS/HONOURS definitions step is designed for families 6 + 7 together. The Brownlow
+  **medallist** `award_winners` row is in scope for family 7 and is **distinct** from
+  `brownlow_season_votes` (ISSUE-113). Do not resolve ISSUE-112; do not add the canonical-rebuild
+  AWARDS/HONOURS stage yet.
+
+---
+
 ## Confirmed source findings
 
 Each verified by direct read at baseline `95819a3`.
@@ -844,7 +943,7 @@ seeded `afldb_meta.import_writable_tables`. `player_link_resolutions` is SELECT+
 |---|---|---|---|
 | `AFLDB-ISSUE-102` | Awards/honours legacy-SQLite acquisition dependency | `issues/open/AFLDB-ISSUE-102.md` | **PARENT**, Open, coordination only |
 | `AFLDB-ISSUE-111` | Coleman Medal derivation from canonical AFLDB facts | `issues/open/AFLDB-ISSUE-111.md` | Open, design complete, **blocked on gate G0** |
-| `AFLDB-ISSUE-112` | Replace legacy SQLite honours acquisition with curated manifests | `issues/open/AFLDB-ISSUE-112.md` | Open. **G0 PASS (all families)**; §11.1 DECIDED. **Slices 1–4 of 7 IMPLEMENTED + DB-validated 2026-09-01** (honour teams §16/§17, Hall of Fame §18, captaincies §19, Rising Star §20). Next: phase 5 — All-Australian. `source_citation` granularity + §11.4 rename acknowledgement remain pre-merge operator items |
+| `AFLDB-ISSUE-112` | Replace legacy SQLite honours acquisition with curated manifests | `issues/open/AFLDB-ISSUE-112.md` | Open. **G0 PASS (all families)**; §11.1 DECIDED. **Slices 1–6 of 7 IMPLEMENTED + DB-validated** (honour teams §16/§17, Hall of Fame §18, captaincies §19, Rising Star §20 — 2026-09-01; All-Australian §21 — 2026-09-02; club best-and-fairest §22 — 2026-09-02). Next: **phase 7 — named medals** (the last family; where the legacy `build_definitions()` finally sheds families 6+7 into the §7 canonical-rebuild step). `source_citation` granularity + §11.4 rename acknowledgement remain pre-merge operator items. Whole `awards-reload-links.test.ts` 76 passed / 21 skipped (the 21 = the legacy-gated blocks that are the whole-ISSUE G3 acceptance gate). |
 | `AFLDB-ISSUE-113` | Replace legacy `brownlow_season_votes` acquisition | `issues/open/AFLDB-ISSUE-113.md` | Open, design complete, **source undecided**; outside 102's closure boundary |
 
 **`AFLDB-ISSUE-110` is allocated to unmerged NL semantic-mapping work.** It does not exist in this
