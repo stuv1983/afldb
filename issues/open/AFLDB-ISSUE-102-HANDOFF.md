@@ -554,6 +554,107 @@ untouched, `D:\dev\afldb` not accessed, streamanator checkout not modified, no G
 
 ---
 
+## CHECKPOINT — pass 11 (2026-09-01): ISSUE-112 slice 4 (RISING STAR) — IMPLEMENTED and DB-validated
+
+Scope: the fourth ISSUE-112 implementation slice, **Rising Star only** (§11.2 phase 4). Full
+detail in `AFLDB-ISSUE-112.md` §20. Read-only `afldb_dev` bootstrap authorised on proof of
+connection; DB-free tests / `tsc` / `afldb_test`-only integration under the restricted
+`afldb_import` role / combined ISSUE-112 regression / whole `awards-reload-links.test.ts` /
+`git diff --check` authorised. No scrape, no `afldb_dev` mutation, no production, no migration,
+no privilege change, ISSUE-111 / ISSUE-113 untouched, `D:\dev\afldb` not accessed, streamanator
+checkout not modified, no Git command.
+
+**Outcome: COMPLETE and GREEN.**
+
+- **Bootstrap extraction executed, read-only, proven** — same `BEGIN TRANSACTION READ ONLY`
+  step-0 guard as Passes 5/7/9/10, over SSH to `arm@10.0.40.100` (`psql` reading
+  `AFLDB_IMPORT_DATABASE_URL` from the streamanator `.env`, password never printed). Proven
+  `current_database() = afldb_dev`, `current_user = afldb_import`, `transaction_read_only = on`,
+  host `127.0.0.1:5432`, PostgreSQL 16.15. 766 rows extracted, matching G0 exactly: provenance
+  `footywire` for all; `source_record_id` all `^[0-9a-f]{24}$`, distinct = 766, none null;
+  season 1993–2026, 34 distinct (contiguous); `round_number` present on all, 0–24; linked 766 /
+  unlinked 0 (`unique` 679 + `resolved` 87); **1 NULL `club_id`**, **3 NULL `opponent_club_id`**,
+  **3 NULL `stat_line`** (the same 3 rows as the NULL opponents); `is_winner` = 33 (exactly one
+  per decided season 1993–2025, zero for 2026); `is_ineligible` = 9 with `ineligible_reason` on
+  exactly those; `votes` NULL on every row; natural key `(season, player)` dup 0;
+  `player_link_resolutions` / `player_link_suggestions` for `award_nominations` both 0. **New
+  probe:** all 765 club + 763 opponent non-null rows round-trip — re-resolving the canonical
+  `clubs.name` season-aware reproduces the stored id (0 mismatches), across the Footscray/
+  Western Bulldogs, Fitzroy/Brisbane Bears/Brisbane Lions, North Melbourne/Kangaroos and
+  South Melbourne→Sydney era pairs.
+- **Manifest:** `data/awards/rising-star.csv` (767 lines). Columns
+  `source_key,season,round_number,club,opponent,player,player_id,link_status,is_winner,is_ineligible,ineligible_reason,votes,stat_line,source_citation`.
+  **`source_key` = the preserved `source_record_id`, carried verbatim — NOT re-minted** (like
+  captaincies). Deterministic order: `source_key` ascending under `COLLATE "C"`. `club` /
+  `opponent` = canonical `clubs.name`, re-resolved by the loader's season-aware `ClubResolver`
+  → rebuild-stable identity, not a frozen id; the 1 NULL club + 3 NULL opponent cells are empty
+  and load back NULL. `stat_line` = the exact FootyWire `jsonb::text` object, carried
+  losslessly; the parser rejects malformed/wrong-shape/non-integer/unknown-key JSON and never
+  infers the 3 empty rows. `votes` always empty (parser refuses a value). `source_citation =
+  footywire` throughout (source-granularity operator policy). `.gitignore` whitelisted. File
+  sha256 `54bd1145240ec0bd1f92afba65b9a551b2bcf640989b9abfe6bbd3c501e2a9e9`.
+- **Loader:** new `tools/migration/rising_star.py` (validating DB-free `--check` parser, no
+  best-effort coercion). `import_awards.py`'s `import_rising_star()` now calls
+  `load_rising_star()` instead of reading legacy SQLite — **`lite` dropped from its signature
+  and its `main()` call**; the dead module-level `STAT_COLUMNS` removed. The `reload_keyed(...)`
+  call (key `(source_id, source_record_id)`, 16-column value list, `scope_column="award_id"`,
+  `scopes=[("source_id", [footywire], False)]`, `allow_link_loss`) is **byte-identical**.
+  `"rising_star"` added to `LEGACY_FREE_GROUPS`; `BATCH_SOURCE_KEYS["rising_star"] = "footywire"`
+  added. **One deliberate orchestration change:** `GROUP_REQUIRES` lost its
+  `"rising_star": {"awards"}` entry so `--groups rising_star` runs legacy-free (as `under_22`
+  does); the reverse `GROUP_REQUIRES["awards"] → {…, "rising_star"}` closure is untouched, and
+  the loader keeps its own `SELECT id FROM awards WHERE slug='rising-star'` fail-loud guard.
+  `GROUPS` / `GROUP_ORDER` / `--dry-run` list unchanged. No migration, no privilege change.
+- **Tests:** `tests/rising-star-source.test.ts` (new, 33 DB-free cases, all passing) and a new
+  legacy-free `describe` block in `tests/integration/awards-reload-links.test.ts`
+  (`canRunRisingStarImporter`): 766-row parity, era re-resolution ×6, NULL club/opponent
+  preserved, `stat_line` byte-round-trip, 3× idempotent fingerprint, resolved-link id-stability,
+  link dropped only for an unresolvable `player_id` (every such row `unmatched`),
+  `manual_admin_edit` protection (AFLDB-ISSUE-080 — outside the domain-AND-provenance scope),
+  other-family non-interference. The block seeds a minimal `rising-star` `awards` definition
+  when absent (a canonically rebuilt `afldb_test`) and removes it afterwards — the definitions
+  step is family A / the deferred §7 stage. `tests/under-22-importer.test.ts`'s `expand_groups`
+  contract was updated: `expandGroups('rising_star')` now expects `['rising_star']` and
+  `GROUP_REQUIRES` is asserted to carry no `"rising_star":` key.
+- **Validation:** DB-free 33/33 (and 83/83 with the two orchestration-contract suites); `npx
+  tsc --noEmit` clean; `git diff --check` clean. Integration **executed for real against
+  `afldb_test`** under the restricted `afldb_import` role over a temporary SSH local
+  port-forward (opened and closed within the pass; `AFLDB_TEST_IMPORT_DATABASE_URL` derived
+  ephemerally in-process, never persisted — same finding as Passes 8/9/10). DSN safety proved
+  (`afldb_test`/`afldb_owner` and `afldb_test`/`afldb_import`) before any test ran; no password
+  or full DSN printed. Results: **Rising Star block 9/9 green**; **combined ISSUE-112 regression
+  (honour teams + Hall of Fame + captaincies + Rising Star) 29/29**; **whole
+  `awards-reload-links.test.ts` 59 passed / 21 skipped / 0 failed** (the 21 skips are the
+  pre-existing `AFLDB_LEGACY_SQLITE`-gated blocks).
+- **Carried-forward risk (not a slice-4 blocker, same kind as Passes 7/9/10):** the manifest
+  carries `player_id` verbatim; `players.id` is not rebuild-stable (ISSUE-111 G5). *Concrete
+  evidence this pass:* against an `afldb_test` whose `players` table was staler than
+  `afldb_dev`, **13 of 766** nominations — all 2026-debut players numbered above `afldb_test`'s
+  max id — loaded `unmatched`/unlinked via the loader's preserved `valid_players` guard, with
+  no other link affected. The **club identity is already rebuild-stable** via `ClubResolver`.
+  Recorded against the deferred §7 AWARDS/HONOURS stage; `source_key` is the durable row
+  identity.
+- **Files changed this pass:** `.gitignore`, `data/awards/rising-star.csv` (new),
+  `tools/migration/rising_star.py` (new), `tools/migration/import_awards.py`,
+  `tests/rising-star-source.test.ts` (new), `tests/integration/awards-reload-links.test.ts`,
+  `tests/under-22-importer.test.ts`, `issues/open/AFLDB-ISSUE-112.md` (§13, §20), this file,
+  `IssuesIndex.md`. No `CHANGELOG.md` entry — nothing deployed or run against a live
+  application database; `import_awards.py`'s behaviour for the still-legacy-dependent groups
+  (`awards`, `all_australian`) is unchanged. A stray 0-byte tooling-artefact file in the
+  worktree root (`(player_id`) was removed; never tracked. A pre-existing, unrelated untracked
+  scratch file `scratch-url.txt` (a grid-solver JS snippet, dated ~21:05, not this pass's) was
+  left in place. No Git command run. `afldb_dev` read-only for the §20.1 extraction only. No
+  migration. No production contact. The streamanator checkout was not modified. ISSUE-111 /
+  ISSUE-113 untouched. `D:\dev\afldb` not accessed.
+- **Exact next action:** phase 5 — **All-Australian (2,158 rows)**, per the §11.2 order
+  (All-Australian → club best-and-fairest → named medals). All-Australian targets
+  `award_winners`, merges `all_australian` + `all_australian_history`, carries the 1984
+  state/club dual-selection natural-key anomaly, and needs the `all-australian` award
+  definition — so family A / the §7 definitions step becomes the real blocker to decoupling it.
+  Do not resolve ISSUE-112; do not add the canonical-rebuild AWARDS/HONOURS stage yet.
+
+---
+
 ## Confirmed source findings
 
 Each verified by direct read at baseline `95819a3`.
@@ -660,7 +761,7 @@ seeded `afldb_meta.import_writable_tables`. `player_link_resolutions` is SELECT+
 |---|---|---|---|
 | `AFLDB-ISSUE-102` | Awards/honours legacy-SQLite acquisition dependency | `issues/open/AFLDB-ISSUE-102.md` | **PARENT**, Open, coordination only |
 | `AFLDB-ISSUE-111` | Coleman Medal derivation from canonical AFLDB facts | `issues/open/AFLDB-ISSUE-111.md` | Open, design complete, **blocked on gate G0** |
-| `AFLDB-ISSUE-112` | Replace legacy SQLite honours acquisition with curated manifests | `issues/open/AFLDB-ISSUE-112.md` | Open. **G0 PASS (all families)**; §11.1 DECIDED. **Slices 1–3 of 7 IMPLEMENTED + DB-validated 2026-09-01** (honour teams §16/§17, Hall of Fame §18, captaincies §19). Next: phase 4 — Rising Star. `source_citation` granularity + §11.4 rename acknowledgement remain pre-merge operator items |
+| `AFLDB-ISSUE-112` | Replace legacy SQLite honours acquisition with curated manifests | `issues/open/AFLDB-ISSUE-112.md` | Open. **G0 PASS (all families)**; §11.1 DECIDED. **Slices 1–4 of 7 IMPLEMENTED + DB-validated 2026-09-01** (honour teams §16/§17, Hall of Fame §18, captaincies §19, Rising Star §20). Next: phase 5 — All-Australian. `source_citation` granularity + §11.4 rename acknowledgement remain pre-merge operator items |
 | `AFLDB-ISSUE-113` | Replace legacy `brownlow_season_votes` acquisition | `issues/open/AFLDB-ISSUE-113.md` | Open, design complete, **source undecided**; outside 102's closure boundary |
 
 **`AFLDB-ISSUE-110` is allocated to unmerged NL semantic-mapping work.** It does not exist in this
