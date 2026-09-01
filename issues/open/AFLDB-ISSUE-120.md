@@ -215,3 +215,42 @@ F3 remains unimplemented.
 Exact next action: checkpoint F2 in Git, then harden the two prototype-key lookups
 with `Object.hasOwn` guards and focused positive/negative controls.
 
+## 14. F3 implementation checkpoint ? complete
+
+Completed 2026-09-01 on branch `codex/issue-120`.
+
+### Implementation
+
+Request-derived catalogue keys are now checked with `Object.hasOwn` before indexing:
+
+- `getCareerRecord()` rejects inherited Object.prototype keys before selecting a SQL column;
+- `runAflwMatchSearch()` ignores inherited keys passed as AFLW match outcomes;
+- valid registered career categories and AFLW outcomes retain their existing behaviour.
+
+This prevents crafted values such as `constructor` from resolving through the prototype chain and reaching malformed SQL construction.
+
+### Validation
+
+Operator-run:
+
+    npx vitest run tests/catalogue-lookups.test.ts tests/aflw-match-outcome-guard.test.ts
+    10/10 passed
+
+    npx tsc --noEmit
+    passed
+
+    git diff --check
+    passed
+
+Regression coverage proves inherited keys are rejected while registered catalogue values remain accepted.
+
+### ISSUE-120 implementation status
+
+All three findings are implemented:
+
+- F1 ? NL search per-IP rate limiting: complete.
+- F2 ? /api/health-event 32 KiB streaming body cap: complete.
+- F3 ? request-derived prototype-key hardening: complete.
+
+Exact next action: commit F3, then perform ISSUE-120 final closeout validation and move the runbook to issues/closed.
+
