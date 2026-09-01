@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-119 — Super Admin can clear NL search telemetry
 
-- **Status:** Approved — Stage 1 complete; §5/§6 boundary approved by the operator 2026-09-01; Stage 2 authorised but not started
+- **Status:** In progress — Stage 2 started 2026-09-01. Migration `081` written and source-reviewed but **never executed**; `privileges.sql`, tests, Server Action and UI not started (see §20)
 - **Created:** 2026-08-31
 - **Severity:** Medium
 - **Area:** Admin / Security / Natural-language search / Telemetry / Database
@@ -192,7 +192,7 @@ Any future request for an absolutely empty NL dashboard remains out of scope per
 
 ## 7. Deletion strategy: bounded `DELETE`, never `TRUNCATE`
 
-Add a forward migration named `<NNN>_nl_search_telemetry_clear.sql`. **Do not hardcode 080.** `079_nl_search_log_head_to_head_grain.sql` is the highest migration on `main`, but `080_external_grids.sql` is already committed on `opus/gridley-corpus`, and `claude/issue-116` carries a competing `079_access_code_delete.sql` that must itself be renumbered on merge. Stage 2 must re-scan every live branch tip and take the next number above all of them — **currently `081`** — then re-verify immediately before writing the file. Never edit 046–055 or 079.
+Add a forward migration named `<NNN>_nl_search_telemetry_clear.sql`. **Do not hardcode 080.** `079_nl_search_log_head_to_head_grain.sql` is the highest migration on `main`, but `080_external_grids.sql` is already committed on `opus/gridley-corpus`, and `claude/issue-116` carries a competing `079_access_code_delete.sql` that must itself be renumbered on merge. Stage 2 must re-scan every live branch tip and take the next number above all of them — **currently `081`** — then re-verify immediately before writing the file. Never edit 046–055 or 079. **ASSIGNED 2026-09-01: `081`.** Re-derived after `git fetch --all --prune` across 46 refs and 34 worktrees; nothing at 081 or above exists on any ref. Evidence in §20.1.
 
 The function should:
 
@@ -257,8 +257,8 @@ Exports are live route queries. No public page reads these relations. If current
 
 | File | Planned change |
 |---|---|
-| `src/db/migrations/<NNN>_nl_search_telemetry_clear.sql` (number assigned per §7; not 080) | Restricted function, locks, retained closure, selective delete and exact grants. |
-| `tools/maintenance/privileges.sql` | Reconcile only function EXECUTE; retain no direct DELETE/TRUNCATE. |
+| `src/db/migrations/081_nl_search_telemetry_clear.sql` (number assigned per §7 and §20.1) | **Written 2026-09-01; untracked and unapplied.** Restricted function, locks, retained closure, selective delete and exact grants. |
+| `tools/maintenance/privileges.sql` | **Next step.** Reconcile function EXECUTE **and owner** (§20.4 R2); retain no direct DELETE/TRUNCATE. |
 | `src/db/queries/nl-search-log.ts` | Typed function invocation/result, or a new narrowly named maintenance module if clearer. |
 | `src/lib/auth/session.ts` | Transaction-aware audit helper preserving existing callers. |
 | `src/app/admin/nl-search/actions.ts` | Guard, server phrase check, atomic clear+audit, revalidation and result state. |
@@ -339,7 +339,7 @@ After implementation, supply one command at a time: focused DB-free action/compo
 
 - **SUPERSEDED 2026-09-01.** Stage 1 recorded "no ISSUE-118 collision exists". That was true of `main` and of this worktree, but Stage 1 did not scan other branches. A collision did exist on `opus/gridley-corpus`, which had committed its own `AFLDB-ISSUE-118`. This issue is now `AFLDB-ISSUE-119`; see §0.
 - **Open operator action:** branch `codex/issue-118` and worktree `D:\dev\afldb-issue-118` still carry the old number. Renaming them was deliberately not attempted in this session.
-- **Migration number is no longer fixed.** `080` belongs to Gridley; Stage 2 must re-derive the next free migration number per §7.
+- ~~**Migration number is no longer fixed.**~~ **CLOSED 2026-09-01.** `080` belongs to Gridley; `081` was re-derived and taken (§20.1). `claude/issue-116`'s duplicate `079` still has to renumber on merge. `082` was the next free migration number as of the 2026-09-01 scan and is **not reserved**: ISSUE-116 must re-scan the relevant live refs and worktrees and derive the next free number itself, immediately before it renumbers its competing migration.
 - No source, migration, grant, test or runtime behaviour changed in Stage 1.
 - No database, test, build, package, deployment or production command ran.
 - `CHANGELOG.md` is intentionally unchanged: workflow excludes investigation-only/runbook updates until retained behaviour changes.
@@ -364,7 +364,7 @@ Stage 2 is accepted only when all are true:
 
 ## 17. Exact next action for Stage 2
 
-**Approval is granted (§5.1, 2026-09-01); this is now the live instruction.** Start a fresh implementation session and create the migration first, taking its number per §7 rather than assuming 080. Implement and source-review the fixed retained-closure/delete function and exact grants before adding any Server Action or UI. Do not run or expose the action until migration, restricted-role and rollback tests are written.
+**PARTLY DISCHARGED 2026-09-01 — the migration now exists; the live instruction is §20.7.** Start a fresh implementation session and create the migration first, taking its number per §7 rather than assuming 080. Implement and source-review the fixed retained-closure/delete function and exact grants before adding any Server Action or UI. Do not run or expose the action until migration, restricted-role and rollback tests are written.
 
 ## 18. Session record — 2026-09-01 (reconciliation session)
 
@@ -459,6 +459,108 @@ Documentation only, consistent with §18: `git diff --check` clean; renumber and
 
 ### Exact next action
 
-Start a **fresh** Stage 2 implementation session and follow §17: derive the migration number per §7 (do **not** assume `080`), then write the `SECURITY DEFINER` retained-closure/delete function and its exact grants, and source-review them before any Server Action or UI exists. The multi-level ancestry test from §13 must be written alongside the migration, not deferred to the UI stage.
+**Superseded 2026-09-01 by §20.7 — done.** Start a **fresh** Stage 2 implementation session and follow §17: derive the migration number per §7 (do **not** assume `080`), then write the `SECURITY DEFINER` retained-closure/delete function and its exact grants, and source-review them before any Server Action or UI exists. The multi-level ancestry test from §13 must be written alongside the migration, not deferred to the UI stage.
 
 Recommended reasoning effort for that session: **XHigh** through the migration and function, dropping to **High** for the Server Action and UI.
+
+## 20. Session record — 2026-09-01 (Stage 2, step 1: migration `081`)
+
+### 20.1 Migration-number re-derivation (§7 obligation discharged)
+
+Method: `git fetch --all --prune`, then every ref enumerated with `git for-each-ref refs/heads refs/remotes` and each ref's `src/db/migrations/` listed with `git ls-tree`. Remote-tracking refs were then checked against a live `git ls-remote --heads origin` so the scan could not silently be a stale mirror.
+
+| Question | Evidence |
+|---|---|
+| Refs scanned | **46** — 39 local, 7 remote-tracking. |
+| Remote freshness | `git ls-remote --heads origin` returns six heads — `main 7a0f592`, `dev 98354a3`, `claude/issue-102 fd6295f`, `claude/issue-108 cdf56e0`, `claude/issue-116 2344ab5`, `fwab/next-16 81840c1` — and each equals its local `refs/remotes/origin/*`. Fetch was a no-op; the refs were already current. |
+| Highest number on any ref | **080**, and only on `refs/heads/opus/gridley-corpus` (`6e3b38a`): `080_external_grids.sql`. It is the only file numbered ≥080 on any ref. |
+| `main` / `dev` (`7a0f592` / `98354a3`) | 079 = `079_nl_search_log_head_to_head_grain.sql`, as §7 recorded. |
+| Competing 079 | `claude/issue-116` and `origin/claude/issue-116` (`2344ab5`) still carry `079_access_code_delete.sql` — a different file at the same number. Unchanged, and not this issue's to fix. |
+| Anything at 081 or above | **None**, on any of the 46 refs. |
+| Uncommitted allocations | All **34** worktrees checked with `git status --porcelain -- src/db/migrations`, and their `src/db/migrations/` directories listed for on-disk `08x_` files. Exactly one untracked migration exists anywhere: `D:/dev/afldb-issue-086` holds `073_data_overrides.sql` — below the contested band, no bearing on this choice. The only on-disk `080` is Gridley's own committed file. |
+| **Assigned** | **`081`** → `src/db/migrations/081_nl_search_telemetry_clear.sql`. |
+
+Contention that survives this step: `claude/issue-116`'s duplicate `079` must still renumber when it merges, and the next free number above all tips is the one taken here. Once `081` is committed on this branch it is allocated under the same branch-local rule §0 applied to Gridley's 118. `082` was the next free migration number as of this 2026-09-01 scan and is **not reserved for anyone**: `claude/issue-116` must re-scan the relevant live refs and worktrees and derive the next free number itself, immediately before renumbering its competing migration — the same §7 obligation discharged above, and for the same reason. `tools/db/migrate.ts` will not catch that collision for them — see 20.4 R4.
+
+### 20.2 What was implemented
+
+One file, `src/db/migrations/081_nl_search_telemetry_clear.sql` (250 lines, untracked, uncommitted, **never executed**). It creates `public.nl_search_telemetry_clear()` and nothing else.
+
+| Element | Implementation |
+|---|---|
+| Signature | `RETURNS TABLE (deleted_log_rows, retained_log_rows, retained_review_rows, retained_feedback_rows, detached_app_health_links)`, all `bigint` — the exact five counts §9 permits the audit event to record, and no more. Takes no parameters. |
+| Security boundary | `LANGUAGE plpgsql`, `VOLATILE`, `SECURITY DEFINER`, `SET search_path = pg_catalog, pg_temp` (:91-92). Every relation reference is `public.`-qualified. No actor check inside the function, per §6. |
+| Ownership | `ALTER FUNCTION … OWNER TO afldb_owner` in a guarded `DO` block (:218), placed **before** the grants so the recorded grantor is the intended owner too. Falls back to a `NOTICE` when the role is absent or the running role has no membership in it, following `privileges.sql`'s treatment of the role grant it may not be entitled to make. |
+| Grants | `REVOKE ALL ON FUNCTION … FROM PUBLIC` (:238), then `GRANT EXECUTE … TO afldb_auth` inside the role-existence `DO` guard that 046/047/049/052 use (:247). No table `DELETE`, no `TRUNCATE`, no grant to any other role. |
+| Locking | `LOCK TABLE` in `SHARE ROW EXCLUSIVE MODE` on `nl_search_review`, `nl_search_feedback`, `app_health_events`, then `nl_search_log` (:115-118) — §7's child-before-parent order exactly. |
+| Retained closure | `WITH RECURSIVE` (:130-159). Seeds: every `nl_search_review.search_log_id`, plus every log row whose `client_ref` matches a feedback row. Recursive term: `SELECT l.parent_search_id FROM public.nl_search_log l JOIN retained rt ON rt.id = l.id WHERE l.parent_search_id IS NOT NULL` (:151-154) — one generation per iteration, unbounded depth, `UNION` rather than `UNION ALL` so a revisited id terminates it. |
+| Deletion | One statement: `DELETE FROM public.nl_search_log l WHERE NOT EXISTS (SELECT 1 FROM retained rt WHERE rt.id = l.id)` (:161-162). |
+| Counts | `GET DIAGNOSTICS v_deleted = ROW_COUNT` (:164); retained figures read from the three tables after the delete; detached links measured as a before/after count of non-NULL `related_search_id` (:126, :168). |
+
+Not touched, as instructed: `tools/maintenance/privileges.sql`, any TypeScript, any test, any Server Action, any UI.
+
+### 20.3 Source review against the runbook
+
+Reviewed against §5.1's binding obligations, §6's authorisation model, §7's deletion strategy and §8's concurrency contract.
+
+| Requirement | Finding |
+|---|---|
+| Arbitrary-depth ancestry (§5.1, §13, §16.2) | **Met.** The recursive term walks from a retained row to its parent, so depth is unbounded rather than the single hop a plain join gives. Termination is by `UNION` dedup against the accumulated set, not by a depth cap. |
+| Sibling / descendant non-retention (§13) | **Met.** Nothing in the closure walks child-ward — no term produces `l.id` from `l.parent_search_id = rt.id`. A disposable child of a retained row, and a disposable sibling hanging off a retained mid-chain ancestor, are therefore both deleted. Retention follows ancestry, not the connected component. |
+| Preserve reviews and feedback (§5.1) | **Met by construction.** The migration contains exactly one `DELETE`, and its target is `public.nl_search_log`. Neither durable table is written, and neither gains a `DELETE` grant. Feedback whose deferred log never landed contributes no seed and is untouched. |
+| Review FK integrity (`NO ACTION`, 047:105) | **Met.** Every reviewed log id is a closure seed, so no review can be orphaned. |
+| Self-FK integrity (`parent_search_id NO ACTION`, 047:66) | **Met.** The closure is upward-closed, so no deleted row is the parent of a retained row; a wholly disposable parent/child set is removed by one statement whose `NO ACTION` check fires at end of statement. |
+| `app_health_events` (§5.1, 052:49) | **Met.** No health row is deleted or updated by this function; the only mutation is the FK's own `ON DELETE SET NULL`. |
+| Sequences (§5.1) | **Met.** No `ALTER SEQUENCE`, no `RESTART`, no `TRUNCATE` anywhere in the file. |
+| Lock mode and order (§7.1, §8) | **Met.** `SHARE ROW EXCLUSIVE` conflicts with `ROW EXCLUSIVE`, so writers block and readers do not; it conflicts with itself, so two clears serialise. Child-before-parent matches the order every application writer already takes — a review, feedback or health writer touches its own table and then reads `nl_search_log` for its FK check — so there is no lock-order cycle to deadlock on. |
+| Fixed `search_path` (§6, §13) | **Met, and fail-loud.** `pg_temp` is listed last, so a temp object cannot shadow anything; `public` is deliberately absent, so an unqualified relation name would raise rather than resolve somewhere unintended. |
+| Object qualification (§13) | **Met.** Every one of the seven relation references inside the function is `public.`-qualified. |
+| No dynamic SQL / no CASCADE (§13) | **Met for the callable function** — its body contains no `EXECUTE` and no `CASCADE`. The file's single `EXECUTE` is a constant `ALTER FUNCTION … OWNER TO afldb_owner` string inside a migration-time `DO` block (:218), with no interpolation and no caller input. |
+| Privilege containment (§6, §16.5) | **Met.** A grep of the file returns exactly one `GRANT` (function `EXECUTE` to `afldb_auth`) and one `REVOKE` (`ALL` from `PUBLIC`). `afldb_app`, `afldb_import` and `afldb_backup` hold nothing here except through `PUBLIC`, which is revoked; the default `PUBLIC` execute grant that would otherwise let every role in the cluster run a `SECURITY DEFINER` function is removed at creation time, not later by reconciliation. |
+| Definer identity | **Pinned.** Without the ownership block the definer would be whichever role ran the migration — a superuser on an install that migrates as `postgres`, which would be a far wider capability than the one designed. |
+| `CREATE` vs `CREATE OR REPLACE` | Deliberate: plain `CREATE FUNCTION`, so a pre-existing function of that name is a loud failure rather than a silent takeover of a security-sensitive name. |
+
+### 20.4 Deviations, risks and blockers
+
+**Deviations from §7's literal wording — behaviour identical, deliberate, and none touching §5.1's obligations:**
+
+- **D1.** §7 step 4 specifies `WHERE id NOT IN retained-set RETURNING id`. Implemented as `NOT EXISTS` and without `RETURNING`. `NOT EXISTS` selects the same rows but is immune to `NOT IN`'s NULL semantics, which would match nothing at all should the set ever acquire one. `RETURNING` was dropped because nothing consumes the ids and §9 forbids recording deleted IDs; `GET DIAGNOSTICS … ROW_COUNT` yields the identical count without materialising a list the audit must not contain.
+- **D2.** §7 step 2 lists "count app-health links that will be detached" before the closure is built, which is not literally executable — a predicted detach count depends on the closure it is listed before. Implemented instead as a before/after count of non-NULL `related_search_id` around the `DELETE`. Under the locks nothing else can move that number, so the difference **is** the detachment; it measures what happened rather than predicting it, and avoids a second copy of the closure that could drift from the one governing the `DELETE`.
+- **D3.** The retained counts are read from the tables after the `DELETE` rather than derived from the closure, so a wrong closure surfaces as a wrong count instead of being confirmed by its own arithmetic.
+
+**Risks carried forward:**
+
+- **R1. The SQL has never been executed.** No database, migration, test, build or typecheck command ran this session. Its first execution must be `npm run db:migrate:test` against `afldb_test`; that run is the proof of the `WITH RECURSIVE … DELETE` form, `GET DIAGNOSTICS`, the `RETURNS TABLE` shape and both `DO` blocks. Do not apply to `afldb_dev` or production before the §13 tests pass.
+- **R2. `privileges.sql` is not yet reconciled** (out of scope for this step). Its subtractive `afldb_auth` loop revokes on **relations** only — `relkind IN ('r','p','v','m','f')`, `tools/maintenance/privileges.sql:470-481` — so it will not strip the function `EXECUTE`. But neither will it re-establish it: on a role-after-migration install the guarded `DO` block skips the grant silently and the feature fails closed. The same gap applies to ownership. The §12 `privileges.sql` change should therefore reconcile **both** `EXECUTE` and owner, not `EXECUTE` alone as §12 currently words it.
+- **R3. `postgres.js` returns `int8` as a JavaScript string.** All five returned counts are `bigint`, so the query layer must cast `::int` (or coerce in TypeScript) or the audit will record string counts and any arithmetic on them will concatenate silently.
+- **R4. Migration-number contention persists.** `tools/db/migrate.ts` keys `afldb_meta.schema_migrations` by **filename** and applies pending files in name order, so it enforces no contiguity — the 080 gap on this branch is harmless — but it also cannot detect a duplicate **number**: two files numbered 079 would both apply. `082` was only the next free migration number as of the 2026-09-01 scan and is **not reserved**: `claude/issue-116` must re-scan the relevant live refs and worktrees and derive the next free number itself, immediately before renumbering its competing migration.
+- **R5. The cutoff depends on the caller.** The locks are released at statement end unless the caller holds an explicit transaction open, so §8's `authSql.begin()` wrapper is load-bearing for both the cutoff and the atomic clear+audit, not a stylistic choice.
+- **R6. Gridley's `080`** may merge after `081` has been applied somewhere. It applies then, by name, and `081` depends on nothing in it.
+
+**Blockers: none.** Nothing in the schema, privileges model or runner contradicted the runbook.
+
+### 20.5 Validation performed
+
+Static and repository evidence only. `git diff --check` clean (exit 0; the new file is untracked, and a `--no-index` whitespace check of it reports nothing beyond git's expected LF→CRLF notice). No trailing whitespace, no tabs, final newline present, ASCII apart from the em dash in the header line, matching 046/047/049/052. Schema claims re-verified in source before writing: 047:66, 047:105, 049:45-47, 052:49, 050 (both FK indexes, `parent_search_id` partial), `tools/db/migrate.ts:150-192`, `tools/maintenance/privileges.sql:373-390` and `:470-481`.
+
+No test, build, typecheck, SQL, database, migration, deployment or production command ran. No database was queried. Nothing was committed.
+
+### 20.6 Files changed this step
+
+| File | State |
+|---|---|
+| `src/db/migrations/081_nl_search_telemetry_clear.sql` | **New, untracked.** The function, its ownership, and its two grants. |
+| `issues/open/AFLDB-ISSUE-119.md` | Modified: header `Status`, §7 number assignment, §12 filename/state, §15 blocker closure, §17 next action, and this §20. |
+
+`IssuesIndex.md` is **not** updated in this step — the operator scoped persistence to this file — so its next-action line still reads "derive the migration number". It needs syncing before this work is committed.
+
+### 20.7 Exact next action
+
+Still Stage 2, still before any Server Action or UI (§17). In order:
+
+1. Update `tools/maintenance/privileges.sql` to reconcile the function **`EXECUTE` grant and its owner** (R2), keeping the absence of any direct `DELETE`/`TRUNCATE` grant on the NL tables.
+2. Write the guarded PostgreSQL integration test from §13, including the **mandatory ancestry fixture deeper than one parent** with a mid-chain disposable sibling that must be deleted (§16.2), plus the unmatched-feedback, app-health-detachment and no-sequence-reset assertions. Rolled-back transactions only, `_test` DSNs only.
+3. Only then run the first execution: `npm run db:migrate:test`, followed by the focused integration suite. That is the syntax and semantics proof for everything in 20.4 R1.
+4. Sync `IssuesIndex.md`.
+
+Server Action, `session.ts` transaction-aware audit helper, `ClearTelemetryForm.tsx`, `page.tsx`, `docs/search.md` and `CHANGELOG.md` all remain untouched and unstarted, in that order after the above.

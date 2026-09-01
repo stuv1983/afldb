@@ -6,7 +6,7 @@
 > `issues.md` disagree, trust `issues.md` and immediately synchronize this file
 > and the Open Issues table at the top of `issues.md`.
 
-**Last updated:** 2026-08-31
+**Last updated:** 2026-09-01
 **Open issues:** 8 tracked here — `AFLDB-ISSUE-102`, `AFLDB-ISSUE-104`,
 `AFLDB-ISSUE-110`, `AFLDB-ISSUE-112`, `AFLDB-ISSUE-113`, `AFLDB-ISSUE-116`,
 `AFLDB-ISSUE-117`, `AFLDB-ISSUE-119`.
@@ -17,7 +17,12 @@
      renumbered 118 -> 119 on 2026-09-01 because its claim was still uncommitted; see
      `issues/open/AFLDB-ISSUE-119.md` §0. Next free issue ID is `AFLDB-ISSUE-120`.
      NOTE: branch `codex/issue-118` and worktree `D:\dev\afldb-issue-118` still carry the
-     old number and were deliberately not renamed. -->
+     old number and were deliberately not renamed.
+     MIGRATION NUMBERS 2026-09-01: `080_external_grids.sql` belongs to `opus/gridley-corpus`;
+     `081_nl_search_telemetry_clear.sql` is allocated to `AFLDB-ISSUE-119` and written on
+     `codex/issue-118`. `082` was the next free migration number as of the 2026-09-01 scan; it is
+     not reserved for anyone. `claude/issue-116` must re-scan every live branch tip and derive its
+     own number immediately before renumbering its competing `079_access_code_delete.sql`. -->
 
 <!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
      the ISSUE-110 branch merged into dev on 2026-08-31 and its own row below is now
@@ -38,7 +43,7 @@
 
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
-| `AFLDB-ISSUE-119` | Medium | Admin / Security / NL search / Telemetry / Database | **Stage 1 complete; §5/§6 boundary APPROVED by the operator 2026-09-01; Stage 2 authorised but not started.** The safe reset target is disposable `nl_search_log` only. Repository contracts make `nl_search_review` durable admin decisions and `nl_search_feedback` immutable reader facts, so both and their minimum log/parent-chain context must survive. Proposed mechanism: selective `DELETE` through one `afldb_auth`-executable, owner-defined fixed function; no direct DELETE/TRUNCATE grant, no sequence reset, mandatory same-transaction count-only `auth_audit_log` event, child-before-parent writer locks, typed confirmation, and test-only restricted-role proof. Runbook: `issues/open/AFLDB-ISSUE-119.md` (renumbered from 118 on 2026-09-01; `opus/gridley-corpus` holds committed ISSUE-118). Approval binds Stage 2 to the §5.1 obligation table and adds a mandatory recursive-ancestry test deeper than one parent (§13). **Next action: fresh Stage 2 session — derive the migration number (080 is taken by the Gridley branch), then the restricted DELETE function, exact grants and multi-level ancestry/rollback tests before any action or UI.** |
+| `AFLDB-ISSUE-119` | Medium | Admin / Security / NL search / Telemetry / Database | **Stage 2 in progress: migration `081_nl_search_telemetry_clear.sql` allocated, written and source-reviewed 2026-09-01 — untracked, unexecuted and database-unvalidated.** The safe reset target is disposable `nl_search_log` only. Repository contracts make `nl_search_review` durable admin decisions and `nl_search_feedback` immutable reader facts, so both and their minimum log/parent-chain context must survive. Proposed mechanism: selective `DELETE` through one `afldb_auth`-executable, owner-defined fixed function; no direct DELETE/TRUNCATE grant, no sequence reset, mandatory same-transaction count-only `auth_audit_log` event, child-before-parent writer locks, typed confirmation, and test-only restricted-role proof. Runbook: `issues/open/AFLDB-ISSUE-119.md` (renumbered from 118 on 2026-09-01; `opus/gridley-corpus` holds committed ISSUE-118). Approval binds Stage 2 to the §5.1 obligation table and adds a mandatory recursive-ancestry test deeper than one parent (§13). The `SECURITY DEFINER` clear function, its owner pinning and its single `EXECUTE` grant are written and source-reviewed against §5–§8; allocation evidence, review findings and deviations are in runbook §20. **Next action: reconcile the function `EXECUTE` grant and owner in `tools/maintenance/privileges.sql`, write the guarded `_test` integration tests (mandatory deeper-than-one-parent ancestry fixture with a deleted mid-chain sibling, restricted-role and rollback), then run `npm run db:migrate:test` — the migration's first execution — followed by the focused integration suite. No Server Action or UI until that evidence passes.** |
 <!-- RETIRED 2026-08-30 — `AFLDB-ISSUE-107` is **Resolved** and is NO LONGER an open issue.
      Its pre-resolution row and detail block are retired below; their "Only open gate" and
      "Exact next action" text is SUPERSEDED. Authoritative records: the `AFLDB-ISSUE-107`
