@@ -46,7 +46,8 @@ vi.mock('@/lib/auth/session', () => ({
   audit: mocks.audit,
 }));
 
-import { clearTelemetry, NL_TELEMETRY_CLEAR_PHRASE } from '@/app/admin/nl-search/actions';
+import { clearTelemetry } from '@/app/admin/nl-search/actions';
+import { NL_TELEMETRY_CLEAR_PHRASE } from '@/app/admin/nl-search/telemetry-clear-phrase';
 
 const COUNTS = {
   deletedLogRows: 12,

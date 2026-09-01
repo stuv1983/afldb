@@ -1623,3 +1623,84 @@ No further Claude-side work is outstanding before the guarded Playwright run. Wh
 ### 32.6 Exact next action
 
 Checkpoint this milestone, then run the guarded Playwright acceptance (§31.7 command) against the disposable `_test` deployment once the §32.5 prerequisites exist. On a green run, close Stage 2 per §31.10.
+
+## 33. Session record — 2026-09-01 (Stage 2, step: Next.js 16 `"use server"` export defect)
+
+### 33.1 Scope of this step
+
+A guarded `_test` `npm run build` was attempted (first full build of the Stage 2 code). It exposed exactly one concrete Next.js 16 integration defect and no other. This step fixes that defect and nothing else; no ISSUE-119 behaviour, contract, SQL, grant, audit, revalidation or acceptance obligation changed.
+
+### 33.2 The defect
+
+`src/app/admin/nl-search/actions.ts` begins with `'use server'` and, as written by §29, also exported a non-function constant:
+
+```ts
+/** Exact phrase an operator must type to enable the clear control (AFLDB-ISSUE-119 §10). */
+export const NL_TELEMETRY_CLEAR_PHRASE = 'CLEAR SEARCH TELEMETRY';
+```
+
+`next build` (Next.js 16) fails compilation:
+
+```text
+Only async functions are allowed to be exported in a "use server" file.
+```
+
+A `'use server'` module is a Server Actions boundary: every export is turned into a callable RPC endpoint, so a plain string export is rejected. `npm run typecheck` and `npx vitest` never caught this because neither applies the `'use server'` export rule — only the bundler does. §29/§30/§32 validation was therefore genuine but incomplete for this one seam.
+
+### 33.3 The fix — smallest repository-consistent change
+
+The literal is shared between a Client Component (`ClearTelemetryForm.tsx`, misclick guard) and the server module (`actions.ts`, independent re-check per §6), so it belongs in a DB-free, `server-only`-free module both can import — the pattern already established by `src/app/admin/nav-model.ts` (colocated admin shared model, imported by a Server Component and a Client Component) and `src/search/nl/review-spec.ts` (the NL review closed-set spec, imported by client and server).
+
+New file **`src/app/admin/nl-search/telemetry-clear-phrase.ts`** — one exported constant, header comment explaining why it cannot live in `actions.ts`:
+
+```ts
+export const NL_TELEMETRY_CLEAR_PHRASE = 'CLEAR SEARCH TELEMETRY';
+```
+
+The phrase string is byte-identical to §10 / §29 — `CLEAR SEARCH TELEMETRY`. Import updates only:
+
+| File | Change |
+|---|---|
+| `src/app/admin/nl-search/actions.ts` | Deleted the `export const NL_TELEMETRY_CLEAR_PHRASE` line + its comment; added `import { NL_TELEMETRY_CLEAR_PHRASE } from './telemetry-clear-phrase';` in a new relative-import group. The server-side re-check at `clearTelemetry()` (`confirmation !== NL_TELEMETRY_CLEAR_PHRASE`, and the error message) is unchanged — independent server phrase validation per §6 is preserved verbatim. |
+| `src/app/admin/nl-search/ClearTelemetryForm.tsx` | Split the barrel import: `clearTelemetry` + `type NlClearTelemetryState` still from `./actions`; `NL_TELEMETRY_CLEAR_PHRASE` now from `./telemetry-clear-phrase`. Client-side gate logic unchanged. |
+| `tests/admin-nl-search-actions.test.ts` | Same import split against the `@/app/admin/nl-search/...` alias. No test body, case count or assertion changed. |
+
+`tests/admin-nl-search-clear/telemetry-clear.spec.ts` was **not** touched: it already uses its own local `const PHRASE = 'CLEAR SEARCH TELEMETRY'` (§31.4) and importing an app module into that standalone harness spec is neither required nor desirable. No migration, `privileges.sql`, query helper, audit helper, `page.tsx`, docs or changelog change.
+
+### 33.4 Validation performed this step
+
+Claude-executed under the explicit authorisation in this step's instruction (build/typecheck/vitest for this task only):
+
+```text
+npx vitest run tests/admin-nl-search-actions.test.ts   → Test Files 1 passed (1) | Tests 11 passed (11)
+npm run typecheck                                       → passed; final output: ✓ Types generated successfully
+npm run build                                           → ✓ Compiled successfully in 4.5s; full route table emitted;
+                                                          prepare-standalone: standalone bundle ready
+```
+
+The `"use server"` export error is gone; the build now completes. `git diff --check` → no whitespace errors (only the repository's known LF→CRLF advisory on the two touched tracked files; see memory `issue-027-atomic-audit-deploy-order`).
+
+### 33.5 Blockers / deviations
+
+- None. The fix is self-contained and the three required validations all pass.
+- Deviation from the §12 file table: one file not previously listed was added — `src/app/admin/nl-search/telemetry-clear-phrase.ts`. It is organisational only (a shared constant home) and changes no approved SQL/security/UI contract, mirroring the §12 note that the query-module split "is organisational only and must not change the approved SQL/security contract".
+- The earlier §29/§32 validation chain did not include `npm run build`; it does now for this seam. The rest of the Stage 2 code (migration, function, grants, integration + privilege suites) is still bundler-unproven only where it is not import-reachable from the app build — those remain gated on the guarded `_test` execution in §31/§32.5, unchanged.
+
+### 33.6 Working set after this step
+
+```text
+ M src/app/admin/nl-search/ClearTelemetryForm.tsx
+ M src/app/admin/nl-search/actions.ts
+ M tests/admin-nl-search-actions.test.ts
+?? src/app/admin/nl-search/telemetry-clear-phrase.ts
+```
+
+(plus the pre-existing §30–§32 working set: `M page.tsx`, `M CHANGELOG.md`, `M docs/search.md`, `?? playwright.telemetry-clear.config.ts`, `?? tests/admin-nl-search-clear/`, and the tracking files). Nothing committed this step.
+
+### 33.7 IssuesIndex.md / issues.md sync check
+
+Not materially stale. Both still describe Stage 2 as implemented and gated on the guarded Playwright run against a disposable `_test` deployment (§31.6 / §32.5), which remains exactly true. This step removed a build blocker on that same path; it did not change severity, area, open/closed state or the next action. No index/ledger edit made.
+
+### 33.8 Exact next action
+
+Unchanged from §32.6: obtain the §32.5 operator prerequisites (plain-admin credentials, disposable loopback `_test` deployment, Chromium), then run the guarded Playwright acceptance (§31.7 command). On a green run, close Stage 2 per §31.10.

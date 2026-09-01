@@ -2,7 +2,8 @@
 
 import { useActionState, useEffect, useState } from 'react';
 
-import { clearTelemetry, NL_TELEMETRY_CLEAR_PHRASE, type NlClearTelemetryState } from './actions';
+import { clearTelemetry, type NlClearTelemetryState } from './actions';
+import { NL_TELEMETRY_CLEAR_PHRASE } from './telemetry-clear-phrase';
 import { formatNumber } from '@/lib/format';
 
 const INITIAL: NlClearTelemetryState = {};

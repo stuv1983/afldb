@@ -8,6 +8,8 @@ import { clearNlSearchTelemetry, type NlTelemetryClearCounts } from '@/db/querie
 import { audit, auditInTransaction, requireSuperAdmin } from '@/lib/auth/session';
 import { isNlReviewCategory, isNlReviewStatus, type NlReviewCategory } from '@/search/nl/review-spec';
 
+import { NL_TELEMETRY_CLEAR_PHRASE } from './telemetry-clear-phrase';
+
 export type NlReviewState = { error?: string; message?: string };
 
 /**
@@ -68,9 +70,6 @@ export async function saveReview(
 
   return { message: 'Review saved.' };
 }
-
-/** Exact phrase an operator must type to enable the clear control (AFLDB-ISSUE-119 §10). */
-export const NL_TELEMETRY_CLEAR_PHRASE = 'CLEAR SEARCH TELEMETRY';
 
 export type NlClearTelemetryState = {
   error?: string;
