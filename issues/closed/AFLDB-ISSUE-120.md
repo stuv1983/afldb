@@ -254,3 +254,46 @@ All three findings are implemented:
 
 Exact next action: commit F3, then perform ISSUE-120 final closeout validation and move the runbook to issues/closed.
 
+## 15. Final validation and closure
+
+Resolved 2026-09-01.
+
+### Final validation
+
+Operator-run:
+
+    npx vitest run       tests/search-rate-limit.test.ts       tests/health-event-route.test.ts       tests/catalogue-lookups.test.ts       tests/aflw-match-outcome-guard.test.ts
+
+Result:
+
+    4 test files passed
+    19/19 tests passed
+
+The two stderr messages in the search-rate-limit suite are intentional assertions
+of the fail-open contract when IP resolution or the limiter itself throws.
+
+Additional validation:
+
+    npx tsc --noEmit
+    passed
+
+    git diff --check
+    passed
+
+    git status --short
+    clean
+
+### Resolution
+
+F1, F2 and F3 are complete.
+
+- Public NL search now has a generous per-IP limiter and a friendly denial path.
+- Limiter/internal IP-resolution failures fail open rather than turning valid searches into 500s.
+- /api/health-event now enforces a 32 KiB streaming request-body cap before JSON parsing.
+- Oversized health-event bodies return 413 and do not reach the write path.
+- Request-derived career-record and AFLW outcome catalogue keys now require own-property membership.
+- Crafted prototype keys such as constructor no longer reach malformed query construction.
+- No schema, migration, privilege, beta-gate or NL-semantics changes were made.
+
+ISSUE-120 is resolved.
+
