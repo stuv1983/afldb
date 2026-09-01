@@ -39,6 +39,7 @@ next-env.d.ts
 /data/awards/*
 !/data/awards/22-under-22.csv
 !/data/awards/honour-teams.csv
+!/data/awards/hall-of-fame.csv
 !/data/records/
 /data/records/*
 !/data/records/first-kick-goal-ids.csv

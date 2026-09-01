@@ -396,6 +396,80 @@ streamanator host.
 
 ---
 
+## CHECKPOINT — pass 9 (2026-09-01): ISSUE-112 slice 2 (HALL OF FAME) — IMPLEMENTED and DB-validated
+
+Scope: the second ISSUE-112 implementation slice, **Hall of Fame only** (§11.2 phase 2). Full
+detail in `AFLDB-ISSUE-112.md` §18. Read-only `afldb_dev` bootstrap authorised on proof of
+connection; DB-free tests / `tsc` / `afldb_test`-only integration under the restricted role /
+`git diff --check` authorised. No scrape, no `afldb_dev` mutation, no production, no migration,
+no privilege change, ISSUE-111 / ISSUE-113 untouched, `D:\dev\afldb` not accessed, streamanator
+checkout not modified, no Git command.
+
+**Outcome: COMPLETE and GREEN.**
+
+- **Bootstrap extraction executed, read-only, proven** — same `BEGIN TRANSACTION READ ONLY`
+  step-0 guard as Passes 5/7, over SSH to `arm@10.0.40.100` (`psql` reading
+  `AFLDB_IMPORT_DATABASE_URL` from the streamanator `.env`, password never printed). Proven
+  `current_database() = afldb_dev`, `current_user = afldb_import`, `transaction_read_only = on`,
+  host `127.0.0.1:5432`, PostgreSQL 16.15. 343 rows extracted, matching G0 exactly: provenance
+  `wikipedia` for all; `inducted_year` 1996–2026 with 45 NULL; linked 246 / name-only 97; 34
+  legends; `(name, inducted_year)` and `name`-alone duplicates both 0; **5** `player_link_resolutions`
+  decisions (all `action = linked`, latest-per-target = 5, 0 orphaned, 0 player mismatch);
+  `player_link_suggestions` empty. New (vs honour teams): **3 `player_id` values appear on more
+  than one row** (same person on a dated + an undated row) — legitimate, `hall_of_fame` has no
+  linked-identity uniqueness constraint, so the parser does not enforce global `player_id`
+  uniqueness.
+- **Manifest:** `data/awards/hall-of-fame.csv` (344 lines), `source_key` minted `hof:<seq>` as an
+  **internal manifest key** (the DB reload key stays the natural `(name, inducted_year)`);
+  deterministic order `inducted_year ASC NULLS LAST, name` with `name` extracted under
+  `COLLATE "C"` so the validator's code-point comparison matches byte-for-byte (recorded: the
+  first extraction used the default collation and the ordering validator correctly rejected it —
+  re-extracted). `source_citation = wikipedia` throughout (source-granularity operator policy,
+  same as the honour-teams slice). `.gitignore` whitelisted.
+- **Loader:** new `tools/migration/hall_of_fame.py` (validating parser, DB-free `--check`, no
+  best-effort coercion — full §5 refusal list plus the `is_legend`/`legend_year` and
+  `removed_year`/`category='removed'` cross-field invariants, both directions).
+  `import_awards.py`'s `import_hall_of_fame()` now calls `load_hall_of_fame()` instead of reading
+  legacy SQLite — `lite` dropped from its signature and its `main()` call. The `reload_keyed`
+  call (key `(name, inducted_year)`, 14-column value list, `scope_column="source_id"`,
+  `name_column="name"`, `refuse_out_of_scope_key=True`) is **byte-identical** to before.
+  `"hall_of_fame"` added to `LEGACY_FREE_GROUPS`; `BATCH_SOURCE_KEYS["hall_of_fame"] = "wikipedia"`
+  added. No other group, `GROUPS`, `GROUP_ORDER`, `GROUP_REQUIRES` entry, or the `--dry-run`
+  legacy-table list changed. No migration, no privilege change.
+- **Tests:** `tests/hall-of-fame-source.test.ts` (new, 24 DB-free cases, all passing) and a new
+  legacy-free `describe` block in `tests/integration/awards-reload-links.test.ts`
+  (`canRunHallOfFameImporter`, mirrors the honour-teams block): 343-row parity, 3× idempotent
+  reload fingerprint, all 5 explicit `player_link_resolutions` decisions survive with id +
+  decided `player_id` stable, all 97 name-only rows stay unlinked, `manual_admin_edit` row
+  untouched, no other family's row counts change.
+- **Validation:** DB-free 24/24 passed; `npx tsc --noEmit` clean; `git diff --check` clean. The
+  integration block was **executed for real against `afldb_test`** under the restricted
+  `afldb_import` role, over a temporary SSH local port-forward to streamanator's PostgreSQL
+  (opened and closed within the pass; `AFLDB_TEST_IMPORT_DATABASE_URL` derived ephemerally
+  in-process, never persisted, since it is still unconfigured anywhere reachable — same finding
+  as Pass 8) — **6/6 green**; re-run alongside the honour-teams block gives **12/12**, confirming
+  honour teams is not regressed. DSN safety proved (`afldb_test` / `afldb_owner` and
+  `afldb_test` / `afldb_import`) before any test ran; no password or full DSN printed.
+- **Carried-forward risk (not a slice-2 blocker, same kind as Pass 6/7 §16.3):** the manifest
+  carries `player_id` verbatim from `afldb_dev` for the 246 linked rows; `players.id` is not
+  rebuild-stable (ISSUE-111 G5), and 7 of the 246 linked rows lack a unique
+  `afltables_profile_url` today. Recorded against the deferred §7 canonical-rebuild AWARDS/HONOURS
+  stage; `source_key`, not `player_id`, is the manifest's durable identity.
+- **Files changed this pass:** `.gitignore`, `data/awards/hall-of-fame.csv` (new),
+  `tools/migration/hall_of_fame.py` (new), `tools/migration/import_awards.py`,
+  `tests/hall-of-fame-source.test.ts` (new), `tests/integration/awards-reload-links.test.ts`,
+  `issues/open/AFLDB-ISSUE-112.md` §13/§18, this file, `IssuesIndex.md`. No `CHANGELOG.md` entry
+  — nothing deployed or run against a live application database. Two stray 0-byte tooling-artefact
+  files in the worktree root (`operator`, `!line.includes('`) were removed; never tracked. No Git
+  command run. `afldb_dev` was read-only. The streamanator checkout was not modified.
+- **Exact next action:** phase 3 — **captaincies (1,375 rows)**, per the §11.2 order. Captaincies
+  reloads on `(source_id, source_record_id)` (not a natural key) and has ISSUE-085 ownership
+  scoping + the `buildCaptaincyFixtureDb` precedent, so its manifest shape differs from the two
+  natural-keyed slices done so far. Do not resolve ISSUE-112; do not add the canonical-rebuild
+  AWARDS/HONOURS stage yet.
+
+---
+
 ## Confirmed source findings
 
 Each verified by direct read at baseline `95819a3`.

@@ -327,8 +327,9 @@ table, it would require `afldb_meta.grant_import_write()` — raise it as a deci
 
 ## 13. Status
 
-Design recorded 2026-08-30. **Slice 1 (honour teams) IMPLEMENTED 2026-09-01 — Pass 7, §16. The
-other six families remain not implemented.**
+Design recorded 2026-08-30. **Slice 1 (honour teams) IMPLEMENTED 2026-09-01 — Pass 7, §16;
+DB-validated Pass 8, §17. Slice 2 (Hall of Fame) IMPLEMENTED and DB-validated 2026-09-01 —
+Pass 9, §18. The other five families remain not implemented.**
 
 - Operator prerequisite §11.1 (extraction source) — **DECIDED 2026-09-01**: the legacy-loaded
   AFLDB PostgreSQL state, not a fresh scrape.
@@ -346,16 +347,25 @@ other six families remain not implemented.**
   and `(team_name, player_id)`. Only the rename-is-link-losing property remains as an operator
   policy acknowledgement (§14.5 item 2).
 - **`source_citation` granularity — DECIDED 2026-09-01 (operator, Pass 7):** source-granularity
-  provenance from the canonical source identity. For the honour-teams slice the value is
-  `wikipedia` for all 113 rows. This is explicitly **not** a per-row page/edition citation;
-  PostgreSQL does not retain that, and legacy SQLite is not being reopened to reconstruct it.
-- **Implementation phasing (§11.2) — honour teams (slice 1 of 7) IMPLEMENTED 2026-09-01.** See
-  §16. **Real DB-backed integration validation EXECUTED and GREEN 2026-09-01 — see §17**: 6/6
-  focused tests passed against real `afldb_test` under the restricted `afldb_import` role
-  (113-row parity, idempotent reload, link-decision survival, unlinked-row preservation,
-  `manual_admin_edit` protection, other-family non-interference). The remaining six families
-  (Hall of Fame, captaincies, Rising Star, All-Australian, club best-and-fairest, named medals)
-  are unstarted.
+  provenance from the canonical source identity — the same policy now applies to the Hall of
+  Fame slice (`wikipedia` for all 343 rows). This is explicitly **not** a per-row page/edition
+  citation; PostgreSQL does not retain that, and legacy SQLite is not being reopened to
+  reconstruct it.
+- **Implementation phasing (§11.2) — honour teams (slice 1 of 7) IMPLEMENTED 2026-09-01** (§16),
+  **DB-validated GREEN** (§17, 6/6 against real `afldb_test` under the restricted `afldb_import`
+  role).
+- **Implementation phasing (§11.2) — Hall of Fame (slice 2 of 7) IMPLEMENTED and DB-validated
+  2026-09-01.** See §18. 343-row bootstrap extracted read-only from `afldb_dev` (proven), matching
+  G0 exactly. `data/awards/hall-of-fame.csv` + `tools/migration/hall_of_fame.py` (validating
+  DB-free parser). `import_hall_of_fame()` reads the manifest instead of legacy SQLite;
+  `reload_keyed` key `(name, inducted_year)` / columns / scope / `refuse_out_of_scope_key` /
+  advisory behaviour **byte-identical**; `"hall_of_fame"` added to `LEGACY_FREE_GROUPS` +
+  `BATCH_SOURCE_KEYS`. DB-free 24/24, `tsc` clean, `git diff --check` clean; new
+  `hall-of-fame manifest reload (AFLDB-ISSUE-112)` integration block **6/6 GREEN** against real
+  `afldb_test` under `afldb_import` (343-row parity, 3× idempotent fingerprint, all five
+  `player_link_resolutions` decisions survive, all 97 name-only rows stay unlinked,
+  `manual_admin_edit` protection, other-family non-interference). The remaining five families
+  (captaincies, Rising Star, All-Australian, club best-and-fairest, named medals) are unstarted.
 
 ---
 
@@ -1003,6 +1013,202 @@ Honour-teams family-specific G1–G4 (§10) are satisfied by this pass's evidenc
 honour-teams family only**; this does not close G2/G3 for ISSUE-112 as a whole, which need all
 seven families. Phase 2 — Hall of Fame (343 rows) — is the next implementation slice, per the
 §11.2 order. **Do not resolve ISSUE-112.**
+
+---
+
+## 18. Pass 9 — 2026-09-01: implementation slice 2 (HALL OF FAME) — IMPLEMENTED and DB-validated
+
+**Scope:** the second ISSUE-112 implementation slice, **Hall of Fame only** (§11.2 phase 2). No
+other family. Authorised: read-only bootstrap extraction from `afldb_dev` (connection proven
+`afldb_dev` + `transaction_read_only = on` first); DB-free tests; `npx tsc --noEmit`; focused
+`afldb_test`-only integration under the restricted `afldb_import` role; `git diff --check`. No
+scrape, no `afldb_dev` mutation, no production, ISSUE-111 / ISSUE-113 untouched, `D:\dev\afldb`
+not accessed, no Git command, no migration, no privilege change, the streamanator checkout not
+modified.
+
+**Outcome: COMPLETE and GREEN.** Manifest built, loader rewired, DB-free + real-DB integration
+tests written and passing.
+
+### 18.1 Bootstrap extraction — executed, read-only, proven
+
+Same discipline as Passes 5/7: one `psql` script, step-0 connection guard, piped over SSH stdin
+(`arm@10.0.40.100`, key `~/.ssh/afldb_dev`, DSN read from `/home/arm/projects/afldb/.env`
+`AFLDB_IMPORT_DATABASE_URL`, password never printed), whole run inside
+`BEGIN TRANSACTION READ ONLY; … ROLLBACK;`. **Observed:** `current_database() = afldb_dev`,
+`current_user = afldb_import`, host `127.0.0.1:5432`, `transaction_read_only = on`,
+PostgreSQL 16.15. No server-side file written; nothing committed.
+
+Measured results matched G0 (§14.4) exactly:
+
+| Fact | Value |
+|---|---|
+| rows | **343**, provenance **`wikipedia`** for all |
+| `inducted_year` | 1996–2026; **45 NULL** |
+| linked / name-only | **246 / 97** |
+| legends (`is_legend`) | **34**, `legend_year` present on the same 34 |
+| `removed_year` present | 2 (Barry Cable 2023, Nicky Winmar 2026) — both `category = 'removed'` |
+| natural key `(name, inducted_year)` duplicates | **0**; `name` alone duplicates **0** |
+| `player_id` appearing on >1 row | **3** — same person on a dated and an undated row (e.g. John Kennedy Sr / John Kennedy Sr.; Graham 'Polly' Farmer / Graham Farmer; Haydn Bunton Sr / Sr.). Legitimate; `hall_of_fame` has no linked-identity uniqueness constraint (`ix_hof_player` is non-unique), so the parser does **not** enforce global `player_id` uniqueness. |
+| `category` vocabulary | `administrator, coach, legend, media, pioneer, player, removed, umpire` (all 343 rows carry one) |
+| `link_status` vocabulary | `unique` 234, `resolved` 12, `ambiguous` 2, `unmatched` 92, `implausible` 3 |
+| `player_link_resolutions` (hall_of_fame) | **5 rows, all `action = linked`**, latest-per-target = 5 linked, **0 orphaned target rows, 0 player mismatches**. Targets: Albert Chadwick/1996→2666, Carji Greeves/1996→2959, Graham 'Polly' Farmer/1996→2861, John Kennedy Sr/1996→1893, John Kennedy Sr./(NULL year)→1893. Every one already `resolved` on its row with the decided `player_id`. |
+| `player_link_suggestions` (hall_of_fame) | **0** (whole table empty) |
+| rebuild-stability probe | of 246 linked rows, **239** resolve to exactly one `afltables_profile_url` identity, **7** to none, **0** to more than one (carried-forward risk §18.3) |
+
+### 18.2 Manifest — `data/awards/hall-of-fame.csv`
+
+344 lines (header + 343). Exact column order:
+
+```
+source_key,name,inducted_year,category,is_legend,legend_year,club,state,playing_career,removed_year,player_id,link_status,note,source_citation
+```
+
+- **`source_key`** — minted once as `hof:<seq>`, `<seq>` a 1-based running counter in file order.
+  This is an **internal manifest key**, not the database reload key: `hall_of_fame` has no
+  `source_record_id` and `reload_keyed` still keys on the natural `(name, inducted_year)`
+  (§4.2 structural warning). It is a positional sequence frozen in the checked-in CSV, so it
+  survives a canonical rebuild and a deterministic reload; it is **not** derived from
+  `player_id`, the target-row `id`, or any database surrogate. Adding a future intake is an
+  `--assign-ids`-style concern, deferred exactly as in the honour-teams slice.
+- **Deterministic order** (file order and `<seq>` basis): `inducted_year ASC NULLS LAST, name`
+  with `name` compared by Unicode code point — extracted with `name COLLATE "C"` so the
+  parser's Python string comparison matches the extraction byte-for-byte. (The first extraction
+  used the database's default collation; re-run under `COLLATE "C"` after the ordering validator
+  rejected it — recorded so it is not repeated.)
+- **`name`** — the source spelling verbatim; this is what `reload_keyed`'s `name_column="name"`
+  guard compares. All 5 decision target `(name, inducted_year)` keys appear verbatim.
+- **`note`** — `hall_of_fame.notes` verbatim. The legacy loader folded `games_goals` into
+  `notes` at the original load (`" · ".join(...)`), so the PostgreSQL value is already the
+  combined string — there is nothing to re-join in the new loader.
+- **`source_citation`** — the literal `wikipedia` for all 343 rows, per the source-granularity
+  operator policy (§13); **not** a per-row page citation.
+- `.gitignore` whitelisted (`!/data/awards/hall-of-fame.csv`, alongside `22-under-22.csv` and
+  `honour-teams.csv`).
+
+### 18.3 Loader — `tools/migration/hall_of_fame.py` + `import_awards.py`
+
+New `tools/migration/hall_of_fame.py`, in the `honour_teams.py` / `under_22.py` mould:
+`HallOfFameSourceError(ValueError)`, a frozen `HallOfFameInductee` dataclass,
+`load_hall_of_fame()` that fully validates before constructing any row (no best-effort
+coercion), `summary()` / `main()` giving a DB-free `--check` (JSON out, exit 1 on error).
+Refuses: malformed header; missing required field (`source_key`, `name`, `category`,
+`is_legend`, `link_status`, `source_citation`); leading/trailing whitespace or a control
+character in any text field; `inducted_year` / `legend_year` / `removed_year` not an integer or
+outside the declared `1996–2026` span; `is_legend` not `true`/`false`; `category` outside the
+8-value vocabulary; `link_status` outside the 5-value enum; `link_status` disagreeing with
+`player_id` presence (the migration 019/053 invariant, enforced here rather than left to the
+database); `is_legend` vs `legend_year` presence disagreeing (both directions); `removed_year`
+vs `category = 'removed'` disagreeing (both directions); malformed `source_key` (not
+`hof:<positive-int>`); a `source_key` seq out of the running sequence; duplicate `source_key`
+(checked **before** the seq rule — a literal repeat is always also seq-invalid, so checking
+duplication first keeps that failure distinctly reported); duplicate natural identity
+`(name, inducted_year)`; rows out of deterministic order (a dated row after an undated one,
+`inducted_year` decreasing, or `name` not ascending within an `inducted_year` group); a total
+row count ≠ 343, a NULL-`inducted_year` count ≠ 45, or a dated span ≠ 1996–2026.
+
+`import_awards.py`: added `from hall_of_fame import HallOfFameInductee, load_hall_of_fame`.
+`import_hall_of_fame()` lost its `lite` parameter; its body now calls `load_hall_of_fame()`
+instead of `lite.execute("SELECT ... FROM hall_of_fame ...")`, mapping the parsed rows onto the
+same tuple shape the loader already built (still passed through the existing `link_status()`
+invariant call for defence in depth). **The `reload_keyed(...)` call — key
+`["name", "inducted_year"]`, the same 14-column value list, `scope_column="source_id"`,
+`name_column="name"`, `refuse_out_of_scope_key=True`, `allow_link_loss` — is byte-identical to
+before.** `"hall_of_fame"` added to `LEGACY_FREE_GROUPS`;
+`BATCH_SOURCE_KEYS["hall_of_fame"] = "wikipedia"` added so its `import_batch` records against
+`wikipedia` rather than the `sports_data_lab` default. The `main()` dispatch drops the `lite`
+argument for this group. `GROUPS`, `GROUP_ORDER`, `GROUP_REQUIRES`, the `--dry-run` legacy-table
+list, and every other group are untouched. No migration, no privilege change.
+
+**Carried-forward risk, unchanged in kind from the honour-teams slice (§16.3), not a slice-2
+blocker:** the manifest carries the 246 linked rows' `player_id` verbatim from `afldb_dev`. That
+reproduces the family exactly in a database sharing `afldb_dev`'s player numbering (which every
+pre-existing `hall_of_fame` test in `awards-reload-links.test.ts` already assumes). It is **not**
+durable across a from-scratch canonical rebuild that re-seeds `players.id` (ISSUE-111 G5) — and
+7 of the 246 linked rows do not carry a unique `afltables_profile_url` today (§18.1), so a
+rebuild-stable re-resolution step could not cover all 246 without a separate adjudication.
+Recorded against the deferred canonical-rebuild AWARDS/HONOURS stage (§7). `source_key`, not
+`player_id`, is the manifest's durable identity.
+
+### 18.4 Tests
+
+**DB-free — `tests/hall-of-fame-source.test.ts` (new, 24 cases, all passing):** the full 343-row
+manifest parses with the exact G0-measured shape (`row_count: 343`, `legend_count: 34`,
+`linked_count: 246`, `unlinked_count: 97`, `null_inducted_year_count: 45`,
+`inducted_year_min/max: 1996/2026`, the 8-entry `categories` map); three representative rows
+round-trip verbatim (the two John Kennedy Sr `(name, inducted_year)` keys and an undated
+name-only row); every row's `source_citation` is `wikipedia`; and one test each for: malformed
+header; unknown `category`; invalid `link_status`; `is_legend` not boolean; a `source_citation`
+outside the decided value (both a wrong source key and a page-URL-shaped value); `link_status`
+disagreeing with `player_id` presence (both directions); `is_legend` true without
+`legend_year`; `legend_year` set with `is_legend` false; `removed_year` without
+`category='removed'` and vice versa; `inducted_year` outside the declared span; malformed
+`source_key`; seq out of sequence; duplicate `source_key`; duplicate natural identity; rows out
+of deterministic order within a year; a dated row after an undated row; `inducted_year` running
+backwards across groups; a total row count short of 343. Reuses the honour-teams test's
+quote-aware CSV cell helpers and a minimal synthetic valid row for the per-row cases.
+
+**Integration — `tests/integration/awards-reload-links.test.ts` (new `describe` block, gated
+`canRunHallOfFameImporter`, legacy-free like the `canRunHonourTeamsImporter` block):** reloads
+the full 343-row manifest with `AFLDB_LEGACY_SQLITE` forced unset and asserts the
+`import_batches` row (`records_read = 343`, `records_rejected = 0`, target `hall_of_fame`,
+`status = completed`) and the resulting split (`total 343, linked 246, unlinked 97, legends 34`
+for `source_id = wikipedia`); three consecutive reloads produce a byte-identical
+`(id, name, inducted_year, player_id)` fingerprint; each of the five explicit
+`player_link_resolutions` decisions resolves under the natural key, keeps its `id` and decided
+`player_id` and stays `resolved` across an extra reload; all 97 name-only rows stay unlinked; a
+synthetic `manual_admin_edit`-sourced `hall_of_fame` row survives untouched;
+`honour_team_members` / `captaincies` / `award_winners` / `award_nominations` row counts are
+unchanged by a `hall_of_fame`-only run. The file's top-level `beforeAll` gains
+`canRunHallOfFameImporter` in its validate condition; no other wiring changed.
+
+### 18.5 Validation — exact results
+
+1. **DB-free:** `npx vitest run tests/hall-of-fame-source.test.ts` — **24/24 passed**;
+   `hall-of-fame.py --check` against the real manifest prints `ok: true` with the G0 shape.
+2. **Typecheck:** `npx tsc --noEmit` — **clean.**
+3. **Integration — EXECUTED FOR REAL, GREEN.** Run from `D:\dev\afldb-issue-102` with streamanator
+   used only as the PostgreSQL endpoint over a temporary SSH local port-forward (`arm@10.0.40.100`,
+   key `~/.ssh/afldb_dev`), opened and closed within the pass. **DSN safety proof (before any
+   test):** `AFLDB_TEST_DATABASE_URL` → `current_database() = afldb_test`,
+   `current_user = afldb_owner`; `AFLDB_TEST_IMPORT_DATABASE_URL` does not exist anywhere reachable
+   (same finding as Pass 8) — derived ephemerally in-process from `AFLDB_IMPORT_DATABASE_URL` by
+   substituting only the database name (`afldb_dev` → `afldb_test`), never written to disk, proven
+   `current_database() = afldb_test`, `current_user = afldb_import`. No password or full DSN
+   printed. Local `psycopg` 3.3.5 already present (Pass 8). Result:
+   `npx vitest run tests/integration/awards-reload-links.test.ts -t "hall-of-fame manifest reload"`
+   — **6/6 passed, 0 failed** (59 other tests filtered out by `-t`). Re-run alongside the
+   honour-teams block (`-t "manifest reload .AFLDB-ISSUE-112."`) — **12/12 passed**, confirming the
+   honour-teams slice is not regressed.
+4. **`git diff --check`:** clean.
+
+### 18.6 Files changed this pass
+
+`.gitignore` (new whitelist line), `data/awards/hall-of-fame.csv` (new, 344 lines),
+`tools/migration/hall_of_fame.py` (new), `tools/migration/import_awards.py` (import,
+`import_hall_of_fame` signature/body, `LEGACY_FREE_GROUPS`, `BATCH_SOURCE_KEYS`, `main()` call
+site), `tests/hall-of-fame-source.test.ts` (new), `tests/integration/awards-reload-links.test.ts`
+(new `describe` block + `canRunHallOfFameImporter` gate + `beforeAll` condition),
+`issues/open/AFLDB-ISSUE-112.md` (§13, this §18), `issues/open/AFLDB-ISSUE-102-HANDOFF.md`,
+`IssuesIndex.md`. No `CHANGELOG.md` entry — nothing deployed or run against a live application
+database; `import_awards.py`'s behaviour for the five still-legacy-dependent groups is unchanged.
+Two stray 0-byte files in the worktree root (`operator`, `!line.includes('`), created as
+tooling artefacts during this pass, were removed; they were never tracked. No Git command run.
+`afldb_dev` read-only for the §18.1 extraction only. No migration. No production contact. The
+streamanator checkout was not modified. ISSUE-111 / ISSUE-113 untouched. `D:\dev\afldb` not
+accessed.
+
+### 18.7 Exact next action
+
+1. Hall-of-Fame family-specific G1–G4 (§10) are satisfied by this pass's evidence — **for the
+   Hall of Fame family only**; this does not close G2/G3 for ISSUE-112 as a whole, which need all
+   seven families.
+2. **Phase 3 — captaincies (1,375 rows)** — is the next implementation slice, per the §11.2
+   order (captaincies → Rising Star → All-Australian → club best-and-fairest → named medals).
+   Captaincies has its own ISSUE-085 ownership scoping and a fixture precedent
+   (`awards-reload-links.test.ts:1248`), and it reloads on `(source_id, source_record_id)` (not a
+   natural key), so its manifest shape differs from the two natural-keyed slices done so far.
+3. Do **not** resolve ISSUE-112. Do **not** add the canonical-rebuild AWARDS/HONOURS stage yet
+   (§7) — record the §18.3 rebuild-stable-identity risk against it when that stage is designed.
 
 ---
 

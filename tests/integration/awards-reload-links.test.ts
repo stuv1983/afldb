@@ -48,6 +48,7 @@ const FIXTURE_EMAIL = 'issue-044-reload@example.test';
 const NOTE = 'AFLDB-ISSUE-044 reload survival';
 const UNDER_22_CSV = join(root, 'data', 'awards', '22-under-22.csv');
 const HONOUR_TEAMS_CSV = join(root, 'data', 'awards', 'honour-teams.csv');
+const HALL_OF_FAME_CSV = join(root, 'data', 'awards', 'hall-of-fame.csv');
 
 // The dev host keeps psycopg in the repo virtualenv; a bare python3 there
 // cannot import it.
@@ -84,11 +85,21 @@ const canRunUnder22Importer = canSpawnPython
 const canRunHonourTeamsImporter = canSpawnPython
   && existsSync(HONOUR_TEAMS_CSV)
   && importRole.isConfigured;
+// AFLDB-ISSUE-112 phase 2: Hall of Fame is legacy-free like honour_teams,
+// gated the same way and independent of canRunImporter/legacySqlite.
+const canRunHallOfFameImporter = canSpawnPython
+  && existsSync(HALL_OF_FAME_CSV)
+  && importRole.isConfigured;
 const roleParitySuffix = importRole.isConfigured ? '' : ` — ${importRole.skipMessage}`;
 
 // One connection pool for the whole file: every describe block shares `sql`.
 beforeAll(async () => {
-  if (canRunFixtureImporter || canRunUnder22Importer || canRunHonourTeamsImporter) {
+  if (
+    canRunFixtureImporter
+    || canRunUnder22Importer
+    || canRunHonourTeamsImporter
+    || canRunHallOfFameImporter
+  ) {
     await importRole.validate();
   }
 });
@@ -705,6 +716,211 @@ describe.skipIf(!canRunHonourTeamsImporter)(
       expect(run.status, importRole.diagnostics(run)).toBe(0);
       const after = await Promise.all([
         countRows('hall_of_fame'), countRows('captaincies'),
+        countRows('award_winners'), countRows('award_nominations'),
+      ]);
+      expect(after).toEqual(before);
+    });
+  },
+);
+
+/**
+ * AFLDB-ISSUE-112 phase 2: the checked-in manifest
+ * (data/awards/hall-of-fame.csv) replaces the legacy SQLite hall_of_fame
+ * table as the sole input to the hall_of_fame group. Legacy-free like
+ * honour_teams — deliberately run with AFLDB_LEGACY_SQLITE forced unset,
+ * proving the group no longer needs it, on top of the reload/link
+ * guarantees the ISSUE-044/080 blocks already cover generically for this
+ * table. hall_of_fame reloads on the natural key (name, inducted_year).
+ */
+describe.skipIf(!canRunHallOfFameImporter)(
+  `hall-of-fame manifest reload (AFLDB-ISSUE-112)${roleParitySuffix}`,
+  () => {
+    const FIXTURE_EMAIL_112_HOF = 'issue-112-hall-of-fame@example.test';
+    // The five hall_of_fame player_link_resolutions decisions measured
+    // read-only from afldb_dev (§18): all action='linked', all already
+    // 'resolved' on their row. inductedYear null is the undated Legend row.
+    const DECIDED = [
+      { name: 'Albert Chadwick', inductedYear: 1996, player: 2666 },
+      { name: 'Carji Greeves', inductedYear: 1996, player: 2959 },
+      { name: "Graham 'Polly' Farmer", inductedYear: 1996, player: 2861 },
+      { name: 'John Kennedy Sr', inductedYear: 1996, player: 1893 },
+      { name: 'John Kennedy Sr.', inductedYear: null, player: 1893 },
+    ];
+    let wikipediaId = 0;
+    let manualId = 0;
+    let adminUserId = 0;
+
+    beforeAll(async () => {
+      const sourceRows = await sql<{ key: string; id: number }[]>`
+        SELECT key, id FROM sources WHERE key IN ('wikipedia', 'manual_admin_edit')
+      `;
+      const byKey = new Map(sourceRows.map((row) => [row.key, row.id]));
+      wikipediaId = byKey.get('wikipedia') ?? 0;
+      manualId = byKey.get('manual_admin_edit') ?? 0;
+      expect(wikipediaId, 'wikipedia source must exist').toBeGreaterThan(0);
+      expect(manualId, 'manual_admin_edit source must exist').toBeGreaterThan(0);
+
+      const [admin] = await sql<{ id: number }[]>`
+        INSERT INTO auth_users (email, role)
+        VALUES (${FIXTURE_EMAIL_112_HOF}, 'admin')
+        ON CONFLICT (email) DO UPDATE SET role = 'admin'
+        RETURNING id
+      `;
+      adminUserId = admin.id;
+    });
+
+    afterAll(async () => {
+      await sql`DELETE FROM auth_users WHERE id = ${adminUserId}`;
+    });
+
+    it('reloads the full 343-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset', async () => {
+      const [before] = await sql<{ id: string }[]>`
+        SELECT coalesce(max(id), 0)::text AS id FROM import_batches
+      `;
+
+      // The third argument forces AFLDB_LEGACY_SQLITE unset regardless of
+      // this process's own environment — the headline ISSUE-112 acceptance.
+      const run = runImporter(['hall_of_fame'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+
+      const [batch] = await sql<{
+        status: string;
+        recordsRead: string;
+        recordsRejected: string;
+      }[]>`
+        SELECT status::text AS status,
+               records_read::text AS "recordsRead",
+               records_rejected::text AS "recordsRejected"
+          FROM import_batches
+         WHERE id > ${before.id}::bigint
+           AND tool = 'import_awards.py'
+           AND target_table = 'hall_of_fame'
+         ORDER BY id DESC
+         LIMIT 1
+      `;
+      expect(batch, 'the hall_of_fame batch must be recorded').toBeDefined();
+      expect(batch.status).toBe('completed');
+      expect(Number(batch.recordsRead)).toBe(343);
+      expect(Number(batch.recordsRejected)).toBe(0);
+
+      const [counts] = await sql<{
+        total: number; linked: number; unlinked: number; legends: number;
+      }[]>`
+        SELECT count(*)::int AS total,
+               count(*) FILTER (WHERE player_id IS NOT NULL)::int AS linked,
+               count(*) FILTER (WHERE player_id IS NULL)::int AS unlinked,
+               count(*) FILTER (WHERE is_legend)::int AS legends
+          FROM hall_of_fame
+         WHERE source_id = ${wikipediaId}
+      `;
+      expect(counts).toEqual({ total: 343, linked: 246, unlinked: 97, legends: 34 });
+    }, 120_000);
+
+    it('is idempotent across three consecutive reloads with a byte-identical row-id fingerprint', async () => {
+      async function fingerprint(): Promise<string> {
+        const [row] = await sql<{ fp: string }[]>`
+          SELECT md5(string_agg(
+                   id || ':' || name || ':'
+                     || coalesce(inducted_year::text, '-') || ':'
+                     || coalesce(player_id::text, '-'), ',' ORDER BY id
+                 )) AS fp
+            FROM hall_of_fame WHERE source_id = ${wikipediaId}
+        `;
+        return row.fp;
+      }
+
+      const first = runImporter(['hall_of_fame'], [], undefined);
+      expect(first.status, importRole.diagnostics(first)).toBe(0);
+      const fp1 = await fingerprint();
+
+      const second = runImporter(['hall_of_fame'], [], undefined);
+      expect(second.status, importRole.diagnostics(second)).toBe(0);
+      expect(await fingerprint()).toBe(fp1);
+
+      const third = runImporter(['hall_of_fame'], [], undefined);
+      expect(third.status, importRole.diagnostics(third)).toBe(0);
+      expect(await fingerprint()).toBe(fp1);
+    }, 180_000);
+
+    it('keeps all five explicit hall_of_fame link decisions resolved across a reload', async () => {
+      const prime = runImporter(['hall_of_fame'], [], undefined);
+      expect(prime.status, importRole.diagnostics(prime)).toBe(0);
+
+      for (const decided of DECIDED) {
+        const yearMatch = decided.inductedYear === null
+          ? sql`inducted_year IS NULL`
+          : sql`inducted_year = ${decided.inductedYear}`;
+        const [before] = await sql<{ id: number; playerId: number | null; status: string }[]>`
+          SELECT id, player_id AS "playerId", link_status_value::text AS status
+            FROM hall_of_fame
+           WHERE name = ${decided.name} AND ${yearMatch}
+             AND source_id = ${wikipediaId}
+        `;
+        expect(before, `${decided.name} must resolve under the manifest natural key`)
+          .toBeDefined();
+        expect(before.status).toBe('resolved');
+        expect(before.playerId).toBe(decided.player);
+
+        const run = runImporter(['hall_of_fame'], [], undefined);
+        expect(run.status, importRole.diagnostics(run)).toBe(0);
+
+        const [after] = await sql<{ id: number; playerId: number | null; status: string }[]>`
+          SELECT id, player_id AS "playerId", link_status_value::text AS status
+            FROM hall_of_fame WHERE id = ${before.id}
+        `;
+        expect(after.id).toBe(before.id);
+        expect(after.playerId).toBe(decided.player);
+        expect(after.status).toBe('resolved');
+      }
+    }, 180_000);
+
+    it('leaves all 97 name-only observations unlinked', async () => {
+      const run = runImporter(['hall_of_fame'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+
+      const [{ n }] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n
+          FROM hall_of_fame
+         WHERE source_id = ${wikipediaId} AND player_id IS NULL
+      `;
+      expect(n).toBe(97);
+    });
+
+    it('does not touch a manual_admin_edit hall_of_fame row', async () => {
+      const [fixture] = await sql<{ id: number }[]>`
+        INSERT INTO hall_of_fame
+          (name, link_status_value, source_id)
+        VALUES
+          ('AFLDB-ISSUE-112 HoF Fixture', 'unmatched', ${manualId})
+        RETURNING id
+      `;
+      try {
+        const before = await countRows('hall_of_fame');
+        const run = runImporter(['hall_of_fame'], [], undefined);
+        expect(run.status, importRole.diagnostics(run)).toBe(0);
+
+        const after = await sql<{ id: number; name: string; sourceId: number | null }[]>`
+          SELECT id, name, source_id AS "sourceId"
+            FROM hall_of_fame WHERE id = ${fixture.id}
+        `;
+        expect(after[0]).toEqual({
+          id: fixture.id, name: 'AFLDB-ISSUE-112 HoF Fixture', sourceId: manualId,
+        });
+        expect(await countRows('hall_of_fame')).toBe(before);
+      } finally {
+        await sql`DELETE FROM hall_of_fame WHERE id = ${fixture.id}`;
+      }
+    });
+
+    it('does not change honour_team_members, captaincies, award_winners or award_nominations row counts', async () => {
+      const before = await Promise.all([
+        countRows('honour_team_members'), countRows('captaincies'),
+        countRows('award_winners'), countRows('award_nominations'),
+      ]);
+      const run = runImporter(['hall_of_fame'], [], undefined);
+      expect(run.status, importRole.diagnostics(run)).toBe(0);
+      const after = await Promise.all([
+        countRows('honour_team_members'), countRows('captaincies'),
         countRows('award_winners'), countRows('award_nominations'),
       ]);
       expect(after).toEqual(before);

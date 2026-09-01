@@ -67,6 +67,7 @@ from common import (  # noqa: E402
     set_reload_scope,
     to_int,
 )
+from hall_of_fame import HallOfFameInductee, load_hall_of_fame  # noqa: E402
 from honour_teams import HonourTeamMember, load_honour_teams  # noqa: E402
 from under_22 import Under22Selection, load_under_22  # noqa: E402
 
@@ -1572,32 +1573,30 @@ def import_rising_star(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
 # ---------------------------------------------------------------------------
 # Group: Hall of Fame
 # ---------------------------------------------------------------------------
-def import_hall_of_fame(pg, lite, rep: Reporter, batch, sources: dict[str, int],
+def import_hall_of_fame(pg, rep: Reporter, batch, sources: dict[str, int],
                         allow_link_loss: bool = False) -> None:
-    rows = lite.execute(
-        """SELECT name, category, inducted_year, is_legend, legend_year, club,
-                  state, playing_career, games_goals, removed_year, player_id,
-                  match_status, candidate_count, notes, source_url
-             FROM hall_of_fame ORDER BY inducted_year, name"""
-    ).fetchall()
+    # AFLDB-ISSUE-112 phase 2: the checked-in manifest replaces the legacy
+    # SQLite hall_of_fame table as the sole input. games_goals was folded
+    # into notes at the original load, so the manifest already carries the
+    # combined note verbatim; there is nothing to re-join here.
+    rows: list[HallOfFameInductee] = load_hall_of_fame()
 
     source_id = require_source(sources, "wikipedia")
 
     def build():
         for r in rows:
             batch.records_read += 1
-            name = clean_text(r["name"])
-            if not name:
-                continue
-            status = link_status(r["match_status"], r["player_id"])
-            notes = [clean_text(r["notes"]), clean_text(r["games_goals"])]
+            # link_status() re-checks the migration 019/053 invariant the
+            # manifest parser already enforces — defence in depth, as in
+            # import_honour_teams.
+            status = link_status(r.link_status, r.player_id)
             yield (
-                name, r["player_id"], status,
-                clean_text(r["category"]), to_int(r["inducted_year"]),
-                bool(r["is_legend"]), to_int(r["legend_year"]),
-                clean_text(r["club"]), clean_text(r["state"]),
-                clean_text(r["playing_career"]), to_int(r["removed_year"]),
-                " · ".join(n for n in notes if n) or None,
+                r.name, r.player_id, status,
+                r.category, r.inducted_year,
+                r.is_legend, r.legend_year,
+                r.club, r.state,
+                r.playing_career, r.removed_year,
+                r.note,
                 source_id, batch.id,
             )
 
@@ -1901,13 +1900,14 @@ GROUPS = {
 # each load a tracked manifest; coleman derives from AFLDB's own canonical
 # match facts. Any of them can therefore run in a canonically rebuilt database
 # with AFLDB_LEGACY_SQLITE unset.
-LEGACY_FREE_GROUPS = {"under_22", COLEMAN_GROUP, "honour_teams"}
+LEGACY_FREE_GROUPS = {"under_22", COLEMAN_GROUP, "hall_of_fame", "honour_teams"}
 
 # The provenance each group's import_batch is recorded against. Everything not
 # named here is a legacy-SQLite extract, recorded as sports_data_lab.
 BATCH_SOURCE_KEYS = {
     "under_22": UNDER_22_SOURCE_KEY,
     COLEMAN_GROUP: "afltables",
+    "hall_of_fame": "wikipedia",
     "honour_teams": "wikipedia",
 }
 
@@ -2148,7 +2148,7 @@ def main() -> int:
                     import_rising_star(pg, lite, rep, batch, clubs, sources,
                                        allow_link_loss=args.allow_link_loss)
                 elif key == "hall_of_fame":
-                    import_hall_of_fame(pg, lite, rep, batch, sources,
+                    import_hall_of_fame(pg, rep, batch, sources,
                                         allow_link_loss=args.allow_link_loss)
                 elif key == "honour_teams":
                     import_honour_teams(pg, rep, batch, sources,
