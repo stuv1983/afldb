@@ -349,6 +349,17 @@ export type AuditActor = { userId?: number; label?: string };
  * tagged-template call and the query helpers and nothing else, so this
  * function cannot open a transaction, take a savepoint or end the pool
  * with whichever handle it is handed; it can only write the row.
+ *
+ * `detail` is bound with `sql.json()`, never `JSON.stringify()`. postgres.js
+ * learns the parameter's real type from the server's ParameterDescription
+ * and then encodes the value with its own jsonb serializer, which is
+ * JSON.stringify; handing it an already-stringified object therefore
+ * encodes it twice and stores a jsonb STRING SCALAR whose contents are JSON
+ * text. `detail->>'deletedLogRows'` is then NULL and jsonb_typeof(detail)
+ * is 'string'. An explicit `::jsonb` cast does not help, because the
+ * parameter is encoded before the cast is applied. This is the defect
+ * migration 048 repaired in nl_search_log and deliberately left in this
+ * column; src/db/queries/nl/log.ts binds the identical way.
  */
 async function insertAuditRow(
   sql: postgres.ISql,
@@ -360,7 +371,7 @@ async function insertAuditRow(
   await sql`
     INSERT INTO auth_audit_log (actor_user_id, actor_label, action, detail, ip)
     VALUES (${actor.userId ?? null}, ${actor.label ?? null}, ${action},
-            ${detail ? JSON.stringify(detail) : null}, ${ip})
+            ${detail ? sql.json(detail as postgres.JSONValue) : null}, ${ip})
   `;
 }
 

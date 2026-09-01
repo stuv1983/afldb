@@ -15,6 +15,39 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-121 — administrative audit payloads are stored as JSONB objects - 1 September 2026
+
+- `auth_audit_log.detail` now stores a real JSONB **object**. Every row ever
+  written to that column held a JSONB **string scalar** whose contents were JSON
+  text: the writer bound `JSON.stringify(detail)`, and postgres.js — which learns
+  a parameter's type from the server and then applies its own JSONB serializer,
+  `JSON.stringify` — encoded it a second time. `jsonb_typeof(detail)` read
+  `'string'` and every `detail->>'field'` read NULL, so the administrative trail's
+  payloads were opaque to SQL. The single writer, `insertAuditRow()` in
+  `src/lib/auth/session.ts`, now binds `sql.json(detail)`, which fixes `audit()`
+  and `auditInTransaction()` together; an explicit `::jsonb` cast does not work,
+  because the parameter is encoded before the cast is applied.
+- Migration `082_auth_audit_log_jsonb_repair.sql` repairs the existing rows and
+  guards the column. The repair unwraps only values that are JSONB strings **and**
+  whose decoded text is a valid JSON object (`IS JSON OBJECT`), so NULLs and
+  already-correct objects are never rewritten and no other scalar is silently
+  reinterpreted; anything it cannot repair by rule aborts the migration with the
+  offending row ids rather than being guessed at. A new CHECK constraint,
+  `auth_audit_log_detail_is_object_ck`, then requires `detail IS NULL OR
+  jsonb_typeof(detail) = 'object'`. This is the deferred half of migration `048`,
+  which repaired the identical defect in `nl_search_log` and explicitly left this
+  column for a separate decision.
+- **No audit data was lost** — the payloads were intact under one surplus layer of
+  encoding, and unwrapping them is exact. No privilege, grant, retention or
+  append-only behaviour changed, and no other table is affected.
+- **Deployment order matters:** the new CHECK constraint rejects the old
+  double-encoded shape, so the migration must not be applied to a database whose
+  application code has not yet been updated, or audited admin actions fail closed.
+- Focused suites pass 43/43 and the wider audit-touching set 76/76, with a
+  regression test proving an object payload binds as a JSONB object rather than a
+  JSONB string; typecheck clean. The PostgreSQL integration suite for the
+  migration and the constraint is written but has not yet been run.
+
 ### AFLDB-ISSUE-120 — public-surface abuse hardening before launch - 1 September 2026
 
 - The public natural-language `/search` path now enforces a per-worker, per-IP

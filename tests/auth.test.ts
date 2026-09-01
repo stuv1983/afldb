@@ -7,12 +7,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // file touches either module.
 type CapturedQuery = { strings: string[]; values: unknown[] };
 
+/**
+ * What postgres.js's own `sql.json()` returns: the raw value tagged with the
+ * jsonb OID, so the driver encodes it exactly once at Bind time. Both fake
+ * handles below expose it, because a jsonb column bound any other way is the
+ * AFLDB-ISSUE-119 double-encoding defect.
+ */
+const jsonParameter = vi.hoisted(() => (
+  (value: unknown) => ({ type: 3802, value }) as unknown as import('postgres').Parameter
+));
+
 const poolQueries = vi.hoisted(() => [] as CapturedQuery[]);
 vi.mock('@/db/authClient', () => {
   const sql = (strings: TemplateStringsArray, ...values: unknown[]) => {
     poolQueries.push({ strings: [...strings], values });
     return Promise.resolve([]);
   };
+  sql.json = jsonParameter;
   return { authSql: sql };
 });
 
@@ -248,10 +259,12 @@ describe('auth_audit_log writer', () => {
   /** Stands in for an authSql.begin() handle: records each tagged-template call. */
   function fakeTx(failure?: Error): { tx: postgres.TransactionSql; queries: CapturedQuery[] } {
     const queries: CapturedQuery[] = [];
-    const tx = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+    const handle = (strings: TemplateStringsArray, ...values: unknown[]) => {
       queries.push({ strings: [...strings], values });
       return failure ? Promise.reject(failure) : Promise.resolve([]);
-    }) as unknown as postgres.TransactionSql;
+    };
+    handle.json = jsonParameter;
+    const tx = handle as unknown as postgres.TransactionSql;
     return { tx, queries };
   }
 
@@ -287,7 +300,7 @@ describe('auth_audit_log writer', () => {
       9,
       'super@example.test',
       'nl_search.telemetry_cleared',
-      JSON.stringify({ deletedLogRows: 412 }),
+      jsonParameter({ deletedLogRows: 412 }),
       '198.51.100.7',
     ]);
   });
@@ -310,7 +323,7 @@ describe('auth_audit_log writer', () => {
 
     expect(poolQueries).toHaveLength(1);
     expect(poolQueries[0].values).toEqual([
-      9, 'super@example.test', 'nl_search.reviewed', JSON.stringify({ searchLogId: 5 }), '198.51.100.7',
+      9, 'super@example.test', 'nl_search.reviewed', jsonParameter({ searchLogId: 5 }), '198.51.100.7',
     ]);
     expect(queries).toHaveLength(0);
   });
@@ -325,6 +338,40 @@ describe('auth_audit_log writer', () => {
     // its shape — which is the reason the SQL is not duplicated.
     expect(queries[0].strings).toEqual(poolQueries[0].strings);
     expect(queries[0].values).toEqual(poolQueries[0].values);
+  });
+
+  it('binds detail as a jsonb OBJECT, not a jsonb string, on both forms (AFLDB-ISSUE-119)', async () => {
+    // The defect this pins: `${JSON.stringify(detail)}` bound a STRING, and
+    // postgres.js then applied its own jsonb serializer -- JSON.stringify --
+    // to that string, so the row stored a jsonb string scalar. Live evidence
+    // was auth_audit_log id 632: jsonb_typeof(detail) = 'string' and
+    // detail->>'deletedLogRows' NULL, on a clear that really did delete 4953
+    // rows. Migration 048 repaired the same defect in nl_search_log.
+    const detail = { deletedLogRows: 4953, retainedLogRows: 0 };
+    const { tx, queries } = fakeTx();
+
+    await auditInTransaction(tx, 'nl_search.telemetry_cleared', detail, admin);
+    await audit('nl_search.telemetry_cleared', detail, admin);
+
+    for (const bound of [queries[0].values[3], poolQueries[0].values[3]]) {
+      const parameter = bound as { type: number; value: unknown };
+
+      // Not a pre-encoded string, and carrying the jsonb OID so the driver
+      // encodes it once rather than a second time.
+      expect(typeof bound).not.toBe('string');
+      expect(parameter.type).toBe(3802);
+      expect(parameter.value).toEqual(detail);
+
+      // What actually reaches PostgreSQL is the driver's single
+      // JSON.stringify of parameter.value, and that text is what the server
+      // parses into the column. Parsing it here is jsonb_typeof(): an object
+      // under the fix, the quoted string scalar under the defect.
+      const wire = JSON.stringify(parameter.value);
+      const parsed = JSON.parse(wire);
+      expect(typeof parsed).toBe('object');
+      expect(parsed).toEqual(detail);
+      expect(parsed.deletedLogRows).toBe(4953);
+    }
   });
 
   it('propagates a failed insert instead of swallowing it, so the caller rolls back', async () => {

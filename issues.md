@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 6 tracked here — `AFLDB-ISSUE-102`, `-104`, `-110`, `-112`, `-113`, `-116`.
+**Open issues:** 7 tracked here — `AFLDB-ISSUE-102`, `-104`, `-110`, `-112`, `-113`, `-116`, `-121`.
 
 <!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
      the ISSUE-110 branch merged into dev on 2026-08-31 and its own ledger rows below are
@@ -15,6 +15,7 @@ created, reopened, resolved, or materially reclassified.
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
+| `AFLDB-ISSUE-121` | Medium | Admin / Security / Audit trail / Database | `auth_audit_log.detail` is `jsonb` but every row ever written holds a jsonb **string scalar** whose contents are JSON text. `insertAuditRow()` bound `${JSON.stringify(detail)}`, and postgres.js then applied its own jsonb serializer — `JSON.stringify` — to that string, so the payload is encoded twice. Live dev evidence: `auth_audit_log` id 632 (`nl_search.telemetry_cleared`), `jsonb_typeof(detail) = 'string'` and `detail->>'deletedLogRows'` NULL on a clear that really did delete 4,953 rows. Blast radius is every `auth_audit_log` detail payload — `insertAuditRow()` is the only writer of the table in `src/`, so `audit()` and `auditInTransaction()` are both affected. Migration 048 diagnosed the identical defect in `nl_search_log` and deliberately deferred this column. **No data was lost**; the payloads carry one surplus encoding layer and unwrap exactly. | **Code fix and migration `082` are written; nothing is applied and nothing is committed.** Next: commit, then run `npx vitest run tests/integration/auth-audit-jsonb.test.ts` where `AFLDB_TEST_DATABASE_URL` exists (absent in `D:\dev\afldb-dev-test`, which has no `.env`), then `npm run db:migrate:test`, then apply `082` to `afldb_dev` and re-read row 632. **Order is load-bearing (R1): the CHECK constraint fails admin actions closed if the migration lands before the code fix.** Runbook: `issues/open/AFLDB-ISSUE-121.md`. |
 | `AFLDB-ISSUE-102` | Medium | Data acquisition / Import architecture | **PARENT.** Scope revised 2026-08-30 by operator decision from "record only" to parent architecture / dependency-inventory / child-coordination / acceptance record for legacy-free awards acquisition. `tools/migration/import_awards.py:1408` still requires `AFLDB_LEGACY_SQLITE` for six of seven groups (`under_22` is already legacy-free). `tools/db/rebuild-test.ts` has **no awards stage**, so a canonical rebuild leaves all six awards/honours tables at **zero rows**, ungated. ISSUE-102 does not implement loaders. | **No implementation. Coordinate `AFLDB-ISSUE-111` (Coleman derivation), `-112` (curated honours manifests) and `-113` (Brownlow season totals; outside this issue's closure boundary).** Closure criteria in `issues/open/AFLDB-ISSUE-102.md` §8. Next action is operator: authorise the read-only measurement gating ISSUE-112 G0, and decide the one-time extraction source (ISSUE-112 §11.1). `AFLDB-ISSUE-111` is **Resolved 2026-08-30** — Coleman is legacy-free by derivation and canonically rebuild-gated. |
 | `AFLDB-ISSUE-112` | Medium | Data acquisition / Import architecture / Data integrity | Replace the legacy SQLite input of the six legacy-dependent `import_awards.py` groups with checked-in, validated, reviewable curated manifests: All-Australian, Hall of Fame, honour teams, captaincies, Rising Star, club best-and-fairest, named medals (+ award definitions and the `person_links` bridge). Reuses `reload_keyed` unchanged — only the **input** changes. Scraping, HTML parsing, paid APIs and undocumented endpoints are **not** authorised. | **Blocked on gate G0** (per-family read-only coverage measurement) **and operator prerequisite §11.1** — where the one-time extraction comes from. Recommended phasing, smallest first: honour teams (113 rows) → Hall of Fame (343) → captaincies (1,375) → Rising Star (766) → All-Australian (2,158) → club B&F → named medals. Headline acceptance: `awards-reload-links.test.ts:205-1247` executes without `AFLDB_LEGACY_SQLITE`. |
 | `AFLDB-ISSUE-113` | Medium | Data acquisition / Import architecture / Data integrity | `brownlow_season_votes` has **no legacy-free writer** — sole writer `import_legacy_afl.py:684`. `rebuild_derived.py:23-26` and `db-health.ts:94` treat it as AUTHORITATIVE. Not reconstructible from round votes: season totals are complete 1924-1941 and 1946-2025 while round votes are complete only 1984-2025, and `vote_rank`/`eligible_rank`/`is_ineligible` are not computable from vote sums. **Silent-wrongness hazard:** with the table empty, `rebuild_derived.py`'s `season_brownlow` CTE falls every decided season to `not_applicable` — AFLDB would assert "no medal that season" for a century. | **Replacement source UNDECIDED and no selection is authorised.** Recommended next step, not a decision: a read-only probe of class B (a free structured season-summary source carrying rank **and** ineligibility) before committing to a 16,120-row manifest. Outside `AFLDB-ISSUE-102`'s closure boundary — 102 may resolve with this open. |
@@ -11364,3 +11365,88 @@ Final acceptance evidence and diagnostic lineage are authoritative in
 
 No production migration or production telemetry clear was performed as part of this
 resolution.
+
+### Addendum — live dev run, 2026-09-01 (record only; nothing above is retracted)
+
+After this resolution, migration `081` and the `privileges.sql` reconciliation were applied
+to `afldb_dev` and Clear Search Telemetry was run live for the first time. **The clear
+itself succeeded**, exactly to contract: `deletedLogRows = 4953`, `retainedLogRows = 0`,
+`retainedReviewRows = 0`, `retainedFeedbackRows = 0`, `detachedAppHealthLinks = 14`, with the
+`nl_search.telemetry_cleared` audit row committed in the same transaction (`auth_audit_log`
+id 632).
+
+That audit row exposed a **separate, pre-existing defect now tracked as `AFLDB-ISSUE-121`**:
+`auth_audit_log.detail` has always been written double-encoded, so id 632 stored
+`jsonb_typeof(detail) = 'string'` and `detail->>'deletedLogRows'` reads NULL. The defect is in
+`insertAuditRow()`'s jsonb binding, predates ISSUE-119 by ~100 rows, and was explicitly
+deferred by migration `048`. No ISSUE-119 evidence, count, contract or acceptance claim is
+affected, and no data was lost.
+
+**Final live dev acceptance of ISSUE-119 is therefore pending the ISSUE-121 repair** — the
+audit row is the artefact an operator reads to confirm what the clear did, and until `082` is
+applied it is opaque to SQL. The destructive clear must **not** be re-run for this; only the
+audit payload needs re-reading.
+
+---
+
+## AFLDB-ISSUE-121 — `auth_audit_log.detail` stores JSON objects as JSONB strings
+
+- **Status:** Open — code fix and migration written, nothing applied, nothing committed
+- **Created:** 2026-09-01
+- **Severity:** Medium
+- **Area:** Admin / Security / Audit trail / Database
+- **Files:** `src/lib/auth/session.ts` (the `insertAuditRow()` jsonb binding), `tests/auth.test.ts` (`auth_audit_log writer` describe — new regression case, two corrected assertions), `src/db/migrations/082_auth_audit_log_jsonb_repair.sql` (new, unapplied), `tests/integration/auth-audit-jsonb.test.ts` (new, unexecuted), `issues/open/AFLDB-ISSUE-121.md`, `IssuesIndex.md`, `issues.md`, `CHANGELOG.md`
+- **Migration:** `082` — re-derived on 2026-09-01, not assumed: `081` is the highest on `dev`, `080` belongs to `opus/gridley-corpus` (`28fdb2f`, unmerged), and `git log --all --name-only` finds no `082_*` in any local or remote ref's history. **Allocated and unapplied everywhere.**
+- **Runbook:** `issues/open/AFLDB-ISSUE-121.md`
+- **Discovered by:** `AFLDB-ISSUE-119` live dev acceptance. ISSUE-119 stays **Resolved**; only an addendum was added to it.
+
+### Symptom
+
+The administrative audit trail's `detail` column is opaque to SQL. `auth_audit_log.detail` is `jsonb` (migration `023`), but every row ever written to it holds a jsonb **string scalar** whose contents are JSON text, so no field inside a payload can be read, filtered or aggregated.
+
+### Reproduction
+
+Any audited admin action with a payload. The live instance: Clear Search Telemetry on `afldb_dev` on 2026-09-01, after migration `081` and `privileges.sql` were applied.
+
+### Expected
+
+`jsonb_typeof(detail) = 'object'`, and `detail->>'deletedLogRows'` returning the recorded count.
+
+### Actual
+
+    SELECT jsonb_typeof(detail) FROM auth_audit_log WHERE id = 632;  -->  string
+    SELECT detail->>'deletedLogRows' FROM auth_audit_log WHERE id = 632;  -->  NULL
+
+with `detail` rendering as `"{\"deletedLogRows\":4953,...}"`.
+
+### Evidence
+
+`auth_audit_log` id 632, `action = nl_search.telemetry_cleared`, written by the clear that returned `deletedLogRows = 4953`, `retainedLogRows = 0`, `retainedReviewRows = 0`, `retainedFeedbackRows = 0`, `detachedAppHealthLinks = 14`. The clear itself was correct; only its audit payload is malformed. `023_auth_submissions.sql:94` declares the column `jsonb`. Migration `048_nl_search_log_jsonb_repair.sql` diagnosed the identical defect in `nl_search_log`'s three jsonb columns, repaired them, added CHECK constraints — and its header explicitly left this column out of scope because nothing read it structurally at the time.
+
+### Root cause
+
+`insertAuditRow()` bound the payload as `${JSON.stringify(detail)}`, which is one encoding too many for a `jsonb` parameter through postgres.js. `inferType()` returns `0` for a JS string, so `Parse` declares no type; the server's `ParameterDescription` then back-fills the statement's types with the OIDs PostgreSQL inferred (`3802`, `jsonb`) in `connection.js`; and `Bind` encodes each parameter with `options.serializers[3802]`, which is `JSON.stringify`. The object is therefore stringified by the application and again by the driver, and what PostgreSQL parses is a valid jsonb **string**. An explicit `::jsonb` cast does not help — the parameter is encoded before the cast is applied — which migration 048 had already established empirically. Only `sql.json()` binds a jsonb parameter correctly.
+
+### Blast radius
+
+All `auth_audit_log` detail payloads, for the life of the table. `insertAuditRow()` is the **only** writer of `auth_audit_log` in `src/` (one `INSERT INTO auth_audit_log`, `src/lib/auth/session.ts:372`), and both `audit()` and `auditInTransaction()` funnel through it; `auditInTransaction()` is not special, it is simply the first caller whose payload anyone reads structurally. Rows with `detail IS NULL` were never affected. **No data was lost:** the payloads are intact under one surplus encoding layer and unwrap exactly. Not affected: `nl_search_log` (repaired and constrained by `048`) and `data_edits` / `player_link_resolutions`, which `src/db/queries/audit-log.ts:50-51` already binds with `tx.json()`.
+
+### Fix
+
+Two halves, both written, neither committed.
+
+**Code.** `insertAuditRow()` now binds `${detail ? sql.json(detail as postgres.JSONValue) : null}` on the `postgres.ISql` handle it was already given, so the pooled and transactional paths stay identical and `auditInTransaction()`'s no-try/catch propagation contract is untouched. No `::jsonb` cast, no `@ts-ignore`, no `eslint-disable`; the `as postgres.JSONValue` widening matches `src/db/queries/audit-log.ts:50`.
+
+**Database.** `082_auth_audit_log_jsonb_repair.sql`, in three steps and deliberately tighter than `048`. (1) The repair `UPDATE` matches only `jsonb_typeof(detail) = 'string'` **and** `(detail #>> '{}') IS JSON OBJECT` (PostgreSQL 16), so NULLs and already-correct objects are never rewritten and a malformed or genuinely scalar value is never silently reinterpreted as structure; it is self-limiting, so a re-run changes nothing. (2) A `DO` block raises — naming the count and the first ids — if any row is still neither NULL nor an object, because a CHECK violation reports one row and no id, which is not enough to decide what a surprising payload ought to become; migrations run in a transaction, so this rolls the repair back and leaves the database on `081`. (3) `auth_audit_log_detail_is_object_ck` (`detail IS NULL OR jsonb_typeof(detail) = 'object'`) is added inside a `pg_constraint` existence check so re-running the file is not an error. Privileges are unchanged: no new table or function, no `grant_app_read()` registration, no `privileges.sql` edit, and the UPDATE runs as the migration owner rather than weakening the table's append-only grant shape.
+
+### Validation
+
+DB-free validation passed on 2026-09-01, Claude-executed under explicit operator instruction for this task. `npx vitest run tests/auth.test.ts tests/admin-nl-search-actions.test.ts` — **2 files, 43/43**. The wider audit-touching set (adding `admin-settings-actions`, `admin-match-mutations`, `nl-search-log`, `audit-link-fk-indexes`) — **6 files, 76/76**. The new regression case was proven to be a real guard: with the old `JSON.stringify` binding temporarily restored it **fails** (`expected 'string' not to be 'string'`), and it asserts on both forms that the bound value is not a string, carries jsonb OID `3802`, and that the driver's single encoding of it parses back to an object. `npx tsc --noEmit` clean; `npx eslint` on the changed TypeScript reported 0 errors; `git diff --check` clean.
+
+**Not validated against a database.** `tests/integration/auth-audit-jsonb.test.ts` reads migration `082` from disk and executes it verbatim inside an always-rolled-back transaction — including the DDL, since PostgreSQL rolls `ALTER TABLE` back too — covering repair of a double-encoded object, an already-correct object left byte- and `xmin`-identical, NULL preserved, idempotent re-run, refusal to transform a non-object string, CHECK rejection of a future string or scalar payload, and object-shaped storage through the real `audit()` / `auditInTransaction()` writers. It has **never run**: `D:\dev\afldb-dev-test` has no `.env` and no `AFLDB_TEST_DATABASE_URL`, `AFLDB_OWNER_DATABASE_URL` or `DATABASE_URL` in the environment, so `tests/integration/guard.ts` refuses the suite by design. No credential was substituted, derived or copied from another worktree. Migration `082` has not been applied to any database, including `afldb_test`.
+
+### Follow-up
+
+**Deployment order is load-bearing (R1).** The CHECK constraint rejects the double-encoded shape, so applying `082` to a database whose application still binds `JSON.stringify(detail)` makes **every audited admin action fail closed** — the same ordering hazard `AFLDB-ISSUE-027` recorded for migration `066`. Code and migration ship together, code first or simultaneously; never the migration alone.
+
+Ordered next actions, none authorised to run automatically: commit the four changed files; run `npx vitest run tests/integration/auth-audit-jsonb.test.ts` where `AFLDB_TEST_DATABASE_URL` exists (owner DSN — the suite issues `ALTER TABLE` inside a rolled-back transaction), with `npm run db:migrate:test` the normal path first; apply `082` to `afldb_dev` by operator decision and re-read row 632, expecting `object` and `4953`; then close `AFLDB-ISSUE-119`'s final live dev acceptance by **re-reading the audit payload only** — the destructive clear already happened and must not be re-run. Production applies both halves together or neither. Secondary risks, all low: an unexpected non-object row aborts the migration rather than being guessed at (R2); `IS JSON OBJECT` requires PostgreSQL 16, and the documented target is 16.14 (R3); a value that was *legitimately* a JSON-object-shaped string would be converted, though no writer can produce one (R4).
