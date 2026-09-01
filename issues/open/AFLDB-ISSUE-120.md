@@ -123,3 +123,57 @@ Implement F1 (the launch-blocking item) in a focused session: add the per-IP lim
 the NL search entry with its unit tests, then F2/F3 as small follow-on edits in the same
 pass. Verify with the operator validation in §9. This issue should be closed or
 explicitly re-adjudicated before any decision to disable `AFLDB_BETA_GATE` in production.
+
+## 12. F1 implementation checkpoint ? complete
+
+Completed 2026-09-01 on branch `codex/issue-120`.
+
+### Implementation
+
+The public AFL/VFL NL `/search` path now has a per-worker, per-IP limiter before
+`globalSearch()` is invoked.
+
+- new boundary: `src/app/search/rate-limit.ts`;
+- reuses `src/lib/auth/rate-limit.ts`;
+- budget: 30 requests per 60 seconds per IP;
+- missing client IP uses the existing-style shared `ip:unknown` bucket;
+- denied requests return a typed `rate_limited` state before `globalSearch()`,
+  so they do not execute the NL pipeline or create the deferred
+  `nl_search_log` write;
+- limiter/IP-resolution exceptions are logged and fail open, preserving search
+  availability per ?10;
+- `src/app/search/page.tsx` renders a friendly
+  "Too many searches / Please try again shortly." state;
+- AFLW search is unchanged and is not charged against this NL limiter;
+- no NL semantics, telemetry schema, beta gate, migration or privilege changes.
+
+### Validation
+
+Operator-run:
+
+    npx tsc --noEmit
+    PASS
+
+    npx vitest run tests/search-rate-limit.test.ts
+    6/6 passed
+
+The focused suite proves:
+
+- an allowed request executes its search exactly once;
+- an over-limit request never executes its search;
+- requests are keyed by client IP;
+- the unknown-IP fallback is deterministic;
+- failure while resolving the IP fails open;
+- failure inside `RateLimiter.check()` also fails open;
+- the configured budget is exactly 30 per 60,000 ms.
+
+The expected stderr emitted by the two fail-open tests is the production diagnostic
+log from the caught limiter failures, not a test failure.
+
+### Remaining ISSUE-120 work
+
+F2 and F3 remain unimplemented.
+
+Exact next action: checkpoint F1 in Git, then implement F2 ? bound
+`/api/health-event` request bodies to 32KB before JSON parsing, preserving the
+normal health-event positive path.
