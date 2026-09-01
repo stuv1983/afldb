@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-119 — Super Admin can clear NL search telemetry
 
-- **Status:** In progress — the Stage 2 **database layer is now fully validated end to end** (§25). Migration `081` (§20) is applied to `afldb_test` (§23), the `privileges.sql` reconciliation (§21) has run against it, `tests/integration/privileges.test.ts` passes 34/34 (§24), and `tests/integration/nl-search-telemetry-clear.test.ts` now passes **9/9 with 0 skipped** — the clear function has been executed for the first time. `AFLDB_TEST_AUTH_DATABASE_URL` is established (§25.2), so the restricted describe **ran rather than skipped**: `afldb_auth` successfully invokes the function while its direct `DELETE`/`TRUNCATE` are refused live with SQLSTATE `42501`. Acceptance criterion 5 is fully evidenced at the database layer. The **query layer now exists and is validated** (§26, §27): `src/db/queries/nl-search-telemetry-clear.ts` wraps the function on a required transaction handle and converts all five `bigint` counts through a rejecting `toCount()`. `npx vitest run tests/nl-search-log.test.ts` passes **16/16**, of which the `clearNlSearchTelemetry count boundary` describe is **11/11**, and `npm run typecheck` passes (final output `Types generated successfully`). **Risk R3 is therefore evidenced at the typed query boundary**: the driver's `bigint`/string counts are explicitly converted, or rejected, before they can enter the application result type or the §9 audit contract. The **transaction-aware audit helper now exists and is validated** (§28): `src/lib/auth/session.ts` extracts its single `auth_audit_log` INSERT into one private writer typed on `postgres.ISql` — the genuine common supertype of the `authSql` pool and a `begin()` handle, which is what makes this type-safe with no cast and no suppression — leaving `audit()` unchanged on the pool and adding `auditInTransaction(tx, …)` for §8's atomic clear-plus-audit. `npx vitest run tests/auth.test.ts` passes **31/31**, of which the new DB-free `auth_audit_log writer` describe is **6/6**, and `npm run typecheck` passes, compiling all **67** existing `audit()` call sites against the refactored signature. Neither helper yet has a **production caller** — both are reachable from nothing but their own tests. **Server Action and UI not started** — criteria 3, 4, 6 and 9 remain open
+- **Status:** In progress — the Stage 2 database and query/audit layers are validated end to end (§25, §27, §28; unchanged this step). The **Server Action now exists** (§29): `clearTelemetry()` in `src/app/admin/nl-search/actions.ts` calls `requireSuperAdmin()` before parsing the confirmation phrase or opening a transaction, checks the exact server-side phrase `CLEAR SEARCH TELEMETRY`, then opens one `authSql.begin()` transaction that runs `clearNlSearchTelemetry(tx)` followed by `auditInTransaction(tx, 'nl_search.telemetry_cleared', result, actor)` on the same handle — `result` is the query layer's `NlTelemetryClearCounts`, so only the five approved counts can reach the audit row. Neither call is wrapped in try/catch, so a clear or audit failure propagates and rolls the transaction back with no success revalidation. On committed success it revalidates `/admin/nl-search` (`'layout'`) and `/admin/app-health`, then returns the counts. `tests/admin-nl-search-actions.test.ts` (11 DB-free cases) is written and **now executed and passing**: `npx vitest run tests/admin-nl-search-actions.test.ts` → 11/11 passed, and `npm run typecheck` → passed (`Types generated successfully`) — see §29.7. This evidences, at the action level: Super Admin guard ordering (guard before phrase parse, before transaction), exact confirmation-phrase gating with no transaction/clear/audit on mismatch, one shared transaction handle for `clearNlSearchTelemetry` and `auditInTransaction`, an audit payload restricted to exactly the five approved counts, failure propagation from either call with no revalidation, correct returned counts, and success-only two-path revalidation. **UI/end-to-end browser confirmation remains unimplemented.** **UI, page wiring, `docs/search.md` and `CHANGELOG.md` not started** — criteria 4 (client half), 9 (UI) and 10-11 remain open; exact next action is the UI step per §29.5 (`ClearTelemetryForm.tsx`, page wiring, `docs/search.md`, `CHANGELOG.md`).
 - **Created:** 2026-08-31
 - **Severity:** Medium
 - **Area:** Admin / Security / Natural-language search / Telemetry / Database
@@ -261,12 +261,12 @@ Exports are live route queries. No public page reads these relations. If current
 | `tools/maintenance/privileges.sql` | **Written 2026-09-01 (§21); unexecuted.** Reconciles function owner, `REVOKE ALL` from `PUBLIC` and `EXECUTE` to `afldb_auth`, and revokes any direct DELETE/TRUNCATE on the three NL tables. |
 | `src/db/queries/nl-search-log.ts` | Typed function invocation/result, or a new narrowly named maintenance module if clearer. |
 | `src/lib/auth/session.ts` | **Written and validated 2026-09-01 (§28).** The `auth_audit_log` INSERT extracted into one private writer typed on `postgres.ISql`; `audit()` unchanged on the pool; new `auditInTransaction(tx, …)` for the atomic clear. |
-| `src/app/admin/nl-search/actions.ts` | Guard, server phrase check, atomic clear+audit, revalidation and result state. |
+| `src/app/admin/nl-search/actions.ts` | **Written and validated 2026-09-01 (§29, §29.7).** `clearTelemetry()` added beside `saveReview()`: guard, server phrase check, one atomic clear+audit transaction, gated revalidation, result state. |
 | `src/app/admin/nl-search/ClearTelemetryForm.tsx` | Typed confirmation, cancel/pending/result UI. |
 | `src/app/admin/nl-search/page.tsx` | Render control and qualify current absolute read-only/append-only copy. |
 | `.env.example` | **Written 2026-09-01 (§22).** Guarded `AFLDB_TEST_AUTH_DATABASE_URL`; same `_test` DB, never fallback. |
 | `tests/auth.test.ts` | **Extended and validated 2026-09-01 (§28).** DB-free `auth_audit_log writer` describe: transaction-bound write, value shape, unchanged `audit()`, identical SQL from both forms, failure propagation. |
-| `tests/admin-nl-search-actions.test.ts` | Server Action auth/confirmation/audit/revalidation tests. |
+| `tests/admin-nl-search-actions.test.ts` | **Written and validated 2026-09-01 (§29, §29.7): 11/11 passed.** 11 DB-free cases: success; guard-rejection stops before any mutation; missing/wrong phrase opens no transaction; clear and audit share one transaction handle; audited payload is exactly the five approved counts; clear/audit failure each propagates with no revalidation; returned counts; gated two-path revalidation. |
 | `tests/integration/nl-search-telemetry-clear.test.ts` | **Written 2026-09-01 (§22); never executed.** Rolled-back safety, atomicity, FK, concurrency and restricted-role tests. |
 | `tests/integration/privileges.test.ts` | **Extended 2026-09-01 (§22); never executed.** Exact function and no-widening catalogue assertions. |
 | `tests/admin-nav/` or dedicated guarded Playwright files | Real confirmation/cancel/success only against a disposable `_test` deployment. |
@@ -1315,3 +1315,91 @@ No SQL, migration, `.env`, `CHANGELOG.md` or configuration file was changed. `CH
 Then `tests/admin-nl-search-actions.test.ts` (§12): the authorisation cases, forged invocation, wrong/missing phrase performing no mutation, the audit riding the same transaction, and the revalidation calls. Then the UI (§10), `docs/search.md` and `CHANGELOG.md`.
 
 Do not re-run or edit migration `081`. `npm run db:privileges:test` remains idempotent and safe to re-run at any point.
+
+## 29. Session record — 2026-09-01 (Stage 2, step: Server Action)
+
+### 29.1 Scope of this step
+
+Followed §28.9's live instruction exactly: implement `clearTelemetry()` in `src/app/admin/nl-search/actions.ts` and its DB-free tests only. No UI/component, page wiring, `docs/search.md` or `CHANGELOG.md` change was made — deliberately out of scope for this step, per the operating instruction that started it.
+
+### 29.2 What was implemented
+
+`src/app/admin/nl-search/actions.ts`, added beside the existing `saveReview()`:
+
+| Element | Implementation |
+|---|---|
+| `NL_TELEMETRY_CLEAR_PHRASE` | Exported `'CLEAR SEARCH TELEMETRY'` constant, so the not-yet-written client form can import the same literal rather than duplicate it. |
+| `NlClearTelemetryState` | `{ error?, message?, counts?: NlTelemetryClearCounts }` — the query layer's own counts type, not a re-declared shape, so the audited/returned/UI-facing count shape cannot drift from what `clearNlSearchTelemetry()` actually returns. |
+| `clearTelemetry(_previous, formData)` | 1. `await requireSuperAdmin()` first, before any other statement (§6, criterion 3). 2. Read `formData.get('confirmation')`, compare with `===` against the exact phrase; on mismatch, return `{ error }` immediately — no transaction, no query call (§10, criterion 4). 3. `await authSql.begin(async (tx) => { const result = await clearNlSearchTelemetry(tx); await auditInTransaction(tx, 'nl_search.telemetry_cleared', result, { userId: admin.id, label: admin.email }); return result; })` — one transaction, both statements, the query layer's own return value passed straight through as the audit detail so it is structurally impossible to include a sixth field (§8, §9). Neither call is wrapped in try/catch: an exception from either propagates out of the `begin()` callback, which is postgres.js's own signal to roll back and reject, matching `auditInTransaction`'s documented contract and requiring no bespoke error handling here. 4. On the line after `begin()` resolves (i.e. only on committed success): `revalidatePath('/admin/nl-search', 'layout')` then `revalidatePath('/admin/app-health')` (§11, §28.9 point 4, literally as specified). 5. Return `{ message, counts }`. |
+
+The form field name `confirmation` is this step's own choice (the runbook does not fix one); it is exported implicitly through the `NlClearTelemetryState`/`NL_TELEMETRY_CLEAR_PHRASE` pair so the UI step can match it, and is recorded here so that step does not have to re-derive it from this file.
+
+### 29.3 Tests written
+
+`tests/admin-nl-search-actions.test.ts`, new file, modelled on the existing `tests/admin-settings-actions.test.ts` / `tests/submission-review-actions.test.ts` `vi.hoisted` mock pattern. `authSql.begin` is faked to invoke the callback with a sentinel `FAKE_TX` symbol and return (or propagate the rejection of) whatever the callback returns — the same behaviour `.begin()` has against a real connection, so a thrown clear/audit failure inside the callback is observed by the test exactly as it would roll back a real transaction. 11 `it()` cases (case 12 below was folded into 3/4/8/9 rather than written separately, so the file has 11 tests, not 12):
+
+1. Super Admin success with the exact phrase.
+2. `requireSuperAdmin()` rejection (standing in for unauthenticated/plain-admin/contributor alike, since all three collapse to "the guard rejected" from this action's point of view — their role-by-role differentiation is `requireAdmin()`/`requireSuperAdmin()`'s own contract, proven in `tests/auth.test.ts`) stops before `begin`, clear, audit or revalidation.
+3. Missing confirmation performs no transaction/clear/audit/revalidation.
+4. Wrong confirmation performs no transaction/clear/audit/revalidation.
+5. `requireSuperAdmin()` still runs when confirmation is absent (guard precedes phrase check unconditionally).
+6. `clearNlSearchTelemetry` and `auditInTransaction` are both called with the same `FAKE_TX` handle.
+7. The audited detail object's keys are exactly the five approved count fields.
+8. A clear failure propagates; no audit, no revalidation.
+9. An audit failure propagates; the clear was still invoked (it runs first inside the transaction) but no revalidation follows.
+10. Returned state carries the counts from `clearNlSearchTelemetry`.
+11. Success revalidates exactly `/admin/nl-search` (`'layout'`) and `/admin/app-health`, and only those two calls.
+12. (Folded into cases 3/4/8/9 above rather than a separate case) failure performs no success revalidation.
+
+### 29.4 Validation performed this session, and what is deliberately deferred
+
+This session read the runbook (§0-§9 sections needed for the contract, plus the live §28.9 instruction), the current `actions.ts`, the query/audit helpers it calls (`nl-search-telemetry-clear.ts`, the `auditInTransaction`/`requireSuperAdmin` region of `session.ts`), `authClient.ts`, and three existing test files as style/mocking templates (`admin-settings-actions.test.ts`, `submission-review-actions.test.ts`, the relevant part of `auth.test.ts`) — narrow reads per CLAUDE.md §3, not a full-file or full-repository sweep.
+
+`git diff --check` was run and is **clean**. `git status --short` was run and reports exactly the two files listed in §29.5 below. Per this repository's operating rule, Claude does not execute tests, typecheck, build, SQL or any other shell command by default; the operator runs the commands in §29.5 and returns the output for analysis. **No test, typecheck, build, SQL, database, migration, deployment or production command has run yet in this step** — this is the one honest gap in this step's evidence, and the reason the header status above says "pending" rather than reporting a pass.
+
+### 29.5 Exact next action
+
+Run, in order, and return the output:
+
+```text
+npx vitest run tests/admin-nl-search-actions.test.ts
+npm run typecheck
+```
+
+If both pass: update this issue's header/§12/§29 evidence lines from "pending" to the actual pass counts, then proceed to the UI step (§10) — `ClearTelemetryForm.tsx`, wiring it into `page.tsx`'s existing warning copy, then `docs/search.md` and `CHANGELOG.md` per §28.9's closing instruction. Do not start the UI before this evidence lands: an untested transaction wrapper is exactly the kind of change §8/§9 exist to guard.
+
+If either fails: the failure is this step's blocker. Fix only what the failure implicates (the action, the test, or a genuine contradiction between this step and the approved §6/§8/§9 contract — the last case must stop and be escalated, not silently redesigned) and re-run only the affected command(s), not the full suite.
+
+### 29.6 Files changed this step
+
+```text
+ M src/app/admin/nl-search/actions.ts
+?? tests/admin-nl-search-actions.test.ts
+```
+
+No SQL, migration, `.env`, `docs/`, `IssuesIndex.md`, `issues.md` or `CHANGELOG.md` file was touched this step, other than this runbook. Nothing was committed.
+
+### 29.7 Validation executed — 2026-09-01
+
+The operator ran the two commands specified in §29.5:
+
+```text
+npx vitest run tests/admin-nl-search-actions.test.ts   → 11/11 passed
+npm run typecheck                                      → passed (final output: "Types generated successfully")
+```
+
+This closes the "test/typecheck evidence pending" gap recorded in §29.4/§29.6. It corrects an earlier stale count in this issue: the test file has **11** `it()` cases, not 12 — §29.3's original numbered list described 12 behavioural cases but explicitly folded case 12 into cases 3/4/8/9, so 11 was always the real number of written tests; §12 and the header status line above are corrected to match.
+
+At the Server Action level, this run evidences:
+
+- Super Admin guard ordering — `requireSuperAdmin()` runs before confirmation-phrase parsing and before any transaction opens, including when confirmation is absent.
+- Exact confirmation-phrase gating — a missing or wrong phrase opens no transaction, calls neither `clearNlSearchTelemetry` nor `auditInTransaction`, and triggers no revalidation.
+- One shared transaction handle — `clearNlSearchTelemetry(tx)` and `auditInTransaction(tx, …)` are both invoked against the same `FAKE_TX` handle standing in for `authSql.begin()`'s real transaction.
+- Five-count-only audit payload — the audited detail object's keys are exactly the five approved `NlTelemetryClearCounts` fields, nothing added.
+- Failure propagation — a thrown clear failure or a thrown audit failure each propagates out of the action and performs no success revalidation (clear failure: audit never runs; audit failure: clear had already run, but no revalidation follows).
+- Returned counts — the action's result state carries the counts exactly as returned by `clearNlSearchTelemetry`.
+- Success-only revalidation — a committed success calls exactly `revalidatePath('/admin/nl-search', 'layout')` and `revalidatePath('/admin/app-health')`, and only those two, and only on success.
+
+No blocker and no deviation from the approved §6/§8/§9 contract. **UI/end-to-end browser confirmation is still unimplemented** — these are DB-free unit-level guarantees on the Server Action, not proof the confirmation flow works through a real browser or a real database.
+
+**Exact next action:** the UI step per §28.9/§29.5 — `ClearTelemetryForm.tsx` (typed confirmation, cancel/pending/result UI), wire it into `page.tsx`'s existing warning copy, then `docs/search.md` and `CHANGELOG.md`. Criteria 4 (client half), 9, 10 and 11 remain open until that step lands.
