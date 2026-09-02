@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { ClearTelemetryForm } from '@/app/admin/nl-search/ClearTelemetryForm';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { SortableTable } from '@/components/SortableTable';
 import {
@@ -110,10 +111,14 @@ export default async function NlSearchAdminPage({
         <h1>Natural-language search</h1>
         <p className="subtitle">
           What readers actually asked the deterministic question engine, and what it did with it.
-          Read-only telemetry: <code>nl_search_log</code> is append-only, and a review recorded
-          here never alters the evidence it is about.
+          <code>nl_search_log</code> is otherwise-append-only telemetry — a Super Admin can clear
+          disposable rows below, but every review and every piece of reader feedback, and the log
+          rows they reference, is retained regardless. A review recorded here never alters the
+          evidence it is about.
         </p>
       </div>
+
+      <ClearTelemetryForm />
 
       <p className="section-note">
         Period:{' '}

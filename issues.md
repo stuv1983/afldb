@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 7 tracked here — `AFLDB-ISSUE-102`, `-104`, `-110`, `-112`, `-113`, `-116`, `-117`.
+**Open issues:** 5 tracked here — `AFLDB-ISSUE-104`, `-110`, `-113`, `-116`, `-122`.
 
 <!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
      the ISSUE-110 branch merged into dev on 2026-08-31 and its own ledger rows below are
@@ -15,19 +15,28 @@ created, reopened, resolved, or materially reclassified.
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
-| `AFLDB-ISSUE-102` | Medium | Data acquisition / Import architecture | **PARENT.** Scope revised 2026-08-30 by operator decision from "record only" to parent architecture / dependency-inventory / child-coordination / acceptance record for legacy-free awards acquisition. `tools/migration/import_awards.py:1408` still requires `AFLDB_LEGACY_SQLITE` for six of seven groups (`under_22` is already legacy-free). `tools/db/rebuild-test.ts` has **no awards stage**, so a canonical rebuild leaves all six awards/honours tables at **zero rows**, ungated. ISSUE-102 does not implement loaders. | **No implementation. Coordinate `AFLDB-ISSUE-111` (Coleman derivation), `-112` (curated honours manifests) and `-113` (Brownlow season totals; outside this issue's closure boundary).** Closure criteria in `issues/open/AFLDB-ISSUE-102.md` §8. Next action is operator: authorise the read-only measurement gating ISSUE-112 G0, and decide the one-time extraction source (ISSUE-112 §11.1). `AFLDB-ISSUE-111` is **Resolved 2026-08-30** — Coleman is legacy-free by derivation and canonically rebuild-gated. |
-| `AFLDB-ISSUE-112` | Medium | Data acquisition / Import architecture / Data integrity | Replace the legacy SQLite input of the six legacy-dependent `import_awards.py` groups with checked-in, validated, reviewable curated manifests: All-Australian, Hall of Fame, honour teams, captaincies, Rising Star, club best-and-fairest, named medals (+ award definitions and the `person_links` bridge). Reuses `reload_keyed` unchanged — only the **input** changes. Scraping, HTML parsing, paid APIs and undocumented endpoints are **not** authorised. | **Blocked on gate G0** (per-family read-only coverage measurement) **and operator prerequisite §11.1** — where the one-time extraction comes from. Recommended phasing, smallest first: honour teams (113 rows) → Hall of Fame (343) → captaincies (1,375) → Rising Star (766) → All-Australian (2,158) → club B&F → named medals. Headline acceptance: `awards-reload-links.test.ts:205-1247` executes without `AFLDB_LEGACY_SQLITE`. |
+| `AFLDB-ISSUE-122` | Medium | Data acquisition / Import architecture | Valid new AFL Tables games are acquired, validated, persisted and projected, but **never become canonical**. `AFLDB-ISSUE-099` built the whole pipeline and deliberately stopped: its §15 is an explicit zero-canonical-write prohibition. **First wrong layer: `recordOutcome()` (`src/lib/acquisition/settle-afltables.ts:2353-2487`)** — a valid promotable observation reaches the non-refusal `else` at `:2439` and falls into the function's only terminal action, the `promotion_candidates` upsert at `:2458-2484`; there is no branch that writes canonical data, and `canonicalRowsInserted`/`Updated` are literal-`0` **types** at `:1327-1329`. Four blocks sit behind it: no canonical writer in `src/lib/acquisition/*`; `'accept'` unrepresentable in `promotion-review.ts:29-36`; the `UNAVAILABLE_MANUAL_AUTHORITY` stub (`observations.ts:398`); and `match_period_scores`/`brownlow_round_votes` having no `source_id`, so both are permanently ownership-indeterminate. Nothing consumes the queue — there is no promotion-review UI, route or handler. Operator has superseded the "canonical promotion is reviewed by default" policy for AFL Tables current-season data. **Also confirmed as current-state evidence:** `current-season-import.ts:922-943` (Squiggle/Kali) updates canonical `matches` with **no ownership predicate and no `data_overrides` check**, silently transferring `source_id` and reverting admin score corrections. | **S0-S7 COMPLETE and COMMITTED 2026-09-02 (branch tip `f0ea8f1`); S8 PARTIAL and uncommitted (runbook §23). Runbook: `issues/open/AFLDB-ISSUE-122.md`.** S6 made the automatic path operational: the derived recompute (`recomputeSeasonMetadata`, `recomputeClubSeasons`, `recomputePlayerDerivedStats`, `recomputeSeasonBrownlowStatus` from `src/db/queries/player-derived.ts`, nothing rebuilt) runs once per run inside the settle transaction, season-scoped, only when `canonicalRowsInserted + canonicalRowsUpdated > 0`, with the player recompute scoped to the players written plus the players on the matches written; `tools/current-season/settle-afltables.ts` gained the explicit `--auto-apply` flag (orthogonal to `--apply`/`--dry-run`, so `--dry-run --auto-apply` previews exactly what `--apply --auto-apply` commits; unknown flags refused; no force/bypass), an exported `runSettleCli()` entry with an entry guard, and `npm run settle:afltables`; four counters were added (`canonicalApplyRefusals`, `advisoryDisagreement`, `derivedRecomputeRuns`, `derivedRecomputePlayers`) and land in `import_batches.validation_result` with the rest; NEW `src/lib/acquisition/settle-report.ts` builds the §9.3 exception report — active unresolved-identity candidates with source/family/record/version/match key/player name/profile URL/season/round/club/target/reason and whether the canonical match landed, other active candidates, open apply failures and disagreements, and MOOT pending candidates (F7), classified by comparing the candidate's version with the latest `canonical_applications` version for the same record and target. **Three defects found and fixed by the identical-rerun proof:** (1) `career_game_no` had two writers — the applier (AFL Tables `Career.Games`) and the derived recompute (row number) — so an identical rerun retried the write every night (SC3); it is now derived-owned on the automatic path (`DERIVED_OWNED_FIELDS`), never written or compared by the applier and filled by the recompute in the same transaction, while `reconcile()` and the review candidate keep the full proposal; (2) the S5 `player_match_stats` UPDATE named an `imported_at` column that table does not have (the branch had never executed); (3) `recordOutcome()` returned early on `unchanged` before the applied bookkeeping, so a §9.3 retry never counted its moot candidate nor resolved its own `canonical_apply_failed` finding. End-to-end on `afldb_test` through the CLI entry with a fixture bundle in a temp project root (no snapshot on disk; `AFLDB_IMPORT_DATABASE_URL` names `afldb_dev`): dry-run → state byte-identical; `--apply --auto-apply` → 6 canonical rows, 3 ledger rows, recompute once over 1 player, debutant the only active exception with the match reported canonical; identical rerun → 0/0/0, no version/candidate/finding, no recompute; identity resolved → 1 retry row, recompute over that player only, candidate reported MOOT while still pending. Gates: `current-season-import` + `reference-data` 257/257, `settle-afltables` integration 44 passed / 1 skipped (pre-existing `AFLDB_TEST_IMPORT_DATABASE_URL` conditional), the four integration suites 94 passed / 1 skipped, `tsc --noEmit` exit 0, `eslint` clean on all six changed files, `git diff --check` clean. The import-role registry on `afldb_test` already lists every derived table the recompute writes, so no privilege change. SC1-SC10 clear. **S7 retirement complete:** Squiggle/Kali retain acquisition, observation/history, staging, diagnostics, corroboration evidence and provenance, but have no canonical DML; `--update-matches` explicitly refuses and the admin control/plumbing is gone. Gate: current-season-import 215/215, CLI refusal smoke exact, typecheck and changed-file lint clean. **S8 PARTIAL 2026-09-02:** `deploy/afldb-settle-afltables.{service,timer,sh}` and `docs/deployment.md` §7b are built and verified (`systemd-analyze verify` exit 0 on both units on the production host; `sh -n` clean; `git diff --check` clean; no TypeScript or lint-covered file changed). The production §15.1 measurement is CLOSED and **S9 is NOT REQUIRED**: `afldb_prod` holds 189 canonical 2026 matches, every one `source_id IS NULL` **and** `legacy_match_id IS NOT NULL`, so §14 rule 7 refuses all of them and the adoptable set is empty; zero `squiggle_api` / `kali_afl_stats` / `afltables` rows — production never ran the now-retired writer, and after S7 nothing can create such a row. **The supervised real run did NOT happen; two operator prerequisites block it:** (P1) R is absent on `afldb-prod` and `sudo` there is password-gated, so the operator must install `r-base-core` 4.3.3 plus the Ubuntu `r-cran-*` dependency set and fitzRoy **1.8.0** from a dated Posit snapshot (exact commands in `docs/deployment.md` §7b; 1.8.0 is currently CRAN's own version, and `acquire_core.R` re-checks the pin on every run, so no deployment can forget it); (P2) production is on `main` at `0da44f9`, **94 commits behind and at migration 070** — it needs 071-079, 081, 082, 083 plus the whole of `src/lib/acquisition/`, `tools/rebuild/fitzroy/` and `tools/current-season/settle-afltables.ts`, with the migration and `db:privileges` before the code (`AFLDB-ISSUE-027`). No unit was installed, no timer enabled, and nothing was written to any database. **Next action: operator installs R + fitzRoy 1.8.0 and deploys this branch to production; then a fresh session runs S8's supervised ladder C-I and enables the timer; then ISSUE-122 final closeout/review.** |
 | `AFLDB-ISSUE-113` | Medium | Data acquisition / Import architecture / Data integrity | `brownlow_season_votes` has **no legacy-free writer** — sole writer `import_legacy_afl.py:684`. `rebuild_derived.py:23-26` and `db-health.ts:94` treat it as AUTHORITATIVE. Not reconstructible from round votes: season totals are complete 1924-1941 and 1946-2025 while round votes are complete only 1984-2025, and `vote_rank`/`eligible_rank`/`is_ineligible` are not computable from vote sums. **Silent-wrongness hazard:** with the table empty, `rebuild_derived.py`'s `season_brownlow` CTE falls every decided season to `not_applicable` — AFLDB would assert "no medal that season" for a century. | **Replacement source UNDECIDED and no selection is authorised.** Recommended next step, not a decision: a read-only probe of class B (a free structured season-summary source carrying rank **and** ineligibility) before committing to a 16,120-row manifest. Outside `AFLDB-ISSUE-102`'s closure boundary — 102 may resolve with this open. |
 | `AFLDB-ISSUE-110` | Medium | Natural-language search / deterministic semantics | NL semantic-mapping fixes, merged into dev 2026-08-31; parser v32 including the ranked-career season-bound fail-closed validator revision. Standing evidence: focused parser/validator **182/182**; expanded focused **345/345**; complete DB-free ISSUE-110 matrix **14 suites, 733/733**; typecheck passed; authoritative post-final-revision operator DB gate **2 files, 46/46 in 20.65 s, started 18:52:45** (24/24 + 22/22) — distinct from the earlier pre-revision 17:47 run. The three documented temporary artifacts were removed exactly. Durable record: `issues/open/AFLDB-ISSUE-110.md`. **Latest independent review verdict: REVISE — NOT READY FOR LARGE-SCALE VALIDATION**, with two unresolved HIGH findings: (A) career-predicate season ownership — a career predicate can exist without consuming `seasonMin`/`seasonMax`, so e.g. `players with at least 3 grand finals since 2000` silently ignores the requested period; (B) `clubFor` ownership with career predicates — e.g. `Carlton players who debuted since 2000`: execution bypasses the generic club filter merely because `careerPredicates` exist. | **Fix findings A and B fail-closed, then a fresh independent re-review.** For A, replace the blanket career-predicate exemption with explicit period ownership — only predicates that actually consume the relevant period bounds may permit them. For B, allow the `clubFor` bypass only when a predicate explicitly owns the relevant club semantics; otherwise reject or correctly compile the club constraint. No 480, 1,435/1,440, 100k, telemetry reset, or other large-scale validation before APPROVE; the 22,607-search run remains incomplete. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
-| `AFLDB-ISSUE-117` | Medium | Security / Production reliability / NL search / Telemetry | The public NL `/search` pipeline has **no rate limit** (`src/app/search/page.tsx:71` → `globalSearch` → one `nl_search_log` INSERT per hit), unlike every comparable public surface (autocomplete 60/min, feedback 12/15 min, health-event 120/min). Exposure is currently bounded by the beta gate (`middleware.ts:117`), so this is a credible pre-launch risk, not a live defect. Secondary LOW hardening: `/api/health-event` buffers an unbounded `request.json()` body (`route.ts:64`; the Caddy 32KB cap covers only the early-access path), and two prototype-key lookups (`records.ts:159`, `aflw.ts:786-793`) can 500 on a crafted key like `constructor` — robustness only, provably not SQL injection. Found by the 2026-08-31 full-codebase review; the same review confirmed all ~90 `sql.unsafe` sites are allowlist-bound and every admin action/route carries its own authz guard. Runbook: `issues/open/AFLDB-ISSUE-117.md`. | **Implement F1 (per-IP limiter on the NL search entry, reusing `src/lib/auth/rate-limit.ts`) plus the two small F2/F3 hardening edits in one focused session** (runbook §5, validation §9). Must be closed or explicitly re-adjudicated before `AFLDB_BETA_GATE` is disabled in production. |
-| `AFLDB-ISSUE-116` | Low | Admin tooling / Data QA / Query performance | The `player_match_stats` anchor of `/admin/query-builder` costs **1.05–1.44 s with no card at all** (T-C11 1056–1072 ms; `EXPLAIN ANALYZE` 1441 ms) — a pre-`AFLDB-ISSUE-115` baseline. `runQueryBuilder` emits `count(*) OVER ()` with an index-ordered `ORDER BY m.match_date DESC LIMIT 50`; the planner costs it as a fast-start plan (`Limit cost=4.41..577`) but the window aggregate must consume all 685,471 rows and spills to temp. Under that plan every related card became a per-row correlated Nested Loop Semi/Anti Join (685,471 executions for 13,275 distinct keys), so ISSUE-115 excluded related-domain cards under this anchor as an evidence-driven V1 boundary. Above the 1 s target, below the 5 s ceiling; own-row filtering still works. | **Separate work, not started.** Fix the anchor baseline (e.g. take the total count off the paged query, or a two-step keyset/count shape) **without** raising `AFLDB_STATEMENT_TIMEOUT_MS`, adding an index or changing schema; re-measure with the T-C11 harness; only then reconsider re-admitting related cards under `player_match_stats` (`QUERYABLE_TABLES.player_match_stats.subjects`, currently `[]`). Do not reopen ISSUE-115. |
+<!-- RETIRED 2026-09-01 — `AFLDB-ISSUE-120` is **Resolved** and is NO LONGER an open issue.
+     F1 (per-IP NL `/search` limiter, 30/60 s, friendly 200 denial, fail-open), F2 (`/api/health-event`
+     32 KiB streaming body cap → 413) and F3 (`Object.hasOwn` guards on the two request-derived
+     catalogue lookups) are implemented and merged into dev as `21d7c60`. Static/unit closure:
+     4 focused suites 19/19, `npx tsc --noEmit` clean. Dev live end-to-end acceptance 2026-09-01:
+     authenticated beta browser loop allowed 1–30, denied request 31 exactly at the budget
+     (`limitedAt: 31`, `hits: {4: 31}`); read-only `nl_search_log` showed exactly 30 rows for the
+     31 requests (denied request wrote no telemetry row); oversized `POST /api/health-event` → 413.
+     Authoritative record: the `AFLDB-ISSUE-120` entry in `issues.md` (Resolution, 2026-09-01) and
+     `issues/closed/AFLDB-ISSUE-120.md` §12–§16. The production `AFLDB_BETA_GATE` re-adjudication
+     in that entry still stands as a launch precondition. -->
+| `AFLDB-ISSUE-116` | Low | Admin tooling / Data QA / Query performance | The `player_match_stats` anchor of `/admin/query-builder` costs **1.05–1.44 s with no card at all** (T-C11 1056–1072 ms; `EXPLAIN ANALYZE` 1441 ms) — a pre-`AFLDB-ISSUE-115` baseline. `runQueryBuilder` emits `count(*) OVER ()` with an index-ordered `ORDER BY m.match_date DESC LIMIT 50`; the planner costs it as a fast-start plan (`Limit cost=4.41..577`) but the window aggregate must consume all 685,471 rows and spills to temp. Under that plan every related card became a per-row correlated Nested Loop Semi/Anti Join (685,471 executions for 13,275 distinct keys), so ISSUE-115 excluded related-domain cards under this anchor as an evidence-driven V1 boundary. Above the 1 s target, below the 5 s ceiling; own-row filtering still works. **NEW EVIDENCE 2026-09-02 (`AFLDB-ISSUE-112` §32.9):** the same mechanism now also fails the T-C11 gate on the **`players`** anchor — `players x player.captaincies NOT EXISTS link_status=unique` measured **1,081 / 1,095 / 1,100 ms** across three runs against the 1,000 ms budget, reproducible, against a freshly rebuilt canonical `afldb_test`. The predicate itself is cheap: `EXPLAIN (ANALYZE)` of the bare `count(*) ... WHERE NOT EXISTS (captaincies JOIN clubs ...)` is **16.6 ms**, while the same predicate under `runQueryBuilder`'s `count(*) OVER ()` + `ORDER BY ... LIMIT 50` shape measures **2,208 ms** — the window aggregate consuming every qualifying row, exactly as described above. The sibling case `players x player.draft_picks NOT EXISTS link_status=unique` passes at 33.6 ms only because it is degenerate (`draft_picks` holds `unmatched` 6,805 / `resolved` 5 and **zero** rows with `link_status = 'unique'`), so it is not evidence that the anchor is healthy. `AFLDB-ISSUE-112` changed neither the query builder nor the captaincies row count (1,375, unchanged). | **Separate work, not started.** Fix the anchor baseline (e.g. take the total count off the paged query, or a two-step keyset/count shape) **without** raising `AFLDB_STATEMENT_TIMEOUT_MS`, adding an index or changing schema; re-measure with the T-C11 harness **on both the `player_match_stats` and the `players` anchors** — the 2026-09-02 evidence shows the defect is the emitted shape, not one anchor's table; only then reconsider re-admitting related cards under `player_match_stats` (`QUERYABLE_TABLES.player_match_stats.subjects`, currently `[]`). Do not reopen ISSUE-115. |
 
 ---
 
 ## AFLDB-ISSUE-001 — Match mutations overwrite authoritative Brownlow totals
 
-- **Status:** Resolved
+- **Status:** Open
 - **Severity:** High
 - **Area:** Admin
 - **Found:** 2026-08-20
@@ -9253,12 +9262,12 @@ execution surfaces a defect in the mechanism.
 
 ## AFLDB-ISSUE-102 — Awards have no canonical legacy-free acquisition path
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Data acquisition / Import architecture
 - **Found:** 2026-08-28 (2026+ API acquisition investigation, source-verified)
-- **Resolved:** N/A
-- **Runbook:** `issues/open/AFLDB-ISSUE-102.md` (architecture / scope adjudication, 2026-08-30 —
+- **Resolved:** 2026-09-02
+- **Runbook:** `issues/closed/AFLDB-ISSUE-102.md` (architecture / scope adjudication, 2026-08-30 —
   authoritative for the current evidence). Origin record:
   `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §2.7 and §9 row G.
 - **Files:** `tools/migration/import_awards.py` (`:1408`)
@@ -9299,7 +9308,7 @@ selecting the ISSUE-113 source; changing `import_legacy_afl.py`; creating a broa
 privileges (none is needed); editing any applied migration.
 
 Full record, including the acquisition matrix, the eight closure criteria and the operator
-decisions of record: `issues/open/AFLDB-ISSUE-102.md`.
+decisions of record: `issues/closed/AFLDB-ISSUE-102.md`.
 
 ### Children
 - **`AFLDB-ISSUE-111`** — Coleman Medal derivation from canonical AFLDB facts.
@@ -9319,12 +9328,41 @@ and 112 with Stage-9 gates and no legacy SQLite in the plan; the full
 `tests/integration/awards-reload-links.test.ts` matrix runs without `AFLDB_LEGACY_SQLITE`;
 `docs/deployment.md` §7 no longer requires legacy SQLite for `import_awards.py`; every family's
 source/provenance contract is documented; and a before/after audit shows no manual player-link
-resolution regression on the five awards link-target tables. Detail: `issues/open/AFLDB-ISSUE-102.md` §8.
+resolution regression on the five awards link-target tables. Detail: `issues/closed/AFLDB-ISSUE-102.md` §8.
+
+### Resolution — 2026-09-02
+
+All eight authoritative closure criteria in `issues/closed/AFLDB-ISSUE-102.md` §8.1 pass.
+Both in-boundary children are resolved: ISSUE-111 supplies the canonical Coleman derivation,
+and ISSUE-112 supplies the seven curated honours families plus the legacy-free rebuild stage.
+
+The closing canonical `afldb_test` rebuild ran with `AFLDB_LEGACY_SQLITE` unset and restored
+every owned dataset at its exact gate: honour teams 113, Hall of Fame 343, captaincies 1,375,
+Rising Star nominations 766 / winners 33, All-Australian 1,158, club best-and-fairest 752,
+named medals 979, Under-22 330, award definitions 39 and Coleman 46. FINAL VALIDATION passed
+38/38 and `award_winners_without_a_source = 0`.
+
+The full legacy-free reload/link matrix and privileges suite passed 141 / 0 skipped / 0 failed.
+The post-rebuild audit found zero orphan and zero wrong-player links across `award_winners`,
+`award_nominations`, `hall_of_fame`, `honour_team_members` and `captaincies`; manual linked
+decisions still resolve to a live row and the same person, and `confirmed_unlinked` decisions
+remain unlinked. Unresolvable identities fail closed rather than being guessed.
+
+`docs/deployment.md` §7 now documents the manifest-backed routine refresh and post-derived
+Coleman step. The bare compatibility-only `awards` group still accepts a deliberate legacy
+re-extract, but it creates no uniquely owned canonical row and is excluded from the canonical
+rebuild and standing refresh, so `import_awards.py` no longer operationally requires legacy
+SQLite for the awards/honours domain.
+
+`AFLDB-ISSUE-113` remains Open by design: its `brownlow_season_votes` writer is
+`import_legacy_afl.py`, not `import_awards.py`, and §8.3 places it outside this closure boundary.
+The unrelated T-C11 query-builder timing regression remains routed to ISSUE-116 and does not
+invalidate any ISSUE-102 closure gate.
 
 ### Amended findings — 2026-08-30 (architecture / scope adjudication pass)
 Evidence-only amendment. **Status, severity and the record-only scope above are unchanged**; no
 importer, source, manifest, migration or privilege change was produced. Full citations in
-`issues/open/AFLDB-ISSUE-102.md`.
+`issues/closed/AFLDB-ISSUE-102.md`.
 
 1. **The dependency is per-group, not per-file.** `needs_legacy = any(key != "under_22" ...)`
    (`import_awards.py:1407`). Six of the seven `GROUPS` need legacy SQLite; `under_22` is
@@ -9391,7 +9429,7 @@ file. Proposed breakdown, **not created** — the highest used id is `AFLDB-ISSU
   be folded into an awards issue).
 
 Minting them, and the four source/semantics decisions they are gated on, are recorded as operator
-decisions in `issues/open/AFLDB-ISSUE-102.md` §9. Nothing is decided here.
+decisions in `issues/closed/AFLDB-ISSUE-102.md` §9. Nothing is decided here.
 
 ## AFLDB-ISSUE-103 — Grid Solver `won_a_final` / `never_won_a_final` queries can hit statement timeout
 
@@ -10221,8 +10259,8 @@ fixture lifecycle are in `issues/closed/AFLDB-ISSUE-109.md`.
 - **Area:** Data acquisition / Import architecture / Derived data
 - **Found:** 2026-08-30 (`AFLDB-ISSUE-102` pass 2, operator-authorised)
 - **Resolved:** 2026-08-30
-- **Runbook:** `issues/open/AFLDB-ISSUE-111.md` (authoritative; retained in `issues/open/` while the
-  parent `AFLDB-ISSUE-102` remains open and cites that path)
+- **Runbook:** `issues/open/AFLDB-ISSUE-111.md` (authoritative historical record; ISSUE-111 is
+  Resolved and its parent ISSUE-102 is now also Resolved)
 - **Files (actual):** `data/reference/coleman-derivation.json` (**new** — the tracked derivation
   contract), `tools/migration/import_awards.py` (the legacy-free `coleman` group, the
   `--rekey-coleman` transition, `LEGACY_FREE_GROUPS`, `BATCH_SOURCE_KEYS`),
@@ -10232,7 +10270,7 @@ fixture lifecycle are in `issues/closed/AFLDB-ISSUE-109.md`.
   `tests/db-test-rebuild.test.ts`, `tests/under-22-importer.test.ts`, `docs/deployment.md`.
   `data/reference/sources.json` was **not** changed — the derivation reuses the existing
   `afltables` source row rather than declaring a new one.
-- **Parent:** `AFLDB-ISSUE-102`
+- **Parent:** `AFLDB-ISSUE-102` (`issues/closed/AFLDB-ISSUE-102.md`, Resolved 2026-09-02)
 
 ### Problem
 Coleman Medal winner rows reach `award_winners` only through the legacy-SQLite `awards` group of
@@ -10356,23 +10394,22 @@ improvement, not a Coleman defect, and it did not affect any run above because e
 `AFLDB_PYTHON`.
 
 ### Next action
-None for this issue. The parent `AFLDB-ISSUE-102` remains open and tracks the two outstanding
-children, `AFLDB-ISSUE-112` (curated honours manifests) and `AFLDB-ISSUE-113` (Brownlow season
-totals).
+None for this issue. The parent `AFLDB-ISSUE-102` and sibling `AFLDB-ISSUE-112` are Resolved.
+`AFLDB-ISSUE-113` (Brownlow season totals) remains Open outside ISSUE-102's closure boundary.
 
 ## AFLDB-ISSUE-112 — Replace legacy SQLite honours acquisition with curated manifests
 
-- **Status:** Open
+- **Status:** Resolved
 - **Severity:** Medium
 - **Area:** Data acquisition / Import architecture / Data integrity
 - **Found:** 2026-08-30 (`AFLDB-ISSUE-102` pass 2, operator-authorised)
-- **Resolved:** N/A
-- **Runbook:** `issues/open/AFLDB-ISSUE-112.md` (authoritative)
+- **Resolved:** 2026-09-02
+- **Runbook:** `issues/closed/AFLDB-ISSUE-112.md` (authoritative)
 - **Files (expected):** `data/awards/*.csv` (new), `tools/migration/import_awards.py`,
   new per-family parsers beside `tools/migration/under_22.py`, `.gitignore`,
   `tools/db/rebuild-test.ts`, `tests/integration/awards-reload-links.test.ts`,
   `docs/deployment.md`
-- **Parent:** `AFLDB-ISSUE-102`
+- **Parent:** `AFLDB-ISSUE-102` (`issues/closed/AFLDB-ISSUE-102.md`, Resolved 2026-09-02)
 
 ### Problem
 Six of the seven `import_awards.py` groups read the legacy SQLite database
@@ -10415,23 +10452,239 @@ the ownership scope entirely. `--allow-link-loss` stays a deliberate, itemised o
 never enter a routine invocation.
 
 ### Canonical rebuild
-`tools/db/rebuild-test.ts` has no awards stage, so a canonical rebuild leaves these tables at zero
-rows. ISSUE-112 adds a stage after DRAFTGURU and before DERIVED, plus Stage-9 gates added **only
-once the manifests exist**. `tests/db-test-rebuild.test.ts:716` must still pass — the legacy source
-must never be wired back in.
+`tools/db/rebuild-test.ts` now has the legacy-free `awards-honours` stage after DRAFTGURU and
+before DERIVED, plus Stage-9 per-family row gates. On 2026-09-02 Pass 18, the operator explicitly
+authorised reacquisition of the missing `ladder-20260828` witness only. Its 129 files / 1,622 rows /
+129 SHA-256 values matched the unchanged existing manifest exactly and the repository witness
+validator passed. On 2026-09-02 Pass 19 the operator authorised reacquisition of the two remaining
+missing snapshots through their pinned adapters, with the tracked acceptance manifests held
+immutable; **both failed exact-byte restoration and the rebuild was therefore not run**
+(runbook §28). fitzRoy `full-history-20260827` reproduced **131/131 filenames, 719,042/719,042 rows,
+129/129 seasons and 130/131 SHA-256 values** — only `player_details.csv` differs (same 16,731 rows,
+same columns), which also breaks the `artefact_set_sha256` binding in
+`data/reference/fitzroy-accepted-baselines.json`; two independent acquisitions today agree with each
+other, so this is upstream AFL Tables drift since 2026-08-27, not local nondeterminism. DraftGuru
+`annual-html-20260826` cannot be reproduced at all: its pages carry a per-render Rails `csrf-token`,
+so the accepted raw bytes are permanently unrecoverable, and 2025 has additionally drifted by 17
+bytes. Both tracked acceptance manifests are byte-unchanged and no bytes were installed. The legacy
+source is not wired into the plan.
 
 ### Validation
-None yet — design only. Gates G0-G8 in the runbook. Headline acceptance: the
-`tests/integration/awards-reload-links.test.ts:205-1247` matrix executes without
-`AFLDB_LEGACY_SQLITE`.
+G1/G2/G3/G4/G5/G7/G8 PASS; G6 BLOCKED. On 2026-09-02 Pass 17, with process-local
+owner/import DSNs proven as `afldb_test` / `afldb_owner` and `afldb_test` /
+`afldb_import` and with `AFLDB_LEGACY_SQLITE` unset, the exact full integration command passed
+**107/107, 0 skipped, 0 failed**. The formerly gated 21 fixtures all executed. Their non-vacuous
+G5 evidence comprised **9 decisions (8 linked + 1 confirmed_unlinked)**: seven linked decisions
+replayed/persisted on the same live row id and intended player; one linked rename case refused by
+default and discarded only under explicit itemised `--allow-link-loss`; the confirmed-unlinked
+decision stayed on its live row with `player_id NULL`; zero retained orphans, target/player
+mismatches or unexpected link loss; ownership/manual-admin protection, stable ids, idempotence,
+collision refusal, advisory locking and cross-family isolation all passed. Full record: runbook
+§26. Pass 18 restored the ladder witness from an explicitly authorised, ladder-only reacquisition:
+129/129 filenames, 1,622/1,622 rows, all 129 seasons 1897–2025 and 129/129 SHA-256 values matched
+the existing acceptance manifest; `validate_ladder_witness.py` passed all checks. Pass 19 reacquired
+the two remaining snapshots under explicit authorisation and **both failed the exact-byte
+acceptance comparison** (§28), so G6 was again not run and no post-rebuild gate was executed. The
+reacquired fitzRoy set nevertheless passed independent offline full-history validation against its
+own manifest with **every measured drift gate identical** to the accepted-baselines register
+(matches 16,838 · players 13,275 · player_match_rows 685,471 · venues 52 ·
+brownlow_round_vote_rows 320,861 · identity scan 685,473 rows / 83 missing_id / 0 missing_url), and
+both probed DraftGuru years re-parsed to their accepted row counts (24 and 142) and schema
+fingerprints. The blocker is the raw-byte acceptance contract, not the data.
+
+Pass 20 (2026-09-02, runbook §29) executed operator route 2 and **re-accepted both snapshots
+under new labels, with zero semantic difference**. fitzRoy `full-history-20260902` was promoted
+from the preserved Pass-19 staging bytes — 131 artefacts copied byte-exact (0 mismatches, 0
+extra), the adapter's own manifest relabelled in exactly two byte ranges and then CRLF→LF
+normalised (`.gitattributes` pins `docs/rebuild-manifests/**` to `eol=lf` because
+`manifest_sha256` binds the file bytes; the ISSUE-108 trap was caught before any commit).
+`import_fitzroy_core.py --label full-history-20260902 --validate-only --require-full-history`
+**PASSED (exit 0, no database access) before any acceptance record for the label existed**, so
+the acceptance could not have blessed it; `--require-accepted-baseline` then **PASSED** against
+the written entry (manifest `2bd66e3d…`, artefact-set `15ba5dc6…`, 131 artefacts, 719,042 rows,
+contract_version 1). Every measured drift gate and identity-scan figure is **identical** to the
+retired baseline. DraftGuru `annual-html-20260902` was a **complete 42-year acquisition** — all
+42 pages HTTP 200, robots.txt refetched and honoured (hash identical), `--accept-baseline-drift`
+not used and not needed — yielding **6,810 rows / 5,057 distinct persons / parity PASS** and a
+manifest whose every field outside the label/timestamp/raw-byte set is identical to
+`annual-html-20260826`: same event totals, special-pick totals, 1,686 blank selections, three
+schema variants and fingerprints, and 42/42 identical per-year row counts and schema
+fingerprints. All 42 raw pages hash differently, from the per-render Rails CSRF token plus a
+`Content-Type` header change on 13 pages; that is raw-render drift only, and **no parsed-data or
+schema validation was weakened**. The frozen CSV parity oracle (42 files) was located in the main
+`D:\dev\afldb` checkout — Pass 19's "no DraftGuru artefacts" finding was true only of the
+annual-HTML directory — and copied read-only into the worktree; without it `run_parity` cannot
+run at all. `data/reference/fitzroy-accepted-baselines.json` now carries two entries under the
+unchanged `exactly_one_accepted` policy: `full-history-20260827` **retired**, with an in-register
+`retirement` block recording that it is historical but superseded because its accepted raw
+`player_details.csv` bytes are unavailable and upstream content drift prevents byte reproduction,
+and `full-history-20260902` **accepted**. No hash, measurement or `accepted_corrections` entry in
+the retired record was edited, and every historical acquisition manifest — fitzRoy
+`full-history-20260827.json` (`a42c6d5f…`), DraftGuru `annual-html-20260826.json` (`d06bf6be…`),
+`csv-export-20260826.json`, `person-html-20260826.json` — is byte-unchanged.
+`annual-html-20260826` is recorded historical/superseded because its accepted raw HTML bytes are
+unavailable and its render-specific CSRF bytes cannot be reproduced by any refetch. DraftGuru has
+no separate acceptance register: its accepted Stage A snapshot is expressed by a validated
+manifest, which `acquire_draft.py` writes **last and only if every gate passes**.
+`ladder-20260828` was not touched and re-validated after the register change
+(`validate_ladder_witness.py --label ladder-20260828` → *All checks passed*), which also proves
+the register edit left its accepted-last-season binding intact. **G6's input blocker is CLEARED;
+G6 itself is NOT met — `npm run db:test:rebuild` was not run.** Five register-pinned assertions
+are now red, measured (`5 failed / 349 passed`): `tests/db-test-rebuild.test.ts:239/420/428/433`
+and `tests/season-rollover.test.ts:1294`. Each is the test correctly reporting that the accepted
+baseline moved; repointing them was **not** done without an operator decision.
+
+Pass 21 (2026-09-02, runbook §30) repointed all five under explicit authorisation and they are
+**green**. Each was pinned to the new baseline exactly and none was loosened: the real-register
+selection test now also proves `--fitzroy-label full-history-20260827` is REFUSED by name; the
+register-shape test asserts two baselines with exactly one accepted and gained a companion test
+proving the retired entry keeps `superseded_by` and its own untouched `a42c6d5f…` / `8e14ce61…`
+bindings, and that the successor's `measured` and `identity_scan` gates equal the predecessor's
+value-for-value; the two binding tests gained literal pins on `2bd66e3d…` and `15ba5dc6…` plus
+not-equal checks against the retired artefacts; the rollover test asserts the
+`['retired','accepted']` shape with both entries' hashes. Two supporting changes were required
+for those assertions to keep their force: the describe block's shared `MANIFEST_PATH` was
+repointed to the accepted manifest — left alone it would have compared the accepted record
+against the **retired** artefact, passing while proving nothing — with a parallel retired-manifest
+fixture added; and the inert-field test now covers **both** manifests, asserting
+`full_history: true` / `completeness: "full_history"` on the retired one and `false` /
+`"unvalidated"` on the accepted one, which strengthens the rule that those fields are never read
+as a verdict in either direction. Measured: `db-test-rebuild` + `season-rollover` **356 passed /
+0 failed**; `fitzroy-core-import` 82 passed / 5 skipped; full DB-free sweep **82 files, 2,641
+passed / 13 skipped / 0 failed**; `npx tsc --noEmit` clean; `git diff --check` clean.
+
+**The G6 canonical rebuild did not start.** `AFLDB_PYTHON` is available (`psycopg` 3.3.5 present)
+and the ephemeral SSH local port-forward was proven working this pass and torn down
+(`arm@10.0.40.100:5432 → 127.0.0.1:5435`, key `~/.ssh/afldb_dev`; the control-socket path must be
+short, a scratchpad path exceeds the 108-byte Unix-socket limit). The blocker is the two test
+DSNs: the proven pattern sources the owner DSN from the streamanator checkout's `.env` and derives
+the restricted one in memory, and **the session's command classifier denied every attempt to read
+that file**, while plain SSH and the port-forward itself were allowed. `resolveTarget()` refuses
+without both DSNs, so nothing ran. `D:\dev\afldb\.env` exists and may hold the same values but was
+deliberately not read: the ISSUE-102 handoff forbids accessing that checkout, and switching to it
+after a classifier denial would route around a security control rather than satisfy it. No DSN was
+guessed, constructed, printed or persisted; no destructive command was issued; `afldb_test` is
+untouched and `AFLDB_LEGACY_SQLITE` stayed unset.
+
+Pass 22 (2026-09-02, runbook §31) cleared that blocker under an operator exception scoped to
+`D:\dev\afldb\.env` and **ran the rebuild. It REFUSED at preflight, before any destructive stage.**
+The DSN safety proof passed (`AFLDB_TEST_DATABASE_URL` → `afldb_test`/`afldb_owner`;
+`AFLDB_TEST_IMPORT_DATABASE_URL`, still not configured anywhere, derived in memory from
+`AFLDB_IMPORT_DATABASE_URL` by changing only the endpoint and database name →
+`afldb_test`/`afldb_import`; `AFLDB_LEGACY_SQLITE` unset; PostgreSQL 16.15), and the tunnel was
+opened and torn down with port 5435 proved closed afterwards. **Two results are worth keeping:**
+with no `--fitzroy-label` passed, the acceptance register resolved `full-history-20260902`
+automatically and the fitzRoy PRECHECK re-derived every full-history gate and re-verified all 131
+artefact SHA-256 values against the live bytes — so the Pass 20 acceptance is proven end to end by
+the real orchestrator, not only by a standalone validator.
+
+**The refusal is an orchestrator defect.** `--draftguru-label` never reaches the DraftGuru
+preflight: `tools/db/rebuild-test.ts:686-688` `draftguruValidateArgv()` takes no argument and emits
+only `--validate-only`, so `tools/rebuild/draftguru/import_draftguru.py:899` falls back to
+`STAGE_A_LABEL = "annual-html-20260826"`, while `rebuild-test.ts:458-459` passes the CLI label to
+the data stage alone. The run banner printed `draftguru : annual-html-20260902` and the preflight
+then refused with `snapshot directory not found: …/annual-html-20260826`. This is a **latent safety
+defect, not merely an inconvenience**: the preflight is the gate that runs before the destructive
+stage, and it validates a snapshot chosen by a hardcoded constant while the import stage uses the
+one on the command line — so with both snapshots present on disk a rebuild would verify one and
+import the other, silently. It fails closed today only because the retired snapshot's bytes are
+absent, and it has been invisible until now only because the constant happened to equal the
+accepted label. Runbook §29.5's expectation that passing the flag would suffice is disproven and
+superseded by §31.3. Read-only counts taken after the refusal confirm `afldb_test` is exactly the
+state passes 15/17 left it in (matches 16,838 · player_match_stats 685,471 · draft_picks 6,810 ·
+draft_persons 5,057 · award_winners 3,298 · captaincies 1,375). No code was changed: the fix edits
+the safety-critical preflight of a destructive operation, and this pass was authorised to run the
+rebuild, not to redesign the harness.
 
 ### Next action
-Gate G0 — per-family read-only coverage measurement (row counts, season spans, linked/unlinked
-splits, distinct award slugs) from a database that still holds the legacy-loaded data. Then the
-operator prerequisite: decide where the one-time extraction comes from (recommended: a read-only
-export of the already-loaded rows, which is not currently authorised). Recommended phasing,
-smallest first: honour teams → Hall of Fame → captaincies → Rising Star → All-Australian →
-club B&F → named medals.
+Keep ISSUE-112 OPEN. Route 2 was taken and both snapshots are accepted (runbook §29), so the
+G6 input blocker is gone; the remaining steps are:
+
+1. ~~Operator decides the five register-pinned test assertions.~~ **DONE — Pass 21, green**
+   (runbook §30.1/§30.2).
+2. ~~Unblock the test DSNs.~~ **DONE — Pass 22**: the operator-scoped `.env` exception works, both
+   DSNs prove correct, and the tunnel pattern is confirmed reproducible.
+3. **Decide the DraftGuru preflight fix** (runbook §31.5): either give
+   `draftguruValidateArgv(label)` a parameter and thread `opts` into `runPreflight` — the
+   recommended option, which closes the verify-one-import-another hole permanently and touches
+   `tests/db-test-rebuild.test.ts:990` and `:1382` — or repoint `import_draftguru.py:68` and
+   `tools/db/rebuild-test.ts:1268` to `annual-html-20260902`, which is a workaround that leaves the
+   defect in place for the next label change.
+4. **Re-run the canonical rebuild** —
+   `npm run db:test:rebuild -- --draftguru-label annual-html-20260902 --acknowledge-destroy afldb_test`
+   — and confirm Stage 8 plus the Stage-12 gates. `--fitzroy-label full-history-20260827` is now
+   **REFUSED**: the fitzRoy label resolves from the acceptance register, so no fitzRoy flag is
+   needed. The DraftGuru label is a CLI default rather than a register lookup, so it must be
+   passed until `import_draftguru.py:68` and `tools/db/rebuild-test.ts:1268` are repointed — a
+   separate decision, left untouched along with the `draftguru-event-kinds.json` /
+   `draftguru-contract.json` provenance records, which name the snapshot their measurements were
+   taken on and would be falsified by an edit.
+5. **Operator decides the 18 players / 33 manifest rows** with no rebuild-stable identity.
+6. Only then resolve ISSUE-112. Do not substitute snapshots or contact production. ISSUE-102
+   stays open until ISSUE-112 closes.
+
+### Resolution — 2026-09-02 (runbook §32, Pass 23)
+
+**Resolved. All eight gates G1-G8 PASS.** The last one, G6, closed when the canonical
+rebuild ran end to end against `afldb_test`.
+
+**Actual root cause of the final blocker.** `draftguruValidateArgv()` took no label and
+emitted only `--validate-only`, so `import_draftguru.py` fell back to its own
+`STAGE_A_LABEL = annual-html-20260826` while the data stage imported whatever
+`--draftguru-label` selected. The two sides of the rebuild could name different snapshots:
+with both snapshot directories present it would have verified snapshot A and then destroyed
+`afldb_test` and imported snapshot B. It failed closed only because the retired snapshot's
+bytes were absent.
+
+**Fix.** Runbook §31.5 fix 1, not the constant repoint. `draftguruImportArgv(label, python?)`
+builds the data-stage argv, `draftguruValidateArgv(label, python?)` is built *from* it plus
+`--validate-only`, and `runPreflight(deps, opts, source?)` now takes the same `Options`
+object `planStages()` builds the data stages from. The preflight and the data stage are
+structurally incapable of selecting different DraftGuru snapshots. `DEFAULT_DRAFTGURU_LABEL`
+is exported and unchanged; `import_draftguru.py` was not modified and its `STAGE_A_LABEL` is
+no longer relied on by the rebuild.
+
+**Validation.** Six new contract assertions in `tests/db-test-rebuild.test.ts` prove label
+propagation, preflight/data equality for arbitrary labels, correct default behaviour, and
+that a destructive RESET cannot precede successful validation of the *selected* snapshot. No
+existing safety assertion was weakened. Pre-rebuild: `db-test-rebuild` 230/230,
+`season-rollover` 131/131, DraftGuru + fitzRoy suites 255 passed / 13 skipped, full DB-free
+sweep 2,646 passed / 13 skipped / 0 failed, `tsc --noEmit` clean, `git diff --check` clean.
+
+**The rebuild** (`--draftguru-label annual-html-20260902 --acknowledge-destroy afldb_test`,
+no `--fitzroy-label`, `AFLDB_LEGACY_SQLITE` unset) exited 0. The register resolved
+`full-history-20260902`; the DraftGuru preflight validated `annual-html-20260902` — the
+defect's direct proof. FINAL VALIDATION **PASSED: 38 checks**. Every awards/honours count is
+exact: honour teams 113, Hall of Fame 343, captaincies 1,375, Rising Star nominations 766,
+Rising Star winners 33, All-Australian 1,158, club best-and-fairest 752, named medals 979,
+22 Under 22 330, award definitions 39, `award_winners_without_a_source` 0. Coleman is
+unchanged from ISSUE-111: 46 rows / 46 seasons / first season 1980 / 0 unlinked. The ladder
+witness D7 cross-check agrees on all 1,622 club-seasons on every compared field.
+
+**Link integrity.** Zero orphan `player_id` values and zero wrong-player attachments across
+`award_winners`, `award_nominations`, `hall_of_fame`, `honour_team_members` and
+`captaincies`. `awards-reload-links.test.ts` + `privileges.test.ts` re-run against the
+rebuilt database: 141 passed / 0 skipped / 0 failed, closing G3, G5 and G8 post-rebuild
+rather than by carry-forward.
+
+**Follow-up recorded, not blocking.** The §24.6 adjudication backlog reproduces exactly —
+18 censused players with no AFL Tables profile identity, across 33 manifest rows — and no
+identity was invented for any of them. A further 16 players / 19 rows are unlinked for the
+first measurable reason: 15 are 2026-cohort footballers whose 2025 Rising Star / draft-pick
+rows have no profile in a baseline that ends at season 2025, and one (bootstrap id 1830,
+"Stephen Icke") has a census URL matching no player in the canonical population. All 34
+fail closed to unlinked; none is mis-linked. This stays with the existing §24.6 operator
+decision and does not warrant its own issue.
+
+**Out-of-scope failure observed, routed to `AFLDB-ISSUE-116`.** The full post-rebuild suite
+had exactly one genuine failure: `tests/integration/query-builder.test.ts` T-C11 cost gate,
+`players x player.captaincies NOT EXISTS link_status=unique` at 1,081-1,100 ms against a
+1,000 ms budget, reproducible across three runs. It is the ISSUE-116 mechanism on a
+different anchor — the bare anti-join is 16.6 ms server-side, but under `runQueryBuilder`'s
+`count(*) OVER ()` + `ORDER BY ... LIMIT 50` shape the same predicate measures 2,208 ms
+because the window aggregate consumes every qualifying row. ISSUE-112 changed neither the
+query builder nor the captaincies row count. Evidence added to `AFLDB-ISSUE-116`.
+
 
 ## AFLDB-ISSUE-113 — Replace legacy `brownlow_season_votes` acquisition
 
@@ -10946,6 +11199,36 @@ one of the five anchors whose **own-row query, with no card at all**, exceeds th
 - The other anchors alone: players 22.2 ms, matches 28.6 ms. The shape is the same; the anchor
   cardinality is what makes it slow.
 
+
+### Evidence addendum — 2026-09-02, the `players` anchor (`AFLDB-ISSUE-112` §32.9)
+
+The defect is the **emitted shape**, not one anchor's table. Measured against a freshly
+rebuilt canonical `afldb_test` (PostgreSQL 16.15), the T-C11 gate now also fails on the
+`players` anchor:
+
+- `players x player.captaincies NOT EXISTS link_status=unique` — **1,081 / 1,095 / 1,100 ms**
+  across three consecutive runs, against the 1,000 ms `BOUND_MS`. Reproducible, not flaky.
+- The predicate itself is cheap. `EXPLAIN (ANALYZE, BUFFERS, TIMING)` of the bare
+  `SELECT count(*) FROM players p WHERE NOT EXISTS (SELECT 1 FROM captaincies r_cap JOIN
+  clubs r_ccl ON r_ccl.id = r_cap.club_id WHERE r_cap.player_id = p.id AND
+  r_cap.link_status_value::text = 'unique')` is **16.6 ms** execution / 4.4 ms planning.
+- The same predicate under `runQueryBuilder`'s emitted shape — `count(*) OVER ()` with
+  `ORDER BY … LIMIT 50` — measures **2,208 ms** execution. Identical mechanism to the
+  `player_match_stats` finding above: the window aggregate must consume every qualifying row
+  before the first row is emitted, so the `LIMIT` buys nothing.
+- The sibling case `players x player.draft_picks NOT EXISTS link_status=unique` passes at
+  **33.6 ms**, but only because it is degenerate: `draft_picks.link_status_value` holds
+  `unmatched` 6,805 and `resolved` 5 and **zero** rows valued `unique`, so the anti-join
+  matches all 13,277 players and does no work. It is not evidence that the anchor is healthy.
+  `captaincies` holds `unique` 1,315 / `resolved` 60, so its anti-join is real.
+- Both `ix_captaincies_player ... WHERE (player_id IS NOT NULL)` and
+  `ix_draft_player ... WHERE (player_id IS NOT NULL)` exist and both tables were autoanalyzed
+  during the rebuild, so this is not a missing index or stale statistics.
+
+Provenance: observed while closing `AFLDB-ISSUE-112` G6. ISSUE-112 changed neither
+`runQueryBuilder` nor the captaincies row count (1,375, unchanged from the legacy load), so
+this is not attributable to it, and it was **not** a completion condition for that issue.
+
 ### Scope
 
 Fixing the anchor baseline is **separate work** from ISSUE-115 and was deliberately not absorbed
@@ -11215,14 +11498,14 @@ section. Next action unchanged.
 
 ---
 
-## AFLDB-ISSUE-117 — Public-surface abuse hardening before launch: NL /search has no rate limit; two minor input-robustness gaps
+## AFLDB-ISSUE-120 — Public-surface abuse hardening before launch: NL /search has no rate limit; two minor input-robustness gaps
 
-- **Status:** Open
+- **Status:** Resolved 2026-09-01
 - **Created:** 2026-08-31 (full-codebase review)
 - **Severity:** Medium (primary); secondary findings Low
 - **Area:** Security / Production reliability / NL search / Telemetry
-- **Runbook:** `issues/open/AFLDB-ISSUE-117.md` (authoritative — problem statement,
-  evidence, invariant, minimum scope, tests, operator validation, next action)
+- **Runbook:** `issues/closed/AFLDB-ISSUE-120.md` (authoritative — problem statement,
+  evidence, invariant, minimum scope, tests, operator validation, resolution)
 
 ### Summary
 
@@ -11249,9 +11532,504 @@ Context from the same review: all ~90 `sql.unsafe` sites in `src/db/queries` res
 module-constant allowlists with bound values; every admin server action and admin route
 handler performs its own authz check; no hardcoded secrets in `src/` or `deploy/`.
 
-### Next action
+### Resolution
 
-Implement F1 (per-IP limiter on the NL search entry, reusing
-`src/lib/auth/rate-limit.ts`, fail-open, friendly UI response) plus F2/F3 in one focused
-session per runbook §5; validate per §9. Binding launch precondition: close or explicitly
-re-adjudicate this issue before disabling `AFLDB_BETA_GATE` in production.
+F1, F2 and F3 implemented on branch `codex/issue-120`, merged into dev as
+`21d7c60`. F1 adds a per-worker, per-IP limiter (30 requests / 60 s) on the public
+NL `/search` entry with a friendly HTTP 200 "Too many searches" denial and
+fail-open on limiter/IP-resolution errors; F2 adds a 32 KiB streaming body cap on
+`/api/health-event` (oversized → 413); F3 adds `Object.hasOwn` guards on the two
+request-derived catalogue lookups. No schema, migration, privilege, beta-gate or
+NL-semantics changes.
+
+Static/unit closure (runbook §12–§15): `npx vitest run` across the four focused
+suites 19/19, `npx tsc --noEmit` clean, `git diff --check` clean.
+
+Dev live end-to-end acceptance (runbook §16, 2026-09-01, against `21d7c60`): an
+authenticated beta browser loop against `http://10.0.40.100:8090/search?q=…` was
+allowed for requests 1–30 and denied on request 31 (`limitedAt: 31`,
+`hits: {4: 31}`) exactly at the 30/60 s budget; a read-only `nl_search_log` check
+(`AFLDB_OWNER_DATABASE_URL`) found exactly 30 rows for the 31 requests, proving the
+denied request wrote no telemetry row. F2: an oversized `POST /api/health-event` on
+dev returned 413. An earlier unauthenticated 140-request loop against the app
+origin was invalid — the beta gate 307-redirects such requests before the NL
+rate-limit boundary runs (runbook §16.1). Temporary diagnostic instrumentation was
+never committed and dev was rebuilt/restarted clean.
+
+Launch precondition satisfied for dev; the same re-adjudication still applies before
+disabling `AFLDB_BETA_GATE` in production.
+
+## AFLDB-ISSUE-119 — Super Admin can clear NL search telemetry
+
+- **Status:** Resolved
+- **Renumbered:** 2026-09-01, from `AFLDB-ISSUE-118` — the Gridley compatibility-corpus project holds committed ISSUE-118 on branch `opus/gridley-corpus` (`9ecc6fc`, `28fdb2f`, `6e3b38a`); this issue's claim was still uncommitted. Evidence in `issues/closed/AFLDB-ISSUE-119.md` §0. Branch and worktree have since been renamed to `codex/issue-119` / `D:\dev\afldb-issue-119`.
+- **Created:** 2026-08-31
+- **Resolved:** 2026-09-01
+- **Severity:** Medium
+- **Area:** Admin / Security / Natural-language search / Telemetry / Database
+- **Files:** `src/db/migrations/081_nl_search_telemetry_clear.sql` (new), `tools/maintenance/privileges.sql` (function reconciliation section), `src/db/queries/nl-search-telemetry-clear.ts` (new — the typed query helper), `tests/integration/nl-search-telemetry-clear.test.ts` (new), `tests/integration/privileges.test.ts` (ISSUE-119 capability describe), `tests/nl-search-log.test.ts` (`clearNlSearchTelemetry count boundary` describe), `src/lib/auth/session.ts` (the `auth_audit_log` INSERT extracted into one `postgres.ISql`-typed private writer; `audit()` unchanged; new `auditInTransaction`), `tests/auth.test.ts` (`auth_audit_log writer` describe), `.env.example` (`AFLDB_TEST_AUTH_DATABASE_URL`), `issues/closed/AFLDB-ISSUE-119.md`, `IssuesIndex.md`, `issues.md`
+- **Migration:** `081` — re-derived per runbook §7 across 46 local/remote refs and 34 worktrees on 2026-09-01 after a fetch; `080` belongs to `opus/gridley-corpus` and nothing at 081 or above existed on any ref. Evidence in runbook §20.1.
+- **Runbook:** `issues/closed/AFLDB-ISSUE-119.md` (authoritative Stage 1 inventory, retention/security/deletion contract, tests, acceptance criteria, Stage 2 gate, and the §20–§28 Stage 2 implementation and validation records)
+
+### Symptom
+
+The Super Admin NL dashboard can inspect, review and export accumulated search telemetry but has no governed way to retire disposable operational rows.
+
+### Expected
+
+A deliberate Super Admin-only action clears only disposable NL engine telemetry while preserving durable reviews, reader feedback, their required context, audit history, configuration/reference data and unrelated application data.
+
+### Actual
+
+No clear action exists. The `afldb_auth` role deliberately has no `DELETE` or `TRUNCATE` on `nl_search_log`, `nl_search_review` or `nl_search_feedback`.
+
+### Evidence
+
+Migrations 046/047/049 and `docs/search.md` establish three distinct meanings: engine telemetry, administrator conclusion and immutable reader feedback. `nl_search_review.search_log_id` is a `NO ACTION` FK to the log; feedback deliberately correlates by `client_ref` without an FK; `app_health_events.related_search_id` uses `ON DELETE SET NULL`. The current privilege reconciler grants log/feedback append-only access and review update access, never deletion. Full inventory and call paths are in the runbook.
+
+### Root cause
+
+Not a defect root cause. The original telemetry design intentionally provided append-only collection, Super Admin reporting/review and audited export, but no retention/reset capability.
+
+### Fix
+
+Partly written, nothing validated. Stage 1 recommends a selective `DELETE` of unprotected log rows through one narrowly executable `afldb_auth` capability, with durable-evidence closure, same-transaction count-only audit, explicit writer locks, server-side Super Admin enforcement and typed confirmation. `TRUNCATE` and direct table DELETE grants are rejected. Migration `081_nl_search_telemetry_clear.sql` implements the database half on 2026-09-01: `public.nl_search_telemetry_clear()`, a `SECURITY DEFINER` function with a fixed `search_path`, schema-qualified objects, no dynamic SQL, child-before-parent `SHARE ROW EXCLUSIVE` locks, a `WITH RECURSIVE` retained closure over `parent_search_id` to arbitrary depth, one selective `DELETE`, and five returned counts; ownership pinned to `afldb_owner`, `EXECUTE` revoked from `PUBLIC` and granted only to `afldb_auth`, with no table `DELETE`/`TRUNCATE` grant added. The `tools/maintenance/privileges.sql` reconciliation follows the same day (§21): it restores the function's owner, its `PUBLIC` revoke and its single `afldb_auth` `EXECUTE` after a role-after-migration install or a `--no-privileges` restore — the restore case being a widening, since a function with no ACL falls back to PostgreSQL's `EXECUTE` to `PUBLIC` default — and revokes any direct `DELETE`/`TRUNCATE` drift has added to `afldb_auth` on the three NL tables, which the reconciler's additive `spec` array could not previously remove. The query layer and the audit helper are validated (§26-§28). The Server Action, `clearTelemetry()` in `src/app/admin/nl-search/actions.ts`, is written and matches this contract exactly (§29): guard-then-phrase-then-one-transaction-holding-both-statements-then-gated-revalidation. Its tests are written but not yet operator-run. The UI remains unwritten.
+
+### Validation
+
+Stage 1 source/graph investigation only. No tests, builds, SQL, database mutations or production operations ran. Required Stage 2 validation is specified in the runbook. On 2026-09-01 the runbook's schema, grant and authorisation claims were re-verified directly against source (migrations 047/049/052, `tools/maintenance/privileges.sql`, `src/lib/auth/session.ts`, `src/app/admin/nl-search/`) and none required correction; one finding was recorded — `audit()` binds the module-level `authSql` and so cannot join a caller's transaction as written, confirming the transaction-aware variant the atomicity contract requires. The operator then approved the retention boundary and strengthened the validation contract so the recursive retained-ancestor test must cover a chain deeper than one parent. Migration `081` was written and source-reviewed against §5–§8 the same day — arbitrary-depth ancestry, sibling/descendant non-retention, FK integrity, lock ordering, fixed `search_path`, object qualification and privilege containment all checked in source, with three documented deviations from §7's literal wording (`NOT EXISTS` for `NOT IN`, `GET DIAGNOSTICS` for `RETURNING`, before/after measurement of detached app-health links) recorded in runbook §20.4. The `privileges.sql` section added on 2026-09-01 was source-reviewed the same way, and one defect in it was found and fixed before it was recorded: folding ownership and ACL into a single exception-protected block would have let a refused `ALTER … OWNER` roll back an already-successful `REVOKE … FROM PUBLIC`, leaving `PUBLIC` holding `EXECUTE` on a `SECURITY DEFINER` function (runbook §21.4). The guarded integration tests followed on 2026-09-01 (runbook §22): `tests/integration/nl-search-telemetry-clear.test.ts` (new — the mandatory deeper-than-one-parent ancestry fixture with a deleted mid-chain sibling and a deleted child-of-leaf, feedback-matched ancestry, orphaned feedback, app-health `SET NULL` detachment, unrelated-sentinel and sequence non-reset assertions, whole-clear rollback, a `pg_blocking_pids`-proven lock cutoff, and restricted `afldb_auth` EXECUTE-success plus live `DELETE`/`TRUNCATE` denial probes, every destructive path inside an always-rolled-back transaction) and a new capability describe in `tests/integration/privileges.test.ts` (owner, `SECURITY DEFINER`, pinned `search_path`, exact `aclexplode` grantee list — asserted outright because a NULL function ACL is EXECUTE-to-PUBLIC — no dynamic SQL/CASCADE/unqualified relation in `prosrc`, and no `afldb_auth` `DELETE`/`TRUNCATE` on any NL table, closing the `nl_search_review` assertion gap). One test defect was found and fixed during source review, before recording: the concurrency test's fail-fast race guards could surface as unhandled rejections after the race was already won. On 2026-09-01 migration `081` was executed for the first time anywhere (runbook §23): `AFLDB_TEST_DATABASE_URL` was first proven to target `afldb_owner@127.0.0.1:5432/afldb_test` — a `_test` database matching `.env.example:60`, with no `afldb_dev`, production or substituted credential and with the optional restricted `AFLDB_TEST_AUTH_DATABASE_URL` confirmed absent rather than filled in — after which `npm run db:migrate:test` applied `081_nl_search_telemetry_clear.sql` cleanly (`ok (240 ms)`, 81 of 81 applied). That proves the SQL parses and every statement runs. It proves **neither** the function's owner **nor** its `afldb_auth` `EXECUTE` grant: `tools/db/migrate.ts:159` sets `onnotice: () => {}`, and both the ownership block and the role-guarded `GRANT` degrade to a suppressed `NOTICE` when the role is missing or the grantor is unentitled. Two worktree-provisioning blockers were found and operator-resolved first (no `.env`, no `node_modules`). Both gaps were then closed on 2026-09-01 (runbook §24), operator-run: `npm run db:privileges:test` succeeded — its `NOTICE` confirming `EXECUTE` on `public.nl_search_telemetry_clear()` revoked from `PUBLIC` and granted to `afldb_auth`, which also establishes that `afldb_auth` exists on the test cluster — and `npx vitest run tests/integration/privileges.test.ts` passed **34/34** (four of them the ISSUE-119 capability describe, whose `beforeAll` fails loudly rather than skipping when the function is absent; the other 30 pre-existing role-confinement tests evidence that the reconciliation widened nothing else). Proven from the applied catalogue rather than the migration text: owner `afldb_owner` — the definer identity the whole model rests on, and the fact §23.5 flagged as unverified — `SECURITY DEFINER`, `VOLATILE`, zero parameters, `proconfig` exactly `search_path=pg_catalog, pg_temp`, an `aclexplode` grantee list asserted **outright** as exactly `{afldb_auth EXECUTE, afldb_owner EXECUTE}`, which is what excludes the NULL-ACL `pg_restore --no-privileges` state that *is* EXECUTE-to-PUBLIC yet satisfies every boolean check, `afldb_app`/`afldb_import`/`afldb_backup` unable to execute, no `EXECUTE`/`CASCADE`/`TRUNCATE` and no unqualified NL or app-health relation in the stored `prosrc`, and **no `DELETE` or `TRUNCATE` for `afldb_auth` on any of the three NL tables**, closing the `nl_search_review` assertion gap. **Still unproven: the clear function has never been called.** `tests/integration/nl-search-telemetry-clear.test.ts` has never run, so the retained closure, arbitrary-depth ancestry, sibling non-retention, the five counts, the lock cutoff, app-health `SET NULL` detachment, sequence non-reset and the rollback cases all remain unvalidated. The privileges suite also connects on the owner DSN, so `has_function_privilege` is a catalogue predicate *about* `afldb_auth`, not a connection *as* it: that the role can actually authenticate and invoke the function is a separate, unevidenced fact. `AFLDB_TEST_AUTH_DATABASE_URL` remains undefined, so the restricted describe would skip explicitly rather than fall back — **a skip is not a pass**, and the restricted-role halves of acceptance criteria 5 and 10 stayed pending at that point. On 2026-09-01 the restricted `_test` auth credential was established and the clear function was **executed for the first time** (runbook §25). `AFLDB_TEST_AUTH_DATABASE_URL` was derived from the existing `afldb_auth` credential by changing only the database name to `afldb_test` — role passwords are cluster-level, and `afldb_dev` and `afldb_test` share the endpoint `127.0.0.1:5432` — after asserting, before any connection and again before any write, that the role is `afldb_auth`, that the password is not the owner’s, and that the target endpoint and database match `AFLDB_TEST_DATABASE_URL` exactly, end in `_test` and are not `afldb_dev`. A connectivity probe confirmed `current_user=afldb_auth` / `current_database=afldb_test` before `.env` was touched; no password or DSN literal was printed or written to any tracked file. `npx vitest run tests/integration/nl-search-telemetry-clear.test.ts` then passed **9/9, 0 skipped**, and a `--reporter=verbose` re-run named all three restricted-role tests as executed, so the restricted describe **ran rather than skipped** — its `beforeAll` identity check makes a green run independent proof that the connection authenticated as `afldb_auth` on `afldb_test`. Now proven by execution against applied migration `081`, every destructive path inside an always-rolled-back transaction: the full four-level ancestor chain above a reviewed leaf survives while the disposable mid-chain sibling and the child-of-leaf are deleted (the assertion a non-recursive one-hop join could not pass); reviews and both matched and orphaned feedback are byte-unchanged; no `app_health_events` row is deleted and only the link to a deleted log becomes `NULL`; unrelated tables are untouched and the identity sequence is not reset; an aborted clearing transaction rolls back the deletes and the `SET NULL` detachments alike; and a writer on a second backend provably blocks on the `SHARE ROW EXCLUSIVE` cutoff via `pg_blocking_pids()`, then proceeds. The live security half is proven as the actual application credential: `afldb_auth` successfully invokes the `SECURITY DEFINER` function, while direct `DELETE ... WHERE false` and `TRUNCATE` are refused with SQLSTATE `42501` on all three NL tables. **Acceptance criterion 5 is now fully evidenced at the database layer** and the restricted-role halves of criteria 5 and 10 are passed. At that point R3 was untouched and that run did not bear on it, because the integration test casts all five counts `::int` inside its own query and never observes the raw `bigint` that `postgres.js` returns as a string. The **query layer closed exactly that gap on 2026-09-01** (runbook §26, §27). `src/db/queries/nl-search-telemetry-clear.ts` takes a `postgres.TransactionSql` handle as a required parameter — no pool overload, because R5 makes the caller's transaction load-bearing for the §8 cutoff and §8's atomicity requires the audit row to commit with the deletion — declares all five returned columns `unknown` rather than trusting the SQL type, and puts each through a `toCount()` that accepts only a digit-only string, a `number` or a `bigint` and then requires `Number.isSafeInteger(n) && n >= 0`, throwing otherwise so the caller's transaction aborts and the deletion rolls back. Rejecting rather than coercing is the load-bearing choice: `Number(null)` is `NaN` and `Number('')` is `0`, so a bare coercion would record a clear that deleted hundreds of rows as having deleted none, indistinguishable from the truth afterwards. The result type's five keys match §9's permitted audit payload one for one, so no sixth fact is reachable. **Operator-run and operator-reported** (as in §24, unlike §25 — Claude executed nothing and observed no raw output): `npx vitest run tests/nl-search-log.test.ts` passed **16/16**, of which **11** are the `clearNlSearchTelemetry count boundary` describe (six `it` declarations, one an `it.each` over six unreadable values) and the other 5 the pre-existing ISSUE-110 `logNlSearch` suite, so the extension also regressed nothing in its host file; and `npm run typecheck` passed, final output `Types generated successfully`, discharging the compile-time half — the `TransactionSql` parameter typing, the `NlTelemetryClearCounts` result type and the test's fake-handle cast. Proven by execution: `int8` strings become real numbers with `412 + 38 === 450` asserted explicitly against the `"41238"` concatenation defect; a legitimate zero clear is accepted as `0` from `'0'`, `0` and `0n` alike; `null`, `undefined`, `''`, `'many'`, `'-1'` and `'1.5'` each throw naming the offending column; a result set that is not exactly one row throws rather than reporting no deletion or reading the first row; and exactly one statement is issued on the given handle, with no second connection or pool fallback. **Risk R3 is therefore closed at the typed query boundary, and only there.** These tests are DB-free — they inject a fake tagged-template handle, contact no database and do not invoke the real function, whose runtime proof remains the §25 integration run — and the helper has **no production caller**: nothing in `src/` imports it, so no retained application behaviour has changed and `CHANGELOG.md` stays untouched. The **transaction-aware audit helper followed on 2026-09-01** (runbook §28), Claude-executed under explicit operator instruction for that task. `src/lib/auth/session.ts` had one `INSERT INTO auth_audit_log` bound to the module-level `authSql` pool, which is why `audit()` cannot join a caller's transaction — the §18 finding §8 needs resolved. The INSERT is now extracted verbatim into a single private `insertAuditRow(sql, action, detail, actor)` typed on **`postgres.ISql`**, which was the load-bearing source finding: in the driver's own types `Sql` and `TransactionSql` are **siblings** that both extend `ISql`, so a shared parameter typed `postgres.Sql` would not have accepted a transaction handle and would have forced a cast; `ISql` carries the tagged-template call and nothing else — no `begin`, no `savepoint`, no `end`. `audit()` keeps its exact exported name, three parameters, return type, pool and absent try/catch and simply delegates; the new `auditInTransaction(tx: postgres.TransactionSql, …)` writes the same row on the caller's handle, with no `authSql` fallback so the pool is a compile error rather than a silent degradation, and no try/catch so a failed audit propagates and rolls the deletion back per §8's refusal of a best-effort warning. The result contains no cast, no `@ts-ignore`/`@ts-expect-error`/`eslint-disable`, and exactly one `INSERT INTO auth_audit_log` in the whole of `src/`. `npx vitest run tests/auth.test.ts` passed **31/31** — 6 of them the new DB-free `auth_audit_log writer` describe extending the existing `src/lib/auth/*` suite rather than a new file, and the other 25 the pre-existing crypto/TOTP/claims/line-input/CSV tests, so the file-scope mocks the describe needs disturbed nothing — proving the row is written on the given handle and never on the pool, that actor id, email label, action, `JSON.stringify`d detail and the last-hop `X-Forwarded-For` IP all land in the same five positions as before, that all five are `null` when absent or when `headers()` throws outside a request scope, that `audit()` still writes on the pool, that both forms emit byte-identical template strings and values (the mechanical check that the SQL was not duplicated), and that a failed insert propagates instead of being swallowed. `npm run typecheck` passed, which is the load-bearing check for "preserve every existing caller": it compiles all **67** `audit()` call sites across 22 files against the refactored signature and is what evidences that `postgres.ISql` genuinely accepts both handles without a cast. `npx eslint` on both changed files reported **0 errors**; one warning was Claude's own unused destructured variable and was fixed (suite re-run 31/31), the other is a pre-existing unused `email` parameter in `createAdminSession`, confirmed present at `HEAD` and deliberately left out of scope. **Still open:** neither the query helper nor the audit helper has a production caller — nothing in `src/` imports either — so no retained application behaviour has changed and `CHANGELOG.md` stays untouched; **the Server Action now exists and is validated by execution (runbook §29, §29.7, 2026-09-01)**: `tests/admin-nl-search-actions.test.ts` (11 DB-free cases covering the guard ordering, exact-phrase enforcement, the shared transaction handle, the five-key-only audit payload, clear/audit failure propagation, returned counts and gated two-path revalidation) passes **11/11**, and `npm run typecheck` passes (`Types generated successfully`) — both operator-run per this repository's execution-boundary rule, not Claude's. The UI does not exist, leaving criteria 4 (client half), 9 and the UI half of 10 unstarted. R7 (new, low) records that `tx` being a genuine transaction is a TypeScript claim rather than a runtime one; the Server Action tests will assert the transaction is actually opened. R8 (new, low) records that `auth_audit_log` now has two writers on the same role and pool: they cannot disagree about SQL, but a future caller could pick the wrong form, so each contract is recorded at its function.
+
+### Follow-up
+
+**Operator approved the §5/§6 boundary on 2026-09-01 exactly as documented; the Stage 2 gate is cleared; migration `081`, the `privileges.sql` reconciliation (§21) and the guarded `_test` integration tests (§22) have since been written and source-reviewed.** Migration `081` has since been applied to `afldb_test` (§23), and the `privileges.sql` reconciliation plus the extended privileges suite have run and passed there (§24), validating the database security boundary. The restricted `_test` auth DSN was then established and the function called for the first time (§25), and the typed query layer was written (§26) and validated (§27). The transaction-aware canonical audit helper was then written and validated (§28): `auditInTransaction(tx, …)` in `src/lib/auth/session.ts`, preserving every existing `audit()` caller unchanged. **The Server Action was then written (§29, 2026-09-01):** `clearTelemetry()` in `src/app/admin/nl-search/actions.ts` — `requireSuperAdmin()` before parsing the confirmation input or opening any transaction; the exact phrase `CLEAR SEARCH TELEMETRY` checked server-side, opening no transaction on mismatch; one `authSql.begin()` holding `clearNlSearchTelemetry(tx)` and `auditInTransaction(tx, 'nl_search.telemetry_cleared', counts, actor)` with no try/catch on either; `revalidatePath('/admin/nl-search', 'layout')` and `revalidatePath('/admin/app-health')` on committed success only. `tests/admin-nl-search-actions.test.ts` (11 DB-free cases) is written and validated (§29.7, 2026-09-01): `npx vitest run tests/admin-nl-search-actions.test.ts` passed **11/11** and `npm run typecheck` passed (`Types generated successfully`). **The UI, `docs/search.md` and `CHANGELOG.md` were then written (runbook §30, 2026-09-01):** `ClearTelemetryForm.tsx` — typed-phrase client confirmation, `DeleteMatchButton`-pattern reveal/confirm/cancel, pending-state protection, success reporting from the returned counts — wired into `page.tsx` beside the period/export controls, with the page's prior unqualified "append-only" claim corrected; `docs/search.md` gained a "Clearing telemetry" paragraph; `CHANGELOG.md` gained the `Unreleased` entry. `npx vitest run tests/admin-nl-search-actions.test.ts` (11/11) and `npm run typecheck` were re-confirmed; no new component test file was added, since this repository has no React-rendering test convention to extend (no testing-library/jsdom, `vitest.config.mts` includes only `tests/**/*.test.ts`, and `DeleteMatchButton` itself has no test). **The guarded Playwright harness is now written (runbook §31, 2026-09-01):** `playwright.telemetry-clear.config.ts` and `tests/admin-nl-search-clear/` (`target-guard.ts` — layered refusal of any non-loopback / non-`_test` / unacknowledged target, at config, setup, spec and seed import; `auth.setup.ts` — two real TOTP logins, super and role-checked plain admin; `seed.ts` — deterministic `DELETE`-and-reseed fixture, exactly deleted 5 / retained 6 / review 1 / feedback 2 / detached-link 1, safe to repeat only after reseed; `telemetry-clear.spec.ts` — reveal/cancel with a zero-POST + byte-equal-DB assertion, exact-phrase client gating, a real clear asserting the four UI strings and the DB end state, plain-admin redirect + export-route 3xx, unauthenticated bounce, and a seeded-marker round-trip proving the deployment reads the seeded `_test` database). It is **type-validated but unexecuted** (`npm run typecheck` → passed, `✓ Types generated successfully`, runbook §32), blocked on two operator prerequisites: a real non-super plain-admin account (`AFLDB_E2E_PLAIN_ADMIN_*`) and a disposable loopback `_test` deployment of this branch (`AFLDB_BETA_GATE=off`, app DSNs → `afldb_test`), plus a Chromium install if needed. Exact run command: runbook §31.7. The guarded PostgreSQL integration suites already passed in §24/§25 and do not need re-running. Note also that `081` is checksum-locked in `afldb_meta.schema_migrations`: any repair must be a new migration or a test-database rebuild, never an in-place edit; `npm run db:privileges:test` remains idempotent and safe to re-run. The `postgres.js` `bigint`-as-string hazard (R3) is now handled and evidenced at the query boundary, but only there — any further code that reads counts from the driver must handle it too. Do not apply the migration to `afldb_dev` or production, and do not invoke a real telemetry reset while ISSUE-110's incomplete validation evidence is under review.
+### Resolution
+
+**Resolved 2026-09-01.** ISSUE-119's implementation and acceptance contract is complete.
+
+Final guarded browser acceptance:
+
+    npx playwright test --config playwright.telemetry-clear.config.ts
+    9 passed (12.5s)
+
+The final browser run proved real Super Admin and plain Admin MFA sessions, `_test`
+deployment binding, no-mutation Cancel behaviour, exact confirmation-phrase gating,
+the selective destructive clear with the expected five counts, retained review and
+feedback evidence, plain-Admin denial of the protected NL-search capability/export,
+and unauthenticated denial.
+
+Final destructive fixture counts:
+
+- `deletedLogRows = 5`
+- `retainedLogRows = 6`
+- `retainedReviewRows = 1`
+- `retainedFeedbackRows = 2`
+- `detachedAppHealthLinks = 1`
+
+The same transaction emitted `nl_search.telemetry_cleared` with those five counts.
+The final Playwright-only corrections asserted rendered authorization outcome rather
+than Next.js redirect pathname behaviour and removed a decorative emoji dependency
+from the reveal-button accessible-name locator. Production authentication,
+authorization, MFA and rate limiting were not weakened.
+
+Final acceptance evidence and diagnostic lineage are authoritative in
+`issues/closed/AFLDB-ISSUE-119.md` §34. Browser-acceptance checkpoint:
+`0a0b26f Record ISSUE-119 browser acceptance`.
+
+No production migration or production telemetry clear was performed as part of this
+resolution.
+
+### Addendum — live dev run, 2026-09-01 (record only; nothing above is retracted)
+
+After this resolution, migration `081` and the `privileges.sql` reconciliation were applied
+to `afldb_dev` and Clear Search Telemetry was run live for the first time. **The clear
+itself succeeded**, exactly to contract: `deletedLogRows = 4953`, `retainedLogRows = 0`,
+`retainedReviewRows = 0`, `retainedFeedbackRows = 0`, `detachedAppHealthLinks = 14`, with the
+`nl_search.telemetry_cleared` audit row committed in the same transaction (`auth_audit_log`
+id 632).
+
+That audit row exposed a **separate, pre-existing defect now tracked as `AFLDB-ISSUE-121`**:
+`auth_audit_log.detail` has always been written double-encoded, so id 632 stored
+`jsonb_typeof(detail) = 'string'` and `detail->>'deletedLogRows'` reads NULL. The defect is in
+`insertAuditRow()`'s jsonb binding, predates ISSUE-119 by ~100 rows, and was explicitly
+deferred by migration `048`. No ISSUE-119 evidence, count, contract or acceptance claim is
+affected, and no data was lost.
+
+**Final live dev acceptance of ISSUE-119 is therefore pending the ISSUE-121 repair** — the
+audit row is the artefact an operator reads to confirm what the clear did, and until `082` is
+applied it is opaque to SQL. The destructive clear must **not** be re-run for this; only the
+audit payload needs re-reading.
+
+### Addendum 2 — final live dev acceptance complete, 2026-09-01
+
+The live dev Clear Search Telemetry run **succeeded** on `afldb_dev` (5 counts to
+contract; `deletedLogRows = 4953`; `nl_search.telemetry_cleared` audit row 632
+committed in the same transaction). Two sequencing gaps found during that run were
+deployment ordering, not code defects, and were corrected:
+
+- Migration `081` and the `privileges.sql` reconciliation had not been applied to
+  `afldb_dev` before the first attempts (SQLSTATE `42883`); both were then applied
+  and the function verified (owner `afldb_owner`, `SECURITY DEFINER`, fixed
+  `search_path`, `afldb_auth` EXECUTE only, no direct `DELETE`/`TRUNCATE`).
+- The audit payload that run wrote was double-encoded — a pre-existing defect in
+  `insertAuditRow()`, tracked and now fixed as `AFLDB-ISSUE-121`. Migration `082`
+  (with the `54c7a31` code fix already deployed) repaired row 632 in place:
+  `jsonb_typeof(detail) = 'object'`, `detail->>'deletedLogRows' = 4953`, and the
+  full five-key object matches the counts this clear returned. `auth_audit_log`
+  now carries `auth_audit_log_detail_is_object_ck`.
+
+Row 632 therefore proves the clear's counts **structurally**. **ISSUE-119's final
+live dev acceptance is complete.** This was reached by re-reading the audit row
+only; the destructive clear was not re-run. The historical runbook
+(`issues/closed/AFLDB-ISSUE-119.md`) is unchanged.
+
+---
+
+## AFLDB-ISSUE-121 — `auth_audit_log.detail` stores JSON objects as JSONB strings
+
+- **Status:** Resolved 2026-09-01
+- **Created:** 2026-09-01
+- **Resolved:** 2026-09-01
+- **Severity:** Medium
+- **Area:** Admin / Security / Audit trail / Database
+- **Files:** `src/lib/auth/session.ts` (the `insertAuditRow()` jsonb binding), `tests/auth.test.ts` (`auth_audit_log writer` describe — new regression case, two corrected assertions), `src/db/migrations/082_auth_audit_log_jsonb_repair.sql` (new), `tests/integration/auth-audit-jsonb.test.ts` (new), `issues/closed/AFLDB-ISSUE-121.md`, `IssuesIndex.md`, `issues.md`, `CHANGELOG.md`
+- **Migration:** `082` — re-derived on 2026-09-01, not assumed: `081` is the highest on `dev`, `080` belongs to `opus/gridley-corpus` (`28fdb2f`, unmerged), and `git log --all --name-only` found no `082_*` in any local or remote ref's history at allocation. **Committed at `54c7a31`; applied to `afldb_test` and `afldb_dev` on 2026-09-01; not applied to production (ships with or after the code fix, never before it).**
+- **Runbook:** `issues/closed/AFLDB-ISSUE-121.md`
+- **Discovered by:** `AFLDB-ISSUE-119` live dev acceptance. ISSUE-119 stays **Resolved**; only an addendum was added to it.
+
+### Symptom
+
+The administrative audit trail's `detail` column is opaque to SQL. `auth_audit_log.detail` is `jsonb` (migration `023`), but every row ever written to it holds a jsonb **string scalar** whose contents are JSON text, so no field inside a payload can be read, filtered or aggregated.
+
+### Reproduction
+
+Any audited admin action with a payload. The live instance: Clear Search Telemetry on `afldb_dev` on 2026-09-01, after migration `081` and `privileges.sql` were applied.
+
+### Expected
+
+`jsonb_typeof(detail) = 'object'`, and `detail->>'deletedLogRows'` returning the recorded count.
+
+### Actual
+
+    SELECT jsonb_typeof(detail) FROM auth_audit_log WHERE id = 632;  -->  string
+    SELECT detail->>'deletedLogRows' FROM auth_audit_log WHERE id = 632;  -->  NULL
+
+with `detail` rendering as `"{\"deletedLogRows\":4953,...}"`.
+
+### Evidence
+
+`auth_audit_log` id 632, `action = nl_search.telemetry_cleared`, written by the clear that returned `deletedLogRows = 4953`, `retainedLogRows = 0`, `retainedReviewRows = 0`, `retainedFeedbackRows = 0`, `detachedAppHealthLinks = 14`. The clear itself was correct; only its audit payload is malformed. `023_auth_submissions.sql:94` declares the column `jsonb`. Migration `048_nl_search_log_jsonb_repair.sql` diagnosed the identical defect in `nl_search_log`'s three jsonb columns, repaired them, added CHECK constraints — and its header explicitly left this column out of scope because nothing read it structurally at the time.
+
+### Root cause
+
+`insertAuditRow()` bound the payload as `${JSON.stringify(detail)}`, which is one encoding too many for a `jsonb` parameter through postgres.js. `inferType()` returns `0` for a JS string, so `Parse` declares no type; the server's `ParameterDescription` then back-fills the statement's types with the OIDs PostgreSQL inferred (`3802`, `jsonb`) in `connection.js`; and `Bind` encodes each parameter with `options.serializers[3802]`, which is `JSON.stringify`. The object is therefore stringified by the application and again by the driver, and what PostgreSQL parses is a valid jsonb **string**. An explicit `::jsonb` cast does not help — the parameter is encoded before the cast is applied — which migration 048 had already established empirically. Only `sql.json()` binds a jsonb parameter correctly.
+
+### Blast radius
+
+All `auth_audit_log` detail payloads, for the life of the table. `insertAuditRow()` is the **only** writer of `auth_audit_log` in `src/` (one `INSERT INTO auth_audit_log`, `src/lib/auth/session.ts:372`), and both `audit()` and `auditInTransaction()` funnel through it; `auditInTransaction()` is not special, it is simply the first caller whose payload anyone reads structurally. Rows with `detail IS NULL` were never affected. **No data was lost:** the payloads are intact under one surplus encoding layer and unwrap exactly. Not affected: `nl_search_log` (repaired and constrained by `048`) and `data_edits` / `player_link_resolutions`, which `src/db/queries/audit-log.ts:50-51` already binds with `tx.json()`.
+
+### Fix
+
+Two halves, both written, neither committed.
+
+**Code.** `insertAuditRow()` now binds `${detail ? sql.json(detail as postgres.JSONValue) : null}` on the `postgres.ISql` handle it was already given, so the pooled and transactional paths stay identical and `auditInTransaction()`'s no-try/catch propagation contract is untouched. No `::jsonb` cast, no `@ts-ignore`, no `eslint-disable`; the `as postgres.JSONValue` widening matches `src/db/queries/audit-log.ts:50`.
+
+**Database.** `082_auth_audit_log_jsonb_repair.sql`, in three steps and deliberately tighter than `048`. (1) The repair `UPDATE` matches only `jsonb_typeof(detail) = 'string'` **and** `(detail #>> '{}') IS JSON OBJECT` (PostgreSQL 16), so NULLs and already-correct objects are never rewritten and a malformed or genuinely scalar value is never silently reinterpreted as structure; it is self-limiting, so a re-run changes nothing. (2) A `DO` block raises — naming the count and the first ids — if any row is still neither NULL nor an object, because a CHECK violation reports one row and no id, which is not enough to decide what a surprising payload ought to become; migrations run in a transaction, so this rolls the repair back and leaves the database on `081`. (3) `auth_audit_log_detail_is_object_ck` (`detail IS NULL OR jsonb_typeof(detail) = 'object'`) is added inside a `pg_constraint` existence check so re-running the file is not an error. Privileges are unchanged: no new table or function, no `grant_app_read()` registration, no `privileges.sql` edit, and the UPDATE runs as the migration owner rather than weakening the table's append-only grant shape.
+
+### Validation
+
+DB-free validation passed on 2026-09-01, Claude-executed under explicit operator instruction for this task. `npx vitest run tests/auth.test.ts tests/admin-nl-search-actions.test.ts` — **2 files, 43/43**. The wider audit-touching set (adding `admin-settings-actions`, `admin-match-mutations`, `nl-search-log`, `audit-link-fk-indexes`) — **6 files, 76/76**. The new regression case was proven to be a real guard: with the old `JSON.stringify` binding temporarily restored it **fails** (`expected 'string' not to be 'string'`), and it asserts on both forms that the bound value is not a string, carries jsonb OID `3802`, and that the driver's single encoding of it parses back to an object. `npx tsc --noEmit` clean; `npx eslint` on the changed TypeScript reported 0 errors; `git diff --check` clean.
+
+**Not validated against a database.** `tests/integration/auth-audit-jsonb.test.ts` reads migration `082` from disk and executes it verbatim inside an always-rolled-back transaction — including the DDL, since PostgreSQL rolls `ALTER TABLE` back too — covering repair of a double-encoded object, an already-correct object left byte- and `xmin`-identical, NULL preserved, idempotent re-run, refusal to transform a non-object string, CHECK rejection of a future string or scalar payload, and object-shaped storage through the real `audit()` / `auditInTransaction()` writers. It has **never run**: `D:\dev\afldb-dev-test` has no `.env` and no `AFLDB_TEST_DATABASE_URL`, `AFLDB_OWNER_DATABASE_URL` or `DATABASE_URL` in the environment, so `tests/integration/guard.ts` refuses the suite by design. No credential was substituted, derived or copied from another worktree. Migration `082` has not been applied to any database, including `afldb_test`.
+
+### Follow-up
+
+**Deployment order is load-bearing (R1).** The CHECK constraint rejects the double-encoded shape, so applying `082` to a database whose application still binds `JSON.stringify(detail)` makes **every audited admin action fail closed** — the same ordering hazard `AFLDB-ISSUE-027` recorded for migration `066`. Code and migration ship together, code first or simultaneously; never the migration alone.
+
+Ordered next actions, none authorised to run automatically: commit the four changed files; run `npx vitest run tests/integration/auth-audit-jsonb.test.ts` where `AFLDB_TEST_DATABASE_URL` exists (owner DSN — the suite issues `ALTER TABLE` inside a rolled-back transaction), with `npm run db:migrate:test` the normal path first; apply `082` to `afldb_dev` by operator decision and re-read row 632, expecting `object` and `4953`; then close `AFLDB-ISSUE-119`'s final live dev acceptance by **re-reading the audit payload only** — the destructive clear already happened and must not be re-run. Production applies both halves together or neither. Secondary risks, all low: an unexpected non-object row aborts the migration rather than being guessed at (R2); `IS JSON OBJECT` requires PostgreSQL 16, and the documented target is 16.14 (R3); a value that was *legitimately* a JSON-object-shaped string would be converted, though no writer can produce one (R4).
+
+### Resolution
+
+**Resolved 2026-09-01.** Documentation close-out after a successful live dev repair;
+the code fix and migration `082` are those committed at `54c7a31` ("Fix auth audit
+JSONB encoding"). Nothing in implementation, tests, migrations or privileges changed
+in the close-out step.
+
+- `tests/integration/auth-audit-jsonb.test.ts` ran against `afldb_test` and passed
+  **8/8** (double-encoded object repaired; already-correct object left `xmin`-identical;
+  `NULL` preserved; idempotent re-run; non-object string refused; CHECK rejects a future
+  string/scalar; object-shaped storage through both real writers). Migration `082` was
+  applied to `afldb_test` first and the runner then reported 82 applied / schema up to
+  date. This clears the "Not validated against a database" gap in Validation above.
+- Deployment order (R1) was observed on `afldb_dev`: it was rebuilt and restarted on
+  code commit `54c7a31` first (`{"status":"ok","database":"ok","latencyMs":28}`), then
+  `applying 082_auth_audit_log_jsonb_repair.sql ... ok`. No audited admin action failed
+  closed.
+- Historical row 632 on `afldb_dev` after `082`: `jsonb_typeof(detail) = 'object'`,
+  `detail->>'deletedLogRows' = 4953`, and `detail` is the five-key object matching
+  `AFLDB-ISSUE-119`'s returned counts exactly. No count changed.
+- `auth_audit_log_detail_is_object_ck` (`detail IS NULL OR jsonb_typeof(detail) =
+  'object'`) is live on `afldb_dev`.
+- No audit data was lost; the repair was exact and idempotent; no privilege, grant,
+  retention or append-only behaviour changed; no other table was affected.
+- `AFLDB-ISSUE-119`'s final live dev acceptance is unblocked — row 632 is now legible to
+  SQL, reached by re-reading it, not by re-running the destructive clear.
+- **Production:** migration `082` is not yet applied there; it ships with or after the
+  `54c7a31` code fix, never before it (R1). Ordinary deployment, not further ISSUE-121 work.
+
+Removed from `IssuesIndex.md` and the Open Issues table; runbook moved to
+`issues/closed/AFLDB-ISSUE-121.md`. The existing `AFLDB-ISSUE-121` entry in `CHANGELOG.md`
+under `Unreleased` had its validation wording updated to the applied state; no new entry
+was added.
+
+## AFLDB-ISSUE-122 — Automatic current-season AFL Tables canonical ingestion
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Data acquisition / Import architecture / Data integrity
+- **Found:** 2026-09-02 (operator product decision: the current-season path must stop
+  requiring routine approval)
+- **Resolved:** N/A
+- **Runbook:** `issues/open/AFLDB-ISSUE-122.md` — **approved planning contract and the
+  authoritative detail.** Planned 2026-09-02, Opus / High / Plan mode, worktree
+  `D:\dev\afldb-issue-122`, branch `claude/issue-122`, base `19de501`.
+- **S0 preflight (2026-09-02):** COMPLETE — measurements, migration-number result (`083`),
+  production `Rscript` result (absent) and the conditional S9 decision are recorded in the
+  runbook §23. Nothing implemented; next stage S1.
+- **S1 migration (2026-09-02):** COMPLETE on `afldb_test` — `src/db/migrations/083_canonical_auto_apply.sql`
+  (§12.2 exactly: provenance quartet on `match_period_scores` and `brownlow_round_votes`,
+  `player_match_stats.source_record_id`, the `canonical_applications` append-only ledger with its
+  composite FK to `staging.source_record_versions`, FK/audit indexes, explicit append-only grants),
+  registered in `tools/maintenance/privileges.sql`, and `tests/integration/privileges.test.ts`
+  extended (§17 row 15). Gates: `db:migrate:test` applied 083 (`afldb_test` 082 → 083, 0 pending
+  after), `db:privileges:test` reconciled, `fk-indexes` 2/2, `privileges` 35/35, `tsc --noEmit`
+  exit 0, `git diff --check` clean. `afldb_dev` and production untouched. Full record, deviations
+  and applied-catalogue evidence in runbook §23 (S1). **Uncommitted** at the time of writing.
+- **S7 Squiggle/Kali retirement (2026-09-02):** COMPLETE — the legacy current-season importer
+  has no canonical `matches` INSERT/UPDATE path and returns structural zero canonical counters;
+  `--update-matches` fails explicitly with an ISSUE-122 deprecation message while
+  `--insert-missing-matches` keeps its existing refusal; the admin current-season controls no
+  longer expose or submit `updateMatches` and are labelled staging/diagnostic fallback only.
+  Acquisition, immutable observations/history, staging, absence state, corroboration diagnostics,
+  source registrations, clients, parsers, independence declarations and provenance remain. No
+  replacement fallback writer was added. Focused gate: `current-season-import` 215/215; real CLI
+  refusal smoke produced the exact message and exit 1; `tsc --noEmit` and changed-file ESLint
+  passed. Full evidence is in runbook §23 (S7). Exact next action: S8.
+- **Files (S1 done; the rest planned):** new
+  `src/lib/acquisition/manual-authority.ts`, `src/lib/acquisition/canonical-apply.ts`,
+  `src/db/migrations/<N>_canonical_auto_apply.sql`,
+  `deploy/afldb-settle-afltables.{service,timer}`; modified
+  `src/lib/acquisition/settle-afltables.ts`, `src/lib/acquisition/reconciliation.ts`,
+  `src/lib/acquisition/source-families.ts`, `data/reference/source-families.json`,
+  `tools/current-season/settle-afltables.ts`,
+  `tools/current-season/update-current-season.ts`,
+  `src/lib/external-afl/current-season-import.ts`,
+  `src/app/admin/current-season/{actions.ts,CurrentSeasonControls.tsx,page.tsx}`,
+  `tools/maintenance/privileges.sql`, `package.json`, `docs/deployment.md`,
+  `docs/acquisition/AFLDB-2026-API-ACQUISITION.md`
+- **Related:** `AFLDB-ISSUE-099` (Resolved — built the pipeline and deliberately stopped at
+  zero canonical writes; ISSUE-122 is the S-E stage its §7 named, plus the A1–A7
+  prerequisites its §16 recorded), `AFLDB-ISSUE-096` (Resolved — the contract and the
+  migration 074 spine; its §6 "no automatic canonical promotion" is superseded for this
+  scope), `AFLDB-ISSUE-086` (Resolved — `data_overrides` is the authority mechanism
+  ISSUE-122 finally calls), `AFLDB-ISSUE-095` (Resolved — `club_seasons` derivation
+  reused), `AFLDB-ISSUE-101` (Resolved — rollover; interface only),
+  `AFLDB-ISSUE-104` (Open — its binding `issue_key` precondition is satisfied by a distinct
+  `issue_type`, not by a migration; it stays open), `AFLDB-ISSUE-113` (Open —
+  `brownlow_season_votes` stays out of scope), `AFLDB-ISSUE-100` (Resolved — staging-only
+  fixtures/lineups remain the incomplete-fixture path).
+
+### Problem
+A newly completed AFL match can exist in AFL Tables, AFLDB can acquire and stage it, and the
+canonical `matches` row and its dependent current-season data are still never written. The
+architecture intentionally stops before general automatic canonical acceptance, so AFLDB lags
+behind AFL Tables even though the source data is available and validated. The operator's
+product decision is now that routine approval must not be required.
+
+### Root cause — the first wrong layer
+`recordOutcome()`, `src/lib/acquisition/settle-afltables.ts:2353-2487`. A valid, fully
+resolved, promotable observation reaches the non-refusal `else` branch at `:2439` and falls
+into the only terminal action the function has — `draftCandidate()` at `:2445` and the
+`promotion_candidates` upsert at `:2458-2484`. `unchanged` returns at `:2377`, `history_only`
+at `:2385`, `absent` at `:2389`, and every refusal verb falls through to the same insert.
+**No branch writes canonical data.** The prohibition is also typed: `canonicalRowsInserted: 0`
+and `canonicalRowsUpdated: 0` are literal-zero types at `:1327-1329`.
+
+Four independent blocks sit behind that boundary:
+
+1. No canonical writer exists anywhere in `src/lib/acquisition/*` — an exhaustive DML grep
+   yields only `staging.*`, `import_batches`, `data_issues`, `import_rejections` and
+   `promotion_candidates`.
+2. `evaluateAcceptRequest` returns `write: { implemented: false }`, and an accept decision is
+   unrepresentable in `PromotionDecisionDraft` (`promotion-review.ts:29-36`, `:752-772`).
+3. The shipped authority provider is `UNAVAILABLE_MANUAL_AUTHORITY = () => 'indeterminate'`
+   (`observations.ts:398`), so every resolved-target diff refuses.
+4. `match_period_scores` and `brownlow_round_votes` carry no `source_id`, so
+   `ownershipForTarget()` returns `indeterminate` (`settle-afltables.ts:200-211`) — those two
+   targets can never produce a promotable candidate.
+
+Nothing consumes the resulting queue: `evaluateAcceptRequest` / `runPromotionGates` /
+`renderReviewItem` have **zero non-test callers**, and there is no promotion-review UI, admin
+route or API handler under `src/app/`.
+
+### Additional confirmed defect, in scope because this issue changes source authority
+`src/lib/external-afl/current-season-import.ts:922-943` is today's only automatic canonical
+writer. It updates `matches` with **no ownership predicate** (`WHERE id = ${localMatchId}`)
+and **no `data_overrides` check**, and stamps its own `source_id` over the previous owner's —
+so it silently transfers ownership away from `afltables` and silently reverts admin score
+corrections, with no TypeScript equivalent of Python's `replay_admin_overrides`. It writes no
+`data_edits` audit row and refreshes only season metadata, leaving `club_seasons` and the
+player aggregates stale.
+
+### Approved product decisions (operator, 2026-09-02)
+1. fitzRoy / AFL Tables is the primary authoritative current-season source; valid data is
+   written automatically; human intervention is an exception path only.
+2. Squiggle and Kali remain as **deprecated, non-writing** fallbacks — their canonical
+   `matches` write is retired, while clients, parsers, source registrations, provenance
+   history, registry entries and useful tests are retained. No replacement fallback writer,
+   and no silent failover.
+3. Machine mutations are audited in a new append-only `canonical_applications` ledger;
+   `promotion_decisions` stays human-only with `admin_user_id NOT NULL`, and `afldb_import`
+   gains no access to human decision records.
+4. Scheduling: provision R plus the pinned fitzRoy on the production droplet and add a
+   systemd service/timer pair mirroring `deploy/afldb-email-intake.{service,timer}`.
+5. Identity stays a human exception, per grain: unresolved **player** identity isolates to
+   that player-grain record; unresolved **club** identity fails closed for that match family;
+   an unmapped **venue** is *not* an identity exception — `venue_raw` is preserved and
+   `venue_id` stays NULL under the existing canonical contract. No source-created identities,
+   no fuzzy or name-only fallback, no new admin UI.
+
+### Planned architecture
+Keep the entire ISSUE-099 pipeline and add one stage. `reconcile()`
+(`reconciliation.ts:467-614`) is already the "determine safe canonical mutation" step and its
+nine gates are reused unchanged; ISSUE-122 adds the write that its tenth outcome has always
+described. A promotable outcome that satisfies a strict eligibility predicate — verb `new` or
+`corrected`, season in `in_progress_seasons`, `source_id` resolving to `afltables` for an
+update, manual authority `clear`, baseline hash unmoved, and `has_player_rows` for a match —
+is applied inside a savepoint that re-runs every gate against re-read state, writes the row
+with its provenance quartet, and inserts the ledger row. Everything else produces a
+`promotion_candidates` refusal row. **A successfully auto-applied record creates no promotion
+candidate and no `promotion_decisions` row**; a pre-existing pending candidate is left pending
+and reported as moot, never machine-marked accepted (the ISSUE-099 F7 invariant).
+
+Savepoint granularity: one per match family (the match plus its period scores) and one per
+player-match record (its `player_match_stats` plus `brownlow_round_votes`), so one debutant
+cannot reject a team-mate and a match never exists with half its period scores. Derived data
+reuses the existing season-scoped and player-scoped functions in
+`src/db/queries/player-derived.ts` — nothing new is built.
+
+### Evidence established during planning
+- `staging.source_record_versions` declares `PRIMARY KEY (source_id, family,
+  external_record_id, version_seq)` (`074:79`) — the exact key `promotion_candidates` already
+  references at `074:178-179`. The new ledger binds to it; no uniqueness is invented or
+  widened.
+- `afldb_import` already holds full DML on all four canonical targets (the deny-list model
+  seeded at `045:99-113`), so **no privilege widening is needed for canonical writes**.
+- `matches.venue_id` is nullable **by design** — `003_matches.sql:35-37`, the column comment
+  at `:74-75`, and the partial index `ix_matches_venue … WHERE venue_id IS NOT NULL` at
+  `:81`; every match read path uses `LEFT JOIN venues`, and existing tests already pin the
+  behaviour.
+- `source_id IS NULL` is **not** proof of unowned: `applyDataEdit` does not re-stamp
+  `matches.source_id` for the score group, `createMatch` can leave a human-created row with
+  no manual marker at all, the CSV ingest promote path stamps neither `source_id` nor
+  `import_batch_id`, and `afldb_import` holds INSERT-only on `data_edits`
+  (`privileges.sql:296`) so the settle role cannot read edit provenance. Source-less rows are
+  therefore **refused**, not adopted, and route to a reviewed one-time transition requiring
+  both a machine proof and an operator-supplied allowlist.
+- Manual authority is answerable from `data_overrides` alone, which `afldb_import` can
+  already read (`privileges.sql:307`), so `AFLDB-ISSUE-099` A4 is satisfied **without**
+  widening migration 073's `entity_type` CHECK.
+- There is no scheduler of any kind for current-season ingestion; the only timer in the
+  system is the 5-minute email-intake one, and no `r-base` provisioning appears in `deploy/`
+  or `docs/`.
+
+### Exact next action
+**S0 through S7 complete (2026-09-02).** S0–S4 are committed at `76480f0`; **S5 and S6 are
+uncommitted.** The automatic path is operational end to end. S6 wired the derived recompute
+(`recomputeSeasonMetadata`, `recomputeClubSeasons`, `recomputePlayerDerivedStats`,
+`recomputeSeasonBrownlowStatus` from `src/db/queries/player-derived.ts`, nothing rebuilt) into
+the settle transaction — once per run, season-scoped, only when `canonicalRowsInserted +
+canonicalRowsUpdated > 0`, the player recompute scoped to the players written plus the players
+on the matches written; added the explicit `--auto-apply` flag to
+`tools/current-season/settle-afltables.ts` (orthogonal to `--apply` / `--dry-run`, so `--dry-run
+--auto-apply` previews exactly what `--apply --auto-apply` commits; unknown flags refused; no
+force or bypass; the body exported as `runSettleCli()` with an entry guard) and `npm run
+settle:afltables`; added four counters (`canonicalApplyRefusals`, `advisoryDisagreement`,
+`derivedRecomputeRuns`, `derivedRecomputePlayers`) that land in `import_batches.validation_result`
+beside the existing ones; and built the §9.3 exception report in NEW
+`src/lib/acquisition/settle-report.ts`, which classifies every pending candidate as **active** or
+**moot** by comparing its version with the latest `canonical_applications` version for the same
+record and target, and reports active unresolved identities with the full §9.3 context including
+whether the canonical match itself landed.
+
+**Three defects were found and fixed by the identical-rerun proof.** (1) `career_game_no` had two
+writers — the applier, from AFL Tables' `Career.Games`, and the derived recompute, as the player's
+row number — so an identical rerun retried the write every night (SC3); it is now derived-owned on
+the automatic path (`DERIVED_OWNED_FIELDS` / `automaticProposal()`), never written or compared by
+the applier and filled by the recompute in the same transaction, while `reconcile()` and the
+review candidate still carry the full proposal. (2) The S5 `player_match_stats` UPDATE set an
+`imported_at` column that table does not have; S5 had never executed that branch. (3)
+`recordOutcome()` returned early on `unchanged` before the applied bookkeeping, so a §9.3 retry
+never counted its moot candidate nor resolved its own `canonical_apply_failed` finding.
+
+End-to-end on `afldb_test`, through the CLI entry with a fixture bundle in a temporary project
+root (no snapshot exists on disk here, and `AFLDB_IMPORT_DATABASE_URL` names `afldb_dev`): dry-run
+→ every relation byte-identical; `--apply --auto-apply` → 6 canonical rows, 3 ledger rows, the
+recompute once over 1 player, the debutant the only active exception with the match reported
+canonical; identical rerun → 0 canonical writes, 0 ledger rows, no new version, candidate or
+finding, no recompute; identity resolved → 1 retry row, recompute over that player only, the
+candidate reported moot while still pending. Gates: `current-season-import` + `reference-data`
+**257/257**; `settle-afltables` integration **44 passed / 1 skipped** (the pre-existing
+`AFLDB_TEST_IMPORT_DATABASE_URL` conditional); the four integration suites **94 passed / 1
+skipped**; `tsc --noEmit` exit 0; `eslint` clean on all six changed files; `git diff --check`
+clean. The import-role registry on `afldb_test` already lists every derived table the recompute
+writes, so no privilege change. Stop conditions SC1–SC10 clear. Full record in runbook §23 (S6).
+
+Operator: review and commit S5 and S6; never the stray `must` file. Then a fresh session,
+worktree `D:\dev\afldb-issue-122`, branch `claude/issue-122`, carry-over
+`issues/open/AFLDB-ISSUE-122.md`, **start at S7** (Squiggle/Kali retirement, runbook §11.2):
+retire the canonical `UPDATE matches` in `src/lib/external-afl/current-season-import.ts` and make
+`--update-matches` and the admin control refuse explicitly, keeping acquisition, observation and
+staging for both providers. Gate: `tests/current-season-import.test.ts` (§17 rows 12–13). The
+literal §17 step-5 commands against a real snapshot are S8's supervised run.
+
+Running the integration suite from the Windows worktree requires an SSH local forward
+(`ssh -N -L 5432:127.0.0.1:5432 arm@10.0.40.100`): the test DSN is loopback-only and is written
+for execution on the development host. Still outstanding from S0: the production copy of §15.1
+(read-only; command in runbook §23) that closes the S9 decision.
+
+**S8 (2026-09-02) — repository deliverables COMPLETE, production run BLOCKED.** New
+`deploy/afldb-settle-afltables.service` (`Type=oneshot`, modelled on the email-intake unit with its
+whole hardening block; two deliberate widenings — `ReadWritePaths` for `data/sources` and
+`docs/rebuild-manifests/afltables_fitzroy_core`, and `AF_UNIX` for the PostgreSQL socket;
+`AFLDB_IMPORT_DATABASE_URL` is the one DSN kept out of `UnsetEnvironment=`), `.timer`
+(`OnCalendar=*-*-* 04:30`, `RandomizedDelaySec=15min`, `Persistent=true`) and `.sh` (the chain runner:
+one label and one season for all three steps, an out-of-season exit 0, and an `EXIT` trap that removes
+a manifest-less working directory so a failed acquisition leaves no consumable partial snapshot).
+`docs/deployment.md` gained §7b — R and pinned-fitzRoy install, verification, service/timer install,
+environment, the supervised validation ladder, journal inspection, cadence/failure/retry, and how to
+disable the timer safely. Both units pass `systemd-analyze verify` (exit 0) on the production host;
+`sh -n` and `git diff --check` are clean; no TypeScript or lint-covered file changed, and no
+repository test reads `deploy/` or `docs/deployment.md`.
+
+**The outstanding S0 production §15.1 measurement is CLOSED and S9 is NOT REQUIRED.** `afldb_prod`:
+189 canonical 2026 matches, **all** `source_id IS NULL` **and** `legacy_match_id IS NOT NULL`
+(§14 rule 7 refuses every one, so the adoptable set is empty); zero `squiggle_api`, `kali_afl_stats`
+and `afltables` rows; `pms = 8694`, `periods = 1512`, `votes = 0`; no NULL `venue_id` in any season
+2020-2026; `data_overrides` does not exist there at all. §14 becomes a recorded non-requirement.
+The nightly path already handles those 189 correctly — `ownership_indeterminate`, refused and queued,
+with only genuinely new matches inserted.
+
+**Two operator prerequisites block the supervised real run, and neither was improvised around.**
+**P1:** R is absent on `afldb-prod` and `sudo` there is password-gated. The install is specified and
+pre-verified against the host (`r-base-core` 4.3.3 from Ubuntu's own universe satisfies fitzRoy's
+`R >= 4.1`; Ubuntu packages every dependency but `janitor` and `nanoparquet`, which matters on a 4 GB
+droplet with no swap; fitzRoy **1.8.0** — currently CRAN's own version — from a dated Posit snapshot
+rather than `latest`, because `latest` is exactly what makes a pin decay). **P2:** production is on
+`main` at `0da44f9`, 94 commits behind and at migration **070**; it needs 071-079, 081, 082, 083 and
+the whole of `src/lib/acquisition/`, with the migration and `db:privileges` before the code
+(`AFLDB-ISSUE-027`). No unit installed, no timer enabled, nothing written to any database.
+
+**Current next action:** operator installs R + fitzRoy 1.8.0 (`docs/deployment.md` §7b) and deploys
+this branch to production; then a fresh session completes S8's supervised ladder C-I and enables the
+timer; then ISSUE-122 final closeout/review. Do not enable the timer before the ladder passes. S8 is
+uncommitted; never include the stray `must` file.

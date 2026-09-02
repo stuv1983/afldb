@@ -320,7 +320,11 @@ describe('afldb_auth is confined to the operational tables', () => {
                 -- The ledger is deliberately NOT import-writable, so this
                 -- grant is the only write path it has.
                 ('promotion_decisions',     'SELECT'),
-                ('promotion_decisions',     'INSERT')
+                ('promotion_decisions',     'INSERT'),
+                -- Automatic canonical mutation ledger (083, AFLDB-ISSUE-122):
+                -- read-only to the admin surface; afldb_import is its only
+                -- writer, asserted in its own section below.
+                ('canonical_applications',  'SELECT')
              ) AS t(name, privilege)
        ORDER BY 1, 2
     `;
@@ -471,6 +475,152 @@ describe('afldb_auth is confined to the operational tables', () => {
   });
 });
 
+/*
+ * AFLDB-ISSUE-119 — the telemetry-clear capability boundary.
+ *
+ * Migration 081 hands afldb_auth exactly one way to delete NL telemetry:
+ * EXECUTE on public.nl_search_telemetry_clear(), a SECURITY DEFINER
+ * function owned by afldb_owner with a pinned search_path. The whole
+ * design collapses if any single property drifts — a superuser owner is a
+ * wider capability than designed, a NULL ACL after pg_restore
+ * --no-privileges silently reverts to EXECUTE-to-PUBLIC, and a direct
+ * DELETE grant on the tables makes the function pointless — so each is
+ * asserted from the applied catalogue, not the migration text.
+ */
+describe('nl_search_telemetry_clear() is the only NL deletion capability (AFLDB-ISSUE-119)', () => {
+  const CLEAR_FN = 'public.nl_search_telemetry_clear()';
+  const NL_TABLES = ['nl_search_log', 'nl_search_review', 'nl_search_feedback'];
+
+  beforeAll(async () => {
+    const [fn] = await sql<{ present: boolean }[]>`
+      SELECT to_regprocedure(${CLEAR_FN}) IS NOT NULL AS present
+    `;
+    if (!fn?.present) {
+      throw new Error(
+        `${CLEAR_FN} is absent from this database, so the ISSUE-119 capability `
+        + 'boundary cannot be verified. Run npm run db:migrate:test rather than '
+        + 'skipping: an unverifiable invariant is not a passing one.',
+      );
+    }
+  });
+
+  it('is SECURITY DEFINER, owned by afldb_owner, with the pinned safe search_path', async () => {
+    const [fn] = await sql<{
+      owner: string; definer: boolean; volatility: string; config: string[] | null; args: number;
+    }[]>`
+      SELECT pg_get_userbyid(p.proowner) AS owner,
+             p.prosecdef                 AS definer,
+             p.provolatile               AS volatility,
+             p.proconfig                 AS config,
+             p.pronargs::int             AS args
+        FROM pg_proc p
+       WHERE p.oid = to_regprocedure(${CLEAR_FN})
+    `;
+    // The owner IS the security boundary: SECURITY DEFINER executes as
+    // it, so a function left owned by the migrating superuser is a far
+    // wider capability than the one migration 081 describes.
+    expect(fn, 'run tools/maintenance/privileges.sql to reconcile owner and ACL').toEqual({
+      owner: 'afldb_owner',
+      definer: true,
+      volatility: 'v',
+      // pg_temp last so a temp object can shadow nothing; public absent
+      // so an unqualified name fails loudly instead of resolving.
+      config: ['search_path=pg_catalog, pg_temp'],
+      // No parameters: there is no input to subvert.
+      args: 0,
+    });
+  });
+
+  it('may be executed by afldb_auth and by no other application role', async () => {
+    const [held] = await sql<{ auth: boolean; app: boolean; imp: boolean }[]>`
+      SELECT has_function_privilege(${AUTH_ROLE},   to_regprocedure(${CLEAR_FN}), 'EXECUTE') AS auth,
+             has_function_privilege(${APP_ROLE},    to_regprocedure(${CLEAR_FN}), 'EXECUTE') AS app,
+             has_function_privilege(${IMPORT_ROLE}, to_regprocedure(${CLEAR_FN}), 'EXECUTE') AS imp
+    `;
+    // app/import false also proves PUBLIC lost EXECUTE: neither role is
+    // granted anything here directly, so a PUBLIC grant is the only way
+    // either could answer true.
+    expect(held, 'run tools/maintenance/privileges.sql').toEqual({
+      auth: true,
+      app: false,
+      imp: false,
+    });
+
+    // afldb_backup exists only on hosts that take backups; asserted when
+    // present rather than invented when not.
+    const [backup] = await sql<{ rolname: string }[]>`
+      SELECT rolname FROM pg_roles WHERE rolname = 'afldb_backup'
+    `;
+    if (backup) {
+      const [b] = await sql<{ held: boolean }[]>`
+        SELECT has_function_privilege('afldb_backup', to_regprocedure(${CLEAR_FN}), 'EXECUTE') AS held
+      `;
+      expect(b.held, 'afldb_backup must not execute the clear').toBe(false);
+    }
+
+    // The grantee list outright, because the boolean checks above cannot
+    // distinguish "PUBLIC revoked" from "ACL is NULL" -- and a NULL
+    // function ACL (pg_restore --no-privileges) IS EXECUTE-to-PUBLIC.
+    const grantees = await sql<{ grantee: string; privilege: string }[]>`
+      SELECT CASE WHEN a.grantee = 0 THEN 'PUBLIC'
+                  ELSE pg_get_userbyid(a.grantee) END AS grantee,
+             a.privilege_type AS privilege
+        FROM pg_proc p
+       CROSS JOIN LATERAL aclexplode(p.proacl) AS a
+       WHERE p.oid = to_regprocedure(${CLEAR_FN})
+       ORDER BY 1
+    `;
+    expect(
+      grantees,
+      'exactly the owner and afldb_auth; an empty list means a NULL ACL, which '
+      + 'grants EXECUTE to PUBLIC -- run tools/maintenance/privileges.sql',
+    ).toEqual([
+      { grantee: 'afldb_auth', privilege: 'EXECUTE' },
+      { grantee: 'afldb_owner', privilege: 'EXECUTE' },
+    ]);
+  });
+
+  it('contains no dynamic SQL, no CASCADE, no TRUNCATE and no unqualified relation', async () => {
+    const [{ src }] = await sql<{ src: string }[]>`
+      SELECT p.prosrc AS src FROM pg_proc p WHERE p.oid = to_regprocedure(${CLEAR_FN})
+    `;
+    // Comments are prose and may mention anything; the executable text is
+    // what the reviewed contract (runbook §13) constrains.
+    const executable = src
+      .split('\n')
+      .map((line) => line.replace(/--.*$/, ''))
+      .join('\n');
+    expect(executable).not.toMatch(/\bEXECUTE\b/i);
+    expect(executable).not.toMatch(/\bCASCADE\b/i);
+    expect(executable).not.toMatch(/\bTRUNCATE\b/i);
+    // Every relation reference must be public.-qualified: with public
+    // absent from search_path, an unqualified name would not merely
+    // resolve somewhere unintended -- it would fail at runtime.
+    expect(executable).not.toMatch(
+      /(?<!public\.)\b(nl_search_log|nl_search_review|nl_search_feedback|app_health_events)\b/,
+    );
+  });
+
+  it('leaves afldb_auth without DELETE or TRUNCATE on any NL table', async () => {
+    // nl_search_log and nl_search_feedback are asserted above with the
+    // rest of the append-only family; nl_search_review is legitimately
+    // UPDATE-able, so its DELETE/TRUNCATE absence is only enforced here.
+    // This is the negative half of the ISSUE-119 boundary: were any of
+    // these held, the function would not be the ONLY deletion capability.
+    const rows = await sql<{ name: string; privilege: string }[]>`
+      SELECT t.name, p.privilege
+        FROM unnest(${NL_TABLES}::text[]) AS t(name)
+       CROSS JOIN LATERAL (VALUES ('DELETE'), ('TRUNCATE')) AS p(privilege)
+       WHERE has_table_privilege(${AUTH_ROLE}, t.name, p.privilege)
+       ORDER BY 1, 2
+    `;
+    expect(
+      rows,
+      'run tools/maintenance/privileges.sql: its ISSUE-119 section revokes exactly this',
+    ).toEqual([]);
+  });
+});
+
 describe('afldb_import is confined to the statistical tables', () => {
   beforeAll(async () => {
     const [role] = await sql<{ rolname: string }[]>`
@@ -590,9 +740,11 @@ describe('afldb_import is confined to the statistical tables', () => {
     // holds INSERT-only on the audit tables so the required audit row
     // commits inside the mutation transaction. data_overrides is a third,
     // column-scoped exception (migration 078, AFLDB-ISSUE-109), which does
-    // not satisfy this table-level INSERT probe. All three stay out of the
-    // registry on purpose -- registering them would grant full DML -- and
-    // their exact narrow shapes are asserted below.
+    // not satisfy this table-level INSERT probe. canonical_applications
+    // (migration 083, AFLDB-ISSUE-122) is the fourth: the automatic
+    // canonical mutation ledger, SELECT + INSERT and nothing else. All
+    // four stay out of the registry on purpose -- registering them would
+    // grant full DML -- and their exact narrow shapes are asserted below.
     const rows = await sql<{ name: string; registered: boolean; writable: boolean }[]>`
       SELECT c.relname AS name,
              (w.name IS NOT NULL) AS registered,
@@ -602,7 +754,8 @@ describe('afldb_import is confined to the statistical tables', () => {
         LEFT JOIN afldb_meta.import_writable_tables w ON w.name = c.relname
        WHERE n.nspname = 'public'
          AND c.relkind IN ('r', 'p')
-         AND c.relname NOT IN ('data_edits', 'player_link_resolutions')
+         AND c.relname NOT IN ('data_edits', 'player_link_resolutions',
+                               'canonical_applications')
        ORDER BY 1
     `;
     expect(rows.length).toBeGreaterThan(0);
@@ -665,6 +818,70 @@ describe('afldb_import is confined to the statistical tables', () => {
       { name: 'data_edits_id_seq', usage: true, selects: false, updates: false },
       { name: 'player_link_resolutions_id_seq', usage: true, selects: false, updates: false },
     ]);
+  });
+
+  it('appends the automatic canonical mutation ledger and can never rewrite it (AFLDB-ISSUE-122)', async () => {
+    // Migration 083: every canonical row the automatic AFL Tables settle
+    // path inserts or updates gets a canonical_applications row in the
+    // same savepoint, written as afldb_import. The ledger is append-only
+    // BY GRANT -- SELECT and INSERT, USAGE on its identity sequence, and
+    // nothing else -- and is deliberately not registered as
+    // import-writable, because grant_import_write() would hand back
+    // UPDATE, DELETE and TRUNCATE at the next reconcile.
+    const [ledger] = await sql<{
+      inserts: boolean; selects: boolean; updates: boolean; deletes: boolean;
+      truncates: boolean; registered: boolean;
+    }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'canonical_applications', 'INSERT')   AS inserts,
+             has_table_privilege(${IMPORT_ROLE}, 'canonical_applications', 'SELECT')   AS selects,
+             has_table_privilege(${IMPORT_ROLE}, 'canonical_applications', 'UPDATE')   AS updates,
+             has_table_privilege(${IMPORT_ROLE}, 'canonical_applications', 'DELETE')   AS deletes,
+             has_table_privilege(${IMPORT_ROLE}, 'canonical_applications', 'TRUNCATE') AS truncates,
+             EXISTS (SELECT 1 FROM afldb_meta.import_writable_tables
+                      WHERE name = 'canonical_applications') AS registered
+    `;
+    expect(ledger).toEqual({
+      inserts: true, selects: true, updates: false, deletes: false,
+      truncates: false, registered: false,
+    });
+
+    const [sequence] = await sql<{ usage: boolean; selects: boolean; updates: boolean }[]>`
+      SELECT has_sequence_privilege(${IMPORT_ROLE}, 'public.canonical_applications_id_seq', 'USAGE')  AS usage,
+             has_sequence_privilege(${IMPORT_ROLE}, 'public.canonical_applications_id_seq', 'SELECT') AS selects,
+             has_sequence_privilege(${IMPORT_ROLE}, 'public.canonical_applications_id_seq', 'UPDATE') AS updates
+    `;
+    expect(sequence).toEqual({ usage: true, selects: false, updates: false });
+
+    // The other two roles: the admin surface reads the ledger and writes
+    // nothing; the public app cannot see it at all -- it is not a public
+    // read surface and is not registered app-readable.
+    const [others] = await sql<{
+      authSelect: boolean; authWrites: boolean; appAny: boolean; appRegistered: boolean;
+    }[]>`
+      SELECT has_table_privilege(${AUTH_ROLE}, 'canonical_applications', 'SELECT') AS "authSelect",
+             (has_any_column_privilege(${AUTH_ROLE}, 'canonical_applications', 'INSERT')
+              OR has_any_column_privilege(${AUTH_ROLE}, 'canonical_applications', 'UPDATE')
+              OR has_table_privilege(${AUTH_ROLE}, 'canonical_applications', 'DELETE')
+              OR has_table_privilege(${AUTH_ROLE}, 'canonical_applications', 'TRUNCATE')) AS "authWrites",
+             (has_any_column_privilege(${APP_ROLE}, 'canonical_applications', 'SELECT')
+              OR has_any_column_privilege(${APP_ROLE}, 'canonical_applications', 'INSERT')
+              OR has_any_column_privilege(${APP_ROLE}, 'canonical_applications', 'UPDATE')
+              OR has_table_privilege(${APP_ROLE}, 'canonical_applications', 'DELETE')) AS "appAny",
+             EXISTS (SELECT 1 FROM afldb_meta.app_readable_tables
+                      WHERE name = 'canonical_applications') AS "appRegistered"
+    `;
+    expect(others).toEqual({
+      authSelect: true, authWrites: false, appAny: false, appRegistered: false,
+    });
+
+    // No grant was widened alongside it: afldb_import still cannot read
+    // data_edits (066 -- nothing in the import path needs it), and the
+    // human decision ledger is still not import-writable (074).
+    const [unchanged] = await sql<{ dataEditsSelect: boolean; decisionsInsert: boolean }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'data_edits', 'SELECT')          AS "dataEditsSelect",
+             has_table_privilege(${IMPORT_ROLE}, 'promotion_decisions', 'INSERT') AS "decisionsInsert"
+    `;
+    expect(unchanged).toEqual({ dataEditsSelect: false, decisionsInsert: false });
   });
 
   it('holds only the Data Editor upsert capability on human overrides (AFLDB-ISSUE-109)', async () => {

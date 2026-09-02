@@ -18,6 +18,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertProjectableColumns,
   countIndependentWitnesses,
+  DEFAULT_CORROBORATION_POLICY,
   getSourceFamily,
   independenceGroups,
   isPromotable,
@@ -332,6 +333,13 @@ describe('load_reference_data.py', () => {
       // one appear silently.
       expect(unregistered).toEqual([
         'app_health_events',
+        // 083 (AFLDB-ISSUE-122). The canonical application ledger is
+        // append-only BY GRANT: migration 083 hands afldb_import SELECT,
+        // INSERT and the sequence only, and afldb_auth SELECT. Registering
+        // it would restore UPDATE/DELETE/TRUNCATE on every privileges
+        // reconcile and silently end the append-only guarantee — the same
+        // distinction promotion_decisions makes below.
+        'canonical_applications',
         'data_edits',
         // 073 / 078 (AFLDB-ISSUE-086 / -109). Human overrides are not
         // importer-owned: privileges.sql grants replay SELECT plus only
@@ -465,6 +473,12 @@ describe('source families dataset (AFLDB-ISSUE-096 S1)', () => {
     mutate(data);
     expect(() => parseSourceFamilyRegistry(data)).toThrow();
   };
+  /** The `refuses` sibling, for a mutation that must still PARSE. */
+  const mutated = (mutate: Parameters<typeof refuses>[0]) => {
+    const data = clone();
+    mutate(data);
+    return data;
+  };
 
   it('declares the four 2026 acquisition sources by stable key only', () => {
     expect([...registry.sources.keys()].sort()).toEqual([
@@ -560,6 +574,38 @@ describe('source families dataset (AFLDB-ISSUE-096 S1)', () => {
     });
     // ...and a promotable family may not lose the shape that earned it.
     refuses((data) => { familyIn(data, 'afltables', 'match').status = 'identity_only'; });
+  });
+
+  /*
+   * AFLDB-ISSUE-122 §10 (stage S4). Corroboration disagreement blocks by
+   * DEFAULT and only the two AFL Tables families opt out. The declaration is
+   * optional precisely so every undeclared family keeps the fail-closed
+   * ISSUE-096 behaviour with no edit; an INVALID one must still fail, because
+   * a typo'd policy silently reading as permissive is the failure mode this
+   * whole file exists to prevent.
+   */
+  it('declares advisory corroboration for the two AFL Tables families only (§10)', () => {
+    expect(DEFAULT_CORROBORATION_POLICY).toBe('blocking');
+    const advisory = registry.families
+      .filter((f) => f.corroborationPolicy === 'advisory')
+      .map((f) => `${f.sourceKey}/${f.family}`).sort();
+    expect(advisory).toEqual(['afltables/match', 'afltables/player_match_stats']);
+    // Everything else — Squiggle and Kali included — still vetoes.
+    for (const family of registry.families) {
+      if (advisory.includes(`${family.sourceKey}/${family.family}`)) continue;
+      expect(family.corroborationPolicy).toBe('blocking');
+    }
+    // Omitted reads as blocking, which is what makes the key safe to add.
+    const omitted = parseSourceFamilyRegistry(mutated((data) => {
+      delete familyIn(data, 'afltables', 'match').corroboration_policy;
+    }));
+    expect(getSourceFamily(omitted, 'afltables', 'match').corroborationPolicy).toBe('blocking');
+    // null is NOT omitted, and neither is a typo or the wrong type.
+    refuses((data) => { familyIn(data, 'afltables', 'match').corroboration_policy = null; });
+    refuses((data) => { familyIn(data, 'afltables', 'match').corroboration_policy = 'advisary'; });
+    refuses((data) => { familyIn(data, 'squiggle_api', 'match').corroboration_policy = true; });
+    // The rest of the family contract stays fail-closed on a missing key.
+    refuses((data) => { delete familyIn(data, 'afltables', 'match').promotion_policy; });
   });
 
   /*

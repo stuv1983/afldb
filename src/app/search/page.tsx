@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { NlAnswerSection } from '@/components/NlAnswerSection';
 import { SearchBox } from '@/components/SearchBox';
+import { runNlSearchWithRateLimit } from '@/app/search/rate-limit';
 import { aflwOnlySearch, globalSearch } from '@/db/queries/search';
 import { getSiteSettings } from '@/db/queries/site-settings';
 import { getAdminUser, ROLE_RANK } from '@/lib/auth/session';
@@ -68,9 +69,14 @@ export default async function SearchPage({
     ? parseNlRunTag((await headers()).get(NL_RUN_TAG_HEADER))
     : null;
 
-  const results = scope !== 'aflw' && hasQuery
-    ? await globalSearch(query, 25, { canReachGridSolver, nlSessionId, nlRunTag })
+  const searchResult = scope !== 'aflw' && hasQuery
+    ? await runNlSearchWithRateLimit(() =>
+        globalSearch(query, 25, { canReachGridSolver, nlSessionId, nlRunTag }),
+      )
     : null;
+
+  const rateLimited = searchResult?.status === 'rate_limited';
+  const results = searchResult?.status === 'ok' ? searchResult.value : null;
 
   const otherScopeHref = scope === 'aflw'
     ? `/search?q=${encodeURIComponent(query)}`
@@ -160,6 +166,11 @@ export default async function SearchPage({
             )}
           </>
         )
+      ) : rateLimited ? (
+        <div className="empty">
+          <h2>Too many searches</h2>
+          <p>Please try again shortly.</p>
+        </div>
       ) : results === null ? (
         <p className="muted">
           Enter at least {MIN_QUERY_LENGTH} characters to search.

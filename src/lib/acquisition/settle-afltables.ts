@@ -23,16 +23,35 @@
  *      projection is gated on resolved identity.
  *   3. **NULL is not zero.** An absent value stays NULL through the bundle,
  *      the projection and the proposal, in every direction.
- *   4. **Nothing here writes anything canonical.** v1 produces observations,
- *      typed staging projections, promotion candidates and `data_issues`
- *      rows. It writes no canonical fact row and no acceptance decision.
+ *   4. **The canonical write is opt-in, gated and audited.** ISSUE-099 v1
+ *      wrote nothing canonical at all. AFLDB-ISSUE-122 S5 adds the automatic
+ *      path, and it stays off unless `autoApply` is set: with it off this
+ *      module still produces only observations, typed staging projections,
+ *      promotion candidates and `data_issues` rows. With it on, a canonical
+ *      mutation happens only inside `canonical-apply.ts`, only when every one
+ *      of E1-E6 passes against state re-read inside that mutation's savepoint,
+ *      and never without its `canonical_applications` audit row. No
+ *      acceptance decision is ever written: `promotion_decisions` stays human.
  */
 import { isAbsolute, resolve } from 'node:path';
 
 import postgres from 'postgres';
 
+import {
+  recomputeClubSeasons,
+  recomputePlayerDerivedStats,
+  recomputeSeasonBrownlowStatus,
+  recomputeSeasonMetadata,
+} from '../../db/queries/player-derived';
 import { asImportBatchId, type ImportBatchId } from '../import-batch-id';
 
+import {
+  applyCanonicalUnit,
+  type CanonicalApplyInvitation,
+  type CanonicalApplyTargetInput,
+  type CanonicalApplyTargetResult,
+  type CanonicalApplyUnitResult,
+} from './canonical-apply';
 import {
   markMissingObservationsAbsent,
   persistSourceObservation,
@@ -45,9 +64,10 @@ import {
   type ManualAuthorityProvider,
   type ObservationHead,
 } from './observations';
-import { draftCandidate } from './promotion-review';
+import { baselineCanonicalHash, draftCandidate } from './promotion-review';
 import {
   classifyCorroboration,
+  diffFields,
   reconcile,
   sameValue,
   type CorroborationReport,
@@ -186,29 +206,39 @@ export function targetEstablishedBySource(
 }
 
 /**
- * The targets that carry no `source_id` column (F5), and therefore cannot
- * express ownership at all.
+ * Ownership from a target row's resolved owner source KEY (§7.2, stage S3).
  *
- * **Binding supply rule (§12).** For these the settle resolver must supply
- * `{ state: 'indeterminate' }`. It must never supply `'unowned'`: a table
- * with no provenance column has not DECLARED an absence of ownership, it
- * simply cannot answer, and claiming otherwise would be a false statement
- * that lets this source adopt a row whose provenance is unknown.
- * `indeterminate` fails closed to `foreign_owned_collision`, which is a
- * truthful refusal recording exactly why the target is not yet promotable.
+ * ISSUE-099 could not ask this question of every target: `match_period_scores`
+ * and `brownlow_round_votes` carried no provenance columns at all (F5), so the
+ * resolver supplied a blanket `{ state: 'indeterminate' }` for them through
+ * `TARGETS_WITHOUT_SOURCE_ID`. **Migration 083 added the provenance quartet to
+ * both** and gave `player_match_stats` its missing `source_record_id`, so all
+ * four targets can now answer, and that special case is gone.
+ *
+ * The reading is unchanged and stays deliberately narrow:
+ *
+ * - `null` owner is `'unowned'` — a DECLARED absence of ownership, which the
+ *   generic Decision E gate permits this source to write. It is **not**
+ *   sufficient for the automatic path; see `autoApplyOwnership()` below.
+ * - a readable owner key is `'owned'`, and `evaluateTargetOwnership()` decides
+ *   whether it is this source's.
+ * - an owner id that resolves to no key is `'indeterminate'` and fails closed
+ *   (`ownershipOf()`), because an unreadable owner is not an absent one.
  */
-export const TARGETS_WITHOUT_SOURCE_ID: readonly SettleTargetTable[] = [
-  'match_period_scores',
-  'brownlow_round_votes',
-];
-
-export function ownershipForTarget(
-  targetTable: SettleTargetTable, ownerSourceKey: string | null,
-): TargetOwnership {
-  if (TARGETS_WITHOUT_SOURCE_ID.includes(targetTable)) return { state: 'indeterminate' };
+export function ownershipForTarget(ownerSourceKey: string | null): TargetOwnership {
   if (ownerSourceKey === null) return { state: 'unowned' };
   return { state: 'owned', sourceKey: ownerSourceKey };
 }
+
+/**
+ * E3 — the ISSUE-122 automatic-path ownership predicate (§5.1, §7.2).
+ *
+ * Defined in `canonical-apply.ts`, which is where it is used, and re-exported
+ * here because S3 introduced it on this module's surface and every existing
+ * caller and test imports it from here. The dependency runs one way only: the
+ * settle pass imports the applier, never the reverse.
+ */
+export { autoApplyOwnership, type AutoApplyOwnership } from './canonical-apply';
 
 /* ------------------------------------------------------------------ *
  * Proposed field sets (§17)
@@ -303,11 +333,48 @@ export function settleIssueKey(
 export const SETTLE_ISSUE_TYPE = 'source_disagreement';
 
 /**
+ * AFLDB-ISSUE-122 §9.2 — the SECOND, and deliberately DISTINCT, `issue_type`.
+ *
+ * Migration 076's dedup index is `(issue_type, issue_key) WHERE issue_key IS
+ * NOT NULL AND resolved_at IS NULL` (`076:434-436`). Because the applier's
+ * findings carry a different `issue_type` from ISSUE-099's disagreements, the
+ * two writers can never contend for the same index entry, so
+ * `AFLDB-ISSUE-104`'s hazard — a foreign writer's open row being refreshed
+ * through `ON CONFLICT` — cannot arise between them. That satisfies ISSUE-104's
+ * binding precondition without a migration and without editing frozen
+ * migration 076. **ISSUE-104 stays open**; its general hazard is unchanged, and
+ * this proof must not be allowed to lapse silently, which is why a test pins
+ * the literal.
+ */
+export const CANONICAL_APPLY_ISSUE_TYPE = 'canonical_apply_failed';
+
+export type SettleIssueType =
+  | typeof SETTLE_ISSUE_TYPE
+  | typeof CANONICAL_APPLY_ISSUE_TYPE;
+
+/** §9.2: `afltables|apply|<family>|<record>|<target>`, exactly. */
+export function canonicalApplyIssueKey(
+  wireFamily: string, externalRecordId: string, targetTable: SettleTargetTable,
+): string {
+  if (!externalRecordId) fail('A data_issues key needs the external record id it describes.');
+  return [
+    SETTLE_SOURCE_KEY, 'apply', contractFamilyOf(wireFamily), externalRecordId, targetTable,
+  ].join('|');
+}
+
+/**
  * The ownership stamp on every `data_issues` row this pass writes, and the
  * only rows it may ever auto-resolve. ISSUE-090's register pass deleted
  * conflicts it did not own; this is that lesson made mechanical.
  */
 export const SETTLE_ISSUE_OWNER = 'AFLDB-ISSUE-099';
+
+/**
+ * The ownership stamp on every `canonical_apply_failed` row, and the only
+ * rows the applier may ever resolve. Same lesson as `SETTLE_ISSUE_OWNER`, and
+ * a different owner so neither writer can close the other's finding.
+ */
+export const CANONICAL_APPLY_ISSUE_OWNER = 'AFLDB-ISSUE-122';
 
 /**
  * §13.2. Disagreement is compared over the shared canonical fields of the
@@ -399,7 +466,7 @@ export type SettleDataIssueDraft = {
   entityType: SettleTargetTable;
   /** The canonical row id, or NULL for a target that does not exist yet. */
   entityId: number | null;
-  issueType: typeof SETTLE_ISSUE_TYPE;
+  issueType: SettleIssueType;
   issueKey: string;
   severity: 'warning' | 'error';
   description: string;
@@ -1313,6 +1380,13 @@ export type SettleCounters = {
   unresolvedIdentityVenue: number;
   unresolvedIdentityMatch: number;
   foreignOwnedCollision: number;
+  /**
+   * Disagreements that REFUSED the proposal, i.e. `corroboration_policy:
+   * "blocking"` families only. An `advisory` family's disagreement is real and
+   * is still recorded — as a `data_issues` row, counted by
+   * `dataIssuesOpened` / `dataIssuesRefreshed` — but it refuses nothing, so it
+   * is deliberately not counted here (ISSUE-122 §10).
+   */
   sourceDisagreement: number;
   manualAuthorityRefusals: number;
 
@@ -1324,9 +1398,61 @@ export type SettleCounters = {
   dataIssuesRefreshed: number;
   dataIssuesResolved: number;
 
-  /** Literally zero in v1, and asserted as a runtime fact (§15). */
-  canonicalRowsInserted: 0;
-  canonicalRowsUpdated: 0;
+  /**
+   * AFLDB-ISSUE-122 S5. Canonical fact ROWS the automatic path wrote, counted
+   * as PostgreSQL actually inserted or updated them — so a `match_period_scores`
+   * set that publishes four quarters counts four, not one. ISSUE-099's literal
+   * `0` type is gone: v1's prohibition is superseded for AFL Tables
+   * current-season data, and a run with `autoApply` off still reports 0
+   * because nothing invites a target.
+   */
+  canonicalRowsInserted: number;
+  canonicalRowsUpdated: number;
+  /** `canonical_applications` rows written — one per applied target (§12). */
+  canonicalApplicationsLogged: number;
+  /**
+   * Units whose savepoint rolled back on a write error (§9.1). Each leaves no
+   * canonical row and no ledger row, opens one `canonical_apply_failed`
+   * finding per invited target, and does not stop the run.
+   */
+  canonicalApplyFailures: number;
+  /**
+   * §9.3. Targets applied because the CANONICAL state showed the write never
+   * landed, not because the source payload moved — the debutant whose identity
+   * was resolved between runs. Ordinary unchanged idempotence is untouched: a
+   * target already carrying the proposed values differs in no field and is
+   * never retried.
+   */
+  canonicalRetryApplied: number;
+  /**
+   * AFLDB-ISSUE-122 S6. Targets the applier was OFFERED and refused inside
+   * the savepoint on a gate re-read there — E2 season, E3 ownership, E4
+   * authority, E5 stale baseline, E6 completion — or found nothing left to
+   * write. Not a write failure (`canonicalApplyFailures`) and not a
+   * reconciliation refusal, which never reaches the applier: this is the
+   * count of proposals the run itself would have applied and the re-read
+   * state overruled. Each one still surfaces in the exception queue.
+   */
+  canonicalApplyRefusals: number;
+  /**
+   * AFLDB-ISSUE-122 §10 / S6. Disagreements recorded under
+   * `corroboration_policy: "advisory"` — a `data_issues` finding was opened or
+   * refreshed and the proposal was NOT vetoed. The blocking counterpart is
+   * `sourceDisagreement`; the two never count the same finding.
+   */
+  advisoryDisagreement: number;
+  /**
+   * AFLDB-ISSUE-122 §13 / S6. `1` when the season-scoped derived recompute
+   * ran (once, at the end of the run, only because
+   * `canonicalRowsInserted + canonicalRowsUpdated > 0`); `0` otherwise.
+   */
+  derivedRecomputeRuns: number;
+  /**
+   * Player ids handed to `recomputePlayerDerivedStats()`: the players whose
+   * own rows this run wrote, plus every player with a stats row on a match
+   * this run wrote. `0` when the recompute did not run.
+   */
+  derivedRecomputePlayers: number;
 };
 
 function emptyCounters(): SettleCounters {
@@ -1363,7 +1489,47 @@ function emptyCounters(): SettleCounters {
     dataIssuesResolved: 0,
     canonicalRowsInserted: 0,
     canonicalRowsUpdated: 0,
+    canonicalApplicationsLogged: 0,
+    canonicalApplyFailures: 0,
+    canonicalRetryApplied: 0,
+    canonicalApplyRefusals: 0,
+    advisoryDisagreement: 0,
+    derivedRecomputeRuns: 0,
+    derivedRecomputePlayers: 0,
   };
+}
+
+/**
+ * AFLDB-ISSUE-122 §13 / S6 — what the run's canonical writes touched, so the
+ * derived recompute at the end of the run can be scoped to exactly that.
+ *
+ * `playerIds` are the players whose own `player_match_stats` /
+ * `brownlow_round_votes` unit applied. `matchIds` are the canonical matches
+ * whose `matches` / `match_period_scores` unit applied, whether inserted or
+ * updated; every player with a stats row on one of them is folded in at the
+ * end, because a corrected match date or score moves their derived rows
+ * exactly as an edit through `match-admin.ts` would.
+ */
+type DerivedScope = {
+  playerIds: Set<number>;
+  matchIds: Set<number>;
+};
+
+/**
+ * The player ids `recomputePlayerDerivedStats()` receives: the run's own
+ * player-unit writes plus the players on every match the run wrote.
+ */
+async function affectedPlayerIds(tx: Tx, scope: DerivedScope): Promise<number[]> {
+  const ids = new Set(scope.playerIds);
+  if (scope.matchIds.size > 0) {
+    const rows = await tx<{ playerId: number }[]>`
+      SELECT DISTINCT player_id::int AS "playerId"
+        FROM player_match_stats
+       WHERE match_id = ANY(${[...scope.matchIds]}::bigint[])
+    `;
+    for (const row of rows) ids.add(row.playerId);
+  }
+  return [...ids].sort((a, b) => a - b);
 }
 
 export type SettleRunOptions = {
@@ -1371,8 +1537,32 @@ export type SettleRunOptions = {
   registry: SourceFamilyRegistry;
   /** `false` runs the identical write path and rolls it back (§22). */
   apply: boolean;
-  /** `UNAVAILABLE_MANUAL_AUTHORITY` in v1. There is no bypass. */
+  /**
+   * The fallback provider, used when no `manualAuthorityLoader` is supplied.
+   * There is no bypass: `UNAVAILABLE_MANUAL_AUTHORITY` refuses everything.
+   */
   manualAuthority: ManualAuthorityProvider;
+  /**
+   * AFLDB-ISSUE-122 §8. Resolved ONCE, inside the run transaction, so the
+   * authority snapshot is taken by the same transaction that would write
+   * (`AFLDB-ISSUE-096` §7 requirement 2). When supplied it replaces
+   * `manualAuthority` for the whole run; when omitted, nothing changes.
+   */
+  manualAuthorityLoader?: (tx: postgres.TransactionSql) => Promise<ManualAuthorityProvider>;
+  /**
+   * AFLDB-ISSUE-122 S5. Off by default, so every existing caller keeps
+   * ISSUE-099's zero-canonical-write behaviour exactly. When on, a record
+   * whose gates E1-E6 all pass INSIDE its savepoint becomes canonical without
+   * a human, and `inProgressSeasons` becomes mandatory — E2 is re-evaluated at
+   * the write rather than inherited from the bundle validation that ran before
+   * PostgreSQL was opened.
+   *
+   * There is no force flag and no bypass: this switch decides whether the
+   * automatic path RUNS, never whether a gate may be skipped.
+   */
+  autoApply?: boolean;
+  /** `data/reference/seasons.json.in_progress_seasons` — required by E2. */
+  inProgressSeasons?: readonly number[];
   /** Passed in, never taken from a clock inside the decision layer. */
   observedAt?: string;
 };
@@ -1397,7 +1587,13 @@ type SettleRefs = {
   clubIdsByHist: ReadonlyMap<string, number>;
   venueIdsByLegacyName: ReadonlyMap<string, number>;
   playerIdsByUrl: ReadonlyMap<string, number>;
-  matchIdsByKey: ReadonlyMap<string, number>;
+  /**
+   * Mutable by design (AFLDB-ISSUE-122 S5): a `matches` row this run inserts
+   * is registered here immediately, so the player-match family — settled after
+   * the match family, in the SAME transaction — resolves against the run's own
+   * write instead of waiting a night for the next run to see it.
+   */
+  matchIdsByKey: Map<string, number>;
 };
 
 async function loadRefs(tx: Tx, season: number): Promise<SettleRefs> {
@@ -1509,21 +1705,35 @@ type ResolvedTarget = {
   identity: IdentityResolution;
   targetId: number | null;
   targetValues: Readonly<Record<string, JsonValue>> | null;
+  /**
+   * AFLDB-ISSUE-122 §13. True only when the sole thing blocking this target is
+   * a canonical `matches` row that does not exist YET. It is a structured fact
+   * about WHY the identity failed, not a licence: the applier uses it to invite
+   * the dependent target into the match family's savepoint AFTER the match has
+   * been inserted, and re-runs every gate there. Nothing else reads it.
+   */
+  pendingMatch: boolean;
 };
 
-function unresolved(reason: string): ResolvedTarget {
-  return { identity: { status: 'unresolved', reason }, targetId: null, targetValues: null };
+function unresolved(reason: string, pendingMatch = false): ResolvedTarget {
+  return {
+    identity: { status: 'unresolved', reason },
+    targetId: null,
+    targetValues: null,
+    pendingMatch,
+  };
 }
 
-function ownershipOf(
-  targetTable: SettleTargetTable, refs: SettleRefs, ownerSourceId: number | null,
-): TargetOwnership {
-  if (TARGETS_WITHOUT_SOURCE_ID.includes(targetTable)) return { state: 'indeterminate' };
+/**
+ * The id-keyed form of `ownershipForTarget()`. Since migration 083 every one
+ * of the four targets carries `source_id`, so this is asked of all of them.
+ */
+function ownershipOf(refs: SettleRefs, ownerSourceId: number | null): TargetOwnership {
   if (ownerSourceId === null) return { state: 'unowned' };
   const key = refs.sourceKeysById.get(ownerSourceId);
   // A source id with no readable key is not an absence of ownership; it is an
   // unreadable owner, which fails closed rather than being adopted.
-  return key === undefined ? { state: 'indeterminate' } : { state: 'owned', sourceKey: key };
+  return key === undefined ? { state: 'indeterminate' } : ownershipForTarget(key);
 }
 
 /* -- the run --------------------------------------------------------- */
@@ -1583,11 +1793,20 @@ export async function runSettleAfltables(
       // reaches this set only on evidence; nothing is added because a
       // disagreement merely failed to reappear.
       const restoredKeys = new Set<string>();
+      // AFLDB-ISSUE-122 S6: what the canonical writes touched, for the
+      // derived recompute below.
+      const derived: DerivedScope = { playerIds: new Set(), matchIds: new Set() };
+
+      // §8. The authority snapshot is taken here, inside the transaction,
+      // before any reconciliation asks it anything.
+      const runOptions: SettleRunOptions = options.manualAuthorityLoader
+        ? { ...options, manualAuthority: await options.manualAuthorityLoader(tx) }
+        : options;
 
       for (const wireFamily of Object.keys(BUNDLE_FAMILIES)) {
         await settleFamily(
-          tx, wireFamily, refs, runBatchId, observedAt, options, counters,
-          completeScopes, restoredKeys,
+          tx, wireFamily, refs, runBatchId, observedAt, runOptions, counters,
+          completeScopes, restoredKeys, derived,
         );
       }
 
@@ -1607,6 +1826,27 @@ export async function runSettleAfltables(
       // planned — an ownership or already-resolved mismatch must show as a
       // resolution that did not happen.
       counters.dataIssuesResolved = await resolveRestoredDisagreements(tx, restoredKeys);
+
+      // AFLDB-ISSUE-122 §13 / S6. The derived recompute: ONCE per run, after
+      // every family, season-scoped, and only when a canonical row actually
+      // moved. It reuses the targeted counterparts of `rebuild_derived.py`
+      // in `src/db/queries/player-derived.ts` in the order `data-edits.ts`
+      // and `match-admin.ts` already run them — metadata first, because the
+      // club-seasons wooden-spoon gate reads `seasons.status`. Inside the
+      // same transaction, so a `--dry-run` rolls it back with everything
+      // else and a failure in it takes the whole run down rather than
+      // leaving canonical facts committed beside stale derived rows.
+      // `recomputePlayerDerivedStats()` is scoped to the players the run's
+      // writes touched, never the season's whole player set.
+      if (counters.canonicalRowsInserted + counters.canonicalRowsUpdated > 0) {
+        const playerIds = await affectedPlayerIds(tx, derived);
+        await recomputeSeasonMetadata(tx, bundle.season);
+        await recomputeClubSeasons(tx, bundle.season);
+        await recomputePlayerDerivedStats(tx, playerIds, bundle.season);
+        await recomputeSeasonBrownlowStatus(tx, bundle.season);
+        counters.derivedRecomputeRuns = 1;
+        counters.derivedRecomputePlayers = playerIds.length;
+      }
 
       // `import_batches.records_rejected` is defined by migration 001 as the
       // number of `import_rejections` rows for the batch, and every writer in
@@ -1659,6 +1899,8 @@ async function settleFamily(
   completeScopes: ReadonlySet<string>,
   /** Collects the issue keys this run positively re-proved as agreeing (§13.3). */
   restoredKeys: Set<string>,
+  /** Collects what the canonical writes touched, for the derived recompute (S6). */
+  derived: DerivedScope,
 ): Promise<void> {
   const family = contractFamilyOf(wireFamily);
   const contract = getSourceFamily(options.registry, SETTLE_SOURCE_KEY, family);
@@ -1697,6 +1939,14 @@ async function settleFamily(
       : null;
 
     // 3. Reconcile each of the family's two canonical targets.
+    //
+    //    AFLDB-ISSUE-122 S5 splits this into two passes over the SAME record.
+    //    Reconciliation is unchanged and still per target; what changed is
+    //    that the canonical write is not performed here. Both of a record's
+    //    targets are decided first, then the applier gets the whole record as
+    //    ONE savepoint unit (§13) — a match never exists with half its period
+    //    scores, and a player's stats and votes land together or not at all.
+    const passes: TargetPass[] = [];
     for (const targetTable of targetTablesFor(wireFamily)) {
       // FIRST, and before identity is consulted at all: did the source
       // establish this target? A target that does not exist gets no
@@ -1768,22 +2018,311 @@ async function settleFamily(
         manualAuthority: options.manualAuthority,
       });
 
+      passes.push({
+        targetTable, outcome, resolvedTarget, proposedValues: proposedValues ?? {}, claims,
+      });
+    }
+
+    // 4. The canonical write (AFLDB-ISSUE-122 S5), inside its own savepoint,
+    //    with every gate re-run against state re-read in the transaction. With
+    //    `autoApply` off this is a no-op and ISSUE-099's behaviour is exact.
+    const applications = options.autoApply
+      ? await applyRecordCanonically(
+        tx,
+        { wireFamily, record, projected, passes, refs, batchId, options, counters, derived },
+      )
+      : new Map<SettleTargetTable, CanonicalApplyTargetResult>();
+
+    // 5. Record every target's outcome. A target the applier landed creates NO
+    //    promotion candidate (§5.2); everything else is the ISSUE-099 path.
+    for (const pass of passes) {
       await recordOutcome(tx, {
         contract,
         wireFamily,
         record,
-        targetTable,
-        outcome,
-        resolvedTarget,
-        proposedValues: proposedValues ?? {},
-        claims,
+        targetTable: pass.targetTable,
+        outcome: pass.outcome,
+        resolvedTarget: pass.resolvedTarget,
+        proposedValues: pass.proposedValues,
+        claims: pass.claims,
         season: options.bundle.season,
         refs,
         batchId,
         counters,
+        application: applications.get(pass.targetTable) ?? null,
       });
     }
   }
+}
+
+/* -- the canonical applier's driver (AFLDB-ISSUE-122 S5) -------------- */
+
+/** One target's reconciliation, held so the whole record can be applied at once. */
+type TargetPass = {
+  targetTable: SettleTargetTable;
+  outcome: ReconciliationOutcome;
+  resolvedTarget: ResolvedTarget;
+  proposedValues: Readonly<Record<string, JsonValue>>;
+  claims: readonly ProviderClaim[];
+};
+
+/**
+ * Which targets of this record are OFFERED to the applier, and why.
+ *
+ * An invitation authorises nothing. Every gate still runs inside the savepoint
+ * against re-read state; this only decides which questions are asked.
+ *
+ *   - **E1 proper** — `reconcile()` returned a `new` or `corrected` candidate.
+ *   - **`pending_match`** — the target is `match_period_scores`, its only
+ *     unresolved component is a canonical match that does not exist yet, and
+ *     the same record's `matches` target is itself being offered. §13 requires
+ *     the match family to be all-or-none, and the dependent target simply
+ *     cannot resolve before the match row exists.
+ *   - **`retry` (§9.3)** — the source payload did not move, so `reconcile()`
+ *     answered `unchanged` and proposed nothing, but the canonical target shows
+ *     the write never landed. Keyed on TARGET state, never on payload change.
+ *     Ordinary idempotence is untouched: a target already carrying the proposed
+ *     values differs in no field, so `diffFields()` is empty and nothing is
+ *     offered.
+ *
+ * A refusal for any other reason — unresolved player identity, a foreign owner,
+ * a blocking disagreement, a manual-authority conflict, a stale review — is
+ * never offered. Those belong to the exception queue, and the automatic path
+ * does not second-guess them.
+ */
+function invitationFor(
+  pass: TargetPass, matchesInvited: boolean,
+): CanonicalApplyInvitation | null {
+  if (Object.keys(automaticProposal(pass.targetTable, pass.proposedValues)).length === 0) {
+    return null;
+  }
+  if (pass.outcome.kind === 'candidate') {
+    return pass.outcome.verb === 'new' || pass.outcome.verb === 'corrected'
+      ? 'candidate'
+      : null;
+  }
+  if (pass.outcome.kind === 'refusal') {
+    return pass.targetTable === 'match_period_scores'
+      && pass.outcome.verb === 'unresolved_identity'
+      && pass.resolvedTarget.pendingMatch
+      && matchesInvited
+      ? 'pending_match'
+      : null;
+  }
+  if (pass.outcome.kind !== 'unchanged' && pass.outcome.kind !== 'history_only') return null;
+  if (pass.resolvedTarget.identity.status === 'unresolved') return null;
+  return diffFields(
+    automaticProposal(pass.targetTable, pass.proposedValues), pass.resolvedTarget.targetValues,
+  ).length > 0
+    ? 'retry'
+    : null;
+}
+
+/**
+ * AFLDB-ISSUE-122 S6 — fields the DERIVED layer owns, which the automatic
+ * path therefore neither writes nor compares.
+ *
+ * `player_match_stats.career_game_no` is proposed from AFL Tables'
+ * `Career.Games` (`import_fitzroy_core.py`), and it is ALSO what
+ * `recomputePlayerDerivedStats()` — the targeted counterpart of
+ * `rebuild_derived.py`, run at the end of every writing settle (§13) and by
+ * every admin match mutation — rewrites as the row number of the player's
+ * matches in AFLDB. Two writers for one column: the first S6 identical-rerun
+ * proof found the recompute had renumbered the value the applier had just
+ * written, so the next run saw a target that "differed" and retried the
+ * write, after which the recompute would renumber it again — one canonical
+ * write and one ledger row per night, forever, over identical source data
+ * (SC3). AFLDB derives this number from its own canonical rows, exactly as
+ * it does after an admin edit, so on the automatic path the source's copy is
+ * corroboration at most, never a value to write.
+ *
+ * Scoped to the AUTOMATIC path only. `reconcile()` and the promotion
+ * candidate it drafts still carry the full proposal, so a source-side
+ * change to this field still surfaces for a human as a `corrected` candidate
+ * (with nothing else to write it is simply never offered to the applier),
+ * and ISSUE-099's review semantics are untouched.
+ */
+export const DERIVED_OWNED_FIELDS: Readonly<Partial<Record<SettleTargetTable, readonly string[]>>> = {
+  player_match_stats: ['career_game_no'],
+};
+
+/** The proposal as the automatic path sees it: the derived-owned fields removed. */
+export function automaticProposal(
+  targetTable: SettleTargetTable, proposedValues: Readonly<Record<string, JsonValue>>,
+): Readonly<Record<string, JsonValue>> {
+  const owned = DERIVED_OWNED_FIELDS[targetTable];
+  if (owned === undefined || owned.length === 0) return proposedValues;
+  return Object.fromEntries(
+    Object.entries(proposedValues).filter(([field]) => !owned.includes(field)),
+  );
+}
+
+/** The evidence version a ledger row must cite, or null when there is none. */
+function versionSeqOf(outcome: ReconciliationOutcome): number | null {
+  if (outcome.kind === 'absent') return null;
+  return outcome.observation?.versionSeq ?? null;
+}
+
+/**
+ * Offer one record's targets to the applier as a single savepoint unit, then
+ * fold the result into the run's counters and, on failure, into `data_issues`.
+ */
+async function applyRecordCanonically(
+  tx: Tx,
+  input: {
+    wireFamily: string;
+    record: BundleRecord;
+    projected: ProjectedRecord | null;
+    passes: readonly TargetPass[];
+    refs: SettleRefs;
+    batchId: ImportBatchId;
+    options: SettleRunOptions;
+    counters: SettleCounters;
+    derived: DerivedScope;
+  },
+): Promise<Map<SettleTargetTable, CanonicalApplyTargetResult>> {
+  const { projected, passes, refs, batchId, options, counters, derived } = input;
+  const applied = new Map<SettleTargetTable, CanonicalApplyTargetResult>();
+  if (projected === null) return applied;
+
+  const { inProgressSeasons } = options;
+  if (inProgressSeasons === undefined) {
+    fail(
+      'An automatic canonical application needs in_progress_seasons: E2 is re-evaluated at '
+      + 'the write and is never inherited from the bundle validation.',
+    );
+  }
+
+  const matchesInvited = passes.some(
+    (pass) => pass.targetTable === 'matches' && invitationFor(pass, false) !== null,
+  );
+
+  const invited: { pass: TargetPass; target: CanonicalApplyTargetInput }[] = [];
+  for (const pass of passes) {
+    const invitation = invitationFor(pass, matchesInvited);
+    if (invitation === null) continue;
+    const versionSeq = versionSeqOf(pass.outcome);
+    // No evidence version, no ledger row, therefore no write: SC2 is not
+    // something to work around.
+    if (versionSeq === null) continue;
+    // S6: the derived-owned fields are removed BEFORE the diff, the baseline
+    // hash and the applier's own comparison, so all three see one field set.
+    const proposedValues = automaticProposal(pass.targetTable, pass.proposedValues);
+    const renderedFields = diffFields(proposedValues, pass.resolvedTarget.targetValues);
+    if (renderedFields.length === 0) continue;
+    invited.push({
+      pass,
+      target: {
+        targetTable: pass.targetTable,
+        invitation,
+        proposedValues,
+        renderedFields,
+        renderedBaselineCanonicalHash: pass.resolvedTarget.targetValues === null
+          ? null
+          : baselineCanonicalHash(renderedFields, pass.resolvedTarget.targetValues),
+        sourceVersionSeq: versionSeq,
+      },
+    });
+  }
+  if (invited.length === 0) return applied;
+
+  const matchKey = projected.family === 'match'
+    ? projected.projection.matchKey
+    : projected.matchKey;
+  const vote = projected.family === 'player_match_stats'
+    ? projected.projection.brownlowRoundVote
+    : null;
+
+  const outcome: CanonicalApplyUnitResult = await applyCanonicalUnit(tx, {
+    family: contractFamilyOf(input.wireFamily),
+    externalRecordId: input.record.externalRecordId,
+    season: options.bundle.season,
+    sourceId: refs.sourceId,
+    sourceKey: SETTLE_SOURCE_KEY,
+    sourceKeysById: refs.sourceKeysById,
+    batchId,
+    inProgressSeasons,
+    // §9.5 / E6. The emitter rejects a match with no joined player row as
+    // `incomplete_match_evidence` and emits it unprojected, so a record that
+    // projected as a match IS a match the completion predicate passed.
+    completionProven: input.record.rejection === null && input.record.projection !== null,
+    // §7.1: the bundle projection's key, verbatim. Never re-rendered, and
+    // `createMatch()` is never called.
+    matchKey,
+    playerId: projected.family === 'player_match_stats' ? projected.playerId : null,
+    brownlowRoundNumber: vote === null ? null : vote.roundNumber,
+    targets: invited.map((entry) => entry.target),
+  });
+
+  // The run learns about its own INSERT, so the player-match family — settled
+  // after the match family inside the SAME transaction — resolves against it.
+  if (outcome.insertedMatchId !== null) {
+    refs.matchIdsByKey.set(matchKey, outcome.insertedMatchId);
+  }
+
+  let unitApplied = false;
+  for (const result of outcome.results) {
+    applied.set(result.targetTable, result);
+    if (!result.applied) {
+      // A gate re-read inside the savepoint overruled the proposal (S6
+      // counter). A unit that rolled back is counted once, below, as a
+      // failure rather than once per target here.
+      if (outcome.failure === null) counters.canonicalApplyRefusals += 1;
+      continue;
+    }
+    unitApplied = true;
+    counters.canonicalRowsInserted += result.rowsInserted;
+    counters.canonicalRowsUpdated += result.rowsUpdated;
+    counters.canonicalApplicationsLogged += 1;
+    const invitation = invited
+      .find((entry) => entry.target.targetTable === result.targetTable)?.target.invitation;
+    if (invitation === 'retry') counters.canonicalRetryApplied += 1;
+  }
+
+  // S6: what the derived recompute must cover. A player unit names its
+  // player; a match unit names its canonical match, which the map above now
+  // knows whether this run inserted it or it already existed.
+  if (unitApplied) {
+    if (projected.family === 'player_match_stats') {
+      derived.playerIds.add(projected.playerId);
+    } else {
+      const matchId = refs.matchIdsByKey.get(matchKey);
+      if (matchId !== undefined) derived.matchIds.add(matchId);
+    }
+  }
+
+  // §9.1. The unit rolled back: no canonical row, no ledger row, one finding
+  // per target that was in it, and the run continues.
+  if (outcome.failure !== null) {
+    counters.canonicalApplyFailures += 1;
+    for (const entry of invited) {
+      await writeSettleDataIssue(tx, {
+        entityType: entry.target.targetTable,
+        entityId: entry.pass.resolvedTarget.targetId,
+        issueType: CANONICAL_APPLY_ISSUE_TYPE,
+        issueKey: canonicalApplyIssueKey(
+          input.wireFamily, input.record.externalRecordId, entry.target.targetTable,
+        ),
+        severity: 'error',
+        description:
+          `The automatic canonical application of ${entry.target.targetTable} `
+          + `'${input.record.externalRecordId}' failed and was rolled back.`,
+        details: {
+          owner: CANONICAL_APPLY_ISSUE_OWNER,
+          source_key: SETTLE_SOURCE_KEY,
+          family: contractFamilyOf(input.wireFamily),
+          external_record_id: input.record.externalRecordId,
+          target_table: entry.target.targetTable,
+          failed_target_table: outcome.failure.targetTable,
+          source_version_seq: entry.target.sourceVersionSeq,
+          fields: [...entry.target.renderedFields],
+          error: outcome.failure.message,
+        },
+      }, counters);
+    }
+  }
+
+  return applied;
 }
 
 /* -- projection writers (upsert only — O1) ---------------------------- */
@@ -2077,6 +2616,7 @@ async function resolveTarget(
           },
           targetId: null,
           targetValues: null,
+          pendingMatch: false,
         };
       }
       const [row] = await tx<{ ownerSourceId: number | null }[]>`
@@ -2088,17 +2628,18 @@ async function resolveTarget(
           status: 'resolved',
           entity: 'matches',
           targetKey: { match_key: projected.projection.matchKey },
-          ownership: ownershipOf(targetTable, refs, row?.ownerSourceId ?? null),
+          ownership: ownershipOf(refs, row?.ownerSourceId ?? null),
         },
         targetId: matchId,
         targetValues: current,
+        pendingMatch: false,
       };
     }
     // match_period_scores keys on match_id, so without a canonical match the
     // target identity does not resolve at all.
     if (matchId === null) {
       counters.unresolvedIdentityMatch += 1;
-      return unresolved('no canonical match exists for this match_key yet');
+      return unresolved('no canonical match exists for this match_key yet', true);
     }
     // Selected with the SAME key names the proposal uses, so `diffFields()`
     // compares like with like. An aliased column would never match and every
@@ -2106,22 +2647,44 @@ async function resolveTarget(
     const rows = await tx<{
       club_id: number; period: number;
       goals: number | null; behinds: number | null; points: number | null;
+      source_id: number | null;
     }[]>`
-      SELECT club_id, period, goals, behinds, points
+      SELECT club_id, period, goals, behinds, points, source_id
         FROM match_period_scores WHERE match_id = ${matchId}
        ORDER BY club_id, period
     `;
+    // S3: migration 083 gave this target the provenance quartet. The whole
+    // period set is ONE target keyed on match_id, so its ownership is the
+    // ownership of the rows that make it up: a single readable owner shared by
+    // every row is that owner; anything else -- a mixed set, or an owner id
+    // with no readable key -- is indeterminate and fails closed. A set with no
+    // rows at all cannot be reached here, because `targetEstablishedBySource()`
+    // routes an unpublished period set to `new_target` instead.
+    const owners = new Set(rows.map((row) => row.source_id));
+    const ownership: TargetOwnership = owners.size === 1
+      ? ownershipOf(refs, [...owners][0])
+      : { state: 'indeterminate' };
+    // `source_id` is read for ownership ONLY and is deliberately dropped here:
+    // `period_scores` is compared field-for-field against
+    // `proposedPeriodScoreValues()`, which carries no provenance, so leaving it
+    // in would make every run look like a correction.
+    const compared = rows.map((row) => ({
+      club_id: row.club_id,
+      period: row.period,
+      goals: row.goals,
+      behinds: row.behinds,
+      points: row.points,
+    }));
     return {
       identity: {
         status: 'resolved',
         entity: 'match_period_scores',
         targetKey: { match_id: matchId },
-        // F5: no source_id column, so ownership is INDETERMINATE, never
-        // 'unowned'. This fails closed to foreign_owned_collision.
-        ownership: ownershipOf(targetTable, refs, null),
+        ownership,
       },
       targetId: matchId,
-      targetValues: { period_scores: [...rows] as unknown as JsonValue },
+      targetValues: { period_scores: compared as unknown as JsonValue },
+      pendingMatch: false,
     };
   }
 
@@ -2129,7 +2692,7 @@ async function resolveTarget(
   if (targetTable === 'player_match_stats') {
     if (matchId === null) {
       counters.unresolvedIdentityMatch += 1;
-      return unresolved('no canonical match exists for this match_key yet');
+      return unresolved('no canonical match exists for this match_key yet', true);
     }
     const [row] = await tx<Record<string, JsonValue>[]>`
       SELECT * FROM player_match_stats
@@ -2144,6 +2707,7 @@ async function resolveTarget(
         },
         targetId: null,
         targetValues: null,
+        pendingMatch: false,
       };
     }
     const values: Record<string, JsonValue> = {};
@@ -2156,20 +2720,22 @@ async function resolveTarget(
         entity: 'player_match_stats',
         targetKey: { player_id: projected.playerId, match_id: matchId },
         ownership: ownershipOf(
-          targetTable, refs,
-          (row as unknown as { source_id: number | null }).source_id ?? null,
+          refs, (row as unknown as { source_id: number | null }).source_id ?? null,
         ),
       },
       targetId: (row as unknown as { id: number }).id,
       targetValues: values,
+      pendingMatch: false,
     };
   }
 
   const vote = projected.projection.brownlowRoundVote;
   /* c8 ignore next */
   if (vote === null) return unresolved('the source published no round vote');
-  const [row] = await tx<{ id: number; played: boolean; votes: number | null }[]>`
-    SELECT id, played, votes FROM brownlow_round_votes
+  const [row] = await tx<{
+    id: number; played: boolean; votes: number | null; source_id: number | null;
+  }[]>`
+    SELECT id, played, votes, source_id FROM brownlow_round_votes
      WHERE season = ${vote.season} AND player_id = ${projected.playerId}
        AND round_number = ${vote.roundNumber}
   `;
@@ -2184,6 +2750,7 @@ async function resolveTarget(
       },
       targetId: null,
       targetValues: null,
+      pendingMatch: false,
     };
   }
   return {
@@ -2193,11 +2760,12 @@ async function resolveTarget(
       targetKey: {
         season: vote.season, player_id: projected.playerId, round_number: vote.roundNumber,
       },
-      // F5 again: no source_id column on this target either.
-      ownership: ownershipOf(targetTable, refs, null),
+      // S3: migration 083 gave this target source_id too.
+      ownership: ownershipOf(refs, row.source_id),
     },
     targetId: row.id,
     targetValues: { played: row.played, votes: row.votes },
+    pendingMatch: false,
   };
 }
 
@@ -2286,7 +2854,7 @@ async function corroborationClaims(
  * There is no DELETE and no TRUNCATE on any path (obligation O1). A
  * disagreement that stops reproducing is resolved in place, never removed.
  */
-async function writeDisagreementIssue(
+async function writeSettleDataIssue(
   tx: Tx, draft: SettleDataIssueDraft, counters: SettleCounters,
 ): Promise<void> {
   const [written] = await tx<{ inserted: boolean }[]>`
@@ -2350,33 +2918,111 @@ async function resolveRestoredDisagreements(
 
 /* -- outcome recording ------------------------------------------------ */
 
-async function recordOutcome(
-  tx: Tx,
-  input: {
-    contract: SourceFamilyContract;
-    /** The dotted wire family, which `settleIssueKey()` narrows to the contract family. */
-    wireFamily: string;
-    record: BundleRecord;
-    targetTable: SettleTargetTable;
-    outcome: ReconciliationOutcome;
-    resolvedTarget: ResolvedTarget;
-    /** Exactly the values corroboration was classified over. */
-    proposedValues: Readonly<Record<string, JsonValue>>;
-    claims: readonly ProviderClaim[];
-    season: number;
-    refs: SettleRefs;
-    batchId: ImportBatchId;
-    counters: SettleCounters;
-  },
+type RecordOutcomeInput = {
+  contract: SourceFamilyContract;
+  /** The dotted wire family, which `settleIssueKey()` narrows to the contract family. */
+  wireFamily: string;
+  record: BundleRecord;
+  targetTable: SettleTargetTable;
+  outcome: ReconciliationOutcome;
+  resolvedTarget: ResolvedTarget;
+  /** Exactly the values corroboration was classified over. */
+  proposedValues: Readonly<Record<string, JsonValue>>;
+  claims: readonly ProviderClaim[];
+  season: number;
+  refs: SettleRefs;
+  batchId: ImportBatchId;
+  counters: SettleCounters;
+  /**
+   * AFLDB-ISSUE-122 S5: what the applier did with this target, or null when
+   * the automatic path was off or never offered it.
+   */
+  application: CanonicalApplyTargetResult | null;
+};
+
+/**
+ * §13 / §10 — open or refresh the corroboration finding, for ANY outcome that
+ * carries a report with disagreeing groups.
+ *
+ * Deliberately not keyed off the refusal verb (ISSUE-122 §10, stage S4). Under
+ * `corroboration_policy: "blocking"` the two are the same thing and the
+ * behaviour is byte-identical to ISSUE-099. Under `advisory` the veto is
+ * withdrawn and the outcome is a candidate — which S5 may now APPLY — that
+ * still carries the same report, so the evidence must still be recorded.
+ * Keying it off the verb, or off whether the write happened, would silently
+ * stop opening findings the moment the veto was removed, which is exactly the
+ * outcome §10 forbids: evidence preserved, only the veto removed.
+ *
+ * `entity_id` is the RESOLVED target id, not the candidate's: a candidate
+ * carrying a refusal verb reports no target id at all, but a disagreement
+ * about an existing canonical row must name that row. It is NULL only when the
+ * target genuinely does not exist yet.
+ */
+async function recordDisagreementFinding(
+  tx: Tx, input: RecordOutcomeInput,
 ): Promise<void> {
+  const { outcome } = input;
+  if (outcome.kind !== 'candidate' && outcome.kind !== 'refusal') return;
+  const report = outcome.kind === 'candidate'
+    ? outcome.proposal.corroboration
+    : outcome.corroboration;
+  if (report === null || report.disagreeingGroups.length === 0) return;
+  // S6 counter. Under `advisory` the finding is evidence without a veto; the
+  // blocking case is already counted as `sourceDisagreement` by the refusal
+  // switch in `recordOutcome()`, so the two never count the same finding.
+  if (input.contract.corroborationPolicy === 'advisory') {
+    input.counters.advisoryDisagreement += 1;
+  }
+  await writeSettleDataIssue(tx, draftDisagreementIssue({
+    wireFamily: input.wireFamily,
+    externalRecordId: input.record.externalRecordId,
+    targetTable: input.targetTable,
+    targetId: input.resolvedTarget.targetId,
+    // The same version the candidate names, from the same decision, so the
+    // finding and the proposal can never cite different evidence.
+    sourceVersionSeq: outcome.observation?.versionSeq ?? null,
+    proposedValues: input.proposedValues,
+    claims: input.claims,
+    corroboration: report,
+  }), input.counters);
+}
+
+/**
+ * §9.3 — an apply failure that has since succeeded is RESOLVED, never deleted.
+ *
+ * Ownership-scoped exactly as `resolveRestoredDisagreements()` is: the
+ * predicate names this writer's own `issue_type` and its own `owner` stamp, so
+ * the applier can only ever close a finding it wrote. A row already closed by
+ * an earlier run, or by a super admin, is not closed a second time, which is
+ * what keeps the counter idempotent.
+ */
+async function resolveAppliedFailureFinding(
+  tx: Tx, input: RecordOutcomeInput,
+): Promise<void> {
+  const resolved = await tx<{ id: string }[]>`
+    UPDATE data_issues
+       SET resolved_at = now(), resolution = 'canonical_apply_succeeded'
+     WHERE issue_type = ${CANONICAL_APPLY_ISSUE_TYPE}
+       AND issue_key = ${canonicalApplyIssueKey(
+    input.wireFamily, input.record.externalRecordId, input.targetTable,
+  )}
+       AND resolved_at IS NULL
+       AND details->>'owner' = ${CANONICAL_APPLY_ISSUE_OWNER}
+    RETURNING id
+  `;
+  input.counters.dataIssuesResolved += resolved.length;
+}
+
+async function recordOutcome(tx: Tx, input: RecordOutcomeInput): Promise<void> {
   const {
     contract, record, targetTable, outcome, resolvedTarget, season, refs, batchId, counters,
   } = input;
-  if (outcome.kind === 'unchanged') {
+  const applied = input.application?.applied === true;
+  if (outcome.kind === 'unchanged' && !applied) {
     counters.observationsUnchanged += 1;
     return;
   }
-  if (outcome.kind === 'history_only') {
+  if (outcome.kind === 'history_only' && !applied) {
     // The payload moved but no projected fact did. History advances, and an
     // existing pending candidate is LEFT IN PLACE (F7) — no machine
     // retirement, no fabricated admin decision, no empty replacement.
@@ -2386,6 +3032,40 @@ async function recordOutcome(
   }
   if (outcome.kind === 'absent') {
     // §18.2: absence is observation state only. No candidate, ever.
+    return;
+  }
+
+  // §5.2 — BINDING. A successfully auto-applied record creates NO promotion
+  // candidate, and never marks one accepted. The automatic path must not write
+  // a review row and then decide it itself: `promotion_decisions` stays the
+  // human ledger, `admin_user_id` stays NOT NULL, and no machine decision is
+  // ever fabricated (SC8).
+  //
+  // Everything that is EVIDENCE rather than review still happens. The
+  // corroboration finding is opened or refreshed below on exactly the same
+  // terms — an advisory disagreement does not veto the write, and §10's
+  // "evidence is preserved, only the veto is removed" would be hollow if a
+  // successful write silenced it. An existing pending candidate is LEFT
+  // pending under the F7 rule and reported as moot; it is not machine-retired.
+  //
+  // S6: this branch is reached for EVERY applied target, the §9.3 retry
+  // included. A retry's observation is `unchanged` (the payload never moved)
+  // and is counted as such — but its canonical effect is real, so its moot
+  // candidate is counted and its own earlier `canonical_apply_failed` finding
+  // is resolved here, not skipped by the observation-only early returns above.
+  if (applied) {
+    if (outcome.kind === 'candidate') counters.observationsCorrected += 1;
+    if (outcome.kind === 'unchanged') counters.observationsUnchanged += 1;
+    if (outcome.kind === 'history_only') counters.observationsHistoryOnly += 1;
+    await recordDisagreementFinding(tx, input);
+    await resolveAppliedFailureFinding(tx, input);
+    const [pending] = await tx<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM promotion_candidates
+       WHERE source_id = ${refs.sourceId} AND family = ${contract.family}
+         AND external_record_id = ${record.externalRecordId}
+         AND target_table = ${targetTable} AND status = 'pending'
+    `;
+    if ((pending?.n ?? 0) > 0) counters.candidatesMootLeftPending += 1;
     return;
   }
 
@@ -2406,31 +3086,9 @@ async function recordOutcome(
         counters.foreignOwnedCollision += 1;
         break;
       case 'source_disagreement':
+        // The blocking veto fired. The finding itself is opened below, for
+        // every outcome that carries one — see the note there.
         counters.sourceDisagreement += 1;
-        // §13: the ONE case Decision C names for data_issues. The refusal
-        // candidate below is still created, so the reviewer sees both the
-        // blocked proposal and the deduplicated finding behind it.
-        //
-        // `entity_id` is the RESOLVED target id, not the candidate's: a
-        // candidate carrying a refusal verb reports no target id at all, but
-        // a disagreement about an existing canonical row must name that row.
-        // It is NULL only when the target genuinely does not exist yet.
-        await writeDisagreementIssue(tx, draftDisagreementIssue({
-          wireFamily: input.wireFamily,
-          externalRecordId: record.externalRecordId,
-          targetTable,
-          targetId: resolvedTarget.targetId,
-          // The same version the candidate names, from the same decision, so
-          // the finding and the proposal can never cite different evidence.
-          sourceVersionSeq: outcome.observation?.versionSeq ?? null,
-          proposedValues: input.proposedValues,
-          claims: input.claims,
-          // Non-null for this verb: `reconcile()` reaches it only by
-          // classifying corroboration.
-          corroboration: outcome.corroboration ?? fail(
-            'A source_disagreement must carry the corroboration report that raised it.',
-          ),
-        }), counters);
         break;
       case 'manual_authority_conflict':
         counters.manualAuthorityRefusals += 1;
@@ -2441,6 +3099,25 @@ async function recordOutcome(
   } else {
     counters.observationsCorrected += 1;
   }
+
+  // §13: the ONE case Decision C names for data_issues, opened from the
+  // CORROBORATION REPORT rather than from the refusal verb (ISSUE-122 §10, S4).
+  //
+  // Under `corroboration_policy: "blocking"` these are the same thing and the
+  // behaviour is byte-identical to ISSUE-099: the veto fires, the outcome is a
+  // `source_disagreement` refusal, and this opens the finding behind it.
+  // Under `advisory` the veto is withdrawn and the outcome is a candidate (or
+  // a later refusal such as `manual_authority_conflict`) that still carries
+  // the same report — so the evidence must still be recorded. Keying it off
+  // the verb would have silently stopped opening findings the moment the veto
+  // was removed, which is exactly the outcome §10 forbids: evidence preserved,
+  // only the veto removed.
+  //
+  // `entity_id` is the RESOLVED target id, not the candidate's: a candidate
+  // carrying a refusal verb reports no target id at all, but a disagreement
+  // about an existing canonical row must name that row. It is NULL only when
+  // the target genuinely does not exist yet.
+  await recordDisagreementFinding(tx, input);
 
   const candidate = draftCandidate({
     contract,

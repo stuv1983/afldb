@@ -36,6 +36,7 @@ function readSource(path: string): string {
 const tool = readSource('tools/current-season/update-current-season.ts');
 const importer = readSource('src/lib/external-afl/current-season-import.ts');
 const adminAction = readSource('src/app/admin/current-season/actions.ts');
+const adminControls = readSource('src/app/admin/current-season/CurrentSeasonControls.tsx');
 const adminPage = readSource('src/app/admin/current-season/page.tsx');
 const adminNav = readSource('src/app/admin/nav-model.ts');
 const migration = readSource('src/db/migrations/063_external_current_match_sources.sql');
@@ -67,12 +68,11 @@ describe('current-season external source import contracts', () => {
     expect(tool).not.toContain('window.');
   });
 
-  it('stages external payloads before updating local matches', () => {
+  it('stages external payloads without mutating canonical matches', () => {
     expect(migration).toContain('CREATE TABLE staging.external_current_matches');
     expect(migration).toContain('raw_payload        jsonb        NOT NULL');
     expect(importer).toContain('INSERT INTO staging.external_current_matches');
-    expect(importer.indexOf('INSERT INTO staging.external_current_matches'))
-      .toBeLessThan(importer.indexOf('UPDATE matches'));
+    expect(importer).not.toMatch(/\b(?:INSERT INTO|UPDATE|DELETE FROM) matches\b/);
   });
 
   it('writes immutable observation history before refreshing the legacy projection', () => {
@@ -113,9 +113,12 @@ describe('current-season external source import contracts', () => {
     expect(importer).not.toMatch(/DELETE FROM staging\.(source_records|source_record_versions|source_payloads)/);
   });
 
-  it('only applies final-score updates when explicitly requested', () => {
-    expect(tool).toContain("argv.includes('--update-matches')");
-    expect(importer).toContain('if (updateMatches) {');
+  it('explicitly refuses the retired --update-matches flag (AFLDB-ISSUE-122)', () => {
+    expect(tool).toContain("if (argv.includes('--update-matches'))");
+    expect(tool).toContain('--update-matches is deprecated by AFLDB-ISSUE-122');
+    expect(tool).toContain('cannot write canonical matches');
+    expect(tool).not.toContain("updateMatches: argv.includes('--update-matches')");
+    expect(importer).not.toContain('updateMatches');
   });
 
   it('accounts for AFLDB counting Opening Round as round 1 from 2024 onward', () => {
@@ -140,10 +143,10 @@ describe('current-season external source import contracts', () => {
     expect(importer).toContain("status: 'incomplete_source_family'");
   });
 
-  it('records source and import-batch provenance on local score updates', () => {
-    expect(importer).toContain('source_id = ${sourceId}');
-    expect(importer).toContain('source_record_id = ${match.externalGameId}');
-    expect(importer).toContain('import_batch_id = ${batchId}');
+  it('retains source and import-batch provenance in observation and staging writes', () => {
+    expect(importer).toContain('persistSourceObservation(\n        tx, matchObservation(sourceId, match), batchId, observedAt,');
+    expect(importer).toContain('INSERT INTO staging.external_current_matches');
+    expect(importer).toContain('${sourceId}, ${match.externalGameId}');
   });
 
   it('exposes the refresh only through a super-admin server action', () => {
@@ -154,11 +157,14 @@ describe('current-season external source import contracts', () => {
     expect(adminNav).toContain("href: '/admin/current-season'");
   });
 
-  it('keeps the admin auto path server-side and non-destructive by default', () => {
+  it('keeps the admin path server-side and staging/diagnostic only', () => {
     expect(adminAction).toContain("mode === 'auto'");
     expect(adminAction).toContain("? ['kali'] as const");
-    expect(adminAction).toContain("const updateMatches = mode !== 'auto'");
-    expect(adminPage).toContain('Existing final scores are left alone');
+    expect(adminAction).not.toContain('updateMatches');
+    expect(adminControls).not.toContain('updateMatches');
+    expect(adminControls).not.toContain('Overwrite existing resolved final scores');
+    expect(adminPage).toContain('deprecated fallback sources');
+    expect(adminPage).toContain('never insert or update');
   });
 
   it('adds provenance columns to matches in a forward-only migration', () => {
@@ -432,27 +438,28 @@ describe('Placeholder and Dry-Run Resolution Logic', () => {
   });
 });
 
-describe('Update logic genuine-change and disagreements', () => {
-  it('No-op canonical update: skips update if scores match identically', () => {
-    expect(importer).toContain('const scoreChanged = current.homeScore !== agreedHomeScore');
-    expect(importer).toContain('if (!scoreChanged && !componentsChanged) {\n          continue;\n        }');
+describe('Retired canonical writer and retained diagnostic corroboration', () => {
+  it('keeps legacy canonical insert and update counters structurally zero', () => {
+    expect(importer).toContain('canonicalRowsInserted: 0;');
+    expect(importer).toContain('canonicalRowsUpdated: 0;');
+    expect(importer).toContain('canonicalRowsUpdated: 0,');
   });
 
-  it('Genuine score correction: updates canonical if score changes', () => {
-    expect(importer).toContain('if (!scoreChanged && !componentsChanged) {\n          continue;\n        }');
-    expect(importer).toContain('UPDATE matches');
-    expect(importer).toContain('home_score = ${agreedHomeScore}');
+  it('contains no canonical matches mutation or replacement writer', () => {
+    expect(importer).not.toMatch(/\b(?:INSERT INTO|UPDATE|DELETE FROM) matches\b/);
+    expect(importer).not.toContain('refreshSeasonMetadata(');
   });
 
-  it('deduplicates candidate processing to one canonical match operation', () => {
-    expect(importer).toContain('const updatesByLocalMatchId = new Map<number, MatchCandidate[]>();');
-    expect(importer).toContain('appendCandidate(updatesByLocalMatchId, localMatchId');
-    expect(importer).toContain('for (const [localMatchId, candidates] of updatesByLocalMatchId.entries())');
+  it('deduplicates diagnostic candidate analysis at canonical match identity grain', () => {
+    expect(importer).toContain('const candidateSets = new Map<string, MatchCandidate[]>();');
+    expect(importer).toContain('appendCandidate(candidateSets, `resolved:${observation.localMatchId}`');
+    expect(importer).toContain('for (const [key, candidates] of candidateSets)');
   });
 
-  it('does not update when independent groups disagree', () => {
-    expect(importer).toContain('if (corroboration.disagreeingGroups.length > 0) {\n          continue;\n        }');
+  it('retains independent-source disagreement diagnostics without a write path', () => {
+    expect(importer).toContain('const hasIndependentDisagreement = corroboration.disagreeingGroups.length > 0;');
     expect(importer).toContain('sourceDisagreements: canonicalPlan.sourceDisagreements');
+    expect(importer).not.toContain('if (updateMatches)');
   });
 
   it('Orientation reversal: correctly aligns home/away before comparison', () => {
@@ -461,9 +468,13 @@ describe('Update logic genuine-change and disagreements', () => {
     expect(importer).toContain('awayScore: sameOrientation ? match.awayScore : match.homeScore');
   });
 
-  it('Null score components: does not silently overwrite known canonical components', () => {
-    expect(importer).toContain('agreedHomeGoals = agreedHomeGoals ?? current.homeGoals;');
-    expect(importer).toContain('agreedAwayBehinds = agreedAwayBehinds ?? current.awayBehinds;');
+  it('retains partial score components as corroboration evidence', () => {
+    const partial = currentSeasonObservation('squiggle_api', 'match', 'partial');
+    partial.values.homeGoals = null;
+    partial.values.awayBehinds = null;
+    const complete = currentSeasonObservation('kali_afl_stats', 'match', 'complete');
+
+    expect(analyseCurrentSeasonCorroboration([partial, complete]).values).toEqual(complete.values);
   });
 
   it('independent-source disagreement blocks unsafe missing-match work', () => {
@@ -645,8 +656,9 @@ describe('AFLDB-ISSUE-097 current-season independence-group corroboration', () =
     expect(result.independentlyCorroborated).toBe(false);
     expect(result.values).toBeNull();
     expect(importer).toContain(
-      'if (corroboration.sameGroupConflictGroups.length > 0) {\n          continue;\n        }',
+      'const hasSameGroupConflict = corroboration.sameGroupConflictGroups.length > 0;',
     );
+    expect(importer).toContain('if (hasIndependentDisagreement || hasSameGroupConflict) rejectedOrConflicted += 1;');
     expect(importer).not.toContain('INSERT INTO matches');
   });
 });
@@ -1474,6 +1486,7 @@ import {
   type IdentityResolution,
   type ReconcileInput,
   type ReconciliationOutcome,
+  type TargetOwnership,
 } from '@/lib/acquisition/reconciliation';
 
 const reconciliationSource = readSource('src/lib/acquisition/reconciliation.ts');
@@ -1823,6 +1836,49 @@ describe('S3 reconciliation — refusals fail closed', () => {
     expect(drift.proposal.corroboration).toMatchObject({
       disagreeingGroups: [], sameGroupConflicts: ['kali_afl_stats'],
     });
+  });
+
+  it('lets an ADVISORY family through a disagreement, keeping every piece of evidence', () => {
+    /*
+     * AFLDB-ISSUE-122 §10 (stage S4), approved decision 5. Squiggle and Kali
+     * are being retired and must never be able to veto the source replacing
+     * them, nor become a prerequisite for it. The two AFL Tables families
+     * therefore declare `corroboration_policy: "advisory"`.
+     *
+     * `advisory` withdraws the VETO and nothing else. Everything the blocking
+     * case above records is still recorded here, on the candidate.
+     */
+    expect(afltablesMatch.corroborationPolicy).toBe('advisory');
+    expect(squiggleMatch.corroborationPolicy).toBe('blocking');
+
+    const authority = authoritySpy('clear');
+    const proceeded = candidateOf(reconcile(reconcileInput({
+      contract: afltablesMatch,
+      identity: { ...RESOLVED_TARGET, ownership: { state: 'owned', sourceKey: 'afltables' } },
+      corroboration: [{ contract: kaliMatch, values: { away_score: 71 } }],
+      manualAuthority: authority.provider,
+    })));
+    expect(proceeded.verb).toBe('corrected');
+    // The report still travels, so the settle caller still opens and
+    // deduplicates the source_disagreement data_issue from it.
+    expect(proceeded.proposal.corroboration)
+      .toMatchObject({ ownGroup: 'afltables', disagreeingGroups: ['kali'] });
+    // And the veto being gone does not skip the gate AFTER it: human
+    // authority is still asked, and is still the strongest word.
+    expect(authority.asked).toHaveLength(1);
+    expect(refusalOf(reconcile(reconcileInput({
+      contract: afltablesMatch,
+      identity: { ...RESOLVED_TARGET, ownership: { state: 'owned', sourceKey: 'afltables' } },
+      corroboration: [{ contract: kaliMatch, values: { away_score: 71 } }],
+      manualAuthority: UNAVAILABLE_MANUAL_AUTHORITY,
+    }))).verb).toBe('manual_authority_conflict');
+
+    // Nor does it weaken any gate BEFORE it: ownership still refuses first.
+    expect(refusalOf(reconcile(reconcileInput({
+      contract: afltablesMatch,
+      identity: { ...RESOLVED_TARGET, ownership: { state: 'owned', sourceKey: 'sports_data_lab' } },
+      corroboration: [{ contract: kaliMatch, values: { away_score: 71 } }],
+    }))).verb).toBe('foreign_owned_collision');
   });
 
   it('never lets provider agreement substitute for human authority', () => {
@@ -2554,8 +2610,14 @@ describe('S4 promotion decisions — append-only, and never an accept', () => {
  * projection rules. Every fixture is a literal and every call is pure — no
  * snapshot on disk, no database, no clock.
  */
+import { CANONICAL_TARGET_TABLES } from '@/lib/acquisition/canonical-apply';
 import {
   agreementRestored,
+  autoApplyOwnership,
+  canonicalApplyIssueKey,
+  CANONICAL_APPLY_ISSUE_TYPE,
+  MATCH_TARGET_TABLES,
+  PLAYER_MATCH_TARGET_TABLES,
   contractFamilyOf,
   disagreementConflicts,
   disagreementSeverity,
@@ -2580,7 +2642,6 @@ import {
   PLAYER_MATCH_STAT_COLUMNS,
   SETTLE_ISSUE_OWNER,
   SETTLE_ISSUE_TYPE,
-  TARGETS_WITHOUT_SOURCE_ID,
   type SettleTargetTable,
 } from '@/lib/acquisition/settle-afltables';
 
@@ -2886,17 +2947,68 @@ describe('AFLDB-ISSUE-099 settle — presence and projection are separate facts 
 });
 
 describe('AFLDB-ISSUE-099 settle — ownership, data_issues identity and corroboration', () => {
-  it('supplies indeterminate ownership for a target that carries no source_id column', () => {
-    expect(TARGETS_WITHOUT_SOURCE_ID).toEqual(['match_period_scores', 'brownlow_round_votes']);
-    for (const target of TARGETS_WITHOUT_SOURCE_ID) {
-      // Never 'unowned': a table with no provenance column has not DECLARED an
-      // absence of ownership, it cannot answer. Indeterminate fails closed.
-      expect(ownershipForTarget(target, null)).toEqual({ state: 'indeterminate' });
-      expect(ownershipForTarget(target, 'afltables')).toEqual({ state: 'indeterminate' });
-    }
-    expect(ownershipForTarget('matches', null)).toEqual({ state: 'unowned' });
-    expect(ownershipForTarget('matches', 'squiggle_api'))
+  it('reads ownership uniformly now that every target carries source_id (S3)', () => {
+    // ISSUE-122 S3: migration 083 gave match_period_scores and
+    // brownlow_round_votes the provenance quartet, so the blanket
+    // TARGETS_WITHOUT_SOURCE_ID indeterminacy is gone and the reading is one
+    // rule for all four targets. NULL is a DECLARED absence of ownership,
+    // which the GENERIC gate still admits (see autoApplyOwnership below for
+    // the automatic path, which does not).
+    expect(ownershipForTarget(null)).toEqual({ state: 'unowned' });
+    expect(ownershipForTarget('afltables')).toEqual({ state: 'owned', sourceKey: 'afltables' });
+    expect(ownershipForTarget('squiggle_api'))
       .toEqual({ state: 'owned', sourceKey: 'squiggle_api' });
+  });
+
+  describe('E3 — the automatic-path ownership predicate (§5.1, §7.2)', () => {
+    const resolved = (ownership: TargetOwnership) => ({
+      status: 'resolved' as const,
+      entity: 'matches',
+      targetKey: { match_key: MATCH_RECORD },
+      ownership,
+    });
+
+    it('treats an absent canonical row as insertable: an INSERT adopts nothing', () => {
+      expect(autoApplyOwnership({
+        status: 'new_target', entity: 'matches', targetKey: { match_key: MATCH_RECORD },
+      }, 'afltables')).toEqual({ verdict: 'insertable' });
+    });
+
+    it('treats an afltables-owned row as updateable', () => {
+      expect(autoApplyOwnership(resolved({ state: 'owned', sourceKey: 'afltables' }), 'afltables'))
+        .toEqual({ verdict: 'updateable' });
+    });
+
+    it('refuses a row owned by another source', () => {
+      expect(autoApplyOwnership(
+        resolved({ state: 'owned', sourceKey: 'squiggle_api' }), 'afltables',
+      )).toEqual({ verdict: 'refused', detail: 'foreign_source_owner' });
+    });
+
+    it('refuses source_id IS NULL, which the generic gate admits', () => {
+      // The whole point of E3. applyDataEdit does not re-stamp
+      // matches.source_id for the score group, createMatch writes no
+      // provenance at all, and afldb_import cannot read data_edits, so NULL
+      // means "provenance unknown", never "free to adopt".
+      expect(autoApplyOwnership(resolved({ state: 'unowned' }), 'afltables'))
+        .toEqual({ verdict: 'refused', detail: 'ownership_indeterminate' });
+      // Proven divergent from the generic gate on the same input.
+      expect(evaluateTargetOwnership({ state: 'unowned' }, 'afltables').verdict).toBe('ok');
+    });
+
+    it('refuses an unreadable owner and an unresolved identity', () => {
+      expect(autoApplyOwnership(resolved({ state: 'indeterminate' }), 'afltables'))
+        .toEqual({ verdict: 'refused', detail: 'ownership_indeterminate' });
+      expect(autoApplyOwnership(
+        { status: 'unresolved', reason: 'no canonical match exists for this match_key yet' },
+        'afltables',
+      )).toEqual({ verdict: 'refused', detail: 'ownership_indeterminate' });
+    });
+
+    it('refuses to answer without the source it is applying for', () => {
+      expect(() => autoApplyOwnership(resolved({ state: 'unowned' }), ''))
+        .toThrow(/name the source/);
+    });
   });
 
   it('derives one stable data_issues key per source, family, record and target', () => {
@@ -3461,5 +3573,477 @@ describe('import-batch ids are opaque identifiers at the driver boundary', () =>
       expect(source, `${name} must not parse a batch id as an integer`)
         .not.toMatch(/parseInt\((batch\.id|batchId|runBatchId)/);
     }
+  });
+});
+
+
+/*
+ * AFLDB-ISSUE-122 S2 — the manual-authority provider, DB-free.
+ *
+ * The §17 home for "registry + reconciliation, DB-free" also owns this: the
+ * whole verdict truth table is pure once the snapshot is in hand, and the two
+ * contracts §8 leans on (migration 073's CHECK, and the editor spec's entity
+ * set) are pinned here as literals so a silent widening fails a test rather
+ * than silently converting a proof into an assumption.
+ */
+import {
+  checkAdmitsExactly,
+  editorEntityKeys,
+  editorSpecMatchesOverrideScope,
+  manualAuthorityVerdict,
+  matchFieldGroupsFor,
+  matchGroupKeys,
+  refusingProvider,
+  MANUAL_ATTENDANCE_SOURCE_KEY,
+  OVERRIDE_ENTITY_TYPES,
+  UNREPRESENTABLE_OVERRIDE_ENTITIES,
+  type ManualAuthoritySnapshot,
+} from '@/lib/acquisition/manual-authority';
+
+const overridesMigration = readSource('src/db/migrations/073_data_overrides.sql');
+
+function authoritySnapshot(over: Partial<ManualAuthoritySnapshot> = {}): ManualAuthoritySnapshot {
+  return {
+    overrideScopeProven: true,
+    matchOverrides: new Map(),
+    manualAttendanceMatches: new Set(),
+    ...over,
+  };
+}
+
+function matchQuery(fields: readonly string[], matchKey = '2026|1|CARL|COLL') {
+  return { entity: 'matches', targetKey: { match_key: matchKey }, fields };
+}
+
+describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', () => {
+  it('pins migration 073 entity_type CHECK to exactly three entity types', () => {
+    expect(overridesMigration).toContain(
+      "entity_type     text   NOT NULL CHECK (entity_type IN ('players', 'matches', 'draft_picks'))",
+    );
+    expect([...OVERRIDE_ENTITY_TYPES]).toEqual(['draft_picks', 'matches', 'players']);
+  });
+
+  it('pins the editor spec to exactly the same three entities', () => {
+    expect(editorEntityKeys()).toEqual([...OVERRIDE_ENTITY_TYPES]);
+    expect(editorSpecMatchesOverrideScope()).toBe(true);
+    for (const entity of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
+      expect(editorEntityKeys()).not.toContain(entity);
+    }
+  });
+
+  it('pins the five matches field groups §8 maps proposals onto', () => {
+    expect(matchGroupKeys())
+      .toEqual(['attendance', 'match_event', 'match_time', 'notes', 'score']);
+  });
+
+  it('reads a live CHECK definition and refuses a widened or unreadable one', () => {
+    const admitted = "CHECK ((entity_type = ANY (ARRAY['players'::text, "
+      + "'matches'::text, 'draft_picks'::text])))";
+    expect(checkAdmitsExactly([admitted])).toBe(true);
+    // Widened to admit a settle target: the unrepresentability proof is gone.
+    expect(checkAdmitsExactly([
+      admitted.replace("'draft_picks'::text", "'draft_picks'::text, 'player_match_stats'::text"),
+    ])).toBe(false);
+    // Narrowed, absent, or ambiguous — every one of them refuses.
+    expect(checkAdmitsExactly([
+      "CHECK ((entity_type = ANY (ARRAY['players'::text, 'matches'::text])))",
+    ])).toBe(false);
+    expect(checkAdmitsExactly([])).toBe(false);
+    expect(checkAdmitsExactly(['CHECK ((is_active IS NOT NULL))'])).toBe(false);
+    expect(checkAdmitsExactly([admitted, admitted])).toBe(false);
+  });
+
+  it('maps only fields the editor actually exposes onto a field group', () => {
+    expect([...matchFieldGroupsFor(['attendance'])]).toEqual(['attendance']);
+    expect([...matchFieldGroupsFor(['home_goals'])]).toEqual(['score']);
+    expect([...matchFieldGroupsFor(['away_behinds', 'match_time'])].sort())
+      .toEqual(['match_time', 'score']);
+    // Source-owned columns no human can edit map to nothing at all.
+    expect([...matchFieldGroupsFor([
+      'round_code', 'venue_id', 'venue_raw', 'margin', 'result',
+      'attendance_status', 'attendance_source_id',
+    ])]).toEqual([]);
+  });
+});
+
+describe('AFLDB-ISSUE-122 §8 — the manual-authority truth table', () => {
+  it('is clear for a matches proposal no active override covers', () => {
+    expect(manualAuthorityVerdict(authoritySnapshot(), matchQuery(['home_goals']))).toBe('clear');
+  });
+
+  it('conflicts when a changed field falls inside an active override group', () => {
+    const state = authoritySnapshot({
+      matchOverrides: new Map([['2026|1|CARL|COLL', new Set(['score'])]]),
+    });
+    expect(manualAuthorityVerdict(state, matchQuery(['home_goals']))).toBe('conflict');
+    expect(manualAuthorityVerdict(state, matchQuery(['away_behinds', 'margin'])))
+      .toBe('conflict');
+    // A different group on the same match is untouched by that decision.
+    expect(manualAuthorityVerdict(state, matchQuery(['match_time']))).toBe('clear');
+    // And a different match entirely carries no decision at all.
+    expect(manualAuthorityVerdict(state, matchQuery(['home_goals'], '2026|1|GEEL|HAW')))
+      .toBe('clear');
+  });
+
+  it('conflicts on attendance already cited to the manual admin source', () => {
+    const state = authoritySnapshot({ manualAttendanceMatches: new Set(['2026|1|CARL|COLL']) });
+    expect(manualAuthorityVerdict(state, matchQuery(['attendance']))).toBe('conflict');
+    // Only the attendance field. Nothing else in the proposal is implicated.
+    expect(manualAuthorityVerdict(state, matchQuery(['home_goals']))).toBe('clear');
+    expect(MANUAL_ATTENDANCE_SOURCE_KEY).toBe('manual_admin_edit');
+  });
+
+  it('is indeterminate when an active override names an unmappable group', () => {
+    const state = authoritySnapshot({
+      matchOverrides: new Map([['2026|1|CARL|COLL', new Set(['retired_group'])]]),
+    });
+    expect(manualAuthorityVerdict(state, matchQuery(['home_goals']))).toBe('indeterminate');
+  });
+
+  it('is indeterminate for an unusable question', () => {
+    expect(manualAuthorityVerdict(authoritySnapshot(), matchQuery([]))).toBe('indeterminate');
+    expect(manualAuthorityVerdict(authoritySnapshot(), {
+      entity: 'matches', targetKey: {}, fields: ['home_goals'],
+    })).toBe('indeterminate');
+    expect(manualAuthorityVerdict(authoritySnapshot(), {
+      entity: 'matches', targetKey: { match_key: 42 }, fields: ['home_goals'],
+    })).toBe('indeterminate');
+    expect(manualAuthorityVerdict(authoritySnapshot(), {
+      entity: 'players', targetKey: { match_key: 'x' }, fields: ['home_goals'],
+    })).toBe('indeterminate');
+  });
+
+  it('answers clear for the three unrepresentable targets only while proven', () => {
+    for (const entity of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
+      expect(manualAuthorityVerdict(authoritySnapshot(), {
+        entity, targetKey: { match_id: 7 }, fields: ['goals'],
+      })).toBe('clear');
+      expect(manualAuthorityVerdict(authoritySnapshot({ overrideScopeProven: false }), {
+        entity, targetKey: { match_id: 7 }, fields: ['goals'],
+      })).toBe('indeterminate');
+    }
+  });
+
+  it('refuses everything when the authority state could not be read', () => {
+    const provider = refusingProvider();
+    expect(provider(matchQuery(['home_goals']))).toBe('indeterminate');
+    expect(provider({ entity: 'player_match_stats', targetKey: {}, fields: ['goals'] }))
+      .toBe('indeterminate');
+  });
+});
+
+describe('AFLDB-ISSUE-122 §8 — data_edits is not the authority source', () => {
+  const providerSource = readSource('src/lib/acquisition/manual-authority.ts');
+
+  it('reads data_overrides and never data_edits', () => {
+    expect(providerSource).toContain('FROM data_overrides');
+    expect(providerSource).not.toMatch(/FROM data_edits\b/);
+    expect(providerSource).not.toMatch(/JOIN data_edits\b/);
+  });
+
+  it('is wired into the settle CLI in place of the stub', () => {
+    const cli = readSource('tools/current-season/settle-afltables.ts');
+    expect(cli).toContain('manualAuthorityLoader: (tx) => loadManualAuthority(tx, bundle.season)');
+    const settle = readSource('src/lib/acquisition/settle-afltables.ts');
+    expect(settle).toContain('manualAuthority: await options.manualAuthorityLoader(tx)');
+  });
+});
+
+/* ================================================================== *
+ * AFLDB-ISSUE-122 S5 — the applier's DB-free contracts
+ * ================================================================== */
+
+/**
+ * The facts about `canonical-apply.ts` that must not drift and that need no
+ * database to check.
+ *
+ * The behavioural proofs — every gate, both savepoint boundaries, the ledger,
+ * the retry and the failure isolation — are in
+ * `tests/integration/settle-afltables.test.ts` against real PostgreSQL,
+ * because a canonical mutation is not a thing that can be proved in the
+ * abstract.
+ */
+describe('AFLDB-ISSUE-122 S5 — the canonical applier contract', () => {
+  const applier = readSource('src/lib/acquisition/canonical-apply.ts');
+  /**
+   * The module with its prose removed.
+   *
+   * The header and the per-writer comments NAME the things these assertions
+   * prove absent — `createMatch()`, `promotion_decisions` — so scanning the
+   * raw file would match its own documentation and pass or fail for the wrong
+   * reason. These assertions are about the code.
+   */
+  const applierCode = applier
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+  it('writes exactly the four targets the settle pass and migration 083 name', () => {
+    // `canonical-apply.ts` declares this union itself, so the dependency runs
+    // one way only: the settle pass imports the applier, never the reverse.
+    // That is only safe while the two agree, so they are pinned to each other
+    // here rather than left to a comment.
+    expect([...CANONICAL_TARGET_TABLES].sort()).toEqual(
+      [...MATCH_TARGET_TABLES, ...PLAYER_MATCH_TARGET_TABLES].sort(),
+    );
+    const ddl = readSource('src/db/migrations/083_canonical_auto_apply.sql');
+    for (const target of CANONICAL_TARGET_TABLES) {
+      expect(ddl).toContain(`'${target}'`);
+    }
+  });
+
+  it('keeps the apply-failure issue_type DISTINCT from the disagreement one '
+    + '(§9.2, AFLDB-ISSUE-104)', () => {
+    // Migration 076's dedup index is (issue_type, issue_key) over open rows,
+    // so two writers with different issue_types can never contend for the
+    // same entry. That is ISSUE-104's binding precondition, satisfied without
+    // a migration — and it lapses silently if these ever converge.
+    expect(CANONICAL_APPLY_ISSUE_TYPE).toBe('canonical_apply_failed');
+    expect(CANONICAL_APPLY_ISSUE_TYPE).not.toBe(SETTLE_ISSUE_TYPE);
+
+    expect(canonicalApplyIssueKey('afltables.match', 'rec-1', 'matches'))
+      .toBe('afltables|apply|match|rec-1|matches');
+    // The contract family, never the dotted wire name, and never colliding
+    // with the disagreement key for the same record and target.
+    expect(canonicalApplyIssueKey('afltables.match', 'rec-1', 'matches'))
+      .not.toBe(settleIssueKey('afltables.match', 'rec-1', 'matches'));
+    expect(() => canonicalApplyIssueKey('afltables.match', '', 'matches'))
+      .toThrow(/external record id/);
+  });
+
+  it('reuses no writer that could render match_key, and creates no identity', () => {
+    // §7.1: three incompatible `match_key` renderings exist in this
+    // repository, and a wrong one inserts a duplicate fixture instead of
+    // conflicting. The applier calls none of them and uses the bundle
+    // projection's key verbatim.
+    expect(applierCode).not.toMatch(/createMatch\s*\(/);
+    // §9.4 and the standing rule: no source creates an identity.
+    for (const table of ['players', 'clubs', 'venues', 'venue_aliases', 'external_identities']) {
+      expect(applierCode).not.toMatch(new RegExp(`INSERT\\s+INTO\\s+${table}\\b`, 'i'));
+    }
+  });
+
+  it('writes neither review ledger: the queue and the decisions stay human', () => {
+    // §5.2 / SC8. A successful automatic application creates no candidate and
+    // fabricates no admin decision, so the applier names neither table in any
+    // statement at all — the mentions left in the file are prose saying so.
+    expect(applierCode).not.toMatch(/promotion_(candidates|decisions)/);
+    // The one machine ledger it does write, in the same savepoint as the
+    // mutation it describes.
+    expect(applierCode).toMatch(/INSERT\s+INTO\s+canonical_applications/);
+  });
+
+  it('touches only the four canonical fact tables and the ledger', () => {
+    const written = [...applierCode.matchAll(/(?:INSERT\s+INTO|UPDATE)\s+([a-z_]+)/g)]
+      .map((match) => match[1]);
+    expect([...new Set(written)].sort()).toEqual([
+      'brownlow_round_votes', 'canonical_applications', 'match_period_scores',
+      'matches', 'player_match_stats',
+    ]);
+  });
+});
+
+/* ================================================================== *
+ * AFLDB-ISSUE-122 S6 — run integration, the DB-free contracts
+ * ================================================================== */
+
+import { parseSettleArgs } from '../tools/current-season/settle-afltables';
+import {
+  automaticProposal,
+  DERIVED_OWNED_FIELDS,
+} from '@/lib/acquisition/settle-afltables';
+import {
+  classifyCandidate,
+  isMatchFamilyTarget,
+  playerNameOf,
+  renderSettleExceptionReport,
+  splitRejectionReason,
+  type SettleExceptionReport,
+} from '@/lib/acquisition/settle-report';
+
+/**
+ * The S6 facts that need no database: the CLI's flag contract, the pure
+ * exception classification behind the §9.3 report, and the source-shape pins
+ * that keep the derived recompute wired the way §13 requires. The end-to-end
+ * proof — dry-run, apply, identical apply, retry, report — is the nested S6
+ * suite in `tests/integration/settle-afltables.test.ts` against PostgreSQL.
+ */
+describe('AFLDB-ISSUE-122 S6 — the operational path contract', () => {
+  const settle = readSource('src/lib/acquisition/settle-afltables.ts');
+  const cli = readSource('tools/current-season/settle-afltables.ts');
+  const cliCode = cli
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+  describe('the CLI flag contract', () => {
+    it('keeps the automatic path explicit: off unless --auto-apply is given', () => {
+      expect(parseSettleArgs(['--label', 'snap', '--dry-run']))
+        .toEqual({ label: 'snap', apply: false, autoApply: false, report: false });
+      expect(parseSettleArgs(['--label', 'snap', '--apply']).autoApply).toBe(false);
+      expect(parseSettleArgs(['--label', 'snap', '--apply', '--auto-apply']))
+        .toEqual({ label: 'snap', apply: true, autoApply: true, report: false });
+      // The preview: the whole automatic path, rolled back.
+      expect(parseSettleArgs(['--label', 'snap', '--dry-run', '--auto-apply']))
+        .toEqual({ label: 'snap', apply: false, autoApply: true, report: false });
+      expect(parseSettleArgs(['--label', 'snap', '--report']).report).toBe(true);
+    });
+
+    it('refuses what it cannot honour rather than guessing', () => {
+      expect(() => parseSettleArgs(['--apply'])).toThrow(/--label <snapshot> is required/);
+      expect(() => parseSettleArgs(['--label', 'snap', '--apply', '--dry-run']))
+        .toThrow(/mutually exclusive/);
+      // A mistyped flag would otherwise run the review-first path and look
+      // like an automatic run that wrote nothing.
+      expect(() => parseSettleArgs(['--label', 'snap', '--apply', '--auto-aply']))
+        .toThrow(/Unknown flag '--auto-aply'/);
+    });
+
+    it('has no force flag and no bypass, and is reachable as npm run settle:afltables', () => {
+      expect(cliCode).not.toMatch(/--force|--bypass|--skip|--override/);
+      // The switch decides whether the automatic path RUNS; E2 is handed the
+      // same list the bundle was validated against and re-evaluated at the write.
+      expect(cliCode).toMatch(/autoApply:\s*args\.autoApply/);
+      expect(cliCode).toMatch(/inProgressSeasons,/);
+      const scripts = (JSON.parse(readFileSync('package.json', 'utf8')) as {
+        scripts: Record<string, string>;
+      }).scripts;
+      expect(scripts['settle:afltables']).toBe('tsx tools/current-season/settle-afltables.ts');
+    });
+  });
+
+  describe('the derived recompute wiring (§13)', () => {
+    it('treats career_game_no as derived-owned on the automatic path, and nothing else', () => {
+      // Two writers for one column would retry the write every night over
+      // identical source data (SC3): the recompute renumbers what the
+      // applier wrote. So the automatic path neither writes nor compares it.
+      expect(DERIVED_OWNED_FIELDS).toEqual({ player_match_stats: ['career_game_no'] });
+      const proposal = { career_game_no: 12, kicks: 5, club_id: 3 };
+      expect(automaticProposal('player_match_stats', proposal))
+        .toEqual({ kicks: 5, club_id: 3 });
+      // Every other target's proposal passes through untouched, by identity.
+      for (const target of ['matches', 'match_period_scores', 'brownlow_round_votes'] as const) {
+        expect(automaticProposal(target, proposal)).toBe(proposal);
+      }
+      // And the derived helper is what fills the column in the same transaction.
+      expect(readSource('src/db/queries/player-derived.ts')).toMatch(/SET career_game_no = /);
+    });
+
+    it('reuses the four player-derived helpers, in the admin order, once, gated on a write',
+      () => {
+        const gate = 'if (counters.canonicalRowsInserted + counters.canonicalRowsUpdated > 0)';
+        const start = settle.indexOf(gate);
+        expect(start).toBeGreaterThan(0);
+        const block = settle.slice(start, settle.indexOf('\n      }', start));
+        const order = [
+          'recomputeSeasonMetadata(tx, bundle.season)',
+          'recomputeClubSeasons(tx, bundle.season)',
+          'recomputePlayerDerivedStats(tx, playerIds, bundle.season)',
+          'recomputeSeasonBrownlowStatus(tx, bundle.season)',
+        ];
+        let cursor = 0;
+        for (const call of order) {
+          const at = block.indexOf(call, cursor);
+          expect(at, call).toBeGreaterThan(-1);
+          cursor = at;
+        }
+        // Exactly one call site each: once per run, never per record. (The
+        // prose names them more often; only an `await` is a call.)
+        for (const call of order) {
+          const name = `await ${call.split('(')[0]}(`;
+          expect(settle.split(name).length - 1, name).toBe(1);
+        }
+        expect(settle).toContain("from '../../db/queries/player-derived'");
+        // Nothing replaces the helpers: no derived table is written directly.
+        for (const table of [
+          'club_seasons', 'player_clubs', 'player_season_stats', 'player_career_stats',
+          'player_club_season_stats',
+        ]) {
+          expect(settle).not.toMatch(
+            new RegExp(`(INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\s+${table}\\b`),
+          );
+        }
+      });
+  });
+
+  describe('the §9.3 exception classification', () => {
+    it('calls a pending candidate moot only once its record applied at or after its version',
+      () => {
+        expect(classifyCandidate(1, null)).toBe('active');
+        expect(classifyCandidate(1, 1)).toBe('moot'); // the §9.3 retry: same version
+        expect(classifyCandidate(1, 2)).toBe('moot'); // superseded by a later apply
+        expect(classifyCandidate(2, 1)).toBe('active'); // the apply predates the exception
+      });
+
+    it("reads the settle's rejection reason back into target and reason", () => {
+      expect(splitRejectionReason('player_match_stats: no external identity for url'))
+        .toEqual({ targetTable: 'player_match_stats', reason: 'no external identity for url' });
+      expect(splitRejectionReason('free text'))
+        .toEqual({ targetTable: 'unknown', reason: 'free text' });
+      expect(isMatchFamilyTarget('matches')).toBe(true);
+      expect(isMatchFamilyTarget('match_period_scores')).toBe(true);
+      expect(isMatchFamilyTarget('player_match_stats')).toBe(false);
+      expect(isMatchFamilyTarget('brownlow_round_votes')).toBe(false);
+    });
+
+    it('takes the display name from display columns only, never as an identity', () => {
+      expect(playerNameOf({ player_name: 'A B', first_name: 'X', surname: 'Y' })).toBe('A B');
+      expect(playerNameOf({ first_name: 'X', surname: 'Y' })).toBe('X Y');
+      expect(playerNameOf({ surname: 'Y' })).toBe('Y');
+      expect(playerNameOf({ url: 'players/x.html' })).toBeNull();
+    });
+
+    it('renders active exceptions apart from moot candidates, with the §9.3 context', () => {
+      const report: SettleExceptionReport = {
+        sourceKey: 'afltables',
+        season: 2026,
+        latestBatch: {
+          batchId: '42' as never, completedAt: '2026-09-02', recordsRead: 3, recordsRejected: 1,
+        },
+        unresolvedRecords: [{
+          sourceKey: 'afltables', family: 'player_match_stats', externalRecordId: 'p@k',
+          sourceVersionSeq: 1, matchKey: 'k', season: 2026, roundCode: '1',
+          playerName: 'New Debutant', profileUrl: 'players/N/New_Debutant.html',
+          clubRaw: 'Carlton', targetTable: 'player_match_stats',
+          reason: 'no external identity', canonicalMatchApplied: true, canonicalMatchId: 7,
+        }],
+        candidates: {
+          active: [{
+            candidateId: '1', family: 'match', externalRecordId: 'k', sourceVersionSeq: 2,
+            verb: 'corrected', targetTable: 'matches', targetId: 7, createdAt: 't',
+            latestAppliedVersionSeq: 1, status: 'active',
+          }],
+          moot: [{
+            candidateId: '2', family: 'player_match_stats', externalRecordId: 'q@k',
+            sourceVersionSeq: 1, verb: 'unresolved_identity', targetTable: 'player_match_stats',
+            targetId: null, createdAt: 't', latestAppliedVersionSeq: 1, status: 'moot',
+          }],
+        },
+        applyFailures: [],
+        disagreements: [],
+        findingsTruncated: false,
+      };
+      const text = renderSettleExceptionReport(report).join('\n');
+      expect(text).toContain('ACTIVE — requires attention (2)');
+      expect(text).toContain(
+        "player_match_stats 'p@k' v1 -> player_match_stats: no external identity",
+      );
+      expect(text).toContain(
+        'player New Debutant · profile players/N/New_Debutant.html · club Carlton'
+        + ' · season 2026 · round 1',
+      );
+      expect(text).toContain('match k: canonical (matches.id 7)');
+      expect(text).toContain("#1 match 'k' v2 -> matches (corrected), last applied v1");
+      expect(text).toContain('MOOT — pending candidates whose record has since applied (1)');
+      expect(text).toContain(
+        "#2 player_match_stats 'q@k' v1 -> player_match_stats (unresolved_identity), applied v1",
+      );
+      // A record whose match has NOT landed says so in as many words.
+      const notLanded = renderSettleExceptionReport({
+        ...report,
+        unresolvedRecords: [{
+          ...report.unresolvedRecords[0], canonicalMatchApplied: false, canonicalMatchId: null,
+        }],
+      }).join('\n');
+      expect(notLanded).toContain('match k: NOT canonical');
+    });
   });
 });

@@ -27,7 +27,7 @@ import { DATASETS, getDataset } from '@/lib/ingest/datasets';
 // real value tests/setup.ts puts here.
 process.env.DATABASE_URL ??= 'postgresql://unused:unused@127.0.0.1:1/afldb_unit_placeholder';
 
-const { RECORD_CATEGORIES, getRecordCategory } = await import('@/db/queries/records');
+const { RECORD_CATEGORIES, getCareerRecord, getRecordCategory } = await import('@/db/queries/records');
 
 /**
  * Truthy when read off a plain object index, so each one used to pass a
@@ -69,6 +69,14 @@ describe('getDataset', () => {
     expect(getDataset('MATCH_RESULTS')).toBeNull();
     expect(getDataset(' match_results')).toBeNull();
     expect(getDataset('match_results ')).toBeNull();
+  });
+});
+
+describe('getCareerRecord category guard', () => {
+  it('rejects inherited Object properties before attempting SQL', async () => {
+    for (const category of INHERITED_KEYS) {
+      await expect(getCareerRecord(category)).resolves.toEqual([]);
+    }
   });
 });
 

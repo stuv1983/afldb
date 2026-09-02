@@ -455,8 +455,37 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       name: `DRAFTGURU — ${opts.draftguruLabel}`,
       kind: 'data',
       run: 'command',
-      argv: [python, 'tools/rebuild/draftguru/import_draftguru.py',
-             '--label', opts.draftguruLabel],
+      argv: draftguruImportArgv(opts.draftguruLabel, python),
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-112 §7/§24. Awards and honours, every family from a tracked
+      // manifest in data/awards/ and never from the retired legacy SQLite
+      // source, which is deliberately absent from this stage's environment
+      // (operator decision 8: it is never wired back into the rebuild).
+      //
+      // It must follow `draftguru`, which is where the canonical `players`
+      // population is complete — every family carries player links, and a link
+      // is dropped rather than mis-resolved when its player is absent. It runs
+      // before `derived` because that is the runbook's declared position; no
+      // derived summary reads an award today, so this is ordering discipline
+      // rather than a data dependency.
+      //
+      // `coleman` is NOT in this list. It is derived, not acquired, and has its
+      // own stage after `derived` because season_metadata must first decide
+      // which seasons are complete (AFLDB-ISSUE-111). Running it here would
+      // duplicate that ownership and break the ordering that gate depends on.
+      //
+      // The legacy `awards` group is NOT in this list either. Since §24 it
+      // creates no definition and no winner row another group does not own, it
+      // is compatibility-only, and it is the one group that still requires the
+      // retired legacy source.
+      id: 'awards-honours',
+      name: 'AWARDS & HONOURS — tracked manifests, no legacy source',
+      kind: 'data',
+      run: 'command',
+      argv: [python, 'tools/migration/import_awards.py', '--groups',
+             ...AWARDS_HONOURS_GROUPS],
       envOverlay: dataEnv,
     },
     {
@@ -507,6 +536,114 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
   ];
 }
 
+/**
+ * The awards/honours groups the rebuild runs, in `import_awards.py`'s own
+ * GROUP_ORDER. Every one is in that module's LEGACY_FREE_GROUPS: each loads a
+ * tracked manifest from `data/awards/` and reads no legacy SQLite.
+ *
+ * `awards` (the legacy re-extract) and `coleman` (derived, its own stage) are
+ * deliberately absent — see the stage comment.
+ */
+export const AWARDS_HONOURS_GROUPS = [
+  'all_australian', 'under_22', 'rising_star', 'club_bf', 'named_medals',
+  'hall_of_fame', 'honour_teams', 'captaincies',
+] as const;
+
+/**
+ * The per-family row counts the AWARDS & HONOURS stage must produce, measured
+ * read-only from `afldb_dev` (AFLDB-ISSUE-112 §14.4, re-confirmed per slice in
+ * §17-§24) and equal to the tracked manifests' own declared row counts, which
+ * their parsers gate offline. Two derivations of the same number, so a drift
+ * means a manifest changed without its contract changing.
+ *
+ * These are ROW counts, not link counts. A row loads whether or not its player
+ * resolves, so this gate is independent of the player-link question recorded in
+ * §24.5 — a link that cannot be re-resolved leaves the row present and
+ * unlinked, which this gate must not mask by also asserting a linked count.
+ */
+export const AWARDS_HONOURS_EXPECTED = {
+  honourTeamMembers: 113,
+  hallOfFame: 343,
+  captaincies: 1375,
+  risingStarNominations: 766,
+  risingStarWinners: 33,
+  allAustralian: 1158,
+  clubBestAndFairest: 752,
+  namedMedals: 979,
+  under22: 330,
+  /** bf-* (19) + named medals (17) + all-australian + rising-star + 22-under-22. */
+  awardDefinitions: 39,
+};
+
+/**
+ * Structural invariants for the manifest-loaded awards and honours families.
+ * Read-only scalar counts, in the clubSeasonChecks/colemanChecks mould.
+ *
+ * Added together with the AWARDS & HONOURS stage, never before it: a gate whose
+ * data source does not yet exist would fail every rebuild (the ISSUE-093
+ * §H15.5 rule).
+ */
+export function awardsHonoursChecks(acceptedLastSeason: number): FinalCheck[] {
+  const winners = (predicate: string) =>
+    'SELECT count(*) FROM award_winners w JOIN awards a ON a.id = w.award_id'
+    + ` WHERE ${predicate}`;
+  const e = AWARDS_HONOURS_EXPECTED;
+  return [
+    { key: 'honour_team_members_rows',
+      sql: 'SELECT count(*) FROM honour_team_members',
+      expected: e.honourTeamMembers },
+
+    { key: 'hall_of_fame_rows', sql: 'SELECT count(*) FROM hall_of_fame',
+      expected: e.hallOfFame },
+
+    { key: 'captaincies_rows', sql: 'SELECT count(*) FROM captaincies',
+      expected: e.captaincies },
+
+    { key: 'rising_star_nomination_rows',
+      sql: 'SELECT count(*) FROM award_nominations n JOIN awards a ON a.id = n.award_id'
+         + " WHERE a.slug = 'rising-star'",
+      expected: e.risingStarNominations },
+
+    { key: 'rising_star_winner_rows', sql: winners("a.slug = 'rising-star'"),
+      expected: e.risingStarWinners },
+
+    { key: 'all_australian_rows', sql: winners("a.slug = 'all-australian'"),
+      expected: e.allAustralian },
+
+    { key: 'club_best_and_fairest_rows',
+      sql: winners("a.category = 'club_best_and_fairest'"),
+      expected: e.clubBestAndFairest },
+
+    { key: 'named_medal_rows',
+      sql: winners("a.category IN ('award', 'draft_pick')"
+                   + " AND a.slug NOT IN ('rising-star', 'coleman')"),
+      expected: e.namedMedals },
+
+    { key: 'under_22_rows', sql: winners("a.slug = '22-under-22'"),
+      expected: e.under22 },
+
+    // Every family's parent row exists. A missing definition is not a smaller
+    // awards table — ON DELETE CASCADE means it is a silently emptied family.
+    { key: 'award_definitions_rows',
+      sql: "SELECT count(*) FROM awards WHERE slug <> 'coleman'",
+      expected: e.awardDefinitions },
+
+    // The whole point of the stage: no honours row may be left without its
+    // provenance, and none may claim a source the manifests do not carry.
+    { key: 'award_winners_without_a_source',
+      sql: 'SELECT count(*) FROM award_winners WHERE source_id IS NULL',
+      expected: 0 },
+
+    // 2026 belongs to the current-season pipeline. The Rising Star manifest
+    // deliberately carries 2026 nominations, so this is scoped to the winner
+    // and honour families the historical core owns.
+    { key: 'award_winners_after_accepted_last_season',
+      sql: 'SELECT count(*) FROM award_winners w JOIN awards a ON a.id = w.award_id'
+         + ` WHERE a.slug <> '22-under-22' AND w.season > ${acceptedLastSeason}`,
+      expected: 0 },
+  ];
+}
+
 export const LADDER_WITNESS_VALIDATOR =
   'tools/rebuild/fitzroy/validate_ladder_witness.py';
 
@@ -544,10 +681,30 @@ export const DRAFTGURU_PREFLIGHT_FILES = [
   'data/reference/draftguru-link-decisions.json',
 ];
 
-/** Built per call, not frozen at module load, so AFLDB_PYTHON is honoured. */
-export function draftguruValidateArgv(): string[] {
-  return [resolvePython(), 'tools/rebuild/draftguru/import_draftguru.py',
-          '--validate-only'];
+/** The one DraftGuru importer entry point, named once. */
+export const DRAFTGURU_IMPORTER = 'tools/rebuild/draftguru/import_draftguru.py';
+
+/**
+ * The DraftGuru data-stage command line. Built per call, not frozen at module load, so
+ * AFLDB_PYTHON is honoured; `python` is threaded in by planStages so the whole graph keeps
+ * its single interpreter resolution.
+ */
+export function draftguruImportArgv(label: string,
+                                    python: string = resolvePython()): string[] {
+  return [python, DRAFTGURU_IMPORTER, '--label', label];
+}
+
+/**
+ * The DraftGuru preflight command line: the SAME argv the data stage will run, plus
+ * --validate-only. AFLDB-ISSUE-112 §28.4 — this used to take no label and emit only
+ * --validate-only, so the importer fell back to its own hardcoded STAGE_A_LABEL default
+ * while the data stage imported whatever --draftguru-label selected. With both snapshot
+ * directories present that would have verified snapshot A and imported snapshot B. Deriving
+ * one argv from the other makes the two structurally incapable of disagreeing.
+ */
+export function draftguruValidateArgv(label: string,
+                                      python: string = resolvePython()): string[] {
+  return [...draftguruImportArgv(label, python), '--validate-only'];
 }
 
 /** The counts the DraftGuru preflight must see before anything is destroyed. */
@@ -690,6 +847,12 @@ export function finalValidationChecks(
   // whose data source does not yet exist would fail every rebuild (the ISSUE-093 §H15.5
   // rule).
   for (const check of colemanChecks(Number(measured.seasons_last))) checks.push(check);
+
+  // AFLDB-ISSUE-112. Added together with the AWARDS & HONOURS stage, for the
+  // same §H15.5 reason as the Coleman gates above.
+  for (const check of awardsHonoursChecks(Number(measured.seasons_last))) {
+    checks.push(check);
+  }
 
   return checks;
 }
@@ -1055,8 +1218,14 @@ export function fitzroyValidateArgv(source: FitzroySource): string[] {
   return argv;
 }
 
-/** The preflight stage's own work, kept separate so it is testable in isolation. */
-export function runPreflight(deps: Deps, source?: FitzroySource): void {
+/**
+ * The preflight stage's own work, kept separate so it is testable in isolation.
+ *
+ * It takes the SAME `Options` object planStages() builds the data stages from, so the
+ * snapshot this proves and the snapshot the rebuild then imports cannot be different
+ * selections. See draftguruValidateArgv().
+ */
+export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource): void {
   // Before anything else. Every stage below this line is a Python child process, and a
   // missing interpreter surfaces on Windows as nothing but "The system cannot find the
   // path specified." — attributed to whichever stage happened to run first, which is how
@@ -1089,10 +1258,12 @@ export function runPreflight(deps: Deps, source?: FitzroySource): void {
         + 'Nothing has been destroyed.');
     }
   }
-  const result = deps.runCommand(draftguruValidateArgv(), {});
+  // The label proven here is opts.draftguruLabel — the one the data stage will import.
+  const result = deps.runCommand(draftguruValidateArgv(opts.draftguruLabel), {});
   if (result.status !== 0) {
     throw new RebuildRefused(
-      'DraftGuru preflight failed (import_draftguru.py --validate-only). '
+      'DraftGuru preflight failed (import_draftguru.py --validate-only '
+      + `--label ${opts.draftguruLabel}). `
       + `Nothing has been destroyed.\n${result.stdout}${result.stderr}`);
   }
   assertDraftguruPreflight(result.stdout);
@@ -1119,9 +1290,16 @@ export function ladderWitnessValidateArgv(): string[] {
           ladderWitnessLabel()];
 }
 
+/**
+ * The DraftGuru snapshot used when --draftguru-label is not given. It is the runner's
+ * single default; import_draftguru.py's own STAGE_A_LABEL is never relied on, because the
+ * runner now always passes --label explicitly to BOTH the preflight and the data stage.
+ */
+export const DEFAULT_DRAFTGURU_LABEL = 'annual-html-20260826';
+
 export function parseArgs(argv: string[]): Options {
   const opts: Options = {
-    draftguruLabel: 'annual-html-20260826',
+    draftguruLabel: DEFAULT_DRAFTGURU_LABEL,
     planOnly: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
@@ -1240,7 +1418,7 @@ async function main(): Promise<number> {
 
   // Preflight runs BEFORE the acknowledgement is even consumed, so a missing input is
   // reported without the operator having to authorise destruction first.
-  runPreflight(deps, fitzroy);
+  runPreflight(deps, opts, fitzroy);
   assertDestructiveAcknowledgement(target, opts.acknowledgeDestroy);
 
   const report = executeRebuild(stages, target, deps);

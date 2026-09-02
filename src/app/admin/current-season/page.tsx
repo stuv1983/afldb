@@ -30,17 +30,16 @@ export default async function CurrentSeasonPage() {
   return (
     <>
       <div className="page-header">
-        <h1>Current season refresh</h1>
+        <h1>Current-season fallback diagnostics</h1>
         <p className="subtitle">
-          Fetch current AFL match results from server-side external APIs, stage the raw payloads,
-          and fill completed match gaps without exposing provider keys to the browser.
+          Acquire Squiggle and Kali observations server-side and retain staging and history for
+          diagnostics or explicit human fallback investigation without exposing provider keys.
         </p>
       </div>
 
       <p className="notice">
-        Auto update uses Kali AFL Stats, stages fresh API rows, and inserts completed matches
-        that AFLDB can resolve unambiguously. Existing final scores are left alone unless the
-        manual overwrite option is deliberately selected.
+        Squiggle and Kali are deprecated fallback sources. These controls never insert or update
+        canonical current-season matches; AFL Tables remains the canonical automatic authority.
       </p>
 
       <CurrentSeasonControls year={year} />

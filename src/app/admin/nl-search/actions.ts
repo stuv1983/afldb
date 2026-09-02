@@ -2,9 +2,13 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { authSql } from '@/db/authClient';
 import { saveNlSearchReview } from '@/db/queries/nl-search-log';
-import { audit, requireSuperAdmin } from '@/lib/auth/session';
+import { clearNlSearchTelemetry, type NlTelemetryClearCounts } from '@/db/queries/nl-search-telemetry-clear';
+import { audit, auditInTransaction, requireSuperAdmin } from '@/lib/auth/session';
 import { isNlReviewCategory, isNlReviewStatus, type NlReviewCategory } from '@/search/nl/review-spec';
+
+import { NL_TELEMETRY_CLEAR_PHRASE } from './telemetry-clear-phrase';
 
 export type NlReviewState = { error?: string; message?: string };
 
@@ -65,4 +69,64 @@ export async function saveReview(
   revalidatePath('/admin/nl-search');
 
   return { message: 'Review saved.' };
+}
+
+export type NlClearTelemetryState = {
+  error?: string;
+  message?: string;
+  counts?: NlTelemetryClearCounts;
+};
+
+/**
+ * Delete disposable nl_search_log rows and audit the deletion, atomically
+ * (AFLDB-ISSUE-119 §6, §8, §9, §11).
+ *
+ * requireSuperAdmin() runs before anything else, including confirmation
+ * parsing, so a forged direct call to this action stops at the guard
+ * rather than at the phrase check -- rendering the control conditionally
+ * on the page is not itself an authorisation boundary.
+ *
+ * The confirmation phrase is re-checked here independently of the client:
+ * a wrong or missing value returns before any transaction opens, so it
+ * deletes nothing and audits nothing.
+ *
+ * clearNlSearchTelemetry() and auditInTransaction() both ride the one
+ * authSql.begin() handle below. That is load-bearing, not stylistic: the
+ * clear function's SHARE ROW EXCLUSIVE locks only define the §8
+ * concurrency cutoff for as long as they live inside an open transaction,
+ * and the audit row must commit with the deletion or not at all. Neither
+ * call is wrapped in try/catch, matching auditInTransaction's own
+ * contract -- an audit failure must abort and roll back the deletion, and
+ * a best-effort warning here would recreate the exact gap that
+ * transaction exists to close.
+ */
+export async function clearTelemetry(
+  _previous: NlClearTelemetryState,
+  formData: FormData,
+): Promise<NlClearTelemetryState> {
+  const admin = await requireSuperAdmin();
+
+  const confirmation = String(formData.get('confirmation') ?? '');
+  if (confirmation !== NL_TELEMETRY_CLEAR_PHRASE) {
+    return { error: `Type ${NL_TELEMETRY_CLEAR_PHRASE} exactly to confirm.` };
+  }
+
+  const counts = await authSql.begin(async (tx) => {
+    const result = await clearNlSearchTelemetry(tx);
+    await auditInTransaction(tx, 'nl_search.telemetry_cleared', result, {
+      userId: admin.id, label: admin.email,
+    });
+    return result;
+  });
+
+  revalidatePath('/admin/nl-search', 'layout');
+  revalidatePath('/admin/app-health');
+
+  return {
+    message: `Cleared ${counts.deletedLogRows} disposable search log row`
+      + `${counts.deletedLogRows === 1 ? '' : 's'}. ${counts.retainedLogRows} log row`
+      + `${counts.retainedLogRows === 1 ? '' : 's'} retained, alongside every review and `
+      + 'feedback row.',
+    counts,
+  };
 }

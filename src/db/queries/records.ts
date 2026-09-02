@@ -156,8 +156,8 @@ export async function getCareerRecord(
   filters: RecordFilters = {},
 ): Promise<CareerRecordRow[]> {
   // Column comes from a fixed map, never from the URL.
+  if (!Object.hasOwn(CAREER_COLUMNS, category)) return [];
   const column = CAREER_COLUMNS[category];
-  if (!column) return [];
 
   const conditions = filters.ranges
     ? rangeConditions(filters.ranges, CAREER_RECORD_FILTER_COLUMNS)

@@ -1,7 +1,7 @@
 # AFLDB-ISSUE-102 — Awards/honours legacy-SQLite acquisition dependency (PARENT)
 
 **Document type:** parent architecture / dependency-coordination record.
-**Status: Open. Not resolved. No implementation has been authorised or started.**
+**Status: RESOLVED 2026-09-02. All eight §8.1 closure criteria pass.**
 
 **Scope revised 2026-08-30 by operator decision.** The former "record only — do not design the
 replacement" boundary is deliberately superseded (§2.1). ISSUE-102 is now the parent
@@ -14,7 +14,7 @@ Pass history:
 - **Pass 2 (2026-08-30)** — operator adopted Option B, revised this issue to parent scope,
   approved the curated-manifest and Coleman-derivation directions, and authorised child issues
   111/112/113. This document is the pass-2 output. Continuation state:
-  `issues/open/AFLDB-ISSUE-102-HANDOFF.md`.
+  `issues/closed/AFLDB-ISSUE-102-HANDOFF.md` (retained lineage).
 
 ---
 
@@ -288,6 +288,28 @@ same file. Making that matrix legacy-independent is an ISSUE-112 acceptance gate
 **outside** ISSUE-102's closure boundary. ISSUE-102 may be Resolved with ISSUE-113 still Open,
 provided §8.1.3 and §8.1.4 hold for the awards domain proper. This must be stated explicitly in
 the resolution so the residual legacy dependency is never mistaken for an oversight.
+
+### 8.4 Closure verification — 2026-09-02
+
+| §8.1 criterion | Result | Closing evidence |
+|---|---|---|
+| 1. ISSUE-111 resolved | **PASS** | Coleman is derived from canonical AFLDB facts, persisted, rebuilt and Stage-9 gated: 46 winners across 46 seasons from 1980, all linked, with the ISSUE-111 integration and DB-free gates passed. |
+| 2. ISSUE-112 resolved | **PASS** | ISSUE-112 is Resolved 2026-09-02 with G1-G8 all PASS; its authoritative closeout is `issues/closed/AFLDB-ISSUE-112.md` §32. |
+| 3. `import_awards.py` operationally legacy-free | **PASS** | Every canonical and standing-refresh family is in `LEGACY_FREE_GROUPS`; a real all-family run and the canonical rebuild completed with `AFLDB_LEGACY_SQLITE` unset. The sole remaining `awards` group is explicitly compatibility-only, creates no uniquely owned canonical row, and is excluded from both operational paths. |
+| 4. Canonical rebuild restores all 111/112 data | **PASS** | `npm run db:test:rebuild` exited 0 and FINAL VALIDATION passed 38/38. Exact restored counts: honour teams 113, Hall of Fame 343, captaincies 1,375, Rising Star nominations 766 / winners 33, All-Australian 1,158, club B&F 752, named medals 979, Under-22 330, award definitions 39 and Coleman 46; `award_winners_without_a_source = 0`. The rebuild plan contains no legacy SQLite source. |
+| 5. Reload/link matrix runs legacy-free | **PASS** | `tests/integration/awards-reload-links.test.ts` runs its full matrix without the former legacy gate; together with privileges it passed 141 / 0 skipped / 0 failed post-rebuild. |
+| 6. Deployment §7 accurate | **PASS** | `docs/deployment.md` §7 names the eight manifest-backed groups, the post-derived Coleman step, their tracked inputs and ordering, and isolates the bare compatibility-only legacy re-extract from the routine refresh. |
+| 7. Source/provenance contracts documented | **PASS** | ISSUE-112 §§2, 4 and 5 record each family's provenance key, manifest location, stable record-id/reload key and fail-closed validation rules; `docs/deployment.md` records the operational source mapping, and the tracked parsers enforce those contracts. |
+| 8. No manual-link regression | **PASS** | The post-rebuild audit found zero orphan and zero wrong-player attachments across `award_winners`, `award_nominations`, `hall_of_fame`, `honour_team_members` and `captaincies`; every decision still targets a live row and the same person, while `confirmed_unlinked` remains unlinked. Unresolvable identities remain deliberately unlinked, never guessed. |
+
+**Residual boundary, explicit.** `AFLDB-ISSUE-113` remains Open because
+`brownlow_season_votes` is still written by `import_legacy_afl.py`. Section 8.3 deliberately
+places that dependency outside ISSUE-102's closure boundary; it is not an overlooked
+`import_awards.py` dependency and does not block this resolution.
+
+**Unrelated validation, already routed.** The post-rebuild T-C11 timing regression for
+`players × player.captaincies NOT EXISTS link_status=unique` remains owned by
+`AFLDB-ISSUE-116`. It does not change awards acquisition, captaincies row count or any §8 gate.
 
 ---
 

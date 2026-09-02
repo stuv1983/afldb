@@ -43,6 +43,12 @@
 -- afldb_auth is a small, fixed set that belongs to specific migrations,
 -- so it is enumerated below with the migration that established each
 -- grant, and everything outside that list is revoked from it.
+--
+-- One FUNCTION is reconciled too, after that section: migration 081's
+-- public.nl_search_telemetry_clear(). A restore that drops a function's
+-- ACL restores the PUBLIC EXECUTE default, so that one is a widening
+-- rather than a gap -- see the section for why its owner matters as much
+-- as its grant.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -291,6 +297,18 @@ BEGIN
     GRANT USAGE ON SEQUENCE data_edits_id_seq TO afldb_import;
   END IF;
 
+  -- Migration 083 (AFLDB-ISSUE-122): the automatic canonical mutation
+  -- ledger. Every machine INSERT/UPDATE of a canonical row writes its
+  -- canonical_applications row in the same savepoint, as afldb_import.
+  -- SELECT + INSERT and USAGE on the identity sequence only -- append-only
+  -- by grant, and deliberately NOT registered in import_writable_tables,
+  -- whose loop above would hand back UPDATE, DELETE and TRUNCATE. No
+  -- sequence SELECT or UPDATE: an INSERT needs neither.
+  IF to_regclass('public.canonical_applications') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON canonical_applications TO afldb_import;
+    GRANT USAGE ON SEQUENCE canonical_applications_id_seq TO afldb_import;
+  END IF;
+
   -- Migrations 073 / 078 (AFLDB-ISSUE-086 / -109): destructive source
   -- reloads read durable human override authority, while saveEdit writes
   -- the override in the same mutation-role transaction as the canonical
@@ -405,6 +423,9 @@ DECLARE
     -- NOT import-writable on purpose: grant_import_write() would hand
     -- back UPDATE/DELETE/TRUNCATE on every reconcile.
     ['promotion_decisions',    'SELECT, INSERT'],                    -- 074
+    -- Read-only: the machine mutation ledger is written by afldb_import
+    -- alone; the admin surface may only read it (see migration 083).
+    ['canonical_applications', 'SELECT'],                            -- 083
     -- Read-only: validation resolves submitted names against these.
     ['players',                'SELECT'],                           -- 023
     ['player_clubs',           'SELECT'],                           -- 023
@@ -503,6 +524,121 @@ BEGIN
 
   RAISE NOTICE 'afldb_auth: grants applied on % of % tables, % other relations revoked',
     applied, array_length(spec, 1), revoked;
+END
+$$;
+
+-- ---------------------------------------------------------------------
+-- AFLDB-ISSUE-119 — the one function grant, nl_search_telemetry_clear()
+-- ---------------------------------------------------------------------
+-- Migration 081 creates public.nl_search_telemetry_clear(), the only way
+-- the application can delete NL telemetry: a SECURITY DEFINER function
+-- owned by afldb_owner, with EXECUTE revoked from PUBLIC and granted to
+-- afldb_auth alone. All three facts are load-bearing, and each is lost by
+-- one of the three failures this file exists to repair:
+--
+--   1. `pg_restore --no-privileges` restores the function and none of its
+--      ACL, which puts the DEFAULT back in force -- and the default for a
+--      new function is EXECUTE to PUBLIC. On a SECURITY DEFINER function
+--      that is every role in the cluster inheriting the owner's ability
+--      to delete telemetry. Alone among the reconciliations in this file,
+--      skipping this one WIDENS the model rather than merely breaking it.
+--   2. Running 02_add_auth_role.sh after the migrations skips 081's
+--      `IF EXISTS (afldb_auth)` guard, leaving the function with no
+--      EXECUTE grant and the Super Admin action failing closed.
+--   3. A cluster migrated as postgres leaves the function owned by
+--      postgres, so SECURITY DEFINER would execute as a superuser rather
+--      than as the role that owns exactly these tables.
+--
+-- Restated in the order migration 081 states it, so the owner is also the
+-- grantor of the grants that follow.
+--
+-- The afldb_auth section above cannot cover this: its subtractive sweep
+-- reads pg_class and so sees relations only (relkind r/p/v/m/f), never
+-- pg_proc. Nothing there touches a function ACL in either direction.
+DO $$
+BEGIN
+  IF to_regprocedure('public.nl_search_telemetry_clear()') IS NULL THEN
+    RAISE NOTICE 'nl_search_telemetry_clear(): absent (pre-081); run npm run db:migrate, then this script';
+    RETURN;
+  END IF;
+
+  -- Ownership and ACL are attempted SEPARATELY, and this is the whole
+  -- reason: an exception rolls its subtransaction back, so folding them
+  -- into one block would mean a refused ALTER discarding a REVOKE that
+  -- had already succeeded -- leaving PUBLIC holding EXECUTE on a
+  -- SECURITY DEFINER function, which is precisely the state this section
+  -- exists to prevent. A role that owns the function but is no member of
+  -- afldb_owner is exactly that case: it may not rename the owner, but it
+  -- may certainly revoke.
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'afldb_owner') THEN
+    BEGIN
+      EXECUTE 'ALTER FUNCTION public.nl_search_telemetry_clear() OWNER TO afldb_owner';
+    EXCEPTION WHEN insufficient_privilege THEN
+      RAISE NOTICE
+        'nl_search_telemetry_clear(): owner left as %, not afldb_owner -- rerun as a member of afldb_owner or as postgres',
+        pg_get_userbyid(
+          (SELECT proowner FROM pg_proc WHERE oid = 'public.nl_search_telemetry_clear()'::regprocedure)
+        );
+    END;
+  ELSE
+    RAISE NOTICE 'nl_search_telemetry_clear(): afldb_owner absent, ownership left as found';
+  END IF;
+
+  BEGIN
+    -- Fail closed first: PUBLIC loses EXECUTE whether or not afldb_auth
+    -- exists yet to be granted it.
+    EXECUTE 'REVOKE ALL ON FUNCTION public.nl_search_telemetry_clear() FROM PUBLIC';
+
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'afldb_auth') THEN
+      EXECUTE 'GRANT EXECUTE ON FUNCTION public.nl_search_telemetry_clear() TO afldb_auth';
+      RAISE NOTICE 'nl_search_telemetry_clear(): PUBLIC revoked, afldb_auth EXECUTE granted';
+    ELSE
+      RAISE NOTICE 'nl_search_telemetry_clear(): afldb_auth absent, EXECUTE revoked from PUBLIC only';
+    END IF;
+  EXCEPTION WHEN insufficient_privilege THEN
+    -- Revoking and granting on a function both require ownership of it or
+    -- a superuser, so these two do genuinely stand or fall together.
+    -- Reported rather than raised, for the reason the afldb_backup
+    -- section below gives: aborting under ON_ERROR_STOP would take the
+    -- rest of the script with it, and a named gap beats a half-reconciled
+    -- database.
+    RAISE NOTICE
+      'nl_search_telemetry_clear(): ACL NOT reconciled -- owner is %, and this role may not grant on it. Rerun as afldb_owner or postgres',
+      pg_get_userbyid(
+        (SELECT proowner FROM pg_proc WHERE oid = 'public.nl_search_telemetry_clear()'::regprocedure)
+      );
+  END;
+END
+$$;
+
+-- The negative half of the same contract. The design rests on afldb_auth
+-- NOT holding direct deletion on the NL tables -- the function above is
+-- what it has instead -- and the spec array states that by omission,
+-- granting only what it lists. Omission cannot REMOVE a privilege that
+-- drift has already added, though: the subtractive sweep skips every
+-- table named in the spec, so a hand-typed DELETE on nl_search_log made
+-- during an incident survives every run of this file, while
+-- tests/integration/privileges.test.ts reports it and tells the operator
+-- to run the script that cannot fix it. Stated explicitly for the three
+-- tables this issue turns on.
+--
+-- Deliberately narrow: DELETE and TRUNCATE, on these three tables, only.
+-- Making the whole spec array exact -- or extending this to UPDATE, which
+-- is migration 046/049's append-only contract rather than this one -- is a
+-- change to the reconciler's general model and belongs to its own issue.
+DO $$
+DECLARE
+  t text;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'afldb_auth') THEN
+    RETURN;
+  END IF;
+
+  FOREACH t IN ARRAY ARRAY['nl_search_log', 'nl_search_review', 'nl_search_feedback'] LOOP
+    IF to_regclass('public.' || quote_ident(t)) IS NOT NULL THEN
+      EXECUTE format('REVOKE DELETE, TRUNCATE ON public.%I FROM afldb_auth', t);
+    END IF;
+  END LOOP;
 END
 $$;
 

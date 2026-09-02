@@ -214,13 +214,13 @@ export function CurrentSeasonControls({
             <input name="year" type="number" min="2000" max="2100" defaultValue={year} required />
           </label>
           <button className="btn" type="submit" disabled={pending}>
-            {pending ? 'Updating...' : 'Auto update from API'}
+            {pending ? 'Refreshing...' : 'Refresh Kali fallback staging'}
           </button>
         </form>
       </section>
 
       <section className="section">
-        <h2>Manual controls</h2>
+        <h2>Fallback investigation controls</h2>
         <form action={action} style={{ display: 'grid', gap: '0.75rem', maxWidth: '34rem' }}>
           <input type="hidden" name="mode" value="manual" />
           <label>
@@ -236,13 +236,10 @@ export function CurrentSeasonControls({
             </select>
           </label>
           <label>
-            <input name="apply" type="checkbox" /> Apply staging rows
-          </label>
-          <label>
-            <input name="updateMatches" type="checkbox" /> Overwrite existing resolved final scores
+            <input name="apply" type="checkbox" /> Persist staging and observation rows
           </label>
           <button className="btn btn-secondary" type="submit" disabled={pending}>
-            {pending ? 'Running...' : 'Run manual refresh'}
+            {pending ? 'Running...' : 'Run staging refresh'}
           </button>
         </form>
       </section>

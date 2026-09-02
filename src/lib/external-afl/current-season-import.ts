@@ -27,7 +27,6 @@ export type CurrentSeasonRunOptions = {
   sources: ExternalSource[];
   apply: boolean;
   insertMissingMatches: boolean;
-  updateMatches: boolean;
 };
 
 export type CurrentSeasonRunResult = {
@@ -40,8 +39,8 @@ export type CurrentSeasonRunResult = {
   observationVersionsInserted: number;
   observationsMarkedAbsent: number;
   canonicalMatchesResolved: number;
-  canonicalRowsInserted: number;
-  canonicalRowsUpdated: number;
+  canonicalRowsInserted: 0;
+  canonicalRowsUpdated: 0;
   unresolvedObservations: number;
   incompleteSourceRecords: number;
   rejectedOrConflicted: number;
@@ -320,7 +319,6 @@ export async function runCurrentSeasonRefresh(options: CurrentSeasonRunOptions):
     const result = await writeMatches(
       sql,
       matches,
-      options.updateMatches,
       options.insertMissingMatches,
     );
     return {
@@ -609,36 +607,6 @@ async function resolveCurrentSeasonObservations(
   return observations;
 }
 
-async function refreshSeasonMetadata(sql: Db, season: number): Promise<void> {
-  await sql`
-    UPDATE seasons s
-       SET status = CASE
-             WHEN NOT EXISTS (
-               SELECT 1 FROM matches m
-                WHERE m.season = s.year
-                  AND m.round_type = 'grand_final'
-                  AND m.result <> 'draw')
-             THEN 'in_progress'::season_status
-             ELSE 'complete'::season_status
-           END,
-           data_through_date = (SELECT max(match_date) FROM matches WHERE season = s.year),
-           last_loaded_round = (
-             SELECT m.round_code FROM matches m
-              WHERE m.season = s.year
-              ORDER BY m.match_date DESC, m.id DESC LIMIT 1),
-           completed_at = CASE
-             WHEN EXISTS (
-               SELECT 1 FROM matches m
-                WHERE m.season = s.year
-                  AND m.round_type = 'grand_final'
-                  AND m.result <> 'draw')
-             THEN (SELECT max(match_date) FROM matches WHERE season = s.year)
-             ELSE NULL
-           END
-     WHERE s.year = ${season}
-  `;
-}
-
 type MatchCandidate = {
   match: ExternalCurrentMatch;
   homeClubId: number;
@@ -746,13 +714,13 @@ function enumeratedMatchScopes(
   return [...scopes.values()];
 }
 
-async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], updateMatches: boolean, insertMissingMatches: boolean): Promise<{
+async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], insertMissingMatches: boolean): Promise<{
   observationsStaged: number;
   observationVersionsInserted: number;
   observationsMarkedAbsent: number;
   canonicalMatchesResolved: number;
   canonicalRowsInserted: 0;
-  canonicalRowsUpdated: number;
+  canonicalRowsUpdated: 0;
   unresolvedObservations: number;
   incompleteSourceRecords: number;
   rejectedOrConflicted: number;
@@ -763,8 +731,6 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
   let observationVersionsInserted = 0;
   let observationHeadsRefreshed = 0;
   let observationsMarkedAbsent = 0;
-  let canonicalRowsUpdated = 0;
-  const touchedSeasons = new Set<number>();
   let canonicalPlan: CurrentSeasonCanonicalPlan = planCurrentSeasonCanonicalWork([], insertMissingMatches);
   const observedAt = new Date().toISOString();
 
@@ -793,7 +759,6 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
     // point on — never narrowed to a number, never cast to int in SQL.
     const batchId = asImportBatchId(batch.id);
 
-    const updatesByLocalMatchId = new Map<number, MatchCandidate[]>();
     const resolvedObservations: ResolvedCurrentSeasonObservation[] = [];
 
     for (const match of matches) {
@@ -854,103 +819,12 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
           last_seen_at = now()
       `;
       observationsStaged += 1;
-
-      if (localMatchId !== null && isCompleteScoredMatch(match)) {
-        appendCandidate(updatesByLocalMatchId, localMatchId, {
-          match, homeClubId: homeClubId!, awayClubId: awayClubId!,
-        });
-      }
     }
 
     canonicalPlan = planCurrentSeasonCanonicalWork(resolvedObservations, insertMissingMatches);
     observationsMarkedAbsent = await markMissingObservationsAbsent(
       tx, enumeratedMatchScopes(sourceIds, matches), batchId, observedAt,
     );
-
-    if (updateMatches) {
-      for (const [localMatchId, candidates] of updatesByLocalMatchId.entries()) {
-        const [current] = await tx<{
-          homeClubId: number;
-          awayClubId: number;
-          homeScore: number;
-          awayScore: number;
-          homeGoals: number | null;
-          homeBehinds: number | null;
-          awayGoals: number | null;
-          awayBehinds: number | null;
-        }[]>`
-          SELECT home_club_id AS "homeClubId", away_club_id AS "awayClubId",
-                 home_score AS "homeScore", away_score AS "awayScore",
-                 home_goals AS "homeGoals", home_behinds AS "homeBehinds",
-                 away_goals AS "awayGoals", away_behinds AS "awayBehinds"
-            FROM matches WHERE id = ${localMatchId}
-        `;
-        if (!current) continue;
-
-        const { corroboration, representative } = analyseCandidates(candidates, current.homeClubId);
-        if (corroboration.disagreeingGroups.length > 0) {
-          continue;
-        }
-        if (corroboration.sameGroupConflictGroups.length > 0) {
-          continue;
-        }
-
-        if (corroboration.values === null) continue;
-        const agreedHomeScore = corroboration.values.homeScore;
-        const agreedAwayScore = corroboration.values.awayScore;
-        let agreedHomeGoals = corroboration.values.homeGoals;
-        let agreedHomeBehinds = corroboration.values.homeBehinds;
-        let agreedAwayGoals = corroboration.values.awayGoals;
-        let agreedAwayBehinds = corroboration.values.awayBehinds;
-
-        agreedHomeGoals = agreedHomeGoals ?? current.homeGoals;
-        agreedHomeBehinds = agreedHomeBehinds ?? current.homeBehinds;
-        agreedAwayGoals = agreedAwayGoals ?? current.awayGoals;
-        agreedAwayBehinds = agreedAwayBehinds ?? current.awayBehinds;
-
-        const scoreChanged = current.homeScore !== agreedHomeScore || current.awayScore !== agreedAwayScore;
-        const componentsChanged = current.homeGoals !== agreedHomeGoals || current.homeBehinds !== agreedHomeBehinds ||
-                                  current.awayGoals !== agreedAwayGoals || current.awayBehinds !== agreedAwayBehinds;
-
-        if (!scoreChanged && !componentsChanged) {
-          continue;
-        }
-
-        const { match } = representative;
-        const sourceId = sourceIds.get(match.source)!;
-
-        await tx`
-          UPDATE matches
-             SET home_score = ${agreedHomeScore},
-                 away_score = ${agreedAwayScore},
-                 home_goals = ${agreedHomeGoals},
-                 home_behinds = ${agreedHomeBehinds},
-                 away_goals = ${agreedAwayGoals},
-                 away_behinds = ${agreedAwayBehinds},
-                 result = CASE
-                   WHEN ${agreedHomeScore} = ${agreedAwayScore} THEN 'draw'::match_result
-                   WHEN ${agreedHomeScore} > ${agreedAwayScore} THEN 'home_win'::match_result
-                   ELSE 'away_win'::match_result
-                 END,
-                 winner_club_id = CASE
-                   WHEN ${agreedHomeScore} = ${agreedAwayScore} THEN NULL
-                   WHEN ${agreedHomeScore} > ${agreedAwayScore} THEN home_club_id
-                   ELSE away_club_id
-                 END,
-                 margin = abs(${agreedHomeScore} - ${agreedAwayScore}),
-                 source_id = ${sourceId},
-                 source_record_id = ${match.externalGameId},
-                 import_batch_id = ${batchId}
-           WHERE id = ${localMatchId}
-        `;
-        canonicalRowsUpdated += 1;
-        touchedSeasons.add(match.season);
-      }
-    }
-
-    for (const season of touchedSeasons) {
-      await refreshSeasonMetadata(tx, season);
-    }
 
     await tx`
       UPDATE import_batches
@@ -966,7 +840,7 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
                observationsMarkedAbsent,
                canonicalMatchesResolved: canonicalPlan.canonicalMatchesResolved,
                canonicalRowsInserted: canonicalPlan.canonicalRowsInserted,
-               canonicalRowsUpdated,
+               canonicalRowsUpdated: 0,
                unresolvedObservations: canonicalPlan.unresolvedObservations,
                incompleteSourceRecords: canonicalPlan.incompleteSourceRecords,
                rejectedOrConflicted: canonicalPlan.rejectedOrConflicted,
@@ -983,7 +857,7 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
     observationsMarkedAbsent,
     canonicalMatchesResolved: canonicalPlan.canonicalMatchesResolved,
     canonicalRowsInserted: canonicalPlan.canonicalRowsInserted,
-    canonicalRowsUpdated,
+    canonicalRowsUpdated: 0,
     unresolvedObservations: canonicalPlan.unresolvedObservations,
     incompleteSourceRecords: canonicalPlan.incompleteSourceRecords,
     rejectedOrConflicted: canonicalPlan.rejectedOrConflicted,

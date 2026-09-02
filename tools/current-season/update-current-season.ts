@@ -39,6 +39,11 @@ function valueFor(argv: string[], flag: string): string | null {
 }
 
 function parseArgs(argv: string[]): Args {
+  if (argv.includes('--update-matches')) {
+    throw new Error(
+      '--update-matches is deprecated by AFLDB-ISSUE-122: Squiggle/Kali refreshes are staging, observation, and diagnostic only and cannot write canonical matches.',
+    );
+  }
   if (argv.includes('--insert-missing-matches')) {
     throw new Error(
       '--insert-missing-matches is disabled: current API observations do not own the complete canonical match family.',
@@ -52,7 +57,6 @@ function parseArgs(argv: string[]): Args {
     apply: argv.includes('--apply'),
     insertMissingMatches: false,
     report: argv.includes('--report'),
-    updateMatches: argv.includes('--update-matches'),
   };
 }
 
@@ -107,7 +111,6 @@ async function main(): Promise<void> {
     console.log(`Within-group source conflicts: ${result.sameGroupConflicts}`);
     console.log('\nDry run. Nothing was written. Re-run with --apply to stage snapshots.');
     console.log('Missing canonical matches remain unresolved until a complete, authorised match-family importer supplies them.');
-    console.log('Add --update-matches with --apply only to overwrite local final scores for unambiguously resolved completed matches.');
     return;
   }
 

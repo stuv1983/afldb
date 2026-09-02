@@ -1287,20 +1287,38 @@ describe('baseline status vocabulary — never invented', () => {
     expect(retirementVocabulary(register)).not.toContain('candidate');
   });
 
-  it('declaring the vocabulary changed nothing else in the real register', () => {
+  it('the real register holds one accepted baseline beside one retired one', () => {
+    // AFLDB-ISSUE-101 declared this vocabulary; AFLDB-ISSUE-112 was the first real
+    // retirement to use it. The shape asserted here is the shape the rollover produces:
+    // the outgoing baseline stays in the file as retired, and exactly one stays accepted.
     const register = JSON.parse(readFileSync(
       join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+    const baselines = register.baselines as Record<string, unknown>[];
     const accepted = selectAccepted(register);
-    expect(register.baselines).toHaveLength(1);
-    expect(accepted.snapshot_label).toBe('full-history-20260827');
+    expect(baselines).toHaveLength(2);
+    expect(baselines.map((b) => b.acceptance_status)).toEqual(['retired', 'accepted']);
+    expect(accepted.snapshot_label).toBe('full-history-20260902');
     expect((accepted.measured as Record<string, unknown>).seasons_last).toBe(2025);
     expect((accepted.contract_binding as Record<string, Record<string, unknown>>)
       .required_range).toEqual({ first_season: 1897, last_season: 2025 });
-    // AFLDB-ISSUE-108: corrected from the CRLF-checkout hash to the canonical LF hash.
+    // AFLDB-ISSUE-108: the canonical LF hash, not the CRLF-checkout one. AFLDB-ISSUE-112
+    // re-proved that rule - the relabelled manifest was CRLF from the R adapter and had
+    // to be normalised before this binding was pinned.
     expect((accepted.acquisition as Record<string, unknown>).manifest_sha256)
-      .toBe('a42c6d5faacbcb6f4ce77a93a01f282577797375d14c60ef17f09bff2ab21d09');
+      .toBe('2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1');
     expect((accepted.raw_artefacts as Record<string, unknown>).artefact_set_sha256)
+      .toBe('15ba5dc624535d95fd1661c7c5e757ae4fc2d31782a2c0b1414e19358580dd6c');
+
+    // The retired predecessor keeps its own bindings, untouched by the retirement.
+    const outgoing = baselines.find((b) => b.acceptance_status === 'retired')!;
+    expect(outgoing.snapshot_label).toBe('full-history-20260827');
+    expect(outgoing.superseded_by).toBe('full-history-20260902');
+    expect((outgoing.acquisition as Record<string, unknown>).manifest_sha256)
+      .toBe('a42c6d5faacbcb6f4ce77a93a01f282577797375d14c60ef17f09bff2ab21d09');
+    expect((outgoing.raw_artefacts as Record<string, unknown>).artefact_set_sha256)
       .toBe('8e14ce6198685b9fec568ab3c680cab34783e8e202ab0c7e93f45773d96f4125');
+    // 'retired' is declared vocabulary, so the retirement is a named decision.
+    expect(retirementVocabulary(register)).toContain(outgoing.acceptance_status);
   });
 
   it('refuses a candidate-style status for a previously accepted baseline', () => {

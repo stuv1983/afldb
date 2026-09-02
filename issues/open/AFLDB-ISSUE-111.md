@@ -1,7 +1,7 @@
 # AFLDB-ISSUE-111 — Coleman Medal derivation from canonical AFLDB facts
 
 **Status: Open. Implementation in progress — see §12.**
-**Parent:** `AFLDB-ISSUE-102` (`issues/open/AFLDB-ISSUE-102.md`).
+**Parent:** `AFLDB-ISSUE-102` (`issues/closed/AFLDB-ISSUE-102.md`, Resolved 2026-09-02).
 **Severity:** Medium — **Area:** Data acquisition / Import architecture / Derived data.
 **Created:** 2026-08-30 (ISSUE-102 pass 2, operator-authorised).
 

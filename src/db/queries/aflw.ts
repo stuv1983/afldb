@@ -783,9 +783,10 @@ export async function runAflwMatchSearch(options: {
   if (venue) conditions.push(sql`m.venue_slug = ${venue}`);
   // The condition comes from the same declaration the select options are
   // built from, so an option can never exist without the SQL behind it.
-  const outcomeFilter = outcome ? AFLW_MATCH_OUTCOME_FILTERS[
-    outcome as keyof typeof AFLW_MATCH_OUTCOME_FILTERS
-  ] : undefined;
+  const outcomeFilter =
+    outcome && Object.hasOwn(AFLW_MATCH_OUTCOME_FILTERS, outcome)
+      ? AFLW_MATCH_OUTCOME_FILTERS[outcome as keyof typeof AFLW_MATCH_OUTCOME_FILTERS]
+      : undefined;
   if (outcomeFilter) conditions.push(sql`${sql.unsafe(outcomeFilter.sql)}`);
   const typeFilter = matchType ? AFLW_MATCH_TYPE_FILTERS[
     matchType as keyof typeof AFLW_MATCH_TYPE_FILTERS

@@ -15,6 +15,385 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-122 — scheduled in-season settle, stage S8 scheduling (In progress) - 2 September 2026
+
+- New `deploy/afldb-settle-afltables.service`, `.timer` and `.sh` run the approved in-season chain
+  as a nightly `oneshot`: AFL Tables is acquired through fitzRoy, adjudicated and emitted offline,
+  then applied canonically by the guarded automatic path. The season comes from
+  `data/reference/seasons.json` and the datasets from the acquisition contract, so neither is
+  duplicated in the unit and neither needs editing at season rollover.
+- The unit carries the email-intake hardening block with two deliberate widenings — writable paths
+  for the acquisition working area and the provenance manifests, and `AF_UNIX` for the PostgreSQL
+  socket. `AFLDB_IMPORT_DATABASE_URL` is the only database credential it keeps; every other DSN and
+  secret `.env` carries is dropped.
+- Failure is fail-closed and self-retrying: a failed acquisition writes no manifest, has its partial
+  working directory removed, never reaches PostgreSQL, fails the unit visibly and is retried at the
+  next firing. `Persistent=true` catches up a run missed while the host was down. Out of season the
+  run exits successfully without doing anything, so the timer can stay enabled all year.
+- **Squiggle and Kali are never invoked automatically and have no canonical writer at all.** There is
+  no fallback canonical authority: if the chain fails, the season does not advance until it succeeds.
+- `docs/deployment.md` gained §7b: installing R and the pinned fitzRoy, verifying the pin, installing
+  and enabling the service and timer, the environment requirement, the supervised validation ladder,
+  journal inspection, a manual supervised run, cadence and retry behaviour, and how to disable the
+  timer safely.
+- Not yet operating: production has neither R nor the ISSUE-122 code, so no unit is installed and no
+  timer is enabled anywhere.
+
+### AFLDB-ISSUE-122 — Squiggle/Kali canonical-write retirement, stage S7 (In progress) - 2 September 2026
+
+- Squiggle and Kali remain available as deprecated fallback sources for acquisition, immutable
+  observation history, staging, diagnostics, explicit human fallback investigation,
+  corroboration evidence and historical provenance, but their legacy current-season path can no
+  longer insert or update canonical `matches` rows. Its canonical insert/update counters are
+  structurally zero and no replacement fallback writer was introduced.
+- `current-season:update --update-matches` now fails explicitly with an AFLDB-ISSUE-122
+  deprecation error; the existing `--insert-missing-matches` refusal remains unchanged.
+- The existing super-admin current-season controls no longer expose or submit `updateMatches` and
+  now describe Squiggle/Kali operations as staging/diagnostic fallback investigation only.
+- Existing current-season regression coverage now proves source acquisition, observation/history,
+  staging and corroboration diagnostics remain available while canonical DML and the retired admin
+  plumbing are absent.
+
+### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stage S6 run integration (In progress) - 2 September 2026
+
+- **The automatic path is now an operator command.** `npm run settle:afltables -- --label
+  <snapshot> --apply --auto-apply` lands a validated AFL Tables snapshot canonically in one
+  transaction; `--dry-run --auto-apply` runs exactly the same path against real constraints and
+  privileges and rolls it all back, so what the preview shows is what the commit does. Without
+  `--auto-apply` the tool behaves exactly as before: observations, staging and review candidates
+  only. There is no force flag and no bypass, and a mistyped flag is refused rather than ignored.
+  Nothing is scheduled yet.
+- **Derived data keeps up with canonical data.** When a run writes a canonical row, the season's
+  metadata, ladder (`club_seasons`), and the written players' club, season and career aggregates
+  are recomputed once, inside the same transaction, using the existing targeted recompute the
+  admin editors already use. A run that writes nothing recomputes nothing. A recompute failure
+  fails the run rather than committing facts beside stale aggregates.
+- **A player's career game number is derived by AFLDB, not copied from the source, on the
+  automatic path.** Both the applier and the recompute were writing it, which would have caused
+  one spurious canonical write and audit row every night over identical source data. The
+  automatic applier now leaves it to the recompute; a source-side change to it still surfaces
+  as a review candidate.
+- **The exception report separates what needs attention from what is history.** After a
+  committed apply, and on `--report`, the tool lists the active exceptions — unresolved player
+  identities with the source name, profile URL, club, season, round, match and reason, and
+  whether the match itself landed; other open review candidates; open apply failures and source
+  disagreements — apart from review candidates left pending only because their record has since
+  applied, which are shown as moot and retained as history.
+- Each run's batch record now also carries the count of automatic writes a re-read gate refused,
+  advisory source disagreements, and whether and how widely the derived recompute ran.
+- Two defects in the stage-S5 applier were found by the end-to-end rerun proof and fixed: an
+  update to a player's match statistics referenced a column that table does not have, and a
+  retry that landed after an earlier failure did not close its own failure finding.
+
+### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stage S5 the applier (In progress) - 2 September 2026
+
+- **A valid new AFL Tables game now becomes canonical on its own.** Once the source publishes a
+  completed match, the settle pass writes the match, its quarter-by-quarter scores and every
+  resolvable player's statistics into the canonical tables, with no administrator clicking
+  approve. Human review becomes the exception path rather than the normal one — the change of
+  product policy AFLDB-ISSUE-096 and -099 deliberately left unbuilt.
+- The automatic write is off unless a run asks for it, so nothing that ran before behaves
+  differently. Every existing guarantee that the settle pass writes no canonical data still holds
+  for every existing caller.
+- A record is applied as a whole or not at all. A match and its period scores land together, and a
+  player's statistics land with their Brownlow votes; a failure in one rolls back only that
+  record. One player whose identity cannot be resolved no longer costs the match or their
+  team-mates their data, and a malformed record cannot leave a match with half its scoreline.
+- Every automatic canonical change is audited. Each insert and update writes an append-only
+  `canonical_applications` row inside the same database savepoint, naming the run, the exact
+  source version that justified it, the target, and the field values before and after. A canonical
+  change without its audit row, or an audit row without its change, is impossible rather than
+  merely unlikely.
+- Nothing is written on trust. Ownership, the human-override state and the canonical baseline are
+  all re-read at the moment of writing, so an administrator's override committed part-way through
+  a run still stops the write it covers. A row another source owns, or one whose provenance cannot
+  be established, is refused and routed to review — never adopted.
+- Absent values stay absent. A statistic that was not recorded is never written as zero, an
+  attendance figure that was never collected is never invented, an unmapped venue keeps its real
+  name with no canonical venue, extra time is never manufactured, and a Brownlow round with no
+  published vote gets no row at all. Zero Brownlow rows during the season is the correct outcome.
+- A record whose player identity is resolved later lands on the next run without the source having
+  to change, and a record that is already correct writes nothing at all.
+- A successful automatic write never creates a review item and never marks one approved. Review
+  decisions remain something only a person makes.
+- A deprecated fallback source that disagrees can no longer block an AFL Tables write, while the
+  disagreement is still recorded as a data-quality finding for someone to look at.
+
+### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stages S3 ownership and S4 corroboration policy (In progress) - 2 September 2026
+
+- All four AFL Tables canonical targets are now ownership-determinate. Migration 083 gave
+  `match_period_scores` and `brownlow_round_votes` their provenance columns, so the settle
+  resolver's `TARGETS_WITHOUT_SOURCE_ID` special case — which made both permanently
+  indeterminate — is removed, and `resolveTarget()` reads the real `source_id` for all four.
+  A period set's ownership is the owner shared by every one of its rows; a mixed set still fails
+  closed. `source_id` is read for ownership only and never enters the compared values, so a run
+  cannot mistake provenance for a score correction.
+- A new automatic-path ownership predicate refuses more than the generic one: an absent row is
+  insertable, an AFL Tables-owned row updateable, a foreign-owned row refused, and a row whose
+  `source_id` is NULL is refused as ownership-indeterminate. A source-less row cannot be proven
+  unowned from anything the settle role can read, so it is never adopted unattended — it stays
+  promotable by a human through the reviewed queue. The generic ownership gate is unchanged.
+- Source families can now declare `corroboration_policy`. `blocking` is the default for every
+  family that does not declare one, so undeclared behaviour is exactly as before. The two AFL
+  Tables families declare `advisory`: a disagreeing independence group no longer vetoes their
+  proposal. Squiggle and Kali — both being retired — can neither block an AFL Tables write nor
+  become a prerequisite for one.
+- Advisory withdraws the veto and nothing else. Corroboration is still classified, agreeing and
+  disagreeing groups are still recorded, and the `source_disagreement` data issue is still opened
+  and deduplicated — it is now raised from the corroboration evidence rather than from the
+  refusal verb, which also means a disagreement that coincides with a manual-authority conflict
+  now records its finding where previously it recorded none.
+- Still no canonical write: these stages decide when one would be permitted, and by whom.
+
+### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stage S2 manual authority (In progress) - 2 September 2026
+
+- The AFL Tables settle path now has a real manual-authority provider,
+  `src/lib/acquisition/manual-authority.ts`, in place of the `UNAVAILABLE_MANUAL_AUTHORITY` stub
+  that refused everything. It reads `data_overrides` — the authority record — and never
+  `data_edits`, so no grant was widened: `afldb_import` still holds INSERT and no SELECT on the
+  audit log.
+- For `matches` it maps a proposal's changed fields onto the `src/lib/edit/spec.ts` field groups
+  and refuses on any intersection with an active override, and refuses an `attendance` change on
+  a match whose `attendance_source_id` already cites `manual_admin_edit`.
+- For `match_period_scores`, `player_match_stats` and `brownlow_round_votes` it answers "clear"
+  only while migration 073's `entity_type` CHECK and the editor spec together make a human
+  override for them unrepresentable; both facts are re-checked at load time, and either one
+  changing turns the answer back into a refusal. Migration 073 is unchanged.
+- Every query error, unreadable result and ambiguous question answers "indeterminate", which
+  refuses. There is no force flag. The snapshot is taken inside the settle run's own transaction.
+- Still no canonical write: this stage only decides when one would be permitted.
+
+### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stage S1 schema (In progress) - 2 September 2026
+
+- Migration `083_canonical_auto_apply.sql` completes provenance on the two canonical targets that
+  had none: `match_period_scores` and `brownlow_round_votes` gain the standard
+  `source_id` / `source_record_id` / `import_batch_id` / `imported_at` quartet, and
+  `player_match_stats` gains its missing `source_record_id` (AFLDB-ISSUE-099 A1/A2/A3).
+- New append-only `canonical_applications` ledger for machine-made canonical mutations: one row
+  per insert/update, bound by composite foreign key to the exact `staging.source_record_versions`
+  row that justified it, with before/after value sets bounded to 64-key JSON objects.
+  `afldb_import` holds SELECT + INSERT and sequence USAGE only; `afldb_auth` SELECT only; no
+  `afldb_app` access; no UPDATE/DELETE/TRUNCATE for any application role. Registered in
+  `tools/maintenance/privileges.sql`; `tests/integration/privileges.test.ts` pins the shape.
+- Applied to `afldb_test` only. No writer exists yet; settle, reconciliation and the
+  Squiggle/Kali path are unchanged in this stage.
+
+### AFLDB-ISSUE-102 — canonical awards and honours acquisition is legacy-free (Resolved) - 2 September 2026
+
+- Closed the parent acquisition dependency after all eight acceptance criteria passed. The
+  canonical rebuild and standing refresh now restore every ISSUE-111/112 awards and honours
+  family from tracked manifests or canonical AFLDB facts with `AFLDB_LEGACY_SQLITE` unset;
+  FINAL VALIDATION passed 38/38 at the exact family counts.
+- The post-rebuild link audit found zero orphan and zero wrong-player attachments across all
+  five awards link-target tables, while manual linked and `confirmed_unlinked` decisions retain
+  their semantics. `docs/deployment.md` §7 records the operational path and isolates the bare
+  compatibility-only legacy `awards` re-extract from routine operation.
+- `AFLDB-ISSUE-113` remains open by design for the separate `brownlow_season_votes`
+  dependency in `import_legacy_afl.py`; the unrelated query-builder timing regression remains
+  owned by `AFLDB-ISSUE-116`.
+
+### AFLDB-ISSUE-112 — the rebuild's DraftGuru preflight now proves the snapshot it is about to import - 2 September 2026
+
+- **Destructive-rebuild safety fix.** `npm run db:test:rebuild` accepted
+  `--draftguru-label` for its DraftGuru **data** stage but never passed it to the
+  DraftGuru **preflight**: `draftguruValidateArgv()` took no label and emitted
+  only `--validate-only`, so `import_draftguru.py` fell back to its own
+  hardcoded `STAGE_A_LABEL`. The two sides could therefore name different
+  snapshots — with both snapshot directories present the rebuild would have
+  verified one, destroyed `afldb_test`, and imported the other. It failed closed
+  only because the retired snapshot's raw bytes happened to be absent.
+- **Fixed at the wiring, not by repointing the constant.** The preflight command
+  line is now *derived from* the data-stage command line
+  (`draftguruValidateArgv(label) = [...draftguruImportArgv(label), '--validate-only']`),
+  and `runPreflight()` takes the same `Options` object `planStages()` builds the
+  data stages from. The preflight and the data stage are structurally incapable
+  of selecting different DraftGuru snapshots, for this label change and every
+  future one. `import_draftguru.py` is unchanged; the runner's
+  `DEFAULT_DRAFTGURU_LABEL` is unchanged and is now always passed explicitly to
+  both sides. Refusals name the label that was proven.
+- **The canonical rebuild is proven end to end.** `afldb_test` was rebuilt from
+  the newly accepted `full-history-20260902` (resolved from the acceptance
+  register — no `--fitzroy-label`), `annual-html-20260902` and the unchanged
+  `ladder-20260828` witness, with `AFLDB_LEGACY_SQLITE` unset throughout.
+  **FINAL VALIDATION passed all 38 checks.** Every awards and honours family
+  restored at its exact expected count — honour teams 113, Hall of Fame 343,
+  captaincies 1,375, Rising Star nominations 766 (33 winners), All-Australian
+  1,158, club best-and-fairest 752, named medals 979, 22 Under 22 330, award
+  definitions 39, and zero award winners without a source. Coleman is unchanged
+  from `AFLDB-ISSUE-111`: 46 rows across 46 seasons from 1980, none unlinked.
+  The ladder witness D7 cross-check agrees with `club_seasons` on all 1,622
+  club-seasons on every compared field.
+- **Award player links survive the rebuild with no wrong-player attachment.**
+  Zero orphan `player_id` values across `award_winners`, `award_nominations`,
+  `hall_of_fame`, `honour_team_members` and `captaincies`; captaincies and
+  Coleman are fully linked. Unresolvable identities remain unlinked rather than
+  guessed — nothing is resolved by name.
+- **`AFLDB-ISSUE-112` is resolved.** All eight gates G1-G8 pass; the seven
+  formerly legacy-dependent awards and honours families now load from tracked
+  manifests and are restored and gated by the canonical rebuild.
+
+### AFLDB-ISSUE-112 — the canonical rebuild's accepted source snapshots move to new labels - 2 September 2026
+
+- **The accepted fitzRoy core baseline is now `full-history-20260902`.** The
+  previously accepted `full-history-20260827` is **retired**: its raw artefacts
+  were lost, and reacquisition proved they cannot be reproduced — 130 of its 131
+  files re-acquire byte-identically, but AFL Tables' `player_details` content
+  drifted upstream after the 2026-08-27 extraction, and the original bytes no
+  longer exist anywhere to diff against. The successor was validated
+  independently by `import_fitzroy_core.py --validate-only
+  --require-full-history` **before** any acceptance record for it existed, and
+  reproduces **every** measured drift gate exactly: 16,838 matches, 13,275
+  players, 685,471 player-match rows, 52 venues, 320,861 Brownlow round-vote
+  rows, and an identity scan of 685,473 rows with 83 missing ids and zero
+  missing or malformed URLs. Canonical semantics are unchanged; only the
+  snapshot's provenance moved.
+- **The accepted DraftGuru Stage A snapshot is now `annual-html-20260902`,** from
+  a complete 42-year re-acquisition. `annual-html-20260826` is historical and
+  superseded: its pages are Rails-rendered and carry a per-render CSRF token, so
+  its accepted bytes cannot be reproduced by any refetch, independently of
+  whether the data changed. The new snapshot re-proves the parity baseline
+  exactly — **6,810 rows, 5,057 distinct persons, parity PASS** — with identical
+  event totals, special-pick totals, schema variants and per-year row counts and
+  schema fingerprints. Every raw page hashes differently (the CSRF token, plus a
+  `Content-Type` header change on 13 pages); that is render drift only, and no
+  parsed-data or schema validation was relaxed to accept it.
+- **`data/reference/fitzroy-accepted-baselines.json` now carries two entries**
+  under the unchanged `exactly_one_accepted` selection policy, using the
+  register's own `retired` lifecycle vocabulary. Each entry states its own
+  reasons in-register. **No historical acquisition manifest was rewritten,
+  renamed or deleted**, and no hash, measurement or accepted correction in the
+  retired record was edited. The ladder witness `ladder-20260828` is unchanged
+  and re-validated.
+- **Operational note.** The rebuild resolves the fitzRoy label from the register,
+  so `--fitzroy-label full-history-20260827` is now refused and no fitzRoy flag
+  is needed. The DraftGuru label is still a CLI default naming the retired
+  snapshot, so a rebuild must pass `--draftguru-label annual-html-20260902`
+  until that default is repointed.
+
+### AFLDB-ISSUE-112 — awards and honours load from tracked manifests, and their player links survive a rebuild - 2 September 2026
+
+- **Awards and honours no longer read the legacy SQLite database.** All nine
+  families — All-Australian, 22 Under 22, Rising Star, club best-and-fairest,
+  named medals, Hall of Fame, honour teams, captaincies and Coleman — now load
+  from checked-in manifests under `data/awards/`, or derive from AFLDB's own
+  match facts. A single `import_awards.py --groups …` run over the eight
+  manifest groups completes with `AFLDB_LEGACY_SQLITE` unset. The last two
+  award definitions that only the legacy `awards` group created,
+  `all-australian` and `rising-star`, are now tracked in
+  `data/awards/award-definitions.csv`, and the 33 `rising-star` winner rows —
+  which no manifest owned and which the legacy reload still wrote — in
+  `data/awards/rising-star-winners.csv`.
+- **Corrected: a manifest's `player_id` no longer decides a player link.** That
+  integer belongs to the database the manifest was bootstrapped from, and the
+  canonical rebuild re-seeds `players.id`. Measured against a canonically
+  rebuilt database, **none of the 12,392 ids present in both denoted the same
+  footballer**, and the loaders' existence check kept every link — so 5,141 of
+  5,194 awards links would have been attached to a different player. Links now
+  resolve through `data/awards/player-identity.csv` and the AFL Tables profile
+  identity in `external_identities`, failing closed: an uncensused id refuses
+  the run, and a player with no such identity loads **unlinked and named in the
+  output**, never guessed from a name. The resolver now also excludes ambiguous
+  identity rows and accepts exactly one distinct `unique`/`resolved` target.
+  The prior DB-backed closeout run preserved 5,138 of 5,194 links and enumerated
+  56 unresolved rows.
+- An already-adjudicated tracked DraftGuru link decision now supplies Matthew
+  Rendell's AFL Tables identity, covering four additional manifest links without
+  name matching. The remaining repository identity gap is 18 players / 33
+  manifest rows, all fail-closed; the improved DB count awaits the next reload.
+- **The canonical test rebuild has an awards-and-honours restoration stage.**
+  `tools/db/rebuild-test.ts` gains an AWARDS & HONOURS stage between DraftGuru
+  and DERIVED, carrying no legacy source, with per-family row-count gates in
+  final validation. Coleman keeps its own later stage, unchanged. End-to-end
+  execution remains blocked on the absent accepted raw snapshots.
+- The 21 previously legacy-gated reload/link fixtures now exercise manifest
+  groups while preserving their decision replay, ownership, idempotency and
+  cross-family assertions. Their DB-backed rerun is still required before G3
+  or the non-vacuous G5 contract can pass.
+- The legacy `awards` group is retained as **compatibility-only** for a
+  deliberate full re-extract; it is no longer part of the rebuild or of the
+  standing refresh sequence, and `docs/deployment.md` names the manifest groups
+  explicitly instead.
+- No migration and no privilege change.
+
+### AFLDB-ISSUE-121 — administrative audit payloads are stored as JSONB objects - 1 September 2026
+
+- `auth_audit_log.detail` now stores a real JSONB **object**. Every row ever
+  written to that column held a JSONB **string scalar** whose contents were JSON
+  text: the writer bound `JSON.stringify(detail)`, and postgres.js — which learns
+  a parameter's type from the server and then applies its own JSONB serializer,
+  `JSON.stringify` — encoded it a second time. `jsonb_typeof(detail)` read
+  `'string'` and every `detail->>'field'` read NULL, so the administrative trail's
+  payloads were opaque to SQL. The single writer, `insertAuditRow()` in
+  `src/lib/auth/session.ts`, now binds `sql.json(detail)`, which fixes `audit()`
+  and `auditInTransaction()` together; an explicit `::jsonb` cast does not work,
+  because the parameter is encoded before the cast is applied.
+- Migration `082_auth_audit_log_jsonb_repair.sql` repairs the existing rows and
+  guards the column. The repair unwraps only values that are JSONB strings **and**
+  whose decoded text is a valid JSON object (`IS JSON OBJECT`), so NULLs and
+  already-correct objects are never rewritten and no other scalar is silently
+  reinterpreted; anything it cannot repair by rule aborts the migration with the
+  offending row ids rather than being guessed at. A new CHECK constraint,
+  `auth_audit_log_detail_is_object_ck`, then requires `detail IS NULL OR
+  jsonb_typeof(detail) = 'object'`. This is the deferred half of migration `048`,
+  which repaired the identical defect in `nl_search_log` and explicitly left this
+  column for a separate decision.
+- **No audit data was lost** — the payloads were intact under one surplus layer of
+  encoding, and unwrapping them is exact. No privilege, grant, retention or
+  append-only behaviour changed, and no other table is affected.
+- **Deployment order matters:** the new CHECK constraint rejects the old
+  double-encoded shape, so the migration must not be applied to a database whose
+  application code has not yet been updated, or audited admin actions fail closed.
+- Focused suites pass 43/43 and the wider audit-touching set 76/76, with a
+  regression test proving an object payload binds as a JSONB object rather than a
+  JSONB string; typecheck clean. The PostgreSQL integration suite for the
+  migration and the constraint passes 8/8 against `afldb_test`. Migration `082` is
+  applied to `afldb_test` and `afldb_dev`; the pre-existing `auth_audit_log` row
+  that exposed the defect now reads `jsonb_typeof(detail) = 'object'` with its
+  recorded counts intact. Not yet applied to production.
+
+### AFLDB-ISSUE-120 — public-surface abuse hardening before launch - 1 September 2026
+
+- The public natural-language `/search` path now enforces a per-worker, per-IP
+  rate limit of 30 requests per 60 seconds ahead of the NL pipeline. A limited
+  request returns the friendly "Too many searches / Please try again shortly."
+  response without running `globalSearch()` or writing an `nl_search_log` row,
+  and limiter or client-IP resolution failures fail open so search availability
+  is never traded for limiting. AFLW search is unaffected.
+- `/api/health-event` bounds the request body to 32 KiB, checking `Content-Length`
+  and enforcing the same cap while streaming, and returns HTTP 413 for oversized
+  bodies before JSON parsing. Malformed JSON still returns 400; normal events are
+  unchanged.
+- Request-derived catalogue keys for career records
+  (`CAREER_COLUMNS`) and AFLW match outcomes (`AFLW_MATCH_OUTCOME_FILTERS`) are
+  now checked with `Object.hasOwn`, so crafted prototype keys such as
+  `constructor` resolve to a clean empty/404 result instead of a 500.
+- No schema, migration, privilege, beta-gate or NL-semantics changes. Focused
+  suites pass 19/19 and typecheck passes. Authenticated dev live acceptance
+  confirmed the 31st search from one IP on the same worker is limited
+  (`limitedAt: 31`) while exactly 30 `nl_search_log` rows are written for the 31
+  requests, and an oversized `/api/health-event` body returns 413.
+
+### AFLDB-ISSUE-119 — Super Admin can clear NL search telemetry - 1 September 2026
+
+- Added a Super Admin-only control on `/admin/nl-search` to permanently
+  delete disposable `nl_search_log` rows — telemetry with no admin review
+  and no matching reader feedback. Every review and every piece of reader
+  feedback is retained unconditionally, along with the log rows they
+  reference to the full recursive `parent_search_id` depth; only the
+  schema's own `app_health_events.related_search_id` links to deleted rows
+  are detached, never the health rows themselves. Identity sequences are
+  not reset.
+- The operator must type the exact phrase `CLEAR SEARCH TELEMETRY`, checked
+  again on the server before anything runs. Deletion happens through a new
+  restricted database capability, `public.nl_search_telemetry_clear()`
+  (migration 081) — a `SECURITY DEFINER` function owned by `afldb_owner`
+  that `afldb_auth` may only `EXECUTE`; the application role still holds no
+  direct `DELETE`/`TRUNCATE` on `nl_search_log`, `nl_search_review` or
+  `nl_search_feedback`. Deletion and its count-only `auth_audit_log` row
+  (`nl_search.telemetry_cleared`) commit atomically; an audit failure rolls
+  the deletion back, and logging resumes immediately after the cutoff.
+- `docs/search.md` documents the retention guarantees and the audit trail.
+
 ### AFLDB-ISSUE-110 — ranked career season-scope fail-closed guard - 31 August 2026
 
 - Parser version remains 32. Validation now refuses every non-predicate
