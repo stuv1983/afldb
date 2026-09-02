@@ -2598,9 +2598,14 @@ describe('S4 promotion decisions — append-only, and never an accept', () => {
  * projection rules. Every fixture is a literal and every call is pure — no
  * snapshot on disk, no database, no clock.
  */
+import { CANONICAL_TARGET_TABLES } from '@/lib/acquisition/canonical-apply';
 import {
   agreementRestored,
   autoApplyOwnership,
+  canonicalApplyIssueKey,
+  CANONICAL_APPLY_ISSUE_TYPE,
+  MATCH_TARGET_TABLES,
+  PLAYER_MATCH_TARGET_TABLES,
   contractFamilyOf,
   disagreementConflicts,
   disagreementSeverity,
@@ -3729,5 +3734,304 @@ describe('AFLDB-ISSUE-122 §8 — data_edits is not the authority source', () =>
     expect(cli).toContain('manualAuthorityLoader: (tx) => loadManualAuthority(tx, bundle.season)');
     const settle = readSource('src/lib/acquisition/settle-afltables.ts');
     expect(settle).toContain('manualAuthority: await options.manualAuthorityLoader(tx)');
+  });
+});
+
+/* ================================================================== *
+ * AFLDB-ISSUE-122 S5 — the applier's DB-free contracts
+ * ================================================================== */
+
+/**
+ * The facts about `canonical-apply.ts` that must not drift and that need no
+ * database to check.
+ *
+ * The behavioural proofs — every gate, both savepoint boundaries, the ledger,
+ * the retry and the failure isolation — are in
+ * `tests/integration/settle-afltables.test.ts` against real PostgreSQL,
+ * because a canonical mutation is not a thing that can be proved in the
+ * abstract.
+ */
+describe('AFLDB-ISSUE-122 S5 — the canonical applier contract', () => {
+  const applier = readSource('src/lib/acquisition/canonical-apply.ts');
+  /**
+   * The module with its prose removed.
+   *
+   * The header and the per-writer comments NAME the things these assertions
+   * prove absent — `createMatch()`, `promotion_decisions` — so scanning the
+   * raw file would match its own documentation and pass or fail for the wrong
+   * reason. These assertions are about the code.
+   */
+  const applierCode = applier
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+  it('writes exactly the four targets the settle pass and migration 083 name', () => {
+    // `canonical-apply.ts` declares this union itself, so the dependency runs
+    // one way only: the settle pass imports the applier, never the reverse.
+    // That is only safe while the two agree, so they are pinned to each other
+    // here rather than left to a comment.
+    expect([...CANONICAL_TARGET_TABLES].sort()).toEqual(
+      [...MATCH_TARGET_TABLES, ...PLAYER_MATCH_TARGET_TABLES].sort(),
+    );
+    const ddl = readSource('src/db/migrations/083_canonical_auto_apply.sql');
+    for (const target of CANONICAL_TARGET_TABLES) {
+      expect(ddl).toContain(`'${target}'`);
+    }
+  });
+
+  it('keeps the apply-failure issue_type DISTINCT from the disagreement one '
+    + '(§9.2, AFLDB-ISSUE-104)', () => {
+    // Migration 076's dedup index is (issue_type, issue_key) over open rows,
+    // so two writers with different issue_types can never contend for the
+    // same entry. That is ISSUE-104's binding precondition, satisfied without
+    // a migration — and it lapses silently if these ever converge.
+    expect(CANONICAL_APPLY_ISSUE_TYPE).toBe('canonical_apply_failed');
+    expect(CANONICAL_APPLY_ISSUE_TYPE).not.toBe(SETTLE_ISSUE_TYPE);
+
+    expect(canonicalApplyIssueKey('afltables.match', 'rec-1', 'matches'))
+      .toBe('afltables|apply|match|rec-1|matches');
+    // The contract family, never the dotted wire name, and never colliding
+    // with the disagreement key for the same record and target.
+    expect(canonicalApplyIssueKey('afltables.match', 'rec-1', 'matches'))
+      .not.toBe(settleIssueKey('afltables.match', 'rec-1', 'matches'));
+    expect(() => canonicalApplyIssueKey('afltables.match', '', 'matches'))
+      .toThrow(/external record id/);
+  });
+
+  it('reuses no writer that could render match_key, and creates no identity', () => {
+    // §7.1: three incompatible `match_key` renderings exist in this
+    // repository, and a wrong one inserts a duplicate fixture instead of
+    // conflicting. The applier calls none of them and uses the bundle
+    // projection's key verbatim.
+    expect(applierCode).not.toMatch(/createMatch\s*\(/);
+    // §9.4 and the standing rule: no source creates an identity.
+    for (const table of ['players', 'clubs', 'venues', 'venue_aliases', 'external_identities']) {
+      expect(applierCode).not.toMatch(new RegExp(`INSERT\\s+INTO\\s+${table}\\b`, 'i'));
+    }
+  });
+
+  it('writes neither review ledger: the queue and the decisions stay human', () => {
+    // §5.2 / SC8. A successful automatic application creates no candidate and
+    // fabricates no admin decision, so the applier names neither table in any
+    // statement at all — the mentions left in the file are prose saying so.
+    expect(applierCode).not.toMatch(/promotion_(candidates|decisions)/);
+    // The one machine ledger it does write, in the same savepoint as the
+    // mutation it describes.
+    expect(applierCode).toMatch(/INSERT\s+INTO\s+canonical_applications/);
+  });
+
+  it('touches only the four canonical fact tables and the ledger', () => {
+    const written = [...applierCode.matchAll(/(?:INSERT\s+INTO|UPDATE)\s+([a-z_]+)/g)]
+      .map((match) => match[1]);
+    expect([...new Set(written)].sort()).toEqual([
+      'brownlow_round_votes', 'canonical_applications', 'match_period_scores',
+      'matches', 'player_match_stats',
+    ]);
+  });
+});
+
+/* ================================================================== *
+ * AFLDB-ISSUE-122 S6 — run integration, the DB-free contracts
+ * ================================================================== */
+
+import { parseSettleArgs } from '../tools/current-season/settle-afltables';
+import {
+  automaticProposal,
+  DERIVED_OWNED_FIELDS,
+} from '@/lib/acquisition/settle-afltables';
+import {
+  classifyCandidate,
+  isMatchFamilyTarget,
+  playerNameOf,
+  renderSettleExceptionReport,
+  splitRejectionReason,
+  type SettleExceptionReport,
+} from '@/lib/acquisition/settle-report';
+
+/**
+ * The S6 facts that need no database: the CLI's flag contract, the pure
+ * exception classification behind the §9.3 report, and the source-shape pins
+ * that keep the derived recompute wired the way §13 requires. The end-to-end
+ * proof — dry-run, apply, identical apply, retry, report — is the nested S6
+ * suite in `tests/integration/settle-afltables.test.ts` against PostgreSQL.
+ */
+describe('AFLDB-ISSUE-122 S6 — the operational path contract', () => {
+  const settle = readSource('src/lib/acquisition/settle-afltables.ts');
+  const cli = readSource('tools/current-season/settle-afltables.ts');
+  const cliCode = cli
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+  describe('the CLI flag contract', () => {
+    it('keeps the automatic path explicit: off unless --auto-apply is given', () => {
+      expect(parseSettleArgs(['--label', 'snap', '--dry-run']))
+        .toEqual({ label: 'snap', apply: false, autoApply: false, report: false });
+      expect(parseSettleArgs(['--label', 'snap', '--apply']).autoApply).toBe(false);
+      expect(parseSettleArgs(['--label', 'snap', '--apply', '--auto-apply']))
+        .toEqual({ label: 'snap', apply: true, autoApply: true, report: false });
+      // The preview: the whole automatic path, rolled back.
+      expect(parseSettleArgs(['--label', 'snap', '--dry-run', '--auto-apply']))
+        .toEqual({ label: 'snap', apply: false, autoApply: true, report: false });
+      expect(parseSettleArgs(['--label', 'snap', '--report']).report).toBe(true);
+    });
+
+    it('refuses what it cannot honour rather than guessing', () => {
+      expect(() => parseSettleArgs(['--apply'])).toThrow(/--label <snapshot> is required/);
+      expect(() => parseSettleArgs(['--label', 'snap', '--apply', '--dry-run']))
+        .toThrow(/mutually exclusive/);
+      // A mistyped flag would otherwise run the review-first path and look
+      // like an automatic run that wrote nothing.
+      expect(() => parseSettleArgs(['--label', 'snap', '--apply', '--auto-aply']))
+        .toThrow(/Unknown flag '--auto-aply'/);
+    });
+
+    it('has no force flag and no bypass, and is reachable as npm run settle:afltables', () => {
+      expect(cliCode).not.toMatch(/--force|--bypass|--skip|--override/);
+      // The switch decides whether the automatic path RUNS; E2 is handed the
+      // same list the bundle was validated against and re-evaluated at the write.
+      expect(cliCode).toMatch(/autoApply:\s*args\.autoApply/);
+      expect(cliCode).toMatch(/inProgressSeasons,/);
+      const scripts = (JSON.parse(readFileSync('package.json', 'utf8')) as {
+        scripts: Record<string, string>;
+      }).scripts;
+      expect(scripts['settle:afltables']).toBe('tsx tools/current-season/settle-afltables.ts');
+    });
+  });
+
+  describe('the derived recompute wiring (§13)', () => {
+    it('treats career_game_no as derived-owned on the automatic path, and nothing else', () => {
+      // Two writers for one column would retry the write every night over
+      // identical source data (SC3): the recompute renumbers what the
+      // applier wrote. So the automatic path neither writes nor compares it.
+      expect(DERIVED_OWNED_FIELDS).toEqual({ player_match_stats: ['career_game_no'] });
+      const proposal = { career_game_no: 12, kicks: 5, club_id: 3 };
+      expect(automaticProposal('player_match_stats', proposal))
+        .toEqual({ kicks: 5, club_id: 3 });
+      // Every other target's proposal passes through untouched, by identity.
+      for (const target of ['matches', 'match_period_scores', 'brownlow_round_votes'] as const) {
+        expect(automaticProposal(target, proposal)).toBe(proposal);
+      }
+      // And the derived helper is what fills the column in the same transaction.
+      expect(readSource('src/db/queries/player-derived.ts')).toMatch(/SET career_game_no = /);
+    });
+
+    it('reuses the four player-derived helpers, in the admin order, once, gated on a write',
+      () => {
+        const gate = 'if (counters.canonicalRowsInserted + counters.canonicalRowsUpdated > 0)';
+        const start = settle.indexOf(gate);
+        expect(start).toBeGreaterThan(0);
+        const block = settle.slice(start, settle.indexOf('\n      }', start));
+        const order = [
+          'recomputeSeasonMetadata(tx, bundle.season)',
+          'recomputeClubSeasons(tx, bundle.season)',
+          'recomputePlayerDerivedStats(tx, playerIds, bundle.season)',
+          'recomputeSeasonBrownlowStatus(tx, bundle.season)',
+        ];
+        let cursor = 0;
+        for (const call of order) {
+          const at = block.indexOf(call, cursor);
+          expect(at, call).toBeGreaterThan(-1);
+          cursor = at;
+        }
+        // Exactly one call site each: once per run, never per record. (The
+        // prose names them more often; only an `await` is a call.)
+        for (const call of order) {
+          const name = `await ${call.split('(')[0]}(`;
+          expect(settle.split(name).length - 1, name).toBe(1);
+        }
+        expect(settle).toContain("from '../../db/queries/player-derived'");
+        // Nothing replaces the helpers: no derived table is written directly.
+        for (const table of [
+          'club_seasons', 'player_clubs', 'player_season_stats', 'player_career_stats',
+          'player_club_season_stats',
+        ]) {
+          expect(settle).not.toMatch(
+            new RegExp(`(INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\s+${table}\\b`),
+          );
+        }
+      });
+  });
+
+  describe('the §9.3 exception classification', () => {
+    it('calls a pending candidate moot only once its record applied at or after its version',
+      () => {
+        expect(classifyCandidate(1, null)).toBe('active');
+        expect(classifyCandidate(1, 1)).toBe('moot'); // the §9.3 retry: same version
+        expect(classifyCandidate(1, 2)).toBe('moot'); // superseded by a later apply
+        expect(classifyCandidate(2, 1)).toBe('active'); // the apply predates the exception
+      });
+
+    it("reads the settle's rejection reason back into target and reason", () => {
+      expect(splitRejectionReason('player_match_stats: no external identity for url'))
+        .toEqual({ targetTable: 'player_match_stats', reason: 'no external identity for url' });
+      expect(splitRejectionReason('free text'))
+        .toEqual({ targetTable: 'unknown', reason: 'free text' });
+      expect(isMatchFamilyTarget('matches')).toBe(true);
+      expect(isMatchFamilyTarget('match_period_scores')).toBe(true);
+      expect(isMatchFamilyTarget('player_match_stats')).toBe(false);
+      expect(isMatchFamilyTarget('brownlow_round_votes')).toBe(false);
+    });
+
+    it('takes the display name from display columns only, never as an identity', () => {
+      expect(playerNameOf({ player_name: 'A B', first_name: 'X', surname: 'Y' })).toBe('A B');
+      expect(playerNameOf({ first_name: 'X', surname: 'Y' })).toBe('X Y');
+      expect(playerNameOf({ surname: 'Y' })).toBe('Y');
+      expect(playerNameOf({ url: 'players/x.html' })).toBeNull();
+    });
+
+    it('renders active exceptions apart from moot candidates, with the §9.3 context', () => {
+      const report: SettleExceptionReport = {
+        sourceKey: 'afltables',
+        season: 2026,
+        latestBatch: {
+          batchId: '42' as never, completedAt: '2026-09-02', recordsRead: 3, recordsRejected: 1,
+        },
+        unresolvedRecords: [{
+          sourceKey: 'afltables', family: 'player_match_stats', externalRecordId: 'p@k',
+          sourceVersionSeq: 1, matchKey: 'k', season: 2026, roundCode: '1',
+          playerName: 'New Debutant', profileUrl: 'players/N/New_Debutant.html',
+          clubRaw: 'Carlton', targetTable: 'player_match_stats',
+          reason: 'no external identity', canonicalMatchApplied: true, canonicalMatchId: 7,
+        }],
+        candidates: {
+          active: [{
+            candidateId: '1', family: 'match', externalRecordId: 'k', sourceVersionSeq: 2,
+            verb: 'corrected', targetTable: 'matches', targetId: 7, createdAt: 't',
+            latestAppliedVersionSeq: 1, status: 'active',
+          }],
+          moot: [{
+            candidateId: '2', family: 'player_match_stats', externalRecordId: 'q@k',
+            sourceVersionSeq: 1, verb: 'unresolved_identity', targetTable: 'player_match_stats',
+            targetId: null, createdAt: 't', latestAppliedVersionSeq: 1, status: 'moot',
+          }],
+        },
+        applyFailures: [],
+        disagreements: [],
+        findingsTruncated: false,
+      };
+      const text = renderSettleExceptionReport(report).join('\n');
+      expect(text).toContain('ACTIVE — requires attention (2)');
+      expect(text).toContain(
+        "player_match_stats 'p@k' v1 -> player_match_stats: no external identity",
+      );
+      expect(text).toContain(
+        'player New Debutant · profile players/N/New_Debutant.html · club Carlton'
+        + ' · season 2026 · round 1',
+      );
+      expect(text).toContain('match k: canonical (matches.id 7)');
+      expect(text).toContain("#1 match 'k' v2 -> matches (corrected), last applied v1");
+      expect(text).toContain('MOOT — pending candidates whose record has since applied (1)');
+      expect(text).toContain(
+        "#2 player_match_stats 'q@k' v1 -> player_match_stats (unresolved_identity), applied v1",
+      );
+      // A record whose match has NOT landed says so in as many words.
+      const notLanded = renderSettleExceptionReport({
+        ...report,
+        unresolvedRecords: [{
+          ...report.unresolvedRecords[0], canonicalMatchApplied: false, canonicalMatchId: null,
+        }],
+      }).join('\n');
+      expect(notLanded).toContain('match k: NOT canonical');
+    });
   });
 });

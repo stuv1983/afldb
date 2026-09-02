@@ -72,7 +72,12 @@
  */
 import './guard';
 
-import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import {
+  copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -87,9 +92,14 @@ import { persistSourceObservation } from '@/lib/acquisition/observation-store';
 import {
   UNAVAILABLE_MANUAL_AUTHORITY,
   type JsonValue,
+  type ManualAuthorityProvider,
 } from '@/lib/acquisition/observations';
 import {
+  canonicalApplyIssueKey,
+  CANONICAL_APPLY_ISSUE_TYPE,
   runSettleAfltables,
+  settleIssueKey,
+  SETTLE_ISSUE_TYPE,
   validateSettleBundle,
   type SettleBundle,
   type SettleRunResult,
@@ -98,7 +108,13 @@ import {
   getSourceFamily,
   parseSourceFamilyRegistry,
 } from '@/lib/acquisition/source-families';
+import { buildSettleExceptionReport } from '@/lib/acquisition/settle-report';
 import { asImportBatchId, type ImportBatchId } from '@/lib/import-batch-id';
+
+import {
+  runSettleCli,
+  type SettleCliOutcome,
+} from '../../tools/current-season/settle-afltables';
 
 import { createImportRoleParityHarness } from './import-role-parity';
 
@@ -1977,5 +1993,1759 @@ describe('AFLDB-ISSUE-122 §8 — manual authority read from data_overrides', ()
     } finally {
       await broken.end({ timeout: 5 });
     }
+  });
+});
+
+
+/* ================================================================== *
+ * AFLDB-ISSUE-122 S5 — the canonical applier against PostgreSQL
+ *
+ * This is the suite that proves ISSUE-099's §15 prohibition has been
+ * deliberately superseded for AFL Tables current-season data, and that
+ * everything it protected is still protected.
+ *
+ * **It writes canonical fact rows on purpose.** That is the whole point: the
+ * ISSUE-099 suite above proves settle writes none with `autoApply` off, and
+ * this one proves what happens with it on. Every row it writes is namespaced
+ * — season **2093**, the `issue122-` external-record-id prefix, its own
+ * players and its own match keys — and every one is removed in `afterAll`.
+ * It runs AFTER the §15 count and xid proofs, and it uses its own run helper
+ * rather than `runSettle()`, whose bracketed zero-canonical assertions are
+ * correct for the automatic path being OFF and would be wrong here.
+ *
+ * 2093 appears in no other test. Two REAL historical club identities are read
+ * and never written, and no venue is mapped, so `venue_id` stays NULL with the
+ * real `venue_raw` — §7.3's designed outcome for this path.
+ *
+ * @see issues/open/AFLDB-ISSUE-122.md §5, §6, §7, §9, §12, §13, §17
+ * @see src/lib/acquisition/canonical-apply.ts
+ * ================================================================== */
+
+const SEASON122 = 2093;
+const PREFIX122 = 'issue122-';
+const LABEL122 = 'issue122-apply-test';
+const SLUG122 = 'issue122-';
+
+const SCOPE122 = 'issue122-main';
+const SCOPE_FOREIGN = 'issue122-foreign';
+const SCOPE_SOURCELESS = 'issue122-sourceless';
+const SCOPE_BROKEN = 'issue122-broken';
+
+const MATCH_A = 'issue122-match-a';
+const KEY_A = 'issue122-key-a';
+const MATCH_FOREIGN = 'issue122-match-foreign';
+const KEY_FOREIGN = 'issue122-key-foreign';
+const MATCH_SOURCELESS = 'issue122-match-sourceless';
+const KEY_SOURCELESS = 'issue122-key-sourceless';
+const MATCH_BROKEN = 'issue122-match-broken';
+const KEY_BROKEN = 'issue122-key-broken';
+const MATCH_OK = 'issue122-match-ok';
+const KEY_OK = 'issue122-key-ok';
+
+const LINKED_RECORD = 'issue122-player-linked';
+const LINKED_URL = 'issue122-players/L/Issue122_Linked.html';
+const DEBUT_RECORD = 'issue122-player-debut';
+const DEBUT_URL = 'issue122-players/D/Issue122_Debut.html';
+
+const VENUE_RAW122 = 'ISSUE-122 Unmapped Ground';
+const PROVIDER_GAME_122 = 'issue122-squiggle-a';
+
+/** Ordered observation times, one per run, strictly increasing. */
+const T122 = {
+  dryRun: '2093-04-05T00:00:00Z',
+  applyFirst: '2093-04-06T00:00:00Z',
+  rerun: '2093-04-07T00:00:00Z',
+  correction: '2093-04-08T00:00:00Z',
+  revert: '2093-04-09T00:00:00Z',
+  retry: '2093-04-10T00:00:00Z',
+  brownlow: '2093-04-11T00:00:00Z',
+  overrideBlocked: '2093-04-12T00:00:00Z',
+  overrideCleared: '2093-04-13T00:00:00Z',
+  foreign: '2093-04-14T00:00:00Z',
+  sourceless: '2093-04-15T00:00:00Z',
+  broken: '2093-04-16T00:00:00Z',
+  advisory: '2093-04-17T00:00:00Z',
+} as const;
+
+type Ids122 = {
+  linkedPlayerId: number;
+  debutPlayerId: number;
+  adminUserId: number;
+};
+
+let ids122: Ids122;
+let createdAdmin122 = false;
+
+/* -- fixtures ------------------------------------------------------- */
+
+function payload122(over: Record<string, JsonValue> = {}): JsonValue {
+  return {
+    issue122_fixture: true,
+    season: SEASON122,
+    round_code: '1',
+    match_date: '2093-04-04',
+    home_team_raw: 'Issue122 Home',
+    away_team_raw: 'Issue122 Away',
+    home_goals: 15, home_behinds: 10, home_points: 100,
+    away_goals: 10, away_behinds: 12, away_points: 72,
+    margin: 28,
+    ...over,
+  };
+}
+
+/**
+ * The `matches` + `match_period_scores` proposal. Every arithmetic identity
+ * the canonical CHECK constraints enforce holds: 6*15+10 = 100, 6*10+12 = 72,
+ * |100-72| = 28, and each quarter reconciles the same way.
+ */
+function projection122(
+  matchKey: string, over: Record<string, JsonValue> = {},
+): JsonValue {
+  return {
+    match_key: matchKey,
+    season: SEASON122,
+    round_code: '1',
+    round_number: 1,
+    round_type: 'home_and_away',
+    is_final: false,
+    match_date: '2093-04-04',
+    match_time: '3:20 PM',
+    // Mapped by no venue, on purpose (§7.3): venue_id stays NULL and
+    // venue_raw carries the real string. No venues row is ever created.
+    venue_raw: VENUE_RAW122,
+    home_club_hist: fixtures.homeClubHist,
+    away_club_hist: fixtures.awayClubHist,
+    home_goals: 15, home_behinds: 10, home_score: 100,
+    away_goals: 10, away_behinds: 12, away_score: 72,
+    result: 'home_win', winner_club_hist: fixtures.homeClubHist, margin: 28,
+    attendance: 31000, attendance_status: 'complete', attendance_source_key: 'afltables',
+    period_scores: [
+      { side: 'home', period: 1, goals: 3, behinds: 2, points: 20 },
+      { side: 'away', period: 1, goals: 2, behinds: 3, points: 15 },
+      { side: 'home', period: 2, goals: 7, behinds: 5, points: 47 },
+      { side: 'away', period: 2, goals: 5, behinds: 6, points: 36 },
+    ],
+    ...over,
+  };
+}
+
+function playerPayload122(url: string, over: Record<string, JsonValue> = {}): JsonValue {
+  return {
+    issue122_fixture: true,
+    url,
+    match_key: KEY_A,
+    season: SEASON122,
+    round_code: '1',
+    playing_for_raw: 'Issue122 Away',
+    ...over,
+  };
+}
+
+function statsWith(over: Record<string, JsonValue> = {}): JsonValue {
+  const stats: Record<string, JsonValue> = {};
+  for (const column of [
+    'kicks', 'marks', 'handballs', 'disposals', 'goals', 'behinds', 'hitouts',
+    'tackles', 'rebounds', 'inside_50s', 'clearances', 'clangers', 'frees_for',
+    'frees_against', 'contested', 'uncontested', 'contested_marks',
+    'marks_inside_50', 'one_percenters', 'bounces', 'goal_assists',
+  ]) stats[column] = 5;
+  // NA. AFL Tables publishes no votes until the count, so no
+  // brownlow_round_votes target exists at all — never a zero, never a filler.
+  stats.brownlow_votes = null;
+  return { ...stats, ...over } as JsonValue;
+}
+
+function playerProjection122(url: string, over: Record<string, JsonValue> = {}): JsonValue {
+  const stats = statsWith();
+  return {
+    url,
+    afltables_id: null,
+    match_key: KEY_A,
+    season: SEASON122,
+    round_code: '1',
+    round_number: 1,
+    is_final: false,
+    club_hist: fixtures.awayClubHist,
+    career_game_no: 12,
+    jumper_number: '9',
+    stats,
+    brownlow_round_vote: null,
+    ...over,
+  };
+}
+
+type MatchSpec = {
+  recordId: string;
+  matchKey: string;
+  scope: string;
+  payloadOver?: Record<string, JsonValue>;
+  projectionOver?: Record<string, JsonValue>;
+};
+
+type PlayerSpec = {
+  recordId: string;
+  url: string;
+  payloadOver?: Record<string, JsonValue>;
+  projectionOver?: Record<string, JsonValue>;
+};
+
+/**
+ * A bundle over exactly the records a test names, enumerated in exactly the
+ * scopes those records occupy.
+ *
+ * Every enumeration is `complete`, so each run sweeps its own scopes and only
+ * its own: a test that names no player record enumerates no player scope, and
+ * a scope this bundle never mentions can never be swept.
+ */
+function bundle122(spec: {
+  matches?: readonly MatchSpec[];
+  players?: readonly PlayerSpec[];
+} = {}): SettleBundle {
+  const matches = spec.matches
+    ?? [{ recordId: MATCH_A, matchKey: KEY_A, scope: SCOPE122 }];
+  const players = spec.players ?? [
+    { recordId: LINKED_RECORD, url: LINKED_URL },
+    { recordId: DEBUT_RECORD, url: DEBUT_URL },
+  ];
+
+  const records: JsonValue[] = [
+    ...matches.map((match) => ({
+      family: 'afltables.match',
+      scope_key: match.scope,
+      external_record_id: match.recordId,
+      payload: payload122({ issue122_record: match.recordId, ...match.payloadOver }),
+      observed_columns: [...(matchContract.knownColumns ?? [])],
+      projection: projection122(match.matchKey, match.projectionOver),
+      rejection: null,
+    })),
+    ...players.map((player) => ({
+      family: 'afltables.player_match_stats',
+      scope_key: SCOPE122,
+      external_record_id: player.recordId,
+      payload: playerPayload122(player.url, player.payloadOver),
+      observed_columns: [...(playerContract.knownColumns ?? [])],
+      projection: playerProjection122(player.url, player.projectionOver),
+      rejection: null,
+    })),
+  ] as JsonValue[];
+
+  const matchScopes = [...new Set(matches.map((match) => match.scope))];
+  const enumerations: JsonValue[] = matchScopes.map((scope) => ({
+    family: 'afltables.match',
+    scope_key: scope,
+    complete: true,
+    incomplete_reason: null,
+    external_record_ids: matches
+      .filter((match) => match.scope === scope)
+      .map((match) => match.recordId),
+  }));
+  if (players.length > 0) {
+    enumerations.push({
+      family: 'afltables.player_match_stats',
+      scope_key: SCOPE122,
+      complete: true,
+      incomplete_reason: null,
+      external_record_ids: players.map((player) => player.recordId),
+    });
+  }
+
+  return validateSettleBundle({
+    raw: {
+      bundle_contract_version: 1,
+      generated_by: 'tools/migration/import_fitzroy_core.py',
+      snapshot_label: LABEL122,
+      manifest_path: `docs/rebuild-manifests/afltables_fitzroy_core/${LABEL122}.json`,
+      manifest_sha256: MANIFEST_SHA,
+      acquisition_kind: 'in_season_partial',
+      season: SEASON122,
+      fitzroy_version: '1.8.0',
+      enumerations,
+      records,
+      unkeyed_rejections: [],
+      counts: {
+        matches: matches.length,
+        player_match_rows: players.length,
+        rejections: 0,
+        unkeyed_rejections: 0,
+      },
+    } as JsonValue,
+    expectedSnapshotLabel: LABEL122,
+    actualManifestSha256: MANIFEST_SHA,
+    inProgressSeasons: [SEASON122],
+    registry,
+  });
+}
+
+/**
+ * One settle run with the AUTOMATIC path on.
+ *
+ * `manualAuthorityLoader` defaults to the real `data_overrides`-backed
+ * provider. A test may hand in a deliberately permissive one to prove the
+ * applier does NOT trust the run-level snapshot — that is the S2 race S3/S4
+ * recorded as binding on this stage, and the only honest way to prove the
+ * re-read inside the savepoint is load-bearing.
+ */
+async function apply122(
+  bundle: SettleBundle,
+  observedAt: string,
+  over: {
+    apply?: boolean;
+    autoApply?: boolean;
+    manualAuthorityLoader?: (
+      tx: postgres.TransactionSql,
+    ) => Promise<ManualAuthorityProvider>;
+  } = {},
+): Promise<SettleRunResult> {
+  return runSettleAfltables(sql, {
+    bundle,
+    registry,
+    apply: over.apply ?? true,
+    autoApply: over.autoApply ?? true,
+    inProgressSeasons: [SEASON122],
+    manualAuthority: UNAVAILABLE_MANUAL_AUTHORITY,
+    manualAuthorityLoader: over.manualAuthorityLoader
+      ?? ((tx) => loadManualAuthority(tx, SEASON122)),
+    observedAt,
+  });
+}
+
+/* -- readers -------------------------------------------------------- */
+
+type MatchRow = {
+  id: number; homeScore: number; awayScore: number; attendance: number | null;
+  attendanceStatus: string; attendanceSourceId: number | null;
+  venueId: number | null; venueRaw: string; roundNumber: number | null;
+  sourceId: number | null; sourceRecordId: string | null; importBatchId: string | null;
+};
+
+async function matchRow122(matchKey: string): Promise<MatchRow | undefined> {
+  const [row] = await sql<MatchRow[]>`
+    SELECT id::int AS id, home_score AS "homeScore", away_score AS "awayScore",
+           attendance, attendance_status AS "attendanceStatus",
+           attendance_source_id::int AS "attendanceSourceId",
+           venue_id::int AS "venueId", venue_raw AS "venueRaw",
+           round_number::int AS "roundNumber",
+           source_id::int AS "sourceId", source_record_id AS "sourceRecordId",
+           import_batch_id::text AS "importBatchId"
+      FROM matches WHERE match_key = ${matchKey}
+  `;
+  return row;
+}
+
+type LedgerRow = {
+  family: string; externalRecordId: string; sourceVersionSeq: number;
+  targetTable: string; targetKey: JsonValue; verb: string;
+  previousValues: JsonValue | null; newValues: JsonValue;
+  importBatchId: string; sourceId: number;
+};
+
+async function ledger122(): Promise<LedgerRow[]> {
+  const rows = await sql<LedgerRow[]>`
+    SELECT family, external_record_id AS "externalRecordId",
+           source_version_seq AS "sourceVersionSeq", target_table AS "targetTable",
+           target_key AS "targetKey", verb,
+           previous_values AS "previousValues", new_values AS "newValues",
+           import_batch_id::text AS "importBatchId", source_id::int AS "sourceId"
+      FROM canonical_applications
+     WHERE external_record_id LIKE ${`${PREFIX122}%`}
+     ORDER BY id
+  `;
+  return [...rows];
+}
+
+type PeriodRow122 = {
+  clubId: number; period: number; goals: number | null; behinds: number | null;
+  points: number | null; sourceId: number | null; sourceRecordId: string | null;
+};
+
+async function periods122(matchId: number): Promise<PeriodRow122[]> {
+  const rows = await sql<PeriodRow122[]>`
+    SELECT club_id::int AS "clubId", period::int AS period, goals, behinds, points,
+           source_id::int AS "sourceId", source_record_id AS "sourceRecordId"
+      FROM match_period_scores WHERE match_id = ${matchId}
+     ORDER BY club_id, period
+  `;
+  return [...rows];
+}
+
+type StatsRow122 = {
+  matchId: number; clubId: number; kicks: number | null; careerGameNo: number | null;
+  jumperNumber: string | null; brownlowVotes: number | null;
+  sourceId: number | null; sourceRecordId: string | null;
+};
+
+async function stats122(playerId: number): Promise<StatsRow122[]> {
+  const rows = await sql<StatsRow122[]>`
+    SELECT match_id::int AS "matchId", club_id::int AS "clubId", kicks,
+           career_game_no::int AS "careerGameNo", jumper_number AS "jumperNumber",
+           brownlow_votes::int AS "brownlowVotes",
+           source_id::int AS "sourceId", source_record_id AS "sourceRecordId"
+      FROM player_match_stats WHERE player_id = ${playerId}
+  `;
+  return [...rows];
+}
+
+type VoteRow122 = {
+  playerId: number; roundNumber: number; played: boolean; votes: number | null;
+  sourceId: number | null; sourceRecordId: string | null;
+};
+
+async function votes122(): Promise<VoteRow122[]> {
+  const rows = await sql<VoteRow122[]>`
+    SELECT player_id::int AS "playerId", round_number::int AS "roundNumber",
+           played, votes::int AS votes,
+           source_id::int AS "sourceId", source_record_id AS "sourceRecordId"
+      FROM brownlow_round_votes WHERE season = ${SEASON122}
+     ORDER BY player_id, round_number
+  `;
+  return [...rows];
+}
+
+async function candidates122(): Promise<CandidateRow[]> {
+  const rows = await sql<CandidateRow[]>`
+    SELECT external_record_id AS "externalRecordId", target_table AS "targetTable",
+           verb, status, source_version_seq AS "sourceVersionSeq",
+           created_by_batch_id AS "createdByBatchId"
+      FROM promotion_candidates
+     WHERE external_record_id LIKE ${`${PREFIX122}%`}
+  `;
+  return [...rows].sort(byRecordThenTarget);
+}
+
+type IssueRow122 = {
+  issueType: string; issueKey: string; entityType: string; severity: string;
+  resolvedAt: string | null; details: Record<string, JsonValue>;
+};
+
+async function issues122(): Promise<IssueRow122[]> {
+  const rows = await sql<IssueRow122[]>`
+    SELECT issue_type AS "issueType", issue_key AS "issueKey",
+           entity_type AS "entityType", severity::text AS severity,
+           resolved_at::text AS "resolvedAt", details
+      FROM data_issues WHERE issue_key LIKE ${`%${PREFIX122}%`}
+     ORDER BY issue_key
+  `;
+  return [...rows];
+}
+
+/* -- cleanup -------------------------------------------------------- */
+
+/**
+ * Remove every row this suite can have committed, canonical rows included, in
+ * dependency-safe order. Run as a pre-clean as well as teardown: an
+ * interrupted earlier run leaves committed rows behind that `afterAll` alone
+ * cannot undo.
+ */
+async function cleanup122(client: postgres.Sql): Promise<void> {
+  const like = `${PREFIX122}%`;
+  // Before import_batches and the spine it references.
+  await client`DELETE FROM canonical_applications WHERE external_record_id LIKE ${like}`;
+  await client`DELETE FROM staging.afltables_match WHERE external_record_id LIKE ${like}`;
+  await client`DELETE FROM staging.afltables_player_match WHERE external_record_id LIKE ${like}`;
+  await client`DELETE FROM promotion_candidates WHERE external_record_id LIKE ${like}`;
+  await client`DELETE FROM import_rejections WHERE source_record_id LIKE ${like}`;
+  await client`DELETE FROM data_issues WHERE issue_key LIKE ${`%${PREFIX122}%`}`;
+  await client`
+    DELETE FROM data_overrides WHERE entity_type = 'matches' AND entity_key LIKE ${like}
+  `;
+  await client`
+    DELETE FROM staging.external_current_matches WHERE external_game_id LIKE ${like}
+  `;
+  // Canonical facts, children first. match_period_scores cascades from matches.
+  await client`DELETE FROM brownlow_round_votes WHERE season = ${SEASON122}`;
+  await client`
+    DELETE FROM player_match_stats
+     WHERE player_id IN (SELECT id FROM players WHERE slug LIKE ${`${SLUG122}%`})
+  `;
+  // S6: the derived rows the end-of-run recompute writes for this season and
+  // for this suite's players. They reference seasons and players, so they go
+  // before both. Every statement is a no-op when the recompute never ran.
+  await client`DELETE FROM club_seasons WHERE season = ${SEASON122}`;
+  for (const table of [
+    'player_clubs', 'player_club_season_stats', 'player_season_stats', 'player_career_stats',
+  ]) {
+    await client`
+      DELETE FROM ${client(table)}
+       WHERE player_id IN (SELECT id FROM players WHERE slug LIKE ${`${SLUG122}%`})
+    `;
+  }
+  await client`DELETE FROM matches WHERE match_key LIKE ${like}`;
+  await client`DELETE FROM staging.source_records WHERE external_record_id LIKE ${like}`;
+  await client`DELETE FROM staging.source_record_versions WHERE external_record_id LIKE ${like}`;
+  await client`
+    DELETE FROM staging.source_payloads WHERE raw_payload->>'issue122_fixture' IS NOT NULL
+  `;
+  await client`DELETE FROM external_identities WHERE external_id LIKE ${like}`;
+  await client`DELETE FROM players WHERE slug LIKE ${`${SLUG122}%`}`;
+  await client`DELETE FROM import_batches WHERE notes LIKE ${`%${LABEL122}%`}`;
+  await client`DELETE FROM seasons WHERE year = ${SEASON122}`;
+}
+
+describe('AFLDB-ISSUE-122 S5 — the canonical applier', () => {
+  beforeAll(async () => {
+    await cleanup122(sql);
+
+    await sql`
+      INSERT INTO seasons (year, league, status)
+      VALUES (${SEASON122}, 'AFL', 'in_progress'::season_status)
+      ON CONFLICT (year) DO NOTHING
+    `;
+
+    // FAIL CLOSED. This suite creates every canonical row on its own keys; a
+    // row already sitting on one is an unknown row, and adopting or
+    // overwriting it would corrupt someone else's data.
+    const collisions = await sql<{ matchKey: string }[]>`
+      SELECT match_key AS "matchKey" FROM matches WHERE match_key LIKE ${`${PREFIX122}%`}
+    `;
+    if (collisions.length > 0) {
+      throw new Error(
+        `Refusing to run: matches rows already exist on ISSUE-122 fixture keys `
+        + `(${collisions.map((row) => row.matchKey).join(', ')}). Remove them deliberately.`,
+      );
+    }
+
+    const [linked] = await sql<{ id: number }[]>`
+      INSERT INTO players (display_name, sort_name, search_name, slug)
+      VALUES ('Issue122 Linked', 'Linked, Issue122', 'issue122 linked',
+              ${`${SLUG122}linked`})
+      RETURNING id::int AS id
+    `;
+    const [debut] = await sql<{ id: number }[]>`
+      INSERT INTO players (display_name, sort_name, search_name, slug)
+      VALUES ('Issue122 Debutant', 'Debutant, Issue122', 'issue122 debutant',
+              ${`${SLUG122}debut`})
+      RETURNING id::int AS id
+    `;
+    // ONLY the linked player has an identity mapping. The debutant is the
+    // §9.4 case: real source identity, no canonical referent, and no source
+    // may create one.
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, match_method)
+      VALUES (${fixtures.sourceId}, ${LINKED_URL}, ${linked.id}, 'unique',
+              'afltables_profile_url')
+    `;
+
+    const [existingAdmin] = await sql<{ id: number }[]>`
+      SELECT id::int AS id FROM auth_users ORDER BY id LIMIT 1
+    `;
+    let adminUserId: number;
+    if (existingAdmin) {
+      adminUserId = existingAdmin.id;
+    } else {
+      const [created] = await sql<{ id: number }[]>`
+        INSERT INTO auth_users (email, role)
+        VALUES ('issue122-apply-test@example.test', 'admin')
+        RETURNING id::int AS id
+      `;
+      adminUserId = created.id;
+      createdAdmin122 = true;
+    }
+
+    ids122 = {
+      linkedPlayerId: linked.id,
+      debutPlayerId: debut.id,
+      adminUserId,
+    };
+  });
+
+  afterAll(async () => {
+    await cleanup122(sql);
+    if (createdAdmin122) {
+      await sql`DELETE FROM auth_users WHERE id = ${ids122.adminUserId}`;
+    }
+  });
+
+  /* ---------------------------------------------------------------- *
+   * §17.17 — the dry run still writes nothing
+   * ---------------------------------------------------------------- */
+
+  it('runs the whole automatic path in --dry-run and leaves no canonical row', async () => {
+    const result = await apply122(bundle122(), T122.dryRun, { apply: false });
+
+    expect(result.applied).toBe(false);
+    // The gates all passed and the writers all ran: the counters prove the
+    // path executed rather than being skipped.
+    expect(result.counters.canonicalRowsInserted).toBeGreaterThan(0);
+    expect(result.counters.canonicalApplicationsLogged).toBeGreaterThan(0);
+
+    // And every one of them was rolled back.
+    expect(await matchRow122(KEY_A)).toBeUndefined();
+    expect(await ledger122()).toEqual([]);
+    expect(await stats122(ids122.linkedPlayerId)).toEqual([]);
+    expect(await candidates122()).toEqual([]);
+  });
+
+  /* ---------------------------------------------------------------- *
+   * §17.1, .5, .6, .7, .8, .9, .21 — the unattended first apply
+   * ---------------------------------------------------------------- */
+
+  it('makes a new completed AFL Tables match canonical with no human action', async () => {
+    const result = await apply122(bundle122(), T122.applyFirst);
+
+    expect(result.applied).toBe(true);
+    // One matches row, four period rows, one player_match_stats row.
+    expect(result.counters.canonicalRowsInserted).toBe(6);
+    expect(result.counters.canonicalRowsUpdated).toBe(0);
+    expect(result.counters.canonicalApplicationsLogged).toBe(3);
+    expect(result.counters.canonicalApplyFailures).toBe(0);
+    expect(result.counters.canonicalRetryApplied).toBe(0);
+
+    const match = await matchRow122(KEY_A);
+    expect(match).toBeDefined();
+    expect({
+      homeScore: match?.homeScore,
+      awayScore: match?.awayScore,
+      attendance: match?.attendance,
+      attendanceStatus: match?.attendanceStatus,
+      venueId: match?.venueId,
+      venueRaw: match?.venueRaw,
+    }).toEqual({
+      homeScore: 100,
+      awayScore: 72,
+      attendance: 31000,
+      // A figure exists, so it is complete and cites its source.
+      attendanceStatus: 'complete',
+      // §7.3: unmapped is not a failure. NULL id, real raw string, no venues
+      // row created and never the literal 'Unknown'.
+      venueId: null,
+      venueRaw: VENUE_RAW122,
+    });
+    // The provenance quartet, stamped by the applier.
+    expect({
+      sourceId: match?.sourceId,
+      sourceRecordId: match?.sourceRecordId,
+      attendanceSourceId: match?.attendanceSourceId,
+      batch: match?.importBatchId,
+    }).toEqual({
+      sourceId: fixtures.sourceId,
+      sourceRecordId: MATCH_A,
+      attendanceSourceId: fixtures.sourceId,
+      batch: String(result.batchId),
+    });
+
+    // §17.5 — the period set landed WITH the match, cumulative as published.
+    const periods = await periods122(match?.id as number);
+    expect(periods.map((row) => ({
+      clubId: row.clubId, period: row.period, goals: row.goals, points: row.points,
+    }))).toEqual([
+      { clubId: fixtures.homeClubId, period: 1, goals: 3, points: 20 },
+      { clubId: fixtures.homeClubId, period: 2, goals: 7, points: 47 },
+      { clubId: fixtures.awayClubId, period: 1, goals: 2, points: 15 },
+      { clubId: fixtures.awayClubId, period: 2, goals: 5, points: 36 },
+    ]);
+    expect(new Set(periods.map((row) => row.sourceId))).toEqual(new Set([fixtures.sourceId]));
+    expect(new Set(periods.map((row) => row.sourceRecordId))).toEqual(new Set([MATCH_A]));
+
+    // §17.7 — the resolved player landed.
+    const linkedStats = await stats122(ids122.linkedPlayerId);
+    expect(linkedStats).toHaveLength(1);
+    expect({
+      matchId: linkedStats[0].matchId,
+      clubId: linkedStats[0].clubId,
+      kicks: linkedStats[0].kicks,
+      careerGameNo: linkedStats[0].careerGameNo,
+      jumperNumber: linkedStats[0].jumperNumber,
+      // Not proposed by this target and therefore never written here.
+      brownlowVotes: linkedStats[0].brownlowVotes,
+      sourceId: linkedStats[0].sourceId,
+      sourceRecordId: linkedStats[0].sourceRecordId,
+    }).toEqual({
+      matchId: match?.id,
+      clubId: fixtures.awayClubId,
+      kicks: 5,
+      // S6: derived-owned. The applier never writes `career_game_no`; the
+      // end-of-run recompute numbers it from AFLDB's own rows, and this is
+      // the player's first match here (the projection's 12 is corroboration
+      // at most). See DERIVED_OWNED_FIELDS in settle-afltables.ts.
+      careerGameNo: 1,
+      jumperNumber: '9',
+      brownlowVotes: null,
+      sourceId: fixtures.sourceId,
+      sourceRecordId: LINKED_RECORD,
+    });
+
+    // §17.7 / SC4 — ONE debutant blocks neither the match nor the other
+    // player. The match landed, the linked player landed, and the debutant
+    // alone is in the exception queue.
+    expect(await stats122(ids122.debutPlayerId)).toEqual([]);
+
+    // §17.8 — NA is not zero: no Brownlow row exists at all, which is the
+    // correct in-season outcome rather than a defect.
+    expect(await votes122()).toEqual([]);
+
+    // §17.21 / §5.2 — a successfully applied target creates NO candidate. The
+    // only pending row is the debutant's genuine exception.
+    expect(await candidates122()).toEqual([{
+      externalRecordId: DEBUT_RECORD,
+      targetTable: 'player_match_stats',
+      verb: 'unresolved_identity',
+      status: 'pending',
+      sourceVersionSeq: 1,
+      createdByBatchId: result.batchId,
+    }]);
+
+    // §12 — three ledger rows, one per applied target, all bound to the exact
+    // evidence version and the exact batch.
+    const ledger = await ledger122();
+    expect(ledger.map((row) => ({
+      family: row.family,
+      record: row.externalRecordId,
+      target: row.targetTable,
+      verb: row.verb,
+      seq: row.sourceVersionSeq,
+      batch: row.importBatchId,
+      previous: row.previousValues,
+    }))).toEqual([
+      { family: 'match', record: MATCH_A, target: 'matches', verb: 'insert', seq: 1,
+        batch: String(result.batchId), previous: null },
+      { family: 'match', record: MATCH_A, target: 'match_period_scores', verb: 'insert',
+        seq: 1, batch: String(result.batchId), previous: null },
+      { family: 'player_match_stats', record: LINKED_RECORD, target: 'player_match_stats',
+        verb: 'insert', seq: 1, batch: String(result.batchId), previous: null },
+    ]);
+    expect(ledger[0].targetKey).toEqual({ match_key: KEY_A });
+    expect((ledger[0].newValues as Record<string, JsonValue>).venue_id).toBeNull();
+    expect(ledger[2].targetKey).toEqual({
+      player_id: ids122.linkedPlayerId, match_id: match?.id,
+    });
+  });
+
+  /* ---------------------------------------------------------------- *
+   * §17.2 / SC3 — the identical rerun
+   * ---------------------------------------------------------------- */
+
+  it('reruns the identical bundle as a total no-op: no canonical write, no ledger row',
+    async () => {
+      const beforeLedger = await ledger122();
+      const beforeMatch = await matchRow122(KEY_A);
+      const beforeCandidates = await candidates122();
+
+      const result = await apply122(bundle122(), T122.rerun);
+
+      expect(result.counters.canonicalRowsInserted).toBe(0);
+      expect(result.counters.canonicalRowsUpdated).toBe(0);
+      expect(result.counters.canonicalApplicationsLogged).toBe(0);
+      expect(result.counters.canonicalRetryApplied).toBe(0);
+      // Every observation was unchanged, so nothing even reached a gate.
+      expect(result.counters.versionsAppended).toBe(0);
+
+      expect(await ledger122()).toEqual(beforeLedger);
+      expect(await matchRow122(KEY_A)).toEqual(beforeMatch);
+      expect(await candidates122()).toEqual(beforeCandidates);
+    });
+
+  /* ---------------------------------------------------------------- *
+   * §17.3, .21 — an upstream correction, and the moot pending candidate
+   * ---------------------------------------------------------------- */
+
+  it('applies an AFL-Tables-owned correction as exactly one update ledger row', async () => {
+    const before = await matchRow122(KEY_A);
+
+    // §5.2 / F7: a pending candidate raised earlier for the SAME target. It
+    // must be left pending — never machine-retired, never marked accepted.
+    await sql`
+      INSERT INTO promotion_candidates (
+        source_id, family, external_record_id, source_version_seq, verb, season,
+        target_table, target_id, proposed_fields, baseline_canonical_hash,
+        agreeing_groups, disagreeing_groups, created_by_batch_id
+      ) VALUES (
+        ${fixtures.sourceId}, 'match', ${MATCH_A}, 1, 'corrected', ${SEASON122},
+        'matches', ${before?.id as number}, ${sql.json({ attendance: 1 } as never)},
+        ${'b'.repeat(64)}, ${[]}::text[], ${[]}::text[], ${fixtures.batchId}
+      )
+    `;
+
+    const result = await apply122(
+      bundle122({
+        matches: [{
+          recordId: MATCH_A, matchKey: KEY_A, scope: SCOPE122,
+          payloadOver: { attendance: 32500 },
+          projectionOver: { attendance: 32500 },
+        }],
+      }),
+      T122.correction,
+    );
+
+    expect(result.counters.canonicalRowsInserted).toBe(0);
+    expect(result.counters.canonicalRowsUpdated).toBe(1);
+    expect(result.counters.canonicalApplicationsLogged).toBe(1);
+    expect(result.counters.candidatesMootLeftPending).toBeGreaterThanOrEqual(1);
+
+    expect((await matchRow122(KEY_A))?.attendance).toBe(32500);
+
+    const ledger = await ledger122();
+    const updates = ledger.filter((row) => row.verb === 'update');
+    expect(updates).toHaveLength(1);
+    expect({
+      target: updates[0].targetTable,
+      seq: updates[0].sourceVersionSeq,
+      previous: updates[0].previousValues,
+      next: updates[0].newValues,
+    }).toEqual({
+      target: 'matches',
+      seq: 2,
+      // Exactly the prior values of exactly the fields that moved.
+      previous: { attendance: 31000 },
+      next: { attendance: 32500 },
+    });
+
+    // The moot candidate is still pending and was never accepted, and no
+    // second candidate was stacked on top of it.
+    const mine = (await candidates122())
+      .filter((row) => row.externalRecordId === MATCH_A && row.targetTable === 'matches');
+    expect(mine.map((row) => ({ status: row.status, verb: row.verb })))
+      .toEqual([{ status: 'pending', verb: 'corrected' }]);
+  });
+
+  /* ---------------------------------------------------------------- *
+   * §17.4 — A -> B -> A
+   * ---------------------------------------------------------------- */
+
+  it('records A -> B -> A as three versions over two payloads and TWO update ledger rows',
+    async () => {
+      const result = await apply122(bundle122(), T122.revert);
+
+      expect(result.counters.canonicalRowsUpdated).toBe(1);
+      expect(result.counters.payloadsReused).toBeGreaterThanOrEqual(1);
+      expect((await matchRow122(KEY_A))?.attendance).toBe(31000);
+
+      const [spine] = await sql<{ versionSeq: number }[]>`
+        SELECT current_version_seq AS "versionSeq" FROM staging.source_records
+         WHERE source_id = ${fixtures.sourceId} AND family = 'match'
+           AND external_record_id = ${MATCH_A}
+      `;
+      expect(spine.versionSeq).toBe(3);
+      const [payloads] = await sql<{ n: number }[]>`
+        SELECT count(DISTINCT v.payload_hash)::int AS n
+          FROM staging.source_record_versions v
+         WHERE v.source_id = ${fixtures.sourceId} AND v.family = 'match'
+           AND v.external_record_id = ${MATCH_A}
+      `;
+      expect(payloads.n).toBe(2);
+
+      // The canonical value returned to A, and BOTH mutations are on the
+      // record: source history append and canonical value mutation are
+      // different facts and are both kept.
+      const updates = (await ledger122())
+        .filter((row) => row.targetTable === 'matches' && row.verb === 'update');
+      expect(updates.map((row) => [row.previousValues, row.newValues])).toEqual([
+        [{ attendance: 31000 }, { attendance: 32500 }],
+        [{ attendance: 32500 }, { attendance: 31000 }],
+      ]);
+    });
+
+  /* ---------------------------------------------------------------- *
+   * §17.20 / §9.3 — retry after identity resolution
+   * ---------------------------------------------------------------- */
+
+  it('lands a debutant on an IDENTICAL payload once the identity is resolved', async () => {
+    // The administrator resolves the identity between runs. Nothing about the
+    // source changed, so `reconcile()` will answer `unchanged` and propose
+    // nothing; only the canonical target state moved.
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, match_method)
+      VALUES (${fixtures.sourceId}, ${DEBUT_URL}, ${ids122.debutPlayerId}, 'unique',
+              'afltables_profile_url')
+    `;
+
+    const beforeLedger = await ledger122();
+    const beforeMatch = await matchRow122(KEY_A);
+
+    const result = await apply122(bundle122(), T122.retry);
+
+    // Exactly one write, and it is the retry.
+    expect(result.counters.canonicalRowsInserted).toBe(1);
+    expect(result.counters.canonicalRowsUpdated).toBe(0);
+    expect(result.counters.canonicalApplicationsLogged).toBe(1);
+    expect(result.counters.canonicalRetryApplied).toBe(1);
+    // The payload did not move for ANY record.
+    expect(result.counters.versionsAppended).toBe(0);
+
+    const debutStats = await stats122(ids122.debutPlayerId);
+    expect(debutStats).toHaveLength(1);
+    expect(debutStats[0].sourceRecordId).toBe(DEBUT_RECORD);
+
+    // Everything unrelated produced zero writes.
+    expect(await matchRow122(KEY_A)).toEqual(beforeMatch);
+    const added = (await ledger122()).slice(beforeLedger.length);
+    expect(added.map((row) => ({
+      record: row.externalRecordId, target: row.targetTable, verb: row.verb,
+    }))).toEqual([
+      { record: DEBUT_RECORD, target: 'player_match_stats', verb: 'insert' },
+    ]);
+
+    // F7 again: the debutant's own earlier exception candidate is left
+    // pending rather than machine-retired.
+    expect((await candidates122())
+      .filter((row) => row.externalRecordId === DEBUT_RECORD)
+      .map((row) => row.status)).toEqual(['pending']);
+  });
+
+  /* ---------------------------------------------------------------- *
+   * §17.8 — the Brownlow grain
+   * ---------------------------------------------------------------- */
+
+  it('writes a published Brownlow vote at the round grain and nothing else', async () => {
+    const [seasonVotesBefore] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM brownlow_season_votes
+    `;
+    const beforeStats = await stats122(ids122.linkedPlayerId);
+
+    const result = await apply122(
+      bundle122({
+        players: [
+          {
+            recordId: LINKED_RECORD, url: LINKED_URL,
+            payloadOver: { brownlow_votes: 3 },
+            projectionOver: {
+              // Migration 076's afltables_player_match_brownlow_row_ck makes
+              // "a polled round carrying no vote" unrepresentable, so the
+              // per-match statistic moves with the round grain.
+              stats: statsWith({ brownlow_votes: 3 }),
+              brownlow_round_vote: {
+                season: SEASON122, round_number: 1, votes: 3,
+              } as unknown as JsonValue,
+            },
+          },
+          { recordId: DEBUT_RECORD, url: DEBUT_URL },
+        ],
+      }),
+      T122.brownlow,
+    );
+
+    expect(result.counters.canonicalRowsInserted).toBe(1);
+    expect(result.counters.canonicalRowsUpdated).toBe(0);
+
+    expect(await votes122()).toEqual([{
+      playerId: ids122.linkedPlayerId,
+      roundNumber: 1,
+      // A row exists only where a vote was published, so `played` is only
+      // ever true here. No filler row is ever manufactured.
+      played: true,
+      votes: 3,
+      sourceId: fixtures.sourceId,
+      sourceRecordId: LINKED_RECORD,
+    }]);
+
+    // brownlow_season_votes is untouched: no season total is derived from a
+    // partial round set (AFLDB-ISSUE-113 owns that table).
+    const [seasonVotesAfter] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM brownlow_season_votes
+    `;
+    expect(seasonVotesAfter.n).toBe(seasonVotesBefore.n);
+
+    // `brownlow_votes` is not in the player_match_stats proposed field set, so
+    // one observation never writes the same fact to two targets.
+    expect(await stats122(ids122.linkedPlayerId)).toEqual(beforeStats);
+
+    const last = (await ledger122()).at(-1);
+    expect({ target: last?.targetTable, verb: last?.verb, key: last?.targetKey }).toEqual({
+      target: 'brownlow_round_votes',
+      verb: 'insert',
+      key: { season: SEASON122, player_id: ids122.linkedPlayerId, round_number: 1 },
+    });
+  });
+
+  /* ---------------------------------------------------------------- *
+   * §17.10 — an active human override, against a deliberately stale snapshot
+   * ---------------------------------------------------------------- */
+
+  it('refuses a mutation an active override covers, even when the run-level '
+    + 'authority snapshot says clear', async () => {
+    await sql`
+      INSERT INTO data_overrides (
+        entity_type, entity_key, field_group, override_values, admin_user_id, is_active
+      ) VALUES (
+        'matches', ${KEY_A}, 'score', ${sql.json({ home_goals: 15 } as never)},
+        ${ids122.adminUserId}, true
+      )
+      ON CONFLICT (entity_type, entity_key, field_group) DO UPDATE
+        SET is_active = true, override_values = EXCLUDED.override_values
+    `;
+
+    const before = await matchRow122(KEY_A);
+    const beforeLedger = await ledger122();
+
+    // 6*16+10 = 106, |106-72| = 34: every canonical CHECK still holds, so the
+    // ONLY thing that can stop this write is the human decision.
+    const scoreCorrection = {
+      matches: [{
+        recordId: MATCH_A, matchKey: KEY_A, scope: SCOPE122,
+        payloadOver: { home_goals: 16, home_points: 106, margin: 34 },
+        projectionOver: { home_goals: 16, home_score: 106, margin: 34 },
+      }],
+      players: [] as PlayerSpec[],
+    };
+
+    const result = await apply122(bundle122(scoreCorrection), T122.overrideBlocked, {
+      // A deliberately permissive run-level snapshot — the S2 race made
+      // concrete. `reconcile()` therefore raises a candidate, and the ONLY
+      // thing that can still refuse the write is the applier re-reading
+      // `data_overrides` inside the savepoint.
+      manualAuthorityLoader: async () => () => 'clear',
+    });
+
+    expect(result.counters.canonicalRowsUpdated).toBe(0);
+    expect(result.counters.canonicalApplicationsLogged).toBe(0);
+    // Byte-identical, and no ledger row.
+    expect(await matchRow122(KEY_A)).toEqual(before);
+    expect(await ledger122()).toEqual(beforeLedger);
+
+    // The exception path still ran: the reviewer sees the proposal.
+    expect((await candidates122()).some(
+      (row) => row.externalRecordId === MATCH_A && row.targetTable === 'matches'
+        && row.status === 'pending',
+    )).toBe(true);
+  });
+
+  it('applies the same correction once the override is deactivated', async () => {
+    await sql`
+      UPDATE data_overrides SET is_active = false
+       WHERE entity_type = 'matches' AND entity_key = ${KEY_A} AND field_group = 'score'
+    `;
+
+    const result = await apply122(
+      bundle122({
+        matches: [{
+          recordId: MATCH_A, matchKey: KEY_A, scope: SCOPE122,
+          payloadOver: { home_goals: 16, home_points: 106, margin: 34 },
+          projectionOver: { home_goals: 16, home_score: 106, margin: 34 },
+        }],
+        players: [],
+      }),
+      T122.overrideCleared,
+    );
+
+    // The payload did not move — this run re-offers the target on CANONICAL
+    // state, which is §9.3's retry rule doing exactly what it is for.
+    expect(result.counters.canonicalRowsUpdated).toBe(1);
+    expect((await matchRow122(KEY_A))?.homeScore).toBe(106);
+  });
+
+  /* ---------------------------------------------------------------- *
+   * §17.9 / SC6 — foreign-owned and source-less rows are never adopted
+   * ---------------------------------------------------------------- */
+
+  it('refuses a foreign-owned canonical row and never adopts it', async () => {
+    await sql`
+      INSERT INTO matches (
+        match_key, season, round_code, round_number, round_type, is_final,
+        match_date, venue_raw, home_club_id, away_club_id,
+        home_goals, home_behinds, home_score, away_goals, away_behinds, away_score,
+        result, winner_club_id, margin,
+        attendance, attendance_status, attendance_source_id, source_id
+      ) VALUES (
+        ${KEY_FOREIGN}, ${SEASON122}, '1', 1, 'home_and_away'::round_type, false,
+        '2093-04-04', ${VENUE_RAW122}, ${fixtures.homeClubId}, ${fixtures.awayClubId},
+        15, 10, 100, 10, 12, 72,
+        'home_win'::match_result, ${fixtures.homeClubId}, 28,
+        20000, 'complete'::coverage_status, ${fixtures.providerSourceId},
+        ${fixtures.providerSourceId}
+      )
+    `;
+    const beforeLedger = await ledger122();
+
+    const result = await apply122(
+      bundle122({
+        matches: [{
+          recordId: MATCH_FOREIGN, matchKey: KEY_FOREIGN, scope: SCOPE_FOREIGN,
+        }],
+        players: [],
+      }),
+      T122.foreign,
+    );
+
+    expect(result.counters.canonicalRowsUpdated).toBe(0);
+    expect(result.counters.foreignOwnedCollision).toBeGreaterThanOrEqual(1);
+    const row = await matchRow122(KEY_FOREIGN);
+    expect({ attendance: row?.attendance, owner: row?.sourceId })
+      .toEqual({ attendance: 20000, owner: fixtures.providerSourceId });
+    expect(await ledger122()).toEqual(beforeLedger);
+    expect((await candidates122()).some(
+      (candidate) => candidate.externalRecordId === MATCH_FOREIGN
+        && candidate.verb === 'foreign_owned_collision',
+    )).toBe(true);
+  });
+
+  it('refuses a source-less canonical row automatically while leaving it '
+    + 'promotable by a human', async () => {
+    // No provenance at all — the `createMatch()` / CSV-promote shape §7.2
+    // proves the settle role cannot distinguish from a human-corrected row.
+    await sql`
+      INSERT INTO matches (
+        match_key, season, round_code, round_number, round_type, is_final,
+        match_date, venue_raw, home_club_id, away_club_id,
+        home_goals, home_behinds, home_score, away_goals, away_behinds, away_score,
+        result, winner_club_id, margin, attendance_status
+      ) VALUES (
+        ${KEY_SOURCELESS}, ${SEASON122}, '1', 1, 'home_and_away'::round_type, false,
+        '2093-04-04', ${VENUE_RAW122}, ${fixtures.homeClubId}, ${fixtures.awayClubId},
+        15, 10, 100, 10, 12, 72,
+        'home_win'::match_result, ${fixtures.homeClubId}, 28,
+        'not_collected'::coverage_status
+      )
+    `;
+    const beforeLedger = await ledger122();
+
+    const result = await apply122(
+      bundle122({
+        matches: [{
+          recordId: MATCH_SOURCELESS, matchKey: KEY_SOURCELESS, scope: SCOPE_SOURCELESS,
+        }],
+        players: [],
+      }),
+      T122.sourceless,
+    );
+
+    expect(result.counters.canonicalRowsUpdated).toBe(0);
+    expect(await ledger122()).toEqual(beforeLedger);
+    const row = await matchRow122(KEY_SOURCELESS);
+    // Untouched, and still unowned: NULL means "provenance unknown", never
+    // "free to adopt".
+    expect({ attendance: row?.attendance, owner: row?.sourceId })
+      .toEqual({ attendance: null, owner: null });
+
+    // The GENERIC gate is unchanged and still admits it, so a human can still
+    // promote it through the reviewed queue. Only the unattended path is
+    // narrowed — that divergence is the whole of E3.
+    expect((await candidates122()).some(
+      (candidate) => candidate.externalRecordId === MATCH_SOURCELESS
+        && candidate.targetTable === 'matches'
+        && candidate.verb === 'corrected'
+        && candidate.status === 'pending',
+    )).toBe(true);
+  });
+
+  /* ---------------------------------------------------------------- *
+   * §17.11 / §9.1 — a write failure cannot leave a partial match family
+   * ---------------------------------------------------------------- */
+
+  it('rolls back the whole match family on a constraint violation and keeps going',
+    async () => {
+      const beforeLedger = await ledger122();
+
+      // round_type 'home_and_away' with a NULL round_number passes migration
+      // 076's staging projection — which carries no such rule — and violates
+      // canonical `matches_round_number_ck`. The failure therefore happens
+      // where this test needs it: inside the canonical savepoint.
+      const result = await apply122(
+        bundle122({
+          matches: [
+            {
+              recordId: MATCH_BROKEN, matchKey: KEY_BROKEN, scope: SCOPE_BROKEN,
+              projectionOver: { round_number: null },
+            },
+            { recordId: MATCH_OK, matchKey: KEY_OK, scope: SCOPE_BROKEN },
+          ],
+          players: [],
+        }),
+        T122.broken,
+      );
+
+      expect(result.counters.canonicalApplyFailures).toBe(1);
+
+      // Neither the match nor its period scores survived: both or neither.
+      expect(await matchRow122(KEY_BROKEN)).toBeUndefined();
+      const [orphans] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM match_period_scores WHERE source_record_id = ${MATCH_BROKEN}
+      `;
+      expect(orphans.n).toBe(0);
+
+      // No ledger row for the failed unit — a rolled-back attempt is not an
+      // application (SC2).
+      expect((await ledger122()).filter((row) => row.externalRecordId === MATCH_BROKEN))
+        .toEqual([]);
+
+      // The run continued: the sound match in the same bundle landed, with
+      // its own ledger rows.
+      const ok = await matchRow122(KEY_OK);
+      expect(ok).toBeDefined();
+      const added = (await ledger122()).slice(beforeLedger.length);
+      expect(added.map((row) => `${row.externalRecordId}|${row.targetTable}`)).toEqual([
+        `${MATCH_OK}|matches`, `${MATCH_OK}|match_period_scores`,
+      ]);
+
+      // §9.2 — one open finding per target that was in the failed unit, under
+      // an issue_type DISTINCT from ISSUE-099's, so the two writers can never
+      // contend for migration 076's dedup index (AFLDB-ISSUE-104).
+      const failures = (await issues122())
+        .filter((issue) => issue.issueType === CANONICAL_APPLY_ISSUE_TYPE);
+      expect(failures.map((issue) => issue.issueKey).sort()).toEqual([
+        canonicalApplyIssueKey('afltables.match', MATCH_BROKEN, 'match_period_scores'),
+        canonicalApplyIssueKey('afltables.match', MATCH_BROKEN, 'matches'),
+      ].sort());
+      expect(failures.every((issue) => issue.resolvedAt === null)).toBe(true);
+      expect(CANONICAL_APPLY_ISSUE_TYPE).not.toBe(SETTLE_ISSUE_TYPE);
+
+      // The exception path still ran for the failed record.
+      expect((await candidates122()).some(
+        (candidate) => candidate.externalRecordId === MATCH_BROKEN,
+      )).toBe(true);
+    });
+
+  /* ---------------------------------------------------------------- *
+   * §17.19 / SC2 — canonical rows and ledger rows imply one another
+   * ---------------------------------------------------------------- */
+
+  it('has no canonical row without a ledger row, and no ledger row without a canonical row',
+    async () => {
+      // (a) Every canonical row this pass wrote names an application.
+      const [unaudited] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM (
+          SELECT m.source_record_id AS record, 'matches' AS target
+            FROM matches m
+           WHERE m.source_record_id LIKE ${`${PREFIX122}%`}
+          UNION ALL
+          SELECT DISTINCT p.source_record_id, 'match_period_scores'
+            FROM match_period_scores p
+           WHERE p.source_record_id LIKE ${`${PREFIX122}%`}
+          UNION ALL
+          SELECT s.source_record_id, 'player_match_stats'
+            FROM player_match_stats s
+           WHERE s.source_record_id LIKE ${`${PREFIX122}%`}
+          UNION ALL
+          SELECT b.source_record_id, 'brownlow_round_votes'
+            FROM brownlow_round_votes b
+           WHERE b.source_record_id LIKE ${`${PREFIX122}%`}
+        ) written
+        WHERE NOT EXISTS (
+          SELECT 1 FROM canonical_applications a
+           WHERE a.external_record_id = written.record
+             AND a.target_table = written.target
+        )
+      `;
+      expect(unaudited.n).toBe(0);
+
+      // (b) Every ledger row names a canonical row that exists.
+      const [phantom] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM canonical_applications a
+         WHERE a.external_record_id LIKE ${`${PREFIX122}%`}
+           AND NOT EXISTS (
+             SELECT 1 FROM matches m
+              WHERE a.target_table IN ('matches', 'match_period_scores')
+                AND m.match_key = a.target_key->>'match_key'
+           )
+           AND NOT EXISTS (
+             SELECT 1 FROM player_match_stats s
+              WHERE a.target_table = 'player_match_stats'
+                AND s.player_id = (a.target_key->>'player_id')::int
+                AND s.match_id = (a.target_key->>'match_id')::int
+           )
+           AND NOT EXISTS (
+             SELECT 1 FROM brownlow_round_votes b
+              WHERE a.target_table = 'brownlow_round_votes'
+                AND b.season = (a.target_key->>'season')::int
+                AND b.player_id = (a.target_key->>'player_id')::int
+                AND b.round_number = (a.target_key->>'round_number')::int
+           )
+      `;
+      expect(phantom.n).toBe(0);
+
+      // No machine decision was ever fabricated (SC8).
+      const [decisions] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM promotion_decisions d
+          JOIN promotion_candidates c ON c.id = d.candidate_id
+         WHERE c.external_record_id LIKE ${`${PREFIX122}%`}
+      `;
+      expect(decisions.n).toBe(0);
+      expect((await candidates122()).every((row) => row.status === 'pending')).toBe(true);
+    });
+
+  /* ---------------------------------------------------------------- *
+   * §17.12 / §10 — a deprecated source may not veto the write
+   * ---------------------------------------------------------------- */
+
+  it('writes despite a disagreeing deprecated group, and still opens the finding',
+    async () => {
+      const match = await matchRow122(KEY_A);
+      await sql`
+        INSERT INTO staging.external_current_matches (
+          source_id, external_game_id, season, round_label, round_number,
+          match_date, venue_raw, home_team_raw, away_team_raw,
+          home_club_id, away_club_id, local_match_id,
+          home_score, away_score, raw_payload
+        ) VALUES (
+          ${fixtures.providerSourceId}, ${PROVIDER_GAME_122}, ${SEASON122}, 'Round 1', 1,
+          '2093-04-04', ${VENUE_RAW122}, 'Issue122 Home', 'Issue122 Away',
+          ${fixtures.homeClubId}, ${fixtures.awayClubId}, ${match?.id as number},
+          55, 72, ${sql.json({ issue122_fixture: true } as never)}
+        )
+      `;
+
+      const result = await apply122(
+        bundle122({
+          matches: [{
+            recordId: MATCH_A, matchKey: KEY_A, scope: SCOPE122,
+            payloadOver: { home_goals: 16, home_points: 106, margin: 34, attendance: 33333 },
+            projectionOver: {
+              home_goals: 16, home_score: 106, margin: 34, attendance: 33333,
+            },
+          }],
+          players: [],
+        }),
+        T122.advisory,
+      );
+
+      // The write proceeded.
+      expect(result.counters.canonicalRowsUpdated).toBe(1);
+      expect((await matchRow122(KEY_A))?.attendance).toBe(33333);
+
+      // The veto is withdrawn, so nothing was refused for disagreement...
+      expect(result.counters.sourceDisagreement).toBe(0);
+      // ...but the evidence is preserved exactly as before.
+      const finding = (await issues122()).find(
+        (issue) => issue.issueType === SETTLE_ISSUE_TYPE
+          && issue.issueKey === settleIssueKey('afltables.match', MATCH_A, 'matches'),
+      );
+      expect(finding).toBeDefined();
+      expect(finding?.resolvedAt).toBeNull();
+      expect(finding?.details.disagreeing_groups).toEqual(['squiggle']);
+    });
+
+  /* ================================================================ *
+   * AFLDB-ISSUE-122 S6 — run integration, driven through the CLI
+   *
+   * The operational path exactly as an operator (or, after S8, a timer)
+   * invokes it: `runSettleCli()` parses the flags, reads the bundle from a
+   * project root on disk, re-hashes the manifest, reads
+   * `seasons.json.in_progress_seasons`, runs the settle with the automatic
+   * path on, prints the counters and builds the §9.3 report. The only thing
+   * substituted is the connection, which is this suite's guarded
+   * `afldb_test` client instead of `AFLDB_IMPORT_DATABASE_URL`.
+   *
+   * Nested inside the S5 suite so it stands on the same fixtures and is torn
+   * down by the same cleanup; it uses its own record ids, match key, scope
+   * and players so nothing S5 asserted is disturbed.
+   *
+   * @see issues/open/AFLDB-ISSUE-122.md §9.3, §13, §16 row S6, §17 step 5
+   * @see tools/current-season/settle-afltables.ts
+   * @see src/lib/acquisition/settle-report.ts
+   * ================================================================ */
+
+  describe('S6 — the operational path end to end', () => {
+    const LABEL_S6 = 'issue122-s6-cli';
+    const SCOPE_S6 = 'issue122-s6';
+    const MATCH_S6 = 'issue122-s6-match';
+    const KEY_S6 = 'issue122-s6-key';
+    const LINKED_S6_RECORD = 'issue122-s6-player-linked';
+    const LINKED_S6_URL = 'issue122-players/S6/Issue122_S6_Linked.html';
+    const DEBUT_S6_RECORD = 'issue122-s6-player-debut';
+    const DEBUT_S6_URL = 'issue122-players/S6/Issue122_S6_Debut.html';
+    const DEBUT_S6_NAME = 'Issue122 S6 Debutant';
+
+    let rootS6 = '';
+    let linkedS6PlayerId = 0;
+    let debutS6PlayerId = 0;
+
+    /** The bundle as `import_fitzroy_core.py` would have written it. */
+    function rawBundleS6(manifestPath: string, manifestSha256: string): JsonValue {
+      const playerRecord = (recordId: string, url: string, name: string): JsonValue => ({
+        family: 'afltables.player_match_stats',
+        scope_key: SCOPE_S6,
+        external_record_id: recordId,
+        payload: playerPayload122(url, {
+          match_key: KEY_S6, round_code: '2', player_name: name,
+        }),
+        observed_columns: [...(playerContract.knownColumns ?? [])],
+        projection: playerProjection122(url, {
+          match_key: KEY_S6, round_code: '2', round_number: 2,
+        }),
+        rejection: null,
+      });
+      return {
+        bundle_contract_version: 1,
+        generated_by: 'tools/migration/import_fitzroy_core.py',
+        snapshot_label: LABEL_S6,
+        manifest_path: manifestPath,
+        manifest_sha256: manifestSha256,
+        acquisition_kind: 'in_season_partial',
+        season: SEASON122,
+        fitzroy_version: '1.8.0',
+        enumerations: [
+          {
+            family: 'afltables.match', scope_key: SCOPE_S6, complete: true,
+            incomplete_reason: null, external_record_ids: [MATCH_S6],
+          },
+          {
+            family: 'afltables.player_match_stats', scope_key: SCOPE_S6, complete: true,
+            incomplete_reason: null, external_record_ids: [LINKED_S6_RECORD, DEBUT_S6_RECORD],
+          },
+        ],
+        records: [
+          {
+            family: 'afltables.match',
+            scope_key: SCOPE_S6,
+            external_record_id: MATCH_S6,
+            payload: payload122({
+              issue122_record: MATCH_S6, match_date: '2093-04-11', round_code: '2',
+            }),
+            observed_columns: [...(matchContract.knownColumns ?? [])],
+            projection: projection122(KEY_S6, {
+              match_date: '2093-04-11', round_code: '2', round_number: 2,
+            }),
+            rejection: null,
+          },
+          playerRecord(LINKED_S6_RECORD, LINKED_S6_URL, 'Issue122 S6 Linked'),
+          playerRecord(DEBUT_S6_RECORD, DEBUT_S6_URL, DEBUT_S6_NAME),
+        ],
+        unkeyed_rejections: [],
+        counts: { matches: 1, player_match_rows: 2, rejections: 0, unkeyed_rejections: 0 },
+      } as JsonValue;
+    }
+
+    /**
+     * A project root on disk with exactly what the CLI reads: the reference
+     * registry, an in-progress season list naming this suite's season, the
+     * manifest, and the bundle that cites the manifest's real digest.
+     */
+    function writeProjectRootS6(): string {
+      const root = mkdtempSync(join(tmpdir(), 'afldb-issue122-s6-'));
+      mkdirSync(join(root, 'data', 'reference'), { recursive: true });
+      copyFileSync(
+        'data/reference/source-families.json',
+        join(root, 'data', 'reference', 'source-families.json'),
+      );
+      writeFileSync(
+        join(root, 'data', 'reference', 'seasons.json'),
+        JSON.stringify({ in_progress_seasons: [SEASON122] }),
+      );
+      const manifestRel = `docs/rebuild-manifests/afltables_fitzroy_core/${LABEL_S6}.json`;
+      mkdirSync(dirname(join(root, manifestRel)), { recursive: true });
+      const manifestBytes = JSON.stringify({ snapshot_label: LABEL_S6, issue122_fixture: true });
+      writeFileSync(join(root, manifestRel), manifestBytes);
+      const sha = createHash('sha256').update(manifestBytes).digest('hex');
+      const bundleDir = join(root, 'data', 'sources', 'afltables', 'fitzroy_core', LABEL_S6);
+      mkdirSync(bundleDir, { recursive: true });
+      writeFileSync(
+        join(bundleDir, 'observations.json'), JSON.stringify(rawBundleS6(manifestRel, sha)),
+      );
+      return root;
+    }
+
+    async function cli(args: string[]): Promise<{ outcome: SettleCliOutcome; lines: string[] }> {
+      const lines: string[] = [];
+      const outcome = await runSettleCli(args, {
+        projectRoot: rootS6, sql, log: (line) => lines.push(line),
+      });
+      return { outcome, lines };
+    }
+
+    /** Everything a run could have moved, canonical, ledger and derived alike. */
+    async function stateS6(): Promise<Record<string, unknown>> {
+      const [matches] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM matches WHERE match_key = ${KEY_S6}
+      `;
+      const [versions] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM staging.source_record_versions
+         WHERE external_record_id LIKE ${'issue122-s6-%'}
+      `;
+      const [payloads] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM staging.source_payloads
+         WHERE raw_payload->>'issue122_fixture' IS NOT NULL
+      `;
+      const [batches] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM import_batches WHERE notes LIKE ${`%${LABEL_S6}%`}
+      `;
+      const clubSeasons = await sql`
+        SELECT club_id::int AS "clubId", played, wins, draws, losses, points_for AS "pointsFor",
+               points_against AS "pointsAgainst", premiership_points AS "premiershipPoints",
+               ladder_rank AS "ladderRank"
+          FROM club_seasons WHERE season = ${SEASON122} ORDER BY club_id
+      `;
+      const playerClubs = await sql`
+        SELECT player_id::int AS "playerId", club_id::int AS "clubId", games, goals,
+               first_season AS "firstSeason", last_season AS "lastSeason"
+          FROM player_clubs
+         WHERE player_id IN (${linkedS6PlayerId}, ${debutS6PlayerId})
+         ORDER BY player_id, club_id
+      `;
+      const playerSeasons = await sql`
+        SELECT player_id::int AS "playerId", games, kicks
+          FROM player_season_stats
+         WHERE season = ${SEASON122}
+           AND player_id IN (${linkedS6PlayerId}, ${debutS6PlayerId})
+         ORDER BY player_id
+      `;
+      const [season] = await sql`
+        SELECT match_count AS "matchCount", last_match_date::text AS "lastMatchDate",
+               last_loaded_round AS "lastLoadedRound"
+          FROM seasons WHERE year = ${SEASON122}
+      `;
+      const s6 = (row: { externalRecordId: string }) => row.externalRecordId.startsWith('issue122-s6-');
+      return {
+        matches: matches.n,
+        versions: versions.n,
+        payloads: payloads.n,
+        batches: batches.n,
+        ledger: (await ledger122()).filter(s6).map((row) => ({
+          record: row.externalRecordId, target: row.targetTable, verb: row.verb,
+          version: row.sourceVersionSeq,
+        })),
+        candidates: (await candidates122()).filter(s6).map((row) => ({
+          record: row.externalRecordId, target: row.targetTable, verb: row.verb,
+          status: row.status, version: row.sourceVersionSeq,
+        })),
+        issues: (await issues122()).filter((row) => row.issueKey.includes('issue122-s6-')),
+        clubSeasons: [...clubSeasons],
+        playerClubs: [...playerClubs],
+        playerSeasons: [...playerSeasons],
+        season,
+      };
+    }
+
+    beforeAll(async () => {
+      rootS6 = writeProjectRootS6();
+      const [linked] = await sql<{ id: number }[]>`
+        INSERT INTO players (display_name, sort_name, search_name, slug)
+        VALUES ('Issue122 S6 Linked', 'Linked, Issue122 S6', 'issue122 s6 linked',
+                ${`${SLUG122}s6-linked`})
+        RETURNING id::int AS id
+      `;
+      const [debut] = await sql<{ id: number }[]>`
+        INSERT INTO players (display_name, sort_name, search_name, slug)
+        VALUES (${DEBUT_S6_NAME}, 'Debutant, Issue122 S6', 'issue122 s6 debutant',
+                ${`${SLUG122}s6-debut`})
+        RETURNING id::int AS id
+      `;
+      linkedS6PlayerId = linked.id;
+      debutS6PlayerId = debut.id;
+      // Only the linked player has an identity mapping; the debutant is the
+      // §9.4 case and stays unresolved until a later case resolves it.
+      await sql`
+        INSERT INTO external_identities (source_id, external_id, player_id, status, match_method)
+        VALUES (${fixtures.sourceId}, ${LINKED_S6_URL}, ${linked.id}, 'unique',
+                'afltables_profile_url')
+      `;
+    });
+
+    afterAll(() => {
+      if (rootS6 !== '') rmSync(rootS6, { recursive: true, force: true });
+    });
+
+    it('refuses a mistyped flag rather than silently running the review-first path',
+      async () => {
+        await expect(cli(['--label', LABEL_S6, '--apply', '--auto-aply']))
+          .rejects.toThrow(/Unknown flag '--auto-aply'/);
+        await expect(cli(['--label', LABEL_S6, '--apply', '--dry-run']))
+          .rejects.toThrow(/mutually exclusive/);
+      });
+
+    it('--dry-run --auto-apply executes the automatic path, the recompute included, '
+      + 'and leaves canonical, ledger and derived state unchanged', async () => {
+      const before = await stateS6();
+
+      const { outcome, lines } = await cli(['--label', LABEL_S6, '--dry-run', '--auto-apply']);
+
+      const counters = outcome.result?.counters;
+      expect(outcome.result?.applied).toBe(false);
+      expect(outcome.report).toBeNull();
+      // The path ran — gates, writers, ledger and the derived recompute.
+      expect(counters?.canonicalRowsInserted).toBeGreaterThan(0);
+      expect(counters?.canonicalApplicationsLogged).toBeGreaterThan(0);
+      expect(counters?.derivedRecomputeRuns).toBe(1);
+      expect(lines.some((line) => line.startsWith('Dry run.'))).toBe(true);
+      expect(lines.some((line) => line.includes('--apply --auto-apply'))).toBe(true);
+
+      // And every relation is byte-identical to before it ran.
+      expect(await stateS6()).toEqual(before);
+      expect(before.matches).toBe(0);
+    });
+
+    it('--apply --auto-apply lands the valid data unattended and recomputes the '
+      + 'derived tables once, scoped to the players it wrote', async () => {
+      const { outcome, lines } = await cli(['--label', LABEL_S6, '--apply', '--auto-apply']);
+      const counters = outcome.result?.counters as SettleRunResult['counters'];
+
+      expect(outcome.result?.applied).toBe(true);
+      // One match, its four period rows, one resolved player. The debutant is
+      // refused at its own record only.
+      expect(counters.canonicalRowsInserted).toBe(6);
+      expect(counters.canonicalRowsUpdated).toBe(0);
+      expect(counters.canonicalApplicationsLogged).toBe(3);
+      expect(counters.canonicalApplyFailures).toBe(0);
+      expect(counters.canonicalApplyRefusals).toBe(0);
+      expect(counters.unresolvedIdentityPlayer).toBeGreaterThan(0);
+      expect(counters.candidatesCreated).toBe(1);
+
+      // The derived recompute ran ONCE, over exactly the linked player: the
+      // debutant wrote nothing and has no stats row on the new match.
+      expect(counters.derivedRecomputeRuns).toBe(1);
+      expect(counters.derivedRecomputePlayers).toBe(1);
+      const state = await stateS6();
+      expect(state.matches).toBe(1);
+      expect(state.ledger).toEqual([
+        { record: MATCH_S6, target: 'matches', verb: 'insert', version: 1 },
+        { record: MATCH_S6, target: 'match_period_scores', verb: 'insert', version: 1 },
+        { record: LINKED_S6_RECORD, target: 'player_match_stats', verb: 'insert', version: 1 },
+      ]);
+      const clubSeasons = state.clubSeasons as { clubId: number; played: number }[];
+      expect(clubSeasons.map((row) => row.clubId)).toEqual(
+        [fixtures.homeClubId, fixtures.awayClubId].sort((a, b) => a - b),
+      );
+      expect(clubSeasons.every((row) => row.played >= 1)).toBe(true);
+      expect(state.playerClubs).toEqual([{
+        playerId: linkedS6PlayerId, clubId: fixtures.awayClubId, games: 1, goals: 5,
+        firstSeason: SEASON122, lastSeason: SEASON122,
+      }]);
+      expect(state.playerSeasons).toEqual([{ playerId: linkedS6PlayerId, games: 1, kicks: 5 }]);
+      const [{ n: matchesThisSeason }] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM matches WHERE season = ${SEASON122}
+      `;
+      expect(state.season).toEqual({
+        matchCount: matchesThisSeason, lastMatchDate: '2093-04-11', lastLoadedRound: '2',
+      });
+
+      // The batch row carries the ISSUE-122 counters the operator needs.
+      const [batch] = await sql<{ validation: Record<string, number> }[]>`
+        SELECT validation_result AS validation FROM import_batches
+         WHERE id = ${outcome.result?.batchId as ImportBatchId}
+      `;
+      for (const key of [
+        'canonicalRowsInserted', 'canonicalRowsUpdated', 'canonicalApplicationsLogged',
+        'canonicalApplyFailures', 'canonicalApplyRefusals', 'canonicalRetryApplied',
+        'unresolvedIdentityPlayer', 'candidatesMootLeftPending', 'advisoryDisagreement',
+        'derivedRecomputeRuns', 'derivedRecomputePlayers',
+      ]) {
+        expect(batch.validation[key]).toBe(counters[key as keyof typeof counters]);
+      }
+      expect(lines.some((line) => /^Applied as import batch \d+: 6 canonical row/.test(line)))
+        .toBe(true);
+
+      // §9.3: the debutant is an ACTIVE exception with its full context, and
+      // the report says the match itself DID land.
+      const report = outcome.report;
+      expect(report?.latestBatch?.batchId).toBe(outcome.result?.batchId);
+      const unresolved = report?.unresolvedRecords.filter(
+        (row) => row.externalRecordId === DEBUT_S6_RECORD,
+      );
+      expect(unresolved).toHaveLength(1);
+      expect(unresolved?.[0]).toEqual({
+        sourceKey: 'afltables',
+        family: 'player_match_stats',
+        externalRecordId: DEBUT_S6_RECORD,
+        sourceVersionSeq: 1,
+        matchKey: KEY_S6,
+        season: SEASON122,
+        roundCode: '2',
+        playerName: DEBUT_S6_NAME,
+        profileUrl: DEBUT_S6_URL,
+        clubRaw: 'Issue122 Away',
+        targetTable: 'player_match_stats',
+        reason: expect.stringMatching(/./),
+        canonicalMatchApplied: true,
+        canonicalMatchId: (await matchRow122(KEY_S6))?.id,
+      });
+      // Listed once, under unresolved records — not again under candidates.
+      expect(report?.candidates.active.map((c) => c.externalRecordId))
+        .not.toContain(DEBUT_S6_RECORD);
+      expect(report?.candidates.moot.map((c) => c.externalRecordId))
+        .not.toContain(DEBUT_S6_RECORD);
+      expect(lines.some((line) => line.includes(`player ${DEBUT_S6_NAME}`))).toBe(true);
+      expect(lines.some((line) => line.includes(`match ${KEY_S6}: canonical`))).toBe(true);
+    });
+
+    it('a second identical --apply --auto-apply is a total no-op: 0 canonical writes, '
+      + '0 ledger rows, no new version, candidate or finding, no recompute', async () => {
+      const before = await stateS6();
+
+      const { outcome } = await cli(['--label', LABEL_S6, '--apply', '--auto-apply']);
+      const counters = outcome.result?.counters as SettleRunResult['counters'];
+
+      expect(outcome.result?.applied).toBe(true);
+      expect(counters.canonicalRowsInserted).toBe(0);
+      expect(counters.canonicalRowsUpdated).toBe(0);
+      expect(counters.canonicalApplicationsLogged).toBe(0);
+      expect(counters.canonicalRetryApplied).toBe(0);
+      expect(counters.canonicalApplyFailures).toBe(0);
+      expect(counters.versionsAppended).toBe(0);
+      expect(counters.payloadsCreated).toBe(0);
+      expect(counters.candidatesCreated).toBe(0);
+      expect(counters.dataIssuesOpened).toBe(0);
+      expect(counters.derivedRecomputeRuns).toBe(0);
+      expect(counters.derivedRecomputePlayers).toBe(0);
+      // The debutant's payload did not move either, so its record is
+      // `unchanged` at gate 4: no new rejection row, and its one pending
+      // candidate is neither refreshed nor duplicated. It is still an active
+      // exception, and the report below still says so from the candidate.
+      expect(counters.candidatesRefreshed).toBe(0);
+      expect(counters.unresolvedIdentityPlayer).toBe(1);
+
+      const after = await stateS6();
+      // The only difference a rerun may make is its own batch row.
+      expect(after).toEqual({ ...before, batches: (before.batches as number) + 1 });
+      // The debutant is still the active exception, still not moot. (The
+      // report is season-wide, so S5's rolled-back match family is listed
+      // beside it as an active exception of its own — correctly.)
+      expect(outcome.report?.unresolvedRecords.map((row) => row.externalRecordId)
+        .filter((id) => id.startsWith('issue122-s6-')))
+        .toEqual([DEBUT_S6_RECORD]);
+    });
+
+    it('lands the debutant on the identical bundle once its identity is resolved, '
+      + 'recomputes only that player, and the report moves its candidate to MOOT',
+    async () => {
+      await sql`
+        INSERT INTO external_identities (source_id, external_id, player_id, status, match_method)
+        VALUES (${fixtures.sourceId}, ${DEBUT_S6_URL}, ${debutS6PlayerId}, 'unique',
+                'afltables_profile_url')
+      `;
+      const before = await stateS6();
+
+      const { outcome } = await cli(['--label', LABEL_S6, '--apply', '--auto-apply']);
+      const counters = outcome.result?.counters as SettleRunResult['counters'];
+
+      expect(counters.canonicalRowsInserted).toBe(1);
+      expect(counters.canonicalRetryApplied).toBe(1);
+      expect(counters.versionsAppended).toBe(0);
+      expect(counters.derivedRecomputeRuns).toBe(1);
+      expect(counters.derivedRecomputePlayers).toBe(1);
+      expect(counters.candidatesMootLeftPending).toBe(1);
+
+      const after = await stateS6();
+      expect(after.ledger).toEqual([
+        ...(before.ledger as unknown[]),
+        { record: DEBUT_S6_RECORD, target: 'player_match_stats', verb: 'insert', version: 1 },
+      ]);
+      expect(after.playerClubs).toEqual([
+        ...(before.playerClubs as unknown[]),
+        {
+          playerId: debutS6PlayerId, clubId: fixtures.awayClubId, games: 1, goals: 5,
+          firstSeason: SEASON122, lastSeason: SEASON122,
+        },
+      ]);
+      // Nothing else moved: same match, same club ladder, same season row.
+      expect(after.matches).toBe(before.matches);
+      expect(after.clubSeasons).toEqual(before.clubSeasons);
+      expect(after.season).toEqual(before.season);
+      // F7: the candidate is still pending in the table...
+      expect(after.candidates).toEqual(before.candidates);
+      // ...and the report now classifies it as moot, with no active exception left.
+      expect(outcome.report?.unresolvedRecords
+        .filter((row) => row.externalRecordId.startsWith('issue122-s6-'))).toEqual([]);
+      const moot = outcome.report?.candidates.moot.find(
+        (c) => c.externalRecordId === DEBUT_S6_RECORD,
+      );
+      expect(moot?.status).toBe('moot');
+      expect(moot?.latestAppliedVersionSeq).toBe(moot?.sourceVersionSeq);
+      expect(outcome.report?.candidates.active.map((c) => c.externalRecordId))
+        .not.toContain(DEBUT_S6_RECORD);
+    });
+
+    it('--report is read-only and renders the same classification', async () => {
+      const before = await stateS6();
+
+      const { outcome, lines } = await cli(['--label', LABEL_S6, '--report']);
+
+      expect(outcome.result).toBeNull();
+      expect(await stateS6()).toEqual(before);
+      expect(lines.some((line) => line.startsWith('ACTIVE — requires attention'))).toBe(true);
+      expect(lines.some((line) => line.startsWith('MOOT — pending candidates'))).toBe(true);
+      expect(lines.some((line) => line.includes(`'${DEBUT_S6_RECORD}'`)
+        && line.includes('applied v1'))).toBe(true);
+
+      // The library entry the CLI wraps agrees with it exactly.
+      const direct = await buildSettleExceptionReport(sql, { season: SEASON122 });
+      expect(direct).toEqual(outcome.report);
+    });
   });
 });

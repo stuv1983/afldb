@@ -15,6 +15,71 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stage S6 run integration (In progress) - 2 September 2026
+
+- **The automatic path is now an operator command.** `npm run settle:afltables -- --label
+  <snapshot> --apply --auto-apply` lands a validated AFL Tables snapshot canonically in one
+  transaction; `--dry-run --auto-apply` runs exactly the same path against real constraints and
+  privileges and rolls it all back, so what the preview shows is what the commit does. Without
+  `--auto-apply` the tool behaves exactly as before: observations, staging and review candidates
+  only. There is no force flag and no bypass, and a mistyped flag is refused rather than ignored.
+  Nothing is scheduled yet.
+- **Derived data keeps up with canonical data.** When a run writes a canonical row, the season's
+  metadata, ladder (`club_seasons`), and the written players' club, season and career aggregates
+  are recomputed once, inside the same transaction, using the existing targeted recompute the
+  admin editors already use. A run that writes nothing recomputes nothing. A recompute failure
+  fails the run rather than committing facts beside stale aggregates.
+- **A player's career game number is derived by AFLDB, not copied from the source, on the
+  automatic path.** Both the applier and the recompute were writing it, which would have caused
+  one spurious canonical write and audit row every night over identical source data. The
+  automatic applier now leaves it to the recompute; a source-side change to it still surfaces
+  as a review candidate.
+- **The exception report separates what needs attention from what is history.** After a
+  committed apply, and on `--report`, the tool lists the active exceptions — unresolved player
+  identities with the source name, profile URL, club, season, round, match and reason, and
+  whether the match itself landed; other open review candidates; open apply failures and source
+  disagreements — apart from review candidates left pending only because their record has since
+  applied, which are shown as moot and retained as history.
+- Each run's batch record now also carries the count of automatic writes a re-read gate refused,
+  advisory source disagreements, and whether and how widely the derived recompute ran.
+- Two defects in the stage-S5 applier were found by the end-to-end rerun proof and fixed: an
+  update to a player's match statistics referenced a column that table does not have, and a
+  retry that landed after an earlier failure did not close its own failure finding.
+
+### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stage S5 the applier (In progress) - 2 September 2026
+
+- **A valid new AFL Tables game now becomes canonical on its own.** Once the source publishes a
+  completed match, the settle pass writes the match, its quarter-by-quarter scores and every
+  resolvable player's statistics into the canonical tables, with no administrator clicking
+  approve. Human review becomes the exception path rather than the normal one — the change of
+  product policy AFLDB-ISSUE-096 and -099 deliberately left unbuilt.
+- The automatic write is off unless a run asks for it, so nothing that ran before behaves
+  differently. Every existing guarantee that the settle pass writes no canonical data still holds
+  for every existing caller.
+- A record is applied as a whole or not at all. A match and its period scores land together, and a
+  player's statistics land with their Brownlow votes; a failure in one rolls back only that
+  record. One player whose identity cannot be resolved no longer costs the match or their
+  team-mates their data, and a malformed record cannot leave a match with half its scoreline.
+- Every automatic canonical change is audited. Each insert and update writes an append-only
+  `canonical_applications` row inside the same database savepoint, naming the run, the exact
+  source version that justified it, the target, and the field values before and after. A canonical
+  change without its audit row, or an audit row without its change, is impossible rather than
+  merely unlikely.
+- Nothing is written on trust. Ownership, the human-override state and the canonical baseline are
+  all re-read at the moment of writing, so an administrator's override committed part-way through
+  a run still stops the write it covers. A row another source owns, or one whose provenance cannot
+  be established, is refused and routed to review — never adopted.
+- Absent values stay absent. A statistic that was not recorded is never written as zero, an
+  attendance figure that was never collected is never invented, an unmapped venue keeps its real
+  name with no canonical venue, extra time is never manufactured, and a Brownlow round with no
+  published vote gets no row at all. Zero Brownlow rows during the season is the correct outcome.
+- A record whose player identity is resolved later lands on the next run without the source having
+  to change, and a record that is already correct writes nothing at all.
+- A successful automatic write never creates a review item and never marks one approved. Review
+  decisions remain something only a person makes.
+- A deprecated fallback source that disagrees can no longer block an AFL Tables write, while the
+  disagreement is still recorded as a data-quality finding for someone to look at.
+
 ### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stages S3 ownership and S4 corroboration policy (In progress) - 2 September 2026
 
 - All four AFL Tables canonical targets are now ownership-determinate. Migration 083 gave

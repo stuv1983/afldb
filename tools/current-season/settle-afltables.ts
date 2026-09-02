@@ -1,23 +1,40 @@
 /**
- * AFLDB-ISSUE-099 — the in-season AFL Tables settle CLI.
+ * AFLDB-ISSUE-099 / AFLDB-ISSUE-122 — the in-season AFL Tables settle CLI.
  *
- * Stage S-C then S-D of §21. Everything before the database is offline and
- * fail-closed: the bundle is read, the manifest it names is re-hashed from
- * disk, and the whole contract is validated. Only if all of that passes is a
- * connection opened at all, so an unverified snapshot cannot reach PostgreSQL.
+ * Stage S-C then S-D of ISSUE-099 §21. Everything before the database is
+ * offline and fail-closed: the bundle is read, the manifest it names is
+ * re-hashed from disk, and the whole contract is validated. Only if all of
+ * that passes is a connection opened at all, so an unverified snapshot cannot
+ * reach PostgreSQL.
  *
  * REVIEW-FIRST IS THE DEFAULT. `--dry-run` needs no other flag; `--apply`
- * must be explicit. Nothing here is scheduled — no cron entry, no timer.
- * Scheduling is a separate authorisation.
+ * must be explicit.
  *
- * v1 WRITES NO CANONICAL ROW. This tool produces observations, typed staging
- * projections and promotion candidates for a human to review. It accepts
- * nothing, and `canonicalRowsInserted` / `canonicalRowsUpdated` are reported
- * because they are always 0.
+ * THE AUTOMATIC CANONICAL PATH IS EXPLICIT TOO (ISSUE-122 S6). Without
+ * `--auto-apply` this tool behaves exactly as ISSUE-099 shipped it: it
+ * produces observations, typed staging projections and promotion candidates
+ * for a human to review, and writes no canonical row. With `--auto-apply` a
+ * record whose gates E1-E6 all pass inside its own savepoint, against state
+ * re-read there, becomes canonical without a human (§5.1); everything else
+ * lands in the exception queue. There is no force flag and no bypass — the
+ * switch decides whether the automatic path RUNS, never whether a gate may be
+ * skipped.
+ *
+ *   --dry-run --auto-apply   runs the full automatic path — gates, canonical
+ *                            writers, ledger, derived recompute — against real
+ *                            constraints and role privileges, then rolls the
+ *                            whole transaction back. It is the preview of
+ *                            exactly what `--apply --auto-apply` would commit.
+ *   --apply --auto-apply     the operational path (§19). Idempotent: a rerun
+ *                            over identical source data performs no write.
+ *   --report                 the §9.3 exception report, read-only.
+ *
+ * Nothing here is scheduled — no cron entry, no timer. Scheduling is a
+ * separate authorisation (ISSUE-122 S8).
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import postgres from 'postgres';
@@ -28,24 +45,37 @@ import {
   resolveManifestPath,
   runSettleAfltables,
   validateSettleBundle,
-  SETTLE_ISSUE_OWNER,
-  SETTLE_ISSUE_TYPE,
   type SettleBundle,
   type SettleCounters,
+  type SettleRunResult,
 } from '../../src/lib/acquisition/settle-afltables';
+import {
+  buildSettleExceptionReport,
+  renderSettleExceptionReport,
+  type SettleExceptionReport,
+} from '../../src/lib/acquisition/settle-report';
 import { parseSourceFamilyRegistry } from '../../src/lib/acquisition/source-families';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = join(__dirname, '..', '..');
+const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
 
-const BUNDLE_ROOT = join(PROJECT_ROOT, 'data', 'sources', 'afltables', 'fitzroy_core');
+/** Where `import_fitzroy_core.py --emit-observations` writes each snapshot. */
+function bundleRootOf(projectRoot: string): string {
+  return join(projectRoot, 'data', 'sources', 'afltables', 'fitzroy_core');
+}
 
-type Args = { label: string; apply: boolean; report: boolean };
+export type SettleCliArgs = {
+  label: string;
+  apply: boolean;
+  /** ISSUE-122: run the automatic canonical path. Off unless asked for. */
+  autoApply: boolean;
+  report: boolean;
+};
 
-function loadEnv(): void {
+function loadEnv(projectRoot: string): void {
   let contents: string;
   try {
-    contents = readFileSync(join(PROJECT_ROOT, '.env'), 'utf8');
+    contents = readFileSync(join(projectRoot, '.env'), 'utf8');
   } catch {
     return;
   }
@@ -58,18 +88,35 @@ function loadEnv(): void {
   }
 }
 
-function valueFor(argv: string[], flag: string): string | null {
+function valueFor(argv: readonly string[], flag: string): string | null {
   const index = argv.indexOf(flag);
   return index >= 0 ? argv[index + 1] ?? null : null;
 }
 
-function parseArgs(argv: string[]): Args {
+const KNOWN_FLAGS = new Set(['--label', '--apply', '--dry-run', '--auto-apply', '--report']);
+
+export function parseSettleArgs(argv: readonly string[]): SettleCliArgs {
   const label = valueFor(argv, '--label');
   if (!label) throw new Error('--label <snapshot> is required.');
   if (argv.includes('--apply') && argv.includes('--dry-run')) {
     throw new Error('--apply and --dry-run are mutually exclusive; choose one.');
   }
-  return { label, apply: argv.includes('--apply'), report: argv.includes('--report') };
+  // An unknown flag is refused rather than ignored: a mistyped
+  // `--auto-aply` silently running the review-first path would look like a
+  // successful automatic run that wrote nothing.
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg.startsWith('--') && !KNOWN_FLAGS.has(arg)) {
+      throw new Error(`Unknown flag '${arg}'.`);
+    }
+    if (arg === '--label') i += 1;
+  }
+  return {
+    label,
+    apply: argv.includes('--apply'),
+    autoApply: argv.includes('--auto-apply'),
+    report: argv.includes('--report'),
+  };
 }
 
 function readJson(path: string): unknown {
@@ -77,14 +124,17 @@ function readJson(path: string): unknown {
 }
 
 /**
- * The bundle, validated against the manifest actually on disk.
+ * The bundle, validated against the manifest actually on disk, and the
+ * in-progress season list the E2 gate is re-evaluated against at the write.
  *
  * The digest is recomputed here rather than trusted from the bundle, which is
  * the whole point of the check: a snapshot that changed after emission is no
  * longer evidence of what the bundle describes.
  */
-function loadBundle(label: string): SettleBundle {
-  const raw = readJson(join(BUNDLE_ROOT, label, 'observations.json')) as {
+function loadBundle(
+  projectRoot: string, label: string,
+): { bundle: SettleBundle; inProgressSeasons: number[] } {
+  const raw = readJson(join(bundleRootOf(projectRoot), label, 'observations.json')) as {
     manifest_path?: unknown;
   };
   if (typeof raw.manifest_path !== 'string') {
@@ -92,12 +142,12 @@ function loadBundle(label: string): SettleBundle {
   }
   // The emitter writes an ABSOLUTE path; joining it onto the root again is the
   // T8 double-prefix defect. The rule lives in the contract module.
-  const manifestPath = resolveManifestPath(PROJECT_ROOT, raw.manifest_path);
+  const manifestPath = resolveManifestPath(projectRoot, raw.manifest_path);
   const actualManifestSha256 = createHash('sha256')
     .update(readFileSync(manifestPath))
     .digest('hex');
 
-  const seasons = readJson(join(PROJECT_ROOT, 'data', 'reference', 'seasons.json')) as {
+  const seasons = readJson(join(projectRoot, 'data', 'reference', 'seasons.json')) as {
     in_progress_seasons?: unknown;
   };
   const inProgressSeasons = Array.isArray(seasons.in_progress_seasons)
@@ -105,16 +155,17 @@ function loadBundle(label: string): SettleBundle {
     : [];
 
   const registry = parseSourceFamilyRegistry(
-    readJson(join(PROJECT_ROOT, 'data', 'reference', 'source-families.json')),
+    readJson(join(projectRoot, 'data', 'reference', 'source-families.json')),
   );
 
-  return validateSettleBundle({
+  const bundle = validateSettleBundle({
     raw,
     expectedSnapshotLabel: label,
     actualManifestSha256,
     inProgressSeasons,
     registry,
   });
+  return { bundle, inProgressSeasons };
 }
 
 function createImportClient(): postgres.Sql {
@@ -123,10 +174,11 @@ function createImportClient(): postgres.Sql {
   return postgres(dsn, { max: 1, onnotice: () => {}, transform: { undefined: null } });
 }
 
-function printCounters(counters: SettleCounters): void {
+function counterLines(counters: SettleCounters): string[] {
+  const lines: string[] = [];
   const group = (title: string, keys: readonly (keyof SettleCounters)[]) => {
-    console.log(`\n${title}`);
-    for (const key of keys) console.log(`  ${key}: ${counters[key]}`);
+    lines.push('', title);
+    for (const key of keys) lines.push(`  ${key}: ${counters[key]}`);
   };
   group('Snapshot', [
     'snapshotMatches', 'snapshotPlayerMatchRows', 'snapshotRejections',
@@ -141,91 +193,77 @@ function printCounters(counters: SettleCounters): void {
     'projectionRowsWritten', 'venueUnmapped', 'nullInCoveredStat',
     'unresolvedIdentityPlayer', 'unresolvedIdentityClub', 'unresolvedIdentityVenue',
     'unresolvedIdentityMatch', 'foreignOwnedCollision', 'sourceDisagreement',
-    'manualAuthorityRefusals',
+    'advisoryDisagreement', 'manualAuthorityRefusals',
   ]);
   group('Review', ['candidatesCreated', 'candidatesRefreshed', 'candidatesMootLeftPending']);
   group('Data issues', ['dataIssuesOpened', 'dataIssuesRefreshed', 'dataIssuesResolved']);
-  // Never summed with the observation counters, and never anything but 0.
-  group('Canonical', ['canonicalRowsInserted', 'canonicalRowsUpdated']);
+  // ISSUE-122: canonical ROWS as PostgreSQL wrote them, the ledger rows
+  // beside them, the retries §9.3 keyed on target state, and the two ways an
+  // offered target does not land — a gate re-read inside the savepoint, or a
+  // write that rolled back. Never summed with the observation counters.
+  group('Canonical (ISSUE-122)', [
+    'canonicalRowsInserted', 'canonicalRowsUpdated', 'canonicalApplicationsLogged',
+    'canonicalRetryApplied', 'canonicalApplyRefusals', 'canonicalApplyFailures',
+  ]);
+  group('Derived recompute', ['derivedRecomputeRuns', 'derivedRecomputePlayers']);
+  return lines;
 }
 
-/** How many open disagreements the report lists before summarising the rest. */
-const OPEN_ISSUE_LIMIT = 20;
+export type SettleCliDeps = {
+  /** The repository root the bundle, manifest and reference data are read under. */
+  projectRoot?: string;
+  /**
+   * A client the CALLER owns. Supplied by tests so the run goes to the
+   * database they guard; the CLI then does not end it. When omitted the
+   * CLI opens `AFLDB_IMPORT_DATABASE_URL` and closes it.
+   */
+  sql?: postgres.Sql;
+  /** Where the lines go. Defaults to stdout. */
+  log?: (line: string) => void;
+};
+
+export type SettleCliOutcome = {
+  args: SettleCliArgs;
+  /** Null on `--report`. */
+  result: SettleRunResult | null;
+  /** Built after a committed apply and on `--report`; null on a dry run. */
+  report: SettleExceptionReport | null;
+};
 
 /**
- * The review queue (§23.1 step 6), in two halves: the pending promotion
- * candidates and the open disagreements behind the ones that are blocked.
- *
- * Strictly read-only. It offers the operator no path to accept, resolve or
- * retire anything — every mutation in this issue happens inside the settle
- * transaction, on evidence, and a report is not evidence.
+ * The CLI, as one callable so the whole path — flag parsing, bundle
+ * verification, the run, the counters and the report — can be exercised
+ * end to end against `afldb_test` by the integration suite, and not only
+ * from a terminal against a bundle that happens to be on disk.
  */
-async function report(sql: postgres.Sql, season: number): Promise<void> {
-  const rows = await sql<{ targetTable: string; verb: string; pending: number }[]>`
-    SELECT c.target_table AS "targetTable", c.verb, count(*)::int AS pending
-      FROM promotion_candidates c
-      JOIN sources s ON s.id = c.source_id
-     WHERE s.key = 'afltables' AND c.season = ${season} AND c.status = 'pending'
-     GROUP BY c.target_table, c.verb
-     ORDER BY c.target_table, c.verb
-  `;
-  console.log(`\nPending AFL Tables promotion candidates for ${season}:`);
-  if (rows.length === 0) console.log('  (none)');
-  for (const row of rows) {
-    console.log(`  ${row.targetTable} / ${row.verb}: ${row.pending}`);
-  }
-
-  // Not season-scoped: `data_issues` carries no season, and inferring one
-  // from a record id would be a guess. The whole open queue is the honest
-  // answer, and ownership keeps it to findings this issue actually wrote.
-  const issues = await sql<{
-    severity: string; issueKey: string; detectedAt: string; description: string;
-  }[]>`
-    SELECT d.severity::text AS severity, d.issue_key AS "issueKey",
-           to_char(d.detected_at, 'YYYY-MM-DD') AS "detectedAt", d.description
-      FROM data_issues d
-     WHERE d.issue_type = ${SETTLE_ISSUE_TYPE}
-       AND d.resolved_at IS NULL
-       AND d.details->>'owner' = ${SETTLE_ISSUE_OWNER}
-     ORDER BY d.severity DESC, d.issue_key
-     LIMIT ${OPEN_ISSUE_LIMIT + 1}
-  `;
-  console.log('\nOpen AFL Tables source disagreements:');
-  if (issues.length === 0) console.log('  (none)');
-  for (const issue of issues.slice(0, OPEN_ISSUE_LIMIT)) {
-    console.log(`  [${issue.severity}] ${issue.issueKey} — first detected ${issue.detectedAt}`);
-    console.log(`      ${issue.description}`);
-  }
-  if (issues.length > OPEN_ISSUE_LIMIT) {
-    console.log(
-      `  … more than ${OPEN_ISSUE_LIMIT} open; query data_issues directly for the full list.`,
-    );
-  }
-}
-
-async function main(): Promise<void> {
-  loadEnv();
-  const args = parseArgs(process.argv.slice(2));
+export async function runSettleCli(
+  argv: readonly string[], deps: SettleCliDeps = {},
+): Promise<SettleCliOutcome> {
+  const projectRoot = deps.projectRoot ?? DEFAULT_PROJECT_ROOT;
+  const log = deps.log ?? ((line: string) => console.log(line));
+  const args = parseSettleArgs(argv);
 
   // Offline and fail-closed. No database has been opened yet.
-  const bundle = loadBundle(args.label);
-  console.log(
+  const { bundle, inProgressSeasons } = loadBundle(projectRoot, args.label);
+  log(
     `Bundle v${bundle.bundleContractVersion} '${bundle.snapshotLabel}' `
     + `(${bundle.acquisitionKind}, season ${bundle.season}, fitzRoy `
     + `${bundle.fitzroyVersion ?? 'unpinned'}) validated against its manifest.`,
   );
 
-  const sql = createImportClient();
+  const ownsClient = deps.sql === undefined;
+  const sql = deps.sql ?? createImportClient();
   try {
     if (args.report) {
-      await report(sql, bundle.season);
-      return;
+      const report = await buildSettleExceptionReport(sql, { season: bundle.season });
+      for (const line of renderSettleExceptionReport(report)) log(line);
+      return { args, result: null, report };
     }
 
     const result = await runSettleAfltables(sql, {
       bundle,
       registry: parseSourceFamilyRegistry(
-        readJson(join(PROJECT_ROOT, 'data', 'reference', 'source-families.json')),
+        readJson(join(projectRoot, 'data', 'reference', 'source-families.json')),
       ),
       apply: args.apply,
       // Only ever reached if the loader below is somehow absent. There is no
@@ -236,32 +274,73 @@ async function main(): Promise<void> {
       // inside the run transaction. A query error or a broken pinned contract
       // yields refusal, not permission.
       manualAuthorityLoader: (tx) => loadManualAuthority(tx, bundle.season),
+      // AFLDB-ISSUE-122 S6. The automatic path runs only when asked for, and
+      // E2 is re-evaluated at the write against the same list the bundle was
+      // validated against.
+      autoApply: args.autoApply,
+      inProgressSeasons,
     });
 
-    printCounters(result.counters);
+    for (const line of counterLines(result.counters)) log(line);
     for (const skipped of result.absenceSweepSkipped) {
-      console.log(
-        `\nAbsence sweep SKIPPED for ${skipped.family} '${skipped.scopeKey}': ${skipped.reason}. `
+      log('');
+      log(
+        `Absence sweep SKIPPED for ${skipped.family} '${skipped.scopeKey}': ${skipped.reason}. `
         + 'Nothing in that scope was marked absent.',
       );
     }
 
-    if (result.applied) {
-      console.log(`\nApplied as import batch ${result.batchId}. No canonical row was written.`);
-      await report(sql, bundle.season);
+    log('');
+    if (!result.applied) {
+      log(
+        'Dry run. The full write path executed against real constraints and privileges'
+        + (args.autoApply ? ', the automatic canonical path included' : '')
+        + ', then the whole transaction was rolled back. Nothing was retained — not even the '
+        + `import_batches row. Re-run with --apply${args.autoApply ? ' --auto-apply' : ''} `
+        + 'to keep it.',
+      );
+      return { args, result, report: null };
+    }
+
+    const { counters } = result;
+    if (args.autoApply) {
+      log(
+        `Applied as import batch ${result.batchId}: ${counters.canonicalRowsInserted} canonical `
+        + `row(s) inserted, ${counters.canonicalRowsUpdated} updated, `
+        + `${counters.canonicalApplicationsLogged} ledger row(s), `
+        + `${counters.canonicalRetryApplied} retried after resolution, `
+        + `${counters.canonicalApplyRefusals} refused at the write, `
+        + `${counters.canonicalApplyFailures} unit(s) rolled back. `
+        + `Derived recompute ${counters.derivedRecomputeRuns === 1 ? 'ran' : 'skipped'}`
+        + ` (${counters.derivedRecomputePlayers} player(s)).`,
+      );
     } else {
-      console.log(
-        '\nDry run. The full write path executed against real constraints and privileges, '
-        + 'then the whole transaction was rolled back. Nothing was retained — not even the '
-        + 'import_batches row. Re-run with --apply to keep it.',
+      log(
+        `Applied as import batch ${result.batchId}. No canonical row was written: the `
+        + 'automatic path runs only with --auto-apply.',
       );
     }
+    const report = await buildSettleExceptionReport(sql, { season: bundle.season });
+    for (const line of renderSettleExceptionReport(report)) log(line);
+    return { args, result, report };
   } finally {
-    await sql.end({ timeout: 5 });
+    if (ownsClient) await sql.end({ timeout: 5 });
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+async function main(): Promise<void> {
+  loadEnv(DEFAULT_PROJECT_ROOT);
+  await runSettleCli(process.argv.slice(2));
+}
+
+// Run only when this file is the entry point. Importing it — as the
+// integration suite does to drive `runSettleCli()` — must not start a run.
+const invokedDirectly = process.argv[1] !== undefined
+  && relative(resolve(process.argv[1]), fileURLToPath(import.meta.url)) === '';
+
+if (invokedDirectly) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}

@@ -1710,3 +1710,552 @@ savepoint against re-read state, including the authority snapshot above. Gate: D
 (`tests/current-season-import.test.ts`) plus integration
 (`tests/integration/settle-afltables.test.ts`). Running the integration suite from Windows needs
 the SSH local forward described under Blocker 1. Do not start S6.
+
+---
+
+### S5 — The applier (2026-09-02, Opus 5 (1M) / Medium / Normal, worktree `D:\dev\afldb-issue-122`, branch `claude/issue-122` at `76480f0`)
+
+**Outcome: S5 COMPLETE and GREEN, DB-free and against real PostgreSQL on `afldb_test`.
+`src/lib/acquisition/canonical-apply.ts` exists, is wired into the settle pass, and AFL Tables
+current-season data now becomes canonical unattended. Nothing committed. `afldb_dev` and
+production untouched. No migration, no grant, no privilege change, no CLI flag, no admin UI.
+S6 not started.**
+
+Commands in this stage were executed by Claude under the operator's explicit S5 instruction
+(the CLAUDE.md §9 exception). The only database opened was `afldb_test`, through the SSH local
+forward the S1/S2 closeout recorded.
+
+#### Files changed
+
+| File | Change |
+|---|---|
+| `src/lib/acquisition/canonical-apply.ts` | **NEW.** The applier: E1–E6 re-evaluated inside the savepoint, the four canonical writers, the `canonical_applications` ledger, savepoint isolation, and `autoApplyOwnership()` (moved here from the settle module — see deviation 1) |
+| `src/lib/acquisition/settle-afltables.ts` | `settleFamily()` decides both of a record's targets first and then applies the record as ONE savepoint unit; `applyRecordCanonically()` and `invitationFor()` added; `recordOutcome()` takes the apply result and creates NO candidate on success; `SettleRefs.matchIdsByKey` made mutable; `SettleCounters`' literal-`0` types become `number` plus three new counters; `ResolvedTarget.pendingMatch`; the `canonical_apply_failed` issue identity, its writer and its resolution path; `autoApplyOwnership` re-exported |
+| `tests/current-season-import.test.ts` | +1 describe (5 cases): the target-table pin, the §9.2 distinct-`issue_type` proof, and three source-shape contracts scanned over the applier with its prose stripped |
+| `tests/integration/settle-afltables.test.ts` | +1 describe (13 cases) against real PostgreSQL, in its own season-2093 / `issue122-` namespace with its own committed-fixture cleanup |
+| `issues/open/AFLDB-ISSUE-122.md`, `issues.md`, `IssuesIndex.md`, `CHANGELOG.md` | tracking |
+
+Untouched, as required: every migration (073–083 included), `tools/maintenance/privileges.sql`,
+`tools/current-season/settle-afltables.ts`, the Squiggle/Kali canonical writer (S7), scheduling
+(S8), transition/adoption (S9), derived recompute and the `--auto-apply` CLI contract (S6), and
+every admin surface. The untracked `must` file was not touched.
+
+#### What was built
+
+**The savepoint unit is the RECORD, which is exactly §13's two units.** A match family is the
+`matches` row plus its `match_period_scores`; a player-match record is its `player_match_stats`
+plus its `brownlow_round_votes`. `settleFamily()` therefore reconciles both of a record's targets
+first and hands the whole record to `applyCanonicalUnit()`, which opens one `tx.savepoint()`.
+Both or neither, ledger rows included. One unresolved debutant rejects neither the match nor a
+team-mate, and a constraint violation on one match does not stop the round.
+
+**Every gate is re-run inside the savepoint against re-read state, and the S2 race is closed.**
+Nothing computed earlier in the run authorises the write:
+
+| Gate | Where its answer comes from at the moment of writing |
+|---|---|
+| E1 | the reconciliation outcome plus one of two named invitations (deviation 2) |
+| E2 | `inProgressSeasons`, re-checked at the write rather than inherited from bundle validation |
+| E3 | `autoApplyOwnership()` fed ownership read from the canonical row **in this savepoint** |
+| E4 | `loadManualAuthority()` called **inside the savepoint**, against live `data_overrides` |
+| E5 | the baseline hash recomputed over the same field set the proposal used, from the freshly-read row |
+| E6 | the emitter's completion proof (deviation 3) |
+
+The proof that E4 is load-bearing is a test, not a claim: the integration case
+`refuses a mutation an active override covers, even when the run-level authority snapshot says
+clear` hands the run a deliberately permissive `manualAuthorityLoader` — so `reconcile()` raises
+a candidate — and the write is still refused, the canonical row still byte-identical, no ledger
+row written. That is the S2 snapshot race S3/S4 recorded as binding, closed and pinned.
+
+**The four writers.** `matches` inserts by the bundle projection's `match_key` verbatim and
+updates by canonical id, touching only changed proposed fields, with the provenance quartet and
+the attendance semantics the proposal already carries (NULL never 0; a genuine 0 storable because
+it cites a source). `match_period_scores` upserts periods 1–4, never deletes, refuses a period
+outside 1–4, and writes no row for an all-NULL side/period. `player_match_stats` upserts at the
+resolved `(player_id, match_id)` grain over the projected `STAT_MAP` fields only, NULL preserved,
+`brownlow_votes` deliberately not among them. `brownlow_round_votes` writes only a published
+vote, at the home-and-away round grain, never a filler row, and `brownlow_season_votes` is never
+touched. `createMatch()` is never called and no identity of any kind is created — both pinned by
+DB-free source assertions.
+
+**The ledger is inseparable from the mutation.** Every successful canonical INSERT/UPDATE writes
+its `canonical_applications` row in the same savepoint, carrying the exact batch, `afltables`,
+the contract family, the external record id, the exact `source_version_seq`, the target table, a
+stable object `target_key`, the verb, the prior values of exactly the fields that moved
+(`NULL` on an insert) and the values written. An unchanged target writes neither; a rolled-back
+unit writes neither. Both directions are asserted in SQL over the whole namespace.
+
+**`promotion_candidates` is the exception queue only.** A successfully applied target creates no
+candidate and marks none accepted. A pending candidate that a later run makes moot is left
+pending and counted as `candidatesMootLeftPending` (the F7 invariant), and `promotion_decisions`
+is never written — asserted by a join over the suite's own candidates.
+
+#### Deviations from the runbook as written
+
+None widens the contract; each is recorded with its reason.
+
+1. **`autoApplyOwnership()` moved from `settle-afltables.ts` into `canonical-apply.ts`, and is
+   re-exported from its old home.** The applier is its only caller, and the alternative was a
+   genuine import cycle between the two modules. Every existing import path and every S3 test is
+   unchanged, because the re-export keeps the symbol on the settle module's surface. The applier
+   likewise declares its own four-target union rather than importing `SettleTargetTable`, so the
+   dependency runs one way only; a DB-free test pins that union against
+   `MATCH_TARGET_TABLES + PLAYER_MATCH_TARGET_TABLES` and against migration 083's CHECK, so the
+   two cannot drift.
+
+2. **E1 admits two named invitations beyond `candidate:new` / `candidate:corrected`, and the
+   runbook requires both.** An invitation authorises nothing — every gate above still runs — it
+   only decides which questions are asked.
+   - `pending_match`: `match_period_scores` keys on `match_id`, so before the canonical match
+     exists `resolveTarget()` cannot resolve it and `reconcile()` must refuse it as
+     `unresolved_identity`. §13 nevertheless requires the match family to be all-or-none, so on a
+     brand-new match the dependent target is re-resolved **inside the same savepoint, after the
+     match row is inserted**. Offered only when that record's own `matches` target is being
+     applied, and carried on a new structured `ResolvedTarget.pendingMatch` flag rather than by
+     matching a reason string.
+   - `retry`: §9.3's requirement in full. An unchanged payload returns `unchanged` at gate 4 and
+     proposes nothing, so retry keys on TARGET state — a full proposal exists and the canonical
+     row differs from it (or is absent). Ordinary idempotence is untouched: a target already
+     carrying the proposed values differs in no field and is never offered. Proven both ways.
+
+   A refusal for any other reason — unresolved player identity, foreign owner, blocking
+   disagreement, manual-authority conflict, stale review — is never offered.
+
+3. **E6 is the emitter's completion proof, and is bundle state rather than database state.**
+   The bundle carries no `has_player_rows` field. `import_fitzroy_core.py:1909-1912` enforces the
+   predicate by emitting an incomplete match as a REJECTED, unprojected record
+   (`incomplete_match_evidence`), so "the record projected as a match" **is**
+   `MatchFact.has_player_rows` as it reaches TypeScript. It is therefore re-checked inside the
+   savepoint but is immutable for the run, which is stated in the code rather than implied.
+
+4. **`match_key` is taken from the bundle projection's `match_key`, not literally from
+   `external_record_id`.** §7.1 states the two are byte-identical (`source-families.json:286`),
+   and the projection value is what `resolveTarget()`, `matchIdsByKey`, `corroborationClaims()`
+   and the identity `targetKey` already use — using it keeps the pipeline self-consistent, where
+   using the record id would introduce a second key notion that only agrees by assumption. The
+   prohibitions §7.1 actually makes are honoured: the key is used verbatim, never re-rendered,
+   and `createMatch()` is never called. A test pins the absence of that call.
+
+5. **`SettleRefs.matchIdsByKey` is now mutable, and a `matches` row this run inserts is
+   registered in it immediately.** Without this the player-match family — settled after the match
+   family in the SAME transaction — would resolve `no canonical match` for every player of a
+   brand-new match, and player rows would land a night after their match on every single run.
+   The map is a cache of the run's own transaction, so teaching it about the run's own write is
+   the correct reading, not a shortcut.
+
+6. **Manual authority is re-read once per savepoint, at its top, before any write in it** —
+   rather than once per target. `ManualAuthorityProvider` is synchronous by contract, and the
+   unit is atomic, so "immediately before the mutation" and "before the unit's mutations" are the
+   same instant. Cost: three queries per applied record; S6 may narrow it, and must not weaken
+   it.
+
+7. **`writeDisagreementIssue()` renamed `writeSettleDataIssue()` and shared.** The
+   `canonical_apply_failed` writer uses the same upsert and the same counters;
+   `SettleDataIssueDraft.issueType` is a two-member union rather than a single literal. The
+   disagreement finding itself also moved into `recordDisagreementFinding()` so the success path
+   opens it on exactly the same terms as the refusal path — §10's "evidence preserved, only the
+   veto removed" would be hollow if a successful write silenced it.
+
+8. **§9.3's resolution half is implemented here rather than deferred.** An open
+   `canonical_apply_failed` row is RESOLVED — never deleted — when its target later applies,
+   under its own owner stamp `AFLDB-ISSUE-122` and its own `issue_type`, exactly as
+   `resolveRestoredDisagreements()` is ownership-scoped. Neither writer can close the other's
+   finding.
+
+9. **Counters.** `canonicalRowsInserted` / `canonicalRowsUpdated` became `number` as planned and
+   count canonical ROWS as PostgreSQL actually wrote them (a four-quarter period set counts
+   four). Added exactly three: `canonicalApplicationsLogged`, `canonicalApplyFailures`,
+   `canonicalRetryApplied`. No S6 reporting.
+
+10. **`autoApply` is an internal `SettleRunOptions` flag, OFF by default, and no CLI flag was
+    added.** With it off the settle pass is byte-identical to S4 — proven by the whole ISSUE-099
+    suite above still passing unchanged, including its §15 zero-canonical-write assertions and
+    its per-transaction xid scan. `inProgressSeasons` is required whenever `autoApply` is on and
+    the applier refuses the run without it.
+
+#### One real defect found and fixed during implementation
+
+`${canonicalJson(value)}::jsonb` **does not store a JSON object.** postgres.js resolves `$1::jsonb`
+to a jsonb parameter and then JSON-encodes whatever JavaScript value it was handed, so passing a
+JSON *string* stores the string: `jsonb_typeof` reads `'string'`, and migration 083's
+`.keyvalue()` key-count CHECK then refuses **every** ledger row — the first apply run produced
+zero canonical writes for that reason alone. Fixed by binding through
+`sql.json(JSON.parse(canonicalJson(v)))`, which keeps `canonicalJson()` as the deterministic
+serialisation and lets the driver send an object. Probed directly against PostgreSQL 16.15:
+`jsonb_typeof('{"a":1}'::text-param::jsonb)` returns `string`, `jsonb_typeof(sql.json({a:1}))`
+returns `object`. This is the double-encoding hazard already recorded in project memory, hit from
+a new direction; the reason is now written into the module beside the writer.
+
+#### Carried forward — an observation, not a change
+
+`proposedPeriodScoreValues()` proposes the period set exactly as the projection carries it, and
+the applier refuses to write an all-NULL side/period (§7.1). Were a projection ever to carry one,
+the proposal and the canonical set could never agree and the target would look corrected on every
+run. It is unreachable today: `import_fitzroy_core.py:1730-1733` filters all-NULL rows out of the
+projection (the payload keeps all eight, which is correct — the payload is evidence). The
+applier's refusal is therefore defence in depth. Recorded for S6 rather than absorbed, because
+fixing it would change ISSUE-099 proposal semantics, which is not S5's to change.
+
+#### Validation
+
+All against `afldb_test` (development host `arm@10.0.40.100`, PostgreSQL 16.15) through the SSH
+local forward. No other database was opened.
+
+| Command | Result |
+|---|---|
+| `npx vitest run tests/current-season-import.test.ts tests/reference-data.test.ts` | **248 passed** (243 before; +5 S5 cases) |
+| `npx vitest run tests/integration/settle-afltables.test.ts` | **38 passed / 1 skipped** (24+1 before; +13 S5 cases). The skip is the pre-existing `AFLDB_TEST_IMPORT_DATABASE_URL` conditional |
+| `npx vitest run tests/integration/{settle-afltables,observation-spine,fk-indexes,privileges}.test.ts` | **88 passed / 1 skipped** — the S1 schema and grant gates still green with the writer live |
+| `npx tsc --noEmit` | exit 0 |
+| `npx eslint` over the four changed source/test files | clean, no output |
+| `git diff --check` | clean (CRLF advisories only) |
+
+**The 13 integration cases, by the §17 row each closes.** Dry run (§17.17): the whole automatic
+path executes and every row rolls back. First apply (§17.1, .5, .6, .7, .8, .9, .21): one
+`matches` row, four period rows and one `player_match_stats` row land unattended with the full
+provenance quartet, `venue_id` NULL beside the real `venue_raw`, attendance `complete` citing
+`afltables`, zero Brownlow rows (NA is not zero), the debutant isolated as the ONLY pending
+candidate, and three ledger rows bound to version 1. Rerun (§17.2 / SC3): zero canonical writes,
+zero ledger rows, zero versions, byte-identical rows. Correction (§17.3, .21): exactly one
+`update` ledger row carrying `{attendance: 31000} -> {attendance: 32500}`, and a pre-existing
+pending candidate left pending with no second candidate stacked on it. A→B→A (§17.4): three
+versions over two payloads and **two** update ledger rows, the second returning the canonical
+value to A. Retry (§17.20): the debutant's identity is resolved between runs, the identical
+bundle is rerun, exactly one row lands, `canonicalRetryApplied` is 1, `versionsAppended` is 0 and
+every unrelated canonical row is untouched. Brownlow (§17.8): a published vote writes one row at
+the round grain with `played = true`, `brownlow_season_votes` is untouched and
+`player_match_stats` does not move. Override (§17.10): refused against a deliberately permissive
+run-level snapshot, canonical row byte-identical, no ledger row, candidate raised — then applied
+once the override is deactivated. Foreign-owned and source-less (§17.9 / SC6): both refused, both
+left byte-identical, and the source-less one still raises a `corrected` candidate, which is the
+E3 divergence made visible. Constraint failure (§17.11): the whole match family rolls back, no
+period-score orphan survives, no ledger row is written, two `canonical_apply_failed` findings
+open under an `issue_type` distinct from ISSUE-099's, the exception candidates are raised, and
+the sound match in the same bundle lands. Atomicity (§17.19 / SC2): asserted in SQL in both
+directions plus a `promotion_decisions` join proving no machine decision exists. Advisory
+(§17.12): a disagreeing Squiggle claim does not veto the write, `sourceDisagreement` stays 0, and
+the `source_disagreement` finding is still open with `disagreeing_groups: ['squiggle']`.
+
+#### Stop conditions
+
+| Condition | Evaluation |
+|---|---|
+| SC1 canonical row written with a gate unclear | **Clear.** Every gate re-runs inside the savepoint; the override, foreign-owned and source-less cases each prove a refusal |
+| SC2 canonical row without a ledger row, or the reverse | **Clear.** Same savepoint by construction; asserted in SQL both ways |
+| SC3 a rerun writes anything | **Clear.** Rerun case: 0/0/0 |
+| SC4 one unresolved identity blocks others | **Clear.** Debutant isolation and the constraint-failure case |
+| SC5 a grant widened, or `promotion_decisions`/`admin_user_id` semantics changed | **Clear.** No migration, no `privileges.sql` change, no grant touched; the S1 privileges suite still passes |
+| SC6 a manual, foreign or source-less row adopted | **Clear.** All three refused, with tests |
+| SC7 Squiggle/Kali perform a canonical write | **Clear.** Untouched; S7 owns the retirement |
+| SC8 a candidate machine-accepted, or a `promotion_decisions` row written | **Clear.** No candidate is created on success, every one of this suite's candidates is `pending`, and no decision row exists |
+| SC9 an applied migration's bytes change | **Clear.** No migration touched |
+| SC10 evidence contradicts the runbook | **Not triggered.** The four readings above (deviations 2–5) are the runbook's own requirements made concrete, not departures from them; each is recorded with the evidence that forced it |
+
+#### Git status at end of S5 (nothing staged, nothing committed)
+
+```text
+ M CHANGELOG.md
+ M IssuesIndex.md
+ M issues.md
+ M issues/open/AFLDB-ISSUE-122.md
+ M src/lib/acquisition/settle-afltables.ts
+ M tests/current-season-import.test.ts
+ M tests/integration/settle-afltables.test.ts
+?? must                                   <- pre-existing empty stray file; NOT touched, do not commit
+?? src/lib/acquisition/canonical-apply.ts
+```
+
+Branch `claude/issue-122` remains at `76480f0`.
+
+#### Next action — S6 (Run integration)
+
+Fresh session, same worktree and branch, carry-over this file. Scope per §16 row S6 and §13:
+wire the derived recompute (`recomputeSeasonMetadata`, `recomputeClubSeasons`,
+`recomputeSeasonBrownlowStatus`, `recomputePlayerDerivedStats` in
+`src/db/queries/player-derived.ts` — build nothing) once per run, season-scoped, **only when**
+`canonicalRowsInserted + canonicalRowsUpdated > 0`, with `recomputePlayerDerivedStats` scoped to
+the player ids actually written; add the `--auto-apply` CLI flag and the `npm run
+settle:afltables` script; and build the §9.3 exception report, distinguishing live exceptions
+from the moot pending candidates §5.2 deliberately leaves in the queue. Gate: end-to-end on
+`afldb_test` — dry-run, apply with `--auto-apply`, apply again and see zero writes.
+
+Do not start S7. Running the integration suite from the Windows worktree still requires the SSH
+local forward (`ssh -N -L 5432:127.0.0.1:5432 arm@10.0.40.100`). Still outstanding from S0: the
+production copy of the §15.1 read-only query, which closes the S9 decision.
+
+---
+
+### S6 — Run integration (2026-09-02, Fable 5.1 / High / Normal, worktree `D:\dev\afldb-issue-122`, branch `claude/issue-122` at `76480f0`)
+
+**Outcome: S6 COMPLETE and GREEN, DB-free and against real PostgreSQL on `afldb_test`. The
+automatic path is now operational end to end: `tools/current-season/settle-afltables.ts
+--apply --auto-apply` lands valid AFL Tables data, recomputes the derived tables once, reports
+the exceptions, and does nothing at all on an identical rerun. Nothing committed. `afldb_dev`
+and production untouched. No migration, no grant, no privilege change, no admin UI, no
+identity creation. S7 not started.**
+
+Commands in this stage were executed by Claude under the operator's explicit S6 instruction
+(the CLAUDE.md §9 exception), as in S5. The only database opened was `afldb_test`, through the
+SSH local forward recorded in the S1/S2 closeout, plus one read-only catalogue query
+(`afldb_meta.import_writable_tables`, below). No bundle was run against `afldb_dev`:
+`AFLDB_IMPORT_DATABASE_URL` in this worktree's `.env` names `afldb_dev`, so the CLI was never
+invoked with a real snapshot from a terminal — see deviation 1.
+
+#### Files changed
+
+| File | Change |
+|---|---|
+| `src/lib/acquisition/settle-afltables.ts` | Derived recompute wired into `runSettleAfltables()` (once, season-scoped, gated, inside the transaction); `DerivedScope` threaded through `settleFamily()` / `applyRecordCanonically()`; four counters; `DERIVED_OWNED_FIELDS` + `automaticProposal()` (deviation 3); `recordOutcome()` applied-first ordering (defect B); `advisoryDisagreement` counted in `recordDisagreementFinding()` from the contract's policy |
+| `src/lib/acquisition/settle-report.ts` | **NEW.** The §9.3 exception report: `buildSettleExceptionReport()`, the pure `classifyCandidate()` / `splitRejectionReason()` / `playerNameOf()` / `isMatchFamilyTarget()`, and `renderSettleExceptionReport()` |
+| `src/lib/acquisition/canonical-apply.ts` | One-line fix: the `player_match_stats` UPDATE no longer sets `imported_at`, a column that table does not have (defect A) |
+| `tools/current-season/settle-afltables.ts` | `--auto-apply`; unknown flags refused; `parseSettleArgs()` / `runSettleCli()` exported; entry guard so importing the module starts no run; `inProgressSeasons` handed to the run; counters printed in groups including the ISSUE-122 and derived ones; the report printed after a committed apply and on `--report`; header rewritten (the v1 "writes no canonical row" statement is superseded) |
+| `package.json` | `settle:afltables` script |
+| `tests/current-season-import.test.ts` | +1 describe (9 cases): the flag contract, the no-force pin, the recompute wiring pin, the derived-owned pin, the classification truth table, the render contract |
+| `tests/integration/settle-afltables.test.ts` | +1 nested describe (6 cases) inside the S5 suite, driven through `runSettleCli()`; `cleanup122()` now removes the derived rows; ONE S5 assertion amended with its reason (`careerGameNo` 12 → 1, deviation 3) |
+| `issues/open/AFLDB-ISSUE-122.md`, `issues.md`, `IssuesIndex.md`, `CHANGELOG.md` | tracking |
+
+Untouched, as required: every migration, `tools/maintenance/privileges.sql`, the Squiggle/Kali
+canonical writer (S7), `deploy/` and scheduling (S8), transition/adoption (S9), every admin
+surface, `src/db/queries/player-derived.ts` (reused, not edited). The untracked `must` file was
+not touched.
+
+#### What was built
+
+**Derived recompute (§13).** After every family, the absence sweep and the disagreement
+resolution, and before the batch-completion UPDATE — inside the same transaction — the run
+calls `recomputeSeasonMetadata`, `recomputeClubSeasons`, `recomputePlayerDerivedStats`,
+`recomputeSeasonBrownlowStatus` from `src/db/queries/player-derived.ts`, in the order
+`data-edits.ts` and `match-admin.ts` already use (metadata first, because the club-seasons
+wooden-spoon gate reads `seasons.status`), **only when** `canonicalRowsInserted +
+canonicalRowsUpdated > 0`. Nothing was rebuilt. `recomputePlayerDerivedStats` receives the
+players whose own unit applied plus every player with a stats row on a match whose unit applied
+(the `match-admin.ts` "affected ids" reading), never the season's player set. A `--dry-run`
+rolls the recompute back with everything else; a recompute failure fails the run, so canonical
+facts are never committed beside stale derived rows. Counted as `derivedRecomputeRuns` (0/1)
+and `derivedRecomputePlayers`.
+
+**CLI.** `--auto-apply` is the explicit operator switch for the automatic path and is
+orthogonal to `--apply` / `--dry-run`: `--dry-run --auto-apply` runs gates, writers, ledger and
+recompute against real constraints and privileges and rolls back — the exact preview of what
+`--apply --auto-apply` commits. Without it the tool is byte-for-byte ISSUE-099's review-first
+behaviour. There is no force flag and no bypass (pinned). An unknown flag is refused, so a
+mistyped `--auto-aply` cannot silently run the review-first path and look like an automatic
+run that wrote nothing. `npm run settle:afltables` reaches it. The body is exported as
+`runSettleCli(argv, { projectRoot?, sql?, log? })` so the integration suite drives the real
+path; a module-level guard runs `main()` only when the file is the process entry.
+
+**Counters.** Four added, none redundant with an existing one: `canonicalApplyRefusals`
+(offered targets a gate re-read inside the savepoint overruled — distinct from
+`canonicalApplyFailures`, which is a rolled-back unit), `advisoryDisagreement` (a finding
+opened under `corroboration_policy: "advisory"` that vetoed nothing — the counterpart of
+`sourceDisagreement`, never counting the same finding), `derivedRecomputeRuns`,
+`derivedRecomputePlayers`. Everything else the operator needs — inserts, updates, ledger rows,
+failures, unresolved identities per kind, moot candidates, retries — already existed and is
+reused. All land in `import_batches.validation_result` (asserted key by key against the run's
+counters) and in the CLI output.
+
+**Exception report (§9.3).** `buildSettleExceptionReport(sql, { season })` reads only
+existing tables and is strictly read-only. Every pending `promotion_candidates` row for the
+source and season is classified by `classifyCandidate(candidateVersion, latestAppliedVersion)`:
+**moot** when a `canonical_applications` row exists for the same `(source, family, record,
+target)` at the candidate's version or later (the §9.3 retry lands at the SAME version; a later
+version supersedes it; `evaluateAcceptance` would refuse it as `stale_review` either way),
+**active** otherwise. Active `unresolved_identity` candidates are reported as unresolved
+records with the §9.3 context — source, family, `external_record_id`, `source_version_seq`,
+match key, source player name, profile URL, season, round, club, target, the exact reason from
+the `import_rejections` row the settle wrote, and whether the canonical `matches` row exists
+right now — the payload coming from the candidate's own evidence version in the immutable
+spine. Every other active candidate, every open `canonical_apply_failed` finding (owner
+`AFLDB-ISSUE-122`) and every open `source_disagreement` finding (owner `AFLDB-ISSUE-099`) is
+listed under ACTIVE; moot candidates under MOOT, marked "retained as history under
+AFLDB-ISSUE-099 F7, nothing to do". Each pending candidate appears exactly once. The CLI prints
+it after a committed apply and on `--report`.
+
+#### Deviations and decisions (none widens the contract; each recorded with its reason)
+
+1. **The bounded end-to-end ran through the exported CLI entry with a fixture bundle, not
+   through the literal §17 step-5 terminal commands.** `data/sources/afltables/fitzroy_core/`
+   holds no snapshot in this worktree (it is git-ignored and R has never run here), and
+   `AFLDB_IMPORT_DATABASE_URL` names `afldb_dev`, which §20 forbids touching before S8. The
+   integration suite therefore writes a project root under `os.tmpdir()` — the real
+   `source-families.json`, a `seasons.json` naming the fixture season, a manifest, and an
+   `observations.json` citing the manifest's real SHA-256 — and calls `runSettleCli()` with
+   the guarded `afldb_test` client and a line sink. Everything the operator's command does —
+   flag parsing, bundle load, manifest re-hash, contract validation, in-progress-season read,
+   the run, the counters, the report — executes; only the connection is substituted. Three
+   terminal smokes prove the entry guard and flag handling from a real process (no args →
+   `--label <snapshot> is required.`; a missing snapshot fails offline with ENOENT before any
+   client is created; `npm run settle:afltables -- --label x --apply --dry-run` → mutually
+   exclusive). The literal commands against a real snapshot are S8's supervised run.
+
+2. **`--dry-run` alone previews the review-first path; `--dry-run --auto-apply` previews the
+   automatic one.** §17 step 5 writes the dry run without `--auto-apply`. Making `--auto-apply`
+   implicit in `--dry-run` would have made the preview and the commit differ by a flag the
+   operator did not type, so the two flags are independent, and the CLI header says which
+   combination previews what. Operators should preview with `--dry-run --auto-apply`.
+
+3. **`player_match_stats.career_game_no` is derived-owned on the automatic path
+   (`DERIVED_OWNED_FIELDS`).** The first identical-rerun proof found a perpetual write:
+   the applier wrote the source's `Career.Games` value, the end-of-run recompute — the targeted
+   counterpart of `rebuild_derived.py`, and what every admin match mutation already runs —
+   renumbered it as the player's row number in AFLDB, and the next run saw a target that
+   "differed" and retried the write. One canonical write and one ledger row per night over
+   identical source data, forever (SC3). Two writers for one column cannot both own it, and
+   AFLDB already derives this number from its own canonical rows after every admin edit, so on
+   the automatic path the source's copy is corroboration at most. `automaticProposal()` removes
+   the field before the retry diff, the rendered field set, the baseline hash and the applier's
+   own comparison, so all four see one field set; the applier never writes it (insert or
+   update) and the recompute fills it in the same transaction. **Scoped to the automatic path
+   only**: `reconcile()` and the promotion candidate it drafts still carry the full proposal, so
+   a source-side change to the field still surfaces for a human as a `corrected` candidate
+   (with nothing else to write it is never offered to the applier), and ISSUE-099's review
+   semantics are untouched. The alternative — dropping the field from
+   `PLAYER_MATCH_STATS_PROPOSED_FIELDS` — would have changed those semantics and was not
+   taken. One S5 assertion moved with the reason written beside it: after the first apply the
+   linked player's `careerGameNo` is `1` (their only match in AFLDB), not the projection's `12`.
+
+4. **Two S5 defects found and fixed by the same proof.** (A) `writePlayerMatchStats()`'s
+   UPDATE set `imported_at = now()`, and `player_match_stats` has no such column — migration
+   001's provenance-quartet helper was never applied to it, unlike the other three targets. S5's
+   suite only ever inserted player rows, so the branch had never executed; the S6 rerun was the
+   first thing to reach it and it rolled the unit back (`canonicalApplyFailures: 1` with the
+   PostgreSQL error in the finding). (B) `recordOutcome()` returned on `unchanged` /
+   `history_only` before the applied bookkeeping, so a §9.3 retry — whose observation is
+   `unchanged` by construction — never counted `candidatesMootLeftPending` and never resolved
+   its own earlier `canonical_apply_failed` finding: a unit that failed once and then landed on
+   the identical payload would have left its finding open forever. The applied branch now runs
+   for every applied target, still counting the observation as what it was.
+
+5. **Unresolved records are candidate-driven, not rejection-driven.** The first draft read the
+   latest batch's `import_rejections`. The rerun proof showed that batch with **zero**
+   rejection rows while the debutant was still unresolved: an unchanged record is `unchanged`
+   at gate 4 before identity is consulted (§9.3), so the settle writes its rejection once, when
+   it refuses the record, and not again. The pending `unresolved_identity` candidate is the
+   durable exception; the newest rejection row for that record and target supplies the reason
+   (with an explicit "not retained" reason if none survives), and the spine supplies the
+   payload.
+
+6. **Recompute scope includes the players on a match the run updated**, not only players whose
+   own unit applied. A corrected match date or score moves those players' derived rows exactly
+   as an edit through `match-admin.ts` does, and that module's "affected ids" query is the
+   pattern followed. In the proofs this adds nothing (the only players on the new match are
+   the ones written), which the counter shows.
+
+7. **`recomputeClubSeasons` fails closed on a season with no home-and-away match**, and
+   because the recompute runs inside the transaction that would then fail the whole run. It is
+   unreachable for a run that just wrote a played match (every AFL Tables results row is a
+   played match; the E6 completion proof holds), and it is the helper's documented contract, so
+   it is reused rather than wrapped. Recorded so S8 knows the failure mode.
+
+8. **The report's "latest batch" is found by the batch note.** `runSettleAfltables()` writes
+   `...; season=<year>; mode=<apply|dry-run>` into `import_batches.notes`, and the report
+   matches `season=<year>;` on it. It is our own format, matched exactly; a dry run's batch is
+   rolled back, so every persisted batch was an apply.
+
+9. **Import-role privileges verified, none changed.** One read-only query of
+   `afldb_meta.import_writable_tables` on `afldb_test` (as `afldb_owner`) lists every table the
+   recompute writes — `seasons`, `players`, `club_seasons`, `player_clubs`,
+   `player_club_season_stats`, `player_season_stats`, `player_career_stats` — so `afldb_import`
+   can run it. The role-parity integration case is still the pre-existing skip
+   (`AFLDB_TEST_IMPORT_DATABASE_URL` unset in this worktree); S8's supervised run as the real
+   role is the remaining proof.
+
+10. **Manual authority is still re-read once per savepoint** (S5 deviation 6). S6 did not narrow
+    it: three queries per applied record is not the cost that matters in a nightly run, and
+    narrowing it is not a correctness change.
+
+#### Validation
+
+All against `afldb_test` (development host `arm@10.0.40.100`, PostgreSQL 16.15) through the SSH
+local forward. No other database was opened.
+
+| Command | Result |
+|---|---|
+| `npx vitest run tests/current-season-import.test.ts tests/reference-data.test.ts` | **257 passed** (248 before; +9 S6 cases) |
+| `npx vitest run tests/integration/settle-afltables.test.ts` | **44 passed / 1 skipped** (38+1 before; +6 S6 cases). The skip is the pre-existing `AFLDB_TEST_IMPORT_DATABASE_URL` conditional |
+| `npx vitest run tests/integration/{settle-afltables,observation-spine,fk-indexes,privileges}.test.ts` | **94 passed / 1 skipped** — the S1 schema and grant gates still green |
+| `npx tsc --noEmit` | exit 0 |
+| `npx eslint` over the six changed source/test files | clean, no output |
+| `git diff --check` | clean (CRLF advisories only) |
+| `npx tsx tools/current-season/settle-afltables.ts` (no args / missing snapshot / `--apply --dry-run`) | refuses offline with the exact message each time; no client created |
+
+**The six S6 integration cases (§17 step 5, through the CLI).** *Flags:* `--auto-aply` and
+`--apply --dry-run` are refused. *Dry run* (`--dry-run --auto-apply`): the counters show the
+automatic path and the recompute ran (`canonicalRowsInserted > 0`,
+`canonicalApplicationsLogged > 0`, `derivedRecomputeRuns = 1`); afterwards every relation —
+matches, versions, payloads, batches, ledger, candidates, findings, `club_seasons`,
+`player_clubs`, `player_season_stats`, the `seasons` row — is `toEqual` its snapshot from
+before. *First apply* (`--apply --auto-apply`): 6 canonical rows (1 match, 4 period rows, 1
+player row), 3 ledger rows all at version 1, 0 failures, 0 refusals, the debutant refused at its
+own record only (1 candidate); the recompute ran once over exactly 1 player; `club_seasons` for
+the season holds exactly the two fixture clubs, `player_clubs` and `player_season_stats` hold
+exactly the linked player's row, `seasons.match_count` / `last_match_date` /
+`last_loaded_round` match the canonical matches; `validation_result` carries every ISSUE-122
+counter equal to the run's; the printed line reads `Applied as import batch N: 6 canonical
+row(s) inserted …`; the report lists the debutant as the one active unresolved record with all
+§9.3 fields (family, record, version 1, match key, name, profile URL, club, season, round,
+target, reason) and **`canonicalMatchApplied: true`** with the match id, and lists it under
+neither candidates list. *Identical rerun:* `canonicalRowsInserted/Updated/ApplicationsLogged/
+RetryApplied/ApplyFailures` all 0, `versionsAppended` 0, `payloadsCreated` 0,
+`candidatesCreated` 0, `candidatesRefreshed` 0 (the debutant is `unchanged` at gate 4),
+`dataIssuesOpened` 0, `derivedRecomputeRuns` 0; the whole state snapshot equals the previous
+one plus exactly one `import_batches` row; the report still names the debutant. *Retry after
+resolution:* the identity is mapped between runs; on the identical bundle exactly 1 row lands
+(`canonicalRetryApplied` 1, `versionsAppended` 0), the recompute runs over exactly that player,
+`candidatesMootLeftPending` is 1, the ledger gains exactly the debutant's insert, `player_clubs`
+gains exactly the debutant's row, the match, ladder and season row are unchanged, the
+candidate is still `pending` in the table (F7) and the report now classifies it **moot** with
+`latestAppliedVersionSeq = sourceVersionSeq`, with no S6 record left active. *`--report`:*
+read-only (state `toEqual` before), renders the ACTIVE and MOOT sections, and equals
+`buildSettleExceptionReport()` called directly.
+
+The report was also exercised by S5's own leftovers, unasked: it lists S5's rolled-back match
+family as an active `match_period_scores` exception with reason "no canonical match exists for
+this match_key yet" and `canonicalMatchApplied: false` — which is exactly right, and which
+first caught out a season-wide assertion in the S6 suite until it was scoped.
+
+#### Stop conditions
+
+| Condition | Evaluation |
+|---|---|
+| SC1 canonical row written with a gate unclear | **Clear.** No gate changed; the S5 override/foreign/source-less refusals still pass |
+| SC2 canonical row without a ledger row, or the reverse | **Clear.** S5's SQL assertion both ways still passes with the recompute live |
+| SC3 a rerun writes anything | **Clear — and this stage's proof is what enforces it.** The `career_game_no` flip-flop (deviation 3) and the `imported_at` failure (defect A) were both SC3 violations in waiting; the identical-rerun case now asserts 0/0/0 and a byte-identical snapshot |
+| SC4 one unresolved identity blocks others | **Clear.** The S6 debutant blocks neither the match nor the linked player |
+| SC5 a grant widened, or `promotion_decisions`/`admin_user_id` semantics changed | **Clear.** No migration, no `privileges.sql` change; the privileges suite still passes |
+| SC6 a manual, foreign or source-less row adopted | **Clear.** Unchanged from S5 |
+| SC7 Squiggle/Kali perform a canonical write | **Clear.** Untouched; S7 owns the retirement |
+| SC8 a candidate machine-accepted, or a `promotion_decisions` row written | **Clear.** The report reads; it retires nothing. The moot candidate is asserted still `pending` |
+| SC9 an applied migration's bytes change | **Clear.** No migration touched |
+| SC10 evidence contradicts the runbook | **Not triggered.** Deviation 3 is a decision the runbook did not anticipate (two writers for one column) and is the smallest change that keeps §13's recompute and §6's idempotence both true; it is recorded here with the alternative not taken. Deviations 1, 2, 4, 5 are the runbook's requirements made concrete |
+
+#### Git status at end of S6 (nothing staged, nothing committed)
+
+```text
+ M CHANGELOG.md
+ M IssuesIndex.md
+ M issues.md
+ M issues/open/AFLDB-ISSUE-122.md
+ M package.json
+ M src/lib/acquisition/settle-afltables.ts
+ M tests/current-season-import.test.ts
+ M tests/integration/settle-afltables.test.ts
+ M tools/current-season/settle-afltables.ts
+?? must                                   <- pre-existing empty stray file; NOT touched, do not commit
+?? src/lib/acquisition/canonical-apply.ts <- S5, still uncommitted
+?? src/lib/acquisition/settle-report.ts   <- S6
+```
+
+Branch `claude/issue-122` remains at `76480f0`. S5 and S6 are both uncommitted.
+
+#### Next action — S7 (Squiggle/Kali retirement)
+
+Fresh session, same worktree and branch, carry-over this file. Scope per §11.2 and §16 row S7:
+retire the canonical `UPDATE matches` in `src/lib/external-afl/current-season-import.ts`
+(`:922-943`) and make `--update-matches` / the admin control refuse explicitly, while keeping
+acquisition, observation and staging for both providers (§11.1 consumer audit, §20 non-goals).
+Gate: `tests/current-season-import.test.ts` (§17 rows 12–13). Do not start S8. Operator first:
+review and commit S5 + S6 together or separately; never the stray `must` file. Still outstanding
+from S0: the production copy of the §15.1 read-only query, which closes the S9 decision. Running
+the integration suite from the Windows worktree still requires the SSH local forward
+(`ssh -N -L 5432:127.0.0.1:5432 arm@10.0.40.100`).
