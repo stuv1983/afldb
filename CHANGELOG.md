@@ -15,6 +15,53 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-122 — automatic current-season AFL Tables canonical ingestion is live in production (Resolved) - 3 September 2026
+
+- **Current-season AFL Tables data now becomes canonical automatically, with no routine admin
+  review.** The nightly chain acquires AFL Tables through fitzRoy, adjudicates and emits
+  observations offline, then applies them canonically behind the existing nine reconciliation
+  gates plus five stronger automatic-path gates re-evaluated inside the write savepoint: season,
+  match completion, ownership, canonical baseline and human authority. Before this, valid new
+  games were acquired, validated, persisted and projected but never became canonical.
+- **Every canonical mutation is audited.** The append-only `canonical_applications` ledger row is
+  written in the *same savepoint* as the mutation it describes, so a canonical row can never exist
+  without its ledger row or the reverse. `promotion_decisions` remains human-only — no machine
+  writes it, and nothing auto-applied is ever marked accepted.
+- **Reruns are free.** An identical rerun writes no canonical row and no ledger row. Proven on
+  production: the first apply wrote 10,582 canonical rows and 9,133 ledger rows with zero refusals
+  and zero failures; the identical rerun immediately after wrote nothing at all.
+- **Failure is isolated and fails closed.** An unresolved player identity blocks only that
+  player's own rows — the match and every other player still land, and the row becomes an
+  exception-queue candidate. An unresolved club fails closed for its whole match family. An
+  unmapped venue is *not* a failure: `venue_id` stays NULL, `venue_raw` carries the real string,
+  and the literal `'Unknown'` is never written. A manual override, a foreign-owned row or a
+  source-less row is never adopted automatically.
+- **Squiggle and Kali have no canonical writer at all** and are never invoked by the scheduled
+  job. They keep acquisition, observations, staging, diagnostics and provenance.
+  `current-season:update --update-matches` refuses explicitly. **There is no fallback canonical
+  authority**: if the chain fails, the season does not advance until it succeeds, and the failed
+  run leaves no consumable partial snapshot.
+- The nightly `afldb-settle-afltables` timer is **enabled and active on production**
+  (`Persistent=true`, so a run missed while the host is down catches up once). Out of season the
+  run exits successfully without doing anything, so the timer stays enabled all year.
+- Production is deployed at `main` merge `250caa2`, schema through migration `083` with 0 pending
+  and `db:privileges` reconciled, with R 4.3.3 and fitzRoy 1.8.0 installed and version-pinned.
+- The 2026 season baseline on production was replaced with a clean rebuilt database (16,838
+  matches, seasons 1897–2025) after a full pre-cutover backup and a matching SHA-256 transfer
+  check. That promotion also reset production-only application state; the real production super
+  admin was restored from the pre-cutover backup and admin login verified, and the remaining
+  production-only rows are preserved in a recovery database pending `AFLDB-ISSUE-126`.
+- The one-time `--adopt-foreign-2026` transition (runbook §14/S9) was measured and is **not
+  required**: every pre-existing 2026 row was legacy-loaded, which the adoption rules refuse, so
+  the adoptable set was empty. It was never built.
+- `afldb.com` is unchanged and intentionally remains the static holding page, with
+  `beta.afldb.com` as the application upstream.
+- Follow-ups routed and not implemented: `AFLDB-ISSUE-123` (settle performance at steady state),
+  `AFLDB-ISSUE-124` (`afldb.service` `StartLimitIntervalSec` is in the wrong section and is
+  ignored), `AFLDB-ISSUE-125` (a documented procedure for preserving production-only state during
+  a canonical database promotion) and `AFLDB-ISSUE-126` (decide and act on the production-only
+  state held in the recovery database).
+
 ### AFLDB-ISSUE-122 — scheduled in-season settle, stage S8 scheduling (In progress) - 2 September 2026
 
 - New `deploy/afldb-settle-afltables.service`, `.timer` and `.sh` run the approved in-season chain

@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 5 tracked here — `AFLDB-ISSUE-104`, `-110`, `-113`, `-116`, `-122`.
+**Open issues:** 8 tracked here — `AFLDB-ISSUE-104`, `-110`, `-113`, `-116`, `-123`, `-124`, `-125`, `-126`.
 
 <!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
      the ISSUE-110 branch merged into dev on 2026-08-31 and its own ledger rows below are
@@ -15,7 +15,23 @@ created, reopened, resolved, or materially reclassified.
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
-| `AFLDB-ISSUE-122` | Medium | Data acquisition / Import architecture | Valid new AFL Tables games are acquired, validated, persisted and projected, but **never become canonical**. `AFLDB-ISSUE-099` built the whole pipeline and deliberately stopped: its §15 is an explicit zero-canonical-write prohibition. **First wrong layer: `recordOutcome()` (`src/lib/acquisition/settle-afltables.ts:2353-2487`)** — a valid promotable observation reaches the non-refusal `else` at `:2439` and falls into the function's only terminal action, the `promotion_candidates` upsert at `:2458-2484`; there is no branch that writes canonical data, and `canonicalRowsInserted`/`Updated` are literal-`0` **types** at `:1327-1329`. Four blocks sit behind it: no canonical writer in `src/lib/acquisition/*`; `'accept'` unrepresentable in `promotion-review.ts:29-36`; the `UNAVAILABLE_MANUAL_AUTHORITY` stub (`observations.ts:398`); and `match_period_scores`/`brownlow_round_votes` having no `source_id`, so both are permanently ownership-indeterminate. Nothing consumes the queue — there is no promotion-review UI, route or handler. Operator has superseded the "canonical promotion is reviewed by default" policy for AFL Tables current-season data. **Also confirmed as current-state evidence:** `current-season-import.ts:922-943` (Squiggle/Kali) updates canonical `matches` with **no ownership predicate and no `data_overrides` check**, silently transferring `source_id` and reverting admin score corrections. | **S0-S7 COMPLETE and COMMITTED 2026-09-02 (branch tip `f0ea8f1`); S8 PARTIAL and uncommitted (runbook §23). Runbook: `issues/open/AFLDB-ISSUE-122.md`.** S6 made the automatic path operational: the derived recompute (`recomputeSeasonMetadata`, `recomputeClubSeasons`, `recomputePlayerDerivedStats`, `recomputeSeasonBrownlowStatus` from `src/db/queries/player-derived.ts`, nothing rebuilt) runs once per run inside the settle transaction, season-scoped, only when `canonicalRowsInserted + canonicalRowsUpdated > 0`, with the player recompute scoped to the players written plus the players on the matches written; `tools/current-season/settle-afltables.ts` gained the explicit `--auto-apply` flag (orthogonal to `--apply`/`--dry-run`, so `--dry-run --auto-apply` previews exactly what `--apply --auto-apply` commits; unknown flags refused; no force/bypass), an exported `runSettleCli()` entry with an entry guard, and `npm run settle:afltables`; four counters were added (`canonicalApplyRefusals`, `advisoryDisagreement`, `derivedRecomputeRuns`, `derivedRecomputePlayers`) and land in `import_batches.validation_result` with the rest; NEW `src/lib/acquisition/settle-report.ts` builds the §9.3 exception report — active unresolved-identity candidates with source/family/record/version/match key/player name/profile URL/season/round/club/target/reason and whether the canonical match landed, other active candidates, open apply failures and disagreements, and MOOT pending candidates (F7), classified by comparing the candidate's version with the latest `canonical_applications` version for the same record and target. **Three defects found and fixed by the identical-rerun proof:** (1) `career_game_no` had two writers — the applier (AFL Tables `Career.Games`) and the derived recompute (row number) — so an identical rerun retried the write every night (SC3); it is now derived-owned on the automatic path (`DERIVED_OWNED_FIELDS`), never written or compared by the applier and filled by the recompute in the same transaction, while `reconcile()` and the review candidate keep the full proposal; (2) the S5 `player_match_stats` UPDATE named an `imported_at` column that table does not have (the branch had never executed); (3) `recordOutcome()` returned early on `unchanged` before the applied bookkeeping, so a §9.3 retry never counted its moot candidate nor resolved its own `canonical_apply_failed` finding. End-to-end on `afldb_test` through the CLI entry with a fixture bundle in a temp project root (no snapshot on disk; `AFLDB_IMPORT_DATABASE_URL` names `afldb_dev`): dry-run → state byte-identical; `--apply --auto-apply` → 6 canonical rows, 3 ledger rows, recompute once over 1 player, debutant the only active exception with the match reported canonical; identical rerun → 0/0/0, no version/candidate/finding, no recompute; identity resolved → 1 retry row, recompute over that player only, candidate reported MOOT while still pending. Gates: `current-season-import` + `reference-data` 257/257, `settle-afltables` integration 44 passed / 1 skipped (pre-existing `AFLDB_TEST_IMPORT_DATABASE_URL` conditional), the four integration suites 94 passed / 1 skipped, `tsc --noEmit` exit 0, `eslint` clean on all six changed files, `git diff --check` clean. The import-role registry on `afldb_test` already lists every derived table the recompute writes, so no privilege change. SC1-SC10 clear. **S7 retirement complete:** Squiggle/Kali retain acquisition, observation/history, staging, diagnostics, corroboration evidence and provenance, but have no canonical DML; `--update-matches` explicitly refuses and the admin control/plumbing is gone. Gate: current-season-import 215/215, CLI refusal smoke exact, typecheck and changed-file lint clean. **S8 PARTIAL 2026-09-02:** `deploy/afldb-settle-afltables.{service,timer,sh}` and `docs/deployment.md` §7b are built and verified (`systemd-analyze verify` exit 0 on both units on the production host; `sh -n` clean; `git diff --check` clean; no TypeScript or lint-covered file changed). The production §15.1 measurement is CLOSED and **S9 is NOT REQUIRED**: `afldb_prod` holds 189 canonical 2026 matches, every one `source_id IS NULL` **and** `legacy_match_id IS NOT NULL`, so §14 rule 7 refuses all of them and the adoptable set is empty; zero `squiggle_api` / `kali_afl_stats` / `afltables` rows — production never ran the now-retired writer, and after S7 nothing can create such a row. **The supervised real run did NOT happen; two operator prerequisites block it:** (P1) R is absent on `afldb-prod` and `sudo` there is password-gated, so the operator must install `r-base-core` 4.3.3 plus the Ubuntu `r-cran-*` dependency set and fitzRoy **1.8.0** from a dated Posit snapshot (exact commands in `docs/deployment.md` §7b; 1.8.0 is currently CRAN's own version, and `acquire_core.R` re-checks the pin on every run, so no deployment can forget it); (P2) production is on `main` at `0da44f9`, **94 commits behind and at migration 070** — it needs 071-079, 081, 082, 083 plus the whole of `src/lib/acquisition/`, `tools/rebuild/fitzroy/` and `tools/current-season/settle-afltables.ts`, with the migration and `db:privileges` before the code (`AFLDB-ISSUE-027`). No unit was installed, no timer enabled, and nothing was written to any database. **Next action: operator installs R + fitzRoy 1.8.0 and deploys this branch to production; then a fresh session runs S8's supervised ladder C-I and enables the timer; then ISSUE-122 final closeout/review.** |
+<!-- RETIRED 2026-09-03 — `AFLDB-ISSUE-122` is **Resolved** and is NO LONGER an open issue.
+     Automatic current-season AFL Tables canonical ingestion is OPERATING IN PRODUCTION: `main`
+     merged at `250caa2`, production pulled it, schema through migration `083` with 0 pending,
+     `db:privileges` reconciled, R 4.3.3 + fitzRoy 1.8.0 installed and pinned. Supervised
+     production ladder passed end to end on snapshot `settle-2026-09-02-1958` — full
+     `--dry-run --auto-apply` against the real production schema rolled back completely, then the
+     real apply (`import_batches` 731) inserted 10582 canonical rows with 9133 ledger rows,
+     0 refusals and 0 failures, and the identical rerun (`import_batches` 732) wrote 0/0/0
+     (**SC3 passed on production**). `deploy/afldb-settle-afltables.timer` is enabled and active,
+     next trigger Fri 2026-09-04 04:34:12 AEST. **S9 is NOT REQUIRED** (§14 rule 7 refuses all 189
+     legacy-loaded 2026 rows; adoptable set 0). Authoritative record: the `AFLDB-ISSUE-122` entry
+     in `issues.md` (Resolution, 2026-09-03) and `issues/closed/AFLDB-ISSUE-122.md` §23. Four
+     follow-ups were routed out of its closeout: `AFLDB-ISSUE-123`, `-124`, `-125`, `-126`. -->
+| `AFLDB-ISSUE-126` | Medium | Database / Admin / Security / Audit trail / Operations | The 2026-09-02 production canonical DB cutover replaced production-only application state along with the football data. The real super admin (`auth_users` id 1) was recovered from the pre-cutover backup and admin login was verified, but three sets of production-only rows were **not** restored and exist only in the recovery database `afldb_prod_auth_recovery`: `auth_audit_log` **92 rows**, `beta_access_codes` **1 row**, `site_settings` **11 rows** (plus whatever else the pre-cutover dump `/home/arm/afldb_prod_pre_rebuild_20260902-200355.dump` carries). Production currently runs with **0** rows in all three. The application does not break — `src/lib/site-settings.ts` falls back to compiled-in defaults — but 11 deliberate super-admin choices are silently reverted to those defaults, one beta access code is gone, and the admin audit trail has a hard discontinuity at the cutover. Old `auth_sessions` (17) were deliberately not restored and must stay unrestored; a fresh login is the correct posture. | **Not started. Decide, per table, restore vs. intentionally reset — do not restore blindly.** `site_settings`: diff the 11 recovered rows against `src/lib/site-settings.ts` defaults and restore only the rows that encode a real operator decision (note `DEFAULT_GRID_AUDIENCE` is already `super_admin`, matching the production posture). `beta_access_codes`: confirm the code is still wanted before reissuing; treat it as live credential material and never paste it into a tracked file. `auth_audit_log`: **never reconstruct an audit trail retroactively** — either restore the 92 rows with an explicit, auditable cutover marker row that says what happened, or record the gap deliberately in this issue and leave the log starting at the cutover. **`afldb_prod_auth_recovery` MUST NOT be dropped until this issue is resolved.** No password hash or TOTP secret may be reproduced in any tracked file. Requires production DML, so it is operator-supervised work, not a repository change. |
+| `AFLDB-ISSUE-125` | Medium | Operations / Deployment / Database / Data integrity | There is **no documented procedure for preserving production-only state when a clean rebuilt database is promoted to production.** `AFLDB-ISSUE-122`'s 2026-09-02 cutover proved the gap by hitting it: restoring the clean rebuilt `afldb_test` dump over `afldb_prod` replaced the broken 2026 football data correctly, but also replaced every application-owned, auth-owned and operations-owned table, and it promoted a **test fixture super admin** (`email-intake-test-fixture@afldb.test`) into production in place of the real one. The repository documents backup/restore and the migration rollout order (`AFLDB-ISSUE-027`), but nothing enumerates which tables are production-only and must survive a canonical rebuild promotion. Recovery worked only because a pre-cutover dump was taken first, which was operator discipline rather than a documented step. | **Not started. Prevention, not incident documentation.** Enumerate every production-only table — at minimum `auth_users`, `auth_sessions`, `admin_invites`, `auth_audit_log`, `beta_access_codes`, `beta_allowed_emails`, `beta_login_tokens`, `site_settings`, plus any operational/telemetry state (`app_health_events`, `nl_search_log`, `data_edits`, `data_overrides`, `data_issues`) that a rebuild would discard — and classify each as must-preserve, must-reset, or decide-per-promotion. Then write a documented promotion procedure into `docs/` (mandatory pre-cutover dump; restore football data only, or restore-then-reinstate; an explicit **refuse-if-a-test-fixture-identity-is-present** check so `*@afldb.test` can never become a production admin; a post-promotion verification checklist ending in a real admin login). Cross-check against `tools/maintenance/` backup/restore and `privileges.sql`, which is already mandatory after a restore. Related: `AFLDB-ISSUE-126` (the data still held from this incident), `AFLDB-ISSUE-027` (rollout order). |
+| `AFLDB-ISSUE-124` | Low | Deployment / Operations | `deploy/afldb.service` declares `StartLimitIntervalSec` in the **`[Service]`** section. systemd only reads `StartLimitIntervalSec`/`StartLimitBurst` from **`[Unit]`**, so it is ignored — `systemd-analyze` on production reports `/etc/systemd/system/afldb.service:65: Unknown key name 'StartLimitIntervalSec' in section 'Service', ignoring.` The crash-loop limiter that the unit's own comment describes is therefore **not in effect** on production. Pre-existing, unrelated to `AFLDB-ISSUE-122`; observed while verifying the new settle units. | **Not started.** Move `StartLimitIntervalSec` (and `StartLimitBurst`, if it is in the same place) from `[Service]` to `[Unit]` in `deploy/afldb.service`, confirm `systemd-analyze verify` no longer warns, reinstall the unit and `systemctl daemon-reload` on production, then validate the limiter actually engages. Check the other units in `deploy/` for the same misplacement while there. Do not change any other directive in the unit. |
+| `AFLDB-ISSUE-123` | Low | Data acquisition / Import architecture / Performance | The first full `AFLDB-ISSUE-122` production pass — `--dry-run --auto-apply` followed by the real `--apply --auto-apply` over snapshot `settle-2026-09-02-1958` (207 matches, 9522 player-match rows, 10582 canonical rows, 9133 ledger rows) — took roughly **an hour**. Diagnosis so far is negative in the useful sense: PostgreSQL showed continuous forward progress with rapidly changing per-record `source_records` / version / projection / savepoint SQL, **no lock blocking, and no long-running single query**. The shape is per-record round-trip cost across a whole season backfill, not a pathological plan. **Steady-state nightly cost is unmeasured** — a nightly in-season pass sees only the new round, and an unchanged rerun is already proven to write nothing (`import_batches` 732, 0/0/0). | **Not started, and correctly low priority until measured.** First **measure the steady-state nightly runtime** from the timer's own journal (`journalctl -u afldb-settle-afltables.service`) across several in-season firings; a first-pass season backfill is not the workload this job actually runs. **Profile before optimizing** — identify whether the cost is per-record round trips, the per-target savepoint, the projection writes or the version/payload upserts. Any change **must preserve the transaction and idempotence semantics** that `AFLDB-ISSUE-122` SC2/SC3 depend on: the ledger row stays in the same savepoint as its mutation, the record stays the savepoint boundary, and an identical rerun must still write zero canonical and zero ledger rows. Do not batch across records in a way that lets one bad record take down a family that would otherwise land. |
 | `AFLDB-ISSUE-113` | Medium | Data acquisition / Import architecture / Data integrity | `brownlow_season_votes` has **no legacy-free writer** — sole writer `import_legacy_afl.py:684`. `rebuild_derived.py:23-26` and `db-health.ts:94` treat it as AUTHORITATIVE. Not reconstructible from round votes: season totals are complete 1924-1941 and 1946-2025 while round votes are complete only 1984-2025, and `vote_rank`/`eligible_rank`/`is_ineligible` are not computable from vote sums. **Silent-wrongness hazard:** with the table empty, `rebuild_derived.py`'s `season_brownlow` CTE falls every decided season to `not_applicable` — AFLDB would assert "no medal that season" for a century. | **Replacement source UNDECIDED and no selection is authorised.** Recommended next step, not a decision: a read-only probe of class B (a free structured season-summary source carrying rank **and** ineligibility) before committing to a 16,120-row manifest. Outside `AFLDB-ISSUE-102`'s closure boundary — 102 may resolve with this open. |
 | `AFLDB-ISSUE-110` | Medium | Natural-language search / deterministic semantics | NL semantic-mapping fixes, merged into dev 2026-08-31; parser v32 including the ranked-career season-bound fail-closed validator revision. Standing evidence: focused parser/validator **182/182**; expanded focused **345/345**; complete DB-free ISSUE-110 matrix **14 suites, 733/733**; typecheck passed; authoritative post-final-revision operator DB gate **2 files, 46/46 in 20.65 s, started 18:52:45** (24/24 + 22/22) — distinct from the earlier pre-revision 17:47 run. The three documented temporary artifacts were removed exactly. Durable record: `issues/open/AFLDB-ISSUE-110.md`. **Latest independent review verdict: REVISE — NOT READY FOR LARGE-SCALE VALIDATION**, with two unresolved HIGH findings: (A) career-predicate season ownership — a career predicate can exist without consuming `seasonMin`/`seasonMax`, so e.g. `players with at least 3 grand finals since 2000` silently ignores the requested period; (B) `clubFor` ownership with career predicates — e.g. `Carlton players who debuted since 2000`: execution bypasses the generic club filter merely because `careerPredicates` exist. | **Fix findings A and B fail-closed, then a fresh independent re-review.** For A, replace the blanket career-predicate exemption with explicit period ownership — only predicates that actually consume the relevant period bounds may permit them. For B, allow the `clubFor` bypass only when a predicate explicitly owns the relevant club semantics; otherwise reject or correctly compile the club constraint. No 480, 1,435/1,440, 100k, telemetry reset, or other large-scale validation before APPROVE; the 22,607-search run remains incomplete. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
@@ -11783,13 +11799,13 @@ was added.
 
 ## AFLDB-ISSUE-122 — Automatic current-season AFL Tables canonical ingestion
 
-- **Status:** Open
+- **Status:** Resolved 2026-09-03
 - **Severity:** Medium
 - **Area:** Data acquisition / Import architecture / Data integrity
 - **Found:** 2026-09-02 (operator product decision: the current-season path must stop
   requiring routine approval)
-- **Resolved:** N/A
-- **Runbook:** `issues/open/AFLDB-ISSUE-122.md` — **approved planning contract and the
+- **Resolved:** 2026-09-03 — operating in production; see Resolution below.
+- **Runbook:** `issues/closed/AFLDB-ISSUE-122.md` — **approved planning contract and the
   authoritative detail.** Planned 2026-09-02, Opus / High / Plan mode, worktree
   `D:\dev\afldb-issue-122`, branch `claude/issue-122`, base `19de501`.
 - **S0 preflight (2026-09-02):** COMPLETE — measurements, migration-number result (`083`),
@@ -12033,3 +12049,306 @@ the whole of `src/lib/acquisition/`, with the migration and `db:privileges` befo
 this branch to production; then a fresh session completes S8's supervised ladder C-I and enables the
 timer; then ISSUE-122 final closeout/review. Do not enable the timer before the ladder passes. S8 is
 uncommitted; never include the stray `must` file.
+
+### Resolution — 2026-09-03
+
+**RESOLVED. Automatic current-season AFL Tables canonical ingestion is operating in production.**
+Valid new AFL Tables games are now acquired, adjudicated, applied canonically and audited every
+night with no routine admin review, behind the same nine reconciliation gates plus five stronger
+automatic-path gates, and with a machine ledger row written in the same savepoint as every
+mutation. The exception queue carries only what genuinely could not be proven.
+
+**Root cause, as fixed.** `recordOutcome()` had no branch that wrote canonical data — a valid
+promotable observation fell through the non-refusal `else` into the `promotion_candidates` upsert,
+and `canonicalRowsInserted`/`Updated` were literal-`0` **types**. Four blocks sat behind it. All
+five were removed: `src/lib/acquisition/canonical-apply.ts` is the canonical writer;
+`src/lib/acquisition/manual-authority.ts` is a real `data_overrides`-backed authority provider
+(satisfying `AFLDB-ISSUE-099` A4 **without** widening migration 073's `entity_type` CHECK);
+migration `083_canonical_auto_apply.sql` gave `match_period_scores` and `brownlow_round_votes`
+their provenance quartet and added the append-only `canonical_applications` ledger; and
+`src/lib/acquisition/settle-report.ts` gave the queue a consumer. `promotion_decisions` stayed
+human-only throughout — no machine DML on it exists anywhere in `src/` or `tools/`. The
+Squiggle/Kali canonical `UPDATE matches` at `current-season-import.ts:922-943` was **retired**:
+that file now has no canonical DML at all, writing only `import_batches` and `staging_*`, and
+`--update-matches` refuses explicitly.
+
+**Deployment.** `main` merged ISSUE-122 at **`250caa2`**. Production pulled `main` to `250caa2`,
+installed **R 4.3.3** and **fitzRoy 1.8.0** (pinned, and re-checked by `acquire_core.R` on every
+run), reached **migration 083 with 0 pending**, and `db:privileges` completed successfully —
+migration and privileges before the code, per `AFLDB-ISSUE-027`.
+
+**Production database cutover.** The broken legacy 2026 baseline was replaced by a clean rebuilt
+database rather than migrated in place: pre-cutover dump
+`/home/arm/afldb_prod_pre_rebuild_20260902-200355.dump` (~18 MB), clean dump
+`/home/arm/afldb_test_rebuilt_20260902-200434.dump` (~18 MB), transfer SHA-256 matched
+(`c81021e269ea277f067cec5cbb758be9a003148de2fe77177cd7376a4e12b0b9`), `afldb_prod` recreated with
+owner `afldb_owner`, restored cleanly. Baseline after restore: **matches 16838**, seasons
+**1897–2025**, **2026 matches 0**.
+
+**Production admin recovery.** The clean rebuild also replaced production-only application/auth
+state and left a **test fixture** super admin (`auth_users` id 12,
+`email-intake-test-fixture@afldb.test`) in place of the real one. The fixture user was removed and
+the real production `auth_users` row (id 1, `stuart.villanti@gmail.com`, `super_admin`, created
+2026-08-16 13:00:47.926753+10) was restored from the pre-cutover backup; **old auth sessions were
+deliberately not restored**, so a fresh login was required. Admin login was then verified working.
+`auth_audit_log` (92 rows), `beta_access_codes` (1 row) and `site_settings` (11 rows) were **not**
+restored and remain safely in the recovery database `afldb_prod_auth_recovery` — routed to
+`AFLDB-ISSUE-126`, which **must** resolve before that database is dropped. No password hash, TOTP
+secret or recovery SQL text is reproduced in any tracked file.
+
+**Production validation, snapshot `settle-2026-09-02-1958`.** Acquisition: 209 raw `results` rows,
+9614 raw `player_stats` rows, manifest written last, no partial-manifest failure. Offline emission
+(no database opened): `snapshotMatches` 207, `snapshotPlayerMatchRows` 9522, `snapshotRejections`
+**0**, `snapshotUnkeyedRejections` 94 (83 rows without an ID, 0 without a profile URL), bundle
+~30 MB. A full `--dry-run --auto-apply` ran against the real production schema and privileges and
+**rolled back completely**. The real `--apply --auto-apply` (`import_batches` **731**) then wrote
+`canonicalRowsInserted` **10582**, `canonicalRowsUpdated` 0, `canonicalApplicationsLogged`
+**9133**, `canonicalApplyRefusals` **0**, `canonicalApplyFailures` **0**, matching the dry-run
+counters exactly; `manualAuthorityRefusals` 0, `foreignOwnedCollision` 0, `sourceDisagreement` 0,
+`advisoryDisagreement` 0, `unresolvedIdentityClub` 0, `unresolvedIdentityVenue` 0,
+`derivedRecomputeRuns` 1 over 576 players. The exception report showed **only** the 803 unresolved
+player rows: other pending candidates 0, open apply failures 0, open source disagreements 0, moot
+candidates 0. `unresolvedIdentityPlayer` 803 with `candidatesCreated` 803 is §9.4 working —
+player-grain rows failed closed at their own record while matches landed independently.
+`unresolvedIdentityMatch` 207 is **not** a failure: it is the documented `pending_match` path
+(`settle-afltables.ts:2641`/`:2694`), the expected value on a database with zero canonical 2026
+matches, and those targets were re-resolved inside the same savepoint after the match INSERT.
+
+**Idempotence — SC3 passed on production.** The identical rerun (`import_batches` **732**) wrote
+`canonicalRowsInserted` **0**, `canonicalRowsUpdated` **0**, `canonicalApplicationsLogged` **0**,
+`canonicalApplyRefusals` **0**, `canonicalApplyFailures` **0**.
+
+**S9 — NOT REQUIRED.** Measured on production before the cutover: 189 source-less 2026 rows, all
+189 with `legacy_match_id IS NOT NULL` (**§14 rule 7 refuses every one**) and
+`attendance_source_id IS NOT NULL`; no Squiggle/Kali-owned canonical matches; and no
+`data_overrides` table at all before the migration. **Adoptable set 0**, so
+`--adopt-foreign-2026` was never built and §14 stands as a recorded non-requirement. The cutover
+has since removed those 189 rows, making the set empty for a second, independent reason.
+
+**Scheduling.** `deploy/afldb-settle-afltables.service` and `.timer` are installed,
+`systemd-analyze verify` passed on both, and the timer is **enabled and active** — observed next
+trigger **Fri 2026-09-04 04:34:12 AEST**, `Persistent=true`. The scheduled chain is AFL Tables via
+fitzRoy only; **Squiggle/Kali are never invoked automatically and no fallback canonical authority
+exists** — if the chain fails the season does not advance until it succeeds.
+
+**Application health.** `afldb.service` restarted, active/running, two Next.js 15.5.23 workers on
+`127.0.0.1:3100`; local health after the final recovery `{"status":"ok","database":"ok",
+"latencyMs":2}`; production super-admin login verified. `afldb.com` intentionally remains the
+static holding page with `beta.afldb.com` as the application upstream, so `afldb.com /api/health`
+returning **404 is expected**; **Caddy was not changed.**
+
+**Validation summary.** §17 assertions 1–21 closed by the S1–S7 gates (DB-free 257/257 and
+215/215; `settle-afltables` integration 44 passed / 1 skipped; the four integration suites 94
+passed / 1 skipped; `fk-indexes` 2/2; `privileges` 35/35; `tsc --noEmit` exit 0; ESLint clean on
+every changed file), with assertions 1, 2, 7, 9, 17, 19 and 21 re-proved on real production data
+by the dry-run → apply → identical-rerun ladder. **All ten stop conditions SC1–SC10 are CLEAR and
+none remains open.** No test was weakened, skipped or deleted.
+
+**Follow-ups routed out of the closeout, none implemented:** `AFLDB-ISSUE-123` (settle
+performance — the first full pass took ~1 hour with forward progress, no lock blocking and no
+long-running query; measure steady state and profile before optimizing, preserving SC2/SC3
+semantics), `AFLDB-ISSUE-124` (`afldb.service` `StartLimitIntervalSec` is in `[Service]` and is
+ignored — pre-existing and unrelated), `AFLDB-ISSUE-125` (a documented procedure for preserving
+production-only state during canonical DB promotion, so this cannot recur) and
+`AFLDB-ISSUE-126` (decide and act on the production-only state still held in
+`afldb_prod_auth_recovery`).
+
+**Carried forward, unchanged and not defects:** `U5` — machine candidate retirement
+(`AFLDB-ISSUE-099` F7) remains a forward gap; moot candidates stay pending and no admin decision
+is ever fabricated. `U6` — debutant onboarding volume is now measurable (803 on the first
+production pass) and warrants its own issue if it proves burdensome; §9.4 is never weakened to
+reduce it.
+
+Full evidence, deviations and the stage-by-stage record: `issues/closed/AFLDB-ISSUE-122.md` §23.
+
+---
+
+## AFLDB-ISSUE-123 — Current-season settle performance is unmeasured at steady state
+
+- **Status:** Open
+- **Severity:** Low
+- **Area:** Data acquisition / Import architecture / Performance
+- **Found:** 2026-09-03 (`AFLDB-ISSUE-122` closeout; observed during the 2026-09-02 supervised production run)
+- **Resolved:** N/A
+- **Files:** `src/lib/acquisition/settle-afltables.ts`, `src/lib/acquisition/canonical-apply.ts`, `src/lib/acquisition/observation-store.ts`, `deploy/afldb-settle-afltables.{service,sh}`
+- **Related:** `AFLDB-ISSUE-122` (Resolved — introduced this path)
+
+### Symptom
+
+The first full `AFLDB-ISSUE-122` production pass took roughly **an hour**: a `--dry-run
+--auto-apply` followed by the real `--apply --auto-apply` over snapshot `settle-2026-09-02-1958`
+(207 matches, 9522 player-match rows, 10582 canonical rows, 9133 ledger rows) on a 2 vCPU droplet
+with PostgreSQL co-located.
+
+### Evidence
+
+Live observation during the run was negative in the useful sense: PostgreSQL showed **continuous
+forward progress** — rapidly changing per-record `source_records` / version / projection /
+savepoint SQL — with **no lock blocking** and **no long-running single query**. The shape is
+per-record round-trip cost across a whole-season backfill, not a pathological plan or a stuck
+transaction. The run completed successfully and its idempotent rerun (`import_batches` 732) wrote
+nothing, so correctness is not in question.
+
+### Why this is Low and not started
+
+The measured hour is a **first-pass season backfill**, which is not the workload the nightly timer
+actually runs. A nightly in-season pass sees one round, and an unchanged rerun is already proven
+to perform zero canonical work. The job is `Nice=10`, `Type=oneshot`, bounded by
+`TimeoutStartSec=3600`, and fires at 04:30 — so even the observed duration is inside its budget
+and outside any user-facing window.
+
+### Next action
+
+1. **Measure steady state first.** Read `journalctl -u afldb-settle-afltables.service` across
+   several in-season firings and record actual nightly runtime. Do not optimize against the
+   backfill number.
+2. **Profile before optimizing.** Determine whether the cost is per-record round trips, the
+   per-target savepoint, the projection writes, or the version/payload upserts.
+3. **Preserve the semantics `AFLDB-ISSUE-122` depends on.** Any change must keep the ledger row in
+   the **same savepoint** as its mutation (SC2), keep the **record** as the savepoint boundary so
+   one bad record cannot take down a family that would otherwise land (SC4), and keep an identical
+   rerun at **zero** canonical and zero ledger writes (SC3). Do not batch across records in a way
+   that weakens any of those.
+4. Only then consider `TimeoutStartSec` or cadence changes.
+
+---
+
+## AFLDB-ISSUE-124 — `afldb.service` declares `StartLimitIntervalSec` in `[Service]`, so systemd ignores it
+
+- **Status:** Open
+- **Severity:** Low
+- **Area:** Deployment / Operations
+- **Found:** 2026-09-02 (observed while verifying the `AFLDB-ISSUE-122` settle units on the production host); recorded 2026-09-03
+- **Resolved:** N/A
+- **Files:** `deploy/afldb.service`
+- **Related:** unrelated to `AFLDB-ISSUE-122`; found during its S8 verification only
+
+### Symptom
+
+`systemd-analyze` on production reports:
+
+    /etc/systemd/system/afldb.service:65: Unknown key name 'StartLimitIntervalSec' in section 'Service', ignoring.
+
+`StartLimitIntervalSec` and `StartLimitBurst` are `[Unit]` directives. Declared in `[Service]`
+they are parsed as unknown keys and dropped, so the crash-loop rate limiter that the unit's own
+comment describes is **not in effect** on production.
+
+### Impact
+
+A crash-looping `afldb.service` restarts without the intended start-limit backoff. Pre-existing,
+not introduced by any recent work, and not a data-integrity problem — but it silently removes a
+protection the deployment believes it has.
+
+### Next action
+
+Move `StartLimitIntervalSec` (and `StartLimitBurst` if it sits in the same section) from
+`[Service]` to `[Unit]` in `deploy/afldb.service`. Confirm `systemd-analyze verify` no longer
+warns, reinstall the unit and `systemctl daemon-reload` on production, then validate that the
+limiter actually engages. Check the other units in `deploy/` for the same misplacement while
+there. Change nothing else in the unit.
+
+---
+
+## AFLDB-ISSUE-125 — No documented procedure preserves production-only state when a clean rebuilt database is promoted
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Operations / Deployment / Database / Data integrity
+- **Found:** 2026-09-03 (`AFLDB-ISSUE-122` closeout; the 2026-09-02 production cutover hit the gap)
+- **Resolved:** N/A
+- **Files:** `docs/deployment.md`, `docs/operations/*`, `tools/maintenance/` (backup/restore), `tools/maintenance/privileges.sql`
+- **Related:** `AFLDB-ISSUE-126` (the data still held from this incident), `AFLDB-ISSUE-122` (the promotion that exposed it), `AFLDB-ISSUE-027` (migration-before-code rollout order)
+
+### Symptom
+
+The repository documents backup/restore and the migration rollout order, but **nothing enumerates
+which tables are production-only and must survive a canonical rebuild promotion.** Restoring a
+clean rebuilt `afldb_test` dump over `afldb_prod` on 2026-09-02 replaced the broken 2026 football
+data correctly — and also replaced every application-owned, auth-owned and operations-owned table
+in the same operation.
+
+### Evidence
+
+After the restore, production held a **test fixture super admin**
+(`email-intake-test-fixture@afldb.test`, `auth_users` id 12) in place of the real one, and
+`auth_sessions`, `auth_audit_log`, `beta_access_codes` and `site_settings` were all at zero rows
+against pre-cutover counts of 17, 92, 1 and 11. Recovery was possible only because a pre-cutover
+dump had been taken first — operator discipline, not a documented step. A test identity being
+promoted into production as `super_admin` is the sharpest edge of this: it is an authentication
+boundary, and nothing refused it.
+
+### Next action
+
+**Prevention, not incident documentation.**
+
+1. **Enumerate** every production-only table and classify each as must-preserve, must-reset, or
+   decide-per-promotion. At minimum: `auth_users`, `auth_sessions`, `admin_invites`,
+   `auth_audit_log`, `beta_access_codes`, `beta_allowed_emails`, `beta_login_tokens`,
+   `site_settings`, plus operational and telemetry state a rebuild would discard
+   (`app_health_events`, `nl_search_log`, `data_edits`, `data_overrides`, `data_issues`).
+2. **Document the promotion procedure** in `docs/`: a mandatory pre-cutover dump; restore of
+   football data only, or restore-then-reinstate with an explicit reinstatement list; an explicit
+   **refuse-if-a-test-fixture-identity-is-present** check so no `*@afldb.test` row can ever become
+   a production admin; and a post-promotion verification checklist that ends in a real admin
+   login.
+3. Cross-check against the existing `tools/maintenance/` backup/restore path and
+   `privileges.sql`, which is already mandatory after any restore.
+4. Never copy test fixture identities into production, and never place a password hash or TOTP
+   secret in a tracked file.
+
+---
+
+## AFLDB-ISSUE-126 — Production-only state from the 2026-09-02 cutover is unrestored and held only in `afldb_prod_auth_recovery`
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Database / Admin / Security / Audit trail / Operations
+- **Found:** 2026-09-03 (`AFLDB-ISSUE-122` closeout)
+- **Resolved:** N/A
+- **Files:** production databases `afldb_prod` and `afldb_prod_auth_recovery`; pre-cutover dump `/home/arm/afldb_prod_pre_rebuild_20260902-200355.dump`; `src/lib/site-settings.ts` (the compiled-in defaults currently in force)
+- **Related:** `AFLDB-ISSUE-125` (prevention), `AFLDB-ISSUE-122` (the cutover)
+
+### Symptom
+
+The 2026-09-02 production canonical DB cutover replaced production-only application state along
+with the football data. The real super admin was recovered and admin login verified, but three
+sets of production-only rows were **not** restored and now exist only in the recovery database
+`afldb_prod_auth_recovery`:
+
+| Table | Rows held in recovery | Rows in production now |
+|---|---|---|
+| `auth_audit_log` | 92 | 0 |
+| `beta_access_codes` | 1 | 0 |
+| `site_settings` | 11 | 0 |
+
+`auth_sessions` (17 rows) were deliberately not restored and **must stay unrestored** — a fresh
+login is the correct posture after a database identity is rebuilt.
+
+### Impact
+
+The application does not break: `src/lib/site-settings.ts` falls back to compiled-in defaults. But
+11 deliberate super-admin choices are silently reverted to those defaults, one beta access code is
+gone, and the administrative audit trail has a hard discontinuity at the cutover with no record in
+the log itself saying why.
+
+### Next action
+
+**Decide per table; do not restore blindly.**
+
+- **`site_settings`** — diff the 11 recovered rows against the `src/lib/site-settings.ts`
+  defaults and restore only the rows that encode a real operator decision. Note
+  `DEFAULT_GRID_AUDIENCE` is already `super_admin`, which matches the intended production
+  posture, so not every difference is a loss.
+- **`beta_access_codes`** — confirm the code is still wanted before reissuing. Treat it as live
+  credential material; never paste it into a tracked file.
+- **`auth_audit_log`** — **never reconstruct an audit trail retroactively.** Either restore the 92
+  rows *and* write an explicit, auditable cutover marker row stating what happened, or record the
+  gap deliberately in this issue and let the production log start at the cutover. Silently
+  back-filling 92 rows into a rebuilt database is not an option.
+
+Also confirm whether the pre-cutover dump carries any other production-only state not listed
+above.
+
+**`afldb_prod_auth_recovery` MUST NOT be dropped until this issue is resolved.** No password hash
+or TOTP secret may be reproduced in any tracked file. This requires production DML and is
+operator-supervised work, not a repository change.

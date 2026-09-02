@@ -2728,3 +2728,313 @@ uncommitted. No commit was made.
    resolution per CLAUDE.md §5.
 
 Do not enable the timer before step 3 passes. Never commit the stray `must` file.
+
+---
+
+### S8 COMPLETE — supervised production run, canonical DB cutover and scheduling (2026-09-02 → 2026-09-03, operator-executed on `afldb-prod`; recorded by Opus 5 (1M) / Medium / Normal, worktree `D:\dev\afldb-issue-122`, branch `claude/issue-122` at `887263a`)
+
+**Outcome: S8 is COMPLETE and ISSUE-122 is OPERATING IN PRODUCTION.** Both S8 blockers are
+cleared, the supervised ladder C→I ran to the end, the real canonical apply landed, the
+identical rerun proved SC3 on production data, and the nightly timer is enabled and active.
+`--dry-run` was run first against the real production schema and privileges and rolled back
+completely before anything was committed.
+
+The evidence below was produced by the operator on the production host and is recorded here
+verbatim. No password hash, TOTP secret or recovery SQL text is reproduced anywhere in this
+runbook, `issues.md`, `IssuesIndex.md` or `CHANGELOG.md`.
+
+---
+
+#### 1. Blockers P1 and P2 — both CLEARED
+
+| Blocker | Resolution |
+|---|---|
+| **P1** — R and fitzRoy absent | **R 4.3.3** installed on `afldb-prod`; **fitzRoy 1.8.0** installed and pinned. `acquire_core.R` re-checks the pin on every run, so the deployment cannot silently drift off it. |
+| **P2** — production 94 commits behind at migration 070 | `main` merged ISSUE-122 at **`250caa2`** ("Merge ISSUE-122 automatic current-season AFL Tables ingestion"); production pulled `main` to `250caa2`. Schema is now **through migration 083 with 0 pending**, and `db:privileges` completed successfully. §19's rollout order (migration and `db:privileges` before the code, the `AFLDB-ISSUE-027` lesson) was honoured. |
+
+#### 2. Production canonical database cutover
+
+The 2026 football data on the old `afldb_prod` was the broken legacy-loaded baseline measured at
+S0/S8 (189 rows, all `legacy_match_id IS NOT NULL`). It was replaced with a clean rebuilt
+database rather than migrated in place.
+
+| Step | Evidence |
+|---|---|
+| Old production DB backed up | `/home/arm/afldb_prod_pre_rebuild_20260902-200355.dump` (~18 MB) |
+| Clean rebuilt source dump | `/home/arm/afldb_test_rebuilt_20260902-200434.dump` (~18 MB) |
+| Transfer integrity | SHA-256 matched end to end: `c81021e269ea277f067cec5cbb758be9a003148de2fe77177cd7376a4e12b0b9` |
+| `afldb_prod` recreated | owner `afldb_owner` |
+| Restore | completed cleanly |
+| Restored baseline | `current_database() = afldb_prod`; **matches 16838**; seasons **1897–2025**; **2026 matches 0** |
+
+**Production-only state was replaced along with the football data — recorded, recovered in part,
+and routed.** The clean rebuild correctly replaced the football data, but it also replaced
+application/auth/operational state that only ever existed on production. Immediately after the
+restore the database carried a **test fixture** super admin (`id 12`,
+`email-intake-test-fixture@afldb.test`) and zero rows of production auth history.
+
+| Table | Old production (pre-cutover) | Immediately after restore |
+|---|---|---|
+| `auth_users` | 1 — the real production super admin, `id 1`, created 2026-08-16 13:00:47.926753+10 | 1 — the **test fixture**, `id 12` |
+| `auth_sessions` | 17 | 0 |
+| `admin_invites` | 0 | 0 |
+| `auth_audit_log` | 92 | 0 |
+| `beta_access_codes` | 1 | 0 |
+| `beta_allowed_emails` | 0 | 0 |
+| `beta_login_tokens` | 0 | 0 |
+| `site_settings` | 11 | 0 |
+
+**Recovery performed, and its boundary.** A recovery database `afldb_prod_auth_recovery` was
+created from the pre-cutover dump. The test fixture auth user was removed; the real production
+`auth_users` row was restored from the pre-cutover backup. **Old auth sessions were deliberately
+NOT restored** — a fresh login was required, which is the correct posture after a database
+identity is rebuilt. The production super admin was then verified (`id 1`,
+`stuart.villanti@gmail.com`, `super_admin`) and **admin login was verified working**.
+
+**What is still only in the recovery database.** `afldb_prod_auth_recovery` still holds the old
+production-only state that was NOT restored — `auth_audit_log` **92 rows**, `beta_access_codes`
+**1 row**, `site_settings` **11 rows**, and whatever else the pre-cutover dump carries. It has
+**not** been discarded. This closeout deliberately did **not** restore it: `site_settings` rows
+are runtime super-admin choices that the application already falls back to compiled-in defaults
+for (`src/lib/site-settings.ts`), `auth_audit_log` is an audit trail that must never be
+reconstructed retroactively without a deliberate decision about how the cutover gap is
+represented, and `beta_access_codes` is live access-credential material. All three need
+production reasoning and production DML, which is outside a closeout session's scope. Routed to
+**`AFLDB-ISSUE-126`**, with the prevention work in **`AFLDB-ISSUE-125`**.
+**`afldb_prod_auth_recovery` must not be dropped until ISSUE-126 is resolved.**
+
+#### 3. Supervised acquisition (ladder step C) — snapshot `settle-2026-09-02-1958`
+
+| Measure | Value |
+|---|---|
+| Raw `results` rows | 209 |
+| Raw `player_stats` rows | 9614 |
+| Manifest | written successfully (last, per §19) |
+| fitzRoy acquisition | completed; **no partial-manifest failure** |
+
+#### 4. Offline observation emission (ladder step D)
+
+| Counter | Value |
+|---|---|
+| `snapshotMatches` | 207 |
+| `snapshotPlayerMatchRows` | 9522 |
+| `snapshotRejections` | **0** |
+| `snapshotUnkeyedRejections` | 94 — 83 rows without an ID, 0 rows without a profile URL |
+| Bundle size | ~30 MB |
+| Database access | **none** — the emission branch never opened PostgreSQL, as §19 requires |
+
+Zero **keyed** rejections. The 94 unkeyed observations are the ordinary "cannot be keyed to a
+record" residue; they are observations, not refusals.
+
+#### 5. Production dry-run (ladder step E) — full `--dry-run --auto-apply`, rolled back
+
+Run against the **real production schema and privileges**, then rolled back completely.
+
+| Counter | Value |
+|---|---|
+| `canonicalRowsInserted` | 10582 |
+| `canonicalRowsUpdated` | 0 |
+| `canonicalApplicationsLogged` | 9133 |
+| `canonicalRetryApplied` | 0 |
+| `canonicalApplyRefusals` | **0** |
+| `canonicalApplyFailures` | **0** |
+| `unresolvedIdentityPlayer` | 803 |
+| `unresolvedIdentityClub` | **0** |
+| `unresolvedIdentityVenue` | **0** |
+| `unresolvedIdentityMatch` | 207 |
+| `candidatesCreated` | 803 |
+| `manualAuthorityRefusals` | **0** |
+| `foreignOwnedCollision` | **0** |
+| `sourceDisagreement` | **0** |
+| `advisoryDisagreement` | **0** |
+| `derivedRecomputeRuns` | 1 |
+| `derivedRecomputePlayers` | 576 |
+
+**Reading of the counters, against the design.**
+
+- `unresolvedIdentityMatch: 207` is **not** a failure and is exactly the expected first-pass
+  value. It is incremented at `settle-afltables.ts:2641` / `:2694` when a player-grain or
+  period-grain target cannot key on a canonical match **that does not exist yet**, and it returns
+  `unresolved(..., pendingMatch = true)`. On a database with 0 canonical 2026 matches every one of
+  the 207 snapshot matches is new, so every dependent target is `pending_match` and is re-resolved
+  inside the same savepoint **after** the match INSERT (`canonical-apply.ts`,
+  `CanonicalApplyInvitation = 'pending_match'`). That is what makes the match family atomic, and
+  it is why 10582 rows still landed.
+- `unresolvedIdentityPlayer: 803` with `candidatesCreated: 803` is §9.4 working: 803 player-grain
+  rows failed closed at their own record and became exception-queue candidates. **Matches landed
+  independently** and no unrelated player row was blocked — `canonicalApplyRefusals: 0` and
+  `canonicalApplyFailures: 0` prove nothing else was refused. This is SC4 satisfied, not violated.
+- `unresolvedIdentityClub: 0` — no match family had to fail closed on a club.
+- `unresolvedIdentityVenue: 0` — and per §7.3 a venue never refuses in any case; an unmapped venue
+  is counted as `venueUnmapped`, writes `venue_id` NULL with the real `venue_raw`, and never the
+  literal `'Unknown'`.
+- `foreignOwnedCollision: 0` and `manualAuthorityRefusals: 0` — nothing was adopted and no human
+  authority was overridden.
+- `sourceDisagreement: 0` / `advisoryDisagreement: 0` — Squiggle/Kali were not a prerequisite and
+  raised nothing.
+
+#### 6. Real production apply (ladder steps F and G)
+
+Completed successfully. **`import_batches` id 731.**
+
+| Counter | Value |
+|---|---|
+| `canonicalRowsInserted` | 10582 |
+| `canonicalRowsUpdated` | 0 |
+| `canonicalApplicationsLogged` | 9133 |
+| `canonicalApplyRefusals` | **0** |
+| `canonicalApplyFailures` | **0** |
+
+The apply counters match the dry-run counters exactly, which is the §16/S6 contract for
+`--dry-run --auto-apply`: it previews precisely what `--apply --auto-apply` commits.
+
+Exception report (`src/lib/acquisition/settle-report.ts`, §9.3):
+
+| Report section | Result |
+|---|---|
+| Unresolved-identity candidates | the 803 player rows only |
+| Other pending candidates | **0** |
+| Open canonical apply failures | **0** |
+| Open source disagreements | **0** |
+| Moot candidates | **0** |
+
+#### 7. Idempotence on production (ladder step H) — **SC3 PASSED**
+
+Identical rerun, `import_batches` id **732**:
+
+| Counter | Value |
+|---|---|
+| `canonicalRowsInserted` | **0** |
+| `canonicalRowsUpdated` | **0** |
+| `canonicalApplicationsLogged` | **0** |
+| `canonicalApplyRefusals` | **0** |
+| `canonicalApplyFailures` | **0** |
+
+A rerun over identical source data wrote **no canonical row and no ledger row** on real
+production data. This is the §17 assertion 2 / SC3 proof at production scale, and it repeats on
+production the result S6 obtained on `afldb_test`.
+
+#### 8. S9 — confirmed **NOT REQUIRED**, on production, before the cutover
+
+The §15.1 measurement recorded in the S8 (partial) entry above was re-confirmed on production
+immediately before the cutover:
+
+- 189 source-less 2026 rows;
+- **all 189** `legacy_match_id IS NOT NULL` → **§14 rule 7 refuses every one**;
+- **all 189** `attendance_source_id IS NOT NULL` → rule 6 is also in doubt for every one;
+- **no** Squiggle/Kali-owned canonical matches → rule 3 finds nothing to adopt;
+- the original production database had **no `data_overrides` table** before the migration.
+
+**Adoptable set = 0. S9 is NOT REQUIRED and `--adopt-foreign-2026` was never built.** §14 stands
+as a recorded non-requirement. The cutover has since removed those 189 rows entirely, so the
+adoptable set is now empty for a second, independent reason.
+
+#### 9. Scheduling (ladder step I)
+
+| Item | Result |
+|---|---|
+| `deploy/afldb-settle-afltables.service` | installed |
+| `deploy/afldb-settle-afltables.timer` | installed |
+| `systemd-analyze verify` on the new units | **passed** |
+| Timer | **enabled and active** |
+| Observed next trigger | **Fri 2026-09-04 04:34:12 AEST** (04:30 plus `RandomizedDelaySec`) |
+| `Persistent=true` | yes — a run missed while the host is down catches up once |
+| Squiggle / Kali | **not invoked automatically** — the unit's chain is AFL Tables via fitzRoy only |
+| Fallback canonical authority | **none exists** — if the chain fails, the season does not advance until it succeeds |
+
+#### 10. Application and health
+
+| Item | Result |
+|---|---|
+| `afldb.service` | restarted; active/running |
+| Workers | two Next.js 15.5.23 workers ready on `127.0.0.1:3100` |
+| Local health after the final recovery | `{"status":"ok","database":"ok","latencyMs":2}` |
+| Production super-admin login | **verified working** |
+
+#### 11. Public apex — unchanged on purpose
+
+`afldb.com` intentionally remains the static holding page and `beta.afldb.com` is the application
+upstream, so `afldb.com /api/health` returning **404 is expected and correct**. **Caddy was not
+changed and must not be changed as part of ISSUE-122.**
+
+#### 12. Findings recorded and routed, not fixed here
+
+| # | Finding | Routed to |
+|---|---|---|
+| 1 | The first full production dry-run/apply pass took roughly an hour. PostgreSQL showed continuous forward progress — rapidly changing per-record `source_records` / version / projection / savepoint SQL — with **no lock blocking and no long-running single query**. Steady-state nightly cost is unmeasured. | **`AFLDB-ISSUE-123`** |
+| 2 | Pre-existing and unrelated: `systemd-analyze` reports `StartLimitIntervalSec` is in `[Service]` on `afldb.service` and is therefore ignored, so the crash-loop limiter that unit's own comment describes is not in effect. | **`AFLDB-ISSUE-124`** |
+| 3 | Clean-rebuild promotion replaced production-only application/auth/operational state. The auth user was recovered; the audit log, access code and site settings were not. | prevention → **`AFLDB-ISSUE-125`**; the retained data → **`AFLDB-ISSUE-126`** |
+
+None was fixed in this closeout, per the closeout contract.
+
+---
+
+### Final review and closeout (2026-09-03, Opus 5 (1M) / Medium / Normal, worktree `D:\dev\afldb-issue-122`, branch `claude/issue-122` at `887263a`)
+
+Review only. No production change, no ingestion rerun, no timer or service change, no Caddy
+change, no migration, no follow-up implementation, and no executable code touched. The untracked
+`must` file was not touched.
+
+This worktree's tree is **byte-identical to `main`** (`git diff --stat claude/issue-122 main` is
+empty; `claude/issue-122` is 0 ahead / 1 behind `main`, that one commit being the merge
+`250caa2`), so the shipped production code is exactly what was reviewed here.
+
+#### §18 stop conditions — final verdict
+
+| Stop condition | Verdict | Evidence |
+|---|---|---|
+| **SC1** — a canonical write while a gate was not clear | **CLEAR** | `applyCanonicalUnit()` re-evaluates E2 (season), E6 (completion), E3 (ownership), E5 (baseline) and E4 (manual authority) **inside the savepoint** before every write (`canonical-apply.ts:722-820`); production `canonicalApplyRefusals: 0` with `manualAuthorityRefusals: 0` and `foreignOwnedCollision: 0`. |
+| **SC2** — a canonical row with no ledger row, or the reverse | **CLEAR** | `writeLedgerRow()` runs in the **same savepoint** as the mutation it describes (`canonical-apply.ts:855`), and a write that changes nothing returns `nothing_to_write` before any ledger row. Production: 10582 canonical rows, 9133 ledger rows, 0 failures. |
+| **SC3** — a rerun writes anything | **CLEAR — PASSED ON PRODUCTION** | batch **732**: 0 inserted, 0 updated, 0 logged, 0 refusals, 0 failures. |
+| **SC4** — one unresolved identity blocks a match or an unrelated row | **CLEAR** | 803 unresolved players isolated to their own records; 207 matches and 10582 rows landed; `canonicalApplyRefusals: 0`. |
+| **SC5** — a grant widened, `promotion_decisions` semantics changed, or `afldb_import` gains SELECT on `data_edits` | **CLEAR** | S1 gate `tests/integration/privileges.test.ts` 35/35 (§17 row 15); production `db:privileges` reconciled with no change to those boundaries. |
+| **SC6** — manual, foreign or source-less ownership adopted automatically | **CLEAR** | `autoApplyOwnership()` refuses `foreign_source_owner`, and refuses **both** `unowned` and `indeterminate` as `ownership_indeterminate` (`canonical-apply.ts:118-141`) — deliberately stronger than the generic gate. Production `foreignOwnedCollision: 0`. |
+| **SC7** — a deprecated fallback performs a canonical write | **CLEAR** | `src/lib/external-afl/current-season-import.ts` has **no** canonical DML at all; its only DML targets are `import_batches` and `staging_*`. `--update-matches` refuses explicitly (`tools/current-season/update-current-season.ts:42-44`). |
+| **SC8** — a machine marks a candidate accepted or writes `promotion_decisions` | **CLEAR** | There is **no INSERT, UPDATE or DELETE on `promotion_decisions` anywhere** in `src/` or `tools/`; every occurrence is a comment or a constraint name. §17 assertion 21 covers the "no candidate for an auto-applied record, existing candidate left pending" half. |
+| **SC9** — an applied migration's bytes change, or a checksum guard weakens | **CLEAR** | 083 is the only migration added; production applied it with **0 pending** and `db:privileges` succeeded. No existing migration was edited. |
+| **SC10** — evidence materially contradicts this runbook | **CLEAR** | Production evidence matches the design at every point. The one counter that reads alarming — `unresolvedIdentityMatch: 207` — is the documented `pending_match` path and is the expected value on a database with zero canonical 2026 matches. |
+
+**No stop condition remains open.**
+
+#### The operator's explicit verification list
+
+| # | Requirement | Verdict |
+|---|---|---|
+| 1 | Automatic AFL Tables current-season acquisition exists | **PASS** — `deploy/afldb-settle-afltables.{service,timer,sh}` installed, timer enabled and active, next trigger Fri 2026-09-04 04:34:12 AEST. |
+| 2 | Valid data auto-applies canonically without routine admin review | **PASS** — production batch 731 inserted 10582 canonical rows with no human action. |
+| 3 | The machine ledger is atomic with the canonical mutation | **PASS** — same savepoint (SC2 above); 9133 ledger rows, 0 failures. |
+| 4 | An identical rerun produces zero canonical / ledger writes | **PASS** — batch 732, every counter 0 (SC3). |
+| 5 | Unresolved player identity isolates only dependent player-grain rows | **PASS** — 803 isolated, matches unaffected, 0 refusals elsewhere. |
+| 6 | Unresolved club fails closed | **PASS** — `settle-afltables.ts:2358-2360` and `:2393-2395` return `null` for the whole family; production `unresolvedIdentityClub: 0`. |
+| 7 | Venue NULL policy preserved | **PASS** — `settle-afltables.ts:2362-2367`: `venue_id` NULL, real `venue_raw`, counted as `venueUnmapped`, **never a refusal**, `'Unknown'` never written, and no venue or venue-alias identity created. |
+| 8 | Manual / foreign / source-less ownership is not silently adopted | **PASS** — `autoApplyOwnership()` (SC6 above). |
+| 9 | Squiggle/Kali cannot write canonically | **PASS** — no canonical DML remains (SC7 above). |
+| 10 | `promotion_decisions` remains human-only | **PASS** — no machine DML anywhere (SC8 above). |
+| 11 | The production timer uses AFL Tables only | **PASS** — `afldb-settle-afltables.sh` runs `acquire_core.R` → `import_fitzroy_core.py` → `settle-afltables.ts` and nothing else; the unit comment states the exclusion explicitly. |
+| 12 | Failure has no automatic fallback | **PASS** — `set -eu` aborts the chain, the manifest is written last, the manifest-less working directory is removed by the `EXIT` trap, the unit fails visibly, and the next firing retries. No replacement canonical writer exists. |
+| 13 | S9 is correctly not required | **PASS** — §14 rule 7 refuses all 189 legacy-loaded rows; the adoptable set is 0, now twice over after the cutover. |
+
+#### §17 assertion table
+
+Assertions 1–21 were closed by the S1–S7 gates recorded above (DB-free 257/257 and 215/215;
+`settle-afltables` integration 44 passed / 1 skipped; the four integration suites 94 passed / 1
+skipped; `fk-indexes` 2/2; `privileges` 35/35; `tsc --noEmit` exit 0; ESLint clean on every
+changed file). Assertions **1, 2, 7, 9, 17, 19 and 21** were additionally re-proved on real
+production data by the dry-run → apply → identical-rerun ladder in this stage. No assertion is
+outstanding, and no test was weakened, skipped or deleted.
+
+#### Closeout actions taken
+
+- This runbook moved from `issues/open/` to `issues/closed/`.
+- `issues.md` — ISSUE-122 marked **Resolved 2026-09-03**, removed from the Open Issues table,
+  production evidence recorded; four follow-ups added.
+- `IssuesIndex.md` — ISSUE-122 removed; ISSUE-123/124/125/126 added; the next free ID is now
+  **127**.
+- `CHANGELOG.md` — an `Unreleased` entry for the completed, operating behaviour.
+- Follow-ups allocated, none implemented: **`AFLDB-ISSUE-123`** (settle performance),
+  **`AFLDB-ISSUE-124`** (`afldb.service` `StartLimitIntervalSec` placement),
+  **`AFLDB-ISSUE-125`** (production-only state preservation during canonical DB promotion),
+  **`AFLDB-ISSUE-126`** (recover the retained production-only state still held in
+  `afldb_prod_auth_recovery`).
+
+**ISSUE-122 is Resolved. Nothing in it is outstanding.**
