@@ -297,6 +297,18 @@ BEGIN
     GRANT USAGE ON SEQUENCE data_edits_id_seq TO afldb_import;
   END IF;
 
+  -- Migration 083 (AFLDB-ISSUE-122): the automatic canonical mutation
+  -- ledger. Every machine INSERT/UPDATE of a canonical row writes its
+  -- canonical_applications row in the same savepoint, as afldb_import.
+  -- SELECT + INSERT and USAGE on the identity sequence only -- append-only
+  -- by grant, and deliberately NOT registered in import_writable_tables,
+  -- whose loop above would hand back UPDATE, DELETE and TRUNCATE. No
+  -- sequence SELECT or UPDATE: an INSERT needs neither.
+  IF to_regclass('public.canonical_applications') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON canonical_applications TO afldb_import;
+    GRANT USAGE ON SEQUENCE canonical_applications_id_seq TO afldb_import;
+  END IF;
+
   -- Migrations 073 / 078 (AFLDB-ISSUE-086 / -109): destructive source
   -- reloads read durable human override authority, while saveEdit writes
   -- the override in the same mutation-role transaction as the canonical
@@ -411,6 +423,9 @@ DECLARE
     -- NOT import-writable on purpose: grant_import_write() would hand
     -- back UPDATE/DELETE/TRUNCATE on every reconcile.
     ['promotion_decisions',    'SELECT, INSERT'],                    -- 074
+    -- Read-only: the machine mutation ledger is written by afldb_import
+    -- alone; the admin surface may only read it (see migration 083).
+    ['canonical_applications', 'SELECT'],                            -- 083
     -- Read-only: validation resolves submitted names against these.
     ['players',                'SELECT'],                           -- 023
     ['player_clubs',           'SELECT'],                           -- 023

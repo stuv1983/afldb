@@ -320,7 +320,11 @@ describe('afldb_auth is confined to the operational tables', () => {
                 -- The ledger is deliberately NOT import-writable, so this
                 -- grant is the only write path it has.
                 ('promotion_decisions',     'SELECT'),
-                ('promotion_decisions',     'INSERT')
+                ('promotion_decisions',     'INSERT'),
+                -- Automatic canonical mutation ledger (083, AFLDB-ISSUE-122):
+                -- read-only to the admin surface; afldb_import is its only
+                -- writer, asserted in its own section below.
+                ('canonical_applications',  'SELECT')
              ) AS t(name, privilege)
        ORDER BY 1, 2
     `;
@@ -736,9 +740,11 @@ describe('afldb_import is confined to the statistical tables', () => {
     // holds INSERT-only on the audit tables so the required audit row
     // commits inside the mutation transaction. data_overrides is a third,
     // column-scoped exception (migration 078, AFLDB-ISSUE-109), which does
-    // not satisfy this table-level INSERT probe. All three stay out of the
-    // registry on purpose -- registering them would grant full DML -- and
-    // their exact narrow shapes are asserted below.
+    // not satisfy this table-level INSERT probe. canonical_applications
+    // (migration 083, AFLDB-ISSUE-122) is the fourth: the automatic
+    // canonical mutation ledger, SELECT + INSERT and nothing else. All
+    // four stay out of the registry on purpose -- registering them would
+    // grant full DML -- and their exact narrow shapes are asserted below.
     const rows = await sql<{ name: string; registered: boolean; writable: boolean }[]>`
       SELECT c.relname AS name,
              (w.name IS NOT NULL) AS registered,
@@ -748,7 +754,8 @@ describe('afldb_import is confined to the statistical tables', () => {
         LEFT JOIN afldb_meta.import_writable_tables w ON w.name = c.relname
        WHERE n.nspname = 'public'
          AND c.relkind IN ('r', 'p')
-         AND c.relname NOT IN ('data_edits', 'player_link_resolutions')
+         AND c.relname NOT IN ('data_edits', 'player_link_resolutions',
+                               'canonical_applications')
        ORDER BY 1
     `;
     expect(rows.length).toBeGreaterThan(0);
@@ -811,6 +818,70 @@ describe('afldb_import is confined to the statistical tables', () => {
       { name: 'data_edits_id_seq', usage: true, selects: false, updates: false },
       { name: 'player_link_resolutions_id_seq', usage: true, selects: false, updates: false },
     ]);
+  });
+
+  it('appends the automatic canonical mutation ledger and can never rewrite it (AFLDB-ISSUE-122)', async () => {
+    // Migration 083: every canonical row the automatic AFL Tables settle
+    // path inserts or updates gets a canonical_applications row in the
+    // same savepoint, written as afldb_import. The ledger is append-only
+    // BY GRANT -- SELECT and INSERT, USAGE on its identity sequence, and
+    // nothing else -- and is deliberately not registered as
+    // import-writable, because grant_import_write() would hand back
+    // UPDATE, DELETE and TRUNCATE at the next reconcile.
+    const [ledger] = await sql<{
+      inserts: boolean; selects: boolean; updates: boolean; deletes: boolean;
+      truncates: boolean; registered: boolean;
+    }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'canonical_applications', 'INSERT')   AS inserts,
+             has_table_privilege(${IMPORT_ROLE}, 'canonical_applications', 'SELECT')   AS selects,
+             has_table_privilege(${IMPORT_ROLE}, 'canonical_applications', 'UPDATE')   AS updates,
+             has_table_privilege(${IMPORT_ROLE}, 'canonical_applications', 'DELETE')   AS deletes,
+             has_table_privilege(${IMPORT_ROLE}, 'canonical_applications', 'TRUNCATE') AS truncates,
+             EXISTS (SELECT 1 FROM afldb_meta.import_writable_tables
+                      WHERE name = 'canonical_applications') AS registered
+    `;
+    expect(ledger).toEqual({
+      inserts: true, selects: true, updates: false, deletes: false,
+      truncates: false, registered: false,
+    });
+
+    const [sequence] = await sql<{ usage: boolean; selects: boolean; updates: boolean }[]>`
+      SELECT has_sequence_privilege(${IMPORT_ROLE}, 'public.canonical_applications_id_seq', 'USAGE')  AS usage,
+             has_sequence_privilege(${IMPORT_ROLE}, 'public.canonical_applications_id_seq', 'SELECT') AS selects,
+             has_sequence_privilege(${IMPORT_ROLE}, 'public.canonical_applications_id_seq', 'UPDATE') AS updates
+    `;
+    expect(sequence).toEqual({ usage: true, selects: false, updates: false });
+
+    // The other two roles: the admin surface reads the ledger and writes
+    // nothing; the public app cannot see it at all -- it is not a public
+    // read surface and is not registered app-readable.
+    const [others] = await sql<{
+      authSelect: boolean; authWrites: boolean; appAny: boolean; appRegistered: boolean;
+    }[]>`
+      SELECT has_table_privilege(${AUTH_ROLE}, 'canonical_applications', 'SELECT') AS "authSelect",
+             (has_any_column_privilege(${AUTH_ROLE}, 'canonical_applications', 'INSERT')
+              OR has_any_column_privilege(${AUTH_ROLE}, 'canonical_applications', 'UPDATE')
+              OR has_table_privilege(${AUTH_ROLE}, 'canonical_applications', 'DELETE')
+              OR has_table_privilege(${AUTH_ROLE}, 'canonical_applications', 'TRUNCATE')) AS "authWrites",
+             (has_any_column_privilege(${APP_ROLE}, 'canonical_applications', 'SELECT')
+              OR has_any_column_privilege(${APP_ROLE}, 'canonical_applications', 'INSERT')
+              OR has_any_column_privilege(${APP_ROLE}, 'canonical_applications', 'UPDATE')
+              OR has_table_privilege(${APP_ROLE}, 'canonical_applications', 'DELETE')) AS "appAny",
+             EXISTS (SELECT 1 FROM afldb_meta.app_readable_tables
+                      WHERE name = 'canonical_applications') AS "appRegistered"
+    `;
+    expect(others).toEqual({
+      authSelect: true, authWrites: false, appAny: false, appRegistered: false,
+    });
+
+    // No grant was widened alongside it: afldb_import still cannot read
+    // data_edits (066 -- nothing in the import path needs it), and the
+    // human decision ledger is still not import-writable (074).
+    const [unchanged] = await sql<{ dataEditsSelect: boolean; decisionsInsert: boolean }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'data_edits', 'SELECT')          AS "dataEditsSelect",
+             has_table_privilege(${IMPORT_ROLE}, 'promotion_decisions', 'INSERT') AS "decisionsInsert"
+    `;
+    expect(unchanged).toEqual({ dataEditsSelect: false, decisionsInsert: false });
   });
 
   it('holds only the Data Editor upsert capability on human overrides (AFLDB-ISSUE-109)', async () => {

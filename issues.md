@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 4 tracked here — `AFLDB-ISSUE-104`, `-110`, `-113`, `-116`.
+**Open issues:** 5 tracked here — `AFLDB-ISSUE-104`, `-110`, `-113`, `-116`, `-122`.
 
 <!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
      the ISSUE-110 branch merged into dev on 2026-08-31 and its own ledger rows below are
@@ -15,6 +15,7 @@ created, reopened, resolved, or materially reclassified.
 
 | Issue | Severity | Area | Summary | Current next action |
 |---|---|---|---|---|
+| `AFLDB-ISSUE-122` | Medium | Data acquisition / Import architecture | Valid new AFL Tables games are acquired, validated, persisted and projected, but **never become canonical**. `AFLDB-ISSUE-099` built the whole pipeline and deliberately stopped: its §15 is an explicit zero-canonical-write prohibition. **First wrong layer: `recordOutcome()` (`src/lib/acquisition/settle-afltables.ts:2353-2487`)** — a valid promotable observation reaches the non-refusal `else` at `:2439` and falls into the function's only terminal action, the `promotion_candidates` upsert at `:2458-2484`; there is no branch that writes canonical data, and `canonicalRowsInserted`/`Updated` are literal-`0` **types** at `:1327-1329`. Four blocks sit behind it: no canonical writer in `src/lib/acquisition/*`; `'accept'` unrepresentable in `promotion-review.ts:29-36`; the `UNAVAILABLE_MANUAL_AUTHORITY` stub (`observations.ts:398`); and `match_period_scores`/`brownlow_round_votes` having no `source_id`, so both are permanently ownership-indeterminate. Nothing consumes the queue — there is no promotion-review UI, route or handler. Operator has superseded the "canonical promotion is reviewed by default" policy for AFL Tables current-season data. **Also confirmed as current-state evidence:** `current-season-import.ts:922-943` (Squiggle/Kali) updates canonical `matches` with **no ownership predicate and no `data_overrides` check**, silently transferring `source_id` and reverting admin score corrections. | **S0 + S1 COMPLETE 2026-09-02 (runbook §23); S1 uncommitted.** S1: `src/db/migrations/083_canonical_auto_apply.sql` (provenance quartet on `match_period_scores` / `brownlow_round_votes`, `player_match_stats.source_record_id`, append-only `canonical_applications` ledger + FK/audit indexes + explicit `afldb_import` SELECT/INSERT and `afldb_auth` SELECT grants) applied to **`afldb_test` only** (082 → 083, 0 pending), registered in `privileges.sql`, `privileges.test.ts` extended; gates `fk-indexes` 2/2, `privileges` 35/35, `tsc` clean. S0: `afldb_test` has no 2026 rows; `afldb_dev` holds 189 legacy + 17 Squiggle/Kali 2026 matches, so S9 is conditionally required pending the production §15.1 query; `Rscript` absent on production (S8 provisioning real; fitzRoy pin `1.8.0`). Next action: commit S1, then fresh **Fable / High / Normal** session, carry-over that runbook, **start at S2** (`manual-authority.ts`). |
 | `AFLDB-ISSUE-113` | Medium | Data acquisition / Import architecture / Data integrity | `brownlow_season_votes` has **no legacy-free writer** — sole writer `import_legacy_afl.py:684`. `rebuild_derived.py:23-26` and `db-health.ts:94` treat it as AUTHORITATIVE. Not reconstructible from round votes: season totals are complete 1924-1941 and 1946-2025 while round votes are complete only 1984-2025, and `vote_rank`/`eligible_rank`/`is_ineligible` are not computable from vote sums. **Silent-wrongness hazard:** with the table empty, `rebuild_derived.py`'s `season_brownlow` CTE falls every decided season to `not_applicable` — AFLDB would assert "no medal that season" for a century. | **Replacement source UNDECIDED and no selection is authorised.** Recommended next step, not a decision: a read-only probe of class B (a free structured season-summary source carrying rank **and** ineligibility) before committing to a 16,120-row manifest. Outside `AFLDB-ISSUE-102`'s closure boundary — 102 may resolve with this open. |
 | `AFLDB-ISSUE-110` | Medium | Natural-language search / deterministic semantics | NL semantic-mapping fixes, merged into dev 2026-08-31; parser v32 including the ranked-career season-bound fail-closed validator revision. Standing evidence: focused parser/validator **182/182**; expanded focused **345/345**; complete DB-free ISSUE-110 matrix **14 suites, 733/733**; typecheck passed; authoritative post-final-revision operator DB gate **2 files, 46/46 in 20.65 s, started 18:52:45** (24/24 + 22/22) — distinct from the earlier pre-revision 17:47 run. The three documented temporary artifacts were removed exactly. Durable record: `issues/open/AFLDB-ISSUE-110.md`. **Latest independent review verdict: REVISE — NOT READY FOR LARGE-SCALE VALIDATION**, with two unresolved HIGH findings: (A) career-predicate season ownership — a career predicate can exist without consuming `seasonMin`/`seasonMax`, so e.g. `players with at least 3 grand finals since 2000` silently ignores the requested period; (B) `clubFor` ownership with career predicates — e.g. `Carlton players who debuted since 2000`: execution bypasses the generic club filter merely because `careerPredicates` exist. | **Fix findings A and B fail-closed, then a fresh independent re-review.** For A, replace the blanket career-predicate exemption with explicit period ownership — only predicates that actually consume the relevant period bounds may permit them. For B, allow the `clubFor` bypass only when a predicate explicitly owns the relevant club semantics; otherwise reject or correctly compile the club constraint. No 480, 1,435/1,440, 100k, telemetry reset, or other large-scale validation before APPROVE; the 22,607-search run remains incomplete. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
@@ -11779,3 +11780,165 @@ Removed from `IssuesIndex.md` and the Open Issues table; runbook moved to
 `issues/closed/AFLDB-ISSUE-121.md`. The existing `AFLDB-ISSUE-121` entry in `CHANGELOG.md`
 under `Unreleased` had its validation wording updated to the applied state; no new entry
 was added.
+
+## AFLDB-ISSUE-122 — Automatic current-season AFL Tables canonical ingestion
+
+- **Status:** Open
+- **Severity:** Medium
+- **Area:** Data acquisition / Import architecture / Data integrity
+- **Found:** 2026-09-02 (operator product decision: the current-season path must stop
+  requiring routine approval)
+- **Resolved:** N/A
+- **Runbook:** `issues/open/AFLDB-ISSUE-122.md` — **approved planning contract and the
+  authoritative detail.** Planned 2026-09-02, Opus / High / Plan mode, worktree
+  `D:\dev\afldb-issue-122`, branch `claude/issue-122`, base `19de501`.
+- **S0 preflight (2026-09-02):** COMPLETE — measurements, migration-number result (`083`),
+  production `Rscript` result (absent) and the conditional S9 decision are recorded in the
+  runbook §23. Nothing implemented; next stage S1.
+- **S1 migration (2026-09-02):** COMPLETE on `afldb_test` — `src/db/migrations/083_canonical_auto_apply.sql`
+  (§12.2 exactly: provenance quartet on `match_period_scores` and `brownlow_round_votes`,
+  `player_match_stats.source_record_id`, the `canonical_applications` append-only ledger with its
+  composite FK to `staging.source_record_versions`, FK/audit indexes, explicit append-only grants),
+  registered in `tools/maintenance/privileges.sql`, and `tests/integration/privileges.test.ts`
+  extended (§17 row 15). Gates: `db:migrate:test` applied 083 (`afldb_test` 082 → 083, 0 pending
+  after), `db:privileges:test` reconciled, `fk-indexes` 2/2, `privileges` 35/35, `tsc --noEmit`
+  exit 0, `git diff --check` clean. `afldb_dev` and production untouched. Full record, deviations
+  and applied-catalogue evidence in runbook §23 (S1). **Uncommitted** at the time of writing.
+- **Files (S1 done; the rest planned):** new
+  `src/lib/acquisition/manual-authority.ts`, `src/lib/acquisition/canonical-apply.ts`,
+  `src/db/migrations/<N>_canonical_auto_apply.sql`,
+  `deploy/afldb-settle-afltables.{service,timer}`; modified
+  `src/lib/acquisition/settle-afltables.ts`, `src/lib/acquisition/reconciliation.ts`,
+  `src/lib/acquisition/source-families.ts`, `data/reference/source-families.json`,
+  `tools/current-season/settle-afltables.ts`,
+  `tools/current-season/update-current-season.ts`,
+  `src/lib/external-afl/current-season-import.ts`,
+  `src/app/admin/current-season/{actions.ts,CurrentSeasonControls.tsx,page.tsx}`,
+  `tools/maintenance/privileges.sql`, `package.json`, `docs/deployment.md`,
+  `docs/acquisition/AFLDB-2026-API-ACQUISITION.md`
+- **Related:** `AFLDB-ISSUE-099` (Resolved — built the pipeline and deliberately stopped at
+  zero canonical writes; ISSUE-122 is the S-E stage its §7 named, plus the A1–A7
+  prerequisites its §16 recorded), `AFLDB-ISSUE-096` (Resolved — the contract and the
+  migration 074 spine; its §6 "no automatic canonical promotion" is superseded for this
+  scope), `AFLDB-ISSUE-086` (Resolved — `data_overrides` is the authority mechanism
+  ISSUE-122 finally calls), `AFLDB-ISSUE-095` (Resolved — `club_seasons` derivation
+  reused), `AFLDB-ISSUE-101` (Resolved — rollover; interface only),
+  `AFLDB-ISSUE-104` (Open — its binding `issue_key` precondition is satisfied by a distinct
+  `issue_type`, not by a migration; it stays open), `AFLDB-ISSUE-113` (Open —
+  `brownlow_season_votes` stays out of scope), `AFLDB-ISSUE-100` (Resolved — staging-only
+  fixtures/lineups remain the incomplete-fixture path).
+
+### Problem
+A newly completed AFL match can exist in AFL Tables, AFLDB can acquire and stage it, and the
+canonical `matches` row and its dependent current-season data are still never written. The
+architecture intentionally stops before general automatic canonical acceptance, so AFLDB lags
+behind AFL Tables even though the source data is available and validated. The operator's
+product decision is now that routine approval must not be required.
+
+### Root cause — the first wrong layer
+`recordOutcome()`, `src/lib/acquisition/settle-afltables.ts:2353-2487`. A valid, fully
+resolved, promotable observation reaches the non-refusal `else` branch at `:2439` and falls
+into the only terminal action the function has — `draftCandidate()` at `:2445` and the
+`promotion_candidates` upsert at `:2458-2484`. `unchanged` returns at `:2377`, `history_only`
+at `:2385`, `absent` at `:2389`, and every refusal verb falls through to the same insert.
+**No branch writes canonical data.** The prohibition is also typed: `canonicalRowsInserted: 0`
+and `canonicalRowsUpdated: 0` are literal-zero types at `:1327-1329`.
+
+Four independent blocks sit behind that boundary:
+
+1. No canonical writer exists anywhere in `src/lib/acquisition/*` — an exhaustive DML grep
+   yields only `staging.*`, `import_batches`, `data_issues`, `import_rejections` and
+   `promotion_candidates`.
+2. `evaluateAcceptRequest` returns `write: { implemented: false }`, and an accept decision is
+   unrepresentable in `PromotionDecisionDraft` (`promotion-review.ts:29-36`, `:752-772`).
+3. The shipped authority provider is `UNAVAILABLE_MANUAL_AUTHORITY = () => 'indeterminate'`
+   (`observations.ts:398`), so every resolved-target diff refuses.
+4. `match_period_scores` and `brownlow_round_votes` carry no `source_id`, so
+   `ownershipForTarget()` returns `indeterminate` (`settle-afltables.ts:200-211`) — those two
+   targets can never produce a promotable candidate.
+
+Nothing consumes the resulting queue: `evaluateAcceptRequest` / `runPromotionGates` /
+`renderReviewItem` have **zero non-test callers**, and there is no promotion-review UI, admin
+route or API handler under `src/app/`.
+
+### Additional confirmed defect, in scope because this issue changes source authority
+`src/lib/external-afl/current-season-import.ts:922-943` is today's only automatic canonical
+writer. It updates `matches` with **no ownership predicate** (`WHERE id = ${localMatchId}`)
+and **no `data_overrides` check**, and stamps its own `source_id` over the previous owner's —
+so it silently transfers ownership away from `afltables` and silently reverts admin score
+corrections, with no TypeScript equivalent of Python's `replay_admin_overrides`. It writes no
+`data_edits` audit row and refreshes only season metadata, leaving `club_seasons` and the
+player aggregates stale.
+
+### Approved product decisions (operator, 2026-09-02)
+1. fitzRoy / AFL Tables is the primary authoritative current-season source; valid data is
+   written automatically; human intervention is an exception path only.
+2. Squiggle and Kali remain as **deprecated, non-writing** fallbacks — their canonical
+   `matches` write is retired, while clients, parsers, source registrations, provenance
+   history, registry entries and useful tests are retained. No replacement fallback writer,
+   and no silent failover.
+3. Machine mutations are audited in a new append-only `canonical_applications` ledger;
+   `promotion_decisions` stays human-only with `admin_user_id NOT NULL`, and `afldb_import`
+   gains no access to human decision records.
+4. Scheduling: provision R plus the pinned fitzRoy on the production droplet and add a
+   systemd service/timer pair mirroring `deploy/afldb-email-intake.{service,timer}`.
+5. Identity stays a human exception, per grain: unresolved **player** identity isolates to
+   that player-grain record; unresolved **club** identity fails closed for that match family;
+   an unmapped **venue** is *not* an identity exception — `venue_raw` is preserved and
+   `venue_id` stays NULL under the existing canonical contract. No source-created identities,
+   no fuzzy or name-only fallback, no new admin UI.
+
+### Planned architecture
+Keep the entire ISSUE-099 pipeline and add one stage. `reconcile()`
+(`reconciliation.ts:467-614`) is already the "determine safe canonical mutation" step and its
+nine gates are reused unchanged; ISSUE-122 adds the write that its tenth outcome has always
+described. A promotable outcome that satisfies a strict eligibility predicate — verb `new` or
+`corrected`, season in `in_progress_seasons`, `source_id` resolving to `afltables` for an
+update, manual authority `clear`, baseline hash unmoved, and `has_player_rows` for a match —
+is applied inside a savepoint that re-runs every gate against re-read state, writes the row
+with its provenance quartet, and inserts the ledger row. Everything else produces a
+`promotion_candidates` refusal row. **A successfully auto-applied record creates no promotion
+candidate and no `promotion_decisions` row**; a pre-existing pending candidate is left pending
+and reported as moot, never machine-marked accepted (the ISSUE-099 F7 invariant).
+
+Savepoint granularity: one per match family (the match plus its period scores) and one per
+player-match record (its `player_match_stats` plus `brownlow_round_votes`), so one debutant
+cannot reject a team-mate and a match never exists with half its period scores. Derived data
+reuses the existing season-scoped and player-scoped functions in
+`src/db/queries/player-derived.ts` — nothing new is built.
+
+### Evidence established during planning
+- `staging.source_record_versions` declares `PRIMARY KEY (source_id, family,
+  external_record_id, version_seq)` (`074:79`) — the exact key `promotion_candidates` already
+  references at `074:178-179`. The new ledger binds to it; no uniqueness is invented or
+  widened.
+- `afldb_import` already holds full DML on all four canonical targets (the deny-list model
+  seeded at `045:99-113`), so **no privilege widening is needed for canonical writes**.
+- `matches.venue_id` is nullable **by design** — `003_matches.sql:35-37`, the column comment
+  at `:74-75`, and the partial index `ix_matches_venue … WHERE venue_id IS NOT NULL` at
+  `:81`; every match read path uses `LEFT JOIN venues`, and existing tests already pin the
+  behaviour.
+- `source_id IS NULL` is **not** proof of unowned: `applyDataEdit` does not re-stamp
+  `matches.source_id` for the score group, `createMatch` can leave a human-created row with
+  no manual marker at all, the CSV ingest promote path stamps neither `source_id` nor
+  `import_batch_id`, and `afldb_import` holds INSERT-only on `data_edits`
+  (`privileges.sql:296`) so the settle role cannot read edit provenance. Source-less rows are
+  therefore **refused**, not adopted, and route to a reviewed one-time transition requiring
+  both a machine proof and an operator-supplied allowlist.
+- Manual authority is answerable from `data_overrides` alone, which `afldb_import` can
+  already read (`privileges.sql:307`), so `AFLDB-ISSUE-099` A4 is satisfied **without**
+  widening migration 073's `entity_type` CHECK.
+- There is no scheduler of any kind for current-season ingestion; the only timer in the
+  system is the 5-minute email-intake one, and no `r-base` provisioning appears in `deploy/`
+  or `docs/`.
+
+### Exact next action
+**S0 and S1 complete (2026-09-02); S1 is uncommitted.** Operator: review and commit S1
+(migration `083`, `privileges.sql`, `privileges.test.ts`, tracking files; never the stray `must`
+file) so the `083` claim becomes visible to other branches. Then a fresh **Fable / High /
+Normal** session, worktree `D:\dev\afldb-issue-122`, branch `claude/issue-122`, carry-over
+`issues/open/AFLDB-ISSUE-122.md`, **start at S2** (manual authority: new
+`src/lib/acquisition/manual-authority.ts` wired into `tools/current-season/settle-afltables.ts`
+in place of `UNAVAILABLE_MANUAL_AUTHORITY`; gates in `tests/current-season-import.test.ts` and
+`tests/integration/settle-afltables.test.ts`). Still outstanding from S0: the production copy of
+§15.1 (read-only; command in runbook §23) that closes the S9 decision.

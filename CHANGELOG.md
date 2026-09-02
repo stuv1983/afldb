@@ -15,6 +15,21 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stage S1 schema (In progress) - 2 September 2026
+
+- Migration `083_canonical_auto_apply.sql` completes provenance on the two canonical targets that
+  had none: `match_period_scores` and `brownlow_round_votes` gain the standard
+  `source_id` / `source_record_id` / `import_batch_id` / `imported_at` quartet, and
+  `player_match_stats` gains its missing `source_record_id` (AFLDB-ISSUE-099 A1/A2/A3).
+- New append-only `canonical_applications` ledger for machine-made canonical mutations: one row
+  per insert/update, bound by composite foreign key to the exact `staging.source_record_versions`
+  row that justified it, with before/after value sets bounded to 64-key JSON objects.
+  `afldb_import` holds SELECT + INSERT and sequence USAGE only; `afldb_auth` SELECT only; no
+  `afldb_app` access; no UPDATE/DELETE/TRUNCATE for any application role. Registered in
+  `tools/maintenance/privileges.sql`; `tests/integration/privileges.test.ts` pins the shape.
+- Applied to `afldb_test` only. No writer exists yet; settle, reconciliation and the
+  Squiggle/Kali path are unchanged in this stage.
+
 ### AFLDB-ISSUE-102 — canonical awards and honours acquisition is legacy-free (Resolved) - 2 September 2026
 
 - Closed the parent acquisition dependency after all eight acceptance criteria passed. The
