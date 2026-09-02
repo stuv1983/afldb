@@ -1,0 +1,95 @@
+[Unit]
+Description=AFLDB — in-season AFL Tables canonical settle (one run)
+Documentation=https://github.com/afldb
+After=network-online.target postgresql.service afldb.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=arm
+Group=arm
+WorkingDirectory=/home/arm/projects/afldb
+
+# The approved AFLDB-ISSUE-122 §19 chain, in one script so all three steps
+# agree on one snapshot label and one season:
+#
+#   acquire_core.R --acquire --in-season
+#     -> import_fitzroy_core.py --require-in-season --on-record-error reject
+#        --emit-observations
+#     -> settle-afltables.ts --apply --auto-apply
+#
+# The script runs under `set -e`, so a failed step aborts the chain: a failed
+# acquisition never reaches the adjudicator and PostgreSQL is never opened.
+# acquire_core.R writes its manifest LAST, so a failed fetch leaves nothing a
+# later run could consume, and the script removes the manifest-less working
+# directory on the way out. The unit then fails visibly and the next timer
+# firing retries from the beginning. Nothing partial is ever committed.
+#
+# Squiggle and Kali are NOT invoked here and have no canonical writer at all
+# (§11.2). There is no automatic fallback authority: if this chain fails, the
+# season simply does not advance until it succeeds.
+# Invoked through /bin/sh rather than relying on an executable bit: every
+# tracked script in this repository is mode 644 and is run by naming its
+# interpreter (`sudo bash tools/maintenance/...`, `Rscript ...`), so a fresh
+# clone needs no chmod step that someone will forget.
+ExecStart=/bin/sh /home/arm/projects/afldb/deploy/afldb-settle-afltables.sh
+
+# One acquisition of an in-progress season is a few minutes of network work,
+# but AFL Tables is a third party. Bound the run rather than letting a stalled
+# fetch hold the unit open until the next firing.
+TimeoutStartSec=3600
+
+# PostgreSQL is co-located on a 2 vCPU droplet and this job is not urgent.
+Nice=10
+
+# Unlike afldb-email-intake.service this unit DOES need a database DSN:
+# settle-afltables.ts connects as afldb_import through
+# AFLDB_IMPORT_DATABASE_URL. It is therefore the one name removed from the
+# UnsetEnvironment list below; every other credential .env carries is dropped,
+# so a compromise here cannot reach the owner, auth, backup or app roles.
+#
+# Honest limitation: settle-afltables.ts also reads .env itself (it fills in
+# only names not already in its environment), so the Node step can still see
+# the other DSNs. UnsetEnvironment is defence in depth for the R and Python
+# steps, which never read .env, rather than an airtight boundary for the whole
+# chain. The tool opens AFLDB_IMPORT_DATABASE_URL and nothing else.
+EnvironmentFile=/home/arm/projects/afldb/.env
+UnsetEnvironment=AFLDB_OWNER_DATABASE_URL AFLDB_AUTH_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL DATABASE_URL AFLDB_SESSION_SECRET AFLDB_SMTP_PASSWORD AFLDB_SMTP_USER AFLDB_EMAIL_INTAKE_SECRET
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=afldb-settle-afltables
+
+# --- Hardening -------------------------------------------------------
+# Modelled on afldb-email-intake.service. Two deliberate widenings, both
+# required by what this chain actually does and neither granted to the web
+# service:
+#
+#  * ReadWritePaths — the acquisition writes raw CSVs under data/sources and
+#    the tracked provenance manifest under docs/rebuild-manifests. Both
+#    directories must EXIST before the unit starts (see docs/deployment.md);
+#    they are named without a leading `-` on purpose, so a missing directory
+#    is a loud startup failure rather than an EROFS halfway through a fetch.
+#  * AF_UNIX — PostgreSQL is reached over the local socket, and Node's own
+#    IPC needs it. AF_INET/AF_INET6 are the AFL Tables fetch.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/arm/projects/afldb/data/sources
+ReadWritePaths=/home/arm/projects/afldb/docs/rebuild-manifests/afltables_fitzroy_core
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+# Node JIT, as in afldb.service.
+MemoryDenyWriteExecute=false
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM

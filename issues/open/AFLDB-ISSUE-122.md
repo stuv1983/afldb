@@ -2364,3 +2364,367 @@ Fresh session, same worktree and branch, carry over this file. Execute **S8 only
 §19: provision R and pinned fitzRoy, then implement the bounded service/timer and perform the
 supervised real run. Do not start S9, do not redesign the S5/S6 applier, and never include the
 stray `must` file.
+
+### S8 — Scheduling and production provisioning (2026-09-02, Opus 5 (1M) / High / Normal, worktree `D:\dev\afldb-issue-122`, branch `claude/issue-122` at `f0ea8f1`)
+
+**Outcome: S8 PARTIALLY COMPLETE — the repository deliverables are built and verified; the
+production provisioning and the supervised real run are BLOCKED on two operator prerequisites,
+neither of which this session may improvise around.** The outstanding S0 production measurement
+is CLOSED, and with it the S9 decision. Nothing was written to any database. No production
+package was installed, no unit was installed or enabled, no timer runs. Nothing was committed.
+The untracked `must` file was not touched.
+
+Commands in this stage were executed by Claude under the operator's explicit S8 instruction
+(the CLAUDE.md §9 exception). Every remote command was read-only: `SELECT`s, `command -v`,
+`apt-cache policy`, `curl`, `systemd-analyze verify`, and three file copies into `/tmp` on the
+production host for unit verification. `sudo` was never invoked (it is password-gated on
+production, see Blocker P1).
+
+---
+
+#### 1. Outstanding S0 item — the §15.1 production measurement [CLOSED]
+
+Run 2026-09-02 19:19–19:22 +10 on `afldb-prod` (`209.38.87.252`), `current_database() =
+afldb_prod`. Queries 1, 3 and 4 verbatim; query 2 **adapted** because production has no
+`data_overrides` table at all (migration 073 is not deployed — see Blocker P2), which is itself
+the answer to its override half. Queries 1 and 4 first ran as `afldb_app`; `afldb_app` has no
+`USAGE` on `afldb_meta`, so the whole file was rerun as `afldb_owner` via
+`AFLDB_PROD_DATABASE_URL`.
+
+| Query | Result on `afldb_prod` |
+|---|---|
+| Q1 — 2026 canonical ownership | **`(source_id IS NULL)` 189**, 2026-03-05 → 2026-08-09. That is the only row: **zero** `afltables`, **zero** `squiggle_api`, **zero** `kali_afl_stats`. |
+| Q2 — manual / legacy markers (adapted) | **189 rows — every 2026 match.** All 189 have `attendance_source_id IS NOT NULL` **and** `legacy_match_id IS NOT NULL`. `data_overrides` **does not exist** on production, so no override row can exist for any of them. |
+| Q3 — 2026 dependent rows | `pms = 8694`, `periods = 1512`, `votes = 0`. Expected on a live database; the Q3 stop condition is scoped to `afldb_test` only. |
+| Q4 — NULL `venue_id` reality | 2020: 0/162 · 2021: 0/207 · 2022: 0/207 · 2023: 0/216 · 2024: 0/216 · 2025: 0/216 · **2026: 0/189**. No canonical row in any modern season carries a NULL `venue_id` yet. |
+
+Supporting context measured in the same read-only pass: `afldb_meta.schema_migrations` top row
+is **`070_import_reads_link_suggestions.sql`** (applied 2026-08-24 20:51 +10);
+`data_overrides`, `source_observations`, `promotion_candidates` and `canonical_applications` are
+all **absent**; `data_edits`, `import_rejections`, `data_issues`, `sources` and `import_batches`
+are present; the `sources` registry holds all eleven keys including `afltables`; and
+`seasons` says 2025 `complete`, **2026 `in_progress`**.
+
+Note on the column name: production's `afldb_meta.schema_migrations` is
+`(name, checksum, applied_at, duration_ms)` — §15.1's helper query in the S0 entry named
+`filename`, which does not exist. Corrected here; no runbook contract depends on it.
+
+#### The S9 decision — **S9 NOT REQUIRED**
+
+Read literally, §15.1's second interpretation rule fires: 189 rows are `(source_id IS NULL)`,
+so §14 "is required". Read against §14's own eight conditions, the adoptable set is **empty**:
+
+- **Rule 7** (`legacy_match_id IS NULL`) refuses **all 189**. Every 2026 production match is
+  legacy-loaded from the historical baseline.
+- **Rule 6** is also in doubt for all 189 (`attendance_source_id IS NOT NULL` on every one) and
+  would have to resolve away from `manual_admin_edit` before rule 7 even mattered.
+- **Rule 3** finds no `squiggle_api` or `kali_afl_stats` row to adopt: production **never ran the
+  Squiggle/Kali canonical writer**. The 17 foreign-owned rows measured on `afldb_dev` at S0 are a
+  development artefact, and after S7 no code path can create another on any host.
+
+So `--adopt-foreign-2026` would, on production, be a mode with nothing it is permitted to adopt.
+§14's closing sentence ("if §15.1 shows every 2026 row is already `afltables`-owned or absent,
+this section is not implemented at all") is written for the two cases that were foreseen; this is
+the third with the same consequence — every 2026 row is permanently refused by an existing rule,
+so the adoption volume is zero and there is nothing for an operator allowlist to authorise.
+
+**Recorded: S9 NOT REQUIRED. §14 becomes a recorded non-requirement.**
+
+| S9 field | Value |
+|---|---|
+| Owner counts (production) | `(source_id IS NULL)` **189**; `squiggle_api` **0**; `kali_afl_stats` **0**; `afltables` **0** |
+| Affected `match_key`s to adopt | **None.** The adoptable set is empty. |
+| Rows that must never be adopted | The complete `season = 2026 AND legacy_match_id IS NOT NULL` set on `afldb_prod` — **all 189**, recorded by predicate exactly as at S0, since the predicate is exact and every row satisfies it. Plus, unchanged from S0, the 189-row legacy predicate and the 17 foreign-owned rows on `afldb_dev`. |
+| Exact S9 opening action | **Not applicable.** If it is ever reopened, the opening action is to re-run §15.1 query 1 against `afldb_prod` and confirm a non-legacy, non-`afltables` owner has appeared — which, after S7, no code can produce. |
+
+**Nightly behaviour on production is unaffected and correct.** §14's first paragraph already
+governs it: the 189 legacy rows are `ownership_indeterminate`, so the automatic path will refuse
+to update them and will route them to the exception queue, inserting only matches that do not yet
+exist. That is the designed steady state, not a defect.
+
+**One consequence worth recording for the operator, not a stop condition.** On `afldb_dev` the
+17 foreign-owned rows will be refused on every nightly run if the timer is ever installed there,
+producing recurring exception-queue entries. Production has no such rows.
+
+---
+
+#### 2. Production host capability [MEASURED]
+
+| Fact | Value |
+|---|---|
+| Host / user | `afldb-prod`, `arm`, Ubuntu **24.04.4 LTS**, amd64 |
+| Project | `/home/arm/projects/afldb`, config in `.env` (not `.env.production`) |
+| Node | **v22.23.2** via nvm, same path as `afldb.service` |
+| Python | system **3.12.3** at `/usr/bin/python3`. **No `.venv` exists** |
+| R | **absent** — no `R`, no `Rscript` (unchanged from S0) |
+| `sudo` | **password-gated** (`sudo -n` → "a password is required") |
+| Resources | 77 G disk / 71 G free; 3.9 G RAM; **no swap** |
+| Timezone / clock | `Australia/Melbourne`, NTP synchronised |
+| Installed AFLDB units | `afldb.service` only — no email-intake, no timers |
+| Egress | CRAN `200`, Posit P3M `200`, **afltables.com `200` in 62 ms** |
+
+The development host `streamanator` was probed read-only for comparison and **also has no R**,
+and is on branch `dev` at `ee72563`. §19's middle rung (validate on `afldb_dev` before
+production) is therefore blocked by the same missing runtime.
+
+#### The fitzRoy pin, resolved
+
+`pinned_version` is **`1.8.0`** (`fitzroy-contract.json:186`), and **1.8.0 is currently the
+version CRAN carries** (`https://cran.r-project.org/web/packages/fitzRoy/DESCRIPTION`, read from
+the production host; `fitzRoy_1.8.0.tar.gz` is in `src/contrib`, not `Archive`). No
+`install_version()`, archive fetch or `--allow-version-mismatch` is needed today — but "current"
+is exactly the property that decays, so the pin is expressed as a **dated Posit Package Manager
+snapshot** rather than `latest`. `.../__linux__/noble/2026-09-01/` was probed from the host and
+serves fitzRoy 1.8.0.
+
+`fitzRoy` 1.8.0 declares `Depends: R (>= 4.1)`; Ubuntu 24.04's own `r-base-core` **4.3.3-2build2**
+satisfies it, so **no third-party apt repository and no R upgrade treadmill is required** — the
+smallest supported runtime is the distribution's own. Of fitzRoy's 20 imports, Ubuntu packages
+all but **`janitor`** (pure R) and **`nanoparquet`** (C, needs `r-base-dev`); `jsonlite` and
+`digest`, which `acquire_core.R` uses directly, are packaged too. That keeps the compile set to
+one package, which matters on a 4 GB droplet with no swap.
+
+**How a future deployment verifies the pin.** It cannot forget to: `acquire_core.R:76-87`
+re-reads the contract and compares `packageVersion("fitzRoy")` with `identical()` on **every**
+run, and records the version used in every probe and manifest. An R or package upgrade that moves
+fitzRoy off 1.8.0 fails the next timer firing loudly and produces no snapshot.
+
+---
+
+#### 3. Files created
+
+| File | Purpose |
+|---|---|
+| `deploy/afldb-settle-afltables.service` | `Type=oneshot`, `User=arm`, `WorkingDirectory=/home/arm/projects/afldb`, `TimeoutStartSec=3600`, `Nice=10`. Modelled on `afldb-email-intake.service` and carrying its whole hardening block, with exactly two deliberate widenings (below). |
+| `deploy/afldb-settle-afltables.timer` | `OnCalendar=*-*-* 04:30`, `RandomizedDelaySec=15min`, `AccuracySec=1min`, **`Persistent=true`**, `WantedBy=timers.target`. |
+| `deploy/afldb-settle-afltables.sh` | **Deviation 1.** The chain runner the unit executes. |
+| `docs/deployment.md` | New **§7b**, between the AFLW refresh and Testing. |
+
+#### The chain, exactly as §19 approves it
+
+```text
+acquire_core.R --acquire --in-season --label L --from S --to S
+  -> import_fitzroy_core.py --label L --require-in-season --on-record-error reject
+     --emit-observations data/sources/afltables/fitzroy_core/L/observations.json
+  -> settle-afltables.ts --label L --apply --auto-apply
+```
+
+`--datasets` is deliberately **not** passed: in-season it defaults to the contract's own
+`in_season.required_datasets` (`acquire_core.R:234-238`), so the unit cannot drift from the
+contract by carrying a stale copy of the list. The season `S` is read at run time from
+`data/reference/seasons.json` `in_progress_seasons` — the same register `acquire_core.R:223-232`
+and `import_fitzroy_core.py` re-derive their gates from — so the job cannot disagree with the
+gates, and needs no edit at rollover.
+
+`--validate-only` is **not** passed to the Python step, matching §19 and ISSUE-099 §23.1 step 3:
+`--emit-observations` returns 0 from its own branch (`import_fitzroy_core.py:2909-2937`) before
+either the `--validate-only` return or the `--require-in-season is OFFLINE ONLY` refusal, having
+already run `validate_snapshot()` and the in-season gates. The step is offline either way.
+
+#### Environment and credential handling
+
+`EnvironmentFile=/home/arm/projects/afldb/.env`, and `UnsetEnvironment=` drops
+`AFLDB_OWNER_DATABASE_URL AFLDB_AUTH_DATABASE_URL AFLDB_TEST_DATABASE_URL
+AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL DATABASE_URL AFLDB_SESSION_SECRET
+AFLDB_SMTP_PASSWORD AFLDB_SMTP_USER AFLDB_EMAIL_INTAKE_SECRET`. **`AFLDB_IMPORT_DATABASE_URL` is
+the one name deliberately removed from the email-intake unit's list** — it is the credential the
+chain exists to use. No secret appears in the unit or anywhere in the repository.
+
+Recorded honestly in the unit's own comment rather than overstated: `settle-afltables.ts`
+calls its own `loadEnv()` (`tools/current-season/settle-afltables.ts:75-89`), which re-reads
+`.env` and fills in any name **not already** in its environment, so the Node step can still see
+the other DSNs. `UnsetEnvironment` is therefore defence in depth for the R and Python steps —
+neither of which reads `.env` — not an airtight boundary for the whole chain. The tool opens
+`AFLDB_IMPORT_DATABASE_URL` and nothing else (`createImportClient()`, `:171-175`).
+
+No Python virtualenv is needed, which matters because production has none:
+`import_fitzroy_core.py`'s module-level imports are stdlib only (`argparse csv hashlib json re
+sys time collections dataclasses datetime pathlib`), and `psycopg` arrives through a lazy
+`from common import ...` inside the database branch that `--emit-observations` returns before.
+
+#### Hardening — two deliberate widenings from `afldb-email-intake.service`
+
+1. **`ReadWritePaths`.** `ProtectHome=read-only` is retained, and exactly two paths are opened:
+   `…/data/sources` (the gitignored acquisition working area) and
+   `…/docs/rebuild-manifests/afltables_fitzroy_core` (the tracked provenance manifest).
+   Neither carries a leading `-`: a missing directory is then a **loud startup failure** rather
+   than an `EROFS` halfway through a network fetch. `docs/rebuild-manifests/…` is tracked and
+   present after any deploy; `data/sources` is gitignored and must be created once (documented).
+2. **`AF_UNIX`** added to `RestrictAddressFamilies` (PostgreSQL's local socket and Node's IPC),
+   and `MemoryDenyWriteExecute=false` for the Node JIT — both exactly as `afldb.service` already
+   does. `AF_INET`/`AF_INET6` are the AFL Tables fetch.
+
+Everything else from the email-intake block is carried unchanged: `NoNewPrivileges`,
+`PrivateTmp`, `PrivateDevices`, `ProtectSystem=strict`, `ProtectKernelTunables`,
+`ProtectKernelModules`, `ProtectControlGroups`, `ProtectClock`, `ProtectHostname`,
+`RestrictNamespaces`, `RestrictRealtime`, `RestrictSUIDSGID`, `LockPersonality`,
+`SystemCallFilter=@system-service`, `SystemCallErrorNumber=EPERM`.
+
+#### Cadence
+
+`OnCalendar=*-*-* 04:30` in the host timezone (`Australia/Melbourne` on both hosts), verified with
+`systemd-analyze calendar` → next elapse `Thu 2026-09-03 04:30:00 AEST`. `RandomizedDelaySec=15min`
+so a small third-party site is not hit at a round number alongside everything else on a schedule.
+`Persistent=true` per §19, so a run missed because the droplet was down catches up once after
+boot. Chosen against §19's "overnight settle window … nightly in season"
+(`AFLDB-2026-API-ACQUISITION.md` §5, T+12–24 h): it is comfortably inside the window for Friday
+and Saturday fixtures, and for a late Sunday-night match it is T+6 h — earlier than the window
+rather than later, which costs latency (that match lands the following night) but never
+correctness, because a match AFL Tables has not yet published is simply absent from the snapshot
+and the pass is idempotent. It is a one-line change if the operator prefers a later hour.
+
+#### Failure behaviour, as §19 requires
+
+- **Failed acquisition.** `acquire_core.R` writes the manifest **last** (`:490`), so a failed
+  fetch leaves no manifest. The script's `EXIT` trap removes the manifest-less working directory,
+  so **no consumable partial snapshot survives**; a failure *after* the manifest exists is left
+  completely alone, because that snapshot is complete, immutable and is the evidence.
+- **Never reaches PostgreSQL.** `set -e` aborts the chain at step 1, and step 2 is offline by
+  construction, so the connection in step 3 is never opened.
+- **Fails visibly and retries.** The unit fails, `systemctl status` and the journal show it, and
+  the next timer firing starts a fresh label from the beginning.
+- **Failed settle.** The transaction rolls back (S5/S6). The snapshot and manifest are kept and
+  never rewritten — snapshots are immutable, which is why each run takes a new label.
+- **No fallback.** Squiggle and Kali are not invoked by the unit and, after S7, have no canonical
+  writer at all. A failure means the season does not advance; it never means a weaker source
+  quietly advances it instead.
+- **Out of season.** The script finds no in-progress season, logs it and exits **0**, so the timer
+  can stay enabled all year instead of failing nightly from October to February.
+
+#### 4. Validation performed
+
+| Check | Result |
+|---|---|
+| `sh -n deploy/afldb-settle-afltables.sh` (workstation **and** production `dash`) | exit 0 |
+| `systemd-analyze verify ./afldb-settle-afltables.service` (production, systemd 255) | **exit 0**, no output but a pre-existing warning from the installed `afldb.service` (below) |
+| `systemd-analyze verify ./afldb-settle-afltables.timer` | **exit 0** |
+| `systemd-analyze calendar '*-*-* 04:30'` | normalises to `*-*-* 04:30:00`; next elapse `Thu 2026-09-03 04:30:00 AEST` |
+| `git diff --check` | exit 0 |
+| `npx tsc --noEmit` | **not run — no TypeScript file was changed in S8.** |
+| `eslint` | **not run — no linted file was changed in S8.** The three new files are a POSIX shell script and two systemd units; `eslint.config.mjs` covers neither. |
+| Repository deployment/config test suite | **none exists.** A targeted search found no test that reads `deploy/*.service`, `deploy/*.timer` or `docs/deployment.md`. |
+
+Line endings: the three new files are LF in the working tree. `.gitattributes` pins `eol=lf` only
+for hash-bound artefacts, and the existing `deploy/*.service` files are CRLF in this Windows
+checkout while working correctly on Linux — so the ordinary checkout normalisation is already
+proven for this directory and no `.gitattributes` change was made.
+
+Verification against the real host was done by copying the three files to `/tmp` on
+`afldb-prod` (never into the project directory, and never installed) and running
+`systemd-analyze verify` there. `ExecStart` initially failed verification with
+"is not executable: No such file or directory"; see deviation 2.
+
+**Unrelated pre-existing finding, recorded and not acted on (scope).** `systemd-analyze` warns
+`/etc/systemd/system/afldb.service:65: Unknown key name 'StartLimitIntervalSec' in section
+'Service', ignoring.` — `StartLimitIntervalSec`/`StartLimitBurst` belong in `[Unit]`, so the
+crash-loop limiter that `deploy/afldb.service`'s own comment describes is **not in effect** on
+production. It is a one-line move in a file S8 must not touch. Not an ISSUE-122 defect and not
+raised as a new issue here: it is a single-line correction to an unrelated unit, best made by the
+operator or under its own trivial change.
+
+#### 5. Blockers — the supervised production validation did NOT run
+
+The §16/S8 ladder was attempted in order and stopped at **step A**.
+
+| Step | Result |
+|---|---|
+| **A** — `Rscript` exists | **FAILED (expected).** R is absent. Installing it needs `apt-get`, and `sudo` on production requires a password this session cannot supply. → **Blocker P1** |
+| **B** — fitzRoy matches the pin | Not reachable (no R). The pin itself is resolved and the install is specified. |
+| **C** — acquisition succeeds, manifest last | Not reachable. Also blocked by **P2**: `tools/rebuild/fitzroy/acquire_core.R` is not in production's checkout. |
+| **D** — Python observation emission | Not reachable. `tools/migration/import_fitzroy_core.py` is not in production's checkout (**P2**). |
+| **E** — settle dry-run / safe preview | Not reachable. `src/lib/acquisition/` does not exist on production (**P2**). |
+| **F** — supervised real `--apply --auto-apply` | **Deliberately NOT attempted**, per the session's own instruction to stop before the real apply if migration 083 or the ISSUE-122 code is not deployed. |
+| **G** — verify applications / counters / report | Not reachable. |
+| **H** — identical rerun proves zero writes | Not reachable. |
+| **I** — enable the timer | **NOT DONE.** No unit was installed and no timer exists on production. |
+
+**Blocker P1 — R and fitzRoy are not installed, and installing them needs the operator.**
+`sudo -n true` on `afldb-prod` returns "a password is required". The exact commands are specified
+and pre-verified against the host's own `apt-cache policy` and a live P3M probe; they are in
+`docs/deployment.md` §7b. Note the droplet has **no swap**, which is the reason the package list
+is chosen to compile exactly one package (`nanoparquet`) rather than the whole tidyverse.
+
+**Blocker P2 — production is 94 commits behind this branch and 12 migrations behind the schema
+this stage needs.** `afldb-prod` is on `main` at **`0da44f9`**, with a clean working tree, and
+`afldb_meta.schema_migrations` tops out at **`070`**. ISSUE-122 requires
+**071, 072, 073, 074, 075, 076, 077, 078, 079, 081, 082, 083** (080 is on another branch and is
+not part of this line), plus the whole of `src/lib/acquisition/`, `tools/rebuild/fitzroy/`,
+`tools/migration/import_fitzroy_core.py` and `tools/current-season/settle-afltables.ts` — none of
+which exists in production's checkout. Per §19's rollout order and the `AFLDB-ISSUE-027` lesson,
+the migration and `db:privileges` must land **before** the code that depends on them.
+
+Neither blocker is an ISSUE-122 design problem, and neither is improvised around. This is not
+**SC10**: no implementation evidence contradicts the runbook. It is the ordinary situation that
+S8's last rung needs a production deployment that has not happened yet, and this session had no
+authority to perform a 94-commit production catch-up deploy.
+
+#### 6. Deviations from §16/§19 as written
+
+1. **A third new file, `deploy/afldb-settle-afltables.sh`, beyond §16.1's two.** The three steps
+   must agree on one label and one season, and systemd **variable-expands `$VAR` inside
+   `ExecStart` before `/bin/sh` sees it**, so shell embedded in the unit needs `$$`/`%%`
+   escaping that cannot be tested without installing the unit — on a host where installing it is
+   itself blocked. The script is checkable with `sh -n` anywhere, and it is what makes the
+   out-of-season exit-0 and the partial-snapshot cleanup expressible at all. The unit still
+   *reads* as the approved chain: the three commands appear in its comment and in the script,
+   in order, unchanged.
+2. **`ExecStart=/bin/sh /home/arm/.../afldb-settle-afltables.sh`, not the script directly.**
+   `systemd-analyze verify` refused the direct form ("is not executable"), and every tracked
+   script in this repository is mode `100644` and is run by naming its interpreter
+   (`sudo bash tools/maintenance/…`, `Rscript …`, `python …`). Naming `/bin/sh` keeps that
+   convention and removes a `chmod` step a fresh clone would otherwise need and someone would
+   forget.
+3. **§15.1 query 2 was adapted for production** — the `data_overrides` join was removed because
+   the table does not exist there. Recorded above with the reason; the adaptation cannot hide an
+   override, since a table that does not exist holds no rows.
+4. **Labels carry a time as well as a date** (`settle-<season>-YYYY-MM-DD-HHMM`). `acquire_core.R:196`
+   refuses a label whose manifest already exists (§4 snapshot immutability), so a date-only label
+   would make a supervised same-day rerun a refusal rather than a run.
+5. **The `afldb_dev` rung of §19's rollout order is also blocked**, because `streamanator` has no
+   R either. It is not skipped, just not yet possible.
+
+#### 7. Operator note recorded, not acted on
+
+Each run writes a new provenance manifest into `docs/rebuild-manifests/afltables_fitzroy_core/`,
+which is a **tracked** directory, so nightly manifests accumulate there as untracked files on the
+production checkout. They are small and do not obstruct `git pull`, but a season's worth
+accumulating unnoticed is worth a periodic prune or commit. Documented in §7b; no retention
+mechanism was built, which would be scope this stage does not have.
+
+#### 8. Current Git status
+
+```text
+## claude/issue-122
+ M CHANGELOG.md
+ M IssuesIndex.md
+ M docs/deployment.md
+ M issues.md
+ M issues/open/AFLDB-ISSUE-122.md
+?? deploy/afldb-settle-afltables.service
+?? deploy/afldb-settle-afltables.sh
+?? deploy/afldb-settle-afltables.timer
+?? must                                   <- pre-existing stray file; NOT touched, do not commit
+```
+
+S0–S7 are committed (tip `f0ea8f1`, "Retire ISSUE-122 fallback canonical writes"). Only S8 is
+uncommitted. No commit was made.
+
+#### 9. Exact next action
+
+**S9 is NOT required** (closed above), so the remaining work is, in order:
+
+1. **Operator, on `afldb-prod`: install R and the pinned fitzRoy** — `docs/deployment.md` §7b,
+   "R and the pinned fitzRoy". Then confirm the gate:
+   `Rscript -e 'cat(as.character(packageVersion("fitzRoy")),"\n")'` must print exactly `1.8.0`.
+2. **Operator: deploy this branch to production** through the existing process, migration and
+   `db:privileges` **before** the code (`AFLDB-ISSUE-027`). Production is at `070`; it needs
+   `071`–`079`, `081`, `082`, `083`.
+3. **Then, in a fresh session, finish S8's ladder C→I**: the supervised acquisition, the offline
+   emission, `--dry-run --auto-apply`, the real `--apply --auto-apply`, the counters and exception
+   report, the zero-write rerun, and only then `systemctl enable --now
+   afldb-settle-afltables.timer`. Commands are in `docs/deployment.md` §7b, "Supervised
+   validation, in escalation order".
+4. **Then ISSUE-122 final closeout/review** — §17's assertion table against the shipped code, and
+   resolution per CLAUDE.md §5.
+
+Do not enable the timer before step 3 passes. Never commit the stray `must` file.

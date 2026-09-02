@@ -15,6 +15,30 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-122 — scheduled in-season settle, stage S8 scheduling (In progress) - 2 September 2026
+
+- New `deploy/afldb-settle-afltables.service`, `.timer` and `.sh` run the approved in-season chain
+  as a nightly `oneshot`: AFL Tables is acquired through fitzRoy, adjudicated and emitted offline,
+  then applied canonically by the guarded automatic path. The season comes from
+  `data/reference/seasons.json` and the datasets from the acquisition contract, so neither is
+  duplicated in the unit and neither needs editing at season rollover.
+- The unit carries the email-intake hardening block with two deliberate widenings — writable paths
+  for the acquisition working area and the provenance manifests, and `AF_UNIX` for the PostgreSQL
+  socket. `AFLDB_IMPORT_DATABASE_URL` is the only database credential it keeps; every other DSN and
+  secret `.env` carries is dropped.
+- Failure is fail-closed and self-retrying: a failed acquisition writes no manifest, has its partial
+  working directory removed, never reaches PostgreSQL, fails the unit visibly and is retried at the
+  next firing. `Persistent=true` catches up a run missed while the host was down. Out of season the
+  run exits successfully without doing anything, so the timer can stay enabled all year.
+- **Squiggle and Kali are never invoked automatically and have no canonical writer at all.** There is
+  no fallback canonical authority: if the chain fails, the season does not advance until it succeeds.
+- `docs/deployment.md` gained §7b: installing R and the pinned fitzRoy, verifying the pin, installing
+  and enabling the service and timer, the environment requirement, the supervised validation ladder,
+  journal inspection, a manual supervised run, cadence and retry behaviour, and how to disable the
+  timer safely.
+- Not yet operating: production has neither R nor the ISSUE-122 code, so no unit is installed and no
+  timer is enabled anywhere.
+
 ### AFLDB-ISSUE-122 — Squiggle/Kali canonical-write retirement, stage S7 (In progress) - 2 September 2026
 
 - Squiggle and Kali remain available as deprecated fallback sources for acquisition, immutable
