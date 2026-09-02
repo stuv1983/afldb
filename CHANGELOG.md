@@ -15,6 +15,41 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-127 — a Super Admin can trigger the AFL Tables current-season refresh on demand - 3 September 2026
+
+- **`/admin/current-season` gains a Super Admin-only "Fetch current AFL data now" control.** It
+  starts *the same* `afldb-settle-afltables.service` unit the nightly `AFLDB-ISSUE-122` timer
+  starts — the same acquisition, the same adjudication, the same gates, the same transaction and
+  the same fail-closed behaviour. There is one ingestion implementation, not two, and no
+  acquisition, adjudication, canonical-write, ownership, provenance or derived-recompute logic
+  was duplicated into the web application. The timer cadence is unchanged.
+- **The control takes no options.** Both Server Actions declare zero parameters, so there is no
+  season, label, path, source, force or bypass value to accept; the host boundary is `execFile`
+  with a fixed argv array of module constants, with no shell and nothing user-supplied anywhere
+  near it. Authorization is enforced server-side by the existing `requireSuperAdmin()` guard, not
+  by a hidden button.
+- **A second run cannot start while one is going.** Concurrency is systemd's own job semantics —
+  a start job for a unit that already has one is merged into it — so a second Super Admin, or a
+  press landing during the 04:30 timer run, is told "already running" and starts nothing. There
+  is no application-memory lock.
+- **The result comes from AFLDB's own structured record.** The panel reads the newest
+  `import_batches` row the settle writes, including its `validation_result` counters (canonical
+  rows inserted/updated, ledger rows, apply refusals and failures, unresolved identities,
+  advisory disagreements, and whether the derived recompute ran), on the read-only application
+  role. No journal text is scraped, and the importing DSN is never opened by the web service.
+  Because that row is written inside the run's transaction, the panel reports the service state
+  and the last committed run as two separately labelled facts rather than merging them.
+- **Every press is audited** as `current_season.settle_triggered`, carrying the actor, the unit,
+  the outcome and the batch id that was newest before the press. No credential or environment
+  value is recorded.
+- **Off by default, and fails closed.** The control is inert unless `AFLDB_SETTLE_TRIGGER=systemd`
+  is set *and* the polkit rule `deploy/afldb-settle-afltables-trigger.rules` is installed, and it
+  says so plainly when it is not. That rule is scoped to one action, one verb, one unit and one
+  user; `sudo` is impossible here because the web service runs under `NoNewPrivileges=true`, and
+  that hardening was kept rather than traded away — `deploy/afldb.service` is unchanged. Squiggle
+  and Kali remain non-writing; the canonical controls retired by `AFLDB-ISSUE-122` were not
+  restored. See `docs/deployment.md` §7b.
+
 ### AFLDB-ISSUE-122 — automatic current-season AFL Tables canonical ingestion is live in production (Resolved) - 3 September 2026
 
 - **Current-season AFL Tables data now becomes canonical automatically, with no routine admin

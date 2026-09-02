@@ -1,0 +1,43 @@
+// AFLDB-ISSUE-127 — the minimum permission that lets the web application
+// start ONE unit.
+//
+// Install as:
+//   sudo install -m 644 -o root -g root \
+//     deploy/afldb-settle-afltables-trigger.rules \
+//     /etc/polkit-1/rules.d/50-afldb-settle-afltables.rules
+//   sudo systemctl restart polkit
+//
+// WHY POLKIT AND NOT SUDO. deploy/afldb.service sets NoNewPrivileges=true
+// (and RestrictSUIDSGID=true) on the web service. Under NoNewPrivileges the
+// kernel ignores the setuid bit, so sudo cannot elevate at all no matter what
+// /etc/sudoers.d permits — making sudo work would mean deleting that line
+// from the public, internet-facing service. `systemctl start` as a non-root
+// user is instead a D-Bus call to PID 1 authorized by polkit: no setuid
+// binary is involved, so it works unchanged under that hardening and
+// deploy/afldb.service is not modified at all.
+//
+// WHAT THIS GRANTS. Exactly one verb, on exactly one unit, to exactly one
+// user. It does not grant stop, restart, reload, enable, disable, mask or
+// kill; it does not grant anything on any other unit; and it grants no shell
+// and no root. The unit it can start is the one the nightly timer already
+// starts, whose own ExecStart, environment and hardening are fixed in
+// deploy/afldb-settle-afltables.service and are not influenced by the caller.
+//
+// WHAT IT DOES NOT NEED TO GRANT. Reading the unit's state
+// (`systemctl show`) is an unprivileged read-only D-Bus call. The status side
+// of the admin panel therefore works with or without this file.
+//
+// The service unit name is spelled out rather than pattern-matched on
+// purpose: a prefix or regex match would silently widen this grant the next
+// time a unit is added with a similar name.
+
+polkit.addRule(function (action, subject) {
+  if (action.id === "org.freedesktop.systemd1.manage-units"
+      && action.lookup("unit") === "afldb-settle-afltables.service"
+      && action.lookup("verb") === "start"
+      && subject.user === "arm") {
+    return polkit.Result.YES;
+  }
+  // Everything else falls through to the system default, which is "ask an
+  // administrator" — i.e. denied for a non-interactive service.
+});

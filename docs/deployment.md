@@ -594,6 +594,64 @@ untracked files. They are small and `git pull` is unaffected, but they are
 worth pruning or committing periodically rather than letting a season's worth
 build up unnoticed.
 
+### On-demand refresh from the admin surface (`AFLDB-ISSUE-127`)
+
+A Super Admin can start **this same unit** immediately from
+`/admin/current-season` — "Fetch current AFL data now" — instead of waiting for
+04:30. It is the same script, the same gates, the same transaction and the same
+fail-closed behaviour; the control takes no season, label, source or force
+input, because the action accepts none.
+
+**Concurrency is systemd's.** A start job for a unit that already has one is
+merged into the existing job, so a second Super Admin, or a click landing
+during the timer's run, cannot start a second ingestion transaction. The panel
+reports "already running" rather than pretending it started something.
+
+**The result comes from `import_batches`, not the journal.** The settle stamps
+its whole counter set into `validation_result` on the way out, so the panel
+reads the structured row. Note that the row is written *inside* the run's
+transaction and is invisible until it commits — during a run the panel shows
+the unit as running and the *previous* run's batch, labelled as such.
+
+Two host steps enable it. **Until both are done the control is inert and says
+so**; nothing fails and nothing half-works, and the nightly timer is unaffected
+either way.
+
+```bash
+cd ~/projects/afldb
+
+# 1. The permission. One action, one verb, one unit, one user.
+sudo install -m 644 -o root -g root   deploy/afldb-settle-afltables-trigger.rules   /etc/polkit-1/rules.d/50-afldb-settle-afltables.rules
+sudo systemctl restart polkit
+
+# 2. The application flag, then a restart to pick it up.
+echo 'AFLDB_SETTLE_TRIGGER=systemd' >> .env
+sudo systemctl restart afldb
+
+# Verify, as the app user, WITHOUT sudo. This is the exact call the app makes.
+sudo -u arm /usr/bin/systemctl show afldb-settle-afltables.service --property=ActiveState
+sudo -u arm /usr/bin/systemctl start --no-block afldb-settle-afltables.service
+systemctl status afldb-settle-afltables.service
+```
+
+**Why polkit and not sudo.** `deploy/afldb.service` sets
+`NoNewPrivileges=true`. Under that, the kernel ignores the setuid bit, so
+`sudo` cannot elevate no matter what `/etc/sudoers.d` permits — making sudo
+work would mean removing that hardening from the public web service. A
+`systemctl start` from a non-root user is instead a D-Bus call to PID 1
+authorized by polkit, which involves no setuid binary and so works unchanged.
+**`deploy/afldb.service` is not modified.** Reading unit state
+(`systemctl show`) is unprivileged and needs no rule at all.
+
+**What the rule does not grant.** Not `stop`, `restart`, `enable`, `disable`,
+`mask` or `kill`; not any other unit; no shell and no root. The unit name is
+spelled out rather than pattern-matched, so a future similarly-named unit
+cannot inherit the grant.
+
+**To revoke it,** remove either half — delete the rules file and restart
+polkit, or unset `AFLDB_SETTLE_TRIGGER` and restart `afldb`. The scheduled
+timer keeps running in both cases.
+
 ## 8. Testing
 
 ```bash
@@ -663,6 +721,7 @@ All configuration is in `/home/arm/projects/afldb/.env` (mode 600, owner `arm`),
 | `AFLDB_POOL_MAX` | app pool size **per worker** (default 10) |
 | `AFLDB_BUILD_WORKERS` | caps `next build` static-generation workers; unset = Next's default |
 | `AFLDB_STATEMENT_TIMEOUT_MS` | per-connection statement timeout |
+| `AFLDB_SETTLE_TRIGGER` | `systemd` enables the Super Admin on-demand settle trigger (§7b). Anything else, including unset, leaves it inert |
 
 **The web service does not receive them all.** `.env` is the whole project's
 configuration, so the unit loads it and then drops the import, owner, test and
