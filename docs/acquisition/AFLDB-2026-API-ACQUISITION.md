@@ -56,6 +56,15 @@ for 2026 and every future season should be.
 
 ## 1. What is actually implemented today [SRC]
 
+> **CURRENT STATE — AFLDB-ISSUE-122 S7 (2026-09-02).** Squiggle and Kali are deprecated
+> fallback sources. Their clients, parsers, source registrations, immutable observations,
+> mutable staging projection, diagnostic reporting, corroboration evidence and historical
+> provenance remain available. Their former canonical `matches` writer is retired: this path
+> performs no canonical INSERT or UPDATE. `--update-matches` now fails explicitly, while
+> `--insert-missing-matches` retains its existing refusal. The older implementation inventory
+> and defect evidence below are retained as architectural lineage and are superseded wherever
+> they describe a Squiggle/Kali canonical writer.
+
 | Piece | File | Reality |
 |---|---|---|
 | Source registry | `src/db/migrations/063_external_current_match_sources.sql:10-19` | `squiggle_api`, `kali_afl_stats` registered as `upstream_dataset` |
@@ -272,6 +281,13 @@ desk. **Out of scope by [DECISION] (free sources only).** Recorded as the escala
 
 ## 3. Source-of-truth matrix (2026+)
 
+> **AMENDED 2026-09-02 (AFLDB-ISSUE-122).** The prior reviewed-promotion policy and matrix
+> wording below are retained as architectural lineage. For current-season canonical data, the
+> guarded AFL Tables applier is now the automatic authority. Squiggle and Kali are deprecated,
+> non-writing fallbacks: acquisition, observation/history, staging, diagnostics, explicit human
+> fallback investigation, corroboration evidence and historical provenance remain; canonical
+> INSERT/UPDATE and automatic failover do not.
+
 Promotion policy per §0: staging always automatic, canonical always reviewed.
 
 | Data family | Preferred source | Corroborating | AFLDB target / staging | Stable source identity | Auto-promote? | Known gaps / risk |
@@ -339,6 +355,12 @@ of lineup data into canonical participation.
 ---
 
 ## 5. Operating lifecycle, 2026 → future seasons
+
+> **AMENDED 2026-09-02 (AFLDB-ISSUE-122).** The lifecycle table below retains the original
+> architecture as lineage. Its current interpretation is: Squiggle/Kali completion and
+> provisional-score work writes observation history and staging only, when explicitly run for
+> diagnostics or fallback investigation. The overnight AFL Tables settle pass is the guarded
+> automatic canonical path. There is no automatic Squiggle/Kali fallback writer.
 
 | Phase | Job | Source | Writes | Cadence |
 |---|---|---|---|---|

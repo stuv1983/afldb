@@ -15,6 +15,21 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-122 — Squiggle/Kali canonical-write retirement, stage S7 (In progress) - 2 September 2026
+
+- Squiggle and Kali remain available as deprecated fallback sources for acquisition, immutable
+  observation history, staging, diagnostics, explicit human fallback investigation,
+  corroboration evidence and historical provenance, but their legacy current-season path can no
+  longer insert or update canonical `matches` rows. Its canonical insert/update counters are
+  structurally zero and no replacement fallback writer was introduced.
+- `current-season:update --update-matches` now fails explicitly with an AFLDB-ISSUE-122
+  deprecation error; the existing `--insert-missing-matches` refusal remains unchanged.
+- The existing super-admin current-season controls no longer expose or submit `updateMatches` and
+  now describe Squiggle/Kali operations as staging/diagnostic fallback investigation only.
+- Existing current-season regression coverage now proves source acquisition, observation/history,
+  staging and corroboration diagnostics remain available while canonical DML and the retired admin
+  plumbing are absent.
+
 ### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stage S6 run integration (In progress) - 2 September 2026
 
 - **The automatic path is now an operator command.** `npm run settle:afltables -- --label

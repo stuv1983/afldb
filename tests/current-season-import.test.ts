@@ -36,6 +36,7 @@ function readSource(path: string): string {
 const tool = readSource('tools/current-season/update-current-season.ts');
 const importer = readSource('src/lib/external-afl/current-season-import.ts');
 const adminAction = readSource('src/app/admin/current-season/actions.ts');
+const adminControls = readSource('src/app/admin/current-season/CurrentSeasonControls.tsx');
 const adminPage = readSource('src/app/admin/current-season/page.tsx');
 const adminNav = readSource('src/app/admin/nav-model.ts');
 const migration = readSource('src/db/migrations/063_external_current_match_sources.sql');
@@ -67,12 +68,11 @@ describe('current-season external source import contracts', () => {
     expect(tool).not.toContain('window.');
   });
 
-  it('stages external payloads before updating local matches', () => {
+  it('stages external payloads without mutating canonical matches', () => {
     expect(migration).toContain('CREATE TABLE staging.external_current_matches');
     expect(migration).toContain('raw_payload        jsonb        NOT NULL');
     expect(importer).toContain('INSERT INTO staging.external_current_matches');
-    expect(importer.indexOf('INSERT INTO staging.external_current_matches'))
-      .toBeLessThan(importer.indexOf('UPDATE matches'));
+    expect(importer).not.toMatch(/\b(?:INSERT INTO|UPDATE|DELETE FROM) matches\b/);
   });
 
   it('writes immutable observation history before refreshing the legacy projection', () => {
@@ -113,9 +113,12 @@ describe('current-season external source import contracts', () => {
     expect(importer).not.toMatch(/DELETE FROM staging\.(source_records|source_record_versions|source_payloads)/);
   });
 
-  it('only applies final-score updates when explicitly requested', () => {
-    expect(tool).toContain("argv.includes('--update-matches')");
-    expect(importer).toContain('if (updateMatches) {');
+  it('explicitly refuses the retired --update-matches flag (AFLDB-ISSUE-122)', () => {
+    expect(tool).toContain("if (argv.includes('--update-matches'))");
+    expect(tool).toContain('--update-matches is deprecated by AFLDB-ISSUE-122');
+    expect(tool).toContain('cannot write canonical matches');
+    expect(tool).not.toContain("updateMatches: argv.includes('--update-matches')");
+    expect(importer).not.toContain('updateMatches');
   });
 
   it('accounts for AFLDB counting Opening Round as round 1 from 2024 onward', () => {
@@ -140,10 +143,10 @@ describe('current-season external source import contracts', () => {
     expect(importer).toContain("status: 'incomplete_source_family'");
   });
 
-  it('records source and import-batch provenance on local score updates', () => {
-    expect(importer).toContain('source_id = ${sourceId}');
-    expect(importer).toContain('source_record_id = ${match.externalGameId}');
-    expect(importer).toContain('import_batch_id = ${batchId}');
+  it('retains source and import-batch provenance in observation and staging writes', () => {
+    expect(importer).toContain('persistSourceObservation(\n        tx, matchObservation(sourceId, match), batchId, observedAt,');
+    expect(importer).toContain('INSERT INTO staging.external_current_matches');
+    expect(importer).toContain('${sourceId}, ${match.externalGameId}');
   });
 
   it('exposes the refresh only through a super-admin server action', () => {
@@ -154,11 +157,14 @@ describe('current-season external source import contracts', () => {
     expect(adminNav).toContain("href: '/admin/current-season'");
   });
 
-  it('keeps the admin auto path server-side and non-destructive by default', () => {
+  it('keeps the admin path server-side and staging/diagnostic only', () => {
     expect(adminAction).toContain("mode === 'auto'");
     expect(adminAction).toContain("? ['kali'] as const");
-    expect(adminAction).toContain("const updateMatches = mode !== 'auto'");
-    expect(adminPage).toContain('Existing final scores are left alone');
+    expect(adminAction).not.toContain('updateMatches');
+    expect(adminControls).not.toContain('updateMatches');
+    expect(adminControls).not.toContain('Overwrite existing resolved final scores');
+    expect(adminPage).toContain('deprecated fallback sources');
+    expect(adminPage).toContain('never insert or update');
   });
 
   it('adds provenance columns to matches in a forward-only migration', () => {
@@ -432,27 +438,28 @@ describe('Placeholder and Dry-Run Resolution Logic', () => {
   });
 });
 
-describe('Update logic genuine-change and disagreements', () => {
-  it('No-op canonical update: skips update if scores match identically', () => {
-    expect(importer).toContain('const scoreChanged = current.homeScore !== agreedHomeScore');
-    expect(importer).toContain('if (!scoreChanged && !componentsChanged) {\n          continue;\n        }');
+describe('Retired canonical writer and retained diagnostic corroboration', () => {
+  it('keeps legacy canonical insert and update counters structurally zero', () => {
+    expect(importer).toContain('canonicalRowsInserted: 0;');
+    expect(importer).toContain('canonicalRowsUpdated: 0;');
+    expect(importer).toContain('canonicalRowsUpdated: 0,');
   });
 
-  it('Genuine score correction: updates canonical if score changes', () => {
-    expect(importer).toContain('if (!scoreChanged && !componentsChanged) {\n          continue;\n        }');
-    expect(importer).toContain('UPDATE matches');
-    expect(importer).toContain('home_score = ${agreedHomeScore}');
+  it('contains no canonical matches mutation or replacement writer', () => {
+    expect(importer).not.toMatch(/\b(?:INSERT INTO|UPDATE|DELETE FROM) matches\b/);
+    expect(importer).not.toContain('refreshSeasonMetadata(');
   });
 
-  it('deduplicates candidate processing to one canonical match operation', () => {
-    expect(importer).toContain('const updatesByLocalMatchId = new Map<number, MatchCandidate[]>();');
-    expect(importer).toContain('appendCandidate(updatesByLocalMatchId, localMatchId');
-    expect(importer).toContain('for (const [localMatchId, candidates] of updatesByLocalMatchId.entries())');
+  it('deduplicates diagnostic candidate analysis at canonical match identity grain', () => {
+    expect(importer).toContain('const candidateSets = new Map<string, MatchCandidate[]>();');
+    expect(importer).toContain('appendCandidate(candidateSets, `resolved:${observation.localMatchId}`');
+    expect(importer).toContain('for (const [key, candidates] of candidateSets)');
   });
 
-  it('does not update when independent groups disagree', () => {
-    expect(importer).toContain('if (corroboration.disagreeingGroups.length > 0) {\n          continue;\n        }');
+  it('retains independent-source disagreement diagnostics without a write path', () => {
+    expect(importer).toContain('const hasIndependentDisagreement = corroboration.disagreeingGroups.length > 0;');
     expect(importer).toContain('sourceDisagreements: canonicalPlan.sourceDisagreements');
+    expect(importer).not.toContain('if (updateMatches)');
   });
 
   it('Orientation reversal: correctly aligns home/away before comparison', () => {
@@ -461,9 +468,13 @@ describe('Update logic genuine-change and disagreements', () => {
     expect(importer).toContain('awayScore: sameOrientation ? match.awayScore : match.homeScore');
   });
 
-  it('Null score components: does not silently overwrite known canonical components', () => {
-    expect(importer).toContain('agreedHomeGoals = agreedHomeGoals ?? current.homeGoals;');
-    expect(importer).toContain('agreedAwayBehinds = agreedAwayBehinds ?? current.awayBehinds;');
+  it('retains partial score components as corroboration evidence', () => {
+    const partial = currentSeasonObservation('squiggle_api', 'match', 'partial');
+    partial.values.homeGoals = null;
+    partial.values.awayBehinds = null;
+    const complete = currentSeasonObservation('kali_afl_stats', 'match', 'complete');
+
+    expect(analyseCurrentSeasonCorroboration([partial, complete]).values).toEqual(complete.values);
   });
 
   it('independent-source disagreement blocks unsafe missing-match work', () => {
@@ -645,8 +656,9 @@ describe('AFLDB-ISSUE-097 current-season independence-group corroboration', () =
     expect(result.independentlyCorroborated).toBe(false);
     expect(result.values).toBeNull();
     expect(importer).toContain(
-      'if (corroboration.sameGroupConflictGroups.length > 0) {\n          continue;\n        }',
+      'const hasSameGroupConflict = corroboration.sameGroupConflictGroups.length > 0;',
     );
+    expect(importer).toContain('if (hasIndependentDisagreement || hasSameGroupConflict) rejectedOrConflicted += 1;');
     expect(importer).not.toContain('INSERT INTO matches');
   });
 });

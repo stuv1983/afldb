@@ -2259,3 +2259,108 @@ review and commit S5 + S6 together or separately; never the stray `must` file. S
 from S0: the production copy of the §15.1 read-only query, which closes the S9 decision. Running
 the integration suite from the Windows worktree still requires the SSH local forward
 (`ssh -N -L 5432:127.0.0.1:5432 arm@10.0.40.100`).
+
+---
+
+### S7 — Squiggle / Kali canonical-write retirement (2026-09-02, Codex / Medium / Normal, worktree `D:\dev\afldb-issue-122`, branch `claude/issue-122`)
+
+**Outcome: S7 COMPLETE and GREEN.** The deprecated Squiggle/Kali current-season path retains
+acquisition, immutable observation/history, mutable staging, absence state, diagnostic reporting,
+corroboration evidence, source registrations, clients, parsers, independence declarations and
+historical provenance, but can no longer INSERT or UPDATE canonical `matches`. No replacement
+fallback writer exists. S8 was not started; no database, migration, privilege, deployment or
+production state was touched. Nothing was committed.
+
+#### Files changed in S7
+
+| File | S7 change |
+|---|---|
+| `src/lib/external-afl/current-season-import.ts` | Removed `CurrentSeasonRunOptions.updateMatches`, its call/signature plumbing, the guarded canonical `UPDATE matches` branch, the mutation-only candidate map and season-metadata helper, and `canonicalRowsUpdated` accumulation. The legacy path's insert/update counters are structural zero while acquisition, observation, staging, absence sweep and diagnostic planning remain. |
+| `tools/current-season/update-current-season.ts` | `--update-matches` now throws an explicit AFLDB-ISSUE-122 deprecation error before any network/database work; its help prompt and parsed option are gone. The existing `--insert-missing-matches` refusal is unchanged. |
+| `src/app/admin/current-season/actions.ts` | Removed `updateMatches` form parsing, refresh-option plumbing and audit payload field; removed unreachable canonical-page revalidation and made the result copy explicitly non-canonical. |
+| `src/app/admin/current-season/CurrentSeasonControls.tsx` | Removed the overwrite checkbox; relabelled the existing controls as fallback staging/investigation operations. |
+| `src/app/admin/current-season/page.tsx` | Copy now names Squiggle/Kali deprecated fallbacks and states that the surface never inserts or updates canonical current-season matches. |
+| `tests/current-season-import.test.ts` | Updated existing coverage rather than deleting it: acquisition, immutable history, staging, absence state, planner/corroboration diagnostics and independence semantics remain; canonical DML, `updateMatches` importer/admin plumbing and the overwrite control are absent; counters are structural zero; the CLI deprecation contract is pinned. |
+| `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` | Added current-state supersession notes in §§1, 3 and 5: Squiggle/Kali are deprecated non-writing fallbacks, the AFL Tables applier is canonical authority, and the prior writer/review architecture remains as lineage. |
+| `issues/open/AFLDB-ISSUE-122.md`, `issues.md`, `IssuesIndex.md`, `CHANGELOG.md` | S7 evidence, current state, exact S8 next action and Unreleased behaviour record. |
+
+The untracked `must` file was not read, edited or otherwise touched.
+
+#### Contract closure
+
+- **Canonical retirement.** `CurrentSeasonRunOptions` and every caller no longer carry
+  `updateMatches`; `writeMatches()` has no canonical DML and returns
+  `canonicalRowsInserted: 0` / `canonicalRowsUpdated: 0`. A scoped source search over
+  `src/lib/external-afl`, `tools/current-season` and `src/app/admin/current-season` found no
+  `INSERT INTO matches`, `UPDATE matches`, `DELETE FROM matches`, `updateMatches`, or overwrite
+  control. No writer was moved or replaced.
+- **CLI.** A real offline invocation of `--update-matches` exits 1 with:
+  `--update-matches is deprecated by AFLDB-ISSUE-122: Squiggle/Kali refreshes are staging,
+  observation, and diagnostic only and cannot write canonical matches.` The refusal is evaluated
+  before source/year parsing or any client creation. `--insert-missing-matches` retains its
+  original explicit refusal branch and is pinned by the focused suite.
+- **Admin.** The existing action and control contain no `updateMatches` string, the checkbox is
+  absent, and the page/action copy says staging/diagnostic fallback only. The super-admin server
+  boundary, auditing, staging apply and report remain.
+- **Deprecated-source preservation.** The focused suite still exercises both fetch clients and
+  source parsing; the importer still calls `persistSourceObservation`, upserts
+  `staging.external_current_matches`, performs the absence sweep, resolves local identities for
+  reporting, and computes corroboration/disagreement data at declared independence-group grain.
+  Source registry/family data, migrations and clients were not changed.
+- **No automatic fallback.** The only canonical automatic writer remains the separately guarded
+  AFL Tables applier built in S5/S6. S7 adds no writer, authority switch, migration, privilege,
+  scheduler or UI.
+
+#### Validation
+
+| Command / evidence | Result |
+|---|---|
+| `npx vitest run tests/current-season-import.test.ts` | First run: **214 passed / 1 failed** because one old source assertion still named the removed writer's same-group-conflict branch. The functional corroboration assertions passed. That assertion was moved to the retained diagnostic planner branch; rerun: **215/215 passed**. |
+| `npx tsx tools/current-season/update-current-season.ts --update-matches` | **Expected refusal:** exit 1 with the exact ISSUE-122 deprecation message above; no database/network access. |
+| `npx tsc --noEmit` | exit 0. |
+| `npx eslint src/lib/external-afl/current-season-import.ts tools/current-season/update-current-season.ts src/app/admin/current-season/actions.ts src/app/admin/current-season/CurrentSeasonControls.tsx src/app/admin/current-season/page.tsx tests/current-season-import.test.ts` | exit 0, no output. |
+| Scoped no-writer/preservation source search | No canonical DML or retired plumbing found; acquisition, observation, staging, absence and diagnostic symbols present. |
+| `git diff --check` | exit 0; CRLF conversion advisories only. |
+
+`tests/reference-data.test.ts` was not run: S7 changed neither the source-family registry nor a
+registry assertion, and the acquisition-document update has no test assertion in that suite.
+There is no separate focused current-season admin/action suite; its existing source-contract
+coverage is in `tests/current-season-import.test.ts` and passed there. No integration/browser
+suite was required because S7 removes canonical mutation and a checkbox rather than adding a
+runtime mutation lifecycle.
+
+#### Deviations / blockers
+
+No runbook or product-contract deviation and no blocker. The normal workspace patch channel's
+Windows sandbox helper failed to open files (`helper_unknown_error`); the same patch utility was
+invoked under the explicitly authorised worktree-write scope. All edits remained inside this
+worktree and were subsequently typechecked, linted and reviewed. No shell write replacement was
+used for source content.
+
+#### Current Git status
+
+```text
+## claude/issue-122
+ M CHANGELOG.md
+ M IssuesIndex.md
+ M docs/acquisition/AFLDB-2026-API-ACQUISITION.md
+ M issues.md
+ M issues/open/AFLDB-ISSUE-122.md
+ M src/app/admin/current-season/CurrentSeasonControls.tsx
+ M src/app/admin/current-season/actions.ts
+ M src/app/admin/current-season/page.tsx
+ M src/lib/external-afl/current-season-import.ts
+ M tests/current-season-import.test.ts
+ M tools/current-season/update-current-season.ts
+?? must                                   <- pre-existing stray file; NOT touched, do not commit
+```
+
+Only S7 is uncommitted; the status at the start/end of this session showed no S5/S6 source files
+modified. No commit was made.
+
+#### Exact next action — S8
+
+Fresh session, same worktree and branch, carry over this file. Execute **S8 only** per §16 and
+§19: provision R and pinned fitzRoy, then implement the bounded service/timer and perform the
+supervised real run. Do not start S9, do not redesign the S5/S6 applier, and never include the
+stray `must` file.

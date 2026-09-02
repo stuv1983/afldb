@@ -46,14 +46,12 @@ export async function runCurrentSeasonAdminAction(
       : parseCurrentSeasonSources(String(formData.get('source') ?? 'kali'));
     const apply = mode === 'auto' || formData.get('apply') === 'on';
     const insertMissingMatches = false;
-    const updateMatches = mode !== 'auto' && formData.get('updateMatches') === 'on';
 
     const result = await runCurrentSeasonRefresh({
       year,
       sources: [...sources],
       apply,
       insertMissingMatches,
-      updateMatches,
     });
     const report = await getCurrentSeasonReport(year);
 
@@ -63,7 +61,6 @@ export async function runCurrentSeasonAdminAction(
       sources,
       apply,
       insertMissingMatches,
-      updateMatches,
       observationsFetched: result.observationsFetched,
       sourceCounts: result.sourceCounts,
       independenceGroupCounts: result.independenceGroupCounts,
@@ -83,18 +80,10 @@ export async function runCurrentSeasonAdminAction(
     }, { userId: admin.id, label: admin.email });
 
     revalidatePath('/admin/current-season');
-    if (result.canonicalRowsInserted > 0 || result.canonicalRowsUpdated > 0) {
-      revalidatePath('/matches');
-      revalidatePath('/matches/[id]', 'page');
-      revalidatePath('/seasons');
-      revalidatePath('/seasons/[year]', 'page');
-      revalidatePath('/clubs/[slug]', 'page');
-      revalidatePath('/records/[category]', 'page');
-    }
 
     return {
       message: result.applied
-        ? `Updated ${year}: staged ${result.observationsStaged} observations, resolved ${result.canonicalMatchesResolved} canonical matches, inserted ${result.canonicalRowsInserted} canonical rows.`
+        ? `Refreshed ${year} fallback evidence: staged ${result.observationsStaged} observations and resolved ${result.canonicalMatchesResolved} local matches for diagnostics. Canonical current-season rows were not changed.`
         : `Dry run for ${year}: fetched ${result.observationsFetched} observations; nothing was written.`,
       result,
       report,
