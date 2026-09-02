@@ -1,16 +1,36 @@
 # AFLDB-ISSUE-112 — Replace legacy SQLite honours acquisition with curated manifests
 
-**Status: OPEN. All nine families are implemented and manifest-backed; G3 and
-the non-vacuous G5 database gate now PASS, while G6 remains blocked — see
-§26.** G1/G2/G3/G4/G5/G7/G8 PASS, **G6 BLOCKED** (the accepted fitzRoy/DraftGuru snapshot
-bytes are absent and re-acquiring them is a scrape, which §12 forbids).
+**Status: RESOLVED 2026-09-02. All nine families are implemented and
+manifest-backed, and **G1-G8 all PASS**. G6 closed in §32: the DraftGuru
+preflight label defect (§31.3) was fixed at the wiring, and the canonical
+`npm run db:test:rebuild` then ran end to end against `afldb_test` — exit 0,
+every family restored at its exact expected count, FINAL VALIDATION 38/38,
+zero orphan and zero wrong-player links, and no legacy SQLite anywhere in the
+plan.**
+
+*Superseded status text, kept as lineage:* "**Status: OPEN. All nine families
+are implemented and manifest-backed; G1/G2/G3/G4/G5/G7/G8 PASS. G6's INPUT
+BLOCKER IS CLEARED — see §29 — but G6 itself is not yet met: the canonical
+rebuild has not been run.** Pass 20 took
+operator route 2 (§28.4) and accepted two new snapshots,
+**`full-history-20260902`** and **`annual-html-20260902`**, each with zero
+semantic difference from its predecessor; `ladder-20260828` is unchanged and
+still valid. All three G6 snapshot directories now exist and are bound to
+tracked acceptance records. Five register-pinned test assertions are red as a
+direct consequence and need an operator decision (§29.6)."
+
+*Superseded status text, kept as lineage:* "G3 and the non-vacuous G5 database
+gate now PASS, while G6 remains blocked — see §27. The operator-authorised
+`ladder-20260828` restoration matches its existing acceptance manifest exactly,
+but the supplied retained fitzRoy core and DraftGuru directories contain no
+files, and reacquiring either is not authorised."
 Pass 15 also **found and fixed a correctness defect**: the manifests' carried
 `player_id` denoted a *different footballer* after a canonical rebuild in
 **12,392 of 12,392** cases; links now resolve through the tracked AFL Tables
 profile identity (§24.5). Pass 16 tightened that resolver and found one
 additional tracked identity; **18 players / 33 manifest rows** remain without
 a repository-supported stable identity and fail closed (§25.2).
-**Parent:** `AFLDB-ISSUE-102` (`issues/open/AFLDB-ISSUE-102.md`).
+**Parent:** `AFLDB-ISSUE-102` (`issues/closed/AFLDB-ISSUE-102.md`, Resolved 2026-09-02).
 **Severity:** Medium — **Area:** Data acquisition / Import architecture / Data integrity.
 **Created:** 2026-08-30 (ISSUE-102 pass 2, operator-authorised).
 
@@ -3169,7 +3189,7 @@ Grimley. Re-linking them **needs an operator decision** (§24.6 blocker 2).
 | **G3** | **PARTIAL.** `awards-reload-links.test.ts` — **86 passed / 21 skipped / 0 failed** (the ISSUE-112 blocks all execute). The 21 skips are the pre-existing legacy-fixture blocks that *build* a synthetic SQLite database; they cannot run without a legacy file and are not ISSUE-112 paths. The headline "`:205-1247` runs without `AFLDB_LEGACY_SQLITE`" is **not** met for those 21. |
 | **G4** | **PASS.** Three consecutive full reloads produce byte-identical fingerprints over `award_winners` (3,298), `award_nominations` (766), `hall_of_fame` (343), `honour_team_members` (113), `captaincies` (1,375) and `awards` (40). |
 | **G5** | **PASS in shape, vacuous in ledger.** 0 orphaned decisions, 0 `linked` mismatches, 0 `confirmed_unlinked` now linked — against a `player_link_resolutions` table that is empty in `afldb_test`. See §24.5. |
-| **G6** | **BLOCKED — see blocker 1.** The stage and its gates are implemented and unit-proven (`tests/db-test-rebuild.test.ts` 223/223, `--plan` renders the 12-stage graph); the rebuild itself cannot be executed here. |
+| **G6** | **BLOCKED — see blocker 1.** The stage and its gates are implemented and unit-proven (`tests/db-test-rebuild.test.ts` 223/223, `--plan` renders the 12-stage graph); the rebuild itself cannot be executed here. **SUPERSEDED by §29.9: blocker 1 is cleared — the accepted snapshots are now `full-history-20260902`, `ladder-20260828` and `annual-html-20260902`. G6 still needs the rebuild run.** |
 | **G7** | **PASS.** `docs/deployment.md` §6/§7 updated: the refresh sequence names the eight manifest groups explicitly and reads no legacy SQLite; the rebuild stage table gains the awards & honours stage; the legacy `awards` group is marked compatibility-only. No production migration or deploy is claimed — **none has happened.** |
 | **G8** | **PASS.** `tests/integration/privileges.test.ts` **34/34**, unchanged. No grant widened, no migration. |
 
@@ -3218,13 +3238,17 @@ ISSUE-113 untouched. `D:\dev\afldb` not accessed.
 
 ### 24.8 Exact next action
 
-1. **Operator supplies the accepted snapshot bytes** —
-   `data/sources/afltables/fitzroy_core/full-history-20260827`,
+1. **SUPERSEDED by §29.5.** *(Original text: "Operator supplies the accepted
+   snapshot bytes — `data/sources/afltables/fitzroy_core/full-history-20260827`,
    `data/sources/afltables/fitzroy_core/ladder-20260828` and
    `data/sources/draftguru/annual-html-20260826` — then run
    `npm run db:test:rebuild -- --fitzroy-label full-history-20260827
-   --acknowledge-destroy afldb_test` and confirm Stage 8 and the new Stage-12
-   gates. That closes **G6**.
+   --acknowledge-destroy afldb_test`…")* All three directories now exist under
+   the Pass 20 labels. `--fitzroy-label full-history-20260827` is now **refused**
+   — the fitzRoy label resolves from the acceptance register. The current
+   command is
+   `npm run db:test:rebuild -- --draftguru-label annual-html-20260902
+   --acknowledge-destroy afldb_test`. Clear §29.6 first.
 2. **Operator decides the 19 unidentified players** (§24.5): accept them
    unlinked, or adjudicate each to a canonical player and extend the census.
 3. Decide whether **G3**'s 21 legacy-fixture blocks are in ISSUE-112's closure
@@ -3312,12 +3336,15 @@ closure run uses the global G5 wording rather than the representative fixtures.
 
 ### 25.4 G6 and closure verdict
 
-G6 remains blocked solely by the missing accepted raw bytes:
-`data/sources/draftguru/annual-html-20260826`,
+**SUPERSEDED by §29.** *(Original: "G6 remains blocked solely by the missing
+accepted raw bytes: `data/sources/draftguru/annual-html-20260826`,
 `data/sources/afltables/fitzroy_core/full-history-20260827`, and the accepted
 ladder witness under `ladder-20260828`. The tracked manifests/contracts exist;
 the raw inputs do not. Re-acquisition is external scraping and remains forbidden
-by §12. No alternative tracked snapshot supplies those bytes.
+by §12. No alternative tracked snapshot supplies those bytes.")* The operator
+subsequently authorised reacquisition (Pass 19) and then route 2 (Pass 20). The
+accepted snapshots are now `full-history-20260902`, `ladder-20260828` and
+`annual-html-20260902`, and the raw inputs are present.
 
 The runbook requires an actual `npm run db:test:rebuild` and contains no waiver
 allowing earlier rebuild evidence plus differential gates to replace G6. That
@@ -3341,9 +3368,10 @@ Next:
    `AFLDB_LEGACY_SQLITE` unset, and run the full
    `tests/integration/awards-reload-links.test.ts` matrix. Confirm all 107 tests
    execute and pass; use the seeded decisions for a non-vacuous G5 audit.
-2. Supply the three exact accepted snapshot directories from authorised
-   retained bytes, then run the canonical rebuild command in §24.8 and confirm
-   the awards-honours stage plus final gates. Do not reacquire or substitute.
+2. **SUPERSEDED by §29.9.** *(Original: "Supply the three exact accepted
+   snapshot directories from authorised retained bytes, then run the canonical
+   rebuild command in §24.8…")* Done in Pass 20 under new labels; the current
+   command is in §29.5.
 3. Resolve ISSUE-112 only after G3, G5 and G6 are evidenced. Do not close
    ISSUE-102 in the same step without a separate explicit request.
 
@@ -3428,6 +3456,1111 @@ ledger audit rejected in §25.3. **G5 is PASS.**
 only next action is for the operator to supply the exact retained accepted
 snapshot directories named in §24.8, then execute the canonical rebuild gate.
 Do not scrape, reacquire, substitute snapshots or contact production.
+
+---
+
+## 27. Pass 18 — 2026-09-02: operator-authorised ladder snapshot restoration
+
+The operator explicitly authorised reacquisition of exactly
+`data/sources/afltables/fitzroy_core/ladder-20260828` because the retained
+accepted bytes were unavailable locally and in backups. The authorisation is
+limited to the existing accepted label, the `ladder` dataset and seasons
+1897–2025 under fitzRoy 1.8.0. It does not authorise refreshing or reacquiring
+the accepted fitzRoy core or DraftGuru snapshots, contacting production, or
+modifying the streamanator checkout. The tracked acceptance manifest remains
+the authority and must not be replaced: any filename, row-count or SHA-256
+difference leaves G6 blocked and ISSUE-112 open.
+
+### 27.1 Acquisition and acceptance result
+
+**Ladder restoration: PASS.** Because the standard acquirer refuses to overwrite
+an existing immutable manifest label, the repository adapter was run from an
+isolated staging working root while the real tracked manifest stayed untouched:
+
+```text
+Rscript tools/rebuild/fitzroy/acquire_core.R --acquire \
+  --label ladder-20260828 --from 1897 --to 2025 --datasets ladder
+```
+
+The installed and pinned fitzRoy versions were both 1.8.0. The generated file
+set was compared independently with the existing tracked manifest before any
+bytes were installed: **129 accepted / 129 generated / 129 on disk; 1,622 rows
+in each; zero missing or extra filenames; zero missing or extra seasons; zero
+row-count differences; zero SHA-256 differences.** This covers every season
+1897–2025. The generated manifest was not installed and the tracked acceptance
+manifest was not changed. The matching raw CSVs were copied to the authorised
+`data/sources/afltables/fitzroy_core/ladder-20260828` path, after which
+`validate_ladder_witness.py --label ladder-20260828` passed every binding,
+manifest, byte, schema, per-season, percentage and identity-resolution check.
+The isolated staging root was then removed.
+
+**Retained-snapshot restoration: BLOCKED.** Both operator-supplied source paths
+exist, but an exact recursive inspection found **zero files** in each:
+
+```text
+D:\dev\afldb\data\sources\afltables\fitzroy_core\full-history-20260827
+D:\dev\afldb\data\sources\draftguru\annual-html-20260826
+```
+
+There are therefore no retained bytes to copy or verify against the repository
+manifests. Neither source was regenerated or refreshed. G6 and every post-rebuild
+gate were not run, because the canonical rebuild preflight cannot pass without
+those two accepted inputs. No production system or streamanator checkout was
+contacted or modified, and no DSN or SSH tunnel was used in this pass.
+
+**Exact next action:** restore the retained files into those two named source
+directories (or provide their exact retained-byte locations), then copy and
+validate them in this worktree and run the already-authorised canonical rebuild.
+ISSUE-112 remains open; ISSUE-102 remains open.
+
+---
+
+## 28. Pass 19 — 2026-09-02: operator-authorised reacquisition of the two missing G6 snapshots — BOTH FAIL EXACT-BYTE RESTORATION
+
+The operator authorised reacquisition of **only** the two missing accepted
+snapshots, `data/sources/afltables/fitzroy_core/full-history-20260827` and
+`data/sources/draftguru/annual-html-20260826`, using their existing
+repository-standard acquisition paths, with the tracked acceptance manifests
+held immutable: any filename, count or SHA-256 difference stops the pass and
+leaves the acceptance baseline where it is. Nothing else was refreshed. The
+already-restored `ladder-20260828` was not touched.
+
+Both reacquisitions ran from **isolated staging roots** under the session
+scratchpad, with staging manifest directories, so neither adapter could write
+near a tracked manifest. Both tracked acceptance manifests are byte-unchanged
+after the pass (`full-history-20260827.json` still hashes to the
+`a42c6d5f...21d09` pinned in `data/reference/fitzroy-accepted-baselines.json`).
+
+**Result: G6 remains BLOCKED. Neither snapshot can be restored byte-exactly.
+No rebuild was run, no bytes were installed in the worktree, no closure gate was
+executed, and ISSUE-112 stays OPEN.**
+
+### 28.1 fitzRoy `full-history-20260827` — 130 of 131 hashes match, one does not
+
+The pinned adapter and configuration were used unchanged: `acquire_core.R`,
+fitzRoy **1.8.0** installed and pinned (match), `--from 1897 --to 2025`,
+`--datasets player_stats,player_details,results`. Two bounded probes ran first
+and both reproduced the accepted bytes exactly (`player_stats_1897.csv`
+`79f7c8a2...1ef93`, `player_stats_2025.csv` `704f8e87...c535e29`), so the full
+acquisition proceeded.
+
+Comparison against the **existing tracked manifest**:
+
+| Check | Result |
+|---|---|
+| Filenames | **131/131 present; zero missing, zero extra** |
+| Row counts | **131/131 identical; 719,042/719,042 total rows** |
+| Column lists | **131/131 identical** |
+| Seasons | **129/129, 1897–2025, exact** |
+| SHA-256 | **130/131 match — `player_details.csv` DIFFERS** |
+
+```text
+player_details.csv
+  accepted   215d66f72a8aa032a615ffd4b43429e18c6c42d8cdbfae67f8833d87bef51461
+  reacquired 62171adf0dba3914afe8e6dbd7a0aa4720a8cd8dec86e10f91b8ab899c1e4a91
+  row_count  16731 accepted / 16731 reacquired (identical)
+  columns    identical
+```
+
+The mismatch propagates to the acceptance binding in
+`data/reference/fitzroy-accepted-baselines.json`:
+
+```text
+raw_artefacts.artefact_set_sha256
+  pinned / recomputed from the tracked manifest  8e14ce6198685b9fec568ab3c680cab34783e8e202ab0c7e93f45773d96f4125
+  recomputed from the reacquired set             15ba5dc624535d95fd1661c7c5e757ae4fc2d31782a2c0b1414e19358580dd6c
+```
+
+`import_fitzroy_core.py` re-verifies every artefact SHA-256 against the
+acquisition manifest (`:938-941`) and re-checks both the manifest hash and the
+artefact-set digest (`:552-560`), so the rebuild's fitzRoy PRECHECK would refuse
+these bytes. **This is not local nondeterminism:** `player_details` was acquired
+a second time and the two independent acquisitions today are byte-identical to
+each other (`62171adf...`), so AFL Tables player-detail content changed upstream
+between the accepted extraction (2026-08-27T01:54:19Z) and 2026-09-02. The exact
+changed field cannot be identified, because the accepted bytes no longer exist
+anywhere reachable to diff against.
+
+**Every measured drift gate still reproduces exactly.** Independent offline
+validation of the reacquired set against its own staging manifest
+(`import_fitzroy_core.py --validate-only --require-full-history`, no database
+access, 19.4 s) **PASSED**: matches 16,838 · matches_with_player_rows 16,838 ·
+attendance_known 15,187 · players 13,275 · players_with_dob 855 ·
+players_with_dob_conflict 0 · player_match_rows 685,471 · venues 52 ·
+club_identities 24 · brownlow_round_vote_rows 320,861 · seasons 1897–2025 ·
+identity scan rows 685,473 / missing_id 83 / missing_url 0 / malformed_url 0 /
+distinct_ids 13,270 / distinct_urls 13,275 — identical to every figure the
+accepted-baselines register records. The reacquired set is a **valid
+full-history acquisition that is semantically identical on every measured
+gate**; it is simply **not the accepted byte set**.
+
+### 28.2 DraftGuru `annual-html-20260826` — cannot be reproduced at all
+
+The pinned adapter `tools/rebuild/draftguru/acquire_draft.py` was used with the
+accepted label, a staging `--snapshot-root` and a staging `--manifest-dir`.
+robots.txt was fetched and honoured. A bounded two-year probe (1981 and 2025 —
+the oldest accepted year and the most volatile) ran **before** any full 42-year
+fetch, and both failed immediately:
+
+```text
+year_1981.html  accepted   6fd27830801a89193fdb6b58a386a0317df824f61d3f7837afeb511aa22f1f31  28,979 bytes
+                reacquired bb172090db14bbc54e70e9440cc937a7d9eb8ea7d5df7d36ca23dc90263bf746  28,979 bytes
+year_2025.html  accepted   c9dc2a0965bd892ac8e38755f11f49809b09b7d69aecba19e9d091809625d657  165,551 bytes
+                reacquired 8876fae537b966862761014277a310a1b9fa2e2916a216599c39447ca196f439  165,568 bytes (+17)
+```
+
+The remaining 40 years were **not fetched**: `import_draftguru.verify_raw_bytes`
+requires *every* raw page to match the manifest SHA-256, so two failures out of
+two already decide the gate, and fetching 40 further pages from the source would
+add nothing.
+
+Cause, measured rather than assumed:
+
+* The 1981 page is the **same length** with a different hash. The pages are
+  Rails-rendered and carry a per-render `csrf-token` meta value; with that one
+  value normalised, the page hashes stably. The accepted token was minted on
+  2026-08-26 and is unrecoverable, so the accepted bytes are **not reproducible
+  by any refetch**, independently of whether the data changed.
+* The 2025 page is additionally **17 bytes longer** — real upstream content
+  drift as well.
+* Two consecutive fetches of the 1981 page today are byte-identical
+  (`bb172090...`, zero differing bytes), so the site currently serves a cached
+  render; today's bytes are stable, but they are not the accepted bytes.
+
+**The parsed content, however, is unchanged.** Re-parsing the reacquired pages
+with the tested `parse_draft_snapshot` parser reproduces the accepted per-year
+figures exactly: 1981 **24/24 rows**, 2025 **142/142 rows**, and both years'
+`schema_fingerprint` values match the manifest (`170485f6...b6d4c5`,
+`429645c7...67e5b2e`). The obstacle is the raw-byte acceptance contract, not the
+data.
+
+### 28.3 What was not done, and why
+
+Per the operator's instruction 7, the pass stopped at the first recorded
+difference for each snapshot:
+
+* **no bytes were installed** at either worktree path — a partial install would
+  create a directory that fails verification and could later be mistaken for the
+  accepted snapshot;
+* **no tracked acceptance manifest was written, regenerated or edited**, and no
+  entry in `data/reference/fitzroy-accepted-baselines.json` was touched;
+* **`npm run db:test:rebuild` was not run**, and therefore none of the
+  post-rebuild awards/honours assertions, the PlayerResolver / wrong-link audit,
+  `awards-reload-links.test.ts`, `db-test-rebuild.test.ts`, `privileges.test.ts`,
+  the ISSUE-111 Coleman regression, `npx tsc --noEmit` or `git diff --check`
+  were executed in this pass;
+* no database, DSN or SSH tunnel was used; `AFLDB_LEGACY_SQLITE` stayed unset;
+  no production system was contacted; the streamanator checkout and
+  `D:\dev\afldb` were not modified.
+
+The verified staging trees still exist for the operator's inspection under the
+session scratchpad (`stage-fitzroy/.../full-history-20260827`, 131 files,
+719,042 rows, 130 accepted hashes; `stage-dg/.../annual-html-20260826/raw/years`,
+2 pages). **They are session-temporary and are not repository state.**
+
+### 28.4 Gate state and exact next action
+
+G1/G2/G3/G4/G5/G7/G8 remain PASS. **G6 remains BLOCKED**, now for a materially
+different and better-evidenced reason than in §25.4/§27: it is no longer "the
+bytes are missing and reacquisition is untried", it is **"the accepted byte sets
+are unreproducible from their own pinned sources"** — permanently for DraftGuru
+(unrecoverable per-render CSRF token), and for one of 131 fitzRoy artefacts
+(upstream `player_details` drift since 2026-08-27).
+
+Exactly one of the following operator decisions unblocks G6. Both are outside
+this pass's authorisation and neither may be taken by Claude:
+
+1. **Restore the true accepted bytes** from an off-machine retained copy, if one
+   exists (both source directories under `D:\dev\afldb` are empty and
+   `D:\backups` holds no DraftGuru or fitzRoy core artefacts). This is the only
+   route that keeps the current acceptance baselines untouched.
+2. **Deliberately re-accept new snapshots** under the acquisition contracts' own
+   immutability rules — a **new label** for each source, a new acquisition
+   manifest, `import_fitzroy_core.py --validate-only --require-full-history`
+   plus a new accepted-baselines entry (retiring `full-history-20260827` under
+   the register's `retired_statuses` policy), and a complete validated 42-year
+   DraftGuru run whose parity and identity gates re-prove the 6,810-row /
+   5,057-person baseline. This **moves the acceptance baseline** and is a
+   deliberate, reviewable operator decision, not a restoration. Pass 19's
+   evidence is favourable to it — every measured fitzRoy drift gate and both
+   probed DraftGuru years reproduce exactly — but the decision, the review and
+   the ISSUE-093 acceptance record are the operator's.
+
+**DECISION TAKEN 2026-09-02: the operator chose route 2. See §29 — both new
+snapshots are accepted, with zero semantic difference, and G6's input blocker is
+cleared.**
+
+ISSUE-112 stays **OPEN**. ISSUE-102 stays **OPEN**; its next action is unchanged
+— it cannot close until ISSUE-112 does.
+
+---
+
+## 29. Pass 20 — 2026-09-02: operator-authorised route 2 — BOTH SNAPSHOTS RE-ACCEPTED UNDER NEW LABELS
+
+The operator chose **§28.4 route 2**: deliberately move both acceptance
+baselines rather than keep waiting for byte sets that Pass 19 proved
+unreproducible. Two new snapshots were accepted under the repository's own
+ISSUE-093 procedures, with every historical record preserved.
+
+**Result: both new snapshots PASS every gate with ZERO semantic difference from
+their predecessors. G6's input blocker is cleared. The canonical rebuild was NOT
+run — the operator stopped the pass at this checkpoint.**
+
+### 29.1 fitzRoy `full-history-20260902` — promoted, not reacquired
+
+fitzRoy was **not** contacted. The Pass 19 staging bytes the operator preserved
+at `D:\backups\afldb\issue-112-staging-20260902\stage-fitzroy\...\full-history-20260827`
+were promoted into a new label:
+
+| Step | Result |
+|---|---|
+| Copy 131 artefacts → `data/sources/afltables/fitzroy_core/full-history-20260902` | 131 files, byte-exact against the staging manifest (0 mismatches, 0 extra) |
+| Manifest relabel | `docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json`, 234,809 bytes — the adapter's own Pass 19 output with **exactly two byte ranges changed** (`snapshot_label`, `working_directory`), then CRLF→LF normalised (§29.7). No filename, hash, row count, column list or observation altered. |
+| `import_fitzroy_core.py --label full-history-20260902 --validate-only --require-full-history` | **PASSED**, exit 0, 19.7 s, no database access |
+| `import_fitzroy_core.py --label full-history-20260902 --validate-only --require-accepted-baseline` | **PASSED**, exit 0, 19.4 s, after the register entry was written |
+
+The full-history verdict was earned **before** any acceptance record for the
+label existed, so the acceptance could not have blessed it.
+
+```text
+manifest_sha256       2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+artefact_set_sha256   15ba5dc624535d95fd1661c7c5e757ae4fc2d31782a2c0b1414e19358580dd6c
+raw_artefacts         131          acquired_rows   719042      contract_version   1
+extraction (unchanged) 2026-09-02T01:00:04Z, acquire_core.R, fitzRoy 1.8.0 pinned == installed
+```
+
+**Measured semantic baseline — every figure unchanged from
+`full-history-20260827`:**
+
+```text
+matches 16838 · matches_with_player_rows 16838 · attendance_known 15187
+players 13275 · players_with_dob 855 · players_with_dob_conflict 0
+player_match_rows 685471 · venues 52 · club_identities 24
+brownlow_round_vote_rows 320861 · seasons 1897-2025
+identity 685473 rows / missing_id 83 / missing_url 0 / malformed_url 0
+         distinct_ids 13270 / distinct_urls 13275
+```
+
+The only difference from the retired baseline is the single artefact Pass 19
+identified: `player_details.csv` `215d66f7…` → `62171adf…`, same 16,731 rows,
+identical columns. That one artefact is why the manifest hash and artefact-set
+digest differ, and therefore why this is a new baseline at all.
+
+### 29.2 DraftGuru `annual-html-20260902` — complete 42-year acquisition
+
+The pinned adapter `tools/rebuild/draftguru/acquire_draft.py` was run with the
+new label, tracked snapshot root and tracked manifest dir. **The full 42-year
+set was fetched — not a probe.** robots.txt was refetched and honoured
+(`d3bdd069…`, identical to the accepted hash). All 42 pages returned HTTP 200.
+
+The adapter writes its manifest **last, and only if parse + identity validation
++ Trade profiling + CSV parity all pass**, so a manifest existing at
+`docs/rebuild-manifests/draftguru/annual-html-20260902.json` *is* the acceptance:
+
+```text
+total_rows 6810 · distinct_player_url_count 5057 · parity PASS
+identity_validation  baseline_total_rows 6810 · baseline_distinct_persons 5057 · baseline_drift null
+extraction  2026-09-02T01:24:12Z -> 2026-09-02T01:25:18Z
+manifest_sha256  e7e471b9b19bb325a1362abdc9957c3bb2611c06e75a9864426ae72d64c9f024  (29,375 bytes)
+raw-page set digest  3e53d256b9624ae2b12adca45ec0c0a1787aecf989fbad741c8fe5f8a82d3ac3
+```
+
+`--accept-baseline-drift` was **not** used and was not needed.
+
+**The CSV parity oracle was found.** Pass 19 recorded that `D:\dev\afldb` held
+no DraftGuru artefacts; that was true of the *annual-HTML* directory but not of
+the frozen browser-export oracle. All 42 CSVs of `full-history-20260826` are
+present in the main checkout and were copied read-only into this worktree at
+`data/sources/draftguru/full-history-20260826` (gitignored). Without them
+`run_parity` cannot execute at all, so the complete acquisition would have been
+impossible. `D:\dev\afldb` was read from and **not modified**.
+
+**Manifest-level comparison against accepted `annual-html-20260826` — every
+field outside the render/label/timestamp set is byte-identical:**
+
+| Check | Result |
+|---|---|
+| Manifest key set | identical |
+| Semantic diffs (all keys except `snapshot_label`, `working_directory`, `extraction_*`, `source_urls`) | **none — zero** |
+| `total_rows` / `distinct_player_url_count` | 6810 / 5057 — identical |
+| `parity.corpus_checks` event totals, special-pick labels, `blank_selection_numbers` 1686 | identical |
+| `schema_variants` (3) and their fingerprints | identical |
+| `trade_column_profile`, `robots_txt_sha256`, `identity_complete`, `import_capable` | identical |
+| Per-year `parsed_row_count` (42 years, 6,810 rows) | **42/42 identical** |
+| Per-year `schema_fingerprint` | **42/42 identical** |
+| Per-year `http_status` / `final_url` | 42/42 identical |
+| Raw page SHA-256 | **42/42 differ — expected and accepted as raw-render drift** |
+
+**Two measured causes of the raw-byte difference, both render-layer only:**
+
+1. **Per-render Rails `csrf-token`** (Pass 19 §28.2) — every page carries one,
+   so every page hashes differently on every render. Unreproducible by design.
+2. **Response `Content-Type` header** — 13 pages (1981, 1982, 1986, 1991, 1992,
+   1996–1999, 2001–2004) now return `text/html` where the accepted snapshot
+   recorded `text/html; charset=utf-8`. This accounts for the entire 195-byte
+   manifest size difference and nothing else.
+
+Twelve pages also differ in byte length (−2 to +18; 2024 +18, 2025 +17 —
+the +17 Pass 19 already measured). **No parsed value moved**: identical row
+counts, identical schema fingerprints, identical event and special-pick totals,
+and a clean parity PASS against the frozen CSV oracle. No parsed-data or schema
+validation was weakened, relaxed or bypassed anywhere in this pass.
+
+### 29.3 Acceptance-register changes
+
+**fitzRoy — `data/reference/fitzroy-accepted-baselines.json`** now holds two
+entries under the unchanged `exactly_one_accepted` policy:
+
+* `full-history-20260827` → `acceptance_status: "retired"` (the *only* correct
+  superseded value per the register's own `retired_statuses` policy), plus
+  `retired_on`, `superseded_by` and a `retirement` block that records, in the
+  register itself, that the baseline is **historical but superseded because its
+  accepted raw `player_details.csv` bytes are unavailable and upstream content
+  drift prevents byte reproduction**. Every hash, measurement and
+  `accepted_corrections` entry in that record is **untouched** — the retirement
+  added fields and changed one status string, and edited no evidence.
+* `full-history-20260902` → `acceptance_status: "accepted"`, with `supersedes`,
+  its own bindings, its own PASSED verdict, and the measured/identity blocks
+  above. `accepted_corrections` carries forward unchanged.
+
+`docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260827.json` is
+**byte-unchanged** (`a42c6d5faacbcb6f4ce77a93a01f282577797375d14c60ef17f09bff2ab21d09`,
+still the value pinned in the retired entry).
+
+**DraftGuru has no separate acceptance register** — unlike fitzRoy, its accepted
+Stage A snapshot is expressed by the presence of a validated manifest plus the
+label pins listed in §29.5. `docs/rebuild-manifests/draftguru/annual-html-20260826.json`
+is preserved byte-unchanged (`d06bf6be358663ad3c44a56066c9096fbc4bdf4760349ed181a642476d374652`)
+and is recorded here as **historical/superseded: its accepted raw HTML bytes are
+unavailable, and its render-specific CSRF bytes cannot be reproduced by any
+refetch.** `csv-export-20260826.json` and `person-html-20260826.json` are also
+untouched. No historical manifest was rewritten, renamed or deleted.
+
+### 29.4 `ladder-20260828` — unchanged and still valid
+
+Not touched by this pass. Re-verified offline after the register change:
+
+```text
+validate_ladder_witness.py --label ladder-20260828   ->  All checks passed (exit 0)
+manifest sha256  604a8a162543e19060f426bd189222d32d07726a0b134bdf4f910175cb7a8d3f
+129 season files · 1,622 rows · 1897-2025 · all identity resolutions inside their own era
+```
+
+Its "no season later than the accepted last season" check reads the acceptance
+register, so this run also proves the register edit left the witness binding
+intact.
+
+### 29.5 G6 references — updated
+
+The three snapshot paths G6 now consumes:
+
+```text
+data/sources/afltables/fitzroy_core/full-history-20260902     131 files
+data/sources/afltables/fitzroy_core/ladder-20260828           129 files
+data/sources/draftguru/annual-html-20260902                    90 files (42 raw + 42 http + 4 parsed + 2 robots)
+```
+
+The **fitzRoy label is resolved from the register**, so
+`--fitzroy-label full-history-20260827` is now *refused* and no flag is needed.
+The **DraftGuru label is a CLI default, not a register lookup**, so it must be
+passed explicitly until the defaults are repointed. **CORRECTION - §31.3
+supersedes this sentence: passing `--draftguru-label` does NOT work, because the
+flag never reaches the DraftGuru preflight, which validates a hardcoded label.
+The rebuild refuses before any destructive stage until that is fixed.** The G6
+command in §24.8 item 1 and §25.5 item 2 is superseded by:
+
+```bash
+npm run db:test:rebuild -- --draftguru-label annual-html-20260902 \
+  --acknowledge-destroy afldb_test
+```
+
+**Four code/reference pins still name the retired DraftGuru label.** They are
+defaults and provenance records, not blockers, and were deliberately left
+unchanged: `tools/rebuild/draftguru/import_draftguru.py:68` (`STAGE_A_LABEL`,
+overridable by `--label`), `tools/db/rebuild-test.ts:1268` (`draftguruLabel`
+default, overridable by `--draftguru-label`),
+`data/reference/draftguru-event-kinds.json` `stage_a_snapshot` (the *provenance*
+of measurements taken on that snapshot — changing it would falsify them), and
+`draftguru-contract.json` `club_resolution.measured.$comment` (same reason).
+
+### 29.6 Five test assertions now fail — a direct, expected consequence
+
+The accepted-baseline move breaks five assertions that pin the register's
+contents. Measured, not predicted — `npx vitest run tests/db-test-rebuild.test.ts
+tests/season-rollover.test.ts` → **5 failed / 349 passed**:
+
+```text
+tests/db-test-rebuild.test.ts:239  accepts exactly full-history-20260827 from the REAL tracked register
+tests/db-test-rebuild.test.ts:420  accepts exactly one baseline, and it is full-history-20260827
+tests/db-test-rebuild.test.ts:428  binds acceptance to the acquisition manifest bytes
+tests/db-test-rebuild.test.ts:433  binds acceptance to the raw artefact hash set
+tests/season-rollover.test.ts:1294 declaring the vocabulary changed nothing else in the real register
+                                   (expects register.baselines to have length 1; it now has 2)
+```
+
+Every failure is the test correctly reporting that the accepted baseline moved.
+Repointing them to `full-history-20260902` / `2bd66e3d…` / `15ba5dc6…` and to a
+two-entry register keeps each assertion's force intact, but it is an edit to
+tracked regression coverage and was **not** made without the operator's word.
+G6 cannot be declared closed while they are red.
+
+### 29.7 A CRLF hazard caught before it was committed
+
+`acquire_core.R` writes its manifest with **CRLF** on Windows. `.gitattributes`
+pins `docs/rebuild-manifests/**` to `text eol=lf` for exactly one reason
+(AFLDB-ISSUE-108): `manifest_sha256` binds the manifest **file bytes**, so a
+CRLF manifest is silently rewritten on checkout and the binding breaks on one
+platform only. The relabelled manifest was therefore **normalised CRLF→LF before
+the register was pinned**:
+
+```text
+246,650 bytes CRLF  ->  234,809 bytes LF
+sha256  5abce316cde98df36e027a1db61e1f934a09059df03c32f5e139542f575361be   (CRLF, never pinned)
+        2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1   (LF, the accepted value)
+```
+
+`--require-accepted-baseline` was re-run after the normalisation and passed.
+`git check-attr text eol` confirms the new file resolves to `text: set` /
+`eol: lf`, so its checked-out bytes will not move. The DraftGuru manifest is
+written by Python and was already LF. **This is the exact ISSUE-108 defect, and
+it was caught before any commit, not after.**
+
+### 29.8 What was not done
+
+* **`npm run db:test:rebuild` was NOT run** — the operator stopped the pass at
+  this checkpoint. No awards/honours assertions, no PlayerResolver audit, no
+  `awards-reload-links.test.ts`, no `privileges.test.ts`, no ISSUE-111 Coleman
+  regression, no `npx tsc --noEmit`, no `git diff --check`.
+* No database, DSN or SSH tunnel; `AFLDB_LEGACY_SQLITE` stayed unset.
+* No production contact. `streamanator` not modified. `D:\dev\afldb` read only.
+* No Git command beyond `git status --short`. Nothing committed.
+* No test file, importer, orchestrator or contract was edited.
+
+### 29.9 Gate state and exact next action
+
+G1/G2/G3/G4/G5/G7/G8 remain PASS. **G6's input blocker is CLEARED** — all three
+snapshot directories now exist, are validated, and are bound to tracked
+acceptance records. G6 itself is **not yet met**: the canonical rebuild has not
+been run, and §29.6's five assertions are red.
+
+1. **Operator decides the five test pins** (§29.6): repoint them to the new
+   accepted baseline, or state a different intent.
+2. Then run the §29.5 rebuild command and confirm Stage 8 and the Stage-12
+   gates. That closes **G6**.
+3. Blocker 2 (§24.6 — 18 players / 33 manifest rows with no rebuild-stable
+   identity) is unchanged and still needs an operator decision.
+4. Resolve ISSUE-112 only after G6 is evidenced. ISSUE-102 closes after 111 +
+   112; do not close it in the same step without a separate explicit request.
+
+ISSUE-112 stays **OPEN**.
+
+---
+
+## 30. Pass 21 — 2026-09-02: regression tests repointed to the new baseline — GREEN; G6 rebuild BLOCKED on credential access
+
+**Scope:** the five register-pinned assertions §29.6 identified, then the G6 canonical
+rebuild. The tests are done and green. **The rebuild did not start** — the pass could not
+obtain the test DSNs, for an environment reason, not a data one. **No destructive command
+was issued, `afldb_test` was not touched, and ISSUE-112 stays OPEN.**
+
+### 30.1 The five assertions — repointed, not relaxed
+
+Every change pins the *new* accepted baseline exactly, and each one gained coverage rather
+than losing it. Nothing was replaced with a loose or existence-only check.
+
+| Was | Now |
+|---|---|
+| `db-test-rebuild.test.ts:239` — real register resolves to `full-history-20260827` | resolves to `full-history-20260902`, **plus** an explicit `not.toBe` on the retired label, **plus** a new test proving `--fitzroy-label full-history-20260827` is now REFUSED by name |
+| `:420` — `accepted` has length 1 and is `full-history-20260827` | `baselines` has length **2**, `accepted` still has length **1** and is `full-history-20260902`, `exactly_one_accepted` still asserted, snapshot_dir repointed; **plus** a new test that the retired entry is still present, carries `superseded_by`/`supersedes`, sits in the declared `retired_statuses` vocabulary, and still holds **its own** untouched `a42c6d5f…` / `8e14ce61…` bindings — so the retirement provably edited no evidence — and that the successor's `measured` and `identity_scan` gates equal the predecessor's value-for-value |
+| `:428` — manifest-bytes binding | same derived-hash assertion against the accepted manifest, **plus** a literal pin on `2bd66e3d…`, **plus** `manifest_path`, **plus** `not.toBe(retiredManifestLfSha)` |
+| `:433` — artefact-set binding | same derived-digest assertion, **plus** a literal pin on `15ba5dc6…`, file_count 131 and total_rows 719,042 kept, **plus** an assertion that it differs from the retired set (the one `player_details.csv` artefact that makes this a separate acceptance) |
+| `season-rollover.test.ts:1294` — register has 1 baseline, accepted is `full-history-20260827` | register has 2 in the order `['retired','accepted']`, accepted is `full-history-20260902` with literal `2bd66e3d…` / `15ba5dc6…`; the retired entry is separately asserted to keep `full-history-20260827`, `superseded_by`, and its own `a42c6d5f…` / `8e14ce61…`; its status is asserted to be in the declared vocabulary |
+
+Two supporting changes were required for those assertions to keep their force:
+
+* The `accepted canonical baseline` describe block's shared `MANIFEST_PATH` still pointed at
+  `full-history-20260827.json`. Left alone, `:428`/`:433` and the two tamper-detection tests
+  would have been comparing the accepted record against the **retired** artefact — passing
+  while proving nothing. It now points at `full-history-20260902.json`, and a parallel
+  `RETIRED_MANIFEST_PATH` / `retiredManifest*` set was added so the retired evidence stays
+  under test. The LF-normalising hash helper was generalised to a `lfSha(bytes)` function
+  used by both.
+* `keeps the acquisition manifest inert and unchanged` → `keeps both acquisition manifests
+  inert and unchanged`. It still asserts the retired manifest's historically-wrong
+  self-declaration (`full_history: true`, `completeness: "full_history"`, label,
+  `2026-08-27T01:54:19Z`) byte-for-byte, and now **also** asserts the accepted manifest's
+  opposite self-declaration (`full_history: false`, `completeness: "unvalidated"`, label,
+  `2026-09-02T01:00:04Z`). That strengthens the inert-field rule: a manifest claiming
+  `false` did not block an acceptance any more than one claiming `true` granted one.
+
+Only the `measured` / `identity_scan` equality check needed care: both entries carry a
+prose `$comment` that legitimately differs, so the comparison strips `$comment` and then
+asserts the remaining key counts (12 and 6) so the strip cannot hide a dropped gate.
+
+### 30.2 Test results
+
+```text
+npx vitest run tests/db-test-rebuild.test.ts tests/season-rollover.test.ts
+  2 files passed · 356 passed / 0 failed        (was 5 failed / 349 passed; +2 new tests)
+npx vitest run tests/fitzroy-core-import.test.ts
+  1 file passed · 82 passed / 5 skipped / 0 failed
+npx vitest run --exclude tests/integration/** --exclude tests/nl-ui/**
+  82 files passed · 2,641 passed / 13 skipped / 0 failed · 59.3 s
+npx tsc --noEmit    clean
+git diff --check    clean (exit 0)
+```
+
+The full DB-free sweep is the proof that no other suite pinned the retired baseline.
+
+### 30.3 The rebuild blocker — exact, and not a data problem
+
+The rebuild needs three things. Two are satisfied; one is not.
+
+| Requirement | State |
+|---|---|
+| `AFLDB_PYTHON` — a worktree has no `.venv`, and `resolvePython()` refuses to search outward | **Available.** `C:\Users\stuar\AppData\Local\Programs\Python\Python312\python.exe`, `psycopg` 3.3.5 present |
+| Ephemeral SSH local port-forward to dev PostgreSQL | **Proven working this pass.** `arm@10.0.40.100:5432 -> 127.0.0.1:5435`, key `~/.ssh/afldb_dev`, `-M -S` control socket, opened, verified (`Master running`, port reachable) and **torn down**. One gotcha recorded: the control-socket path must be short — a scratchpad path exceeds the 108-byte Unix-socket limit and fails with `unix_listener: path ... too long`; `/tmp/afldb-t1` works |
+| `AFLDB_TEST_DATABASE_URL` + `AFLDB_TEST_IMPORT_DATABASE_URL` | **NOT OBTAINABLE BY CLAUDE IN THIS SESSION.** |
+
+`resolveTarget()` refuses without both DSNs, so nothing ran. The proven pattern (§17.1,
+§26.1) sources the owner DSN from the streamanator checkout's `.env` and derives the
+restricted one in memory from `AFLDB_IMPORT_DATABASE_URL`. **The session's command
+classifier denied every attempt to read that file** — both `ls -a ~/streamanator` and a
+`grep` over its `.env` were refused with *"Blocked by classifier"*. Plain SSH
+(`echo`/`hostname`/`ls ~`) and the port-forward itself were allowed; it is specifically
+reading the remote checkout and its credentials that is denied.
+
+`D:\dev\afldb\.env` exists and may hold the same values, but it was **deliberately not
+read**: the standing prohibition in the ISSUE-102 handoff forbids accessing that checkout,
+and switching to it after a classifier denial would be routing around a security control
+rather than satisfying it. That is the operator's decision to make, not Claude's.
+
+**Nothing was guessed, probed or substituted. No DSN was constructed, printed or
+persisted. No destructive command was issued. `afldb_test` is untouched and
+`AFLDB_LEGACY_SQLITE` stayed unset throughout.**
+
+### 30.4 Exact next action — one unblock, then the rebuild
+
+The operator picks either route:
+
+1. **Grant the permission** — add a Bash rule allowing `ssh` remote commands to
+   `arm@10.0.40.100`, or state explicitly that reading `D:\dev\afldb\.env` is
+   authorised for this pass. Claude then runs §30.5 unattended.
+2. **Run it directly.** In the Claude Code prompt, `!` runs a command in-session so the
+   output lands here. The exact sequence is §30.5.
+
+### 30.5 The exact rebuild sequence
+
+```bash
+SOCK=/tmp/afldb-g6
+ssh -o ExitOnForwardFailure=yes -i ~/.ssh/afldb_dev -M -S "$SOCK" -f -N \
+    -L 127.0.0.1:5435:127.0.0.1:5432 arm@10.0.40.100
+
+# owner DSN from the streamanator .env, host rewritten to the tunnel; restricted DSN
+# derived in memory by changing ONLY the database name. Never echoed, never written.
+export AFLDB_TEST_DATABASE_URL='<afldb_test @ 127.0.0.1:5435 as afldb_owner>'
+export AFLDB_TEST_IMPORT_DATABASE_URL='<afldb_test @ 127.0.0.1:5435 as afldb_import>'
+unset AFLDB_LEGACY_SQLITE
+export AFLDB_PYTHON='C:\Users\stuar\AppData\Local\Programs\Python\Python312\python.exe'
+
+# prove both DSNs BEFORE the destructive run
+python -c "import psycopg,os;[print(d, psycopg.connect(os.environ[d]).execute('select current_database(),current_user').fetchone()) for d in ('AFLDB_TEST_DATABASE_URL','AFLDB_TEST_IMPORT_DATABASE_URL')]"
+# expect: afldb_test/afldb_owner and afldb_test/afldb_import
+
+npm run db:test:rebuild -- --draftguru-label annual-html-20260902 \
+  --acknowledge-destroy afldb_test
+
+ssh -S "$SOCK" -O exit arm@10.0.40.100
+```
+
+`--fitzroy-label` is **not** passed: the fitzRoy source resolves from the acceptance
+register, and naming the retired label is now refused by design (proven by the new test in
+§30.1). Keep the control-socket path short — see §30.3.
+
+### 30.6 Gate state
+
+G1/G2/G3/G4/G5/G7/G8 remain PASS. **G6 remains NOT MET** — its inputs are ready and
+validated (§29), its regression coverage is now correct and green (§30.1–§30.2), and the
+only thing outstanding is credential access to run the rebuild. Blocker 2 (§24.6 — 18
+players / 33 manifest rows with no rebuild-stable identity) is unchanged and still needs an
+operator decision.
+
+**ISSUE-112 stays OPEN. ISSUE-102 stays OPEN** — it cannot close until ISSUE-112 does, and
+its own closure contract is separate.
+
+### 30.7 Files changed this pass
+
+`tests/db-test-rebuild.test.ts`, `tests/season-rollover.test.ts`,
+`issues/open/AFLDB-ISSUE-112.md`, `issues/open/AFLDB-ISSUE-102-HANDOFF.md`, `issues.md`,
+`IssuesIndex.md`. No source, importer, orchestrator, contract or reference document was
+changed. No database contacted, no production contact, no streamanator modification, no
+migration, nothing committed. The only Git commands run were `git status --short` and
+`git diff --check`.
+
+---
+
+## 31. Pass 22 — 2026-09-02: G6 rebuild REFUSED at preflight — `--draftguru-label` is not wired to the DraftGuru preflight
+
+**The credential blocker is gone and the rebuild was launched. It REFUSED before any
+destructive stage, on a real defect in the orchestrator — not on data, not on the new
+snapshots.** `afldb_test` is byte-for-byte as it was. ISSUE-112 stays **OPEN**.
+
+### 31.1 DSN safety proof — PASSED
+
+Under the operator's explicit, file-scoped exception, `D:\dev\afldb\.env` was read
+read-only for its DSNs and nothing else in that checkout was opened or modified.
+
+```text
+AFLDB_TEST_DATABASE_URL          current_database=afldb_test  current_user=afldb_owner   pg=16.15  OK
+AFLDB_TEST_IMPORT_DATABASE_URL   current_database=afldb_test  current_user=afldb_import  pg=16.15  OK
+AFLDB_LEGACY_SQLITE              unset OK
+AFLDB_PYTHON                     C:\Users\stuar\AppData\Local\Programs\Python\Python312\python.exe
+```
+
+`AFLDB_TEST_IMPORT_DATABASE_URL` is **still not configured anywhere** — the same finding as
+passes 7-14 and 17. It was derived in memory from `AFLDB_IMPORT_DATABASE_URL` in the same
+file by changing only the endpoint to the tunnel and the database name `afldb_dev ->
+afldb_test`. Reading that third key was necessary for the documented derivation and is
+recorded here explicitly. No password or complete DSN was printed or written to disk; both
+DSNs existed only in the runner process and its child's environment.
+
+Tunnel: `arm@10.0.40.100:5432 -> 127.0.0.1:5435`, key `~/.ssh/afldb_dev`, `-M -S
+/tmp/afldb-g6`, opened for the run and **torn down** (`-O exit`; port 5435 subsequently
+proved closed, `ConnectionRefusedError`, and zero `:5435` sockets remain).
+
+### 31.2 What the rebuild proved before it refused
+
+The two things this pass most needed to know both came back right:
+
+```text
+AFLDB clean test rebuild (AFLDB-ISSUE-093 §10)
+  target        : afldb_test
+  fitzRoy label : full-history-20260902 (ACCEPTED canonical full-history baseline)
+  draftguru     : annual-html-20260902
+...
+accepted canonical baseline VERIFIED
+  accepted_label       full-history-20260902
+  manifest_sha256      2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+  artefact_set_sha256  15ba5dc624535d95fd1661c7c5e757ae4fc2d31782a2c0b1414e19358580dd6c
+  raw_artefacts 131 · acquired_rows 719042 · contract_version 1
+Validation complete in 20.1s (no database access).
+```
+
+**The register resolved the new baseline automatically with no `--fitzroy-label`**, exactly
+as §29.5 said it would, and the fitzRoy PRECHECK re-derived every full-history gate and
+re-verified all 131 artefact hashes against the live bytes. The Pass 20 acceptance is
+therefore proven end to end by the real orchestrator, not just by a standalone validator.
+
+### 31.3 The refusal, and its cause
+
+```text
+AFLDB DraftGuru import (Stage B2-4/5)
+REFUSED: snapshot directory not found:
+  D:\dev\afldb-issue-102\data\sources\draftguru\annual-html-20260826
+REFUSED: DraftGuru preflight failed (import_draftguru.py --validate-only).
+  Nothing has been destroyed.
+REBUILD EXIT=1
+```
+
+The banner says `draftguru : annual-html-20260902`; the preflight looked for
+`annual-html-20260826`. **`--draftguru-label` never reaches the preflight.**
+
+```text
+tools/db/rebuild-test.ts:686-688   draftguruValidateArgv() takes NO argument and emits
+                                   [python, import_draftguru.py, '--validate-only']
+tools/db/rebuild-test.ts:1236      runPreflight calls draftguruValidateArgv()
+tools/rebuild/draftguru/import_draftguru.py:899
+                                   --label defaults to STAGE_A_LABEL = 'annual-html-20260826'
+tools/db/rebuild-test.ts:458-459   the DATA stage alone passes '--label', opts.draftguruLabel
+```
+
+So the flag reaches the import stage and nothing else. **This is a latent safety defect,
+not merely an inconvenience.** The preflight is the gate that runs *before* the destructive
+stage, and it validates a snapshot chosen by a hardcoded constant while the import stage
+uses the one on the command line. Today the mismatch fails closed only because
+`annual-html-20260826`'s bytes are absent. Had both snapshots been present on disk, the
+rebuild would have **verified one snapshot's hashes and imported a different one** — with
+no warning at all. It has been invisible until now only because the constant happened to
+equal the accepted label.
+
+§29.5's recorded expectation — "the DraftGuru label is a CLI default, so it must be passed
+explicitly until the defaults are repointed" — is therefore **WRONG and is superseded by
+this section**: passing it does not work, and cannot work, for the preflight.
+
+### 31.4 Nothing was destroyed — measured, not assumed
+
+Read-only counts on `afldb_test` after the refusal (owner DSN, `begin transaction read
+only`, rolled back):
+
+```text
+matches 16,838 · players 13,277 · player_match_stats 685,471 · clubs 24 · venues 52
+draft_picks 6,810 · draft_persons 5,057 · award_winners 3,298 · hall_of_fame 343
+honour_team_members 113 · captaincies 1,375 · awards 40 · player_link_resolutions 0
+```
+
+The database is exactly the state Pass 15/17 left it in. The fail-closed preflight worked
+as designed: it refused before RESET_SQL, and said so.
+
+### 31.5 The fix — an operator decision, deliberately not taken here
+
+Two candidate changes. **Neither was made:** each edits the safety-critical preflight of a
+destructive operation, and this pass's authorisation was to *run* the rebuild, not to
+redesign the harness. The runbook's own rule applies — material evidence contradicted the
+plan, so the pass stopped and reported.
+
+1. **Wire the label through (recommended).** Give `draftguruValidateArgv(label: string)` a
+   parameter, pass `opts.draftguruLabel` from `runPreflight`, and thread `opts` into
+   `runPreflight` (it currently receives none). This makes `--draftguru-label` mean what it
+   says and **closes the verify-A-import-B hole permanently**, for every future snapshot.
+   Test impact: `tests/db-test-rebuild.test.ts:990` and `:1382` call
+   `draftguruValidateArgv()` with no argument and would take one; a new assertion that the
+   preflight and the data stage carry the *same* label belongs with them.
+2. **Repoint the constants instead.** Set `import_draftguru.py:68 STAGE_A_LABEL` and
+   `tools/db/rebuild-test.ts:1268 draftguruLabel` to `annual-html-20260902`. Smaller, and
+   it lets the rebuild run with no flag at all — but it leaves the defect in place for the
+   next label change, so it is a workaround, not a fix.
+
+Option 1 then needs no flag change to the recorded command; option 2 makes
+`--draftguru-label` unnecessary. Either way the G6 command stays as recorded in §30.5.
+
+Not in scope for either option, and still deliberately untouched:
+`data/reference/draftguru-event-kinds.json` `stage_a_snapshot` and
+`draftguru-contract.json` `club_resolution.measured.$comment` name the snapshot their
+measurements were taken on, and editing them would falsify that provenance.
+
+### 31.6 Gate state and exact next action
+
+G1/G2/G3/G4/G5/G7/G8 remain PASS. **G6 remains NOT MET.** Its inputs are validated (§29),
+its regression coverage is green (§30), the credential path now works and the fitzRoy half
+of the preflight passed for real (§31.2). The single remaining obstacle is §31.3.
+
+1. **Operator picks fix 1 or fix 2** (§31.5) and authorises the code change.
+2. Re-run the §30.5 sequence. The DSN pattern, the tunnel and `AFLDB_PYTHON` are all proven
+   working this pass and need no rediscovery.
+3. Then the remaining closure gates run, and **G6 closes**.
+4. Blocker 2 (§24.6 — 18 players / 33 manifest rows with no rebuild-stable identity) is
+   unchanged and still needs an operator decision.
+5. Resolve ISSUE-112 only after G6 is evidenced. **ISSUE-102 stays OPEN** regardless; its
+   closure contract is separate and is not satisfied by this work.
+
+### 31.7 Files changed this pass
+
+`issues/open/AFLDB-ISSUE-112.md`, `issues/open/AFLDB-ISSUE-102-HANDOFF.md`, `issues.md`,
+`IssuesIndex.md` — documentation only. **No source, test, contract, manifest or reference
+document was changed in this pass.** No production contact, no streamanator modification,
+no migration, nothing committed. `D:\dev\afldb` was read exactly once, for the two
+DSN values under the operator's explicit exception, and was not modified.
+
+---
+
+## 32. Pass 23 — 2026-09-02: DraftGuru preflight label wired through; **G6 PASS**; ISSUE-112 RESOLVED
+
+**The §31.3 orchestrator defect is fixed, the canonical rebuild ran end to end against
+`afldb_test`, and every ISSUE-112 gate G1–G8 is now evidenced. ISSUE-112 is RESOLVED.**
+At completion of this pass, `AFLDB-ISSUE-102` stayed Open because its separate closure
+verification had not yet run. That verification subsequently passed later on 2026-09-02;
+ISSUE-102 is now Resolved (see `issues/closed/AFLDB-ISSUE-102.md` §8.4).
+
+### 32.1 The fix — preflight and data stage now share one label selection
+
+Fix 1 of §31.5 was implemented (parameterise the preflight), **not** fix 2 (repointing the
+constant). Repointing `STAGE_A_LABEL` would have made this rebuild work and left the same
+hole for the next baseline move.
+
+`tools/db/rebuild-test.ts`:
+
+* `DRAFTGURU_IMPORTER` — the importer path, named once instead of written out twice.
+* `draftguruImportArgv(label, python?)` — the DraftGuru **data-stage** argv. `planStages()`
+  now builds the `draftguru` stage from it, threading in the graph's single `python`
+  resolution so the "one resolution for the whole graph" invariant is unchanged.
+* `draftguruValidateArgv(label, python?)` — the **preflight** argv, built as
+  `[...draftguruImportArgv(label, python), '--validate-only']`. The preflight argv is now
+  *derived from* the data-stage argv rather than written independently, so the two are
+  structurally incapable of naming different snapshots.
+* `runPreflight(deps, opts, source?)` — takes the same `Options` object `planStages()`
+  builds the data stages from, and validates `opts.draftguruLabel`. The refusal message
+  now names the label it proved.
+* `DEFAULT_DRAFTGURU_LABEL` — the runner's single default, exported so the tests pin it.
+  It is still `annual-html-20260826`; the default was deliberately **not** moved, because
+  the runner now always passes `--label` explicitly to both sides and the G6 command names
+  the label anyway. `import_draftguru.py`'s own `STAGE_A_LABEL` is untouched and is no
+  longer relied on by the rebuild.
+
+No Python was changed. `import_draftguru.py --label` already drove both
+`verify_stage_a_manifest()` and `resolve_snapshot_dir()`; it was simply never given one.
+
+### 32.2 Tests — six new contract assertions, nothing weakened
+
+New `describe` block in `tests/db-test-rebuild.test.ts`, "DraftGuru preflight validates the
+label the data stage will import". Every case runs a real `runPreflight()` and inspects the
+argv it actually emitted:
+
+1. `--draftguru-label annual-html-20260902` reaches the preflight validator — argv carries
+   `--validate-only`, `--label`, and that exact label; and is explicitly **not** the old
+   label-less form that let the importer fall back to `STAGE_A_LABEL`.
+2. The data stage receives the same label (stage argv and stage name both).
+3. Label equality is contractual for *any* label — asserted over three labels, including
+   one that exists nowhere, proving the property is structural rather than a coincidence of
+   the two current values. `draftguruImportArgv(l) === stage.argv` and
+   `preflightArgv === [...stage.argv, '--validate-only']`.
+4. Default-label behaviour with no override: `parseArgs([])` yields
+   `DEFAULT_DRAFTGURU_LABEL`, and both sides receive it.
+5. Destructive RESET cannot precede successful validation of the **selected** snapshot: when
+   the selected label's validator refuses, `runPreflight` throws `RebuildRefused`, the
+   refusal names the label, no SQL runs at all, and the runner source still sequences
+   `runPreflight(deps, opts, fitzroy)` before both `assertDestructiveAcknowledgement` and
+   `executeRebuild(`.
+
+The retired-fitzRoy-label refusal (§30.1) and every accepted-baseline hash assertion are
+untouched and still green. The existing preflight ordering assertion was repointed to the
+new call shape only.
+
+### 32.3 Pre-rebuild validation
+
+```text
+tests/db-test-rebuild.test.ts                     230 passed / 0 failed
+tests/season-rollover.test.ts                     131 passed / 0 failed
+draftguru-import + draftguru-acquisition
+  + fitzroy-core-import + fitzroy-acquisition      255 passed / 13 skipped / 0 failed
+full DB-free sweep                               2,646 passed / 13 skipped / 0 failed
+npx tsc --noEmit                                 clean
+git diff --check                                 clean
+```
+
+The DB-free sweep is +5 tests on Pass 21's 2,641, which is exactly the new block.
+
+### 32.4 DSN safety proof — PASSED
+
+Under the operator's file-scoped exception, `D:\dev\afldb\.env` was read read-only for DSNs
+and nothing else in that checkout was opened or modified.
+
+```text
+AFLDB_TEST_DATABASE_URL          current_database=afldb_test  current_user=afldb_owner   pg=16.15  OK
+AFLDB_TEST_IMPORT_DATABASE_URL   current_database=afldb_test  current_user=afldb_import  pg=16.15  OK
+AFLDB_AUTH_DATABASE_URL          current_database=afldb_test  current_user=afldb_auth    (derived, §32.7)
+AFLDB_LEGACY_SQLITE              unset OK
+AFLDB_PYTHON                     C:\Users\stuar\AppData\Local\Programs\Python\Python312\python.exe
+psycopg                          3.3.5
+```
+
+`AFLDB_TEST_IMPORT_DATABASE_URL` is still not configured anywhere; it was derived in memory
+from `AFLDB_IMPORT_DATABASE_URL` by changing only the endpoint to the tunnel and the
+database name `afldb_dev -> afldb_test`, as in Pass 22. No password or complete DSN was
+printed or written to disk; the derived values lived in one scratchpad file that was deleted
+at teardown.
+
+Tunnel: `arm@10.0.40.100:5432 -> 127.0.0.1:5435`, key `~/.ssh/afldb_dev`, opened for the run
+and **torn down** — port 5435 subsequently proved closed with zero `:5435` listeners.
+
+**Two environment findings, neither a repository defect:**
+
+* `~/.ssh/config`'s `Host dev / streamanator` block names `IdentityFile ~/.ssh/id_ed25519`
+  under a global `IdentitiesOnly yes`, and streamanator rejects that key
+  (`Permission denied (publickey,password)`). The key it accepts is `~/.ssh/afldb_dev`.
+  The config block is stale; it is in the operator's home directory, not this repository,
+  and was **not** modified.
+* `psql` is not on `PATH` in this shell. It is installed at
+  `C:\Program Files\PostgreSQL\16\bin` (psql 16.15). The first rebuild attempt refused at
+  DATABASE RESET with `Could not run 'psql': spawnSync psql ENOENT ... Nothing has been
+  executed.` — the fail-closed path working exactly as designed, with nothing destroyed.
+  Adding that directory to `PATH` for the run was sufficient; no code was changed.
+
+### 32.5 The canonical rebuild — G6 PASS
+
+```bash
+npm run db:test:rebuild -- --draftguru-label annual-html-20260902 \
+  --acknowledge-destroy afldb_test
+```
+
+No `--fitzroy-label`. The register resolved `full-history-20260902` automatically, as
+designed. `AFLDB_LEGACY_SQLITE` unset throughout. Exit 0.
+
+The preflight now validates the selected DraftGuru snapshot — the defect's direct proof:
+
+```text
+snapshot   : annual-html-20260902 (42 year pages, sha256 verified)
+persons    : 5057
+picks      : 6810
+```
+
+Stage results:
+
+| Stage | Result |
+|---|---|
+| PRECHECK | fitzRoy 131 artefact hashes + full-history gates + accepted-baseline bindings VERIFIED; DraftGuru `annual-html-20260902` validated; ladder witness `ladder-20260828` all checks passed |
+| DATABASE RESET | `afldb_test` cleared |
+| MIGRATIONS | complete tracked set |
+| PRIVILEGES | reconciled from the registries |
+| REFERENCE DATA | 24 stat definitions, 3,120 stat-availability rows, 48 club aliases, 21 club organizations |
+| FITZROY CORE `full-history-20260902` | 52 venues, 13,275 players, 16,838 matches, 134,704 period scores, 685,471 player-match stats, 320,861 Brownlow round votes — 249.7 s |
+| DRAFTGURU `annual-html-20260902` | 5,057 persons, 6,810 picks, 6 ledger decisions, 0 live overrides, 0 bridge entries |
+| AWARDS & HONOURS | all seven families from tracked manifests, no legacy source — 127 s |
+| DERIVED | 130 season_metadata, 16,713 player_clubs, 58,425 club-season stats, 58,176 season stats, 13,275 career stats, 1,622 club_seasons, 13,277 search_rank — 41.9 s |
+| COLEMAN | 46 winners, 46 inserted, 0 updated, 0 deleted |
+| LADDER WITNESS | all checks passed, including the D7 read-only cross-check: every one of 1,622 club-seasons agrees on every compared field |
+| FINAL VALIDATION | **PASSED: 38 checks** |
+
+### 32.6 Awards and honours — every canonical count exact
+
+| Family | Rows | Expected | Linked |
+|---|---|---|---|
+| Honour team members | 113 | 113 | 85 |
+| Hall of Fame | 343 | 343 | 239 |
+| Captaincies | 1,375 | 1,375 | **1,375 (all)** |
+| Rising Star nominations | 766 | 766 | 750 |
+| Rising Star winners | 33 | 33 | 33 |
+| All-Australian | 1,158 | 1,158 | 1,067 |
+| Club best-and-fairest | 752 | 752 | 737 |
+| Named medals | 979 | 979 | 856 |
+| 22 Under 22 | 330 | 330 | 307 |
+| Coleman (ISSUE-111) | 46 | 46 | 46 |
+| Award definitions | 39 | 39 | — |
+
+`award_winners_without_a_source = 0`. `award_winners_after_accepted_last_season = 0`.
+Coleman ownership and ordering are unchanged from ISSUE-111: 46 rows / 46 seasons / first
+season 1980 / 0 unlinked / 0 rows not derived from AFL Tables / 0 rows keyed on a numeric id.
+
+### 32.7 PlayerResolver / wrong-player audit — clean
+
+Read-only, against the rebuilt database:
+
+```text
+award_winners       orphan player_id   0
+award_nominations   orphan player_id   0
+hall_of_fame        orphan player_id   0
+honour_team_members orphan player_id   0
+captaincies         orphan player_id   0
+```
+
+**Zero wrong-player attachments and zero orphan links.** Every non-NULL `player_id` on every
+awards link-target table resolves to a live `players` row. Nothing was resolved by name;
+`confirmed_unlinked` semantics are unchanged.
+
+`tests/integration/awards-reload-links.test.ts` + `tests/integration/privileges.test.ts`
+against the rebuilt database: **141 passed / 0 skipped / 0 failed**. G3, G5 and G8 re-proved
+post-rebuild, not merely carried forward.
+
+### 32.8 The unresolved identity set — 18/33 unchanged, plus 16/19 newly visible
+
+Measured from `data/awards/player-identity.csv` against `external_identities` in the rebuilt
+database, over every manifest row that names a bootstrap `player_id`:
+
+```text
+census rows                                       1,738
+  with an afltables_profile_url                   1,720
+  without one                                        18
+
+resolved                                     rows 5,142   distinct players 1,704
+censused, no bootstrap identity              rows    33   distinct players    18
+identity absent from rebuilt afldb_test      rows    19   distinct players    16
+manifest rows naming no player_id            rows   325
+```
+
+* **The tracked 18 players / 33 manifest rows (§24.6 blocker 2) reproduce EXACTLY.** No
+  identity was invented for any of them. Matthew Rendell remains resolved through the
+  already-adjudicated DraftGuru identity.
+* **16 players / 19 rows are newly visible** and are *not* a regression — they are the first
+  measurement of these manifests against a genuinely canonical `afldb_test`. Fifteen are
+  2026-cohort footballers (Jagga Smith, Willem Duursma, Dyson Sharp, Harry Dean, Zeke Uwland,
+  Phoenix Gothard, Mitchell Edwards, Sam Grlj, Josh Lindsay, Talor Byrne, Jacob Farrow,
+  Sullivan Robey, Patrick Retschko, Jai Murray, Riley Hamilton) carrying 2025-season Rising
+  Star / draft-pick rows; the accepted baseline ends at season 2025, so they correctly have
+  no AFL Tables profile in this database and their rows **fail closed to unlinked**. The
+  sixteenth is bootstrap id 1830 "Stephen Icke", whose census URL is
+  `players/S/Steven_Icke.html`; no Icke identity or player exists in the canonical
+  population under either spelling, so that row also fails closed.
+* Total unresolved after the rebuild: **34 distinct players across 52 manifest rows**, every
+  one unlinked rather than mis-linked. This does not meet the bar for a new issue — it is
+  the same §24.6 adjudication backlog, now measured against canonical data, and is recorded
+  here rather than opened separately.
+
+### 32.9 Full suite against the rebuilt database
+
+`npx vitest run --no-file-parallelism`, with `AFLDB_TEST_DATABASE_URL`,
+`AFLDB_TEST_IMPORT_DATABASE_URL` and `AFLDB_AUTH_DATABASE_URL` all pointed at the rebuilt
+`afldb_test`:
+
+```text
+Test Files   107 passed / 3 failed / 2 skipped (112)
+Tests      3,250 passed / 15 failed / 50 skipped (3,333)
+```
+
+Fourteen of those fifteen failures were environmental only: `AFLDB_AUTH_DATABASE_URL is not
+set`, across `tests/integration/datasets.test.ts` and `tests/integration/db-health.test.ts`.
+An auth test DSN was derived exactly as the import DSN was (endpoint to the tunnel,
+`afldb_dev -> afldb_test`) and the three files were re-run:
+
+```text
+tests/integration/datasets.test.ts      passed
+tests/integration/db-health.test.ts     passed
+tests/integration/query-builder.test.ts 22 passed / 1 failed
+                                        -> 43 passed / 1 failed (44)
+```
+
+So exactly **one** genuine failure remains, and it is **not an ISSUE-112 gate and is not caused by this change**:
+
+`tests/integration/query-builder.test.ts` — "cost gate (ISSUE-115 T-C11) … partial-index
+relationships". `players x player.captaincies NOT EXISTS link_status=unique` measured
+**1,081 / 1,095 / 1,100 ms** across three runs against a 1,000 ms client-side wall-clock
+budget. Reproducible, not flaky.
+
+Diagnosis: this is the **already-tracked `AFLDB-ISSUE-116` mechanism**, appearing on the
+`players` anchor rather than the `player_match_stats` anchor ISSUE-116 recorded. The
+underlying anti-join is cheap — `EXPLAIN (ANALYZE)` of the bare
+`count(*) … WHERE NOT EXISTS (captaincies JOIN clubs …)` is **16.6 ms** server-side — but the
+same predicate under `runQueryBuilder`'s emitted shape, `count(*) OVER ()` with
+`ORDER BY … LIMIT 50`, measures **2,208 ms** server-side, because the window aggregate must
+consume every qualifying row. That is verbatim the ISSUE-116 root cause. The sibling case
+`players x player.draft_picks NOT EXISTS link_status=unique` passes at 33.6 ms only because
+it is degenerate: `draft_picks` holds `unmatched` 6,805 / `resolved` 5 and **zero** rows with
+`link_status = 'unique'`, so its anti-join matches all 13,277 players and does no work.
+`captaincies` holds `unique` 1,315 / `resolved` 60, so its anti-join is real.
+
+ISSUE-112 did not change the query builder, and it did not change the captaincies row count
+(1,375, exactly as before). Evidence is recorded against `AFLDB-ISSUE-116`, which already
+owns this mechanism and is already open. It is **not** a completion condition for ISSUE-112.
+
+Two other files failed on the first full run for a purely environmental reason —
+`AFLDB_AUTH_DATABASE_URL is not set` (14 tests across `tests/integration/datasets.test.ts`
+and `tests/integration/db-health.test.ts`). An auth DSN was derived the same way as the
+import DSN and both files then passed; they are counted as passing above.
+
+### 32.10 Final gate matrix
+
+| Gate | State | Evidence |
+|---|---|---|
+| **G1** | PASS | Passes 7–15 |
+| **G2** | PASS | `AFLDB_LEGACY_SQLITE` unset through the whole rebuild, §32.5 |
+| **G3** | PASS | `awards-reload-links.test.ts` 107/107, 0 skipped — re-run post-rebuild, §32.7 |
+| **G4** | PASS | Pass 17 |
+| **G5** | PASS | Pass 17 non-vacuous replay; zero orphans / zero wrong-player post-rebuild, §32.7 |
+| **G6** | **PASS** | §32.5 — rebuild exit 0, all seven families restored, FINAL VALIDATION 38/38, no legacy SQLite in the plan |
+| **G7** | PASS | `docs/deployment.md` §7 |
+| **G8** | PASS | `tests/integration/privileges.test.ts` passes unchanged post-rebuild, §32.7 |
+
+**All eight gates PASS. ISSUE-112 is RESOLVED.**
+
+### 32.11 Files changed this pass
+
+`tools/db/rebuild-test.ts`, `tests/db-test-rebuild.test.ts` (source and test),
+`issues/open/AFLDB-ISSUE-112.md` -> `issues/closed/AFLDB-ISSUE-112.md`,
+`issues/open/AFLDB-ISSUE-102-HANDOFF.md`, `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`.
+
+No manifest, contract, reference document or acceptance register was changed. No production
+contact, no streamanator modification, no migration authored or applied, nothing committed.
+`D:\dev\afldb` was read for DSN values only, under the operator's exception, and was not
+modified.
+
+### 32.12 ISSUE-102 — exact next action
+
+> **Superseded later on 2026-09-02:** ISSUE-102's own closure verification subsequently passed
+> all eight criteria and it is now Resolved. See `issues/closed/AFLDB-ISSUE-102.md` §8.4.
+
+**`AFLDB-ISSUE-102` stays OPEN.** ISSUE-112 closing does not close it. Its remaining child
+work is `AFLDB-ISSUE-113` (`brownlow_season_votes` has no legacy-free writer); ISSUE-111
+(Coleman) and ISSUE-112 (the seven honours families) are both now closed. The next action is
+to evaluate ISSUE-102's own closure contract against ISSUE-113's state in a fresh session —
+not in this one.
 
 ---
 

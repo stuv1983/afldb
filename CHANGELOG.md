@@ -15,6 +15,98 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-102 — canonical awards and honours acquisition is legacy-free (Resolved) - 2 September 2026
+
+- Closed the parent acquisition dependency after all eight acceptance criteria passed. The
+  canonical rebuild and standing refresh now restore every ISSUE-111/112 awards and honours
+  family from tracked manifests or canonical AFLDB facts with `AFLDB_LEGACY_SQLITE` unset;
+  FINAL VALIDATION passed 38/38 at the exact family counts.
+- The post-rebuild link audit found zero orphan and zero wrong-player attachments across all
+  five awards link-target tables, while manual linked and `confirmed_unlinked` decisions retain
+  their semantics. `docs/deployment.md` §7 records the operational path and isolates the bare
+  compatibility-only legacy `awards` re-extract from routine operation.
+- `AFLDB-ISSUE-113` remains open by design for the separate `brownlow_season_votes`
+  dependency in `import_legacy_afl.py`; the unrelated query-builder timing regression remains
+  owned by `AFLDB-ISSUE-116`.
+
+### AFLDB-ISSUE-112 — the rebuild's DraftGuru preflight now proves the snapshot it is about to import - 2 September 2026
+
+- **Destructive-rebuild safety fix.** `npm run db:test:rebuild` accepted
+  `--draftguru-label` for its DraftGuru **data** stage but never passed it to the
+  DraftGuru **preflight**: `draftguruValidateArgv()` took no label and emitted
+  only `--validate-only`, so `import_draftguru.py` fell back to its own
+  hardcoded `STAGE_A_LABEL`. The two sides could therefore name different
+  snapshots — with both snapshot directories present the rebuild would have
+  verified one, destroyed `afldb_test`, and imported the other. It failed closed
+  only because the retired snapshot's raw bytes happened to be absent.
+- **Fixed at the wiring, not by repointing the constant.** The preflight command
+  line is now *derived from* the data-stage command line
+  (`draftguruValidateArgv(label) = [...draftguruImportArgv(label), '--validate-only']`),
+  and `runPreflight()` takes the same `Options` object `planStages()` builds the
+  data stages from. The preflight and the data stage are structurally incapable
+  of selecting different DraftGuru snapshots, for this label change and every
+  future one. `import_draftguru.py` is unchanged; the runner's
+  `DEFAULT_DRAFTGURU_LABEL` is unchanged and is now always passed explicitly to
+  both sides. Refusals name the label that was proven.
+- **The canonical rebuild is proven end to end.** `afldb_test` was rebuilt from
+  the newly accepted `full-history-20260902` (resolved from the acceptance
+  register — no `--fitzroy-label`), `annual-html-20260902` and the unchanged
+  `ladder-20260828` witness, with `AFLDB_LEGACY_SQLITE` unset throughout.
+  **FINAL VALIDATION passed all 38 checks.** Every awards and honours family
+  restored at its exact expected count — honour teams 113, Hall of Fame 343,
+  captaincies 1,375, Rising Star nominations 766 (33 winners), All-Australian
+  1,158, club best-and-fairest 752, named medals 979, 22 Under 22 330, award
+  definitions 39, and zero award winners without a source. Coleman is unchanged
+  from `AFLDB-ISSUE-111`: 46 rows across 46 seasons from 1980, none unlinked.
+  The ladder witness D7 cross-check agrees with `club_seasons` on all 1,622
+  club-seasons on every compared field.
+- **Award player links survive the rebuild with no wrong-player attachment.**
+  Zero orphan `player_id` values across `award_winners`, `award_nominations`,
+  `hall_of_fame`, `honour_team_members` and `captaincies`; captaincies and
+  Coleman are fully linked. Unresolvable identities remain unlinked rather than
+  guessed — nothing is resolved by name.
+- **`AFLDB-ISSUE-112` is resolved.** All eight gates G1-G8 pass; the seven
+  formerly legacy-dependent awards and honours families now load from tracked
+  manifests and are restored and gated by the canonical rebuild.
+
+### AFLDB-ISSUE-112 — the canonical rebuild's accepted source snapshots move to new labels - 2 September 2026
+
+- **The accepted fitzRoy core baseline is now `full-history-20260902`.** The
+  previously accepted `full-history-20260827` is **retired**: its raw artefacts
+  were lost, and reacquisition proved they cannot be reproduced — 130 of its 131
+  files re-acquire byte-identically, but AFL Tables' `player_details` content
+  drifted upstream after the 2026-08-27 extraction, and the original bytes no
+  longer exist anywhere to diff against. The successor was validated
+  independently by `import_fitzroy_core.py --validate-only
+  --require-full-history` **before** any acceptance record for it existed, and
+  reproduces **every** measured drift gate exactly: 16,838 matches, 13,275
+  players, 685,471 player-match rows, 52 venues, 320,861 Brownlow round-vote
+  rows, and an identity scan of 685,473 rows with 83 missing ids and zero
+  missing or malformed URLs. Canonical semantics are unchanged; only the
+  snapshot's provenance moved.
+- **The accepted DraftGuru Stage A snapshot is now `annual-html-20260902`,** from
+  a complete 42-year re-acquisition. `annual-html-20260826` is historical and
+  superseded: its pages are Rails-rendered and carry a per-render CSRF token, so
+  its accepted bytes cannot be reproduced by any refetch, independently of
+  whether the data changed. The new snapshot re-proves the parity baseline
+  exactly — **6,810 rows, 5,057 distinct persons, parity PASS** — with identical
+  event totals, special-pick totals, schema variants and per-year row counts and
+  schema fingerprints. Every raw page hashes differently (the CSRF token, plus a
+  `Content-Type` header change on 13 pages); that is render drift only, and no
+  parsed-data or schema validation was relaxed to accept it.
+- **`data/reference/fitzroy-accepted-baselines.json` now carries two entries**
+  under the unchanged `exactly_one_accepted` selection policy, using the
+  register's own `retired` lifecycle vocabulary. Each entry states its own
+  reasons in-register. **No historical acquisition manifest was rewritten,
+  renamed or deleted**, and no hash, measurement or accepted correction in the
+  retired record was edited. The ladder witness `ladder-20260828` is unchanged
+  and re-validated.
+- **Operational note.** The rebuild resolves the fitzRoy label from the register,
+  so `--fitzroy-label full-history-20260827` is now refused and no fitzRoy flag
+  is needed. The DraftGuru label is still a CLI default naming the retired
+  snapshot, so a rebuild must pass `--draftguru-label annual-html-20260902`
+  until that default is repointed.
+
 ### AFLDB-ISSUE-112 — awards and honours load from tracked manifests, and their player links survive a rebuild - 2 September 2026
 
 - **Awards and honours no longer read the legacy SQLite database.** All nine

@@ -455,8 +455,7 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       name: `DRAFTGURU — ${opts.draftguruLabel}`,
       kind: 'data',
       run: 'command',
-      argv: [python, 'tools/rebuild/draftguru/import_draftguru.py',
-             '--label', opts.draftguruLabel],
+      argv: draftguruImportArgv(opts.draftguruLabel, python),
       envOverlay: dataEnv,
     },
     {
@@ -682,10 +681,30 @@ export const DRAFTGURU_PREFLIGHT_FILES = [
   'data/reference/draftguru-link-decisions.json',
 ];
 
-/** Built per call, not frozen at module load, so AFLDB_PYTHON is honoured. */
-export function draftguruValidateArgv(): string[] {
-  return [resolvePython(), 'tools/rebuild/draftguru/import_draftguru.py',
-          '--validate-only'];
+/** The one DraftGuru importer entry point, named once. */
+export const DRAFTGURU_IMPORTER = 'tools/rebuild/draftguru/import_draftguru.py';
+
+/**
+ * The DraftGuru data-stage command line. Built per call, not frozen at module load, so
+ * AFLDB_PYTHON is honoured; `python` is threaded in by planStages so the whole graph keeps
+ * its single interpreter resolution.
+ */
+export function draftguruImportArgv(label: string,
+                                    python: string = resolvePython()): string[] {
+  return [python, DRAFTGURU_IMPORTER, '--label', label];
+}
+
+/**
+ * The DraftGuru preflight command line: the SAME argv the data stage will run, plus
+ * --validate-only. AFLDB-ISSUE-112 §28.4 — this used to take no label and emit only
+ * --validate-only, so the importer fell back to its own hardcoded STAGE_A_LABEL default
+ * while the data stage imported whatever --draftguru-label selected. With both snapshot
+ * directories present that would have verified snapshot A and imported snapshot B. Deriving
+ * one argv from the other makes the two structurally incapable of disagreeing.
+ */
+export function draftguruValidateArgv(label: string,
+                                      python: string = resolvePython()): string[] {
+  return [...draftguruImportArgv(label, python), '--validate-only'];
 }
 
 /** The counts the DraftGuru preflight must see before anything is destroyed. */
@@ -1199,8 +1218,14 @@ export function fitzroyValidateArgv(source: FitzroySource): string[] {
   return argv;
 }
 
-/** The preflight stage's own work, kept separate so it is testable in isolation. */
-export function runPreflight(deps: Deps, source?: FitzroySource): void {
+/**
+ * The preflight stage's own work, kept separate so it is testable in isolation.
+ *
+ * It takes the SAME `Options` object planStages() builds the data stages from, so the
+ * snapshot this proves and the snapshot the rebuild then imports cannot be different
+ * selections. See draftguruValidateArgv().
+ */
+export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource): void {
   // Before anything else. Every stage below this line is a Python child process, and a
   // missing interpreter surfaces on Windows as nothing but "The system cannot find the
   // path specified." — attributed to whichever stage happened to run first, which is how
@@ -1233,10 +1258,12 @@ export function runPreflight(deps: Deps, source?: FitzroySource): void {
         + 'Nothing has been destroyed.');
     }
   }
-  const result = deps.runCommand(draftguruValidateArgv(), {});
+  // The label proven here is opts.draftguruLabel — the one the data stage will import.
+  const result = deps.runCommand(draftguruValidateArgv(opts.draftguruLabel), {});
   if (result.status !== 0) {
     throw new RebuildRefused(
-      'DraftGuru preflight failed (import_draftguru.py --validate-only). '
+      'DraftGuru preflight failed (import_draftguru.py --validate-only '
+      + `--label ${opts.draftguruLabel}). `
       + `Nothing has been destroyed.\n${result.stdout}${result.stderr}`);
   }
   assertDraftguruPreflight(result.stdout);
@@ -1263,9 +1290,16 @@ export function ladderWitnessValidateArgv(): string[] {
           ladderWitnessLabel()];
 }
 
+/**
+ * The DraftGuru snapshot used when --draftguru-label is not given. It is the runner's
+ * single default; import_draftguru.py's own STAGE_A_LABEL is never relied on, because the
+ * runner now always passes --label explicitly to BOTH the preflight and the data stage.
+ */
+export const DEFAULT_DRAFTGURU_LABEL = 'annual-html-20260826';
+
 export function parseArgs(argv: string[]): Options {
   const opts: Options = {
-    draftguruLabel: 'annual-html-20260826',
+    draftguruLabel: DEFAULT_DRAFTGURU_LABEL,
     planOnly: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
@@ -1384,7 +1418,7 @@ async function main(): Promise<number> {
 
   // Preflight runs BEFORE the acknowledgement is even consumed, so a missing input is
   // reported without the operator having to authorise destruction first.
-  runPreflight(deps, fitzroy);
+  runPreflight(deps, opts, fitzroy);
   assertDestructiveAcknowledgement(target, opts.acknowledgeDestroy);
 
   const report = executeRebuild(stages, target, deps);

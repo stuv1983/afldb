@@ -18,7 +18,12 @@
     "The acquisition manifest's own `full_history` and `completeness` fields are INERT.",
     "full-history-20260827 self-declared full_history=true while the independent validator",
     "rejected it (the acquirer implemented a smaller gate set than the contract declares).",
-    "That manifest is preserved byte-for-byte as the record of that mistake."
+    "That manifest is preserved byte-for-byte as the record of that mistake.",
+    "",
+    "2026-09-02 (AFLDB-ISSUE-112): this register now carries TWO entries. full-history-20260827",
+    "is RETIRED and historical; full-history-20260902 is the single accepted baseline. The",
+    "retirement is a provenance decision, not a semantic one - the successor reproduces every",
+    "measured drift gate and identity-scan figure exactly. Each entry states its own reasons."
   ],
   "contract": "afldb.fitzroy.accepted_baselines",
   "schema_version": 1,
@@ -57,9 +62,42 @@
   "baselines": [
     {
       "snapshot_label": "full-history-20260827",
-      "acceptance_status": "accepted",
+      "acceptance_status": "retired",
       "accepted_on": "2026-08-27",
+      "retired_on": "2026-09-02",
+      "superseded_by": "full-history-20260902",
       "issue": "AFLDB-ISSUE-093",
+      "retirement": {
+        "reason": "unreproducible_accepted_bytes",
+        "decided_by": "operator, AFLDB-ISSUE-112 Pass 20 (runbook §28.4 route 2)",
+        "$comment": [
+          "HISTORICAL, NOT INVALID. This baseline was validly accepted on 2026-08-27 and every",
+          "record below is preserved unchanged as evidence: its acquisition manifest",
+          "docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260827.json is still",
+          "byte-for-byte the original, its hash bindings still describe the bytes it was",
+          "granted over, and its measured fingerprint is still the fingerprint this source",
+          "must reproduce.",
+          "",
+          "It is retired because its ACCEPTED RAW BYTES ARE UNAVAILABLE. The working copy at",
+          "snapshot_dir was lost, and AFLDB-ISSUE-112 Pass 19 proved on 2026-09-02 that a",
+          "reacquisition from the pinned adapter cannot reproduce them: 130 of 131 artefacts",
+          "re-acquire byte-identically, but player_details.csv does not",
+          "(accepted 215d66f72a8aa032a615ffd4b43429e18c6c42d8cdbfae67f8833d87bef51461,",
+          "reacquired 62171adf0dba3914afe8e6dbd7a0aa4720a8cd8dec86e10f91b8ab899c1e4a91,",
+          "16731 rows and identical columns in both). Two independent acquisitions on",
+          "2026-09-02 agree with each other, so this is upstream AFL Tables player-detail",
+          "content drift since the 2026-08-27T01:54:19Z extraction, not local nondeterminism.",
+          "The changed field cannot be named because the accepted bytes no longer exist to",
+          "diff against.",
+          "",
+          "No byte, hash or measurement in this entry was edited to accommodate the",
+          "retirement, and the successor was NOT accepted by copying this record: it earned",
+          "its own independent --require-full-history verdict over its own bytes. The",
+          "successor reproduces every measured drift gate and every identity-scan figure",
+          "here EXACTLY, which is why the retirement is a relabelling of provenance and not",
+          "a change of canonical semantics."
+        ]
+      },
       "competition": "VFL/AFL men's senior competition",
       "snapshot_dir": "data/sources/afltables/fitzroy_core/full-history-20260827",
 
@@ -145,6 +183,184 @@
           "Settled under contract_version 1. Each is tracked in fitzroy-contract.json or",
           "pinned in the importer; this list states what the acceptance covers, and a change",
           "to any of them is a new acceptance decision, not an edit to this one."
+        ],
+        "source_normalisation": [
+          {
+            "kind": "source_club_normalisation",
+            "rule": "Brisbane Lions 1987-1996 -> Brisbane Bears",
+            "dataset_scope": "all datasets"
+          },
+          {
+            "kind": "source_club_normalisation",
+            "rule": "North Melbourne 1999-2007 -> Kangaroos",
+            "dataset_scope": "results"
+          }
+        ],
+        "source_data": [
+          {
+            "kind": "source_row_corrections",
+            "rule": "two spurious 1909 Jim Stewart Cartesian-product rows dropped under tracked row fingerprints",
+            "rows_dropped": 2
+          }
+        ],
+        "import_transformation": [
+          {
+            "kind": "display_name_fallback",
+            "rule": "blank Player falls back to First.name + ' ' + Surname only when both are present; a non-blank Player always wins; neither present still fails closed",
+            "rows_affected": 79,
+            "players_affected": 4
+          }
+        ]
+      }
+    },
+    {
+      "snapshot_label": "full-history-20260902",
+      "acceptance_status": "accepted",
+      "accepted_on": "2026-09-02",
+      "issue": "AFLDB-ISSUE-112",
+      "supersedes": "full-history-20260827",
+      "competition": "VFL/AFL men's senior competition",
+      "snapshot_dir": "data/sources/afltables/fitzroy_core/full-history-20260902",
+      "acceptance_rationale": {
+        "$comment": [
+          "Accepted under AFLDB-ISSUE-112 runbook \u00a728.4 route 2, an explicit operator",
+          "decision to MOVE the acceptance baseline rather than restore unreproducible bytes.",
+          "This is a new acceptance under the AFLDB-ISSUE-093 \u00a74 immutability rule (a",
+          "reacquisition whose bytes differ is a NEW snapshot with its own label, its own",
+          "manifest and its own fingerprint), never an in-place replacement of",
+          "full-history-20260827's record.",
+          "",
+          "Provenance of the bytes: acquired 2026-09-02T01:00:04Z by the pinned adapter",
+          "tools/rebuild/fitzroy/acquire_core.R, fitzRoy 1.8.0 (installed == pinned),",
+          "--from 1897 --to 2025, --datasets player_stats,player_details,results, during",
+          "AFLDB-ISSUE-112 Pass 19. That pass acquired into an isolated staging root so no",
+          "adapter could write near a tracked manifest; the artefacts were preserved off-tree",
+          "and promoted here unmodified in Pass 20. They were NOT reacquired for this",
+          "acceptance, so the manifest's extraction timestamp is the true extraction time.",
+          "",
+          "Relationship to the retired baseline: 130 of the 131 artefacts are byte-identical",
+          "to full-history-20260827. The single difference is player_details.csv",
+          "(215d66f7... -> 62171adf...), upstream AFL Tables content drift, same 16731 rows",
+          "and identical columns. That one artefact is why the artefact-set digest and the",
+          "manifest hash differ, and therefore why this is a new baseline at all.",
+          "",
+          "Why the move is safe: every measured drift gate and every identity-scan figure",
+          "below is IDENTICAL to the retired baseline's, re-derived independently from these",
+          "artefacts by the sole verdict authority. The acceptance changes provenance, not",
+          "canonical semantics."
+        ]
+      },
+
+      "acquisition": {
+        "manifest_path": "docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json",
+        "manifest_sha256": "2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1",
+        "immutable": true,
+        "adapter": "tools/rebuild/fitzroy/acquire_core.R",
+        "adapter_schema_version": 1,
+        "extraction_timestamp_utc": "2026-09-02T01:00:04Z",
+        "fitzroy_version_pinned": "1.8.0",
+        "$comment": [
+          "manifest_sha256 covers the acquisition manifest byte-for-byte, so the artefact",
+          "hash list inside it cannot be edited to cover for a tampered artefact without",
+          "breaking this binding.",
+          "",
+          "The manifest is the adapter's own Pass 19 output with exactly two byte ranges",
+          "changed for the new label: `snapshot_label` and `working_directory`, then newline-",
+          "normalised from CRLF to LF. Nothing else differs - not one filename, hash, row",
+          "count, column list or observation - and the importer re-hashes all 131 artefacts",
+          "against it regardless.",
+          "",
+          "The LF normalisation is MANDATORY, not cosmetic: .gitattributes pins",
+          "docs/rebuild-manifests/** to eol=lf precisely because manifest_sha256 above binds",
+          "the manifest FILE bytes (AFLDB-ISSUE-108). A CRLF manifest would be rewritten on",
+          "checkout and would break this binding on one platform only.",
+          "",
+          "Its self-declared `full_history: false` / `completeness: unvalidated` are INERT,",
+          "like every acquisition verdict field. This adapter build correctly declines to",
+          "self-assess; the verdict below came from the independent validator."
+        ]
+      },
+
+      "raw_artefacts": {
+        "file_count": 131,
+        "total_rows": 719042,
+        "artefact_set_sha256": "15ba5dc624535d95fd1661c7c5e757ae4fc2d31782a2c0b1414e19358580dd6c",
+        "digest_rule": "sha256 over sorted lines '<filename> <sha256> <row_count>\\n' from the acquisition manifest's files[]",
+        "$comment": [
+          "A second, independently recomputable binding to the same artefact set. It survives",
+          "insignificant reformatting of the manifest while still pinning every filename,",
+          "content hash and row count."
+        ]
+      },
+
+      "contract_binding": {
+        "fitzroy_contract": "tools/rebuild/fitzroy/fitzroy-contract.json",
+        "contract_version": 1,
+        "contract_full_history_version": 1,
+        "required_range": { "first_season": 1897, "last_season": 2025 },
+        "required_datasets": ["player_stats", "player_details", "results"]
+      },
+
+      "validation": {
+        "authority": "tools/migration/import_fitzroy_core.py",
+        "command": "import_fitzroy_core.py --label full-history-20260902 --validate-only --require-full-history",
+        "verdict": "PASSED",
+        "validated_on": "2026-09-02",
+        "database_accessed": false,
+        "$comment": [
+          "The verdict recorded here is history. Every normal rebuild re-runs this exact",
+          "command in PRECHECK, before any destructive stage, and uses that live result.",
+          "",
+          "This verdict was earned over THESE artefacts before this entry existed: the",
+          "full-history run above passed while no acceptance record for this label existed,",
+          "so the acceptance did not and could not bless it. --require-accepted-baseline was",
+          "then re-run after this entry was written, to prove the bindings hold."
+        ]
+      },
+
+      "measured": {
+        "$comment": [
+          "Drift gates. Re-derived from the snapshot on every validate and compared exactly.",
+          "Every value is identical to retired baseline full-history-20260827's."
+        ],
+        "matches": 16838,
+        "matches_with_player_rows": 16838,
+        "seasons_first": 1897,
+        "seasons_last": 2025,
+        "venues": 52,
+        "attendance_known": 15187,
+        "club_identities": 24,
+        "players": 13275,
+        "players_with_dob": 855,
+        "players_with_dob_conflict": 0,
+        "player_match_rows": 685471,
+        "brownlow_round_vote_rows": 320861
+      },
+
+      "identity_scan": {
+        "$comment": [
+          "Canonical identity is the AFL Tables profile URL. The fitzRoy numeric ID is",
+          "optional: 83 recent-2025 rows carry none, and distinct_urls - distinct_ids = 5",
+          "is exactly the five players who have no ID anywhere in the snapshot.",
+          "Identical to retired baseline full-history-20260827's scan."
+        ],
+        "rows": 685473,
+        "missing_id": 83,
+        "missing_url": 0,
+        "malformed_url": 0,
+        "distinct_ids": 13270,
+        "distinct_urls": 13275
+      },
+
+      "accepted_corrections": {
+        "$comment": [
+          "Settled under contract_version 1. Each is tracked in fitzroy-contract.json or",
+          "pinned in the importer; this list states what the acceptance covers, and a change",
+          "to any of them is a new acceptance decision, not an edit to this one.",
+          "",
+          "Carried forward UNCHANGED from full-history-20260827. The contract, the importer",
+          "and the measured effects of all four corrections are the same; nothing about this",
+          "acceptance reopens them."
         ],
         "source_normalisation": [
           {
