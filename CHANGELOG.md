@@ -15,6 +15,50 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stages S3 ownership and S4 corroboration policy (In progress) - 2 September 2026
+
+- All four AFL Tables canonical targets are now ownership-determinate. Migration 083 gave
+  `match_period_scores` and `brownlow_round_votes` their provenance columns, so the settle
+  resolver's `TARGETS_WITHOUT_SOURCE_ID` special case — which made both permanently
+  indeterminate — is removed, and `resolveTarget()` reads the real `source_id` for all four.
+  A period set's ownership is the owner shared by every one of its rows; a mixed set still fails
+  closed. `source_id` is read for ownership only and never enters the compared values, so a run
+  cannot mistake provenance for a score correction.
+- A new automatic-path ownership predicate refuses more than the generic one: an absent row is
+  insertable, an AFL Tables-owned row updateable, a foreign-owned row refused, and a row whose
+  `source_id` is NULL is refused as ownership-indeterminate. A source-less row cannot be proven
+  unowned from anything the settle role can read, so it is never adopted unattended — it stays
+  promotable by a human through the reviewed queue. The generic ownership gate is unchanged.
+- Source families can now declare `corroboration_policy`. `blocking` is the default for every
+  family that does not declare one, so undeclared behaviour is exactly as before. The two AFL
+  Tables families declare `advisory`: a disagreeing independence group no longer vetoes their
+  proposal. Squiggle and Kali — both being retired — can neither block an AFL Tables write nor
+  become a prerequisite for one.
+- Advisory withdraws the veto and nothing else. Corroboration is still classified, agreeing and
+  disagreeing groups are still recorded, and the `source_disagreement` data issue is still opened
+  and deduplicated — it is now raised from the corroboration evidence rather than from the
+  refusal verb, which also means a disagreement that coincides with a manual-authority conflict
+  now records its finding where previously it recorded none.
+- Still no canonical write: these stages decide when one would be permitted, and by whom.
+
+### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stage S2 manual authority (In progress) - 2 September 2026
+
+- The AFL Tables settle path now has a real manual-authority provider,
+  `src/lib/acquisition/manual-authority.ts`, in place of the `UNAVAILABLE_MANUAL_AUTHORITY` stub
+  that refused everything. It reads `data_overrides` — the authority record — and never
+  `data_edits`, so no grant was widened: `afldb_import` still holds INSERT and no SELECT on the
+  audit log.
+- For `matches` it maps a proposal's changed fields onto the `src/lib/edit/spec.ts` field groups
+  and refuses on any intersection with an active override, and refuses an `attendance` change on
+  a match whose `attendance_source_id` already cites `manual_admin_edit`.
+- For `match_period_scores`, `player_match_stats` and `brownlow_round_votes` it answers "clear"
+  only while migration 073's `entity_type` CHECK and the editor spec together make a human
+  override for them unrepresentable; both facts are re-checked at load time, and either one
+  changing turns the answer back into a refusal. Migration 073 is unchanged.
+- Every query error, unreadable result and ambiguous question answers "indeterminate", which
+  refuses. There is no force flag. The snapshot is taken inside the settle run's own transaction.
+- Still no canonical write: this stage only decides when one would be permitted.
+
 ### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stage S1 schema (In progress) - 2 September 2026
 
 - Migration `083_canonical_auto_apply.sql` completes provenance on the two canonical targets that

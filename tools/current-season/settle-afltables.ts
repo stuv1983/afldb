@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 import postgres from 'postgres';
 
+import { loadManualAuthority } from '../../src/lib/acquisition/manual-authority';
 import { UNAVAILABLE_MANUAL_AUTHORITY } from '../../src/lib/acquisition/observations';
 import {
   resolveManifestPath,
@@ -227,9 +228,14 @@ async function main(): Promise<void> {
         readJson(join(PROJECT_ROOT, 'data', 'reference', 'source-families.json')),
       ),
       apply: args.apply,
-      // v1 has no manual-authority provider, and there is no bypass: an
-      // un-implemented authority mechanism refuses rather than permitting.
+      // Only ever reached if the loader below is somehow absent. There is no
+      // bypass: an un-implemented authority mechanism refuses rather than
+      // permitting.
       manualAuthority: UNAVAILABLE_MANUAL_AUTHORITY,
+      // AFLDB-ISSUE-122 §8. The real provider, resolved from `data_overrides`
+      // inside the run transaction. A query error or a broken pinned contract
+      // yields refusal, not permission.
+      manualAuthorityLoader: (tx) => loadManualAuthority(tx, bundle.season),
     });
 
     printCounters(result.counters);

@@ -186,28 +186,88 @@ export function targetEstablishedBySource(
 }
 
 /**
- * The targets that carry no `source_id` column (F5), and therefore cannot
- * express ownership at all.
+ * Ownership from a target row's resolved owner source KEY (§7.2, stage S3).
  *
- * **Binding supply rule (§12).** For these the settle resolver must supply
- * `{ state: 'indeterminate' }`. It must never supply `'unowned'`: a table
- * with no provenance column has not DECLARED an absence of ownership, it
- * simply cannot answer, and claiming otherwise would be a false statement
- * that lets this source adopt a row whose provenance is unknown.
- * `indeterminate` fails closed to `foreign_owned_collision`, which is a
- * truthful refusal recording exactly why the target is not yet promotable.
+ * ISSUE-099 could not ask this question of every target: `match_period_scores`
+ * and `brownlow_round_votes` carried no provenance columns at all (F5), so the
+ * resolver supplied a blanket `{ state: 'indeterminate' }` for them through
+ * `TARGETS_WITHOUT_SOURCE_ID`. **Migration 083 added the provenance quartet to
+ * both** and gave `player_match_stats` its missing `source_record_id`, so all
+ * four targets can now answer, and that special case is gone.
+ *
+ * The reading is unchanged and stays deliberately narrow:
+ *
+ * - `null` owner is `'unowned'` — a DECLARED absence of ownership, which the
+ *   generic Decision E gate permits this source to write. It is **not**
+ *   sufficient for the automatic path; see `autoApplyOwnership()` below.
+ * - a readable owner key is `'owned'`, and `evaluateTargetOwnership()` decides
+ *   whether it is this source's.
+ * - an owner id that resolves to no key is `'indeterminate'` and fails closed
+ *   (`ownershipOf()`), because an unreadable owner is not an absent one.
  */
-export const TARGETS_WITHOUT_SOURCE_ID: readonly SettleTargetTable[] = [
-  'match_period_scores',
-  'brownlow_round_votes',
-];
-
-export function ownershipForTarget(
-  targetTable: SettleTargetTable, ownerSourceKey: string | null,
-): TargetOwnership {
-  if (TARGETS_WITHOUT_SOURCE_ID.includes(targetTable)) return { state: 'indeterminate' };
+export function ownershipForTarget(ownerSourceKey: string | null): TargetOwnership {
   if (ownerSourceKey === null) return { state: 'unowned' };
   return { state: 'owned', sourceKey: ownerSourceKey };
+}
+
+/**
+ * E3 — the ISSUE-122 automatic-path ownership predicate (§5.1, §7.2).
+ *
+ * **This is strictly stronger than the generic gate and does not replace it.**
+ * `evaluateOwnership()` (`observations.ts:362`) and `evaluateTargetOwnership()`
+ * still answer `'ok'` for a NULL owner, and stage S3 changes neither: a
+ * source-less row remains promotable by a HUMAN through the reviewed
+ * `promotion_candidates` queue and the §14 transition. Only the unattended
+ * path is narrowed, and only here.
+ *
+ * A source-less canonical row cannot be proven unowned from anything the
+ * settle role can read (§7.2): `applyDataEdit` does not re-stamp
+ * `matches.source_id` for the score group, `createMatch` writes no provenance
+ * at all, the CSV/email promote path upserts `matches` with none, and
+ * `afldb_import` holds INSERT-only on `data_edits` so edit provenance is
+ * unreadable by design (stop condition SC5). NULL therefore means "provenance
+ * unknown", never "free to adopt".
+ *
+ * | Identity state | Verdict |
+ * |---|---|
+ * | no canonical row (`new_target`) | `insertable` — an INSERT adopts nothing |
+ * | owner resolves to the promoting source | `updateable` |
+ * | owner resolves to another source | `refused` / `foreign_source_owner` |
+ * | `source_id IS NULL` (`unowned`) | `refused` / `ownership_indeterminate` |
+ * | owner unreadable (`indeterminate`) | `refused` / `ownership_indeterminate` |
+ * | identity `unresolved` | `refused` / `ownership_indeterminate` |
+ *
+ * **S3 implements the predicate only.** Nothing calls it on a write path yet:
+ * the applier is S5, which must re-evaluate it inside the savepoint against
+ * state re-read in the same transaction, together with E1, E2 and E4–E6.
+ */
+export type AutoApplyOwnership =
+  | { verdict: 'insertable' }
+  | { verdict: 'updateable' }
+  | { verdict: 'refused'; detail: 'foreign_source_owner' | 'ownership_indeterminate' };
+
+export function autoApplyOwnership(
+  identity: IdentityResolution, promotingSourceKey: string,
+): AutoApplyOwnership {
+  if (!promotingSourceKey) {
+    fail('An automatic canonical application must name the source it is applying for.');
+  }
+  // No row: there is nothing to adopt, so an INSERT cannot take another
+  // owner's authority. Eligibility still depends on E1, E2 and E4-E6.
+  if (identity.status === 'new_target') return { verdict: 'insertable' };
+  // Never resolved, never ambiguous: no source may create an identity.
+  if (identity.status === 'unresolved') {
+    return { verdict: 'refused', detail: 'ownership_indeterminate' };
+  }
+  const { ownership } = identity;
+  if (ownership.state === 'owned') {
+    return ownership.sourceKey === promotingSourceKey
+      ? { verdict: 'updateable' }
+      : { verdict: 'refused', detail: 'foreign_source_owner' };
+  }
+  // 'unowned' AND 'indeterminate' both land here. The generic gate separates
+  // them and admits the first; the automatic path deliberately does not.
+  return { verdict: 'refused', detail: 'ownership_indeterminate' };
 }
 
 /* ------------------------------------------------------------------ *
@@ -1313,6 +1373,13 @@ export type SettleCounters = {
   unresolvedIdentityVenue: number;
   unresolvedIdentityMatch: number;
   foreignOwnedCollision: number;
+  /**
+   * Disagreements that REFUSED the proposal, i.e. `corroboration_policy:
+   * "blocking"` families only. An `advisory` family's disagreement is real and
+   * is still recorded — as a `data_issues` row, counted by
+   * `dataIssuesOpened` / `dataIssuesRefreshed` — but it refuses nothing, so it
+   * is deliberately not counted here (ISSUE-122 §10).
+   */
   sourceDisagreement: number;
   manualAuthorityRefusals: number;
 
@@ -1371,8 +1438,18 @@ export type SettleRunOptions = {
   registry: SourceFamilyRegistry;
   /** `false` runs the identical write path and rolls it back (§22). */
   apply: boolean;
-  /** `UNAVAILABLE_MANUAL_AUTHORITY` in v1. There is no bypass. */
+  /**
+   * The fallback provider, used when no `manualAuthorityLoader` is supplied.
+   * There is no bypass: `UNAVAILABLE_MANUAL_AUTHORITY` refuses everything.
+   */
   manualAuthority: ManualAuthorityProvider;
+  /**
+   * AFLDB-ISSUE-122 §8. Resolved ONCE, inside the run transaction, so the
+   * authority snapshot is taken by the same transaction that would write
+   * (`AFLDB-ISSUE-096` §7 requirement 2). When supplied it replaces
+   * `manualAuthority` for the whole run; when omitted, nothing changes.
+   */
+  manualAuthorityLoader?: (tx: postgres.TransactionSql) => Promise<ManualAuthorityProvider>;
   /** Passed in, never taken from a clock inside the decision layer. */
   observedAt?: string;
 };
@@ -1515,15 +1592,16 @@ function unresolved(reason: string): ResolvedTarget {
   return { identity: { status: 'unresolved', reason }, targetId: null, targetValues: null };
 }
 
-function ownershipOf(
-  targetTable: SettleTargetTable, refs: SettleRefs, ownerSourceId: number | null,
-): TargetOwnership {
-  if (TARGETS_WITHOUT_SOURCE_ID.includes(targetTable)) return { state: 'indeterminate' };
+/**
+ * The id-keyed form of `ownershipForTarget()`. Since migration 083 every one
+ * of the four targets carries `source_id`, so this is asked of all of them.
+ */
+function ownershipOf(refs: SettleRefs, ownerSourceId: number | null): TargetOwnership {
   if (ownerSourceId === null) return { state: 'unowned' };
   const key = refs.sourceKeysById.get(ownerSourceId);
   // A source id with no readable key is not an absence of ownership; it is an
   // unreadable owner, which fails closed rather than being adopted.
-  return key === undefined ? { state: 'indeterminate' } : { state: 'owned', sourceKey: key };
+  return key === undefined ? { state: 'indeterminate' } : ownershipForTarget(key);
 }
 
 /* -- the run --------------------------------------------------------- */
@@ -1584,9 +1662,15 @@ export async function runSettleAfltables(
       // disagreement merely failed to reappear.
       const restoredKeys = new Set<string>();
 
+      // §8. The authority snapshot is taken here, inside the transaction,
+      // before any reconciliation asks it anything.
+      const runOptions: SettleRunOptions = options.manualAuthorityLoader
+        ? { ...options, manualAuthority: await options.manualAuthorityLoader(tx) }
+        : options;
+
       for (const wireFamily of Object.keys(BUNDLE_FAMILIES)) {
         await settleFamily(
-          tx, wireFamily, refs, runBatchId, observedAt, options, counters,
+          tx, wireFamily, refs, runBatchId, observedAt, runOptions, counters,
           completeScopes, restoredKeys,
         );
       }
@@ -2088,7 +2172,7 @@ async function resolveTarget(
           status: 'resolved',
           entity: 'matches',
           targetKey: { match_key: projected.projection.matchKey },
-          ownership: ownershipOf(targetTable, refs, row?.ownerSourceId ?? null),
+          ownership: ownershipOf(refs, row?.ownerSourceId ?? null),
         },
         targetId: matchId,
         targetValues: current,
@@ -2106,22 +2190,43 @@ async function resolveTarget(
     const rows = await tx<{
       club_id: number; period: number;
       goals: number | null; behinds: number | null; points: number | null;
+      source_id: number | null;
     }[]>`
-      SELECT club_id, period, goals, behinds, points
+      SELECT club_id, period, goals, behinds, points, source_id
         FROM match_period_scores WHERE match_id = ${matchId}
        ORDER BY club_id, period
     `;
+    // S3: migration 083 gave this target the provenance quartet. The whole
+    // period set is ONE target keyed on match_id, so its ownership is the
+    // ownership of the rows that make it up: a single readable owner shared by
+    // every row is that owner; anything else -- a mixed set, or an owner id
+    // with no readable key -- is indeterminate and fails closed. A set with no
+    // rows at all cannot be reached here, because `targetEstablishedBySource()`
+    // routes an unpublished period set to `new_target` instead.
+    const owners = new Set(rows.map((row) => row.source_id));
+    const ownership: TargetOwnership = owners.size === 1
+      ? ownershipOf(refs, [...owners][0])
+      : { state: 'indeterminate' };
+    // `source_id` is read for ownership ONLY and is deliberately dropped here:
+    // `period_scores` is compared field-for-field against
+    // `proposedPeriodScoreValues()`, which carries no provenance, so leaving it
+    // in would make every run look like a correction.
+    const compared = rows.map((row) => ({
+      club_id: row.club_id,
+      period: row.period,
+      goals: row.goals,
+      behinds: row.behinds,
+      points: row.points,
+    }));
     return {
       identity: {
         status: 'resolved',
         entity: 'match_period_scores',
         targetKey: { match_id: matchId },
-        // F5: no source_id column, so ownership is INDETERMINATE, never
-        // 'unowned'. This fails closed to foreign_owned_collision.
-        ownership: ownershipOf(targetTable, refs, null),
+        ownership,
       },
       targetId: matchId,
-      targetValues: { period_scores: [...rows] as unknown as JsonValue },
+      targetValues: { period_scores: compared as unknown as JsonValue },
     };
   }
 
@@ -2156,8 +2261,7 @@ async function resolveTarget(
         entity: 'player_match_stats',
         targetKey: { player_id: projected.playerId, match_id: matchId },
         ownership: ownershipOf(
-          targetTable, refs,
-          (row as unknown as { source_id: number | null }).source_id ?? null,
+          refs, (row as unknown as { source_id: number | null }).source_id ?? null,
         ),
       },
       targetId: (row as unknown as { id: number }).id,
@@ -2168,8 +2272,10 @@ async function resolveTarget(
   const vote = projected.projection.brownlowRoundVote;
   /* c8 ignore next */
   if (vote === null) return unresolved('the source published no round vote');
-  const [row] = await tx<{ id: number; played: boolean; votes: number | null }[]>`
-    SELECT id, played, votes FROM brownlow_round_votes
+  const [row] = await tx<{
+    id: number; played: boolean; votes: number | null; source_id: number | null;
+  }[]>`
+    SELECT id, played, votes, source_id FROM brownlow_round_votes
      WHERE season = ${vote.season} AND player_id = ${projected.playerId}
        AND round_number = ${vote.roundNumber}
   `;
@@ -2193,8 +2299,8 @@ async function resolveTarget(
       targetKey: {
         season: vote.season, player_id: projected.playerId, round_number: vote.roundNumber,
       },
-      // F5 again: no source_id column on this target either.
-      ownership: ownershipOf(targetTable, refs, null),
+      // S3: migration 083 gave this target source_id too.
+      ownership: ownershipOf(refs, row.source_id),
     },
     targetId: row.id,
     targetValues: { played: row.played, votes: row.votes },
@@ -2406,31 +2512,9 @@ async function recordOutcome(
         counters.foreignOwnedCollision += 1;
         break;
       case 'source_disagreement':
+        // The blocking veto fired. The finding itself is opened below, for
+        // every outcome that carries one — see the note there.
         counters.sourceDisagreement += 1;
-        // §13: the ONE case Decision C names for data_issues. The refusal
-        // candidate below is still created, so the reviewer sees both the
-        // blocked proposal and the deduplicated finding behind it.
-        //
-        // `entity_id` is the RESOLVED target id, not the candidate's: a
-        // candidate carrying a refusal verb reports no target id at all, but
-        // a disagreement about an existing canonical row must name that row.
-        // It is NULL only when the target genuinely does not exist yet.
-        await writeDisagreementIssue(tx, draftDisagreementIssue({
-          wireFamily: input.wireFamily,
-          externalRecordId: record.externalRecordId,
-          targetTable,
-          targetId: resolvedTarget.targetId,
-          // The same version the candidate names, from the same decision, so
-          // the finding and the proposal can never cite different evidence.
-          sourceVersionSeq: outcome.observation?.versionSeq ?? null,
-          proposedValues: input.proposedValues,
-          claims: input.claims,
-          // Non-null for this verb: `reconcile()` reaches it only by
-          // classifying corroboration.
-          corroboration: outcome.corroboration ?? fail(
-            'A source_disagreement must carry the corroboration report that raised it.',
-          ),
-        }), counters);
         break;
       case 'manual_authority_conflict':
         counters.manualAuthorityRefusals += 1;
@@ -2440,6 +2524,41 @@ async function recordOutcome(
     }
   } else {
     counters.observationsCorrected += 1;
+  }
+
+  // §13: the ONE case Decision C names for data_issues, opened from the
+  // CORROBORATION REPORT rather than from the refusal verb (ISSUE-122 §10, S4).
+  //
+  // Under `corroboration_policy: "blocking"` these are the same thing and the
+  // behaviour is byte-identical to ISSUE-099: the veto fires, the outcome is a
+  // `source_disagreement` refusal, and this opens the finding behind it.
+  // Under `advisory` the veto is withdrawn and the outcome is a candidate (or
+  // a later refusal such as `manual_authority_conflict`) that still carries
+  // the same report — so the evidence must still be recorded. Keying it off
+  // the verb would have silently stopped opening findings the moment the veto
+  // was removed, which is exactly the outcome §10 forbids: evidence preserved,
+  // only the veto removed.
+  //
+  // `entity_id` is the RESOLVED target id, not the candidate's: a candidate
+  // carrying a refusal verb reports no target id at all, but a disagreement
+  // about an existing canonical row must name that row. It is NULL only when
+  // the target genuinely does not exist yet.
+  const report = outcome.kind === 'candidate'
+    ? outcome.proposal.corroboration
+    : outcome.corroboration;
+  if (report !== null && report.disagreeingGroups.length > 0) {
+    await writeDisagreementIssue(tx, draftDisagreementIssue({
+      wireFamily: input.wireFamily,
+      externalRecordId: record.externalRecordId,
+      targetTable,
+      targetId: resolvedTarget.targetId,
+      // The same version the candidate names, from the same decision, so the
+      // finding and the proposal can never cite different evidence.
+      sourceVersionSeq: outcome.observation?.versionSeq ?? null,
+      proposedValues: input.proposedValues,
+      claims: input.claims,
+      corroboration: report,
+    }), counters);
   }
 
   const candidate = draftCandidate({

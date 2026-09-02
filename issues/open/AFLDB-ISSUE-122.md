@@ -1338,3 +1338,375 @@ authority provider) and wire it into `tools/current-season/settle-afltables.ts` 
 `tests/current-season-import.test.ts` and an integration refusal case in
 `tests/integration/settle-afltables.test.ts` (both on `afldb_test`, which is now at `083`). No
 migration, no applier, no settle-logic change beyond the provider wiring.
+
+
+---
+
+### S2 — Manual authority (2026-09-02, Opus 5 / Medium / Normal, worktree `D:\dev\afldb-issue-122`, branch `claude/issue-122` at `37495c7`)
+
+**Outcome: S2 CODE COMPLETE and DB-free-green. `src/lib/acquisition/manual-authority.ts` written
+and wired into the settle CLI in place of `UNAVAILABLE_MANUAL_AUTHORITY`. The DB-free truth
+table, the two pinned contracts, `tsc --noEmit` and `eslint` are all green. The integration
+refusal case is WRITTEN BUT NOT YET EXECUTED — this workstation has no `.env` and no route to
+`afldb_test` (SSH to `arm@10.0.40.100` is `Permission denied (publickey,password)` from this
+session). Nothing committed. Production untouched. No migration written, no grant widened.**
+
+Commands in this stage were executed by Claude under the operator's explicit S2 instruction
+("Run only the validation required for S2"), the CLAUDE.md §9 exception. `npm ci` was run in the
+worktree because it had no `node_modules`; that directory is gitignored. No database was opened.
+
+#### Files changed
+
+| File | Change |
+|---|---|
+| `src/lib/acquisition/manual-authority.ts` | **NEW.** The real `ManualAuthorityProvider`. |
+| `src/lib/acquisition/settle-afltables.ts` | `SettleRunOptions.manualAuthorityLoader?` added; resolved once inside `sql.begin()` before any family is settled. `manualAuthority` kept as the fallback. No other change. |
+| `tools/current-season/settle-afltables.ts` | Supplies `manualAuthorityLoader: (tx) => loadManualAuthority(tx, bundle.season)`. `UNAVAILABLE_MANUAL_AUTHORITY` retained as the unreachable fallback, so an un-wired run still refuses. |
+| `tests/current-season-import.test.ts` | +3 describes (14 cases): the two pinned contracts, the full verdict truth table, and the "`data_edits` is not the authority source" / wiring assertions. |
+| `tests/integration/settle-afltables.test.ts` | +1 describe (5 cases) against real PostgreSQL; `cleanupIssue099()` extended to remove this suite's namespaced `data_overrides` rows. |
+
+`must` (untracked, unrelated) was not touched. Migration 073 was not modified; nothing widened
+`data_overrides.entity_type`; `afldb_import` was granted nothing.
+
+#### Authority semantics implemented
+
+The provider is a snapshot read plus a pure verdict function.
+
+**`matches` — answered from real rows.**
+
+- `SELECT entity_key, field_group FROM data_overrides WHERE entity_type='matches' AND is_active`.
+- Changed fields are mapped onto field groups by reading `EDITABLE_ENTITIES.matches.groups` from
+  `src/lib/edit/spec.ts` directly — the spec is the only mapping authority, so the five groups
+  (`attendance`, `score`, `match_time`, `match_event`, `notes`) are not re-declared here.
+- Any intersection between the proposal's touched groups and that match's active groups ⇒
+  **`conflict`**.
+- A changed field in no group (`round_code`, `venue_id`, `venue_raw`, `result`, `margin`,
+  `attendance_status`, `attendance_source_id`, …) maps to nothing: the editor does not expose it,
+  so no human can have overridden it.
+- **Provenance is authority too.** A match whose canonical `attendance_source_id` resolves to
+  source key `manual_admin_edit` ⇒ **`conflict`** for a proposal whose changed fields include
+  `attendance`, whether or not the override row survived.
+- An active override naming a `field_group` the editor no longer defines cannot be mapped onto
+  the proposal at all ⇒ **`indeterminate`** (added beyond §8's literal text; it fails closed,
+  and the alternative would silently read ambiguity as absence).
+
+**`match_period_scores`, `player_match_stats`, `brownlow_round_votes` — answered from proof.**
+
+`clear` **only while both pinned contracts hold**, checked at load time, not assumed:
+
+1. the live `data_overrides.entity_type` CHECK admits exactly `players`, `matches`,
+   `draft_picks` — read with `pg_get_constraintdef()` over `'public.data_overrides'::regclass`
+   and compared to `OVERRIDE_ENTITY_TYPES`; widened, narrowed, absent, duplicated or unparseable
+   all fail;
+2. `Object.keys(EDITABLE_ENTITIES)` is exactly those same three, and contains none of the three
+   targets.
+
+If either fails ⇒ **`indeterminate`**. `AFLDB-ISSUE-099` A4 is therefore satisfied without
+touching the 073 CHECK.
+
+**Everything else refuses.** Any other `entity`; an empty or non-string `fields`; a `targetKey`
+with no usable string `match_key`; any query error or unreadable result shape (the whole load is
+wrapped, and the `catch` returns `refusingProvider()`). There is no force flag and no bypass.
+
+**`data_edits` is not read.** The provider contains no reference to it; `afldb_import` still
+holds INSERT and no SELECT on it, already pinned by
+`tests/integration/privileges.test.ts:879-883` (`dataEditsSelect: false`) — that existing
+assertion is the correct home and needed no change, so none was made.
+
+#### Deviation from §8 as written (does not widen the contract)
+
+§8 requires the authority to be queried **inside** the transaction. `ManualAuthorityProvider` is
+synchronous by contract (`observations.ts:391`), so it cannot query per call. The snapshot is
+therefore read **once, inside the run transaction**, by `manualAuthorityLoader` at the top of
+`sql.begin()`, before any family is settled. The settle transaction takes no lock on
+`data_overrides`, so an override committed by an admin part-way through a long run is not seen by
+that run — it is seen by the next one, and until then the run proposes rather than applies. That
+gap is documented in the module header and is **carried to S5**: if the canonical writer needs a
+stronger guarantee it belongs with the writer (row locks, or `REPEATABLE READ`), not here.
+
+#### Tests, commands, results
+
+| Step | Command | Result |
+|---|---|---|
+| Install | `npm ci --no-audit --no-fund` | exit 0 (worktree had no `node_modules`) |
+| DB-free | `npx vitest run tests/current-season-import.test.ts` | **1 file / 194 tests passed, 0 failed**, 1.13 s (14 of them new) |
+| Adjacent | `npx vitest run tests/data-overrides-source-contract.test.ts` | passed |
+| Typecheck | `npx tsc --noEmit` | exit 0 (the config includes `tests/**`, so the integration file compiles) |
+| Lint | `npx eslint` over the five changed files | clean, no output |
+| Whitespace | `git diff --check` | clean |
+| Line endings | all five files 100 % CRLF | consistent with the rest of the tree |
+| **Integration** | `npx vitest run tests/integration/settle-afltables.test.ts` | **NOT RUN — blocked, see below** |
+
+The new DB-free coverage: migration 073's CHECK literal pinned; `editorEntityKeys()` pinned to
+the same three; the five `matches` group keys pinned; `checkAdmitsExactly()` proved against a
+real `pg_get_constraintdef()` rendering plus widened / narrowed / absent / non-`entity_type` /
+duplicated variants; the field→group mapping including the seven source-owned columns that map
+to nothing; and the whole verdict table — clear, conflict by group, conflict by attendance
+provenance, group-scoped and match-scoped non-interference, unmappable group, empty/ malformed
+question, foreign entity, the three unrepresentable targets both proven and unproven, and
+`refusingProvider()`.
+
+The five written integration cases (`afldb_test`, this suite's own namespaced fixtures): an
+active `score` override refuses a score proposal and only that group; deactivating it restores
+`clear`; `attendance_source_id` pointed at `manual_admin_edit` refuses `attendance` alone (the
+column is restored in a `finally`); the live CHECK is read back AND a `player_match_stats`
+override is proved to be rejected by PostgreSQL before the three targets are answered `clear`;
+and a closed connection refuses everything.
+
+#### Blockers
+
+1. **The integration case has not been executed.** This worktree has no `.env`, so
+   `AFLDB_TEST_DATABASE_URL` is unset and `tests/integration/guard.ts` refuses; and
+   `ssh arm@10.0.40.100` fails with `Permission denied (publickey,password)` from this session,
+   so the S1 route (validate in a throwaway clone on the development host) was not available.
+   **Exact command for the operator, on the development host, against `afldb_test` (now at
+   `083`):**
+
+   ```bash
+   npx vitest run tests/integration/settle-afltables.test.ts
+   ```
+
+   Expect the pre-existing suite unchanged plus `AFLDB-ISSUE-122 §8 — manual authority read from
+   data_overrides` 5/5.
+
+2. **Pre-existing S1 failure, NOT caused by S2 and NOT fixed here (out of the S2 boundary).**
+   `npx vitest run tests/reference-data.test.ts` fails 1 case:
+   `post-045 tables unreadable to afldb_import (§H12) > finds the tables created after 045 that
+   never registered import write` (`tests/reference-data.test.ts:333`). The list expects 11
+   tables; migration 083 added a 12th, `canonical_applications`, which S1 deliberately granted
+   directly rather than through `grant_import_write()` (S1 deviation notes). The assertion is a
+   deliberate exact-equality closure, so the fix is to add `'canonical_applications'` to that
+   literal list with a comment naming 083 — an S1 closeout item. S2 changed no file this test
+   reads. **Operator decision: fold it into the S1 commit, or take it as the first item of S3.**
+
+#### Git status at end of stage
+
+```
+ M CHANGELOG.md
+ M IssuesIndex.md
+ M issues.md
+ M issues/open/AFLDB-ISSUE-122.md
+ M src/lib/acquisition/settle-afltables.ts
+ M tests/current-season-import.test.ts
+ M tests/integration/settle-afltables.test.ts
+ M tools/current-season/settle-afltables.ts
+?? must
+?? src/lib/acquisition/manual-authority.ts
+```
+
+(The four tracking files are the S2 records: this runbook's §23 entry, the `CHANGELOG.md`
+`Unreleased` S2 entry, and the state/next-action cells in `issues.md` and `IssuesIndex.md`.)
+
+Branch `claude/issue-122` remains at `37495c7`. Nothing committed. `must` is the unrelated
+untracked root file and must stay out of any commit. `node_modules/` was created by `npm ci` and
+is gitignored.
+
+#### Next action — S3 (Ownership completion)
+
+Fresh session, same worktree and branch, carry-over this file. Scope per §16 row S3 and §7.2:
+empty `TARGETS_WITHOUT_SOURCE_ID` in `src/lib/acquisition/settle-afltables.ts:200-203` now that
+migration 083 has given `match_period_scores` and `brownlow_round_votes` their provenance
+quartet; make `resolveTarget()` read the real `source_id` for all four targets so
+`ownershipForTarget()` can return `'owned'`/`'unowned'` instead of the blanket
+`{ state: 'indeterminate' }`; and land E3's stricter auto-apply predicate. Gate: DB-free
+(`tests/current-season-import.test.ts`). Before starting, run the two commands under **Blockers**
+above — the S2 integration case and the `reference-data` decision. Do not start S4 (corroboration
+policy), S5 (the applier) or any canonical write.
+
+---
+
+### S1/S2 closeout + S3 + S4 (2026-09-02, Opus 5 (1M) / Medium / Normal, worktree `D:\dev\afldb-issue-122`, branch `claude/issue-122` at `37495c7`)
+
+#### S1/S2 closeout — both blockers cleared
+
+**Blocker 2 — the S1 `reference-data` test-list defect. FIXED.**
+`tests/reference-data.test.ts` post-045 exact-equality list now carries
+`'canonical_applications'`, with a comment naming migration 083 and the append-only-BY-GRANT
+rationale (083 hands `afldb_import` SELECT + INSERT + the sequence and `afldb_auth` SELECT;
+registering it with `afldb_meta.grant_import_write()` would restore UPDATE/DELETE/TRUNCATE on
+every privileges reconcile). This is the same distinction `promotion_decisions` already makes in
+the entry below it. **Migration 083 was not touched, `grant_import_write()` was not used, and no
+privilege was widened.** Result: `npx vitest run tests/reference-data.test.ts` — **41/41 pass**
+(42/42 after the S4 case below).
+
+**Blocker 1 — the unexecuted DB-backed validation. EXECUTED, GREEN.**
+Two attempts were needed and the first one is recorded because it is the reproducible trap:
+`AFLDB_TEST_DATABASE_URL` is `postgresql://***@127.0.0.1:5432/afldb_test`, written for execution
+**on the development host**, where PostgreSQL binds loopback only. With the `.env` merely copied
+into the worktree the suite aborted in `beforeAll` with `connect ECONNREFUSED 127.0.0.1:5432` and
+**25 tests skipped — zero assertions ran**, which is an environment failure and not an S1/S2
+result. Neither `127.0.0.1:5432` nor `10.0.40.100:5432` is reachable from the Windows worktree.
+The operator opened an SSH local forward (`-L 5432:127.0.0.1:5432 arm@10.0.40.100`) and the
+existing DSN then worked unchanged.
+
+```
+npx vitest run tests/integration/settle-afltables.test.ts
+Test Files  1 passed (1)
+     Tests  24 passed | 1 skipped (25)
+```
+
+All five `AFLDB-ISSUE-122 §8 — manual authority read from data_overrides` cases pass by name:
+active `score` override refuses the score proposal and only that group; deactivating it restores
+`clear`; `attendance_source_id = manual_admin_edit` refuses `attendance` on provenance alone; the
+live 073 CHECK is read back and a `player_match_stats` override is proved rejected by PostgreSQL
+before the three source-owned targets are answered `clear`; a closed connection refuses
+everything. The single skip is the pre-existing conditional one —
+`executes the whole write path under the restricted afldb_import role`, skipped because
+`AFLDB_TEST_IMPORT_DATABASE_URL` is unset. It is unrelated to S1/S2 and was skipped before them.
+
+**No substantive S1/S2 design problem was exposed, so S3 and S4 proceeded.**
+
+#### S3 — Ownership completion (§7.2, §16 row S3)
+
+`TARGETS_WITHOUT_SOURCE_ID` and every branch that consulted it are **removed**, not emptied.
+Migration 083 gave `match_period_scores` and `brownlow_round_votes` the provenance quartet, so
+the blanket `{ state: 'indeterminate' }` supply rule no longer describes reality, and keeping it
+would have left the two targets permanently unpromotable for a reason that had been fixed.
+
+- `ownershipForTarget(ownerSourceKey)` lost its target parameter: one rule for all four targets.
+  `null` → `unowned`, a key → `owned`.
+- `ownershipOf(refs, ownerSourceId)` likewise. An owner id that resolves to **no readable key**
+  is still `indeterminate` and still fails closed — an unreadable owner is not an absent one.
+- `resolveTarget()` now reads the real `source_id` for all four targets:
+  - `matches` — unchanged, already did.
+  - `player_match_stats` — unchanged, already did.
+  - `match_period_scores` — `source_id` added to the row read. The whole period set is **one**
+    target keyed on `match_id`, so its ownership is the ownership of the rows composing it: a
+    single readable owner shared by every row is that owner; a **mixed** set is `indeterminate`
+    and fails closed. An empty set is unreachable here because `targetEstablishedBySource()`
+    routes an unpublished period set to `new_target` first.
+  - `brownlow_round_votes` — `source_id` added to the row read and passed straight through.
+- **`source_id` is read for ownership only and is stripped from `targetValues`** for
+  `match_period_scores`. `period_scores` is compared field-for-field against
+  `proposedPeriodScoreValues()`, which carries no provenance; leaving the column in the compared
+  array would have made **every run look like a correction**. `matches`, `player_match_stats`
+  and `brownlow_round_votes` build `targetValues` from their explicit proposed-field lists and
+  were never exposed to this.
+
+New exported predicate `autoApplyOwnership(identity, promotingSourceKey)` → E3:
+
+| Identity state | Verdict |
+|---|---|
+| no canonical row (`new_target`) | `insertable` — an INSERT adopts nothing |
+| owner resolves to the promoting source | `updateable` |
+| owner resolves to another source | `refused` / `foreign_source_owner` |
+| `source_id IS NULL` (`unowned`) | `refused` / `ownership_indeterminate` |
+| owner unreadable (`indeterminate`) | `refused` / `ownership_indeterminate` |
+| identity `unresolved` | `refused` / `ownership_indeterminate` |
+| empty `promotingSourceKey` | throws |
+
+**The generic gate is untouched, and a test now pins the divergence on the same input.**
+`evaluateOwnership()` (`observations.ts:362`) and `evaluateTargetOwnership()`
+(`reconciliation.ts:142`) still answer `'ok'` for a NULL owner, so a source-less row stays
+promotable by a **human** through `promotion_candidates` and the §14 transition. Only the
+unattended path is narrowed, and only inside `autoApplyOwnership()`.
+
+**Nothing calls `autoApplyOwnership()` on a write path.** S3 implements the predicate; S5 must
+re-evaluate it inside the savepoint against state re-read in the same transaction, alongside
+E1, E2 and E4–E6. No canonical write, no S9 adoption, and no generic ownership behaviour was
+weakened outside the ISSUE-122 automatic path.
+
+#### S4 — Corroboration policy (§10, §16 row S4)
+
+`corroboration_policy: "blocking" | "advisory"` added to the source-family contract.
+
+- `src/lib/acquisition/source-families.ts`: `CorroborationPolicy` type,
+  `DEFAULT_CORROBORATION_POLICY = 'blocking'` (exported so the test can pin it),
+  `contract.corroborationPolicy`, and the key added to `FAMILY_KEYS`. `expectKeys()` gained an
+  `optional` argument and a new `OPTIONAL_FAMILY_KEYS = ['corroboration_policy']`, because
+  `expectKeys()` otherwise requires **every** declared key — without this, adding the key would
+  have made it mandatory on all eight families and contradicted "undeclared defaults to
+  blocking". **Only `undefined` takes the default**: `null`, a typo and a wrong type all still
+  fail closed, and every other family key stays mandatory.
+- `data/reference/source-families.json`: `"corroboration_policy": "advisory"` on
+  `afltables`/`match` and `afltables`/`player_match_stats` only, each with a `notes` entry
+  stating what advisory does and does not withdraw. The six other families are undeclared and
+  therefore blocking — Squiggle and Kali included.
+- `src/lib/acquisition/reconciliation.ts`: gate 7 is now
+  `disagreeingGroups.length > 0 && contract.corroborationPolicy === 'blocking'`.
+  `classifyCorroboration()` still runs on every path and the report still travels on the outcome.
+
+**One change was required that §10 implies but does not spell out.** `recordOutcome()` opened the
+`source_disagreement` `data_issues` row **inside the refusal switch**, keyed off the verb. Under
+`advisory` the outcome is a candidate, so keying it off the verb would have silently stopped
+opening findings the moment the veto was removed — the exact opposite of "evidence is preserved;
+only the veto is removed". The writer now runs from the **corroboration report**, for any outcome
+that carries one with disagreeing groups. Under `blocking` this is byte-identical to ISSUE-099.
+It additionally closes a latent gap: a `manual_authority_conflict` refusal carries a disagreement
+report and previously opened no finding for it.
+
+`counters.sourceDisagreement` keeps its meaning — disagreements that **refused** — and is now
+documented as such in `SettleCounters`. An advisory disagreement is counted where it is now
+recorded, by `dataIssuesOpened` / `dataIssuesRefreshed`. The §13.3 resolution path needed no
+change: it already recomputes corroboration for itself, verb-independently.
+
+Advisory disagreement does not skip any other gate. Proven both ways in the DB-free suite:
+ownership still refuses **before** it, and human authority is still asked and still refuses
+**after** it.
+
+#### One test amended, deliberately, with its reason recorded
+
+`tests/integration/settle-afltables.test.ts` →
+`opens exactly one row for a genuine independent score disagreement`:
+`result.counters.sourceDisagreement` changed `1` → `0`, and two assertions were **added** proving
+the reviewer now sees the proposal rather than a `source_disagreement` refusal. **Everything the
+test previously proved about the finding is unchanged and still asserted**: one row, the issue
+key, `entity_type`, the named `entity_id`, `severity = 'error'`, the full `details` object with
+`disagreeing_groups: ['squiggle']` and the `home_score` conflict, and the batch-stored counters.
+No regression coverage was deleted, skipped, disabled or weakened.
+
+#### Files changed this session
+
+| File | Stage | Change |
+|---|---|---|
+| `tests/reference-data.test.ts` | S1 closeout, S4 | `canonical_applications` added to the post-045 list; `mutated()` helper; the §10 registry case |
+| `src/lib/acquisition/settle-afltables.ts` | S3, S4 | `TARGETS_WITHOUT_SOURCE_ID` removed; `ownershipForTarget` / `ownershipOf` simplified; `autoApplyOwnership()` added; real `source_id` for all four targets; disagreement finding opened from the report; `sourceDisagreement` documented |
+| `tests/current-season-import.test.ts` | S3, S4 | ownership case rewritten; six E3 cases; the advisory-corroboration case |
+| `src/lib/acquisition/source-families.ts` | S4 | `CorroborationPolicy`, `DEFAULT_CORROBORATION_POLICY`, optional-key support |
+| `data/reference/source-families.json` | S4 | `advisory` on the two AFL Tables families, plus notes |
+| `src/lib/acquisition/reconciliation.ts` | S4 | gate 7 honours the policy |
+| `issues/open/AFLDB-ISSUE-122.md`, `issues.md`, `IssuesIndex.md`, `CHANGELOG.md` | tracking | this entry and the state/next-action cells |
+
+Untouched, as required: migrations 073–083, `tools/maintenance/privileges.sql`, canonical
+application logic (S5), derived recompute (S6), the Squiggle/Kali canonical writer (S7),
+scheduling (S8), transition/adoption (S9), production and `afldb_dev`. The untracked `must` file
+was not touched. A `.env` was placed in the worktree by the operator and is gitignored
+(`.gitignore:24`), so it is absent from `git status`.
+
+#### Validation
+
+| Command | Result |
+|---|---|
+| `npx vitest run tests/reference-data.test.ts` | **42/42 pass** (41 at closeout, +1 S4 case) |
+| `npx vitest run tests/current-season-import.test.ts` | **201/201 pass** (194 before; +6 E3, +1 advisory, ownership case rewritten) |
+| `npx vitest run tests/integration/settle-afltables.test.ts` | **24 passed, 1 skipped** — the skip is the pre-existing `AFLDB_TEST_IMPORT_DATABASE_URL` conditional |
+| the other five `source-families` / `reconciliation` consumers | **99 passed, 1 skipped** (`afl-api-lineup{,-store,-migration}`, `integration/observation-spine`, `integration/afl-api-lineup-store`) |
+| `npx tsc --noEmit` | exit 0 |
+| `npx eslint` on the six changed source/test files | 24 problems, **all pre-existing `no-explicit-any` in `tests/reference-data.test.ts`** — 24 at `HEAD` too, verified by linting the `HEAD` copy. Delta zero; the other five files are clean |
+| `git diff --check` | clean (CRLF advisories only) |
+
+#### Carried forward — BINDING on S5
+
+**The S2 authority-snapshot race.** `ManualAuthorityProvider` is synchronous and its snapshot is
+loaded **once**, inside `sql.begin()`, before the per-record loop. If `data_overrides` changes
+later in the same run, a record decided after that change is decided against a stale authority
+snapshot. This was deliberately **not** solved opportunistically in S3 or S4. **S5 must re-read
+both the manual authority AND the canonical target state immediately before the canonical
+mutation, inside the savepoint** — that is E4 and E5 together, and §5.1 already requires every
+condition to be re-evaluated there against state re-read in the same transaction. The S3
+predicate `autoApplyOwnership()` is subject to the same rule: it is pure, and S5 must feed it
+freshly-read ownership, never the value `resolveTarget()` computed earlier in the pass.
+
+Also still open from S0: the production copy of the §15.1 read-only query, which closes the S9
+decision.
+
+#### Next action — S5 (the applier)
+
+Fresh session, same worktree and branch, carry-over this file. Scope per §16 row S5 and §13:
+`src/lib/acquisition/canonical-apply.ts` — the four target writers, the `canonical_applications`
+ledger row, savepoint isolation, `targetNeedsApply` retry, wired into `recordOutcome()`;
+`SettleCounters`' literal-`0` types become `number`. Every one of E1–E6 re-evaluated inside the
+savepoint against re-read state, including the authority snapshot above. Gate: DB-free
+(`tests/current-season-import.test.ts`) plus integration
+(`tests/integration/settle-afltables.test.ts`). Running the integration suite from Windows needs
+the SSH local forward described under Blocker 1. Do not start S6.

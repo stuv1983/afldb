@@ -77,6 +77,12 @@ import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import {
+  checkAdmitsExactly,
+  loadManualAuthority,
+  MANUAL_ATTENDANCE_SOURCE_KEY,
+  UNREPRESENTABLE_OVERRIDE_ENTITIES,
+} from '@/lib/acquisition/manual-authority';
 import { persistSourceObservation } from '@/lib/acquisition/observation-store';
 import {
   UNAVAILABLE_MANUAL_AUTHORITY,
@@ -266,6 +272,12 @@ async function cleanupIssue099(client: postgres.Sql): Promise<void> {
   await client`
     DELETE FROM staging.external_current_matches
      WHERE external_game_id LIKE ${`${PREFIX}%`}
+  `;
+  // AFLDB-ISSUE-122 S2. This suite's own human-override fixtures, on its own
+  // namespaced keys — before `matches`, and never wider than the prefix.
+  await client`
+    DELETE FROM data_overrides
+     WHERE entity_type = 'matches' AND entity_key LIKE ${`${PREFIX}%`}
   `;
   // The ONE canonical fixture row, by its dedicated key and nothing wider.
   await client`DELETE FROM matches WHERE match_key LIKE ${`${PREFIX}%`}`;
@@ -1350,7 +1362,27 @@ describe('AFLDB-ISSUE-099 settle — the transaction against PostgreSQL', () => 
     it('opens exactly one row for a genuine independent score disagreement', async () => {
       const result = await runSettle(disagreeBundle(), true, T.issueOpen);
 
-      expect(result.counters.sourceDisagreement).toBe(1);
+      /*
+       * AMENDED by AFLDB-ISSUE-122 S4 (§10). `afltables`/`match` now declares
+       * `corroboration_policy: "advisory"`, so a disagreeing Squiggle no
+       * longer VETOES the proposal — `sourceDisagreement` counts refusals, and
+       * there is none. Everything else this test proved is unchanged and is
+       * still asserted below: the finding is opened, deduplicated, keyed,
+       * attributed and detailed exactly as before, because the settle writer
+       * opens it from the corroboration REPORT and not from the refusal verb.
+       *
+       * The candidate the reviewer sees is now the proposal itself rather than
+       * a `source_disagreement` refusal, which is the point of decision 5: a
+       * source being retired cannot block the source replacing it, and its
+       * agreement is never a prerequisite.
+       */
+      expect(result.counters.sourceDisagreement).toBe(0);
+      const disagreeCandidates = (await candidateRows())
+        .filter((row) => row.externalRecordId === DISAGREE_RECORD
+          && row.targetTable === 'matches');
+      expect(disagreeCandidates).toHaveLength(1);
+      expect(disagreeCandidates[0].verb).not.toBe('source_disagreement');
+
       expect(result.counters.dataIssuesOpened).toBe(1);
       expect(result.counters.dataIssuesRefreshed).toBe(0);
       expect(result.counters.dataIssuesResolved).toBe(0);
@@ -1742,4 +1774,208 @@ describe('AFLDB-ISSUE-099 settle — the transaction against PostgreSQL', () => 
       }
     },
   );
+});
+
+
+/* ================================================================== *
+ * AFLDB-ISSUE-122 S2 — the manual-authority provider against PostgreSQL
+ * ================================================================== */
+
+/**
+ * The DB-free truth table lives in `tests/current-season-import.test.ts`. What
+ * needs a real database is narrower and is exactly what is proved here: that
+ * an ACTIVE `data_overrides` row refuses authority over the fields it covers,
+ * that the live migration-073 CHECK still makes an override for the three
+ * source-owned targets unrepresentable, and that a manually-cited attendance
+ * figure refuses on provenance alone.
+ *
+ * Nothing here writes a canonical fact row. The one canonical column it moves
+ * — `attendance_source_id` on this suite's own fixture match — is restored in
+ * a `finally`, and every override row it creates is namespaced and removed.
+ */
+describe('AFLDB-ISSUE-122 §8 — manual authority read from data_overrides', () => {
+  let adminUserId = 0;
+  let createdAdmin = false;
+  let manualSourceId = 0;
+  let createdManualSource = false;
+
+  beforeAll(async () => {
+    const [existingAdmin] = await sql<{ id: number }[]>`
+      SELECT id::int AS id FROM auth_users ORDER BY id LIMIT 1
+    `;
+    if (existingAdmin) {
+      adminUserId = existingAdmin.id;
+    } else {
+      const [created] = await sql<{ id: number }[]>`
+        INSERT INTO auth_users (email, role)
+        VALUES ('issue122-authority-test@example.test', 'admin')
+        RETURNING id::int AS id
+      `;
+      adminUserId = created.id;
+      createdAdmin = true;
+    }
+
+    // Shared reference data, on the same terms as the sources rows above: a
+    // pre-existing row is borrowed and left exactly as found.
+    const [existingSource] = await sql<{ id: number }[]>`
+      SELECT id::int AS id FROM sources WHERE key = ${MANUAL_ATTENDANCE_SOURCE_KEY}
+    `;
+    if (existingSource) {
+      manualSourceId = existingSource.id;
+    } else {
+      const [created] = await sql<{ id: number }[]>`
+        INSERT INTO sources (key, name, kind)
+        VALUES (${MANUAL_ATTENDANCE_SOURCE_KEY}, 'Manual admin edit', 'manual')
+        RETURNING id::int AS id
+      `;
+      manualSourceId = created.id;
+      createdManualSource = true;
+    }
+  });
+
+  afterAll(async () => {
+    await sql`
+      DELETE FROM data_overrides
+       WHERE entity_type = 'matches' AND entity_key LIKE ${`${PREFIX}%`}
+    `;
+    if (createdManualSource) {
+      await sql`DELETE FROM sources WHERE id = ${manualSourceId}`;
+    }
+    if (createdAdmin) {
+      await sql`DELETE FROM auth_users WHERE id = ${adminUserId}`;
+    }
+  });
+
+  it('refuses a score proposal covered by an active override, and only that group', async () => {
+    await sql`
+      INSERT INTO data_overrides (
+        entity_type, entity_key, field_group, override_values, admin_user_id, is_active
+      ) VALUES (
+        'matches', ${DISAGREE_MATCH_KEY}, 'score',
+        ${sql.json({ home_goals: 21 })}, ${adminUserId}, true
+      )
+      ON CONFLICT (entity_type, entity_key, field_group) DO UPDATE
+        SET is_active = true, override_values = EXCLUDED.override_values
+    `;
+
+    const authority = await loadManualAuthority(sql, SEASON);
+
+    // The human decided the score. This source may not move it.
+    expect(authority({
+      entity: 'matches',
+      targetKey: { match_key: DISAGREE_MATCH_KEY },
+      fields: ['home_goals', 'home_behinds', 'home_score'],
+    })).toBe('conflict');
+
+    // A different field group on the same match carries no decision.
+    expect(authority({
+      entity: 'matches',
+      targetKey: { match_key: DISAGREE_MATCH_KEY },
+      fields: ['match_time'],
+    })).toBe('clear');
+
+    // Neither does a different match.
+    expect(authority({
+      entity: 'matches',
+      targetKey: { match_key: MATCH_KEY },
+      fields: ['home_goals'],
+    })).toBe('clear');
+  });
+
+  it('stops refusing once the override is deactivated', async () => {
+    await sql`
+      UPDATE data_overrides SET is_active = false
+       WHERE entity_type = 'matches' AND entity_key = ${DISAGREE_MATCH_KEY}
+         AND field_group = 'score'
+    `;
+    const authority = await loadManualAuthority(sql, SEASON);
+    expect(authority({
+      entity: 'matches',
+      targetKey: { match_key: DISAGREE_MATCH_KEY },
+      fields: ['home_goals'],
+    })).toBe('clear');
+  });
+
+  it('refuses attendance cited to manual_admin_edit, on provenance alone', async () => {
+    const [before] = await sql<{ sourceId: number }[]>`
+      SELECT attendance_source_id::int AS "sourceId"
+        FROM matches WHERE match_key = ${DISAGREE_MATCH_KEY}
+    `;
+    try {
+      await sql`
+        UPDATE matches SET attendance_source_id = ${manualSourceId}
+         WHERE match_key = ${DISAGREE_MATCH_KEY}
+      `;
+      const authority = await loadManualAuthority(sql, SEASON);
+      expect(authority({
+        entity: 'matches',
+        targetKey: { match_key: DISAGREE_MATCH_KEY },
+        fields: ['attendance', 'attendance_status'],
+      })).toBe('conflict');
+      // Only attendance. The rest of the proposal is not implicated.
+      expect(authority({
+        entity: 'matches',
+        targetKey: { match_key: DISAGREE_MATCH_KEY },
+        fields: ['home_goals'],
+      })).toBe('clear');
+    } finally {
+      await sql`
+        UPDATE matches SET attendance_source_id = ${before.sourceId}
+         WHERE match_key = ${DISAGREE_MATCH_KEY}
+      `;
+    }
+  });
+
+  it('proves from the live CHECK that the three source-owned targets are clear', async () => {
+    // The proof, not the assumption: this reads the constraint PostgreSQL is
+    // actually enforcing right now.
+    const [check] = await sql<{ def: string }[]>`
+      SELECT pg_get_constraintdef(c.oid) AS def
+        FROM pg_constraint c
+       WHERE c.conrelid = 'public.data_overrides'::regclass
+         AND c.contype = 'c'
+         AND pg_get_constraintdef(c.oid) LIKE '%entity_type%'
+    `;
+    expect(checkAdmitsExactly([check.def])).toBe(true);
+
+    // And the database refuses to store one, which is what makes it a proof.
+    await expect(sql`
+      INSERT INTO data_overrides (
+        entity_type, entity_key, field_group, override_values, admin_user_id
+      ) VALUES (
+        'player_match_stats', ${`${PREFIX}unrepresentable`}, 'stats',
+        ${sql.json({ goals: 3 })}, ${adminUserId}
+      )
+    `).rejects.toThrow();
+
+    const authority = await loadManualAuthority(sql, SEASON);
+    for (const entity of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
+      expect(authority({ entity, targetKey: { match_id: 1 }, fields: ['goals'] }))
+        .toBe('clear');
+    }
+  });
+
+  it('refuses everything when the authority state cannot be read', async () => {
+    const broken = postgres(process.env.AFLDB_TEST_DATABASE_URL as string, {
+      max: 1,
+      onnotice: () => {},
+      transform: { undefined: null },
+    });
+    try {
+      // A closed connection is an unreadable authority record, not an absent
+      // one, so every question refuses.
+      await broken.end({ timeout: 5 });
+      const authority = await loadManualAuthority(broken, SEASON);
+      expect(authority({
+        entity: 'matches',
+        targetKey: { match_key: DISAGREE_MATCH_KEY },
+        fields: ['home_goals'],
+      })).toBe('indeterminate');
+      expect(authority({
+        entity: 'player_match_stats', targetKey: { match_id: 1 }, fields: ['goals'],
+      })).toBe('indeterminate');
+    } finally {
+      await broken.end({ timeout: 5 });
+    }
+  });
 });
