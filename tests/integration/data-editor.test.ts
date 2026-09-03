@@ -6,6 +6,7 @@ import { saveEdit } from '@/db/queries/data-edits';
 import { saveMatchSheet } from '@/db/queries/match-sheet';
 import { recomputeClubSeasons } from '@/db/queries/player-derived';
 import { createImportRoleParityHarness } from './import-role-parity';
+import { seedWildcardFinalSeason, type WildcardFixture } from './wildcard-final-fixture';
 
 // Ensure saveMatchSheet uses the test database.
 process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
@@ -25,6 +26,7 @@ const TEST_NOTES = [
   'issue-083 restricted import-role audit proof',
   'issue-109 restricted override proof',
   'issue-109 restricted override restore',
+  'issue-132 wildcard brownlow refusal',
 ];
 let adminUserId = 0;
 let createdThrowawayAdmin = false;
@@ -574,5 +576,125 @@ describe('Targeted club_seasons rebuild (AFLDB-ISSUE-015)', () => {
       expect(homeAfter.pts).toBe(homeBefore.pts - 4);
       expect(awayAfter.pts).toBe(awayBefore.pts + 4);
     });
+  });
+});
+
+/**
+ * AFLDB-ISSUE-132 T6 — the admin write path keeps the Brownlow exclusion for a
+ * Wildcard Final. `saveMatchSheet` refuses votes whenever `is_final` is true,
+ * which a `wildcard_final` row is (ISSUE-129 §8.4), and the refusal fires
+ * before any player row is written, so the whole sheet is rejected, not just
+ * the votes. Fixture season 2088 (2087 belongs to database.test.ts).
+ *
+ * The payload must carry a complete 3-2-1 allocation: `validateMatchSheetPayload`
+ * runs before the transaction and refuses a partial allocation on its own, so a
+ * single voted row never reaches the `is_final` check (T6b pins that pre-write
+ * refusal separately). The club-membership and `is_final` checks both precede
+ * every player-row write, so the extra voted rows need not have played the match.
+ */
+describe('AFLDB-ISSUE-132 wildcard final on the admin match sheet', () => {
+  let fixture: WildcardFixture;
+  let thirdPlayerId = 0;
+
+  beforeAll(async () => {
+    fixture = await seedWildcardFinalSeason(2088);
+    const [third] = await sql<{ id: number }[]>`
+      SELECT id FROM players
+       WHERE id NOT IN (${fixture.wildcardOnlyPlayerId}, ${fixture.finalsSeriesPlayerId})
+       ORDER BY id
+       LIMIT 1
+    `;
+    if (!third) throw new Error('T6 needs a third existing player row in the test database.');
+    thirdPlayerId = third.id;
+  });
+
+  afterAll(async () => {
+    await fixture?.cleanup();
+  });
+
+  const readRow = async () => {
+    const [row] = await sql<{ brownlowVotes: number | null; kicks: number | null }[]>`
+      SELECT brownlow_votes AS "brownlowVotes", kicks
+        FROM player_match_stats
+       WHERE match_id = ${fixture.wildcardMatchId}
+         AND player_id = ${fixture.wildcardOnlyPlayerId}
+    `;
+    return row;
+  };
+
+  const expectNothingWritten = async (before: { brownlowVotes: number | null; kicks: number | null }) => {
+    // The refusal precedes every write: the votes stay NULL, the kick edit in
+    // the same sheet is rolled back with it, and no audit row was committed.
+    const after = await readRow();
+    expect(after.brownlowVotes).toBeNull();
+    expect(after.kicks).toBe(before.kicks);
+
+    const [audit] = await sql<{ count: number }[]>`
+      SELECT count(*)::int AS count
+        FROM data_edits
+       WHERE table_name = 'matches' AND row_id = ${fixture.wildcardMatchId}
+    `;
+    expect(audit.count).toBe(0);
+  };
+
+  it('T6: a complete Brownlow allocation is refused on a Wildcard Final and nothing is written', async () => {
+    const before = await readRow();
+    expect(before).toBeDefined();
+    expect(before.brownlowVotes).toBeNull();
+
+    const result = await saveMatchSheet({
+      matchId: fixture.wildcardMatchId,
+      syncMatchScores: false,
+      players: [
+        {
+          playerId: fixture.wildcardOnlyPlayerId,
+          clubId: fixture.wildcardWinnerClubId,
+          kicks: (before.kicks ?? 0) + 1,
+          brownlowVotes: 3,
+        },
+        {
+          playerId: fixture.finalsSeriesPlayerId,
+          clubId: fixture.wildcardWinnerClubId,
+          brownlowVotes: 2,
+        },
+        {
+          playerId: thirdPlayerId,
+          clubId: fixture.wildcardLoserClubId,
+          brownlowVotes: 1,
+        },
+      ],
+      adminUserId,
+      note: 'issue-132 wildcard brownlow refusal',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.error).toContain('Brownlow votes cannot be recorded');
+
+    await expectNothingWritten(before);
+  });
+
+  it('T6b: a partial Brownlow allocation is refused by the payload validator before any write', async () => {
+    const before = await readRow();
+    expect(before.brownlowVotes).toBeNull();
+
+    const result = await saveMatchSheet({
+      matchId: fixture.wildcardMatchId,
+      syncMatchScores: false,
+      players: [{
+        playerId: fixture.wildcardOnlyPlayerId,
+        clubId: fixture.wildcardWinnerClubId,
+        kicks: (before.kicks ?? 0) + 1,
+        brownlowVotes: 3,
+      }],
+      adminUserId,
+      note: 'issue-132 wildcard brownlow refusal',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.error).toContain('requires exactly one player with 3 votes, one with 2, and one with 1');
+
+    await expectNothingWritten(before);
   });
 });

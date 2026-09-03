@@ -19,7 +19,9 @@
  *
  * Seasons 2086 and 2090-2094 and 2098-2099 are already claimed by other
  * integration suites; the three ISSUE-129 consumers take 2095, 2096 and 2097
- * so the suites stay parallel-safe.
+ * so the suites stay parallel-safe. AFLDB-ISSUE-132 claims 2087
+ * (`database.test.ts`) and 2088 (`data-editor.test.ts`) for its visibility
+ * suites.
  *
  * The shape, one home-and-away round plus a two-match finals fringe:
  *
