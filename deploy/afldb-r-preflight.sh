@@ -36,7 +36,7 @@ cd "$PROJECT_ROOT"
 
 CONTRACT=tools/rebuild/fitzroy/fitzroy-contract.json
 
-. deploy/afldb-r-env.sh
+. "$PROJECT_ROOT/deploy/afldb-r-env.sh"
 
 echo "AFLDB R preflight — $PROJECT_ROOT"
 echo "Rscript:      $RSCRIPT"

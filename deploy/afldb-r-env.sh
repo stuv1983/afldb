@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-130 — the R runtime the settle chain runs under.
 #
-# SOURCED, never executed: `. deploy/afldb-r-env.sh` from the project root by
+# SOURCED, never executed: `. "$PROJECT_ROOT/deploy/afldb-r-env.sh"` by
 #
 #   deploy/afldb-settle-afltables.sh   (the unit, every nightly firing)
 #   deploy/afldb-r-preflight.sh        (deploy-time validation)

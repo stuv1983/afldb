@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, join, resolve } from 'node:path';
 
 import { fetchKaliCurrentMatches, fetchSquiggleCurrentMatches } from '@/lib/external-afl/current-matches';
 import {
@@ -4237,6 +4239,9 @@ describe('AFLDB-ISSUE-128 — source completeness', () => {
  * ------------------------------------------------------------------ */
 
 describe('AFLDB-ISSUE-130 — the R runtime declaration', () => {
+  // The one resolution line both scripts must share, and the one sourcing form.
+  const ROOT_LINE = 'PROJECT_ROOT=${AFLDB_PROJECT_ROOT:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}';
+  const SOURCE_LINE = '. "$PROJECT_ROOT/deploy/afldb-r-env.sh"';
   const settle = readSource('deploy/afldb-settle-afltables.sh');
   const fragment = readSource('deploy/afldb-r-env.sh');
   const preflight = readSource('deploy/afldb-r-preflight.sh');
@@ -4248,15 +4253,37 @@ describe('AFLDB-ISSUE-130 — the R runtime declaration', () => {
 
   describe('the settle script', () => {
     it('sources the shared fragment before it invokes Rscript, and resolves RSCRIPT nowhere else', () => {
-      const sourced = settle.indexOf('. deploy/afldb-r-env.sh');
+      const sourced = settle.indexOf(SOURCE_LINE);
       const invoked = settle.indexOf('"$RSCRIPT" tools/rebuild/fitzroy/acquire_core.R');
       expect(sourced).toBeGreaterThan(-1);
       expect(invoked).toBeGreaterThan(sourced);
       // The fragment is the single place the interpreter is resolved: a second
       // definition here would let the unit and the preflight drift apart.
       expect(settle).not.toMatch(/^RSCRIPT=/m);
-      // It is sourced after `cd "$PROJECT_ROOT"`, so the relative path is real.
+      // It is sourced after `cd "$PROJECT_ROOT"`, and through PROJECT_ROOT.
       expect(settle.indexOf('cd "$PROJECT_ROOT"')).toBeLessThan(sourced);
+    });
+
+    it('resolves PROJECT_ROOT from its own location, exactly as the preflight does (Stage 3 defect)', () => {
+      // Stage 3 on streamanator: the unit was pointed at a worktree checkout
+      // and died with `.: cannot open deploy/afldb-r-env.sh` because this
+      // script defaulted PROJECT_ROOT to the literal canonical path and cd'd
+      // there, away from the copy actually being run. The default must be
+      // derived from $0, so the fragment sourced is the one beside the script.
+      expect(settle).toContain(ROOT_LINE);
+      expect(preflight).toContain(ROOT_LINE);
+      // The override survives, first, as the only way to name another root.
+      expect(settle).toMatch(/^PROJECT_ROOT=\$\{AFLDB_PROJECT_ROOT:-/m);
+      // And the canonical path is no longer a fallback anywhere in the script:
+      // a wrong checkout must fail loudly, never quietly run production's copy.
+      expect(settle).not.toMatch(/^PROJECT_ROOT=.*\/home\/arm\/projects\/afldb/m);
+      expect(settle).not.toContain('PROJECT_ROOT:-/home/');
+      // Both scripts source the fragment through the resolved root, never a
+      // bare relative path that depends on where the shell happens to be.
+      expect(settle).toContain(SOURCE_LINE);
+      expect(preflight).toContain(SOURCE_LINE);
+      expect(settle).not.toContain('. deploy/afldb-r-env.sh');
+      expect(preflight).not.toContain('. deploy/afldb-r-env.sh');
     });
 
     it('keeps the three-step chain, its flags, its label and its cleanup trap unchanged', () => {
@@ -4267,6 +4294,103 @@ describe('AFLDB-ISSUE-130 — the R runtime declaration', () => {
       expect(settle).toContain('label="settle-${season}-$(date +%Y-%m-%d-%H%M)"');
       expect(settle).toContain('trap cleanup_partial EXIT');
       expect(settle).toContain('set -eu');
+    });
+  });
+
+  /* The Stage 3 defect, executed rather than grepped. The settle script is
+   * copied VERBATIM into a temporary checkout with its own copy of the fragment
+   * (the real one, plus one sentinel line that prints the directory it was
+   * sourced in), an empty in-progress register, and a stub "python" that
+   * answers the season question with AMBIGUOUS:0. That drives the real script
+   * through root resolution, the fragment and the season gate, then out at
+   * the out-of-season `exit 0` — before any label, network or PostgreSQL.
+   * The process runs with its working directory somewhere ELSE, so a
+   * dependency on the caller's cwd would fail here too. Requires a POSIX sh
+   * (Linux always; Windows through Git Bash); skipped, loudly, without one. */
+  describe('the settle script, executed from a temporary alternate checkout', () => {
+    const haveSh = spawnSync('sh', ['-c', 'exit 0']).status === 0;
+    const scratch: string[] = [];
+    const posix = (p: string) => p.replace(/\\/g, '/');
+
+    function makeCheckout(tag: string): string {
+      const root = mkdtempSync(join(tmpdir(), `afldb-issue-130-${tag}-`));
+      scratch.push(root);
+      mkdirSync(join(root, 'deploy'));
+      mkdirSync(join(root, 'data', 'reference'), { recursive: true });
+      writeFileSync(join(root, 'deploy', 'afldb-settle-afltables.sh'), settle);
+      writeFileSync(
+        join(root, 'deploy', 'afldb-r-env.sh'),
+        `${fragment}\necho "AFLDB_TEST_FRAGMENT_ROOT=$PWD"\n`,
+      );
+      writeFileSync(join(root, 'data', 'reference', 'seasons.json'), '{"in_progress_seasons":[]}\n');
+      const python = join(root, 'fake-python');
+      writeFileSync(python, '#!/bin/sh\ncat >/dev/null\necho AMBIGUOUS:0\n');
+      chmodSync(python, 0o755);
+      return root;
+    }
+
+    function runSettle(root: string, env: Record<string, string> = {}) {
+      const script = posix(join(root, 'deploy', 'afldb-settle-afltables.sh'));
+      const inherited = { ...process.env };
+      delete inherited.AFLDB_PROJECT_ROOT;
+      delete inherited.AFLDB_R_LIBS;
+      return spawnSync('sh', [script], {
+        cwd: tmpdir(), // deliberately NOT the checkout
+        encoding: 'utf8',
+        env: { ...inherited, AFLDB_PYTHON: posix(join(root, 'fake-python')), ...env },
+      });
+    }
+
+    afterEach(() => {
+      for (const root of scratch.splice(0)) rmSync(root, { recursive: true, force: true });
+    });
+
+    it.skipIf(!haveSh)('sources the fragment beside ITSELF, not one under /home/arm/projects/afldb', () => {
+      const root = makeCheckout('alt');
+      const run = runSettle(root);
+      expect(run.stderr).toBe('');
+      expect(run.status).toBe(0);
+      // The sentinel names the directory the fragment ran in: this checkout.
+      // (Git Bash reports C:/x as /c/x, so match on the unique leaf name.)
+      expect(run.stdout).toMatch(/^AFLDB_TEST_FRAGMENT_ROOT=.*$/m);
+      expect(run.stdout).toContain(`/${basename(root)}\n`);
+      expect(run.stdout).not.toContain('/home/arm/projects/afldb');
+      // It got as far as the season gate and stopped there, cleanly.
+      expect(run.stdout).toContain('nothing to settle');
+    });
+
+    it.skipIf(!haveSh)('runs the real fragment it found: a missing AFLDB_R_LIBS is refused before anything else', () => {
+      const root = makeCheckout('libs');
+      const run = runSettle(root, { AFLDB_R_LIBS: posix(join(root, 'no-such-library')) });
+      expect(run.status).toBe(1);
+      expect(run.stderr).toContain('AFLDB_R_LIBS is set to');
+      expect(run.stderr).toContain('does not exist');
+      expect(run.stdout).not.toContain('nothing to settle');
+      expect(run.stdout).not.toContain('AFLDB in-season settle');
+    });
+
+    it.skipIf(!haveSh)('still honours AFLDB_PROJECT_ROOT as an explicit override of its own location', () => {
+      const here = makeCheckout('here');
+      const other = makeCheckout('other');
+      const run = runSettle(here, { AFLDB_PROJECT_ROOT: posix(other) });
+      expect(run.stderr).toBe('');
+      expect(run.status).toBe(0);
+      expect(run.stdout).toContain(`/${basename(other)}\n`);
+      expect(run.stdout).not.toContain(`/${basename(here)}\n`);
+    });
+
+    it.skipIf(!haveSh)('fails loudly, not silently, when the resolved root is not a checkout', () => {
+      const root = makeCheckout('broken');
+      rmSync(join(root, 'deploy', 'afldb-r-env.sh'));
+      const run = runSettle(root);
+      expect(run.status).not.toBe(0);
+      expect(run.stderr).toContain('afldb-r-env.sh');
+      expect(run.stdout).not.toContain('nothing to settle');
+    });
+
+    it('is not silently skipped on the supported runtime', () => {
+      // Linux is the runtime that matters; there, `sh` must exist.
+      if (process.platform === 'linux') expect(haveSh).toBe(true);
     });
   });
 
@@ -4305,7 +4429,7 @@ describe('AFLDB-ISSUE-130 — the R runtime declaration', () => {
 
   describe('deploy/afldb-r-preflight.sh', () => {
     it('exercises the same resolution the unit does', () => {
-      expect(preflight).toContain('. deploy/afldb-r-env.sh');
+      expect(preflight).toContain(SOURCE_LINE);
       expect(preflight).toContain('set -eu');
       expect(preflight).toContain('"$RSCRIPT" -');
     });

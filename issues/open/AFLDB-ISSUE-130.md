@@ -6,7 +6,8 @@
 >
 > Sections marked **[CONFIRMED]** are repository or host evidence verified in a session.
 > Sections marked **[PROPOSED]** were Stage 1 design; **§9 records the Stage 2 implementation**
-> (2026-09-03). Stage 3 host validation is the exact next action (§9.6).
+> (2026-09-03). **§10 records the Stage 3 host result: fragment/preflight proved under systemd,
+> one settle-script defect found and corrected; the revised host retry is §10.6.**
 
 ---
 
@@ -440,3 +441,136 @@ runs; step D exits 0 with `SOURCE COMPLETENESS: COMPLETE`. If step D still fails
 with the drop-in absent, the preflight output from C is the evidence to bring back. Only after
 D passes: `CHANGELOG.md` (Unreleased) entry and close the issue. `/home/arm/R/library` may then
 be left in place or removed; nothing tracked references it.
+
+---
+
+## 10. Stage 3 host validation — one defect found, corrected [CONFIRMED]
+
+> Session: 2026-09-03, Fable 5.1 / Stage 3 correction, same worktree and branch, on top of
+> the Stage 2 commit `d2d2353`. streamanator and production were **not** modified from this
+> session.
+
+### 10.1 What Stage 3 proved before the failure
+
+On streamanator the branch was checked out as a worktree at
+`/home/arm/projects/afldb-issue-130` (commit `d2d2353`) and §9.6 steps A–C were completed:
+
+- host reconciled to the canonical layout: `jsonlite` 1.8.8 and `digest` 0.6.34 in
+  `/usr/lib/R/site-library`, `fitzRoy` 1.8.0 in `/usr/local/lib/R/site-library`;
+- the temporary `R_LIBS_USER` drop-in removed; `systemctl show … -p Environment` prints
+  `Environment=`;
+- the preflight ended `R PREFLIGHT: OK`, exit 0, **both** interactively and under
+  `systemd-run` with the unit's properties.
+
+So the R-runtime declaration itself (fragment + preflight) is proved on Linux under systemd.
+
+### 10.2 The failure (step D, supervised settle from the worktree)
+
+The supervised run was pointed at the worktree copy:
+
+```text
+ExecStart=/bin/sh /home/arm/projects/afldb-issue-130/deploy/afldb-settle-afltables.sh
+WorkingDirectory=/home/arm/projects/afldb-issue-130
+```
+
+and died before the season gate:
+
+```text
+/home/arm/projects/afldb-issue-130/deploy/afldb-settle-afltables.sh: 48:
+.: cannot open deploy/afldb-r-env.sh: No such file
+```
+
+`sh -x` shows why:
+
+```text
++ PROJECT_ROOT=/home/arm/projects/afldb
++ cd /home/arm/projects/afldb
++ . deploy/afldb-r-env.sh
+deploy/afldb-settle-afltables.sh: 48: .: cannot open deploy/afldb-r-env.sh: No such file
+```
+
+### 10.3 Root cause
+
+`deploy/afldb-settle-afltables.sh` defaulted `PROJECT_ROOT` to the **literal** canonical path
+(`${AFLDB_PROJECT_ROOT:-/home/arm/projects/afldb}`), `cd`'d there, and then sourced the
+fragment by a bare relative path. Run from any other checkout, the script silently left the
+copy it was started from and executed against the canonical checkout, which at `main` has no
+`deploy/afldb-r-env.sh`. Two consequences:
+
+1. branch/worktree deployment validation could not exercise the branch's own implementation at
+   all — the Stage 2 script was unrunnable from anywhere but the canonical path;
+2. more generally, the new fragment lookup was coupled to the canonical path rather than to
+   the script's own checkout, so a worktree run of a branch that *did* exist at `main` would
+   have quietly run `main`'s tools and fragment instead, with no message.
+
+The Stage 2 preflight (`deploy/afldb-r-preflight.sh`) already resolved its root from its own
+location, which is why step C passed from the worktree while D failed. The Stage 2 tests
+asserted the sourcing *order* and the literal string `. deploy/afldb-r-env.sh`, and never
+executed the script, so nothing failed on Windows.
+
+### 10.4 Corrective implementation
+
+| File | Change |
+|---|---|
+| `deploy/afldb-settle-afltables.sh` | `PROJECT_ROOT=${AFLDB_PROJECT_ROOT:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}` — the same convention the preflight already used. Under the unit `$0` is the absolute `ExecStart=` path, so the result is `/home/arm/projects/afldb` exactly as before; from a worktree it is that worktree; it does not depend on the caller's cwd. The `AFLDB_PROJECT_ROOT` override is kept, first, unchanged. The fragment is now sourced as `. "$PROJECT_ROOT/deploy/afldb-r-env.sh"` so it can only ever be this checkout's own. Steps, flags, label scheme, trap, season gate, `set -eu` and exit semantics unchanged (asserted by the existing test). |
+| `deploy/afldb-r-preflight.sh` | sources the fragment through `"$PROJECT_ROOT/…"` too, so the two scripts are line-for-line identical in how they find it (asserted). |
+| `deploy/afldb-r-env.sh` | header comment updated to the new sourcing form. No code change. |
+| `deploy/afldb-settle-afltables.service` | **untouched**; existing tests re-assert `ExecStart`, no `Environment=`, the full hardening set and `TimeoutStartSec=3600`. |
+| `tests/current-season-import.test.ts` | one new static assertion (both scripts contain the identical resolution line; no `/home/…` default for `PROJECT_ROOT`; fragment sourced through `$PROJECT_ROOT` in both, bare relative form absent), and a new **executing** harness `describe('the settle script, executed from a temporary alternate checkout')`: the real settle script is copied verbatim into a `mkdtemp` checkout with the real fragment plus one sentinel `echo` line, an empty in-progress register and a stub `AFLDB_PYTHON` that answers `AMBIGUOUS:0`; it is run by `sh` **with cwd elsewhere**. Cases: (1) sentinel names the temp checkout, `nothing to settle`, exit 0, no `/home/arm/projects/afldb` in output; (2) `AFLDB_R_LIBS` naming a missing dir → the real fragment's refusal, exit 1, no label; (3) `AFLDB_PROJECT_ROOT` pointing at a second temp checkout → the override wins; (4) fragment deleted → non-zero exit naming `afldb-r-env.sh`, nothing after it runs; (5) on Linux `sh` must exist (`skipIf` cannot hide the harness on the supported runtime). Reaches neither network, R nor PostgreSQL. |
+
+### 10.5 Validation (Windows worktree, 2026-09-03)
+
+| Check | Result |
+|---|---|
+| `sh -n` on the three shell files | OK |
+| Harness run manually from the scratchpad with cwd `/tmp` | new script: sentinel printed with the alternate root, `nothing to settle`, exit 0; with `AFLDB_R_LIBS=/nonexistent/rlib`: fragment refusal, exit 1; **Stage 2 script from the same alternate root: `cd: /home/arm/projects/afldb: No such file or directory`, exit 1** — the Stage 3 failure reproduced |
+| `npx vitest run tests/current-season-import.test.ts -t ISSUE-130` | 24 passed (18 existing + 6 new), harness cases confirmed executed, not skipped |
+| Same, with the Stage 2 script temporarily restored | **5 failed** (the new static test, the modified sourcing test, and three harness cases) — the new coverage would have failed Stage 2 |
+| `npx vitest run tests/current-season-import.test.ts` | 252 passed |
+| `npx eslint tests/current-season-import.test.ts` | clean |
+| `git diff --check` | clean |
+
+### 10.6 Exact revised Stage 3 host retry (streamanator only)
+
+Steps A–C of §9.6 are done and need not be repeated. From the worktree, after fetching the
+corrective commit:
+
+```bash
+cd /home/arm/projects/afldb-issue-130
+git pull --ff-only                                  # must land the corrective commit
+git log -1 --oneline
+
+# 1. no-network proof that the script now finds ITS OWN fragment: run it from a
+#    different directory with a deliberately missing library dir. Expected: the
+#    fragment's four-line "AFLDB_R_LIBS is set to '/nonexistent/rlib'…" refusal on
+#    stderr and exit=1 — i.e. the fragment beside the script was sourced and
+#    stopped the run before any label, fetch or database.
+cd /tmp
+AFLDB_R_LIBS=/nonexistent/rlib sh /home/arm/projects/afldb-issue-130/deploy/afldb-settle-afltables.sh; echo "exit=$?"
+cd /home/arm/projects/afldb-issue-130
+
+# 2. preflight again from the worktree (unchanged behaviour expected: R PREFLIGHT: OK)
+sh deploy/afldb-r-preflight.sh
+
+# 3. the supervised settle, pointed at the worktree exactly as in the failed run.
+#    Use whatever override produced the ExecStart above; the transient-unit form is:
+sudo systemd-run --wait --pipe --collect --unit=afldb-settle-issue130 \
+  -p User=arm -p Group=arm \
+  -p WorkingDirectory=/home/arm/projects/afldb-issue-130 \
+  -p EnvironmentFile=/home/arm/projects/afldb/.env \
+  -p ProtectHome=read-only -p ProtectSystem=strict -p PrivateTmp=true \
+  -p NoNewPrivileges=true -p TimeoutStartSec=3600 \
+  -p ReadWritePaths=/home/arm/projects/afldb-issue-130/data/sources \
+  -p ReadWritePaths=/home/arm/projects/afldb-issue-130/docs/rebuild-manifests/afltables_fitzroy_core \
+  /bin/sh /home/arm/projects/afldb-issue-130/deploy/afldb-settle-afltables.sh; echo "exit=$?"
+```
+
+Expected for step 3: `AFLDB in-season settle — season 2026, label settle-2026-…`, `[1/3]`
+acquire via fitzRoy resolving from the canonical library, `[3/3]` … `SOURCE COMPLETENESS:
+COMPLETE`, `settle chain complete`, exit 0, with the drop-in absent. Then §9.6 step E
+(read-only look at production's library), then `CHANGELOG.md` (Unreleased) and close.
+
+Note for step 3: the worktree's `data/sources` and `docs/rebuild-manifests/afltables_fitzroy_core`
+must exist because `ReadWritePaths` without a leading `-` fails the unit if they do not; the
+snapshot and manifest the run writes land in the **worktree**, not in
+`/home/arm/projects/afldb`, which is the correct place for a branch validation run.
