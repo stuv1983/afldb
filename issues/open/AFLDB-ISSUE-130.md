@@ -7,7 +7,9 @@
 > Sections marked **[CONFIRMED]** are repository or host evidence verified in a session.
 > Sections marked **[PROPOSED]** were Stage 1 design; **§9 records the Stage 2 implementation**
 > (2026-09-03). **§10 records the Stage 3 host result: fragment/preflight proved under systemd,
-> one settle-script defect found and corrected; the revised host retry is §10.6.**
+> one settle-script defect found and corrected; the revised host retry is §10.6. §11 records the
+> Stage 3 retry at `98dc294`: supervised settle COMPLETE with the drop-in absent; dev host done.
+> Next: §11.7 read-only production inspection.**
 
 ---
 
@@ -574,3 +576,160 @@ Note for step 3: the worktree's `data/sources` and `docs/rebuild-manifests/aflta
 must exist because `ReadWritePaths` without a leading `-` fails the unit if they do not; the
 snapshot and manifest the run writes land in the **worktree**, not in
 `/home/arm/projects/afldb`, which is the correct place for a branch validation run.
+
+---
+
+## 11. Stage 3 host validation complete — streamanator green [CONFIRMED]
+
+Session 2026-09-03, streamanator, `/home/arm/projects/afldb-issue-130` at `98dc294`. Every
+step of §10.6 ran and passed. No further dev-host change is required. No repository file was
+changed on the host. The evidence below is recorded verbatim from the operator.
+
+### 11.1 Canonical R host state (after §9.6 steps A–B)
+
+| Item | Value |
+|---|---|
+| R | 4.3.3 |
+| `jsonlite` | 1.8.8 from `/usr/lib/R/site-library` (apt) |
+| `digest` | 0.6.34 from `/usr/lib/R/site-library` (apt) |
+| `fitzRoy` | 1.8.0 from `/usr/local/lib/R/site-library` (canonical, dated Posit snapshot) |
+| temporary `R_LIBS_USER` drop-in | removed |
+| `systemctl show afldb-settle-afltables.service -p Environment` | `Environment=` |
+
+### 11.2 Tracked preflight (§9.6 step C, repeated at `98dc294`)
+
+```text
+sh deploy/afldb-r-preflight.sh
+R PREFLIGHT: OK
+exit=0
+```
+
+Service-equivalent `systemd-run` preflight: `Finished with result: success`,
+`Main processes terminated with code=exited/status=0`, `exit=0`.
+
+### 11.3 Stage 3 correction proof (§10.6 step 1 — no network, no database)
+
+```text
+AFLDB_R_LIBS=/nonexistent/rlib \
+  sh /home/arm/projects/afldb-issue-130/deploy/afldb-settle-afltables.sh
+
+AFLDB_R_LIBS is set to '/nonexistent/rlib', but that directory does not exist.
+...
+Refusing to continue.
+exit=1
+```
+
+This is the fragment's refusal, so `98dc294` resolves and sources `deploy/afldb-r-env.sh`
+from **its own checkout** and stops before label, acquisition or database. The §10.3 root
+cause is closed on the host, not only in the test harness.
+
+### 11.4 Supervised settle (§10.6 step 3, drop-in ABSENT)
+
+**First attempt:** acquisition and adjudication succeeded — the R library resolution now works
+under the unit's sandbox — and the run then failed at the Node stage because the isolated
+validation worktree had no `node_modules`/`tsx`. That is validation-worktree setup only, not a
+repository defect (the canonical checkout carries its own `node_modules`). A host-local symlink
+was added, `/home/arm/projects/afldb-issue-130/node_modules -> /home/arm/projects/afldb/node_modules`;
+no repository file changed.
+
+**Second attempt (transient systemd unit, same override):** completed.
+
+```text
+label                                  settle-2026-2026-09-03-1633
+matches                                209
+player_match_rows                      9614
+rejections                             0
+unkeyed_rejections                     0
+afltables.match                        209  complete=True
+afltables.player_match_stats           9614 complete=True
+SOURCE COMPLETENESS: COMPLETE — every acquired row was represented.
+Open canonical apply failures (0)
+Open source disagreements (0)
+settle chain complete — label settle-2026-2026-09-03-1633
+Finished with result: success
+Main processes terminated with code=exited/status=0
+exit=0
+```
+
+This matches the §1 baseline that previously needed the hand-written drop-in (209 / 9,614 / 0
+unkeyed / COMPLETE), now achieved with the unit declaring nothing and the packages in the
+canonical layout — the defect as stated in §3.1 is resolved on the dev host.
+
+### 11.5 Cleanup — effective unit after validation
+
+The temporary persistent validation drop-in was removed and `systemctl daemon-reload` run.
+Effective service state:
+
+```text
+ExecStart=/bin/sh /home/arm/projects/afldb/deploy/afldb-settle-afltables.sh
+Environment=
+WorkingDirectory=/home/arm/projects/afldb
+ReadWritePaths=/home/arm/projects/afldb/data/sources
+               /home/arm/projects/afldb/docs/rebuild-manifests/afltables_fitzroy_core
+```
+
+No ISSUE-130 worktree path remains in the effective unit. Note that
+`/home/arm/projects/afldb` (the checkout the unit executes) is still at `main` until
+`claude/issue-130` is merged and pulled; the scripts validated here ran from the worktree.
+
+### 11.6 What remains open
+
+- **Not closed.** `CHANGELOG.md` untouched by design. Production untouched.
+- The §9.6 step E production look has **not** been done. Production is a different host
+  (`afldb-prod`) with a different history: it is known to lag `main` by many commits, its
+  `sudo` needs a password, and earlier provisioning notes record **no R installed at all**.
+  Nothing here may assume production matches streamanator's layout.
+- Merge of `claude/issue-130` into `main` and the ordinary `git pull` deploy to
+  `/home/arm/projects/afldb` are operator steps outside this runbook's evidence.
+
+### 11.7 Exact next action — read-only production inspection (afldb-prod)
+
+Purpose: establish, without changing anything, (a) whether the settle unit exists on
+production at all, (b) whether R and the three packages exist and where, and (c) whether any
+host-local drop-in or `.Renviron` is already compensating. Every command below is read-only;
+none needs `sudo`; none writes, installs, restarts or reloads. Run them on `afldb-prod` and
+bring back the raw output. Where a command's target is absent, the "not found" output is
+itself the evidence — do not fix anything in the same session.
+
+```bash
+# 0. which checkout and commit production runs
+cd ~/projects/afldb 2>/dev/null && git log -1 --oneline && git status --short | head
+ls -l deploy/afldb-r-env.sh deploy/afldb-r-preflight.sh deploy/afldb-settle-afltables.sh 2>&1
+
+# 1. does the settle unit exist on production, and does anything host-local shape it
+systemctl list-unit-files 'afldb-*' --no-pager
+systemctl cat afldb-settle-afltables.service --no-pager 2>&1 | head -60
+ls -la /etc/systemd/system/afldb-settle-afltables.service.d/ 2>&1
+systemctl show afldb-settle-afltables.service -p Environment -p EnvironmentFiles -p ExecStart -p WorkingDirectory -p ReadWritePaths 2>&1
+systemctl list-timers 'afldb-*' --all --no-pager
+
+# 2. R runtime: present? which? from where?
+command -v R Rscript; Rscript --version 2>&1
+dpkg -l 'r-base*' 'r-cran-jsonlite' 'r-cran-digest' 2>/dev/null | awk '/^ii|^un|^rc/'
+ls -la /usr/lib/R/site-library /usr/local/lib/R/site-library /usr/lib/R/library 2>&1 | head -40
+ls -la ~/R 2>&1 | head; ls -la ~/.Renviron ~/.Rprofile /etc/R/Renviron.site /usr/lib/R/etc/Renviron.site 2>&1
+grep -n 'R_LIBS' ~/.Renviron /etc/R/Renviron.site /usr/lib/R/etc/Renviron.site /etc/environment 2>/dev/null
+
+# 3. only if Rscript resolved in step 2 — library paths and the three packages
+Rscript -e 'print(.libPaths()); for (p in c("jsonlite","digest","fitzRoy")) { d <- system.file(package=p); cat(sprintf("%-9s %s  %s\n", p, if (nzchar(d)) as.character(packageVersion(p)) else "MISSING", dirname(d))) }' 2>&1
+
+# 4. only if step 0 shows the tracked preflight present on production — it installs nothing
+sh deploy/afldb-r-preflight.sh; echo "exit=$?"
+
+# 5. the pin production would be checked against (repository file, read-only)
+grep -n pinned_version docs/rebuild-manifests/afltables_fitzroy_core/fitzroy-contract.json 2>&1
+```
+
+Interpretation guide for the returned output:
+
+| Finding | Meaning for ISSUE-130 |
+|---|---|
+| step 1: unit not installed | production does not yet run the settle service; the ISSUE-130 change lands with the normal deploy and the preflight becomes the install gate — no drop-in to remove |
+| step 1: a `.service.d` drop-in setting `R_LIBS*` | production has the same untracked compensation as the dev host had; plan its removal only after the canonical layout is proved by step 3/4 |
+| step 2: no `Rscript` | consistent with the provisioning notes; production needs `docs/deployment.md` §7b (apt `r-base`, `r-cran-jsonlite`, `r-cran-digest`, fitzRoy from the dated Posit snapshot into `/usr/local/lib/R/site-library`) **before** the service can ever run — a separate, sudo, state-changing session |
+| step 3: fitzRoy present but not in `/usr/local/lib/R/site-library` | a deviation like streamanator's was; reconcile per §9.1 or, if deliberately kept, declare it via `AFLDB_R_LIBS` in `.env` |
+| step 3: fitzRoy version ≠ step 5 pin | preflight will (correctly) refuse; reinstall from the dated snapshot |
+| step 4: `R PREFLIGHT: OK` | production is ready for a service-equivalent `systemd-run` preflight (needs sudo) and then a supervised settle, in a later authorised session |
+
+After the production inspection is recorded here as §12: `CHANGELOG.md` (Unreleased) entry,
+then close the issue with §11.4 as the resolving validation.
