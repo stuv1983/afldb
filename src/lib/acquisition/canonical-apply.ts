@@ -46,6 +46,10 @@ import type postgres from 'postgres';
 import type { ImportBatchId } from '@/lib/import-batch-id';
 
 import { loadManualAuthority } from './manual-authority';
+import {
+  carryMatchOverrides, findRetiredMatchIdentities,
+  type MatchRekeyIdentity, type MatchRekeyScope,
+} from './match-rekey';
 import { canonicalJson, ObservationContractError, type JsonValue } from './observations';
 import { baselineCanonicalHash } from './promotion-review';
 import { diffFields, type IdentityResolution, type TargetOwnership } from './reconciliation';
@@ -224,6 +228,20 @@ export type CanonicalApplyUnitInput = {
   completionProven: boolean;
   /** The bundle projection's `match_key`, used verbatim. Never re-rendered. */
   matchKey: string;
+  /**
+   * AFLDB-ISSUE-131 §5.3 — what this run still publishes, and the fixture
+   * identity the proposal resolved, so a canonical row under a RETIRED
+   * rendering of the same match can be proven rather than guessed.
+   *
+   * Supplied for the match family only; `null` disables the search entirely,
+   * which is the correct answer for every other family and for any caller that
+   * cannot prove an enumeration complete. It authorises nothing on its own —
+   * the search is re-run here, under `FOR UPDATE`, inside the savepoint.
+   */
+  matchRekey: {
+    scope: MatchRekeyScope;
+    identity: Omit<MatchRekeyIdentity, 'season' | 'sourceId' | 'family' | 'matchKey'>;
+  } | null;
   /** Player-family units only. */
   playerId: number | null;
   /** Player-family units only: the polled home-and-away round. */
@@ -244,8 +262,35 @@ export type CanonicalApplyRefusal =
   | 'manual_authority_conflict'
   | 'manual_authority_indeterminate'
   | 'stale_canonical_target'
+  /**
+   * AFLDB-ISSUE-131 §5.10. Three fail-closed refusals, no force flag and no
+   * adoption, exactly as rule 2 requires.
+   *
+   *   - `rekey_ambiguous` — more than one canonical row is a possible rekey
+   *     of this record. Two clubs can meet twice in a season, so this is real
+   *     rather than theoretical, and guessing would corrupt a second fixture.
+   *   - `rekey_would_merge` — the incoming rendering ALREADY has a canonical
+   *     row and a retired one also exists. That is two canonical rows for one
+   *     fixture before this run touched anything. Merging two populated
+   *     canonical graphs is a supervised operation, never an automatic one.
+   *   - `rekey_override_conflict` — both renderings carry a live human
+   *     override for the same field group (§5.7). A human decides which one
+   *     stands; nothing is overwritten here.
+   */
+  | 'rekey_ambiguous'
+  | 'rekey_would_merge'
+  | 'rekey_override_conflict'
   | 'nothing_to_write'
   | 'write_failed';
+
+/** The three refusals AFLDB-ISSUE-131 added, for the caller's finding writer. */
+export const REKEY_REFUSALS = [
+  'rekey_ambiguous', 'rekey_would_merge', 'rekey_override_conflict',
+] as const;
+
+export function isRekeyRefusal(refusal: CanonicalApplyRefusal | null): boolean {
+  return refusal !== null && (REKEY_REFUSALS as readonly string[]).includes(refusal);
+}
 
 export type CanonicalApplyTargetResult = {
   targetTable: CanonicalTargetTable;
@@ -266,6 +311,33 @@ export type CanonicalApplyUnitResult = {
    * the same run resolve against it.
    */
   insertedMatchId: number | null;
+  /**
+   * AFLDB-ISSUE-131 — the canonical `matches` row this unit REKEYED in place,
+   * and the rendering it carried before. The run's reference map retires the
+   * old key and registers the new one against the SAME id, so the rest of the
+   * run — the player family above all — resolves against the preserved row
+   * rather than looking for a match that was never inserted.
+   */
+  rekeyedMatch: { id: number; previousMatchKey: string } | null;
+  /**
+   * AFLDB-ISSUE-131 §5.10 — the rekey refusal that stopped this unit's
+   * `matches` target, if one did.
+   *
+   * A rekey refusal is a statement about the FIXTURE, not about one table: the
+   * evidence says this run cannot tell which canonical row denotes this real-
+   * world match, or that two already do. Every later target of that fixture
+   * would therefore be written against a row this run has just declined to
+   * identify. So the refusal blocks the rest of the unit here, and the caller
+   * carries it forward to the fixture's other families for the rest of the run
+   * (`player_match_stats` above all, which is settled in a later unit).
+   */
+  fixtureBlocked: CanonicalApplyRefusal | null;
+  /**
+   * AFLDB-ISSUE-131 §5.7 — active human overrides carried from a retired
+   * rendering to the live one by this unit. Surfaced as a run counter so an
+   * automatic carry is visible in the settle summary rather than silent.
+   */
+  overridesCarried: number;
 };
 
 function refused(
@@ -284,7 +356,19 @@ type FreshTarget = {
   targetId: number | null;
   /** Current values for the proposed field set, or null for a new target. */
   currentValues: Record<string, JsonValue> | null;
+  /**
+   * AFLDB-ISSUE-131. Non-null when the row was found under a RETIRED rendering
+   * rather than the incoming one: the `match_key` this row carries right now,
+   * which the write is about to move. `match_key` is in the proposed field set
+   * on this path only, so it diffs, it is audited in `previous_values` /
+   * `new_values`, and the ordinary UPDATE writes it with no special case.
+   */
+  rekeyFromMatchKey: string | null;
 };
+
+/** What `readFreshTarget()` returns instead of a target when it must refuse. */
+type FreshTargetRefusal =
+  | 'no_canonical_match' | 'rekey_ambiguous' | 'rekey_would_merge';
 
 /**
  * A `date` column arrives as a Date; every other canonical value arrives as
@@ -327,7 +411,7 @@ function periodSetValues(rows: readonly PeriodRow[]): Record<string, JsonValue> 
 async function readFreshTarget(
   sp: Tx, unit: CanonicalApplyUnitInput, target: CanonicalApplyTargetInput,
   matchId: number | null,
-): Promise<FreshTarget | 'no_canonical_match'> {
+): Promise<FreshTarget | FreshTargetRefusal> {
   const fields = Object.keys(target.proposedValues);
   const { sourceKeysById } = unit;
 
@@ -336,22 +420,65 @@ async function readFreshTarget(
       SELECT * FROM matches WHERE match_key = ${unit.matchKey}
     `;
     const targetKey = { match_key: unit.matchKey };
-    if (!row) {
+    // AFLDB-ISSUE-131 §5.3. Re-derived HERE, under `FOR UPDATE`, against state
+    // read inside the savepoint — never carried in from the pass that built
+    // the proposal. Two concurrent settles therefore cannot both claim the
+    // same retired row, and a candidate that stopped being one between the
+    // proposal and the write is simply not one.
+    const retired = unit.matchRekey === null ? [] : await findRetiredMatchIdentities(
+      sp,
+      {
+        season: unit.season,
+        sourceId: unit.sourceId,
+        family: unit.family,
+        matchKey: unit.matchKey,
+        ...unit.matchRekey.identity,
+      },
+      { kind: 'run_enumeration', scope: unit.matchRekey.scope },
+      true,
+    );
+    if (row) {
+      // The incoming rendering already has a row AND a retired one exists:
+      // one fixture, two canonical rows, before this run wrote anything.
+      // Never merged automatically (§5.3).
+      if (retired.length > 0) return 'rekey_would_merge';
       return {
-        identity: { status: 'new_target', entity: 'matches', targetKey },
-        targetId: null,
-        currentValues: null,
+        identity: {
+          status: 'resolved',
+          entity: 'matches',
+          targetKey,
+          ownership: ownershipOf(sourceKeysById, (row.source_id as number | null) ?? null),
+        },
+        targetId: row.id as number,
+        currentValues: projectRow(row, fields),
+        rekeyFromMatchKey: null,
+      };
+    }
+    if (retired.length > 1) return 'rekey_ambiguous';
+    if (retired.length === 1) {
+      const [stale] = await sp<Record<string, unknown>[]>`
+        SELECT * FROM matches WHERE id = ${retired[0].id}
+      `;
+      // The row was locked a statement ago inside this savepoint, so it is
+      // still there; a disappearance would be a contract breach, not a race.
+      if (!stale) fail('A locked rekey candidate vanished inside its own savepoint.');
+      return {
+        identity: {
+          status: 'resolved',
+          entity: 'matches',
+          targetKey,
+          ownership: ownershipOf(sourceKeysById, (stale.source_id as number | null) ?? null),
+        },
+        targetId: stale.id as number,
+        currentValues: projectRow(stale, fields),
+        rekeyFromMatchKey: stale.match_key as string,
       };
     }
     return {
-      identity: {
-        status: 'resolved',
-        entity: 'matches',
-        targetKey,
-        ownership: ownershipOf(sourceKeysById, (row.source_id as number | null) ?? null),
-      },
-      targetId: row.id as number,
-      currentValues: projectRow(row, fields),
+      identity: { status: 'new_target', entity: 'matches', targetKey },
+      targetId: null,
+      currentValues: null,
+      rekeyFromMatchKey: null,
     };
   }
 
@@ -368,6 +495,7 @@ async function readFreshTarget(
         identity: { status: 'new_target', entity: 'match_period_scores', targetKey },
         targetId: null,
         currentValues: null,
+        rekeyFromMatchKey: null,
       };
     }
     // The whole period set is ONE target keyed on match_id, so its ownership
@@ -382,6 +510,7 @@ async function readFreshTarget(
       identity: { status: 'resolved', entity: 'match_period_scores', targetKey, ownership },
       targetId: matchId,
       currentValues: periodSetValues(rows),
+      rekeyFromMatchKey: null,
     };
   }
 
@@ -398,6 +527,7 @@ async function readFreshTarget(
         identity: { status: 'new_target', entity: 'player_match_stats', targetKey },
         targetId: null,
         currentValues: null,
+        rekeyFromMatchKey: null,
       };
     }
     return {
@@ -409,6 +539,7 @@ async function readFreshTarget(
       },
       targetId: row.id as number,
       currentValues: projectRow(row, fields),
+      rekeyFromMatchKey: null,
     };
   }
 
@@ -428,6 +559,7 @@ async function readFreshTarget(
       identity: { status: 'new_target', entity: 'brownlow_round_votes', targetKey },
       targetId: null,
       currentValues: null,
+      rekeyFromMatchKey: null,
     };
   }
   return {
@@ -439,6 +571,7 @@ async function readFreshTarget(
     },
     targetId: row.id as number,
     currentValues: projectRow(row, fields),
+    rekeyFromMatchKey: null,
   };
 }
 
@@ -709,12 +842,28 @@ export async function applyCanonicalUnit(
   tx: Tx, unit: CanonicalApplyUnitInput,
 ): Promise<CanonicalApplyUnitResult> {
   if (unit.targets.length === 0) {
-    return { results: [], failure: null, insertedMatchId: null };
+    return {
+      results: [],
+      failure: null,
+      insertedMatchId: null,
+      rekeyedMatch: null,
+      fixtureBlocked: null,
+      overridesCarried: 0,
+    };
   }
   if (!unit.sourceKey) fail('A canonical application must name the source it applies for.');
 
   const results: CanonicalApplyTargetResult[] = [];
   let insertedMatchId: number | null = null;
+  let rekeyedMatch: { id: number; previousMatchKey: string } | null = null;
+  /**
+   * AFLDB-ISSUE-131 §5.10. Set the moment a rekey refusal stops the `matches`
+   * target, and it stops the whole fixture family with it: the remaining
+   * targets of this unit are refused unwritten, and the caller withholds the
+   * fixture's other families for the rest of the run.
+   */
+  let fixtureBlocked: CanonicalApplyRefusal | null = null;
+  let overridesCarried = 0;
   /** The target being written when a failure fires, for the finding's key. */
   let attempting: CanonicalTargetTable = unit.targets[0].targetTable;
 
@@ -723,6 +872,9 @@ export async function applyCanonicalUnit(
       const sp = scope as Tx;
       results.length = 0;
       insertedMatchId = null;
+      rekeyedMatch = null;
+      fixtureBlocked = null;
+      overridesCarried = 0;
 
       // §8 / E4. The authority snapshot is re-read HERE, inside the savepoint
       // and before any write in it, so an override committed after the
@@ -743,6 +895,16 @@ export async function applyCanonicalUnit(
 
       for (const target of unit.targets) {
         attempting = target.targetTable;
+        // AFLDB-ISSUE-131 §5.10. A rekey refusal on this fixture's `matches`
+        // target is not a refusal of one table: this run cannot say which
+        // canonical row IS this fixture, so every dependent target would be
+        // written against a row it just declined to identify. The specific
+        // refusal is carried onto the dependent rather than flattened, so the
+        // report still names the evidence that stopped it.
+        if (fixtureBlocked !== null) {
+          results.push(refused(target.targetTable, fixtureBlocked));
+          continue;
+        }
         // E2. The season gate, re-evaluated rather than inherited from the
         // bundle validation that ran before PostgreSQL was opened.
         if (!unit.inProgressSeasons.includes(unit.season)) {
@@ -760,8 +922,18 @@ export async function applyCanonicalUnit(
         }
 
         const fresh = await readFreshTarget(sp, unit, target, matchId);
-        if (fresh === 'no_canonical_match') {
-          results.push(refused(target.targetTable, 'no_canonical_match'));
+        // AFLDB-ISSUE-131 §5.10 — every one of these writes nothing, opens a
+        // finding through the caller and leaves the record for a human. There
+        // is no force flag and no adoption.
+        if (typeof fresh === 'string') {
+          // §5.10 again: the rekey refusals are fixture-wide, so the matchId
+          // this unit was carrying is retired with them. Nothing may be
+          // written against a row whose identity was just refused.
+          if (target.targetTable === 'matches' && isRekeyRefusal(fresh)) {
+            fixtureBlocked = fresh;
+            matchId = null;
+          }
+          results.push(refused(target.targetTable, fresh));
           continue;
         }
         if (target.targetTable === 'matches' && fresh.targetId !== null) {
@@ -800,11 +972,24 @@ export async function applyCanonicalUnit(
         // E4. Human authority, asked unconditionally — including for a target
         // that does not exist yet, which `reconcile()` deliberately does not
         // do (its gate 8 is scoped to overwriting an existing row).
-        const verdict = authority({
+        //
+        // AFLDB-ISSUE-131: on a rekey the authority is asked under BOTH
+        // renderings, and the strongest answer wins. The human's decision was
+        // recorded against the key the row carried at the time, which is the
+        // OLD one, so asking only under the incoming key would read a live
+        // override as absence — precisely the orphaning §5.7 exists to stop.
+        let verdict = authority({
           entity: target.targetTable,
           targetKey: fresh.identity.status === 'unresolved' ? {} : fresh.identity.targetKey,
           fields: changedFields,
         });
+        if (verdict === 'clear' && fresh.rekeyFromMatchKey !== null) {
+          verdict = authority({
+            entity: target.targetTable,
+            targetKey: { match_key: fresh.rekeyFromMatchKey },
+            fields: changedFields,
+          });
+        }
         if (verdict !== 'clear') {
           results.push(refused(
             target.targetTable,
@@ -831,12 +1016,36 @@ export async function applyCanonicalUnit(
           previousValues,
         };
 
+        // §5.7. The human overrides move with the match BEFORE the canonical
+        // row does, so a refusal leaves this savepoint with nothing written at
+        // all rather than a rekeyed row whose override was left behind.
+        if (fresh.rekeyFromMatchKey !== null) {
+          const carry = await carryMatchOverrides(sp, fresh.rekeyFromMatchKey, unit.matchKey);
+          if ('conflict' in carry) {
+            // The rekey is refused, so the row this unit was about to write
+            // against keeps the RETIRED rendering. Blocking the fixture is
+            // what stops a dependent target landing on it (§5.10).
+            if (target.targetTable === 'matches') {
+              fixtureBlocked = 'rekey_override_conflict';
+              matchId = null;
+            }
+            results.push(refused(target.targetTable, 'rekey_override_conflict'));
+            continue;
+          }
+          overridesCarried += carry.carried;
+        }
+
         let written: { rowsInserted: number; rowsUpdated: number };
         if (target.targetTable === 'matches') {
           const outcome = await writeMatch(sp, unit, plan);
           written = { rowsInserted: outcome.rowsInserted, rowsUpdated: outcome.rowsUpdated };
           matchId = outcome.targetId;
           if (verb === 'insert') insertedMatchId = outcome.targetId;
+          if (fresh.rekeyFromMatchKey !== null) {
+            rekeyedMatch = {
+              id: outcome.targetId, previousMatchKey: fresh.rekeyFromMatchKey,
+            };
+          }
         } else if (target.targetTable === 'match_period_scores') {
           written = await writePeriodScores(sp, unit, matchId as number, plan);
         } else if (target.targetTable === 'player_match_stats') {
@@ -882,8 +1091,13 @@ export async function applyCanonicalUnit(
         message: error instanceof Error ? error.message : String(error),
       },
       insertedMatchId: null,
+      rekeyedMatch: null,
+      fixtureBlocked: null,
+      overridesCarried: 0,
     };
   }
 
-  return { results, failure: null, insertedMatchId };
+  return {
+    results, failure: null, insertedMatchId, rekeyedMatch, fixtureBlocked, overridesCarried,
+  };
 }

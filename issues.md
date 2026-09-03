@@ -7,7 +7,13 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 10 tracked here — `AFLDB-ISSUE-104`, `-110`, `-113`, `-116`, `-123`, `-124`, `-125`, `-126`, `-127`, `-130`.
+**Open issues:** 10 tracked here — `AFLDB-ISSUE-104`, `-110`, `-113`, `-116`, `-123`, `-124`, `-125`, `-126`, `-127`, `-131`.
+
+<!-- SYNCHRONISED 2026-09-03 (ISSUE-131 Stage 1): `AFLDB-ISSUE-130` was removed from this
+     count — its own ledger entry below has read **Resolved 2026-09-03** since the ISSUE-130
+     closeout, and this line had not been updated to match. `AFLDB-ISSUE-131` is newly
+     allocated and Open. Next free issue ID is `AFLDB-ISSUE-132`. -->
+
 
 <!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
      the ISSUE-110 branch merged into dev on 2026-08-31 and its own ledger rows below are
@@ -68,6 +74,7 @@ created, reopened, resolved, or materially reclassified.
      **NOT DEPLOYED TO PRODUCTION, deliberately** — the nightly unit will report `failed` every
      night the 2026 Wildcard Round is in the acquired window. `AFLDB-ISSUE-129` (Wildcard Final
      enum + finals semantics) is the open blocker and must be decided first. -->
+| `AFLDB-ISSUE-131` | High | Data acquisition / Import architecture / Data integrity | **STAGE 2 COMPLETE + INDEPENDENT REVIEW ANSWERED 2026-09-03 on `claude/issue-131` (unmerged); production untouched, timer still STOPPED.** The review returned merge YES AFTER FIXES with one HIGH and no blockers, and every required fix is made and validated (runbook §14): HIGH-1 fixture-family blocking, so a `rekey_ambiguous` / `rekey_would_merge` / `rekey_override_conflict` refusal on the `matches` target now withholds `match_period_scores` in the same unit AND `player_match_stats` for the same fixture in the rest of the run, carrying the specific refusal and leaving no stale `matchId` usable; `canonicalOverridesCarried` surfaced as a counter with the remaining `data_edits` limitation documented; the false "structurally cannot DELETE/TRUNCATE" claims and the stale "§5.3 runs on misses only" text corrected; RED framing removed; and the repair tool's stale-candidate throw, unclosed batch row and premature success logging fixed. Five new regression tests; ISSUE-131 20 passed, settle + current-season 316 passed / 1 skipped, four adjacent suites 175 passed, tsc and eslint clean. The fix is a narrow, fail-closed rekey-in-place: on a `matches` lookup miss the applier looks for a canonical row that is provably the SAME fixture under a source identity the run no longer publishes (exact season + both club ids, at most one of `round_code`/`match_date` moved, AFL Tables-owned, its source record retired inside a proven-complete enumeration), and on exactly one candidate UPDATES that row in place — preserving `matches.id`, so every child row and provenance reference stays attached and **zero child mutation and no DELETE** occur. `match_key` joins the proposed field set on that path only, so the rendering diffs, is covered by the E5 baseline hash and lands in the ledger's `previous_values`/`new_values`. Human authority is asked under BOTH renderings and active `data_overrides` are carried to the new key (old row deactivated, never deleted — `afldb_import` holds no DELETE and no UPDATE on `entity_key`). Three fail-closed refusals with no force flag: `rekey_ambiguous`, `rekey_would_merge` (which also stops the ORDINARY update of a live row while a retired duplicate of its fixture stands) and `rekey_override_conflict`; each writes nothing, opens a `canonical_apply_failed` finding and surfaces in the exception report. The predicate lives once, in new `src/lib/acquisition/match-rekey.ts`, and is re-derived under `FOR UPDATE` inside the savepoint. §8's `tools/current-season/repair-match-rekeys.ts` ships: dry-run by default, `afldb_import` DSN, `--season` required, plan hash re-checked inside the transaction, per-fixture savepoints, ledger row per mutation, before/after validation, three actions (rekey in place / report only / refuse) and no DELETE. **No migration.** A latent defect was found and fixed in passing: `latestBatchOf()` sorted batches by the TEXT output alias, so the settle exception report named a stale batch once ids crossed a digit-count boundary. Validation (all `afldb_test`): the two RED tests GREEN unaltered plus nine new cases (11 passed), settle + current-season suites 311 passed / 1 skipped, three adjacent suites 138 passed, `database.test.ts` 37 passed, tsc and eslint clean. Original defect: when AFL Tables revises identity-relevant scheduling metadata on a match AFLDB has already materialised, the settle inserts a **second** canonical `matches` row instead of updating the first, and the stale row keeps its `match_period_scores` and `player_match_stats` forever. Root cause proven from code at **Stage 1**: `match_key` is `season\|round_code\|match_date\|home\|away` (`import_fitzroy_core.py:1615`) and the **same five-part string is also the match family's `external_record_id`** (`:1221-1224`), so it is a content address over mutable metadata and is the only handle either side of the pipeline has. `reconcile()` keys on `external_record_id`, so a moved component is verb `new`; `resolveTarget()` (`settle-afltables.ts:2608`) and `readFreshTarget()` (`canonical-apply.ts:336`, `:740`) look the canonical row up by `match_key` **alone**, so `new_target` → `insertable` → INSERT. `matches` carries **only** `match_key UNIQUE` (`003_matches.sql:23`) and nothing on the real-world fixture, so the duplicate is admissible; the vanished record is swept `absent` and §18.2 makes absence observation state only (`settle-afltables.ts:3034`), so nothing revisits the stale row. **General rekey defect, not Wildcard-specific** — it fires on `round_code`, `match_date` or the club-name rendering; ISSUE-129's `WF` reclassification is the trigger that exposed it. Two further findings: AFL Tables' own stable `Game` id **is parsed** (`MatchFact.game_id`, required at `:192`) and written as `matches.source_record_id` by the full-history rebuild (`:2613`) but is **dropped entirely** on the settle path, leaving two incompatible conventions in that column; and `data_overrides.entity_key` for `matches` **is** the `match_key` (`manual-authority.ts:153`), so a rekey silently orphans every active human override — migration 073's "survive... even if the row is rekeyed" comment is false for this class. **RED reproduction written** (`tests/integration/settle-afltables.test.ts`, nested `AFLDB-ISSUE-131` describe: a `round_code`-only move, and the `24` → `wildcard_final` reclassification), asserting the intended one-row contract and expected to FAIL until Stage 2. Design complete in `issues/open/AFLDB-ISSUE-131.md`: rekey-in-place on a deterministic fail-closed proof, never an automatic merge, **no migration required**. | **Stage 2 and the independent-review fixes are implemented and validated on `afldb_test`; nothing is merged and production is untouched.** (1) Operator reviews the diff on `claude/issue-131`. (2) **DONE 2026-09-03 — runbook §15:** the operator ran the read-only §9 evidence. **Dev** (`streamanator`/`afldb_dev`) holds **17 duplicate 2026 fixtures / 34 canonical rows**, every one a `round_code` movement (Round 23 → 24, Round 24 → 25) with season/date/home/away identical and all rows still `home_and_away`; §9.3 returned **0** date-only pairs; §9.5 classified all 34 rows as **17 empty + 17 populated** (17 numeric `source_record_id` stale halves with 0 `player_match_stats` / 0 `match_period_scores` / 0 `player_achievements`, paired with 17 five-part key-string live halves carrying ~44–46 player rows and 8 period rows) — corroborating §3.6's two conventions. **Production** (`afldb-prod`/`afldb_prod`) §9.2 returned **0 rows**: no duplicate 2026 fixtures at all, confirming §10 risk 2, because the timer has been stopped and the rekeyed identities have never been settled there. Consequence: **production requires prevention (the §6 code fix), not duplicate cleanup** — `repair-match-rekeys` still ships and is still run, but its production plan is expected to be empty. **CORRECTED on re-review (runbook §15.3):** dev's 17 stale halves are **not** §8 action 2 report-only groups — they are outside the repair tool's candidate set altogether. `findRetiredMatchIdentities()` proves an identity retired by joining `staging.source_records` on `external_record_id = matches.source_record_id`, and dev's stale halves carry the historical numeric/game-id convention (§3.6), so they can never satisfy that proof. A dev `repair-match-rekeys` dry run is therefore expected to print `Nothing to repair` while its validation block still reports `duplicateFixtureGroupsInSeason = 17`; a subsequent dev settle finds the populated live rows by their current `match_key`, updates them ordinarily, raises **no** `rekey_would_merge` for these fixtures and never touches the 17 empty historical rows. Those rows are a separate supervised cleanup / data-hygiene decision **outside ISSUE-131**, and **no DELETE is proposed** here or held by `afldb_import`. **§9.4 and §9.6 were NOT run** — §7's hardening index remains unmeasured and unwritten (**no migration**) and `game_id` remains unmeasured and **not adopted** (§5.2 undecided, §10 risk 1 stands). (3) Merge only after that review, then runbook §8's supervised production sequence in order with the timer still stopped: deploy, `sh deploy/afldb-r-preflight.sh` ending `R PREFLIGHT: OK`, `repair-match-rekeys` dry run, review, `--apply --plan-hash`, one supervised settle (`--dry-run --auto-apply`, the real apply, then an identical rerun proving 0/0/0), and only then re-enable `afldb-settle-afltables.timer`. Separately, on **dev**: nothing in this issue acts on the 17 duplicate fixtures — a `repair-match-rekeys` dry run there is expected to print `Nothing to repair` with `duplicateFixtureGroupsInSeason = 17` in its validation block, and the 17 empty historical rows remain a separate supervised cleanup decision. Optional, separately: run §9.4 before deciding §7's hardening index, and §9.6 plus a cross-snapshot `Game` comparison before deciding §5.2's `game_id` — both still unrun. **No production write, settle, migration or DELETE is authorised until §8 completes and is accepted.** |
 | `AFLDB-ISSUE-127` | Low | Admin tooling / Data acquisition / Deployment / Security | A Super Admin had no way to trigger an AFL Tables current-season refresh on demand: after `AFLDB-ISSUE-122` went live, the only options were to wait for the 04:30 timer or to SSH in and `sudo systemctl start afldb-settle-afltables.service`, which leaves no record in AFLDB's own audit trail. **IMPLEMENTED 2026-09-03** on `codex/issue-127`. `/admin/current-season` gains a Super Admin-only "Fetch current AFL data now" control that starts **the same unit the timer starts** — no second ingestion implementation, no new source authority, no force or bypass input, and both Server Actions declare **zero parameters** so no user value can reach a command line (`execFile` with a fixed argv array, no shell). Concurrency is systemd's job-merge semantics, not an application lock. The result is read from the structured `import_batches` row the settle already writes (`validation_result` counters), never from the journal, on the read-only app pool. **sudo is impossible here** — `deploy/afldb.service` sets `NoNewPrivileges=true`, so the grant is a polkit rule scoped to one action / one verb / one unit / one user, and `afldb.service` is not modified. Fail-closed behind `AFLDB_SETTLE_TRIGGER=systemd`. Validation: focused suite 28/28, four related suites 259/259, `tsc --noEmit` clean, eslint clean. Key files: `src/lib/acquisition/settle-trigger.ts`, `src/db/queries/settle-runs.ts`, `deploy/afldb-settle-afltables-trigger.rules`, `issues/open/AFLDB-ISSUE-127.md`. | **Operator host validation, then close — nothing further is needed in the repository.** On dev first: install the polkit rule and restart polkit; prove `sudo -u arm systemctl start --no-block afldb-settle-afltables.service` succeeds while the same call for any other unit is refused; set `AFLDB_SETTLE_TRIGGER=systemd` and restart `afldb`; then press the control as a Super Admin and confirm start, "already running" on a second press, the counters after commit, one `current_season.settle_triggered` audit row per press, and that the control is inert with the flag unset. Do not change the timer cadence. |
 | `AFLDB-ISSUE-126` | Medium | Database / Admin / Security / Audit trail / Operations | The 2026-09-02 production canonical DB cutover replaced production-only application state along with the football data. The real super admin (`auth_users` id 1) was recovered from the pre-cutover backup and admin login was verified, but three sets of production-only rows were **not** restored and exist only in the recovery database `afldb_prod_auth_recovery`: `auth_audit_log` **92 rows**, `beta_access_codes` **1 row**, `site_settings` **11 rows** (plus whatever else the pre-cutover dump `/home/arm/afldb_prod_pre_rebuild_20260902-200355.dump` carries). Production currently runs with **0** rows in all three. The application does not break — `src/lib/site-settings.ts` falls back to compiled-in defaults — but 11 deliberate super-admin choices are silently reverted to those defaults, one beta access code is gone, and the admin audit trail has a hard discontinuity at the cutover. Old `auth_sessions` (17) were deliberately not restored and must stay unrestored; a fresh login is the correct posture. | **Not started. Decide, per table, restore vs. intentionally reset — do not restore blindly.** `site_settings`: diff the 11 recovered rows against `src/lib/site-settings.ts` defaults and restore only the rows that encode a real operator decision (note `DEFAULT_GRID_AUDIENCE` is already `super_admin`, matching the production posture). `beta_access_codes`: confirm the code is still wanted before reissuing; treat it as live credential material and never paste it into a tracked file. `auth_audit_log`: **never reconstruct an audit trail retroactively** — either restore the 92 rows with an explicit, auditable cutover marker row that says what happened, or record the gap deliberately in this issue and leave the log starting at the cutover. **`afldb_prod_auth_recovery` MUST NOT be dropped until this issue is resolved.** No password hash or TOTP secret may be reproduced in any tracked file. Requires production DML, so it is operator-supervised work, not a repository change. |
 | `AFLDB-ISSUE-125` | Medium | Operations / Deployment / Database / Data integrity | There is **no documented procedure for preserving production-only state when a clean rebuilt database is promoted to production.** `AFLDB-ISSUE-122`'s 2026-09-02 cutover proved the gap by hitting it: restoring the clean rebuilt `afldb_test` dump over `afldb_prod` replaced the broken 2026 football data correctly, but also replaced every application-owned, auth-owned and operations-owned table, and it promoted a **test fixture super admin** (`email-intake-test-fixture@afldb.test`) into production in place of the real one. The repository documents backup/restore and the migration rollout order (`AFLDB-ISSUE-027`), but nothing enumerates which tables are production-only and must survive a canonical rebuild promotion. Recovery worked only because a pre-cutover dump was taken first, which was operator discipline rather than a documented step. | **Not started. Prevention, not incident documentation.** Enumerate every production-only table — at minimum `auth_users`, `auth_sessions`, `admin_invites`, `auth_audit_log`, `beta_access_codes`, `beta_allowed_emails`, `beta_login_tokens`, `site_settings`, plus any operational/telemetry state (`app_health_events`, `nl_search_log`, `data_edits`, `data_overrides`, `data_issues`) that a rebuild would discard — and classify each as must-preserve, must-reset, or decide-per-promotion. Then write a documented promotion procedure into `docs/` (mandatory pre-cutover dump; restore football data only, or restore-then-reinstate; an explicit **refuse-if-a-test-fixture-identity-is-present** check so `*@afldb.test` can never become a production admin; a post-promotion verification checklist ending in a real admin login). Cross-check against `tools/maintenance/` backup/restore and `privileges.sql`, which is already mandatory after a restore. Related: `AFLDB-ISSUE-126` (the data still held from this incident), `AFLDB-ISSUE-027` (rollout order). |
@@ -13036,3 +13043,285 @@ deployment gate created by this issue, with one command and one required output.
    left alone.
 4. `/home/arm/R/library` on the dev host is no longer referenced by anything tracked and may be
    left or removed at the operator's convenience.
+
+---
+
+## AFLDB-ISSUE-131 — An upstream match rekey duplicates the canonical match instead of updating it
+
+- **Status:** Open — Stage 1 complete 2026-09-03. **Stage 2 (implementation + validation) COMPLETE 2026-09-03 on `claude/issue-131`, unmerged.** Production untouched; `afldb-settle-afltables.timer` remains STOPPED. Remaining: operator review, the §9 read-only evidence on dev/production, merge, then runbook §8's supervised production sequence.
+- **Severity:** High — data integrity, and it blocks re-enabling the production settle timer
+- **Area:** Data acquisition / Import architecture / Data integrity
+- **Found:** 2026-09-03 (stale duplicate/rekeyed canonical 2026 matches observed during development current-season settlement, around the late home-and-away / Wildcard boundary)
+- **Branch / worktree:** `claude/issue-131` — `D:\dev\afldb-issue-131`
+- **Files (Stage 1, 2026-09-03):** `issues/open/AFLDB-ISSUE-131.md` (new runbook), `tests/integration/settle-afltables.test.ts` (two new `T122` timestamps and a new nested `AFLDB-ISSUE-131` RED describe; **no existing assertion altered**), `issues.md`, `IssuesIndex.md`. No production code changed.
+- **Files (Stage 2, 2026-09-03):** `src/lib/acquisition/match-rekey.ts` (**new** — the §5.3 candidate search and §5.7 override carry, the single identity rule both callers import), `src/lib/acquisition/canonical-apply.ts`, `src/lib/acquisition/settle-afltables.ts`, `src/lib/acquisition/settle-report.ts` (the `latestBatchOf()` alias-ordering fix), `tools/current-season/settle-afltables.ts` (two new counters reported), `tools/current-season/repair-match-rekeys.ts` (**new** — the §8 remediation tool), `tests/integration/settle-afltables.test.ts` (the two RED tests GREEN unaltered, nine new cases, the fixture helper generalised, `cleanup122()` extended), `CHANGELOG.md`, `issues.md`, `IssuesIndex.md`. **No migration.**
+- **Runbook:** `issues/open/AFLDB-ISSUE-131.md` — the authoritative design and evidence ledger; root cause **§3**, reconciliation contract **§5**, remediation design **§8**, outstanding read-only evidence **§9**, risks **§10**
+- **Related:** `AFLDB-ISSUE-122` (the applier this defect lives in), `AFLDB-ISSUE-099` (the observation spine and the five-part key), `AFLDB-ISSUE-128` (source completeness), `AFLDB-ISSUE-129` (Wildcard Final semantics — the trigger, not the cause), `AFLDB-ISSUE-086` (`data_overrides`, orphaned by a rekey)
+- **Migration:** **none claimed.** Stage 1 concludes the identity fix needs no schema change. One optional hardening index is proposed and is gated on measurement (runbook §7, §9.4); if adopted it must re-derive its number by scanning every live branch tip (`086` is the next number visible from this worktree and is **not** reserved).
+- **CHANGELOG:** Stage 1 no entry (investigation only). **Stage 2: `Unreleased` entry added** — the settle's canonical behaviour materially changed.
+
+### Symptom
+
+One real-world AFL match present twice in `matches`: a stale row on the identity AFL Tables
+previously published, and a live row on the identity it publishes now. The stale row retains its
+`match_period_scores` and `player_match_stats`, so the same player-match is canonical twice under
+two match ids. Observed in development around the late home-and-away / Wildcard boundary and
+described as stale duplicate/rekeyed Round 24/25 canonical matches.
+
+**The specific stale rows have not been enumerated from a database.** Stage 1 establishes the
+mechanism from the repository with certainty; identifying the exact affected rows needs the
+read-only evidence in runbook §9, which the operator must run. Nothing below is inferred from the
+symptom.
+
+### Root cause (proven from code and schema)
+
+Canonical match identity is a **content address over mutable scheduling metadata**, and the same
+string is simultaneously the source record identity, so neither can witness that the other moved.
+
+1. `match_key` is `season|round_code|match_date|home name|away name`
+   (`tools/migration/import_fitzroy_core.py:1615-1619`). Three of the five components are revised
+   upstream, and the club-name component comes from `clubs.json`, so it can move with no upstream
+   change at all.
+2. The **same five components** build the match family's `external_record_id` (`:1221-1224`), the
+   scope enumeration keys on it (`:1885`), and player rows inherit it as
+   `<profile url path>@<match_key>` (`:1378`, `:1402`).
+3. `reconcile()` keys on `external_record_id`, so a moved component is a record never observed:
+   no open version, verb `new`.
+4. The applier's **only** canonical lookup is by `match_key` — `matchIdsByKey`
+   (`src/lib/acquisition/settle-afltables.ts:1620-1636`), `resolveTarget()` (`:2608`), and the
+   savepoint re-read `SELECT * FROM matches WHERE match_key = $1`
+   (`src/lib/acquisition/canonical-apply.ts:336`, `:740`). A miss is `new_target`,
+   `autoApplyOwnership()` answers `insertable` by design (`canonical-apply.ts:126`), every
+   remaining gate legitimately passes, and `writeMatch()` INSERTs a second row.
+5. Nothing constrains it: `matches` carries **only** `match_key text NOT NULL UNIQUE`
+   (`src/db/migrations/003_matches.sql:23`) and no constraint on the real-world fixture
+   `(season, match_date, home_club_id, away_club_id)`.
+6. Nothing revisits it: the vanished record is swept `absent`, and absence is observation state
+   only — *"§18.2: absence is observation state only. No candidate, ever."*
+   (`settle-afltables.ts:3033-3034`). Absence correctly never deletes, but no other path ever
+   looks at the stale row again.
+
+`canonical-apply.ts:38-42` names the adjacent hazard it did close — *"a wrong rendering inserts a
+duplicate fixture instead of conflicting"* — by using the bundle's key verbatim. It does not guard
+against a **moved** key.
+
+**This is a general rekey/reschedule defect, not a Wildcard Final defect.** It fires on any move of
+`round_code`, `match_date` or the club-name rendering. ISSUE-129's `WF` reclassification is one
+instance and is the one that exposed it.
+
+### Two further findings recorded in the same investigation
+
+- **`matches.source_record_id` holds two incompatible conventions.** AFL Tables' own stable `Game`
+  id is a required results column (`import_fitzroy_core.py:192`), is parsed into
+  `MatchFact.game_id` (`:1135`, `:1304`) and **is** written as the canonical provenance by the
+  full-history rebuild (`:2613`) — but it is absent from `MATCH_PAYLOAD_COLUMNS` (`:1028-1032`) and
+  from `match_projection` (`:1723-1753`), so the current-season settle never sees it and stamps the
+  five-part key string instead (`canonical-apply.ts:513`). The one candidate stable identity in the
+  feed is available and unused. Its stability across acquisitions is **unmeasured** and must not be
+  assumed (runbook §9.6, §10.1).
+- **A rekey silently orphans human overrides.** `data_overrides.entity_key` for `matches` **is** the
+  `match_key` (`src/lib/acquisition/manual-authority.ts:153-156`,
+  `src/db/migrations/073_data_overrides.sql:21`), so migration 073's header claim that overrides
+  *"survive source reloads even if the row is rekeyed"* is **false for this class of rekey** — the
+  natural key is exactly what moves. The next settle would then overwrite a field a human had
+  pinned. The fix must carry active overrides across in the same transaction, or refuse.
+
+### RED reproduction
+
+`tests/integration/settle-afltables.test.ts`, new nested describe
+`AFLDB-ISSUE-131 — an upstream rekey must not duplicate the match`, added inside the existing
+`AFLDB-ISSUE-122 S5 — the canonical applier` suite so it reuses that suite's guarded `afldb_test`
+client, fixtures and `cleanup122()` teardown, and drives the same `runSettleAfltables()` entry point
+production uses. Two tests, **RED by design**, asserting the intended contract:
+
+1. **`round_code` moves and nothing else** — the same season, date and two clubs settled first at
+   `round_code '1'`, then at `'2'`. Asserts one canonical row on the new key, the same `matches.id`,
+   the new `source_record_id`, one `player_match_stats` row and four period rows. **Today: two
+   `matches` rows and two `player_match_stats` rows.** Proves the defect is general.
+2. **`24`/`home_and_away` reclassified to `WF`/`wildcard_final`** — the ISSUE-129 shape, same
+   assertions. Worst downstream consequence: a surviving stale `24` row is still `home_and_away`,
+   so it keeps earning the ladder points ISSUE-129 says a Wildcard Final never earns.
+
+They must stay RED until Stage 2 and **must not be weakened to pass**. Not run in this session — no
+command execution was authorised; the operator baseline command is runbook §9.1.
+
+### Proposed contract (runbook §5, for Stage 2 — approved design, not implemented)
+
+`match_key` is demoted from *identity* to *current rendering*: still `UNIQUE`, still maintained
+equal to the source string, but never the sole reconciliation handle. On a `match_key` miss only —
+so the steady state is unaffected — the applier searches, inside the savepoint against freshly-read
+state, for canonical rows in the same season, owned by the promoting source, agreeing **exactly** on
+both club ids, differing in **at most one** of `{round_code, match_date}`, and whose `match_key` the
+source no longer publishes in this run's complete enumeration. Exactly one candidate is a **proven
+rekey** and is UPDATEd in place (`match_key` joins the proposed field set on that path only,
+provenance restamped, `canonical_applications` verb `update` carrying old and new keys, so migration
+083's verb CHECK is untouched); zero is a genuine INSERT as today; more than one refuses
+`rekey_ambiguous`. A new key that already exists alongside a stale candidate refuses
+`rekey_would_merge`. **Two canonical rows are never merged automatically.** Rekey-in-place is also
+the only structurally available option: eight tables reference `matches(id)` and only
+`match_period_scores` cascades, and `afldb_import` holds no DELETE — ISSUE-099 obligation O1
+(*"sends no DELETE and no TRUNCATE at all"*) stays intact.
+
+### Production remediation (runbook §8, designed, not built)
+
+New `tools/current-season/repair-match-rekeys.ts`: dry-run by default, `--apply` explicit, opened on
+`AFLDB_IMPORT_DATABASE_URL` so it structurally cannot delete, `--season` required and refused for a
+season not in progress, full plan output with per-row child counts, three outcomes only (rekey in
+place / report-only for a childless stale row / refuse when both rows carry dependent data), one
+transaction with per-fixture savepoints, a plan hash so `--apply` aborts if the state moved, ledger
+row in the same savepoint as each mutation, and the before/after validation block printed by the
+tool. **No ad-hoc SQL DELETE at any point.**
+
+### Production posture
+
+`afldb-settle-afltables.timer` is **STOPPED on production and stays stopped.** No production write,
+settle, migration, DELETE or repair was performed, and none is authorised by this entry. The
+supplied production state — `wildcard_final` rows = 0, T15/`is_finals_series` mismatches = 0,
+`player_career_stats` finals drift = 0, `club_seasons` finals sum 1436 = 2 × finals-series matches —
+is **consistent with production currently holding no stale duplicates**, because the Wildcard
+matches were rejected as unrepresentable before ISSUE-129 and have never been settled. That must be
+measured (runbook §9.2), not assumed; the remediation tool is required either way, because the
+*next* settle is what would create them.
+
+### Validation
+
+Stage 1 is investigation and design; no behaviour changed, so there was nothing to validate
+beyond the RED baseline, which the operator returned failing for the intended reason (two canonical
+rows where one was asserted).
+
+**Stage 2, all against `afldb_test` in the `claude/issue-131` worktree, 2026-09-03:**
+
+- `npx vitest run tests/integration/settle-afltables.test.ts -t "AFLDB-ISSUE-131"` — **11 passed**,
+  45 skipped. Both RED tests GREEN with **no assertion weakened**, plus: ISSUE-129 `is_finals_series`
+  semantics survive the rekey; idempotence (rekeyed 0 / inserted 0 / updated 0 / refused 0 on an
+  identical rerun); `rekey_ambiguous`; `rekey_would_merge`; both `round_code` and `match_date`
+  moved (no rekey — the contract stays narrow); club identity changed (no rekey); foreign-owned row
+  never a candidate; an active human override carried across a safe rekey and still `conflict` at
+  the new key with the old row retired rather than deleted; `rekey_override_conflict`; and the
+  repair tool end to end (argument and season guards, plan → apply → nothing-left-to-do, a wrong
+  `--plan-hash` refused, the ledger row naming both renderings, children still on the preserved id,
+  and the ambiguous case refused).
+- `npx vitest run tests/integration/settle-afltables.test.ts tests/current-season-import.test.ts` —
+  **311 passed, 1 skipped, 0 failed.**
+- `npx vitest run tests/admin-current-season-settle.test.ts tests/fitzroy-core-import.test.ts
+  tests/integration/afl-api-lineup-store.test.ts` — **138 passed**, 5 skipped.
+- `npx vitest run tests/integration/database.test.ts` — **37 passed**, 4 skipped.
+- `npx tsc --noEmit -p tsconfig.json` and `npx eslint` over every changed file — **clean**.
+
+Outstanding, all operator-run and all read-only, and NOT done by Stage 2: runbook §9.2/§9.3
+(actual duplicate fixtures, dev then production), §9.4 (whether the optional hardening index is
+representable against full history), §9.5 (child-row exposure), §9.6 (the two `source_record_id`
+conventions, and `Game`-id stability). No dev or production database was opened.
+
+**Independent review answered, 2026-09-03 (runbook §14).** Merge recommendation **YES AFTER
+FIXES**: one HIGH, no blockers. Every required fix is made and validated on
+`claude/issue-131`; production remained untouched and the timer was not started.
+
+- **HIGH-1 — a rekey refusal did not stop the rest of the fixture family.** Confirmed.
+  `rekey_would_merge` refused only the `matches` target, so `match_period_scores` and
+  `player_match_stats` (a later unit in the same transaction) still wrote against the LIVE half
+  of a duplicated fixture; and `rekey_override_conflict`, decided inside the savepoint after
+  `matchId` had been set to the STALE candidate, allowed a pending period set to be inserted onto
+  that stale row. Both deepen the duplicated state §8 exists to resolve. **Fixed by fixture-family
+  blocking:** `applyCanonicalUnit()` now carries a `fixtureBlocked` refusal — set by either the
+  `readFreshTarget()` refusals or the §5.7 override carry, and clearing `matchId` with it — and
+  refuses the unit's remaining targets; `SettleRefs.rekeyBlockedFixtures` withholds every later
+  family of that fixture, the player family included. The SPECIFIC refusal travels with the block
+  rather than being flattened into a generic `write_failed`, findings and counters keep their
+  existing per-target semantics, and no fail-closed rule was weakened.
+- **MEDIUM-2 — the override carry was silent.** `overridesCarried` now leaves the applier,
+  accumulates into the new `canonicalOverridesCarried` counter and is printed by the settle CLI.
+  The remaining audit limitation is documented rather than engineered around: an automatic carry
+  writes no `data_edits` row, because `data_edits` is the admin UI's human-edit ledger keyed on an
+  admin user and `afldb_import` holds no grant on it. The durable audit is the `data_overrides`
+  pair (new active row, old row deactivated and never deleted) plus the `canonical_applications`
+  row naming both renderings.
+- **MEDIUM-3 — the DELETE/TRUNCATE guarantee was overstated.** Stage 1's "structurally cannot
+  DELETE or TRUNCATE" is corrected in §5.5, §8 rule 2 and the repair tool's header to the
+  behavioural guarantee it actually is: the tool contains no DELETE or TRUNCATE on any path, and
+  ISSUE-099 obligation O1 proves the same of the settle path from the statements it issues. The
+  role bounds the blast radius; it is not the proof. **No grant changed.**
+- **MEDIUM-4 — "the §5.3 probe runs only on a lookup miss" was stale.** D6 deliberately runs it on
+  hit and miss, because the would-merge clause is only reachable on a hit. §5.3, `resolveTarget()`
+  and `findRetiredMatchIdentities()` now agree.
+- **LOW-9** — the RED framing is gone from the two now-GREEN Stage-1 tests; their assertions are
+  unchanged.
+- **Smaller items, all fixed:** `derivePlan()` refuses `rekey_candidate_unreadable` instead of
+  throwing when a candidate row cannot be read back; the repair tool's `import_batches` row is
+  completed inside the same transaction that wrote its mutations; per-fixture success lines are
+  printed only after the commit; `unresolvedIdentityMatch` is no longer inflated by a rekey — the
+  dependent period target now resolves against the preserved id, which also stopped a genuine
+  period correction being refused `stale_canonical_target` on the rekey run, and the
+  empty-period-set answer is scoped to the rekey path so E3's foreign-owned / source-less refusals
+  are untouched; and `MATCHES_PROPOSED_FIELDS`'s docblock now states that `match_key` joins the
+  proposed set on the rekey path via `withRekeyRendering()` and only there.
+
+**Validation of the review pass (all `afldb_test`, 2026-09-03):**
+
+- `npx vitest run tests/integration/settle-afltables.test.ts -t "AFLDB-ISSUE-131"` — **20 passed**,
+  45 skipped. The 11 Stage-2 tests plus five new ones: the would-merge fixture-family withholding
+  (three targets refused, nothing mutated, `canonical_applications` byte-identical before and
+  after); `rekey_override_conflict` inserting **zero** period rows onto a stale row seeded with an
+  empty period set; a date-only rekey with an identical no-op rerun; a club-rendering-only rekey
+  (§10 risk 3, the bulk `clubs.json` vector) with the ledger row naming both renderings; and
+  `latestBatchOf()` selecting the numerically latest batch across a digit-count boundary.
+- `npx vitest run tests/integration/settle-afltables.test.ts tests/current-season-import.test.ts` —
+  **316 passed, 1 skipped, 0 failed.**
+- `npx vitest run tests/admin-current-season-settle.test.ts tests/fitzroy-core-import.test.ts
+  tests/integration/afl-api-lineup-store.test.ts tests/integration/database.test.ts` —
+  **175 passed**, 9 skipped.
+- `npx tsc --noEmit -p tsconfig.json` and `npx eslint` over every changed file — **clean**.
+
+One intermediate failure is recorded because it is evidence: the first cut answered an EMPTY
+canonical period set as a new target on every path, and the existing foreign-owner and source-less
+tests caught it immediately — a period set would have been inserted under a `matches` row this
+source does not own. The branch is now scoped to the rekey path, where the candidate is owned by
+the promoting source by construction.
+
+**Deliberately deferred:** a `data_edits` row for an automatic override carry (out of scope, needs
+its own issue); `game_id` / §5.2 (§10.1 still unmeasured); §7's hardening index (§9.4 still
+unmeasured, still no migration); and all of §9's read-only environment evidence, which was NOT
+started in that session. Both-round-and-date moves remain fail-closed and regression-tested.
+
+**§9 read-only environment evidence, operator-run 2026-09-03 (runbook §15).** Read-only
+throughout: no write, no settle, no repair, no deploy, and `afldb-settle-afltables.timer` on
+production remains STOPPED. **Dev** (`afldb_dev`): §9.2 returned **17 duplicate 2026 fixtures /
+34 canonical rows**, every observed rekey a `round_code` movement (Round 23 → 24, Round 24 → 25)
+with season, date and both club ids identical and all rows still `home_and_away` — the §3
+mechanism in the field. §9.3 returned **0** date-only pairs. §9.5 classified all 34 rows: 17
+`empty_rows`, 17 `populated_rows`, 17 numeric `source_record_id` and 17 five-part key strings,
+with the consistent shape of an older numeric-id row holding 0 `player_match_stats` /
+0 `match_period_scores` / 0 `player_achievements` paired with a newer key-string row holding ~44–46
+player rows and 8 period rows. Dev therefore holds the **empty stale row + populated live row**
+shape in all 17 pairs and **no** pair with both halves populated; the 17/17 convention split
+corroborates §3.6 and adopts nothing. **Production** (`afldb_prod`): §9.2 returned **0 rows** — no
+duplicate 2026 fixtures of this class, confirming §10 risk 2, since the timer has been stopped
+since ISSUE-129 and the rekeyed identities have never been settled there. **Consequences.**
+Production needs **prevention, not duplicate cleanup**: the §6 code fix must land before the timer
+is re-enabled, and `repair-match-rekeys` still ships and is still run in §8's sequence but is
+expected to report an empty plan there. **CORRECTED on re-review (runbook §15.3):** dev's 17 stale
+halves are **not** §8 action 2 report-only groups. `findRetiredMatchIdentities()` proves an identity
+retired by joining `staging.source_records` on `external_record_id = matches.source_record_id`, and
+those halves carry the historical numeric/game-id convention (§3.6), so they fall out of that JOIN
+and are outside the repair tool's candidate set entirely. A dev dry run is therefore expected to
+print `Nothing to repair` while its validation block still reports
+`duplicateFixtureGroupsInSeason = 17` — the tool reporting state it cannot prove anything about,
+not failing to see it. A subsequent dev settle finds each populated live row by its current
+`match_key` and updates it ordinarily; the retired-identity probe returns nothing on that hit path,
+so **no** `rekey_would_merge` arises for these fixtures and the 17 empty historical rows are never
+read as candidates nor written to. Dev is not made worse by the fixed code, by a different
+mechanism than first recorded. Those 17 rows are a separate supervised cleanup / data-hygiene
+decision **outside ISSUE-131**: retiring an empty row needs an owner-level DELETE that
+`afldb_import` does not and must not hold, and §8 rule 3 forbids an ad-hoc one, so **no DELETE is
+proposed**. **§9.4 and §9.6 were not run**, so §7's hardening index remains unmeasured and unwritten
+(**no migration**) and `game_id` remains unmeasured and **not adopted** (§5.2 undecided, §10 risk 1
+stands). No application code changed in response — the evidence does not contradict the implemented
+contract.
+
+### Next action
+
+**Stage 2 and the independent-review fixes are implemented and validated on `afldb_test`; nothing is merged and production is untouched.** (1) Operator reviews the diff on `claude/issue-131`.
+
+(2) **DONE 2026-09-03 — runbook §15:** the operator ran the read-only §9 evidence. **Dev** (`streamanator`/`afldb_dev`) holds **17 duplicate 2026 fixtures / 34 canonical rows**, every one a `round_code` movement (Round 23 → 24, Round 24 → 25) with season/date/home/away identical and all rows still `home_and_away`; §9.3 returned **0** date-only pairs; §9.5 classified all 34 rows as **17 empty + 17 populated** (17 numeric `source_record_id` stale halves with 0 `player_match_stats` / 0 `match_period_scores` / 0 `player_achievements`, paired with 17 five-part key-string live halves carrying ~44–46 player rows and 8 period rows) — corroborating §3.6's two conventions. **Production** (`afldb-prod`/`afldb_prod`) §9.2 returned **0 rows**: no duplicate 2026 fixtures at all, confirming §10 risk 2, because the timer has been stopped and the rekeyed identities have never been settled there. Consequence: **production requires prevention (the §6 code fix), not duplicate cleanup** — `repair-match-rekeys` still ships and is still run, but its production plan is expected to be empty. **CORRECTED on re-review (runbook §15.3):** dev's 17 stale halves are **not** §8 action 2 report-only groups — they are outside the repair tool's candidate set altogether. `findRetiredMatchIdentities()` proves an identity retired by joining `staging.source_records` on `external_record_id = matches.source_record_id`, and dev's stale halves carry the historical numeric/game-id convention (§3.6), so they can never satisfy that proof. A dev `repair-match-rekeys` dry run is therefore expected to print `Nothing to repair` while its validation block still reports `duplicateFixtureGroupsInSeason = 17`; a subsequent dev settle finds the populated live rows by their current `match_key`, updates them ordinarily, raises **no** `rekey_would_merge` for these fixtures and never touches the 17 empty historical rows. Those rows are a separate supervised cleanup / data-hygiene decision **outside ISSUE-131**, and **no DELETE is proposed** here or held by `afldb_import`. **§9.4 and §9.6 were NOT run** — §7's hardening index remains unmeasured and unwritten (**no migration**) and `game_id` remains unmeasured and **not adopted** (§5.2 undecided, §10 risk 1 stands).
+
+(3) Merge only after that review, then runbook §8's supervised production sequence in order with the timer still stopped: deploy, `sh deploy/afldb-r-preflight.sh` ending `R PREFLIGHT: OK`, `repair-match-rekeys` dry run, review, `--apply --plan-hash`, one supervised settle (`--dry-run --auto-apply`, the real apply, then an identical rerun proving 0/0/0), and only then re-enable `afldb-settle-afltables.timer`. Separately, on **dev**: nothing in this issue acts on the 17 duplicate fixtures — a `repair-match-rekeys` dry run there is expected to print `Nothing to repair` with `duplicateFixtureGroupsInSeason = 17` in its validation block, and the 17 empty historical rows remain a separate supervised cleanup decision. Optional, separately: run §9.4 before deciding §7's hardening index, and §9.6 plus a cross-snapshot `Game` comparison before deciding §5.2's `game_id` — both still unrun. **No production write, settle, migration or DELETE is authorised until §8 completes and is accepted.**
