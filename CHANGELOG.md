@@ -15,6 +15,57 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-131 — an upstream match rekey now updates the canonical match instead of duplicating it - 3 September 2026
+
+- **The defect.** `matches.match_key` is `season|round_code|match_date|home|away`, and the identical
+  five-part string is also the match family's `external_record_id`. It is therefore a content address
+  over mutable scheduling metadata, and it was the only handle either side of the pipeline had. When
+  AFL Tables revised a round or a date on a match AFLDB had already materialised, both moved together:
+  `reconcile()` saw a record it had never observed, the applier's only canonical lookup was by
+  `match_key` and missed, and a **second** canonical row was inserted for a fixture that already had
+  one. `matches` carries no constraint on the real-world fixture, so the duplicate was admissible; the
+  vanished identity was swept `absent`, and absence is observation state only, so nothing ever
+  revisited the stale row — it kept its `match_period_scores` and `player_match_stats` forever. A
+  general rekey defect; ISSUE-129's Wildcard Final reclassification was the trigger that exposed it.
+- **Rekey in place, on deterministic evidence only.** On a `match_key` miss the settle now looks for a
+  canonical row that is provably the same fixture under an identity the source has retired: exact
+  season and **both** club ids, at most one of `round_code` / `match_date` moved, the row owned by AFL
+  Tables, and its source record absent from a scope the run proved complete. Exactly one candidate is
+  UPDATED in place. **The canonical `matches.id` is preserved**, so every child row and every
+  provenance reference stays attached — zero child mutation, and no DELETE on any path.
+  `match_key` joins the proposed field set on that path only, so the move diffs, is covered by the
+  staleness hash, reaches the reviewer as a correction, and lands in `canonical_applications` with the
+  old rendering in `previous_values` and the new one in `new_values`.
+- **Human decisions travel with the match.** `data_overrides.entity_key` for a match *is* the
+  `match_key`, so a rekey silently orphaned every active human override. Authority is now asked under
+  both renderings, and active overrides are carried to the new key inside the same savepoint; the old
+  row is deactivated, never deleted. The run reports how many it carried
+  (`canonicalOverridesCarried`), so moving a human's pinned decision is never silent.
+- **Three fail-closed refusals, no force flag.** `rekey_ambiguous` (more than one row could be the
+  rekey), `rekey_would_merge` (the fixture already holds two canonical rows — which now also stops the
+  ordinary update of the live one rather than deepening the duplication) and `rekey_override_conflict`
+  (a live override under both renderings). Each writes nothing, opens a `canonical_apply_failed`
+  finding and surfaces in the settle exception report. **Two populated canonical rows are never merged
+  automatically.**
+- **A rekey refusal stops the whole fixture, not just the `matches` row.** A refusal says the run
+  cannot name the canonical row that *is* this real-world match, so every dependent target of that
+  fixture is withheld for the rest of the run: `match_period_scores` in the same savepoint, and
+  `player_match_stats`, which is settled afterwards in the same transaction and would otherwise have
+  written against the live half of a duplicated fixture. The specific refusal travels with the block
+  rather than being flattened into a generic failure, so the exception report still names the
+  evidence that stopped each target.
+- **`tools/current-season/repair-match-rekeys.ts`** (new) repairs rows already made stale. Dry run by
+  default; `--apply` requires the hash of the plan that was reviewed and re-derives the plan inside the
+  transaction, aborting if it moved. It runs as the restricted `afldb_import` role, prints the resolved
+  database, requires `--season`, uses per-fixture savepoints, writes a ledger row per mutation, and
+  prints the duplicate-fixture and finals-accounting counts before and after. Three actions only —
+  rekey in place, report only, refuse — and never a DELETE.
+- **Fixed in passing.** The settle exception report named a stale import batch: `latestBatchOf()`
+  ordered by an `id::text AS id` output alias, so batches sorted as text and `'963'` sorted above
+  `'1062'`. It could only fire once batch ids crossed a digit-count boundary.
+- **No migration.** The identity fix needs no schema change.
+
+
 ### AFLDB-ISSUE-130 — the settle service's R library is declared by the repository and gated at deploy time - 3 September 2026
 
 - **The defect.** `afldb-settle-afltables.service` failed on the dev host at step 1 with

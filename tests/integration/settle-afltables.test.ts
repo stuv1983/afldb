@@ -108,13 +108,21 @@ import {
   getSourceFamily,
   parseSourceFamilyRegistry,
 } from '@/lib/acquisition/source-families';
-import { buildSettleExceptionReport } from '@/lib/acquisition/settle-report';
+import {
+  buildSettleExceptionReport,
+  SETTLE_BATCH_TOOL,
+} from '@/lib/acquisition/settle-report';
 import { asImportBatchId, type ImportBatchId } from '@/lib/import-batch-id';
 
 import {
   runSettleCli,
   type SettleCliOutcome,
 } from '../../tools/current-season/settle-afltables';
+import {
+  parseRepairArgs,
+  runRepairMatchRekeys,
+  type RepairOutcome,
+} from '../../tools/current-season/repair-match-rekeys';
 
 import { createImportRoleParityHarness } from './import-role-parity';
 
@@ -2065,6 +2073,41 @@ const T122 = {
   sourceless: '2093-04-15T00:00:00Z',
   broken: '2093-04-16T00:00:00Z',
   advisory: '2093-04-17T00:00:00Z',
+  // AFLDB-ISSUE-131 — the upstream rekey pairs, each "before" strictly before
+  // its own "after" so the two runs are ordered observations of one fixture.
+  rekeyBefore: '2093-04-18T00:00:00Z',
+  rekeyAfter: '2093-04-19T00:00:00Z',
+  wildcardBefore: '2093-04-20T00:00:00Z',
+  wildcardAfter: '2093-04-21T00:00:00Z',
+  // AFLDB-ISSUE-131 Stage 2 — idempotence, the fail-closed refusals, and the
+  // override carry-across. Each run is a later observation than the last.
+  rekeyRerun: '2093-04-22T00:00:00Z',
+  ambiguousSeed: '2093-04-23T00:00:00Z',
+  ambiguousMove: '2093-04-24T00:00:00Z',
+  mergeSeed: '2093-04-25T00:00:00Z',
+  mergeMove: '2093-04-26T00:00:00Z',
+  bothMovedBefore: '2093-04-27T00:00:00Z',
+  bothMovedAfter: '2093-04-28T00:00:00Z',
+  clubMovedBefore: '2093-04-29T00:00:00Z',
+  clubMovedAfter: '2093-04-30T00:00:00Z',
+  foreignBefore: '2093-05-01T00:00:00Z',
+  foreignAfter: '2093-05-02T00:00:00Z',
+  overrideBefore: '2093-05-03T00:00:00Z',
+  overrideAfter: '2093-05-04T00:00:00Z',
+  overrideClashBefore: '2093-05-05T00:00:00Z',
+  overrideClashAfter: '2093-05-06T00:00:00Z',
+  // AFLDB-ISSUE-131 independent review, HIGH-1 — a rekey refusal must stop the
+  // whole fixture family, not just the `matches` target, plus the two rekey
+  // vectors §10 named and the review asked for explicitly.
+  mergeFamilySeed: '2093-05-07T00:00:00Z',
+  mergeFamilyMove: '2093-05-08T00:00:00Z',
+  clashFamilySeed: '2093-05-09T00:00:00Z',
+  clashFamilyMove: '2093-05-10T00:00:00Z',
+  dateOnlyBefore: '2093-05-11T00:00:00Z',
+  dateOnlyAfter: '2093-05-12T00:00:00Z',
+  dateOnlyRerun: '2093-05-13T00:00:00Z',
+  renderingBefore: '2093-05-14T00:00:00Z',
+  renderingAfter: '2093-05-15T00:00:00Z',
 } as const;
 
 type Ids122 = {
@@ -2478,6 +2521,12 @@ async function cleanup122(client: postgres.Sql): Promise<void> {
   await client`DELETE FROM external_identities WHERE external_id LIKE ${like}`;
   await client`DELETE FROM players WHERE slug LIKE ${`${SLUG122}%`}`;
   await client`DELETE FROM import_batches WHERE notes LIKE ${`%${LABEL122}%`}`;
+  // AFLDB-ISSUE-131 §8: the repair tool stamps its own batch, whose notes name
+  // the issue and the season rather than this suite's snapshot label.
+  await client`
+    DELETE FROM import_batches
+     WHERE tool = 'repair-match-rekeys.ts' AND notes LIKE ${`%season=${SEASON122}%`}
+  `;
   await client`DELETE FROM seasons WHERE year = ${SEASON122}`;
 }
 
@@ -3746,6 +3795,1222 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier', () => {
       // The library entry the CLI wraps agrees with it exactly.
       const direct = await buildSettleExceptionReport(sql, { season: SEASON122 });
       expect(direct).toEqual(outcome.report);
+    });
+  });
+
+  /* ================================================================ *
+   * AFLDB-ISSUE-131 — the upstream rekey
+   *
+   * The first two tests are the Stage-1 reproduction of the stale-duplicate
+   * defect, written RED against the intended contract and turned GREEN by
+   * Stage 2 with no assertion altered. They stay exactly as they were written:
+   * they are the defect's regression, and nothing here may be weakened to
+   * accommodate a future change.
+   *
+   * The defect. `match_key` is `season|round_code|match_date|home|away`
+   * (`tools/migration/import_fitzroy_core.py:1615`) and the SAME five-part
+   * string is also the match family's `external_record_id` (:1221-1224). It is
+   * therefore a content address over mutable scheduling metadata, and it is the
+   * only handle either side of the pipeline has:
+   *
+   *   - `reconcile()` keys on `external_record_id`, so a moved component makes
+   *     a brand new source record with no open version -> verb `new`;
+   *   - `resolveTarget()` and `readFreshTarget()` look the canonical row up by
+   *     `match_key` alone (`settle-afltables.ts:2608`,
+   *     `canonical-apply.ts:336`, `:740`), so the row that already describes
+   *     this fixture is invisible -> `new_target` -> `insertable` -> INSERT.
+   *
+   * `matches` carries exactly one uniqueness constraint — `match_key UNIQUE`
+   * (`003_matches.sql:23`) — and none on the real-world fixture
+   * `(season, match_date, home_club_id, away_club_id)`, so the second row is
+   * admissible. The vanished record is swept to `absent`, and §18.2 makes
+   * absence observation state only ("No candidate, ever.",
+   * `settle-afltables.ts:3034`), so nothing ever revisits the stale row: it
+   * keeps its `match_period_scores` and its `player_match_stats` forever.
+   *
+   * The first test moves `round_code` only, with the date and both clubs held
+   * fixed, which is the smallest possible identity move and proves the defect
+   * is a GENERAL rekey defect. The second replays the ISSUE-129 shape — a
+   * numbered home-and-away round reclassified to `wildcard_final` — to show the
+   * same mechanism fires on the path that exposed it.
+   *
+   * @see issues/open/AFLDB-ISSUE-131.md §3 (root cause), §5 (contract)
+   * ================================================================ */
+
+  describe('AFLDB-ISSUE-131 — an upstream rekey must not duplicate the match', () => {
+    const SCOPE_RK = 'issue122-131-rekey';
+    const SCOPE_WF = 'issue122-131-wildcard';
+
+    const MATCH_RK_BEFORE = 'issue122-131-rekey-match-r1';
+    const KEY_RK_BEFORE = 'issue122-131-rekey-key-r1';
+    const MATCH_RK_AFTER = 'issue122-131-rekey-match-r2';
+    const KEY_RK_AFTER = 'issue122-131-rekey-key-r2';
+    const PLAYER_RK_BEFORE = 'issue122-131-rekey-player-r1';
+    const PLAYER_RK_AFTER = 'issue122-131-rekey-player-r2';
+    const URL_RK = 'issue122-players/R/Issue122_131_Rekey.html';
+
+    const MATCH_WF_BEFORE = 'issue122-131-wildcard-match-24';
+    const KEY_WF_BEFORE = 'issue122-131-wildcard-key-24';
+    const MATCH_WF_AFTER = 'issue122-131-wildcard-match-wf';
+    const KEY_WF_AFTER = 'issue122-131-wildcard-key-wf';
+    const PLAYER_WF_BEFORE = 'issue122-131-wildcard-player-24';
+    const PLAYER_WF_AFTER = 'issue122-131-wildcard-player-wf';
+    const URL_WF = 'issue122-players/W/Issue122_131_Wildcard.html';
+
+    /** The date and both clubs are IDENTICAL across every run below. */
+    const FIXTURE_DATE = '2093-08-30';
+
+    let rekeyPlayerId = 0;
+    let wildcardPlayerId = 0;
+    /** A club that is neither the fixture's home nor its away side. */
+    let thirdClubHist = '';
+
+    async function seedPlayer(suffix: string, url: string): Promise<number> {
+      const [player] = await sql<{ id: number }[]>`
+        INSERT INTO players (display_name, sort_name, search_name, slug)
+        VALUES (${`Issue131 ${suffix}`}, ${`${suffix}, Issue131`},
+                ${`issue131 ${suffix.toLowerCase()}`}, ${`${SLUG122}131-${suffix.toLowerCase()}`})
+        RETURNING id::int AS id
+      `;
+      await sql`
+        INSERT INTO external_identities (source_id, external_id, player_id, status, match_method)
+        VALUES (${fixtures.sourceId}, ${url}, ${player.id}, 'unique', 'afltables_profile_url')
+      `;
+      return player.id;
+    }
+
+    beforeAll(async () => {
+      rekeyPlayerId = await seedPlayer('Rekey', URL_RK);
+      wildcardPlayerId = await seedPlayer('Wildcard', URL_WF);
+      // Read, never created — clubs are canonical identity and this suite
+      // creates none (§17.3 in spirit: no source may create an identity).
+      const [third] = await sql<{ hist: string }[]>`
+        SELECT legacy_club_hist AS hist
+          FROM clubs
+         WHERE legacy_club_hist IS NOT NULL
+           AND legacy_club_hist <> ${fixtures.homeClubHist}
+           AND legacy_club_hist <> ${fixtures.awayClubHist}
+         ORDER BY id LIMIT 1
+      `;
+      if (!third) {
+        throw new Error(
+          'afldb_test carries fewer than three clubs with a legacy_club_hist; the '
+          + 'AFLDB-ISSUE-131 club-identity refusal needs a third club to move to.',
+        );
+      }
+      thirdClubHist = third.hist;
+    });
+
+    /** Every `canonical_apply_failed` finding one record wrote, refusal first. */
+    async function rekeyFindings(externalRecordId: string): Promise<{
+      refusal: string | null; targetTable: string | null; resolvedAt: string | null;
+    }[]> {
+      const rows = await sql<{
+        refusal: string | null; targetTable: string | null; resolvedAt: string | null;
+      }[]>`
+        SELECT details->>'refusal' AS refusal,
+               details->>'target_table' AS "targetTable",
+               resolved_at::text AS "resolvedAt"
+          FROM data_issues
+         WHERE issue_type = 'canonical_apply_failed'
+           AND details->>'external_record_id' = ${externalRecordId}
+         ORDER BY issue_key
+      `;
+      return [...rows];
+    }
+
+    /** Active and retired human overrides on one `match_key`. */
+    async function overridesOn(entityKey: string): Promise<{
+      fieldGroup: string; isActive: boolean; overrideValues: JsonValue;
+    }[]> {
+      const rows = await sql<{
+        fieldGroup: string; isActive: boolean; overrideValues: JsonValue;
+      }[]>`
+        SELECT field_group AS "fieldGroup", is_active AS "isActive",
+               override_values AS "overrideValues"
+          FROM data_overrides
+         WHERE entity_type = 'matches' AND entity_key = ${entityKey}
+         ORDER BY field_group
+      `;
+      return [...rows];
+    }
+
+    async function seedOverride(entityKey: string, attendance: number): Promise<void> {
+      await sql`
+        INSERT INTO data_overrides (
+          entity_type, entity_key, field_group, override_values, admin_user_id, is_active
+        ) VALUES (
+          'matches', ${entityKey}, 'attendance',
+          ${sql.json({ attendance } as never)}, ${ids122.adminUserId}, true
+        )
+        ON CONFLICT (entity_type, entity_key, field_group) DO UPDATE
+          SET is_active = true, override_values = EXCLUDED.override_values
+      `;
+    }
+
+    /** Every canonical match this fixture could have produced, either key. */
+    async function fixtureMatches(keys: readonly string[]): Promise<{
+      matchKey: string; roundCode: string; roundNumber: number | null;
+      roundType: string; isFinal: boolean; sourceRecordId: string | null;
+      matchDate: string; homeClubId: number; awayClubId: number; id: number;
+    }[]> {
+      const rows = await sql<{
+        matchKey: string; roundCode: string; roundNumber: number | null;
+        roundType: string; isFinal: boolean; sourceRecordId: string | null;
+        matchDate: string; homeClubId: number; awayClubId: number; id: number;
+      }[]>`
+        SELECT id::int AS id, match_key AS "matchKey", round_code AS "roundCode",
+               round_number::int AS "roundNumber", round_type::text AS "roundType",
+               is_final AS "isFinal", source_record_id AS "sourceRecordId",
+               match_date::text AS "matchDate",
+               home_club_id::int AS "homeClubId", away_club_id::int AS "awayClubId"
+          FROM matches
+         WHERE season = ${SEASON122} AND match_key IN ${sql([...keys])}
+         ORDER BY match_key
+      `;
+      return [...rows];
+    }
+
+    /**
+     * One run over exactly one match record and exactly one player record for
+     * it, in this fixture's own match scope. Both enumerations are complete, so
+     * the run that carries the rekeyed identity sweeps the old one absent —
+     * which is precisely what production does.
+     */
+    function rekeyMatchSpec(spec: {
+      scope: string;
+      matchRecordId: string;
+      matchKey: string;
+      roundCode: string;
+      roundNumber: number | null;
+      roundType?: string;
+      isFinal?: boolean;
+      date?: string;
+      awayClubHist?: string;
+      attendance?: number;
+      periodScores?: JsonValue;
+    }): MatchSpec {
+      const date = spec.date ?? FIXTURE_DATE;
+      const roundType = spec.roundType ?? 'home_and_away';
+      return {
+        recordId: spec.matchRecordId,
+        matchKey: spec.matchKey,
+        scope: spec.scope,
+        payloadOver: {
+          round_code: spec.roundCode,
+          round_number: spec.roundNumber,
+          round_type: roundType,
+          match_date: date,
+          ...(spec.attendance === undefined ? {} : { attendance: spec.attendance }),
+        },
+        projectionOver: {
+          round_code: spec.roundCode,
+          round_number: spec.roundNumber,
+          round_type: roundType,
+          is_final: spec.isFinal ?? false,
+          match_date: date,
+          ...(spec.awayClubHist === undefined ? {} : { away_club_hist: spec.awayClubHist }),
+          ...(spec.attendance === undefined ? {} : { attendance: spec.attendance }),
+          ...(spec.periodScores === undefined ? {} : { period_scores: spec.periodScores }),
+        },
+      };
+    }
+
+    function rekeyBundle(spec: {
+      scope: string;
+      matchRecordId: string;
+      matchKey: string;
+      roundCode: string;
+      roundNumber: number | null;
+      roundType?: string;
+      isFinal?: boolean;
+      date?: string;
+      awayClubHist?: string;
+      attendance?: number;
+      playerRecordId?: string;
+      url?: string;
+    }): SettleBundle {
+      return bundle122({
+        matches: [rekeyMatchSpec(spec)],
+        players: spec.playerRecordId === undefined || spec.url === undefined ? [] : [{
+          recordId: spec.playerRecordId,
+          url: spec.url,
+          payloadOver: { match_key: spec.matchKey, round_code: spec.roundCode },
+          projectionOver: {
+            match_key: spec.matchKey,
+            round_code: spec.roundCode,
+            round_number: spec.roundNumber,
+            is_final: spec.isFinal ?? false,
+          },
+        }],
+      });
+    }
+
+    it('rekeys the existing canonical match when only round_code moves, '
+      + 'instead of inserting a duplicate', async () => {
+      await apply122(rekeyBundle({
+        scope: SCOPE_RK,
+        matchRecordId: MATCH_RK_BEFORE,
+        matchKey: KEY_RK_BEFORE,
+        roundCode: '1',
+        roundNumber: 1,
+        roundType: 'home_and_away',
+        isFinal: false,
+        playerRecordId: PLAYER_RK_BEFORE,
+        url: URL_RK,
+      }), T122.rekeyBefore);
+
+      // Precondition: exactly one canonical match, on the original key.
+      const seeded = await fixtureMatches([KEY_RK_BEFORE, KEY_RK_AFTER]);
+      expect(seeded.map((row) => row.matchKey)).toEqual([KEY_RK_BEFORE]);
+      expect(await stats122(rekeyPlayerId)).toHaveLength(1);
+
+      // AFL Tables corrects the round. Same season, same date, same two clubs,
+      // same real-world match — so the source record id and the canonical
+      // match_key both move, because both are that same five-part string.
+      await apply122(rekeyBundle({
+        scope: SCOPE_RK,
+        matchRecordId: MATCH_RK_AFTER,
+        matchKey: KEY_RK_AFTER,
+        roundCode: '2',
+        roundNumber: 2,
+        roundType: 'home_and_away',
+        isFinal: false,
+        playerRecordId: PLAYER_RK_AFTER,
+        url: URL_RK,
+      }), T122.rekeyAfter);
+
+      const after = await fixtureMatches([KEY_RK_BEFORE, KEY_RK_AFTER]);
+
+      // GOAL 1: one real-world match resolves to one canonical match.
+      // GOAL 2: the correction leaves no stale duplicate behind.
+      expect(after.map((row) => row.matchKey)).toEqual([KEY_RK_AFTER]);
+      expect(after).toHaveLength(1);
+      expect({
+        roundCode: after[0]?.roundCode,
+        roundNumber: after[0]?.roundNumber,
+        matchDate: after[0]?.matchDate,
+      }).toEqual({ roundCode: '2', roundNumber: 2, matchDate: FIXTURE_DATE });
+
+      // GOAL 3/4: the canonical id survived the rekey and every child row
+      // still hangs off it, cited to the record that now describes it.
+      expect(after[0]?.id).toBe(seeded[0]?.id);
+      expect(after[0]?.sourceRecordId).toBe(MATCH_RK_AFTER);
+
+      const stats = await stats122(rekeyPlayerId);
+      expect(stats).toHaveLength(1);
+      expect(stats[0]?.matchId).toBe(after[0]?.id);
+      expect(await periods122(after[0]?.id as number)).toHaveLength(4);
+    });
+
+    it('rekeys in place when a numbered round is reclassified '
+      + 'wildcard_final, rather than duplicating the fixture', async () => {
+      await apply122(rekeyBundle({
+        scope: SCOPE_WF,
+        matchRecordId: MATCH_WF_BEFORE,
+        matchKey: KEY_WF_BEFORE,
+        roundCode: '24',
+        roundNumber: 24,
+        roundType: 'home_and_away',
+        isFinal: false,
+        playerRecordId: PLAYER_WF_BEFORE,
+        url: URL_WF,
+      }), T122.wildcardBefore);
+
+      const seeded = await fixtureMatches([KEY_WF_BEFORE, KEY_WF_AFTER]);
+      expect(seeded.map((row) => row.matchKey)).toEqual([KEY_WF_BEFORE]);
+
+      // ISSUE-129 semantics: `WF` is not home-and-away, so it is_final and
+      // carries no round_number, but it is NOT finals-series.
+      await apply122(rekeyBundle({
+        scope: SCOPE_WF,
+        matchRecordId: MATCH_WF_AFTER,
+        matchKey: KEY_WF_AFTER,
+        roundCode: 'WF',
+        roundNumber: null,
+        roundType: 'wildcard_final',
+        isFinal: true,
+        playerRecordId: PLAYER_WF_AFTER,
+        url: URL_WF,
+      }), T122.wildcardAfter);
+
+      const after = await fixtureMatches([KEY_WF_BEFORE, KEY_WF_AFTER]);
+
+      expect(after.map((row) => row.matchKey)).toEqual([KEY_WF_AFTER]);
+      expect(after).toHaveLength(1);
+      expect({
+        roundCode: after[0]?.roundCode,
+        roundNumber: after[0]?.roundNumber,
+        roundType: after[0]?.roundType,
+        isFinal: after[0]?.isFinal,
+      }).toEqual({
+        roundCode: 'WF', roundNumber: null, roundType: 'wildcard_final', isFinal: true,
+      });
+      expect(after[0]?.id).toBe(seeded[0]?.id);
+
+      // The reclassified match must not be counted twice anywhere downstream:
+      // a stale `24` row would still be home_and_away and would keep earning
+      // ladder points ISSUE-129 says a Wildcard Final never earns.
+      const stats = await stats122(wildcardPlayerId);
+      expect(stats).toHaveLength(1);
+      expect(stats[0]?.matchId).toBe(after[0]?.id);
+    });
+
+    /* ============================================================== *
+     * Stage 2 — the contract AROUND the rekey.
+     *
+     * The two tests above prove the rekey happens. These prove it happens
+     * ONLY on the evidence §5.3 admits, that it costs nothing on a rerun,
+     * and that a human decision travels with the match.
+     * ============================================================== */
+
+    it('leaves the Wildcard Final out of the finals series (ISSUE-129 semantics '
+      + 'survive the rekey)', async () => {
+      const [row] = await sql<{
+        isFinal: boolean; isFinalsSeries: boolean; roundType: string; roundNumber: number | null;
+      }[]>`
+        SELECT is_final AS "isFinal", is_finals_series AS "isFinalsSeries",
+               round_type::text AS "roundType", round_number::int AS "roundNumber"
+          FROM matches WHERE match_key = ${KEY_WF_AFTER}
+      `;
+      // Migration 085 GENERATES is_finals_series from round_type, so the rekey
+      // moves it without the applier ever naming it. A Wildcard Final is a
+      // final and is NOT finals series, which is the whole of ISSUE-129.
+      expect(row).toEqual({
+        isFinal: true, isFinalsSeries: false, roundType: 'wildcard_final', roundNumber: null,
+      });
+    });
+
+    it('is idempotent — settling the rekeyed identity again writes nothing', async () => {
+      const before = await fixtureMatches([KEY_RK_AFTER]);
+      const outcome = await apply122(rekeyBundle({
+        scope: SCOPE_RK,
+        matchRecordId: MATCH_RK_AFTER,
+        matchKey: KEY_RK_AFTER,
+        roundCode: '2',
+        roundNumber: 2,
+        playerRecordId: PLAYER_RK_AFTER,
+        url: URL_RK,
+      }), T122.rekeyRerun);
+
+      // §5.9. The second run finds the row at the FIRST lookup, so the §5.3
+      // search is never even reached; nothing diffs, so nothing is written and
+      // nothing is audited. SC3, for the rekey path.
+      expect({
+        rekeyed: outcome.counters.canonicalMatchesRekeyed,
+        inserted: outcome.counters.canonicalRowsInserted,
+        updated: outcome.counters.canonicalRowsUpdated,
+        refused: outcome.counters.canonicalRekeyRefusals,
+      }).toEqual({ rekeyed: 0, inserted: 0, updated: 0, refused: 0 });
+
+      const after = await fixtureMatches([KEY_RK_BEFORE, KEY_RK_AFTER]);
+      expect(after.map((row) => row.matchKey)).toEqual([KEY_RK_AFTER]);
+      expect(after[0]?.id).toBe(before[0]?.id);
+    });
+
+    it('refuses when more than one canonical row could be the rekey, and writes '
+      + 'nothing', async () => {
+      const SCOPE = 'issue122-131-ambiguous';
+      const DATE = '2093-09-01';
+      const KEY_81 = 'issue122-131-amb-key-81';
+      const KEY_82 = 'issue122-131-amb-key-82';
+      const KEY_83 = 'issue122-131-amb-key-83';
+      const RECORD_83 = 'issue122-131-amb-match-83';
+
+      // Two canonical rows for the same two clubs on the same day. §5.3's
+      // "at most one component moved" budget is what normally keeps the
+      // candidate set at one; a double-up defeats it, which is risk 4.
+      await apply122(bundle122({
+        matches: [
+          rekeyMatchSpec({
+            scope: SCOPE, matchRecordId: 'issue122-131-amb-match-81',
+            matchKey: KEY_81, roundCode: '81', roundNumber: 81, date: DATE,
+          }),
+          rekeyMatchSpec({
+            scope: SCOPE, matchRecordId: 'issue122-131-amb-match-82',
+            matchKey: KEY_82, roundCode: '82', roundNumber: 82, date: DATE,
+          }),
+        ],
+        players: [],
+      }), T122.ambiguousSeed);
+      expect((await fixtureMatches([KEY_81, KEY_82])).map((row) => row.matchKey))
+        .toEqual([KEY_81, KEY_82]);
+
+      // Now the source publishes ONE identity neither of them carries. Both
+      // retired rows differ from it in round_code alone, so both are
+      // candidates and neither can be proven to be the one.
+      const outcome = await apply122(bundle122({
+        matches: [rekeyMatchSpec({
+          scope: SCOPE, matchRecordId: RECORD_83,
+          matchKey: KEY_83, roundCode: '83', roundNumber: 83, date: DATE,
+        })],
+        players: [],
+      }), T122.ambiguousMove);
+
+      expect(outcome.counters.canonicalRekeyRefusals).toBe(1);
+      expect(outcome.counters.canonicalRowsInserted).toBe(0);
+      // Nothing rekeyed, nothing merged, and no third row invented.
+      expect((await fixtureMatches([KEY_81, KEY_82, KEY_83])).map((row) => row.matchKey))
+        .toEqual([KEY_81, KEY_82]);
+      expect(await rekeyFindings(RECORD_83))
+        .toEqual([{ refusal: 'rekey_ambiguous', targetTable: 'matches', resolvedAt: null }]);
+    });
+
+    it('refuses to update a live row while a retired duplicate of the same fixture '
+      + 'still exists', async () => {
+      const SCOPE = 'issue122-131-merge';
+      const DATE = '2093-09-02';
+      const KEY_STALE = 'issue122-131-merge-key-91';
+      const KEY_LIVE = 'issue122-131-merge-key-92';
+      const RECORD_LIVE = 'issue122-131-merge-match-92';
+
+      await apply122(bundle122({
+        matches: [
+          rekeyMatchSpec({
+            scope: SCOPE, matchRecordId: 'issue122-131-merge-match-91',
+            matchKey: KEY_STALE, roundCode: '91', roundNumber: 91, date: DATE,
+          }),
+          rekeyMatchSpec({
+            scope: SCOPE, matchRecordId: RECORD_LIVE,
+            matchKey: KEY_LIVE, roundCode: '92', roundNumber: 92, date: DATE,
+          }),
+        ],
+        players: [],
+      }), T122.mergeSeed);
+
+      const [seeded] = await sql<{ attendance: number | null }[]>`
+        SELECT attendance FROM matches WHERE match_key = ${KEY_LIVE}
+      `;
+      expect(seeded?.attendance).toBe(31000);
+
+      // The source keeps publishing '92', stops publishing '91', and carries a
+      // real correction. One fixture now holds two canonical rows — the state
+      // this issue exists to stop being deepened — so the ORDINARY update
+      // refuses too rather than writing into one half of a duplicate pair.
+      const outcome = await apply122(bundle122({
+        matches: [rekeyMatchSpec({
+          scope: SCOPE, matchRecordId: RECORD_LIVE,
+          matchKey: KEY_LIVE, roundCode: '92', roundNumber: 92, date: DATE,
+          attendance: 41000,
+        })],
+        players: [],
+      }), T122.mergeMove);
+
+      expect(outcome.counters.canonicalRekeyRefusals).toBe(1);
+      expect(outcome.counters.canonicalRowsUpdated).toBe(0);
+      const [live] = await sql<{ attendance: number | null }[]>`
+        SELECT attendance FROM matches WHERE match_key = ${KEY_LIVE}
+      `;
+      expect(live?.attendance).toBe(31000);
+      expect(await rekeyFindings(RECORD_LIVE))
+        .toEqual([{ refusal: 'rekey_would_merge', targetTable: 'matches', resolvedAt: null }]);
+    });
+
+    it('does not rekey when BOTH the round and the date moved', async () => {
+      const SCOPE = 'issue122-131-bothmoved';
+      const KEY_BEFORE = 'issue122-131-both-key-31';
+      const KEY_AFTER = 'issue122-131-both-key-32';
+
+      await apply122(rekeyBundle({
+        scope: SCOPE, matchRecordId: 'issue122-131-both-match-31',
+        matchKey: KEY_BEFORE, roundCode: '31', roundNumber: 31, date: '2093-09-03',
+      }), T122.bothMovedBefore);
+
+      await apply122(rekeyBundle({
+        scope: SCOPE, matchRecordId: 'issue122-131-both-match-32',
+        matchKey: KEY_AFTER, roundCode: '32', roundNumber: 32, date: '2093-09-04',
+      }), T122.bothMovedAfter);
+
+      // §5.3 admits at most ONE of round_code / match_date moving. Two clubs
+      // meeting on a different day in a different round is not deterministic
+      // evidence of one match; it is the shape of two. The contract is
+      // deliberately narrow, so this INSERTS, and the resulting pair is a
+      // supervised §8 decision rather than a guess made here.
+      const rows = await fixtureMatches([KEY_BEFORE, KEY_AFTER]);
+      expect(rows.map((row) => row.matchKey)).toEqual([KEY_BEFORE, KEY_AFTER]);
+      expect(rows[0]?.id).not.toBe(rows[1]?.id);
+    });
+
+    it('does not rekey across a change of club identity', async () => {
+      const SCOPE = 'issue122-131-clubmoved';
+      const DATE = '2093-09-05';
+      const KEY_BEFORE = 'issue122-131-club-key-41';
+      const KEY_AFTER = 'issue122-131-club-key-42';
+
+      await apply122(rekeyBundle({
+        scope: SCOPE, matchRecordId: 'issue122-131-club-match-41',
+        matchKey: KEY_BEFORE, roundCode: '41', roundNumber: 41, date: DATE,
+      }), T122.clubMovedBefore);
+
+      await apply122(rekeyBundle({
+        scope: SCOPE, matchRecordId: 'issue122-131-club-match-42',
+        matchKey: KEY_AFTER, roundCode: '42', roundNumber: 42, date: DATE,
+        awayClubHist: thirdClubHist,
+      }), T122.clubMovedAfter);
+
+      // A club that differs is never a rekey — it is a different fixture, and
+      // §5.3 requires both RESOLVED club ids to agree exactly.
+      const rows = await fixtureMatches([KEY_BEFORE, KEY_AFTER]);
+      expect(rows.map((row) => row.matchKey)).toEqual([KEY_BEFORE, KEY_AFTER]);
+      expect(rows[0]?.awayClubId).not.toBe(rows[1]?.awayClubId);
+    });
+
+    it('never rekeys a canonical row owned by another source', async () => {
+      const SCOPE = 'issue122-131-foreign';
+      const DATE = '2093-09-06';
+      const KEY_BEFORE = 'issue122-131-foreign-key-51';
+      const KEY_AFTER = 'issue122-131-foreign-key-52';
+
+      await apply122(rekeyBundle({
+        scope: SCOPE, matchRecordId: 'issue122-131-foreign-match-51',
+        matchKey: KEY_BEFORE, roundCode: '51', roundNumber: 51, date: DATE,
+      }), T122.foreignBefore);
+
+      // The row passes to another provider between runs. Rule 3: ownership is
+      // never adopted, and a rekey is a write like any other.
+      await sql`
+        UPDATE matches SET source_id = ${fixtures.providerSourceId}
+         WHERE match_key = ${KEY_BEFORE}
+      `;
+
+      await apply122(rekeyBundle({
+        scope: SCOPE, matchRecordId: 'issue122-131-foreign-match-52',
+        matchKey: KEY_AFTER, roundCode: '52', roundNumber: 52, date: DATE,
+      }), T122.foreignAfter);
+
+      const rows = await fixtureMatches([KEY_BEFORE, KEY_AFTER]);
+      expect(rows.map((row) => row.matchKey)).toEqual([KEY_BEFORE, KEY_AFTER]);
+      // The foreign row was not touched at all: not rekeyed, not restamped.
+      expect(rows[0]?.roundCode).toBe('51');
+    });
+
+    it('carries an active human override across a safe rekey', async () => {
+      const SCOPE = 'issue122-131-override';
+      const DATE = '2093-09-07';
+      const KEY_BEFORE = 'issue122-131-override-key-61';
+      const KEY_AFTER = 'issue122-131-override-key-62';
+
+      await apply122(rekeyBundle({
+        scope: SCOPE, matchRecordId: 'issue122-131-override-match-61',
+        matchKey: KEY_BEFORE, roundCode: '61', roundNumber: 61, date: DATE,
+      }), T122.overrideBefore);
+
+      // A human pins the crowd figure. data_overrides.entity_key for a match
+      // IS the match_key (073), which is precisely what a rekey moves —
+      // migration 073's "survives a rekey" comment is false for this class.
+      await seedOverride(KEY_BEFORE, 54321);
+
+      await apply122(rekeyBundle({
+        scope: SCOPE, matchRecordId: 'issue122-131-override-match-62',
+        matchKey: KEY_AFTER, roundCode: '62', roundNumber: 62, date: DATE,
+      }), T122.overrideAfter);
+
+      const rows = await fixtureMatches([KEY_BEFORE, KEY_AFTER]);
+      expect(rows.map((row) => row.matchKey)).toEqual([KEY_AFTER]);
+
+      // §5.7. The decision moved with the match and is still effective, so the
+      // next run cannot overwrite the field a human pinned.
+      expect(await overridesOn(KEY_AFTER)).toEqual([
+        { fieldGroup: 'attendance', isActive: true, overrideValues: { attendance: 54321 } },
+      ]);
+      // Retired, never deleted: afldb_import holds no DELETE here, and a
+      // retired human decision is history worth keeping.
+      expect(await overridesOn(KEY_BEFORE)).toEqual([
+        { fieldGroup: 'attendance', isActive: false, overrideValues: { attendance: 54321 } },
+      ]);
+
+      const authority = await loadManualAuthority(sql, SEASON122);
+      expect(authority({
+        entity: 'matches', targetKey: { match_key: KEY_AFTER }, fields: ['attendance'],
+      })).toBe('conflict');
+    });
+
+    it('refuses the rekey when both renderings carry a live override for the same '
+      + 'field group', async () => {
+      const SCOPE = 'issue122-131-override-clash';
+      const DATE = '2093-09-08';
+      const KEY_BEFORE = 'issue122-131-clash-key-71';
+      const KEY_AFTER = 'issue122-131-clash-key-72';
+      const RECORD_AFTER = 'issue122-131-clash-match-72';
+
+      await apply122(rekeyBundle({
+        scope: SCOPE, matchRecordId: 'issue122-131-clash-match-71',
+        matchKey: KEY_BEFORE, roundCode: '71', roundNumber: 71, date: DATE,
+      }), T122.overrideClashBefore);
+
+      // Two live human decisions for one fixture, under two renderings. There
+      // is no automatic answer to which one stands.
+      await seedOverride(KEY_BEFORE, 11111);
+      await seedOverride(KEY_AFTER, 22222);
+
+      const outcome = await apply122(rekeyBundle({
+        scope: SCOPE, matchRecordId: RECORD_AFTER,
+        matchKey: KEY_AFTER, roundCode: '72', roundNumber: 72, date: DATE,
+      }), T122.overrideClashAfter);
+
+      expect(outcome.counters.canonicalRekeyRefusals).toBe(1);
+      expect(outcome.counters.canonicalRowsInserted).toBe(0);
+      expect(outcome.counters.canonicalRowsUpdated).toBe(0);
+
+      // Nothing was written: not the rekey, not a duplicate, not the override.
+      const rows = await fixtureMatches([KEY_BEFORE, KEY_AFTER]);
+      expect(rows.map((row) => row.matchKey)).toEqual([KEY_BEFORE]);
+      expect(rows[0]?.roundCode).toBe('71');
+      expect(await overridesOn(KEY_BEFORE)).toEqual([
+        { fieldGroup: 'attendance', isActive: true, overrideValues: { attendance: 11111 } },
+      ]);
+      expect(await overridesOn(KEY_AFTER)).toEqual([
+        { fieldGroup: 'attendance', isActive: true, overrideValues: { attendance: 22222 } },
+      ]);
+      expect(await rekeyFindings(RECORD_AFTER)).toEqual([
+        { refusal: 'rekey_override_conflict', targetTable: 'matches', resolvedAt: null },
+      ]);
+    });
+
+    /* ============================================================== *
+     * HIGH-1 (independent review) — a rekey refusal is a statement
+     * about the FIXTURE, not about one table.
+     *
+     * Both refusals below used to stop the `matches` target and then let
+     * the rest of the same real-world fixture write anyway:
+     *
+     *   - `rekey_would_merge` left the LIVE half of a duplicated fixture
+     *     open, so its `match_period_scores` and its `player_match_stats`
+     *     (a later unit, in the same transaction) still landed;
+     *   - `rekey_override_conflict` refused the match rekey but left
+     *     `matchId` pointing at the STALE row, so a pending period set
+     *     could be inserted onto it.
+     *
+     * Either one deepens exactly the duplicated state this issue exists
+     * to resolve. The contract is: refused fixture, nothing written, and
+     * the specific refusal — never a generic failure — reported against
+     * every target it withheld.
+     * ============================================================== */
+
+    /** Findings in a deterministic, collation-independent target order. */
+    function byTarget<T extends { targetTable: string | null }>(rows: readonly T[]): T[] {
+      return [...rows].sort((a, b) => (String(a.targetTable) < String(b.targetTable) ? -1 : 1));
+    }
+
+    it('withholds the whole fixture family when the matches target refuses '
+      + 'rekey_would_merge', async () => {
+      const SCOPE = 'issue122-131-mergefamily';
+      // Clear of every other fixture's date: §5.3's candidate search keys on
+      // (season, both club ids, at most one of round/date), and every fixture
+      // in this suite shares the season and both clubs.
+      const DATE = '2093-09-20';
+      const KEY_STALE = 'issue122-131-mergefam-key-101';
+      const KEY_LIVE = 'issue122-131-mergefam-key-102';
+      const RECORD_STALE = 'issue122-131-mergefam-match-101';
+      const RECORD_LIVE = 'issue122-131-mergefam-match-102';
+      const RECORD_PLAYER = 'issue122-131-mergefam-player-102';
+      const URL = 'issue122-players/M/Issue122_131_MergeFamily.html';
+      const playerId = await seedPlayer('MergeFamily', URL);
+
+      /** The player record for this fixture, at whatever stats it carries. */
+      function playerOn(stats?: JsonValue): PlayerSpec {
+        return {
+          recordId: RECORD_PLAYER,
+          url: URL,
+          payloadOver: { match_key: KEY_LIVE, round_code: '102' },
+          projectionOver: {
+            match_key: KEY_LIVE,
+            round_code: '102',
+            round_number: 102,
+            is_final: false,
+            ...(stats === undefined ? {} : { stats }),
+          },
+        };
+      }
+
+      // One fixture, two canonical rows, and the live half fully populated:
+      // four period rows and one player-match row.
+      await apply122(bundle122({
+        matches: [
+          rekeyMatchSpec({
+            scope: SCOPE, matchRecordId: RECORD_STALE,
+            matchKey: KEY_STALE, roundCode: '101', roundNumber: 101, date: DATE,
+          }),
+          rekeyMatchSpec({
+            scope: SCOPE, matchRecordId: RECORD_LIVE,
+            matchKey: KEY_LIVE, roundCode: '102', roundNumber: 102, date: DATE,
+          }),
+        ],
+        players: [playerOn()],
+      }), T122.mergeFamilySeed);
+
+      const seeded = await fixtureMatches([KEY_STALE, KEY_LIVE]);
+      expect(seeded.map((row) => row.matchKey)).toEqual([KEY_STALE, KEY_LIVE]);
+      const liveId = seeded[1]?.id as number;
+      expect(await periods122(liveId)).toHaveLength(4);
+      expect(await stats122(playerId)).toHaveLength(1);
+
+      // The source retires '101' and publishes a correction to every part of
+      // the fixture at once: the crowd, the period set and the player's kicks.
+      const ledgerBefore = await ledger122();
+      const outcome = await apply122(bundle122({
+        matches: [rekeyMatchSpec({
+          scope: SCOPE, matchRecordId: RECORD_LIVE,
+          matchKey: KEY_LIVE, roundCode: '102', roundNumber: 102, date: DATE,
+          attendance: 41000,
+          periodScores: [
+            { side: 'home', period: 1, goals: 4, behinds: 2, points: 26 },
+            { side: 'away', period: 1, goals: 2, behinds: 3, points: 15 },
+            { side: 'home', period: 2, goals: 7, behinds: 5, points: 47 },
+            { side: 'away', period: 2, goals: 5, behinds: 6, points: 36 },
+          ] as unknown as JsonValue,
+        })],
+        players: [playerOn(statsWith({ kicks: 9 }))],
+      }), T122.mergeFamilyMove);
+
+      // Three targets refused for one fixture: the match, its period set, and
+      // the player-match row settled in a LATER unit of the same transaction.
+      expect({
+        rekeyRefusals: outcome.counters.canonicalRekeyRefusals,
+        inserted: outcome.counters.canonicalRowsInserted,
+        updated: outcome.counters.canonicalRowsUpdated,
+        rekeyed: outcome.counters.canonicalMatchesRekeyed,
+      }).toEqual({ rekeyRefusals: 3, inserted: 0, updated: 0, rekeyed: 0 });
+
+      // Nothing moved: not the crowd, not the period set, not the player row.
+      const [live] = await sql<{ attendance: number | null }[]>`
+        SELECT attendance FROM matches WHERE match_key = ${KEY_LIVE}
+      `;
+      expect(live?.attendance).toBe(31000);
+      expect((await periods122(liveId)).map((row) => row.goals).sort()).toEqual([2, 3, 5, 7]);
+      const stats = await stats122(playerId);
+      expect(stats).toHaveLength(1);
+      expect(stats[0]?.kicks).toBe(5);
+
+      // No ledger row anywhere: a withheld dependent is not a quiet write.
+      expect(await ledger122()).toEqual(ledgerBefore);
+      // And the refusal that stopped each one is named, not flattened.
+      expect(byTarget(await rekeyFindings(RECORD_LIVE))).toEqual([
+        { refusal: 'rekey_would_merge', targetTable: 'match_period_scores', resolvedAt: null },
+        { refusal: 'rekey_would_merge', targetTable: 'matches', resolvedAt: null },
+      ]);
+      expect(await rekeyFindings(RECORD_PLAYER)).toEqual([
+        { refusal: 'rekey_would_merge', targetTable: 'player_match_stats', resolvedAt: null },
+      ]);
+    });
+
+    it('inserts no period row onto the stale match when rekey_override_conflict '
+      + 'refuses the rekey', async () => {
+      const SCOPE = 'issue122-131-clashfamily';
+      const DATE = '2093-09-21';
+      const KEY_BEFORE = 'issue122-131-clashfam-key-111';
+      const KEY_AFTER = 'issue122-131-clashfam-key-112';
+      const RECORD_AFTER = 'issue122-131-clashfam-match-112';
+      const RECORD_PLAYER = 'issue122-131-clashfam-player';
+      const URL = 'issue122-players/C/Issue122_131_ClashFamily.html';
+      const playerId = await seedPlayer('ClashFamily', URL);
+
+      function playerOn(matchKey: string, roundCode: string, stats?: JsonValue): PlayerSpec {
+        return {
+          recordId: RECORD_PLAYER,
+          url: URL,
+          payloadOver: { match_key: matchKey, round_code: roundCode },
+          projectionOver: {
+            match_key: matchKey,
+            round_code: roundCode,
+            round_number: Number(roundCode),
+            is_final: false,
+            ...(stats === undefined ? {} : { stats }),
+          },
+        };
+      }
+
+      // The stale row is seeded with NO period set at all — an empty
+      // `period_scores` establishes no `match_period_scores` target — so its
+      // canonical baseline for that target is genuinely "no row". That is the
+      // exact shape in which the dependent insert used to succeed while the
+      // match rekey was being refused.
+      await apply122(bundle122({
+        matches: [rekeyMatchSpec({
+          scope: SCOPE, matchRecordId: 'issue122-131-clashfam-match-111',
+          matchKey: KEY_BEFORE, roundCode: '111', roundNumber: 111, date: DATE,
+          periodScores: [] as unknown as JsonValue,
+        })],
+        players: [playerOn(KEY_BEFORE, '111')],
+      }), T122.clashFamilySeed);
+
+      const seeded = await fixtureMatches([KEY_BEFORE]);
+      const staleId = seeded[0]?.id as number;
+      expect(await periods122(staleId)).toHaveLength(0);
+      expect(await stats122(playerId)).toHaveLength(1);
+
+      // Two live human decisions, one under each rendering: the carry has no
+      // automatic answer, so the rekey is refused inside the savepoint.
+      await seedOverride(KEY_BEFORE, 11111);
+      await seedOverride(KEY_AFTER, 22222);
+
+      const ledgerBefore = await ledger122();
+      const outcome = await apply122(bundle122({
+        matches: [rekeyMatchSpec({
+          scope: SCOPE, matchRecordId: RECORD_AFTER,
+          matchKey: KEY_AFTER, roundCode: '112', roundNumber: 112, date: DATE,
+        })],
+        players: [playerOn(KEY_AFTER, '112', statsWith({ kicks: 8 }))],
+      }), T122.clashFamilyMove);
+
+      expect({
+        inserted: outcome.counters.canonicalRowsInserted,
+        updated: outcome.counters.canonicalRowsUpdated,
+        rekeyed: outcome.counters.canonicalMatchesRekeyed,
+      }).toEqual({ inserted: 0, updated: 0, rekeyed: 0 });
+
+      // ZERO period rows on the stale row: the match kept the retired
+      // rendering, so nothing may be attached to it.
+      expect(await periods122(staleId)).toHaveLength(0);
+      // The row itself did not move, and no duplicate was invented.
+      const rows = await fixtureMatches([KEY_BEFORE, KEY_AFTER]);
+      expect(rows.map((row) => row.matchKey)).toEqual([KEY_BEFORE]);
+      expect(rows[0]?.roundCode).toBe('111');
+      // The player family was withheld too, and its existing row is untouched.
+      const stats = await stats122(playerId);
+      expect(stats).toHaveLength(1);
+      expect(stats[0]?.kicks).toBe(5);
+      expect(await ledger122()).toEqual(ledgerBefore);
+      // Both human decisions still stand, exactly as they were left.
+      expect(await overridesOn(KEY_BEFORE)).toEqual([
+        { fieldGroup: 'attendance', isActive: true, overrideValues: { attendance: 11111 } },
+      ]);
+      expect(await overridesOn(KEY_AFTER)).toEqual([
+        { fieldGroup: 'attendance', isActive: true, overrideValues: { attendance: 22222 } },
+      ]);
+      expect(byTarget(await rekeyFindings(RECORD_AFTER)).map((row) => row.refusal))
+        .toEqual(['rekey_override_conflict', 'rekey_override_conflict']);
+      // The player target never resolved in the first place — the live
+      // rendering has no canonical row for it to key on — so it is withheld by
+      // the ordinary fail-closed path and opens no rekey finding of its own.
+      // What matters is that it wrote nothing, which is asserted above.
+      expect(await rekeyFindings(RECORD_PLAYER)).toEqual([]);
+    });
+
+    it('rekeys in place when only the match_date moves, and the identical rerun '
+      + 'writes nothing', async () => {
+      const SCOPE = 'issue122-131-dateonly';
+      const KEY_BEFORE = 'issue122-131-date-key-121';
+      const KEY_AFTER = 'issue122-131-date-key-122';
+      const RECORD_AFTER = 'issue122-131-date-match-122';
+
+      await apply122(rekeyBundle({
+        scope: SCOPE, matchRecordId: 'issue122-131-date-match-121',
+        matchKey: KEY_BEFORE, roundCode: '121', roundNumber: 121, date: '2093-09-22',
+      }), T122.dateOnlyBefore);
+      const seeded = await fixtureMatches([KEY_BEFORE]);
+      expect(seeded).toHaveLength(1);
+
+      // The OTHER half of §5.3's one-component budget: the round is untouched
+      // and the fixture is simply played a day later than first published.
+      const moved = await apply122(rekeyBundle({
+        scope: SCOPE, matchRecordId: RECORD_AFTER,
+        matchKey: KEY_AFTER, roundCode: '121', roundNumber: 121, date: '2093-09-23',
+      }), T122.dateOnlyAfter);
+
+      expect(moved.counters.canonicalMatchesRekeyed).toBe(1);
+      expect(moved.counters.canonicalRowsInserted).toBe(0);
+      const after = await fixtureMatches([KEY_BEFORE, KEY_AFTER]);
+      expect(after.map((row) => row.matchKey)).toEqual([KEY_AFTER]);
+      expect(after[0]?.id).toBe(seeded[0]?.id);
+      expect(after[0]?.matchDate).toBe('2093-09-23');
+      expect(after[0]?.roundCode).toBe('121');
+
+      // §5.9. The next run finds the row on the first lookup and writes
+      // nothing at all — a moved date is a correction, not a source of drift.
+      const rerun = await apply122(rekeyBundle({
+        scope: SCOPE, matchRecordId: RECORD_AFTER,
+        matchKey: KEY_AFTER, roundCode: '121', roundNumber: 121, date: '2093-09-23',
+      }), T122.dateOnlyRerun);
+      expect({
+        rekeyed: rerun.counters.canonicalMatchesRekeyed,
+        inserted: rerun.counters.canonicalRowsInserted,
+        updated: rerun.counters.canonicalRowsUpdated,
+        refused: rerun.counters.canonicalRekeyRefusals,
+      }).toEqual({ rekeyed: 0, inserted: 0, updated: 0, refused: 0 });
+      expect((await fixtureMatches([KEY_BEFORE, KEY_AFTER])).map((row) => row.id))
+        .toEqual([seeded[0]?.id]);
+    });
+
+    it('rekeys in place when ONLY the match_key rendering changed (the bulk '
+      + 'club-rendering vector, §10 risk 3)', async () => {
+      const SCOPE = 'issue122-131-rendering';
+      const DATE = '2093-09-24';
+      const KEY_BEFORE = 'issue122-131-render-key-131-oldname';
+      const KEY_AFTER = 'issue122-131-render-key-131-newname';
+      const RECORD_AFTER = 'issue122-131-render-match-131-newname';
+
+      await apply122(rekeyBundle({
+        scope: SCOPE, matchRecordId: 'issue122-131-render-match-131-oldname',
+        matchKey: KEY_BEFORE, roundCode: '131', roundNumber: 131, date: DATE,
+      }), T122.renderingBefore);
+      const seeded = await fixtureMatches([KEY_BEFORE]);
+      expect(seeded).toHaveLength(1);
+
+      // `match_key` embeds `clubs.name_of(...)`, so editing `clubs.json`
+      // rekeys matches with NO upstream change at all, potentially every match
+      // of that club in one run (§10 risk 3). Season, both resolved club ids,
+      // the round and the date are all identical here; the rendering is the
+      // only thing that moved, which is inside §5.3's budget of at most one
+      // moved component and is therefore a safe in-place rekey.
+      const outcome = await apply122(rekeyBundle({
+        scope: SCOPE, matchRecordId: RECORD_AFTER,
+        matchKey: KEY_AFTER, roundCode: '131', roundNumber: 131, date: DATE,
+      }), T122.renderingAfter);
+
+      expect(outcome.counters.canonicalMatchesRekeyed).toBe(1);
+      expect(outcome.counters.canonicalRowsInserted).toBe(0);
+      expect(outcome.counters.canonicalRekeyRefusals).toBe(0);
+
+      const after = await fixtureMatches([KEY_BEFORE, KEY_AFTER]);
+      expect(after.map((row) => row.matchKey)).toEqual([KEY_AFTER]);
+      expect(after[0]?.id).toBe(seeded[0]?.id);
+      // Nothing but the rendering and its provenance moved.
+      expect({
+        roundCode: after[0]?.roundCode,
+        matchDate: after[0]?.matchDate,
+        homeClubId: after[0]?.homeClubId,
+        awayClubId: after[0]?.awayClubId,
+      }).toEqual({
+        roundCode: '131',
+        matchDate: DATE,
+        homeClubId: seeded[0]?.homeClubId,
+        awayClubId: seeded[0]?.awayClubId,
+      });
+      expect(after[0]?.sourceRecordId).toBe(RECORD_AFTER);
+      // The move is a first-class field change: audited under both renderings.
+      const rekeyRow = (await ledger122())
+        .filter((row) => row.externalRecordId === RECORD_AFTER && row.targetTable === 'matches');
+      expect(rekeyRow).toHaveLength(1);
+      expect(rekeyRow[0]?.verb).toBe('update');
+      expect((rekeyRow[0]?.previousValues as Record<string, JsonValue>).match_key)
+        .toBe(KEY_BEFORE);
+      expect((rekeyRow[0]?.newValues as Record<string, JsonValue>).match_key).toBe(KEY_AFTER);
+    });
+
+    it('names the numerically latest settle batch in the exception report, not '
+      + 'the lexicographically latest', async () => {
+      // `import_batches.id` is bigint and the report selects it as `id::text`.
+      // A bare `ORDER BY id DESC` binds to that OUTPUT ALIAS, so the newest
+      // batch was ordered as TEXT: '99999999' sorts above '100000000' and the
+      // report named a stale batch. It only misfires once the id crosses a
+      // digit-count boundary, which is why it survived unnoticed. Explicit
+      // ids reproduce that boundary without waiting for the sequence.
+      const OLDER = '99999999';
+      const NEWER = '100000000';
+      const notes = `AFLDB-ISSUE-099 settle; snapshot=${LABEL122}; `
+        + `season=${SEASON122}; mode=apply`;
+      for (const [id, read] of [[OLDER, 7], [NEWER, 9]] as const) {
+        await sql`
+          INSERT INTO import_batches (
+            id, source_id, tool, target_table, records_read, records_rejected,
+            status, completed_at, notes
+          ) OVERRIDING SYSTEM VALUE VALUES (
+            ${id}::bigint, ${fixtures.sourceId}, ${SETTLE_BATCH_TOOL}, 'matches',
+            ${read}, 0, 'completed', now(), ${notes}
+          )
+        `;
+      }
+      try {
+        const report = await buildSettleExceptionReport(sql, { season: SEASON122 });
+        expect(report.latestBatch?.batchId).toBe(NEWER);
+        expect(report.latestBatch?.recordsRead).toBe(9);
+      } finally {
+        await sql`DELETE FROM import_batches WHERE id IN (${OLDER}::bigint, ${NEWER}::bigint)`;
+      }
+    });
+  });
+
+  /* ================================================================ *
+   * AFLDB-ISSUE-131 §8 — the supervised remediation tool.
+   *
+   * The §5.3/§5.4 fix stops the defect recurring. This tool is for rows that
+   * went stale BEFORE it shipped, and it is deliberately weaker than the
+   * settle: it never deletes, never merges, never guesses a rendering, and
+   * writes nothing without an explicit --apply carrying the hash of the plan
+   * the operator read.
+   *
+   * The fixtures below use record ids that ARE their match_keys, which is the
+   * production convention (import_fitzroy_core.py:1221-1224 vs :1615) and the
+   * one the tool proves per fixture before it will rekey anything.
+   * ================================================================ */
+  describe('AFLDB-ISSUE-131 §8 — repair-match-rekeys', () => {
+    const SCOPE_FIX = 'issue122-131-repair';
+    const KEY_FIX_STALE = 'issue122-131-repair-101';
+    const KEY_FIX_LIVE = 'issue122-131-repair-102';
+    const FIX_DATE = '2093-09-10';
+
+    const SCOPE_AMB = 'issue122-131-repair-amb';
+    const KEY_AMB_A = 'issue122-131-repair-amb-201';
+    const KEY_AMB_B = 'issue122-131-repair-amb-202';
+    const KEY_AMB_LIVE = 'issue122-131-repair-amb-203';
+    const AMB_DATE = '2093-09-11';
+
+    /**
+     * A settle bundle whose match record id IS its `match_key`, exactly as the
+     * emitter builds both from the same five components.
+     */
+    function conventionalBundle(spec: {
+      scope: string; keys: readonly { matchKey: string; roundCode: string; roundNumber: number }[];
+      date: string;
+    }): SettleBundle {
+      return bundle122({
+        matches: spec.keys.map((entry) => ({
+          recordId: entry.matchKey,
+          matchKey: entry.matchKey,
+          scope: spec.scope,
+          payloadOver: {
+            round_code: entry.roundCode,
+            round_number: entry.roundNumber,
+            match_date: spec.date,
+          },
+          projectionOver: {
+            round_code: entry.roundCode,
+            round_number: entry.roundNumber,
+            match_date: spec.date,
+          },
+        })),
+        players: [],
+      });
+    }
+
+    function repair(argv: readonly string[]): Promise<RepairOutcome> {
+      const lines: string[] = [];
+      return runRepairMatchRekeys(
+        [...argv, '--season', String(SEASON122), '--acknowledge-completed-season'],
+        { sql, log: (line) => lines.push(line) },
+      );
+    }
+
+    async function matchByKey(matchKey: string): Promise<{
+      id: number; roundCode: string; sourceRecordId: string | null;
+    } | undefined> {
+      const [row] = await sql<{
+        id: number; roundCode: string; sourceRecordId: string | null;
+      }[]>`
+        SELECT id::int AS id, round_code AS "roundCode",
+               source_record_id AS "sourceRecordId"
+          FROM matches WHERE match_key = ${matchKey}
+      `;
+      return row;
+    }
+
+    it('refuses --apply without the plan hash, and rejects an unknown flag', () => {
+      expect(() => parseRepairArgs(['--season', '2026', '--apply'])).toThrow(/--plan-hash/);
+      expect(() => parseRepairArgs(['--season', '2026', '--aply'])).toThrow(/Unknown flag/);
+      expect(() => parseRepairArgs(['--apply'])).toThrow(/--season/);
+      expect(parseRepairArgs(['--season', '2026'])).toEqual({
+        season: 2026, apply: false, planHash: null, acknowledgeCompletedSeason: false,
+      });
+    });
+
+    it('refuses a season this pipeline does not own unless it is acknowledged', async () => {
+      await expect(runRepairMatchRekeys(
+        ['--season', String(SEASON122)], { sql, log: () => {} },
+      )).rejects.toThrow(/in_progress_seasons/);
+    });
+
+    it('plans, applies and then finds nothing left to do', async () => {
+      // 1. The stale row: settled canonically under round 101.
+      await apply122(conventionalBundle({
+        scope: SCOPE_FIX, date: FIX_DATE,
+        keys: [{ matchKey: KEY_FIX_STALE, roundCode: '101', roundNumber: 101 }],
+      }), '2093-05-10T00:00:00Z');
+      const staleRow = await matchByKey(KEY_FIX_STALE);
+      expect(staleRow).toBeDefined();
+
+      // 2. The source revises the round. Observed and projected, but NOT
+      //    applied — which is exactly the state a pre-fix settle left behind:
+      //    the old identity is swept absent and the new one has no canonical
+      //    row. The absence sweep is what stamps `absent_since`, and §19 only
+      //    ever lets it do so inside a proven-complete enumeration.
+      await apply122(conventionalBundle({
+        scope: SCOPE_FIX, date: FIX_DATE,
+        keys: [{ matchKey: KEY_FIX_LIVE, roundCode: '102', roundNumber: 102 }],
+      }), '2093-05-11T00:00:00Z', { autoApply: false });
+      expect(await matchByKey(KEY_FIX_LIVE)).toBeUndefined();
+
+      // 3. Dry run. Plans the repair and writes NOTHING.
+      const dry = await repair([]);
+      const planned = dry.plan.filter((entry) => entry.matchKey === KEY_FIX_LIVE);
+      expect(planned).toHaveLength(1);
+      expect(planned[0]?.action).toBe('rekey_in_place');
+      expect(planned[0]?.live).toBeNull();
+      expect(planned[0]?.stale.map((row) => row.id)).toEqual([staleRow?.id]);
+      // The child rows are exactly why the id is preserved rather than the row
+      // replaced: four period rows hang off it.
+      expect(planned[0]?.stale[0]?.children.periodScores).toBe(4);
+      expect(dry.applied).toBe(false);
+      expect(await matchByKey(KEY_FIX_STALE)).toBeDefined();
+
+      // 4. Applying a plan hash that is not the current plan is refused.
+      await expect(repair(['--apply', '--plan-hash', 'deadbeef']))
+        .rejects.toThrow(/plan has changed/);
+      expect(await matchByKey(KEY_FIX_STALE)).toBeDefined();
+
+      // 5. The real repair. One UPDATE, the id preserved, no DELETE anywhere.
+      const applied = await repair(['--apply', '--plan-hash', dry.planHash]);
+      expect(applied.applied).toBe(true);
+      expect(applied.rekeyed).toBe(1);
+
+      expect(await matchByKey(KEY_FIX_STALE)).toBeUndefined();
+      const repaired = await matchByKey(KEY_FIX_LIVE);
+      expect(repaired?.id).toBe(staleRow?.id);
+      expect(repaired?.roundCode).toBe('102');
+      expect(repaired?.sourceRecordId).toBe(KEY_FIX_LIVE);
+      expect(await periods122(repaired?.id as number)).toHaveLength(4);
+
+      // §8.7. The audit row, naming both renderings.
+      const [ledger] = await sql<{
+        verb: string; previousValues: JsonValue; newValues: JsonValue; targetKey: JsonValue;
+      }[]>`
+        SELECT verb, previous_values AS "previousValues", new_values AS "newValues",
+               target_key AS "targetKey"
+          FROM canonical_applications
+         WHERE external_record_id = ${KEY_FIX_LIVE} AND target_table = 'matches'
+         ORDER BY id DESC LIMIT 1
+      `;
+      expect(ledger?.verb).toBe('update');
+      expect(ledger?.targetKey).toEqual({ match_key: KEY_FIX_LIVE });
+      expect((ledger?.previousValues as Record<string, unknown>)?.match_key)
+        .toBe(KEY_FIX_STALE);
+      expect((ledger?.newValues as Record<string, unknown>)?.match_key).toBe(KEY_FIX_LIVE);
+
+      // 6. Idempotent: the fixture is no longer stale, so there is nothing to plan.
+      const rerun = await repair([]);
+      expect(rerun.plan.filter((entry) => entry.matchKey === KEY_FIX_LIVE)).toHaveLength(0);
+      expect(rerun.rekeyed).toBe(0);
+    });
+
+    it('refuses rather than guessing when two retired rows could be the fixture', async () => {
+      // Two canonical rows for one fixture, both settled, both then retired by
+      // a third identity. There is no automatic answer to which is which.
+      await apply122(conventionalBundle({
+        scope: SCOPE_AMB, date: AMB_DATE,
+        keys: [
+          { matchKey: KEY_AMB_A, roundCode: '201', roundNumber: 201 },
+          { matchKey: KEY_AMB_B, roundCode: '202', roundNumber: 202 },
+        ],
+      }), '2093-05-12T00:00:00Z');
+      await apply122(conventionalBundle({
+        scope: SCOPE_AMB, date: AMB_DATE,
+        keys: [{ matchKey: KEY_AMB_LIVE, roundCode: '203', roundNumber: 203 }],
+      }), '2093-05-13T00:00:00Z', { autoApply: false });
+
+      const dry = await repair([]);
+      const planned = dry.plan.filter((entry) => entry.matchKey === KEY_AMB_LIVE);
+      expect(planned).toHaveLength(1);
+      expect(planned[0]?.action).toBe('refuse');
+      expect(planned[0]?.refusal).toBe('rekey_ambiguous');
+      expect(planned[0]?.stale).toHaveLength(2);
+
+      // --apply changes nothing for a refused fixture, and refuses no writes
+      // into the rest of the run either: both rows are exactly where they were.
+      const applied = await repair(['--apply', '--plan-hash', dry.planHash]);
+      expect(applied.refused).toBeGreaterThanOrEqual(1);
+      expect((await matchByKey(KEY_AMB_A))?.roundCode).toBe('201');
+      expect((await matchByKey(KEY_AMB_B))?.roundCode).toBe('202');
+      expect(await matchByKey(KEY_AMB_LIVE)).toBeUndefined();
     });
   });
 });

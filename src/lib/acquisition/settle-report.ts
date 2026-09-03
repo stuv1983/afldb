@@ -233,7 +233,13 @@ async function latestBatchOf(
        AND tool = ${SETTLE_BATCH_TOOL}
        AND status = 'completed'
        AND notes LIKE ${`%season=${season};%`}
-     ORDER BY id DESC
+     -- QUALIFIED, and it has to be. A bare ORDER BY id binds to the OUTPUT
+     -- alias (id::text AS id) in PostgreSQL, not to the bigint column, so the
+     -- newest batch was sorted as TEXT and '963' sorted above '1062'. The
+     -- report then named a stale batch, and only once the id crossed a
+     -- digit-count boundary, which is why it survived until AFLDB-ISSUE-131's
+     -- tests pushed the test sequence past 1000. Found there, fixed here.
+     ORDER BY import_batches.id DESC
      LIMIT 1
   `;
   if (!row) return null;

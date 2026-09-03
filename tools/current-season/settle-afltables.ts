@@ -223,6 +223,13 @@ function counterLines(counters: SettleCounters): string[] {
     'canonicalRowsInserted', 'canonicalRowsUpdated', 'canonicalApplicationsLogged',
     'canonicalRetryApplied', 'canonicalApplyRefusals', 'canonicalApplyFailures',
   ]);
+  // ISSUE-131: identity moves, the three fail-closed refusals that stop one,
+  // and the human overrides an identity move carried with it. A rekey is also
+  // counted as an update above; this says how many of those updates moved the
+  // rendering rather than the facts, and how many HUMAN decisions travelled.
+  group('Canonical identity (ISSUE-131)', [
+    'canonicalMatchesRekeyed', 'canonicalRekeyRefusals', 'canonicalOverridesCarried',
+  ]);
   group('Derived recompute', ['derivedRecomputeRuns', 'derivedRecomputePlayers']);
   return lines;
 }

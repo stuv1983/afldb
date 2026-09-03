@@ -47,11 +47,18 @@ import { asImportBatchId, type ImportBatchId } from '../import-batch-id';
 
 import {
   applyCanonicalUnit,
+  isRekeyRefusal,
   type CanonicalApplyInvitation,
+  type CanonicalApplyRefusal,
   type CanonicalApplyTargetInput,
   type CanonicalApplyTargetResult,
   type CanonicalApplyUnitResult,
 } from './canonical-apply';
+import {
+  findRetiredMatchIdentities,
+  type MatchRekeyIdentity,
+  type MatchRekeyScope,
+} from './match-rekey';
 import {
   markMissingObservationsAbsent,
   persistSourceObservation,
@@ -244,7 +251,16 @@ export { autoApplyOwnership, type AutoApplyOwnership } from './canonical-apply';
  * Proposed field sets (§17)
  * ------------------------------------------------------------------ */
 
-/** §17.1. `venue_id` may be NULL; `venue_raw` always carries the real string. */
+/**
+ * §17.1. `venue_id` may be NULL; `venue_raw` always carries the real string.
+ *
+ * This is what `proposedMatchValues()` builds, and it is the set every
+ * ordinary path proposes. It is NOT the whole of what can reach the applier:
+ * AFLDB-ISSUE-131 §5.4 adds `match_key` on the rekey path, in
+ * `withRekeyRendering()`, because there and only there the rendering itself is
+ * what moved. On every other path the rendering IS the identity the row was
+ * found by, so proposing it would be proposing a value that cannot differ.
+ */
 export const MATCHES_PROPOSED_FIELDS = [
   'round_code', 'round_number', 'round_type', 'is_final',
   'match_date', 'match_time', 'venue_id', 'venue_raw',
@@ -1435,6 +1451,38 @@ export type SettleCounters = {
    */
   canonicalApplyRefusals: number;
   /**
+   * AFLDB-ISSUE-131 §5.4. Canonical `matches` rows REKEYED in place because
+   * the source revised the scheduling metadata its identity is derived from.
+   * Each one preserved its `matches.id`, and therefore every child row and
+   * every provenance reference hanging off it, instead of leaving a stale
+   * duplicate behind. These rows are also counted in `canonicalRowsUpdated`;
+   * this counter says how many of those updates moved the rendering.
+   */
+  canonicalMatchesRekeyed: number;
+  /**
+   * AFLDB-ISSUE-131 §5.10. Targets refused because the rekey evidence was
+   * ambiguous, would have merged two populated canonical rows, or collided
+   * with a live human override. Every one writes nothing, opens a finding and
+   * is left for a human. Counted here in ADDITION to
+   * `canonicalApplyRefusals`, which counts every refused target.
+   */
+  canonicalRekeyRefusals: number;
+  /**
+   * AFLDB-ISSUE-131 §5.7. Active human overrides carried from a retired
+   * `match_key` to the live one, automatically, inside the rekey's savepoint.
+   *
+   * `data_overrides.entity_key` for a match IS the `match_key`, so a rekey
+   * moves the very thing the override is filed under; without the carry the
+   * decision is orphaned and the next run overwrites a pinned field. The carry
+   * is therefore load-bearing, and it is the one part of a rekey that touches
+   * a HUMAN's record, so the run reports how many it moved rather than doing
+   * it silently. The audit trail is the pair of `data_overrides` rows it
+   * leaves — the new active row and the old one deactivated, never deleted;
+   * `data_edits` is the admin UI's ledger and `afldb_import` holds no grant on
+   * it, so an automatic carry is not written there (§13.4 D4).
+   */
+  canonicalOverridesCarried: number;
+  /**
    * AFLDB-ISSUE-122 §10 / S6. Disagreements recorded under
    * `corroboration_policy: "advisory"` — a `data_issues` finding was opened or
    * refreshed and the proposal was NOT vetoed. The blocking counterpart is
@@ -1493,6 +1541,9 @@ function emptyCounters(): SettleCounters {
     canonicalApplyFailures: 0,
     canonicalRetryApplied: 0,
     canonicalApplyRefusals: 0,
+    canonicalMatchesRekeyed: 0,
+    canonicalRekeyRefusals: 0,
+    canonicalOverridesCarried: 0,
     advisoryDisagreement: 0,
     derivedRecomputeRuns: 0,
     derivedRecomputePlayers: 0,
@@ -1594,9 +1645,31 @@ type SettleRefs = {
    * write instead of waiting a night for the next run to see it.
    */
   matchIdsByKey: Map<string, number>;
+  /**
+   * AFLDB-ISSUE-131 §5.3 — what this run publishes for the match family, and
+   * the scopes it proved complete. Derived from the BUNDLE, not the database,
+   * and immutable for the run: it is the evidence that a canonical row's
+   * source identity has been retired rather than merely unobserved.
+   */
+  matchRekeyScope: MatchRekeyScope;
+  /**
+   * AFLDB-ISSUE-131 §5.10 — fixtures this run has refused to identify, by the
+   * INCOMING `match_key`, and the refusal that stopped each one.
+   *
+   * A rekey refusal is a statement about the real-world fixture: this run
+   * cannot say which canonical row denotes it, or two already do. Every family
+   * of that fixture is therefore withheld for the rest of the run — the match
+   * family's dependent `match_period_scores` inside the same unit, and the
+   * player family, which is settled afterwards in the SAME transaction and
+   * would otherwise write `player_match_stats` against the live half of a
+   * duplicated fixture. Mutable by design, exactly as `matchIdsByKey` is.
+   */
+  rekeyBlockedFixtures: Map<string, CanonicalApplyRefusal>;
 };
 
-async function loadRefs(tx: Tx, season: number): Promise<SettleRefs> {
+async function loadRefs(
+  tx: Tx, season: number, matchRekeyScope: MatchRekeyScope,
+): Promise<SettleRefs> {
   const sources = await tx<{ id: number; key: string }[]>`SELECT id, key FROM sources`;
   const sourceIdsByKey = new Map(sources.map((row) => [row.key, row.id]));
   const sourceId = resolveSourceId(sourceIdsByKey, SETTLE_SOURCE_KEY);
@@ -1634,6 +1707,32 @@ async function loadRefs(tx: Tx, season: number): Promise<SettleRefs> {
     ),
     playerIdsByUrl: new Map(links.map((row) => [row.externalId, row.playerId])),
     matchIdsByKey: new Map(matches.map((row) => [row.matchKey, row.id])),
+    matchRekeyScope,
+    rekeyBlockedFixtures: new Map(),
+  };
+}
+
+/** The wire family whose canonical target is `matches`. */
+const MATCH_WIRE_FAMILY = 'afltables.match';
+
+/**
+ * AFLDB-ISSUE-131 §5.3 — the run's published match identities and its
+ * proven-complete match scopes, read off the bundle exactly once.
+ *
+ * A scope this run could not prove complete is a scope in which absence
+ * proves nothing (§19), so it contributes no scope key and no canonical row
+ * inside it can ever be treated as retired.
+ */
+function matchRekeyScopeOf(
+  bundle: SettleBundle, sweepable: readonly { family: string; scopeKey: string }[],
+): MatchRekeyScope {
+  return {
+    completeScopeKeys: sweepable
+      .filter((scope) => scope.family === MATCH_WIRE_FAMILY)
+      .map((scope) => scope.scopeKey),
+    publishedRecordIds: bundle.records
+      .filter((record) => record.family === MATCH_WIRE_FAMILY)
+      .map((record) => record.externalRecordId),
   };
 }
 
@@ -1713,6 +1812,21 @@ type ResolvedTarget = {
    * been inserted, and re-runs every gate there. Nothing else reads it.
    */
   pendingMatch: boolean;
+  /**
+   * AFLDB-ISSUE-131. The rendering the canonical row carries RIGHT NOW, when
+   * this proposal reached it under a different one. Non-null only for the
+   * `matches` target and only on a proven rekey (§5.3), and it is what puts
+   * `match_key` into the compared field set so the move is diffed, reviewed
+   * and audited like any other correction.
+   */
+  rekeyFromMatchKey: string | null;
+  /**
+   * AFLDB-ISSUE-131 §5.10. Set when the rekey search found something the
+   * automatic path must not act on. The target is still reconciled and still
+   * reaches the review queue; it is simply never offered to the applier, and
+   * the run opens a finding for it.
+   */
+  rekeyBlock: 'rekey_ambiguous' | 'rekey_would_merge' | null;
 };
 
 function unresolved(reason: string, pendingMatch = false): ResolvedTarget {
@@ -1721,6 +1835,8 @@ function unresolved(reason: string, pendingMatch = false): ResolvedTarget {
     targetId: null,
     targetValues: null,
     pendingMatch,
+    rekeyFromMatchKey: null,
+    rekeyBlock: null,
   };
 }
 
@@ -1767,7 +1883,9 @@ export async function runSettleAfltables(
 
   try {
     await sql.begin(async (tx) => {
-      const refs = await loadRefs(tx, bundle.season);
+      const refs = await loadRefs(
+        tx, bundle.season, matchRekeyScopeOf(bundle, sweep.sweepable),
+      );
 
       const [batch] = await tx<{ id: string }[]>`
         INSERT INTO import_batches (source_id, tool, target_table, records_read, notes)
@@ -1947,6 +2065,11 @@ async function settleFamily(
     //    ONE savepoint unit (§13) — a match never exists with half its period
     //    scores, and a player's stats and votes land together or not at all.
     const passes: TargetPass[] = [];
+    // AFLDB-ISSUE-131 — the canonical match this record's own `matches` target
+    // resolved to under a RETIRED rendering. `MATCH_TARGET_TABLES` puts
+    // `matches` first, so the dependent period-score target below is resolved
+    // against the row the rekey is about to move rather than against nothing.
+    let rekeyedMatchId: number | null = null;
     for (const targetTable of targetTablesFor(wireFamily)) {
       // FIRST, and before identity is consulted at all: did the source
       // establish this target? A target that does not exist gets no
@@ -1954,15 +2077,18 @@ async function settleFamily(
       // anything else about it would be asking about a fact nobody published.
       if (!targetEstablishedBySource(targetTable, record.projection)) continue;
 
-      const resolvedTarget = projected
-        ? await resolveTarget(tx, targetTable, projected, refs, counters)
+      const resolvedTarget: ResolvedTarget = projected
+        ? await resolveTarget(tx, targetTable, projected, refs, counters, rekeyedMatchId)
         : unresolved(
           record.rejection
             ? `${record.rejection.reason}: ${record.rejection.detail ?? 'no detail'}`
             : 'the record produced no typed projection',
         );
+      if (targetTable === 'matches' && resolvedTarget.rekeyFromMatchKey !== null) {
+        rekeyedMatchId = resolvedTarget.targetId;
+      }
       const proposedValues = projected
-        ? proposedValuesForTarget(targetTable, projected)
+        ? withRekeyRendering(targetTable, projected, resolvedTarget)
         : {};
 
       // Read ONCE and reused below. A `data_issues` row must explain itself
@@ -2096,6 +2222,11 @@ function invitationFor(
   if (Object.keys(automaticProposal(pass.targetTable, pass.proposedValues)).length === 0) {
     return null;
   }
+  // AFLDB-ISSUE-131 §5.10. Ambiguous rekey evidence, or a would-be merge of
+  // two populated canonical rows. The reconciliation still happens and the
+  // reviewer still sees the candidate; the AUTOMATIC path simply declines to
+  // ask the question, and the run opens a finding.
+  if (pass.resolvedTarget.rekeyBlock !== null) return null;
   if (pass.outcome.kind === 'candidate') {
     return pass.outcome.verb === 'new' || pass.outcome.verb === 'corrected'
       ? 'candidate'
@@ -2193,9 +2324,65 @@ async function applyRecordCanonically(
     );
   }
 
-  const matchesInvited = passes.some(
+  const matchKey = projected.family === 'match'
+    ? projected.projection.matchKey
+    : projected.matchKey;
+
+  // AFLDB-ISSUE-131 §5.10 — FIXTURE-family blocking.
+  //
+  // A rekey refusal says this run cannot name the canonical row that IS this
+  // real-world fixture, or that two rows already claim to be it. That is not a
+  // fact about one table: every other target of the same fixture would be
+  // written against a row the run just declined to identify, which is exactly
+  // how the duplicated state this issue exists to resolve gets deeper. So the
+  // refusal is recorded against the fixture and every family of it is withheld
+  // for the REST OF THE RUN — the dependent `match_period_scores` here, and
+  // `player_match_stats`, which is settled afterwards in this transaction.
+  //
+  // The specific refusal travels with the block, so a withheld dependent is
+  // reported as the evidence that stopped it rather than as a generic failure.
+  let blocked: CanonicalApplyRefusal | null = refs.rekeyBlockedFixtures.get(matchKey) ?? null;
+  for (const pass of passes) {
+    if (pass.resolvedTarget.rekeyBlock !== null) blocked = pass.resolvedTarget.rekeyBlock;
+  }
+
+  const matchesInvited = blocked === null && passes.some(
     (pass) => pass.targetTable === 'matches' && invitationFor(pass, false) !== null,
   );
+
+  if (blocked !== null) {
+    refs.rekeyBlockedFixtures.set(matchKey, blocked);
+    // One finding per blocked target, written whether or not anything else in
+    // the record was applied, so a refusal is never silent. A target the
+    // automatic path would not have offered anyway is simply not offered; it
+    // is not turned into a finding it never had.
+    for (const pass of passes) {
+      const wouldOffer = pass.resolvedTarget.rekeyBlock !== null
+        || invitationFor(pass, false) !== null;
+      if (!wouldOffer) continue;
+      counters.canonicalApplyRefusals += 1;
+      counters.canonicalRekeyRefusals += 1;
+      applied.set(pass.targetTable, {
+        targetTable: pass.targetTable,
+        applied: false,
+        verb: null,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        refusal: blocked,
+      });
+      await writeRekeyRefusalIssue(tx, {
+        wireFamily: input.wireFamily,
+        externalRecordId: input.record.externalRecordId,
+        targetTable: pass.targetTable,
+        targetId: pass.resolvedTarget.targetId,
+        refusal: blocked,
+        matchKey,
+        counters,
+      });
+    }
+    // Nothing of this fixture is offered to the applier at all.
+    return applied;
+  }
 
   const invited: { pass: TargetPass; target: CanonicalApplyTargetInput }[] = [];
   for (const pass of passes) {
@@ -2226,9 +2413,6 @@ async function applyRecordCanonically(
   }
   if (invited.length === 0) return applied;
 
-  const matchKey = projected.family === 'match'
-    ? projected.projection.matchKey
-    : projected.matchKey;
   const vote = projected.family === 'player_match_stats'
     ? projected.projection.brownlowRoundVote
     : null;
@@ -2249,6 +2433,19 @@ async function applyRecordCanonically(
     // §7.1: the bundle projection's key, verbatim. Never re-rendered, and
     // `createMatch()` is never called.
     matchKey,
+    // AFLDB-ISSUE-131 §5.3 — offered for the match family only. The applier
+    // re-runs the search itself, under `FOR UPDATE`, inside its savepoint.
+    matchRekey: projected.family === 'match'
+      ? {
+        scope: refs.matchRekeyScope,
+        identity: {
+          roundCode: projected.projection.roundCode,
+          matchDate: projected.projection.matchDate,
+          homeClubId: projected.identity.homeClubId,
+          awayClubId: projected.identity.awayClubId,
+        },
+      }
+      : null,
     playerId: projected.family === 'player_match_stats' ? projected.playerId : null,
     brownlowRoundNumber: vote === null ? null : vote.roundNumber,
     targets: invited.map((entry) => entry.target),
@@ -2259,6 +2456,25 @@ async function applyRecordCanonically(
   if (outcome.insertedMatchId !== null) {
     refs.matchIdsByKey.set(matchKey, outcome.insertedMatchId);
   }
+  // AFLDB-ISSUE-131. The row kept its id and changed its rendering, so the
+  // run's map retires the old key and registers the new one against the SAME
+  // id. Without this the player family — settled after the match family in
+  // this transaction — would look for a match under a key nothing carries and
+  // report an unresolved identity for a match that is sitting right there.
+  if (outcome.rekeyedMatch !== null) {
+    refs.matchIdsByKey.delete(outcome.rekeyedMatch.previousMatchKey);
+    refs.matchIdsByKey.set(matchKey, outcome.rekeyedMatch.id);
+    counters.canonicalMatchesRekeyed += 1;
+  }
+  // §5.10. A refusal the savepoint decided — `rekey_override_conflict` above
+  // all, which no pre-invitation pass can see — blocks the fixture for the
+  // rest of the run exactly like one decided before the invitation.
+  if (outcome.fixtureBlocked !== null) {
+    refs.rekeyBlockedFixtures.set(matchKey, outcome.fixtureBlocked);
+  }
+  // §5.7. Visible rather than silent: an automatic carry moves a HUMAN's
+  // pinned decision from the retired rendering to the live one.
+  counters.canonicalOverridesCarried += outcome.overridesCarried;
 
   let unitApplied = false;
   for (const result of outcome.results) {
@@ -2268,6 +2484,21 @@ async function applyRecordCanonically(
       // counter). A unit that rolled back is counted once, below, as a
       // failure rather than once per target here.
       if (outcome.failure === null) counters.canonicalApplyRefusals += 1;
+      // §5.10. A rekey refusal decided inside the savepoint, on state re-read
+      // there. Reported exactly like the pre-invitation block above.
+      if (outcome.failure === null && isRekeyRefusal(result.refusal)) {
+        counters.canonicalRekeyRefusals += 1;
+        await writeRekeyRefusalIssue(tx, {
+          wireFamily: input.wireFamily,
+          externalRecordId: input.record.externalRecordId,
+          targetTable: result.targetTable,
+          targetId: passes.find((pass) => pass.targetTable === result.targetTable)
+            ?.resolvedTarget.targetId ?? null,
+          refusal: result.refusal as string,
+          matchKey,
+          counters,
+        });
+      }
       continue;
     }
     unitApplied = true;
@@ -2323,6 +2554,57 @@ async function applyRecordCanonically(
   }
 
   return applied;
+}
+
+/**
+ * AFLDB-ISSUE-131 §5.10 — one visible, resolvable finding per rekey refusal.
+ *
+ * It carries `CANONICAL_APPLY_ISSUE_TYPE` and the applier's owner stamp, so it
+ * renders in the settle exception report beside every other apply failure and
+ * is closed by `resolveAppliedFailureFinding()` the moment a later run applies
+ * that record's target successfully — which is exactly what happens once the
+ * ambiguity, the duplicate or the override conflict has been resolved by a
+ * human. It is a refusal, never a silent skip: nothing canonical was written.
+ */
+async function writeRekeyRefusalIssue(
+  tx: Tx,
+  input: {
+    wireFamily: string;
+    externalRecordId: string;
+    targetTable: SettleTargetTable;
+    targetId: number | null;
+    refusal: string;
+    matchKey: string;
+    counters: SettleCounters;
+  },
+): Promise<void> {
+  const reason = input.refusal === 'rekey_ambiguous'
+    ? 'more than one canonical row could be the same fixture under a retired identity'
+    : input.refusal === 'rekey_would_merge'
+      ? 'this fixture already holds two canonical rows, which are never merged automatically'
+      : 'a live human override exists under both renderings of this match';
+  await writeSettleDataIssue(tx, {
+    entityType: input.targetTable,
+    entityId: input.targetId,
+    issueType: CANONICAL_APPLY_ISSUE_TYPE,
+    issueKey: canonicalApplyIssueKey(
+      input.wireFamily, input.externalRecordId, input.targetTable,
+    ),
+    severity: 'error',
+    description:
+      `The automatic canonical application of ${input.targetTable} `
+      + `'${input.externalRecordId}' was refused (${input.refusal}): ${reason}.`,
+    details: {
+      owner: CANONICAL_APPLY_ISSUE_OWNER,
+      source_key: SETTLE_SOURCE_KEY,
+      family: contractFamilyOf(input.wireFamily),
+      external_record_id: input.externalRecordId,
+      target_table: input.targetTable,
+      refusal: input.refusal,
+      match_key: input.matchKey,
+      issue: 'AFLDB-ISSUE-131',
+    },
+  }, input.counters);
 }
 
 /* -- projection writers (upsert only — O1) ---------------------------- */
@@ -2575,6 +2857,27 @@ async function currentVersionSeq(
 
 /* -- per-target resolution and proposals ------------------------------ */
 
+/**
+ * AFLDB-ISSUE-131 §5.4 — `match_key` joins the proposed field set on the rekey
+ * path, and ONLY there.
+ *
+ * On every ordinary path the rendering is the identity the row was found by,
+ * so proposing it would be proposing a value that cannot differ. On a rekey it
+ * is exactly what moved, and putting it in the proposed set is what makes the
+ * move a first-class field change: it diffs, it is covered by the E5 baseline
+ * hash, it reaches the reviewer in a `corrected` candidate, it lands in the
+ * ledger's `previous_values` / `new_values`, and the ordinary UPDATE writes it
+ * with no special case in the writer.
+ */
+function withRekeyRendering(
+  targetTable: SettleTargetTable, projected: ProjectedRecord, resolved: ResolvedTarget,
+): Record<string, JsonValue> | null {
+  const proposed = proposedValuesForTarget(targetTable, projected);
+  if (proposed === null || targetTable !== 'matches') return proposed;
+  if (resolved.rekeyFromMatchKey === null) return proposed;
+  return { ...proposed, match_key: projected.family === 'match' ? projected.projection.matchKey : null };
+}
+
 function proposedValuesForTarget(
   targetTable: SettleTargetTable, projected: ProjectedRecord,
 ): Record<string, JsonValue> | null {
@@ -2586,6 +2889,30 @@ function proposedValuesForTarget(
   return targetTable === 'player_match_stats'
     ? proposedPlayerMatchValues(projected.projection, projected.clubId)
     : proposedBrownlowValues(projected.projection);
+}
+
+/**
+ * AFLDB-ISSUE-131 §5.3 — the fixture identity a rekey must agree with exactly.
+ *
+ * Season and BOTH resolved club ids, plus the two components the search allows
+ * to move. These are the RESOLVED canonical ids, never the source's club name
+ * rendering: `match_key` embeds `clubs.name_of(...)`, so a `clubs.json` edit
+ * rekeys matches with no upstream change at all (§10.3), and the ids are what
+ * make that case a rekey rather than a new fixture.
+ */
+function rekeyIdentityOf(
+  projected: Extract<ProjectedRecord, { family: 'match' }>, refs: SettleRefs,
+): MatchRekeyIdentity {
+  return {
+    season: projected.projection.season,
+    sourceId: refs.sourceId,
+    family: contractFamilyOf(MATCH_WIRE_FAMILY),
+    matchKey: projected.projection.matchKey,
+    roundCode: projected.projection.roundCode,
+    matchDate: projected.projection.matchDate,
+    homeClubId: projected.identity.homeClubId,
+    awayClubId: projected.identity.awayClubId,
+  };
 }
 
 /**
@@ -2603,20 +2930,81 @@ async function resolveTarget(
   projected: ProjectedRecord,
   refs: SettleRefs,
   counters: SettleCounters,
+  /**
+   * AFLDB-ISSUE-131 — the canonical match id this record's own `matches`
+   * target just resolved to under a RETIRED rendering, when it did.
+   *
+   * The row exists; it is simply still carrying the identity the source has
+   * revised, and this run is about to move it. Without this the dependent
+   * `match_period_scores` would look the match up by the incoming key alone,
+   * find nothing, and be counted as an unresolved identity for a match that
+   * is sitting right there — and its baseline would be recorded as "no row"
+   * against a row that has four period rows, so the period target would then
+   * refuse `stale_canonical_target` inside the savepoint and a genuine period
+   * correction would be lost for the run.
+   */
+  rekeyedMatchId: number | null = null,
 ): Promise<ResolvedTarget> {
   if (projected.family === 'match') {
     const matchId = refs.matchIdsByKey.get(projected.projection.matchKey) ?? null;
     if (targetTable === 'matches') {
+      const targetKey = { match_key: projected.projection.matchKey };
+      // AFLDB-ISSUE-131 §5.3. `match_key` is a content address over mutable
+      // scheduling metadata, so a lookup miss is not proof of a new fixture:
+      // it may be the same real-world match under a rendering the source has
+      // just revised.
+      //
+      // Run on the HIT path as well as the miss (§13.4 D6). §5.3's would-merge
+      // clause — the incoming rendering already has a row AND a retired one
+      // exists — is only ever reachable on a hit, and refusing it is what stops
+      // the ordinary update deepening a duplication that already exists. So
+      // this is one indexed probe per match record, not one per lookup miss,
+      // and it is re-derived under `FOR UPDATE` inside the applier's savepoint
+      // before anything is written.
+      const retired = await findRetiredMatchIdentities(
+        tx, rekeyIdentityOf(projected, refs),
+        { kind: 'run_enumeration', scope: refs.matchRekeyScope },
+      );
       if (matchId === null) {
+        if (retired.length > 1) {
+          return {
+            identity: { status: 'new_target', entity: 'matches', targetKey },
+            targetId: null,
+            targetValues: null,
+            pendingMatch: false,
+            rekeyFromMatchKey: null,
+            rekeyBlock: 'rekey_ambiguous',
+          };
+        }
+        if (retired.length === 1) {
+          const [owner] = await tx<{ ownerSourceId: number | null }[]>`
+            SELECT source_id AS "ownerSourceId" FROM matches WHERE id = ${retired[0].id}
+          `;
+          // `match_key` joins the compared field set on this path and this
+          // path only, so the rendering itself is diffed, reviewed and
+          // audited exactly like any other corrected field.
+          const current = await currentMatchValues(tx, retired[0].id);
+          return {
+            identity: {
+              status: 'resolved',
+              entity: 'matches',
+              targetKey,
+              ownership: ownershipOf(refs, owner?.ownerSourceId ?? null),
+            },
+            targetId: retired[0].id,
+            targetValues: { ...current, match_key: retired[0].matchKey },
+            pendingMatch: false,
+            rekeyFromMatchKey: retired[0].matchKey,
+            rekeyBlock: null,
+          };
+        }
         return {
-          identity: {
-            status: 'new_target',
-            entity: 'matches',
-            targetKey: { match_key: projected.projection.matchKey },
-          },
+          identity: { status: 'new_target', entity: 'matches', targetKey },
           targetId: null,
           targetValues: null,
           pendingMatch: false,
+          rekeyFromMatchKey: null,
+          rekeyBlock: null,
         };
       }
       const [row] = await tx<{ ownerSourceId: number | null }[]>`
@@ -2627,17 +3015,26 @@ async function resolveTarget(
         identity: {
           status: 'resolved',
           entity: 'matches',
-          targetKey: { match_key: projected.projection.matchKey },
+          targetKey,
           ownership: ownershipOf(refs, row?.ownerSourceId ?? null),
         },
         targetId: matchId,
         targetValues: current,
         pendingMatch: false,
+        rekeyFromMatchKey: null,
+        // The incoming rendering already HAS a canonical row and a retired
+        // one also exists: two canonical rows for one fixture, before this
+        // run touched anything. Two populated canonical graphs are never
+        // merged automatically (§5.3), so the ordinary update stops too —
+        // deepening the duplication is worse than refusing it.
+        rekeyBlock: retired.length > 0 ? 'rekey_would_merge' : null,
       };
     }
     // match_period_scores keys on match_id, so without a canonical match the
-    // target identity does not resolve at all.
-    if (matchId === null) {
+    // target identity does not resolve at all. A proven rekey is not that
+    // case: the canonical match exists and keeps its id (§5.5).
+    const periodMatchId = matchId ?? rekeyedMatchId;
+    if (periodMatchId === null) {
       counters.unresolvedIdentityMatch += 1;
       return unresolved('no canonical match exists for this match_key yet', true);
     }
@@ -2650,16 +3047,43 @@ async function resolveTarget(
       source_id: number | null;
     }[]>`
       SELECT club_id, period, goals, behinds, points, source_id
-        FROM match_period_scores WHERE match_id = ${matchId}
+        FROM match_period_scores WHERE match_id = ${periodMatchId}
        ORDER BY club_id, period
     `;
+    // AFLDB-ISSUE-131 — the REKEY path only, and deliberately so.
+    //
+    // A retired row keeps its id and its children, and a fixture settled with
+    // an all-NULL period set has none, so this branch is how a rekeyed match
+    // acquires its first period rows — answered exactly as `readFreshTarget()`
+    // answers it, with a new target. The row is owned by the promoting source
+    // by construction (§5.3 admits no other candidate), so nothing is adopted.
+    //
+    // On the ORDINARY path an existing canonical match with no period rows is
+    // left exactly as it was: its ownership cannot be read off a set with no
+    // rows, so it falls through to `indeterminate` and fails closed. That is
+    // what stops a period set being inserted under a foreign-owned or a
+    // source-less `matches` row, and E3 is not weakened here.
+    if (rows.length === 0 && matchId === null) {
+      return {
+        identity: {
+          status: 'new_target',
+          entity: 'match_period_scores',
+          targetKey: { match_id: periodMatchId },
+        },
+        targetId: null,
+        targetValues: null,
+        pendingMatch: false,
+        rekeyFromMatchKey: null,
+        rekeyBlock: null,
+      };
+    }
     // S3: migration 083 gave this target the provenance quartet. The whole
     // period set is ONE target keyed on match_id, so its ownership is the
     // ownership of the rows that make it up: a single readable owner shared by
     // every row is that owner; anything else -- a mixed set, or an owner id
     // with no readable key -- is indeterminate and fails closed. A set with no
-    // rows at all cannot be reached here, because `targetEstablishedBySource()`
-    // routes an unpublished period set to `new_target` instead.
+    // rows at all is `indeterminate` here, and is answered above as a new
+    // target on the rekey path alone.
     const owners = new Set(rows.map((row) => row.source_id));
     const ownership: TargetOwnership = owners.size === 1
       ? ownershipOf(refs, [...owners][0])
@@ -2679,12 +3103,14 @@ async function resolveTarget(
       identity: {
         status: 'resolved',
         entity: 'match_period_scores',
-        targetKey: { match_id: matchId },
+        targetKey: { match_id: periodMatchId },
         ownership,
       },
-      targetId: matchId,
+      targetId: periodMatchId,
       targetValues: { period_scores: compared as unknown as JsonValue },
       pendingMatch: false,
+      rekeyFromMatchKey: null,
+      rekeyBlock: null,
     };
   }
 
@@ -2708,6 +3134,8 @@ async function resolveTarget(
         targetId: null,
         targetValues: null,
         pendingMatch: false,
+        rekeyFromMatchKey: null,
+        rekeyBlock: null,
       };
     }
     const values: Record<string, JsonValue> = {};
@@ -2726,6 +3154,8 @@ async function resolveTarget(
       targetId: (row as unknown as { id: number }).id,
       targetValues: values,
       pendingMatch: false,
+      rekeyFromMatchKey: null,
+      rekeyBlock: null,
     };
   }
 
@@ -2751,6 +3181,8 @@ async function resolveTarget(
       targetId: null,
       targetValues: null,
       pendingMatch: false,
+      rekeyFromMatchKey: null,
+      rekeyBlock: null,
     };
   }
   return {
@@ -2766,6 +3198,8 @@ async function resolveTarget(
     targetId: row.id,
     targetValues: { played: row.played, votes: row.votes },
     pendingMatch: false,
+    rekeyFromMatchKey: null,
+    rekeyBlock: null,
   };
 }
 
