@@ -5,6 +5,13 @@
 **Independent review answered 2026-09-03 — merge YES AFTER FIXES; every required fix is
 made and validated. See §14.**
 Production untouched; the timer stays stopped. See §13 and §14.
+**Bookkeeping note 2026-09-03 (recorded during the ISSUE-133 closeout, not by an ISSUE-131
+session):** the line above is superseded by read-only production evidence in
+`issues/closed/AFLDB-ISSUE-133.md` §3–§4 and §11.3 — ISSUE-131 is merged as `657a875` and
+deployed as production `HEAD`, `afldb-settle-afltables.timer` is **active**, and settle batches
+735–738 ran on the evening of 2026-09-03. §8's acceptance evidence is not recorded in this
+runbook; recording it (or the gap) and resolving remain the operator's ISSUE-131 actions.
+Nothing else in this document was changed.
 **Severity:** High — data integrity, and it blocks re-enabling the production settle timer.
 **Area:** Data acquisition / Import architecture / Data integrity
 **Branch / worktree:** `claude/issue-131` — `D:\dev\afldb-issue-131`
