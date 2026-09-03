@@ -24,6 +24,26 @@ describe('admin match mutation source contracts', () => {
     expect(playerDerived).not.toMatch(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+brownlow_season_votes/i);
   });
 
+  // AFLDB-ISSUE-129 §8.4 item 9: a super admin may select wildcard_final wherever
+  // an explicit round_type is already selectable, and it is never inferred. All
+  // three admin surfaces have to agree, or an operator can never repair a
+  // Wildcard Final through the data editor.
+  it('lets admin tooling select wildcard_final explicitly on every surface', () => {
+    const createForm = source('src', 'app', 'admin', 'data-editor', 'CreateMatchForm.tsx');
+    const actions = source('src', 'app', 'admin', 'data-editor', 'actions.ts');
+
+    expect(createForm).toContain('<option value="wildcard_final">Wildcard Final</option>');
+    // The server action's allow-list is the real gate; the form alone proves nothing.
+    expect(actions).toMatch(/roundTypes = \[[^\]]*'wildcard_final'/s);
+    expect(matchAdmin).toMatch(/roundType: [^;]*'wildcard_final'/);
+    // A non-home-and-away round derives its code from the type, so an omitted
+    // round_code must become 'WF' rather than the generic 'Final' default.
+    expect(matchAdmin).toContain("case 'wildcard_final': roundCode = 'WF'; break;");
+    // round_number stays NULL: isFinal is derived from round_type, and
+    // matches_round_number_ck forbids a number on anything but home-and-away.
+    expect(matchAdmin).toContain("const isFinal = input.roundType !== 'home_and_away';");
+  });
+
   it('keeps prepared tagged queries to one SQL command', () => {
     for (const queryModule of [matchSheet, matchAdmin, playerDerived]) {
       expect(queryModule).not.toMatch(/;\s*(?:INSERT|UPDATE|DELETE|SELECT|WITH|TRUNCATE)\b/i);

@@ -231,8 +231,11 @@ export async function searchSeasons(query: string, limit = 4): Promise<SearchRes
  */
 const ROUND_QUERY_RE =
   /^(?:(?:round|rnd|r)\s*(\d{1,2})\s+(\d{4})|(\d{4})\s+(?:round|rnd|r)\s*(\d{1,2}))$/i;
+// "wildcard final" is a round_type in its own right from 2026 (AFLDB-ISSUE-129
+// §8.4). It is listed here because this regex names explicit round identities;
+// it is not a finals-series synonym.
 const FINALS_QUERY_RE =
-  /^(?:(\d{4})\s+)?(grand final|preliminary final|semi final|qualifying final|elimination final)(?:\s+(\d{4}))?$/i;
+  /^(?:(\d{4})\s+)?(grand final|preliminary final|semi final|qualifying final|elimination final|wildcard final)(?:\s+(\d{4}))?$/i;
 
 export async function searchRounds(query: string): Promise<SearchResult[]> {
   const trimmed = query.trim().toLowerCase();

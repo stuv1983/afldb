@@ -85,6 +85,15 @@ describe('formatRound', () => {
     expect(formatRoundShort('grand_final', null)).toBe('GF');
   });
 
+  // AFLDB-ISSUE-129. Every AFL call site passes NO fallback — only AFLW carries a
+  // round_code to fall back to — so without a map entry these would render as the
+  // bare identifier "wildcard_final", including as a season-page heading and its
+  // anchor id. The no-fallback call shape is the point of this test.
+  it('names a Wildcard Final with no fallback available', () => {
+    expect(formatRound('wildcard_final', null)).toBe('Wildcard Final');
+    expect(formatRoundShort('wildcard_final', null)).toBe('WF');
+  });
+
   // A round type this map has never seen, or a home-and-away row with no
   // number, must not render as an identifier or as "Rnull".
   it('falls back to the source label for an unknown type', () => {

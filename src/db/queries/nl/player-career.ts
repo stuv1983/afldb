@@ -113,7 +113,7 @@ function conditionSql(cond: NlCareerCondition, plan: NlQueryPlan): SqlFragment {
 function boundarySql(boundary: NlBoundary): SqlFragment {
   const finalCondition = boundary.where === 'grand_final'
     ? sql`m.round_type = 'grand_final'`
-    : sql`m.is_final`;
+    : sql`m.is_finals_series`;
   if (boundary.event === 'debut') {
     return sql`EXISTS (SELECT 1 FROM player_match_stats pms
                           JOIN matches m ON m.id = pms.match_id

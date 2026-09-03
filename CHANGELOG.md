@@ -15,6 +15,66 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-129 — the AFL Wildcard Round is representable, and "a final" is now two questions - 3 September 2026
+
+- **The gap.** AFL Tables publishes a Wildcard Final round from 2026 — 28-Aug Western Bulldogs v
+  Collingwood and 29-Aug Melbourne v Carlton, results code `WF`, plus 92 player-match rows — and
+  AFLDB's `round_type` enum had no member that could carry it. Those rows had no representable
+  identity, so they became unkeyed rejections and both presence enumerations went incomplete.
+  `AFLDB-ISSUE-128` made that loss audible; this change makes the rows land.
+- **`round_type` gains `wildcard_final`** (migration `084`), positioned after `home_and_away` so
+  the enum's declaration order stays chronological. It is deliberately **not** collapsed into
+  `elimination_final` or any other existing finals type. `matches_is_final_ck` is unchanged, so
+  a wildcard final carries `is_final = true` by construction and 129 seasons of history are
+  untouched.
+- **`matches.is_finals_series`** (migration `085`) is a new generated column and the single
+  definition of finals-series membership. The Wildcard Round is the first round in AFL history
+  where two questions that shared one answer come apart:
+  - `is_final` — *is this outside the home-and-away premiership-points season?* **True** for a
+    wildcard final, which is why the ladder, premiership points and Brownlow polling keep
+    reading it and are correct with no change.
+  - `is_finals_series` — *is this part of the traditional finals series?* **False** for a
+    wildcard final.
+- **Every "did they play finals" answer now reads `is_finals_series`**: `player_career_stats`
+  and `player_season_stats` `finals`, `club_seasons.finals_played`, the `db-health` finals
+  parity check, all Grid Solver finals criteria, the natural-language *finals* match type, and
+  the Match Search "Finals only" filter. The decisive consequence, and the reason a plain
+  "counts as a final" was rejected: a club seeded 9th that loses its Wildcard Final and never
+  reaches the eight has `finals_played = 0` and answers **missed the finals**.
+- **Both source vocabularies are taught together, exactly.** `results.csv` `WF` and
+  `player_stats` `Wildcard Final` map to `wildcard_final` through explicit tables — no regex, no
+  case-folding, no prefix matching, no fallback — and the two grains must agree or the importer
+  rejects every player row on a round mismatch. fitzRoy's own `Round.Type` stays untrusted for
+  this round: it reports `Regular`. The same code is taught to the manual CSV ingest path and to
+  the external-provider corroboration matcher.
+- **Not polled for the Brownlow.** `WF` joins `FINALS_CODES`, which gates round-vote derivation
+  and also protects the round-vote key from `int('WF')`.
+- **User-visible surfaces.** `Wildcard Final` / `WF` display labels; a `wildcard final` /
+  `wildcard finals` / `wildcard round` natural-language match type that is read before the bare
+  "finals" rule rather than swallowed by it; a `wildcard final` site-search round; a
+  `Wildcard Final only` Match Search filter; an explicit `Wildcard Final` option in the admin
+  match editor, never inferred from free text; and `is_finals_series` as a Query Builder field
+  alongside `is_final`, which is relabelled `Not home-and-away` so the two stop reading as
+  synonyms.
+- **The ISSUE-095 ladder witness is preserved, not loosened.** fitzRoy labels a `WF` row
+  `Round.Type = "Regular"` and counts it on its own ladder, so for any season containing a
+  Wildcard Round the witness and `club_seasons` compute different quantities. Those seasons are
+  now named and declared explicitly uncomparable; every other season is compared exactly as
+  strictly as before.
+- **Proved against the live source.** The 2026 snapshot was re-acquired from AFL Tables through
+  the pinned fitzRoy 1.8.0 and re-emitted: **209 matches and 9,614 player-match rows, 0
+  rejections, 0 unkeyed rejections, both presence enumerations complete, verdict
+  `SOURCE COMPLETENESS: COMPLETE`** — where the same source previously emitted 207 / 9,522 with
+  94 unrepresentable rows. The two Wildcard Finals and their 92 player rows are exactly the
+  difference. `AFLDB-ISSUE-128` needed no code change: its verdict is a measurement, and the
+  measurement moved. The fitzRoy ladder witness independently confirms nothing historical moved
+  — 1,622 club-seasons agree with `club_seasons` on points, percentage and ladder position.
+- **Regression coverage.** The `AFLDB-ISSUE-128` fixture — which carries the real 2026 `WF` /
+  `Wildcard Final` vocabulary measured from the live source — had its assertions **inverted, not
+  deleted**: it now proves 2 matches and 4 player rows emitted, 0 unkeyed rejections and both
+  enumerations complete. ISSUE-128's own guarantee is re-proved on a round code AFLDB still does
+  not know, so teaching one round did not switch the reporting off for the next.
+
 ### AFLDB-ISSUE-128 — a current-season settle can no longer report success while dropping rows AFL Tables supplied - 3 September 2026
 
 - **The defect, measured rather than inferred.** A real in-season chain run against the live

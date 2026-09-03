@@ -243,7 +243,10 @@ export async function reconcileCareerTotals(): Promise<ReconciliationCheck[]> {
         SELECT pms.player_id, count(*) AS actual
           FROM player_match_stats pms
           JOIN matches m ON m.id = pms.match_id
-         WHERE m.is_final
+         -- Must mirror rebuild_derived.py / player-derived.ts exactly, which
+         -- build player_career_stats.finals from is_finals_series. Using
+         -- is_final here would report false drift for every Wildcard Final.
+         WHERE m.is_finals_series
          GROUP BY pms.player_id
       ) f ON f.player_id = c.player_id
       WHERE c.finals <> COALESCE(f.actual, 0)
@@ -269,7 +272,7 @@ export async function reconcileCareerTotals(): Promise<ReconciliationCheck[]> {
   return [
     { check: 'games: player_career_stats vs. player_match_stats', mismatches: Number(games[0].count) },
     { check: 'goals: player_career_stats vs. player_match_stats', mismatches: Number(goals[0].count) },
-    { check: 'finals: player_career_stats vs. player_match_stats + matches.is_final', mismatches: Number(finals[0].count) },
+    { check: 'finals: player_career_stats vs. player_match_stats + matches.is_finals_series', mismatches: Number(finals[0].count) },
     { check: 'brownlow votes: player_career_stats vs. brownlow_season_votes', mismatches: Number(brownlow[0].count) },
     { check: 'players with match history but no player_career_stats row', mismatches: Number(missing[0].count) },
   ];

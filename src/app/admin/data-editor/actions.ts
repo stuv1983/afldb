@@ -542,6 +542,8 @@ export async function createMatchAction(
   const roundTypeValue = String(formData.get('roundType') ?? 'home_and_away') || 'home_and_away';
   const roundTypes = [
     'home_and_away',
+    // Explicitly selectable, never inferred from free text (ISSUE-129 §8.4 item 9).
+    'wildcard_final',
     'elimination_final',
     'qualifying_final',
     'semi_final',

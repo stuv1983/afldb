@@ -133,12 +133,29 @@ KNOWN_DATASETS = ("player_stats", "player_details", "results", "ladder")
 
 EARLIEST_PLAUSIBLE_DOB = date(1850, 1, 1)
 
+#: results-grain round code -> canonical round_type, for every round that is not
+#: home-and-away. The name is historical: membership means "not a home-and-away
+#: premiership-points round", which is exactly matches.is_final, NOT finals-series
+#: membership (matches.is_finals_series). A Wildcard Final belongs here because it
+#: earns no premiership points, does not move the ladder and is never polled for the
+#: Brownlow -- see AFLDB-ISSUE-129 §8.4. It is deliberately NOT collapsed into any
+#: existing finals type.
 FINALS_CODES = {
     "EF": "elimination_final",
     "QF": "qualifying_final",
     "SF": "semi_final",
     "PF": "preliminary_final",
     "GF": "grand_final",
+    "WF": "wildcard_final",
+}
+
+#: The player_stats grain spells some rounds out in words where results.csv uses a
+#: code, so the two grains have to be reconciled or `import_fitzroy_core` rejects every
+#: player row on a round mismatch against results.csv. EXACT strings only: no regex, no
+#: case-folding, no prefix matching, no fallback. An unrecognised round code must keep
+#: raising MatchIdentityError rather than being guessed at (AFLDB-ISSUE-129 §8.4 item 6).
+STATS_ROUND_ALIASES = {
+    "Wildcard Final": "WF",
 }
 
 # Explicit snapshot-column -> player_match_stats-column mapping. The 21
@@ -1166,10 +1183,12 @@ def normalise_results_round(raw: str, context: str) -> tuple[str, str]:
 
 
 def normalise_stats_round(raw: str, context: str) -> str:
-    """player_stats Round ("1", "EF") -> round_code."""
+    """player_stats Round ("1", "EF", "Wildcard Final") -> round_code."""
     code = raw.strip()
     if re.match(r"^\d+$", code):
         return code
+    # Exact-match alias table only; see STATS_ROUND_ALIASES.
+    code = STATS_ROUND_ALIASES.get(code, code)
     if code in FINALS_CODES:
         return code
     raise MatchIdentityError(f"{context}: unrecognised player_stats round code {raw!r}")
@@ -1821,7 +1840,16 @@ def measure_brownlow_votes(files: list[SnapshotFile], corrections: list[dict] | 
             continue
         values.add(votes)
         season = to_int(row.get("Season"))
-        round_code = clean(row.get("Round"))
+        # The player grain spells some rounds out ("Wildcard Final"), so the raw cell is
+        # not a round_code. Normalise before testing FINALS_CODES or a wildcard row would
+        # be measured as a projectable home-and-away vote row. This is a measurement over
+        # possibly-malformed bytes, so an unreadable code is carried through as-is rather
+        # than aborting the audit -- it will fail closed in the import pass instead.
+        raw_round = clean(row.get("Round"))
+        try:
+            round_code = normalise_stats_round(raw_round or "", context)
+        except MatchIdentityError:
+            round_code = raw_round
         if season in round_vote_seasons and round_code not in FINALS_CODES:
             projectable += 1
     return {

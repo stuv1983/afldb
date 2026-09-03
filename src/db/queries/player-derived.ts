@@ -83,6 +83,7 @@ export async function recomputePlayerDerivedStats(
           pms.club_id,
           m.season,
           m.is_final,
+          m.is_finals_series,
           m.round_type,
           CASE
             WHEN m.result = 'draw' THEN 'D'
@@ -101,7 +102,7 @@ export async function recomputePlayerDerivedStats(
         c.season,
         c.club_id,
         count(*),
-        count(*) FILTER (WHERE c.is_final),
+        count(*) FILTER (WHERE c.is_finals_series),
         count(*) FILTER (WHERE c.outcome = 'W'),
         count(*) FILTER (WHERE c.outcome = 'D'),
         count(*) FILTER (WHERE c.outcome = 'L'),
@@ -144,6 +145,7 @@ export async function recomputePlayerDerivedStats(
           pms.club_id,
           m.season,
           m.is_final,
+          m.is_finals_series,
           m.round_type,
           CASE
             WHEN m.result = 'draw' THEN 'D'
@@ -163,7 +165,7 @@ export async function recomputePlayerDerivedStats(
           c.player_id,
           c.season,
           count(*) AS games,
-          count(*) FILTER (WHERE c.is_final) AS finals,
+          count(*) FILTER (WHERE c.is_finals_series) AS finals,
           count(*) FILTER (WHERE c.outcome = 'W') AS wins,
           count(*) FILTER (WHERE c.outcome = 'D') AS draws,
           count(*) FILTER (WHERE c.outcome = 'L') AS losses,
@@ -221,6 +223,7 @@ export async function recomputePlayerDerivedStats(
           m.season,
           m.match_date,
           m.is_final,
+          m.is_finals_series,
           m.round_type,
           CASE
             WHEN m.result = 'draw' THEN 'D'
@@ -238,7 +241,7 @@ export async function recomputePlayerDerivedStats(
       SELECT
           c.player_id,
           count(*) AS games,
-          count(*) FILTER (WHERE c.is_final) AS finals,
+          count(*) FILTER (WHERE c.is_finals_series) AS finals,
           count(*) FILTER (WHERE c.round_type = 'grand_final' AND c.outcome = 'W') AS premierships,
           count(*) FILTER (WHERE c.outcome = 'W') AS wins,
           count(*) FILTER (WHERE c.outcome = 'D') AS draws,
@@ -494,12 +497,15 @@ export async function recomputeClubSeasons(tx: Tx, season: number): Promise<void
           AND season = ${season}
     ) gf ON gf.season = k.season AND gf.club_id = k.club_id
     LEFT JOIN (
+        -- is_finals_series, not is_final: a Wildcard Final is not a
+        -- finals-series appearance, and this column answers
+        -- "made finals"/"missed finals" (nl/club-season.ts). ISSUE-129 §8.4.
         SELECT season, club_id, count(*) AS finals FROM (
             SELECT season, home_club_id AS club_id FROM matches
-             WHERE is_final AND season = ${season}
+             WHERE is_finals_series AND season = ${season}
             UNION ALL
             SELECT season, away_club_id FROM matches
-             WHERE is_final AND season = ${season}
+             WHERE is_finals_series AND season = ${season}
         ) x GROUP BY season, club_id
     ) f ON f.season = k.season AND f.club_id = k.club_id
   `;

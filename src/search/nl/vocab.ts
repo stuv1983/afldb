@@ -568,6 +568,13 @@ export const MATCH_TYPE_WORDS: [RegExp, string][] = [
   // read by year only), so there is nothing else this word could mean
   // here to collide with.
   [/\bseptember\b/, 'finals'],
+  // Before the bare "finals?" entry below, for the same reason grand and
+  // preliminary finals are: "wildcard final" contains the word "final", so the
+  // narrower rule has to be tried first or it is silently read as a generic
+  // finals question. A Wildcard Final is NOT part of the finals series
+  // (AFLDB-ISSUE-129 §8.4), so this is a distinct match type, not a synonym.
+  [/\bwildcard finals?\b/, 'wildcard_final'],
+  [/\bwildcard round\b/, 'wildcard_final'],
   [/\bpreliminary finals?\b/, 'preliminary_final'],
   [/\bsemi finals?\b/, 'semi_final'],
   [/\bqualifying finals?\b/, 'qualifying_final'],

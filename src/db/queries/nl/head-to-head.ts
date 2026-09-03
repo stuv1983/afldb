@@ -8,7 +8,9 @@ type SqlFragment = ReturnType<typeof sql>;
 
 function matchTypeSql(matchType: NlMatchType | undefined): SqlFragment {
   if (!matchType) return sql`TRUE`;
-  if (matchType === 'finals') return sql`m.is_final`;
+  // 'finals' means the finals series, so is_finals_series, not is_final: a
+  // wildcard final is is_final = true but is not a finals appearance (ISSUE-129 §8.4).
+  if (matchType === 'finals') return sql`m.is_finals_series`;
   return sql`m.round_type = ${matchType}::round_type`;
 }
 

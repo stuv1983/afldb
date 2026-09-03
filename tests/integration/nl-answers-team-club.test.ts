@@ -7,13 +7,15 @@
  */
 import './guard';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
+import { getClubSeasons } from '@/db/queries/clubs';
 import { answerClubSeason } from '@/db/queries/nl/club-season';
 import { answerTeamMatch } from '@/db/queries/nl/team-match';
 import { answerTeamStreak } from '@/db/queries/nl/team-streak';
 import { validatePlan, type NlQueryPlan } from '@/search/nl/plan';
+import { seedWildcardFinalSeason, type WildcardFixture } from './wildcard-final-fixture';
 import type {
   NlAnswerPayload, NlClubSeasonRow, NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '@/search/nl/answer-types';
@@ -456,5 +458,80 @@ describe('team_streak matches chronological truth', () => {
     expect(lead).not.toBeNull();
     expect(lead!.clubId).toBe(org.id);
     expect(lead!.streakLength).toBe(longest);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-129 §11 T8 — the core of the §8.4 decision at the club-season
+ * grain. A Wildcard Final is `is_final = true` and `is_finals_series = false`,
+ * so losing one is not "making the finals": the 9th-placed club that loses the
+ * Wildcard Round and goes home must read exactly like a club that missed the
+ * eight, and the club that wins it and then plays an Elimination Final must
+ * count that ONE final, not two.
+ */
+describe('AFLDB-ISSUE-129 wildcard finals semantics (club_season)', () => {
+  let fixture: WildcardFixture;
+
+  beforeAll(async () => {
+    fixture = await seedWildcardFinalSeason(2095);
+  });
+
+  afterAll(async () => {
+    await fixture?.cleanup();
+  });
+
+  it('a club that loses a Wildcard Final and plays no other final has finals_played = 0', async () => {
+    const [row] = await sql<{ finalsPlayed: number; played: number }[]>`
+      SELECT finals_played AS "finalsPlayed", played
+        FROM club_seasons
+       WHERE season = ${fixture.season} AND club_id = ${fixture.wildcardLoserClubId}
+    `;
+    expect(row.finalsPlayed).toBe(0);
+    // And the Wildcard Final contributed nothing to the home-and-away record.
+    expect(row.played).toBe(1);
+  });
+
+  it('that club answers "missed finals", and never "made finals"', async () => {
+    const seasonScope = { seasonMin: fixture.season, seasonMax: fixture.season };
+    const missed = await clubSeason({
+      clubSeasonConditions: [{ kind: 'missed_finals' }], scope: seasonScope,
+    }, 100);
+    const made = await clubSeason({
+      clubSeasonConditions: [{ kind: 'made_finals' }], scope: seasonScope,
+    }, 100);
+
+    expect(missed.rows.map((row) => row.clubId).sort()).toEqual(
+      [fixture.wildcardLoserClubId, fixture.homeAndAwayOnlyClubId].sort(),
+    );
+    expect(made.rows.map((row) => row.clubId).sort()).toEqual(
+      [fixture.wildcardWinnerClubId, fixture.eliminationLoserClubId].sort(),
+    );
+  });
+
+  it('shows 0 finals appearances on the club page for the wildcard loser', async () => {
+    const rows = await getClubSeasons(fixture.wildcardLoserClubId, 'era');
+    const row = rows.find((entry) => entry.season === fixture.season);
+    expect(row).toBeDefined();
+    expect(row!.finalsPlayed).toBe(0);
+  });
+
+  it('counts the wildcard winner\'s Elimination Final ONCE, not twice', async () => {
+    const [row] = await sql<{ finalsPlayed: number }[]>`
+      SELECT finals_played AS "finalsPlayed"
+        FROM club_seasons
+       WHERE season = ${fixture.season} AND club_id = ${fixture.wildcardWinnerClubId}
+    `;
+    expect(row.finalsPlayed).toBe(1);
+
+    // The club played two is_final matches; exactly one of them is the series.
+    const [counts] = await sql<{ isFinal: string; isSeries: string }[]>`
+      SELECT count(*) FILTER (WHERE is_final)         AS "isFinal",
+             count(*) FILTER (WHERE is_finals_series) AS "isSeries"
+        FROM matches
+       WHERE season = ${fixture.season}
+         AND ${fixture.wildcardWinnerClubId} IN (home_club_id, away_club_id)
+    `;
+    expect(Number(counts.isFinal)).toBe(2);
+    expect(Number(counts.isSeries)).toBe(1);
   });
 });

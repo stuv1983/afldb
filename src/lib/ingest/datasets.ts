@@ -404,12 +404,21 @@ const allAustralian: DatasetSpec = {
 
 // --- Dataset: Match results ---
 
+/**
+ * Round code -> canonical `round_type` for every round that is not home-and-away.
+ * The name is historical: membership means "not a home-and-away premiership-points
+ * round" (`matches.is_final`), not finals-series membership
+ * (`matches.is_finals_series`). `WF` — the AFL Wildcard Round — belongs here and is
+ * deliberately not collapsed into an existing finals type. See AFLDB-ISSUE-129 §8.4.
+ * Kept in step with `FINALS_CODES` in `tools/migration/import_fitzroy_core.py`.
+ */
 const FINALS_ROUND_TYPES: Record<string, string> = {
   EF: 'elimination_final',
   QF: 'qualifying_final',
   SF: 'semi_final',
   PF: 'preliminary_final',
   GF: 'grand_final',
+  WF: 'wildcard_final',
 };
 
 const matchResults: DatasetSpec = {
@@ -444,7 +453,7 @@ const matchResults: DatasetSpec = {
       if (roundNumber !== null) {
         return {
           verdict: 'error',
-          reasons: [`round_code "${roundCode}" is a finals code; round_number must be empty`],
+          reasons: [`round_code "${roundCode}" is a non-home-and-away round code; round_number must be empty`],
         };
       }
       roundType = finalsType;
@@ -453,7 +462,7 @@ const matchResults: DatasetSpec = {
     } else {
       return {
         verdict: 'error',
-        reasons: [`round_code "${roundCode}" is not a recognised finals code (EF/QF/SF/PF/GF) `
+        reasons: [`round_code "${roundCode}" is not a recognised round code (EF/QF/SF/PF/GF/WF) `
           + 'and round_number is empty'],
       };
     }

@@ -1,0 +1,56 @@
+-- =====================================================================
+-- AFLDB 084 — round_type gains 'wildcard_final'
+-- =====================================================================
+-- AFLDB-ISSUE-129, implementing the operator decision recorded verbatim in
+-- issues/open/AFLDB-ISSUE-129.md §8.4 (approved 2026-09-03).
+--
+-- WHY
+--
+-- AFL Tables publishes a Wildcard Final round from 2026 (28-Aug-2026
+-- Western Bulldogs v Collingwood and 29-Aug-2026 Melbourne v Carlton,
+-- results code 'WF', plus 92 player-match rows). round_type as declared in
+-- 003_matches.sql has six members and none of them can carry it:
+--
+--   * it is not any existing finals type, and the decision explicitly
+--     forbids collapsing it into one (§8.4 item 5);
+--   * it cannot be 'home_and_away' either, because it has no round number
+--     and matches_round_number_ck forbids that combination.
+--
+-- So a new enum member is unavoidable. AFLDB-ISSUE-128 made the resulting
+-- loss audible (the settle run reports SOURCE COMPLETENESS: INCOMPLETE);
+-- this migration is the first half of making the rows land.
+--
+-- WHY THIS FILE CONTAINS NOTHING ELSE
+--
+-- tools/db/migrate.ts:211-212 wraps EACH migration file in one
+-- sql.begin() transaction. PostgreSQL permits ALTER TYPE ... ADD VALUE
+-- inside a transaction block (12+), but the new label may NOT be USED in
+-- the transaction that adds it. Anything referencing 'wildcard_final' as a
+-- value therefore has to live in a later file, and it does: 085 carries
+-- the is_finals_series predicate and the re-documenting comments.
+--
+-- Do not add statements to this file.
+--
+-- POSITION IN THE ENUM
+--
+-- AFTER 'home_and_away' keeps the declaration order chronological, which
+-- is what the existing EF -> QF -> SF -> PF -> GF order already encodes: a
+-- Wildcard Final is played after the home-and-away season and before the
+-- finals series. Nothing currently sorts by round_type, so this is
+-- future-proofing rather than a fix.
+--
+-- WHAT THIS DOES NOT CHANGE
+--
+--   * matches_is_final_ck is deliberately untouched (§8.4 item 11), so a
+--     wildcard final carries is_final = true by construction. That is
+--     correct and free for every consumer that means "not a
+--     home-and-away premiership-points match": the ladder, premiership
+--     points, Brownlow polling and every home-and-away scoping filter.
+--   * 076_afltables_settle_projections.sql reuses this same type for its
+--     settle projection and repeats the is_final CHECK, so it inherits the
+--     new member automatically and needs no change.
+--   * AFLW is unaffected: 025_staging_aflw.sql stores round_type as text
+--     with its own CHECK and does not share this enum.
+-- =====================================================================
+
+ALTER TYPE round_type ADD VALUE IF NOT EXISTS 'wildcard_final' AFTER 'home_and_away';

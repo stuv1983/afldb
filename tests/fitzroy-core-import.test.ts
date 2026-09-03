@@ -1083,56 +1083,203 @@ function emitInSeason(
   return { run: emitted, bundlePath };
 }
 
-describe('AFLDB-ISSUE-128 — in-season source completeness is reported, not swallowed', () => {
-  it.runIf(canSpawn)('emits the representable match and drops nothing quietly', () => {
-    const emitted = emitInSeason(inSeason2026Snapshot());
+/**
+ * A round code neither grain recognises. AFLDB-ISSUE-129 taught the importer
+ * 'WF' / 'Wildcard Final', so the ISSUE-128 reporting guarantee needs a
+ * genuinely unrepresentable row to keep proving itself. This is that row, and
+ * it must stay unknown: never teach the importer 'XF'.
+ */
+const M_UNKNOWN_2026: FixtureMatch = {
+  ...M_WF_2026, game: '17048', date: '2026-08-30',
+  roundResults: 'XF', roundStats: 'XF',
+  home: 'Melbourne', away: 'Carlton',
+};
 
-    // Exit 0 on purpose: the rows AFLDB CAN represent must still reach the
-    // settle. The fail-closed decision is the settle CLI's
-    // --require-complete-source, taken after its transaction commits.
+/** The same in-season path carrying one row AFLDB genuinely cannot represent. */
+function inSeason2026UnrepresentableSnapshot(): { dir: string; manifest: string } {
+  const ps = (m: FixtureMatch, p: FixturePlayer) => psRow(m, p, {
+    Season: 2026, Round: m.roundStats, Attendance: m.att,
+  });
+  return buildSnapshot({
+    range: { from: 2026, to: 2026 },
+    results: [resultsRow(M_HA_2026, 2026), resultsRow(M_UNKNOWN_2026, 2026)],
+    playerStats: {
+      'player_stats_2026.csv': {
+        rows: [
+          ps(M_HA_2026, P_ESS), ps(M_HA_2026, P_PORT),
+          ps(M_UNKNOWN_2026, WF_PLAYER), ps(M_UNKNOWN_2026, P_COLL),
+        ],
+      },
+    },
+    mutateManifest: (manifest) => { manifest.acquisition_kind = 'in_season_partial'; },
+  });
+}
+
+describe('AFLDB-ISSUE-129 — the Wildcard Final round vocabulary', () => {
+  /**
+   * The round normalisers, exercised through the REAL importer module rather
+   * than a re-implementation. §8.4 item 6: exact deterministic mappings only,
+   * so the near-misses matter as much as the hits.
+   */
+  function normaliseRounds(cases: [string, 'results' | 'stats'][]): string[] {
+    const script = `
+import json, sys, pathlib
+sys.path.insert(0, "tools/migration"); sys.argv = ["x"]
+import import_fitzroy_core as ifc
+out = []
+for raw, grain in json.loads(${JSON.stringify(JSON.stringify(cases))}):
+    try:
+        if grain == "results":
+            code, rtype = ifc.normalise_results_round(raw, "t")
+            out.append(code + "|" + rtype)
+        else:
+            out.append(ifc.normalise_stats_round(raw, "t"))
+    except Exception as exc:
+        out.append("REFUSED:" + type(exc).__name__)
+print(json.dumps(out))
+`;
+    const run = spawnSync(python, ['-c', script], { cwd: root, encoding: 'utf8' });
+    if (run.status !== 0) throw new Error(run.stderr || 'normaliser spawn failed');
+    return JSON.parse(run.stdout) as string[];
+  }
+
+  it.runIf(canSpawn)('maps both source vocabularies to wildcard_final, exactly', () => {
+    expect(normaliseRounds([
+      ['WF', 'results'],
+      ['Wildcard Final', 'stats'],
+      ['WF', 'stats'],
+    ])).toEqual(['WF|wildcard_final', 'WF', 'WF']);
+  });
+
+  it.runIf(canSpawn)('refuses every near miss rather than guessing', () => {
+    // No case-folding, no partial match, no regex, no fallback. Each of these
+    // would be a silent mis-import if the mapping were fuzzy.
+    expect(normaliseRounds([
+      ['wildcard final', 'stats'],
+      ['WILDCARD FINAL', 'stats'],
+      ['Wildcard', 'stats'],
+      ['Wildcard Finals', 'stats'],
+      ['Wildcard  Final', 'stats'],
+      ['wf', 'results'],
+      ['WFX', 'results'],
+      ['W', 'results'],
+      ['Wildcard Final', 'results'],
+    ])).toEqual(Array(9).fill('REFUSED:MatchIdentityError'));
+  });
+
+  it.runIf(canSpawn)('keeps the existing round vocabulary unchanged', () => {
+    expect(normaliseRounds([
+      ['R1', 'results'], ['R25', 'results'], ['EF', 'results'], ['GF', 'results'],
+      ['1', 'stats'], ['GF', 'stats'], ['ZZ', 'results'],
+    ])).toEqual([
+      '1|home_and_away', '25|home_and_away', 'EF|elimination_final',
+      'GF|grand_final', '1', 'GF', 'REFUSED:MatchIdentityError',
+    ]);
+  });
+
+  it.runIf(canSpawn)('treats a Wildcard Final as never polled for the Brownlow', () => {
+    // The gate is `round_code in FINALS_CODES`, which also protects the
+    // int(round_code) round-vote key from a ValueError on 'WF'.
+    const script = `
+import json, sys
+sys.path.insert(0, "tools/migration"); sys.argv = ["x"]
+import import_fitzroy_core as ifc
+print(json.dumps({"wf": ifc.FINALS_CODES.get("WF"),
+                  "aliases": ifc.STATS_ROUND_ALIASES}))
+`;
+    const run = spawnSync(python, ['-c', script], { cwd: root, encoding: 'utf8' });
+    expect(run.status, String(run.stderr)).toBe(0);
+    expect(JSON.parse(run.stdout)).toEqual({
+      wf: 'wildcard_final', aliases: { 'Wildcard Final': 'WF' },
+    });
+  });
+});
+
+describe('AFLDB-ISSUE-128/129 — in-season source completeness is reported, not swallowed', () => {
+  it.runIf(canSpawn)('now emits the Wildcard Final it used to drop', () => {
+    // AFLDB-ISSUE-128 pinned this fixture while the rows were UNREPRESENTABLE:
+    // 1 match emitted, 3 unkeyed rejections, both enumerations incomplete. Those
+    // assertions are inverted here, deliberately, because ISSUE-129 made the
+    // rows representable -- not deleted, so the fixture still carries the exact
+    // real 2026 vocabulary measured from the live source.
+    const emitted = emitInSeason(inSeason2026Snapshot());
     expect(emitted.run.status, String(emitted.run.stderr)).toBe(0);
 
     const bundle = JSON.parse(readFileSync(emitted.bundlePath, 'utf8'));
+    expect(bundle.counts.matches).toBe(2);
+    expect(bundle.counts.player_match_rows).toBe(4);
+    expect(bundle.counts.unkeyed_rejections).toBe(0);
 
-    // The home-and-away match survives end to end, from the same fixture that
-    // loses the Wildcard Final: this is not a snapshot-wide failure.
-    expect(bundle.counts.matches).toBe(1);
-    expect(bundle.counts.player_match_rows).toBe(2);
-    const survivor = bundle.records.find(
+    const matches = bundle.records.filter(
       (record: { family: string }) => record.family === 'afltables.match',
     );
-    expect(survivor.external_record_id).toBe('2026|25|2026-08-23|Essendon|Port Adelaide');
-    expect(survivor.rejection).toBeNull();
-    expect(survivor.projection).toMatchObject({
+    const ha = matches.find(
+      (r: { external_record_id: string }) => r.external_record_id.includes('|25|'),
+    );
+    expect(ha.rejection).toBeNull();
+    expect(ha.projection).toMatchObject({
       home_score: 95, away_score: 105, round_code: '25', round_type: 'home_and_away',
       is_final: false, season: 2026,
     });
 
-    // The Wildcard Final is nowhere in the records — that is the defect, and
-    // it is the reason the reporting below has to exist.
-    expect(JSON.stringify(bundle.records)).not.toContain('2026-08-28');
-
-    // 1 results row + 2 player_stats rows, each with NO provable identity.
-    expect(bundle.counts.unkeyed_rejections).toBe(3);
-    const reasons = bundle.unkeyed_rejections.map(
-      (row: { family: string; reason: string }) => row.family + '/' + row.reason,
+    // The row that used to vanish. Identity, round code and type are all the
+    // canonical ones; round_number stays NULL, which matches_round_number_ck
+    // requires for anything that is not home-and-away.
+    const wildcard = matches.find(
+      (r: { external_record_id: string }) => r.external_record_id.includes('|WF|'),
     );
-    expect(reasons.filter((r: string) => r === 'afltables.match/no_match_identity'))
-      .toHaveLength(1);
-    expect(reasons.filter(
-      (r: string) => r === 'afltables.player_match_stats/no_player_match_identity',
-    )).toHaveLength(2);
+    // The source says "Footscray"; the era-correct 2026 identity is Western
+    // Bulldogs, which the club resolver applies exactly as it does elsewhere.
+    expect(wildcard.external_record_id).toBe('2026|WF|2026-08-28|Western Bulldogs|Collingwood');
+    expect(wildcard.rejection).toBeNull();
+    expect(wildcard.projection).toMatchObject({
+      season: 2026, round_code: 'WF', round_type: 'wildcard_final',
+      round_number: null,
+      // Structural, per ISSUE-129 §8.4 item 2: not a home-and-away
+      // premiership-points match. It is NOT a finals-series appearance, which
+      // matches.is_finals_series answers instead.
+      is_final: true,
+      home_score: 96, away_score: 93,
+    });
 
-    // Neither scope may be absence-swept: a row whose presence cannot be
-    // represented must never be concluded to have disappeared.
+    // The 2026-08-28 date is now present rather than absent -- the exact
+    // inversion of the ISSUE-128 assertion.
+    expect(JSON.stringify(bundle.records)).toContain('2026-08-28');
+
+    // Player grain: both grains agreed on the round, so neither row was
+    // rejected on a round mismatch against results.csv.
+    const wfPlayers = bundle.records.filter(
+      (r: { family: string; projection?: { round_code?: string } }) =>
+        r.family === 'afltables.player_match_stats' && r.projection?.round_code === 'WF',
+    );
+    expect(wfPlayers).toHaveLength(2);
+    for (const row of wfPlayers) {
+      expect(row.rejection).toBeNull();
+      expect(row.projection).toMatchObject({
+        season: 2026, round_code: 'WF', round_number: null, is_final: true,
+      });
+      // Never polled: no brownlow_round_votes row is projected for a Wildcard
+      // Final, and NA stays NULL rather than becoming a zero.
+      expect(row.projection.brownlow_round_vote).toBeNull();
+      expect(row.projection.stats.brownlow_votes).toBeNull();
+    }
+
     for (const enumeration of bundle.enumerations) {
-      expect(enumeration.complete).toBe(false);
-      expect(enumeration.incomplete_reason).toMatch(/no provable identity/);
+      expect(enumeration.complete).toBe(true);
     }
   });
 
-  it.runIf(canSpawn)('states INCOMPLETE in the run output with the offending rows', () => {
-    const emitted = emitInSeason(inSeason2026Snapshot());
+  it.runIf(canSpawn)('reports COMPLETE for the Wildcard Final snapshot', () => {
+    const out = String(emitInSeason(inSeason2026Snapshot()).run.stdout);
+    expect(out).toContain('SOURCE COMPLETENESS: COMPLETE');
+    expect(out).not.toContain('INCOMPLETE');
+  });
+
+  it.runIf(canSpawn)('still states INCOMPLETE for a round it genuinely cannot represent', () => {
+    // ISSUE-128's guarantee, re-proved on a vocabulary AFLDB does not know. Teaching
+    // the importer one new round must not switch the reporting off for the next one.
+    const emitted = emitInSeason(inSeason2026UnrepresentableSnapshot());
+    expect(emitted.run.status, String(emitted.run.stderr)).toBe(0);
     const out = String(emitted.run.stdout);
 
     expect(out).toContain('SOURCE COMPLETENESS: INCOMPLETE');
@@ -1141,9 +1288,15 @@ describe('AFLDB-ISSUE-128 — in-season source completeness is reported, not swa
     expect(out).toContain('afltables.player_match_stats / no_player_match_identity: 2 row(s)');
     expect(out).toContain('is NOT sweepable');
     expect(out).toContain('Do NOT read this run as a complete import of the season');
-    // The cause is named honestly. A stale-cache diagnosis would have sent an
-    // operator to fitzRoy, which is not where the rows are being lost.
     expect(out).toContain('source outage');
+
+    const bundle = JSON.parse(readFileSync(emitted.bundlePath, 'utf8'));
+    expect(bundle.counts.matches).toBe(1);
+    expect(bundle.counts.unkeyed_rejections).toBe(3);
+    for (const enumeration of bundle.enumerations) {
+      expect(enumeration.complete).toBe(false);
+      expect(enumeration.incomplete_reason).toMatch(/no provable identity/);
+    }
   });
 
   it.runIf(canSpawn)('reports COMPLETE when every acquired row is represented', () => {
@@ -1186,18 +1339,18 @@ describe('AFLDB-ISSUE-128 — in-season source completeness is reported, not swa
     expect(readFileSync(second.bundlePath, 'utf8')).toBe(firstBundle);
   });
 
-  it('the historical rebuild path still ABORTS on the same vocabulary', () => {
+  it('the historical rebuild path still ABORTS on an unknown round code', () => {
     // --on-record-error reject is in-season only by design (ISSUE-099 F6). A
-    // clean rebuild must never drop a record it cannot interpret, and
-    // ISSUE-128 does not soften that: the full-history path still dies on the
-    // exact row the in-season path merely reports.
+    // clean rebuild must never drop a record it cannot interpret. 'WF' is no
+    // longer such a record (ISSUE-129), so this uses a code that still is.
     const wildcard = resultsRow(M1);
-    wildcard[2] = 'WF';
+    wildcard[2] = 'XF';
     const snapshot = buildSnapshot({ results: [wildcard, resultsRow(M2)] });
     const result = run(snapshot);
     expect(result.status).not.toBe(0);
     expect(String(result.stderr)).toContain('unrecognised results round code');
   });
+
 });
 
 describe('fitzRoy source row corrections', () => {
