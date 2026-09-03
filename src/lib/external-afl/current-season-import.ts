@@ -221,8 +221,25 @@ export function analyseCurrentSeasonCorroboration(
   };
 }
 
+/**
+ * AFLDB-ISSUE-128: there is NO default source here any more.
+ *
+ * This function used to read an empty argument as `kali`, which was the last
+ * place in the codebase still asserting that Kali is what a current-season
+ * refresh means when nobody says otherwise. Since AFLDB-ISSUE-122 the default
+ * current-season source is AFL Tables, and AFL Tables does not come through
+ * this function at all — it comes through the acquire/adjudicate/settle chain.
+ * Leaving the old default in place would have kept a deprecated fallback
+ * provider one omitted parameter away from looking like the primary one.
+ */
 export function parseCurrentSeasonSources(value: string): ExternalSource[] {
-  const sourceArg = value.trim() || 'kali';
+  const sourceArg = value.trim();
+  if (!sourceArg) {
+    throw new Error(
+      'Name a fallback source explicitly: squiggle, kali, or all. There is no default — '
+      + 'AFL Tables is the primary current-season source and is not refreshed through here.',
+    );
+  }
   const sources = sourceArg === 'all'
     ? ['squiggle', 'kali'] as ExternalSource[]
     : sourceArg.split(',').map((s) => s.trim()).filter(Boolean) as ExternalSource[];

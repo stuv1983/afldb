@@ -64,6 +64,15 @@ for 2026 and every future season should be.
 > `--insert-missing-matches` retains its existing refusal. The older implementation inventory
 > and defect evidence below are retained as architectural lineage and are superseded wherever
 > they describe a Squiggle/Kali canonical writer.
+>
+> **CURRENT STATE — AFLDB-ISSUE-128 (2026-09-03).** The admin surface's legacy
+> `mode=auto` is **removed**, not relabelled: it meant "Kali + apply", the shape of the
+> retired automatic writer, and a `mode=auto` post is now refused rather than
+> reinterpreted. `parseCurrentSeasonSources()` no longer defaults to `kali` — there is no
+> default fallback source at all. `/admin/current-season` states that AFL Tables via
+> fitzRoy is the primary and only automatic current-season source, and AFL Tables is
+> deliberately absent from the fallback source list because it is not acquired through this
+> code path.
 
 | Piece | File | Reality |
 |---|---|---|
@@ -73,7 +82,7 @@ for 2026 and every future season should be.
 | API clients | `src/lib/external-afl/current-matches.ts` | Squiggle `?q=teams` + `?q=games`; Kali `GET /matches?year=&limit=200` with `Authorization: Bearer` |
 | Orchestration | `src/lib/external-afl/current-season-import.ts` | fetch → resolve club → resolve local match → upsert staging → optional canonical update/insert, all inside one `sql.begin` |
 | CLI | `tools/current-season/update-current-season.ts` | `npm run current-season:update`, dry-run default, `--apply`, `--insert-missing-matches`, `--update-matches`, `--report` |
-| Admin | `src/app/admin/current-season/{page,actions}.tsx` | super-admin only, audited, `mode=auto` ⇒ Kali + apply + insert-missing |
+| Admin | `src/app/admin/current-season/{page,actions}.tsx` | super-admin only, audited. **Superseded by ISSUE-128:** `mode=auto` is gone; the only fallback modes are `manual` (explicit source, no canonical write) and `report` |
 | Debug contract | `.agents/skills/afldb-api-data-debug/SKILL.md` | pipeline-correctness skill; records a live 2026 dry-run whose aggregate and per-source counters contradict each other |
 
 **Data families covered today: matches only.** Player stats, lineups, rosters, ladder, awards,

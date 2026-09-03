@@ -2000,6 +2000,54 @@ def rejection_json(rejection) -> dict | None:
     return {"reason": rejection["reason"], "detail": rejection["detail"]}
 
 
+def render_source_completeness(bundle: dict) -> list[str]:
+    """AFLDB-ISSUE-128 — say plainly whether the source was fully represented.
+
+    The bundle already carried every fact needed to answer this: an enumeration
+    marked ``complete: false`` and a non-empty ``unkeyed_rejections`` list mean rows
+    the source supplied never entered the pipeline. What it did not do was SAY so.
+    On 2026-09-03 an in-season emission over the real 2026 snapshot printed
+    ``complete=False`` twice and ``unkeyed_rejections 94`` amid a wall of healthy
+    counters, returned 0, and the chain went on to report a successful nightly
+    import that was missing the entire Wildcard Final round.
+
+    This is a report, not a gate: the emission still returns 0 so the records that
+    ARE representable reach the settle. The fail-closed decision belongs to the
+    settle CLI's ``--require-complete-source``, which makes it after the
+    transaction has committed and so costs no data.
+    """
+    unkeyed = bundle.get("unkeyed_rejections") or []
+    incomplete = [e for e in bundle.get("enumerations") or [] if not e.get("complete")]
+    if not unkeyed and not incomplete:
+        return ["", "  SOURCE COMPLETENESS: COMPLETE — every acquired row was represented."]
+
+    by_reason: dict[tuple, list[dict]] = {}
+    for rejection in unkeyed:
+        by_reason.setdefault(
+            (rejection.get("family"), rejection.get("reason")), []).append(rejection)
+
+    lines = [
+        "",
+        "  SOURCE COMPLETENESS: INCOMPLETE",
+        f"    {len(unkeyed)} acquired row(s) had no identity AFLDB could represent, so they",
+        "    are absent from the enumeration and can never reach canonical data.",
+    ]
+    for (family, reason), rows in sorted(by_reason.items(), key=lambda kv: str(kv[0])):
+        samples = ", ".join(str(r.get("detail")) for r in rows[:3])
+        more = "" if len(rows) <= 3 else f", +{len(rows) - 3} more"
+        lines.append(f"    {family} / {reason}: {len(rows)} row(s) — {samples}{more}")
+    for enumeration in incomplete:
+        lines.append(
+            f"    enumeration {enumeration.get('family')} "
+            f"'{enumeration.get('scope_key')}' is NOT sweepable: "
+            f"{enumeration.get('incomplete_reason')}")
+    lines.append(
+        "    This is a source vocabulary or identity AFLDB does not model yet, not a")
+    lines.append(
+        "    source outage. Do NOT read this run as a complete import of the season.")
+    return lines
+
+
 def enumeration_of(family: str, scope_key: str, record_ids: list[str],
                    unkeyed: list[dict]) -> dict:
     """One presence enumeration.
@@ -2927,6 +2975,8 @@ def main() -> int:
             print(f"  {enumeration['family']:<28} "
                   f"{len(enumeration['external_record_ids'])} record(s), "
                   f"complete={enumeration['complete']}")
+        for line in render_source_completeness(bundle):
+            print(line)
         votes = bundle["measurements"]["brownlow_votes"]
         print("  Brownlow.Votes (offline measurement, AFLDB-ISSUE-099 F11)")
         for k, v in votes.items():

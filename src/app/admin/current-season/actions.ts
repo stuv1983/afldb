@@ -46,7 +46,7 @@ export async function runCurrentSeasonAdminAction(
   formData: FormData,
 ): Promise<CurrentSeasonAdminState> {
   const admin = await requireSuperAdmin();
-  const mode = String(formData.get('mode') ?? 'auto');
+  const mode = String(formData.get('mode') ?? 'report');
 
   try {
     const year = parseYear(formData);
@@ -59,10 +59,22 @@ export async function runCurrentSeasonAdminAction(
       };
     }
 
-    const sources = mode === 'auto'
-      ? ['kali'] as const
-      : parseCurrentSeasonSources(String(formData.get('source') ?? 'kali'));
-    const apply = mode === 'auto' || formData.get('apply') === 'on';
+    // AFLDB-ISSUE-128. The legacy `auto` mode is GONE. It meant "refresh Kali
+    // and persist", which is the shape of the pre-ISSUE-122 automatic writer
+    // and was the last thing on this page still calling a deprecated fallback
+    // provider "automatic". Automatic current-season ingestion is the AFL
+    // Tables settle chain and nothing else; a `mode=auto` post is now refused
+    // rather than quietly reinterpreted, so an old bookmark or a stale client
+    // cannot resurrect the behaviour by name.
+    if (mode !== 'manual') {
+      throw new Error(
+        `Unknown current-season fallback mode '${mode}'. Automatic current-season ingestion `
+        + 'is the AFL Tables settle chain, not a Squiggle/Kali refresh; the only fallback '
+        + 'modes here are manual diagnostics and report.',
+      );
+    }
+    const sources = parseCurrentSeasonSources(String(formData.get('source') ?? ''));
+    const apply = formData.get('apply') === 'on';
     const insertMissingMatches = false;
 
     const result = await runCurrentSeasonRefresh({
@@ -101,8 +113,8 @@ export async function runCurrentSeasonAdminAction(
 
     return {
       message: result.applied
-        ? `Refreshed ${year} fallback evidence: staged ${result.observationsStaged} observations and resolved ${result.canonicalMatchesResolved} local matches for diagnostics. Canonical current-season rows were not changed.`
-        : `Dry run for ${year}: fetched ${result.observationsFetched} observations; nothing was written.`,
+        ? `Refreshed ${year} fallback evidence from ${sources.join(', ')}: staged ${result.observationsStaged} observations and resolved ${result.canonicalMatchesResolved} local matches for diagnostics. Canonical current-season rows were not changed; only the AFL Tables settle chain writes those.`
+        : `Dry run for ${year} over ${sources.join(', ')}: fetched ${result.observationsFetched} observations; nothing was written.`,
       result,
       report,
     };

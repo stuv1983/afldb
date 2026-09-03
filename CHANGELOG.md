@@ -15,6 +15,65 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-128 — a current-season settle can no longer report success while dropping rows AFL Tables supplied - 3 September 2026
+
+- **The defect, measured rather than inferred.** A real in-season chain run against the live
+  source acquired **209** matches and **9,614** player-match rows from AFL Tables, emitted an
+  observation bundle carrying **207** and **9,522** with **94** unkeyed rejections and both
+  presence enumerations marked `complete: false` — and **exited 0**. The settle counted the same
+  facts and exited 0, the systemd unit went green, and the admin surface projected none of it.
+  Those are the same figures the production `AFLDB-ISSUE-122` run recorded on snapshot
+  `settle-2026-09-02-1958`, so production dropped the entire 2026 Wildcard Round and reported a
+  clean pass. Every stage behaved correctly and fail-closed; not one of them was audible.
+- **`import_fitzroy_core.py` now states a completeness verdict.** The emission prints a
+  `SOURCE COMPLETENESS` block naming the family, the reason, the row count and the offending
+  source lines. It still exits 0, deliberately: the records AFLDB *can* represent must still
+  reach the settle.
+- **`settle-afltables.ts --require-complete-source` makes an incomplete source a failed run.**
+  The verdict is evaluated **after** the settle transaction has committed, so every representable
+  record still lands and a rerun is still idempotent — all the exit code costs the run is its
+  claim to have imported the season. `deploy/afldb-settle-afltables.sh` passes the flag, so the
+  nightly unit reports `failed` rather than success when rows were dropped.
+- **The verdict is built from the source's own evidence, never from a calendar.** It reads the
+  unrepresentable-row, unprojected-record and unswept-scope counters the settle already writes.
+  A bye, the gap before finals and the whole off-season acquire nothing, produce zero
+  unrepresentable rows and read `complete`, so a red state always means a real coverage gap. A run
+  that recorded no counters reads `unknown`, never `complete`.
+- **`/admin/current-season` shows the verdict above the run counters**, and the settle result now
+  projects the five snapshot coverage counters (`snapshotMatches`, `snapshotPlayerMatchRows`,
+  `snapshotRejections`, `snapshotUnkeyedRejections`, `absenceSweepSkipped`). The verdict is derived
+  on read, so a batch row written before this change still gets a reading.
+- **The legacy Kali "auto" path is removed, not relabelled.** `mode=auto` — which meant
+  "Kali + apply", the retired automatic writer's exact shape — is gone, and an unknown mode is now
+  **refused** rather than reinterpreted, so a stale client cannot resurrect it by name.
+  `parseCurrentSeasonSources()` no longer defaults to `kali`; there is no default fallback source
+  at all. The fallback control is manual-only, requires an explicit source, marks both providers
+  deprecated, and defaults to Squiggle.
+- **Provider precedence is stated where an operator reads it.** `/admin/current-season` says that
+  AFL Tables via fitzRoy is the primary and only automatic current-season source and the only one
+  with canonical-write authority, and says explicitly why AFL Tables is absent from the fallback
+  source list — acquiring it there would be a second ingestion implementation inside Next.js.
+- **The reported stale-`fitzRoy_data`-cache theory was false and nothing was changed for it.**
+  `fetch_results_afltables()` reads `afltables.com/afl/stats/biglists/bg3.txt` live with no cache
+  in the path; the player-stats cache was current through 2026-08-29. `No new data found!
+  Returning cached data` means the cache is up to date, not stale.
+- **No behaviour was weakened.** Squiggle and Kali gained nothing: still deprecated, still
+  non-writing, still never invoked automatically, and the fallback action still hardcodes
+  `insertMissingMatches = false`. Existing final scores are untouched, the historical rebuild path
+  still aborts on a record it cannot interpret, and no schema, migration, privilege, settle-library
+  or canonical-apply code changed.
+
+### AFLDB-ISSUE-129 — raised: AFL Tables' Wildcard Final has no canonical representation - 3 September 2026
+
+- **Raised, not fixed.** Two completed 2026 matches (28-Aug Western Bulldogs v Collingwood,
+  29-Aug Melbourne v Carlton) and their 92 player-match rows are acquired correctly and cannot be
+  stored: `matches.round_type` is a PostgreSQL enum with six members and no wildcard, and a
+  wildcard final cannot be modelled as home-and-away because it has no round number. Storing it
+  needs a new enum value **and** an AFLDB-wide decision on whether it counts as a finals
+  appearance — `is_final` is derived from `round_type` by CHECK, so the choice propagates through
+  finals counts, search filters, NL answers, Grid Solver criteria and career aggregates. No
+  migration number is claimed and no code was written; the decision blocks all implementation.
+
 ### AFLDB-ISSUE-127 — a Super Admin can trigger the AFL Tables current-season refresh on demand - 3 September 2026
 
 - **`/admin/current-season` gains a Super Admin-only "Fetch current AFL data now" control.** It

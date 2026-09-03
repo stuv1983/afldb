@@ -207,20 +207,14 @@ export function CurrentSeasonControls({
   return (
     <>
       <section className="section">
-        <form action={action} style={{ display: 'grid', gap: '0.75rem', maxWidth: '34rem' }}>
-          <input type="hidden" name="mode" value="auto" />
-          <label>
-            Season
-            <input name="year" type="number" min="2000" max="2100" defaultValue={year} required />
-          </label>
-          <button className="btn" type="submit" disabled={pending}>
-            {pending ? 'Refreshing...' : 'Refresh Kali fallback staging'}
-          </button>
-        </form>
-      </section>
-
-      <section className="section">
-        <h2>Fallback investigation controls</h2>
+        <h3>Manual fallback acquisition</h3>
+        <p className="muted">
+          There is deliberately no automatic option here. Since AFLDB-ISSUE-122 the only
+          automatic current-season path is the AFL Tables settle chain above; a Squiggle or
+          Kali refresh is a diagnostic a human asks for, names a source for, and reads. It
+          stages observations and history only — it can resolve local matches for
+          comparison, and it can never insert or update a canonical match or a final score.
+        </p>
         <form action={action} style={{ display: 'grid', gap: '0.75rem', maxWidth: '34rem' }}>
           <input type="hidden" name="mode" value="manual" />
           <label>
@@ -228,18 +222,18 @@ export function CurrentSeasonControls({
             <input name="year" type="number" min="2000" max="2100" defaultValue={year} required />
           </label>
           <label>
-            Source
-            <select name="source" defaultValue="kali">
-              <option value="kali">Kali AFL Stats</option>
-              <option value="squiggle">Squiggle</option>
-              <option value="all">Both sources</option>
+            Source (deprecated fallback providers only)
+            <select name="source" defaultValue="squiggle" required>
+              <option value="squiggle">Squiggle — deprecated fallback</option>
+              <option value="kali">Kali AFL Stats — deprecated fallback</option>
+              <option value="all">Both deprecated fallback sources</option>
             </select>
           </label>
           <label>
             <input name="apply" type="checkbox" /> Persist staging and observation rows
           </label>
           <button className="btn btn-secondary" type="submit" disabled={pending}>
-            {pending ? 'Running...' : 'Run staging refresh'}
+            {pending ? 'Running...' : 'Run fallback staging refresh'}
           </button>
         </form>
       </section>

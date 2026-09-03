@@ -983,6 +983,223 @@ describe.skipIf(!canSpawn)('in-season completeness gates (AFLDB-ISSUE-099)', () 
  * pairs = 4 rows where AFL Tables has 2. The correction drops the two rows that
  * correspond to no real appearance; the two genuine rows are already correct.
  */
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-128 — an in-season run may not report success while it
+ * silently drops rows AFL Tables supplied.
+ * ------------------------------------------------------------------ */
+
+/**
+ * The fixture is the REAL 2026 Wildcard Final vocabulary, measured from the
+ * live source on 2026-09-03, not an invented sentinel:
+ *
+ *   results.csv        Round = 'WF', Round.Type = 'Regular', Round.Number = ''
+ *   player_stats.csv   Round = 'Wildcard Final'
+ *
+ * `fetch_results_afltables()` reads afltables.com/afl/stats/biglists/bg3.txt
+ * live and returned both 28/29-Aug-2026 Wildcard Finals; `Round.Number` is
+ * blank because fitzRoy's own `round_levels` factor has no `WF` level, and
+ * `Round.Type` says `Regular` for the same reason. Neither vocabulary is in
+ * `FINALS_CODES`, so both rows lose their identity here.
+ *
+ * What this suite pins is NOT that AFLDB imports them — it cannot, because
+ * `matches.round_type` is an enum with no wildcard member (`AFLDB-ISSUE-129`
+ * owns that decision). It is that the run SAYS SO. The measured behaviour
+ * before this change was 209 acquired matches, 207 emitted, 94 unkeyed
+ * rejections, exit 0, and a nightly job reporting success.
+ */
+const M_HA_2026: FixtureMatch = {
+  game: '17043', date: '2026-08-23', roundResults: 'R25', roundStats: '25',
+  roundType: 'Regular', roundNumber: '25', time: '1220', venue: 'Docklands',
+  att: '29200', home: 'Essendon', away: 'Port Adelaide',
+  hg: 14, hb: 11, hp: 95, ag: 16, ab: 9, ap: 105, margin: -10,
+  hq: [[2, 5, 17], [5, 8, 38], [9, 9, 63], [14, 11, 95]],
+  aq: [[3, 3, 21], [8, 6, 54], [9, 8, 62], [16, 9, 105]],
+};
+
+/** 28-Aug-2026 Wildcard Final, exactly as AFL Tables publishes it. */
+const M_WF_2026: FixtureMatch = {
+  game: '17046', date: '2026-08-28', roundResults: 'WF', roundStats: 'Wildcard Final',
+  // fitzRoy cannot rank a round code its factor has no level for, so the
+  // acquired row genuinely carries an empty Round.Number and 'Regular'.
+  roundType: 'Regular', roundNumber: '', time: '1940', venue: 'M.C.G.',
+  att: '61000', home: 'Footscray', away: 'Collingwood',
+  hg: 14, hb: 12, hp: 96, ag: 14, ab: 9, ap: 93, margin: 3,
+  hq: [[3, 4, 22], [7, 7, 49], [11, 9, 75], [14, 12, 96]],
+  aq: [[4, 2, 26], [8, 4, 52], [11, 7, 73], [14, 9, 93]],
+};
+
+/** Rostered to the fixture's own clubs: the match join is by Playing.for. */
+const P_ESS: FixturePlayer = {
+  id: '201', first: 'Zach', sur: 'Merrett',
+  url: 'https://afltables.com/afl/stats/players/Z/Zach_Merrett.html',
+  dob: '', votes: '3', playingFor: 'Essendon', career: '260', jumper: '7',
+};
+const P_PORT: FixturePlayer = {
+  id: '202', first: 'Connor', sur: 'Rozee',
+  url: 'https://afltables.com/afl/stats/players/C/Connor_Rozee.html',
+  dob: '', votes: '2', playingFor: 'Port Adelaide', career: '140', jumper: '8',
+};
+const P_COLL: FixturePlayer = {
+  id: '203', first: 'Nick', sur: 'Daicos',
+  url: 'https://afltables.com/afl/stats/players/N/Nick_Daicos.html',
+  dob: '', votes: '', playingFor: 'Collingwood', career: '90', jumper: '35',
+};
+
+const WF_PLAYER: FixturePlayer = {
+  id: '105', first: 'Adam', sur: 'Treloar',
+  url: 'https://afltables.com/afl/stats/players/A/Adam_Treloar.html',
+  dob: '', votes: '', playingFor: 'Footscray', career: '240', jumper: '2',
+};
+
+function inSeason2026Snapshot(): { dir: string; manifest: string } {
+  const ps = (m: FixtureMatch, p: FixturePlayer) => psRow(m, p, {
+    Season: 2026, Round: m.roundStats, Attendance: m.att,
+  });
+  return buildSnapshot({
+    range: { from: 2026, to: 2026 },
+    results: [resultsRow(M_HA_2026, 2026), resultsRow(M_WF_2026, 2026)],
+    playerStats: {
+      'player_stats_2026.csv': {
+        rows: [
+          ps(M_HA_2026, P_ESS), ps(M_HA_2026, P_PORT),
+          ps(M_WF_2026, WF_PLAYER), ps(M_WF_2026, P_COLL),
+        ],
+      },
+    },
+    // The in-season adjudicator refuses anything that is not an
+    // in_season_partial, so the fixture must declare what it really is.
+    mutateManifest: (manifest) => { manifest.acquisition_kind = 'in_season_partial'; },
+  });
+}
+
+function emitInSeason(
+  snapshot: { dir: string; manifest: string },
+): { run: ReturnType<typeof spawnSync>; bundlePath: string } {
+  const bundlePath = join(snapshot.dir, 'observations.json');
+  const emitted = spawnSync(python, [importerPath,
+    '--label', LABEL, '--snapshot-dir', snapshot.dir, '--manifest', snapshot.manifest,
+    '--require-in-season', '--on-record-error', 'reject',
+    '--emit-observations', bundlePath], { cwd: root, encoding: 'utf8' });
+  return { run: emitted, bundlePath };
+}
+
+describe('AFLDB-ISSUE-128 — in-season source completeness is reported, not swallowed', () => {
+  it.runIf(canSpawn)('emits the representable match and drops nothing quietly', () => {
+    const emitted = emitInSeason(inSeason2026Snapshot());
+
+    // Exit 0 on purpose: the rows AFLDB CAN represent must still reach the
+    // settle. The fail-closed decision is the settle CLI's
+    // --require-complete-source, taken after its transaction commits.
+    expect(emitted.run.status, String(emitted.run.stderr)).toBe(0);
+
+    const bundle = JSON.parse(readFileSync(emitted.bundlePath, 'utf8'));
+
+    // The home-and-away match survives end to end, from the same fixture that
+    // loses the Wildcard Final: this is not a snapshot-wide failure.
+    expect(bundle.counts.matches).toBe(1);
+    expect(bundle.counts.player_match_rows).toBe(2);
+    const survivor = bundle.records.find(
+      (record: { family: string }) => record.family === 'afltables.match',
+    );
+    expect(survivor.external_record_id).toBe('2026|25|2026-08-23|Essendon|Port Adelaide');
+    expect(survivor.rejection).toBeNull();
+    expect(survivor.projection).toMatchObject({
+      home_score: 95, away_score: 105, round_code: '25', round_type: 'home_and_away',
+      is_final: false, season: 2026,
+    });
+
+    // The Wildcard Final is nowhere in the records — that is the defect, and
+    // it is the reason the reporting below has to exist.
+    expect(JSON.stringify(bundle.records)).not.toContain('2026-08-28');
+
+    // 1 results row + 2 player_stats rows, each with NO provable identity.
+    expect(bundle.counts.unkeyed_rejections).toBe(3);
+    const reasons = bundle.unkeyed_rejections.map(
+      (row: { family: string; reason: string }) => row.family + '/' + row.reason,
+    );
+    expect(reasons.filter((r: string) => r === 'afltables.match/no_match_identity'))
+      .toHaveLength(1);
+    expect(reasons.filter(
+      (r: string) => r === 'afltables.player_match_stats/no_player_match_identity',
+    )).toHaveLength(2);
+
+    // Neither scope may be absence-swept: a row whose presence cannot be
+    // represented must never be concluded to have disappeared.
+    for (const enumeration of bundle.enumerations) {
+      expect(enumeration.complete).toBe(false);
+      expect(enumeration.incomplete_reason).toMatch(/no provable identity/);
+    }
+  });
+
+  it.runIf(canSpawn)('states INCOMPLETE in the run output with the offending rows', () => {
+    const emitted = emitInSeason(inSeason2026Snapshot());
+    const out = String(emitted.run.stdout);
+
+    expect(out).toContain('SOURCE COMPLETENESS: INCOMPLETE');
+    expect(out).toContain('3 acquired row(s) had no identity AFLDB could represent');
+    expect(out).toContain('afltables.match / no_match_identity: 1 row(s)');
+    expect(out).toContain('afltables.player_match_stats / no_player_match_identity: 2 row(s)');
+    expect(out).toContain('is NOT sweepable');
+    expect(out).toContain('Do NOT read this run as a complete import of the season');
+    // The cause is named honestly. A stale-cache diagnosis would have sent an
+    // operator to fitzRoy, which is not where the rows are being lost.
+    expect(out).toContain('source outage');
+  });
+
+  it.runIf(canSpawn)('reports COMPLETE when every acquired row is represented', () => {
+    // The same in-season path with the Wildcard Final removed. Proves the
+    // verdict is a measurement rather than a permanent warning, and that a bye
+    // or a quiet week reads as complete instead of raising an alarm nobody can
+    // act on.
+    const snapshot = buildSnapshot({
+      range: { from: 2026, to: 2026 },
+      results: [resultsRow(M_HA_2026, 2026)],
+      playerStats: {
+        'player_stats_2026.csv': {
+          rows: [
+            psRow(M_HA_2026, P_ESS, { Season: 2026, Round: '25', Attendance: M_HA_2026.att }),
+            psRow(M_HA_2026, P_PORT, { Season: 2026, Round: '25', Attendance: M_HA_2026.att }),
+          ],
+        },
+      },
+      mutateManifest: (manifest) => { manifest.acquisition_kind = 'in_season_partial'; },
+    });
+    const emitted = emitInSeason(snapshot);
+
+    expect(emitted.run.status, String(emitted.run.stderr)).toBe(0);
+    expect(String(emitted.run.stdout)).toContain('SOURCE COMPLETENESS: COMPLETE');
+    expect(String(emitted.run.stdout)).not.toContain('INCOMPLETE');
+
+    const bundle = JSON.parse(readFileSync(emitted.bundlePath, 'utf8'));
+    expect(bundle.counts.unkeyed_rejections).toBe(0);
+    for (const enumeration of bundle.enumerations) expect(enumeration.complete).toBe(true);
+  });
+
+  it.runIf(canSpawn)('is idempotent: the same input emits an identical bundle', () => {
+    // Re-emission over the same acquired rows must produce the same evidence,
+    // so a rerun cannot make the completeness verdict drift.
+    const snapshot = inSeason2026Snapshot();
+    const first = emitInSeason(snapshot);
+    const firstBundle = readFileSync(first.bundlePath, 'utf8');
+    const second = emitInSeason(snapshot);
+    expect(second.run.status).toBe(0);
+    expect(readFileSync(second.bundlePath, 'utf8')).toBe(firstBundle);
+  });
+
+  it('the historical rebuild path still ABORTS on the same vocabulary', () => {
+    // --on-record-error reject is in-season only by design (ISSUE-099 F6). A
+    // clean rebuild must never drop a record it cannot interpret, and
+    // ISSUE-128 does not soften that: the full-history path still dies on the
+    // exact row the in-season path merely reports.
+    const wildcard = resultsRow(M1);
+    wildcard[2] = 'WF';
+    const snapshot = buildSnapshot({ results: [wildcard, resultsRow(M2)] });
+    const result = run(snapshot);
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('unrecognised results round code');
+  });
+});
+
 describe('fitzRoy source row corrections', () => {
   const contract = JSON.parse(readFileSync(
     join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));

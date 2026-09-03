@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 /**
  * AFLDB-ISSUE-127 — DB-free Server Action and boundary tests for the Super
  * Admin on-demand AFL Tables refresh.
@@ -391,6 +394,11 @@ describe('settle batch projection', () => {
 
   it('projects only the whitelisted counters and sums unresolved identity', () => {
     const counters = extractSettleCounters({
+      snapshotMatches: 207,
+      snapshotPlayerMatchRows: 9522,
+      snapshotRejections: 0,
+      snapshotUnkeyedRejections: 94,
+      absenceSweepSkipped: 2,
       canonicalRowsInserted: 10582,
       canonicalRowsUpdated: 3,
       canonicalApplicationsLogged: 9133,
@@ -408,6 +416,14 @@ describe('settle batch projection', () => {
     });
 
     expect(counters).toEqual({
+      // AFLDB-ISSUE-128 added the snapshot coverage counters to the whitelist.
+      // They were already in `validation_result`; only this projection was
+      // missing, which is why 94 dropped source rows never reached an operator.
+      snapshotMatches: 207,
+      snapshotPlayerMatchRows: 9522,
+      snapshotRejections: 0,
+      snapshotUnkeyedRejections: 94,
+      absenceSweepSkipped: 2,
       canonicalRowsInserted: 10582,
       canonicalRowsUpdated: 3,
       canonicalApplicationsLogged: 9133,
@@ -467,5 +483,77 @@ describe('unchanged contracts', () => {
 
     expect(vi.mocked(runCurrentSeasonRefresh).mock.calls[0][0])
       .toMatchObject({ insertMissingMatches: false });
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-128 — the admin surface must not present a dropped-rows
+ * run as a clean one, and must name the real provider precedence.
+ * ------------------------------------------------------------------ */
+
+describe('AFLDB-ISSUE-128 — provider precedence and completeness on the admin surface', () => {
+  const readSource = (relative: string) =>
+    readFileSync(resolve(process.cwd(), relative), 'utf8');
+  const page = readSource('src/app/admin/current-season/page.tsx');
+  const controls = readSource('src/app/admin/current-season/CurrentSeasonControls.tsx');
+  const panel = readSource('src/app/admin/current-season/SettleRunPanel.tsx');
+  const actions = readSource('src/app/admin/current-season/actions.ts');
+  const query = readSource('src/db/queries/settle-runs.ts');
+
+  it('carries the completeness verdict beside the run, derived not stored', () => {
+    // Derived on read, so a batch row written before ISSUE-128 existed still
+    // gets today's reading rather than none at all.
+    expect(query).toContain('assessSourceCompleteness(counters)');
+    expect(query).toContain('sourceCompleteness: SourceCompletenessVerdict');
+  });
+
+  it('projects the snapshot coverage counters an operator needs to see', () => {
+    for (const counter of [
+      'snapshotMatches', 'snapshotPlayerMatchRows', 'snapshotRejections',
+      'snapshotUnkeyedRejections', 'absenceSweepSkipped',
+    ]) {
+      expect(query).toContain(`${counter}: counterOf(raw, '${counter}')`);
+      expect(panel).toContain(`counters.${counter}`);
+    }
+  });
+
+  it('renders the verdict as a verdict, not as one more number in a table', () => {
+    expect(panel).toContain('run.sourceCompleteness');
+    expect(panel).toContain('Source INCOMPLETE');
+    expect(panel).toContain("role=\"alert\"");
+    expect(panel).toContain('Source completeness unknown');
+  });
+
+  it('names AFL Tables/fitzRoy as primary and Squiggle/Kali as deprecated fallback', () => {
+    expect(page).toContain('AFL Tables, acquired via fitzRoy, is the primary');
+    expect(page).toContain('only automatic');
+    expect(page).toContain('no canonical-write authority');
+    expect(page).toContain('Deprecated fallback diagnostics');
+    // The exact wording the observed defect displayed.
+    expect(page).not.toContain('Auto update uses Kali AFL Stats');
+  });
+
+  it('offers no automatic Squiggle/Kali path, by name or by shape', () => {
+    expect(controls).not.toContain('Auto update from API');
+    expect(controls).not.toContain('value="auto"');
+    expect(controls).toContain('value="manual"');
+    expect(actions).toContain("if (mode !== 'manual')");
+    expect(actions).not.toContain("['kali'] as const");
+  });
+
+  it('does not offer AFL Tables in the fallback source list', () => {
+    // Wiring fitzRoy into the Squiggle/Kali dispatcher would be a SECOND
+    // canonical ingestion implementation inside Next.js. The fitzRoy control
+    // is the settle panel, which starts the one approved chain.
+    expect(controls).not.toMatch(/value="(afltables|fitzroy|afl_tables)"/);
+    expect(page).toContain('AFL Tables itself is deliberately absent from the source list');
+  });
+
+  it('keeps the fallback providers non-writing', () => {
+    // Unchanged by ISSUE-128, and asserted here so a wording change cannot
+    // quietly travel with a behaviour change.
+    expect(actions).toContain('const insertMissingMatches = false;');
+    expect(actions).not.toMatch(/insertMissingMatches\s*[:=]\s*true/);
+    expect(actions).not.toMatch(/insertMissingMatches\s*[:=]\s*formData/);
   });
 });

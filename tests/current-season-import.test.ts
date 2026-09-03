@@ -5,6 +5,10 @@ import { resolve } from 'node:path';
 
 import { fetchKaliCurrentMatches, fetchSquiggleCurrentMatches } from '@/lib/external-afl/current-matches';
 import {
+  assessSourceCompleteness,
+  renderSourceCompleteness,
+} from '@/lib/acquisition/source-completeness';
+import {
   analyseCurrentSeasonCorroboration,
   parseCurrentSeasonSources,
   planCurrentSeasonCanonicalWork,
@@ -158,13 +162,46 @@ describe('current-season external source import contracts', () => {
   });
 
   it('keeps the admin path server-side and staging/diagnostic only', () => {
-    expect(adminAction).toContain("mode === 'auto'");
-    expect(adminAction).toContain("? ['kali'] as const");
+    // AFLDB-ISSUE-128 supersedes the old assertions here. The admin action
+    // used to carry `mode === 'auto'` mapping to `['kali'] as const` — the
+    // legacy automatic Kali writer's shape. There is no automatic mode on
+    // this surface any more: automatic current-season ingestion is the AFL
+    // Tables settle chain, and a `mode=auto` post is REFUSED rather than
+    // reinterpreted, so a stale client cannot resurrect it by name.
+    expect(adminAction).not.toContain("mode === 'auto'");
+    expect(adminAction).not.toContain("['kali'] as const");
+    expect(adminAction).toContain("if (mode !== 'manual')");
+    expect(adminAction).toContain('Unknown current-season fallback mode');
     expect(adminAction).not.toContain('updateMatches');
     expect(adminControls).not.toContain('updateMatches');
     expect(adminControls).not.toContain('Overwrite existing resolved final scores');
     expect(adminPage).toContain('deprecated fallback sources');
-    expect(adminPage).toContain('never insert or update');
+    expect(adminPage).toContain('no canonical-write authority');
+  });
+
+  it('names AFL Tables/fitzRoy as the primary current-season source in the admin UI', () => {
+    // AFLDB-ISSUE-128 Stage 4. The observed defect was a page that said
+    // "Auto update uses Kali AFL Stats". The page must now state provider
+    // precedence, and must not offer AFL Tables in the fallback source list —
+    // AFL Tables is not acquired through that code path, and adding it there
+    // would be a second ingestion implementation.
+    expect(adminPage).toContain('AFL Tables, acquired via fitzRoy, is the primary');
+    expect(adminPage).not.toContain('Auto update uses Kali');
+    expect(adminControls).not.toContain('Auto update from API');
+    expect(adminControls).not.toContain('Refresh Kali fallback staging');
+    expect(adminControls).toContain('There is deliberately no automatic option here');
+    for (const value of ['"squiggle"', '"kali"', '"all"']) {
+      expect(adminControls).toContain(`<option value=${value}`);
+    }
+    expect(adminControls).not.toContain('value="afltables"');
+    expect(adminControls).not.toContain('value="fitzroy"');
+  });
+
+  it('has no default fallback source: Kali is never what "unspecified" means', () => {
+    // The last place in the codebase asserting Kali as the default provider.
+    expect(() => parseCurrentSeasonSources('')).toThrow(/no default/);
+    expect(() => parseCurrentSeasonSources('   ')).toThrow(/AFL Tables is the primary/);
+    expect(parseCurrentSeasonSources('kali')).toEqual(['kali']);
   });
 
   it('adds provenance columns to matches in a forward-only migration', () => {
@@ -3876,15 +3913,25 @@ describe('AFLDB-ISSUE-122 S6 — the operational path contract', () => {
 
   describe('the CLI flag contract', () => {
     it('keeps the automatic path explicit: off unless --auto-apply is given', () => {
-      expect(parseSettleArgs(['--label', 'snap', '--dry-run']))
-        .toEqual({ label: 'snap', apply: false, autoApply: false, report: false });
+      expect(parseSettleArgs(['--label', 'snap', '--dry-run'])).toEqual({
+        label: 'snap', apply: false, autoApply: false, report: false,
+        requireCompleteSource: false,
+      });
       expect(parseSettleArgs(['--label', 'snap', '--apply']).autoApply).toBe(false);
-      expect(parseSettleArgs(['--label', 'snap', '--apply', '--auto-apply']))
-        .toEqual({ label: 'snap', apply: true, autoApply: true, report: false });
+      expect(parseSettleArgs(['--label', 'snap', '--apply', '--auto-apply'])).toEqual({
+        label: 'snap', apply: true, autoApply: true, report: false,
+        requireCompleteSource: false,
+      });
       // The preview: the whole automatic path, rolled back.
-      expect(parseSettleArgs(['--label', 'snap', '--dry-run', '--auto-apply']))
-        .toEqual({ label: 'snap', apply: false, autoApply: true, report: false });
+      expect(parseSettleArgs(['--label', 'snap', '--dry-run', '--auto-apply'])).toEqual({
+        label: 'snap', apply: false, autoApply: true, report: false,
+        requireCompleteSource: false,
+      });
       expect(parseSettleArgs(['--label', 'snap', '--report']).report).toBe(true);
+      // AFLDB-ISSUE-128: opt-in, and off unless asked for, exactly like --auto-apply.
+      expect(parseSettleArgs(
+        ['--label', 'snap', '--apply', '--auto-apply', '--require-complete-source'],
+      ).requireCompleteSource).toBe(true);
     });
 
     it('refuses what it cannot honour rather than guessing', () => {
@@ -4044,6 +4091,134 @@ describe('AFLDB-ISSUE-122 S6 — the operational path contract', () => {
         }],
       }).join('\n');
       expect(notLanded).toContain('match k: NOT canonical');
+    });
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-128 — the source-completeness verdict
+ * ------------------------------------------------------------------ */
+
+describe('AFLDB-ISSUE-128 — source completeness', () => {
+  /** The counter shape a healthy in-season run stamps. */
+  const clean = {
+    snapshotMatches: 207,
+    snapshotPlayerMatchRows: 9522,
+    snapshotRejections: 0,
+    snapshotUnkeyedRejections: 0,
+    absenceSweepSkipped: 0,
+  };
+
+  describe('the verdict', () => {
+    it('reads a fully represented snapshot as complete', () => {
+      const verdict = assessSourceCompleteness(clean);
+      expect(verdict.status).toBe('complete');
+      expect(verdict.reasons).toEqual([]);
+      expect(verdict.enumeratedRecords).toBe(9729);
+      expect(verdict.headline).toContain('Source complete');
+    });
+
+    it('reads an EMPTY scope as complete, not as an alarm', () => {
+      // The guard must be source evidence, never a calendar. Byes, the gap
+      // before finals and five months of off-season all acquire nothing, and
+      // a defence that cried wolf through all of them would be turned off.
+      const verdict = assessSourceCompleteness({
+        ...clean, snapshotMatches: 0, snapshotPlayerMatchRows: 0,
+      });
+      expect(verdict.status).toBe('complete');
+      expect(verdict.headline).toContain('supplied no rows');
+    });
+
+    it('reads the measured 2026-09-03 production shape as incomplete', () => {
+      // The real numbers: 209 matches and 9,614 player rows acquired live
+      // from AFL Tables, 207 and 9,522 emitted, 94 rows with no representable
+      // identity, both scopes unsweepable.
+      const verdict = assessSourceCompleteness({
+        ...clean, snapshotUnkeyedRejections: 94, absenceSweepSkipped: 2,
+      });
+      expect(verdict.status).toBe('incomplete');
+      expect(verdict.unrepresentableRows).toBe(94);
+      expect(verdict.scopesNotSwept).toBe(2);
+      expect(verdict.reasons.map((r) => r.code))
+        .toEqual(['unrepresentable_rows', 'scopes_not_swept']);
+      expect(verdict.headline).toContain('Source INCOMPLETE');
+      expect(verdict.headline).toContain('must not be read as a complete import');
+    });
+
+    it('treats an unprojected record as incomplete in its own right', () => {
+      const verdict = assessSourceCompleteness({ ...clean, snapshotRejections: 1 });
+      expect(verdict.status).toBe('incomplete');
+      expect(verdict.reasons.map((r) => r.code)).toEqual(['rejected_records']);
+    });
+
+    it('reports a run with no counters as unknown, never as complete', () => {
+      // A run that ended before its counter stamp proves nothing about the
+      // source. Saying "complete" there is exactly the false reassurance this
+      // module exists to remove.
+      for (const missing of [null, undefined]) {
+        const verdict = assessSourceCompleteness(missing);
+        expect(verdict.status).toBe('unknown');
+        expect(verdict.reasons.map((r) => r.code)).toEqual(['no_counters']);
+        expect(verdict.headline).toContain('UNKNOWN');
+      }
+    });
+
+    it('does not escalate a malformed counter into an alarm nobody can act on', () => {
+      const verdict = assessSourceCompleteness({
+        ...clean, snapshotUnkeyedRejections: Number.NaN, absenceSweepSkipped: -3,
+      });
+      expect(verdict.status).toBe('complete');
+      expect(verdict.unrepresentableRows).toBe(0);
+      expect(verdict.scopesNotSwept).toBe(0);
+    });
+
+    it('renders every reason it found, and says what to do only when incomplete', () => {
+      const bad = renderSourceCompleteness(assessSourceCompleteness({
+        ...clean, snapshotUnkeyedRejections: 94, absenceSweepSkipped: 2,
+      })).join('\n');
+      expect(bad).toContain('Source completeness: INCOMPLETE');
+      expect(bad).toContain('unrepresentable_rows');
+      expect(bad).toContain('scopes_not_swept');
+      expect(bad).toContain('not a source outage');
+
+      const good = renderSourceCompleteness(assessSourceCompleteness(clean)).join('\n');
+      expect(good).toContain('Source completeness: COMPLETE');
+      expect(good).not.toContain('Investigate');
+    });
+  });
+
+  describe('the settle CLI gate', () => {
+    const cli = readSource('tools/current-season/settle-afltables.ts');
+    const shell = readSource('deploy/afldb-settle-afltables.sh');
+
+    it('evaluates the verdict on every run, dry or applied', () => {
+      expect(cli).toContain('assessSourceCompleteness(result.counters)');
+      expect(cli).toContain('renderSourceCompleteness(sourceCompleteness)');
+    });
+
+    it('decides the exit code AFTER the run returns, so no data is lost', () => {
+      // The whole point: an incomplete source must cost the run its claim to
+      // success, never cost AFLDB the records it CAN represent. The gate is in
+      // main(), after runSettleCli() has returned and its transaction has
+      // committed, and it sets an exit code rather than throwing.
+      const main = cli.slice(cli.indexOf('async function main('));
+      expect(main).toContain('const outcome = await runSettleCli(');
+      expect(main).toContain('outcome.args.requireCompleteSource');
+      expect(main).toContain('process.exitCode = 1');
+      // Nothing in the gate may skip, roll back or re-run the settle.
+      expect(main).not.toMatch(/rollback|--force|skip/i);
+    });
+
+    it('fails an unknown verdict too: "not shown" is not "shown to be fine"', () => {
+      const main = cli.slice(cli.indexOf('async function main('));
+      expect(main).toContain("outcome.sourceCompleteness.status === 'complete'");
+    });
+
+    it('the scheduled unit asks for the gate', () => {
+      // Without this the nightly timer would keep reporting success for a
+      // pass that dropped rows, which is the defect ISSUE-128 owns.
+      expect(shell).toContain('--require-complete-source');
+      expect(shell).toContain('--apply --auto-apply --require-complete-source');
     });
   });
 });

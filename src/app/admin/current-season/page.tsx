@@ -45,15 +45,17 @@ export default async function CurrentSeasonPage() {
       <div className="page-header">
         <h1>Current season</h1>
         <p className="subtitle">
-          AFL Tables is the canonical automatic authority. Squiggle and Kali remain here as
-          deprecated fallback diagnostics only.
+          <strong>AFL Tables, acquired via fitzRoy, is the primary and only automatic
+          current-season source.</strong> It is the only provider with canonical-write
+          authority. Squiggle and Kali AFL Stats are deprecated fallback providers, kept for
+          manual diagnostics and corroboration evidence only.
         </p>
       </div>
 
       <SettleRunPanel initialStatus={settleStatus} />
 
       <div className="page-header">
-        <h2>Fallback diagnostics</h2>
+        <h2>Deprecated fallback diagnostics — Squiggle and Kali AFL Stats</h2>
         <p className="subtitle">
           Acquire Squiggle and Kali observations server-side and retain staging and history for
           diagnostics or explicit human fallback investigation without exposing provider keys.
@@ -61,8 +63,13 @@ export default async function CurrentSeasonPage() {
       </div>
 
       <p className="notice">
-        Squiggle and Kali are deprecated fallback sources. These controls never insert or update
-        canonical current-season matches; AFL Tables remains the canonical automatic authority.
+        <strong>These controls are not the current-season refresh.</strong> Squiggle and Kali
+        are deprecated fallback sources with no canonical-write authority: nothing here inserts
+        or updates a canonical match, and nothing here can change an existing final score. They
+        are also never invoked automatically. To refresh current-season data, use the AFL Tables
+        control above. AFL Tables itself is deliberately absent from the source list below,
+        because it is not acquired through this path — duplicating it here would be a second
+        ingestion implementation.
       </p>
 
       <CurrentSeasonControls year={year} />

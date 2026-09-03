@@ -391,7 +391,8 @@ chain is:
 acquire_core.R --acquire --in-season          network; writes files, manifest LAST
   -> import_fitzroy_core.py --require-in-season --on-record-error reject
      --emit-observations                       offline; never opens a database
-  -> settle-afltables.ts --apply --auto-apply  the only step that reaches PostgreSQL
+  -> settle-afltables.ts --apply --auto-apply --require-complete-source
+                                                the only step that reaches PostgreSQL
 ```
 
 `deploy/afldb-settle-afltables.sh` runs those three steps under `set -e`,
@@ -575,6 +576,36 @@ sudo systemctl disable --now afldb-settle-afltables.timer   # stop scheduling
 Disabling the timer is always safe: the chain holds no state between runs, so
 nothing is left half-done. The service unit stays installed and can still be
 started by hand.
+
+### A FAILED unit that still wrote data — `--require-complete-source`
+
+`AFLDB-ISSUE-128`. The settle CLI's last step evaluates a **source-completeness
+verdict** and, under `--require-complete-source`, exits non-zero when the
+verdict is not `complete`. The unit then shows `failed` even though the run
+committed.
+
+**That is deliberate, and it is not a half-finished write.** The exit code is
+decided *after* `runSettleCli()` returns, so the transaction has already
+committed: every record AFLDB could represent has landed and the rerun is
+still idempotent. What the exit code reports is that AFL Tables supplied rows
+this chain could **not** represent, which before ISSUE-128 was invisible — the
+2026-09-03 measurement was 209 matches acquired, 207 emitted, 94 rows dropped,
+exit 0, and a nightly job reporting success.
+
+When the unit goes red, read the emission step, not the settle step:
+
+```bash
+journalctl -u afldb-settle-afltables --since yesterday | grep -A 12 'SOURCE COMPLETENESS'
+```
+
+It names the family, the reason and the offending source lines. The verdict is
+computed from the source's own counters, never from a calendar, so a bye, the
+gap before finals and the whole off-season all read `complete` — a red unit
+always means a real coverage gap. The same verdict is on
+`/admin/current-season` above the run counters.
+
+Removing the flag would restore the silent-success behaviour and is not a fix
+for a red unit.
 
 ### Cadence, failure and retry
 
