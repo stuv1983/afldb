@@ -4222,3 +4222,183 @@ describe('AFLDB-ISSUE-128 — source completeness', () => {
     });
   });
 });
+
+/* ------------------------------------------------------------------
+ * AFLDB-ISSUE-130 — the R runtime declaration
+ *
+ * The settle unit failed on a host where every required R package was
+ * installed, because the packages sat in a library that R under systemd never
+ * searches, and nothing tracked said so. These assertions hold the shape of the
+ * fix: ONE sourced fragment resolves R for the unit and for a deploy-time
+ * preflight; the optional AFLDB_R_LIBS is additive and must exist; the preflight
+ * validates what the unit will see and reads the fitzRoy pin from the contract;
+ * the unit file gains no host path and loses no hardening; and the mechanism is
+ * documented, so it cannot ship as tribal knowledge.
+ * ------------------------------------------------------------------ */
+
+describe('AFLDB-ISSUE-130 — the R runtime declaration', () => {
+  const settle = readSource('deploy/afldb-settle-afltables.sh');
+  const fragment = readSource('deploy/afldb-r-env.sh');
+  const preflight = readSource('deploy/afldb-r-preflight.sh');
+  const unit = readSource('deploy/afldb-settle-afltables.service');
+  const deploymentDoc = readSource('docs/deployment.md');
+  const contract = JSON.parse(readSource('tools/rebuild/fitzroy/fitzroy-contract.json')) as {
+    pinned_version: string;
+  };
+
+  describe('the settle script', () => {
+    it('sources the shared fragment before it invokes Rscript, and resolves RSCRIPT nowhere else', () => {
+      const sourced = settle.indexOf('. deploy/afldb-r-env.sh');
+      const invoked = settle.indexOf('"$RSCRIPT" tools/rebuild/fitzroy/acquire_core.R');
+      expect(sourced).toBeGreaterThan(-1);
+      expect(invoked).toBeGreaterThan(sourced);
+      // The fragment is the single place the interpreter is resolved: a second
+      // definition here would let the unit and the preflight drift apart.
+      expect(settle).not.toMatch(/^RSCRIPT=/m);
+      // It is sourced after `cd "$PROJECT_ROOT"`, so the relative path is real.
+      expect(settle.indexOf('cd "$PROJECT_ROOT"')).toBeLessThan(sourced);
+    });
+
+    it('keeps the three-step chain, its flags, its label and its cleanup trap unchanged', () => {
+      expect(settle).toContain('--acquire --in-season --label "$label" --from "$season" --to "$season"');
+      expect(settle).toContain('--require-in-season');
+      expect(settle).toContain('--on-record-error reject');
+      expect(settle).toContain('--apply --auto-apply --require-complete-source');
+      expect(settle).toContain('label="settle-${season}-$(date +%Y-%m-%d-%H%M)"');
+      expect(settle).toContain('trap cleanup_partial EXIT');
+      expect(settle).toContain('set -eu');
+    });
+  });
+
+  describe('deploy/afldb-r-env.sh', () => {
+    it('resolves RSCRIPT with the same override convention as the other interpreters', () => {
+      expect(fragment).toContain('RSCRIPT=${AFLDB_RSCRIPT:-/usr/bin/Rscript}');
+    });
+
+    it('prepends AFLDB_R_LIBS to R_LIBS additively, never R_LIBS_SITE or R_LIBS_USER', () => {
+      // Additive: the apt-installed site library must stay visible.
+      expect(fragment).toContain('R_LIBS="$AFLDB_R_LIBS${R_LIBS:+:$R_LIBS}"');
+      expect(fragment).toContain('export R_LIBS');
+      // R_LIBS_SITE replaces the site entries; R_LIBS_USER names THE user
+      // library. Neither may be assigned or exported here.
+      expect(fragment).not.toMatch(/^\s*(export\s+)?R_LIBS_SITE=/m);
+      expect(fragment).not.toMatch(/^\s*(export\s+)?R_LIBS_USER=/m);
+    });
+
+    it('is a no-op beyond RSCRIPT when AFLDB_R_LIBS is unset, and set -u safe', () => {
+      expect(fragment).toContain('if [ -n "${AFLDB_R_LIBS:-}" ]; then');
+    });
+
+    it('refuses a configured directory that does not exist, because R would drop it silently', () => {
+      expect(fragment).toContain('if [ ! -d "$AFLDB_R_LIBS" ]; then');
+      expect(fragment).toContain('exit 1');
+      expect(fragment).toContain('silently drop');
+    });
+
+    it('carries no host-specific library path and installs nothing', () => {
+      expect(fragment).not.toContain('/home/');
+      expect(fragment).not.toContain('install.packages');
+      // The only absolute path is the canonical library, named as documentation.
+      expect(fragment).toContain('/usr/local/lib/R/site-library');
+    });
+  });
+
+  describe('deploy/afldb-r-preflight.sh', () => {
+    it('exercises the same resolution the unit does', () => {
+      expect(preflight).toContain('. deploy/afldb-r-env.sh');
+      expect(preflight).toContain('set -eu');
+      expect(preflight).toContain('"$RSCRIPT" -');
+    });
+
+    it('validates every fact the settle chain depends on and prints the evidence', () => {
+      for (const pkg of ['jsonlite', 'digest', 'fitzRoy']) {
+        expect(preflight).toContain(`"${pkg}"`);
+      }
+      expect(preflight).toContain('requireNamespace(pkg, quietly = TRUE)');
+      expect(preflight).toContain('.libPaths()');
+      expect(preflight).toContain('R.version.string');
+      // Rscript itself must resolve before R is asked anything.
+      expect(preflight).toContain('Rscript does not resolve');
+    });
+
+    it('proves a configured AFLDB_R_LIBS is really on the effective .libPaths()', () => {
+      expect(preflight).toContain('AFLDB_R_PREFLIGHT_LIBS="${AFLDB_R_LIBS:-}"');
+      expect(preflight).toContain('is NOT on the effective .libPaths()');
+    });
+
+    it('reads the fitzRoy pin from the contract rather than duplicating it', () => {
+      expect(preflight).toContain('tools/rebuild/fitzroy/fitzroy-contract.json');
+      expect(preflight).toContain('$pinned_version');
+      expect(preflight).toContain('identical(installed, pinned)');
+      // The pinned value itself must not appear anywhere in the script: the
+      // contract is the single authority, exactly as for acquire_core.R.
+      expect(contract.pinned_version).toMatch(/^\d+\.\d+\.\d+$/);
+      expect(preflight).not.toContain(contract.pinned_version);
+      expect(preflight).not.toMatch(/\d+\.\d+\.\d+/);
+    });
+
+    it('fails closed with a non-zero exit, and never installs', () => {
+      expect(preflight).toContain('quit(save = "no", status = 1)');
+      expect(preflight).toContain('R PREFLIGHT: FAILED');
+      expect(preflight).toContain('R PREFLIGHT: OK');
+      expect(preflight).not.toContain('install.packages');
+      expect(preflight).not.toContain('/home/');
+    });
+
+    it('warns about the interactive-shell startup file the supported path must not depend on', () => {
+      expect(preflight).toContain('~/.Renviron');
+      expect(preflight).toContain('WARNING');
+    });
+  });
+
+  describe('deploy/afldb-settle-afltables.service', () => {
+    it('declares no Environment= of its own, so no host path can hide in the tracked unit', () => {
+      // The library is declared through .env (EnvironmentFile=) and the sourced
+      // fragment, never as a tracked, host-specific Environment= line — R would
+      // silently drop the path on any host where it does not exist, and the
+      // unit would LOOK as though it declared the dependency while doing nothing.
+      expect(unit).not.toMatch(/^Environment=/m);
+      expect(unit).toContain('EnvironmentFile=/home/arm/projects/afldb/.env');
+      expect(unit).toContain('ExecStart=/bin/sh /home/arm/projects/afldb/deploy/afldb-settle-afltables.sh');
+    });
+
+    it('keeps its hardening, timeout and credential boundary intact', () => {
+      for (const line of [
+        'NoNewPrivileges=true',
+        'PrivateTmp=true',
+        'ProtectSystem=strict',
+        'ProtectHome=read-only',
+        'RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX',
+        'SystemCallFilter=@system-service',
+        'TimeoutStartSec=3600',
+        'Type=oneshot',
+      ]) {
+        expect(unit).toContain(line);
+      }
+      expect(unit).toMatch(/^UnsetEnvironment=.*AFLDB_OWNER_DATABASE_URL/m);
+      expect(unit).not.toMatch(/^UnsetEnvironment=.*AFLDB_IMPORT_DATABASE_URL/m);
+    });
+  });
+
+  describe('docs/deployment.md', () => {
+    it('names the canonical library, the optional override, and the preflight', () => {
+      expect(deploymentDoc).toContain('/usr/local/lib/R/site-library');
+      expect(deploymentDoc).toContain('AFLDB_R_LIBS');
+      expect(deploymentDoc).toContain('sh deploy/afldb-r-preflight.sh');
+      expect(deploymentDoc).toContain('R PREFLIGHT: OK');
+    });
+
+    it('distinguishes the interactive-shell check from the service-equivalent one', () => {
+      expect(deploymentDoc).toContain('systemd-run');
+      expect(deploymentDoc).toContain('-p EnvironmentFile=/home/arm/projects/afldb/.env');
+      expect(deploymentDoc).toContain('-p ProtectHome=read-only');
+      expect(deploymentDoc).toContain('systemctl show afldb-settle-afltables.service -p Environment');
+    });
+
+    it('rules out the untracked substitutes and records the drop-in removal', () => {
+      expect(deploymentDoc).toContain('r-library.conf');
+      expect(deploymentDoc).toContain('~/.Renviron');
+      expect(deploymentDoc).toContain('daemon-reload');
+    });
+  });
+});

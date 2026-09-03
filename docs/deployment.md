@@ -445,28 +445,109 @@ sudo Rscript -e 'install.packages("fitzRoy",
   lib   = "/usr/local/lib/R/site-library")'
 ```
 
-`/usr/local/lib/R/site-library` is the system-wide library `r-base-core`
-creates. Installing there rather than into `~/R` keeps the library outside
-`$HOME`, which the unit mounts read-only, and means the service never writes
-to its own library at run time.
+**`/usr/local/lib/R/site-library` is AFLDB's canonical R library on every
+deployed host.** It is the system-wide library `r-base-core` creates, it is on
+R's default `.libPaths()` with nothing configured, it sits outside `$HOME`
+(which the unit mounts read-only), and the service never writes to it at run
+time. Every `install.packages()` in this section names it with `lib =`; the
+`apt` `r-cran-*` packages land beside it in `/usr/lib/R/site-library`. A host
+installed this way needs **no** R-related setting in `.env` and no systemd
+environment at all.
 
-**Verify the pin — this is the gate, not the install log:**
+#### Where the unit looks for the library (`AFLDB-ISSUE-130`)
+
+`Rscript` under systemd computes `.libPaths()` from `R_LIBS`, `R_LIBS_USER`,
+the site library and the system library — and from nothing else. systemd
+sources no login shell, so an `R_LIBS_USER` exported from `~/.bashrc` or
+`~/.profile` does not exist for the unit, and packages installed into `~/R`
+from an interactive session are on no path the service can see. That is the
+failure `AFLDB-ISSUE-130` records: the unit died with `Package 'jsonlite' is
+required` while the packages were installed and healthy in `/home/arm/R/library`.
+
+The tracked chain therefore resolves R the same way it resolves `python3` and
+`node`, in one sourced fragment, `deploy/afldb-r-env.sh`, shared by the settle
+script and the preflight below:
+
+- `AFLDB_RSCRIPT` — the interpreter, default `/usr/bin/Rscript`;
+- `AFLDB_R_LIBS` — **optional**, one extra library directory. When set it is
+  prepended to `R_LIBS` (additive, so the `apt` site library stays visible;
+  `R_LIBS_SITE` would replace it) and it **must exist**: R silently drops a
+  missing directory from `.libPaths()`, so the fragment refuses instead, and
+  the unit fails before a snapshot label exists.
+
+`AFLDB_R_LIBS` is an explicit escape hatch for a host whose packages
+genuinely live somewhere other than the canonical library. It belongs in
+`.env`, which the unit already loads through `EnvironmentFile=`. It is **not**
+part of the normal installation: a host built by the commands above leaves it
+unset. Two things are not acceptable substitutes:
+
+- a hand-written `/etc/systemd/system/afldb-settle-afltables.service.d/*.conf`
+  drop-in — it is invisible to every deployment, every clone and every
+  re-provisioned host, which is exactly how ISSUE-130 happened;
+- `~/.Renviron` — R does read it under systemd, but it is the same class of
+  untracked, per-host state, and the preflight warns when one exists.
+
+The supported path depends on no interactive-shell startup file.
+
+**Verify the runtime — this is the gate, not the install log.** The preflight
+starts R the way the unit will (it sources the same fragment), prints
+`R.version.string`, the effective `.libPaths()` and the `R_LIBS*` environment
+R saw, checks that `jsonlite`, `digest` and `fitzRoy` are visible and where
+each resolves from, and compares the installed fitzRoy with `pinned_version`
+read from `fitzroy-contract.json`. It installs nothing and opens nothing; it
+exits non-zero with every failure listed.
 
 ```bash
-command -v Rscript
-Rscript -e 'cat(as.character(packageVersion("fitzRoy")), "\n")'   # must print 1.8.0
-Rscript -e 'cat(R.version.string, "\n")'
+cd ~/projects/afldb
+
+# 1. interactive-shell check: proves the packages and the pin, from YOUR shell.
+sh deploy/afldb-r-preflight.sh
+
+# 2. service-equivalent check: the same script as user arm, with the unit's
+#    working directory, its EnvironmentFile (so AFLDB_R_LIBS from .env
+#    applies) and its filesystem hardening, and WITHOUT your login shell.
+#    This is the environment that failed in ISSUE-130; step 1 alone cannot
+#    prove it. The exit status is the preflight's own.
+sudo systemd-run --wait --pipe --collect --unit=afldb-r-preflight \
+  -p User=arm -p Group=arm \
+  -p WorkingDirectory=/home/arm/projects/afldb \
+  -p EnvironmentFile=/home/arm/projects/afldb/.env \
+  -p ProtectHome=read-only -p ProtectSystem=strict -p PrivateTmp=true \
+  -p NoNewPrivileges=true \
+  /bin/sh /home/arm/projects/afldb/deploy/afldb-r-preflight.sh
+
+# 3. the unit itself declares no environment of its own; it must print exactly
+#    `Environment=` — anything else is an untracked drop-in (see below).
+systemctl show afldb-settle-afltables.service -p Environment
 ```
 
-If those two versions do not match the contract, stop: do not pass
-`--allow-version-mismatch` to work around it. Re-pinning the contract is a
-deliberate, reviewed edit with fresh probe evidence behind it.
+Both preflight runs must end with `R PREFLIGHT: OK`. If the pin fails, stop:
+do not pass `--allow-version-mismatch` to work around it. Re-pinning the
+contract is a deliberate, reviewed edit with fresh probe evidence behind it.
+If a package is `MISSING` in step 2 but present in step 1, the packages are in
+a library your shell can see and the service cannot — reinstall them into the
+canonical library, or declare that directory as `AFLDB_R_LIBS` in `.env`.
+
+**Removing an untracked drop-in.** A host that was made to work with a
+hand-written `r-library.conf` (the ISSUE-130 stop-gap) must have it removed
+once the tracked fix is deployed, or the tracked declaration is never actually
+exercised:
+
+```bash
+sudo rm /etc/systemd/system/afldb-settle-afltables.service.d/r-library.conf
+sudo rmdir /etc/systemd/system/afldb-settle-afltables.service.d   # only if now empty
+sudo systemctl daemon-reload
+systemctl show afldb-settle-afltables.service -p Environment       # must print: Environment=
+```
+
+then repeat preflight step 2 and one supervised `systemctl start`.
 
 **How a future deployment verifies the pin.** It does not need to remember to:
 `acquire_core.R` re-reads `fitzroy-contract.json` and re-checks the installed
 version on **every** run, and records the version actually used in every probe
 and manifest. An R upgrade that moves fitzRoy therefore fails the next timer
-firing loudly, and no snapshot is produced.
+firing loudly, and no snapshot is produced. The preflight reports the same
+comparison earlier, at deploy time, from the same contract field.
 
 ### Installing the service and timer
 
@@ -507,8 +588,12 @@ scheduled until step 9 passes.
 ```bash
 cd ~/projects/afldb
 
-# 1-2. runtime and the pin
-command -v Rscript && Rscript -e 'cat(as.character(packageVersion("fitzRoy")),"\n")'
+# 1-2. runtime, library and the pin — the preflight, twice: from this shell,
+#      then service-equivalent through systemd-run (the exact command is in
+#      "R and the pinned fitzRoy" above). Both must print `R PREFLIGHT: OK`.
+#      An interactive Rscript check is NOT a substitute: the unit's library
+#      path is not your shell's (AFLDB-ISSUE-130).
+sh deploy/afldb-r-preflight.sh
 
 # 3. acquisition only. Writes files; the manifest is written LAST
 L=settle-$(date +%Y-%m-%d-%H%M)
@@ -753,6 +838,8 @@ All configuration is in `/home/arm/projects/afldb/.env` (mode 600, owner `arm`),
 | `AFLDB_BUILD_WORKERS` | caps `next build` static-generation workers; unset = Next's default |
 | `AFLDB_STATEMENT_TIMEOUT_MS` | per-connection statement timeout |
 | `AFLDB_SETTLE_TRIGGER` | `systemd` enables the Super Admin on-demand settle trigger (§7b). Anything else, including unset, leaves it inert |
+| `AFLDB_R_LIBS` | **optional**, normally unset. One extra R library directory for the settle unit, prepended to `R_LIBS`; must exist. The canonical library `/usr/local/lib/R/site-library` needs nothing (§7b, `AFLDB-ISSUE-130`) |
+| `AFLDB_RSCRIPT` | **optional**, default `/usr/bin/Rscript` — the interpreter the settle unit runs (§7b) |
 
 **The web service does not receive them all.** `.env` is the whole project's
 configuration, so the unit loads it and then drops the import, owner, test and

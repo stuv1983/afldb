@@ -22,7 +22,7 @@
 set -eu
 
 PROJECT_ROOT=${AFLDB_PROJECT_ROOT:-/home/arm/projects/afldb}
-RSCRIPT=${AFLDB_RSCRIPT:-/usr/bin/Rscript}
+# RSCRIPT is resolved by deploy/afldb-r-env.sh, sourced below.
 PYTHON=${AFLDB_PYTHON:-/usr/bin/python3}
 # Node is installed per-user via nvm, so the path is pinned rather than relying
 # on PATH — the same reasoning as afldb.service. tsx is invoked through its own
@@ -35,6 +35,17 @@ SNAPSHOT_ROOT=data/sources/afltables/fitzroy_core
 MANIFEST_ROOT=docs/rebuild-manifests/afltables_fitzroy_core
 
 cd "$PROJECT_ROOT"
+
+# --- the R runtime --------------------------------------------------------
+# AFLDB-ISSUE-130: RSCRIPT and the OPTIONAL AFLDB_R_LIBS library directory are
+# resolved by ONE sourced fragment shared with deploy/afldb-r-preflight.sh, so
+# the runtime the preflight validated at deploy time is exactly the runtime
+# this unit runs. The canonical library, /usr/local/lib/R/site-library, needs
+# nothing set; AFLDB_R_LIBS, when a host declares it in .env, is prepended to
+# R_LIBS and MUST exist — the fragment exits non-zero otherwise, here, before
+# a label exists, so a run cannot reach acquisition with a library it cannot
+# see. Nothing is installed at run time.
+. deploy/afldb-r-env.sh
 
 # --- the season -----------------------------------------------------------
 # data/reference/seasons.json is the in-progress register acquire_core.R and

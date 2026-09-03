@@ -4,8 +4,9 @@
 > Session: 2026-09-03, Opus 5 / Stage 1 (investigation and design only),
 > worktree `D:\dev\afldb-issue-130`, branch `claude/issue-130`, base `c958367`.
 >
-> Sections marked **[CONFIRMED]** are repository or host evidence verified in this session.
-> Sections marked **[PROPOSED]** are design, not implementation. **Nothing is implemented yet.**
+> Sections marked **[CONFIRMED]** are repository or host evidence verified in a session.
+> Sections marked **[PROPOSED]** were Stage 1 design; **§9 records the Stage 2 implementation**
+> (2026-09-03). Stage 3 host validation is the exact next action (§9.6).
 
 ---
 
@@ -116,7 +117,7 @@ stops relying on a non-default location at all. 2 + 3 are what make the *next* h
 
 ---
 
-## 5. Proposed implementation [PROPOSED — NOT IMPLEMENTED]
+## 5. Proposed implementation [PROPOSED at Stage 1 — IMPLEMENTED at Stage 2, see §9]
 
 ### 5.1 `deploy/afldb-r-env.sh` (new, tracked, mode 644)
 
@@ -254,7 +255,7 @@ change from this worktree.
 
 ---
 
-## 7. Decision required before Stage 2 [OPEN]
+## 7. Decision required before Stage 2 [TAKEN — see §9.1]
 
 Everything in §5 is settled **except** one question that is the operator's, not the
 repository's:
@@ -283,9 +284,9 @@ fitzRoy 1.8.0 installed and pinned" on production, not *where*.
 
 ---
 
-## 8. Stage 1 state and exact next action
+## 8. Stage 1 state and exact next action (superseded by §9)
 
-**Stage 1 (investigation and design) is COMPLETE. Nothing is implemented.**
+**Stage 1 (investigation and design) is COMPLETE.** Stage 2 has since implemented it — see §9.
 
 Repository files changed by Stage 1: `issues/open/AFLDB-ISSUE-130.md` (this file),
 `issues.md`, `IssuesIndex.md`. No code, no deploy artefact, no test, no `CHANGELOG.md` entry
@@ -307,3 +308,135 @@ Repository files changed by Stage 1: `issues/open/AFLDB-ISSUE-130.md` (this file
 
 Production deployment is **not** authorised by this issue and is separate work; note that
 `AFLDB-ISSUE-128`/`-129` are already queued ahead of it for the same host.
+
+---
+
+## 9. Stage 2 — implementation [CONFIRMED]
+
+> Session: 2026-09-03, Fable 5.1 / Stage 2, same worktree and branch, on top of the Stage 1
+> tracking commit `98ebcc0`. Everything in §5 is now **implemented**; §5 is retained above as
+> the design record and this section records what was actually built and proved.
+
+### 9.1 Operator decision taken (closes §7)
+
+- **`/usr/local/lib/R/site-library` is AFLDB's canonical supported R library on every deployed
+  Linux host.** `docs/deployment.md` now says so in those words.
+- streamanator's `/home/arm/R/library` is a **temporary host deviation** to be reconciled
+  (packages reinstalled into the canonical library per `docs/deployment.md` §7b) after this
+  tracked fix is deployed — Stage 3, §9.6.
+- `AFLDB_R_LIBS` remains an optional, explicit escape hatch for a nonstandard host. It is not
+  required by, and does not appear in, the normal documented installation.
+
+### 9.2 What was built
+
+| File | Change |
+|---|---|
+| `deploy/afldb-r-env.sh` | **new**, sourced fragment. `RSCRIPT=${AFLDB_RSCRIPT:-/usr/bin/Rscript}`; when `AFLDB_R_LIBS` is non-empty it **requires the directory to exist** (`[ ! -d ]` → message on stderr naming the canonical library → `exit 1`, which aborts the sourcing caller), then `R_LIBS="$AFLDB_R_LIBS${R_LIBS:+:$R_LIBS}"; export R_LIBS`. Never assigns `R_LIBS_SITE` or `R_LIBS_USER`; contains no `/home/` path; installs nothing. |
+| `deploy/afldb-r-preflight.sh` | **new**. Resolves the project root from its own location (or `AFLDB_PROJECT_ROOT`), sources the fragment, checks `Rscript` resolves, then runs **one** `Rscript -` process (program on stdin; the contract path and `AFLDB_R_LIBS` travel as environment, nothing is interpolated into R code) that prints `R.version.string`, `R_HOME`, the `R_LIBS`/`R_LIBS_USER`/`R_LIBS_SITE` R saw, the effective `.libPaths()` in order; **warns** if `~/.Renviron` exists; verifies a configured `AFLDB_R_LIBS` is actually in `.libPaths()` (normalised comparison); reports `jsonlite`/`digest`/`fitzRoy` as version + resolving library or `MISSING`; compares installed fitzRoy with `pinned_version` **read from `fitzroy-contract.json`** using the same `identical()` as `acquire_core.R`. Every failure is collected and listed under `R PREFLIGHT: FAILED`, exit 1; otherwise `R PREFLIGHT: OK`, exit 0. No install, no write, no network, no database. |
+| `deploy/afldb-settle-afltables.sh` | the `RSCRIPT=` line replaced by a comment; `. deploy/afldb-r-env.sh` sourced immediately after `cd "$PROJECT_ROOT"`, before the season gate, label, trap and step 1. Steps, flags, label scheme, trap, `set -eu` and exit semantics unchanged. |
+| `deploy/afldb-settle-afltables.service` | **untouched** (verified by test: no `Environment=` line, full hardening set, `TimeoutStartSec=3600`, `UnsetEnvironment` boundary). |
+| `docs/deployment.md` §7b | canonical-library statement; new "Where the unit looks for the library" subsection (`AFLDB_RSCRIPT`, `AFLDB_R_LIBS` additive + must-exist, drop-in and `~/.Renviron` rejected as substitutes); "Verify the runtime" replaces the interactive eyeball with (1) `sh deploy/afldb-r-preflight.sh`, (2) the service-equivalent `systemd-run` command, (3) `systemctl show … -p Environment`; a "Removing an untracked drop-in" block; escalation steps 1-2 now run the preflight. §9 configuration table gains `AFLDB_R_LIBS` and `AFLDB_RSCRIPT` rows. |
+| `tests/current-season-import.test.ts` | new top-level `describe('AFLDB-ISSUE-130 — the R runtime declaration')`, 18 assertions in the existing `readSource` style covering §5.6 items 1-5 plus: the fragment's must-exist refusal, the preflight's `.libPaths()` membership check and `~/.Renviron` warning, and that the contract's actual `pinned_version` string (read from the JSON at test time) does **not** appear in the preflight. |
+
+**Sub-decision from §5.3 settled as recommended:** the settle script does *not* call the
+preflight on every firing; `acquire_core.R` already fails closed on both conditions.
+
+**Service-equivalent validation command (desired property #10, safety item 6).** The unit's
+own environment is reproduced with `systemd-run` and the unit's properties rather than a login
+shell: `User`/`Group=arm`, `WorkingDirectory`, `EnvironmentFile=/home/arm/projects/afldb/.env`
+(so `AFLDB_R_LIBS` from `.env` applies), `ProtectHome=read-only`, `ProtectSystem=strict`,
+`PrivateTmp`, `NoNewPrivileges`, with `--wait --pipe --collect` so the exit status is the
+preflight's own and the transient unit is unloaded afterwards. Exact command in §9.6 / docs.
+
+### 9.3 Deviations from §5 (all additive, none contradicting the approved design)
+
+1. The preflight is runnable from any directory (resolves its own root) rather than only
+   "from the project root"; the documented invocation is unchanged.
+2. The preflight does **not** pass `--vanilla`/`--no-environ`: the unit does not either, so it
+   reads exactly the startup files the unit would. Instead it prints the `R_LIBS*` environment
+   and **warns** when `~/.Renviron` exists, which is how requirement 4 (supported path must not
+   depend on interactive startup files) is made visible without diverging from the unit.
+3. The fragment aborts with `exit 1` (not `return`), deliberately: it is only ever sourced, and
+   a caller that cannot see its library must stop before a label or a network fetch exists.
+4. `docs/deployment.md` §9 (configuration table) was also touched — two rows — because that
+   table is where every `.env` variable is listed.
+5. The tests are a new top-level `describe` at the end of the file rather than nested inside
+   the ISSUE-128 block; same file, same style.
+6. `.env.example` was **not** changed: it does not list the other settle overrides
+   (`AFLDB_RSCRIPT`, `AFLDB_SETTLE_TRIGGER`) either, and the variable must not look required.
+
+### 9.4 Validation evidence (Windows worktree, 2026-09-03)
+
+| Check | Result |
+|---|---|
+| `sh -n` on `afldb-r-env.sh`, `afldb-r-preflight.sh`, `afldb-settle-afltables.sh` | all OK |
+| `git diff --check` | clean |
+| `npx vitest run tests/current-season-import.test.ts` | **246 passed** (18 new ISSUE-130 + 228 existing), 0 failed |
+| `npx eslint tests/current-season-import.test.ts` | clean |
+| Preflight executed for real with the local R 4.6.1 (`AFLDB_RSCRIPT` pointed at it), `AFLDB_R_LIBS` unset | ran end to end: printed version, env, `.libPaths()`, `jsonlite 2.0.0` + `fitzRoy 1.8.0` with their library dirs, `fitzRoy pin: installed 1.8.0 == contract pinned_version 1.8.0: OK`, then `R PREFLIGHT: FAILED` / exit 1 because `digest` is genuinely absent on this Windows box — the correct verdict. Proves `Rscript -` (stdin), the contract read, and the failure/exit path. |
+| Preflight with `AFLDB_R_LIBS=/nonexistent/rlib` | fragment refused before R started, four-line stderr message, exit 1 |
+| Preflight with `AFLDB_R_LIBS=<existing empty dir>` | `R_LIBS` set, dir first in `.libPaths()`, `AFLDB_R_LIBS is on the effective .libPaths(): OK` |
+
+Incidental confirmation of §3.1's hazard: on the Windows box `R_LIBS_SITE` names a directory
+that does not exist and it is absent from `.libPaths()` — R dropped it without a word.
+
+Environment note: the worktree had no `node_modules`; a gitignored NTFS junction to the
+`afldb-issue-129` worktree's `node_modules` was created to run vitest. It is untracked and
+can be deleted at any time.
+
+**Not proved here (Linux-only, Stage 3):** the preflight under systemd on streamanator, the
+supervised settle with the drop-in absent, and production's library location.
+
+### 9.5 Tracking
+
+- `CHANGELOG.md` is deliberately **not** updated yet — per §8 step 5 it is written when the
+  host validation passes with the drop-in absent and the issue closes.
+- `issues.md` entry and Open Issues row, and `IssuesIndex.md`, updated to "Stage 2 complete;
+  awaiting Stage 3 host validation".
+- streamanator and production were **not** modified.
+
+### 9.6 Exact next action — Stage 3, streamanator only, in this order
+
+Precondition: `claude/issue-130` merged/deployed to the dev host's checkout by the normal
+`git pull` deploy so that `deploy/afldb-r-env.sh` and `deploy/afldb-r-preflight.sh` exist in
+`/home/arm/projects/afldb`.
+
+```bash
+cd ~/projects/afldb
+
+# A. host reconciliation (the §9.1 decision): put the packages where the docs say.
+#    apt part and the dated Posit snapshot exactly as docs/deployment.md §7b.
+sudo apt-get install -y --no-install-recommends r-cran-jsonlite r-cran-digest
+sudo Rscript -e 'install.packages("fitzRoy",
+  repos = "https://packagemanager.posit.co/cran/__linux__/noble/2026-09-01",
+  lib   = "/usr/local/lib/R/site-library")'
+
+# B. remove the stop-gap drop-in and prove the unit declares nothing itself
+sudo rm /etc/systemd/system/afldb-settle-afltables.service.d/r-library.conf
+sudo rmdir /etc/systemd/system/afldb-settle-afltables.service.d
+sudo systemctl daemon-reload
+systemctl show afldb-settle-afltables.service -p Environment     # must print: Environment=
+
+# C. preflight, interactive then service-equivalent; both must end R PREFLIGHT: OK
+sh deploy/afldb-r-preflight.sh
+sudo systemd-run --wait --pipe --collect --unit=afldb-r-preflight \
+  -p User=arm -p Group=arm \
+  -p WorkingDirectory=/home/arm/projects/afldb \
+  -p EnvironmentFile=/home/arm/projects/afldb/.env \
+  -p ProtectHome=read-only -p ProtectSystem=strict -p PrivateTmp=true \
+  -p NoNewPrivileges=true \
+  /bin/sh /home/arm/projects/afldb/deploy/afldb-r-preflight.sh
+
+# D. one supervised run with the drop-in ABSENT
+sudo systemctl start afldb-settle-afltables.service; echo "exit=$?"
+journalctl -u afldb-settle-afltables --since -15min | grep -E 'settle chain complete|SOURCE COMPLETENESS|Error|Refusing'
+
+# E. (read-only, on afldb-prod) where production's fitzRoy actually lives
+Rscript -e 'cat(dirname(system.file(package="fitzRoy")), "\n"); print(.libPaths())'
+```
+
+Expected: step C prints `fitzRoy` resolving from `/usr/local/lib/R/site-library` in **both**
+runs; step D exits 0 with `SOURCE COMPLETENESS: COMPLETE`. If step D still fails at step 1
+with the drop-in absent, the preflight output from C is the evidence to bring back. Only after
+D passes: `CHANGELOG.md` (Unreleased) entry and close the issue. `/home/arm/R/library` may then
+be left in place or removed; nothing tracked references it.
