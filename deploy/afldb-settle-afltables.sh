@@ -116,8 +116,16 @@ echo "[2/3] adjudicate and emit observations (offline)"
 # The only step that opens PostgreSQL, and it re-hashes the manifest from disk
 # before it does. Idempotent: a rerun over identical source data writes no
 # canonical row and no ledger row.
+#
+# AFLDB-ISSUE-128: --require-complete-source makes an incomplete source a
+# FAILED unit. The flag is evaluated after the settle transaction commits, so
+# every record AFLDB could represent still lands and the rerun stays
+# idempotent; what it prevents is this unit reporting success for a pass that
+# dropped rows AFL Tables supplied. Out of season and on a quiet week the
+# source carries nothing to drop and the verdict is `complete`, so a red unit
+# always means a real coverage gap rather than a calendar.
 echo "[3/3] settle (apply, automatic canonical path)"
 "$NODE" "$TSX" tools/current-season/settle-afltables.ts \
-  --label "$label" --apply --auto-apply
+  --label "$label" --apply --auto-apply --require-complete-source
 
 echo "settle chain complete — label $label"

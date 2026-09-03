@@ -14,6 +14,8 @@
  */
 import { useState, useTransition } from 'react';
 
+import type { SourceCompletenessVerdict } from '@/lib/acquisition/source-completeness';
+
 import {
   refreshSettleRunStatusAction,
   startSettleRunAction,
@@ -31,6 +33,44 @@ const PHASE_TEXT: Record<string, string> = {
   unknown: 'Unknown',
 };
 
+/**
+ * AFLDB-ISSUE-128 — the source-completeness verdict, rendered ABOVE the
+ * counters rather than as one more column in them.
+ *
+ * The defect this fixes was not a missing number. Every counter this reads
+ * was already being written; an operator looking at a table of canonical row
+ * counts simply had no reason to conclude that 94 rows AFL Tables supplied
+ * had never entered the pipeline. A verdict states it.
+ */
+function SourceCompleteness({ verdict }: { verdict: SourceCompletenessVerdict }) {
+  if (verdict.status === 'complete') {
+    return (
+      <p className="notice" role="status">
+        <strong>Source complete.</strong> {verdict.headline}
+      </p>
+    );
+  }
+  return (
+    <div role="alert">
+      <p className="notice">
+        <strong>
+          {verdict.status === 'unknown'
+            ? 'Source completeness unknown.'
+            : 'Source INCOMPLETE — this run did not import everything AFL Tables supplied.'}
+        </strong>
+        {' '}{verdict.headline}
+      </p>
+      <ul>
+        {verdict.reasons.map((reason) => (
+          <li key={reason.code}>
+            <span className="mono">{reason.code}</span>: {reason.detail}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function Counters({ counters }: { counters: NonNullable<
   NonNullable<SettleRunAdminState['status']>['latestRun']
 >['counters'] }) {
@@ -47,6 +87,11 @@ function Counters({ counters }: { counters: NonNullable<
       <table>
         <thead>
           <tr>
+            <th scope="col" className="num">Source matches</th>
+            <th scope="col" className="num">Source player rows</th>
+            <th scope="col" className="num">Unrepresentable rows</th>
+            <th scope="col" className="num">Unprojected records</th>
+            <th scope="col" className="num">Scopes not swept</th>
             <th scope="col" className="num">Canonical inserted</th>
             <th scope="col" className="num">Canonical updated</th>
             <th scope="col" className="num">Ledger rows</th>
@@ -60,6 +105,11 @@ function Counters({ counters }: { counters: NonNullable<
         </thead>
         <tbody>
           <tr>
+            <td className="num">{counters.snapshotMatches}</td>
+            <td className="num">{counters.snapshotPlayerMatchRows}</td>
+            <td className="num">{counters.snapshotUnkeyedRejections}</td>
+            <td className="num">{counters.snapshotRejections}</td>
+            <td className="num">{counters.absenceSweepSkipped}</td>
             <td className="num">{counters.canonicalRowsInserted}</td>
             <td className="num">{counters.canonicalRowsUpdated}</td>
             <td className="num">{counters.canonicalApplicationsLogged}</td>
@@ -187,6 +237,7 @@ export function SettleRunPanel({
                 the pipeline is idle.
               </p>
             )}
+            <SourceCompleteness verdict={run.sourceCompleteness} />
             <Counters counters={run.counters} />
           </>
         )}

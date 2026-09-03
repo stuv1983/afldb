@@ -55,6 +55,11 @@ import {
   type SettleExceptionReport,
 } from '../../src/lib/acquisition/settle-report';
 import { parseSourceFamilyRegistry } from '../../src/lib/acquisition/source-families';
+import {
+  assessSourceCompleteness,
+  renderSourceCompleteness,
+  type SourceCompletenessVerdict,
+} from '../../src/lib/acquisition/source-completeness';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
@@ -70,6 +75,16 @@ export type SettleCliArgs = {
   /** ISSUE-122: run the automatic canonical path. Off unless asked for. */
   autoApply: boolean;
   report: boolean;
+  /**
+   * AFLDB-ISSUE-128. Make an incomplete source a FAILED run.
+   *
+   * The exit code is decided AFTER the transaction has committed, never
+   * before: every record AFLDB could represent still lands, and the run stays
+   * idempotent. What changes is only that the process — and therefore the
+   * systemd unit, and therefore the admin panel — stops reporting success for
+   * a pass that silently dropped rows the source supplied.
+   */
+  requireCompleteSource: boolean;
 };
 
 function loadEnv(projectRoot: string): void {
@@ -93,7 +108,9 @@ function valueFor(argv: readonly string[], flag: string): string | null {
   return index >= 0 ? argv[index + 1] ?? null : null;
 }
 
-const KNOWN_FLAGS = new Set(['--label', '--apply', '--dry-run', '--auto-apply', '--report']);
+const KNOWN_FLAGS = new Set([
+  '--label', '--apply', '--dry-run', '--auto-apply', '--report', '--require-complete-source',
+]);
 
 export function parseSettleArgs(argv: readonly string[]): SettleCliArgs {
   const label = valueFor(argv, '--label');
@@ -116,6 +133,7 @@ export function parseSettleArgs(argv: readonly string[]): SettleCliArgs {
     apply: argv.includes('--apply'),
     autoApply: argv.includes('--auto-apply'),
     report: argv.includes('--report'),
+    requireCompleteSource: argv.includes('--require-complete-source'),
   };
 }
 
@@ -228,6 +246,11 @@ export type SettleCliOutcome = {
   result: SettleRunResult | null;
   /** Built after a committed apply and on `--report`; null on a dry run. */
   report: SettleExceptionReport | null;
+  /**
+   * AFLDB-ISSUE-128. The source-completeness verdict for this run. Null on
+   * `--report`, which runs no settle and so measures no source.
+   */
+  sourceCompleteness: SourceCompletenessVerdict | null;
 };
 
 /**
@@ -257,7 +280,7 @@ export async function runSettleCli(
     if (args.report) {
       const report = await buildSettleExceptionReport(sql, { season: bundle.season });
       for (const line of renderSettleExceptionReport(report)) log(line);
-      return { args, result: null, report };
+      return { args, result: null, report, sourceCompleteness: null };
     }
 
     const result = await runSettleAfltables(sql, {
@@ -282,6 +305,13 @@ export async function runSettleCli(
     });
 
     for (const line of counterLines(result.counters)) log(line);
+
+    // AFLDB-ISSUE-128. Rendered for EVERY run, dry or applied, and before the
+    // outcome line below, so the verdict cannot be read as a footnote to a
+    // success message.
+    const sourceCompleteness = assessSourceCompleteness(result.counters);
+    for (const line of renderSourceCompleteness(sourceCompleteness)) log(line);
+
     for (const skipped of result.absenceSweepSkipped) {
       log('');
       log(
@@ -299,7 +329,7 @@ export async function runSettleCli(
         + `import_batches row. Re-run with --apply${args.autoApply ? ' --auto-apply' : ''} `
         + 'to keep it.',
       );
-      return { args, result, report: null };
+      return { args, result, report: null, sourceCompleteness };
     }
 
     const { counters } = result;
@@ -322,7 +352,7 @@ export async function runSettleCli(
     }
     const report = await buildSettleExceptionReport(sql, { season: bundle.season });
     for (const line of renderSettleExceptionReport(report)) log(line);
-    return { args, result, report };
+    return { args, result, report, sourceCompleteness };
   } finally {
     if (ownsClient) await sql.end({ timeout: 5 });
   }
@@ -330,7 +360,24 @@ export async function runSettleCli(
 
 async function main(): Promise<void> {
   loadEnv(DEFAULT_PROJECT_ROOT);
-  await runSettleCli(process.argv.slice(2));
+  const outcome = await runSettleCli(process.argv.slice(2));
+
+  // AFLDB-ISSUE-128. The ONLY place the verdict becomes an exit code, and it
+  // is reached after `runSettleCli()` has returned — so the transaction is
+  // already committed and every representable record has landed. Failing here
+  // costs no data; it costs the run its claim to have imported the season.
+  //
+  // `unknown` fails too. A run that recorded no counters has not shown the
+  // source was covered, and "not shown" is not "shown to be fine".
+  if (!outcome.args.requireCompleteSource || outcome.sourceCompleteness === null) return;
+  if (outcome.sourceCompleteness.status === 'complete') return;
+  console.error('');
+  console.error(
+    `--require-complete-source: ${outcome.sourceCompleteness.headline} `
+    + 'Records that could be represented were still applied and the run remains idempotent; '
+    + 'this exit code reports that the import was not complete.',
+  );
+  process.exitCode = 1;
 }
 
 // Run only when this file is the entry point. Importing it — as the

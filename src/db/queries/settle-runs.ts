@@ -21,6 +21,11 @@
  */
 import 'server-only';
 
+import {
+  assessSourceCompleteness,
+  type SourceCompletenessVerdict,
+} from '@/lib/acquisition/source-completeness';
+
 import { sql } from '@/db/client';
 
 /** The `import_batches.tool` value the settle stamps on every batch it opens. */
@@ -36,6 +41,22 @@ export const SETTLE_BATCH_TOOL = 'settle-afltables.ts';
  * to add.
  */
 export type SettleRunCounters = {
+  /**
+   * AFLDB-ISSUE-128 — the snapshot coverage counters, whitelisted for the
+   * same reason the canonical ones are. They were already written to
+   * `validation_result` by every ISSUE-122 run; nothing but this projection
+   * was missing, which is exactly why a run could drop 94 source rows and
+   * still present an operator with a clean result table.
+   */
+  snapshotMatches: number;
+  snapshotPlayerMatchRows: number;
+  /** Enumerated records that did not project. */
+  snapshotRejections: number;
+  /** Acquired rows whose presence AFLDB could not represent at all. */
+  snapshotUnkeyedRejections: number;
+  /** Scopes not proven complete, so not absence-swept. */
+  absenceSweepSkipped: number;
+
   canonicalRowsInserted: number;
   canonicalRowsUpdated: number;
   canonicalApplicationsLogged: number;
@@ -64,6 +85,13 @@ export type SettleRunRecord = {
   recordsRejected: number;
   /** Null when the run did not reach the counter stamp — i.e. it did not finish. */
   counters: SettleRunCounters | null;
+  /**
+   * AFLDB-ISSUE-128. Derived from the counters above, never stored: the
+   * verdict is a reading of a run, so an older batch row gets today's reading
+   * rather than the reading whichever build happened to write it.
+   * `unknown` when `counters` is null.
+   */
+  sourceCompleteness: SourceCompletenessVerdict;
 };
 
 /**
@@ -100,6 +128,11 @@ export function extractSettleCounters(validationResult: unknown): SettleRunCount
   if (validationResult === null || typeof validationResult !== 'object') return null;
   const raw = validationResult as Record<string, unknown>;
   return {
+    snapshotMatches: counterOf(raw, 'snapshotMatches'),
+    snapshotPlayerMatchRows: counterOf(raw, 'snapshotPlayerMatchRows'),
+    snapshotRejections: counterOf(raw, 'snapshotRejections'),
+    snapshotUnkeyedRejections: counterOf(raw, 'snapshotUnkeyedRejections'),
+    absenceSweepSkipped: counterOf(raw, 'absenceSweepSkipped'),
     canonicalRowsInserted: counterOf(raw, 'canonicalRowsInserted'),
     canonicalRowsUpdated: counterOf(raw, 'canonicalRowsUpdated'),
     canonicalApplicationsLogged: counterOf(raw, 'canonicalApplicationsLogged'),
@@ -157,6 +190,7 @@ export async function getLatestSettleRun(): Promise<SettleRunRecord | null> {
   if (!row) return null;
 
   const { snapshotLabel, season } = parseSettleBatchNote(row.notes);
+  const counters = extractSettleCounters(row.validationResult);
   return {
     batchId: row.id,
     snapshotLabel,
@@ -166,6 +200,7 @@ export async function getLatestSettleRun(): Promise<SettleRunRecord | null> {
     completedAt: row.completedAt,
     recordsRead: row.recordsRead,
     recordsRejected: row.recordsRejected,
-    counters: extractSettleCounters(row.validationResult),
+    counters,
+    sourceCompleteness: assessSourceCompleteness(counters),
   };
 }
