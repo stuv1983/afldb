@@ -12,7 +12,10 @@ Advanced Search all read these tables, so a metric can never mean two
 different things in two places.
 
     games        one row in player_match_stats
-    finals       a game whose match.is_final is true
+    finals       a game in the traditional AFL finals series, i.e. one whose
+                 match.is_finals_series is true. NOT match.is_final, which is
+                 the structural "not home-and-away" flag and is also true for a
+                 Wildcard Final (AFLDB-ISSUE-129 §8.4).
     premiership  a game in a grand final whose result the player's club won
     clubs played distinct MODERN club identities (clubs.current_identity_id),
                  not distinct historical names. Brent Harvey played for
@@ -63,6 +66,7 @@ SELECT
     m.season,
     m.match_date,
     m.is_final,
+    m.is_finals_series,
     m.round_type,
     -- The player's club won iff "home won" agrees with "player was home".
     CASE
@@ -157,7 +161,7 @@ SELECT
     c.season,
     c.club_id,
     count(*)                                        AS games,
-    count(*) FILTER (WHERE c.is_final)              AS finals,
+    count(*) FILTER (WHERE c.is_finals_series)      AS finals,
     count(*) FILTER (WHERE c.outcome = 'W')         AS wins,
     count(*) FILTER (WHERE c.outcome = 'D')         AS draws,
     count(*) FILTER (WHERE c.outcome = 'L')         AS losses,
@@ -202,7 +206,7 @@ agg AS (
         c.player_id,
         c.season,
         count(*)                                        AS games,
-        count(*) FILTER (WHERE c.is_final)              AS finals,
+        count(*) FILTER (WHERE c.is_finals_series)      AS finals,
         count(*) FILTER (WHERE c.outcome = 'W')         AS wins,
         count(*) FILTER (WHERE c.outcome = 'D')         AS draws,
         count(*) FILTER (WHERE c.outcome = 'L')         AS losses,
@@ -266,7 +270,7 @@ FROM (
     SELECT
         player_id,
         count(*)                                    AS games,
-        count(*) FILTER (WHERE is_final)            AS finals,
+        count(*) FILTER (WHERE is_finals_series)    AS finals,
         count(*) FILTER (WHERE round_type = 'grand_final' AND outcome = 'W')
                                                     AS premierships,
         count(*) FILTER (WHERE outcome = 'W')       AS wins,
@@ -316,8 +320,13 @@ LEFT JOIN (
 # the same facts from its own matches and keeps that artefact as an
 # independent VALIDATION witness at the rebuild's final validation stage.
 #
-# `NOT is_final` is exactly fitzRoy's "Regular" filter: migration 003
-# CHECK-constrains is_final = (round_type <> 'home_and_away').
+# `NOT is_final` is the home-and-away premiership-points set: migration 003
+# CHECK-constrains is_final = (round_type <> 'home_and_away'), so a Wildcard
+# Final is correctly excluded from the ladder here. It is NOT identical to
+# fitzRoy's own "Regular" filter any more -- fitzRoy labels a WF row `Regular`
+# because its round_levels factor has no WF level, which is why
+# validate_ladder_witness.py now excludes WF explicitly (AFLDB-ISSUE-129 §8.4
+# item 10).
 #
 # No identity re-pointing is needed or wanted here. The old SQL re-pointed
 # through afldb_identity_for_season because the legacy ladder named every
@@ -415,10 +424,13 @@ LEFT JOIN (
     FROM matches WHERE round_type = 'grand_final' AND winner_club_id IS NOT NULL
 ) gf ON gf.season = k.season AND gf.club_id = k.club_id
 LEFT JOIN (
+    -- is_finals_series, not is_final: a Wildcard Final is not a finals-series
+    -- appearance, and this column is what answers "made finals"/"missed finals"
+    -- (src/db/queries/nl/club-season.ts). AFLDB-ISSUE-129 §8.4.
     SELECT season, club_id, count(*) AS finals FROM (
-        SELECT season, home_club_id AS club_id FROM matches WHERE is_final
+        SELECT season, home_club_id AS club_id FROM matches WHERE is_finals_series
         UNION ALL
-        SELECT season, away_club_id FROM matches WHERE is_final
+        SELECT season, away_club_id FROM matches WHERE is_finals_series
     ) x GROUP BY season, club_id
 ) f ON f.season = k.season AND f.club_id = k.club_id;
 """

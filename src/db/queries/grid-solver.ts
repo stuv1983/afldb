@@ -92,10 +92,17 @@ function orderedRange(axis: GridAxisState, loKey: string, loLabel: string, hiKey
  * checks. player_match_stats.player_id is NOT NULL, so NOT (= ANY(array)) is
  * the exact complement of membership, including for an empty array.
  */
+/*
+ * Finals criteria here mean the traditional finals series, so every predicate
+ * below reads matches.is_finals_series, never matches.is_final -- a Wildcard
+ * Final is is_final = true but is not a finals appearance (AFLDB-ISSUE-129
+ * §8.4). The grand_final / preliminary_final predicates are unaffected: they
+ * name an explicit round identity.
+ */
 function winningFinalPlayerIdsArray(): SqlFragment {
   return sql`ARRAY(SELECT DISTINCT pms.player_id FROM player_match_stats pms
                      JOIN matches m ON m.id = pms.match_id
-                    WHERE m.is_final AND m.winner_club_id = pms.club_id)`;
+                    WHERE m.is_finals_series AND m.winner_club_id = pms.club_id)`;
 }
 
 /**
@@ -431,7 +438,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       const n = requireInt(axis, 'x', 'At least');
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                             JOIN matches m ON m.id = pms.match_id
-                           WHERE m.is_final AND m.winner_club_id = pms.club_id
+                           WHERE m.is_finals_series AND m.winner_club_id = pms.club_id
                            GROUP BY pms.player_id HAVING count(*) >= ${n})`;
     }
     case 'never_won_a_final':
@@ -439,7 +446,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     case 'played_finals_no_wins':
       return sql`c.finals > 0 AND NOT EXISTS (
                     SELECT 1 FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
-                     WHERE pms.player_id = p.id AND m.is_final AND m.winner_club_id = pms.club_id)`;
+                     WHERE pms.player_id = p.id AND m.is_finals_series AND m.winner_club_id = pms.club_id)`;
     case 'finals_clubs_min': {
       // Distinct organizations, not distinct historical identities --
       // finals played either side of a club rename are one club here,
@@ -448,7 +455,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                             JOIN matches m ON m.id = pms.match_id
                             JOIN clubs cl ON cl.id = pms.club_id
-                           WHERE m.is_final
+                           WHERE m.is_finals_series
                            GROUP BY pms.player_id HAVING count(DISTINCT cl.organization_id) >= ${n})`;
     }
     case 'final_game_stat_min': {
@@ -456,7 +463,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       const n = requireInt(axis, 'x', 'At least');
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                             JOIN matches m ON m.id = pms.match_id
-                           WHERE m.is_final AND ${sql.unsafe(`pms.${statKey}`)} >= ${n})`;
+                           WHERE m.is_finals_series AND ${sql.unsafe(`pms.${statKey}`)} >= ${n})`;
     }
     case 'grand_final_game_stat_min': {
       const statKey = requireStatKey(axis);
@@ -471,7 +478,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       const col = sql.unsafe(`pms.${statKey}`);
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                             JOIN matches m ON m.id = pms.match_id
-                           WHERE m.is_final
+                           WHERE m.is_finals_series
                            GROUP BY pms.player_id HAVING sum(${col}) >= ${n})`;
     }
     case 'finals_stat_avg_min': {
@@ -480,7 +487,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       const col = sql.unsafe(`pms.${statKey}`);
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                             JOIN matches m ON m.id = pms.match_id
-                           WHERE m.is_final AND ${col} IS NOT NULL
+                           WHERE m.is_finals_series AND ${col} IS NOT NULL
                            GROUP BY pms.player_id HAVING avg(${col}) >= ${avg})`;
     }
     case 'played_a_grand_final':
@@ -572,7 +579,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       // while retaining the same player/club/match semantics.
       return sql`p.id = ANY (ARRAY(SELECT DISTINCT pms.player_id FROM player_match_stats pms
                                     JOIN matches m ON m.id = pms.match_id
-                                   WHERE m.venue_id = ${venueId} AND m.is_final
+                                   WHERE m.venue_id = ${venueId} AND m.is_finals_series
                                      AND m.winner_club_id = pms.club_id))`;
     }
     case 'venue_game_stat_min': {

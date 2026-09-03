@@ -8,9 +8,12 @@
  */
 import './guard';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
+import { reconcileCareerTotals } from '@/db/queries/db-health';
+import { getSeasonRoundLadder } from '@/db/queries/rounds';
+import { seedWildcardFinalSeason, type WildcardFixture } from './wildcard-final-fixture';
 import type { NlGrain } from '@/search/nl/plan';
 
 const SUPPORTED_NL_GRAINS = {
@@ -482,5 +485,123 @@ describe('query performance', () => {
        ORDER BY m.match_date DESC LIMIT 50
     `;
     expect(Date.now() - started).toBeLessThan(200);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-129 §11 T9 and T10 — the player-career and ladder halves of the
+ * §8.4 decision, over a reserved fixture season.
+ *
+ * T9: a player whose only appearance is a Wildcard Final has played one game
+ * and NO finals, because `player_career_stats.finals` counts
+ * `matches.is_finals_series`. T10: the Wildcard Final moves no ladder figure —
+ * no premiership points, no played/win/loss, no score — and never appears in
+ * the round ladder, which reads `round_type = 'home_and_away'`.
+ */
+describe('AFLDB-ISSUE-129 wildcard finals semantics (player career and ladder)', () => {
+  let fixture: WildcardFixture;
+
+  beforeAll(async () => {
+    fixture = await seedWildcardFinalSeason(2096);
+  });
+
+  afterAll(async () => {
+    await fixture?.cleanup();
+  });
+
+  it('T9: a wildcard-only player has games = 1 and finals = 0', async () => {
+    const [row] = await sql<{ games: number; finals: number }[]>`
+      SELECT games, finals FROM player_career_stats WHERE player_id = ${fixture.wildcardOnlyPlayerId}
+    `;
+    expect(row.games).toBe(1);
+    expect(row.finals).toBe(0);
+  });
+
+  it('T9: an elimination-final player is still counted as a finals game', async () => {
+    const [row] = await sql<{ games: number; finals: number }[]>`
+      SELECT games, finals FROM player_career_stats WHERE player_id = ${fixture.finalsSeriesPlayerId}
+    `;
+    expect(row.games).toBe(1);
+    expect(row.finals).toBe(1);
+  });
+
+  it('T9: db-health finals parity reports 0 mismatches with the fixture present', async () => {
+    const checks = await reconcileCareerTotals();
+    const finals = checks.find((check) => check.check.startsWith('finals:'));
+    expect(finals).toBeDefined();
+    expect(finals!.mismatches).toBe(0);
+  });
+
+  it('T10: the Wildcard Final contributes nothing to club_seasons', async () => {
+    const rows = await sql<{
+      clubId: number; played: number; wins: number; losses: number;
+      pointsFor: number; pointsAgainst: number; premiershipPoints: number;
+    }[]>`
+      SELECT club_id AS "clubId", played, wins, losses,
+             points_for AS "pointsFor", points_against AS "pointsAgainst",
+             premiership_points AS "premiershipPoints"
+        FROM club_seasons WHERE season = ${fixture.season} ORDER BY club_id
+    `;
+    // Four clubs, one home-and-away match each: the two finals are invisible here.
+    expect(rows).toHaveLength(4);
+    for (const row of rows) expect(row.played).toBe(1);
+
+    const loser = rows.find((row) => row.clubId === fixture.wildcardLoserClubId)!;
+    // Lost the home-and-away match 80-100 and lost the Wildcard Final 93-96.
+    // Only the first is on the ladder.
+    expect(loser.wins).toBe(0);
+    expect(loser.losses).toBe(1);
+    expect(loser.pointsFor).toBe(80);
+    expect(loser.pointsAgainst).toBe(100);
+    expect(loser.premiershipPoints).toBe(0);
+
+    const winner = rows.find((row) => row.clubId === fixture.wildcardWinnerClubId)!;
+    // Won the home-and-away match 100-80 and two finals; still 1 win, 4 points.
+    expect(winner.wins).toBe(1);
+    expect(winner.pointsFor).toBe(100);
+    expect(winner.pointsAgainst).toBe(80);
+    expect(winner.premiershipPoints).toBe(4);
+  });
+
+  it('T10: the Wildcard Final does not appear in the round ladder', async () => {
+    const ladder = await getSeasonRoundLadder(fixture.season);
+    expect(ladder.length).toBeGreaterThan(0);
+    // Round 1 only: the WF and EF carry no round_number and no ladder row.
+    expect([...new Set(ladder.map((row) => row.roundNumber))]).toEqual([1]);
+    for (const row of ladder) {
+      expect(row.played).toBe(1);
+      expect(row.premiershipPoints).toBe(row.wins * 4 + row.draws * 2);
+    }
+  });
+
+  /**
+   * T16, the half a fixture can prove. `validate_ladder_witness.py --compare`
+   * asks AFLDB which seasons contain a `wildcard_final` and declares exactly
+   * those UNCOMPARABLE, because fitzRoy labels a WF row `Round.Type='Regular'`
+   * and counts it on the ladder while AFLDB does not (ISSUE-129 §8.4 item 10).
+   * The exclusion is driven by this query, so a wildcard season can never be
+   * silently passed — and a season without one is never excluded.
+   */
+  it('T16: the ladder witness wildcard-season query names the fixture season', async () => {
+    const rows = await sql<{ season: number }[]>`
+      SELECT DISTINCT season FROM matches
+       WHERE round_type = 'wildcard_final'
+       ORDER BY season
+    `;
+    const seasons = rows.map((row) => row.season);
+    expect(seasons).toContain(fixture.season);
+    // Nothing historical is dragged into the exclusion.
+    expect(seasons.filter((season) => season < 2026)).toEqual([]);
+  });
+
+  it('T10: the wildcard match is is_final but not is_finals_series', async () => {
+    const [row] = await sql<{ isFinal: boolean; isFinalsSeries: boolean; roundNumber: number | null }[]>`
+      SELECT is_final AS "isFinal", is_finals_series AS "isFinalsSeries",
+             round_number AS "roundNumber"
+        FROM matches WHERE id = ${fixture.wildcardMatchId}
+    `;
+    expect(row.isFinal).toBe(true);
+    expect(row.isFinalsSeries).toBe(false);
+    expect(row.roundNumber).toBeNull();
   });
 });

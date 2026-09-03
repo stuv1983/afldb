@@ -73,6 +73,11 @@ export function formatScore(
 }
 
 const ROUND_LABELS: Record<string, string> = {
+  // The AFL Wildcard Round (AFLDB-ISSUE-129). Every AFL call site of
+  // formatRound/formatRoundShort passes no `fallback` — only AFLW does — so an
+  // entry here is required, not cosmetic: without it the UI would render the bare
+  // identifier `wildcard_final`, including as a season-page heading and anchor id.
+  wildcard_final: 'Wildcard Final',
   elimination_final: 'Elimination Final',
   qualifying_final: 'Qualifying Final',
   semi_final: 'Semi Final',
@@ -81,6 +86,7 @@ const ROUND_LABELS: Record<string, string> = {
 };
 
 const ROUND_SHORT: Record<string, string> = {
+  wildcard_final: 'WF',
   elimination_final: 'EF',
   qualifying_final: 'QF',
   semi_final: 'SF',

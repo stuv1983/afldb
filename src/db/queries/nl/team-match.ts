@@ -17,7 +17,7 @@ type SqlFragment = ReturnType<typeof sql>;
  * uniformly instead of repeating the CASE per metric.
  */
 const SIDES = sql`
-  SELECT m.id AS match_id, m.season, m.round_type, m.round_number, m.is_final,
+  SELECT m.id AS match_id, m.season, m.round_type, m.round_number, m.is_finals_series,
          m.match_date, m.venue_id, m.attendance, m.winner_club_id,
          m.winner_club_id AS final_winner_club_id,
          m.home_club_id AS club_id, m.away_club_id AS opponent_id,
@@ -27,7 +27,7 @@ const SIDES = sql`
     LEFT JOIN match_period_scores hq ON hq.match_id = m.id AND hq.club_id = m.home_club_id AND hq.period = 3
     LEFT JOIN match_period_scores aq ON aq.match_id = m.id AND aq.club_id = m.away_club_id AND aq.period = 3
   UNION ALL
-  SELECT m.id, m.season, m.round_type, m.round_number, m.is_final,
+  SELECT m.id, m.season, m.round_type, m.round_number, m.is_finals_series,
          m.match_date, m.venue_id, m.attendance, m.winner_club_id,
          m.winner_club_id,
          m.away_club_id, m.home_club_id,
@@ -71,7 +71,7 @@ function metricValueExpr(metric: string): SqlFragment {
 /** 'finals' is a synthetic "any final" reading; every other NlMatchType is a literal round_type enum member, the same bound-and-cast pattern player-game.ts's matchTypeSql and search.ts's own round_type lookup already use. */
 function matchTypeSql(matchType: NlMatchType | undefined): SqlFragment {
   if (!matchType) return sql`TRUE`;
-  if (matchType === 'finals') return sql`t.is_final`;
+  if (matchType === 'finals') return sql`t.is_finals_series`;
   return sql`t.round_type = ${matchType}::round_type`;
 }
 
@@ -160,7 +160,7 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
          GROUP BY match_id, club_id
       ),
       period_sides AS (
-        SELECT s.match_id, s.season, s.round_type, s.round_number, s.is_final,
+        SELECT s.match_id, s.season, s.round_type, s.round_number, s.is_finals_series,
                s.match_date, s.venue_id, s.attendance, s.final_winner_club_id,
                CASE WHEN ${forPoints} > ${againstPoints} THEN s.club_id
                     WHEN ${forPoints} < ${againstPoints} THEN s.opponent_id
@@ -193,7 +193,7 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
          GROUP BY match_id, club_id
       ),
       checkpoint_sides AS (
-        SELECT s.match_id, s.season, s.round_type, s.round_number, s.is_final,
+        SELECT s.match_id, s.season, s.round_type, s.round_number, s.is_finals_series,
                s.match_date, s.venue_id, s.attendance, s.final_winner_club_id,
                CASE WHEN ${forPoints} > ${againstPoints} THEN s.club_id
                     WHEN ${forPoints} < ${againstPoints} THEN s.opponent_id

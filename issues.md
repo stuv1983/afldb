@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 10 tracked here — `AFLDB-ISSUE-104`, `-110`, `-113`, `-116`, `-123`, `-124`, `-125`, `-126`, `-127`, `-129`.
+**Open issues:** 9 tracked here — `AFLDB-ISSUE-104`, `-110`, `-113`, `-116`, `-123`, `-124`, `-125`, `-126`, `-127`.
 
 <!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
      the ISSUE-110 branch merged into dev on 2026-08-31 and its own ledger rows below are
@@ -28,7 +28,26 @@ created, reopened, resolved, or materially reclassified.
      legacy-loaded 2026 rows; adoptable set 0). Authoritative record: the `AFLDB-ISSUE-122` entry
      in `issues.md` (Resolution, 2026-09-03) and `issues/closed/AFLDB-ISSUE-122.md` §23. Four
      follow-ups were routed out of its closeout: `AFLDB-ISSUE-123`, `-124`, `-125`, `-126`. -->
-| `AFLDB-ISSUE-129` | High | Database / Data modelling / Data acquisition / Search | **Not started; a product decision blocks all implementation.** AFL Tables publishes a **Wildcard Final** round in 2026 — 28-Aug Western Bulldogs v Collingwood and 29-Aug Melbourne v Carlton, plus 92 player-match rows — which fitzRoy acquires correctly and AFLDB **cannot store**. `src/db/migrations/003_matches.sql:8` declares `round_type` as a PostgreSQL **enum** with six members and no wildcard, and `matches_round_number_ck` forbids `home_and_away` with a NULL `round_number`, so it cannot be modelled as a home-and-away round either: **a new enum value is unavoidable**. `matches_is_final_ck` then derives `is_final` from `round_type` by CHECK, so any non-`home_and_away` value makes every wildcard final a final **by construction** across the whole application unless each consumer excludes it — 34 files reference `is_final`, 19 of them non-AFLW production consumers. `import_fitzroy_core.py:136` `FINALS_CODES` also lacks `WF`, and `normalise_stats_round()` lacks `Wildcard Final`; both grains must be taught together or every player row is rejected on a round mismatch. Routed out of `AFLDB-ISSUE-128`, which made the loss audible but cannot make the rows land. Runbook: `issues/open/AFLDB-ISSUE-129.md`. | **Decide the finals semantics first (runbook §3) and record the reasoning — nothing else may start.** Does a Wildcard Final count as a finals appearance? It changes finals counts, finals-only search filters, NL answers, Grid Solver criteria and career aggregates, and retroactively defines AFLDB's position from 2026 on. **No option is authorised and no migration number is claimed** — `IssuesIndex.md` requires a live-branch-tip re-scan first, and `ALTER TYPE … ADD VALUE` cannot run inside a transaction block on older PostgreSQL, so check `tools/db/migrate.ts` before writing it. Then teach both source vocabularies, add the label in `src/lib/format.ts`, work the `is_final` consumers under the decision, and **invert rather than delete** the `AFLDB-ISSUE-128` fixture assertions in `tests/fitzroy-core-import.test.ts`. |
+<!-- RETIRED 2026-09-03 - `AFLDB-ISSUE-129` is **Resolved** and is NO LONGER an open issue.
+     AFL Tables' Wildcard Final is now canonically representable. Implementation commit `b1d4085`
+     on `opus/issue-129` adds migrations `084_round_type_wildcard_final.sql` and
+     `085_matches_is_finals_series.sql` - applied to `afldb_test` ONLY, not dev and not production
+     - a distinct `wildcard_final` round type with `matches_is_final_ck` UNCHANGED (so
+     `is_final = true` by construction), and one canonical `matches.is_finals_series` generated
+     column that is false for both `home_and_away` and `wildcard_final`. The full §11 acceptance is
+     green: T1-T16; five touched integration suites **268 passed / 5 skipped / 0 failed**;
+     typecheck clean; 0 lint findings in changed or new code; **T15 generated-column invariant
+     0 mismatches**; **T16 ladder witness 1,622 comparable club-seasons agree**; and **T7 against
+     the real live source 209 matches / 9,614 player-match rows, 0 rejected, 0 unkeyed,
+     `SOURCE COMPLETENESS: COMPLETE`** (was 207 / 9,522 with 94 unrepresentable rows). ISSUE-128
+     needed no code change. Its number stays allocated and `084`/`085` are definitively taken.
+     Authoritative record: the `AFLDB-ISSUE-129` entry in `issues.md` (Resolution, 2026-09-03) and
+     `issues/closed/AFLDB-ISSUE-129.md` §18.
+     **NOT DEPLOYED TO PRODUCTION** - production is at `083` with no wildcard support. ISSUE-128 and
+     ISSUE-129 must ship together: deploying 128 alone leaves the nightly settle unit reporting
+     `failed` every night the 2026 Wildcard Round is in the acquired window. Next action: merge both
+     to `main`, apply `084` then `085` to dev and re-validate, then production in the order
+     migrations -> `npm run db:privileges` -> code deploy -> supervised settle. -->
 <!-- RETIRED 2026-09-03 — `AFLDB-ISSUE-128` is **Resolved** and is NO LONGER an open issue.
      A current-season settle can no longer report success while dropping rows AFL Tables supplied:
      the completeness verdict is derived from the source's own counters (never a calendar), stated
@@ -12666,15 +12685,20 @@ Full validation from implementation: fixture suite 87/5 skipped; 5 focused suite
 
 ## AFLDB-ISSUE-129 — AFL Tables' Wildcard Final has no canonical representation in AFLDB
 
-- **Status:** Open — not started. A product decision blocks all implementation.
+- **Status:** Resolved 2026-09-03
 - **Severity:** High
 - **Area:** Database / Data modelling / Data acquisition / Search
 - **Found:** 2026-09-03 (routed out of `AFLDB-ISSUE-128`'s root-cause analysis)
-- **Resolved:** N/A
-- **Files (to review, none changed):** `src/db/migrations/003_matches.sql`, `tools/migration/import_fitzroy_core.py`, `src/lib/format.ts`, and the 19 non-AFLW production consumers of `is_final` listed in the runbook
-- **Runbook:** `issues/open/AFLDB-ISSUE-129.md`
+- **Resolved:** 2026-09-03 — implemented and committed as `b1d4085` on `opus/issue-129`, with the
+  full §11 acceptance green against `afldb_test` and against the real live source. See Resolution
+  below and `issues/closed/AFLDB-ISSUE-129.md` §13-§18. **Not merged to `main` and not deployed to
+  production.**
+- **Files (39 changed in `b1d4085`, plus this ledger):** `src/db/migrations/084_round_type_wildcard_final.sql` (new), `src/db/migrations/085_matches_is_finals_series.sql` (new), `tools/migration/import_fitzroy_core.py`, `tools/migration/rebuild_derived.py`, `tools/rebuild/fitzroy/validate_ladder_witness.py`, `src/db/queries/{db-health,grid-solver,match-admin,match-search,player-derived,search}.ts`, `src/db/queries/nl/{head-to-head,player-career,player-game,team-match,team-streak}.ts`, `src/lib/{format.ts,ingest/datasets.ts,external-afl/current-season-import.ts}`, `src/search/{match-spec.ts,query-builder-spec.ts,nl/plan.ts,nl/vocab.ts}`, `src/app/admin/data-editor/{CreateMatchForm.tsx,actions.ts}`, `tests/{finals-semantics-contract,fitzroy-core-import,format,nl-parser,admin-match-mutations}.test.ts`, `tests/integration/{database,grid-solver,nl-answers-team-club}.test.ts`, `tests/integration/wildcard-final-fixture.ts` (new), `docs/architecture.md`, `docs/rebuild-manifests/afltables_fitzroy_core/issue129-t7-20260903.json` (new). Stage 1 measured **47** files referencing `is_final`/`isFinal`, not the 34 first recorded. Original review list: `src/db/migrations/003_matches.sql`, `tools/migration/import_fitzroy_core.py`, `src/lib/ingest/datasets.ts`, `src/lib/format.ts`, and the full call-site consumer matrix in runbook §9 (classes A/B/C/D). Stage 1 measured **47** files referencing `is_final`/`isFinal` in this worktree, not the 34 first recorded, and found two consumers §4 had mis-stated: `src/lib/format.ts` is mandatory rather than cosmetic (every non-AFLW `formatRound*` call passes no `fallback`, so an unmapped type renders as the literal string `wildcard_final`), and `tools/rebuild/fitzroy/validate_ladder_witness.py` is a consumer §4 missed entirely (its ISSUE-095 D7 witness keeps fitzRoy's `Round.Type == "Regular"`, which includes the WF rows).
+- **Runbook:** `issues/closed/AFLDB-ISSUE-129.md` — the authoritative evidence ledger. Decision in
+  **§8**, consumer matrix in **§9**, acceptance plan in **§11**, implementation in **§13-§15**,
+  database-backed acceptance in **§17**, closeout in **§18**.
 - **Related:** `AFLDB-ISSUE-128` (**Resolved 2026-09-03** — it found and reported this, and its completeness verdict stays red until this is fixed; it is also why production deployment of `--require-complete-source` waits on this decision), `AFLDB-ISSUE-122` (the pipeline the rows travel)
-- **Migration:** **will need one, NOT yet claimed.** `IssuesIndex.md` requires a live-branch-tip re-scan first; `084` is next free as seen from `codex/issue-127` but is not reserved.
+- **Migration:** **TWO, CLAIMED, WRITTEN AND COMMITTED — `084_round_type_wildcard_final.sql` and `085_matches_is_finals_series.sql`, applied to `afldb_test` 2026-09-03. NOT applied to `afldb_dev` and NOT applied to production (production is at `083`).** `tools/db/migrate.ts:211-212` wraps each migration file in one `sql.begin()` transaction and PostgreSQL 16 forbids using a new enum label in the transaction that adds it, so the `ALTER TYPE round_type ADD VALUE 'wildcard_final'` stands alone in `084` and the `is_finals_series` generated column, its index and its comments are in `085`. The numbers were claimed after a scan of all 54 references and 5 sibling worktrees. **The next free migration number is `086`.**
 
 ### Symptom
 
@@ -12705,13 +12729,119 @@ set out in the runbook §3; **none is authorised**. Operator instruction: *"Do n
 Wildcard Final as a normal final or non-final… That needs an explicit AFLDB-wide semantic decision
 and regression coverage."*
 
-### Next action
+### Stage 1 — decision and impact analysis [2026-09-03]
 
-**Decide the finals semantics (runbook §3) and record the reasoning in the runbook.** Nothing else
-may start. Then: re-scan every live branch tip for a migration number; check whether
-`tools/db/migrate.ts` runs migrations inside a transaction, because `ALTER TYPE … ADD VALUE` cannot
-on older PostgreSQL; teach both source vocabularies; add the display label in `src/lib/format.ts`;
-work the `is_final` consumers under the decision; and invert — deliberately, not delete — the
-`AFLDB-ISSUE-128` fixture assertions in `tests/fitzroy-core-import.test.ts`, which already build a
-snapshot carrying the exact real vocabulary. Prove the two real matches reach canonical `matches`
-and `player_match_stats` against `afldb_test`, and that a rerun writes nothing.
+Analysis only; no schema, code, migration, test, database or production change was made, and
+nothing was committed. Recorded in runbook §8-§12:
+
+- **§8 — recommended semantics (NOT authorised).** Add a distinct `wildcard_final` round type
+  positioned `AFTER 'home_and_away'`; leave `matches_is_final_ck` **unchanged**, so
+  `is_final = true` by construction; re-document `is_final` as the structural
+  "not a home-and-away premiership-points match" flag it literally is; and add ONE explicit
+  finals-series predicate for the affirmative consumers. Plain Option A is refused because
+  `club_seasons.finals_played` feeds `nl/club-season.ts` `made_finals`/`missed_finals`, so a
+  9th-placed club eliminated in the Wildcard Round would answer "made the finals". Plain Option B
+  is refused because `NOT is_final` is what correctly keeps a Wildcard Final out of the ladder,
+  out of premiership points and out of Brownlow polling — and because omitting `WF` from
+  `FINALS_CODES` would crash `import_fitzroy_core.py:1835` on `int('WF')`.
+- **§9 — consumer matrix**, enumerated by call site from the repository: class A (inherits
+  `is_final = true`, no edit), class B (~20 affirmative sites needing the explicit exclusion),
+  class C (explicit round identity, immune), class D (six further product decisions, including
+  the mandatory `format.ts` label and the newly found ladder-witness consumer).
+- **§10 — migration shape.** Two files, not one. `tools/db/migrate.ts:211-212` wraps each file in
+  one `sql.begin()` transaction and PostgreSQL 16 forbids using a new enum label in the
+  transaction that adds it, so `ALTER TYPE round_type ADD VALUE` stands alone. Preferred predicate
+  shape is a `GENERATED ALWAYS AS ... STORED` column on `matches` so there is exactly one
+  definition. `076_afltables_settle_projections.sql` inherits the enum and needs no change.
+- **§11 — 16-case acceptance plan**, defined before implementation and mapped onto existing test
+  suites, including T15 "no historical regression" over every pre-2026 finals aggregate.
+
+### Stage 2 — implementation [2026-09-03, commit `b1d4085`]
+
+Runbook §13-§15. Migrations `084` and `085` written after a live-branch-tip re-scan; both source
+vocabularies taught by exact table (`results.csv` `WF`, `player_stats` `Wildcard Final`) with no
+regex, case-folding, prefix matching or fallback; every affirmative finals consumer switched to
+`is_finals_series` while every exclusionary one still reads `NOT is_final`; the six §9 class D
+product decisions implemented (display label, NL match type, site-search round, Match Search
+filter, admin round option, and `is_finals_series` as a Query Builder field with `is_final`
+relabelled `Not home-and-away` so the two stop reading as synonyms). `WF` joins `FINALS_CODES`,
+which gates Brownlow round-vote derivation and also protects the round-vote key from `int('WF')`.
+Validation: 84 test files / **2,753 unit tests passed**, typecheck clean, **0 lint findings in
+changed or new code**. A new `tests/finals-semantics-contract.test.ts` (10 cases) pins the
+cross-cutting invariant no existing suite owned — `is_finals_series` is defined once, in `085`,
+and no consumer re-spells the predicate.
+
+### Stage 3 — database-backed acceptance [2026-09-03, `afldb_test` at `085`]
+
+Runbook §17. The five touched integration suites — `database`, `grid-solver`,
+`nl-answers-team-club`, `nl-semantic-mapping`, `settle-afltables` — **268 passed / 5 skipped /
+0 failed**. **T15**, the single most important gate, returns **0 mismatches** on
+`is_finals_series <> (is_final AND round_type <> 'wildcard_final')` across full history. **T16**,
+an independent second-toolchain witness, agrees with `club_seasons` on **1,622** comparable
+club-seasons for `points_for`, `points_against`, `premiership_points`, `ladder_rank` and
+`percentage`; seasons containing a wildcard final are declared explicitly uncomparable and named
+rather than silently weakened, and that exclusion query is itself pinned by a fixture case. T8-T11
+are covered by 19 new fixture-backed cases: a club that loses a Wildcard Final and plays no other
+final has `finals_played = 0` and answers **`missed_finals`**; a wildcard-only player has career
+`finals = 0` and `games = 1`; the WF match contributes no premiership points, no played/win/loss,
+no score and no ladder row; and no Grid Solver finals criterion matches a wildcard-only player.
+
+**T7 — the real source, re-acquired live.** Through the pinned fitzRoy 1.8.0: **209 matches,
+9,614 player-match rows, 0 rejections, 0 unkeyed rejections, both presence enumerations complete,
+verdict `SOURCE COMPLETENESS: COMPLETE`** — where the same source previously emitted 207 / 9,522
+with 94 unrepresentable rows. The two Wildcard Finals and their 92 player rows are exactly the
+difference. Manifest: `docs/rebuild-manifests/afltables_fitzroy_core/issue129-t7-20260903.json`.
+The 3-hour full-season canonical apply was deliberately not run (runbook §17.4) — an accepted
+operator tradeoff, recorded as such, not an evidence gap.
+
+### Resolution — 2026-09-03
+
+`round_type` gains a distinct `wildcard_final` member (`084`), positioned after `home_and_away`.
+`matches_is_final_ck` is **unchanged**, so a wildcard final carries `is_final = true` by
+construction and 129 seasons of history are untouched. The Wildcard Round is the first round in
+AFL history where two questions that always shared one answer come apart, so AFLDB now asks both
+separately and defines each exactly once:
+
+- `is_final` — *is this outside the home-and-away premiership-points season?* **True** for a
+  wildcard final, which is why the ladder, premiership points and Brownlow polling keep reading it
+  and are correct with no change.
+- `matches.is_finals_series` (`085`, `GENERATED ALWAYS AS ... STORED`) — *is this part of the
+  traditional finals series?* **False** for both `home_and_away` and `wildcard_final`.
+
+Every "did they play finals" answer now reads `is_finals_series`: `player_career_stats` and
+`player_season_stats` `finals`, `club_seasons.finals_played`, the `db-health` finals parity check,
+all Grid Solver finals criteria, the natural-language *finals* match type and the Match Search
+"Finals only" filter. The decisive consequence, and the reason plain "counts as a final" was
+refused: a club seeded 9th that loses its Wildcard Final and never reaches the eight has
+`finals_played = 0` and answers **missed the finals**.
+
+`AFLDB-ISSUE-128` needed **no code change**, exactly as predicted: its completeness verdict is a
+measurement, and the measurement moved to `COMPLETE`. Its fixture assertions were **inverted in
+place, not deleted**, and its INCOMPLETE guarantee was re-proved on a round code AFLDB still does
+not know (`XF`), so teaching AFLDB one round did not switch the reporting off for the next.
+
+### Follow-up — deliberately not done here
+
+1. **No production deployment, and none is authorised by this closeout.** Production is at `083`.
+   `db:privileges` was not run and no database outside `afldb_test` was touched; `084`/`085` have
+   not been applied to `afldb_dev`.
+2. **`AFLDB-ISSUE-128` and `AFLDB-ISSUE-129` must ship together.** 128 alone makes the nightly
+   settle unit report `failed` every night the 2026 Wildcard Round is inside the acquired window;
+   129 is what makes the rows land and the verdict go green. Both are green independently, 129
+   changed no ISSUE-128 code, and 129's tests re-prove 128's guarantee — so merging both to `main`
+   together is the safe sequence and neither should go alone.
+3. **Exact production/deployment next action**, in order: merge the ISSUE-128 and ISSUE-129 work to
+   `main` together; on **dev**, apply `084` then `085` with `npm run db:migrate`, reconcile
+   privileges (subject to the shared-dev orphan-migration caveat recorded in ISSUE-128 §12),
+   deploy the code, and run one supervised settle expecting `SOURCE COMPLETENESS: COMPLETE` and a
+   green unit; then on **production**, take a pre-deploy backup, apply `084` then `085`, run
+   `npm run db:privileges`, deploy the code, and run one supervised `--dry-run --auto-apply` before
+   the real apply. Migrations precede code in both environments. The generated column is computed
+   by PostgreSQL so existing rows need no backfill, but `rebuild_derived.py` should be re-run once
+   per environment so `player_career_stats.finals` and `club_seasons.finals_played` are rebuilt
+   under the new predicate before the first wildcard row lands.
+4. The cosmetic `/admin/current-season` rendered-DOM check carried over from `AFLDB-ISSUE-128` was
+   **not** performed here either. It remains cosmetic-only and cannot make a run silently report
+   success.
+
+---

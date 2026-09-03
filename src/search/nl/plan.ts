@@ -362,13 +362,19 @@ export type NlPlayerRef = { id: number; slug: string; name: string };
 export type NlClubRef = { organizationId: number; slug: string; name: string };
 export type NlVenueRef = { id: number; slug: string; name: string };
 
+/**
+ * 'finals' is the synthetic "any finals-series match" reading and compiles to
+ * matches.is_finals_series. Every other member is a literal round_type enum
+ * member, including 'wildcard_final' — the AFL Wildcard Round, which is NOT part
+ * of the finals series and so is never matched by 'finals' (AFLDB-ISSUE-129 §8.4).
+ */
 export type NlMatchType =
   | 'finals' | 'home_and_away' | 'grand_final' | 'preliminary_final'
-  | 'semi_final' | 'qualifying_final' | 'elimination_final';
+  | 'semi_final' | 'qualifying_final' | 'elimination_final' | 'wildcard_final';
 
 const NL_MATCH_TYPES: readonly NlMatchType[] = [
   'finals', 'home_and_away', 'grand_final', 'preliminary_final',
-  'semi_final', 'qualifying_final', 'elimination_final',
+  'semi_final', 'qualifying_final', 'elimination_final', 'wildcard_final',
 ];
 
 export function isNlMatchType(value: string): value is NlMatchType {
@@ -694,7 +700,9 @@ export const NL_COVERAGE: Partial<Record<string, NlCoverage>> = {
     // played. (NL_LIMITS is declared below this, so referencing it here
     // would also be a temporal-dead-zone error.)
     seasons: [[1931, 1934], [1984, Number.POSITIVE_INFINITY]],
-    neverForMatchTypes: ['finals', 'grand_final', 'preliminary_final', 'semi_final', 'qualifying_final', 'elimination_final'],
+    // A Wildcard Final is not polled for the Brownlow either — it is outside the
+    // home-and-away season (AFLDB-ISSUE-129 §8.4).
+    neverForMatchTypes: ['finals', 'grand_final', 'preliminary_final', 'semi_final', 'qualifying_final', 'elimination_final', 'wildcard_final'],
     // player_career/player_season brownlow_votes are season and career
     // TOTALS, which exist for every year the medal has been awarded.
     // Only the per-match figure has the gap.

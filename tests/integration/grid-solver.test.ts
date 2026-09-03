@@ -11,7 +11,7 @@ import './guard';
 
 import { performance } from 'node:perf_hooks';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
 import { solveCellRows, solveCellSummary } from '@/db/queries/grid-solver';
@@ -23,6 +23,7 @@ import {
   isAxisComplete,
   type GridAxisState,
 } from '@/search/grid-solver-spec';
+import { seedWildcardFinalSeason, type WildcardFixture } from './wildcard-final-fixture';
 
 afterAll(async () => {
   await sql.end();
@@ -624,5 +625,82 @@ describe('grid solver correctness', () => {
       `;
       expect(led.found, `player ${r.id} (${r.displayName})`).toBe(true);
     }
+  });
+});
+
+/**
+ * AFLDB-ISSUE-129 §11 T11 — the Grid Solver's finals criteria.
+ *
+ * Every affirmative finals builder reads `matches.is_finals_series`, so a
+ * player whose only game is a Wildcard Final satisfies none of them — not even
+ * "won a final", which the fixture makes the hard case by putting that player
+ * on the WINNING side. The `grand_final_*` builders read `round_type` directly
+ * and are untouched by the new enum value.
+ */
+describe('AFLDB-ISSUE-129 wildcard finals semantics (grid solver)', () => {
+  let fixture: WildcardFixture;
+
+  /** The fixture season alone, used as the partner axis so a cell isolates it. */
+  let seasonAxis: GridAxisState;
+
+  beforeAll(async () => {
+    fixture = await seedWildcardFinalSeason(2097);
+    seasonAxis = {
+      builder: 'played_between_seasons',
+      params: { from: String(fixture.season), to: String(fixture.season) },
+    };
+  });
+
+  afterAll(async () => {
+    await fixture?.cleanup();
+  });
+
+  async function playerIdsFor(axis: GridAxisState): Promise<number[]> {
+    const { rows } = await solveCellRows(axis, seasonAxis, 'games_asc',
+      { limit: GRID_LIMITS.maxRowsPerCell, offset: 0 });
+    return rows.map((row) => row.id);
+  }
+
+  it('the fixture season is isolated: only the two fixture players are in the cell', async () => {
+    const ids = await playerIdsFor(fillerAxis('career_games_min'));
+    expect(ids.sort()).toEqual(
+      [fixture.wildcardOnlyPlayerId, fixture.finalsSeriesPlayerId].sort(),
+    );
+  });
+
+  it.each([
+    ['played_in_a_final', {}],
+    ['won_a_final', {}],
+    ['finals_games_min', { games: '1' }],
+    ['final_game_stat_min', { stat: 'disposals', x: '1' }],
+    ['played_a_grand_final', {}],
+    ['finals_wins_min', { x: '1' }],
+  ] as const)('a wildcard-only player does not satisfy "%s"', async (builder, params) => {
+    const ids = await playerIdsFor({ builder, params: { ...params } });
+    expect(ids).not.toContain(fixture.wildcardOnlyPlayerId);
+  });
+
+  it.each([
+    ['played_in_a_final', {}],
+    ['finals_games_min', { games: '1' }],
+    ['final_game_stat_min', { stat: 'disposals', x: '1' }],
+  ] as const)('an elimination-final player still satisfies "%s"', async (builder, params) => {
+    const ids = await playerIdsFor({ builder, params: { ...params } });
+    expect(ids).toContain(fixture.finalsSeriesPlayerId);
+  });
+
+  it('"never played finals" now includes the wildcard-only player', async () => {
+    const ids = await playerIdsFor(fillerAxis('never_played_finals'));
+    expect(ids).toContain(fixture.wildcardOnlyPlayerId);
+    expect(ids).not.toContain(fixture.finalsSeriesPlayerId);
+  });
+
+  it('the grand_final_* criteria are untouched by the new enum value', async () => {
+    const played = await playerIdsFor({ builder: 'played_a_grand_final', params: {} });
+    expect(played).toHaveLength(0);
+    const never = await playerIdsFor({ builder: 'never_played_grand_final', params: {} });
+    expect(never.sort()).toEqual(
+      [fixture.wildcardOnlyPlayerId, fixture.finalsSeriesPlayerId].sort(),
+    );
   });
 });

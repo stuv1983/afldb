@@ -230,6 +230,25 @@ describe('6. finals', () => {
     expect(p.player?.name).toBe('Dustin Martin');
   });
 
+  // AFLDB-ISSUE-129 §8.4 item 8. "wildcard final" contains the word "final", so
+  // it has to beat the bare /\bfinals?\b/ rule or it is silently read as a
+  // generic finals question. It is its own match type, not a finals synonym.
+  it('reads a wildcard final as its own match type, not as generic finals', async () => {
+    for (const q of [
+      'dusty top 5 disposal games in the wildcard final',
+      'dusty top 5 disposal games in wildcard finals',
+      'dusty top 5 disposal games in the wildcard round',
+    ]) {
+      const p = await plan(q);
+      expect(p.scope.matchType, q).toBe('wildcard_final');
+    }
+  });
+
+  it('leaves the generic finals reading unchanged', async () => {
+    const p = await plan('dusty top 5 disposal games in finals');
+    expect(p.scope.matchType).toBe('finals');
+  });
+
   it('most finals played without winning a premiership', async () => {
     const p = await plan('most finals played without winning a premiership');
     expect(p.grain).toBe('player_career');

@@ -7,9 +7,9 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-09-03
-**Open issues:** 10 tracked here — `AFLDB-ISSUE-104`, `AFLDB-ISSUE-110`,
+**Open issues:** 9 tracked here — `AFLDB-ISSUE-104`, `AFLDB-ISSUE-110`,
 `AFLDB-ISSUE-113`, `AFLDB-ISSUE-116`, `AFLDB-ISSUE-123`, `AFLDB-ISSUE-124`,
-`AFLDB-ISSUE-125`, `AFLDB-ISSUE-126`, `AFLDB-ISSUE-127`, `AFLDB-ISSUE-129`.
+`AFLDB-ISSUE-125`, `AFLDB-ISSUE-126`, `AFLDB-ISSUE-127`.
 
 <!-- ALLOCATION WARNING 2026-09-01: `AFLDB-ISSUE-118` is allocated and is NOT free.
      It belongs to the Gridley compatibility-corpus project on branch `opus/gridley-corpus`,
@@ -58,8 +58,15 @@
      reserved.
      UPDATE 2026-09-03 (ISSUE-128 closeout): `AFLDB-ISSUE-128` is **Resolved 2026-09-03** and is
      no longer an open issue; its number stays allocated and it still claims NO migration number.
-     **Next free issue ID is still `AFLDB-ISSUE-130`.** `AFLDB-ISSUE-129` remains Open, not
-     started, and still has NOT claimed a migration number. -->
+     **Next free issue ID is still `AFLDB-ISSUE-130`.**
+     UPDATE 2026-09-03 (ISSUE-129 closeout): `AFLDB-ISSUE-129` is **Resolved 2026-09-03** and is no
+     longer an open issue; its number stays allocated. It **CLAIMED, WROTE AND COMMITTED TWO
+     MIGRATION NUMBERS** - `084_round_type_wildcard_final.sql` and
+     `085_matches_is_finals_series.sql`, committed on `opus/issue-129` at `b1d4085` after a scan of
+     all 54 references and 5 sibling worktrees. Both are APPLIED TO `afldb_test` ONLY - **not**
+     `afldb_dev` and **not** production, which is still at `083`. **`084` and `085` are definitively
+     taken; the next free migration number is `086`, and any branch needing one must still re-scan
+     every live branch tip.** **Next free issue ID is `AFLDB-ISSUE-130`.** -->
 
 <!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
      the ISSUE-110 branch merged into dev on 2026-08-31 and its own row below is now
@@ -263,7 +270,26 @@ closure boundary, and the unrelated query-builder timing regression remains with
      the `AFLDB-ISSUE-122` entry in `issues.md` (Resolution, 2026-09-03) and
      `issues/closed/AFLDB-ISSUE-122.md` §23. Four follow-ups routed out of the closeout:
      `AFLDB-ISSUE-123`, `-124`, `-125`, `-126`. -->
-| `AFLDB-ISSUE-129` | High | Database / Data modelling / Data acquisition / Search | **Not started; a product decision blocks all implementation.** AFL Tables publishes a **Wildcard Final** round in 2026 — 28-Aug Western Bulldogs v Collingwood and 29-Aug Melbourne v Carlton, plus 92 player-match rows — which fitzRoy acquires correctly and AFLDB **cannot store**. `src/db/migrations/003_matches.sql:8` declares `round_type` as a PostgreSQL **enum** with six members and no wildcard, and `matches_round_number_ck` forbids `home_and_away` with a NULL `round_number`, so it cannot be modelled as a home-and-away round either: **a new enum value is unavoidable**. `matches_is_final_ck` then derives `is_final` from `round_type` by CHECK, so any non-`home_and_away` value makes every wildcard final a final **by construction** across the whole application unless each consumer excludes it — 34 files reference `is_final`, 19 of them non-AFLW production consumers. `import_fitzroy_core.py:136` `FINALS_CODES` also lacks `WF`, and `normalise_stats_round()` lacks `Wildcard Final`; both grains must be taught together or every player row is rejected on a round mismatch. Routed out of `AFLDB-ISSUE-128`, which made the loss audible but cannot make the rows land. Runbook: `issues/open/AFLDB-ISSUE-129.md`. | **Decide the finals semantics first (runbook §3) and record the reasoning — nothing else may start.** Does a Wildcard Final count as a finals appearance? It changes finals counts, finals-only search filters, NL answers, Grid Solver criteria and career aggregates, and retroactively defines AFLDB's position from 2026 on. **No option is authorised and no migration number is claimed** — `IssuesIndex.md` requires a live-branch-tip re-scan first, and `ALTER TYPE … ADD VALUE` cannot run inside a transaction block on older PostgreSQL, so check `tools/db/migrate.ts` before writing it. Then teach both source vocabularies, add the label in `src/lib/format.ts`, work the `is_final` consumers under the decision, and **invert rather than delete** the `AFLDB-ISSUE-128` fixture assertions in `tests/fitzroy-core-import.test.ts`. |
+<!-- RETIRED 2026-09-03 - `AFLDB-ISSUE-129` is **Resolved** and is NO LONGER an open issue.
+     AFL Tables' Wildcard Final is now canonically representable. Implementation commit `b1d4085`
+     on `opus/issue-129` adds migrations `084_round_type_wildcard_final.sql` and
+     `085_matches_is_finals_series.sql` - applied to `afldb_test` ONLY, not dev and not production
+     - a distinct `wildcard_final` round type with `matches_is_final_ck` UNCHANGED (so
+     `is_final = true` by construction), and one canonical `matches.is_finals_series` generated
+     column that is false for both `home_and_away` and `wildcard_final`. The full §11 acceptance is
+     green: T1-T16; five touched integration suites **268 passed / 5 skipped / 0 failed**;
+     typecheck clean; 0 lint findings in changed or new code; **T15 generated-column invariant
+     0 mismatches**; **T16 ladder witness 1,622 comparable club-seasons agree**; and **T7 against
+     the real live source 209 matches / 9,614 player-match rows, 0 rejected, 0 unkeyed,
+     `SOURCE COMPLETENESS: COMPLETE`** (was 207 / 9,522 with 94 unrepresentable rows). ISSUE-128
+     needed no code change. Its number stays allocated and `084`/`085` are definitively taken.
+     Authoritative record: the `AFLDB-ISSUE-129` entry in `issues.md` (Resolution, 2026-09-03) and
+     `issues/closed/AFLDB-ISSUE-129.md` §18.
+     **NOT DEPLOYED TO PRODUCTION** - production is at `083` with no wildcard support. ISSUE-128 and
+     ISSUE-129 must ship together: deploying 128 alone leaves the nightly settle unit reporting
+     `failed` every night the 2026 Wildcard Round is in the acquired window. Next action: merge both
+     to `main`, apply `084` then `085` to dev and re-validate, then production in the order
+     migrations -> `npm run db:privileges` -> code deploy -> supervised settle. -->
 <!-- RETIRED 2026-09-03 — `AFLDB-ISSUE-128` is **Resolved** and is NO LONGER an open issue.
      A current-season settle can no longer report success while dropping rows AFL Tables supplied:
      the completeness verdict is derived from the source's own counters (never a calendar), stated

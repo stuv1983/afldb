@@ -7,12 +7,12 @@ import type { NlAnswerPayload, NlTeamStreakRow } from '@/search/nl/answer-types'
 type SqlFragment = ReturnType<typeof sql>;
 
 const SIDES = sql`
-  SELECT m.id AS match_id, m.season, m.round_type, m.round_number, m.is_final,
+  SELECT m.id AS match_id, m.season, m.round_type, m.round_number, m.is_finals_series,
          m.match_date, m.venue_id, m.winner_club_id,
          m.home_club_id AS club_id, m.away_club_id AS opponent_id
     FROM matches m
   UNION ALL
-  SELECT m.id, m.season, m.round_type, m.round_number, m.is_final,
+  SELECT m.id, m.season, m.round_type, m.round_number, m.is_finals_series,
          m.match_date, m.venue_id, m.winner_club_id,
          m.away_club_id, m.home_club_id
     FROM matches m
@@ -20,7 +20,7 @@ const SIDES = sql`
 
 function matchTypeSql(matchType: NlMatchType | undefined): SqlFragment {
   if (!matchType) return sql`TRUE`;
-  if (matchType === 'finals') return sql`t.is_final`;
+  if (matchType === 'finals') return sql`t.is_finals_series`;
   return sql`t.round_type = ${matchType}::round_type`;
 }
 

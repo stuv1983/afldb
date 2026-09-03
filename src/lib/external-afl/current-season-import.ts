@@ -399,7 +399,9 @@ function roundCodes(match: ExternalCurrentMatch): string[] {
   if (match.roundNumber !== null) return [String(match.roundNumber)];
   const label = match.roundLabel?.trim().toUpperCase();
   if (!label) return [];
-  if (['EF', 'QF', 'SF', 'PF', 'GF'].includes(label)) return [label];
+  // 'WF' is the AFL Wildcard Round (AFLDB-ISSUE-129). Exact codes only — an
+  // unrecognised label yields no round code rather than a guess.
+  if (['EF', 'QF', 'SF', 'PF', 'GF', 'WF'].includes(label)) return [label];
   return [];
 }
 

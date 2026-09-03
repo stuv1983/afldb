@@ -100,7 +100,7 @@ export async function searchAdminMatches(options: {
 
 export type CreateMatchInput = {
   season: number;
-  roundType: 'home_and_away' | 'elimination_final' | 'qualifying_final' | 'semi_final' | 'preliminary_final' | 'grand_final';
+  roundType: 'home_and_away' | 'wildcard_final' | 'elimination_final' | 'qualifying_final' | 'semi_final' | 'preliminary_final' | 'grand_final';
   roundNumber?: number | null;
   roundCode?: string | null;
   matchDate: string; // YYYY-MM-DD
@@ -152,6 +152,7 @@ export async function createMatch(input: CreateMatchInput): Promise<{
         case 'semi_final': roundCode = 'SF'; break;
         case 'qualifying_final': roundCode = 'QF'; break;
         case 'elimination_final': roundCode = 'EF'; break;
+        case 'wildcard_final': roundCode = 'WF'; break;
         default: roundCode = 'Final';
       }
     }
