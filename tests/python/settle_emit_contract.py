@@ -173,7 +173,9 @@ def run(snapshot: Snapshot, *, mode: str = ifc.ON_RECORD_ERROR_REJECT,
     clubs = clubs_resolver()
     policy = ifc.RecordErrorPolicy(mode, scope_key=SCOPE)
     matches = ifc.scan_results(snapshot.results_path, clubs, policy)
-    players, rows_read, votes = ifc.scan_player_stats(
+    # AFLDB-ISSUE-136 added a fourth return (the continuity rules applied); in-season
+    # `continuity` is None, so it is always empty here.
+    players, rows_read, votes, _continuity = ifc.scan_player_stats(
         snapshot.files, matches, clubs, vote_seasons if vote_seasons is not None
         else {SEASON}, [], policy)
     bundle = ifc.emit_observation_bundle(

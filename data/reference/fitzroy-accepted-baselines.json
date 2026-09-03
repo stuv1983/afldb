@@ -318,10 +318,37 @@
         ]
       },
 
+      "amendments": [
+        {
+          "date": "2026-09-04",
+          "issue": "AFLDB-ISSUE-136",
+          "kind": "import_transformation_added",
+          "$comment": [
+            "The raw artefacts, their hashes, the manifest binding and every identity_scan figure",
+            "are UNCHANGED. The importer gained the profile_url_continuity transformation",
+            "(tools/rebuild/fitzroy/fitzroy-contract.json, tools/migration/import_fitzroy_core.py)",
+            "and measured.players therefore moved 13275 -> 13271: the four 2025 profiles AFL",
+            "Tables renumbered (blank fitzRoy ID, career-game numbering continuing by exactly one",
+            "from the continuing profile) now fold into their continuing players instead of",
+            "seeding four 2025-only duplicates. distinct_urls stays 13275 because every profile",
+            "path is still registered as an external identity of its (now single) player.",
+            "",
+            "Recorded here as a dated amendment to the accepted entry rather than a new",
+            "acceptance: the acceptance binds bytes and measurements, both re-derived by the",
+            "validator on every run, and the OLD players figure was the one that described a",
+            "split identity. Ratification of this amendment (or a decision to re-accept under a",
+            "bumped contract_version instead) is the operator's, recorded in",
+            "issues/open/AFLDB-ISSUE-136.md."
+          ]
+        }
+      ],
+
       "measured": {
         "$comment": [
           "Drift gates. Re-derived from the snapshot on every validate and compared exactly.",
-          "Every value is identical to retired baseline full-history-20260827's."
+          "Every value is identical to retired baseline full-history-20260827's EXCEPT",
+          "players (13275 -> 13271) and the added players_with_renumbered_profile, both from",
+          "the AFLDB-ISSUE-136 amendment above."
         ],
         "matches": 16838,
         "matches_with_player_rows": 16838,
@@ -330,7 +357,8 @@
         "venues": 52,
         "attendance_known": 15187,
         "club_identities": 24,
-        "players": 13275,
+        "players": 13271,
+        "players_with_renumbered_profile": 4,
         "players_with_dob": 855,
         "players_with_dob_conflict": 0,
         "player_match_rows": 685471,
@@ -341,7 +369,10 @@
         "$comment": [
           "Canonical identity is the AFL Tables profile URL. The fitzRoy numeric ID is",
           "optional: 83 recent-2025 rows carry none, and distinct_urls - distinct_ids = 5",
-          "is exactly the five players who have no ID anywhere in the snapshot.",
+          "is exactly the five profile paths that have no ID anywhere in the snapshot.",
+          "AFLDB-ISSUE-136 (2026-09-04): those five paths are FOUR renumbered profiles of",
+          "continuing players (79 rows) plus ONE genuine 2025 debutant (Billy Wilson, 4 rows),",
+          "so they denote 13271 players, not 13275 — see measured.players and the amendment.",
           "Identical to retired baseline full-history-20260827's scan."
         ],
         "rows": 685473,
@@ -387,6 +418,23 @@
             "rule": "blank Player falls back to First.name + ' ' + Surname only when both are present; a non-blank Player always wins; neither present still fails closed",
             "rows_affected": 79,
             "players_affected": 4
+          }
+        ],
+        "identity_continuity": [
+          {
+            "kind": "profile_url_continuity",
+            "added": "2026-09-04",
+            "issue": "AFLDB-ISSUE-136",
+            "rule": "a renumbered AFL Tables profile (blank fitzRoy ID, live 2025 url) folds into its continuing player only under a tracked rule binding the continuing ID, both profiles' seasons, the renumbered row count and AFL Tables' career-game numbering continuing by exactly one; both urls register to the one player; a blank-ID profile no rule names is refused unless it debuts at career game 1",
+            "rule_ids": [
+              "2025-charlie-cameron-renumbered-profile",
+              "2025-jack-graham-renumbered-profile",
+              "2025-jack-ross-renumbered-profile",
+              "2025-jack-williams-renumbered-profile"
+            ],
+            "rows_affected": 79,
+            "players_affected": 4,
+            "not_folded": "players/B/Billy_Wilson2.html — genuine 2025 debutant (career game 1), stays a distinct player"
           }
         ]
       }

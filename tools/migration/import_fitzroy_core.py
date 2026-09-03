@@ -40,6 +40,16 @@ Identity rules
   numeric ``ID`` is used only as the in-run grouping key and must map
   1:1 to the URL; any violation fails closed. Names are never identity:
   two players sharing a name but not an ID/URL stay two players.
+* A RENUMBERED profile URL (AFLDB-ISSUE-136) — fitzRoy serves completed
+  seasons from its cached release but scrapes the newest season live, so a
+  player whose AFL Tables profile was renumbered arrives under a new URL
+  with a blank ID — is folded into the continuing player ONLY under a
+  tracked ``profile_url_continuity`` rule in the contract, which binds the
+  continuing ID, the seasons, the row count and AFL Tables' own career-game
+  numbering continuing by exactly one. Both URLs are then registered to the
+  one player. A blank-ID URL whose first row is not career game 1 and which
+  no rule names is refused; a blank-ID URL that debuts at career game 1 is a
+  genuine new player. Never applied in-season.
 * Match identity is results.csv (season, round, date, home, away), with
   match_key ``season|round_code|date|home name|away name`` — the same
   natural-key convention current-season-import.ts writes. player_stats
@@ -124,6 +134,17 @@ SOURCE_KEY_FITZROY = "fitzroy_afldata"
 DOB_EVIDENCE_TYPE = "fitzroy_player_stats"
 
 MATCH_METHOD = "afltables_profile_url"
+
+#: AFLDB-ISSUE-136. The normalised profile path a profile_url_continuity rule may name —
+#: exactly the form external_identities stores (see tools/migration/player_identity.py).
+PROFILE_PATH_SHAPE = re.compile(r"^players/[A-Z]/[^/]+\.html$")
+#: Every fact a profile_url_continuity rule must bind. All are re-measured from the
+#: snapshot on every run and compared exactly; a rule that binds fewer is refused.
+CONTINUITY_EXPECT_KEYS = (
+    "continuing_id", "continuing_last_season", "continuing_last_career_game",
+    "renumbered_first_season", "renumbered_last_season",
+    "renumbered_first_career_game", "renumbered_rows",
+)
 
 #: The fitzRoy datasets a source-normalisation rule may name.
 #: `ladder` is acquired as an AFLDB-ISSUE-095 VALIDATION witness only — no
@@ -632,6 +653,9 @@ def enforce_accepted_fingerprint(baseline: dict, summary: dict, coverage: dict) 
         "players": summary.get("players"),
         "players_with_dob": summary.get("players_with_dob"),
         "players_with_dob_conflict": summary.get("players_with_dob_conflict"),
+        # AFLDB-ISSUE-136: pinned when the acceptance record declares it (an older
+        # record that does not is simply not compared on it).
+        "players_with_renumbered_profile": summary.get("players_with_renumbered_profile"),
         "player_match_rows": summary.get("player_match_rows"),
         "brownlow_round_vote_rows": summary.get("brownlow_round_vote_rows"),
     }
@@ -1164,11 +1188,24 @@ class PlayerFact:
     given_name: str | None = None
     surname: str | None = None
     display_name: str | None = None
+    #: Every profile path registered to this player. One by construction, two after an
+    #: AFLDB-ISSUE-136 continuity rule folds a renumbered profile in; `url` stays the
+    #: continuing (ID-bearing) path and is the deterministic key everywhere.
     urls: set = field(default_factory=set)
     dobs: dict = field(default_factory=dict)  # date -> occurrences
     bad_dob: set = field(default_factory=set)
     first_season: int | None = None
     last_season: int | None = None
+    #: AFLDB-ISSUE-136 continuity evidence, measured from the rows themselves: how many
+    #: rows this profile carries and its first/last appearance as
+    #: (season, match_date, Career.Games). Career.Games is AFL Tables' own running
+    #: count for the profile, so it is the source-stable proof that one profile's
+    #: career continues into another's — or does not.
+    rows: int = 0
+    first_appearance: tuple | None = None
+    last_appearance: tuple | None = None
+    #: The continuity rule ids folded into this player, in application order.
+    continuity_rule_ids: list = field(default_factory=list)
 
 
 def normalise_results_round(raw: str, context: str) -> tuple[str, str]:
@@ -1320,6 +1357,81 @@ def load_row_corrections(contract_path: Path | None = None) -> list[dict]:
     return list(contract.get("source_row_corrections", {}).get("rules", []))
 
 
+def load_profile_continuity_rules(contract_path: Path | None = None) -> list[dict]:
+    """Tracked renumbered-profile continuity rules from the contract (AFLDB-ISSUE-136).
+
+    Every rule is checked for shape here, before any snapshot row is read, so a rule that
+    could not be applied exactly is refused up front rather than silently skipped: the
+    two paths must be distinct normalised profile paths, every ``expect`` fact must be
+    present and typed, ids and renumbered paths must be unique, and no renumbered path
+    may itself be another rule's continuing path (a chain is a second review, not an
+    inference).
+    """
+    contract = json.loads((contract_path or CONTRACT_PATH).read_text(encoding="utf-8"))
+    rules = list((contract.get("profile_url_continuity") or {}).get("rules", []))
+
+    def refuse(rule: dict, detail: str) -> "SnapshotValidationError":
+        return SnapshotValidationError(
+            f"profile_url_continuity rule {rule.get('id')!r} is malformed: {detail}")
+
+    seen_ids: set[str] = set()
+    renumbered: set[str] = set()
+    for rule in rules:
+        rid = rule.get("id")
+        if not isinstance(rid, str) or not rid or rid in seen_ids:
+            raise refuse(rule, "id must be a unique non-empty string")
+        seen_ids.add(rid)
+        if rule.get("dataset") != "player_stats":
+            raise refuse(rule, "dataset must be 'player_stats'")
+        file_match = PLAYER_STATS_FILE.match(str(rule.get("file") or ""))
+        if file_match is None:
+            raise refuse(rule, "file must name the renumbered profile's player_stats "
+                               "artefact (player_stats_<season>.csv)")
+        cont, renum = rule.get("continuing_url"), rule.get("renumbered_url")
+        for label, path in (("continuing_url", cont), ("renumbered_url", renum)):
+            if not isinstance(path, str) or PROFILE_PATH_SHAPE.match(path) is None:
+                raise refuse(rule, f"{label} must be a normalised profile path "
+                                   f"(players/A/Name.html), got {path!r}")
+        if cont == renum:
+            raise refuse(rule, "continuing_url and renumbered_url are the same path")
+        if renum in renumbered:
+            raise refuse(rule, f"renumbered_url {renum!r} is named by more than one rule")
+        renumbered.add(renum)
+        expect = rule.get("expect")
+        if not isinstance(expect, dict):
+            raise refuse(rule, "expect must be an object")
+        missing = [k for k in CONTINUITY_EXPECT_KEYS if k not in expect]
+        if missing:
+            raise refuse(rule, f"expect lacks {', '.join(missing)}")
+        cid = expect["continuing_id"]
+        if not isinstance(cid, str) or not cid.strip():
+            raise refuse(rule, "expect.continuing_id must be the non-empty fitzRoy ID string")
+        for key in CONTINUITY_EXPECT_KEYS[1:]:
+            value = expect[key]
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise refuse(rule, f"expect.{key} must be a non-negative integer")
+        if expect["renumbered_last_season"] < expect["renumbered_first_season"]:
+            raise refuse(rule, "expect.renumbered_last_season precedes renumbered_first_season")
+        if int(file_match.group(1)) != expect["renumbered_first_season"]:
+            raise refuse(rule, "file must be the artefact of expect.renumbered_first_season")
+        if expect["continuing_last_season"] >= expect["renumbered_first_season"]:
+            raise refuse(rule, "expect.continuing_last_season must precede "
+                               "renumbered_first_season: the two profiles may never overlap")
+        if expect["renumbered_first_career_game"] != expect["continuing_last_career_game"] + 1:
+            raise refuse(rule, "expect.renumbered_first_career_game must be exactly "
+                               "continuing_last_career_game + 1")
+        if expect["renumbered_rows"] < 1:
+            raise refuse(rule, "expect.renumbered_rows must be at least 1")
+        for key in ("authority", "reason"):
+            if not isinstance(rule.get(key), str) or not rule[key].strip():
+                raise refuse(rule, f"{key} must be a non-empty string")
+    for rule in rules:
+        if rule["continuing_url"] in renumbered:
+            raise refuse(rule, f"continuing_url {rule['continuing_url']!r} is another "
+                               "rule's renumbered_url; chains are not inferred")
+    return rules
+
+
 def iter_player_stats(files: list[SnapshotFile], corrections: list[dict] | None = None):
     """Yield (context, season, row) across every player_stats file in order.
 
@@ -1410,7 +1522,8 @@ def scan_player_stats(
     round_vote_seasons: set[int],
     corrections: list[dict] | None = None,
     policy: "RecordErrorPolicy | None" = None,
-) -> tuple[dict[str, PlayerFact], int, int]:
+    continuity: list[dict] | None = None,
+) -> tuple[dict[str, PlayerFact], int, int, list[dict]]:
     """First streaming pass: player identity + match-grain supplements.
 
     Attendance, start time and quarter team scores are repeated on every
@@ -1421,6 +1534,10 @@ def scan_player_stats(
     counts the brownlow_round_votes rows the import would derive
     (gated seasons, home-and-away, non-NA votes — a 0 counts, NA never
     does), so the plan report proves the NA/0 distinction statically.
+
+    ``continuity`` (AFLDB-ISSUE-136) is the tracked profile_url_continuity rule list on
+    the historical path and None in-season; see apply_profile_continuity. The fourth
+    return value is the list of rules applied, for the plan report.
     """
     players: dict[str, PlayerFact] = {}
     seen_player_match: set = set()
@@ -1551,6 +1668,14 @@ def scan_player_stats(
                     f"{context}: profile URL {url_path} carries conflicting IDs "
                     f"{fact.afl_id} and {afl_id} — refusing to guess which player this is")
         fact.urls.add(url_path)
+        # AFLDB-ISSUE-136 continuity evidence. Career.Games is AFL Tables' running count
+        # for this profile; blank stays None (not recorded), never 0.
+        fact.rows += 1
+        appearance = (season, match_date, to_int(row["Career.Games"]))
+        if fact.first_appearance is None or appearance[:2] < fact.first_appearance[:2]:
+            fact.first_appearance = appearance
+        if fact.last_appearance is None or appearance[:2] > fact.last_appearance[:2]:
+            fact.last_appearance = appearance
         fact.given_name = clean(row["First.name"]) or fact.given_name
         fact.surname = clean(row["Surname"]) or fact.surname
         # `Player` is the source's own convenience concatenation of First.name and
@@ -1581,6 +1706,22 @@ def scan_player_stats(
                 and to_int(row["Brownlow.Votes"]) is not None):
             round_vote_rows += 1
 
+    # AFLDB-ISSUE-136. On the historical path only: fold each tracked renumbered profile
+    # into its continuing player, then refuse any blank-ID profile that is left claiming
+    # earlier appearances no rule accounts for. Both are aggregate decisions — they need
+    # every row of both profiles — so they run here, after the scan and before the
+    # aggregate identity checks below (which then see the folded player once). In-season
+    # `continuity` is None and nothing here runs: a single live season cannot carry the
+    # continuing profile, and the settle resolves urls through registered identities.
+    applied: list[dict] = []
+    if continuity is not None:
+        # As for source_row_corrections: a rule is in scope only when the artefact it
+        # names is part of this snapshot. The refusal below runs regardless of scope.
+        present = {f.path.name for f in files if f.dataset == "player_stats"}
+        applied = apply_profile_continuity(
+            players, [r for r in continuity if r["file"] in present])
+        refuse_unresolved_renumbering(players)
+
     # Identity is now keyed on the URL, so one URL cannot reach two players by
     # construction. The remaining contradiction to catch is the other direction: one
     # fitzRoy ID appearing under two different profile URLs, which would mean the source
@@ -1609,7 +1750,129 @@ def scan_player_stats(
             # at all means the source row was not what it claimed to be.
             sink.refuse_player(PlayerIdentityError(f"{url} has no usable name"),
                                url, "no_usable_name")
-    return players, rows_read, round_vote_rows
+    return players, rows_read, round_vote_rows, applied
+
+
+def apply_profile_continuity(players: dict[str, PlayerFact],
+                             rules: list[dict]) -> list[dict]:
+    """Fold each tracked renumbered profile into its continuing player (AFLDB-ISSUE-136).
+
+    A rule is applied ONLY when the snapshot reproduces every fact it binds: the
+    continuing profile carries exactly the bound fitzRoy ID and ends in the bound season;
+    the renumbered profile carries NO ID, spans exactly the bound seasons and row count;
+    the two never overlap; their structured name fields and any DOBs agree; and AFL
+    Tables' own career-game numbering runs from the continuing profile's last appearance
+    to the renumbered profile's first by exactly one. The last of these is the
+    source-stable proof of continuity — the name check is a consistency guard that must
+    hold, never evidence that it is the same person. Anything else is a refusal, so a
+    rule written against one acquisition cannot silently apply to another.
+
+    Rules apply in renumbered-season order, so a profile renumbered again in a later
+    acquisition can be bound by a second rule against the already-folded player.
+    """
+    applied: list[dict] = []
+    for rule in sorted(rules, key=lambda r: (r["expect"]["renumbered_first_season"],
+                                             r["id"])):
+        rid, expect = rule["id"], rule["expect"]
+        cont_url, renum_url = rule["continuing_url"], rule["renumbered_url"]
+
+        def refuse(detail: str) -> "PlayerIdentityError":
+            return PlayerIdentityError(
+                f"profile_url_continuity rule {rid!r}: {detail}. The snapshot no longer "
+                f"reproduces the evidence this rule was written against — re-review the "
+                f"rule against these artefacts; the importer will not guess.")
+
+        cont, renum = players.get(cont_url), players.get(renum_url)
+        if cont is None:
+            raise refuse(f"continuing profile {cont_url!r} has no rows in this snapshot")
+        if renum is None:
+            raise refuse(f"renumbered profile {renum_url!r} has no rows in this snapshot")
+        if renum.afl_id is not None:
+            raise refuse(f"renumbered profile {renum_url!r} carries fitzRoy ID "
+                         f"{renum.afl_id}; a profile fitzRoy could identify is not a "
+                         f"renumbering")
+        if cont.afl_id != expect["continuing_id"]:
+            raise refuse(f"continuing profile {cont_url!r} carries fitzRoy ID "
+                         f"{cont.afl_id!r}, rule binds {expect['continuing_id']!r}")
+        if (cont.given_name, cont.surname) != (renum.given_name, renum.surname):
+            raise refuse(f"name fields disagree ({cont.given_name!r} {cont.surname!r} vs "
+                         f"{renum.given_name!r} {renum.surname!r})")
+        if cont.dobs and renum.dobs and set(cont.dobs) != set(renum.dobs):
+            raise refuse(f"DOB disagrees ({sorted(cont.dobs)} vs {sorted(renum.dobs)})")
+        if cont.last_season != expect["continuing_last_season"]:
+            raise refuse(f"continuing profile ends in {cont.last_season}, rule binds "
+                         f"{expect['continuing_last_season']}")
+        if (renum.first_season, renum.last_season) != (
+                expect["renumbered_first_season"], expect["renumbered_last_season"]):
+            raise refuse(f"renumbered profile spans {renum.first_season}-"
+                         f"{renum.last_season}, rule binds "
+                         f"{expect['renumbered_first_season']}-"
+                         f"{expect['renumbered_last_season']}")
+        if not cont.last_season < renum.first_season:
+            raise refuse("the two profiles' seasons overlap or are out of order")
+        if renum.rows != expect["renumbered_rows"]:
+            raise refuse(f"renumbered profile carries {renum.rows} row(s), rule binds "
+                         f"{expect['renumbered_rows']}")
+        last_game = cont.last_appearance[2] if cont.last_appearance else None
+        first_game = renum.first_appearance[2] if renum.first_appearance else None
+        if last_game is None or first_game is None:
+            raise refuse("Career.Games is not recorded on the boundary rows, so "
+                         "continuity cannot be proved from the source")
+        if (last_game, first_game) != (expect["continuing_last_career_game"],
+                                       expect["renumbered_first_career_game"]):
+            raise refuse(f"career games run {last_game} -> {first_game}, rule binds "
+                         f"{expect['continuing_last_career_game']} -> "
+                         f"{expect['renumbered_first_career_game']}")
+        if first_game != last_game + 1:
+            raise refuse(f"AFL Tables' career-game numbering does not continue "
+                         f"({last_game} then {first_game})")
+
+        # Every bound fact holds: fold the renumbered profile into the continuing
+        # player. `url` (the continuing path) stays the key; both paths are registered.
+        cont.urls |= renum.urls
+        for dob, occurrences in renum.dobs.items():
+            cont.dobs[dob] = cont.dobs.get(dob, 0) + occurrences
+        cont.bad_dob |= renum.bad_dob
+        cont.rows += renum.rows
+        cont.last_season = renum.last_season
+        cont.last_appearance = renum.last_appearance
+        cont.continuity_rule_ids.append(rid)
+        del players[renum_url]
+        applied.append({
+            "rule_id": rid, "continuing_url": cont_url, "renumbered_url": renum_url,
+            "rows": renum.rows, "seasons": f"{renum.first_season}-{renum.last_season}",
+            "career_games": f"{last_game} -> {first_game}",
+        })
+    return applied
+
+
+def refuse_unresolved_renumbering(players: dict[str, PlayerFact]) -> None:
+    """Refuse a blank-ID profile that claims earlier appearances no rule accounts for.
+
+    AFLDB-ISSUE-136. A profile with no fitzRoy ID is one fitzRoy's identity table did
+    not know — either a genuine debutant or a renumbered continuing player. AFL Tables'
+    own Career.Games on the profile's first row separates the two without any name or
+    DOB heuristic: 1 is a debut and is accepted as a new player; anything else says the
+    source knows of earlier appearances this profile does not cover, and seeding a new
+    player would split a career. Measured on full-history-20260902: exactly four such
+    profiles, all covered by rules, and one debut (Billy Wilson). ID-bearing profiles
+    are never examined here — 41 of them legitimately start above 1 or at 0 in the
+    early 1910s source, and their identity is already settled by the ID.
+    """
+    for url, fact in sorted(players.items()):
+        if fact.afl_id is not None:
+            continue
+        first_game = fact.first_appearance[2] if fact.first_appearance else None
+        if first_game == 1:
+            continue
+        season = fact.first_appearance[0] if fact.first_appearance else "?"
+        raise PlayerIdentityError(
+            f"{url}: no fitzRoy ID, and its first row in the snapshot ({season}) is "
+            f"career game {first_game!r}, so AFL Tables asserts earlier appearances this "
+            f"profile does not cover — the AFLDB-ISSUE-136 renumbered-profile shape, and no "
+            f"profile_url_continuity rule names it. Refusing to seed a new player and "
+            f"split a career; review the continuing profile and add a rule. A name is "
+            f"never identity, so nothing is inferred here.")
 
 
 def match_key_of(match: MatchFact, clubs: ClubResolver) -> str:
@@ -1633,6 +1896,11 @@ def summarise(matches: dict[tuple, MatchFact], players: dict[str, PlayerFact],
         "players": len(players),
         "players_with_dob": dob_players,
         "players_with_dob_conflict": sum(1 for p in players.values() if len(p.dobs) > 1),
+        # AFLDB-ISSUE-136: players carrying a folded renumbered profile. Reported, and
+        # already pinned by `players` above (the count would rise by this many if the
+        # rules stopped applying).
+        "players_with_renumbered_profile": sum(
+            1 for p in players.values() if p.continuity_rule_ids),
         "player_match_rows": rows_read,
         "venues": len({m.venue_raw for m in matches.values()}),
         "seasons": f"{seasons[0]}-{seasons[-1]}" if seasons else "-",
@@ -2217,10 +2485,24 @@ def import_players(pg, rep, players: dict[str, PlayerFact], args, refs: dict) ->
             touched: list[int] = []
             for fact in sorted(players.values(), key=lambda f: f.url):
                 batch.records_read += 1
-                url = next(iter(fact.urls))
+                url = fact.url
+                urls = sorted(fact.urls)
                 sort_name = (f"{fact.surname}, {fact.given_name}"
                              if fact.given_name else fact.surname)
-                existing_id = existing_by_url.get(url)
+                # AFLDB-ISSUE-136: every profile path of one player must already agree.
+                # A database that registered the continuing and the renumbered paths to
+                # DIFFERENT players holds the split this rule repairs at rebuild time; it
+                # is never merged here — no heuristic choice, no delete — the import HALTs
+                # and the operator rebuilds or reconciles under supervision.
+                registered = {existing_by_url[u] for u in urls if u in existing_by_url}
+                if len(registered) > 1:
+                    raise RuntimeError(
+                        f"external-identity split: profile paths {urls!r} of one player "
+                        f"(profile_url_continuity {fact.continuity_rule_ids!r}) are "
+                        f"registered to different players {sorted(registered)!r} in this "
+                        f"database — refusing to merge or choose; rebuild canonically or "
+                        f"reconcile the identity under supervision before rerunning")
+                existing_id = next(iter(registered)) if registered else None
                 if existing_id is not None:
                     cur.execute(
                         """UPDATE players
@@ -2244,6 +2526,8 @@ def import_players(pg, rep, players: dict[str, PlayerFact], args, refs: dict) ->
                          fact.surname, fact.first_season, fact.last_season))
                     player_ids[url] = cur.fetchone()[0]
                     batch.records_inserted += 1
+                for alias in urls:
+                    player_ids[alias] = player_ids[url]
                 touched.append(player_ids[url])
 
             # search_name/slug derived in SQL so they can never drift from
@@ -2265,7 +2549,7 @@ def import_players(pg, rep, players: dict[str, PlayerFact], args, refs: dict) ->
             #    club-list or register evidence layers.
             evidence_rows = []
             for fact in players.values():
-                url = next(iter(fact.urls))
+                url = fact.url
                 for dob, occurrences in sorted(fact.dobs.items()):
                     evidence_rows.append((
                         player_ids[url], fitzroy_id, url, dob,
@@ -2291,8 +2575,7 @@ def import_players(pg, rep, players: dict[str, PlayerFact], args, refs: dict) ->
             cur.execute("SELECT id, dob FROM players WHERE id = ANY(%s)", (touched,))
             current_dob = dict(cur.fetchall())
             for fact in players.values():
-                url = next(iter(fact.urls))
-                pid = player_ids[url]
+                pid = player_ids[fact.url]
                 if len(fact.dobs) > 1:
                     internal += 1
                     continue
@@ -2330,14 +2613,25 @@ def import_players(pg, rep, players: dict[str, PlayerFact], args, refs: dict) ->
             #    asserted URL to a DIFFERENT player is an identity HALT —
             #    abort before any reconciliation delete or upsert. No
             #    heuristic choice, no name merge, no warn-and-continue.
+            #    AFLDB-ISSUE-136: a player folded under a continuity rule
+            #    registers EVERY one of its profile paths to the one
+            #    players.id, so the settle, the awards census and any
+            #    later writer resolve the renumbered path to the same
+            #    career player. The population is one row per path.
             identity_rows = []
             for fact in sorted(players.values(), key=lambda f: f.url):
-                url = next(iter(fact.urls))
-                identity_rows.append(
-                    (afltables_id, url, f"https://afltables.com/afl/stats/{url}",
-                     player_ids[url]))
-            asserted_ids = [ext for _, ext, _, _ in identity_rows]
-            intended = {ext: pid for _, ext, _, pid in identity_rows}
+                for path in sorted(fact.urls):
+                    note = "Matched on profile URL, not name."
+                    if path != fact.url:
+                        note += (f" AFLDB-ISSUE-136 profile_url_continuity "
+                                 f"{', '.join(fact.continuity_rule_ids)}: AFL Tables "
+                                 f"renumbered this player's profile; same player as "
+                                 f"{fact.url}.")
+                    identity_rows.append(
+                        (afltables_id, path, f"https://afltables.com/afl/stats/{path}",
+                         player_ids[path], note))
+            asserted_ids = [ext for _, ext, _, _, _ in identity_rows]
+            intended = {ext: pid for _, ext, _, pid, _ in identity_rows}
             cur.execute(
                 """SELECT external_id, player_id FROM external_identities
                     WHERE source_id = %s AND external_id = ANY(%s)""",
@@ -2378,15 +2672,15 @@ def import_players(pg, rep, players: dict[str, PlayerFact], args, refs: dict) ->
                 """INSERT INTO external_identities
                      (source_id, external_id, external_url, player_id, status,
                       match_method, notes)
-                   VALUES (%s, %s, %s, %s, 'unique', %s,
-                           'Matched on profile URL, not name.')
+                   VALUES (%s, %s, %s, %s, 'unique', %s, %s)
                    ON CONFLICT (source_id, external_id) DO UPDATE
                      SET status       = EXCLUDED.status,
                          match_method = EXCLUDED.match_method,
-                         external_url = EXCLUDED.external_url
+                         external_url = EXCLUDED.external_url,
+                         notes        = EXCLUDED.notes
                    WHERE external_identities.player_id = EXCLUDED.player_id""",
-                [(sid, ext, ext_url, pid, MATCH_METHOD)
-                 for sid, ext, ext_url, pid in identity_rows])
+                [(sid, ext, ext_url, pid, MATCH_METHOD, note)
+                 for sid, ext, ext_url, pid, note in identity_rows])
         pg.commit()
     rep.result("players", len(players))
 
@@ -2945,6 +3239,10 @@ def main() -> int:
         if args.require_in_season:
             in_season_coverage = enforce_in_season(manifest, snapshot_dir, contract)
         corrections = load_row_corrections(contract_path)
+        # AFLDB-ISSUE-136: historical path only. In-season the list is None, so neither
+        # the fold nor the blank-ID refusal runs against a single live-scraped season.
+        continuity = (None if args.require_in_season
+                      else load_profile_continuity_rules(contract_path))
         clubs = ClubResolver(
             json.loads(CLUBS_JSON.read_text(encoding="utf-8")),
             (json.loads(contract_path.read_text(encoding="utf-8"))
@@ -2953,8 +3251,9 @@ def main() -> int:
         round_vote_seasons = load_round_vote_seasons(availability_path)
         results_file = next(f for f in files if f.dataset == "results")
         matches = scan_results(results_file.path, clubs, policy)
-        players, rows_read, round_vote_rows = scan_player_stats(
-            files, matches, clubs, round_vote_seasons, corrections, policy)
+        players, rows_read, round_vote_rows, continuity_applied = scan_player_stats(
+            files, matches, clubs, round_vote_seasons, corrections, policy,
+            continuity=continuity)
     except (SnapshotValidationError, MatchIdentityError, PlayerIdentityError) as exc:
         raise fail(str(exc))
 
@@ -2963,6 +3262,12 @@ def main() -> int:
         print("snapshot scan summary")
         for k, v in summary.items():
             print(f"  {k:<28} {v}")
+        if continuity_applied:
+            print("profile URL continuity applied (AFLDB-ISSUE-136)")
+            for entry in continuity_applied:
+                print(f"  {entry['rule_id']:<44} {entry['renumbered_url']} -> "
+                      f"{entry['continuing_url']} ({entry['rows']} rows, "
+                      f"{entry['seasons']}, career games {entry['career_games']})")
     if full_history_coverage is not None:
         print("full-history gates PASSED — identity coverage")
         for k, v in full_history_coverage.items():

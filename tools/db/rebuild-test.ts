@@ -757,7 +757,12 @@ export function assertDraftguruPreflight(stdout: string): void {
  *
  * `players` is counted over the AFL Tables external identities, not over `players`: the
  * canonical identity is the AFL Tables profile URL (§H4), and the `players` table also holds
- * whatever canonical shells the DraftGuru stage minted afterwards.
+ * whatever canonical shells the DraftGuru stage minted afterwards. It counts DISTINCT
+ * players behind those identities, because since AFLDB-ISSUE-136 one player may carry two
+ * profile URLs (a renumbered AFL Tables profile folded into its continuing player under a
+ * tracked `profile_url_continuity` rule); `players_with_renumbered_profile` gates exactly
+ * how many do, so a rebuild that re-split them (identities 13,275, players 13,275) fails
+ * here rather than passing on the identity row count alone.
  */
 const MEASURED_SQL: Record<string, string> = {
   matches: 'SELECT count(*) FROM matches',
@@ -770,8 +775,15 @@ const MEASURED_SQL: Record<string, string> = {
     'SELECT count(*) FROM (SELECT home_club_id AS club_id FROM matches'
     + ' UNION SELECT away_club_id FROM matches) c',
   players:
-    'SELECT count(*) FROM external_identities ei JOIN sources s ON s.id = ei.source_id'
-    + " WHERE s.key = 'afltables'",
+    'SELECT count(DISTINCT ei.player_id) FROM external_identities ei'
+    + ' JOIN sources s ON s.id = ei.source_id'
+    + " WHERE s.key = 'afltables' AND ei.match_method = 'afltables_profile_url'"
+    + ' AND ei.player_id IS NOT NULL',
+  players_with_renumbered_profile:
+    'SELECT count(*) FROM (SELECT ei.player_id FROM external_identities ei'
+    + ' JOIN sources s ON s.id = ei.source_id'
+    + " WHERE s.key = 'afltables' AND ei.match_method = 'afltables_profile_url'"
+    + ' AND ei.player_id IS NOT NULL GROUP BY ei.player_id HAVING count(*) > 1) folded',
   player_match_rows: 'SELECT count(*) FROM player_match_stats',
   brownlow_round_vote_rows: 'SELECT count(*) FROM brownlow_round_votes',
 };
