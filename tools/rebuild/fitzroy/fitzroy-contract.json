@@ -52,6 +52,92 @@
       "$comment": "Audited across the whole snapshot and found already correct, so deliberately left alone: the younger player's other appearances (1909 R11 career game 2, and 1911 R5 career game 3) already carry players/J/Jim_Stewart1.html with ID 5685, and the older player's 85 appearances (1905-1912) already carry players/J/Jim_Stewart0.html with ID 5230. No row anywhere needs re-attribution between the two, and no fitzRoy ID needed discarding or inventing: both IDs are internally consistent with their own careers."
     }
   },
+  "profile_url_continuity": {
+    "$comment": "AFLDB-ISSUE-136 — tracked continuity of a player whose AFL Tables profile URL was RENUMBERED after fitzRoy's identity table was built. Mechanism: fitzRoy serves completed seasons from its cached afldata release (profile URL and numeric ID as they stood when that cache was cut) and scrapes the newest season live from afltables.com, where a same-name debutant can shift an existing player's profile to a new numeric suffix. The live rows then carry the NEW url and a BLANK ID (the cached ID table has no entry for that url), so an importer keyed on the url seeds a second canonical player for the same footballer and every later-season row — round votes, season votes, awards, the settle's 2026 rows — splits across the two. A rule here names the continuing profile (the ID-bearing url the cached seasons use) and the renumbered profile (the live url), and binds EXACT evidence the snapshot must still reproduce: the continuing profile's fitzRoy ID and last season, the renumbered profile's seasons and row count, and — the source-stable proof — AFL Tables' own career-game numbering continuing by exactly one from the continuing profile's last appearance to the renumbered profile's first. import_fitzroy_core.py folds the renumbered profile into the continuing player, registers BOTH urls as external identities of that one player, and refuses if any bound fact disagrees, if the two profiles' seasons overlap, if their name fields or DOBs disagree, or if the renumbered profile carries an ID. Not a matching rule, not a merge heuristic, not name-based: a name is never evidence here, and a player with no rule is NEVER guessed — a blank-ID profile whose first snapshot row is not career game 1 is refused outright until a rule is reviewed for it, while a blank-ID profile that debuts at career game 1 is a genuine new player (Billy Wilson, players/B/Billy_Wilson2.html, 2025: four rows, DOB 16-Jun-2005, debut 2025-06-26 — deliberately NO rule). Rules are reviewed per acquisition, never inherited: a successor snapshot that adds a season changes the bound row counts and seasons, and the import fails visibly until the rule is re-reviewed.",
+    "applies_to_source": "AFL Tables via fitzRoy",
+    "is_alias": false,
+    "url_form": "normalised AFL Tables profile path, exactly as external_identities stores it (players/<Letter>/<Name>.html)",
+    "scope": "As for source_row_corrections, a rule is IN SCOPE only when the artefact it names (`file`, the renumbered profile's season) is part of the snapshot; a snapshot without that artefact has nothing to fold. When it is in scope the continuing profile MUST also be present, so a partial snapshot carrying only the renumbered season is refused rather than seeded. The blank-ID refusal below runs regardless of rule scope.",
+    "in_season_scope": "Historical (full-history / accepted-baseline / trial) validation and import only. An in-season snapshot (--require-in-season) is a single live-scraped season, so it cannot contain the continuing profile's rows; the settle resolves every url through the identities the rebuild registered, and an unregistered url stays unresolved there — never a new player.",
+    "rules": [
+      {
+        "id": "2025-charlie-cameron-renumbered-profile",
+        "dataset": "player_stats",
+        "file": "player_stats_2025.csv",
+        "continuing_url":"players/C/Charlie_Cameron.html",
+        "renumbered_url": "players/C/Charlie_Cameron3.html",
+        "expect": {
+          "continuing_id": "12277",
+          "continuing_last_season": 2024,
+          "continuing_last_career_game": 229,
+          "renumbered_first_season": 2025,
+          "renumbered_last_season": 2025,
+          "renumbered_first_career_game": 230,
+          "renumbered_rows": 25
+        },
+        "authority": "full-history-20260902 player_stats: players/C/Charlie_Cameron.html carries ID 12277 on all 229 rows, seasons 2014-2024 (Adelaide, Brisbane Lions), DOB 5-Jul-1994, last appearance 2024-09-28 as career game 229; players/C/Charlie_Cameron3.html carries NO ID on all 25 rows, season 2025 only (Brisbane Lions), first appearance 2025-03-29 as career game 230. The three other Charlie Cameron profiles in the snapshot (Charlie_Cameron0 1897, Charlie_Cameron1 1905-1910, Charlie_Cameron2 1926-1936) each carry their own ID and are untouched. data/awards/player-identity.csv already maps bootstrap player 12277 to Charlie_Cameron3.html, which is the live AFL Tables url.",
+        "reason": "AFL Tables renumbered the modern Charlie Cameron from the unsuffixed profile to suffix 3; fitzRoy's cached seasons still name the old url and its ID table has no entry for the new one. Without this rule the importer seeds a 2025-only second player, his 2019-2024 Brownlow round votes stay on the career player while season rows and awards keyed on the live url attach to the duplicate (AFLDB-ISSUE-113 V5: 6 player-seasons, part of the 34-vote gap)."
+      },
+      {
+        "id": "2025-jack-graham-renumbered-profile",
+        "dataset": "player_stats",
+        "file": "player_stats_2025.csv",
+        "continuing_url":"players/J/Jack_Graham.html",
+        "renumbered_url": "players/J/Jack_Graham2.html",
+        "expect": {
+          "continuing_id": "12576",
+          "continuing_last_season": 2024,
+          "continuing_last_career_game": 131,
+          "renumbered_first_season": 2025,
+          "renumbered_last_season": 2025,
+          "renumbered_first_career_game": 132,
+          "renumbered_rows": 18
+        },
+        "authority": "full-history-20260902 player_stats: players/J/Jack_Graham.html carries ID 12576 on all 131 rows, seasons 2017-2024 (Richmond), DOB 25-Feb-1998, last appearance 2024-08-24 as career game 131; players/J/Jack_Graham2.html carries NO ID on all 18 rows, season 2025 only (West Coast), first appearance 2025-03-16 as career game 132. Jack_Graham0 (1935-1949) and Jack_Graham1 (1897-1899) carry their own IDs and are untouched. data/awards/player-identity.csv maps bootstrap player 12576 to Jack_Graham2.html.",
+        "reason": "Same renumbering shape as Charlie Cameron; the club change (Richmond to West Coast) is a real 2025 transfer, not identity evidence, and the career-game numbering continues by exactly one across it. AFLDB-ISSUE-113 V5: his 2019-2022 round votes are the other 4 of the 10 split player-seasons."
+      },
+      {
+        "id": "2025-jack-ross-renumbered-profile",
+        "dataset": "player_stats",
+        "file": "player_stats_2025.csv",
+        "continuing_url":"players/J/Jack_Ross.html",
+        "renumbered_url": "players/J/Jack_Ross3.html",
+        "expect": {
+          "continuing_id": "12712",
+          "continuing_last_season": 2024,
+          "continuing_last_career_game": 70,
+          "renumbered_first_season": 2025,
+          "renumbered_last_season": 2025,
+          "renumbered_first_career_game": 71,
+          "renumbered_rows": 23
+        },
+        "authority": "full-history-20260902 player_stats: players/J/Jack_Ross.html carries ID 12712 on all 70 rows, seasons 2019-2024 (Richmond), DOB 3-Sep-2000, last appearance 2024-08-24 as career game 70; players/J/Jack_Ross3.html carries NO ID on all 23 rows, season 2025 only (Richmond), first appearance 2025-03-13 as career game 71. Jack_Ross0 (1931-1940), Jack_Ross1 (1920-1922) and Jack_Ross2 (1919) carry their own IDs and are untouched.",
+        "reason": "Same renumbering shape; no vote or award consequence measured yet, but the split identity is the same defect and the 2026 settle rows arrive under the renumbered url."
+      },
+      {
+        "id": "2025-jack-williams-renumbered-profile",
+        "dataset": "player_stats",
+        "file": "player_stats_2025.csv",
+        "continuing_url":"players/J/Jack_Williams.html",
+        "renumbered_url": "players/J/Jack_Williams3.html",
+        "expect": {
+          "continuing_id": "12962",
+          "continuing_last_season": 2024,
+          "continuing_last_career_game": 29,
+          "renumbered_first_season": 2025,
+          "renumbered_last_season": 2025,
+          "renumbered_first_career_game": 30,
+          "renumbered_rows": 13
+        },
+        "authority": "full-history-20260902 player_stats: players/J/Jack_Williams.html carries ID 12962 on all 29 rows, seasons 2022-2024 (West Coast), DOB 1-Dec-2003, last appearance 2024-08-24 as career game 29; players/J/Jack_Williams3.html carries NO ID on all 13 rows, season 2025 only (West Coast), first appearance 2025-03-30 as career game 30. Jack_Williams0 (1925-1934), Jack_Williams1 (1930) and Jack_Williams2 (1939-1946) carry their own IDs and are untouched.",
+        "reason": "Same renumbering shape; the smallest career of the four, which is why the split was least visible downstream."
+      }
+    ],
+    "not_a_rule": {
+      "$comment": "players/B/Billy_Wilson2.html (2025, 4 rows, NO ID, DOB 16-Jun-2005) is the fifth blank-ID profile in the accepted snapshot and is NOT renumbered: its first row is career game 1 on 2025-06-26, so AFL Tables itself says he had no earlier appearance. The two older Billy Wilson profiles (Billy_Wilson0 1913-1914, Billy_Wilson1 1932-1935) are different footballers. He is a genuine new player and any rule folding him into another profile would be wrong; the importer accepts a blank-ID debut at career game 1 without a rule."
+    },
+    "fail_closed": "A blank-ID profile whose first snapshot row is not career game 1, and which no rule here names, is refused before any player is seeded. A rule whose bound facts the snapshot does not reproduce is refused. Nothing here is ever applied to an in-season snapshot."
+  },
   "source_club_normalisation": {
     "$comment": "AFLDB-ISSUE-093 — SOURCE normalisation, not club identity. fitzRoy emits one modern club string per organization, so a historical season can arrive labelled with a name that did not exist then. Where the organization is continuous (Footscray/Western Bulldogs, Kangaroos/North Melbourne, South Melbourne/Sydney) ClubResolver already remaps within the organization and needs no rule here. This block exists ONLY for the case the organization model deliberately refuses to bridge: a MERGER. Brisbane Bears (1987-1996) and Brisbane Lions (1997-) are separate organizations — migration 017: 'folding them into the Lions record would invent a history the club does not have' — so the org walk finds no candidate and fails closed, which is correct. A SECOND class was added later and is the more dangerous one: a NESTED era, where the modern identity's canonical span CONTAINS the historical identity's (North Melbourne 1925-present contains Kangaroos 1999-2007). There the era check succeeds, no organization walk is attempted, and the row resolves to the wrong identity SILENTLY — it fails open, not closed — so every dataset that carries the modernised label needs its own rule. These rules are scoped to this source, to an exact raw string, and to an exact season range. They add NO alias, so the two identities remain non-interchangeable everywhere else in AFLDB, and nothing outside a listed range is affected.",
     "applies_to_source": "AFL Tables via fitzRoy",

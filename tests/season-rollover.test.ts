@@ -1771,11 +1771,15 @@ describe('the validator path overrides are additive and fail closed', () => {
   it('routes every contract read site, so the two halves cannot disagree', () => {
     // The §14 hazard: four read sites, and missing one would let the gate read a
     // different contract from the scan. None may read the module constant directly.
+    // AFLDB-ISSUE-136 added a fifth, load_profile_continuity_rules(contract_path), routed
+    // the same way — so the successor contract's continuity rules are what a rollover
+    // validation applies.
     expect(importer).not.toMatch(/CONTRACT_PATH\.read_text/);
     expect(importer).not.toMatch(/AVAILABILITY_JSON\.read_text/);
     expect(witness).not.toMatch(/\bCONTRACT\.read_text/);
     expect((importer.match(/\(contract_path or CONTRACT_PATH\)\.read_text/g) ?? []).length)
-      .toBe(2);
+      .toBe(3);
+    expect(importer).toContain('load_profile_continuity_rules(contract_path)');
     expect(importer).toContain('contract = json.loads(contract_path.read_text');
     expect(importer).toContain('(json.loads(contract_path.read_text(encoding="utf-8"))');
   });

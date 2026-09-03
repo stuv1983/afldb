@@ -15,6 +15,62 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-136 — a renumbered AFL Tables profile URL no longer splits a career into two canonical players - 4 September 2026
+
+- **The defect.** fitzRoy serves completed seasons from its cached release but scrapes the newest
+  season live from afltables.com. When AFL Tables renumbers an existing player's profile (a
+  same-name debutant shifts the numeric suffix), the live rows arrive under the NEW url with a
+  BLANK fitzRoy `ID`, because fitzRoy's cached identity table has no entry for that url. Player
+  identity is the profile url, so `import_fitzroy_core.py` seeded a second canonical player for
+  the same footballer. In the accepted `full-history-20260902` snapshot this split four
+  careers — Charlie Cameron (`Charlie_Cameron.html` → `Charlie_Cameron3.html`), Jack Graham
+  (`Jack_Graham.html` → `Jack_Graham2.html`), Jack Ross (`Jack_Ross.html` → `Jack_Ross3.html`) and
+  Jack Williams (`Jack_Williams.html` → `Jack_Williams3.html`), 79 rows, all 2025 — so their
+  2019–2024 Brownlow round votes stayed on the career player while season rows, awards and
+  the 2026 settle's rows keyed on the live url attached to a 2025-only duplicate (the
+  `AFLDB-ISSUE-113` V5 34-vote gap). The fifth blank-ID profile, Billy Wilson
+  (`Billy_Wilson2.html`, career game 1 on debut), is a genuine new player and is untouched.
+- **The rule: tracked, fail-closed continuity, never inference.** A new `profile_url_continuity`
+  block in `tools/rebuild/fitzroy/fitzroy-contract.json` names, per player, the continuing
+  (ID-bearing) profile and the renumbered profile and binds exact snapshot evidence: the
+  continuing fitzRoy ID and last season, the renumbered profile's seasons and row count, and —
+  the source-stable proof — AFL Tables' own `Career.Games` continuing by exactly one from the
+  continuing profile's last appearance to the renumbered profile's first (229 → 230, 131 → 132,
+  70 → 71, 29 → 30). The importer folds the renumbered profile into the continuing player only
+  when every bound fact holds, and refuses if the renumbered profile carries an ID, the seasons
+  overlap, the name fields or DOBs disagree, or any count drifts. Names are a consistency guard,
+  never evidence. A rule is in scope only when the artefact it names is in the snapshot, exactly
+  like `source_row_corrections`.
+- **No rule, no guess.** A blank-ID profile whose first snapshot row is not career game 1 — the
+  source itself asserting earlier appearances the profile does not cover — is now refused
+  outright until a rule is reviewed for it; a blank-ID profile that debuts at career game 1 is
+  accepted as a new player. Never applied in-season: the settle resolves every url through the
+  identities the rebuild registered and leaves an unregistered url unresolved.
+- **Both urls, one player.** `import_players()` registers every profile path of a folded player
+  in `external_identities` against the one `players.id` (the renumbered path's `notes` names the
+  rule), so the settle, the awards census (`data/awards/player-identity.csv` already maps these
+  players to the live urls) and the Brownlow writers resolve either url to the same career. A
+  database that already holds the split (the two paths registered to different players) makes
+  the import HALT before any delete or upsert — no merge, no choice.
+- **Acceptance record amended, not re-blessed.** `data/reference/fitzroy-accepted-baselines.json`
+  (`full-history-20260902`) records the change as a dated amendment: `measured.players`
+  13,275 → 13,271, new `players_with_renumbered_profile: 4`, and an `identity_continuity`
+  correction bound to the four rule ids. Bytes, hashes and every identity-scan figure are
+  unchanged; `distinct_urls` stays 13,275. `db:test:rebuild`'s final validation now counts
+  `players` as DISTINCT players behind the AFL Tables identities and gates the folded count, so
+  a rebuild that re-split them fails there. Offline validation of the accepted snapshot:
+  **`accepted canonical baseline VERIFIED`, players 13,271, four rules applied.**
+- **Proven in PostgreSQL.** The canonical `db:test:rebuild` of the accepted snapshot on the shared
+  `afldb_test` passed all 39 final-validation checks (`players = 13271`,
+  `players_with_renumbered_profile = 4`, 685,471 player-match rows, 320,861 Brownlow round rows);
+  exactly four players hold both a continuing and a renumbered AFL Tables path; the four careers
+  carry their 2025 rows, DOBs and awards, and Billy Wilson is a separate 2025 debut. The
+  `AFLDB-ISSUE-113` V5 witness on that database closes its identity gap: no player-season with
+  positive round votes lacks a season row under the same player (was 10 / 34 votes) and the
+  derived season-grain Brownlow total is 79,113 (was 79,079). The split HALT was exercised against
+  the real database and rolled back cleanly. Production still holds the split — tracked as
+  `AFLDB-ISSUE-137`.
+
 ### AFLDB-ISSUE-131 — an upstream match rekey now updates the canonical match instead of duplicating it - 3 September 2026
 
 - **The defect.** `matches.match_key` is `season|round_code|match_date|home|away`, and the identical

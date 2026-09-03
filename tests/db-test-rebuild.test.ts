@@ -474,16 +474,34 @@ describe('accepted canonical baseline', () => {
       .toBe(setDigest(retiredManifest.files));
     expect(retired[0].raw_artefacts.artefact_set_sha256)
       .toBe('8e14ce6198685b9fec568ab3c680cab34783e8e202ab0c7e93f45773d96f4125');
-    // The successor reproduces its predecessor's measured fingerprint exactly - the
+    // The successor reproduced its predecessor's measured fingerprint exactly - the
     // retirement moved provenance, not canonical semantics. Compared on the measured
     // values themselves; only each entry's own prose $comment differs.
+    //
+    // AFLDB-ISSUE-136 (2026-09-04) then amended the ACCEPTED entry only: the importer's
+    // profile_url_continuity transformation folds four renumbered 2025 profiles into
+    // their continuing players, so `players` moved 13,275 -> 13,271 and the accepted
+    // entry gained `players_with_renumbered_profile`. The retired entry is historical
+    // evidence and was deliberately NOT rewritten, so the two differ on exactly that.
     const gates = (o: any) => {
       const { $comment, ...rest } = o;
       return rest;
     };
-    expect(gates(accepted[0].measured)).toEqual(gates(retired[0].measured));
+    const { players: acceptedPlayers, players_with_renumbered_profile: folded,
+      ...acceptedRest } = gates(accepted[0].measured);
+    const { players: retiredPlayers, ...retiredRest } = gates(retired[0].measured);
+    expect(acceptedRest).toEqual(retiredRest);
+    expect(retiredPlayers).toBe(13275);
+    expect(acceptedPlayers).toBe(13271);
+    expect(folded).toBe(4);
+    expect(retiredPlayers - acceptedPlayers).toBe(folded);
+    expect(retired[0].measured.players_with_renumbered_profile).toBeUndefined();
+    expect(accepted[0].amendments[0]).toMatchObject({
+      date: '2026-09-04', issue: 'AFLDB-ISSUE-136', kind: 'import_transformation_added',
+    });
     expect(gates(accepted[0].identity_scan)).toEqual(gates(retired[0].identity_scan));
-    expect(Object.keys(gates(accepted[0].measured))).toHaveLength(12);
+    expect(Object.keys(gates(accepted[0].measured))).toHaveLength(13);
+    expect(Object.keys(gates(retired[0].measured))).toHaveLength(12);
     expect(Object.keys(gates(accepted[0].identity_scan))).toHaveLength(6);
   });
 
@@ -552,8 +570,12 @@ describe('accepted canonical baseline', () => {
     expect(accepted[0].validation.command).toContain('--require-full-history');
     expect(accepted[0].validation.authority)
       .toBe('tools/migration/import_fitzroy_core.py');
+    // AFLDB-ISSUE-136: players is 13,271, not the 13,275 distinct profile URLs — four
+    // renumbered 2025 profiles fold into their continuing players under the tracked
+    // profile_url_continuity rules; identity_scan.distinct_urls stays 13,275 (raw rows).
     expect(accepted[0].measured).toMatchObject({
-      matches: 16838, matches_with_player_rows: 16838, players: 13275,
+      matches: 16838, matches_with_player_rows: 16838, players: 13271,
+      players_with_renumbered_profile: 4,
       player_match_rows: 685471, brownlow_round_vote_rows: 320861,
       seasons_first: 1897, seasons_last: 2025, club_identities: 24,
       venues: 52, attendance_known: 15187, players_with_dob: 855,
@@ -576,6 +598,17 @@ describe('accepted canonical baseline', () => {
     expect(c.source_data[0].rows_dropped).toBe(2);
     expect(c.import_transformation[0].rows_affected).toBe(79);
     expect(c.import_transformation[0].players_affected).toBe(4);
+    // AFLDB-ISSUE-136: the four renumbered-profile continuity rules are an accepted
+    // identity correction of this baseline, bound by rule id to the contract.
+    const contract = JSON.parse(readFileSync(
+      join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+    const ruleIds = (contract.profile_url_continuity.rules as { id: string }[])
+      .map((r) => r.id).sort();
+    expect(c.identity_continuity[0].kind).toBe('profile_url_continuity');
+    expect(c.identity_continuity[0].rows_affected).toBe(79);
+    expect(c.identity_continuity[0].players_affected).toBe(4);
+    expect([...c.identity_continuity[0].rule_ids].sort()).toEqual(ruleIds);
+    expect(ruleIds).toHaveLength(4);
   });
 
   it('cannot bypass --require-full-history by hand-editing the record', () => {

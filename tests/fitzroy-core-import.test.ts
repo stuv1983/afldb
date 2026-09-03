@@ -538,14 +538,17 @@ describe.skipIf(!canSpawn)('snapshot validation and scan (no database)', () => {
     expect(String(result.stderr)).toContain('refusing to collapse two players');
   });
 
-  it('accepts a row whose stable ID is absent but whose profile URL is canonical', () => {
-    // Measured on the real 1897-2025 acquisition: 83 rows across 5 players carry a
+  it('accepts a debut row whose stable ID is absent but whose profile URL is canonical', () => {
+    // Measured on the real 1897-2025 acquisition: 83 rows across 5 profile URLs carry a
     // canonical URL and no ID. The ID never reaches a database column, so requiring it
-    // would discard five real players for a value the schema does not keep.
+    // would discard real players for a value the schema does not keep. AFLDB-ISSUE-136
+    // narrowed this: a blank-ID profile is accepted as a NEW player only when AFL Tables'
+    // own career-game count says it is a debut (career game 1); a blank-ID profile that
+    // continues a career is refused unless a tracked continuity rule names it (below).
     const snapshot = buildSnapshot({
       playerStats: {
         'player_stats_2024.csv': {
-          rows: [psRow(M1, { ...P_A, id: '' }), psRow(M1, P_B),
+          rows: [psRow(M1, { ...P_A, id: '', career: '1' }), psRow(M1, P_B),
             psRow(M2, P_C), psRow(M2, P_D)],
         },
       },
@@ -983,6 +986,304 @@ describe.skipIf(!canSpawn)('in-season completeness gates (AFLDB-ISSUE-099)', () 
  * pairs = 4 rows where AFL Tables has 2. The correction drops the two rows that
  * correspond to no real appearance; the two genuine rows are already correct.
  */
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-136 — a renumbered AFL Tables profile URL must not split a
+ * career into two canonical players.
+ *
+ * fitzRoy serves completed seasons from its cached release and scrapes the
+ * newest season live, so a player whose AFL Tables profile was renumbered
+ * arrives under a NEW url with a BLANK ID. Identity is the url, so the
+ * importer seeded a second player. The fix is a tracked, fail-closed
+ * `profile_url_continuity` rule bound to source evidence (the continuing
+ * ID, the seasons, the row count, and AFL Tables' own career-game count
+ * continuing by exactly one); a blank-ID profile no rule names is refused
+ * unless it is a career-game-1 debut. Measured on full-history-20260902:
+ * four renumbered profiles (Cameron, Graham, Ross, Williams) and one
+ * debutant (Billy Wilson).
+ * ------------------------------------------------------------------ */
+describe.skipIf(!canSpawn)('renumbered profile URL continuity (AFLDB-ISSUE-136)', () => {
+  const contractPath = join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json');
+  const REAL_CONTRACT = JSON.parse(readFileSync(contractPath, 'utf8'));
+
+  /** The 2025 fixture match: same clubs as M1, one season later. */
+  const M_2025: FixtureMatch = { ...M1, game: '3', date: '2025-03-14' };
+
+  /** P_A's profile as AFL Tables renumbered it: blank ID, new suffix, career continues. */
+  const P_A_RENUMBERED: FixturePlayer = {
+    ...P_A, id: '',
+    url: 'https://afltables.com/afl/stats/players/J/John_Smith3.html', career: '30',
+  };
+
+  const RULE = {
+    id: 'fixture-john-smith-renumbered-profile',
+    dataset: 'player_stats',
+    file: 'player_stats_2025.csv',
+    continuing_url: 'players/J/John_Smith0.html',
+    renumbered_url: 'players/J/John_Smith3.html',
+    expect: {
+      continuing_id: '101', continuing_last_season: 2024, continuing_last_career_game: 29,
+      renumbered_first_season: 2025, renumbered_last_season: 2025,
+      renumbered_first_career_game: 30, renumbered_rows: 1,
+    },
+    authority: 'fixture', reason: 'fixture',
+  };
+
+  /** The real contract with ONLY these continuity rules, written for --contract. */
+  function contractWith(rules: unknown[]): string {
+    const dir = mkdtempSync(join(tmpdir(), 'issue136-contract-'));
+    tempDirs.push(dir);
+    const contract = {
+      ...REAL_CONTRACT,
+      profile_url_continuity: { ...REAL_CONTRACT.profile_url_continuity, rules },
+    };
+    const path = join(dir, 'fitzroy-contract.json');
+    writeFileSync(path, JSON.stringify(contract, null, 2), 'utf8');
+    return path;
+  }
+
+  /** 2024 (P_A with ID) + 2025 (P_A renumbered, blank ID). */
+  function splitSnapshot(
+    renumbered: Partial<FixturePlayer> = {}, continuing: Partial<FixturePlayer> = {},
+    extra2024: Cell[][] = [],
+  ) {
+    return buildSnapshot({
+      results: [resultsRow(M1), resultsRow(M2), resultsRow(M_2025, 2025)],
+      playerStats: {
+        'player_stats_2024.csv': {
+          rows: [psRow(M1, { ...P_A, ...continuing }), psRow(M1, P_B),
+            psRow(M2, P_C), psRow(M2, P_D), ...extra2024],
+        },
+        'player_stats_2025.csv': {
+          rows: [psRow(M_2025, { ...P_A_RENUMBERED, ...renumbered }, { Season: 2025 }),
+            psRow(M_2025, P_B, { Season: 2025 })],
+        },
+      },
+      range: { from: 2024, to: 2025 },
+    });
+  }
+
+  const runWith = (snapshot: { dir: string; manifest: string }, contract: string) =>
+    spawnSync(python, [importerPath, '--label', LABEL,
+      '--snapshot-dir', snapshot.dir, '--manifest', snapshot.manifest,
+      '--validate-only', '--contract', contract], { cwd: root, encoding: 'utf8' });
+
+  type ContinuityRule = {
+    id: string; file: string; continuing_url: string; renumbered_url: string;
+    expect: Record<string, number> & { continuing_id: string };
+  };
+
+  it('the tracked contract names exactly the four measured renumberings, and not the debutant', () => {
+    const rules: ContinuityRule[] = REAL_CONTRACT.profile_url_continuity.rules;
+    expect(rules.map((r) => r.id).sort()).toEqual([
+      '2025-charlie-cameron-renumbered-profile',
+      '2025-jack-graham-renumbered-profile',
+      '2025-jack-ross-renumbered-profile',
+      '2025-jack-williams-renumbered-profile',
+    ]);
+    expect(rules.map((r) => [r.continuing_url, r.renumbered_url])).toEqual([
+      ['players/C/Charlie_Cameron.html', 'players/C/Charlie_Cameron3.html'],
+      ['players/J/Jack_Graham.html', 'players/J/Jack_Graham2.html'],
+      ['players/J/Jack_Ross.html', 'players/J/Jack_Ross3.html'],
+      ['players/J/Jack_Williams.html', 'players/J/Jack_Williams3.html'],
+    ]);
+    for (const r of rules) {
+      expect(r.file).toBe('player_stats_2025.csv');
+      expect(r.expect.renumbered_first_career_game)
+        .toBe(r.expect.continuing_last_career_game + 1);
+      expect(r.expect.continuing_last_season).toBeLessThan(r.expect.renumbered_first_season);
+    }
+    // 25 + 18 + 23 + 13 = the 79 blank-ID rows that are renumberings; the other 4 of the
+    // 83 are Billy Wilson's debut season, which no rule may name.
+    expect(rules.reduce((n, r) => n + r.expect.renumbered_rows, 0)).toBe(79);
+    expect(JSON.stringify(rules)).not.toContain('Billy_Wilson');
+    expect(REAL_CONTRACT.profile_url_continuity.is_alias).toBe(false);
+  });
+
+  it('pins the fail-closed structure in the importer', () => {
+    expect(importerSource).toContain('def load_profile_continuity_rules');
+    expect(importerSource).toContain('def apply_profile_continuity');
+    expect(importerSource).toContain('def refuse_unresolved_renumbering');
+    // In-season the fold and the refusal are both disabled — the settle resolves
+    // registered identities and never seeds a player.
+    expect(importerSource).toContain('None if args.require_in_season');
+    // A database that already holds the split HALTs before the reconciliation DELETE.
+    const splitHalt = importerSource.indexOf('f"external-identity split');
+    const reconcileDelete = importerSource.indexOf('DELETE FROM external_identities');
+    expect(splitHalt).toBeGreaterThan(-1);
+    expect(splitHalt).toBeLessThan(reconcileDelete);
+    // Every profile path of a player is registered to the one players.id.
+    expect(importerSource).toContain('for path in sorted(fact.urls):');
+    // Nothing name-based was introduced.
+    expect(importerSource).not.toMatch(/fuzzy|difflib|SequenceMatcher/);
+  });
+
+  it('without a rule, a blank-ID profile that continues a career is refused, never seeded', () => {
+    const result = runWith(splitSnapshot(), contractWith([]));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('players/J/John_Smith3.html');
+    expect(String(result.stderr)).toContain('career game 30');
+    expect(String(result.stderr)).toContain('no profile_url_continuity rule names it');
+    expect(String(result.stderr)).toContain('Refusing to seed a new player');
+    expect(String(result.stderr)).toContain('never identity');
+  });
+
+  it('under a tracked rule the renumbered profile folds into the continuing player', () => {
+    const result = runWith(splitSnapshot(), contractWith([RULE]));
+    expect(result.status).toBe(0);
+    const out = String(result.stdout);
+    // Four fixture players, not five: the fold happened.
+    expect(out).toMatch(/players\s+4\b/);
+    expect(out).toMatch(/players_with_renumbered_profile\s+1\b/);
+    expect(out).toContain('profile URL continuity applied (AFLDB-ISSUE-136)');
+    expect(out).toContain('players/J/John_Smith3.html -> players/J/John_Smith0.html');
+    expect(out).toContain('career games 29 -> 30');
+    // Still two John Smiths: P_B (ID 102, its own url) is untouched by the fold.
+    expect(out).not.toContain('John_Smith1.html ->');
+  });
+
+  it('a blank-ID profile that debuts at career game 1 is a new player and needs no rule', () => {
+    // Billy Wilson's shape: no ID, first row career game 1, same surname as older
+    // profiles. Never folded, never refused.
+    const result = runWith(splitSnapshot({ career: '1', first: 'Billy', sur: 'Smith',
+      url: 'https://afltables.com/afl/stats/players/B/Billy_Smith2.html' }), contractWith([]));
+    expect(result.status).toBe(0);
+    expect(String(result.stdout)).toMatch(/players\s+5\b/);
+    expect(String(result.stdout)).not.toContain('continuity applied');
+  });
+
+  it('a rule is out of scope when the artefact it names is absent, and the refusal still runs', () => {
+    // The real contract's four rules name player_stats_2025.csv; a 2024-only snapshot
+    // has nothing to fold and passes exactly as before.
+    const ok = run(buildSnapshot());
+    expect(ok.status).toBe(0);
+    expect(String(ok.stdout)).not.toContain('continuity applied');
+    // ...but a blank-ID veteran in that same 2024-only snapshot is still refused.
+    const bad = run(buildSnapshot({
+      playerStats: {
+        'player_stats_2024.csv': {
+          rows: [psRow(M1, { ...P_A, id: '', career: '29' }), psRow(M1, P_B),
+            psRow(M2, P_C), psRow(M2, P_D)],
+        },
+      },
+    }));
+    expect(bad.status).not.toBe(0);
+    expect(String(bad.stderr)).toContain('no profile_url_continuity rule names it');
+  });
+
+  it('a rule in scope whose continuing profile is absent is refused (partial snapshot)', () => {
+    const snapshot = buildSnapshot({
+      results: [resultsRow(M_2025, 2025)],
+      playerStats: {
+        'player_stats_2025.csv': {
+          rows: [psRow(M_2025, P_A_RENUMBERED, { Season: 2025 }),
+            psRow(M_2025, P_B, { Season: 2025 })],
+        },
+      },
+      range: { from: 2025, to: 2025 },
+    });
+    const result = runWith(snapshot, contractWith([RULE]));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('has no rows in this snapshot');
+  });
+
+  it('refuses when the renumbered profile carries a fitzRoy ID', () => {
+    const result = runWith(splitSnapshot({ id: '999' }), contractWith([RULE]));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('carries fitzRoy ID 999');
+  });
+
+  it('refuses when the continuing profile does not carry the bound ID', () => {
+    const result = runWith(splitSnapshot(), contractWith([
+      { ...RULE, expect: { ...RULE.expect, continuing_id: '102' } }]));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain("rule binds '102'");
+  });
+
+  it("refuses when AFL Tables' career-game numbering does not continue by one", () => {
+    const result = runWith(splitSnapshot({ career: '31' }), contractWith([RULE]));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('career games run 29 -> 31');
+  });
+
+  it('refuses when the boundary row has no career-game count to prove continuity', () => {
+    const result = runWith(splitSnapshot({ career: '' }), contractWith([RULE]));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('continuity cannot be proved');
+  });
+
+  it('refuses when the two profiles overlap in a season', () => {
+    // The renumbered url also appears in 2024 (a second Sydney row in M1 under its own
+    // url), so its span is 2024-2025, not 2025.
+    const result = runWith(splitSnapshot({}, {}, [psRow(M1, { ...P_A_RENUMBERED, career: '29' })]),
+      contractWith([RULE]));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('spans 2024-2025');
+  });
+
+  it('refuses when the two profiles disagree on DOB or on the name fields', () => {
+    const dob = runWith(splitSnapshot({ dob: '1-Jan-1990' }), contractWith([RULE]));
+    expect(dob.status).not.toBe(0);
+    expect(String(dob.stderr)).toContain('DOB disagrees');
+
+    const name = runWith(splitSnapshot({ first: 'Jon' }), contractWith([RULE]));
+    expect(name.status).not.toBe(0);
+    expect(String(name.stderr)).toContain('name fields disagree');
+  });
+
+  it('refuses when the bound row count or seasons no longer match the artefacts', () => {
+    const rows = runWith(splitSnapshot(), contractWith([
+      { ...RULE, expect: { ...RULE.expect, renumbered_rows: 2 } }]));
+    expect(rows.status).not.toBe(0);
+    expect(String(rows.stderr)).toContain('carries 1 row(s), rule binds 2');
+
+    const seasons = runWith(splitSnapshot(), contractWith([
+      { ...RULE, expect: { ...RULE.expect, continuing_last_season: 2023 } }]));
+    expect(seasons.status).not.toBe(0);
+    expect(String(seasons.stderr)).toContain('continuing profile ends in 2024, rule binds 2023');
+  });
+
+  it('refuses a malformed rule before any row is read', () => {
+    const same = runWith(splitSnapshot(), contractWith([
+      { ...RULE, renumbered_url: RULE.continuing_url }]));
+    expect(same.status).not.toBe(0);
+    expect(String(same.stderr)).toContain('is malformed');
+
+    const gap = runWith(splitSnapshot(), contractWith([
+      { ...RULE, expect: { ...RULE.expect, renumbered_first_career_game: 31 } }]));
+    expect(gap.status).not.toBe(0);
+    expect(String(gap.stderr)).toContain('continuing_last_career_game + 1');
+
+    const raw = runWith(splitSnapshot(), contractWith([
+      { ...RULE, renumbered_url: P_A_RENUMBERED.url }]));
+    expect(raw.status).not.toBe(0);
+    expect(String(raw.stderr)).toContain('normalised profile path');
+  });
+
+  it('never applies in-season: a blank-ID veteran row still validates under --require-in-season', () => {
+    const SEASONS = JSON.parse(readFileSync(
+      join(root, 'data', 'reference', 'seasons.json'), 'utf8'));
+    const season = SEASONS.in_progress_seasons[0] as number;
+    const IM: FixtureMatch = { ...M1, date: `${season}-03-05` };
+    const snapshot = buildSnapshot({
+      results: [resultsRow(IM, season)],
+      playerStats: {
+        [`player_stats_${season}.csv`]: {
+          rows: [psRow(IM, { ...P_A_RENUMBERED, career: '45' }, { Season: season }),
+            psRow(IM, P_B, { Season: season })],
+        },
+      },
+      range: { from: season, to: season },
+      mutateManifest: (m) => { m.acquisition_kind = 'in_season_partial'; },
+    });
+    const result = spawnSync(python, [importerPath, '--label', LABEL,
+      '--snapshot-dir', snapshot.dir, '--manifest', snapshot.manifest,
+      '--validate-only', '--require-in-season'], { cwd: root, encoding: 'utf8' });
+    expect(result.status).toBe(0);
+    expect(String(result.stdout)).toContain('in-season gates PASSED');
+    expect(String(result.stdout) + String(result.stderr)).not.toContain('continuity');
+  });
+});
+
 /* ------------------------------------------------------------------ *
  * AFLDB-ISSUE-128 — an in-season run may not report success while it
  * silently drops rows AFL Tables supplied.
