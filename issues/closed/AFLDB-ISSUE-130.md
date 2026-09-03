@@ -9,7 +9,9 @@
 > (2026-09-03). **§10 records the Stage 3 host result: fragment/preflight proved under systemd,
 > one settle-script defect found and corrected; the revised host retry is §10.6. §11 records the
 > Stage 3 retry at `98dc294`: supervised settle COMPLETE with the drop-in absent; dev host done.
-> Next: §11.7 read-only production inspection.**
+> §12 records the read-only production inspection (afldb-prod already compliant, no reconciliation
+> required). §13 is the closeout: Resolved 2026-09-03; the one remaining step is the post-deploy
+> production preflight, which is a deployment gate rather than open issue work.**
 
 ---
 
@@ -733,3 +735,126 @@ Interpretation guide for the returned output:
 
 After the production inspection is recorded here as §12: `CHANGELOG.md` (Unreleased) entry,
 then close the issue with §11.4 as the resolving validation.
+
+---
+
+## 12. Production read-only inspection — afldb-prod already compliant [CONFIRMED]
+
+Executed by the operator on `afldb-prod` per §11.7, 2026-09-03. Every command was read-only:
+nothing was installed, written, reloaded or restarted, and `sudo` was not used. Raw output was
+returned and is summarised here.
+
+### 12.1 Checkout
+
+- `/home/arm/projects/afldb` at **`250caa2`** (`HEAD -> main, origin/main, origin/HEAD`,
+  "Merge ISSUE-122 automatic current-season AFL Tables ingestion").
+- Production is **behind current `main`** and has not received any ISSUE-128/129/130-era code.
+- **Not present:** `deploy/afldb-r-env.sh`, `deploy/afldb-r-preflight.sh` (they do not exist at
+  `250caa2`). **Present:** `deploy/afldb-settle-afltables.sh` (the pre-ISSUE-130 script).
+- Two pre-existing **untracked settle manifest JSON files** are in the working tree. They are
+  operational output of the production settle unit, not ISSUE-130 state; they are to be left
+  alone and are not touched by anything in this issue.
+- §11.7 step 4 (run the tracked preflight) was therefore **not applicable** — the script is not
+  on the host yet.
+
+### 12.2 Settle unit
+
+| Property | Production value |
+|---|---|
+| `afldb-settle-afltables.service` | exists |
+| `afldb-settle-afltables.timer` | exists, **enabled** |
+| `/etc/systemd/system/afldb-settle-afltables.service.d/` | **does not exist** — no host-local drop-in |
+| `Environment=` | empty |
+| `WorkingDirectory=` | `/home/arm/projects/afldb` |
+| `ExecStart=` | `/bin/sh /home/arm/projects/afldb/deploy/afldb-settle-afltables.sh` |
+| `ReadWritePaths=` | the canonical project data/sources and rebuild-manifest paths |
+
+Production runs the **tracked unit unmodified**. Unlike the dev host before Stage 3, there was
+never an untracked `R_LIBS*` compensation on production — nothing to remove.
+
+### 12.3 R runtime and library layout
+
+| Item | Production value |
+|---|---|
+| `Rscript` | **4.3.3** |
+| `r-cran-jsonlite` (apt) | `1.8.8+dfsg-1` |
+| `r-cran-digest` (apt) | `0.6.34-1` |
+| effective `.libPaths()` | `/usr/local/lib/R/site-library`, `/usr/lib/R/site-library`, `/usr/lib/R/library` |
+| `jsonlite` | 1.8.8 → `/usr/lib/R/site-library` |
+| `digest` | 0.6.34 → `/usr/lib/R/site-library` |
+| `fitzRoy` | **1.8.0** → `/usr/local/lib/R/site-library` |
+
+This is the **canonical layout decided in §9.1**, byte-for-byte the same versions and locations
+§11.1 recorded on streamanator after its reconciliation, and fitzRoy matches the
+`pinned_version` in `fitzroy-contract.json` (1.8.0). The earlier provisioning note that
+production had "no R installed at all" (§11.6) is superseded by this direct evidence: R and all
+three packages are installed, in the supported locations, with no `R_LIBS` override anywhere.
+
+### 12.4 Conclusion — no production reconciliation required
+
+Against the §11.7 interpretation table, production is the best case on every row: unit
+installed, no drop-in, `Rscript` present, fitzRoy in `/usr/local/lib/R/site-library` at the
+exact pin. **No package installation, no `R_LIBS`/`AFLDB_R_LIBS` override, no host-local
+drop-in and no R-library reconciliation is required on production.** The ISSUE-130 change is
+purely additive for this host: when it arrives by the ordinary deploy, the settle script will
+source the fragment with `AFLDB_R_LIBS` unset (the default, no-op path proved in §11.3–§11.4)
+and the preflight is expected to print `R PREFLIGHT: OK` with the resolutions above.
+
+**Not deployed from this session, by instruction.** Production stays at `250caa2`.
+
+### 12.5 Final acceptance step — post-deploy production preflight
+
+After the ISSUE-130 code reaches `main` and is deployed to production through the normal
+controlled deployment (operator step, outside this runbook), run on `afldb-prod` from
+`/home/arm/projects/afldb`:
+
+```bash
+sh deploy/afldb-r-preflight.sh; echo "exit=$?"
+```
+
+**Required result: the final line `R PREFLIGHT: OK` and `exit=0`**, with `fitzRoy 1.8.0`
+resolving from `/usr/local/lib/R/site-library`. The service-equivalent `systemd-run` form in
+`docs/deployment.md` §7b is the stronger check and should follow if `sudo` is available at
+deploy time. Any other outcome is a deployment blocker: do not enable or start the settle unit
+on the new code until the preflight is green, and record the output against this issue.
+
+---
+
+## 13. Closeout — Resolved 2026-09-03
+
+**Decision: `AFLDB-ISSUE-130` is closed on the evidence in this runbook.** The runbook's own
+acceptance criteria (§9.6 "only after D passes", §11.7 "after the production inspection is
+recorded here as §12 … close the issue with §11.4 as the resolving validation") are both met.
+The post-deploy production preflight in §12.5 is **not** a condition of closure: it is the
+deployment gate that this issue *created* (`docs/deployment.md` §7b makes the preflight
+mandatory before the timer is enabled), and closing an issue before its code is deployed to
+production follows repository practice — `AFLDB-ISSUE-128` and `AFLDB-ISSUE-129` were both
+resolved on `afldb_test`/dev evidence with production explicitly not deployed. Keeping the
+issue open would track a routine deployment step, not a defect.
+
+### 13.1 Why this is closed rather than waiting for production
+
+- **The defect (§3.1) was in the repository**, not on a host: the R library was undeclared and
+  unvalidated. It is now declared (`deploy/afldb-r-env.sh`), validated (`deploy/afldb-r-preflight.sh`),
+  documented and tested (24 assertions in `tests/current-season-import.test.ts`).
+- **The resolving validation is §11.4:** the tracked unit, with no drop-in and `Environment=`
+  empty, ran a supervised settle to `SOURCE COMPLETENESS: COMPLETE` (209 / 9,614 / 0 unkeyed,
+  exit 0) on the dev host under systemd — the exact scenario that originally failed.
+- **Production is already compliant (§12)** and was never dependent on an untracked drop-in, so
+  the failure mode this issue guards against cannot occur there when the code lands.
+- **What remains is a deployment gate** with a single exact command and a single required
+  output (§12.5). It cannot change the repository fix; it can only confirm it on one more host.
+
+### 13.2 What this closeout does NOT do
+
+- No production deployment, and none is authorised here. Production is at `250caa2`.
+- The two untracked settle manifest JSON files on production are untouched.
+- `claude/issue-130` is not merged to `main`; merge and the `git pull` deploy are operator steps.
+- No host was changed in this session at all.
+
+### 13.3 Files changed by this closeout
+
+`issues/open/AFLDB-ISSUE-130.md` → `issues/closed/AFLDB-ISSUE-130.md` (this file, moved),
+`issues.md` (Status, Resolved, Stage 4 production inspection, Resolution, Follow-up; Open Issues
+row removed), `IssuesIndex.md` (row removed, count 10 → 9, retirement note), `CHANGELOG.md`
+(Unreleased entry).

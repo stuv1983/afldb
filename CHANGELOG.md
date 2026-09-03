@@ -15,6 +15,45 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-130 — the settle service's R library is declared by the repository and gated at deploy time - 3 September 2026
+
+- **The defect.** `afldb-settle-afltables.service` failed on the dev host at step 1 with
+  `Package 'jsonlite' is required` while `jsonlite` and `fitzRoy` 1.8.0 were installed and healthy —
+  in `/home/arm/R/library`, which is on no `.libPaths()` under systemd (no login shell, the unit
+  declares no environment, `~/.Renviron` sets nothing). An **untracked** host drop-in setting
+  `R_LIBS_USER` was what made the nightly settle work. Nothing in the repository declared the R
+  library, and `docs/deployment.md` verified the install only from an interactive shell, which is
+  not the environment that fails.
+- **Declared.** New sourced `deploy/afldb-r-env.sh` resolves `AFLDB_RSCRIPT` and, only when the
+  optional `AFLDB_R_LIBS` is set, prepends it to `R_LIBS` (additive; `R_LIBS_SITE` is not used so the
+  apt-installed site library is never displaced). It **refuses, exit 1, if that directory does not
+  exist**, because R drops a missing library path silently. `/usr/local/lib/R/site-library` is the
+  canonical library on every deployed host; the override is an explicit escape hatch, not part of the
+  documented install.
+- **Gated.** New `deploy/afldb-r-preflight.sh` is the deploy-time check: one `Rscript` run that
+  prints the R version, `R_LIBS*` and `.libPaths()`, proves a configured `AFLDB_R_LIBS` really
+  appears on `.libPaths()`, reports `jsonlite`/`digest`/`fitzRoy` with the library each resolves
+  from, compares fitzRoy with `pinned_version` **read from** `fitzroy-contract.json` (never
+  hard-coded), warns when a `~/.Renviron` exists, installs nothing, and exits 1 on any failure.
+  `docs/deployment.md` §7b makes it mandatory before the timer is enabled — from the operator's
+  shell **and** service-equivalently under `systemd-run` with the unit's sandbox — and records the
+  removal of the hand-written drop-in.
+- **Both scripts resolve their project root from their own location** (`AFLDB_PROJECT_ROOT` still
+  overrides). The settle script previously hard-coded `/home/arm/projects/afldb`, so a worktree
+  checkout silently ran against the canonical checkout. Chain, flags, label, trap, season gate,
+  exit semantics and the unit file are unchanged.
+- **Validated.** Dev host, tracked unit, drop-in **removed**, `Environment=` empty, packages in the
+  canonical layout: supervised settle `settle-2026-2026-09-03-1633` completed — 209 matches, 9,614
+  player-match rows, 0 unkeyed, `SOURCE COMPLETENESS: COMPLETE`, exit 0 — the scenario that
+  originally failed. Preflight `R PREFLIGHT: OK` interactively and under `systemd-run`. 24 new
+  assertions in `tests/current-season-import.test.ts`, including an executing alternate-checkout
+  harness; vitest 252/252, `sh -n` and eslint clean.
+- **Production inspected read-only and already compliant:** at `250caa2` the tracked unit runs with
+  no drop-in, R 4.3.3, `jsonlite`/`digest` from apt and fitzRoy 1.8.0 in
+  `/usr/local/lib/R/site-library` — nothing to reconcile. **Not merged to `main`, not deployed.**
+  After the normal controlled deploy, `sh deploy/afldb-r-preflight.sh` on production must end
+  `R PREFLIGHT: OK` before the settle timer runs on the new code.
+
 ### AFLDB-ISSUE-129 — the AFL Wildcard Round is representable, and "a final" is now two questions - 3 September 2026
 
 - **The gap.** AFL Tables publishes a Wildcard Final round from 2026 — 28-Aug Western Bulldogs v
