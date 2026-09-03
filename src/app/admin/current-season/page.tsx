@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import { readSettleRunStatus, type SettleRunStatus } from '@/lib/acquisition/settle-status';
 import { requireSuperAdmin } from '@/lib/auth/session';
 import { getCurrentSeasonReport } from '@/lib/external-afl/current-season-import';
 
@@ -7,6 +8,7 @@ import {
   CurrentSeasonControls,
   CurrentSeasonReportTable,
 } from './CurrentSeasonControls';
+import { SettleRunPanel } from './SettleRunPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +21,17 @@ export default async function CurrentSeasonPage() {
   await requireSuperAdmin();
 
   const year = new Date().getFullYear();
+
+  // AFLDB-ISSUE-127. Never allowed to take the page down: a host without
+  // systemd, or a database that refuses the batch read, must still render the
+  // fallback diagnostics below.
+  let settleStatus: SettleRunStatus | undefined;
+  try {
+    settleStatus = await readSettleRunStatus();
+  } catch {
+    settleStatus = undefined;
+  }
+
   let report = null;
   let reportError: string | null = null;
   try {
@@ -30,7 +43,17 @@ export default async function CurrentSeasonPage() {
   return (
     <>
       <div className="page-header">
-        <h1>Current-season fallback diagnostics</h1>
+        <h1>Current season</h1>
+        <p className="subtitle">
+          AFL Tables is the canonical automatic authority. Squiggle and Kali remain here as
+          deprecated fallback diagnostics only.
+        </p>
+      </div>
+
+      <SettleRunPanel initialStatus={settleStatus} />
+
+      <div className="page-header">
+        <h2>Fallback diagnostics</h2>
         <p className="subtitle">
           Acquire Squiggle and Kali observations server-side and retain staging and history for
           diagnostics or explicit human fallback investigation without exposing provider keys.
