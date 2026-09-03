@@ -21,8 +21,15 @@
 
 set -eu
 
-PROJECT_ROOT=${AFLDB_PROJECT_ROOT:-/home/arm/projects/afldb}
-RSCRIPT=${AFLDB_RSCRIPT:-/usr/bin/Rscript}
+# The project root is THIS file's own checkout, resolved from $0, unless the
+# AFLDB_PROJECT_ROOT override names another one. Under the unit $0 is the
+# absolute ExecStart= path, so this is /home/arm/projects/afldb exactly as
+# before; run from a worktree (deployment validation of a branch, ISSUE-130
+# Stage 3) it is that worktree, so the fragment and tools used below are the
+# ones beside this script and never a different checkout's. It does not depend
+# on the caller's working directory. Same convention as afldb-r-preflight.sh.
+PROJECT_ROOT=${AFLDB_PROJECT_ROOT:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}
+# RSCRIPT is resolved by deploy/afldb-r-env.sh, sourced below.
 PYTHON=${AFLDB_PYTHON:-/usr/bin/python3}
 # Node is installed per-user via nvm, so the path is pinned rather than relying
 # on PATH — the same reasoning as afldb.service. tsx is invoked through its own
@@ -35,6 +42,18 @@ SNAPSHOT_ROOT=data/sources/afltables/fitzroy_core
 MANIFEST_ROOT=docs/rebuild-manifests/afltables_fitzroy_core
 
 cd "$PROJECT_ROOT"
+
+# --- the R runtime --------------------------------------------------------
+# AFLDB-ISSUE-130: RSCRIPT and the OPTIONAL AFLDB_R_LIBS library directory are
+# resolved by ONE sourced fragment shared with deploy/afldb-r-preflight.sh, so
+# the runtime the preflight validated at deploy time is exactly the runtime
+# this unit runs. The canonical library, /usr/local/lib/R/site-library, needs
+# nothing set; AFLDB_R_LIBS, when a host declares it in .env, is prepended to
+# R_LIBS and MUST exist — the fragment exits non-zero otherwise, here, before
+# a label exists, so a run cannot reach acquisition with a library it cannot
+# see. Nothing is installed at run time. Sourced through PROJECT_ROOT, not a
+# bare relative path, so the fragment can only ever be this checkout's own.
+. "$PROJECT_ROOT/deploy/afldb-r-env.sh"
 
 # --- the season -----------------------------------------------------------
 # data/reference/seasons.json is the in-progress register acquire_core.R and
