@@ -12,7 +12,18 @@ created, reopened, resolved, or materially reclassified.
 <!-- SYNCHRONISED 2026-09-03 (ISSUE-131 Stage 1): `AFLDB-ISSUE-130` was removed from this
      count — its own ledger entry below has read **Resolved 2026-09-03** since the ISSUE-130
      closeout, and this line had not been updated to match. `AFLDB-ISSUE-131` is newly
-     allocated and Open. Next free issue ID is `AFLDB-ISSUE-132`. -->
+     allocated and Open. Next free issue ID is `AFLDB-ISSUE-132`.
+     UPDATE 2026-09-03 (ISSUE-132 Stage 1): `AFLDB-ISSUE-132` is now ALLOCATED and Open (Wildcard
+     Final visibility on the public and admin UI — the rendered-surface follow-up ISSUE-129
+     deferred), on branch `claude/issue-132` in worktree `D:\dev\afldb-issue-132`. Stage 1 is
+     inspection/plan only; it claims NO migration number. Next free issue ID is `AFLDB-ISSUE-133`.
+     UPDATE 2026-09-03 (ISSUE-132 closeout): `AFLDB-ISSUE-132` is **Resolved** (no application
+     change; regression tests only) and removed from this count and the Open Issues table. Its
+     number stays allocated; it claimed NO migration number. The separate production/runtime
+     discrepancy (two canonical 2026 Wildcard Finals in production, not shown by the observed
+     public season UI) is recorded as a NOT-started handoff in the ISSUE-132 ledger entry
+     (Follow-up) and `issues/closed/AFLDB-ISSUE-132.md` §11; allocate `AFLDB-ISSUE-133` for it
+     when it opens. Next free issue ID is still `AFLDB-ISSUE-133`. -->
 
 
 <!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
@@ -13325,3 +13336,141 @@ contract.
 (2) **DONE 2026-09-03 — runbook §15:** the operator ran the read-only §9 evidence. **Dev** (`streamanator`/`afldb_dev`) holds **17 duplicate 2026 fixtures / 34 canonical rows**, every one a `round_code` movement (Round 23 → 24, Round 24 → 25) with season/date/home/away identical and all rows still `home_and_away`; §9.3 returned **0** date-only pairs; §9.5 classified all 34 rows as **17 empty + 17 populated** (17 numeric `source_record_id` stale halves with 0 `player_match_stats` / 0 `match_period_scores` / 0 `player_achievements`, paired with 17 five-part key-string live halves carrying ~44–46 player rows and 8 period rows) — corroborating §3.6's two conventions. **Production** (`afldb-prod`/`afldb_prod`) §9.2 returned **0 rows**: no duplicate 2026 fixtures at all, confirming §10 risk 2, because the timer has been stopped and the rekeyed identities have never been settled there. Consequence: **production requires prevention (the §6 code fix), not duplicate cleanup** — `repair-match-rekeys` still ships and is still run, but its production plan is expected to be empty. **CORRECTED on re-review (runbook §15.3):** dev's 17 stale halves are **not** §8 action 2 report-only groups — they are outside the repair tool's candidate set altogether. `findRetiredMatchIdentities()` proves an identity retired by joining `staging.source_records` on `external_record_id = matches.source_record_id`, and dev's stale halves carry the historical numeric/game-id convention (§3.6), so they can never satisfy that proof. A dev `repair-match-rekeys` dry run is therefore expected to print `Nothing to repair` while its validation block still reports `duplicateFixtureGroupsInSeason = 17`; a subsequent dev settle finds the populated live rows by their current `match_key`, updates them ordinarily, raises **no** `rekey_would_merge` for these fixtures and never touches the 17 empty historical rows. Those rows are a separate supervised cleanup / data-hygiene decision **outside ISSUE-131**, and **no DELETE is proposed** here or held by `afldb_import`. **§9.4 and §9.6 were NOT run** — §7's hardening index remains unmeasured and unwritten (**no migration**) and `game_id` remains unmeasured and **not adopted** (§5.2 undecided, §10 risk 1 stands).
 
 (3) Merge only after that review, then runbook §8's supervised production sequence in order with the timer still stopped: deploy, `sh deploy/afldb-r-preflight.sh` ending `R PREFLIGHT: OK`, `repair-match-rekeys` dry run, review, `--apply --plan-hash`, one supervised settle (`--dry-run --auto-apply`, the real apply, then an identical rerun proving 0/0/0), and only then re-enable `afldb-settle-afltables.timer`. Separately, on **dev**: nothing in this issue acts on the 17 duplicate fixtures — a `repair-match-rekeys` dry run there is expected to print `Nothing to repair` with `duplicateFixtureGroupsInSeason = 17` in its validation block, and the 17 empty historical rows remain a separate supervised cleanup decision. Optional, separately: run §9.4 before deciding §7's hardening index, and §9.6 plus a cross-snapshot `Game` comparison before deciding §5.2's `game_id` — both still unrun. **No production write, settle, migration or DELETE is authorised until §8 completes and is accepted.**
+
+---
+
+## AFLDB-ISSUE-132 — Wildcard Final visibility on the public and admin UI
+
+- **Status:** Resolved 2026-09-03 — **no application change required**
+- **Severity:** Medium — user-visible correctness of the first 2026 Wildcard Final rows on every public surface, and the admin tooling that maintains them
+- **Area:** Frontend/UI / Admin / Search / Tests
+- **Found:** 2026-09-03 (the rendered-surface check `AFLDB-ISSUE-129` explicitly deferred; raised once ISSUE-131 was merged and production held 2 canonical 2026 `wildcard_final` matches with 0 duplicate fixtures)
+- **Branch / worktree:** `claude/issue-132` — `D:\dev\afldb-issue-132`
+- **Resolved:** 2026-09-03 — Stage 2 regression coverage GREEN (runbook §6), `tsc --noEmit` GREEN, operator-dispositioned command-3 red (pre-existing ISSUE-129 Windows CRLF artefact, outside this issue). **Uncommitted on `claude/issue-132`; not merged, not deployed** (tests only — nothing to deploy).
+- **Files (Stage 1, 2026-09-03):** `issues/open/AFLDB-ISSUE-132.md` (new runbook), `issues.md`, `IssuesIndex.md`. No application code, test, migration or database touched.
+- **Files (Stage 2 + closeout, 2026-09-03):** `tests/integration/database.test.ts` (T1-T5), `tests/integration/data-editor.test.ts` (T6, T6b), `tests/integration/wildcard-final-fixture.ts` (season-claim comment only), `issues/closed/AFLDB-ISSUE-132.md` (moved from `issues/open/`), `issues.md`, `IssuesIndex.md`. **No application code changed.**
+- **Runbook:** `issues/closed/AFLDB-ISSUE-132.md` — surface inventory and verdicts **§2**, findings and observations **§3**, Stage 2 test plan **§4**, evidence **§6**, closeout **§10**, production/runtime discrepancy handoff **§11**
+- **Related:** `AFLDB-ISSUE-129` (the semantics verified here — resolved, merged, production-validated; NOT reopened), `AFLDB-ISSUE-131` (rekey reconciliation — merged and production-accepted; not touched), `AFLDB-ISSUE-128`
+- **Migration:** **none.** No schema change is needed or proposed.
+- **CHANGELOG:** no entry (investigation plus regression tests only; no application behaviour changed).
+
+### Scope
+
+Confirm wildcard-final matches are visible everywhere they should be in the public/admin UI;
+preserve the ordering home-and-away → Wildcard Final → traditional finals; preserve
+`round_type = 'wildcard_final'`, `is_final = true`, `is_finals_series = false`; ensure a Wildcard
+Final is never counted as a traditional final; preserve the ladder, premiership and Brownlow
+exclusions; identify any UI/query code still assuming only traditional finals exist; add focused
+regression tests for the affected surfaces. No ingestion/rekey change, no refactor.
+
+### Stage 1 — inspection [2026-09-03]
+
+Every surface was traced from the route to its query (runbook §2: 14 public, 4 admin, plus the
+six remaining `is_final` readers). Verdicts:
+
+- **Season page** (`src/app/seasons/[year]/page.tsx:128-134,648-668` → `getSeasonMatches`):
+  rows are `ORDER BY match_date, id` and grouped by the `formatRound()` label in first-seen
+  order, so the Wildcard Final is its own "Wildcard Final" block, anchored `#wildcard-final`,
+  between the last home-and-away round and the finals; the "Ladder after …" table is emitted only
+  for `home_and_away`, so none is claimed after the WF. Ordering is chronology, exactly as it is
+  for EF/QF/SF/PF/GF — there is no round-type rank anywhere.
+- **Match page** renders "Wildcard Final" via `formatRound`; the Brownlow column is driven by
+  vote presence and a WF has none.
+- **Match Search** (`src/search/match-spec.ts:70-78`, `src/db/queries/match-search.ts:84-92`):
+  offers `Wildcard Final only`; `Finals only` → `is_finals_series` and `Home-and-away` →
+  `NOT is_final` both exclude it; sorts are date/margin/score only.
+- **Site search** `searchRounds` accepts "wildcard final" and returns slug `YYYY#wildcard-final`,
+  the season-page anchor; numbered-round lookups stay `home_and_away`.
+- **Player page / match log, records, clubs**: labels pass through `formatRoundShort` → "WF";
+  every finals figure reads `player_career_stats.finals` / `club_seasons.finals_played`, both
+  built from `is_finals_series`.
+- **Query Builder, NL, Grid Solver, structured data, sitemap**: already correct from ISSUE-129
+  or round-type-free.
+- **Admin**: `searchAdminMatches` lists the WF (`roundCode 'WF'`), its `roundNumber` filter
+  excludes it as it excludes every final; `saveMatchSheet` refuses Brownlow votes when
+  `is_final` — the Brownlow exclusion holds on the admin write path; the create-match form
+  already offers `wildcard_final` (ISSUE-129 T14); `/admin/current-season` renders no rounds.
+- The remaining `is_final` readers (`rounds.ts`, `search.ts`, `player-derived.ts:416-443`,
+  `match-search.ts:89`, `match-sheet.ts:85`, `db-health.ts`) are all exclusions a WF is meant to
+  fall on the excluded side of. **No site uses `is_final` affirmatively as "played a final".**
+
+**Finding: no defect on any inspected surface.** Three cosmetic observations were recorded and
+deliberately not changed (CLAUDE.md §13): O1 `match-sheet.ts:86` refusal text says "for finals";
+O2 the in-progress notice reads "(round WF)" from `last_loaded_round`, the same shape as
+"(round GF)"; O3 the player match log's "sort by round" puts a WF in the NULL-round tail with the
+finals. What is missing is regression coverage at the query surfaces the pages call, which
+ISSUE-129 did not pin.
+
+### Stage 2 — regression tests, no application change (2026-09-03)
+
+Two existing integration suites were extended (no new test file); fixture seasons **2087**
+(`database.test.ts`) and **2088** (`data-editor.test.ts`) were claimed for parallel safety via
+`seedWildcardFinalSeason`.
+
+- `tests/integration/database.test.ts` — new describe `AFLDB-ISSUE-132 wildcard final
+  visibility (public and admin query surfaces)`: **T1** `getSeasonMatches` returns
+  `home_and_away, home_and_away, wildcard_final, elimination_final` and groups by `formatRound()`
+  into `['Round 1', 'Wildcard Final', 'Elimination Final']` with anchor `wildcard-final`; **T2**
+  `runMatchSearch` `all`/`home_and_away`/`finals`/`wildcard_final` → 4/2/1 (EF only)/1 (WF
+  only); **T3** `searchRounds('2087 wildcard final')` and `'wildcard final 2087'` → one `round`
+  result, slug `2087#wildcard-final`, title `Wildcard Final, 2087`, and `'round 1 2087'`
+  unaffected; **T4** `getPlayerMatches` for the wildcard-only player → one `wildcard_final` row,
+  `roundNumber null`, `formatRoundShort` → `WF`; **T5** `searchAdminMatches({ season })` lists
+  the WF with `roundCode 'WF'` and `{ season, roundNumber: 1 }` omits it.
+- `tests/integration/data-editor.test.ts` — new describe `AFLDB-ISSUE-132 wildcard final on
+  the admin match sheet`: **T6** `saveMatchSheet` on the WF with a complete 3-2-1 Brownlow
+  allocation is refused by the `is_final` check (`match-sheet.ts:84-87`, message "Brownlow
+  votes cannot be recorded for finals.") and writes nothing (votes NULL, kicks unchanged, no
+  `data_edits` row); **T6b** a single-row partial allocation is refused pre-write by
+  `validateMatchSheetPayload` ("requires exactly one player with 3 votes, one with 2, and one
+  with 1") and writes nothing. T6's first draft submitted only the partial payload and went RED
+  on the validator message — a test-design error corrected into T6/T6b, not an application
+  defect (runbook §6).
+
+**Validation (operator-run, this worktree, `afldb_test`, vitest 4.1.10):**
+`npx vitest run tests/integration/database.test.ts -t "AFLDB-ISSUE-132"` → 5 passed;
+`npx vitest run tests/integration/data-editor.test.ts -t "AFLDB-ISSUE-132"` → 2 passed;
+the combined run of both suites plus `tests/finals-semantics-contract.test.ts` and
+`tests/format.test.ts` → 99 passed, 6 pre-existing conditional skips, **1 failed**: the
+pre-existing ISSUE-129 test `finals-semantics-contract.test.ts` "adds the enum value in its own
+migration", verified to fail only because this Windows checkout (`core.autocrlf=true`, `i/lf
+w/crlf`) gives migration `084` CRLF endings while the test splits on bare `\n`. **Operator
+disposition 2026-09-03:** accepted as a Windows CRLF artefact; the ISSUE-129 test, migration
+084, Git config and line-ending behaviour are not modified under ISSUE-132, and ISSUE-132's
+own coverage is treated as GREEN on the focused and combined results with the artefact
+recorded. `npx tsc --noEmit -p tsconfig.json` → **GREEN** (exit 0, no diagnostics).
+
+### Resolution — 2026-09-03
+
+- **Root cause:** none — no defect. ISSUE-129 had already implemented every UI-facing
+  Wildcard Final decision; this issue verified it route → query on every public and admin
+  surface and found no mislabelled, misordered, miscounted or hidden `wildcard_final` row, and
+  no `is_final` reader used affirmatively as "played a final".
+- **Fix:** no application change. Regression coverage added at the query surfaces the pages
+  actually call (T1-T6, T6b above), which ISSUE-129 had not pinned.
+- **Validation:** as above — focused runs GREEN, typecheck GREEN, one pre-existing Windows
+  CRLF artefact outside this issue explicitly recorded and dispositioned.
+- **Runbook contract (§0/§4):** fully satisfied — semantics, ordering, exclusions, no
+  ingestion/rekey change, no refactor, no migration, no observation (O1-O3) adopted.
+- **Not committed** (operator instruction). No `CHANGELOG.md` entry.
+
+### Follow-up — production/runtime discrepancy (separate investigation, NOT started)
+
+Recorded at the operator's instruction; **no evidence gathered under ISSUE-132.** Production
+currently holds **two canonical 2026 Wildcard Final matches** (ISSUE-131 closeout), but the
+**public season UI observed in production did not show them**, even though the repository's
+query/render paths (runbook §2 P1) and T1-T5 support them against the `afldb_test` fixture.
+The discrepancy therefore lies between the branch's code and what production served, not in
+the repository's query/render code. Exact starting point, read-only and in order:
+(1) pin the observation — URL, time, viewer, what precisely was or was not rendered;
+(2) pin the deployed revision on `afldb-prod` against `origin/main` and whether it contains
+ISSUE-129 (migrations `084`/`085`, `formatRound` "Wildcard Final") and ISSUE-131;
+(3) pin the served data — the two 2026 `wildcard_final` rows' `round_type`, `round_code`,
+`round_number`, `match_date`, `is_final`, `is_finals_series`, clubs and `source_record_id`,
+plus `seasons.last_loaded_round` and the per-`round_type` 2026 count;
+(4) pin the render path — whether `/seasons/2026` is statically cached/revalidated in the
+deployed build such that a pre-settle render is still served, comparing rendered HTML with a
+fresh server render; (5) only then classify (stale deploy / stale cache / data shape / genuine
+render defect) and open its own issue. Full handoff: `issues/closed/AFLDB-ISSUE-132.md` §11.
+Allocate `AFLDB-ISSUE-133` when it opens. No production write, settle, migration or cache purge
+until fact-finding is complete and accepted.

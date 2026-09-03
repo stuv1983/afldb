@@ -93,7 +93,23 @@
      and NOT reserved, so the next free migration number is still `086` and any branch needing one
      must re-scan every live branch tip. Also synchronised in this pass: `issues.md`'s open-issue
      count line still listed the resolved `AFLDB-ISSUE-130` and now does not.
-     **Next free issue ID is `AFLDB-ISSUE-132`.** -->
+     **Next free issue ID is `AFLDB-ISSUE-132`.**
+     UPDATE 2026-09-03 (ISSUE-132 Stage 1): `AFLDB-ISSUE-132` is now ALLOCATED and Open (Wildcard
+     Final visibility on the public and admin UI — the rendered-surface follow-up ISSUE-129
+     deferred), on branch `claude/issue-132` in worktree `D:\dev\afldb-issue-132`. Stage 1 is
+     inspection/plan only (no defect found; Stage 2 is regression tests). It claims **NO
+     migration number**, so the next free migration number is still `086`.
+     **Next free issue ID is `AFLDB-ISSUE-133`.**
+     UPDATE 2026-09-03 (ISSUE-132 closeout): `AFLDB-ISSUE-132` is **Resolved** — no application
+     change; regression tests only (T1-T6/T6b GREEN, `tsc` GREEN, one pre-existing ISSUE-129
+     Windows CRLF test artefact dispositioned by the operator). Removed from this index; its
+     number stays allocated; it claimed NO migration number, so `086` is still the next free
+     migration. **Uncommitted on `claude/issue-132`.** A SEPARATE, NOT-started investigation is
+     handed off in `issues/closed/AFLDB-ISSUE-132.md` §11 and the ISSUE-132 ledger Follow-up:
+     production holds two canonical 2026 Wildcard Final matches that the observed public season
+     UI did not show, although the repository's query/render paths and tests support them.
+     Allocate `AFLDB-ISSUE-133` for it when it opens.
+     **Next free issue ID is still `AFLDB-ISSUE-133`.** -->
 
 <!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
      the ISSUE-110 branch merged into dev on 2026-08-31 and its own row below is now

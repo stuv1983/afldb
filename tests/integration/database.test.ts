@@ -12,8 +12,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
 import { reconcileCareerTotals } from '@/db/queries/db-health';
+import { searchAdminMatches } from '@/db/queries/match-admin';
+import { runMatchSearch } from '@/db/queries/match-search';
+import { getSeasonMatches } from '@/db/queries/matches';
+import { getPlayerMatches } from '@/db/queries/players';
 import { getSeasonRoundLadder } from '@/db/queries/rounds';
+import { searchRounds } from '@/db/queries/search';
+import { formatRound, formatRoundShort } from '@/lib/format';
 import { seedWildcardFinalSeason, type WildcardFixture } from './wildcard-final-fixture';
+import type { MatchType } from '@/search/match-spec';
 import type { NlGrain } from '@/search/nl/plan';
 
 const SUPPORTED_NL_GRAINS = {
@@ -603,5 +610,161 @@ describe('AFLDB-ISSUE-129 wildcard finals semantics (player career and ladder)',
     expect(row.isFinal).toBe(true);
     expect(row.isFinalsSeries).toBe(false);
     expect(row.roundNumber).toBeNull();
+  });
+});
+
+/**
+ * AFLDB-ISSUE-132 — the query surfaces the public season, match-search,
+ * site-search, player and admin pages actually call. ISSUE-129 above pins the
+ * derived aggregates; this pins what each page renders from a `wildcard_final`
+ * row: visible, labelled "Wildcard Final" / "WF", ordered between the last
+ * home-and-away round and the finals series, and on the excluded side of every
+ * finals-only filter. Fixture season 2087 (2096 belongs to ISSUE-129 above).
+ */
+describe('AFLDB-ISSUE-132 wildcard final visibility (public and admin query surfaces)', () => {
+  let fixture: WildcardFixture;
+
+  beforeAll(async () => {
+    fixture = await seedWildcardFinalSeason(2087);
+  });
+
+  afterAll(async () => {
+    await fixture?.cleanup();
+  });
+
+  it('T1: getSeasonMatches orders H&A → WF → finals and groups like the season page', async () => {
+    const rows = await getSeasonMatches(fixture.season);
+    expect(rows.map((row) => row.roundType)).toEqual([
+      'home_and_away', 'home_and_away', 'wildcard_final', 'elimination_final',
+    ]);
+
+    // Exactly the grouping src/app/seasons/[year]/page.tsx performs: keyed by
+    // formatRound() in first-seen (chronological) order, anchor id derived from
+    // the label.
+    const groups = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const key = formatRound(row.roundType, row.roundNumber);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(row);
+    }
+    const labels = [...groups.keys()];
+    expect(labels).toEqual(['Round 1', 'Wildcard Final', 'Elimination Final']);
+    expect(labels.map((label) => label.toLowerCase().replace(/\s+/g, '-')))
+      .toEqual(['round-1', 'wildcard-final', 'elimination-final']);
+
+    const wildcardGroup = groups.get('Wildcard Final')!;
+    expect(wildcardGroup).toHaveLength(1);
+    expect(wildcardGroup[0].id).toBe(fixture.wildcardMatchId);
+    expect(wildcardGroup[0].roundNumber).toBeNull();
+
+    // The WF sits strictly after the last home-and-away match and strictly
+    // before the first finals-series match.
+    const lastHomeAndAway = rows[1].matchDate.getTime();
+    const wildcard = rows[2].matchDate.getTime();
+    const firstFinal = rows[3].matchDate.getTime();
+    expect(wildcard).toBeGreaterThan(lastHomeAndAway);
+    expect(wildcard).toBeLessThan(firstFinal);
+  });
+
+  it('T2: runMatchSearch match types put the WF on the right side of every filter', async () => {
+    const search = (matchType: MatchType) => runMatchSearch({
+      filters: [{ field: 'season', min: fixture.season, max: fixture.season }],
+      clubSlugs: [],
+      outcome: 'all',
+      matchType,
+      sort: 'date_asc',
+      page: 1,
+      pageSize: 50,
+    });
+
+    const all = await search('all');
+    expect(all.total).toBe(4);
+    expect(all.rows.map((row) => row.roundType)).toEqual([
+      'home_and_away', 'home_and_away', 'wildcard_final', 'elimination_final',
+    ]);
+
+    const homeAndAway = await search('home_and_away');
+    expect(homeAndAway.total).toBe(2);
+    expect(homeAndAway.rows.every((row) => row.roundType === 'home_and_away')).toBe(true);
+    expect(homeAndAway.rows.map((row) => row.id)).not.toContain(fixture.wildcardMatchId);
+
+    const finals = await search('finals');
+    expect(finals.total).toBe(1);
+    expect(finals.rows.map((row) => row.id)).toEqual([fixture.eliminationMatchId]);
+
+    const wildcard = await search('wildcard_final');
+    expect(wildcard.total).toBe(1);
+    expect(wildcard.rows.map((row) => row.id)).toEqual([fixture.wildcardMatchId]);
+    expect(wildcard.rows[0].roundType).toBe('wildcard_final');
+  });
+
+  it('T3: searchRounds returns the anchor the season page emits for the WF', async () => {
+    const expectedSlug = `${fixture.season}#wildcard-final`;
+    // The page's anchor for the WF group, derived exactly as in T1.
+    const pageAnchor = formatRound('wildcard_final', null).toLowerCase().replace(/\s+/g, '-');
+    expect(expectedSlug).toBe(`${fixture.season}#${pageAnchor}`);
+
+    const yearFirst = await searchRounds(`${fixture.season} wildcard final`);
+    expect(yearFirst).toHaveLength(1);
+    expect(yearFirst[0]).toMatchObject({
+      type: 'round',
+      id: fixture.season,
+      slug: expectedSlug,
+      title: `Wildcard Final, ${fixture.season}`,
+      subtitle: null,
+    });
+
+    const yearLast = await searchRounds(`wildcard final ${fixture.season}`);
+    expect(yearLast).toEqual(yearFirst);
+
+    // A numbered round stays home_and_away only: the WF never leaks into it.
+    const roundOne = await searchRounds(`round 1 ${fixture.season}`);
+    expect(roundOne).toHaveLength(1);
+    expect(roundOne[0]).toMatchObject({
+      type: 'round',
+      slug: `${fixture.season}#round-1`,
+      title: `Round 1, ${fixture.season}`,
+      subtitle: '2 matches',
+    });
+  });
+
+  it('T4: getPlayerMatches shows the WF row, labelled WF, for the wildcard-only player', async () => {
+    const { rows, total } = await getPlayerMatches(fixture.wildcardOnlyPlayerId, {
+      limit: 20, offset: 0,
+    });
+    expect(total).toBe(1);
+    expect(rows).toHaveLength(1);
+    const [row] = rows;
+    expect(row.matchId).toBe(fixture.wildcardMatchId);
+    expect(row.season).toBe(fixture.season);
+    expect(row.roundType).toBe('wildcard_final');
+    expect(row.roundNumber).toBeNull();
+    expect(formatRoundShort(row.roundType, row.roundNumber)).toBe('WF');
+    expect(formatRound(row.roundType, row.roundNumber)).toBe('Wildcard Final');
+    // On the winning side of the WF; no Brownlow votes exist for it.
+    expect(row.outcome).toBe('W');
+    expect(row.brownlowVotes).toBeNull();
+  });
+
+  it('T5: searchAdminMatches lists the WF for the season and drops it under a round-number filter', async () => {
+    const season = await searchAdminMatches({ season: fixture.season });
+    expect(season.total).toBe(4);
+    expect(season.rows).toHaveLength(4);
+    const wildcard = season.rows.find((row) => row.id === fixture.wildcardMatchId);
+    expect(wildcard).toBeDefined();
+    expect(wildcard!.roundType).toBe('wildcard_final');
+    expect(wildcard!.roundCode).toBe('WF');
+    expect(wildcard!.roundNumber).toBeNull();
+    expect(wildcard!.playerCount).toBe(1);
+
+    // Newest first: EF, WF, then the two home-and-away matches.
+    expect(season.rows.map((row) => row.roundType)).toEqual([
+      'elimination_final', 'wildcard_final', 'home_and_away', 'home_and_away',
+    ]);
+
+    const roundOne = await searchAdminMatches({ season: fixture.season, roundNumber: 1 });
+    expect(roundOne.total).toBe(2);
+    expect(roundOne.rows.every((row) => row.roundNumber === 1)).toBe(true);
+    expect(roundOne.rows.map((row) => row.id)).not.toContain(fixture.wildcardMatchId);
   });
 });
