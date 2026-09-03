@@ -836,3 +836,91 @@ Files added in this stage: `tests/integration/wildcard-final-fixture.ts`,
 `docs/rebuild-manifests/afltables_fitzroy_core/issue129-t7-20260903.json`. Files changed:
 `tests/integration/database.test.ts`, `tests/integration/grid-solver.test.ts`,
 `tests/integration/nl-answers-team-club.test.ts`, this runbook.
+
+---
+
+# STAGE 4 — CLOSEOUT [2026-09-03]
+
+## 18. Closeout
+
+**`AFLDB-ISSUE-129` is Resolved 2026-09-03.** Implementation commit **`b1d4085`** ("Add Wildcard
+Final semantics") on branch `opus/issue-129`, worktree `D:\dev\afldb-issue-129`. This runbook moved
+from `issues/open/` to `issues/closed/` with the closeout commit.
+
+### 18.1 Acceptance — every §11 case
+
+| §11 | Proves | State | Evidence |
+|---|---|---|---|
+| T1 | exact vocabulary mapping, 9 near-misses still refused | **PASS** | §15 |
+| T2 | the ISSUE-128 fixture inverted in place: 2 matches, 4 player rows, 0 unkeyed | **PASS** | §15 |
+| T3 | the COMPLETE verdict stays a measurement | **PASS** | §15 |
+| T4 | idempotence, bundle and canonical apply | **PASS** | §15, §17.2 |
+| T5 | INCOMPLETE re-proved on a genuinely unknown code (`XF`) | **PASS** | §15 |
+| T6 | WF player rows: `is_final` true, no Brownlow round vote | **PASS** | §15 |
+| T7 | real source snapshot COMPLETE | **PASS** | §17.3 (209 / 9,614 / 0 / 0) |
+| T8 | a losing wildcard club reads `missed_finals`, `finals_played = 0` | **PASS** | §17.5 |
+| T9 | wildcard-only player: career `finals = 0`, `games = 1`, db-health 0 mismatches | **PASS** | §17.5 |
+| T10 | no premiership points, no ladder movement, no score | **PASS** | §17.5 |
+| T11 | no Grid Solver finals criterion matches | **PASS** | §17.5 |
+| T12 | NL `wildcard_final` match type, generic `finals` unchanged | **PASS** | §15 |
+| T13 | `formatRound`/`formatRoundShort` with no `fallback` | **PASS** | §15 |
+| T14 | admin `wildcard_final` explicit on every surface | **PASS** | §15 |
+| T15 | **no historical regression** — generated-column invariant | **PASS — 0 mismatches** | §17.1 |
+| T16 | fitzRoy ladder witness | **PASS — 1,622 club-seasons agree** | §17.6 |
+
+Aggregate: five touched integration suites **268 passed / 5 skipped / 0 failed**; 84 unit test
+files **2,753 passed / 14 skipped / 0 failed**; `npm run typecheck` clean; eslint **0 findings in
+changed or new code**; `git diff --check` clean.
+
+### 18.2 Schema state, by environment
+
+| Environment | Schema | `084`/`085` |
+|---|---|---|
+| `afldb_test` | `085` | **applied** 2026-09-03 |
+| `afldb_dev` | `083` | not applied |
+| production | `083` | **not applied** |
+
+`084_round_type_wildcard_final.sql` and `085_matches_is_finals_series.sql` are now definitively
+taken. **The next free migration number is `086`**, and any branch claiming it must still re-scan
+every live branch tip first.
+
+### 18.3 What was deliberately NOT done
+
+1. **No production deployment.** `db:privileges` was not run; no database other than `afldb_test`
+   was touched; nothing was merged to `main`.
+2. **The 3-hour full-season canonical apply was not run** (§17.4) — an accepted operator tradeoff,
+   recorded as such. The apply path itself is unchanged code, exercised by `settle-afltables`
+   integration coverage and by ISSUE-122's production ladder.
+3. **The cosmetic `/admin/current-season` rendered-DOM check** carried over from ISSUE-128 §13 was
+   not performed. It remains cosmetic-only and cannot make a run silently report success.
+
+### 18.4 Merge readiness — ISSUE-128 + ISSUE-129 together
+
+**Safe, and they should go together rather than separately.**
+
+- 129 changed **no ISSUE-128 code**; its verdict is a measurement and the measurement moved from
+  `INCOMPLETE` (207 / 9,522, 94 unrepresentable) to `COMPLETE` (209 / 9,614, 0 unkeyed).
+- 129's suite **re-proves** ISSUE-128's guarantee rather than deleting it: the INCOMPLETE path is
+  asserted on a round code AFLDB still does not know (`XF`), so teaching one round did not switch
+  the reporting off for the next.
+- Deploying **128 alone** leaves the nightly settle unit reporting `failed` every night the 2026
+  Wildcard Round is inside the acquired window. Deploying **129 alone** is coherent but pointless —
+  128 is what makes an incomplete run audible.
+- Both branches are green independently; there is no schema conflict, because 128 claims no
+  migration number.
+
+### 18.5 Exact production/deployment next action
+
+1. Merge the ISSUE-128 and ISSUE-129 work to `main` **together**.
+2. **Dev:** `npm run db:migrate` (expect `084` then `085` applied, 0 pending) → reconcile
+   privileges, subject to the shared-dev orphan-migration caveat recorded in ISSUE-128 §12 → deploy
+   the code → re-run `rebuild_derived.py` so `player_career_stats.finals` and
+   `club_seasons.finals_played` are rebuilt under the new predicate → one supervised settle,
+   expecting `SOURCE COMPLETENESS: COMPLETE` and a green unit.
+3. **Production:** pre-deploy backup → apply `084` then `085` → `npm run db:privileges` → deploy the
+   code → re-run `rebuild_derived.py` → one supervised `--dry-run --auto-apply` before the real
+   apply.
+
+Migrations precede code in both environments. The generated column is computed by PostgreSQL, so
+existing rows need no backfill, but the derived aggregates do, and they must be rebuilt before the
+first wildcard row lands.

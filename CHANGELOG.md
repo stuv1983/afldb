@@ -74,6 +74,15 @@ commit.
   deleted**: it now proves 2 matches and 4 player rows emitted, 0 unkeyed rejections and both
   enumerations complete. ISSUE-128's own guarantee is re-proved on a round code AFLDB still does
   not know, so teaching one round did not switch the reporting off for the next.
+- **Accepted and closed 2026-09-03.** The full 16-case acceptance plan is green against `afldb_test`
+  at migration `085`: five touched integration suites **268 passed / 5 skipped / 0 failed**, 84 unit
+  test files **2,753 passed**, typecheck clean, 0 lint findings in changed or new code, and the
+  decisive no-historical-regression gate — `is_finals_series <> (is_final AND round_type <>
+  'wildcard_final')` across full history — returns **0 mismatches**. **Not yet deployed:** `084` and
+  `085` are applied to `afldb_test` only; `afldb_dev` and production remain at `083`, and
+  `db:privileges` was not run. `AFLDB-ISSUE-128` and `AFLDB-ISSUE-129` ship **together** — 128 alone
+  makes the nightly settle unit report `failed` every night the 2026 Wildcard Round is in the
+  acquired window, and 129 is what makes the rows land.
 
 ### AFLDB-ISSUE-128 — a current-season settle can no longer report success while dropping rows AFL Tables supplied - 3 September 2026
 
