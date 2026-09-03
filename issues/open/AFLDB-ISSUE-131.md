@@ -1057,22 +1057,44 @@ against it — with §9.2 empty they have no groups to classify.
    nothing to find — but on current production it will report an empty plan. The §8
    ordering is unchanged: the code fix lands before the timer is re-enabled, or the very
    next settle creates on production exactly what dev now holds.
-2. **Dev's 17 pairs are §8 action 2 — "report only".** The stale halves carry no
-   dependent data at all, so under §8 rule 5 the tool prints the group and stops. It does
-   **not** rekey them (the live key is already present, so a rekey would be a merge) and
-   it does **not** delete them: retiring an empty row needs a DELETE, `afldb_import` must
-   not do that, and §8 rule 3 forbids ad-hoc SQL DELETE at any point, by anyone. **The
-   contract stays report-only for this shape.** Nothing in this evidence changes that,
-   and no DELETE is being proposed here.
-3. **The settle's own behaviour over dev's shape is already specified and tested.** With
-   both halves present, a further rekey attempt on one of those fixtures resolves to
-   `rekey_would_merge`, which refuses, writes nothing, and — since §14.1 — withholds the
-   whole fixture family for the rest of the run. Dev is therefore not made worse by
-   running the fixed code against it.
-4. **Deciding what to do with dev's 17 empty halves is a separate, supervised decision**
-   and is not part of this issue's authorised scope. It needs an owner-level DELETE or an
-   equivalent supervised action, on dev only, after the repair tool has printed the
-   groups.
+2. **Dev's 17 stale halves are OUTSIDE the repair tool's candidate set, and deliberately
+   so.** They are **not** §8 action 2 "report only" groups, and this section previously
+   said they were. Correcting that:
+
+   `findRetiredMatchIdentities()` proves an identity retired by joining
+   `staging.source_records` on `r.external_record_id = m.source_record_id`
+   (`src/lib/acquisition/match-rekey.ts`), and its rule 3 states the exclusion outright —
+   a canonical row whose `source_record_id` is an AFL Tables **game id** rather than a
+   spine record id (§3.6) falls out of that JOIN. Dev's 17 stale halves are exactly that
+   historical numeric convention (§15.1), so they can never satisfy the retired-source-
+   record proof and are never candidates.
+
+   The concrete consequence, and the output to expect from a **dev** dry run:
+
+   ```
+   Validation BEFORE ... duplicateFixtureGroupsInSeason = 17
+   Nothing to repair: no canonical row sits under a retired identity ...
+   ```
+
+   an **empty plan**, printed alongside a validation block that still counts the 17
+   duplicate groups. That is the tool working correctly, not failing to see them: it
+   reports the state and declines to act on rows it cannot prove anything about.
+
+   Nothing in this changes the rule that matters — **no DELETE, by the tool or ad hoc**
+   (§8 rule 3), and `afldb_import` must not hold one.
+3. **A subsequent dev settle performs ordinary updates and does not touch the 17 empty
+   historical rows.** It finds each populated live row by its current `match_key`, and
+   the retired-identity probe on that hit path returns nothing for the reason in item 2,
+   so no `rekey_would_merge` arises for these fixtures — this section previously claimed
+   it would. The live half is updated normally; the empty historical half is neither read
+   as a candidate nor written to. Dev is therefore not made worse by running the fixed
+   code against it, by a different mechanism than was first written here.
+4. **The 17 empty historical rows are a separate supervised cleanup / data-hygiene
+   decision, outside ISSUE-131.** They are dev-only, they carry no dependent data, and
+   nothing in this issue's authorised scope removes them: retiring an empty row needs an
+   owner-level DELETE, which `afldb_import` does not and must not hold. They are recorded
+   here as observed state, not as work this issue schedules, and they are **not** waiting
+   on the repair tool to print them.
 
 ### 15.4 §9 status after this pass
 
@@ -1106,7 +1128,9 @@ Consequently:
    only if the plan is non-empty, one supervised settle (`--dry-run --auto-apply`, then
    the real apply, then an identical rerun proving 0/0/0), and only then re-enable
    `afldb-settle-afltables.timer`.
-4. Separately, on **dev**: run `repair-match-rekeys` dry-run to print the 17 report-only
-   groups, then take the supervised decision of §15.3 item 4.
+4. Separately, on **dev**: nothing in this issue acts on the 17 duplicate fixtures. A
+   `repair-match-rekeys` dry run there is expected to print `Nothing to repair` with
+   `duplicateFixtureGroupsInSeason = 17` in its validation block (§15.3 item 2); the
+   empty historical halves are a separate supervised cleanup decision (§15.3 item 4).
 5. Optional, separately: run §9.4 and decide the §7 index; run §9.6 plus a cross-snapshot
    `Game` comparison and decide §5.2.
