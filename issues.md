@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 11 tracked here — `AFLDB-ISSUE-104`, `-110`, `-113`, `-116`, `-123`, `-124`, `-125`, `-126`, `-127`, `-128`, `-129`.
+**Open issues:** 10 tracked here — `AFLDB-ISSUE-104`, `-110`, `-113`, `-116`, `-123`, `-124`, `-125`, `-126`, `-127`, `-129`.
 
 <!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
      the ISSUE-110 branch merged into dev on 2026-08-31 and its own ledger rows below are
@@ -29,7 +29,26 @@ created, reopened, resolved, or materially reclassified.
      in `issues.md` (Resolution, 2026-09-03) and `issues/closed/AFLDB-ISSUE-122.md` §23. Four
      follow-ups were routed out of its closeout: `AFLDB-ISSUE-123`, `-124`, `-125`, `-126`. -->
 | `AFLDB-ISSUE-129` | High | Database / Data modelling / Data acquisition / Search | **Not started; a product decision blocks all implementation.** AFL Tables publishes a **Wildcard Final** round in 2026 — 28-Aug Western Bulldogs v Collingwood and 29-Aug Melbourne v Carlton, plus 92 player-match rows — which fitzRoy acquires correctly and AFLDB **cannot store**. `src/db/migrations/003_matches.sql:8` declares `round_type` as a PostgreSQL **enum** with six members and no wildcard, and `matches_round_number_ck` forbids `home_and_away` with a NULL `round_number`, so it cannot be modelled as a home-and-away round either: **a new enum value is unavoidable**. `matches_is_final_ck` then derives `is_final` from `round_type` by CHECK, so any non-`home_and_away` value makes every wildcard final a final **by construction** across the whole application unless each consumer excludes it — 34 files reference `is_final`, 19 of them non-AFLW production consumers. `import_fitzroy_core.py:136` `FINALS_CODES` also lacks `WF`, and `normalise_stats_round()` lacks `Wildcard Final`; both grains must be taught together or every player row is rejected on a round mismatch. Routed out of `AFLDB-ISSUE-128`, which made the loss audible but cannot make the rows land. Runbook: `issues/open/AFLDB-ISSUE-129.md`. | **Decide the finals semantics first (runbook §3) and record the reasoning — nothing else may start.** Does a Wildcard Final count as a finals appearance? It changes finals counts, finals-only search filters, NL answers, Grid Solver criteria and career aggregates, and retroactively defines AFLDB's position from 2026 on. **No option is authorised and no migration number is claimed** — `IssuesIndex.md` requires a live-branch-tip re-scan first, and `ALTER TYPE … ADD VALUE` cannot run inside a transaction block on older PostgreSQL, so check `tools/db/migrate.ts` before writing it. Then teach both source vocabularies, add the label in `src/lib/format.ts`, work the `is_final` consumers under the decision, and **invert rather than delete** the `AFLDB-ISSUE-128` fixture assertions in `tests/fitzroy-core-import.test.ts`. |
-| `AFLDB-ISSUE-128` | High | Data acquisition / Import architecture / Admin tooling / Data integrity | **IMPLEMENTED 2026-09-03, awaiting operator validation on a real host.** Reported as "recent AFL Tables games missing" plus a stale Kali admin UI; measured live, it was three findings. **(1) The stale-`fitzRoy_data`-cache lead is FALSE** — `fetch_results_afltables()` reads `bg3.txt` **live** with no cache and returned 209 matches through 2026-08-29; the player-stats cache is current too, and `No new data found!` means exactly that. **(2)** AFL Tables' 2026 Wildcard Round arrives as `Round = "WF"` (results) and `"Wildcard Final"` (player stats); `import_fitzroy_core.py:136` `FINALS_CODES` knows neither, so the rows lose their identity and become **unkeyed rejections** — owned by `AFLDB-ISSUE-129`. **(3) The defect this issue owns is the SILENCE.** A real chain run acquired 209 matches / 9,614 player rows, emitted **207 / 9,522** with **94** unkeyed rejections and both enumerations `complete: false` — and **exited 0**; the settle counted them and exited 0; the unit went green; and the ISSUE-127 admin whitelist projected none of them. `209−207 = 2`, `9,614−9,522 = 92`, `2+92 = 94` — the same figures production recorded on `settle-2026-09-02-1958`, so **production dropped exactly the Wildcard Round and reported a clean pass**. Separately, the Kali UI symptom was mostly a **stale deployment** (`f0ea8f1` had already removed the banner; `main` carries it) over a genuinely incomplete retirement: `mode === 'auto'` ⇒ `['kali'] as const` survived, as did a `kali` default in `parseCurrentSeasonSources('')`. Fixed: new pure `src/lib/acquisition/source-completeness.ts` verdict (`complete`/`incomplete`/`unknown`) from the source's own counters and **never a calendar**, so byes and the off-season read `complete`; `--require-complete-source` on the settle CLI, evaluated **after the commit** so no data is lost and only the claim of success is; the flag wired into `deploy/afldb-settle-afltables.sh`; a `SOURCE COMPLETENESS` block in the importer; the five snapshot counters whitelisted into the admin projection with the verdict derived on read; and `mode=auto` removed with unknown modes now **refused**. Evidence: 5 suites **405/405** (0 failed), `tsc --noEmit` clean, eslint clean, `next build` compiled + typechecked. Runbook: `issues/open/AFLDB-ISSUE-128.md`. | **Operator validation on dev, then close.** Run the chain and confirm the unit now goes `failed` while the batch still commits; confirm `journalctl -u afldb-settle-afltables \| grep -A 12 'SOURCE COMPLETENESS'` names the Wildcard Final rows; confirm `/admin/current-season` shows the INCOMPLETE verdict above the counters; and run `tests/integration/settle-afltables.test.ts` against `afldb_test` on a host that has one (**blocked here** — no PostgreSQL, no `.env`; no settle-library or canonical-apply code was changed, so no behavioural change is expected). **Do not deploy to production before `AFLDB-ISSUE-129` is decided:** the nightly unit will report `failed` every night the Wildcard Round is in the acquired window. That is true, and is the point — but the operator should know in advance. |
+<!-- RETIRED 2026-09-03 — `AFLDB-ISSUE-128` is **Resolved** and is NO LONGER an open issue.
+     A current-season settle can no longer report success while dropping rows AFL Tables supplied:
+     the completeness verdict is derived from the source's own counters (never a calendar), stated
+     by `import_fitzroy_core.py`, enforced by `settle-afltables.ts --require-complete-source`
+     **after** the settle commits, passed by `deploy/afldb-settle-afltables.sh`, and projected by
+     `/admin/current-season`. The legacy Kali `auto` mode is removed, unknown modes are refused and
+     `parseCurrentSeasonSources()` no longer defaults to `kali`. Validated on dev with the real
+     systemd chain (`import_batches` 87 committed `completed`, 980 canonical rows, 0 apply failures,
+     unit exited **1** with `Source INCOMPLETE: 94 unrepresentable row(s), 2 unswept scope(s)`), then
+     accepted on `afldb_test` — `tests/integration/settle-afltables.test.ts` **44 passed / 1 skipped
+     / 0 failed** (the skip is the pre-existing restricted `afldb_import`-role check on an unset
+     `AFLDB_TEST_IMPORT_DATABASE_URL`). The temporary systemd drop-in repointing the unit at the
+     ISSUE-128 worktree has been removed and the unit restored to `/home/arm/projects/afldb`.
+     NOT eyeballed in a browser: the rendered INCOMPLETE alert on `/admin/current-season` — proven
+     at the data layer only; carried to `AFLDB-ISSUE-129`. Authoritative record: the
+     `AFLDB-ISSUE-128` entry in `issues.md` (Resolution, 2026-09-03) and
+     `issues/closed/AFLDB-ISSUE-128.md` §12-§13.
+     **NOT DEPLOYED TO PRODUCTION, deliberately** — the nightly unit will report `failed` every
+     night the 2026 Wildcard Round is in the acquired window. `AFLDB-ISSUE-129` (Wildcard Final
+     enum + finals semantics) is the open blocker and must be decided first. -->
 | `AFLDB-ISSUE-127` | Low | Admin tooling / Data acquisition / Deployment / Security | A Super Admin had no way to trigger an AFL Tables current-season refresh on demand: after `AFLDB-ISSUE-122` went live, the only options were to wait for the 04:30 timer or to SSH in and `sudo systemctl start afldb-settle-afltables.service`, which leaves no record in AFLDB's own audit trail. **IMPLEMENTED 2026-09-03** on `codex/issue-127`. `/admin/current-season` gains a Super Admin-only "Fetch current AFL data now" control that starts **the same unit the timer starts** — no second ingestion implementation, no new source authority, no force or bypass input, and both Server Actions declare **zero parameters** so no user value can reach a command line (`execFile` with a fixed argv array, no shell). Concurrency is systemd's job-merge semantics, not an application lock. The result is read from the structured `import_batches` row the settle already writes (`validation_result` counters), never from the journal, on the read-only app pool. **sudo is impossible here** — `deploy/afldb.service` sets `NoNewPrivileges=true`, so the grant is a polkit rule scoped to one action / one verb / one unit / one user, and `afldb.service` is not modified. Fail-closed behind `AFLDB_SETTLE_TRIGGER=systemd`. Validation: focused suite 28/28, four related suites 259/259, `tsc --noEmit` clean, eslint clean. Key files: `src/lib/acquisition/settle-trigger.ts`, `src/db/queries/settle-runs.ts`, `deploy/afldb-settle-afltables-trigger.rules`, `issues/open/AFLDB-ISSUE-127.md`. | **Operator host validation, then close — nothing further is needed in the repository.** On dev first: install the polkit rule and restart polkit; prove `sudo -u arm systemctl start --no-block afldb-settle-afltables.service` succeeds while the same call for any other unit is refused; set `AFLDB_SETTLE_TRIGGER=systemd` and restart `afldb`; then press the control as a Super Admin and confirm start, "already running" on a second press, the counters after commit, one `current_season.settle_triggered` audit row per press, and that the control is inert with the flag unset. Do not change the timer cadence. |
 | `AFLDB-ISSUE-126` | Medium | Database / Admin / Security / Audit trail / Operations | The 2026-09-02 production canonical DB cutover replaced production-only application state along with the football data. The real super admin (`auth_users` id 1) was recovered from the pre-cutover backup and admin login was verified, but three sets of production-only rows were **not** restored and exist only in the recovery database `afldb_prod_auth_recovery`: `auth_audit_log` **92 rows**, `beta_access_codes` **1 row**, `site_settings` **11 rows** (plus whatever else the pre-cutover dump `/home/arm/afldb_prod_pre_rebuild_20260902-200355.dump` carries). Production currently runs with **0** rows in all three. The application does not break — `src/lib/site-settings.ts` falls back to compiled-in defaults — but 11 deliberate super-admin choices are silently reverted to those defaults, one beta access code is gone, and the admin audit trail has a hard discontinuity at the cutover. Old `auth_sessions` (17) were deliberately not restored and must stay unrestored; a fresh login is the correct posture. | **Not started. Decide, per table, restore vs. intentionally reset — do not restore blindly.** `site_settings`: diff the 11 recovered rows against `src/lib/site-settings.ts` defaults and restore only the rows that encode a real operator decision (note `DEFAULT_GRID_AUDIENCE` is already `super_admin`, matching the production posture). `beta_access_codes`: confirm the code is still wanted before reissuing; treat it as live credential material and never paste it into a tracked file. `auth_audit_log`: **never reconstruct an audit trail retroactively** — either restore the 92 rows with an explicit, auditable cutover marker row that says what happened, or record the gap deliberately in this issue and leave the log starting at the cutover. **`afldb_prod_auth_recovery` MUST NOT be dropped until this issue is resolved.** No password hash or TOTP secret may be reproduced in any tracked file. Requires production DML, so it is operator-supervised work, not a repository change. |
 | `AFLDB-ISSUE-125` | Medium | Operations / Deployment / Database / Data integrity | There is **no documented procedure for preserving production-only state when a clean rebuilt database is promoted to production.** `AFLDB-ISSUE-122`'s 2026-09-02 cutover proved the gap by hitting it: restoring the clean rebuilt `afldb_test` dump over `afldb_prod` replaced the broken 2026 football data correctly, but also replaced every application-owned, auth-owned and operations-owned table, and it promoted a **test fixture super admin** (`email-intake-test-fixture@afldb.test`) into production in place of the real one. The repository documents backup/restore and the migration rollout order (`AFLDB-ISSUE-027`), but nothing enumerates which tables are production-only and must survive a canonical rebuild promotion. Recovery worked only because a pre-cutover dump was taken first, which was operator discipline rather than a documented step. | **Not started. Prevention, not incident documentation.** Enumerate every production-only table — at minimum `auth_users`, `auth_sessions`, `admin_invites`, `auth_audit_log`, `beta_access_codes`, `beta_allowed_emails`, `beta_login_tokens`, `site_settings`, plus any operational/telemetry state (`app_health_events`, `nl_search_log`, `data_edits`, `data_overrides`, `data_issues`) that a rebuild would discard — and classify each as must-preserve, must-reset, or decide-per-promotion. Then write a documented promotion procedure into `docs/` (mandatory pre-cutover dump; restore football data only, or restore-then-reinstate; an explicit **refuse-if-a-test-fixture-identity-is-present** check so `*@afldb.test` can never become a production admin; a post-promotion verification checklist ending in a real admin login). Cross-check against `tools/maintenance/` backup/restore and `privileges.sql`, which is already mandatory after a restore. Related: `AFLDB-ISSUE-126` (the data still held from this incident), `AFLDB-ISSUE-027` (rollout order). |
@@ -12468,13 +12487,16 @@ throughout.
 
 ## AFLDB-ISSUE-128 — Current-season settle reported success while silently dropping rows AFL Tables supplied; legacy Kali controls survived the ISSUE-122 retirement
 
-- **Status:** Open — implemented, awaiting operator validation on a real host
+- **Status:** Resolved 2026-09-03
 - **Severity:** High
 - **Area:** Data acquisition / Import architecture / Admin tooling / Data integrity
 - **Found:** 2026-09-03 (reported as "recent AFL Tables games missing" plus a stale Kali admin UI)
-- **Resolved:** N/A
+- **Resolved:** 2026-09-03 — implemented, validated on dev against the real systemd chain and
+  accepted on `afldb_test`; see Resolution below and `issues/closed/AFLDB-ISSUE-128.md` §12-§13.
+  **Not deployed to production** — deliberately blocked on `AFLDB-ISSUE-129`.
 - **Files:** `src/lib/acquisition/source-completeness.ts` (new), `tools/current-season/settle-afltables.ts`, `deploy/afldb-settle-afltables.sh`, `tools/migration/import_fitzroy_core.py`, `src/db/queries/settle-runs.ts`, `src/app/admin/current-season/{actions.ts,page.tsx,CurrentSeasonControls.tsx,SettleRunPanel.tsx}`, `src/lib/external-afl/current-season-import.ts`, `tests/{fitzroy-core-import,current-season-import,admin-current-season-settle}.test.ts`, `docs/deployment.md`, `docs/acquisition/AFLDB-2026-API-ACQUISITION.md`
-- **Runbook:** `issues/open/AFLDB-ISSUE-128.md`
+- **Runbook:** `issues/closed/AFLDB-ISSUE-128.md` — the authoritative evidence ledger. Operator
+  validation on dev in **§12**, closeout and acceptance verdict in **§13**.
 - **Related:** `AFLDB-ISSUE-122` (the pipeline measured here — its library code is unchanged), `AFLDB-ISSUE-127` (its result projection is extended, its trigger is not touched), `AFLDB-ISSUE-129` (routed out of this issue; owns the `round_type` enum and the finals-semantics decision)
 - **Migration:** none claimed. No schema change. `AFLDB-ISSUE-129` will need one.
 
@@ -12580,18 +12602,65 @@ Routed to `AFLDB-ISSUE-129` by explicit operator decision.
   `AFLDB-ISSUE-122`'s production ladder (10,582 canonical / 9,133 ledger rows, then 0/0/0 on the
   identical rerun); no code on that path was changed.
 
-### Next action
+### Resolution — 2026-09-03
 
-**Operator validation on dev, then close.** On dev: run the chain and confirm the unit now goes
-`failed` while the batch still commits; confirm
-`journalctl -u afldb-settle-afltables | grep -A 12 'SOURCE COMPLETENESS'` names the Wildcard Final
-rows; confirm `/admin/current-season` shows the INCOMPLETE verdict above the counters; and run
-`tests/integration/settle-afltables.test.ts` against `afldb_test` on a host that has one (no
-behavioural change is expected — no settle-library or canonical-apply code was touched).
+**Root cause fixed: the silence, not the dropped rows.** AFLDB genuinely cannot represent the 2026
+Wildcard Round (that is `AFLDB-ISSUE-129`). What ISSUE-128 owned is that a run could drop 94 source
+rows and still exit 0, go green in systemd, and project nothing to the admin surface. A completeness
+verdict is now derived from the source's own counters — never from a calendar — stated by the
+importer, enforced by `settle-afltables.ts --require-complete-source` **after** the settle
+transaction commits, passed by `deploy/afldb-settle-afltables.sh`, and projected by
+`/admin/current-season`. The run still lands every representable record idempotently; all the exit
+code costs it is its claim to have imported the season. Separately the legacy Kali `auto` mode was
+removed rather than relabelled, unknown modes are now refused, and `parseCurrentSeasonSources()` no
+longer defaults to `kali`.
 
-**Do not deploy to production before `AFLDB-ISSUE-129` is decided.** With the flag in place the
-nightly unit will report `failed` every night the Wildcard Round is in the acquired window. That is
-true and is the point, but the operator should know it in advance rather than discover it.
+**Operator validation on dev — 2026-09-03 (runbook §12).** The real systemd chain against
+`afldb_dev` (R 4.3.3, fitzRoy 1.8.0, migration `083` applied; `db:privileges` deliberately skipped
+because shared dev carries orphan `079_access_code_delete` / `080_external_grids` whose grants this
+checkout would strip): `import_batches` **87** committed `completed` with **980** canonical rows and
+`canonicalApplyFailures = 0`, while the unit exited **1** with `Source INCOMPLETE: 94
+unrepresentable row(s), 2 unswept scope(s)`. `getLatestSettleRun()` — the exact function the admin
+page consumes — returns `sourceCompleteness.status = "incomplete"` with both reason codes. The two
+Wildcard games were **not** guessed into canonical data: zero 2026 canonical matches exist on or
+after 2026-08-26 and 2026 has no `finals` row at all. The 8,686 `foreign_owned_collision` refusals
+are pre-existing shared-dev residue owned by `fitzroy_afldata` from batch 28 (2026-08-15), on code
+ISSUE-128 did not touch.
+
+**Final acceptance and cleanup — 2026-09-03 (runbook §13).**
+
+- `tests/integration/settle-afltables.test.ts` against `afldb_test` on `streamanator`:
+  **44 passed / 1 skipped / 0 failed**. The single skip is the pre-existing restricted
+  `afldb_import`-role validation, gated on an unset `AFLDB_TEST_IMPORT_DATABASE_URL`. This closes
+  the environmental blocker recorded during implementation, and confirms the expectation that no
+  settle-library or canonical-apply behaviour changed.
+- The temporary drop-in `/etc/systemd/system/afldb-settle-afltables.service.d/`
+  `issue-128-validation.conf`, which repointed the unit at the ISSUE-128 worktree, has been removed
+  and `systemctl daemon-reload` completed. `systemctl cat` proves the unit restored to
+  `WorkingDirectory=/home/arm/projects/afldb` with the deployed `ExecStart` and `EnvironmentFile`.
+  No worktree override remains on the host.
+- **Not performed, and not claimed:** nobody loaded `/admin/current-season` in a browser to eyeball
+  the rendered INCOMPLETE alert. The verdict is proven at the data layer (§12.8) and the panel's
+  wiring is asserted in `tests/admin-current-season-settle.test.ts`, but those are source-text and
+  data assertions, not rendered-DOM assertions. The residual risk is cosmetic only — it cannot make
+  a run silently report success — and the check is carried to `AFLDB-ISSUE-129`, whose work must
+  load that page anyway.
+
+Full validation from implementation: fixture suite 87/5 skipped; 5 focused suites **405 passed /
+0 failed**; `tsc --noEmit` clean; eslint clean over the changed TS/TSX; `sh -n` and `py_compile` OK;
+`next build` compiled and typechecked.
+
+### Follow-up — deliberately not done here
+
+1. **`AFLDB-ISSUE-129` remains the open blocker** for the Wildcard Final `round_type` enum value,
+   the AFLDB-wide finals-semantics decision, and the two source vocabularies. ISSUE-128 made the
+   loss audible; it does not make the rows land, and closing it does not either. Not started.
+2. **Production deployment is not authorised by this closeout and was not performed**, and
+   `db:privileges` was not run. With `--require-complete-source` live, the nightly unit will report
+   `failed` every night the Wildcard Round is inside the acquired window. That is correct and is the
+   point — but `AFLDB-ISSUE-129` should be decided first so the operator meets a red timer
+   deliberately rather than by surprise.
+3. The cosmetic render check above.
 
 ---
 
@@ -12604,7 +12673,7 @@ true and is the point, but the operator should know it in advance rather than di
 - **Resolved:** N/A
 - **Files (to review, none changed):** `src/db/migrations/003_matches.sql`, `tools/migration/import_fitzroy_core.py`, `src/lib/format.ts`, and the 19 non-AFLW production consumers of `is_final` listed in the runbook
 - **Runbook:** `issues/open/AFLDB-ISSUE-129.md`
-- **Related:** `AFLDB-ISSUE-128` (found and reported it; its completeness verdict stays red until this is fixed), `AFLDB-ISSUE-122` (the pipeline the rows travel)
+- **Related:** `AFLDB-ISSUE-128` (**Resolved 2026-09-03** — it found and reported this, and its completeness verdict stays red until this is fixed; it is also why production deployment of `--require-complete-source` waits on this decision), `AFLDB-ISSUE-122` (the pipeline the rows travel)
 - **Migration:** **will need one, NOT yet claimed.** `IssuesIndex.md` requires a live-branch-tip re-scan first; `084` is next free as seen from `codex/issue-127` but is not reserved.
 
 ### Symptom

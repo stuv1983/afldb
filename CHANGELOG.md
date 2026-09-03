@@ -62,6 +62,15 @@ commit.
   `insertMissingMatches = false`. Existing final scores are untouched, the historical rebuild path
   still aborts on a record it cannot interpret, and no schema, migration, privilege, settle-library
   or canonical-apply code changed.
+- **Validated end to end on dev, then accepted on `afldb_test`.** The real systemd chain against
+  `afldb_dev` committed `import_batches` **87** as `completed` with 980 canonical rows and 0 apply
+  failures while the unit exited **1** with `Source INCOMPLETE: 94 unrepresentable row(s), 2 unswept
+  scope(s)` — the same run that previously exited 0 with a clean counter table. No Wildcard data was
+  guessed into canonical storage. `tests/integration/settle-afltables.test.ts` then passed **44 / 1
+  skipped / 0 failed** against `afldb_test` (the skip is the pre-existing restricted
+  `afldb_import`-role check on an unset `AFLDB_TEST_IMPORT_DATABASE_URL`). **Not yet deployed to
+  production:** while `AFLDB-ISSUE-129` is undecided, the nightly unit will report `failed` every
+  night the 2026 Wildcard Round is in the acquired window.
 
 ### AFLDB-ISSUE-129 — raised: AFL Tables' Wildcard Final has no canonical representation - 3 September 2026
 

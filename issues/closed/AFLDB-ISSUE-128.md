@@ -7,6 +7,12 @@
 > **[MEASURED]** = evidence produced by running the real thing in this worktree today.
 > **[CONFIRMED]** = repository evidence read in this worktree.
 > **[BUILT]** = what this session implemented.
+>
+> **STATUS: RESOLVED 2026-09-03.** Closeout, final validation and the acceptance verdict are
+> in **§13**; the operator validation on dev that precedes it is in **§12**. §11 and §12.10
+> are superseded. `AFLDB-ISSUE-129` (Wildcard Final enum + finals semantics) and the
+> production deployment of `--require-complete-source` deliberately remain outstanding —
+> see §13.5.
 
 ---
 
@@ -354,7 +360,7 @@ that path.
 
 ---
 
-## 11. Exact next action
+## 11. Exact next action (superseded by §12 — operator validation is complete)
 
 **Operator validation on dev (§8.3), then close.** Do not deploy to production before
 `AFLDB-ISSUE-129` is decided: with the flag in place the nightly unit will report `failed`
@@ -364,3 +370,324 @@ but the operator should know it before it happens rather than after.
 **Repository state:** all work is **uncommitted** on `codex/issue-127`. Nothing was
 committed, pushed, merged or deployed; no production or `afldb_dev` state was touched. The
 probe snapshot and its manifest (`probe-issue128-20260903`) were removed after measurement.
+
+---
+
+## 12. Operator validation on dev — 2026-09-03 [MEASURED]
+
+Executed by the operator on `streamanator` (`arm@10.0.40.100`), against **`afldb_dev` only**.
+Everything recorded here was verified read-only after the run; **no application or database
+state was changed by this verification**, and no second settle was run.
+
+### 12.1 Environment
+
+| Fact | Value |
+|---|---|
+| Host | `streamanator`, dev only. Production untouched. |
+| Database | `afldb_dev` (shared development DB) |
+| Checkout | `/home/arm/projects/afldb-issue-128` |
+| Unit | `afldb-settle-afltables.service`, **temporary drop-in** overriding `WorkingDirectory=` and `EnvironmentFile=` onto `/home/arm/projects/afldb-issue-128`. The permanent `/home/arm/projects/afldb` unit was not edited. |
+| R | `R version 4.3.3 (2024-02-29)` |
+| fitzRoy | **1.8.0** (`/home/arm/R/library/fitzRoy/DESCRIPTION`) — the pinned contract version |
+| Migration | **`083_canonical_auto_apply.sql` applied 2026-09-03 11:11:55+10**, immediately before the run |
+| `db:privileges` | **Deliberately NOT run.** `afldb_meta.schema_migrations` on `afldb_dev` carries two migrations this checkout does not have — `079_access_code_delete.sql` (2026-08-31 18:40) and `080_external_grids.sql` (2026-08-31 23:01). `privileges.sql` is a reconciler with a hand-typed grant list, so running it from this checkout would **strip the grants those two orphan migrations created**. ISSUE-128 adds no table and needs no grant, so skipping it is correct and carries no risk to this validation. |
+
+### 12.2 Source counters — the acquisition snapshot
+
+Snapshot `data/sources/afltables/fitzroy_core/settle-2026-2026-09-03-1112/` (in the
+issue-128 checkout):
+
+| Artefact | Rows |
+|---|---|
+| `results.csv` | **209** (210 lines incl. header) |
+| `player_stats_2026.csv` | **9,614**, of which **92** carry `Round = "Wildcard Final"` |
+
+Emitted bundle: **207** matches, **9,522** player-match rows.
+Unkeyed rejections **94** = `no_match_identity` **2** + `no_player_match_identity` **92**.
+Both scopes `complete: false`; absence sweep skipped for both.
+
+Exactly the §4.3 figures, now measured through the real systemd chain rather than a probe.
+
+### 12.3 Batch counters — `import_batches` id **87**
+
+`notes = AFLDB-ISSUE-099 settle; snapshot=settle-2026-2026-09-03-1112; season=2026; mode=apply`,
+`status = completed`, `started_at/completed_at = 2026-09-03 11:12:41.726479+10`,
+`records_read = 9729`, `records_rejected = 18`.
+
+`validation_result` (the counters ISSUE-128's verdict reads are in **bold**):
+
+| Counter | Value |
+|---|---|
+| **`snapshotMatches`** | **207** |
+| **`snapshotPlayerMatchRows`** | **9,522** |
+| **`snapshotRejections`** | **0** |
+| **`snapshotUnkeyedRejections`** | **94** |
+| **`absenceSweepSkipped`** | **2** |
+| `canonicalRowsInserted` | 980 |
+| `canonicalRowsUpdated` | 0 |
+| `canonicalApplicationsLogged` | 854 |
+| `canonicalApplyRefusals` | 189 |
+| `canonicalApplyFailures` | **0** |
+| `foreignOwnedCollision` | 8,686 |
+| `unresolvedIdentityPlayer` | 18 |
+| `unresolvedIdentityMatch` | 18 |
+| `unresolvedIdentityClub` / `unresolvedIdentityVenue` | 0 / 0 |
+| `sourceDisagreement` / `advisoryDisagreement` | 0 / 0 |
+| `manualAuthorityRefusals` | 0 |
+| `observationsSeen` / `versionsAppended` / `payloadsCreated` | 9,729 / 9,729 / 9,729 |
+| `observationsCorrected` | 1,025 |
+| `observationsHistoryOnly` | 189 |
+| `candidatesCreated` / `candidatesMootLeftPending` | 8,893 / 189 |
+| `derivedRecomputeRuns` / `derivedRecomputePlayers` | 1 / 449 |
+| `dataIssuesOpened` / `dataIssuesResolved` | 0 / 0 |
+
+`canonical_applications` for batch 87 reconciles the 854:
+`player_match_stats` insert **818** + `matches` insert **18** + `match_period_scores`
+insert **18** = **854**; with the eight period rows per match the 980 canonical rows follow.
+
+### 12.4 Completeness verdict
+
+`assessSourceCompleteness()` over those counters: `unrepresentableRows` 94,
+`rejectedRecords` 0, `scopesNotSwept` 2, `enumeratedRecords` 9,729 => **`incomplete`**,
+with reason codes `unrepresentable_rows` (94) and `scopes_not_swept` (2).
+
+Journal headline, verbatim:
+
+```text
+--require-complete-source: Source INCOMPLETE: 94 unrepresentable row(s), 2 unswept
+scope(s). This run must not be read as a complete import of AFL Tables current-season
+data. Records that could be represented were still applied and the run remains
+idempotent; this exit code reports that the import was not complete.
+```
+
+### 12.5 The systemd exit code is intentional [MEASURED]
+
+```text
+systemctl show afldb-settle-afltables.service
+  ActiveState=failed
+  Result=exit-code
+  ExecMainStatus=1
+  ExecMainExitTimestamp=Thu 2026-09-03 11:21:08 AEST
+```
+
+**This is the fix working, not a failure.** The batch still committed (`status = completed`,
+counters stamped, 980 canonical rows applied, `canonicalApplyFailures = 0`). The exit code
+withdraws only the run's *claim* to have imported the season. §8.3 item 1 is satisfied:
+the unit goes `failed` while the batch commits.
+
+### 12.6 The 8,686 `foreign_owned_collision` refusals are pre-existing shared-dev state
+
+Ownership of every 2026 `player_match_stats` row on `afldb_dev`:
+
+| Owner source | Rows | Written by |
+|---|---|---|
+| `fitzroy_afldata` | **8,694** | `import_batches` id **28**, tool `import_legacy_afl.py`, started **2026-08-15 02:34** |
+| `afltables` | **818** | `import_batches` id **87** — this run |
+
+- **Owner:** `fitzroy_afldata`, a *different* source key from the settle's `afltables`.
+- **Pre-dates this run:** by ~19 days, from a legacy bulk import, not from any ISSUE-122/128 path.
+- **Expected:** yes. `evaluateOwnership()` (`src/lib/acquisition/observations.ts:363`) returns
+  `foreign_owned_collision` for any target row owned by a source other than the promoting
+  one. Refusing 8,686 rows already owned by `fitzroy_afldata` is the source-containment
+  contract behaving exactly as designed — it never adopts and never deletes another
+  source's authority.
+- **ISSUE-128 changed no ownership behaviour.** `observations.ts`, `reconciliation.ts`,
+  `canonical-apply.ts` and `settle-afltables.ts` (library) are all untouched by this issue
+  (§7 "Not changed"). The collisions would be identical on `be4dd7e^`.
+
+The 2026 match rows tell the same story: 189 matches unowned (legacy), 18 owned by
+`afltables` (this run), 10 by `squiggle_api` (batch 69), 7 by `kali_afl_stats` (batch 80) —
+i.e. **`afldb_dev` carries residue from three superseded ingestion paths.** That is shared
+development contamination, not an ISSUE-128 defect.
+
+### 12.7 The Wildcard matches were NOT guessed into canonical data [MEASURED]
+
+Source rows, from the run's own `results.csv` (last two lines):
+
+```text
+17046,2026-08-28,"WF","Footscray",14,12,96,"Collingwood",14,9,93,"M.C.G.",3,2026,"Regular",
+17047,2026-08-29,"WF","Melbourne",7,13,55,"Carlton",10,14,74,"M.C.G.",-19,2026,"Regular",
+```
+
+Canonical proof, `afldb_dev`, read-only:
+
+| Query | Result |
+|---|---|
+| 2026 matches with `match_date >= 2026-08-26` | **0 rows** |
+| 2026 `round_type` distribution | `home_and_away` **224**, min `2026-03-05`, **max `2026-08-23`** — no `finals` row of any kind exists for 2026 |
+| 2026 matches pairing Footscray/Western Bulldogs–Collingwood or Melbourne–Carlton | **1 row**: id 16942, **2026-05-30**, round **13**, `home_and_away`, 97–93, owner NULL |
+
+That single hit is the Round 13 home-and-away game (different date, different score,
+legacy-owned) — **not** a Wildcard representation. Neither 28-Aug nor 29-Aug produced a
+canonical match under any round type, from this run or any other source. The chain refused
+at identity and stayed refused: **no guessed match, no misfiled round, no duplicate.**
+
+### 12.8 The admin projection reports INCOMPLETE [MEASURED]
+
+Executed `getLatestSettleRun()` from `src/db/queries/settle-runs.ts` directly — the same
+function `/admin/current-season` consumes, not a re-implementation:
+
+```json
+{
+  "batchId": "87",
+  "snapshotLabel": "settle-2026-2026-09-03-1112",
+  "season": 2026,
+  "status": "completed",
+  "recordsRead": 9729,
+  "recordsRejected": 18,
+  "counters": {
+    "snapshotMatches": 207, "snapshotPlayerMatchRows": 9522,
+    "snapshotRejections": 0, "snapshotUnkeyedRejections": 94,
+    "absenceSweepSkipped": 2,
+    "canonicalRowsInserted": 980, "canonicalRowsUpdated": 0,
+    "canonicalApplicationsLogged": 854, "canonicalApplyRefusals": 189,
+    "canonicalApplyFailures": 0, "unresolvedIdentity": 36,
+    "advisoryDisagreement": 0,
+    "derivedRecomputeRuns": 1, "derivedRecomputePlayers": 449
+  },
+  "sourceCompleteness": {
+    "status": "incomplete",
+    "unrepresentableRows": 94, "rejectedRecords": 0,
+    "scopesNotSwept": 2, "enumeratedRecords": 9729,
+    "reasons": [
+      { "code": "unrepresentable_rows", "count": 94 },
+      { "code": "scopes_not_swept",     "count": 2  }
+    ],
+    "headline": "Source INCOMPLETE: 94 unrepresentable row(s), 2 unswept scope(s). ..."
+  }
+}
+```
+
+§8.3 item 2 is satisfied at the data layer: the projection the panel renders returns
+`incomplete` with both reason codes. The remaining piece is purely visual — an operator
+looking at the rendered `role="alert"` block in a browser.
+
+### 12.9 Verdict — what this validation does and does not prove
+
+**PROVES (the ISSUE-128 acceptance condition):** a run can no longer silently report success
+while source rows are unrepresentable. Identical input to the pre-fix run — 209/9,614
+acquired, 207/9,522 represented, 94 dropped — previously exited **0** with a clean counter
+table. It now emits a named `SOURCE INCOMPLETE` verdict at the importer, the settle CLI and
+the admin projection, and exits **1**, while still committing every representable record
+idempotently.
+
+**DOES NOT PROVE, and does not need to:** that `afldb_dev` is a clean canonical database. It
+is not. It carries `fitzroy_afldata`, `squiggle_api` and `kali_afl_stats` residue from three
+superseded paths, which is why 8,686 rows collided. Those collisions are **orthogonal** to
+this issue — they are the source-containment contract working, on code ISSUE-128 did not
+touch, against rows that pre-date it by 19 days. Requiring a pristine database would test
+`AFLDB-ISSUE-122`'s canonical apply, whose evidence is its own supervised production ladder
+(§8.2), not this defect.
+
+**STILL OUTSTANDING (unchanged by this validation):**
+`tests/integration/settle-afltables.test.ts` against an `afldb_test` host (§8.3 item 3);
+no behavioural change is expected there, since ISSUE-128 touches no settle-library or
+canonical-apply code.
+
+**OPERATOR VALIDATION: PASSED.**
+
+### 12.10 Exact next action (superseded by §13 — closeout complete)
+
+1. Eyeball `/admin/current-season` on dev and confirm the INCOMPLETE alert block renders
+   above the counter table (§12.8 proves the data; this proves the pixels).
+2. Run `tests/integration/settle-afltables.test.ts` against `afldb_test` (§8.3 item 3).
+3. Remove the temporary systemd drop-in that repoints
+   `afldb-settle-afltables.service` at `/home/arm/projects/afldb-issue-128`, so the unit
+   returns to `/home/arm/projects/afldb`.
+4. **Do not deploy to production until `AFLDB-ISSUE-129` is decided.** With the flag in
+   place the nightly unit will report `failed` every night the Wildcard Round is in the
+   acquired window. That is true and is the point — but the operator should know before it
+   happens, not after.
+5. Then close ISSUE-128 and start ISSUE-129 in a fresh session.
+
+---
+
+## 13. Closeout — 2026-09-03 [MEASURED]
+
+All three residual steps from §12.10 are now accounted for. Two passed on the operator host.
+One was not performed, and is recorded here as unverified rather than claimed.
+
+### 13.1 Integration acceptance on `afldb_test` — §8.3 item 3 / §12.10 item 2 PASSED
+
+Run by the operator on `streamanator`, from `/home/arm/projects/afldb-issue-128`:
+
+| Suite | Result |
+|---|---|
+| `tests/integration/settle-afltables.test.ts` | **44 passed / 1 skipped / 0 failed** |
+
+The single skip is the pre-existing restricted `afldb_import`-role validation, gated on
+`AFLDB_TEST_IMPORT_DATABASE_URL`, which is unset on that host. It is not an ISSUE-128 skip,
+and nothing was skipped, weakened or disabled to reach this result.
+
+This **closes the §8.2 environmental blocker**, which was the only outstanding item in §12.9.
+The expectation recorded there held: ISSUE-128 changed no settle-library and no
+canonical-apply code, and the DB-backed acceptance shows no behavioural change on that path.
+
+### 13.2 Temporary systemd override removed — §12.10 item 3 PASSED
+
+The drop-in that repointed the unit at this worktree —
+`/etc/systemd/system/afldb-settle-afltables.service.d/issue-128-validation.conf` — has been
+deleted and `systemctl daemon-reload` completed. `systemctl cat` now proves the installed
+unit is restored to the deployed checkout:
+
+```ini
+WorkingDirectory=/home/arm/projects/afldb
+ExecStart=/bin/sh /home/arm/projects/afldb/deploy/afldb-settle-afltables.sh
+EnvironmentFile=/home/arm/projects/afldb/.env
+```
+
+No ISSUE-128 worktree override remains on the host. The nightly `AFLDB-ISSUE-122` timer will
+run against `/home/arm/projects/afldb`, not against this branch.
+
+### 13.3 The rendered admin alert — §12.10 item 1 NOT PERFORMED
+
+**Not verified, and not claimed.** Nobody loaded `/admin/current-season` in a browser to look
+at the rendered alert block. §12.8 remains the strongest evidence for this item.
+
+What is proven in its place, and why the issue closes without it:
+
+- `getLatestSettleRun()` — the exact function the page consumes, executed directly, not
+  re-implemented — returns `sourceCompleteness.status = "incomplete"` with both reason codes
+  and the headline (§12.8).
+- `tests/admin-current-season-settle.test.ts:521-522` asserts that `SettleRunPanel` reads
+  `run.sourceCompleteness` and carries the `Source INCOMPLETE` copy.
+- `src/app/admin/current-season/SettleRunPanel.tsx:240` renders
+  `<SourceCompleteness verdict={run.sourceCompleteness} />` above the counter table, and
+  `:59` carries the incomplete headline.
+
+Those are source-text and data-layer assertions, **not** a rendered-DOM assertion, so a purely
+cosmetic render fault would not be caught by them. The residual risk is therefore real but
+cosmetic: it cannot make a run silently report success, which is the condition this issue
+owns and which §12.9 proves is closed. The check is carried forward to `AFLDB-ISSUE-129`,
+whose work must load this page in any case.
+
+### 13.4 Acceptance verdict — RESOLVED
+
+| Acceptance condition | Evidence | State |
+|---|---|---|
+| A run with unrepresentable source rows can no longer exit 0 / report success | §12.5, §12.9 — unit exited **1** with `Source INCOMPLETE: 94 unrepresentable row(s), 2 unswept scope(s)` | **PASSED** |
+| Every representable record still commits, idempotently | §12.3 — batch **87** `completed`, 980 canonical rows, `canonicalApplyFailures = 0` | **PASSED** |
+| The verdict is derived from the source's own counters, never a calendar | §6.1, `src/lib/acquisition/source-completeness.ts`; byes/off-season read `complete` | **PASSED** |
+| The importer names the offending rows | §12.5, `SOURCE COMPLETENESS` block | **PASSED** |
+| The admin projection carries the verdict | §12.8 — `sourceCompleteness.status = incomplete` from `getLatestSettleRun()` | **PASSED (data layer; render not eyeballed — §13.3)** |
+| The legacy Kali `auto` path is removed, not relabelled | §6.4, §8.1 — `mode=auto` gone, unknown modes refused, no default source | **PASSED** |
+| No data is guessed into canonical storage to satisfy the verdict | §12.7 — zero 2026 canonical matches on/after 2026-08-26; 2026 has no `finals` row | **PASSED** |
+| DB-backed acceptance on a real host | §13.1 — 44/1/0 | **PASSED** |
+| Host left clean | §13.2 — override removed, unit restored | **PASSED** |
+
+**ISSUE-128 is RESOLVED 2026-09-03.**
+
+### 13.5 What deliberately stays open
+
+1. **`AFLDB-ISSUE-129` is the blocker that remains** — the `round_type` enum value, the
+   AFLDB-wide finals-semantics decision, and the two source vocabularies. ISSUE-128 made the
+   loss audible; it cannot make the rows land, and closing it does not make them land.
+   **Not started here.**
+2. **Production deployment is NOT authorised by this closeout and was not performed.** With
+   `--require-complete-source` in place the nightly unit will report `failed` every night the
+   2026 Wildcard Round is inside the acquired window. That is correct behaviour and is the
+   whole point of the fix, but the operator should decide `AFLDB-ISSUE-129` first rather than
+   meet a red timer unprepared. `db:privileges` was likewise not run.
+3. **The cosmetic render check** (§13.3), carried to ISSUE-129.
+4. `AFLDB-ISSUE-127` remains open on its own terms — its trigger control still awaits operator
+   host validation. ISSUE-128 extended its result projection and touched nothing else of it.
