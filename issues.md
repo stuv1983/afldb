@@ -13040,6 +13040,56 @@ above.
 or TOTP secret may be reproduced in any tracked file. This requires production DML and is
 operator-supervised work, not a repository change.
 
+### Progress — 2026-09-04 (Stages 1–3 complete, read-only; awaiting operator approval)
+
+Runbook `issues/open/AFLDB-ISSUE-126.md` holds the schema findings, the production evidence
+(measured read-only on `afldb-prod` @ `169d738`, build `MRjsomoqFJRsjZWElQ6A0`, health ok,
+migrations prod 085 / recovery 083), the per-table decisions and the commit-gated scripts
+`issues/open/AFLDB-ISSUE-126-{export.sh,t1-audit.sql,t2-content.sql,t4-join-request.sql,t5-aflw.sh,t6-marker.sql}`.
+**No production write has been made.**
+
+Re-measured counts (recovery → production now): `auth_audit_log` 92 (ids 90–181, 2026-08-16 →
+2026-09-02 10:16) → 11 (ids 16–26, all after 2026-09-03 06:23); `beta_access_codes` 1 → 1;
+`site_settings` 11 → 0; `auth_sessions` 17 (all expired) → 7. The ISSUE-125 contract tables were
+measured too and **four more recovery-only sets exist**: `staging_aflw.*` 51,018 rows → 0 (the
+public AFLW read model on production is empty since the cutover), `site_media` 1 → 0,
+`beta_join_requests` 1 → 0, `data_edits` 2 → 0, `player_link_resolutions`/`_suggestions` 6/2 → 0,
+telemetry 88/1/2 → 4/0/4.
+
+Decisions: **`site_settings`** — restore the 7 rows that differ from the compiled defaults
+(`apex.content`, `early_access.intro`, `early_access.notify`, `early_access.questions`,
+`home.aflw_leaders`, `home.record_of_the_week`, `site.footer`), retire the 4 that equal them;
+**`beta_access_codes`** — retire (the recovered code was single-use and already spent; production
+issued its own code on 2026-09-04); **`auth_audit_log`** — restore the 92 rows with their original
+ids (no id or timestamp overlap; every actor resolves to the same super admin; `detail` satisfies
+the 082 CHECK) plus an explicit `database.recovered` marker written last; **`auth_sessions`** — not
+restored; **`site_media`** — restore with `apex.content` (the live `afldb.com` page was published
+from them and the next content save would otherwise overwrite it with defaults);
+**`staging_aflw.*`** — restore from the pre-cutover dump per table in FK order;
+**`beta_join_requests`** — restore (optional); **`data_edits`** — audit rows not restored (their
+`row_id` 4375 now denotes a different player; Kelly Robinson is production id 8065) and the two
+2026-08-19 corrections are re-applied by the operator through the data editor; **player links** and
+**telemetry** — retired (ids do not survive the rebuild / collide). Recovery database retained.
+
+### Progress — 2026-09-04 evening (operator approval received; T0 and rehearsals green; PAUSED before DML)
+
+Operator approved T1, T2, T5 and T6 and retired T4 (the join request), the spent beta code, the
+expired sessions, the stale `data_edits` and player-link decisions, and the colliding telemetry.
+T0 on `afldb-prod`: hostname and `afldb_prod` verified, backup `afldb_prod-20260904-201037.dump`
+(sha256 `e8cfa912…d639`, 1,199 objects) restore-proven 9/9 into `afldb_restore_test`, off-host copy
+verified, recovery database present, every §3 count re-asserted read-only on both databases, rows
+exported. Rehearsals (no commit): T1 and T2 green; T5 refused on its own TOC grep (`grep -q` +
+`pipefail` SIGPIPE, not a dump problem) — script fixed and re-rehearsed green with a stronger
+per-table selection assertion; T6 green. **Paused before any commit:** the T1 rehearsal's
+`setval` is non-transactional and survived its ROLLBACK, leaving `auth_audit_log_id_seq` at 182
+(rows untouched: 11, ids 16–26). T1's `setval` now runs only in its commit branch. Runbook §7
+holds the evidence; §7.5 the decision.
+
+**Next action:** operator chooses runbook §7.5 (a) — `setval('auth_audit_log_id_seq', 26, true)`
+on `afldb_prod` as owner, restoring the exact pre-rehearsal value (recommended) — or (b); then the
+resume path in §7.5 (each unit rehearsed then committed one at a time), §5 post-checks, browser
+pass, close-out.
+
 ---
 
 ## AFLDB-ISSUE-127 — Super Admin on-demand AFL Tables current-season refresh
