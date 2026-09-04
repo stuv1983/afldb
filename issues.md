@@ -7,7 +7,8 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 3 tracked here — `AFLDB-ISSUE-110`, `-126`, `-137`.
+**Open issues:** 2 tracked here — `AFLDB-ISSUE-110`, `-137`.
+<!-- 2026-09-04: `-126` Resolved (production-only cutover state recovered and accepted; recovery database still retained); 3 -> 2. -->
 <!-- 2026-09-04: `-125` Resolved (production promotion procedure + read-only checker); 4 -> 3. -->
 <!-- Count corrected 2026-09-04: `-104` removed by its own closeout (Resolved — closed as not
      reachable under the current single-owner-per-`issue_type` contract); 7 -> 6. -->
@@ -150,7 +151,27 @@ created, reopened, resolved, or materially reclassified.
      Authoritative records: the `AFLDB-ISSUE-131` entry below (Resolution, 2026-09-04) and
      `issues/closed/AFLDB-ISSUE-131.md` §16. Deferred, non-blocking: §9.4/§7 hardening index and
      §9.6/§5.2 `game_id`, both unmeasured and not adopted (§16.8). -->
-| `AFLDB-ISSUE-126` | Medium | Database / Admin / Security / Audit trail / Operations | The 2026-09-02 production canonical DB cutover replaced production-only application state along with the football data. The real super admin (`auth_users` id 1) was recovered from the pre-cutover backup and admin login was verified, but three sets of production-only rows were **not** restored and exist only in the recovery database `afldb_prod_auth_recovery`: `auth_audit_log` **92 rows**, `beta_access_codes` **1 row**, `site_settings` **11 rows** (plus whatever else the pre-cutover dump `/home/arm/afldb_prod_pre_rebuild_20260902-200355.dump` carries). Production currently runs with **0** rows in all three. The application does not break — `src/lib/site-settings.ts` falls back to compiled-in defaults — but 11 deliberate super-admin choices are silently reverted to those defaults, one beta access code is gone, and the admin audit trail has a hard discontinuity at the cutover. Old `auth_sessions` (17) were deliberately not restored and must stay unrestored; a fresh login is the correct posture. | **Not started. Decide, per table, restore vs. intentionally reset — do not restore blindly.** `site_settings`: diff the 11 recovered rows against `src/lib/site-settings.ts` defaults and restore only the rows that encode a real operator decision (note `DEFAULT_GRID_AUDIENCE` is already `super_admin`, matching the production posture). `beta_access_codes`: confirm the code is still wanted before reissuing; treat it as live credential material and never paste it into a tracked file. `auth_audit_log`: **never reconstruct an audit trail retroactively** — either restore the 92 rows with an explicit, auditable cutover marker row that says what happened, or record the gap deliberately in this issue and leave the log starting at the cutover. **`afldb_prod_auth_recovery` MUST NOT be dropped until this issue is resolved.** No password hash or TOTP secret may be reproduced in any tracked file. Requires production DML, so it is operator-supervised work, not a repository change. |
+<!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-126` is **Resolved** and is NO LONGER an open issue.
+     The production-only state stranded in `afldb_prod_auth_recovery` by the 2026-09-02 cutover was
+     decided per table and the approved subset restored to `afldb_prod` on 2026-09-04 under
+     commit-gated, fail-closed scripts: the 92 `auth_audit_log` rows with their original ids
+     90–181, the 7 `site_settings` overrides and the 1 `site_media` row, all eight `staging_aflw`
+     tables (51,018 rows — the public AFLW read model is populated again), and a
+     `database.recovered` marker as id 182. Deliberately retired and recorded rather than silently
+     dropped: the 4 default-equal settings, the spent single-use beta code, 17 expired sessions,
+     the pending join request, 2 `data_edits` and 8 player-link rows whose entity ids no longer
+     denote the same people after the rebuild, and pre-cutover telemetry with colliding ids.
+     Database-level acceptance all PASS; browser acceptance all PASS — the operator's fresh
+     super-admin login landed as audit id 183 straight after the marker, and `/`, `/aflw`,
+     `/aflw/seasons`, `/aflw/seasons/2025` and a real AFLW match page all render the recovered
+     state. The two public pages that still showed pre-recovery content immediately afterwards
+     were stale ISR output on the one-hour window (the `AFLDB-ISSUE-133` / `AFLDB-ISSUE-134`
+     mechanisms, per-worker page cache included), not a defect and not caused by the recovery;
+     both converged on their own with no save, publish, revalidation, restart or deploy, and no
+     new issue was allocated. **No application, schema, migration or `privileges.sql` change.**
+     `afldb_prod_auth_recovery` is **still retained** — dropping it is a separate, explicitly
+     approved destructive action. Authoritative records: the `AFLDB-ISSUE-126` entry below
+     (Resolution — 2026-09-04) and `issues/closed/AFLDB-ISSUE-126.md` §8.2/§8.3/§10. -->
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-124` is **Resolved** and is NO LONGER an open issue.
      `deploy/afldb.service` moved `StartLimitIntervalSec=120`/`StartLimitBurst=5` from `[Service]`
      to `[Unit]` (commit `146b3e0`, branch `claude/issue-124`), values unchanged; the other four
@@ -12987,13 +13008,16 @@ untouched.
 
 ## AFLDB-ISSUE-126 — Production-only state from the 2026-09-02 cutover is unrestored and held only in `afldb_prod_auth_recovery`
 
-- **Status:** Open
+- **Status:** Resolved 2026-09-04
 - **Severity:** Medium
 - **Area:** Database / Admin / Security / Audit trail / Operations
 - **Found:** 2026-09-03 (`AFLDB-ISSUE-122` closeout)
-- **Resolved:** N/A
-- **Files:** production databases `afldb_prod` and `afldb_prod_auth_recovery`; pre-cutover dump `/home/arm/afldb_prod_pre_rebuild_20260902-200355.dump`; `src/lib/site-settings.ts` (the compiled-in defaults currently in force)
-- **Related:** `AFLDB-ISSUE-125` (prevention), `AFLDB-ISSUE-122` (the cutover)
+- **Resolved:** 2026-09-04 — the approved subset was restored to `afldb_prod` under commit-gated,
+  fail-closed scripts (T1 audit rows, T2 settings + media, T5 `staging_aflw`, T6 marker; T4 and
+  five other sets deliberately retired), database-level acceptance passed in full, and both the
+  admin and public browser acceptance passed. Runbook: `issues/closed/AFLDB-ISSUE-126.md`
+- **Files:** production databases `afldb_prod` and `afldb_prod_auth_recovery`; pre-cutover dump `/home/arm/afldb_prod_pre_rebuild_20260902-200355.dump`; `src/lib/site-settings.ts` (the compiled-in defaults that were in force); runbook and scripts `issues/closed/AFLDB-ISSUE-126{.md,-export.sh,-t1-audit.sql,-t2-content.sql,-t4-join-request.sql,-t5-aflw.sh,-t6-marker.sql}`. **No application, schema, migration or `privileges.sql` change was made or needed**
+- **Related:** `AFLDB-ISSUE-125` (prevention), `AFLDB-ISSUE-122` (the cutover), `AFLDB-ISSUE-133` / `AFLDB-ISSUE-134` (the ISR mechanisms that made two public pages look wrong afterwards), `AFLDB-ISSUE-137` (untouched)
 
 ### Symptom
 
@@ -13042,10 +13066,10 @@ operator-supervised work, not a repository change.
 
 ### Progress — 2026-09-04 (Stages 1–3 complete, read-only; awaiting operator approval)
 
-Runbook `issues/open/AFLDB-ISSUE-126.md` holds the schema findings, the production evidence
+Runbook `issues/closed/AFLDB-ISSUE-126.md` holds the schema findings, the production evidence
 (measured read-only on `afldb-prod` @ `169d738`, build `MRjsomoqFJRsjZWElQ6A0`, health ok,
 migrations prod 085 / recovery 083), the per-table decisions and the commit-gated scripts
-`issues/open/AFLDB-ISSUE-126-{export.sh,t1-audit.sql,t2-content.sql,t4-join-request.sql,t5-aflw.sh,t6-marker.sql}`.
+`issues/closed/AFLDB-ISSUE-126-{export.sh,t1-audit.sql,t2-content.sql,t4-join-request.sql,t5-aflw.sh,t6-marker.sql}`.
 **No production write has been made.**
 
 Re-measured counts (recovery → production now): `auth_audit_log` 92 (ids 90–181, 2026-08-16 →
@@ -13105,10 +13129,56 @@ ok. `afldb_prod_auth_recovery`, the T0 backup `afldb_prod-20260904-201037.dump` 
 sha256 verified) and the host export/logs are retained. Runbook §7.6–§7.7 hold every mutation and
 count; §8 the acceptance matrix.
 
-**Next action:** operator runs the browser acceptance in runbook §8.1 (real super-admin login,
-`/admin/settings`, `/admin/content`, `/admin/access`, home, `/aflw`) and reports; then close-out per
-runbook §10 (resolve, retire the index row, move the runbook to `issues/closed/`, delete the host
-scratch, commit, push, no merge). The recovery database is dropped only under a separate approval.
+### Resolution — 2026-09-04
+
+**Root cause.** The 2026-09-02 cutover (`AFLDB-ISSUE-122` §S8) recreated `afldb_prod` from the
+rebuilt `afldb_test` dump, which correctly replaced the football data and, in the same operation,
+every table that only ever existed on production — the gap `AFLDB-ISSUE-125` now closes for future
+promotions.
+
+**Fix.** A per-table decision, executed on `afldb_prod` under commit-gated scripts that re-assert
+every §3 count before and after writing and roll back unless invoked with `commit`: **T1** the 92
+pre-cutover `auth_audit_log` rows with their original ids 90–181 (sequence → 181); **T2** the 7
+`site_settings` rows that encoded operator choices plus the 1 `site_media` row the apex document
+references; **T5** all eight `staging_aflw` tables from the pre-cutover dump (51,018 rows), which
+repopulated the public AFLW read model; **T6** an explicit `database.recovered` marker (id 182)
+naming the cutover, the source, the restored and post-cutover id ranges, the gaps and every
+retired set. Deliberately **not** restored, each recorded rather than silently dropped: the four
+default-equal settings, the spent single-use beta code, 17 expired sessions, the pending join
+request, 2 `data_edits` and 8 player-link rows whose entity ids no longer denote the same people
+after the rebuild, and pre-cutover telemetry with colliding ids. The audit trail was never made to
+look continuous. **No repository code, schema, migration or privilege change was required.**
+
+**Validation.** Database-level acceptance all PASS (runbook §8): 104 audit rows (ids 16–26,
+90–182) with id order equal to `at` order inside every block and the marker last on both; the 7
+settings md5-identical to their recovery values with the 4 retired keys absent; the media row
+byte-consistent; no pre-cutover session and no spent code restored; `staging_aflw` 11 / 818 / 710 /
+144 / 3,972 / 29,878 / 15,483 / 2 with `aflw.seasons` 11, `aflw.matches` 710, `aflw.players` 960;
+`/api/health` ok. Browser acceptance all PASS (runbook §8.2): the operator's fresh super-admin
+login landed as audit id **183** immediately after the marker, `/admin/settings`,
+`/admin/content` and `/admin/access` all correct; and from this session, admitted only through the
+ordinary `/beta` code flow with a temporary operator-issued code, `/aflw` renders 960 / 710 / 11 /
+29,878 with the restored `games` leader board, `/aflw/seasons` lists all 11 recovered seasons,
+`/aflw/seasons/2025` and `/aflw/matches/2025-1-car-col` render, and `/` shows the restored
+`most-brownlow-votes` record of the week and the restored footer.
+
+**The two public pages that looked stale afterwards were stale ISR output, not a defect**
+(runbook §8.3): `/` and `/aflw` are `revalidate = 3600` and were serving the deploy's
+build-time prerender, while their `force-dynamic` children were always correct; Cloudflare
+(`cf-cache-status: DYNAMIC`) and the browser were excluded, the regenerated files on the host
+carry post-recovery timestamps, and `/` lagged `/aflw` only because Next 16 keeps the page cache
+per cluster worker (the `AFLDB-ISSUE-134` property). Both converged on their own window, with no
+save, publish, revalidation, restart, cache deletion or deploy. No new issue was allocated.
+
+**Retained.** `afldb_prod_auth_recovery` is **not** dropped — that remains a separate, explicitly
+approved destructive action (runbook §9). The T0 backup `afldb_prod-20260904-201037.dump` (host +
+sha256-verified off-host copy) and the pre-cutover dump are retained; the host scratch under
+`/home/arm/i126*` was deleted at close-out, its content being transcribed in runbook §7.
+
+**Follow-up (outside this issue, operator's discretion, through the admin UI):** re-apply the
+Kelly Robinson `dob`/`birth_year` corrections on production player **8065** via
+`/admin/data-editor` (runbook §3.9); redo any wanted player-link decisions and refresh the
+candidates via `/admin/player-links` (§3.10). `AFLDB-ISSUE-137` was not touched.
 
 ---
 

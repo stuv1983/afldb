@@ -1,6 +1,10 @@
 # AFLDB-ISSUE-126 — Production-only state from the 2026-09-02 cutover, held only in `afldb_prod_auth_recovery`
 
-- **Status:** Open — **EXECUTED on PROD 2026-09-04 20:33–20:37 AEST** (T1, T2, T5, T6 committed; T4 and every other retirement recorded); database-level acceptance **all PASS** (§8); **awaiting the operator's browser acceptance (super-admin login + admin/home/AFLW pages)** before close-out
+- **Status:** **RESOLVED 2026-09-04** — **EXECUTED on PROD 2026-09-04 20:33–20:37 AEST** (T1, T2,
+  T5, T6 committed; T4 and every other retirement recorded); database-level acceptance **all PASS**
+  (§8) and public browser acceptance **all PASS** (§8.2, 20:58–21:23 AEST). The two stale public
+  pages the operator reported were stale ISR output and nothing else (§8.3); no repository change
+  was needed and no new issue was allocated
 - **Severity:** Medium
 - **Area:** Database / Admin / Security / Audit trail / Operations
 - **Branch:** `claude/issue-126` (worktree `D:\dev\afldb-issue-126`)
@@ -8,7 +12,7 @@
 - **Related:** `AFLDB-ISSUE-122` §S8 (the cutover), `AFLDB-ISSUE-125` (the promotion procedure and
   the production-only table contract in `tools/db/promotion-inventory.ts`), `AFLDB-ISSUE-137`
   (untouched; its own close-out also lists the recovery database)
-- **Scripts (this branch):** `issues/open/AFLDB-ISSUE-126-export.sh` (read-only export from the
+- **Scripts (this branch):** `issues/closed/AFLDB-ISSUE-126-export.sh` (read-only export from the
   recovery database), `-t1-audit.sql`, `-t2-content.sql`, `-t4-join-request.sql`, `-t5-aflw.sh`,
   `-t6-marker.sql` (each commit-gated; see §6)
 
@@ -301,7 +305,7 @@ Then export the source rows from the recovery database (read-only; files mode 60
 `/home/arm/i126/`, deleted at close-out):
 
 ```bash
-bash issues/open/AFLDB-ISSUE-126-export.sh
+bash issues/closed/AFLDB-ISSUE-126-export.sh
 ```
 
 Expected: `audit.csv` 93 lines (header + 92), `settings.csv` 8 lines (header + 7; multi-line
@@ -655,7 +659,7 @@ Nothing else was written to `afldb_prod`. Not touched: `auth_users`, `auth_sessi
 | Current production sessions unaffected | `auth_sessions` 7 rows, 2 live, oldest 2026-09-03 06:23:06 — identical to T0 | **PASS** |
 | All eight `staging_aflw` tables restored with expected counts | seasons 11, fixtures 818, matches 710, ladders 144, player_seasons 3,972, player_match_stats 29,878, scoring_events 15,483, issues 2 (= 51,018); `aflw.seasons` 11, `aflw.matches` 710, `aflw.players` 960; `issues_id_seq` 2 | **PASS** |
 | Application health green | `/api/health` `{"status":"ok","database":"ok","latencyMs":1}`; `/beta` 200, `/admin/login` 200; `/` and `/aflw` 307 → `/beta` (beta gate, unchanged) | **PASS** |
-| Real production super-admin login succeeds | **not performed from this session** — no credential is (or should be) available to it; the login path is exercised only indirectly (T6 inserted through the same identity default the app uses; `/admin/login` renders) | **PENDING — operator** |
+| Real production super-admin login succeeds | operator signed in from a fresh Incognito session and the application's own writer recorded it as `auth_audit_log` id **183**, `admin.login`, 2026-09-04 20:46:22.249131+10 — after the marker (182) and with no id collision or gap (§8.2) | **PASS** |
 | `afldb_prod_auth_recovery` intact | present at every verify; never connected to read-write | **PASS** |
 | Backups intact | T0 dump on host + `.sha256`; off-host copy verified; pre-cutover dump untouched | **PASS** |
 
@@ -691,6 +695,102 @@ Final state: `auth_audit_log` **104** rows (92 + 11 + 1), ids 16–26 and 90–1
 
 Report the outcome of 1–7; any deviation is a stop, not something to fix in place.
 
+### 8.2 Browser acceptance — **GREEN** (2026-09-04 20:46–21:23 AEST)
+
+Admin-side (operator, fresh Incognito session, 20:46): super-admin login succeeded after the
+recovery; the dashboard's newest activity read `admin.login`, `database.recovered`,
+`admin.logout`, …, so the fresh login sits above the marker; `/admin/settings` and
+`/admin/content` both load and `/admin/content` shows the restored page-content structure;
+`/admin/access` lists only the current live code (`me`) — the spent `screenGrabs` code is
+absent, as decided in §3.4.
+
+Public side (this session, 20:58–21:23): a fresh browser context admitted through the ordinary
+`/beta` code flow with a temporary access code the operator cut for this pass and revoked
+afterwards (`access.code_created` id 184 at 20:54:28; `beta.code_redeemed` id 185 at 20:58:19,
+actor label `claude`). No admin credential was used or requested; every request was a
+GET/navigation. The code is not reproduced in this file, in any script, fixture, screenshot, log
+or commit, and the browser context's cookie was cleared at the end.
+
+| Page | HTTP | Result | Evidence |
+|---|---|---|---|
+| `/aflw` | 200 | **PASS** | Players **960**, Matches **710**, Seasons **11**, Player games **29,878** — equal to §7.6.4's `aflw.players` / `aflw.matches` / `aflw.seasons` and `staging_aflw.player_match_stats`; "From the vault" is populated (the "No earlier meetings to draw from." placeholder the operator saw is gone); "Record of the week" reads "Most games, every AFLW season from 2017" — i.e. the restored `home.aflw_leaders = games`, not the compiled default `goals`; the footer is the restored `site.footer` |
+| `/aflw/seasons` | 200 | **PASS** | the full recovered catalogue, 11 seasons: 2026, 2025, 2024, 2023, 2022 (Season 7), 2022 (Season 6), 2021, 2020, 2019, 2018, 2017 |
+| `/aflw/seasons/2025` | 200 | **PASS** | "2025 AFLW season", 117 match links, 160 table rows (ladder + fixtures) |
+| `/aflw/matches/2025-1-car-col` | 200 | **PASS** | "Carlton v Collingwood", Thursday 14 August 2025 · 19:15 · Round 1 · Princes Park; 6.9 (45) v 3.3 (21); 3 tables / 63 rows |
+| `/` | 200 | **PASS** (after ISR regeneration — §8.3) | Record of the week = "Career Brownlow Medal votes, summed from the official season counts.", Gary Ablett 262 / Patrick Dangerfield 259 / Gary Dempsey 246 — the restored `home.record_of_the_week = most-brownlow-votes`; the footer is the restored `site.footer` (the compiled default's third line, "Statistics not collected … never as zero", is gone); AFL totals unchanged at 13,273 / 17,047 / 130 / 694,273 |
+
+Errors: the only console error on any page is the Cloudflare Insights beacon refused by the
+site's own CSP (`script-src 'self' 'unsafe-inline'`). It appears identically on pages that render
+perfectly, it is the only failed network request in the entire pass, and it is unrelated to this
+issue. Every other request — documents and RSC prefetches alike — returned 200. No hydration
+error, no page error, no 4xx/5xx.
+
+Audit continuity after the recovery (read read-only from `afldb_prod` on the owner DSN):
+
+| id | at (AEST) | action | note |
+|---|---|---|---|
+| 182 | 20:37:22.755022 | `database.recovered` | the T6 marker |
+| 183 | 20:46:22.249131 | `admin.login` | **the operator's post-recovery super-admin login — exactly the id §8.1 step 1 predicted.** Actor label is the super admin's address and is not reproduced here (§3.5) |
+| 184 | 20:54:28.426253 | `access.code_created` | the temporary beta code cut for this browser pass |
+| 185 | 20:58:19.7624 | `beta.code_redeemed` | this session's admission through `/beta`, actor label `claude` |
+
+The application's own writer produced 183–185 unaided, continuing from the marker with no
+collision and no gap — the restored sequence works.
+
+### 8.3 The two stale public pages — diagnosis
+
+Both were **stale ISR output**: not a defect, not caused by the recovery, and not repaired by any
+action of ours. Nothing was saved, published, revalidated, restarted, deployed or deleted to make
+them correct.
+
+1. **Cache class, not data.** `/` (`src/app/page.tsx:23`) and `/aflw` (`src/app/aflw/page.tsx:29`)
+   declare `export const revalidate = 3600` and are prerendered at build; `/aflw/seasons`,
+   `/aflw/seasons/[key]` and `/aflw/matches/[key]` declare `export const dynamic =
+   'force-dynamic'`. Measured on production: the two landing pages answer with `cache-control:
+   s-maxage=3600, stale-while-revalidate=31532400` and `x-nextjs-cache: HIT` (once `STALE`), while
+   the three child pages answer `private, no-cache, no-store, max-age=0, must-revalidate` with no
+   `x-nextjs-cache` at all. That difference is the whole of the operator's observation:
+   `/aflw/seasons` was right at the same instant `/aflw` showed zeros because one is rendered per
+   request and the other was a cached copy.
+2. **Same data source underneath.** `/aflw`'s counts come from `getAflwOverview()` over
+   `aflw.seasons/matches/players/player_match_stats` and its vault from `getAflwVaultMeetings()`
+   over `aflw.matches` (`src/db/queries/aflw.ts`) — the same views `/aflw/seasons` reads. `/` reads
+   `site_settings` through `getSiteSettings()`, which is a React `cache()` and therefore
+   request-scoped only: there is no persistent settings cache anywhere in the tree. And
+   `most-brownlow-votes` is a valid `HOME_RECORD_CATEGORIES` member with its own
+   `RECORD_CATEGORIES` entry, so no silent fallback-to-default path was involved. The restored
+   settings were provably live the moment a page re-rendered: `/aflw` showed `games` (a restored
+   non-default) and the restored footer while `/` was still showing `most-goals` and the compiled
+   default footer, under the same deployment and the same database.
+3. **Not the edge, not the browser.** Every response carried `cf-cache-status: DYNAMIC`
+   (Cloudflare neither served nor cached these documents), and the context was fresh with unique
+   query strings.
+4. **Host evidence (read-only).** Build unchanged at `MRjsomoqFJRsjZWElQ6A0` — no redeploy. The
+   served tree is `.next/standalone/.next/server/app/`, which is where ISR writes regenerations
+   back: `aflw.html` was rewritten at **20:50:16** and `index.html` at **21:00:26** AEST (both
+   after T2/T5) and contain `29,878` and "Career Brownlow Medal votes" respectively, while the
+   build-time copies under `.next/server/app/` still carry their 12:28–12:29 deploy timestamps.
+   What the operator saw was that deploy's prerender, produced about eight hours before the
+   recovery.
+5. **Why `/` lagged `/aflw` by half an hour.** Production runs the clustered entry point
+   (`deploy/server-cluster.mjs`) and Next 16 keeps the page cache **per process** — the same
+   property `AFLDB-ISSUE-134` had to satisfy by posting its invalidation to every worker ordinal.
+   One worker regenerated `/` at 21:00:26 while the other went on serving its own pre-T2
+   in-memory copy, so `/` alternated between the two answers until that worker's own hour
+   elapsed. Sampled convergence: 8 fresh / 4 stale at 21:01, 5 / 1 at 21:16, **6 / 0 at 21:19:46
+   and 6 / 0 at 21:22:43**, then a final combined pass at **21:22:59 with 8 / 8 on `/` and 8 / 8
+   on `/aflw`**.
+
+No repository change is required and no new issue is allocated. The mechanism is already owned and
+documented — `AFLDB-ISSUE-133` (build-before-data ISR staleness on a one-hour window) and
+`AFLDB-ISSUE-134` (per-worker page-cache invalidation under the cluster) — and §8.1 item 6
+predicted this outcome for the home page before the operator looked. Recorded as an observation
+only, not converted to an issue: a production data restore has no equivalent of ISSUE-134's
+season publisher, so any ISR landing page it affects self-heals on its own window rather than
+immediately; here that window was under an hour and the supported remedies (a settings save, which
+calls `revalidatePath('/', 'layout')`, or a deploy) were deliberately not used because neither was
+warranted.
+
 ## 9. `afldb_prod_auth_recovery` retention
 
 **Retained.** It is the only online copy of everything §3 retires, and the cross-check for
@@ -699,14 +799,34 @@ separately approved destructive action (`sudo -u postgres dropdb afldb_prod_auth
 the operator's password on this host anyway). The pre-cutover dump file stays under normal
 backup retention regardless.
 
-## 10. Exact next action
+## 10. Close-out (2026-09-04)
 
-**Operator:** run §8.1 (browser acceptance) and report. **Then, next session (close-out only, no
-further production DML):** mark the ledger entry Resolved with the §7/§8 evidence, retire the
-`IssuesIndex.md` row, move this file and its scripts to `issues/closed/`, update `CHANGELOG.md`'s
-entry to "accepted", delete `/home/arm/i126/` and `/home/arm/i126_*` on the host, commit on
-`claude/issue-126`, push, do not merge. `afldb_prod_auth_recovery` is dropped only under a separate
-approval after that (§9); the T0 backup follows normal retention. Later, through the UI and outside
-this issue: re-apply the Kelly Robinson `dob`/`birth_year` corrections on production player **8065**
-via `/admin/data-editor` (§3.9), redo any wanted player-link decisions and refresh the candidates via
-`/admin/player-links` (§3.10). ISSUE-137 was not touched.
+Done in the close-out session, with **no further production DML of any kind** (the only production
+commands were browser GETs, four read-only SELECTs and the scratch-file removal below):
+
+- §8.2/§8.3 recorded; §8's last PENDING row closed to PASS on audit id 183.
+- Ledger entry marked **Resolved 2026-09-04**; the `issues.md` Open Issues row and the
+  `IssuesIndex.md` row retired and the open-issue count decremented (3 → 2:
+  `AFLDB-ISSUE-110`, `AFLDB-ISSUE-137`); `CHANGELOG.md`'s Unreleased entry updated to accepted.
+- This runbook and its six scripts moved to `issues/closed/`.
+- Host scratch removed on `afldb-prod`: `/home/arm/i126/` (the four export CSVs and every unit log)
+  and the eleven `/home/arm/i126_*` scripts and logs. Verified absent afterwards. Their content is
+  transcribed in §7 and re-derivable from the retained recovery database.
+- **Retained and verified present after cleanup:** `afldb_prod_auth_recovery`; the T0 backup
+  `/home/arm/backups/afldb/afldb_prod-20260904-201037.dump` (21,543,086 bytes) with its `.sha256`;
+  the off-host copy `D:\backups\afldb\afldb_prod-20260904-201037.dump` (same size) with its
+  `.sha256`; and the pre-cutover dump `/home/arm/afldb_prod_pre_rebuild_20260902-200355.dump`
+  (18,865,740 bytes).
+- The temporary beta access code used for §8.2 is no longer needed and may be revoked; it appears
+  in no tracked file, script, fixture, log, screenshot or commit.
+
+Not done here, deliberately: nothing was merged, nothing was deployed, no settings or content were
+saved, no cache file was deleted and `AFLDB-ISSUE-137` was not touched.
+
+**`afldb_prod_auth_recovery` is still not dropped.** §9 stands: its removal is a separate,
+explicitly approved destructive action. The T0 backup follows normal retention.
+
+Outstanding follow-through, outside this issue and through the admin UI at the operator's
+discretion: re-apply the Kelly Robinson `dob`/`birth_year` corrections on production player
+**8065** via `/admin/data-editor` (§3.9), and redo any wanted player-link decisions and refresh the
+candidates via `/admin/player-links` (§3.10).
