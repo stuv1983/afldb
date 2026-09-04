@@ -5,6 +5,16 @@ After=network-online.target postgresql.service
 Wants=network-online.target
 Requires=postgresql.service
 
+# Give up only after repeated rapid failures, so a crash loop is visible
+# rather than silently retried forever. These bound the Restart=always policy
+# in [Service] below, but they belong HERE: systemd parses
+# StartLimitIntervalSec= and StartLimitBurst= in [Unit] only. In [Service] they
+# are unknown keys, are dropped with
+#   Unknown key name 'StartLimitIntervalSec' in section 'Service', ignoring.
+# and the limiter silently never engages (AFLDB-ISSUE-124).
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
 [Service]
 Type=simple
 User=arm
@@ -60,10 +70,9 @@ Environment=HOSTNAME=127.0.0.1
 KillMode=mixed
 Restart=always
 RestartSec=5
-# Give up only after repeated rapid failures, so a crash loop is visible
-# rather than silently retried forever.
-StartLimitIntervalSec=120
-StartLimitBurst=5
+# The crash-loop limiter that bounds this Restart= policy is
+# StartLimitIntervalSec=/StartLimitBurst= in [Unit] above, not here: systemd
+# reads those two keys from [Unit] only (AFLDB-ISSUE-124).
 
 # Logging goes to the journal: journalctl -u afldb
 StandardOutput=journal
