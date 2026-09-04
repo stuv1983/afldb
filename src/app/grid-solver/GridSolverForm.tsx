@@ -301,6 +301,21 @@ function ParamInput({
     );
   }
 
+  if (param.kind === 'text') {
+    return (
+      <label>
+        {param.label}
+        <input
+          type="text"
+          value={value}
+          maxLength={200}
+          onChange={(e) => onChange(e.target.value)}
+          style={{ width: '14rem' }}
+        />
+      </label>
+    );
+  }
+
   // integer / decimal / season
   return (
     <label>

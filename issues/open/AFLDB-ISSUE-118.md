@@ -1,7 +1,10 @@
 # AFLDB-ISSUE-118 — Persist Gridley history and use it as a Grid Solver compatibility corpus
 
-**Stage 0 investigation runbook.** This is the durable cross-session handoff document.
-Stage 0 is investigation and design only. **No implementation was performed.**
+**Runbook.** Stages 0–2 (§1–§21) were investigation, persistence and acquisition on
+`opus/gridley-corpus`; §22 (4 September 2026, `claude/issue-118`) recovers that work onto
+current `main`, exports the stored corpus as an offline fixture, maps every criterion, adds the
+missing builders, proves the whole corpus through the production solver and resolves the
+`/grid-solver` crash digest. **Read §22 first; earlier sections are history.**
 
 ---
 
@@ -2046,3 +2049,327 @@ two boards; this compares every board they share.
   recipe was not touched. §21.14 remains open, deliberately.
 * Nothing was committed, merged, rebased, pushed or deployed. The Stage 2 milestone is ready for
   the operator commit.
+
+---
+
+## 22. Stages 3–6 — compatibility proven on the stored corpus (4 September 2026)
+
+**Status at 4 September 2026:** the recovered Stage 0/1/2 work is on `claude/issue-118`
+(cherry-picked from `opus/gridley-corpus`, which `main` never merged), the whole stored corpus is
+exported as an offline fixture, every one of its 839 criteria is classified, 29 builders were
+added so that every criterion AFLDB holds data for is answerable, the exhaustive regression
+runs every cell through the production solver, and the `/grid-solver` crash digest is
+identified. §22.9 has the run figures; §22.10 the exact next action.
+
+| Field | Value |
+|---|---|
+| Branch / worktree | `claude/issue-118` / `D:\dev\afldb-issue-118` |
+| Base | `main @ f04e86d` |
+| Recovered commits | `d7e98f0` (Stage 0 doc), `ffba02d` (Stage 1), `084cf2e` (Stage 2) — cherry-picks of `9ecc6fc`/`28fdb2f`/`6e3b38a`; conflicts on `CHANGELOG.md`, `IssuesIndex.md`, `issues.md`, `.gitattributes` resolved by keeping `main`'s files (tracking rewritten in this section; the Gridley `.gitattributes` rule re-added) |
+| Model / effort | Fable 5.1, Medium |
+| Databases touched | `afldb_dev` read-only (corpus export, telemetry, reference facts); `afldb_test` read-only (regression); **production untouched** |
+
+### 22.1 Stage 0 — what survived and what did not
+
+- `main` carried nothing of the Gridley work: no migration `080`, no importer, no fixtures, no
+  acquisition tool. All three `opus/gridley-corpus` commits cherry-picked cleanly apart from the
+  tracking files; `tools/maintenance/privileges.sql` applied without conflict. The recovered
+  suites (`tests/gridley-acquisition.test.ts`, `tests/external-grids-import.test.ts`) pass on
+  current `main`: **92/92**.
+- The on-disk snapshot (`data/sources/gridley/history/`, git-ignored in the deleted
+  `D:\dev\afldb-gridley` worktree) **is gone**. The corpus survives only in `afldb_dev`
+  (`external_grids`: 1,143 `gridley_api` + 1,123 `legacy_sqlite` current revisions, migration
+  `080` applied there with checksum `0801b8a9…`) and in the two committed fixture boards. The
+  raw JSON was preserved by §10.3 exactly for this case.
+- `afldb_test` does not have migration `080` (its ledger runs 081–085 only), which is why the
+  regression reads the corpus from the exported fixture, not from the database.
+
+### 22.2 Stage 1 — the authoritative corpus, exported offline
+
+`tools/gridley/export_corpus.py` (read-only, `--dsn`) writes two byte-deterministic files:
+
+| File | Content | Size |
+|---|---|---|
+| `tests/fixtures/gridley/corpus.json` | 1,143 boards: number, date, 3 row items (`vItems`) and 3 column items (`hItems`) with Gridley's `id`/`title`/`subtitle`/`description`/`type`, the AFL champion image id where present, and each cell's answer-set size | 1,648,799 bytes |
+| `tests/fixtures/gridley/corpus-answers.json.gz` | per board a 3×3 array of sorted Gridley player ids (`correctAnswersPlayerMap` keys), gzip with a zero mtime | 3,023,422 bytes |
+
+The stored envelope is `raw_payload -> {board_date, body_sha256, payload, source, url}`; the
+Gridley JSON is `payload`. Rows = `vItems`, columns = `hItems` (§21.4).
+
+**Denominator (`tests/gridley-compat.test.ts`, DB-free, asserted exactly):**
+
+| Measure | Value |
+|---|---:|
+| stored games | **1,143** (#1 2023-07-17 → #1143 2026-09-01, dense) |
+| question/cell occurrences | **10,287** cells; **6,858** criterion occurrences |
+| unique criteria (by Gridley `id`) | **839** |
+| mapped to an AFLDB Grid Solver axis | **810** criteria / **6,590** occurrences |
+| freebie (`free-hit`, "select any player") | 1 / 1 |
+| data absent in AFLDB (explicit reason each) | **28** criteria / **267** occurrences |
+| malformed / non-question rows | **0** — every capture parsed; 14 ids vary only in subtitle/description wording across boards |
+| unrecognised | **0** |
+| answer-key entries | 1,512,436 (13,524 distinct Gridley player ids); no empty cell |
+
+Duplicates/equivalents: distinct Gridley ids are the unit; the same question under two ids
+(`grandfinals1-2000s` / `grandfinals2000s-playedin-1`) maps to the same axis, asserted by "one
+axis per id".
+
+### 22.3 Stage 2 — semantic mapping (`src/search/gridley-compat.ts`)
+
+Rules are keyed by Gridley's criterion **id** and pin the title(s) Gridley has used; a changed
+title is refused as unrecognised, never mapped to the old meaning. AFLDB ids (organizations,
+venues, awards, players) come from injected lookups. Decisions that were not obvious:
+
+- **Clubs.** Gridley: "played ≥1 game … *or currently on their list*". AFLDB has no season
+  lists, so the listed-never-played tail is unrepresentable (`NO_LISTS`; noted on every club
+  rule, not hidden). Everything else is `played_for_club` at the organization.
+  **Brisbane Lions** is Gridley-defined to include Fitzroy and the Bears; AFLDB's lineage model
+  keeps mergers link-only (`club_organization_relations.merged_into`), so two new builders
+  follow that link explicitly: `played_for_club_incl_merged`, `debut_club_incl_merged`.
+  `bears` is the Bears organization alone. Sydney/South Melbourne and Bulldogs/Footscray are
+  one organization already. Port Adelaide is AFL-only in both.
+- **Teammates** (403 `*-teammate-<gridleyId>` + ~140 name-only ids) → `teammate_of`
+  (same club-season overlap). Names resolve by normalised full name; the five ambiguous names
+  are settled by debut season in `PLAYER_OVERRIDES` (Josh J. Kennedy 2008, Nathan Brown 1997
+  (Bulldogs), Scott Thompson 2001 (Adelaide), Tom Hickey 2011, Gary Ablett jr 2002). The
+  answer-key bridge (§22.4) checks each choice.
+- **Thresholds by arithmetic.** "less than 10 goals" → `career_goals_max(9)`; "50 games or
+  less" → `career_games_max(50)`; era disclosures ("since 1965") are AFLDB's own coverage and
+  need no filter (§7.2).
+- **Finals.** `NO FINALS WINS` → `never_won_a_final` (no played-finals gate, per Gridley's
+  text); `WINNING RECORD IN FINALS` → new `finals_winning_record` (draws are neither).
+- **Grand Finals.** Named-year boards → `grand_final_between_seasons(y,y)`; "beat Collingwood
+  in a GF" → new `grand_final_won_against_club`; "1+ goal in multiple GFs" → new
+  `grand_finals_with_stat_min_count`; "defeated by Dusty in a GF" → `lost_grand_final_against`.
+- **Season-bound totals.** `20+ GAMES IN 2023`, `15+ GOALS IN 2023` → new
+  `games_in_named_season_min` / `named_season_stat_total_min`.
+- **Leaders.** Club leaders → `club_season_stat_leader` (ties count); `MOST BROWNLOW VOTES
+  TEAM` → new `club_season_brownlow_leader`; `TOP 10 GOAL KICKER SEASON` etc. → new
+  `league_season_stat_rank_top` (`rank()`, ties at the boundary included).
+- **Rivalries.** Showdown = Port Adelaide/Adelaide, Western Derby = West Coast/Fremantle,
+  QClash = Brisbane/Gold Coast, Sydney Derby = Sydney/GWS via `matchup_played_min` plus new
+  `matchup_won_min`, `matchup_game_stat_min`, `matchup_winning_record`. Anzac Day and Dreamtime
+  use `matches.match_event`; `ANZAC DAY MATCH WINNER` → new `match_event_won`; **Big Freeze** =
+  King's Birthday from 2015 → new `match_event_played_between`. **Gather Round** carries no tag:
+  new `gather_round_played` / `gather_round_game_stat_min` derive it as the one home-and-away
+  round per season (2023+) played entirely at the four South Australian grounds.
+- **Awards.** All-Australian selections (incl. 1953–1988 carnivals and VFL Team of the Year, as
+  AFLDB's `all-australian` rows already do), position groups → new
+  `all_australian_defender/forward/midfielder` (ruck excluded, as Gridley says);
+  `ALL-AUSTRALIAN SQUAD 2024` → new `all_australian_squad_in_season` (AFLDB's squad rows are the
+  non-selected members, so squad ∪ team); B&F in a premiership year → new
+  `best_and_fairest_in_premiership_season`; premiership captain → new `premiership_captain`
+  (captain that season **and** on the winning GF side).
+- **Draft.** `PICK 1` / `TOP 5` / `TOP 10` → new `national_draft_pick_between`
+  (`draft_kind = 'national'`; `draft_pick_between` spans every draft kind); rookie →
+  `draft_type_is('Rookie')`; free agent → `draft_type_is('Free Agency')` (FA + DFA); father–son
+  pick → `recruited_via('Father-Son')`.
+- **Names & numbers** (new group): `given_name_in('Steve,Steven,Stephen,Stefan')`,
+  `surname_hyphenated`, `jumper_number_worn(n)`; `100 POINT WIN` → new `won_by_margin_min`;
+  `10 WINS IN A ROW` → new `consecutive_wins_min` (runs in the player's own game sequence);
+  `MORE FREES FOR THAN AGAINST` → `career_stat_exceeds`; `PLAYED IN CHINA` →
+  `played_at_venue(Jiangwan Stadium)`; `30+ DISPOSALS TWO DIFF CLUBS` → new
+  `single_game_stat_multi_club_min`.
+
+**Data absent — the 28 criteria (267 occurrences) AFLDB cannot answer, with the reason the
+rule table carries:**
+
+| Criteria | Occ. | Why |
+|---|---:|---|
+| `height195`, `height180` | 142 | `players.height_cm` is NULL for all 13,273 players on every environment; `draft_picks.height_cm` covers drafted players only |
+| `brother` | 53 | `player_relationships` (migration 006) has never been populated anywhere |
+| `season2024player` | 14 | no season lists |
+| `coachedBy*` ×7, `premcoach` | 16 | no coaching data in the schema |
+| `moty`, `goty`, `anzacmedal`, `showdown-medal`, `glendenning`, `qclash-medal`, `battleofthebridge-medal` | 22 | no such award rows in `awards` |
+| `intrulesplayer`, `nfl` | 6 | other-code / representative careers not modelled |
+| `winaftersiren` | 4 | no scoring-event timeline |
+| `fathersonfather` | 3 | `father_son_selections` never populated; `signing_kind` names the son only |
+| `irish`, `tasmanian` | 3 | no birthplace / nationality |
+| `recruitedByDodoro` | 2 | recruiters not modelled |
+| `spoils5season` | 1 | spoils not a recorded stat |
+| `debut22` | 1 | `players.dob` populated for 855 of 13,273 |
+
+None of these is a solver limitation; each needs a data acquisition of its own and is recorded
+as follow-up in §22.11, not silently excluded.
+
+### 22.4 Stage 3 — the exhaustive regression (`tests/integration/gridley-corpus.test.ts`)
+
+Against `afldb_test`, offline from Gridley, deterministic:
+
+1. lookups from the database (organizations, venues, awards, all players);
+2. one `compileAxis` + full eligible-set query per distinct mapped criterion, timed;
+3. every one of the 10,287 cells through `solveCellSummary` (the page's own call), asserting
+   `eligible` equals the intersection of the two criterion sets, is non-empty (Gridley's answer
+   set never is), and — for the **401 Gridley player ids the corpus itself bridges** (403
+   player-valued criteria: 401 teammate ids, 2 of whom also appear as GF opponents) — that membership in Gridley's
+   answer key and in AFLDB's eligible set agree in both directions;
+4. a failure names board, cell, source criterion, the AFLDB axis and a category: `parse`,
+   `unsupported` (counted, never failed), `query failure`, `timeout`, `empty answer`,
+   `incorrect known answer`, `count mismatch`; every criterion over 1 s and every cell over 1 s is
+   listed and fails the run.
+
+`AFLDB_GRIDLEY_REPORT=<file>` writes the full per-criterion / per-cell report.
+
+### 22.5 Stage 4 — digest `1511510695`
+
+- The digest is Next's `djb2(message + stack)` of a server-component error
+  (`create-error-handler.js:102`). The same digest is already on record: **`AFLDB-ISSUE-076`**
+  (`issues.md`, Symptom/Evidence) reproduced it on dev build `NQrtI3zQGWx62e6zbI5bR` and
+  `journalctl -u afldb` correlated *every* occurrence with **SQLSTATE 57014, "canceling
+  statement due to statement timeout"** thrown by postgres.js. `afldb_dev.app_health_events`
+  still holds those four `PAGE_CRASH` rows (2026-08-22 16:42–16:45, build
+  `NQrtI3zQGWx62e6zbI5bR`) — this session read them.
+- The production events (2026-09-03 05:49, two rows) carry the identical digest on a different
+  build. The digest is stable across builds because the cancelled statement's error is created
+  inside the externalised driver at the same deploy path on both hosts, so the hashed message
+  and stack do not change with the app bundle. **Exception: PostgreSQL 57014 statement timeout
+  in a Grid Solver cell.**
+- Mechanism: `page.tsx` awaited nine `solveCellSummary` calls in one `Promise.all`; one
+  cancelled statement rejected the render and the route showed the error boundary, which posts
+  `PAGE_CRASH` with the digest. `error.tsx` stores only the digest, so the offending *board* is
+  not in telemetry.
+- Which predicate timed out on production on 2026-09-03 is **not yet read**: the production
+  journal is operator-gated (§22.10). Two facts bound the hypothesis: the ISSUE-076/103 repairs
+  (`6014b9e`, `0391e07`) were on production by then, and the crash came the morning after the
+  2026-09-02 database promotion — `docs/production-promotion.md` and `tools/db/promotion-*` run
+  **no `ANALYZE`** after the restore, so planner statistics were whatever autovacuum had reached.
+- Fixes in this branch: (1) `guardCellTimeout` / `isStatementTimeout` in
+  `src/db/queries/grid-solver.ts` confine 57014 to its square — the page renders "Timed out" for
+  that square and the drill-down, logs `[grid-solver] cell r-c timed out: <row> x <col>`
+  server-side, and rethrows anything else (`tests/grid-solver-timeout.test.ts`, 7 tests);
+  (2) the corpus run gates every predicate the corpus can produce at 1 s (§22.9).
+  This is not a catch-all: only SQLSTATE 57014 is confined, and only per cell.
+
+### 22.6 Stage 5 — performance
+
+Criteria over 1 s in the criterion pass (full eligible set, tunnel latency ≈ 60 ms included):
+
+| Criterion | Axis | ms | Players |
+|---|---|---:|---:|
+| `moreFFthanFAcareer` | `career_stat_exceeds(frees_for, frees_against)` | 1,866 | 2,511 |
+| `teammates-150` | `career_teammates_min(150)` | 1,819 | 995 |
+| `teammates-100` | `career_teammates_min(100)` | 1,766 | 3,580 |
+
+`career_teammates_min` is the documented ~2 s roster-array shape (grid-solver.ts comment);
+`career_stat_exceeds` on two `live_only` stats sums `player_match_stats` twice per player —
+`player_career_stats.frees_for/frees_against` exist but are **NULL on `afldb_test`** (canonical
+rebuild does not fill them), so switching to the precomputed column was not taken without
+evidence that dev/prod populate it. No index was added. All three are one-shot set queries;
+§22.9 records the per-cell production-path timings.
+
+### 22.7 Stage 6 — UI
+
+Only the crash handling above: a timed-out square and drill-down render as such; the `text`
+parameter kind (for `given_name_in`) gets a plain text input in `GridSolverForm.tsx`. No
+redesign.
+
+### 22.8 Files changed in this session
+
+- `src/search/grid-solver-spec.ts` — 29 builders, `text` param kind, `Names & numbers` group
+  (108 → 137)
+- `src/db/queries/grid-solver.ts` — their compilers; `clubIdsInclMerged`, `matchupMatchFilter`,
+  `gatherRoundMatchIds`, season-bound `seasonStatAtLeast`; `isStatementTimeout`, `guardCellTimeout`
+- `src/app/grid-solver/page.tsx`, `src/app/grid-solver/GridSolverForm.tsx`
+- `src/search/gridley-compat.ts` — the mapping (new)
+- `tools/gridley/export_corpus.py` — fixture exporter (new)
+- `tests/fixtures/gridley/corpus.json`, `corpus-answers.json.gz` (new)
+- `tests/gridley-compat.test.ts`, `tests/integration/gridley-corpus.test.ts`,
+  `tests/grid-solver-timeout.test.ts` (new); `tests/grid-solver-spec.test.ts` (count)
+- `docs/search.md` §7; `.gitattributes` (Gridley rule re-added); tracking files
+
+### 22.9 Validation
+
+- `tests/gridley-compat.test.ts` + `tests/grid-solver-spec.test.ts`: **29/29** (DB-free).
+- `tests/grid-solver-timeout.test.ts`: **7/7** (DB-free).
+- `tests/gridley-acquisition.test.ts` + `tests/external-grids-import.test.ts`: **92/92**.
+- `tests/integration/grid-solver.test.ts` "every grid builder compiles and solves":
+  **137/137** on `afldb_test`.
+- `npx tsc --noEmit`: clean. `eslint` on every changed file: 0 errors, 1 pre-existing warning
+  (`_total` in `solvePredicates`).
+- Exhaustive corpus run on `afldb_test`: **see §22.9.1**.
+
+#### 22.9.1 Exhaustive corpus run
+
+Run of 4 September 2026 (sixth and final run of the session; each earlier run found and fixed
+something — see the history below). `npx vitest run tests/integration/gridley-corpus.test.ts`
+against `afldb_test` over the 55432 tunnel, ~5 minutes, **1,161/1,161 tests**.
+
+| Measure | Value |
+|---|---:|
+| criteria mapped and compiled | 810, **0 query failures, 0 timeouts, 0 empty sets** outside the named dataset gaps |
+| criteria over 1 s (full eligible set) | 3: `teammates-150` 1,818 ms, `teammates-100` 1,784 ms, `moreFFthanFAcareer` 1,763 ms — none over the 4 s guard |
+| cells through `solveCellSummary` | **9,141** of 10,287 (the rest are the 795 `unsupported` + 351 `dataset gap` cells below, never solved because an axis is data-absent here) |
+| `eligible` = set intersection | every solved cell (0 count mismatches) |
+| empty answers | **0** |
+| cell time p50 / p90 / p99 / max | 41 ms / 300 ms / 523 ms / 2,061 ms; 19 cells over 1 s, all on `teammates-100/150`, `moreFFthanFAcareer` or a large teammate set; none over 4 s |
+| known-answer checks (401 bridged players × 9,141 cells) | **0 incorrect known answers** among fair comparisons |
+
+Findings that are counted and reported, not failed (each names its reason in the log and the report):
+
+| Category | Cells / checks | Meaning |
+|---|---:|---|
+| `unsupported` | 795 cells | an axis is one of the 28 data-absent criteria (§22.3) |
+| `dataset gap` | 353 cells | an axis reads a dataset `afldb_test` lacks: draft links (5 of 6,810 linked), `matches.match_event` (0 rows), the 2026 season (2026 debutants Duursma and Smith; two teammate cells whose only answers moved club in 2026) |
+| `partial dataset` | 506 checks | `captaincies` has no Geelong, Hawthorn or West Coast rows on any environment (West Coast × premiership captain is empty for that reason) |
+| `time of board` | 12,531 checks | Gridley's answer key is frozen at the board's date; the player was still playing then (or a Hall of Fame induction came later: Hodge/Riewoldt 2025, Ablett 2026), so today's AFLDB legitimately differs |
+| `list membership` | 809 checks | Gridley's club, decade, teammate, club-count, wooden-spoon and minor-premiership criteria count a player merely *listed* by the club that season — verified case by case (Kane Johnson listed at Richmond 2009, Robbie Tarrant at Richmond 2023, the suspended 2016 Essendon players in a wooden-spoon season, Michael Voss's Bears→Lions merger before the fold); AFLDB models games played and has no list data (`NO_LISTS`, §22.3) |
+
+The oracle is therefore exact on what it can be exact about: for every player whose career had
+ended before the board's year, every criterion pair AFLDB holds data for, in both directions, the
+solver and Gridley agree.
+
+**History of the six runs (what each found):** run 1 exposed `brownlow_season_votes.club_id`
+being NULL (club leader over-inclusion), the swapped Josh Kennedy overrides, 61 cells over 1 s
+with a 4.9 s worst case and the `afldb_test` dataset gaps; run 2 (InitPlan shape) fixed the
+slow pairs but timed out on two 13,000-player axes; run 3 (set-then-rank) showed the Bears→Lions
+merger fold was missing from the club-count criteria and that the answer keys are frozen at
+board date; runs 4–5 verified the residual disagreements one by one (all list membership) and
+run 6 is clean.
+
+### 22.10 Exact next action
+
+The branch is complete and green; two things stand between it and closeout, both the operator's:
+
+1. **Read the production journal for the 2026-09-03 crash (read-only, PROD).** Which board timed
+   out is not in telemetry; the journal has it. One command, from PowerShell (the production alias
+   needs the agent-held key):
+
+   ```text
+   ssh -o BatchMode=yes afldb "journalctl -u afldb --since '2026-09-03 05:45' --until '2026-09-03 05:55' --no-pager | grep -v '_next/static' | head -80"
+   ```
+
+   Expected: `PostgresError: canceling statement due to statement timeout`, `code: 57014`,
+   `digest: '1511510695'` and, just above, the request line for `/grid-solver?g=...`. Paste the
+   `g=` token into `parseBoardState` (or the page on DEV) to name the board; record it in §22.5.
+   If the journal has rotated, `journalctl --list-boots` first; if the entry is gone, the
+   identification stands on the digest identity with ISSUE-076's correlated journal and the
+   4 dev events on build `NQrtI3zQGWx62e6zbI5bR`, and the closeout says so.
+   Also worth one read-only check while there: `SELECT relname, last_analyze, last_autoanalyze
+   FROM pg_stat_user_tables WHERE relname IN ('player_match_stats','matches','player_clubs')` —
+   the promotion of 2026-09-02 ran no `ANALYZE` (§22.11).
+
+2. **Merge and deploy `claude/issue-118` to DEV, then PROD, code first.** Migration `080` is
+   for the corpus tables only and is optional on production; it is already on `afldb_dev`.
+   No privileges change is required for the app. After deploy, load `/grid-solver` with the
+   ISSUE-076 board and one of the corpus's heaviest pairs (`teammates-100` × `disposals30`) and
+   confirm every square resolves.
+
+Then close: move `issues/open/AFLDB-ISSUE-118.md` to `issues/closed/`, mark the ledger entry
+Resolved with the production board recorded, retire the row from `IssuesIndex.md` and the Open
+Issues table (3 → 2). Nothing in ISSUE-110 or ISSUE-137 is touched by this branch.
+
+Optional, separately tracked follow-ups (§22.11): refresh `afldb_test` so the `dataset gap`
+line is empty; acquisitions for the 28 data-absent criteria and the three missing clubs'
+captaincies; `ANALYZE` in the promotion procedure.
+
+### 22.11 Follow-up recorded, not carried as open issues
+
+- Data acquisitions that would retire the 28 data-absent criteria: player height (all
+  players), sibling relationships (`player_relationships`), father–son links, coaching
+  tenures, the seven medals, birthplace.
+- `afldb_test` lags `afldb_dev` in ways the corpus exposes: no `matches.match_event` tags
+  (legacy import only), no linked `draft_picks` (5 vs 5,103), no `player_achievements`, no 2026
+  season, `player_career_stats.frees_*` NULL — while dev has only 910 `jumper_number` values
+  against test's 643,114. Families that read those tables pass on test only where test has the
+  data; the run report lists each affected criterion.
+- `docs/production-promotion.md` runs no `ANALYZE` after the restore (§22.5).

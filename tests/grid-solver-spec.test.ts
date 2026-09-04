@@ -113,7 +113,9 @@ describe('isAxisComplete', () => {
 
 describe('GRID_BUILDERS catalogue', () => {
   it('offers AFLPA 22Under22 selection as a dedicated fixed criterion', () => {
-    expect(Object.keys(GRID_BUILDERS)).toHaveLength(108);
+    // 108 before AFLDB-ISSUE-118, which added the 37 builders the Gridley
+    // corpus needed (tests/gridley-compat.test.ts holds the mapping).
+    expect(Object.keys(GRID_BUILDERS)).toHaveLength(145);
     expect(GRID_BUILDERS.under_22_selection).toEqual({
       key: 'under_22_selection',
       label: 'Selected in AFLPA 22Under22 team',

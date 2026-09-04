@@ -343,14 +343,22 @@ set, showing an eligible-player count and a top-ranked answer, with a
 drill-down to the full ranked list.
 
 **Named builders, not user-chosen columns.** `src/search/grid-solver-spec.ts`
-holds `GRID_BUILDERS`: 108 fixed, parameterised questions across eleven
+holds `GRID_BUILDERS`: 137 fixed, parameterised questions across twelve
 categories (clubs & journeys, career milestones, single-game feats,
 season & era, finals & premierships, grounds & venues, rivalries &
 marquee matches, teammates, captaincy, awards & honours, draft &
-recruitment) — checked one category
+recruitment, names & numbers) — the original 108 checked one category
 at a time against the reference's own generated criteria doc
 (`afl_grid_criteria.md`, ~133 questions across 13 categories) and against
-AFLDB's live data, not ported wholesale. Each compiles in
+AFLDB's live data, not ported wholesale, plus 29 added by
+`AFLDB-ISSUE-118` so that every criterion Gridley (gridleygame.com) has
+ever published can be asked here. That corpus — 1,143 boards, 839
+distinct criteria, captured in `external_grids` and exported to
+`tests/fixtures/gridley/` — is mapped onto the catalogue by
+`src/search/gridley-compat.ts` and replayed through the production solver
+by `tests/integration/gridley-corpus.test.ts`; the criteria AFLDB cannot
+answer (player height, siblings, coaches, a handful of medals it does not
+record) are listed there with their reasons rather than approximated. Each compiles in
 `src/db/queries/grid-solver.ts` to a fixed SQL shape with bound
 parameters; there is no request-selected column or operator at all here,
 so most of the catalogue needs no allowlist check beyond "is this a known

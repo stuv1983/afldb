@@ -15,6 +15,39 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-118 — Gridley compatibility corpus and Grid Solver completeness - 4 September 2026
+
+- **Grid Solver catalogue: 108 → 137 builders** (`src/search/grid-solver-spec.ts`,
+  `src/db/queries/grid-solver.ts`): merged-lineage club membership and debut
+  (`played_for_club_incl_merged`, `debut_club_incl_merged`), named-season games and totals,
+  league top-N rank for a stat, club Brownlow-vote leader, played in a win by X+ points, X+
+  consecutive wins, finals winning record, X+ Grand Finals with Y+ of a stat, Grand Final won
+  against a club, premiership captain, club B&F in a premiership season, matchup wins / stat /
+  winning record between two clubs, marquee match won and marquee match between seasons,
+  Gather Round played / stat, All-Australian defender/forward/midfielder and squad-in-season,
+  National Draft pick range, first name in a list, hyphenated surname, guernsey number worn,
+  single-game feat for X+ clubs. New `Names & numbers` group and a `text` parameter kind.
+- **Cell queries are now set-then-rank:** each axis's eligible set is one statement, cells
+  intersect in the application and rank with the ids bound as a hashed constant array; the page
+  shares its six axis sets across nine cells. Removes the Nested Loop Semi Join / Materialize
+  rescans behind ISSUE-076/103 for the whole catalogue (worst corpus cell 10.9 s → 0.06 s). No
+  timeout, index or schema change.
+- **A statement timeout no longer crashes `/grid-solver`:** SQLSTATE 57014 is confined to its
+  square ("Timed out"), logged server-side, everything else still throws
+  (`guardCellTimeout`). Production digest `1511510695` is this timeout class (as ISSUE-076
+  established from the dev journal).
+- **`club_season_brownlow_leader`** takes the club from `player_club_season_stats`, not the
+  NULL `brownlow_season_votes.club_id`.
+- **Gridley corpus retained as a regression asset:** migration `080_external_grids.sql`, the
+  Stage 1/2 importers and acquisition tool (recovered from `opus/gridley-corpus`),
+  `tools/gridley/export_corpus.py`, the deterministic fixtures `tests/fixtures/gridley/corpus.json`
+  and `corpus-answers.json.gz` (1,143 boards, 839 criteria, 1,512,436 answer-key entries),
+  `src/search/gridley-compat.ts` (every criterion mapped or explicitly data-absent),
+  `tests/gridley-compat.test.ts` (offline denominator) and
+  `tests/integration/gridley-corpus.test.ts` (every cell through the production solver,
+  checked against Gridley's own answer keys for the 405 bridged players).
+- `docs/search.md` §7 updated.
+
 ### AFLDB-ISSUE-126 — production-only state recovered after the 2026-09-02 cutover - 4 September 2026
 
 - **Recovered on `afldb_prod`** (from `afldb_prod_auth_recovery` and the pre-cutover dump,

@@ -135,14 +135,70 @@ function careerStatAtLeast(statKey: GridStatKey, n: number): SqlFragment {
  * live_only stats fall back to grouping player_match_stats by player and
  * season only, matching that same whole-season (not per-club-stint) grain.
  */
-function seasonStatAtLeast(statKey: GridStatKey, n: number): SqlFragment {
+function seasonStatAtLeast(statKey: GridStatKey, n: number, seasonYear?: number): SqlFragment {
+  const seasonFilter = seasonYear === undefined ? sql`TRUE` : sql`season = ${seasonYear}`;
   if (GRID_STATS[statKey].grain !== 'live_only') {
-    return sql`p.id IN (SELECT player_id FROM player_season_stats WHERE ${sql.unsafe(statKey)} >= ${n})`;
+    return sql`p.id IN (SELECT player_id FROM player_season_stats WHERE ${seasonFilter} AND ${sql.unsafe(statKey)} >= ${n})`;
   }
+  const matchSeasonFilter = seasonYear === undefined ? sql`TRUE` : sql`m.season = ${seasonYear}`;
   return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                         JOIN matches m ON m.id = pms.match_id
+                       WHERE ${matchSeasonFilter}
                        GROUP BY pms.player_id, m.season
                       HAVING sum(${sql.unsafe(statKey)}) >= ${n})`;
+}
+
+/**
+ * The club identities of one organization plus every organization that
+ * merged into it (club_organization_relations, relation = 'merged_into').
+ * Mergers are link-only in AFLDB's lineage model, so this is opt-in for the
+ * two *_incl_merged builders and nothing else.
+ */
+function clubIdsInclMerged(orgId: number): SqlFragment {
+  return sql`SELECT id FROM clubs
+              WHERE organization_id = ${orgId}
+                 OR organization_id IN (SELECT from_organization_id FROM club_organization_relations
+                                         WHERE to_organization_id = ${orgId} AND relation = 'merged_into')`;
+}
+
+/**
+ * The organization a club identity belongs to once mergers are folded: the
+ * `merged_into` target when one exists, else the organization itself.
+ * `alias` is the clubs-table alias in the enclosing query.
+ */
+function mergedOrgExpr(alias: string): SqlFragment {
+  const org = sql.unsafe(`${alias}.organization_id`);
+  return sql`COALESCE((SELECT r.to_organization_id FROM club_organization_relations r
+                        WHERE r.from_organization_id = ${org} AND r.relation = 'merged_into'), ${org})`;
+}
+
+/** Distinct merged-lineage clubs a player has played for, as a scalar. */
+function mergedClubsPlayed(): SqlFragment {
+  return sql`(SELECT count(DISTINCT ${mergedOrgExpr('cl')}) FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id WHERE pc.player_id = p.id)`;
+}
+
+/** Matches between two organizations, either way round -- shared by the matchup_* builders. */
+function matchupMatchFilter(orgA: number, orgB: number): SqlFragment {
+  return sql`((home.organization_id = ${orgA} AND away.organization_id = ${orgB})
+           OR (home.organization_id = ${orgB} AND away.organization_id = ${orgA}))`;
+}
+
+/**
+ * Gather Round: from 2023, the one home-and-away round each season played
+ * entirely in South Australia. matches carries no round tag for it, so it is
+ * derived from the round's venues -- every match of the round at one of the
+ * four South Australian grounds the round has used. Named venues rather than
+ * venues.state because that column is not populated.
+ */
+function gatherRoundMatchIds(): SqlFragment {
+  return sql`SELECT m.id FROM matches m
+              WHERE m.season >= 2023 AND m.round_type = 'home_and_away'
+                AND (m.season, m.round_number) IN (
+                  SELECT m2.season, m2.round_number
+                    FROM matches m2 JOIN venues v ON v.id = m2.venue_id
+                   WHERE m2.season >= 2023 AND m2.round_type = 'home_and_away'
+                   GROUP BY m2.season, m2.round_number
+                  HAVING bool_and(v.canonical_name IN ('Adelaide Oval', 'Norwood Oval', 'Summit Sports Park', 'Barossa Park')))`;
 }
 
 /**
@@ -206,6 +262,43 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`p.id IN (SELECT player_id FROM player_match_stats
                             WHERE career_game_no = 1
                               AND club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgId}))`;
+    }
+    case 'played_for_club_incl_merged': {
+      const orgId = requireInt(axis, 'club', 'Club');
+      return sql`p.id IN (SELECT pc.player_id FROM player_clubs pc
+                            WHERE pc.club_id IN (${clubIdsInclMerged(orgId)}))`;
+    }
+    case 'debut_club_incl_merged': {
+      const orgId = requireInt(axis, 'club', 'Club');
+      return sql`p.id IN (SELECT player_id FROM player_match_stats
+                            WHERE career_game_no = 1
+                              AND club_id IN (${clubIdsInclMerged(orgId)}))`;
+    }
+    case 'one_club_player_incl_merged':
+      return sql`${mergedClubsPlayed()} = 1`;
+    case 'multi_club_player_incl_merged':
+      return sql`${mergedClubsPlayed()} > 1`;
+    case 'clubs_played_min_incl_merged':
+      return sql`${mergedClubsPlayed()} >= ${requireInt(axis, 'clubs', 'Clubs')}`;
+    case 'games_at_one_club_min_incl_merged': {
+      const n = requireInt(axis, 'games', 'Games');
+      return sql`EXISTS (SELECT 1 FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id
+                          WHERE pc.player_id = p.id
+                          GROUP BY ${mergedOrgExpr('cl')} HAVING sum(pc.games) >= ${n})`;
+    }
+    case 'games_at_multiple_clubs_min_incl_merged':
+    case 'goals_at_multiple_clubs_min_incl_merged': {
+      const column = axis.builder === 'games_at_multiple_clubs_min_incl_merged' ? sql.unsafe('pc.games') : sql.unsafe('pc.goals');
+      const threshold = axis.builder === 'games_at_multiple_clubs_min_incl_merged'
+        ? requireInt(axis, 'games', 'Games') : requireInt(axis, 'goals', 'Goals');
+      const clubs = requireInt(axis, 'clubs', 'Clubs');
+      return sql`(c.clubs_played >= ${clubs} AND (
+                    SELECT count(*) FROM (
+                      SELECT 1 FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id
+                       WHERE pc.player_id = p.id
+                       GROUP BY ${mergedOrgExpr('cl')}
+                      HAVING sum(${column}) >= ${threshold}
+                    ) org) >= ${clubs})`;
     }
     case 'one_club_player':
       return sql`c.clubs_played = 1`;
@@ -343,6 +436,15 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`p.id IN (SELECT player_id FROM player_match_stats WHERE ${sql.unsafe(statKey)} >= ${y}
                            GROUP BY player_id HAVING count(*) >= ${times})`;
     }
+    case 'single_game_stat_multi_club_min': {
+      const statKey = requireStatKey(axis);
+      const x = requireInt(axis, 'x', 'At least');
+      const clubs = requireInt(axis, 'clubs', 'Clubs');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN clubs cl ON cl.id = pms.club_id
+                           WHERE ${sql.unsafe(`pms.${statKey}`)} >= ${x}
+                           GROUP BY pms.player_id HAVING count(DISTINCT ${mergedOrgExpr('cl')}) >= ${clubs})`;
+    }
 
     // -- Season & era -----------------------------------------------------
     case 'debuted_between': {
@@ -422,6 +524,64 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                            WHERE cs.ladder_rank = 1
                            GROUP BY pcs.player_id HAVING count(*) >= ${n})`;
     }
+    case 'games_in_named_season_min': {
+      const seasonYear = requireInt(axis, 'season', 'Season');
+      const n = requireInt(axis, 'games', 'Games');
+      return sql`p.id IN (SELECT player_id FROM player_season_stats WHERE season = ${seasonYear} AND games >= ${n})`;
+    }
+    case 'named_season_stat_total_min':
+      return seasonStatAtLeast(requireStatKey(axis), requireInt(axis, 'x', 'At least'), requireInt(axis, 'season', 'Season'));
+    case 'league_season_stat_rank_top': {
+      // rank() so a tie for the last place is in; a NULL season total is
+      // "not recorded" (docs/data-dictionary.md) and never ranks. live_only
+      // stats are totalled per player-season from player_match_stats first.
+      const statKey = requireStatKey(axis);
+      const place = requireInt(axis, 'place', 'Top place');
+      const col = sql.unsafe(statKey);
+      const totals = GRID_STATS[statKey].grain !== 'live_only'
+        ? sql`SELECT player_id, season, ${col} AS total FROM player_season_stats WHERE ${col} IS NOT NULL`
+        : sql`SELECT pms.player_id, m.season, sum(pms.${col}) AS total
+                FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
+               WHERE pms.${col} IS NOT NULL
+               GROUP BY pms.player_id, m.season`;
+      return sql`p.id IN (SELECT player_id FROM (
+                    SELECT player_id, rank() OVER (PARTITION BY season ORDER BY total DESC) AS rk
+                      FROM (${totals}) t) ranked
+                   WHERE rk <= ${place})`;
+    }
+    case 'club_season_brownlow_leader':
+      // Equal-top counts as "most", like club_season_stat_leader; a club
+      // whose players polled nothing has no leader. The player's club for
+      // the season comes from player_club_season_stats, not from
+      // brownlow_season_votes.club_id, which the season artefact leaves
+      // NULL (it is NULL on every row of afldb_test).
+      return sql`p.id IN (SELECT b.player_id FROM brownlow_season_votes b
+                            JOIN player_club_season_stats pcs ON pcs.player_id = b.player_id AND pcs.season = b.season
+                           WHERE b.player_id IS NOT NULL AND b.votes > 0
+                             AND NOT EXISTS (
+                               SELECT 1 FROM brownlow_season_votes b2
+                                JOIN player_club_season_stats pcs2 ON pcs2.player_id = b2.player_id AND pcs2.season = b2.season
+                                WHERE b2.season = b.season AND pcs2.club_id = pcs.club_id AND b2.votes > b.votes))`;
+    case 'won_by_margin_min': {
+      const margin = requireInt(axis, 'margin', 'Margin');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.winner_club_id = pms.club_id AND m.margin >= ${margin})`;
+    }
+    case 'consecutive_wins_min': {
+      // Runs of wins in the player's OWN game sequence (career_game_no is
+      // dense per player): the gaps-and-islands trick over the games the
+      // player's club won. A bye or a game the player missed breaks nothing
+      // for the team, but breaks the run for the player, which is what
+      // "played in X consecutive wins" asks.
+      const n = requireInt(axis, 'times', 'Wins in a row');
+      return sql`p.id IN (SELECT player_id FROM (
+                    SELECT pms.player_id,
+                           pms.career_game_no - row_number() OVER (PARTITION BY pms.player_id ORDER BY pms.career_game_no) AS grp
+                      FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
+                     WHERE m.winner_club_id = pms.club_id) runs
+                   GROUP BY player_id, grp HAVING count(*) >= ${n})`;
+    }
 
     // -- Finals & premierships ------------------------------------------
     case 'played_in_a_final':
@@ -457,6 +617,16 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                             JOIN clubs cl ON cl.id = pms.club_id
                            WHERE m.is_finals_series
                            GROUP BY pms.player_id HAVING count(DISTINCT cl.organization_id) >= ${n})`;
+    }
+    case 'finals_clubs_min_incl_merged':
+    case 'grand_final_clubs_min_incl_merged': {
+      const n = requireInt(axis, 'clubs', 'Clubs');
+      const matchFilter = axis.builder === 'finals_clubs_min_incl_merged' ? sql`m.is_finals_series` : sql`m.round_type = 'grand_final'`;
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                            JOIN clubs cl ON cl.id = pms.club_id
+                           WHERE ${matchFilter}
+                           GROUP BY pms.player_id HAVING count(DISTINCT ${mergedOrgExpr('cl')}) >= ${n})`;
     }
     case 'final_game_stat_min': {
       const statKey = requireStatKey(axis);
@@ -554,6 +724,45 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                              AND pms2.player_id = ${otherId}
                              AND m.winner_club_id = pms2.club_id)`;
     }
+    case 'finals_winning_record':
+      // Draws are neither; a player whose only finals were drawn has no
+      // winning record.
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.is_finals_series
+                           GROUP BY pms.player_id
+                          HAVING count(*) FILTER (WHERE m.winner_club_id = pms.club_id)
+                               > count(*) FILTER (WHERE m.winner_club_id IS NOT NULL AND m.winner_club_id <> pms.club_id))`;
+    case 'grand_finals_with_stat_min_count': {
+      const statKey = requireStatKey(axis);
+      const y = requireInt(axis, 'y', 'At least (per Grand Final)');
+      const times = requireInt(axis, 'times', 'In this many Grand Finals');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.round_type = 'grand_final' AND ${sql.unsafe(`pms.${statKey}`)} >= ${y}
+                           GROUP BY pms.player_id HAVING count(*) >= ${times})`;
+    }
+    case 'grand_final_won_against_club': {
+      // The beaten side is whichever club in the match is not the player's;
+      // resolved by lineage like every club parameter.
+      const orgId = requireInt(axis, 'club', 'Beaten club');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                            JOIN clubs loser ON loser.id = CASE WHEN m.home_club_id = pms.club_id THEN m.away_club_id ELSE m.home_club_id END
+                           WHERE m.round_type = 'grand_final' AND m.winner_club_id = pms.club_id
+                             AND loser.organization_id = ${orgId})`;
+    }
+    case 'premiership_captain':
+      // Captain of the club that season (captaincies, linked rows) AND on the
+      // winning side of that season's Grand Final -- "won a premiership while
+      // captaining", not merely captain of a club that happened to win.
+      return sql`p.id IN (SELECT cp.player_id FROM captaincies cp
+                           WHERE cp.player_id IS NOT NULL AND cp.link_status_value IN ('unique', 'resolved')
+                             AND EXISTS (
+                               SELECT 1 FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
+                                WHERE pms.player_id = cp.player_id AND pms.club_id = cp.club_id
+                                  AND m.season = cp.season AND m.round_type = 'grand_final'
+                                  AND m.winner_club_id = pms.club_id))`;
 
     // -- Grounds & venues -------------------------------------------------
     case 'played_at_venue': {
@@ -642,9 +851,65 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                             JOIN matches m ON m.id = pms.match_id
                             JOIN clubs home ON home.id = m.home_club_id
                             JOIN clubs away ON away.id = m.away_club_id
-                           WHERE (home.organization_id = ${orgA} AND away.organization_id = ${orgB})
-                              OR (home.organization_id = ${orgB} AND away.organization_id = ${orgA})
+                           WHERE ${matchupMatchFilter(orgA, orgB)}
                            GROUP BY pms.player_id HAVING count(*) >= ${n})`;
+    }
+    case 'match_event_won': {
+      const event = requireParam(axis, 'event', 'Marquee match');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.match_event = ${event} AND m.winner_club_id = pms.club_id)`;
+    }
+    case 'match_event_played_between': {
+      const event = requireParam(axis, 'event', 'Marquee match');
+      const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                           WHERE m.match_event = ${event} AND m.season BETWEEN ${lo} AND ${hi})`;
+    }
+    case 'matchup_won_min': {
+      const orgA = requireInt(axis, 'clubA', 'Club A');
+      const orgB = requireInt(axis, 'clubB', 'Club B');
+      const n = requireInt(axis, 'times', 'Wins');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                            JOIN clubs home ON home.id = m.home_club_id
+                            JOIN clubs away ON away.id = m.away_club_id
+                           WHERE ${matchupMatchFilter(orgA, orgB)} AND m.winner_club_id = pms.club_id
+                           GROUP BY pms.player_id HAVING count(*) >= ${n})`;
+    }
+    case 'matchup_game_stat_min': {
+      const orgA = requireInt(axis, 'clubA', 'Club A');
+      const orgB = requireInt(axis, 'clubB', 'Club B');
+      const statKey = requireStatKey(axis);
+      const n = requireInt(axis, 'x', 'At least');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                            JOIN clubs home ON home.id = m.home_club_id
+                            JOIN clubs away ON away.id = m.away_club_id
+                           WHERE ${matchupMatchFilter(orgA, orgB)} AND ${sql.unsafe(`pms.${statKey}`)} >= ${n})`;
+    }
+    case 'matchup_winning_record': {
+      const orgA = requireInt(axis, 'clubA', 'Club A');
+      const orgB = requireInt(axis, 'clubB', 'Club B');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN matches m ON m.id = pms.match_id
+                            JOIN clubs home ON home.id = m.home_club_id
+                            JOIN clubs away ON away.id = m.away_club_id
+                           WHERE ${matchupMatchFilter(orgA, orgB)}
+                           GROUP BY pms.player_id
+                          HAVING count(*) FILTER (WHERE m.winner_club_id = pms.club_id)
+                               > count(*) FILTER (WHERE m.winner_club_id IS NOT NULL AND m.winner_club_id <> pms.club_id))`;
+    }
+    case 'gather_round_played':
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                           WHERE pms.match_id IN (${gatherRoundMatchIds()}))`;
+    case 'gather_round_game_stat_min': {
+      const statKey = requireStatKey(axis);
+      const n = requireInt(axis, 'x', 'At least');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                           WHERE pms.match_id IN (${gatherRoundMatchIds()})
+                             AND ${sql.unsafe(`pms.${statKey}`)} >= ${n})`;
     }
 
     // -- Teammates -- the same self-join as getPlayerOverlapSummary
@@ -861,6 +1126,33 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                            WHERE a.slug = 'rising-star' AND n.season = ${seasonYear}
                              AND n.player_id IS NOT NULL AND n.link_status_value IN ('unique', 'resolved'))`;
     }
+    case 'all_australian_defender':
+    case 'all_australian_forward':
+    case 'all_australian_midfielder': {
+      const positions = axis.builder === 'all_australian_defender' ? ['FB', 'BP', 'CHB', 'HBF']
+        : axis.builder === 'all_australian_forward' ? ['FF', 'FP', 'CHF', 'HFF']
+          : ['C', 'W', 'RR', 'Ro'];
+      return sql`p.id IN (SELECT w.player_id FROM award_winners w
+                            JOIN awards a ON a.id = w.award_id
+                           WHERE a.slug = 'all-australian' AND w.position = ANY(${positions})
+                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
+    }
+    case 'all_australian_squad_in_season': {
+      const seasonYear = requireInt(axis, 'season', 'Season');
+      return sql`p.id IN (SELECT w.player_id FROM award_winners w
+                            JOIN awards a ON a.id = w.award_id
+                           WHERE a.slug IN ('all-australian-squad', 'all-australian') AND w.season = ${seasonYear}
+                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
+    }
+    case 'best_and_fairest_in_premiership_season':
+      // The club the player represented that season (player_club_season_stats)
+      // won the flag (club_seasons.is_premier) in the season of the B&F.
+      return sql`p.id IN (SELECT w.player_id FROM award_winners w
+                            JOIN awards a ON a.id = w.award_id
+                            JOIN player_club_season_stats pcs ON pcs.player_id = w.player_id AND pcs.season = w.season
+                            JOIN club_seasons cs ON cs.season = pcs.season AND cs.club_id = pcs.club_id
+                           WHERE a.category = 'club_best_and_fairest' AND cs.is_premier
+                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
 
     // -- Draft & recruitment -- draft_picks_link_ck (migration 019)
     // already guarantees link_status_value IN ('unique','resolved')
@@ -914,6 +1206,30 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                             WHERE link_status_value IN ('unique', 'resolved') AND draft_kind = 'trade'
                            GROUP BY player_id HAVING count(*) >= ${n})`;
     }
+    case 'national_draft_pick_between': {
+      const [lo, hi] = orderedRange(axis, 'from', 'From pick', 'to', 'To pick');
+      return sql`p.id IN (SELECT player_id FROM draft_picks
+                            WHERE link_status_value IN ('unique', 'resolved') AND draft_kind = 'national'
+                              AND pick_number BETWEEN ${lo} AND ${hi})`;
+    }
+
+    // -- Names & numbers ---------------------------------------------------
+    case 'given_name_in': {
+      // A bound text array, compared against the first given name, case-
+      // insensitively. Never an identifier.
+      const names = requireParam(axis, 'names', 'Names')
+        .split(',').map((s) => s.trim().toLowerCase()).filter((s) => s !== '');
+      if (names.length === 0) throw new Error('Names is required.');
+      return sql`lower(split_part(p.given_name, ' ', 1)) = ANY(${names})`;
+    }
+    case 'surname_hyphenated':
+      return sql`p.surname LIKE '%-%'`;
+    case 'jumper_number_worn': {
+      // jumper_number is text as captured from the source; the bound
+      // value is the integer's canonical decimal form.
+      const number = requireInt(axis, 'number', 'Number');
+      return sql`p.id IN (SELECT player_id FROM player_match_stats WHERE jumper_number = ${String(number)})`;
+    }
 
     default:
       throw new Error(`Builder "${axis.builder}" has no compiler.`);
@@ -927,10 +1243,84 @@ const GRID_ORDER_SQL: Record<GridOrder, string> = {
   debut_desc: 'c.debut_season DESC NULLS LAST, p.sort_name',
 };
 
-/** AND-folds any number of axes into one WHERE fragment. `TRUE` for zero axes, same convention as filters.ts's allOf. */
-function andAxes(axes: readonly GridAxisState[]): SqlFragment {
-  if (axes.length === 0) return sql`TRUE`;
-  return axes.map((axis) => compileAxis(axis)).reduce((acc, fragment) => sql`${acc} AND ${fragment}`);
+/**
+ * The eligible players of one axis, as a plain id list, from the same base
+ * relation the cell query ranks. Each axis is its own statement, so the
+ * per-predicate query shapes tuned over ISSUE-076/ISSUE-103 and the Gridley
+ * corpus (AFLDB-ISSUE-118) run exactly as measured, one at a time.
+ *
+ * Before ISSUE-118 a cell ANDed the two raw fragments in one statement and
+ * PostgreSQL planned many `p.id IN (subquery)` pairs as a Nested Loop Semi
+ * Join over a Materialize node rescanned once per player: e.g.
+ * won_by_margin_min x played_for_club_incl_merged took 10.9 s that way
+ * (0.06 s as two sets), season_stat_avg_min x won_a_final 7.5 s. A scalar
+ * InitPlan array (`p.id = ANY(ARRAY(...))`) fixed those but is a linear scan
+ * per row and timed out on two 13,000-player axes; an INTERSECT re-planned
+ * the same joins. Fetching each set and intersecting here is O(n) per axis,
+ * and the ranked read below binds the intersection as a constant array,
+ * which PostgreSQL hashes.
+ *
+ * `cache` lets one board share its six axis sets across nine cells.
+ */
+export type AxisSetCache = Map<string, Promise<Set<number>>>;
+
+export function createAxisSetCache(): AxisSetCache {
+  return new Map();
+}
+
+async function fetchAxisPlayerIds(axis: GridAxisState): Promise<Set<number>> {
+  const rows = await sql<{ id: number }[]>`
+    SELECT p.id FROM players p JOIN player_career_stats c ON c.player_id = p.id
+     WHERE ${compileAxis(axis)}
+  `;
+  return new Set(rows.map((r) => r.id));
+}
+
+export function axisPlayerIds(axis: GridAxisState, cache?: AxisSetCache): Promise<Set<number>> {
+  if (!cache) return fetchAxisPlayerIds(axis);
+  const key = JSON.stringify([axis.builder, axis.params]);
+  let pending = cache.get(key);
+  if (!pending) {
+    pending = fetchAxisPlayerIds(axis);
+    cache.set(key, pending);
+  }
+  return pending;
+}
+
+/** The ids satisfying every axis: the intersection of their sets, smallest first. */
+async function eligiblePlayerIds(axes: readonly GridAxisState[], cache?: AxisSetCache): Promise<number[] | null> {
+  if (axes.length === 0) return null; // every player
+  const sets = await Promise.all(axes.map((axis) => axisPlayerIds(axis, cache)));
+  sets.sort((a, b) => a.size - b.size);
+  let ids = [...sets[0]];
+  for (const other of sets.slice(1)) ids = ids.filter((id) => other.has(id));
+  return ids;
+}
+
+/** PostgreSQL SQLSTATE 57014: the statement hit AFLDB_STATEMENT_TIMEOUT_MS and was cancelled. */
+export function isStatementTimeout(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === '57014';
+}
+
+export type GridCellOutcome<T> = { status: 'solved'; value: T } | { status: 'timeout' };
+
+/**
+ * Confine one cell's statement timeout to that cell. Before AFLDB-ISSUE-118
+ * a single 57014 anywhere in the nine solves rejected the page's
+ * Promise.all and the whole route rendered the error boundary (Next digest
+ * 1511510695 in production telemetry, the same digest ISSUE-076 traced to
+ * 57014 on dev). The timeout is still a defect to fix at the query -- the
+ * Gridley corpus suite gates every predicate -- but it is a defect in one
+ * square, so it is reported as one square. Anything that is not a
+ * timeout still throws.
+ */
+export async function guardCellTimeout<T>(work: () => Promise<T>): Promise<GridCellOutcome<T>> {
+  try {
+    return { status: 'solved', value: await work() };
+  } catch (err) {
+    if (isStatementTimeout(err)) return { status: 'timeout' };
+    throw err;
+  }
 }
 
 export type GridCellSummary = {
@@ -950,30 +1340,37 @@ export async function solveCellSummary(
   row: GridAxisState,
   col: GridAxisState,
   order: GridOrder,
+  cache?: AxisSetCache,
 ): Promise<GridCellSummary> {
-  const where = andAxes([row, col]);
+  const ids = await eligiblePlayerIds([row, col], cache);
+  if (ids !== null && ids.length === 0) return { eligible: 0, top: null };
 
-  const rows = await sql<{
+  const [top] = await sql<{
     id: number; slug: string; displayName: string;
-    debutSeason: number | null; finalSeason: number | null; games: number; total: string;
+    debutSeason: number | null; finalSeason: number | null; games: number;
   }[]>`
     SELECT p.id, p.slug, p.display_name AS "displayName",
-           c.debut_season AS "debutSeason", c.final_season AS "finalSeason", c.games,
-           count(*) OVER () AS total
+           c.debut_season AS "debutSeason", c.final_season AS "finalSeason", c.games
       FROM players p JOIN player_career_stats c ON c.player_id = p.id
-     WHERE ${where}
+     WHERE ${ids === null ? sql`TRUE` : sql`p.id = ANY(${ids}::int[])`}
      ORDER BY ${sql.unsafe(GRID_ORDER_SQL[order])}
      LIMIT 1
   `;
-  const [top] = rows;
   if (!top) return { eligible: 0, top: null };
   return {
-    eligible: Number(top.total),
+    eligible: ids === null ? await countAllPlayers() : ids.length,
     top: {
       id: top.id, slug: top.slug, displayName: top.displayName,
       debutSeason: top.debutSeason, finalSeason: top.finalSeason, games: top.games,
     },
   };
+}
+
+async function countAllPlayers(): Promise<number> {
+  const [row] = await sql<{ total: string }[]>`
+    SELECT count(*) AS total FROM players p JOIN player_career_stats c ON c.player_id = p.id
+  `;
+  return Number(row.total);
 }
 
 export type GridCellRow = {
@@ -998,33 +1395,24 @@ export async function solvePredicates(
   axes: readonly GridAxisState[],
   order: GridOrder,
   options: { limit: number; offset: number },
+  cache?: AxisSetCache,
 ): Promise<{ rows: GridCellRow[]; total: number }> {
-  const where = andAxes(axes);
+  const ids = await eligiblePlayerIds(axes, cache);
   const limit = Math.min(Math.max(1, options.limit), GRID_LIMITS.maxRowsPerCell);
   const offset = Math.max(0, options.offset);
+  const total = ids === null ? await countAllPlayers() : ids.length;
+  if (total === 0 || offset >= total) return { rows: [], total };
 
-  const rows = await sql<(GridCellRow & { total: string })[]>`
+  const rows = await sql<GridCellRow[]>`
     SELECT p.id, p.slug, p.display_name AS "displayName",
            c.debut_season AS "debutSeason", c.final_season AS "finalSeason",
-           c.games, c.goals,
-           count(*) OVER () AS total
+           c.games, c.goals
       FROM players p JOIN player_career_stats c ON c.player_id = p.id
-     WHERE ${where}
+     WHERE ${ids === null ? sql`TRUE` : sql`p.id = ANY(${ids}::int[])`}
      ORDER BY ${sql.unsafe(GRID_ORDER_SQL[order])}
      LIMIT ${limit} OFFSET ${offset}
   `;
-  if (rows.length > 0) {
-    return { rows: rows.map(({ total: _total, ...rest }) => rest), total: Number(rows[0].total) };
-  }
-
-  // Same reason as getPlayerMatches/listPlayers: a window count cannot
-  // survive an empty page (an offset past the end, or eligible=0 outright).
-  const [counted] = await sql<{ total: string }[]>`
-    SELECT count(*) AS total
-      FROM players p JOIN player_career_stats c ON c.player_id = p.id
-     WHERE ${where}
-  `;
-  return { rows: [], total: Number(counted.total) };
+  return { rows, total };
 }
 
 /** The ranked list for one grid-solver cell (a row axis and a column axis), paged -- for the drill-down section. */
@@ -1033,6 +1421,7 @@ export async function solveCellRows(
   col: GridAxisState,
   order: GridOrder,
   options: { limit: number; offset: number },
+  cache?: AxisSetCache,
 ): Promise<{ rows: GridCellRow[]; total: number }> {
-  return solvePredicates([row, col], order, options);
+  return solvePredicates([row, col], order, options, cache);
 }

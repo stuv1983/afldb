@@ -7,7 +7,8 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 2 tracked here — `AFLDB-ISSUE-110`, `-137`.
+**Open issues:** 3 tracked here — `AFLDB-ISSUE-110`, `-118`, `-137`.
+<!-- 2026-09-04: `-118` (Gridley compatibility corpus) restored to this table by its own branch; it was allocated 2026-08-31 on `opus/gridley-corpus` and never listed on `main`; 2 -> 3. -->
 <!-- 2026-09-04: `-126` Resolved (production-only cutover state recovered and accepted; recovery database still retained); 3 -> 2. -->
 <!-- 2026-09-04: `-125` Resolved (production promotion procedure + read-only checker); 4 -> 3. -->
 <!-- Count corrected 2026-09-04: `-104` removed by its own closeout (Resolved — closed as not
@@ -138,6 +139,7 @@ created, reopened, resolved, or materially reclassified.
      `AFLDB-ISSUE-136` entry below (Resolution, 2026-09-04) and `issues/closed/AFLDB-ISSUE-136.md` §13.
      Follow-up: `AFLDB-ISSUE-137` (production still split). -->
 | `AFLDB-ISSUE-137` | High | Data integrity / Operations / Database (production) | Production `afldb_prod` still holds the four canonical player splits that `AFLDB-ISSUE-136` fixed at rebuild time: Charlie Cameron, Jack Graham, Jack Ross and Jack Williams each exist as a career player and a 2025-only duplicate keyed on the renumbered AFL Tables url (`Charlie_Cameron3`, `Jack_Graham2`, `Jack_Ross3`, `Jack_Williams3`), with the duplicates carrying their 2025 `player_match_stats`, the awards-census rows keyed on the live urls, and every 2026 settle row. The fixed importer HALTs (`external-identity split`) against such a database by design, so production cannot be repaired by re-running it. Allocated 2026-09-04 at ISSUE-136 closeout; **not started; no production mutation authorised yet.** | Operator chooses the repair path: (a) the canonical rebuild-and-promote path (`AFLDB-ISSUE-125` governs preserving production-only state), or (b) a supervised identity reconciliation that re-points each renumbered identity, its `player_match_stats`, award rows and settle-written rows to the career player and retires the duplicate, verified with the ISSUE-136 runbook §10.3 / §13.4 SQL. Until then every 2026 settle keeps writing the four players' rows to the duplicates. |
+| `AFLDB-ISSUE-118` | Medium | Grid Solver / External datasets / Performance | Gridley compatibility corpus. Stage 0–2 (recovered from `opus/gridley-corpus`) captured all 1,143 Gridley boards into `external_grids`; on `claude/issue-118` the corpus is exported as a deterministic fixture (`tests/fixtures/gridley/`), every one of its 839 criteria is mapped to an exact solver axis or an explicit data-absent reason (`src/search/gridley-compat.ts`: 810 mapped, 1 freebie, 28 data-absent, 0 unrecognised), 37 builders were added (108 → 145), and `tests/integration/gridley-corpus.test.ts` replays all 10,287 cells through the production solver against Gridley's own answer keys. The `/grid-solver` crash digest `1511510695` is the PostgreSQL 57014 statement timeout (as ISSUE-076 established from the dev journal): cells now solve set-then-rank (worst corpus cell 10.9 s → 0.06 s) and a timeout is confined to its square. **Implementation and validation complete on the branch; not merged, not deployed.** | Operator: read the production journal for 2026-09-03 05:49 (`journalctl -u afldb --since "2026-09-03 05:45" --until "2026-09-03 05:55"`, read-only) to record which board timed out, then close: move the runbook to `issues/closed/`, retire this row. Deploy order: code only (migration 080 is for the corpus tables and is optional on production). |
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-131` (an upstream match rekey duplicates the canonical match)
      is **Resolved** and is NO LONGER an open issue. The fail-closed rekey-in-place fix is merged
      (`657a875`) and deployed; runbook §8's production acceptance is reconstructed and accepted in
@@ -12042,6 +12044,51 @@ never committed and dev was rebuilt/restarted clean.
 
 Launch precondition satisfied for dev; the same re-adjudication still applies before
 disabling `AFLDB_BETA_GATE` in production.
+
+## AFLDB-ISSUE-118 — Gridley compatibility corpus: every stored Gridley question answerable by the Grid Solver
+
+- **Status:** Open — implementation and validation complete on `claude/issue-118`; closes on the production journal read in §Next action
+- **Severity:** Medium
+- **Area:** Grid Solver / External datasets / Performance
+- **Found:** 2026-08-31 (Stage 0 on `opus/gridley-corpus`)
+- **Runbook:** `issues/open/AFLDB-ISSUE-118.md` (§22 is current; §1–§21 are the recovered Stage 0–2 history)
+- **Files:** `src/search/grid-solver-spec.ts`, `src/db/queries/grid-solver.ts`, `src/search/gridley-compat.ts`, `src/app/grid-solver/page.tsx`, `src/app/grid-solver/GridSolverForm.tsx`, `tools/gridley/export_corpus.py`, `tests/fixtures/gridley/`, `tests/gridley-compat.test.ts`, `tests/integration/gridley-corpus.test.ts`, `tests/grid-solver-timeout.test.ts`, `src/db/migrations/080_external_grids.sql`, `tools/migration/import_external_grids.py`, `tools/migration/acquire_gridley_boards.py`, `tools/migration/import_gridley_boards.py`
+- **Related:** `AFLDB-ISSUE-076` and `AFLDB-ISSUE-103` (the same statement-timeout digest, two earlier predicates); `AFLDB-ISSUE-119` (renumbered away from 118)
+
+### Goal
+Prove that every valid Gridley (gridleygame.com) question AFLDB has captured and stored can be answered correctly by the AFLDB Grid Solver, exhaustively, and resolve the production `/grid-solver` crashes of 2026-09-03 05:49 (Next digest `1511510695`).
+
+### Corpus
+1,143 boards (#1 2023-07-17 → #1143 2026-09-01) captured by Stage 2 into `external_grids` on `afldb_dev` (the git-ignored raw snapshot did not survive the deleted worktree; the database copy did, as §10.3 intended). Exported by `tools/gridley/export_corpus.py` to `tests/fixtures/gridley/corpus.json` (boards and criteria) and `corpus-answers.json.gz` (Gridley's own per-cell answer keys, 1,512,436 entries), byte-deterministic.
+
+| Denominator | |
+|---|---:|
+| boards / cells / criterion occurrences | 1,143 / 10,287 / 6,858 |
+| unique criteria | 839 |
+| mapped to a solver axis | 810 (6,590 occurrences) |
+| freebie ("select any player") | 1 |
+| data absent in AFLDB, reason recorded | 28 (267 occurrences) |
+| malformed / unrecognised | 0 |
+
+### Root causes and fixes
+1. **Missing builders.** 29 Gridley questions had AFLDB data but no builder: merged-lineage club membership (Brisbane Lions incl. Fitzroy/Bears), named-season totals, league top-N rank, club Brownlow leader, margin and win-streak, finals winning record, repeated Grand Final feats, Grand Final won against a club, premiership captain, B&F in a premiership year, matchup wins/stats/records, marquee-match wins and season bounds (Big Freeze), Gather Round (derived from the all-South-Australia round), All-Australian position groups and squad, national-draft-only picks, first-name/hyphenated-surname/guernsey-number facts, single-game feat at two clubs. Added to `GRID_BUILDERS` (108 → 137) with compilers.
+2. **Mapping.** `src/search/gridley-compat.ts` maps every criterion id to an exact axis or an explicit data-absent reason; rules pin Gridley's titles so a redefinition fails rather than mapping to the old meaning. Semantics decided from Gridley's own descriptions and answer keys; the five ambiguous player names were settled against those keys (`PLAYER_OVERRIDES`).
+3. **`club_season_brownlow_leader`** first read `brownlow_season_votes.club_id`, which the season artefact leaves NULL; it now takes the club from `player_club_season_stats`.
+4. **Cell query shape (the crash).** Digest `1511510695` is `djb2(message+stack)` of a PostgreSQL 57014 statement timeout, exactly as `AFLDB-ISSUE-076` had correlated it with `journalctl` on the dev build the telemetry names; the corpus reproduced the class at cell level (`won_by_margin_min × played_for_club_incl_merged` 10.9 s, `season_stat_avg_min × won_a_final` 7.5 s: Nested Loop Semi Join over a rescanned Materialize). A cell now fetches each axis's player set as its own statement, intersects in the application and ranks with the intersection bound as a constant array (hashed by PostgreSQL); the page shares the six axis sets across its nine cells. No timeout increase, index or schema change.
+5. **Page isolation.** A 57014 in one square renders that square as "Timed out" instead of the route's error boundary (`guardCellTimeout`, only SQLSTATE 57014, everything else still throws).
+
+### Validation
+- DB-free: `tests/gridley-compat.test.ts` + `tests/grid-solver-spec.test.ts` + `tests/grid-solver-timeout.test.ts` + `tests/grid-solver-under22.test.ts` **38/38**; recovered `tests/gridley-acquisition.test.ts` + `tests/external-grids-import.test.ts` **92/92**.
+- `afldb_test`: `tests/integration/grid-solver.test.ts` **172/172** (every one of the 145 builders compiles and solves; the ISSUE-076 and ISSUE-103 timing guards hold); `tests/integration/gridley-corpus.test.ts` **1,161/1,161** — 9,141 cells solved through `solveCellSummary`, 0 query failures, 0 timeouts, 0 empty answers, 0 count mismatches, 0 incorrect known answers among fair comparisons (401 bridged players, retired before the board); cell p50/p99/max 41 ms / 523 ms / 2,061 ms, no criterion or cell over the 4 s guard. Counted, named, not failed: 795 `unsupported` cells (the 28 data-absent criteria), 353 `dataset gap` cells (afldb_test lacks draft links, marquee tags and the 2026 season), 506 `partial dataset` checks (captaincies lack Geelong/Hawthorn/West Coast), 12,531 `time of board` checks (Gridley's answer keys are frozen at the board's date), 809 `list membership` checks (Gridley counts players merely listed by a club that season). Runbook §22.9.1.
+- `npx tsc --noEmit` clean; `eslint` on every changed file: 0 problems.
+
+### Not modelled (explicit, not approximated)
+Player height, siblings, father–son links, coaches, seven medals AFLDB does not record, birthplace, International Rules/NFL careers, after-the-siren winners, spoils, age on debut, current-season lists (Gridley's club criteria also include "currently on their list", which AFLDB cannot represent). Listed with reasons in `tests/gridley-compat.test.ts` and runbook §22.3.
+
+### Next action
+Operator: read the production journal for 2026-09-03 05:45–05:55 (read-only; runbook §22.10 has the command and what to expect) to name the board that timed out, then merge and deploy the branch (code first; migration `080` optional on production) and close — runbook to `issues/closed/`, this entry Resolved with the board recorded, row retired from `IssuesIndex.md` and the Open Issues table. Do not touch ISSUE-110 or ISSUE-137.
+
+---
 
 ## AFLDB-ISSUE-119 — Super Admin can clear NL search telemetry
 
