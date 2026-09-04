@@ -9,3 +9,9 @@
 docs/rebuild-manifests/**       text eol=lf
 data/reference/*.json           text eol=lf
 tools/rebuild/**/*.json          text eol=lf
+
+# AFLDB-ISSUE-113 — the season-grain Brownlow artefact, its manifest and the identity
+# adjudication file are hash-bound (manifest csv_sha256 / identity.csv_sha256), so their
+# bytes must be identical on every platform.
+data/brownlow/*.csv             text eol=lf
+data/brownlow/*.json            text eol=lf

@@ -26,6 +26,12 @@ import {
   AWARDS_HONOURS_EXPECTED,
   AWARDS_HONOURS_GROUPS,
   awardsHonoursChecks,
+  BROWNLOW_SEASON_LOADER,
+  BROWNLOW_SEASON_PREFLIGHT_FILES,
+  brownlowSeasonChecks,
+  brownlowSeasonExpected,
+  brownlowSeasonImportArgv,
+  brownlowSeasonValidateArgv,
   buildFinalValidationSql,
   executeRebuild,
   finalValidationChecks,
@@ -727,25 +733,79 @@ describe('stage graph', () => {
     // nothing new imports. See 'ladder witness cross-check' below.
     expect(idsOf(stages)).toEqual([
       'precheck', 'recreate', 'migrations', 'privileges',
-      'reference', 'fitzroy', 'draftguru', 'awards-honours', 'derived',
-      'coleman', 'ladder-witness', 'fingerprints',
+      'reference', 'fitzroy', 'draftguru', 'awards-honours', 'brownlow-season',
+      'derived', 'coleman', 'ladder-witness', 'fingerprints',
     ]);
   });
 
-  it('adds exactly two data stages beyond the four, neither of which acquires', () => {
+  it('adds exactly three data stages beyond the four, none of which acquires', () => {
     // AFLDB-ISSUE-111. 'coleman' is the fifth DATA stage. It is admitted because it
     // acquires nothing: no legacy SQLite, no manifest, no network — it reads AFLDB's own
     // canonical match facts and writes the award they imply.
     // AFLDB-ISSUE-112. 'awards-honours' is the sixth. It acquires nothing either: every
     // family reads a tracked manifest checked in under data/awards/, and the legacy
     // SQLite source is never wired back in (operator decision 8).
+    // AFLDB-ISSUE-113. 'brownlow-season' is the seventh, for the same reason: it reads
+    // the tracked artefact under data/brownlow/ — a re-keyed read-only export of the
+    // preserved authoritative table — and never the legacy SQLite or the network.
     expect(idsOf(stages.filter((s) => s.kind === 'data')))
-      .toEqual(['reference', 'fitzroy', 'draftguru', 'awards-honours', 'derived',
-                'coleman']);
+      .toEqual(['reference', 'fitzroy', 'draftguru', 'awards-honours', 'brownlow-season',
+                'derived', 'coleman']);
     const coleman = stages.find((s) => s.id === 'coleman')!;
     expect(coleman.argv).toEqual([
       resolvePython(), 'tools/migration/import_awards.py', '--groups', 'coleman',
     ]);
+  });
+
+  describe('brownlow season (AFLDB-ISSUE-113 §8.6)', () => {
+    const brownlow = stages.find((s) => s.id === 'brownlow-season')!;
+
+    it('runs after AWARDS & HONOURS and before DERIVED', () => {
+      const ids = idsOf(stages);
+      // fitzroy supplies players and the profile identities every row resolves
+      // through; derived reads the table this stage writes.
+      expect(ids.indexOf('fitzroy')).toBeLessThan(ids.indexOf('brownlow-season'));
+      expect(ids.indexOf('awards-honours')).toBeLessThan(ids.indexOf('brownlow-season'));
+      expect(ids.indexOf('brownlow-season')).toBeLessThan(ids.indexOf('derived'));
+    });
+
+    it('is a data stage that runs the dedicated loader with no legacy source', () => {
+      expect(brownlow.kind).toBe('data');
+      expect(brownlow.argv).toEqual([resolvePython(), BROWNLOW_SEASON_LOADER]);
+      expect(brownlow.argv).toEqual(brownlowSeasonImportArgv());
+      expect(brownlow.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+      expect(brownlow.envOverlay).not.toHaveProperty('AFLDB_LEGACY_SQLITE');
+    });
+
+    it('preflights the tracked artefact, manifest and adjudication file offline', () => {
+      expect(BROWNLOW_SEASON_PREFLIGHT_FILES).toEqual([
+        'data/brownlow/season-votes.csv',
+        'data/brownlow/season-votes.manifest.json',
+        'data/brownlow/player-identity.csv',
+      ]);
+      expect(brownlowSeasonValidateArgv()).toEqual([
+        resolvePython(), BROWNLOW_SEASON_LOADER, '--validate-only',
+      ]);
+      const draftguruOk = 'snapshot : x (42 year pages, sha256 verified)\n'
+        + 'persons    : 5057\npicks      : 6810\n';
+      const withBrownlow = (status: number): Deps => ({
+        ...fakeDeps().deps,
+        runCommand: (a: string[]) => (a.includes(BROWNLOW_SEASON_LOADER)
+          ? { status, stdout: status ? '{"ok": false, "error": "sha256 mismatch"}' : '{"ok": true}', stderr: '' }
+          : { status: 0, stdout: draftguruOk, stderr: '' }),
+      });
+      expect(() => runPreflight(withBrownlow(0), OPTS)).not.toThrow();
+      // A failing self-validation refuses before anything is destroyed.
+      expect(() => runPreflight(withBrownlow(1), OPTS)).toThrow(RebuildRefused);
+      expect(() => runPreflight(withBrownlow(1), OPTS)).toThrow(/Nothing has been destroyed/);
+      // A missing tracked input refuses too.
+      const missing: Deps = {
+        ...withBrownlow(0),
+        fileExists: (path) => !path.endsWith('season-votes.manifest.json'),
+      };
+      expect(() => runPreflight(missing, OPTS))
+        .toThrow(/required tracked input is missing: data\/brownlow\/season-votes\.manifest\.json/);
+    });
   });
 
   describe('awards & honours (AFLDB-ISSUE-112 §7/§24)', () => {
@@ -1343,6 +1403,79 @@ describe('final validation', () => {
     it('renders every awards gate into the executed stream', () => {
       const sql = finalValidationSql();
       for (const check of awardsHonoursChecks(2025)) {
+        expect(sql).toContain(check.key);
+      }
+    });
+  });
+
+  describe('brownlow season gates (AFLDB-ISSUE-113)', () => {
+    const manifest = JSON.parse(readFileSync(
+      join(root, 'data', 'brownlow', 'season-votes.manifest.json'), 'utf8')) as {
+        artefact: Record<string, number>;
+      };
+    const gate = (key: string) =>
+      finalValidationChecks(measuredRegister({ matches: 1, seasons_last: 2025 }))
+        .find((c) => c.key === key);
+
+    it('reads its expected values from the tracked manifest, never a literal', () => {
+      const e = brownlowSeasonExpected();
+      expect(e).toEqual({
+        rows: manifest.artefact.rows,
+        votesTotal: manifest.artefact.votes_total,
+        winners: manifest.artefact.winners,
+        seasons: manifest.artefact.seasons,
+        firstSeason: manifest.artefact.first_season,
+        lastSeason: manifest.artefact.last_season,
+      });
+      // The measured recovery-source contract (§8.11), asserted here so a regenerated
+      // artefact that silently shrank is caught before it is loaded anywhere.
+      expect(e.rows).toBe(16_120);
+      expect(e.votesTotal).toBe(79_113);
+      expect(e.winners).toBe(112);
+      expect(e.seasons).toBe(98);
+      expect(e.firstSeason).toBe(1924);
+      expect(e.lastSeason).toBe(2025);
+    });
+
+    it('gates rows, total votes, winners and season count at the manifest values', () => {
+      const e = brownlowSeasonExpected();
+      expect(gate('brownlow_season_rows')?.expected).toBe(e.rows);
+      expect(gate('brownlow_season_votes_total')?.expected).toBe(e.votesTotal);
+      expect(gate('brownlow_season_winners')?.expected).toBe(e.winners);
+      expect(gate('brownlow_season_seasons')?.expected).toBe(e.seasons);
+      expect(gate('brownlow_season_first_season')?.expected).toBe(e.firstSeason);
+      expect(gate('brownlow_season_last_season')?.expected).toBe(e.lastSeason);
+    });
+
+    it('refuses rows with foreign provenance or a non-profile key', () => {
+      expect(gate('brownlow_season_rows_not_sourced_from_afltables')?.expected).toBe(0);
+      expect(gate('brownlow_season_rows_not_keyed_by_profile_path')?.sql)
+        .toContain('^brownlow-season:[0-9]{4}:players/');
+    });
+
+    it('excludes the current season by the accepted baseline, not a hard-coded year', () => {
+      expect(gate('brownlow_season_after_accepted_last_season')?.sql)
+        .toContain('season > 2025');
+      expect(brownlowSeasonChecks(2026)
+        .find((c) => c.key === 'brownlow_season_after_accepted_last_season')?.sql)
+        .toContain('season > 2026');
+    });
+
+    it('refuses a missing or malformed manifest rather than gating nothing', () => {
+      expect(() => brownlowSeasonExpected(() => null)).toThrow(RebuildRefused);
+      expect(() => brownlowSeasonExpected(() => ({ artefact: { rows: 'many' } })))
+        .toThrow(RebuildRefused);
+    });
+
+    it('never touches the round-vote table', () => {
+      for (const check of brownlowSeasonChecks(2025)) {
+        expect(check.sql).not.toContain('brownlow_round_votes');
+      }
+    });
+
+    it('renders every Brownlow season gate into the executed stream', () => {
+      const sql = finalValidationSql();
+      for (const check of brownlowSeasonChecks(2025)) {
         expect(sql).toContain(check.key);
       }
     });

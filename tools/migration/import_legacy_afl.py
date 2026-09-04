@@ -680,81 +680,10 @@ def import_player_match_stats(pg: psycopg.Connection, lite, rep: Reporter, batch
     analyze(pg, "player_match_stats")
 
 
-def import_brownlow(pg: psycopg.Connection, lite, rep: Reporter, batch) -> None:
-    truncate(pg, "brownlow_season_votes", "brownlow_round_votes")
-    source_id = scalar(pg, "SELECT id FROM sources WHERE key = 'afltables'")
-    valid_players = {r[0] for r in pg.execute("SELECT id FROM players").fetchall()}
-    valid_seasons = {r[0] for r in pg.execute("SELECT year FROM seasons").fetchall()}
-
-    rows = lite.execute(
-        "SELECT * FROM brownlow_results WHERE player_id IS NOT NULL ORDER BY season, player_id"
-    ).fetchall()
-
-    # Keep the highest-vote row if a source ever duplicates (season, player).
-    best: dict[tuple[int, int], object] = {}
-    for r in rows:
-        batch.records_read += 1
-        key = (r["season"], r["player_id"])
-        if r["player_id"] not in valid_players:
-            batch.reject(r["result_id"], "player_id not present in AFLDB", None)
-            continue
-        if r["season"] not in valid_seasons:
-            batch.reject(r["result_id"], f"season {r['season']} not present in AFLDB", None)
-            continue
-        if key not in best or (r["votes"] or 0) > (best[key]["votes"] or 0):
-            best[key] = r
-
-    def build():
-        for (season, player_id), r in best.items():
-            yield (
-                season, player_id, r["votes"] or 0, r["vote_rank"], r["eligible_rank"],
-                bool(r["ineligible"]), bool(r["winner"]),
-                to_int(r["games"]), to_int(r["three_vote_games"]),
-                to_int(r["two_vote_games"]), to_int(r["one_vote_games"]),
-                to_int(r["polling_games"]),
-                r["match_status"] if r["match_status"] in
-                ("unique", "resolved", "ambiguous", "unmatched", "implausible") else "unique",
-                source_id, r["result_id"], batch.id,
-            )
-
-    copy_rows(
-        pg, "brownlow_season_votes",
-        ["season", "player_id", "votes", "vote_rank", "eligible_rank",
-         "is_ineligible", "is_winner", "games", "three_vote_games",
-         "two_vote_games", "one_vote_games", "polling_games",
-         "link_status_value", "source_id", "source_record_id", "import_batch_id"],
-        build(), batch,
-    )
-
-    # Round votes, joined through result_id to recover player and season.
-    result_map = {r["result_id"]: (r["season"], r["player_id"]) for r in rows}
-    round_rows = lite.execute("SELECT * FROM brownlow_round_votes").fetchall()
-
-    def build_rounds():
-        seen: set[tuple[int, int, int]] = set()
-        for r in round_rows:
-            mapped = result_map.get(r["result_id"])
-            if mapped is None:
-                continue
-            season, player_id = mapped
-            if player_id not in valid_players or season not in valid_seasons:
-                continue
-            key = (season, player_id, r["round_number"])
-            if key in seen:
-                continue
-            seen.add(key)
-            yield (season, player_id, r["round_number"], bool(r["played"]), to_int(r["votes"]))
-
-    copy_rows(pg, "brownlow_round_votes",
-              ["season", "player_id", "round_number", "played", "votes"],
-              build_rounds())
-    pg.commit()
-
-    total = scalar(pg, "SELECT sum(votes) FROM brownlow_season_votes")
-    rep.result("brownlow_season_votes", scalar(pg, "SELECT count(*) FROM brownlow_season_votes"),
-               f"({total:,} votes)")
-    rep.result("brownlow_round_votes", scalar(pg, "SELECT count(*) FROM brownlow_round_votes"),
-               "(1984-2025 only)")
+# The legacy Brownlow writer (import_brownlow) was retired under AFLDB-ISSUE-113.
+# brownlow_season_votes is loaded from the tracked artefact by
+# tools/migration/import_brownlow_season.py, and brownlow_round_votes is owned
+# by the canonical fitzRoy/settle writers. Nothing here may truncate either.
 
 
 def import_ladders(pg: psycopg.Connection, lite, rep: Reporter, batch) -> None:
@@ -975,11 +904,10 @@ GROUPS = {
     "players": "players",
     "matches": "matches and quarter scores",
     "stats": "player match statistics (694K rows)",
-    "brownlow": "Brownlow season and round votes",
     "ladders": "season ladders into staging",
     "coverage": "stat definitions and per-season availability",
 }
-DEFAULT_ORDER = ["reference", "players", "matches", "stats", "brownlow",
+DEFAULT_ORDER = ["reference", "players", "matches", "stats",
                  "ladders", "coverage"]
 
 # What each group actually rebuilds. Used to decide whether a partial run
@@ -992,7 +920,6 @@ GROUP_TABLES = {
     "players": ("players",),
     "matches": ("matches", "match_period_scores"),
     "stats": ("player_match_stats",),
-    "brownlow": ("brownlow_season_votes", "brownlow_round_votes"),
     "ladders": ("staging.team_seasons",),
     "coverage": ("stat_definitions", "stat_availability"),
 }
@@ -1028,7 +955,7 @@ def main() -> int:
 
     if args.dry_run:
         print("  DRY RUN — no changes will be written\n")
-        for table in ("players", "games", "matches", "brownlow_results", "team_seasons"):
+        for table in ("players", "games", "matches", "team_seasons"):
             count = lite.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
             rep.result(f"legacy {table}", count)
         return 0
@@ -1073,10 +1000,6 @@ def main() -> int:
                 with import_batch(pg, "fitzroy_afldata", "import_legacy_afl.py",
                                   "player_match_stats") as b:
                     import_player_match_stats(pg, lite, rep, b)
-            elif group == "brownlow":
-                with import_batch(pg, "afltables", "import_legacy_afl.py",
-                                  "brownlow_season_votes") as b:
-                    import_brownlow(pg, lite, rep, b)
             elif group == "ladders":
                 with import_batch(pg, "sports_data_lab", "import_legacy_afl.py",
                                   "staging.team_seasons") as b:
@@ -1086,7 +1009,7 @@ def main() -> int:
     finally:
         lite.close()
 
-    analyze(pg, "players", "matches", "clubs", "venues", "brownlow_season_votes")
+    analyze(pg, "players", "matches", "clubs", "venues")
     print(f"\nCompleted in {time.time() - started:.1f}s")
 
     rejected = scalar(pg, "SELECT count(*) FROM import_rejections")

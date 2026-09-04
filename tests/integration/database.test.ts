@@ -231,16 +231,14 @@ describe('data integrity', () => {
   });
 });
 
-// AFLDB-ISSUE-108: the canonical legacy-free rebuild has no writer for
-// brownlow_season_votes or player_career_stats.brownlow_votes
-// (AFLDB-ISSUE-090 §27.5), so the authoritative-total assertions (79,113) and the
-// legacy per-game figure (46,979) no longer describe the dataset. Skipped, not
-// re-pinned to zero; re-enable with a legacy-free season-grain Brownlow path.
-// When re-enabling, also re-address the Bob Skilton case below: player_id 3702 is a
-// retired legacy surrogate that the canonical rebuild re-seeded (it is now David
-// Stark). Resolve the witness from the data, as the club-identity gates now do.
+// AFLDB-ISSUE-108 retired the legacy source of brownlow_season_votes and these
+// assertions were skipped rather than re-pinned to zero. AFLDB-ISSUE-113 §8.6 landed
+// the legacy-free season-grain writer (tools/migration/import_brownlow_season.py over
+// the tracked artefact data/brownlow/season-votes.csv), so they are re-armed. The
+// Bob Skilton witness is resolved from the data by AFL Tables profile path: the
+// retired pin 3702 is a legacy surrogate the canonical rebuild re-seeded.
 describe('Brownlow correctness', () => {
-  it.skip('uses the authoritative season totals for career votes', async () => {
+  it('uses the authoritative season totals for career votes', async () => {
     const [row] = await sql<{ career: number; authoritative: number }[]>`
       SELECT (SELECT sum(brownlow_votes) FROM player_career_stats)::int AS career,
              (SELECT sum(votes) FROM brownlow_season_votes)::int        AS authoritative
@@ -249,20 +247,26 @@ describe('Brownlow correctness', () => {
     expect(row.career).toBe(79_113);
   });
 
-  it.skip('does not derive career votes from per-game votes', async () => {
-    const [row] = await sql<{ perGame: number }[]>`
+  it('does not derive career votes from per-game votes', async () => {
+    const [row] = await sql<{ perGame: number | null }[]>`
       SELECT sum(brownlow_votes)::int AS "perGame" FROM player_match_stats
     `;
     // Per-game votes are incomplete (1935-1983 missing) and must not be
-    // the basis of a career total.
-    expect(row.perGame).toBe(46_979);
-    expect(row.perGame).toBeLessThan(79_113);
+    // the basis of a career total. AFLDB-ISSUE-113: the canonical per-game column
+    // is fitzRoy-sourced, so the retired legacy figure (46,979) is not re-pinned;
+    // the invariant is that it falls short of the authoritative total.
+    expect(row.perGame ?? 0).toBeLessThan(79_113);
   });
 
-  it.skip('credits Bob Skilton with the votes the legacy derivation lost', async () => {
+  it('credits Bob Skilton with the votes the legacy derivation lost', async () => {
     const [row] = await sql<{ votes: number; medals: number }[]>`
-      SELECT brownlow_votes AS votes, brownlow_medals AS medals
-        FROM player_career_stats WHERE player_id = 3702
+      SELECT c.brownlow_votes AS votes, c.brownlow_medals AS medals
+        FROM player_career_stats c
+        JOIN external_identities ei ON ei.player_id = c.player_id
+        JOIN sources s ON s.id = ei.source_id AND s.key = 'afltables'
+       WHERE ei.match_method = 'afltables_profile_url'
+         AND ei.status IN ('unique', 'resolved')
+         AND ei.external_id = 'players/B/Bob_Skilton.html'
     `;
     expect(row.votes).toBe(180);
     expect(row.medals).toBe(3);
@@ -449,19 +453,22 @@ describe('advanced search regression cases', () => {
       SELECT count(*)::int AS n FROM player_career_stats
        WHERE games BETWEEN 200 AND 249 AND finals >= 16
     `;
-    expect(row.n).toBe(115);
+    // AFLDB-ISSUE-136: 115 → 114 — Charlie Cameron is one canonical player with
+    // 254 games / 27 finals once his renumbered AFL Tables profile was folded, so
+    // he has left the 200-249 band.
+    expect(row.n).toBe(114);
   });
 
-  // AFLDB-ISSUE-108: skipped — with no canonical career-Brownlow acquisition,
-  // player_career_stats.brownlow_votes is 0 for almost every player, so this cohort
-  // no longer isolates anything. Re-enable with the legacy-free Brownlow path.
-  it.skip('50-199 goals and no Brownlow votes', async () => {
+  // AFLDB-ISSUE-108: skipped while no canonical career-Brownlow acquisition existed.
+  // AFLDB-ISSUE-113 restored the acquisition and re-measured the cohort on the
+  // canonically rebuilt afldb_test (§8.17.3): 261, not the legacy 269 (career goals
+  // are now fitzRoy-sourced) and not the 750 the per-game derivation produced.
+  it('50-199 goals and no Brownlow votes', async () => {
     const [row] = await sql<{ n: number }[]>`
       SELECT count(*)::int AS n FROM player_career_stats
        WHERE goals BETWEEN 50 AND 199 AND brownlow_votes = 0
     `;
-    // 269, not the 750 the legacy per-game derivation produced.
-    expect(row.n).toBe(269);
+    expect(row.n).toBe(261);
   });
 
   it('200+ games, 100+ goals and 15+ finals', async () => {

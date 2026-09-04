@@ -35,6 +35,13 @@ next-env.d.ts
 # manifests may opt in explicitly below so a fresh deployment can reproduce
 # the same sourced facts.
 /data/*
+# AFLDB-ISSUE-113: the season-grain Brownlow artefact, its provenance manifest and the
+# identity adjudication file are curated, hash-bound inputs of the canonical rebuild.
+!/data/brownlow/
+/data/brownlow/*
+!/data/brownlow/season-votes.csv
+!/data/brownlow/season-votes.manifest.json
+!/data/brownlow/player-identity.csv
 !/data/awards/
 /data/awards/*
 !/data/awards/22-under-22.csv
