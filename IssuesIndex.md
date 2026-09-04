@@ -7,8 +7,8 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-09-04
-**Open issues:** 6 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-116`,
-`AFLDB-ISSUE-125`, `AFLDB-ISSUE-126`, `AFLDB-ISSUE-134`, `AFLDB-ISSUE-137`.
+**Open issues:** 5 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-125`,
+`AFLDB-ISSUE-126`, `AFLDB-ISSUE-134`, `AFLDB-ISSUE-137`.
 
 <!-- UPDATE 2026-09-04 (ISSUE-127 closeout): `AFLDB-ISSUE-127` is **Resolved** — operator host
      validation completed on dev (`streamanator`, deployed revision `169d738`). The polkit grant
@@ -549,7 +549,23 @@ closure boundary, and the unrelated query-builder timing regression remains with
      Authoritative records: the `AFLDB-ISSUE-120` entry in `issues.md` (Resolution, 2026-09-01) and
      `issues/closed/AFLDB-ISSUE-120.md` §12–§16. The production `AFLDB_BETA_GATE` re-adjudication
      recorded there still stands as a launch precondition. -->
-| `AFLDB-ISSUE-116` | Low | Admin tooling / Data QA / Query performance | The `player_match_stats` anchor of `/admin/query-builder` costs **1.05–1.44 s with no card** (T-C11 1056–1072 ms; `EXPLAIN ANALYZE` 1441 ms) — pre-ISSUE-115 behaviour. `runQueryBuilder` (`src/db/queries/query-builder.ts:282-286`) emits `count(*) OVER ()` with an index-ordered `ORDER BY m.match_date DESC LIMIT 50`; the planner costs it fast-start (`Limit cost=4.41..577`) but the window aggregate consumes all 685,471 rows and spills to temp. That plan turned every related card into a per-row Nested Loop Semi/Anti Join (685,471 executions), so ISSUE-115 excluded related cards under this anchor as an evidence-driven V1 boundary (`QUERYABLE_TABLES.player_match_stats.subjects = []`). Above the 1 s target, below the 5 s ceiling; own-row filtering works. **NEW EVIDENCE 2026-09-02 (from `AFLDB-ISSUE-112` G6 closeout):** the same emitted shape also fails T-C11 on the **`players`** anchor — `players x player.captaincies NOT EXISTS link_status=unique` at **1,081-1,100 ms** across three runs, while the bare predicate is **16.6 ms** server-side and the `count(*) OVER ()` + `ORDER BY ... LIMIT 50` shape is **2,208 ms**. The sibling `draft_picks` case passes only because it is degenerate (zero rows valued `unique`). So the defect is the emitted shape, not one anchor's table. Key files: `src/db/queries/query-builder.ts`, `src/search/query-builder-spec.ts`, `tests/integration/query-builder.test.ts` (T-C11 anchor-alone reference). **Next action: separate work, not started** — fix the page/count shape without raising the timeout, adding an index or changing schema; re-measure with T-C11 **on both the `player_match_stats` and `players` anchors**; only then reconsider re-admitting related cards under PMS (T-A1/T-B8 assert `subjects: []` exactly). Do not reopen ISSUE-115. |
+<!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-116` is **Resolved** and is NO LONGER an open issue.
+     `runQueryBuilder` no longer carries the total on the page as `count(*) OVER ()`. The page and
+     the count are two statements inside one `REPEATABLE READ READ ONLY` transaction sharing one
+     compiled `WHERE` fragment; a short page derives its own exact total, so the count statement is
+     skipped entirely for single-page and empty results; and `SET LOCAL jit = off` precedes the
+     count, whose unlimited cost estimate crossed `jit_above_cost` and cost ~1.15 s of JIT
+     compilation for 75 ms of work. Measured on `afldb_test` (PostgreSQL 16.15, 55432 tunnel):
+     `player_match_stats` anchor alone **1144.5 → 353.4 ms**, `players x player.captaincies NOT
+     EXISTS link_status=unique` **1073.4 → 320.9 ms**, both under the 1,000 ms T-C11 target, with
+     `AFLDB_STATEMENT_TIMEOUT_MS` unchanged at 5000, no index and no schema change. The PMS
+     anchor-alone gate was tightened from CEILING_MS to BOUND_MS. Filtering, sort, pagination,
+     exact-total, parameterisation and timeout semantics are unchanged; the one deliberate
+     correction is that a page past the end now reports the real total instead of 0.
+     `QUERYABLE_TABLES.player_match_stats.subjects` stays `[]` (re-admission recorded as a separate
+     future decision); `AFLDB-ISSUE-115` was not reopened. Authoritative records: the
+     `AFLDB-ISSUE-116` entry in `issues.md` (Resolution, 2026-09-04) and
+     `issues/closed/AFLDB-ISSUE-116.md`. -->
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-104` is **Resolved** and is NO LONGER an open issue.
      Closed as **NOT REACHABLE**, not fixed, and the old "ISSUE-099 is the only writer" premise is
      SUPERSEDED: a second `issue_key` writer now exists (`canonical_apply_failed`, owner

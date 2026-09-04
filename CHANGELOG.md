@@ -15,6 +15,35 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-116 — the Data QA search stops after the page instead of reading the whole result set - 4 September 2026
+
+- **The defect.** `/admin/query-builder` (super-admin Data QA search) asked PostgreSQL for the page
+  and its total in one statement, carrying `count(*) OVER () AS "__total"` on every page row. The
+  planner costs that as a fast-start ordered walk, but a window aggregate cannot emit its first row
+  until it has consumed every qualifying row, so the `ORDER BY … LIMIT 50` bought nothing. The
+  `player_match_stats` anchor read all 685,471 rows and spilled 3,401 temp blocks **with no filter
+  card at all**, and the defect was not anchor-specific: `players` filtered by "has no captaincy
+  row linked as unique" cost over a second for a predicate that counts in 16.6 ms on its own.
+- **The fix.** The page and the total are now two statements inside one
+  `REPEATABLE READ READ ONLY` transaction, splicing the same compiled `WHERE` fragment so they can
+  never describe different questions. The page query keeps its fast-start plan and really does stop
+  after 50 rows; the count runs unordered and unlimited. A short page proves its own exact total
+  (`offset + rows returned`), so the count statement is not issued at all for a result that fits on
+  one page or matches nothing. `SET LOCAL jit = off` precedes the count: without a `LIMIT` its cost
+  estimate carries the whole relation, which put it past PostgreSQL's JIT thresholds and cost about
+  1.15 s of compiling 104 functions for 75 ms of work.
+- **Behaviour change.** Measured end to end against the canonical test database (PostgreSQL 16.15),
+  with the 5 s statement timeout unchanged, no index added and no schema change: the
+  `player_match_stats` anchor alone **1144.5 → 353.4 ms** and `players` × captaincies `NOT EXISTS`
+  **1073.4 → 320.9 ms**, both now under the 1,000 ms target the tool holds every other shape to.
+  One user-visible correction comes with it: the total used to be read off the page's first row, so
+  asking for a page past the end reported "0 rows match" for a query with matches. It is now the
+  whole match count on every page. Filtering, sort, pagination, exact totals, parameter binding and
+  the catalogue-only identifier rule are otherwise unchanged.
+- **Scope.** Related-domain cards remain unavailable under the `player_match_stats` anchor
+  (`subjects: []`, the AFLDB-ISSUE-115 boundary); the post-fix evidence that this may now be
+  reconsiderable is recorded, but re-admitting them is a separate decision.
+
 ### AFLDB-ISSUE-124 — the afldb.service crash-loop limiter is now actually in effect - 4 September 2026
 
 - **The defect.** `deploy/afldb.service` declared its crash-loop rate limiter as

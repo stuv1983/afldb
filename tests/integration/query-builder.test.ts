@@ -502,6 +502,155 @@ describe('query builder compiler -- multi-domain cards (ISSUE-115)', () => {
   });
 });
 
+/**
+ * AFLDB-ISSUE-116 -- the page/total split.
+ *
+ * runQueryBuilder used to carry the total on every page row as
+ * `count(*) OVER ()`. The planner costs that as a fast-start ordered walk
+ * but the window aggregate must consume every qualifying row before the
+ * first one can be emitted, so the LIMIT bought nothing and the
+ * player_match_stats anchor cost 1.0-1.4 s with no card at all. The page
+ * and the total are now two statements read inside one REPEATABLE READ
+ * READ ONLY transaction -- one snapshot, so the total still describes
+ * exactly the relation the page was drawn from.
+ *
+ * These cases pin the semantics the split must not change (exact total,
+ * exact rows, exact order, exact OFFSET, bound values in BOTH statements)
+ * and the one it deliberately corrects: a page past the end used to report
+ * total 0, because the total rode on a row that did not exist.
+ */
+describe('query builder compiler -- page/total split (ISSUE-116)', () => {
+  // The 110-row known-answer set the first case in this file already uses.
+  // Its default sort (`c.games DESC, p.sort_name`) is a TOTAL order over
+  // these rows -- no (games, sort_name) pair repeats within the set -- so
+  // the page slices asserted below are deterministic rather than
+  // tie-break-dependent.
+  const sixtiesTwoClubs = (page: number): QueryBuilderState => ({
+    table: 'player_career_stats',
+    cards: [{
+      join: 'AND',
+      card: {
+        match: 'AND',
+        conditions: [
+          { column: 'debut_season', op: 'between', lo: 1960, hi: 1969 },
+          { column: 'clubs_played', op: '=', value: 2 },
+        ],
+      },
+    }],
+    page,
+  });
+
+  it('T-E1: the total is the whole match count on every page, including a page past the end', async () => {
+    const p1 = await runQueryBuilder(sixtiesTwoClubs(1));
+    const p3 = await runQueryBuilder(sixtiesTwoClubs(3));
+    const p4 = await runQueryBuilder(sixtiesTwoClubs(4));
+
+    expect(p1.total).toBe(110);
+    expect(p1.rows).toHaveLength(QB_LIMITS.defaultPageSize);
+    expect(p3.total).toBe(110);
+    expect(p3.rows).toHaveLength(10);
+
+    // RED before ISSUE-116: the total was read off the page's first row, so
+    // an out-of-range page reported total 0 and the page said "No rows
+    // match" for a query with 110 matches.
+    expect(p4.rows).toHaveLength(0);
+    expect(p4.total).toBe(110);
+  });
+
+  it('T-E2: the pages partition the ordered result set exactly, in the same order', async () => {
+    const paged: Record<string, unknown>[] = [];
+    for (const page of [1, 2, 3]) {
+      const result = await runQueryBuilder(sixtiesTwoClubs(page));
+      expect(result.total).toBe(110);
+      paged.push(...result.rows);
+    }
+
+    const oracle = await sql<{ display_name: string; games: number }[]>`
+      SELECT p.display_name, c.games
+        FROM players p JOIN player_career_stats c ON c.player_id = p.id
+       WHERE c.debut_season BETWEEN 1960 AND 1969 AND c.clubs_played = 2
+       ORDER BY c.games DESC, p.sort_name
+    `;
+
+    expect(paged).toHaveLength(oracle.length);
+    expect(paged.map((row) => row.display_name)).toEqual(oracle.map((row) => row.display_name));
+    expect(paged.map((row) => row.games)).toEqual(oracle.map((row) => row.games));
+    // OFFSET is exact: no anchor row is repeated or skipped across pages.
+    expect(new Set(paged.map((row) => `${row.display_name}|${row.games}`)).size).toBe(oracle.length);
+  });
+
+  it('T-E3: a related-domain NOT EXISTS total equals an independent count, and the page is its ordered head', async () => {
+    const state: QueryBuilderState = {
+      table: 'players',
+      cards: [{
+        join: 'AND',
+        card: {
+          domain: 'player.captaincies',
+          quantifier: 'none',
+          match: 'AND',
+          conditions: [{ column: 'link_status', op: 'equals', value: 'unique' }],
+        },
+      }],
+      page: 1,
+    };
+    const result = await runQueryBuilder(state);
+
+    const [oracle] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n
+        FROM players p
+       WHERE NOT EXISTS (
+         SELECT 1 FROM captaincies r_cap JOIN clubs r_ccl ON r_ccl.id = r_cap.club_id
+          WHERE r_cap.player_id = p.id AND r_cap.link_status_value::text = 'unique'
+       )
+    `;
+    expect(result.total).toBe(oracle.n);
+    expect(result.total).toBeGreaterThan(QB_LIMITS.defaultPageSize);
+    expect(result.rows).toHaveLength(QB_LIMITS.defaultPageSize);
+
+    const head = await sql<{ display_name: string }[]>`
+      SELECT p.display_name
+        FROM players p
+       WHERE NOT EXISTS (
+         SELECT 1 FROM captaincies r_cap JOIN clubs r_ccl ON r_ccl.id = r_cap.club_id
+          WHERE r_cap.player_id = p.id AND r_cap.link_status_value::text = 'unique'
+       )
+       ORDER BY p.sort_name
+       LIMIT ${QB_LIMITS.defaultPageSize}
+    `;
+    expect(result.rows.map((row) => row.display_name)).toEqual(head.map((row) => row.display_name));
+  });
+
+  it('T-E4: the count statement binds its values too, so nothing typed reaches it as SQL', async () => {
+    // The total is now its own statement, so the parameterisation wall has
+    // to stand there as well: SQL punctuation must be matched literally.
+    // Unbound, this value would flip the predicate open and total every club.
+    const injected = (page: number): QueryBuilderState => ({
+      table: 'clubs',
+      cards: [{
+        join: 'AND',
+        card: { match: 'AND', conditions: [{ column: 'name', op: 'contains', value: "%' OR '1'='1" }] },
+      }],
+      page,
+    });
+
+    // Page 1 takes the short-page path -- the page itself proves total 0.
+    const first = await runQueryBuilder(injected(1));
+    expect(first.total).toBe(0);
+    expect(first.rows).toHaveLength(0);
+
+    // Page 2 is an empty page at a non-zero offset, the one case that must
+    // ask the count statement. If that statement spliced the value instead
+    // of binding it, the predicate would open and the total would be every
+    // club rather than none.
+    const second = await runQueryBuilder(injected(2));
+    expect(second.total).toBe(0);
+    expect(second.rows).toHaveLength(0);
+
+    const [all] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM clubs`;
+    expect(all.n).toBeGreaterThan(0);
+  });
+});
+
 describe('query builder compiler -- cost gate (ISSUE-115 T-C11)', () => {
   // Runbook §9.3. Obligation A is the normal 5 s statement timeout
   // (AFLDB_STATEMENT_TIMEOUT_MS, default 5000 -- never raised): a query that
@@ -595,14 +744,18 @@ describe('query builder compiler -- cost gate (ISSUE-115 T-C11)', () => {
     const linkUnique: ConditionSpec = { column: 'link_status', op: 'equals', value: 'unique' };
     const one = (table: string, group: CardGroup): QueryBuilderState => ({ table, cards: [group], page: 1 });
     const rows: Timed[] = [
-      // Reference points: the anchors alone (pre-115 shapes, held only to the
-      // 5 s ceiling), so a related card's cost can be read as the difference.
-      // player_match_stats alone measured 1072 ms in Stage 5 -- above the
+      // Reference points: the anchors alone, so a related card's cost can be
+      // read as the difference. player_match_stats alone measured 1072 ms in
+      // ISSUE-115 Stage 5 and 1144 ms at the start of ISSUE-116 -- above the
       // related-card target with no card at all, which is why that anchor
-      // hosts none (runbook §20.5).
+      // hosts none (runbook §20.5). ISSUE-116 split the total off the page
+      // query, so this anchor is now held to the same BOUND_MS target as
+      // every other shape here rather than to the 5 s ceiling: it is the
+      // regression gate for that fix, and the reason the two other anchors
+      // stay on CEILING_MS is only that they were never the defect.
       await timed('players (anchor alone)', { table: 'players', cards: [], page: 1 }, CEILING_MS),
       await timed('matches (anchor alone)', { table: 'matches', cards: [], page: 1 }, CEILING_MS),
-      await timed('player_match_stats (anchor alone)', { table: 'player_match_stats', cards: [], page: 1 }, CEILING_MS),
+      await timed('player_match_stats (anchor alone)', { table: 'player_match_stats', cards: [], page: 1 }),
       // Every relationship whose target is player_match_stats (685k rows),
       // conditioned, under each anchor that offers it.
       await timed('players x player.match_stats EXISTS goals>=8', one('players', related('player.match_stats', 'any', [goals8]))),

@@ -257,6 +257,35 @@ export type QueryBuilderResult = {
   columns: string[];
 };
 
+/**
+ * ISSUE-116 -- the page and the total are TWO statements, not one.
+ *
+ * The page used to carry its own total as `count(*) OVER ()`. The planner
+ * costs that as a fast-start ordered walk (`Limit cost=4.41..577`), but a
+ * window aggregate cannot emit its first row until it has consumed the
+ * whole qualifying relation, so the `LIMIT` bought nothing: the
+ * player_match_stats anchor read all 685,471 rows and spilled 3,401 temp
+ * blocks with no card at all (1.05-1.44 s), and `players x
+ * player.captaincies NOT EXISTS` cost 1.07-2.21 s for a predicate that
+ * counts in 16.6 ms on its own. Split, the page query keeps the fast-start
+ * plan and really does stop after 50 rows, and the count query runs
+ * unordered and unlimited -- the shape each one is good at.
+ *
+ * Both statements are read inside ONE `REPEATABLE READ READ ONLY`
+ * transaction. Under the default READ COMMITTED each statement takes its
+ * own snapshot, so a concurrent import could let the total describe a
+ * different relation from the page; one repeatable-read snapshot restores
+ * exactly the atomicity the single window-aggregate query had. READ ONLY
+ * also says in the transaction itself what the `afldb_app` grant already
+ * enforces.
+ *
+ * The SAME compiled `where` fragment is spliced into both statements, so
+ * the two can never drift: postgres.js's `fragment()` only reads a nested
+ * query's strings and pushes its values into the ENCLOSING statement's
+ * parameter list, so one fragment yields independently bound parameters in
+ * each. Values stay bound in the count statement exactly as in the page
+ * statement (T-E4).
+ */
 export async function runQueryBuilder(state: QueryBuilderState): Promise<QueryBuilderResult> {
   const table = QUERYABLE_TABLES[state.table];
   if (!table) throw new Error(`Unknown table: ${state.table}`);
@@ -266,30 +295,73 @@ export async function runQueryBuilder(state: QueryBuilderState): Promise<QueryBu
 
   const where = compileCards(state.table, state.cards);
 
-  // Display columns and the sort expression come only from this table's
-  // own catalogue entry -- safe to splice as one fixed fragment, the
-  // same trust level as advanced-search.ts's `sql.unsafe(SORTS[...].sql)`.
+  // Display columns, the FROM fragment and the sort expression come only
+  // from this table's own catalogue entry -- safe to splice as fixed
+  // fragments, the same trust level as advanced-search.ts's
+  // `sql.unsafe(SORTS[...].sql)`.
   const selectList = table.displayColumns
     .map((key) => `${table.columns[key].column} AS "${key}"`)
     .join(', ');
+  const from = sql.unsafe(table.from);
   const sortColumn = (state.sort && table.columns[state.sort]?.column) || table.defaultSort;
 
   const page = Number.isSafeInteger(state.page) && state.page >= 1
     ? Math.min(state.page, QB_LIMITS.maxPage) : 1;
   const offset = (page - 1) * QB_LIMITS.defaultPageSize;
 
-  const rows = await sql<(Record<string, unknown> & { __total: string })[]>`
-    SELECT ${sql.unsafe(selectList)}, count(*) OVER () AS "__total"
-      FROM ${sql.unsafe(table.from)}
-     WHERE ${where}
-     ORDER BY ${sql.unsafe(sortColumn)}
-     LIMIT ${QB_LIMITS.defaultPageSize} OFFSET ${offset}
-  `;
+  const { rows, total } = await sql.begin(
+    'ISOLATION LEVEL REPEATABLE READ READ ONLY',
+    async (tx) => {
+      const pageRows = await tx<Record<string, unknown>[]>`
+        SELECT ${sql.unsafe(selectList)}
+          FROM ${from}
+         WHERE ${where}
+         ORDER BY ${sql.unsafe(sortColumn)}
+         LIMIT ${QB_LIMITS.defaultPageSize} OFFSET ${offset}
+      `;
+      // A SHORT page proves its own total, exactly: `LIMIT` returned fewer
+      // rows than it was allowed to, so the ordered set was exhausted at
+      // `offset + pageRows.length`. Deriving it there is not an estimate,
+      // and it spares the second statement for every query that fits on one
+      // page and for every query that matches nothing -- which is the shape
+      // the split would otherwise punish, because a page with nothing to
+      // find cannot stop early and would then be paid for twice.
+      // The one short page that proves nothing is an EMPTY page at a
+      // non-zero offset: `OFFSET` may have skipped past the end of a
+      // perfectly large result set, so there the count still has to run.
+      if (pageRows.length < QB_LIMITS.defaultPageSize && (pageRows.length > 0 || offset === 0)) {
+        return { rows: [...pageRows], total: offset + pageRows.length };
+      }
+      // JIT off before the count, for this transaction only (`SET LOCAL`,
+      // so it cannot leak onto the pooled connection) and only on the path
+      // that needs it. The count statement has no LIMIT, so its ESTIMATED
+      // cost carries the whole relation -- 5.8M for the four-related-card
+      // shape, past jit_above_cost 100000 AND jit_optimize_above_cost
+      // 500000 -- and PostgreSQL compiles ~104 functions with inlining and
+      // optimisation before executing any of them. Measured on afldb_test:
+      // 1228 ms with JIT, 76 ms without, for 75 ms of actual work. The page
+      // query never triggers it because its LIMIT keeps the estimate tiny,
+      // which is exactly why the pre-116 single-statement shape never paid
+      // this. JIT earns its compile time on multi-second analytical scans;
+      // nothing here is allowed to run that long (AFLDB_STATEMENT_TIMEOUT_MS
+      // caps every statement at 5 s and this tool targets under 1 s), so
+      // here it can only lose.
+      await tx`SET LOCAL jit = off`;
 
-  const total = rows.length > 0 ? Number(rows[0].__total) : 0;
-  return {
-    rows: rows.map(({ __total: _total, ...rest }) => rest),
-    total,
-    columns: table.displayColumns,
-  };
+      // No ORDER BY and no LIMIT: the count only has to be exact, and an
+      // order it cannot observe would just cost a sort. `::text` because
+      // count(*) is int8, which postgres.js hands back as a string.
+      const counted = await tx<{ __total: string }[]>`
+        SELECT count(*)::text AS "__total"
+          FROM ${from}
+         WHERE ${where}
+      `;
+      // The total is the whole match count, independent of which page was
+      // asked for: a page past the end is an empty page of a real result
+      // set, not an empty result set.
+      return { rows: [...pageRows], total: Number(counted[0].__total) };
+    },
+  );
+
+  return { rows, total, columns: table.displayColumns };
 }
