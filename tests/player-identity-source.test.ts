@@ -129,8 +129,8 @@ describe('awards player-identity census (AFLDB-ISSUE-112 §24.5)', () => {
     expect(result.status).toBe(0);
     expect(result.stderr).toBe('');
     expect(result.payload.ok).toBe(true);
-    expect(result.payload.player_count).toBe(1738);
-    expect(result.payload.with_identity).toBe(1720);
+    expect(result.payload.player_count).toBe(1745);
+    expect(result.payload.with_identity).toBe(1727);
     expect(result.payload.without_identity).toBe(18);
   });
 
@@ -210,7 +210,7 @@ describe('awards player-identity census (AFLDB-ISSUE-112 §24.5)', () => {
   });
 
   it('refuses a truncated census rather than resolving half the family', () => {
-    expectRejected(canonicalLines.slice(0, -1), /expected 1738 censused players/);
+    expectRejected(canonicalLines.slice(0, -1), /expected 1745 censused players/);
   });
 
   it('refuses a census whose unlinkable population has changed', () => {

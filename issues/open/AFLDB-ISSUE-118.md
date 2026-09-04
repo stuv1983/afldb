@@ -2837,7 +2837,7 @@ partial captaincies) and the three missing All-Australian teams, which the stric
 
 **Files:** `tests/integration/gridley-aa-oracle.test.ts` (new, opt-in). Typecheck and lint clean.
 
-### 23.13 Exact next action
+### 23.13 Exact next action (as recorded after §23.12 — superseded by §23.15)
 
 1. **Stage AA3 — acquire the three VFL Teams of the Year (1983, 1986, 1988)** into
    `data/awards/all-australian.csv` (wikipedia provenance, `aah:` keys, parser expectations
@@ -2850,3 +2850,152 @@ partial captaincies) and the three missing All-Australian teams, which the stric
    the height answer-key comparison (7,216 Gridley ids need height; 195 of them name-bridged,
    more now fingerprint-bridged).
 3. Strict corpus run stays red until the acquisitions land; closeout per §23.2.
+
+### 23.14 Stage AA3 — the VFL Teams of the Year acquired (5 September 2026, third session)
+
+**Scope as briefed:** the 1983, 1986 and 1988 VFL Teams of the Year. **Scope as executed:
+1983, 1986, 1987 and 1988.** The source (below) names a VFL Team of the Year every season
+1982–1990 except 1985, and AFLDB's 1987 rows are — like 1983/1986/1988 — the carnival team
+(21 draftguru rows = the source's 1987 State of Origin team of 22 minus its coach; Jarman /
+Rogers / McDermott / Salisbury with no club), while two of the §23.12 "source missing" players
+(David Rhys-Jones, Steven Stretch) and Jim Krakouer's second selection are in the **1987** Team of
+the Year and nowhere else. Leaving 1987 out would have left the family incomplete under the same
+rule that made 1983/1986/1988 incomplete, so it is included and called out here.
+
+**Source.** Wikipedia, *All-Australian team*, section "VFL/AFL Team of the Year: 1982–1990"
+(`https://en.wikipedia.org/wiki/All-Australian_team`; raw wikitext fetched 2026-09-05 through
+`?action=raw`). The section states: *"The AFL website recognises players who were named in the
+VFL/AFL Team of the Year from 1982 to 1990 as having All-Australian status. This was a team picked
+by Victorian selectors. Teams were named every season from 1982 to 1990, except 1985."* Each team
+is an `{{Aussie rules team}}` template whose title is literally **"1983 VFL Team of the Year"**,
+**"1986 VFL Team of the Year"**, **"1987 VFL Team of the Year"**, **"1988 VFL Team of the Year"**,
+all citing one reference (`TOTYs`): HB Meyers, *The forgotten accolade – the VFL Team of the
+Year*, The Mongrel Punt, 23 June 2023
+(`https://themongrelpunt.com/footy-history/2023/06/23/the-forgotten-accolade-the-vfl-team-of-the-year/`).
+The same article's "Australian Football Carnival era: 1953–1988" section holds the State of Origin
+teams for 1983, 1985, 1986, 1987 and 1988 separately, so the source itself keeps the two honours
+apart; the 1984 template in the same section is the team the bootstrap's 24 club-labelled
+`wikipedia` rows already hold, which confirms the provenance is the same page. **No ambiguity:**
+none of the 14 §23.12 players appears in a carnival team, and no carnival-only player appears in a
+Team of the Year. Positions (template slots), the 1986 captain (Terry Daniher) and the coaches
+(Jeans 1983/1986) are present in the source and **not carried**: `wikipedia` rows carry no
+position, captaincy or note by the parser's contract (`POSITIONS` is the draftguru slot
+vocabulary), and no coach row exists anywhere in the family. Recording those is a separate
+contract change, not done here.
+
+**Rows added (86, all `wikipedia`, key `aah:<season>:<player>:<club>`, `link_status`
+`resolved`, `candidate_count` 1, no position / captaincy / note).** Player is the article's link
+label verbatim (`Gary Ablett Sr.`, `Billy Picken`, `Steven O'Dwyer`); club is the template's
+abbreviation expanded to the full club string the 1984 `wikipedia` rows already use (`Syd` →
+`Sydney Swans`, `Foot` → `Footscray`, `WC` → `West Coast`, `NM` → `North Melbourne`, `St K` →
+`St Kilda`, the rest their obvious names — all in `KNOWN_CLUBS`).
+
+| Season | Size | Team (source order: B, HB, C, HF, F, followers, interchange) |
+|---|---:|---|
+| 1983 | 20 | Des English (Carlton), Gary Malarkey (Geelong), Gary Ayres (Hawthorn), Ken Hunter (Carlton), Ross Glendinning (North Melbourne), Russell Greene (Hawthorn), Robert Flower (Melbourne), Terry Wallace (Hawthorn), Geoff Cunningham (St Kilda), Tim Watson (Essendon), Terry Daniher (Essendon), Maurice Rioli (Richmond), Simon Madden (Essendon), Bernie Quinlan (Fitzroy), Leigh Matthews (Hawthorn), Mark Lee (Richmond), Michael Tuck (Hawthorn), Brian Royal (Footscray), Billy Picken (Collingwood), Mark Browning (Sydney Swans) |
+| 1986 | 22 | Mark Thompson (Essendon), Gary Pert (Fitzroy), Gary Ayres (Hawthorn), Glenn Hawker (Essendon), Paul Roos (Fitzroy), Dennis Carroll (Sydney Swans), Doug Hawkins (Footscray), Greg Williams (Sydney Swans), Robert DiPierdomenico (Hawthorn), Gary Ablett Sr. (Geelong), Terry Daniher (Essendon), Gary Buckenara (Hawthorn), Wayne Blackwell (Carlton), Brian Taylor (Collingwood), Jim Krakouer (North Melbourne), Greg Dear (Hawthorn), Gerard Healy (Sydney Swans), Dale Weightman (Richmond), Craig Bradley (Carlton), Justin Madden (Carlton), John Platten (Hawthorn), Dermott Brereton (Hawthorn) |
+| 1987 | 22 | Andrew Bews (Geelong), Chris Langford (Hawthorn), David Rhys-Jones (Carlton), Sean Wight (Melbourne), Paul Roos (Fitzroy), Mark Bos (Geelong), Robert DiPierdomenico (Hawthorn), Greg Williams (Sydney Swans), Steven Stretch (Melbourne), Wayne Johnston (Carlton), Stephen Kernahan (Carlton), Tony McGuinness (Footscray), Mark Bairstow (Geelong), Tony Lockett (St Kilda), Dale Weightman (Richmond), Justin Madden (Carlton), Gerard Healy (Sydney Swans), John Platten (Hawthorn), Simon Madden (Essendon), Russell Morris (Hawthorn), Jim Krakouer (North Melbourne), Ross Glendinning (West Coast) |
+| 1988 | 22 | Gary Ayres (Hawthorn), Chris Langford (Hawthorn), Danny Frawley (St Kilda), John Worsfold (West Coast), Stephen Silvagni (Carlton), Brett Lovett (Melbourne), Darren Kappler (Fitzroy), Greg Williams (Sydney Swans), Craig Bradley (Carlton), Gary Buckenara (Hawthorn), Stephen Kernahan (Carlton), Peter Daicos (Collingwood), Dale Weightman (Richmond), Jason Dunstall (Hawthorn), Steven O'Dwyer (Melbourne), Simon Madden (Essendon), Gerard Healy (Sydney Swans), John Platten (Hawthorn), Shane Morwood (Collingwood), Dermott Brereton (Hawthorn), Matthew Larkin (North Melbourne), Barry Mitchell (Sydney Swans) |
+
+The existing draftguru carnival rows for all four seasons are untouched; the two teams stay two
+sets of rows (28 players are in both teams of their season, 23 of them under the same club
+string).
+
+**Player links.** `player_id` is the manifest's bootstrap id (legacy `afldb_dev.players.id`),
+resolved by name against the bootstrap read-only and checked against the AFL Tables profile and
+debut/final season: every one of the 63 distinct players resolved to **exactly one** bootstrap
+player carrying an `afltables_profile_url` identity, so every row is `resolved` / 1. Seven of
+them were not yet in `data/awards/player-identity.csv` (no earlier manifest referenced them) and
+were censused: 686 Sean Wight, 1254 Shane Morwood, 1361 Steven ODwyer, 1391 Geoff Cunningham,
+1400 Wayne Blackwell, 1403 Brian Taylor, 1708 Des English (`EXPECTED_ROWS` 1,738 → 1,745,
+`with_identity` 1,720 → 1,727, the 18 no-identity players unchanged). Load outcome: **86 of 86 new
+rows linked** on both databases (`afldb_test` 1,244 rows / 1,153 linked, was 1,158 / 1,067;
+`afldb_dev` 1,244 / 1,153 — dev additionally reports bootstrap 1347 Matt Rendell as not uniquely
+carried, pre-existing).
+
+**Parser contract (`tools/migration/all_australian.py`).** `EXPECTED_TOTAL` 1,158 → **1,244**,
+`EXPECTED_BY_SOURCE.wikipedia` 252 → **338**, `EXPECTED_LINKED` 1,078 → **1,164**; seasons, null
+clubs, positions, captains and notes unchanged. The natural identity is now
+**`(source, season, player, club)`**: `(season, player, club)` collides for the 23 players named
+in both teams of one season under one club string (e.g. `Michael Tuck` / `Hawthorn` 1983 in
+both), and those are two selections in two teams, not a duplicate. Legitimately duplicated
+`(season, player)` pairs 10 → **38** (1983 7, 1984 9, 1986 6, 1987 9, 1988 6, 2016 1). Mirrored
+in `tests/all-australian-source.test.ts`, `tests/player-identity-source.test.ts`,
+`tests/integration/awards-reload-links.test.ts` (1,244 / 1,245 read / 1,164 / 338 / 38) and
+`tools/db/rebuild-test.ts` (`allAustralian: 1244`). No builder, mapping or award-semantics
+change.
+
+**Oracle before / after (`afldb_test`, same corpus, same bridge method):**
+
+| Measure | Before (§23.12 re-run this session) | After |
+|---|---:|---:|
+| fingerprint bridge / union bridge | 1,609 / 1,832 | 1,615 / 1,838 (0 disagreements both) |
+| unbridged Gridley answer entries | 26,391 | 26,247 |
+| board-time effect | 730 | 730 |
+| other axis, not All-Australian | 636 | 639 |
+| **AFLDB source missing required selection** | **315 entries / 14 players** | **11 entries / 1 player** |
+| AFLDB source has extra non-Gridley selection | 65 | 65 (unchanged set) |
+
+**The 14-player gap:** cleared for **13**. Jim Krakouer (1986 + 1987), David Rhys-Jones (1987),
+Darren Kappler (1988), Steven Stretch (1987), Brian Taylor (1986), Dermott Brereton (1986 + 1988,
+now 3x with 1985), Barry Mitchell (1988, 2x with 1991), Doug Hawkins (1986, 2x with 1984), Brian
+Royal (1983, 2x with 1986), Bernie Quinlan (1983, 2x with 1984), Gary Malarkey (**1983** — the
+"1980 or 1983" question in §23.12 is settled), Terry Wallace (1983, 3x with 1982/1988), Gary Pert
+(1986, 3x with 1985/1989). (The briefing's "Simon Mitchell / Mark Royal / Gary Anderson / Peter
+Malarkey / Stephen Pert" are these players under the §23.12 names.) **Not cleared: Greg Anderson**
+(11 `allAus2x` entries). Gridley lists him as a 2x All-Australian; AFLDB holds 1993 (Adelaide)
+only, and the source article lists him in exactly one team in 1982–2025 (1993) and in no carnival
+team. On the evidence available this is a Gridley-side claim, not a source gap; it is **recorded,
+not fixed**, and would need a second authoritative source naming a second selection before any row
+is added.
+
+**David Clarke 1972 — resolved, no data change.** The row links bootstrap 1895 → AFL Tables
+`players/D/David_Clarke0.html`: born 31 December 1952, career 1971–1982 (the other candidate,
+`David_Clarke1`, was born in 1980 and played 1999–2005). The source's 1972 carnival team lists
+*David Clarke (Australian footballer, born 1952)*, Victoria, Geelong. The link is correct; Gridley's
+answer keys omit him (48 cells). Classification changes from "source ambiguity" to **Gridley-side
+omission**; the 65 "extra" entries are therefore all either this omission or other-axis /
+board-time effects, none an AFLDB source error.
+
+**The same-season double-selection count — now decided by the corpus.** Danny Frawley is named in
+both 1988 teams and in no other season: 1 distinct season, 2 rows. He satisfies the other axis of
+**7 `allAus2x` cells and Gridley lists him in 0 of them**, while every player with two distinct
+seasons and a same-season double (Leon Baker 6/6, David Ackerly 4/4) is listed in all of theirs.
+Gridley counts a player named in two teams of one season **once**. `all_australian_team_min_times`
+(`count(DISTINCT season)`) is therefore exactly right and the §23.12 open ambiguity is closed for
+the dual-team seasons; the 1984 club+state pair is the same shape (one season, two lists) and stays
+on distinct-season counting.
+
+**Validation executed (workstation, `afldb_test` through the 55432 tunnel):**
+
+| Check | Result |
+|---|---|
+| `python tools/migration/all_australian.py` / `player_identity.py` | ok, 1,244 rows / 1,745 players |
+| `tests/all-australian-source.test.ts`, `tests/player-identity-source.test.ts`, `tests/gridley-compat.test.ts`, `tests/grid-solver-spec.test.ts` | 91/91 |
+| `tests/db-test-rebuild.test.ts` | 240/240 |
+| `import_awards.py --groups all_australian` → `afldb_test`, then `afldb_dev` | 1,244 rows, 1,153 linked, 0 rejected, 3 s each |
+| `tests/integration/grid-solver.test.ts` | 189/189 (final team ≠ squad, distinct-season X+ still holds with the new double rows) |
+| `tests/integration/awards-reload-links.test.ts -t "all-australian manifest reload"` (needs `AFLDB_TEST_IMPORT_DATABASE_URL`, the import role on `afldb_test`) | 8/8 |
+| `AFLDB_AA_REPORT=… tests/integration/gridley-aa-oracle.test.ts` | 16/16, ~55 s, table above; no timeout |
+| `tsc --noEmit` | clean |
+| `eslint` on the four touched TS files | 2 pre-existing `no-explicit-any` errors on untouched lines (`tests/player-identity-source.test.ts:43`, `tools/db/rebuild-test.ts:810`) and 1 pre-existing warning; nothing in this diff |
+
+**Files:** `data/awards/all-australian.csv` (+86), `data/awards/player-identity.csv` (+7),
+`tools/migration/all_australian.py`, `tools/migration/player_identity.py`,
+`tests/all-australian-source.test.ts`, `tests/player-identity-source.test.ts`,
+`tests/integration/awards-reload-links.test.ts`, `tools/db/rebuild-test.ts`, this runbook,
+`issues.md`, `IssuesIndex.md`, `CHANGELOG.md`. Production untouched.
+
+### 23.15 Exact next action
+
+1. **All-Australian family: complete** for Gridley's definition (`AFLDB source missing required
+   selection` = 11 entries, all Greg Anderson, documented above as Gridley-side; 0 AFLDB source
+   errors). No further acquisition unless a second source names an Anderson selection. Optional,
+   separate contract change: carry the Team of the Year positions / 1986 captaincy on `wikipedia`
+   rows.
+2. **Fable High session** for Stage H2 (height acquisition and provenance, §23.5) and the
+   schema/model families (§23.7); the oracle's fingerprint bridge (now 1,838 players) is the tool
+   for the height answer-key comparison.
+3. Strict corpus run stays red until the height/draft/marquee/captaincy gaps land; closeout per
+   §23.2. Production receives the 86 rows with the next deploy plus `import_awards.py --groups
+   all_australian` (ISSUE-137 sequencing applies; not part of this stage).

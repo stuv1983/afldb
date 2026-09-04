@@ -15,6 +15,26 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-118 Stage AA3 — the 1983–1988 VFL Teams of the Year join the All-Australian source - 5 September 2026
+
+- **`data/awards/all-australian.csv`: 1,158 → 1,244 rows.** The VFL Team of the Year for **1983,
+  1986, 1987 and 1988** (20 / 22 / 22 / 22 selections) is now held alongside the State of Origin
+  carnival team of the same season, as the honour's definition (VFL Team of the Year 1982–90 plus
+  the carnivals 1953–88) requires; the bootstrap had only the carnival team in those four years.
+  Source: Wikipedia *All-Australian team* § "VFL/AFL Team of the Year: 1982–1990" (`wikipedia`
+  provenance, `aah:` keys, names verbatim). Every new row links to a player; seven players were
+  added to `data/awards/player-identity.csv` (1,738 → 1,745).
+- **`tools/migration/all_australian.py`:** declared counts bumped (wikipedia 252 → 338, linked
+  1,078 → 1,164); the natural identity is `(source, season, player, club)` because a player named in
+  both teams of one season is two selections in two teams, not a duplicate. Award semantics and
+  the Grid Solver builders are unchanged: "X+ times" still counts distinct seasons, which the
+  Gridley corpus now confirms (a player in both 1988 teams and no other season is not a "2x").
+- **Effect on the Grid Solver:** 13 of the 14 players the Gridley answer keys listed as
+  All-Australians that AFLDB lacked (Brereton, Krakouer, Rhys-Jones, Kappler, Stretch, Brian Taylor,
+  Barry Mitchell, Hawkins, Royal, Quinlan, Malarkey, Wallace, Pert) now answer correctly; the
+  oracle's source-missing count fell from 315 answer entries to 11, all one Gridley-side claim
+  (Greg Anderson as a 2x) that no source supports. Loaded on `afldb_dev` and `afldb_test`;
+  production receives it with the next deploy and `import_awards.py --groups all_australian`.
 ### AFLDB-ISSUE-118 (reopened) — All-Australian final team, height builders, strict Gridley regression - 5 September 2026
 
 - **Reopened:** the 5 September closeout counted 28 valid Gridley criteria as acceptable because

@@ -61,10 +61,12 @@ DEFAULT_PATH = _DATA_DIR / "player-identity.csv"
 HEADER = ("player_id", "display_name", "afltables_profile_url")
 
 # The census covers exactly the distinct linked player_id values the eight
-# awards/honours manifests reference, measured 2026-09-02. A row count outside
+# awards/honours manifests reference, measured 2026-09-02, plus the seven
+# 1983-1988 VFL Team of the Year players censused under AFLDB-ISSUE-118
+# §23.14 (2026-09-05). A row count outside
 # this is a manifest change that has not been re-censused — refuse rather than
 # load a bridge that no longer spans the whole family.
-EXPECTED_ROWS = 1738
+EXPECTED_ROWS = 1745
 EXPECTED_WITHOUT_IDENTITY = 18
 
 # The normalised AFL Tables profile path, exactly as external_identities

@@ -598,7 +598,7 @@ export const AWARDS_HONOURS_EXPECTED = {
   captaincies: 1375,
   risingStarNominations: 766,
   risingStarWinners: 33,
-  allAustralian: 1158,
+  allAustralian: 1244,
   clubBestAndFairest: 752,
   namedMedals: 979,
   under22: 330,
