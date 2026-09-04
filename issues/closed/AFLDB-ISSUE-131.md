@@ -1,17 +1,20 @@
 # AFLDB-ISSUE-131 — An upstream match rekey duplicates the canonical match
 
-**Status:** Open — Stage 1 (investigation / design) COMPLETE.
-**Stage 2 (implementation + validation) COMPLETE 2026-09-03 on `claude/issue-131`, unmerged.**
-**Independent review answered 2026-09-03 — merge YES AFTER FIXES; every required fix is
-made and validated. See §14.**
-Production untouched; the timer stays stopped. See §13 and §14.
+**Status: RESOLVED 2026-09-04.** §8's production acceptance is reconstructed and accepted in
+**§16**. Stage 1 (investigation / design) COMPLETE; **Stage 2 (implementation + validation)
+COMPLETE 2026-09-03**, merged as `657a875` and deployed to production; **independent review
+answered 2026-09-03 — merge YES AFTER FIXES; every required fix is made and validated (§14)**.
+~~Production untouched; the timer stays stopped.~~ **Superseded — do not read that line as
+current.** Production is deployed on the fix, `afldb-settle-afltables.timer` is **active**, and
+five settles have run on it (batches 735–739) with **0 duplicate fixtures**, 0 refusals and 0
+findings. See **§16** for the acceptance mapping, what could not be reconstructed, and the
+deferred non-blocking follow-up (§9.4, §9.6).
 **Bookkeeping note 2026-09-03 (recorded during the ISSUE-133 closeout, not by an ISSUE-131
-session):** the line above is superseded by read-only production evidence in
+session):** the struck line above was first corrected from read-only production evidence in
 `issues/closed/AFLDB-ISSUE-133.md` §3–§4 and §11.3 — ISSUE-131 is merged as `657a875` and
 deployed as production `HEAD`, `afldb-settle-afltables.timer` is **active**, and settle batches
-735–738 ran on the evening of 2026-09-03. §8's acceptance evidence is not recorded in this
-runbook; recording it (or the gap) and resolving remain the operator's ISSUE-131 actions.
-Nothing else in this document was changed.
+735–738 ran on the evening of 2026-09-03. §8's acceptance evidence was not recorded in this
+runbook at that time; **§16 (2026-09-04) reconstructs and accepts it.**
 **Severity:** High — data integrity, and it blocks re-enabling the production settle timer.
 **Area:** Data acquisition / Import architecture / Data integrity
 **Branch / worktree:** `claude/issue-131` — `D:\dev\afldb-issue-131`
@@ -35,9 +38,14 @@ the Stage-1 record and is left as written EXCEPT where §14 names a correction i
 §13 records what was built, what was proved, and where the implementation had to depart
 from the design, and §14 records the independent review and the pre-merge fixes.
 
-`afldb-settle-afltables.timer` on production is **STOPPED and must stay stopped** until
-Stage 2 ships and §8's supervised acceptance passes. No production write, settle,
-migration, DELETE or repair was performed or is authorised by this document.
+**Stage-1 posture, now satisfied and superseded — see §16.** As written, this section said
+`afldb-settle-afltables.timer` on production was **STOPPED and must stay stopped** until
+Stage 2 shipped and §8's supervised acceptance passed, and that no production write,
+settle, migration, DELETE or repair was performed or authorised by this document. Stage 2
+shipped and merged (`657a875`), production was deployed on it on 2026-09-03, §8's
+acceptance is reconstructed and accepted in **§16**, and the timer is **active** and has
+fired on schedule. **No migration, DELETE or repair was ever performed** — the repair tool
+was correctly not needed (§16.4 step 3/4).
 
 ---
 
@@ -590,6 +598,10 @@ No shell, Git, SQL, SSH, service, build or deployment command was executed.
 4. Do not touch production. The timer stays stopped until §8's supervised sequence
    completes and is accepted.
 
+**Superseded by §13.6, then §15.5, then §16.** Stage 2 shipped and merged, production was
+deployed on it on 2026-09-03 and the timer is active; item 4 above is a Stage-1
+instruction and is no longer current.
+
 
 ---
 
@@ -992,7 +1004,9 @@ fix was already in, and LOW-5 asked only for the regression test, which is now w
 ## 15. §9 read-only environment evidence — operator-run (2026-09-03)
 
 The operator ran the §9 queries. **Read-only throughout; no write, no settle, no repair,
-no deploy. `afldb-settle-afltables.timer` on production remains STOPPED.** This session
+no deploy. `afldb-settle-afltables.timer` on production remains STOPPED.** *(That last
+clause was true when this section was written, before the 2026-09-03 22:16 AEST deploy;
+the timer has been active since — see §16.)* This session
 opened neither database and made no application-code change in response — the evidence
 does not contradict the implemented contract.
 
@@ -1141,3 +1155,208 @@ Consequently:
    empty historical halves are a separate supervised cleanup decision (§15.3 item 4).
 5. Optional, separately: run §9.4 and decide the §7 index; run §9.6 plus a cross-snapshot
    `Game` comparison and decide §5.2.
+
+**Superseded by §16.** Steps 1–3 were completed on 2026-09-03 (merge `657a875`, deploy,
+settle batches 735–739) and §8's acceptance is reconstructed and accepted in §16; step 5
+remains genuinely outstanding and is recorded there as deferred, non-blocking follow-up.
+
+---
+
+## 16. Final acceptance — §8 reconstructed from production evidence (2026-09-04)
+
+**This pass is bookkeeping and acceptance reconstruction only.** No application code,
+migration, test, deployment file or configuration was changed; no settle, repair, deploy
+or database write was performed on any environment. The production reads in §16.3 ran as
+`afldb_owner` on `afldb_prod` with `default_transaction_read_only = on`, SELECT only.
+
+### 16.1 Why this section exists
+
+§8's supervised production sequence was carried out by the operator on the evening of
+2026-09-03, but no terminal transcript of it was ever written into this runbook, and the
+§0/§13/§14 headers went on saying "production untouched; the timer stays stopped" until
+the ISSUE-133 closeout corrected them. That gap — a missing transcript, not a missing
+step — is the only reason ISSUE-131 stayed Open.
+
+The acceptance is therefore reconstructed from state the pipeline itself persists. That
+state is stronger evidence than a transcript would have been:
+`import_batches.validation_result` holds each settle run's own counters,
+`canonical_applications` holds every canonical mutation, and `matches` holds the result —
+none of which can be retrospectively narrated.
+
+### 16.2 Evidence sources
+
+| Source | What it establishes |
+|---|---|
+| `issues/closed/AFLDB-ISSUE-133.md` §3 | deployed revision `657a875`, `BUILD_ID w9ce2qfWBViW-3wnIRGzt`, service restart 22:16:18 AEST, `afldb-settle-afltables.timer` **active**, migrations 084/085 applied |
+| `issues/closed/AFLDB-ISSUE-133.md` §4, §5 | the two canonical `wildcard_final` rows, their exact shape and query path, and the ledger timing of batch 735 |
+| `issues/closed/AFLDB-ISSUE-133.md` §11.1 | the public `/seasons/2026` page rendering both matches after the ISR window expired |
+| `issues/closed/AFLDB-ISSUE-132.md` §1, §11 | production holding 2 canonical Wildcard Finals and **0 duplicate fixtures** after the settle, recorded contemporaneously |
+| §15.2 of this runbook | production §9.2 = **0 duplicate fixtures** *before* the fixed code ran — the pre-state the repair tool would have been given |
+| `import_batches.validation_result` on `afldb_prod` | each settle run's own counter set, including the rekey counters this issue added |
+| `canonical_applications`, `matches`, `data_issues` on `afldb_prod` | the resulting canonical state and the absence of any refusal or finding |
+| `tools/rebuild/fitzroy/acquire_core.R` (`:43-44`, `:77-84`, `:100`) | the acquisition fails closed on a missing `jsonlite`/`fitzRoy`, on a fitzRoy version that is not `fitzroy-contract.json`'s `pinned_version`, and on the absence of a SHA-256 provider; `deploy/afldb-settle-afltables.sh:118-121` passes **no** `--allow-version-mismatch` |
+
+### 16.3 Production read, 2026-09-04 13:27 AEST (PROD `afldb-prod`, read-only)
+
+```bash
+# PROD afldb-prod — read-only; script scp'd and run by path
+cd /home/arm/projects/afldb && set -a && . ./.env && set +a
+systemctl is-active afldb-settle-afltables.timer
+PGOPTIONS='-c default_transaction_read_only=on' psql "$AFLDB_PROD_DATABASE_URL" -X -At -F ' | '
+# statements issued (SELECT only):
+#   current_user, current_database(), now(), current_setting('default_transaction_read_only')
+#   §9.2 duplicate fixtures, season 2026 — group form and row form
+#   matches by round_type for 2026; count(*) for season 2026
+#   import_batches id >= 730: id, tool, status, started_at, records_read, records_rejected, notes
+#   canonical_applications where import_batch_id >= 735, grouped by batch/target/verb
+#   data_issues since 2026-09-03 20:00+10, and any row whose description/details mention "rekey"
+#   validation_result for batches 735, 736, 739
+#   player_match_stats / match_period_scores counts for the two wildcard_final matches
+```
+
+Results:
+
+| Measure | Value |
+|---|---|
+| `afldb-settle-afltables.timer` | **active** |
+| §9.2 duplicate 2026 fixture groups | **0** (no rows) |
+| 2026 `matches` | **209** — `home_and_away` 207 (2026-03-05 … 2026-08-23), `wildcard_final` 2 (2026-08-28 … 2026-08-29) |
+| Settle batches since the fix | 735 (09-03 22:37:47), 736 (22:39:48), 737 (22:44:04), 738 (22:45:03), 739 (**09-04 04:31:39, the nightly timer**) — every one `settle-afltables.ts`, `mode=apply`, status `completed` |
+| Earlier settles | 731 (09-02 21:43:16), 732 (09-03 05:53:38), both `completed`. Ids 730, 733, 734, 740 do not exist; **no `failed` or `running` batch row exists at all** |
+| Non-settle batches | 741 `AFLDB-ISSUE-137 identity reconciliation` (09-04 12:18:07), 742 `import_brownlow_season.py` (09-04 12:23:51) — not this issue's work and not touched here |
+| `canonical_applications` for batches ≥ 735 | **only batch 735**: `matches` insert **2**, `match_period_scores` insert **2**, `player_match_stats` insert **83** (87 ledger rows). **Batches 736, 737, 738 and 739 wrote none.** |
+| `data_issues` opened since 2026-09-03 20:00 AEST | **none** |
+| `data_issues` mentioning a rekey (description or details) | **none** |
+| Wildcard Final child rows | `17381` 42 `player_match_stats` / 8 `match_period_scores`; `17382` 41 / 8 |
+
+Batch 735's own counter set (`validation_result`), snapshot `settle-2026-09-03-2230`:
+
+| Counter | Value | Counter | Value |
+|---|---|---|---|
+| `snapshotMatches` | 209 | `canonicalRowsInserted` | 101 |
+| `snapshotPlayerMatchRows` | 9,614 | `canonicalRowsUpdated` | 0 |
+| `snapshotRejections` | 0 | `canonicalApplicationsLogged` | 87 |
+| `snapshotUnkeyedRejections` | 0 | **`canonicalMatchesRekeyed`** | **0** |
+| `absenceSweepSkipped` | 0 | **`canonicalRekeyRefusals`** | **0** |
+| `observationsSeen` | 9,823 | `canonicalApplyFailures` | 0 |
+| `observationsCorrected` | 85 | `canonicalApplyRefusals` | 0 |
+| `versionsAppended` | 94 | `manualAuthorityRefusals` | 0 |
+| `candidatesCreated` | 9 | `canonicalOverridesCarried` | 0 |
+| `unresolvedIdentityMatch` | 2 | `dataIssuesOpened` | 0 |
+| `foreignOwnedCollision` | 0 | `derivedRecomputeRuns` | 1 |
+
+`canonicalRowsInserted = 101` reconciles exactly with the ledger and the resulting rows:
+2 `matches` + 16 `match_period_scores` (two sets of 8) + 83 `player_match_stats`.
+`snapshotRejections`, `snapshotUnkeyedRejections` and `absenceSweepSkipped` are all 0, so
+`assessSourceCompleteness()` (`src/lib/acquisition/source-completeness.ts:96-160`) returns
+**`complete`** over 9,823 enumerated records — the ISSUE-128 gate, satisfied on the
+production run itself.
+
+Batch 736 (read in full) and batch 739 (read in full) carry the same snapshot enumeration
+and **every write counter at zero** — `canonicalRowsInserted` 0, `canonicalRowsUpdated` 0,
+`canonicalApplicationsLogged` 0, `versionsAppended` 0, `payloadsCreated` 0,
+`observationsCorrected` 0, `candidatesCreated` 0, `dataIssuesOpened` 0,
+`canonicalMatchesRekeyed` 0, `canonicalRekeyRefusals` 0 — with `observationsUnchanged`
+10,032. For batches 737 and 738 the counter blobs were not printed; their batch rows show
+`records_rejected = 0` and they wrote **zero** `canonical_applications` rows, which is the
+same fact at the ledger grain.
+
+### 16.4 §8's acceptance sequence, mapped
+
+| §8 step | Requirement | Evidence | Status |
+|---|---|---|---|
+| 1 | §9 read-only evidence on production; the stale set may be empty | §15.2 — §9.2 returned 0 duplicate fixtures on `afldb_prod` before the deploy | **RECONSTRUCTED EXACTLY** (recorded in this runbook when it was run) |
+| 2 | Deploy the code fix | ISSUE-133 §3 — `657a875` is production `HEAD`, `5f4c082`/`d734c73`/`657a875` all ancestors, build `w9ce2qfWBViW-3wnIRGzt`, service restarted 22:16:18 onto it | **RECONSTRUCTED EXACTLY** |
+| 2 | `sh deploy/afldb-r-preflight.sh` ends `R PREFLIGHT: OK` | No transcript exists. The property the gate proves was demonstrated at runtime instead, twice: snapshots `settle-2026-09-03-2230` and `settle-2026-2026-09-04-0431` were acquired by `acquire_core.R` under the systemd unit, which `stop()`s on a missing `jsonlite`/`fitzRoy`, on any fitzRoy version other than the contract's `pinned_version` (the settle script passes no `--allow-version-mismatch`), and on a missing SHA-256 provider. ISSUE-130's read-only production inspection had already found R 4.3.3 with `jsonlite`/`digest`/fitzRoy 1.8.0 in `/usr/local/lib/R/site-library` and no drop-in | **SUPERSEDED — property proven, transcript not retained** |
+| 3 | `repair-match-rekeys` dry run; review the plan | No transcript exists. The plan is a function of the duplicate-fixture groups (§8 rule 4), and production held **0** before the run (§15.2) and holds **0** now (§16.3), so the plan was necessarily empty — §15.3 item 1 predicted exactly this | **SUPERSEDED — an empty plan is entailed by the measured pre- and post-state** |
+| 4 | `--apply`; re-run the validation block | Not applicable: `--apply` is authorised only on a non-empty plan (§15.5 step 3, "if and only if the plan is non-empty"). No `repair-match-rekeys` batch row exists on production | **NOT REQUIRED — correctly not run** |
+| 5 | One supervised settle | Batch **735**, `mode=apply`, snapshot `settle-2026-09-03-2230`, status `completed`: 2 `matches` + 2 `match_period_scores` + 83 `player_match_stats` applied at 22:37:47 AEST, 87 ledger rows, source completeness `complete`, 0 failures, 0 refusals, 0 findings | **RECONSTRUCTED EXACTLY** |
+| 5 | An identical rerun proving 0/0/0 (SC3) | Batches **736, 737, 738** re-ran the same snapshot label 2–8 minutes later: every write counter 0, **zero** `canonical_applications` rows, `records_rejected` 0. The nightly timer run **739** (a fresh snapshot) also wrote nothing | **RECONSTRUCTED EXACTLY — three reruns, not the one §8 asked for** |
+| 6 | Re-enable `afldb-settle-afltables.timer` only after the above | `systemctl is-active` = **active** (ISSUE-133 §3, re-confirmed 2026-09-04), and batch 739 is the timer firing on schedule at 04:31 AEST and writing nothing | **RECONSTRUCTED EXACTLY** |
+| — | No duplicate canonical match created | §9.2 on production: **0** duplicate fixture groups on 2026-09-04, after five settles on the fixed code. 209 canonical 2026 rows = 207 `home_and_away` + 2 `wildcard_final`; ISSUE-132 §1/§11 recorded the same 0 contemporaneously | **RECONSTRUCTED EXACTLY (measured after the fact)** |
+| — | Resulting production data correct | ISSUE-133 §4 (both rows, correct shape, correct join and ordering, `seasons.last_loaded_round = 'WF'`) and §11.1 (the live page renders the Wildcard Final block) | **RECONSTRUCTED EXACTLY** |
+
+### 16.5 What remains genuinely unknown
+
+Three transcripts were never retained, and this document does not claim otherwise:
+
+1. whether `sh deploy/afldb-r-preflight.sh` was executed on production, and its output;
+2. whether `repair-match-rekeys --dry-run --season 2026` was executed on production, and
+   its output;
+3. whether the settle was first run `--dry-run --auto-apply` before batch 735's apply.
+
+None is material. Each was a means of proving a property that is now proven directly and
+more strongly by production state: the R runtime by two completed fail-closed
+acquisitions, the empty repair plan by a measured zero duplicate-fixture count before and
+after, and the dry run by the apply's own outcome plus three identical no-op reruns. §8's
+purpose was to make re-enabling the timer safe; the timer has since fired unsupervised
+(batch 739) and written nothing.
+
+### 16.6 The rekey path itself was never exercised on production
+
+`canonicalMatchesRekeyed = 0` on every settle since the fix, and `canonicalRekeyRefusals`,
+`canonicalApplyRefusals`, `canonicalApplyFailures` and `manualAuthorityRefusals` are all 0.
+This is the expected consequence of §15.2: production's 2026 rows already stood on the
+identities AFL Tables currently publishes, so no canonical row needed rekeying and the two
+Wildcard Finals were genuinely new records (verb `new` → INSERT, correctly). Production
+therefore accepts the **prevention** — the fixed code ran repeatedly against real data,
+created no duplicate and refused nothing — while the rekey-in-place behaviour itself
+remains proven by the `afldb_test` regression suite (§13.3, §14.8), not by a production
+firing. Recorded plainly so no later reader mistakes an unexercised path for a
+field-validated one.
+
+### 16.7 Observations recorded, not acted on
+
+- Batch 735 wrote **83** of the source's **92** Wildcard Final `player_match_stats` rows
+  (42 on match 17381, 41 on 17382). The batch's `records_rejected = 9` counts
+  `import_rejections` rows — targets refused for **unresolved identity**
+  (`settle-afltables.ts:1969-1990`) — and `candidatesCreated = 9` opened the matching
+  review candidates. Nothing was silently dropped: `snapshotRejections` and
+  `snapshotUnkeyedRejections` are 0, so the source enumeration is complete and the nine
+  records' presence is recorded. This is identity resolution on the ISSUE-122 path, not
+  the rekey contract, and it is consistent with the four production canonical player
+  splits `AFLDB-ISSUE-137` tracks (batch 741 reconciled those at 12:18 on 2026-09-04,
+  after these runs). **Not investigated here.** Worth re-measuring on the first settle
+  after ISSUE-137 completes.
+- `unresolvedIdentityPlayer = 812` is unchanged across batches 735, 736 and 739, so it is
+  a standing count rather than a per-run failure. Not pursued.
+
+### 16.8 Deferred, non-blocking follow-up — NOT ISSUE-131 acceptance
+
+These were never part of §8's acceptance and do not hold this issue open:
+
+1. **§9.4 — the §7 hardening index measurement.** Never run. §7's optional UNIQUE on
+   `(season, match_date, home_club_id, away_club_id)` remains unmeasured, **unwritten and
+   not adopted**; ISSUE-131 claims **no migration number** and needs none. Adopting it
+   later requires §9.4 over full history first and a migration number re-derived by
+   scanning every live branch tip.
+2. **§9.6 — `game_id` as a stable identity.** Never run, and no cross-snapshot `Game`
+   comparison was made. §5.2 stays undecided and §10 risk 1 stands; the two
+   `source_record_id` conventions (§3.6) remain as they are.
+3. **Dev's 17 empty historical duplicate rows** (§15.1, §15.3 item 4) — dev-only, carrying
+   no dependent data, outside the repair tool's candidate set by construction, and a
+   separate supervised cleanup decision. **No DELETE is proposed**, here or anywhere.
+4. **ISR staleness after a settle** — `AFLDB-ISSUE-134`, allocated from the ISSUE-133
+   closeout.
+5. **The nine unresolved-identity rejections** in §16.7, to be re-measured after
+   `AFLDB-ISSUE-137`.
+
+### 16.9 Verdict
+
+**§8's acceptance is substantively satisfied. `AFLDB-ISSUE-131` is RESOLVED 2026-09-04.**
+
+The fix is merged (`657a875`), deployed, and has run on production five times without
+creating a duplicate canonical match, without a single refusal or finding, with source
+completeness `complete`, with three identical no-op reruns and one unsupervised nightly
+timer firing that wrote nothing. The remediation tool shipped and was correctly not
+needed. The public surface renders the resulting data correctly (ISSUE-133 §11.1).
+
+### 16.10 Corrections made to this document in this pass
+
+- The header's "Production untouched; the timer stays stopped" and §0's
+  "`afldb-settle-afltables.timer` on production is **STOPPED and must stay stopped**" were
+  live instructions that had been false since 2026-09-03 22:16 AEST. Both are corrected in
+  place and point here.
+- §15's dated preamble ("the timer remains STOPPED") is a true record of the state when
+  §15 was written and is left as written, with a pointer to this section.
+- Nothing else in §1–§15 was altered.
