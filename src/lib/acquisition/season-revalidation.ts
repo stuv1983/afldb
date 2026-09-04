@@ -37,6 +37,7 @@
  */
 import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
+import { isIP } from 'node:net';
 
 /** The path segment of the route. Fixed; never taken from a caller. */
 export const REVALIDATE_ROUTE = '/api/internal/revalidate-season';
@@ -55,6 +56,105 @@ export const REVALIDATE_SECRET_ENV = 'AFLDB_REVALIDATE_SECRET';
  * would be a credential disclosure rather than a misconfiguration.
  */
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
+
+/* ------------------------------------------------------------------ *
+ * Who the caller is, as the running framework actually reports it
+ * ------------------------------------------------------------------ */
+
+/**
+ * The verdict on a request's `x-forwarded-for`, from the route's point of
+ * view. Only `loopback` and `absent` may be served; everything else is a
+ * request that did not originate on this host, or one whose forwarding data
+ * does not match the deployment contract and so cannot be reasoned about.
+ */
+export type ForwardedClientVerdict =
+  | 'loopback'
+  | 'absent'
+  | 'remote'
+  | 'chained'
+  | 'malformed';
+
+/**
+ * AFLDB-ISSUE-134 §10.2 — why this is not "the header must be absent".
+ *
+ * Next 16 fills the forwarding headers in on EVERY request, before any
+ * handler runs (`next/dist/server/base-server.js`):
+ *
+ *   req.headers['x-forwarded-host'] ??= req.headers['host'] ?? this.hostname;
+ *   req.headers['x-forwarded-for']  ??= originalRequest?.socket?.remoteAddress;
+ *
+ * so absence is not a signal about anything — a direct loopback POST carries
+ * both headers too. The first deployment of this feature tested for absence
+ * and was 404 on every request on the real host. What the `??=` DOES mean is
+ * that the framework never overwrites a value the proxy set, so the value
+ * seen here is Caddy's when the request was proxied and the kernel's socket
+ * address when it was not. Both are trustworthy, for different reasons:
+ *
+ *   - `deploy/Caddyfile` and `deploy/Caddyfile.production` both set
+ *     `header_up X-Forwarded-For {remote_host}` on every `reverse_proxy` block
+ *     — OVERWRITE, not append — and drop `X-Real-IP` and `Forwarded`. A public
+ *     client that sends `X-Forwarded-For: 127.0.0.1` has it replaced with its
+ *     real address before Node sees it. `src/lib/auth/session.ts` already
+ *     stakes the audit trail on this same property, and
+ *     `tests/settle-season-revalidation.test.ts` asserts it against the
+ *     tracked files so an append/trust change cannot land quietly.
+ *   - `deploy/afldb.service` pins `HOSTNAME=127.0.0.1`, so the application
+ *     socket is bound to loopback and the only way to reach it without
+ *     passing through Caddy is to already be on this host.
+ *
+ * `absent` is served for the one case the two facts above leave: no
+ * forwarding identity was produced at all. Caddy always emits the header — by
+ * the tracked `header_up`, and by its own default behaviour if that line were
+ * ever lost — so a request with none of it did not come through the proxy.
+ * Serving it keeps this route working if a future framework stops
+ * synthesising, which is the exact failure this classifier replaces.
+ *
+ * A COMMA-SEPARATED CHAIN IS REFUSED, not parsed. Under this deployment
+ * exactly one hop is ever produced, so a chain means either the proxy
+ * contract changed or something upstream is passing client input through;
+ * neither is a state in which a loopback claim can be believed.
+ */
+export function classifyForwardedClient(value: string | null | undefined): ForwardedClientVerdict {
+  if (value === null || value === undefined) return 'absent';
+  if (value.includes(',')) return 'chained';
+  const host = unbracket(value.trim());
+  if (host === '') return 'malformed';
+  if (isLoopbackAddress(host)) return 'loopback';
+  return isIP(host) === 0 ? 'malformed' : 'remote';
+}
+
+/** Whether the route may serve a request whose forwarded client is `verdict`. */
+export function isServableForwardedClient(verdict: ForwardedClientVerdict): boolean {
+  return verdict === 'loopback' || verdict === 'absent';
+}
+
+/** `[::1]` -> `::1`. Neither producer brackets, but a reader must not care. */
+function unbracket(host: string): string {
+  return host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
+}
+
+/**
+ * The loopback forms this deployment can actually emit: `::1` from a Node
+ * socket over IPv6, `::ffff:127.0.0.1` from an IPv4 connection to a
+ * dual-stack socket, and anything in 127.0.0.0/8 — a block that is
+ * unroutable off the host, so every address in it means the same thing.
+ */
+function isLoopbackAddress(host: string): boolean {
+  const lower = host.toLowerCase();
+  if (lower === '::1') return true;
+  return isLoopbackV4(lower.startsWith('::ffff:') ? lower.slice('::ffff:'.length) : lower);
+}
+
+function isLoopbackV4(host: string): boolean {
+  const octets = host.split('.');
+  if (octets.length !== 4) return false;
+  // No leading zeros: nothing here emits them, and accepting them would mean
+  // deciding whether `0177.0.0.1` is octal.
+  if (!octets.every((octet) => /^(?:0|[1-9]\d{0,2})$/.test(octet) && Number(octet) <= 255)) {
+    return false;
+  }
+  return octets[0] === '127';
+}
 
 /**
  * AFL's first season, and a year the wall clock cannot plausibly reach while

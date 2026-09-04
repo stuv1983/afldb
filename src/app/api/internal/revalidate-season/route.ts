@@ -5,7 +5,9 @@ import { NextResponse } from 'next/server';
 
 import { RateLimiter } from '@/lib/auth/rate-limit';
 import {
+  classifyForwardedClient,
   isPlausibleSeason,
+  isServableForwardedClient,
   REVALIDATE_SECRET_ENV,
   REVALIDATE_SECRET_HEADER,
 } from '@/lib/acquisition/season-revalidation';
@@ -41,11 +43,25 @@ export const dynamic = 'force-dynamic';
  * WHY IT IS NOT REACHABLE FROM THE INTERNET. Two independent gates, both of
  * which must pass:
  *
- *   1. The request must not have come through the reverse proxy. Caddy
- *      (`deploy/Caddyfile.production`) proxies the public site to
- *      127.0.0.1:3100 and adds `X-Forwarded-For` to everything it forwards,
- *      so a request carrying those headers did not originate on this host.
+ *   1. The forwarded client address must resolve to loopback. NOT "must be
+ *      absent" — that was this route's first, wrong premise, and it made the
+ *      feature 404 on every request on the real host (AFLDB-ISSUE-134 §10.2):
+ *      Next 16 synthesises `x-forwarded-for` and `x-forwarded-host` on every
+ *      request before any handler runs, so absence is not a loopback signal.
+ *      What makes the VALUE trustworthy is the deployment contract —
+ *      `header_up X-Forwarded-For {remote_host}` on every proxy block, which
+ *      overwrites rather than appends, and `HOSTNAME=127.0.0.1` in
+ *      `deploy/afldb.service`, which binds the application to loopback. A
+ *      public client cannot forge the header past Caddy and cannot reach the
+ *      socket without Caddy. `classifyForwardedClient()` in
+ *      `@/lib/acquisition/season-revalidation` holds the full argument and
+ *      the cases; the tracked proxy lines it rests on are asserted in
+ *      `tests/settle-season-revalidation.test.ts`.
  *   2. The shared secret must match, compared in constant time.
+ *
+ * `x-forwarded-host` is DELIBERATELY not a gate. Next fills it from the
+ * request's own `Host` header, which is client input on both paths, so it
+ * carries no information about where the request came from.
  *
  * Unconfigured, it answers 503 and does nothing at all — the same fail-closed
  * shape as `/api/admin/email-intake` and `AFLDB_SETTLE_TRIGGER`.
@@ -92,11 +108,12 @@ export async function POST(request: Request) {
     );
   }
 
-  // Gate 1: proxied requests are not local requests. Checked before the
-  // secret so a probe from the internet learns nothing about whether the
-  // secret it guessed was the right length.
-  if (request.headers.get('x-forwarded-for') !== null
-    || request.headers.get('x-forwarded-host') !== null) {
+  // Gate 1: the caller must be on this host. Checked before the secret so a
+  // probe from the internet learns nothing about whether the secret it
+  // guessed was the right length, and answers 404 rather than 403 so the
+  // route does not confirm its own existence to the internet.
+  const forwardedClient = classifyForwardedClient(request.headers.get('x-forwarded-for'));
+  if (!isServableForwardedClient(forwardedClient)) {
     return NextResponse.json(
       { error: 'Not found.' },
       { status: 404, headers: { 'Cache-Control': 'no-store' } },

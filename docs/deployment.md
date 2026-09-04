@@ -827,10 +827,37 @@ curl -s -X POST http://127.0.0.1:3100/api/internal/revalidate-season   -H "x-afl
 **What the secret authorises.** One thing: asking the site to re-render
 `/seasons/<year>`. The body carries an integer year and nothing else — the
 path is composed server-side — so there is no arbitrary path, pattern, layout
-or tag to purge. The route also refuses any request carrying `X-Forwarded-For`
-or `X-Forwarded-Host`, which Caddy adds to everything it proxies, so it cannot
-be reached from the internet even with the secret. Unconfigured, it answers
-503.
+or tag to purge. Unconfigured, it answers 503.
+
+**Why the internet cannot reach it.** The route serves a request only when its
+forwarded client address resolves to loopback, and that value is trustworthy
+because of two things this repository controls:
+
+- **Every proxy block overwrites the header.** `deploy/Caddyfile` and
+  `deploy/Caddyfile.production` set `header_up X-Forwarded-For {remote_host}`
+  on each `reverse_proxy`, and drop `X-Real-IP` and `Forwarded`. A public
+  client that sends `X-Forwarded-For: 127.0.0.1` has it *replaced* with the
+  address Caddy observed before Node sees it. `src/lib/auth/session.ts` already
+  stakes the audit trail on the same property.
+- **The application is bound to loopback.** `deploy/afldb.service` sets
+  `HOSTNAME=127.0.0.1`, so the only way to the port without passing through
+  Caddy is to already be on the host.
+
+A comma-separated chain, a non-loopback address, or a malformed value is
+refused — the deployment produces exactly one hop, so anything else means the
+contract changed and no loopback claim can be believed. Both properties are
+asserted against the tracked files in
+`tests/settle-season-revalidation.test.ts`, so an append/trust change to a
+Caddyfile cannot quietly invalidate the model.
+
+> **NOT "the forwarding headers must be absent".** That was the first version
+> of this gate and it made the route 404 on *every* request on the real host
+> (`AFLDB-ISSUE-134` §10.2). Next 16 synthesises `x-forwarded-for` and
+> `x-forwarded-host` on every request before any handler runs
+> (`base-server.js`), filling them from the socket address and the `Host`
+> header when the proxy did not — so **absence is not a loopback signal**, and
+> a direct loopback POST carries both headers too. `x-forwarded-host` is not a
+> gate at all: it is client input on both paths.
 
 **When it fires.** Only after the settle transaction has committed, and only
 when that run actually wrote a canonical or ledger row. The idempotent 0/0

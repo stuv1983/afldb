@@ -190,13 +190,12 @@ than assumed.
   shape).
 - **Loopback only, both ends.** The client refuses a configured URL whose host is not
   `127.0.0.1`/`::1`/`localhost`, so a mistyped `.env` cannot post the secret to a public host.
-  The route refuses any request carrying `x-forwarded-for` / `x-forwarded-host`, which Caddy
-  always adds (`deploy/Caddyfile.production` proxies to `127.0.0.1:3100`), so a request that
-  arrived through the public proxy is rejected before the secret is even compared.
-  > **DISPROVED ON THE HOST — see §10.2.** Next 16 synthesises *both* headers on every request
-  > (`base-server.js:606-612`), so the test is true for loopback callers too and the route can
-  > never succeed. The replacement gate is §10.4. Everything else in this list held up under
-  > the §10 acceptance probes.
+  The route serves a request only when its **forwarded client address resolves to loopback**,
+  checked before the secret is compared.
+  > **REVISED — the original rule ("the forwarding headers must be absent") was disproved on
+  > the host in §10.2 and replaced in §11.** Next 16 synthesises both headers on every request
+  > (`base-server.js:606-612`), so absence is not a loopback signal and the route could never
+  > succeed. Everything else in this list held up under the §10 acceptance probes.
 - **No user-controlled path or tag.** The body carries a single integer `season`; the handler
   builds the path itself with `seasonPath()` after bounds-checking the integer. There is no
   input by which any other path, pattern, layout or tag can be reached.
@@ -436,13 +435,14 @@ so the comment is misleading rather than wrong in effect. Out of scope here.)
 | 4. Repository gates | **ALL GREEN** — unit 49/49, focused 287/287, `tsc` clean, ESLint clean, integration 64 passed / 1 pre-existing skip in 240.85 s — §5.2, §5.4 |
 | 5. Coverage-contract scrutiny | **Complete** — §6; two hardening changes made (§5.3) |
 | 6. DEV preflight (read-only) | **Complete** — §7 |
-| 7. DEV acceptance | **HALTED ON A DEFECT** — deployed and worker identity proved on the host, but the route is unconditionally 404. DEV restored to `main`. §10 |
-| 8. Close-out | **BLOCKED** — ISSUE-134 stays OPEN; see §10.4 |
+| 7. DEV acceptance (first attempt) | **HALTED ON A DEFECT** — deployed and worker identity proved on the host, but the route is unconditionally 404. DEV restored to `main`. §10 |
+| 8. Security boundary repaired | **Complete** — gate 1 is now a loopback allowlist resting on the tracked proxy contract; tests replaced; docs corrected; all repository gates green. §11 |
+| 9. DEV acceptance (second attempt) | **PENDING** — re-run from §10.1 |
+| 10. Close-out | **BLOCKED on stage 9** — ISSUE-134 stays OPEN |
 
-**Exact next action:** operator decides on §10.4 — invert gate 1 to a loopback allowlist on
-`x-forwarded-for`, replace the test that passed for the wrong reason, correct the false premise
-in `route.ts` and `docs/deployment.md` §7c, re-run the §5 gates, then re-run DEV acceptance
-from §10.1. **ISSUE-134 stays OPEN. PROD untouched.**
+**Exact next action:** redeploy the pushed `claude/issue-134` branch to DEV (`streamanator`) by
+the same reversible procedure as §10.1, and re-run the acceptance sequence §9.3–§9.4 that §10.2
+blocked. **ISSUE-134 stays OPEN until that is green. PROD untouched.**
 
 ## 9. DEV acceptance plan — as proposed (superseded in part by §10)
 
@@ -599,7 +599,7 @@ Not reached, because the route never succeeds: real four-worker invalidation cov
 **The worker-identity half of the coverage contract was proved on the host (§10.1); the
 connection round-robin half was not.**
 
-### 10.4 Recommended fix - evidence-backed, NOT implemented
+### 10.4 Recommended fix - evidence-backed (IMPLEMENTED in §11)
 
 Invert gate 1: instead of requiring the forwarded headers to be **absent**, require
 `x-forwarded-for` to be **exactly a loopback address**.
@@ -641,3 +641,116 @@ Scope of the fix. All of it needs operator approval, because it moves a security
 | Working tree | 0 tracked modifications |
 
 **PROD was not touched at any point. I§UE-137 was not touched.**
+
+
+---
+
+## 11. Stage 5 — the security boundary, repaired (2026-09-04, workstation)
+
+§10.2's gate rested on a premise that is false under the running framework. This stage
+replaces it with one that rests on the **deployment contract**, which is tracked, and then
+asserts that contract so it cannot drift.
+
+### 11.1 The proxy chain, proven from tracked files (not assumed)
+
+| Fact | Where it is written | Why it matters |
+|---|---|---|
+| Caddy **overwrites** `X-Forwarded-For` with `{remote_host}` | `deploy/Caddyfile.production` (both `reverse_proxy` blocks) and `deploy/Caddyfile` (dev, port 8090) | A public client's own `X-Forwarded-For: 127.0.0.1` is *replaced* with the address Caddy observed. It cannot be forged past the proxy |
+| Caddy drops `X-Real-IP` and `Forwarded` | same blocks, `header_up -X-Real-IP`, `header_up -Forwarded` | No second, weaker address header for a future reader to trust |
+| The app binds **loopback only** | `deploy/afldb.service:47` — `Environment=HOSTNAME=127.0.0.1` | The socket cannot be reached from the internet without passing through Caddy |
+| Next fills the header in **only when absent** | `node_modules/next/dist/server/base-server.js` — `req.headers['x-forwarded-for'] ??= originalRequest?.socket?.remoteAddress` | `??=`, not `=`: Caddy's value survives, so what the handler reads is Caddy's on a proxied request and the kernel's socket address on a direct one |
+| The same property already carries the audit trail | `src/lib/auth/session.ts` — `requestIp()` / `lastForwardedIp()` reads the **rightmost** hop, "only trustworthy because Caddy overwrites rather than appends" | This is not a new trust assumption; it is the one the session/audit layer has always made |
+
+**Verdict: the contract is strong enough.** The gate was not weakened to make the route work —
+it was moved off a framework accident and onto the proxy contract, which is where the security
+argument already lived for `auth_sessions` and `auth_audit_log`.
+
+### 11.2 The new rule
+
+`classifyForwardedClient()` in `src/lib/acquisition/season-revalidation.ts` (Next-free, so the
+settle CLI can still import the module) returns one of five verdicts, and the route serves only
+the first two:
+
+| Verdict | Input | Served |
+|---|---|---|
+| `loopback` | `127.0.0.0/8`, `::1`, `[::1]`, `::ffff:127.0.0.1` | yes |
+| `absent` | no header at all | yes — see below |
+| `remote` | any other syntactically valid IP, v4 or v6 | **no** (404) |
+| `chained` | anything containing a comma | **no** (404) |
+| `malformed` | empty, `localhost`, `127.0.0.1:9000`, `0177.0.0.1`, junk | **no** (404) |
+
+- **A chain is refused, not parsed.** This deployment produces exactly one hop. A chain means
+  the proxy contract changed or something upstream is passing client input through; neither is
+  a state in which a loopback claim can be believed. Note this is *stricter* than
+  `lastForwardedIp()`, which takes the rightmost hop — appropriate, because this endpoint is
+  loopback-only rather than public.
+- **Leading zeros are refused rather than interpreted**, so `0177.0.0.1` cannot become 127 by
+  way of `Number()`.
+- **`absent` is served, deliberately.** Every proxy block in `deploy/` sets the header — by the
+  tracked `header_up`, and by Caddy's own default if that line were ever lost — so a request
+  carrying no forwarding identity did not come through the proxy. Refusing it would re-create
+  §10.2 the day a framework stops synthesising: the feature would go silently inert again. The
+  static assertions in §11.4 are what keep this branch honest.
+- **`x-forwarded-host` is no longer a gate at all.** Next fills it from the request's own
+  `Host` header, which is client input on both paths, so it carries no information about where
+  a request came from. Checking it was never meaningful and is now removed.
+
+### 11.3 Files changed in this stage
+
+| File | Change |
+|---|---|
+| `src/lib/acquisition/season-revalidation.ts` | `ForwardedClientVerdict`, `classifyForwardedClient()`, `isServableForwardedClient()`, and the evidence comment. Imports `node:net` for `isIP` — still no Next import |
+| `src/app/api/internal/revalidate-season/route.ts` | Gate 1 rewritten as the loopback allowlist; the `x-forwarded-host` test removed; the header comment's false premise corrected |
+| `tests/settle-season-revalidation.test.ts` | The synthetic premise replaced — see §11.4 |
+| `docs/deployment.md` §7c | "Why the internet cannot reach it", with the two tracked properties and an explicit note that absence is not a loopback signal |
+
+Unchanged, and deliberately so: the secret is still mandatory and still compared with
+`timingSafeEqual`; the limiter still charges failures only; the body is still an integer season
+and nothing else; the path is still composed server-side by `seasonPath()`; 503 when
+unconfigured. The worker-coverage tests added earlier are untouched.
+
+### 11.4 Tests — the premise, replaced
+
+The old suite built `Request` objects with **no** forwarding headers, a shape the framework
+never produces, which is exactly why every gate was green while the route was 404. The helper
+now sends what a real loopback POST carries (`x-forwarded-for: 127.0.0.1`,
+`x-forwarded-host: 127.0.0.1:3100`), so every existing case — secret, season validation, worker
+identity, limiter — is now exercised against the real shape.
+
+New coverage:
+
+- a loopback caller **with** the synthesised headers **succeeds** (the case that would have
+  caught §10.2);
+- every loopback form the deployment can emit succeeds, including `::ffff:127.0.0.1`;
+- `x-forwarded-host: beta.afldb.com` does not change the verdict;
+- a non-loopback forwarded client is refused **with the correct secret**;
+- a chain is refused from either end;
+- malformed values (`localhost`, `0177.0.0.1`, a host:port, junk) are refused;
+- a request with no forwarding identity is served;
+- the caller is classified **before** the secret, so a probe learns nothing;
+- the classifier's own unit table, all five verdicts.
+
+**And the contract itself is asserted**, so a Caddyfile edit cannot silently invalidate the
+model — `AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on`:
+
+- each `reverse_proxy 127.0.0.1:3100` block in **both** Caddyfiles has exactly one matching
+  `header_up X-Forwarded-For {remote_host}` (a new site block that forgets the line fails);
+- neither file uses an append idiom (`header_up +X-Forwarded-For`,
+  `{http.request.header...}`) or `trusted_proxies`;
+- `-X-Real-IP` and `-Forwarded` are dropped once per proxy block;
+- `deploy/afldb.service` still pins `HOSTNAME=127.0.0.1`;
+- `base-server.js` still uses `??=` rather than `=` for `x-forwarded-for`.
+
+### 11.5 Repository gates — all green (2026-09-04)
+
+| Gate | Result |
+|---|---|
+| `npx vitest run tests/settle-season-revalidation.test.ts` | **69 passed** |
+| `npx vitest run tests/current-season-import.test.ts tests/admin-current-season-settle.test.ts` | **287 passed** |
+| `npx vitest run tests/integration/settle-afltables.test.ts` (afldb_test over the 55432 tunnel) | **64 passed, 1 skipped**, 246.7 s |
+| `npx tsc --noEmit` | clean |
+| `npx eslint` on the three touched source/test files | clean |
+
+Repository gates were green before §10 as well. **They are a necessary and not a sufficient
+condition** — the §12 host acceptance is what decides this.
+
