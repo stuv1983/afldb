@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-09-04
-**Open issues:** 3 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-126`, `AFLDB-ISSUE-137`.
+**Open issues:** 2 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-137`.
 
 <!-- UPDATE 2026-09-04 (ISSUE-125 closeout): `AFLDB-ISSUE-125` is **Resolved**. A rebuilt
      database is now promoted by restoring it into a NEW candidate on the production host,
@@ -507,7 +507,24 @@ closure boundary, and the unrelated query-builder timing regression remains with
      735's nine unresolved-identity rejections after `AFLDB-ISSUE-137`. Authoritative records: the
      `AFLDB-ISSUE-131` entry in `issues.md` (Resolution, 2026-09-04) and
      `issues/closed/AFLDB-ISSUE-131.md` §16. -->
-| `AFLDB-ISSUE-126` | Medium | Database / Admin / Security / Audit trail / Operations | The 2026-09-02 production canonical DB cutover replaced production-only application state along with the football data. The real super admin (`auth_users` id 1) was recovered from the pre-cutover backup and admin login verified, but three sets of production-only rows were **not** restored and exist only in the recovery database `afldb_prod_auth_recovery`: `auth_audit_log` **92 rows**, `beta_access_codes` **1 row**, `site_settings` **11 rows**. Production runs with 0 rows in all three. Nothing breaks — `src/lib/site-settings.ts` falls back to compiled-in defaults — but 11 deliberate super-admin choices are silently reverted, one beta access code is gone, and the admin audit trail has a hard discontinuity at the cutover. `auth_sessions` (17) were deliberately not restored and must stay unrestored. Key files/state: `afldb_prod_auth_recovery`, `/home/arm/afldb_prod_pre_rebuild_20260902-200355.dump`, `src/lib/site-settings.ts`. | **Not started. Decide per table; do not restore blindly.** `site_settings`: diff the 11 rows against the compiled-in defaults and restore only real operator decisions. `beta_access_codes`: confirm the code is still wanted; treat as live credential material, never in a tracked file. `auth_audit_log`: **never reconstruct an audit trail retroactively** — restore the 92 rows *with* an explicit auditable cutover marker, or record the gap deliberately and let the log start at the cutover. Also confirm whether the dump carries other production-only state. **`afldb_prod_auth_recovery` MUST NOT be dropped until this is resolved.** Operator-supervised production DML, not a repository change. |
+<!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-126` is **Resolved** and is NO LONGER an open issue.
+     The row is DELETED, not merely commented out, so it cannot render as an open row under any
+     renderer. Production-only state stranded by the 2026-09-02 cutover was decided per table and
+     the approved subset restored to `afldb_prod` on 2026-09-04 (T1 92 audit rows with original
+     ids 90–181, T2 7 `site_settings` + 1 `site_media`, T5 all eight `staging_aflw` tables =
+     51,018 rows, T6 the `database.recovered` marker id 182); the spent beta code, 17 expired
+     sessions, the join request, 2 `data_edits`, 8 player-link rows and colliding telemetry were
+     deliberately retired and recorded. Database acceptance all PASS and browser acceptance all
+     PASS — the operator's post-recovery super-admin login is audit id 183, and `/`, `/aflw`,
+     `/aflw/seasons`, `/aflw/seasons/2025` and an AFLW match page all render the recovered state.
+     The two public pages that looked stale straight afterwards were ISR output on the one-hour
+     window (`AFLDB-ISSUE-133`/`-134` mechanisms, per-worker page cache included) and converged on
+     their own; **no defect, no new issue, no application/schema/migration/privileges change, and
+     nothing merged or deployed.** `afldb_prod_auth_recovery` is **still retained** — dropping it
+     needs separate explicit approval. Committed on `claude/issue-126`, not merged. It claims
+     **NO migration number** (`086` still next free) and **next free issue ID is still
+     `AFLDB-ISSUE-138`.** Authoritative records: the `AFLDB-ISSUE-126` entry in `issues.md`
+     (Resolution — 2026-09-04) and `issues/closed/AFLDB-ISSUE-126.md` §8.2/§8.3/§10. -->
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-124` is **Resolved** and is NO LONGER an open issue.
      `deploy/afldb.service` moved `StartLimitIntervalSec=120`/`StartLimitBurst=5` from `[Service]`
      to `[Unit]` (commit `146b3e0`, branch `claude/issue-124`), values unchanged; the other four

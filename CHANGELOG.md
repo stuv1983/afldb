@@ -15,6 +15,40 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-126 — production-only state recovered after the 2026-09-02 cutover - 4 September 2026
+
+- **Recovered on `afldb_prod`** (from `afldb_prod_auth_recovery` and the pre-cutover dump,
+  operator-approved per table, every script rehearsed and then committed one unit at a time
+  behind fail-closed count assertions): the 92 pre-cutover `auth_audit_log` rows with their
+  original ids 90–181 plus an explicit `database.recovered` marker (id 182) that names the
+  cutover, the source, the restored and post-cutover id ranges, the gaps and every retired
+  set; the 7 `site_settings` rows that encoded operator choices (apex document and footer,
+  early-access intro/notify/questions, home record-of-the-week and AFLW leaders) together
+  with the `site_media` row the apex page references; and all eight `staging_aflw` tables
+  (51,018 rows), so the public AFLW read model is populated again.
+- **Deliberately not restored:** the 4 default-equal settings, the spent single-use beta
+  code, 17 expired sessions, the pending join request, 2 `data_edits` and 8 player-link rows
+  whose entity ids did not survive the rebuild (to be redone through the admin UI on the
+  current ids), and pre-cutover telemetry whose ids collide.
+- **Scripts** `issues/closed/AFLDB-ISSUE-126-*.{sh,sql}` (commit-gated). Rehearsal found and
+  fixed two defects: a `grep -q` under `pipefail` that refused on SIGPIPE, and a `setval`
+  that survived `ROLLBACK` because sequences are non-transactional — it now runs only in the
+  commit branch, and the operator-approved reset restored the sequence before T1.
+- **Accepted.** Database-level acceptance passed in full, and so did the browser pass: the
+  operator's post-recovery super-admin login was written as audit id 183 immediately after the
+  marker, `/admin/settings`, `/admin/content` and `/admin/access` show the restored values, and
+  `/`, `/aflw`, `/aflw/seasons`, `/aflw/seasons/2025` and an AFLW match page all render the
+  recovered state — `/aflw` at 960 players / 710 matches / 11 seasons / 29,878 player games with
+  the restored `games` leader board, `/` with the restored Brownlow-votes record of the week and
+  footer. The home and AFLW landing pages briefly kept serving the deploy's build-time
+  prerender because both are `revalidate = 3600` and Next keeps that page cache per cluster
+  worker; both regenerated on their own window, and nothing was saved, published, revalidated,
+  restarted, cache-deleted or deployed to force it. No application, schema, migration or
+  privilege change was made or needed.
+- `afldb_prod_auth_recovery` is **retained**; dropping it is a separate, explicitly approved
+  destructive action. The T0 backup and its verified off-host copy are retained; only the host
+  scratch under `/home/arm/i126*` was removed at close-out.
+
 ### AFLDB-ISSUE-125 — promoting a rebuilt database to production without losing production-only state - 4 September 2026
 
 - **The gap.** The 2026-09-02 cutover restored the rebuilt `afldb_test` dump over `afldb_prod`,
