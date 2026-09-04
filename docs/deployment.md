@@ -259,6 +259,7 @@ source .venv/bin/activate    # or use ./.venv/bin/python directly
 ./.venv/bin/python tools/migration/import_awards.py --groups \
     all_australian under_22 rising_star club_bf named_medals \
     hall_of_fame honour_teams captaincies                     # awards and honours, manifest-backed
+./.venv/bin/python tools/migration/import_brownlow_season.py  # season Brownlow totals, artefact-backed
 ./.venv/bin/python tools/migration/rebuild_derived.py         # ~30s   summaries
 ./.venv/bin/python tools/migration/import_awards.py --groups coleman  # after season_metadata
 ./.venv/bin/python tools/validation/validate_migration.py     # every check must pass
@@ -308,6 +309,17 @@ still selects the legacy `awards` group and therefore still demands
 award definition and no winner row that another group does not already own, and
 it is not part of the canonical rebuild or of this refresh sequence. Run it only
 for a deliberate full re-extract from a legacy database you still hold.
+
+`import_brownlow_season.py` (AFLDB-ISSUE-113) is the only writer of
+`brownlow_season_votes`. It loads the tracked artefact `data/brownlow/season-votes.csv`
+(verified against `data/brownlow/season-votes.manifest.json` before any database
+contact), resolves every row through the AFL Tables profile identity in
+`external_identities`, and writes nothing unless every row resolves — zero rejections or
+no write. It truncates only `brownlow_season_votes`; `brownlow_round_votes` belongs to
+the fitzRoy/settle writers and is never touched. The legacy `brownlow` group of
+`import_legacy_afl.py`, which truncated both tables from the retired SQLite source, no
+longer exists. It must run before `rebuild_derived.py`, which reads the season table to
+derive `player_season_stats.brownlow_votes` / `brownlow_status` and the career totals.
 
 The order matters. `rebuild_derived.py` must run last of the summary builders: it reads the tables the earlier steps write, and its first target, `season_metadata`, decides whether a season is still in progress — which in turn decides whether that season's Brownlow reads as a zero or as "not yet awarded".
 

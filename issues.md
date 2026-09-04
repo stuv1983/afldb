@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 12 tracked here — `AFLDB-ISSUE-104`, `-110`, `-113`, `-116`, `-123`, `-124`, `-125`, `-126`, `-127`, `-131`, `-134`, `-137`.
+**Open issues:** 11 tracked here — `AFLDB-ISSUE-104`, `-110`, `-116`, `-123`, `-124`, `-125`, `-126`, `-127`, `-131`, `-134`, `-137`.
 
 <!-- UPDATE 2026-09-04 (ISSUE-136 closeout): `AFLDB-ISSUE-136` is **Resolved** (canonical rebuild and
      ISSUE-113 V5 witness green on the shared `afldb_test`; committed on `claude/issue-136`, not
@@ -127,7 +127,6 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-125` | Medium | Operations / Deployment / Database / Data integrity | There is **no documented procedure for preserving production-only state when a clean rebuilt database is promoted to production.** `AFLDB-ISSUE-122`'s 2026-09-02 cutover proved the gap by hitting it: restoring the clean rebuilt `afldb_test` dump over `afldb_prod` replaced the broken 2026 football data correctly, but also replaced every application-owned, auth-owned and operations-owned table, and it promoted a **test fixture super admin** (`email-intake-test-fixture@afldb.test`) into production in place of the real one. The repository documents backup/restore and the migration rollout order (`AFLDB-ISSUE-027`), but nothing enumerates which tables are production-only and must survive a canonical rebuild promotion. Recovery worked only because a pre-cutover dump was taken first, which was operator discipline rather than a documented step. | **Not started. Prevention, not incident documentation.** Enumerate every production-only table — at minimum `auth_users`, `auth_sessions`, `admin_invites`, `auth_audit_log`, `beta_access_codes`, `beta_allowed_emails`, `beta_login_tokens`, `site_settings`, plus any operational/telemetry state (`app_health_events`, `nl_search_log`, `data_edits`, `data_overrides`, `data_issues`) that a rebuild would discard — and classify each as must-preserve, must-reset, or decide-per-promotion. Then write a documented promotion procedure into `docs/` (mandatory pre-cutover dump; restore football data only, or restore-then-reinstate; an explicit **refuse-if-a-test-fixture-identity-is-present** check so `*@afldb.test` can never become a production admin; a post-promotion verification checklist ending in a real admin login). Cross-check against `tools/maintenance/` backup/restore and `privileges.sql`, which is already mandatory after a restore. Related: `AFLDB-ISSUE-126` (the data still held from this incident), `AFLDB-ISSUE-027` (rollout order). |
 | `AFLDB-ISSUE-124` | Low | Deployment / Operations | `deploy/afldb.service` declares `StartLimitIntervalSec` in the **`[Service]`** section. systemd only reads `StartLimitIntervalSec`/`StartLimitBurst` from **`[Unit]`**, so it is ignored — `systemd-analyze` on production reports `/etc/systemd/system/afldb.service:65: Unknown key name 'StartLimitIntervalSec' in section 'Service', ignoring.` The crash-loop limiter that the unit's own comment describes is therefore **not in effect** on production. Pre-existing, unrelated to `AFLDB-ISSUE-122`; observed while verifying the new settle units. | **Not started.** Move `StartLimitIntervalSec` (and `StartLimitBurst`, if it is in the same place) from `[Service]` to `[Unit]` in `deploy/afldb.service`, confirm `systemd-analyze verify` no longer warns, reinstall the unit and `systemctl daemon-reload` on production, then validate the limiter actually engages. Check the other units in `deploy/` for the same misplacement while there. Do not change any other directive in the unit. |
 | `AFLDB-ISSUE-123` | Low | Data acquisition / Import architecture / Performance | The first full `AFLDB-ISSUE-122` production pass — `--dry-run --auto-apply` followed by the real `--apply --auto-apply` over snapshot `settle-2026-09-02-1958` (207 matches, 9522 player-match rows, 10582 canonical rows, 9133 ledger rows) — took roughly **an hour**. Diagnosis so far is negative in the useful sense: PostgreSQL showed continuous forward progress with rapidly changing per-record `source_records` / version / projection / savepoint SQL, **no lock blocking, and no long-running single query**. The shape is per-record round-trip cost across a whole season backfill, not a pathological plan. **Steady-state nightly cost is unmeasured** — a nightly in-season pass sees only the new round, and an unchanged rerun is already proven to write nothing (`import_batches` 732, 0/0/0). | **Not started, and correctly low priority until measured.** First **measure the steady-state nightly runtime** from the timer's own journal (`journalctl -u afldb-settle-afltables.service`) across several in-season firings; a first-pass season backfill is not the workload this job actually runs. **Profile before optimizing** — identify whether the cost is per-record round trips, the per-target savepoint, the projection writes or the version/payload upserts. Any change **must preserve the transaction and idempotence semantics** that `AFLDB-ISSUE-122` SC2/SC3 depend on: the ledger row stays in the same savepoint as its mutation, the record stays the savepoint boundary, and an identical rerun must still write zero canonical and zero ledger rows. Do not batch across records in a way that lets one bad record take down a family that would otherwise land. |
-| `AFLDB-ISSUE-113` | Medium | Data acquisition / Import architecture / Data integrity | `brownlow_season_votes` has **no legacy-free writer** — sole writer `import_legacy_afl.py:684`. `rebuild_derived.py:23-26` and `db-health.ts:94` treat it as AUTHORITATIVE. Not reconstructible from round votes: season totals are complete 1924-1941 and 1946-2025 while round votes are complete only 1984-2025, and `vote_rank`/`eligible_rank`/`is_ineligible` are not computable from vote sums. **Silent-wrongness hazard:** with the table empty, `rebuild_derived.py`'s `season_brownlow` CTE falls every decided season to `not_applicable` — AFLDB would assert "no medal that season" for a century. | **Replacement source UNDECIDED and no selection is authorised.** Recommended next step, not a decision: a read-only probe of class B (a free structured season-summary source carrying rank **and** ineligibility) before committing to a 16,120-row manifest. Outside `AFLDB-ISSUE-102`'s closure boundary — 102 may resolve with this open. |
 | `AFLDB-ISSUE-110` | Medium | Natural-language search / deterministic semantics | NL semantic-mapping fixes, merged into dev 2026-08-31; parser v32 including the ranked-career season-bound fail-closed validator revision. Standing evidence: focused parser/validator **182/182**; expanded focused **345/345**; complete DB-free ISSUE-110 matrix **14 suites, 733/733**; typecheck passed; authoritative post-final-revision operator DB gate **2 files, 46/46 in 20.65 s, started 18:52:45** (24/24 + 22/22) — distinct from the earlier pre-revision 17:47 run. The three documented temporary artifacts were removed exactly. Durable record: `issues/open/AFLDB-ISSUE-110.md`. **Latest independent review verdict: REVISE — NOT READY FOR LARGE-SCALE VALIDATION**, with two unresolved HIGH findings: (A) career-predicate season ownership — a career predicate can exist without consuming `seasonMin`/`seasonMax`, so e.g. `players with at least 3 grand finals since 2000` silently ignores the requested period; (B) `clubFor` ownership with career predicates — e.g. `Carlton players who debuted since 2000`: execution bypasses the generic club filter merely because `careerPredicates` exist. | **Fix findings A and B fail-closed, then a fresh independent re-review.** For A, replace the blanket career-predicate exemption with explicit period ownership — only predicates that actually consume the relevant period bounds may permit them. For B, allow the `clubFor` bypass only when a predicate explicitly owns the relevant club semantics; otherwise reject or correctly compile the club constraint. No 480, 1,435/1,440, 100k, telemetry reset, or other large-scale validation before APPROVE; the 22,607-search run remains incomplete. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
 <!-- RETIRED 2026-09-01 — `AFLDB-ISSUE-120` is **Resolved** and is NO LONGER an open issue.
@@ -10799,12 +10798,12 @@ query builder nor the captaincies row count. Evidence added to `AFLDB-ISSUE-116`
 
 ## AFLDB-ISSUE-113 — Replace legacy `brownlow_season_votes` acquisition
 
-- **Status:** Open
+- **Status:** **Resolved 2026-09-04** on `claude/issue-113` (`D:\dev\afldb-issue-113`) — tracked artefact + fail-closed loader + `brownlow-season` rebuild stage; V1-V13 green on the canonical `db:test:rebuild` with the `AFLDB-ISSUE-136` fold; committed, not merged, not deployed. Production remediation sequenced under `AFLDB-ISSUE-137`.
 - **Severity:** Medium
 - **Area:** Data acquisition / Import architecture / Data integrity
 - **Found:** 2026-08-30 (`AFLDB-ISSUE-102` pass 2, operator-authorised)
-- **Resolved:** N/A
-- **Runbook:** `issues/open/AFLDB-ISSUE-113.md` (authoritative)
+- **Resolved:** 2026-09-04
+- **Runbook:** `issues/closed/AFLDB-ISSUE-113.md` (authoritative; resolution §8.18)
 - **Files:** `tools/migration/import_legacy_afl.py` (`:684` `import_brownlow`, `:1021`),
   `tools/migration/rebuild_derived.py`, `tests/integration/release-gates.test.ts`
 - **Related:** origin recorded unowned at `issues/closed/AFLDB-ISSUE-090.md` §27.5 item 1.
@@ -10850,16 +10849,180 @@ structured season-summary source — **unprobed, and the most valuable unexplore
 votes plus a curated historical tail — blocked on ineligibility, which votes cannot supply;
 (D) a one-time read-only export of the already-loaded rows — lowest risk, needs authorisation.
 
+### Production symptom (2026-09-04, linked from `AFLDB-ISSUE-135`)
+The §3.2 hazard is now live. The 2026-09-02 production cutover promoted a canonical rebuild, whose
+stages populate `brownlow_round_votes` but never `brownlow_season_votes`; the season table arrived
+empty and `rebuild_derived.py` wrote zeros / `not_applicable` downstream. Public production shows
+Harley Reid, Matt Rowell and Tom Green (`12550`) at 0 Brownlow votes and `/brownlow` career
+leaders at 0 players, while `brownlow_round_votes` is populated and correctly linked (10 / 89 / 73
+career votes by direct SQL). Correctness defect. ISSUE-135's runbook is not on this branch; the
+linkage is recorded from the operator's brief (runbook §8.1).
+
 ### Validation
-None yet — design only. Acceptance requirements in the runbook §5, including re-arming the
-already-skipped `tests/integration/release-gates.test.ts:65-81` Brownlow assertions.
+Acceptance requirements in the runbook §5; the measured plan V1-V13 is at runbook §8.7.
 
-### Next action
-Recommended, not decided: authorise a read-only probe of class B to establish whether a free
-structured season-summary source carries `vote_rank`, `eligible_rank` and `is_ineligible` — not
-merely vote totals — before committing to a 16,120-row hand-maintained manifest. No probe was
-performed by the pass that created this issue.
+**2026-09-04 (runbook §8.14):** the authorised read-only export from `afldb_prod_auth_recovery`
+reproduced the contract exactly (16,120 rows / 79,113 votes / 112 winners / 98 decided seasons /
+4,275 players; NULL `eligible_rank` 3, NULL `polling_games` 4,928 preserved; export SHA-256
+`256d9507…`, dump SHA-256 `80eccdff…`, extracted 2026-09-03T15:39:41Z). The 174-player identity
+gap re-derived exactly as §8.11 (164 / 8 / 2; 20 witnessed by round votes; Peter Brown 1978 by
+operator to `Peter_Brown3.html`). The tracked artefact, manifest and adjudication file validate
+offline (`import_brownlow_season.py --validate-only` → ok) and the DB-free suites pass
+(`tests/db-test-rebuild.test.ts` + `tests/brownlow-season-artefact.test.ts`: 255 tests;
+`tsc` clean). **V1-V13, the full `db:test:rebuild`, the idempotent rerun and the
+`brownlow_round_votes` before/after check are NOT run** — the repository-standard `afldb_test`
+is unreachable from the worktree (§8.14.6) — and an offline identity pre-check against the
+canonical bridge found **14 rows (5 bridged players) that would be rejected** (§8.14.5). The
+re-armed integration gates are therefore unexecuted; the 269-cohort pins remain skipped pending
+measurement.
 
+### Stage 2026-09-04 findings (runbook §8)
+Sole writer unchanged (`import_legacy_afl.py:683-757`); settle, canonical-apply and
+`import_awards.py` all disclaim the table. Rebuild slot: a new data stage after `awards-honours`,
+before `derived`. Privileges already sufficient (migration 045). **Class B has no repository
+evidence** — fitzRoy 1.8.0's only tally function is FootyWire's `fetch_awards_brownlow()`,
+existence-verified but never probed, with no evidence of rank/ineligibility or pre-modern reach;
+probe recorded (§8.3), optional. **Class D is evidence-supported**: the pre-cutover authoritative
+table survives in `afldb_prod_auth_recovery` (full pre-cutover dump; must not be dropped until
+ISSUE-126) and, presumptively, in legacy-loaded `afldb_dev`. Legacy `player_id` is never copied:
+the re-key goes through the AFL Tables profile path in `external_identities`
+(`afltables_profile_url`), fail-closed, exactly as ISSUE-112's `PlayerResolver`, with zero
+rejections required for acceptance. **Provisional decision: class D → tracked
+`data/brownlow/season-votes.csv` + manifest → new `tools/migration/import_brownlow_season.py`
+(truncates only the season table) → new `brownlow-season` rebuild stage + Stage-9 fingerprints
+→ retire the legacy `brownlow` group.** Nothing implemented; nothing run; nothing committed.
+
+### Measurements 2026-09-04 (operator-authorised, read-only, runbook §8.11)
+Run over SSH on `afldb-prod` as the owner role inside `default_transaction_read_only = on` plus
+explicit read-only transactions. **`afldb_prod_auth_recovery` reproduces the contract exactly:
+16,120 rows / 79,113 votes / 112 winners / 98 decided seasons (1924-2025), 4,275 players,
+15,058 unique + 1,062 resolved links, every decided season present, nothing in 1942-1945 or
+2026, 12 joint-medal seasons reconciling 98 → 112, source `afltables`, one batch.** Semantics to
+preserve: 3 ineligible rows carry NULL `eligible_rank`; 4,928 rows carry NULL `polling_games`.
+Identity bridge (`afltables_profile_url`, 12,472 rows, unambiguous): **4,101 of 4,275 players
+resolve; 174 players / 525 rows / 2,407 votes / 7 winner rows (Bunton ×3, Smallhorn, Ryan,
+Ruthven, Murray) do not** — the ISSUE-090 register-pass gap, spread 1920s-1990s. Name-plus-
+career-span sizing against production's 13,275 unambiguous profile paths: 164 players match
+exactly one candidate, 8 match one after the span filter, **2 are ambiguous** — Michael Kennedy
+1989 settled by the canonical round-vote witness (9534 polled the 1 vote), **Peter Brown 1978
+needs an operator decision** (10476 vs 10478); 0 have no match. David Bain's 36 legacy votes
+equal his canonical round-vote sum, proving the method for 1984+. Production today:
+season table 0, round table 320,861 rows / 44,478 votes (identical to the legacy round total),
+`player_season_stats` 0 `complete` and **129 seasons `not_applicable`**, career votes 0;
+`afldb_import` already holds INSERT/TRUNCATE on the season table (and, informationally, TRUNCATE
+on the round table — the code is the boundary).
+
+### Adjudication stage 2026-09-04 (runbook §8.15) — §8.14.5 resolved; `afldb_test` still unreachable
+The operator adjudicated the five bridged path variants: Archie Roberts 1934 → `733`
+`Archie_Roberts.html`; Glen Scanlon 1977 → `5164` `Glen_Scanlon.html`; Jack Patterson 1931-35 →
+`6489` `Jack_Paterson.html`; Lyall Anderson 1958 → `8970` `Lyall_Anderson.html`; Stephen Icke
+1976-84 → `12010` `Stephen_Icke.html` (14 rows / 77 votes, no winner rows). Mechanism, narrow by
+design: `data/brownlow/player-identity.csv` gained a fifth column `recovery_profile_url` (empty
+for the 174 gap-fill rows); a row carrying one is an explicit override, evidence `operator`,
+that the builder applies only when the export carries exactly that path for exactly that
+bootstrap id. A non-empty recovery-bridge path stays authoritative otherwise; an override that
+names a player the export lacks or a path it does not carry is a hard failure; no fuzzy,
+spelling, span or alias matching exists anywhere. The replaced path is preserved in the
+manifest's `identity.overrides` and the offline validator cross-checks it. Artefacts rebuilt
+from the same hash-verified export: identity 179 rows (SHA-256 `17b512e4…`), artefact 16,120
+rows unchanged in every count (SHA-256 `042a8fca…`), manifest `db44fb86…` (the dump path, mangled
+by Git Bash in the previous build, is now `/home/arm/…`). Offline resolution against the prod
+bridge witness: **16,120 / 16,120** (was 16,106 / 16,120), the five resolving to exactly the
+intended canonical players, no duplicate `(season, player)` key. `npx vitest run
+tests/brownlow-season-artefact.test.ts tests/db-test-rebuild.test.ts` → 267 passed (5 positive
+override cases; negatives: unadjudicated path carried verbatim and rejected by the resolver, a
+wrong original path, an unknown player, a gap-fill row for a bridged player); `tsc` clean.
+`127.0.0.1:5432` still has no listener — the loader has still never run against a database.
+
+### Database validation stage 2026-09-04 (runbook §8.16) — full rebuild green, loader ran with zero rejections, V5 RED on a core identity split (`AFLDB-ISSUE-136`)
+`afldb_test` became reachable (SSH tunnel `127.0.0.1:55432` → `streamanator:5432`, owner DSN,
+`--allow-owner-import-dsn`; snapshots staged from the ISSUE-102 worktree; `--draftguru-label
+annual-html-20260902` as in the ISSUE-102/112 closure). `npm run db:test:rebuild` ran end to end
+(13 stages, 07:52 → 08:13 AUSEST, exit 0, **FINAL VALIDATION PASSED: 47 checks** including every
+Stage-9 Brownlow gate). The loader executed against a database for the first time: batch 16,
+read 16,120 / inserted 16,120 / **rejected 0**; `brownlow_round_votes` 320,861 untouched.
+V1 (16,120 / 79,113 / 112 / 98 / 4,275, NULL counts, link status, provenance), V2, V3, V4
+(`complete` over exactly 1924-2025, `not_applicable` 1897-1945 all NULL, 2026 `pending` in
+`stat_availability` with no season row — no 2026 match rows exist to carry it), V6 (0 asymmetric
+against `award_winners` 1980-2025), V7 (Reynolds 154/3, Skilton 180/3, Reid 10, Rowell 89, Green
+73; the five adjudications 2/1/12/2/60; career sum 79,113) and V8 (db-health 0 mismatches) are
+**green**. **V5 is RED**: of 8,560 compared 1984-2025 player-seasons 0 disagree on votes,
+polling or the 3-2-1 split, but 10 polled player-seasons have no season row under the same
+`player_id` — Charlie Cameron 2019-2024 (25 votes) and Jack Graham 2019-2022 (9 votes). Their
+season rows resolved by path to `Charlie_Cameron3.html` → `2608` / `Jack_Graham2.html` → `6296`,
+2025-only shells, while their 2014-2024 / 2017-2024 careers and round votes sit on `2604`
+`Charlie_Cameron.html` / `6293` `Jack_Graham.html`. Cause, measured in the accepted snapshot: the
+2025 rows for five players carry a blank fitzRoy `ID` and a renumbered AFL Tables URL (83 rows:
+`Charlie_Cameron3`, `Jack_Graham2`, `Jack_Ross3`, `Jack_Williams3`, `Billy_Wilson2`), and the
+core import seeded each as a new canonical player. The artefact, builder, adjudication file and
+loader behaved as designed and need no change; the same 34 votes are the whole
+`sum(player_season_stats.brownlow_votes)` gap (79,079 vs 79,113), so two re-armed release gates
+would fail on this database — they were not run. Validation stopped per instruction; V9-V13
+not run; 269 cohort measured at 262 and the per-game sum at 46,970, neither re-pinned. Tracked
+as **`AFLDB-ISSUE-136`** (core identity). Nothing committed.
+
+### Next action (superseded by the §8.17 stage below)
+Runbook §8.16.6. (1) Fix the core identity split under `AFLDB-ISSUE-136` on its own branch —
+not inside this issue. (2) Then, in this worktree: full `db:test:rebuild` (runbook §8.16.1
+command) and V5-V13 including the idempotent rerun and the round-table before/after count;
+re-pin the cohort and decide the per-game pin; commit. (3) Operator option: commit the ISSUE-113
+implementation now on the strength of §8.16.2-§8.16.3 (the red is upstream; the artefact needs
+no change) and close V5/V12/V13 after 136. (4) Production remediation only after (2) is green.
+`afldb_prod_auth_recovery` should survive until the artefact is committed.
+
+### Database validation stage 2 2026-09-04 (runbook §8.17) — ISSUE-136 merged; full rebuild green (48 checks); V1-V11 green with V5 fixed; V12 RED on three gates; stopped
+`AFLDB-ISSUE-136` merged into `claude/issue-113` via `main` (`295e054`); the three bookkeeping
+conflicts were resolved keeping ISSUE-136 Resolved, ISSUE-137 allocated and this issue open
+(next free ID still `AFLDB-ISSUE-138`). Full canonical `db:test:rebuild` of the repository-standard
+`afldb_test` (same environment as §8.16): exit 0, both baseline checks `VERIFIED`, **FINAL
+VALIDATION PASSED: 48 checks** (`players = 13271`, `players_with_renumbered_profile = 4`, every
+Stage-9 Brownlow gate at its manifest value); loader batch 16 inserted 16,120 / rejected 0. **V1-V11
+GREEN. V5 is fixed by ISSUE-136**: 8,570 player-seasons compared, 0 / 0 / 0 mismatches, 0 orphaned
+either way; `sum(player_season_stats.brownlow_votes)` = 79,113; Cameron `2604` 254 games / 25
+votes and Graham `6292` 149 games / 9 votes are single players holding both paths. V9 through the
+real query modules (98 season pages non-empty with a winner; leaders headed Ablett 262, Dangerfield
+259, Dempsey 246; 112 winners; 17 multiple medallists), V10 98 routes, V11 grid-solver 143 passed.
+**V12 RED on three gates**: (a) players without a date 12,422 → 12,418 and (b) 200-249 games /
+16+ finals 115 → 114 are legacy pins the ISSUE-136 fold moved (the four removed duplicates were
+undated; Cameron left the band) — ISSUE-136 consequences to re-pin here; (c) this issue's
+re-armed "2026 Brownlow pending" gate asserts a 2026 `player_season_stats` row, and the accepted
+baseline holds 0 rows for 2026 on every canonical rebuild — a gate-design defect of this issue,
+to be rewritten against `stat_availability`. V13 not run. Cohort measured 261 (digest
+`ca65f15239aaf0b5`), per-game 46,970. Nothing committed.
+
+### Next action (as of §8.17 — completed 2026-09-04, see Resolution)
+Runbook §8.17.6: (1) fix the three gates in place and re-run the two suites on the current
+`afldb_test` (no rebuild needed); (2) re-pin the cohort at 261; (3) V13 idempotent rerun with the
+owner test DSN set explicitly; (4) close and commit; (5) production remediation after that,
+sequenced with `AFLDB-ISSUE-137`.
+
+### Resolution — 2026-09-04 (runbook §8.18)
+- **Root cause:** after `AFLDB-ISSUE-108` retired the legacy SQLite path, `brownlow_season_votes`
+  (authoritative for every season and career Brownlow total) had no writer, so every canonical
+  rebuild — including the 2026-09-02 production cutover — left it empty and the derived layer
+  reported decided seasons as `not_applicable` and totals as 0.
+- **Fix:** `data/brownlow/season-votes.csv` + `season-votes.manifest.json` + `player-identity.csv`
+  (read-only, hash-recorded export of the preserved authoritative table, keyed by AFL Tables
+  profile path; 174 path-less legacy players adjudicated in the tracked identity file, five bridged
+  paths overridden by operator decision); `tools/migration/import_brownlow_season.py` (fail-closed,
+  never matches on a name, truncates only the season table); `brownlow-season` stage in
+  `tools/db/rebuild-test.ts` with Stage-9 manifest gates; legacy `brownlow` group removed from
+  `import_legacy_afl.py`; Brownlow release gates re-armed on profile identity.
+- **Validation:** V1-V13 GREEN on the canonical `db:test:rebuild` of the accepted baseline with the
+  ISSUE-136 fold (exit 0, 48 final checks; loader 16,120 / 79,113 / 112 / 98, 0 rejected). V5
+  0 / 0 / 0 over 8,570 player-seasons; season, career and derived totals 79,113. V12 after fixing
+  the three §8.17.4 gates (12,422 → 12,418 and 115 → 114 re-pinned with ISSUE-136 attribution;
+  the 2026-pending gate rewritten against `stat_availability` — the accepted contract has no 2026
+  `player_season_stats` rows while the award is pending — still never treating 2026 as
+  complete/zero): `release-gates` + `database` suites 105 passed / 7 skipped / 0 failed. Cohort
+  re-pinned 261 / digest `ca65f15239aaf0b5` in both suites; per-game 46,970 recorded, `< 79,113`
+  invariant kept. V13 loader rerun: batch 18 `completed` 16,120 / 16,120 / 0 rejected;
+  `brownlow_round_votes` 320,861 / 44,478 with fingerprint `0c45273f93c23e49` unchanged;
+  `brownlow_season_votes` 16,120 / 79,113 with fingerprint `59ead6dbdffe23f1` unchanged.
+- **Follow-up:** production remediation (repair the four ISSUE-137 splits first, then load the
+  committed artefact under operator control with a backup) is tracked in `AFLDB-ISSUE-137`;
+  `afldb_prod_auth_recovery` may now be retired at operator discretion (retain until the
+  production load is validated). Not merged, not deployed.
 ---
 
 ## AFLDB-ISSUE-114 — the ladder witness `manifest_sha256` is the pre-ISSUE-108 CRLF hash
@@ -13626,6 +13789,8 @@ Offline against the real accepted snapshot: `--require-accepted-baseline` → **
 ### Follow-up — `AFLDB-ISSUE-137` (allocated 2026-09-04, NOT started)
 Production still holds the split (two `players` rows for each of the four; identities registered to different players; the duplicates carry the 2025 match rows, awards-census rows and all 2026 settle rows). The fixed importer HALTs against it by design. Repair is either the rebuild-and-promote path (`AFLDB-ISSUE-125`) or a supervised identity reconciliation — see the `AFLDB-ISSUE-137` entry below. No production mutation was authorised by this issue.
 
+**Post-merge note 2026-09-04 (from `AFLDB-ISSUE-113` §8.17):** two legacy pins in the integration gates moved with the fold and were not re-pinned here — `release-gates.test.ts` players without a date 12,422 → 12,418 (the four removed duplicates were undated; 13,273 = 855 + 12,418) and `database.test.ts` 200-249 games / 16+ finals 115 → 114 (Charlie Cameron is now 254 games). To be re-pinned on `claude/issue-113`, which carries the merge.
+
 ## AFLDB-ISSUE-137 — Production still holds the four canonical player splits fixed by ISSUE-136
 
 - **Status:** Open — allocated 2026-09-04 at the `AFLDB-ISSUE-136` closeout. **Not started. No production mutation authorised.**
@@ -13633,7 +13798,7 @@ Production still holds the split (two `players` rows for each of the four; ident
 - **Area:** Data integrity / Operations / Database (production)
 - **Found:** 2026-09-04 (consequence recorded in `AFLDB-ISSUE-136` §1, §10.5).
 - **Resolved:** N/A
-- **Related:** `AFLDB-ISSUE-136` (the rebuild-time fix; runbook `issues/closed/AFLDB-ISSUE-136.md` §10.3/§13.4 hold the verification SQL), `AFLDB-ISSUE-125` (preserving production-only state on rebuild-and-promote), `AFLDB-ISSUE-126` (production audit-trail expectations), `AFLDB-ISSUE-113` (its V5 on production is satisfiable only after this repair), `AFLDB-ISSUE-122` (the settle resolves urls through registered identities).
+- **Related:** `AFLDB-ISSUE-136` (the rebuild-time fix; runbook `issues/closed/AFLDB-ISSUE-136.md` §10.3/§13.4 hold the verification SQL), `AFLDB-ISSUE-125` (preserving production-only state on rebuild-and-promote), `AFLDB-ISSUE-126` (production audit-trail expectations), `AFLDB-ISSUE-113` (Resolved 2026-09-04; its V5 on production is satisfiable only after this repair, and its **production remediation — loading the committed `data/brownlow/` artefact with `tools/migration/import_brownlow_season.py` into `afldb_prod` per `issues/closed/AFLDB-ISSUE-113.md` §8.6/§8.18.5 — is sequenced AFTER this repair**, because the artefact resolves correctly only where the four careers are one player each), `AFLDB-ISSUE-122` (the settle resolves urls through registered identities).
 - **Migration:** none expected.
 
 ### Problem

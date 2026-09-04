@@ -1,0 +1,181 @@
+{
+  "$comment": [
+    "AFLDB-ISSUE-113 \u00a78.6. Provenance for data/brownlow/season-votes.csv: a",
+    "re-keyed, read-only export of the legacy-loaded authoritative",
+    "brownlow_season_votes preserved in the pre-cutover recovery database.",
+    "Every value is carried verbatim; empty = SQL NULL, never 0. The loader",
+    "(tools/migration/import_brownlow_season.py) and the Stage-9 rebuild gates",
+    "verify the artefact against this file. Regenerate only from a fresh",
+    "authorised export via tools/migration/build_brownlow_season_artefact.py."
+  ],
+  "schema_version": 1,
+  "issue": "AFLDB-ISSUE-113",
+  "builder": "tools/migration/build_brownlow_season_artefact.py",
+  "loader": "tools/migration/import_brownlow_season.py",
+  "provenance_source_key": "afltables",
+  "source": {
+    "host": "afldb-prod",
+    "database": "afldb_prod_auth_recovery",
+    "role": "afldb_owner",
+    "postgres_version": "PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+    "read_only": true,
+    "restored_from_dump": "/home/arm/afldb_prod_pre_rebuild_20260902-200355.dump",
+    "dump_sha256": "80eccdff2de90d726bd2249b24d1e51d9fad872f60cc85281477cd8cc94c27e5"
+  },
+  "extracted_at_utc": "2026-09-03T15:39:41Z",
+  "export_sql": "SELECT b.season, ei.external_id AS afltables_profile_url, b.votes, b.vote_rank, b.eligible_rank, b.is_ineligible, b.is_winner, b.games, b.three_vote_games, b.two_vote_games, b.one_vote_games, b.polling_games, b.link_status_value, b.player_id AS bootstrap_player_id, p.display_name, b.source_record_id AS legacy_source_record_id FROM brownlow_season_votes b JOIN players p ON p.id = b.player_id LEFT JOIN (SELECT ei.player_id, ei.external_id FROM external_identities ei JOIN sources s ON s.id = ei.source_id WHERE s.key = 'afltables' AND ei.match_method = 'afltables_profile_url' AND ei.status IN ('unique','resolved') AND ei.player_id IS NOT NULL) ei ON ei.player_id = b.player_id ORDER BY b.season, ei.external_id, b.player_id",
+  "export": {
+    "rows": 16120,
+    "csv_sha256": "256d9507f874879b100ea11a999d2b4374f4da1a66f517a92d21058384224bb0",
+    "rows_without_profile_path": 525,
+    "rows_with_overridden_profile_path": 14
+  },
+  "identity": {
+    "file": "data/brownlow/player-identity.csv",
+    "csv_sha256": "17b512e48374c12d2f666194aa99c7c713db57643ce5b31cc67f9f8931493c61",
+    "players": 179,
+    "rows": 539,
+    "gap_players": 174,
+    "gap_rows": 525,
+    "override_players": 5,
+    "override_rows": 14,
+    "evidence": {
+      "round_vote_witness": 20,
+      "unique_name_span": 153,
+      "operator": 6
+    },
+    "overrides": [
+      {
+        "bootstrap_player_id": 1830,
+        "display_name": "Stephen Icke",
+        "recovery_profile_url": "players/S/Steven_Icke.html",
+        "afltables_profile_url": "players/S/Stephen_Icke.html",
+        "evidence": "operator",
+        "rows": 8,
+        "seasons": [
+          1976,
+          1977,
+          1979,
+          1980,
+          1981,
+          1982,
+          1983,
+          1984
+        ],
+        "votes": 60
+      },
+      {
+        "bootstrap_player_id": 2060,
+        "display_name": "Jack Patterson",
+        "recovery_profile_url": "players/J/Jack_Patterson.html",
+        "afltables_profile_url": "players/J/Jack_Paterson.html",
+        "evidence": "operator",
+        "rows": 3,
+        "seasons": [
+          1931,
+          1932,
+          1935
+        ],
+        "votes": 12
+      },
+      {
+        "bootstrap_player_id": 2425,
+        "display_name": "Glen Scanlon",
+        "recovery_profile_url": "players/G/Glenn_Scanlon.html",
+        "afltables_profile_url": "players/G/Glen_Scanlon.html",
+        "evidence": "operator",
+        "rows": 1,
+        "seasons": [
+          1977
+        ],
+        "votes": 1
+      },
+      {
+        "bootstrap_player_id": 2459,
+        "display_name": "Lyall Anderson",
+        "recovery_profile_url": "players/L/Lyle_Anderson.html",
+        "afltables_profile_url": "players/L/Lyall_Anderson.html",
+        "evidence": "operator",
+        "rows": 1,
+        "seasons": [
+          1958
+        ],
+        "votes": 2
+      },
+      {
+        "bootstrap_player_id": 3597,
+        "display_name": "Archie Roberts",
+        "recovery_profile_url": "players/A/Archie_Roberts0.html",
+        "afltables_profile_url": "players/A/Archie_Roberts.html",
+        "evidence": "operator",
+        "rows": 1,
+        "seasons": [
+          1934
+        ],
+        "votes": 2
+      }
+    ]
+  },
+  "artefact": {
+    "file": "data/brownlow/season-votes.csv",
+    "csv_sha256": "042a8fca776f3c3879585daa6524690d48add5e67f60c3f8dbdf5e5dc5c70059",
+    "columns": [
+      "season",
+      "afltables_profile_url",
+      "votes",
+      "vote_rank",
+      "eligible_rank",
+      "is_ineligible",
+      "is_winner",
+      "games",
+      "three_vote_games",
+      "two_vote_games",
+      "one_vote_games",
+      "polling_games",
+      "link_status_value",
+      "bootstrap_player_id",
+      "display_name",
+      "legacy_source_record_id"
+    ],
+    "nullable_columns": [
+      "vote_rank",
+      "eligible_rank",
+      "games",
+      "three_vote_games",
+      "two_vote_games",
+      "one_vote_games",
+      "polling_games"
+    ],
+    "rows": 16120,
+    "votes_total": 79113,
+    "winners": 112,
+    "seasons": 98,
+    "players": 4275,
+    "first_season": 1924,
+    "last_season": 2025,
+    "season_coverage": [
+      [
+        1924,
+        1941
+      ],
+      [
+        1946,
+        2025
+      ]
+    ],
+    "null_counts": {
+      "vote_rank": 0,
+      "eligible_rank": 3,
+      "games": 0,
+      "three_vote_games": 10589,
+      "two_vote_games": 10568,
+      "one_vote_games": 9003,
+      "polling_games": 4928
+    },
+    "ineligible_rows": 3,
+    "link_status_counts": {
+      "unique": 15058,
+      "resolved": 1062
+    }
+  }
+}

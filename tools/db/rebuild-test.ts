@@ -135,6 +135,19 @@ const FITZROY_CONTRACT = join('tools', 'rebuild', 'fitzroy', 'fitzroy-contract.j
 /** The AFLDB-ISSUE-111 Coleman derivation contract. Declares the derived span. */
 const COLEMAN_CONTRACT = join('data', 'reference', 'coleman-derivation.json');
 
+/**
+ * AFLDB-ISSUE-113. The season-grain Brownlow artefact's manifest: the Stage-9 gate reads
+ * its measured counts at plan time (never typed into this file), and the preflight
+ * requires the artefact, manifest and adjudication file to exist and self-validate.
+ */
+const BROWNLOW_SEASON_MANIFEST = join('data', 'brownlow', 'season-votes.manifest.json');
+export const BROWNLOW_SEASON_LOADER = 'tools/migration/import_brownlow_season.py';
+export const BROWNLOW_SEASON_PREFLIGHT_FILES = [
+  'data/brownlow/season-votes.csv',
+  'data/brownlow/season-votes.manifest.json',
+  'data/brownlow/player-identity.csv',
+];
+
 // ---------------------------------------------------------------------------
 // Safety — every refusal happens before any destruction
 // ---------------------------------------------------------------------------
@@ -489,6 +502,24 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       envOverlay: dataEnv,
     },
     {
+      // AFLDB-ISSUE-113 §8.6. The AUTHORITATIVE season-grain Brownlow totals, from the
+      // tracked artefact data/brownlow/season-votes.csv (a re-keyed read-only export of
+      // the preserved pre-cutover database), never from the retired legacy SQLite.
+      //
+      // It must follow `fitzroy`, which populates `players` and the AFL Tables profile
+      // identities every artefact row is resolved through (fail-closed, zero rejections
+      // or no write), and precede `derived`, which reads brownlow_season_votes to write
+      // player_season_stats.brownlow_votes / brownlow_status and the career totals.
+      // Without it the derived pass asserts "no medal that season" for 98 decided seasons
+      // (§8.1). It never touches brownlow_round_votes, which fitzroy/settle own.
+      id: 'brownlow-season',
+      name: 'BROWNLOW SEASON — authoritative season totals from the tracked artefact',
+      kind: 'data',
+      run: 'command',
+      argv: brownlowSeasonImportArgv(python),
+      envOverlay: dataEnv,
+    },
+    {
       id: 'derived',
       name: 'DERIVED — recomputed summaries',
       kind: 'data',
@@ -642,6 +673,119 @@ export function awardsHonoursChecks(acceptedLastSeason: number): FinalCheck[] {
          + ` WHERE a.slug <> '22-under-22' AND w.season > ${acceptedLastSeason}`,
       expected: 0 },
   ];
+}
+
+/** The manifest's measured season-grain facts, as the Stage-9 gate needs them. */
+export type BrownlowSeasonExpected = {
+  rows: number;
+  votesTotal: number;
+  winners: number;
+  seasons: number;
+  firstSeason: number;
+  lastSeason: number;
+};
+
+/**
+ * AFLDB-ISSUE-113. Read the artefact manifest's measured counts at plan time.
+ *
+ * Never a literal here: the loader verifies the artefact against the SAME manifest
+ * before it writes, so the gate asserts that the database received exactly what the
+ * manifest declares (16,120 rows / 79,113 votes / 112 winners / 98 seasons as measured
+ * from the recovery source on 2026-09-04 — but measured, not typed). A missing or
+ * malformed manifest refuses rather than gating nothing.
+ */
+export function brownlowSeasonExpected(
+  readManifest: () => Record<string, unknown> | null = () => {
+    const path = join(REPO_ROOT, BROWNLOW_SEASON_MANIFEST);
+    return existsSync(path)
+      ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
+      : null;
+  },
+): BrownlowSeasonExpected {
+  const manifest = readManifest();
+  const artefact = manifest?.artefact as Record<string, unknown> | undefined;
+  if (!artefact) {
+    throw new RebuildRefused(
+      `${BROWNLOW_SEASON_MANIFEST} is missing or records no 'artefact' block. The `
+      + 'BROWNLOW SEASON stage has no declared contract to validate against, and the '
+      + 'rebuild will not invent one.');
+  }
+  const integer = (key: string): number => {
+    const value = artefact[key];
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+      throw new RebuildRefused(
+        `${BROWNLOW_SEASON_MANIFEST}: artefact.${key} is not a non-negative integer.`);
+    }
+    return value;
+  };
+  return {
+    rows: integer('rows'),
+    votesTotal: integer('votes_total'),
+    winners: integer('winners'),
+    seasons: integer('seasons'),
+    firstSeason: integer('first_season'),
+    lastSeason: integer('last_season'),
+  };
+}
+
+/**
+ * Structural invariants for the season-grain Brownlow table, in the
+ * clubSeasonChecks/colemanChecks mould. Read-only scalar counts.
+ *
+ * These re-record the retired ISSUE-090 §27.5 gate ("no legacy-free writer for
+ * brownlow_season_votes") as a Stage-9 fingerprint, now that the writer exists.
+ */
+export function brownlowSeasonChecks(
+  acceptedLastSeason: number,
+  expected: BrownlowSeasonExpected = brownlowSeasonExpected(),
+): FinalCheck[] {
+  const from = 'FROM brownlow_season_votes';
+  return [
+    { key: 'brownlow_season_rows', sql: `SELECT count(*) ${from}`, expected: expected.rows },
+
+    { key: 'brownlow_season_votes_total',
+      sql: `SELECT coalesce(sum(votes), 0) ${from}`, expected: expected.votesTotal },
+
+    { key: 'brownlow_season_winners',
+      sql: `SELECT count(*) ${from} WHERE is_winner`, expected: expected.winners },
+
+    { key: 'brownlow_season_seasons',
+      sql: `SELECT count(DISTINCT season) ${from}`, expected: expected.seasons },
+
+    { key: 'brownlow_season_first_season',
+      sql: `SELECT coalesce(min(season), 0) ${from}`, expected: expected.firstSeason },
+
+    { key: 'brownlow_season_last_season',
+      sql: `SELECT coalesce(max(season), 0) ${from}`, expected: expected.lastSeason },
+
+    // Every row is acquired from AFL Tables facts and keyed by the profile path the
+    // rebuild preserves; a row with other provenance did not come from this loader.
+    { key: 'brownlow_season_rows_not_sourced_from_afltables',
+      sql: `SELECT count(*) ${from} b LEFT JOIN sources s ON s.id = b.source_id`
+         + " WHERE s.key IS DISTINCT FROM 'afltables'",
+      expected: 0 },
+
+    { key: 'brownlow_season_rows_not_keyed_by_profile_path',
+      sql: `SELECT count(*) ${from} WHERE source_record_id !~ `
+         + "'^brownlow-season:[0-9]{4}:players/[A-Z]/[^/]+\\.html$'",
+      expected: 0 },
+
+    // A pending season must never read as decided (§8.2 coverage semantics): the
+    // current season belongs to the settle pipeline and has no season total yet.
+    { key: 'brownlow_season_after_accepted_last_season',
+      sql: `SELECT count(*) ${from} WHERE season > ${acceptedLastSeason}`,
+      expected: 0 },
+  ];
+}
+
+/** The BROWNLOW SEASON data-stage command line; the same interpreter as every stage. */
+export function brownlowSeasonImportArgv(python: string = resolvePython()): string[] {
+  return [python, BROWNLOW_SEASON_LOADER];
+}
+
+/** Offline artefact/manifest/adjudication validation — no database is contacted. */
+export function brownlowSeasonValidateArgv(python: string = resolvePython()): string[] {
+  return [python, BROWNLOW_SEASON_LOADER, '--validate-only'];
 }
 
 export const LADDER_WITNESS_VALIDATOR =
@@ -863,6 +1007,13 @@ export function finalValidationChecks(
   // AFLDB-ISSUE-112. Added together with the AWARDS & HONOURS stage, for the
   // same §H15.5 reason as the Coleman gates above.
   for (const check of awardsHonoursChecks(Number(measured.seasons_last))) {
+    checks.push(check);
+  }
+
+  // AFLDB-ISSUE-113. Added together with the BROWNLOW SEASON stage, for the same
+  // §H15.5 reason. The expected values are read from the artefact's manifest, so the
+  // gate and the loader cannot drift apart.
+  for (const check of brownlowSeasonChecks(Number(measured.seasons_last))) {
     checks.push(check);
   }
 
@@ -1293,6 +1444,24 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
       + `'${ladderWitnessLabel()}', but its acquired bytes are missing, incomplete or do `
       + 'not match the manifest. Re-acquire it with acquire_core.R --datasets ladder. '
       + `Nothing has been destroyed.\n${witness.stdout}${witness.stderr}`);
+  }
+
+  // AFLDB-ISSUE-113. The season-grain Brownlow artefact is TRACKED (unlike the acquired
+  // snapshots above), so the failure modes are a checkout missing the files or bytes
+  // that no longer hash to the manifest. Prove both offline, before destruction.
+  for (const path of BROWNLOW_SEASON_PREFLIGHT_FILES) {
+    if (!deps.fileExists(path)) {
+      throw new RebuildRefused(
+        `Brownlow season preflight: required tracked input is missing: ${path}. `
+        + 'Nothing has been destroyed.');
+    }
+  }
+  const brownlow = deps.runCommand(brownlowSeasonValidateArgv(), {});
+  if (brownlow.status !== 0) {
+    throw new RebuildRefused(
+      `Brownlow season preflight failed (${BROWNLOW_SEASON_LOADER} --validate-only): `
+      + 'the artefact, its manifest and the identity adjudication file do not agree. '
+      + `Nothing has been destroyed.\n${brownlow.stdout}${brownlow.stderr}`);
   }
 }
 

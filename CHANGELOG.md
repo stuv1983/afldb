@@ -71,6 +71,53 @@ commit.
   the real database and rolled back cleanly. Production still holds the split — tracked as
   `AFLDB-ISSUE-137`.
 
+### AFLDB-ISSUE-113 — season-grain Brownlow totals are loaded from a tracked artefact, never the legacy SQLite - 4 September 2026
+
+- `brownlow_season_votes` — the authoritative basis for every career and season Brownlow total,
+  the `/brownlow` pages, the sitemap's Brownlow routes and six Grid Solver axes — now has a
+  legacy-free writer. `tools/migration/import_brownlow_season.py` loads
+  `data/brownlow/season-votes.csv`, a read-only, hash-recorded export of the pre-cutover
+  authoritative table (16,120 rows / 79,113 votes / 112 winners / 98 decided seasons, 1924-1941
+  and 1946-2025), verified against `data/brownlow/season-votes.manifest.json` before any
+  database contact. Every row is keyed by the AFL Tables profile path and resolved through
+  `external_identities`, fail-closed: any unresolved or ambiguous row is a recorded rejection and
+  the load writes nothing. The 174 legacy players with no profile path are adjudicated in the
+  tracked `data/brownlow/player-identity.csv` (by round-vote witness, unique name-and-span, or
+  operator decision); the loader itself never matches on a name. Five further rows in the same
+  file are explicit operator overrides (2026-09-04) of a recovery-bridge path that AFL Tables
+  does not use (Archie Roberts 1934, Glen Scanlon 1977, Jack Patterson 1931-35, Lyall Anderson
+  1958, Stephen Icke 1976-84; 14 rows / 77 votes): the artefact builder replaces a bridged path
+  only for a row naming that exact legacy player and its exact original path, records the
+  replaced path in the manifest, and applies no fuzzy, spelling, span or alias matching. NULL
+  polling counts stay NULL.
+- The canonical rebuild gains a `brownlow-season` data stage between `awards-honours` and
+  `derived`, preflighted offline, with Stage-9 gates for rows, total votes, winners, season span
+  and provenance read from the manifest. The legacy `brownlow` group of `import_legacy_afl.py` —
+  which also truncated the canonically-owned `brownlow_round_votes` — is removed; the new loader
+  truncates only the season table.
+- The Brownlow release gates skipped since AFLDB-ISSUE-108 are re-armed, with their witnesses
+  resolved by profile identity rather than pinned surrogate ids, plus a new gate that every
+  1984-onward career total equals its round-vote sum.
+- The "2026 Brownlow pending" release gate now asserts the pending state through the
+  season-level `stat_availability` contract (`brownlow_season_total` exactly `2025 complete`,
+  `2026 pending`, `seasons.status` in progress, no 2026 season-grain row, and no 2026
+  player-season carrying a vote or any status but pending) instead of requiring a 2026
+  `player_season_stats` row that a canonical rebuild of the accepted baseline never contains.
+  2026 is still never treated as complete or as zero.
+- Two legacy integration pins moved by the `AFLDB-ISSUE-136` fold are re-pinned with
+  attribution: players honestly without a date 12,422 → 12,418 (the four folded duplicates were
+  undated 2025-only rows) and 200-249 games with 16+ finals 115 → 114 (Charlie Cameron is one
+  player with 254 games). The "50-199 goals and zero Brownlow votes" cohort gates, skipped since
+  AFLDB-ISSUE-108, are re-armed at the re-measured 261 with a profile-identity membership digest.
+- Validated end to end on the canonical `db:test:rebuild` of `afldb_test` with the ISSUE-136
+  fold (13 stages, 48 final checks): V1-V13 green — round-vote witness 0 / 0 / 0 over 8,570
+  player-seasons, season / career / derived totals 79,113, the two integration suites 105 passed
+  / 0 failed, and a second loader run idempotent (16,120 / 16,120 / 0 rejected; season-table and
+  round-table content fingerprints unchanged). Committed on `claude/issue-113`; not merged, not
+  deployed. **Production still shows the empty-season-table symptom** until the load is applied
+  there, sequenced after the `AFLDB-ISSUE-137` identity repair
+  (`issues/closed/AFLDB-ISSUE-113.md` §8.18).
+
 ### AFLDB-ISSUE-131 — an upstream match rekey now updates the canonical match instead of duplicating it - 3 September 2026
 
 - **The defect.** `matches.match_key` is `season|round_code|match_date|home|away`, and the identical
