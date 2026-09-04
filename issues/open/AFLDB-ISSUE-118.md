@@ -2479,7 +2479,7 @@ table (3 → 2), runbook moved to `issues/closed/`. ISSUE-110 and ISSUE-137 unto
 | Branch / worktree | `claude/issue-118` / `D:\dev\afldb-issue-118` |
 | Base | `main @ 208fd5d` (the closeout commit) |
 | Model / effort | Fable 5.1, Medium |
-| Databases touched this session | none — the `55432` tunnel to `afldb_test` was down; every DB-backed step is listed in §23.8 as the operator's next command. **Production untouched.** |
+| Databases touched | first session: none (tunnel down); second session (operator-run validation, then §23.12): `afldb_test` read-only. **Production untouched.** |
 
 ### 23.1 The acceptance gap
 
@@ -2724,3 +2724,129 @@ Closeout requires §23.2 in full: 100% of valid criteria supported exactly, 0 un
 unresolved, 0 unrecognised, 0 timeouts, the strict run green on a database that carries every
 dataset, and the browser check of §23.9 on DEV. **ISSUE-110 and ISSUE-137 are not touched by this
 branch. Production is not touched.**
+
+### 23.12 DB-backed validation and the All-Australian answer-key comparison (5 September 2026, second session)
+
+**Operator validation on `afldb_test` (tunnel up):** `tests/integration/grid-solver.test.ts`
+**189/189** — every builder (151) solves; the final team is distinct from the 40-man squad; X+
+counts distinct seasons (the 1984 double rows do not make a "2x"); `height_min` / `height_max`
+compile and NULL never qualifies. Diagnostic corpus run (`AFLDB_GRIDLEY_DIAGNOSTIC=1`):
+**1,164/1,164**, cells solved 9,141 / 10,287, **unsupported valid criteria 26**, findings
+`unsupported` 375, `dataset gap` 773, `partial dataset` 506, **timeouts 0**; probe `maxSeason`
+2025, `draftLinks` false, `matchEvents` false, **`heights` false** (so the two height criteria are
+now a named dataset gap, not an unsupported question). Slowest full-axis criteria unchanged
+(`teammates-150` 1,816 ms, `teammates-100` 1,788 ms, `moreFFthanFAcareer` 1,766 ms; none over
+the 4 s guard). A strict run would fail on exactly those three data-gap categories.
+
+**The oracle (`tests/integration/gridley-aa-oracle.test.ts`, opt-in with `AFLDB_AA_REPORT=<file>`,
+~60 s).** Gridley player ids are opaque and the answer keys carry ids only, so the corpus's name
+bridge (player-valued criteria) reaches 380 players. This run adds a **co-occurrence fingerprint
+bridge**: a Gridley id and an AFLDB player that occupy the same cells across the corpus are the
+same person (Jaccard ≥ 0.7 over cell memberships, second candidate below half the best, injective).
+Result: **1,609** fingerprint matches, **380** name matches, **157** ids in both — **0
+disagreements**, so the method is validated; union bridge **1,832** players. Computed over 791
+criterion sets and 9,798 usable cells.
+
+**All-Australian comparison — exact counts.** 493 cells carry an All-Australian criterion
+(292 `allAus1953`, 56 `allAus2x`, 39 `allAusDef`, 24 `allAusFwd`, 22 `allAus2010s`, 19
+`allAus2000s`, 12 `allAus2020s`, 10 `allAus3x`, 9 `allAusMid`, 4 `allAus1990s`, 3 `allAusRuc`,
+3 `allAusSquad2024`). Gridley's answer entries in those cells: 41,531 for `allAus1953` (AFLDB
+38,889), 4,012 for `allAus2x` (AFLDB 3,835), 344 for `allAus3x` (AFLDB 314); the decade,
+position and squad criteria agree to within list-membership noise (median per-cell difference 0 to
+2; `allAusSquad2024` 84 = 84). **26,391 Gridley answer entries (51%) are unbridged → identity
+bridge gap**, counted, not judged. Among bridged players every entry was classified:
+
+| Classification | Entries | Distinct retired players |
+|---|---:|---:|
+| board-time effect (player still active at the board, or Hall of Fame inducted after it) | 730 | — |
+| other axis, not All-Australian (the pair criterion: `clubs1`, `hof`, club list membership) | 636 | — |
+| **AFLDB source missing required selection** (Gridley lists, AFLDB holds no selection or too few) | **315** | **14** |
+| AFLDB source has extra non-Gridley selection | 65 | **1** (David Clarke, 48 cells) plus board-time modern players |
+
+**Every material disagreement, by name (bridged, retired before the board):**
+
+| Player | AFLDB All-Australian rows | Gridley says | Cells | Classification |
+|---|---|---|---:|---|
+| Jim Krakouer (1982–1991) | none | 1x **and 2x** | 58 | source missing (two selections) |
+| David Rhys-Jones (1980–1992) | none | 1x | 50 | source missing |
+| Darren Kappler (1987–1998) | none | 1x | 47 | source missing |
+| Steven Stretch (1986–1995) | none | 1x | 41 | source missing |
+| Brian Taylor (1980–1990) | none | 1x | 31 | source missing |
+| Dermott Brereton (1982–1995) | 1985 Hawthorn | 2x **and 3x** | 16 | source missing (two selections) |
+| Barry Mitchell (1984–1996) | 1991 Sydney | 2x | 15 | source missing |
+| Doug Hawkins (1978–1995) | 1984 Footscray | 2x | 13 | source missing |
+| Brian Royal (1983–1993) | 1986 Western Bulldogs | 2x | 11 | source missing |
+| Greg Anderson (1988–1996) | 1993 Adelaide | 2x | 11 | source missing |
+| Bernie Quinlan (1969–1986) | 1984 Fitzroy | 2x | 9 | source missing |
+| Gary Malarkey (1977–1986) | 1979 Geelong | 2x | 7 | source missing (1980 or a 1983 team — source ambiguity on the season) |
+| Terry Wallace (1978–1991) | 1982 Hawthorn, 1988 Western Bulldogs | 3x | 4 | source missing |
+| Gary Pert (1982–1995) | 1985 Fitzroy, 1989 Fitzroy | 3x | 2 | source missing |
+| David Clarke (Geelong, 1971–1982) | 1972 "David Clarke*" Geelong (wikipedia row, link resolved from **2** candidates) | not an All-Australian | 48 | **source ambiguity**: either the 1972 link points at the wrong David Clarke or Gridley's 1972 team omits him — to be settled against the 1972 carnival team, not assumed |
+| Petracca, Curnow, Oliver, L. Ryan (active) | modern, correct | omitted from `ONE CLUB` × All-Australian on 2026 boards | 15 | other axis (`clubs1` list-membership convention) — not All-Australian |
+| Hodge, Riewoldt | correct | omitted from `HALL OF FAME` × All-Australian, board #339 (2024) | 2 | board-time (inducted 2025) — not All-Australian |
+
+Not one bridged player that AFLDB lists in an All-Australian team of 1983, 1984, 1986 or 1988 is
+omitted by Gridley: every one is listed in **100%** of the `allAus1953` cells whose other axis they
+satisfy (e.g. Rioli 49/49, Glendinning 68/68, Greene 67/67, Wiley 57/57, Hardie 61/61, Healy
+70/70, Ablett 86/86, Frawley 49/49, McLean 47/47), and players with a single AFLDB season are
+listed in **0** of their `allAus2x` cells while players with two or more distinct seasons are
+listed in all of them. AFLDB therefore has **no extra selection** in those years; it is **missing**
+selections.
+
+**Conclusions for 1983 / 1984 / 1986 / 1988 (from the oracle and the source rows, not from labels):**
+
+- **1984 — complete, both teams.** The 48 rows are two teams: 24 club-labelled rows (the VFL Team
+  of the Year) and 24 state-labelled rows (Vic 9, WA 8, SA 5, NT 1, NSW 1: a State of Origin–based
+  All-Australian team). Gridley counts **both**: WA-only 1984 members with no club row — Allen
+  Daniels (29/29 cells), Murray Rance (27/27), Paul Harding (47/47) — are listed as All-Australians,
+  as are the club-only members (Purser 48/48, Evans 49/49, Burns 41/41). Whether Gridley counts a
+  player named in both 1984 teams as one selection or two **cannot be decided from the corpus**:
+  all nine dual-listed players (Tuck, Flower, Madden, Daniher, Glendinning, Baker, Greene, Healy,
+  Ablett, Ackerly) hold another season, and the three whose row count reaches 3 only through the
+  pair (Baker, Greene, Ackerly) satisfy the other axis of none of the ten `allAus3x` cells.
+  Distinct-season counting stays, with this recorded as an open ambiguity that only a 3x cell
+  involving one of those three could settle.
+- **1983, 1986, 1988 — one team each, and it is the carnival team.** AFLDB's rows for those
+  seasons contain SANFL/WAFL players with no club (8, 11 and 4 rows: Bradley, Motley, Kevin Taylor,
+  Peake, Jarman, MacNish, Keene, Wilson, Whittlesea, Long …) — the State of Origin carnival
+  composition — and Gridley accepts every bridged one of them. The **VFL Team of the Year for
+  1983, 1986 and 1988 is absent**: the 14 Gridley-listed players AFLDB lacks are all VFL players of
+  exactly those years (Quinlan's 116-goal 1983, Brian Taylor's 100-goal 1986, Brereton, Kappler,
+  Stretch, Mitchell, Anderson, Rhys-Jones in 1988 …). This matches the source's own shape: the
+  `wikipedia` rows cover 1982, 1984, 1989 and 1990 — precisely the Team of the Year seasons that
+  had **no** carnival — and `draftguru` covers the carnival seasons, so the years with both events
+  got only the carnival team. Gridley's definition ("Includes VFL Team of the Year (1982–90), and
+  State of Origin carnivals (1953–1988)") requires both.
+- **1x / 2x / 3x, modern players:** exact. Every disagreement among bridged retired players traces
+  to the three missing teams (or David Clarke 1972); the 1991+ rows produce no disagreement at all.
+
+**Is the current All-Australian mapping exact?** The **builders and mapping are exact** for what
+AFLDB holds: the final-team semantics, the distinct-season counting and the decade/position/squad
+criteria all agree with Gridley's keys. **The family is not complete**, because the source lacks
+three teams. Classification of the family: **AFLDB source missing required selection** — an
+acquisition of the 1983, 1986 and 1988 VFL Teams of the Year (~60 rows) into
+`data/awards/all-australian.csv` under the existing `wikipedia` provenance and key shape
+(`aah:<season>:<player>:<club>`), with the parser's declared counts (`EXPECTED_TOTAL` 1,158,
+`EXPECTED_BY_SOURCE`, `EXPECTED_LINKED`) bumped deliberately, plus a decision on the 1972 David
+Clarke link. Not done in this session (Medium; acquisition is its own stage).
+
+**Remaining unsupported count:** 26 criteria / 125 occurrences (unchanged this session); plus the
+open data gaps that fail the strict run on this database (`heights`, draft links, marquee tags,
+partial captaincies) and the three missing All-Australian teams, which the strict run cannot see
+(they show only through the oracle, as `AFLDB source missing required selection`).
+
+**Files:** `tests/integration/gridley-aa-oracle.test.ts` (new, opt-in). Typecheck and lint clean.
+
+### 23.13 Exact next action
+
+1. **Stage AA3 — acquire the three VFL Teams of the Year (1983, 1986, 1988)** into
+   `data/awards/all-australian.csv` (wikipedia provenance, `aah:` keys, parser expectations
+   bumped), re-run `tools/migration/import_awards.py` on `afldb_dev`/`afldb_test`, then the oracle
+   (`AFLDB_AA_REPORT=<file> npx vitest run tests/integration/gridley-aa-oracle.test.ts`) — expect
+   the 14 "source missing" players to clear. Resolve David Clarke 1972 against the 1972 carnival
+   team in the same pass.
+2. **Fable High session** for Stage H2 (height acquisition and provenance, §23.5) and the
+   schema/model families (§23.7); the oracle's fingerprint bridge (1,832 players) is the tool for
+   the height answer-key comparison (7,216 Gridley ids need height; 195 of them name-bridged,
+   more now fingerprint-bridged).
+3. Strict corpus run stays red until the acquisitions land; closeout per §23.2.
