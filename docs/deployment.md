@@ -364,6 +364,8 @@ nothing else is reading, and re-run from the start after any failure.
 
 **Cache invalidation.** Historical pages are cached for 1–24 hours. After an import, a rebuild and restart refreshes them; a full restart is not otherwise required. Rebuilding is preferred over waiting for revalidation, because prerendered pages are regenerated at build time.
 
+**The nightly in-season settle is the exception, and publishes itself (§7c).** A manual import is a supervised act with a rebuild at the end of it; the 04:30 settle is not, and it changes exactly one season. It therefore asks the running site to invalidate that one page once its transaction has committed, instead of leaving readers on pre-settle output for the rest of the ISR hour (`AFLDB-ISSUE-134`).
+
 ## 7a. AFLW staging refresh
 
 AFLW lives in `staging_aflw` only. It is not yet in the normalised model, is
@@ -780,6 +782,66 @@ cannot inherit the grant.
 polkit, or unset `AFLDB_SETTLE_TRIGGER` and restart `afldb`. The scheduled
 timer keeps running in both cases.
 
+## 7c. Publishing a settled season (`AFLDB-ISSUE-134`)
+
+`/seasons/[year]` is ISR: `revalidate = 3600`, and `generateStaticParams()`
+prerenders every season at build time. The nightly settle runs out of process,
+so without this step a settle that lands real matches at 04:35 is invisible to
+readers until the page's hour expires. Measured on production
+(`AFLDB-ISSUE-133`): prerendered 22:14:46, rows committed 22:37:47, page
+regenerated 23:50:48.
+
+**Why it is a loopback request and not `revalidatePath()` in the settle.**
+`revalidatePath()` only exists inside a Next server context, and Next 16 keeps
+page invalidation in *per-process* memory — a module-level tag map, plus an
+in-memory cache in front of the file cache. `deploy/server-cluster.mjs` runs
+`AFLDB_WORKERS` independent processes behind one socket, so a single request
+invalidates a single worker. The settle therefore posts on fresh connections
+until every worker ordinal has answered, and reports a failure if it cannot
+reach them all. Deleting `.next` cache files would not work either: the
+in-memory cache is read first.
+
+Two host steps, and **until both are done the settle is inert** — it runs and
+commits exactly as before, and the page falls back to expiring on its own.
+
+```bash
+cd ~/projects/afldb
+
+# 1. The origin of the local site (the port Caddy proxies to) and a secret.
+#    Generate the secret on the host; never commit it.
+echo "AFLDB_REVALIDATE_URL=http://127.0.0.1:3100" >> .env
+echo "AFLDB_REVALIDATE_SECRET=$(openssl rand -hex 32)" >> .env
+
+# 2. The web service must be restarted to see the secret. The settle unit
+#    reads .env at each start and needs nothing.
+sudo systemctl restart afldb
+```
+
+Verify without waiting for 04:30 — this is the exact request the settle makes,
+and it should answer `{"ok":true,...}` naming the worker that handled it:
+
+```bash
+curl -s -X POST http://127.0.0.1:3100/api/internal/revalidate-season   -H "x-afldb-revalidate-secret: $(grep '^AFLDB_REVALIDATE_SECRET=' .env | cut -d= -f2-)"   -H 'content-type: application/json' -d '{"season":2026}'
+```
+
+**What the secret authorises.** One thing: asking the site to re-render
+`/seasons/<year>`. The body carries an integer year and nothing else — the
+path is composed server-side — so there is no arbitrary path, pattern, layout
+or tag to purge. The route also refuses any request carrying `X-Forwarded-For`
+or `X-Forwarded-Host`, which Caddy adds to everything it proxies, so it cannot
+be reached from the internet even with the secret. Unconfigured, it answers
+503.
+
+**When it fires.** Only after the settle transaction has committed, and only
+when that run actually wrote a canonical or ledger row. The idempotent 0/0
+rerun — most nights out of season, and any repeat over unchanged source data —
+makes no request at all.
+
+**When it fails.** The unit goes red and the journal says why, exactly as
+`--require-complete-source` does. **The data is committed and correct; only
+the cache invalidation did not happen**, so the page reverts to expiring on
+its own hour. Nothing is retried and nothing is rolled back.
+
 ## 8. Testing
 
 ```bash
@@ -850,6 +912,8 @@ All configuration is in `/home/arm/projects/afldb/.env` (mode 600, owner `arm`),
 | `AFLDB_BUILD_WORKERS` | caps `next build` static-generation workers; unset = Next's default |
 | `AFLDB_STATEMENT_TIMEOUT_MS` | per-connection statement timeout |
 | `AFLDB_SETTLE_TRIGGER` | `systemd` enables the Super Admin on-demand settle trigger (§7b). Anything else, including unset, leaves it inert |
+| `AFLDB_REVALIDATE_URL` | **optional**, e.g. `http://127.0.0.1:3100` — the loopback origin the settle posts its finished season to (§7c). Must be loopback; a non-loopback host is refused |
+| `AFLDB_REVALIDATE_SECRET` | **optional** — the shared secret for that one route. Set both or neither; one alone is refused |
 | `AFLDB_R_LIBS` | **optional**, normally unset. One extra R library directory for the settle unit, prepended to `R_LIBS`; must exist. The canonical library `/usr/local/lib/R/site-library` needs nothing (§7b, `AFLDB-ISSUE-130`) |
 | `AFLDB_RSCRIPT` | **optional**, default `/usr/bin/Rscript` — the interpreter the settle unit runs (§7b) |
 
