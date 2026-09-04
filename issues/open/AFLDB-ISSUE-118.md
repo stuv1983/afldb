@@ -2228,8 +2228,20 @@ Against `afldb_test`, offline from Gridley, deterministic:
   cancelled statement rejected the render and the route showed the error boundary, which posts
   `PAGE_CRASH` with the digest. `error.tsx` stores only the digest, so the offending *board* is
   not in telemetry.
-- Which predicate timed out on production on 2026-09-03 is **not yet read**: the production
-  journal is operator-gated (§22.10). Two facts bound the hypothesis: the ISSUE-076/103 repairs
+- **Production journal, read by the operator on 2026-09-05 (read-only, host `afldb-prod`).**
+  The app-health timestamps are UTC, so the incident window is **2026-09-03 15:45–15:55 AEST**
+  (the first `05:45–05:55` local query returned nothing for that reason). The retained journal
+  block holds two entries, both `Error [PostgresError]: canceling statement due to statement
+  timeout`, `code: '57014'`, `digest: '1511510695'`, at **15:49:25** and **15:49:41 AEST**.
+  This confirms on production, independently of ISSUE-076's dev correlation, that digest
+  `1511510695` is SQLSTATE 57014 and that there were two incidents, not one repeated event.
+  **Limitation:** the retained block does not contain the `/grid-solver?g=...` request line, so
+  the board token cannot be recovered and the exact cell that timed out on production stays
+  unnamed. This does not block closeout: the failure class is confirmed at the production host,
+  ISSUE-076 had already tied the digest to the same timeout class, and this branch reproduced
+  the class at cell level and removed it for the whole catalogue (§22.4, §22.6).
+- Which predicate timed out on production on 2026-09-03 is therefore known by class, not by
+  board. Two facts bound the hypothesis: the ISSUE-076/103 repairs
   (`6014b9e`, `0391e07`) were on production by then, and the crash came the morning after the
   2026-09-02 database promotion — `docs/production-promotion.md` and `tools/db/promotion-*` run
   **no `ANALYZE`** after the restore, so planner statistics were whatever autovacuum had reached.
@@ -2330,7 +2342,13 @@ run 6 is clean.
 
 The branch is complete and green; two things stand between it and closeout, both the operator's:
 
-1. **Read the production journal for the 2026-09-03 crash (read-only, PROD).** Which board timed
+1. **DONE 2026-09-05 — production journal read.** Result recorded in §22.5: two 57014 entries
+   with digest `1511510695` at 15:49:25 and 15:49:41 AEST (the window is UTC in telemetry, so
+   the `05:45` command below found nothing); the `/grid-solver?g=` request line is not in the
+   retained block, so the board is not recoverable. Closeout proceeds on the digest identity.
+   The original instruction is kept below for the record.
+
+   **Read the production journal for the 2026-09-03 crash (read-only, PROD).** Which board timed
    out is not in telemetry; the journal has it. One command, from PowerShell (the production alias
    needs the agent-held key):
 
