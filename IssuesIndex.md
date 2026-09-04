@@ -7,9 +7,8 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-09-04
-**Open issues:** 7 tracked here — `AFLDB-ISSUE-104`, `AFLDB-ISSUE-110`,
-`AFLDB-ISSUE-116`, `AFLDB-ISSUE-125`, `AFLDB-ISSUE-126`, `AFLDB-ISSUE-134`,
-`AFLDB-ISSUE-137`.
+**Open issues:** 6 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-116`,
+`AFLDB-ISSUE-125`, `AFLDB-ISSUE-126`, `AFLDB-ISSUE-134`, `AFLDB-ISSUE-137`.
 
 <!-- UPDATE 2026-09-04 (ISSUE-127 closeout): `AFLDB-ISSUE-127` is **Resolved** — operator host
      validation completed on dev (`streamanator`, deployed revision `169d738`). The polkit grant
@@ -551,7 +550,18 @@ closure boundary, and the unrelated query-builder timing regression remains with
      `issues/closed/AFLDB-ISSUE-120.md` §12–§16. The production `AFLDB_BETA_GATE` re-adjudication
      recorded there still stands as a launch precondition. -->
 | `AFLDB-ISSUE-116` | Low | Admin tooling / Data QA / Query performance | The `player_match_stats` anchor of `/admin/query-builder` costs **1.05–1.44 s with no card** (T-C11 1056–1072 ms; `EXPLAIN ANALYZE` 1441 ms) — pre-ISSUE-115 behaviour. `runQueryBuilder` (`src/db/queries/query-builder.ts:282-286`) emits `count(*) OVER ()` with an index-ordered `ORDER BY m.match_date DESC LIMIT 50`; the planner costs it fast-start (`Limit cost=4.41..577`) but the window aggregate consumes all 685,471 rows and spills to temp. That plan turned every related card into a per-row Nested Loop Semi/Anti Join (685,471 executions), so ISSUE-115 excluded related cards under this anchor as an evidence-driven V1 boundary (`QUERYABLE_TABLES.player_match_stats.subjects = []`). Above the 1 s target, below the 5 s ceiling; own-row filtering works. **NEW EVIDENCE 2026-09-02 (from `AFLDB-ISSUE-112` G6 closeout):** the same emitted shape also fails T-C11 on the **`players`** anchor — `players x player.captaincies NOT EXISTS link_status=unique` at **1,081-1,100 ms** across three runs, while the bare predicate is **16.6 ms** server-side and the `count(*) OVER ()` + `ORDER BY ... LIMIT 50` shape is **2,208 ms**. The sibling `draft_picks` case passes only because it is degenerate (zero rows valued `unique`). So the defect is the emitted shape, not one anchor's table. Key files: `src/db/queries/query-builder.ts`, `src/search/query-builder-spec.ts`, `tests/integration/query-builder.test.ts` (T-C11 anchor-alone reference). **Next action: separate work, not started** — fix the page/count shape without raising the timeout, adding an index or changing schema; re-measure with T-C11 **on both the `player_match_stats` and `players` anchors**; only then reconsider re-admitting related cards under PMS (T-A1/T-B8 assert `subjects: []` exactly). Do not reopen ISSUE-115. |
-| `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key)` carries **no owner**, so the `data_issues` refresh upsert could update a foreign-owned open row. Resolution *is* ownership-scoped; refresh is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. Key files: `076_afltables_settle_projections.sql` (**frozen — never edit**), `settle-afltables.ts`. Next action: **nothing until a second `issue_key` writer is proposed**; ownership must enter the dedup contract before one ships. |
+<!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-104` is **Resolved** and is NO LONGER an open issue.
+     Closed as **NOT REACHABLE**, not fixed, and the old "ISSUE-099 is the only writer" premise is
+     SUPERSEDED: a second `issue_key` writer now exists (`canonical_apply_failed`, owner
+     `AFLDB-ISSUE-122`), but it carries a distinct `issue_type` and a disjoint key prefix
+     (`afltables|apply|…`), so it can never contend for ISSUE-099's index entry. The owner-blind
+     `ON CONFLICT` is unchanged and is safe only because each `issue_type` in the keyed namespace
+     has exactly one owner. No code, schema, migration or test change; migration 076 untouched.
+     Authoritative records: the `AFLDB-ISSUE-104` entry in `issues.md` (Resolution, 2026-09-04) and
+     `issues/closed/AFLDB-ISSUE-104.md`. Binding reopen trigger: a second owner writing an
+     `issue_type` another owner already writes with a non-NULL `issue_key`; the two `issue_type`
+     literals converging; or any writer outside `settle-afltables.ts` populating `issue_key`.
+     Guard test: `tests/current-season-import.test.ts:3833-3846`. -->
 <!-- RETIRED 2026-08-29 — `AFLDB-ISSUE-105` is **Resolved** and is NO LONGER an open issue.
      Do not read the commented-out row below as current: it is the pre-resolution index row,
      kept only as lineage, and its "NOT yet validated" / "next action" text is SUPERSEDED.
