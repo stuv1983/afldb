@@ -211,7 +211,22 @@ created, reopened, resolved, or materially reclassified.
      Authoritative record: the `AFLDB-ISSUE-120` entry in `issues.md` (Resolution, 2026-09-01) and
      `issues/closed/AFLDB-ISSUE-120.md` §12–§16. The production `AFLDB_BETA_GATE` re-adjudication
      in that entry still stands as a launch precondition. -->
-| `AFLDB-ISSUE-116` | Low | Admin tooling / Data QA / Query performance | The `player_match_stats` anchor of `/admin/query-builder` costs **1.05–1.44 s with no card at all** (T-C11 1056–1072 ms; `EXPLAIN ANALYZE` 1441 ms) — a pre-`AFLDB-ISSUE-115` baseline. `runQueryBuilder` emits `count(*) OVER ()` with an index-ordered `ORDER BY m.match_date DESC LIMIT 50`; the planner costs it as a fast-start plan (`Limit cost=4.41..577`) but the window aggregate must consume all 685,471 rows and spills to temp. Under that plan every related card became a per-row correlated Nested Loop Semi/Anti Join (685,471 executions for 13,275 distinct keys), so ISSUE-115 excluded related-domain cards under this anchor as an evidence-driven V1 boundary. Above the 1 s target, below the 5 s ceiling; own-row filtering still works. **NEW EVIDENCE 2026-09-02 (`AFLDB-ISSUE-112` §32.9):** the same mechanism now also fails the T-C11 gate on the **`players`** anchor — `players x player.captaincies NOT EXISTS link_status=unique` measured **1,081 / 1,095 / 1,100 ms** across three runs against the 1,000 ms budget, reproducible, against a freshly rebuilt canonical `afldb_test`. The predicate itself is cheap: `EXPLAIN (ANALYZE)` of the bare `count(*) ... WHERE NOT EXISTS (captaincies JOIN clubs ...)` is **16.6 ms**, while the same predicate under `runQueryBuilder`'s `count(*) OVER ()` + `ORDER BY ... LIMIT 50` shape measures **2,208 ms** — the window aggregate consuming every qualifying row, exactly as described above. The sibling case `players x player.draft_picks NOT EXISTS link_status=unique` passes at 33.6 ms only because it is degenerate (`draft_picks` holds `unmatched` 6,805 / `resolved` 5 and **zero** rows with `link_status = 'unique'`), so it is not evidence that the anchor is healthy. `AFLDB-ISSUE-112` changed neither the query builder nor the captaincies row count (1,375, unchanged). | **Separate work, not started.** Fix the anchor baseline (e.g. take the total count off the paged query, or a two-step keyset/count shape) **without** raising `AFLDB_STATEMENT_TIMEOUT_MS`, adding an index or changing schema; re-measure with the T-C11 harness **on both the `player_match_stats` and the `players` anchors** — the 2026-09-02 evidence shows the defect is the emitted shape, not one anchor's table; only then reconsider re-admitting related cards under `player_match_stats` (`QUERYABLE_TABLES.player_match_stats.subjects`, currently `[]`). Do not reopen ISSUE-115. |
+<!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-116` is **Resolved**. `runQueryBuilder` no longer carries
+     the total on the page as `count(*) OVER ()`; the page and the count are two statements inside
+     one `REPEATABLE READ READ ONLY` transaction, a short page derives its own exact total so the
+     count statement is skipped for single-page and empty results, and `SET LOCAL jit = off`
+     precedes the count (its unlimited estimate crossed jit_above_cost and cost ~1.15 s of
+     compilation for 75 ms of work). Measured on `afldb_test` (PostgreSQL 16.15, 55432 tunnel,
+     `AFLDB_STATEMENT_TIMEOUT_MS` unchanged at 5000, no index, no schema change): the
+     `player_match_stats` anchor alone **1144.5 → 353.4 ms** and `players x player.captaincies
+     NOT EXISTS link_status=unique` **1073.4 → 320.9 ms**, both now under the 1,000 ms T-C11
+     target; the PMS anchor-alone gate was tightened from CEILING_MS to BOUND_MS. Filtering, sort,
+     pagination, exact-total, parameterisation, catalogue and timeout semantics are unchanged; the
+     one deliberate correction is that a page past the end now reports the real total instead of 0.
+     `QUERYABLE_TABLES.player_match_stats.subjects` stays `[]` — re-admission is recorded as a
+     separate future decision with bounded evidence. `AFLDB-ISSUE-115` was not reopened.
+     Authoritative records: the `AFLDB-ISSUE-116` entry in `issues.md` (Resolution, 2026-09-04)
+     and `issues/closed/AFLDB-ISSUE-116.md`. -->
 
 ---
 
@@ -11559,7 +11574,7 @@ pre-existing PMS anchor baseline is `AFLDB-ISSUE-116`.
 
 ## AFLDB-ISSUE-116 — The `player_match_stats` Data QA anchor exceeds 1 s with no card
 
-- **Status:** Open
+- **Status:** Resolved 2026-09-04
 - **Severity:** Low
 - **Area:** Admin tooling / Data QA / Query performance
 - **Found:** 2026-08-30 (`AFLDB-ISSUE-115` Stage 5 performance gate)
@@ -11649,12 +11664,61 @@ the 5 s ceiling; only super-admins reach the tool; no public route is affected. 
 QA questions at per-player-per-match grain cannot combine with related domains until this is
 fixed.
 
-### Next action
+### Resolution — 2026-09-04
 
-Not started. When taken up: reproduce with the T-C11 anchor-alone reference point, capture the
-plan, choose and implement a page/count shape, re-measure, and only then decide on re-admission
-under ISSUE-115's existing tests (T-B8/T-A1 assert the current `subjects: []` exactly and must be
-changed deliberately, not silently).
+**Root cause.** The emitted shape, exactly as described above. `runQueryBuilder` selected
+`count(*) OVER () AS "__total"` alongside the display columns, so a window aggregate had to
+consume every qualifying row before the ordered `LIMIT` could emit its first one. Reproduced on
+`afldb_test` (PostgreSQL 16.15, `afldb_owner` over the 55432 tunnel) at branch base `fde0851`:
+`player_match_stats` anchor alone **1144.5 ms**, `players x player.captaincies NOT EXISTS
+link_status=unique` **1073.4 ms**. Isolated in `psql`, the current shape measured 2502.6 ms and
+1253.8 ms respectively, against **11.4 ms / 9.4 ms** for the same page query without the window
+and **182.5 ms / 8.3 ms** for a standalone count.
+
+**Fix** (`src/db/queries/query-builder.ts`, `runQueryBuilder` only — the compiler is untouched):
+
+1. The page query drops `count(*) OVER ()` and keeps its fast-start ordered plan; the count query
+   drops `ORDER BY` and `LIMIT`.
+2. Both run inside ONE `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY`, so the total still
+   describes exactly the snapshot the page was drawn from, and so `SET LOCAL` is safe on a pooled
+   connection. Both statements splice the SAME compiled `where` fragment, which `postgres.js`
+   serialises into each enclosing statement's own parameter list, so they cannot drift.
+3. A short page proves its own exact total (`offset + rows.length`), so the count statement is not
+   issued at all for single-page or empty results. Without this the split doubled the cost of any
+   query matching nothing — `matches x match.player_stats EXISTS club_is_participant IS FALSE`
+   regressed 753.4 → 1533.4 ms before it was added.
+4. `SET LOCAL jit = off` immediately before the count. The count has no `LIMIT`, so its estimated
+   cost carries the whole relation (5,782,960 for the four-related-card shape, past both
+   `jit_above_cost` 100000 and `jit_optimize_above_cost` 500000) and PostgreSQL compiled 104
+   functions with inlining and optimisation: **1228.7 ms with JIT versus 75.6 ms without**, for
+   75 ms of real work. The pre-fix shape never paid this because its `LIMIT` kept the estimate
+   tiny. This is the one deviation from pure query-shape work and is recorded as such; it is
+   transaction-local and raises no timeout, adds no index and changes no schema.
+
+**Validation.** T-C11 after the fix: `player_match_stats` anchor alone **353.4 ms** (gate
+tightened from the 5 s ceiling to the 1,000 ms target), `players x player.captaincies NOT EXISTS
+link_status=unique` **320.9 ms**, the 24-shape anchor×relationship sweep green at 171–453 ms, and
+the tightest remaining case `matches x match.player_stats EXISTS club_is_participant IS FALSE`
+at 910.0 ms with its bound unchanged. `npm test -- tests/query-builder-spec.test.ts
+tests/integration/query-builder.test.ts` → 2 files, **51/51**; `npx tsc --noEmit` clean; eslint
+clean on both touched files. Four new regression cases (T-E1–T-E4) pin exact total, exact page
+partitioning and order, a related-domain total against an independent oracle, and value binding
+in the count statement specifically; T-E1 was RED before the fix.
+
+**Semantic correction.** `total` was previously read off the page's first row, so a page past the
+end reported 0 and the UI said "No rows match" for a query with matches. It is now the whole match
+count on every page. Filtering, sort, pagination, parameterisation, catalogue-identifier and
+timeout semantics are otherwise unchanged, as is the `QueryBuilderResult` contract.
+
+**Not done, deliberately.** `QUERYABLE_TABLES.player_match_stats.subjects` remains `[]` and
+ISSUE-115's T-A1/T-B8 are unchanged. Bounded post-fix evidence under that anchor (page 9–30 ms,
+count 69–243 ms for three shapes, against ISSUE-115 §20.5's 1.9–4.8 s and four 5 s timeouts) is
+recorded in `issues/closed/AFLDB-ISSUE-116.md` §9, but three of twenty-four shapes measured as raw
+SQL do not justify re-admission; that is a separate decision needing the full T-C11 harness.
+`AFLDB-ISSUE-115` was not reopened.
+
+Removed from `IssuesIndex.md` and the Open Issues table; `CHANGELOG.md` updated under
+`Unreleased`. Committed on `claude/issue-116-query-builder`; not merged, not deployed.
 
 ## AFLDB-ISSUE-110 — Problem Search semantic triage and club-career games
 
