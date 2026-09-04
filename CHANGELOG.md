@@ -15,6 +15,30 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-124 — the afldb.service crash-loop limiter is now actually in effect - 4 September 2026
+
+- **The defect.** `deploy/afldb.service` declared its crash-loop rate limiter as
+  `StartLimitIntervalSec=120` and `StartLimitBurst=5` in the **`[Service]`** section. systemd reads
+  both keys from **`[Unit]`** only; in `[Service]` they are unknown keys and are dropped, with
+  `afldb.service:65: Unknown key name 'StartLimitIntervalSec' in section 'Service', ignoring.` from
+  `systemd-analyze`. The unit therefore ran on the `10s` default interval, and the limiter its own
+  comment described had never engaged. Pre-existing since the unit was written; found while
+  verifying the `AFLDB-ISSUE-122` settle units.
+- **The fix.** Both directives moved to `[Unit]`, values unchanged at `120`/`5`, with the rationale
+  comment moved alongside them and a pointer comment left in `[Service]` so the next reader is not
+  led back to the wrong section. No other directive altered. The other four units under `deploy/`
+  were swept and carry no second occurrence.
+- **Behaviour change.** `afldb.service` now gives up after 5 starts within 120 seconds instead of
+  restarting forever at the `10s` default, so a crash loop becomes visible rather than silently
+  retried. `Restart=always`/`RestartSec=5` are unchanged; a healthy service is unaffected.
+- **Deployment.** The values are unit-object properties, so `systemctl daemon-reload` applies them
+  and **no service restart is required** — proved on both hosts by an unchanged `MainPID`.
+  Development (`streamanator`) and production both report `StartLimitIntervalUSec=2min` (was `10s`),
+  `StartLimitBurst=5`, a clean `systemd-analyze verify`, and healthy loopback and public
+  `/api/health`. Production kept `MainPID=803941` across the reload and stayed `active`; the
+  installed unit is `root root 644`. Any host installing this unit needs a `daemon-reload` to pick
+  the change up; nothing else.
+
 ### AFLDB-ISSUE-136 — a renumbered AFL Tables profile URL no longer splits a career into two canonical players - 4 September 2026
 
 - **The defect.** fitzRoy serves completed seasons from its cached release but scrapes the newest

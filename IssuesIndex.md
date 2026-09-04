@@ -7,9 +7,9 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-09-04
-**Open issues:** 9 tracked here — `AFLDB-ISSUE-104`, `AFLDB-ISSUE-110`,
-`AFLDB-ISSUE-116`, `AFLDB-ISSUE-123`, `AFLDB-ISSUE-124`, `AFLDB-ISSUE-125`,
-`AFLDB-ISSUE-126`, `AFLDB-ISSUE-134`, `AFLDB-ISSUE-137`.
+**Open issues:** 8 tracked here — `AFLDB-ISSUE-104`, `AFLDB-ISSUE-110`,
+`AFLDB-ISSUE-116`, `AFLDB-ISSUE-123`, `AFLDB-ISSUE-125`, `AFLDB-ISSUE-126`,
+`AFLDB-ISSUE-134`, `AFLDB-ISSUE-137`.
 
 <!-- UPDATE 2026-09-04 (ISSUE-127 closeout): `AFLDB-ISSUE-127` is **Resolved** — operator host
      validation completed on dev (`streamanator`, deployed revision `169d738`). The polkit grant
@@ -181,7 +181,14 @@
      **Uncommitted on `claude/issue-133`.**
      UPDATE 2026-09-04 (ISSUE-113 validation): `AFLDB-ISSUE-135` is ALLOCATED on `claude/issue-135`
      (worktree `D:\dev\afldb-issue-135`, not yet on `main`) and `AFLDB-ISSUE-136` is allocated here on
-     `claude/issue-113`. **Next free issue ID is `AFLDB-ISSUE-137`.** -->
+     `claude/issue-113`. **Next free issue ID is `AFLDB-ISSUE-137`.**
+     UPDATE 2026-09-04 (ISSUE-124 closeout): `AFLDB-ISSUE-124` is **Resolved 2026-09-04** and is no
+     longer an open issue, superseding the 2026-09-03 line above that listed it as Open and
+     unimplemented; its number stays allocated and it claims **NO migration number** - `086` is
+     still the next free one. The fix is a `deploy/afldb.service` section move only: no migration,
+     schema, `privileges.sql`, `.env`, timer, polkit or database change. Of the four ISSUE-122
+     follow-ups, `AFLDB-ISSUE-123`, `-125` and `-126` remain Open and unimplemented. Committed on
+     `claude/issue-124`, **not merged**. -->
 
 <!-- The former "`AFLDB-ISSUE-110` is allocated and is NOT free" merge warning is retired:
      the ISSUE-110 branch merged into dev on 2026-08-31 and its own row below is now
@@ -473,7 +480,23 @@ closure boundary, and the unrelated query-builder timing regression remains with
      `issues/closed/AFLDB-ISSUE-131.md` §16. -->
 | `AFLDB-ISSUE-126` | Medium | Database / Admin / Security / Audit trail / Operations | The 2026-09-02 production canonical DB cutover replaced production-only application state along with the football data. The real super admin (`auth_users` id 1) was recovered from the pre-cutover backup and admin login verified, but three sets of production-only rows were **not** restored and exist only in the recovery database `afldb_prod_auth_recovery`: `auth_audit_log` **92 rows**, `beta_access_codes` **1 row**, `site_settings` **11 rows**. Production runs with 0 rows in all three. Nothing breaks — `src/lib/site-settings.ts` falls back to compiled-in defaults — but 11 deliberate super-admin choices are silently reverted, one beta access code is gone, and the admin audit trail has a hard discontinuity at the cutover. `auth_sessions` (17) were deliberately not restored and must stay unrestored. Key files/state: `afldb_prod_auth_recovery`, `/home/arm/afldb_prod_pre_rebuild_20260902-200355.dump`, `src/lib/site-settings.ts`. | **Not started. Decide per table; do not restore blindly.** `site_settings`: diff the 11 rows against the compiled-in defaults and restore only real operator decisions. `beta_access_codes`: confirm the code is still wanted; treat as live credential material, never in a tracked file. `auth_audit_log`: **never reconstruct an audit trail retroactively** — restore the 92 rows *with* an explicit auditable cutover marker, or record the gap deliberately and let the log start at the cutover. Also confirm whether the dump carries other production-only state. **`afldb_prod_auth_recovery` MUST NOT be dropped until this is resolved.** Operator-supervised production DML, not a repository change. |
 | `AFLDB-ISSUE-125` | Medium | Operations / Deployment / Database / Data integrity | No documented procedure preserves production-only state when a clean rebuilt database is promoted to production. `AFLDB-ISSUE-122`'s 2026-09-02 cutover proved the gap: restoring the clean rebuilt `afldb_test` dump over `afldb_prod` replaced the broken 2026 football data correctly but also replaced every application-, auth- and operations-owned table, promoting a **test fixture super admin** (`email-intake-test-fixture@afldb.test`) into production in place of the real one. Recovery worked only because a pre-cutover dump had been taken — operator discipline, not a documented step. The repo documents backup/restore and the migration-before-code order (`AFLDB-ISSUE-027`) but nothing enumerates production-only tables. Key files: `docs/deployment.md`, `tools/maintenance/` backup/restore, `tools/maintenance/privileges.sql`. | **Not started. Prevention, not incident documentation.** Enumerate every production-only table (at minimum `auth_users`, `auth_sessions`, `admin_invites`, `auth_audit_log`, `beta_access_codes`, `beta_allowed_emails`, `beta_login_tokens`, `site_settings`, plus `app_health_events`, `nl_search_log`, `data_edits`, `data_overrides`, `data_issues`) and classify each must-preserve / must-reset / decide-per-promotion. Then document a promotion procedure in `docs/`: mandatory pre-cutover dump; football-data-only restore or restore-then-reinstate; an explicit **refuse-if-a-test-fixture-identity-is-present** check so no `*@afldb.test` row can become a production admin; and a post-promotion checklist ending in a real admin login. Cross-check `privileges.sql`, already mandatory after any restore. |
-| `AFLDB-ISSUE-124` | Low | Deployment / Operations | `deploy/afldb.service` declares `StartLimitIntervalSec` in **`[Service]`**; systemd reads it only from **`[Unit]`**, so it is dropped — production `systemd-analyze` reports `afldb.service:65: Unknown key name 'StartLimitIntervalSec' in section 'Service', ignoring.` The crash-loop limiter the unit's own comment describes is **not in effect**. Pre-existing and unrelated to `AFLDB-ISSUE-122`; observed while verifying its settle units. Key file: `deploy/afldb.service`. | **Not started.** Move `StartLimitIntervalSec` (and `StartLimitBurst` if co-located) to `[Unit]`, confirm `systemd-analyze verify` is warning-free, reinstall the unit and `daemon-reload` on production, validate the limiter engages, and check the other `deploy/` units for the same misplacement. Change nothing else in the unit. |
+<!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-124` is **Resolved** and is NO LONGER an open issue.
+     `deploy/afldb.service` moved `StartLimitIntervalSec=120`/`StartLimitBurst=5` from `[Service]`
+     to `[Unit]` (commit `146b3e0`, branch `claude/issue-124`), values unchanged; the other four
+     `deploy/` units carry no second occurrence. Dev D1-D4 green on `streamanator` (in-place
+     relocation, not a file copy). **Production P1-P5 green 2026-09-04** under operator-authorised
+     **Option B** — the tracked unit installed as a file behind a host-side `diff` gate that
+     returned only this issue's relocation and comment move (net +9 lines, no W1/W2/W3, both md5s
+     pinned at install time): `systemd-analyze verify` clean, `StartLimitIntervalUSec=2min`
+     (was `10s`), `StartLimitBurst=5`, `MainPID=803941` **unchanged**, `active`, `root root 644`,
+     loopback and `https://beta.afldb.com/api/health` both ok, **no service restart**. Option B was
+     safe on production only because W1-W3 were already installed and live there before this issue
+     — measured read-only pre-change; runbook §5.4.1 is corrected accordingly and the evidence is
+     §5.4.2. The withheld set therefore remains outstanding **on dev only**, as a routine gated
+     deployment of already-reviewed tracked configuration, not a tracked defect. No migration,
+     schema, `privileges.sql`, `.env`, timer, polkit or database change; `086` still next free.
+     Authoritative records: the `AFLDB-ISSUE-124` entry below (Resolution, 2026-09-04) and
+     `issues/closed/AFLDB-ISSUE-124.md` §7.3. -->
 | `AFLDB-ISSUE-123` | Low | Data acquisition / Import architecture / Performance | The first full `AFLDB-ISSUE-122` production pass — `--dry-run --auto-apply` then the real `--apply --auto-apply` over snapshot `settle-2026-09-02-1958` (207 matches, 9522 player-match rows, 10582 canonical rows, 9133 ledger rows) — took roughly **an hour** on a 2 vCPU droplet with PostgreSQL co-located. Diagnosis is negative in the useful sense: continuous forward progress, rapidly changing per-record `source_records`/version/projection/savepoint SQL, **no lock blocking and no long-running single query** — per-record round-trip cost across a season backfill, not a bad plan. Correctness is not in question (the rerun wrote nothing). **Steady-state nightly cost is unmeasured.** Key files: `src/lib/acquisition/settle-afltables.ts`, `src/lib/acquisition/canonical-apply.ts`, `deploy/afldb-settle-afltables.{service,sh}`. | **Not started, correctly low until measured.** First read `journalctl -u afldb-settle-afltables.service` across several in-season firings and record the real nightly runtime — a season backfill is not the scheduled workload. Then **profile before optimizing** (per-record round trips vs. per-target savepoint vs. projection writes vs. version/payload upserts). Any change **must preserve** the ledger row in the same savepoint as its mutation (SC2), the record as the savepoint boundary (SC4), and zero canonical/ledger writes on an identical rerun (SC3). Do not batch across records in a way that lets one bad record take down a family that would otherwise land. |
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-113` (replace legacy `brownlow_season_votes` acquisition) is
      **Resolved** and is NO LONGER an open issue. Authoritative records: `issues.md` (Resolution —
