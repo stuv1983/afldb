@@ -138,12 +138,17 @@ describe('Gridley compatibility mapping -- exhaustive classification', () => {
     }).toEqual({
       occurrences: 6858,
       distinctCriteria: 839,
-      mappedOccurrences: 6590,
-      mappedDistinct: 810,
+      mappedOccurrences: 6732,
+      mappedDistinct: 812,
       freebieOccurrences: 1,
-      dataAbsentOccurrences: 267,
-      dataAbsentDistinct: 28,
+      dataAbsentOccurrences: 125,
+      dataAbsentDistinct: 26,
     });
+    // Tracked debt, not a pass: ISSUE-118's acceptance is zero data-absent
+    // valid criteria (issues/open/AFLDB-ISSUE-118.md §23). The exact figure
+    // is pinned so it only ever moves deliberately, and the integration
+    // corpus run fails while it is above zero.
+    expect(distinct(absentList)).toBeLessThanOrEqual(26);
   });
 
   it('names every data-absent criterion with its reason', () => {
@@ -159,7 +164,7 @@ describe('Gridley compatibility mapping -- exhaustive classification', () => {
     // The complete list, largest first. Every entry is a fact about AFLDB's
     // data, not about the solver: see issues/open/AFLDB-ISSUE-118.md §Stage 2.
     expect(rows.map(([id, r]) => `${id} [${r.occurrences}]`)).toEqual([
-      'height195 [87]', 'height180 [55]', 'brother [53]', 'season2024player [14]',
+      'brother [53]', 'season2024player [14]',
       'moty [7]', 'intrulesplayer [5]', 'showdown-medal [5]', 'premcoach [4]',
       'winaftersiren [4]', 'anzacmedal [3]', 'coachedByWorsfold [3]', 'fathersonfather [3]',
       'goty [3]', 'coachedByDaniher [2]', 'coachedByHardwick [2]', 'coachedBySimpson [2]',
@@ -216,6 +221,31 @@ describe('Gridley semantics that are decided by arithmetic or lineage, not by lo
     expect(map('WB', 'Western Bulldogs')).toMatchObject({ axis: { builder: 'played_for_club' } });
     expect(map('bears', 'BRISBANE')).toMatchObject({ axis: { builder: 'played_for_club', params: { club: String(STUB_LOOKUPS.clubs['brisbane-bears']) } } });
     expect(map('debut-team-brisbane', 'BRISBANE LIONS')).toMatchObject({ axis: { builder: 'debut_club_incl_merged' } });
+  });
+
+  it('keeps the All-Australian final team distinct from the 40-man squad, and repeats on distinct seasons', () => {
+    // Gridley's "ALL AUSTRALIAN" is the selected team (1953-1988 carnivals,
+    // 1982-1990 VFL Team of the Year, 1991+), never the squad; the squad
+    // criterion is its own id. Neither goes through the generic award
+    // dropdown any more, so the page offers each by name.
+    expect(map('allAus1953', 'ALL AUSTRALIAN')).toMatchObject({ axis: { builder: 'all_australian_team', params: {} } });
+    expect(map('allAus2x', '2x ALL AUSTRALIAN')).toMatchObject({ axis: { builder: 'all_australian_team_min_times', params: { times: '2' } } });
+    expect(map('allAus3x', '3x ALL AUSTRALIAN')).toMatchObject({ axis: { builder: 'all_australian_team_min_times', params: { times: '3' } } });
+    expect(map('allAus2010s', 'ALL AUSTRALIAN')).toMatchObject({ axis: { builder: 'all_australian_team_between_seasons', params: { from: '2010', to: '2019' } } });
+    expect(map('allAusSquad2024', 'ALL-AUSTRALIAN SQUAD')).toMatchObject({ axis: { builder: 'all_australian_squad_in_season', params: { season: '2024' } } });
+    for (const key of ['all_australian_team', 'all_australian_team_min_times', 'all_australian_team_between_seasons']) {
+      expect(GRID_BUILDERS[key].label, key).toMatch(/final team/);
+      expect(GRID_BUILDERS[key].label, key).not.toMatch(/squad/i);
+    }
+    for (const key of ['all_australian_squad_member', 'all_australian_squad_in_season']) {
+      expect(GRID_BUILDERS[key].label, key).toMatch(/40-man squad/);
+      expect(GRID_BUILDERS[key].label, key).not.toMatch(/final team/);
+    }
+  });
+
+  it('maps height bounds exactly onto players.height_cm builders', () => {
+    expect(map('height195', '195cm', 'OR TALLER')).toMatchObject({ axis: { builder: 'height_min', params: { cm: '195' } } });
+    expect(map('height180', '180cm', 'OR SHORTER')).toMatchObject({ axis: { builder: 'height_max', params: { cm: '180' } } });
   });
 
   it('teammate criteria resolve through the id-embedded Gridley player id or the title', () => {

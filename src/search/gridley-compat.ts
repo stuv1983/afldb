@@ -12,9 +12,11 @@
  * the table does not know is reported as unrecognised, and each rule pins
  * the title it was written against so a redefinition upstream fails loudly
  * instead of silently mapping to the old meaning. Where AFLDB holds no data
- * for a question (coaches, birthplace, height, siblings, a medal AFLDB does
- * not record) the rule says so explicitly with the reason, so the corpus
- * denominator never loses a row.
+ * for a question (coaches, birthplace, siblings, a medal AFLDB does not
+ * record) the rule says so explicitly with the reason, so the corpus
+ * denominator never loses a row. That status is a diagnostic, not a pass:
+ * the issue's acceptance is zero unsupported valid criteria, and the corpus
+ * regression fails on any of them unless run in diagnostic mode.
  *
  * Every id of AFLDB's own (club organizations, venues, awards, players) is
  * resolved through injected lookups, so this file stays pure and the
@@ -168,7 +170,6 @@ const SYDNEY_DERBY: [string, string] = ['sydney', 'greater-western-sydney'];
 
 const NO_COACHES = 'AFLDB has no coaching data (no coaches table anywhere in the schema)';
 const NO_LISTS = 'AFLDB models games played, not season lists: a listed player with no game is not represented';
-const NO_HEIGHT = 'players.height_cm is unpopulated for every player; draft_picks.height_cm covers only drafted players, so the population cannot be answered honestly';
 const NO_SIBLINGS = 'player_relationships (migration 006) has never been populated on any environment';
 const NO_FATHER_LINK = 'father_son_selections has never been populated; draft_picks.signing_kind names the son, not the father';
 const NO_BIRTHPLACE = 'AFLDB has no birthplace, nationality or state-of-origin column';
@@ -450,13 +451,16 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   brownlowOver25: fixed('WON BROWNLOW', mapped('brownlow_winner_votes_min', { votes: '25' })),
 
   // -- awards and honours ----------------------------------------------------
-  allAus1953: rule('ALL AUSTRALIAN', withAward('all-australian', (award) => mapped('award_winner', { award }))),
-  allAus2x: rule('2x ALL AUSTRALIAN', withAward('all-australian', (award) => mapped('award_winner_min_times', { award, times: '2' }))),
-  allAus3x: rule('3x ALL AUSTRALIAN', withAward('all-australian', (award) => mapped('award_winner_min_times', { award, times: '3' }))),
-  allAus1990s: rule('ALL AUSTRALIAN', withAward('all-australian', (award) => mapped('award_winner_between_seasons', { award, from: '1990', to: '1999' }))),
-  allAus2000s: rule('ALL AUSTRALIAN', withAward('all-australian', (award) => mapped('award_winner_between_seasons', { award, from: '2000', to: '2009' }))),
-  allAus2010s: rule('ALL AUSTRALIAN', withAward('all-australian', (award) => mapped('award_winner_between_seasons', { award, from: '2010', to: '2019' }))),
-  allAus2020s: rule('ALL AUSTRALIAN', withAward('all-australian', (award) => mapped('award_winner_between_seasons', { award, from: '2020', to: '2029' }))),
+  // The FINAL team (AFLDB award all-australian: 1953-1988 carnival teams,
+  // 1982-1990 VFL Team of the Year, 1991+ selected teams), never the
+  // 40-man squad. Dedicated builders; repeats count distinct seasons.
+  allAus1953: fixed('ALL AUSTRALIAN', mapped('all_australian_team')),
+  allAus2x: fixed('2x ALL AUSTRALIAN', mapped('all_australian_team_min_times', { times: '2' })),
+  allAus3x: fixed('3x ALL AUSTRALIAN', mapped('all_australian_team_min_times', { times: '3' })),
+  allAus1990s: fixed('ALL AUSTRALIAN', mapped('all_australian_team_between_seasons', { from: '1990', to: '1999' })),
+  allAus2000s: fixed('ALL AUSTRALIAN', mapped('all_australian_team_between_seasons', { from: '2000', to: '2009' })),
+  allAus2010s: fixed('ALL AUSTRALIAN', mapped('all_australian_team_between_seasons', { from: '2010', to: '2019' })),
+  allAus2020s: fixed('ALL AUSTRALIAN', mapped('all_australian_team_between_seasons', { from: '2020', to: '2029' })),
   allAusDef: fixed('ALL AUSTRALIAN', mapped('all_australian_defender')),
   allAusFwd: fixed('ALL AUSTRALIAN', mapped('all_australian_forward')),
   allAusMid: fixed('ALL AUSTRALIAN', mapped('all_australian_midfielder')),
@@ -494,9 +498,15 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   worn25: fixed('WORN #25', mapped('jumper_number_worn', { number: '25' })),
   worn35: fixed('WORN #35', mapped('jumper_number_worn', { number: '35' })),
 
+  // -- biography ---------------------------------------------------------------
+  // Exact bounds on players.height_cm; an unknown height never qualifies.
+  // The column is unpopulated on every environment until the height
+  // acquisition lands (ISSUE-118 reopened, Stage H2), so these answer
+  // nothing today and the corpus regression says so rather than passing.
+  height195: fixed('195cm', mapped('height_min', { cm: '195' })),
+  height180: fixed('180cm', mapped('height_max', { cm: '180' })),
+
   // -- attributes AFLDB does not hold ------------------------------------------
-  height195: fixed('195cm', absent(NO_HEIGHT)),
-  height180: fixed('180cm', absent(NO_HEIGHT)),
   brother: fixed('BROTHER', absent(NO_SIBLINGS)),
   irish: fixed('IRISH PLAYER', absent(NO_BIRTHPLACE)),
   tasmanian: fixed('TASMANIAN', absent(NO_BIRTHPLACE)),

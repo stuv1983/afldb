@@ -166,6 +166,7 @@ export const GRID_GROUP_ORDER = [
   'Awards & honours',
   'Draft & recruitment',
   'Names & numbers',
+  'Biography',
 ] as const;
 
 // Phase A ships infrastructure only: the original 31 builders (unchanged
@@ -370,12 +371,26 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   // Position groups over the 1991+ named All-Australian positions: the
   // back six, the forward six and the four on-ball positions. Ruck and
   // interchange belong to no group, matching the source's own wording.
-  all_australian_defender: { key: 'all_australian_defender', label: 'All-Australian defender', group: 'Awards & honours', params: [] },
-  all_australian_forward: { key: 'all_australian_forward', label: 'All-Australian forward', group: 'Awards & honours', params: [] },
-  all_australian_midfielder: { key: 'all_australian_midfielder', label: 'All-Australian midfielder', group: 'Awards & honours', params: [] },
-  // The 40/44-man squad: AFLDB's all-australian-squad rows are the members
-  // NOT selected in the final team, so the squad is those plus the team.
-  all_australian_squad_in_season: { key: 'all_australian_squad_in_season', label: 'All-Australian squad member in season', group: 'Awards & honours', params: [season('season', 'Season')] },
+  all_australian_defender: { key: 'all_australian_defender', label: 'All-Australian final-team defender (1991 onwards)', group: 'Awards & honours', params: [] },
+  all_australian_forward: { key: 'all_australian_forward', label: 'All-Australian final-team forward (1991 onwards)', group: 'Awards & honours', params: [] },
+  all_australian_midfielder: { key: 'all_australian_midfielder', label: 'All-Australian final-team midfielder (1991 onwards)', group: 'Awards & honours', params: [] },
+  // The final All-Australian team itself (award slug all-australian): the
+  // selected side of 20-22 each season, 1953 onwards, with the 1953-1988
+  // carnival teams and the 1982-1990 VFL Team of the Year in the same
+  // award -- exactly Gridley's definition. NOT the 40/44-man squad, which
+  // is a separate award below. Dedicated builders so the page never
+  // relies on finding "All-Australian Team" inside the generic award
+  // dropdown (it sits under the honour_team group there, not award).
+  // Repeat selections count DISTINCT seasons: the 1984 team lists nine
+  // players under both their club and their state (two rows, one honour).
+  all_australian_team: { key: 'all_australian_team', label: 'All-Australian final team (1953 onwards)', group: 'Awards & honours', params: [] },
+  all_australian_team_min_times: { key: 'all_australian_team_min_times', label: 'All-Australian final team, X+ times', group: 'Awards & honours', params: [int('times', 'Times')] },
+  all_australian_team_between_seasons: { key: 'all_australian_team_between_seasons', label: 'All-Australian final team, between seasons', group: 'Awards & honours', params: [season('from', 'From season'), season('to', 'To season')] },
+  // The 40/44-man squad (award slug all-australian-squad, 2007 onwards):
+  // AFLDB's squad rows are the members NOT selected in the final team, so
+  // a squad member is a squad row OR a final-team row in a squad-era season.
+  all_australian_squad_member: { key: 'all_australian_squad_member', label: 'All-Australian 40-man squad member (2007 onwards)', group: 'Awards & honours', params: [] },
+  all_australian_squad_in_season: { key: 'all_australian_squad_in_season', label: 'All-Australian 40-man squad member, in season', group: 'Awards & honours', params: [season('season', 'Season')] },
   best_and_fairest_in_premiership_season: { key: 'best_and_fairest_in_premiership_season', label: 'Club best and fairest in a premiership season', group: 'Awards & honours', params: [] },
 
   // Draft & recruitment -- linked rows only (link_status_value IN
@@ -395,6 +410,11 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   given_name_in: { key: 'given_name_in', label: 'First name is one of…', group: 'Names & numbers', params: [text('names', 'Names (comma-separated)')] },
   surname_hyphenated: { key: 'surname_hyphenated', label: 'Hyphenated surname', group: 'Names & numbers', params: [] },
   jumper_number_worn: { key: 'jumper_number_worn', label: 'Wore guernsey number', group: 'Names & numbers', params: [int('number', 'Number')] },
+
+  // Biography -- players.height_cm. NULL means unknown and never qualifies
+  // on either side of the bound; an unknown height is not a short one.
+  height_min: { key: 'height_min', label: 'Height X cm or taller', group: 'Biography', params: [int('cm', 'Centimetres')] },
+  height_max: { key: 'height_max', label: 'Height X cm or shorter', group: 'Biography', params: [int('cm', 'Centimetres')] },
 };
 
 export const GRID_BUILDER_KEYS = Object.keys(GRID_BUILDERS);

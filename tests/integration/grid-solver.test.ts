@@ -50,6 +50,84 @@ describe('every grid builder compiles and solves', () => {
   });
 });
 
+describe('All-Australian final team versus 40-man squad (ISSUE-118 reopened)', () => {
+  const team = (params: Record<string, string> = {}): GridAxisState => ({ builder: 'all_australian_team', params });
+  const anyPlayer: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+
+  it('the final team is the all-australian award alone, never the squad rows', async () => {
+    const [truth] = await sql<{ team: number; squadOnly: number; squadMembers: number; squadFirst: number | null }[]>`
+      WITH linked AS (
+        SELECT w.player_id, w.season, a.slug FROM award_winners w JOIN awards a ON a.id = w.award_id
+         WHERE a.slug IN ('all-australian', 'all-australian-squad')
+           AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved')
+      ), first_squad AS (SELECT min(season) AS season FROM linked WHERE slug = 'all-australian-squad')
+      SELECT (SELECT count(DISTINCT player_id) FROM linked WHERE slug = 'all-australian')::int AS team,
+             (SELECT count(DISTINCT player_id) FROM linked WHERE slug = 'all-australian-squad'
+               AND player_id NOT IN (SELECT player_id FROM linked WHERE slug = 'all-australian'))::int AS "squadOnly",
+             (SELECT count(DISTINCT player_id) FROM linked
+               WHERE slug = 'all-australian-squad'
+                  OR (slug = 'all-australian' AND season >= (SELECT season FROM first_squad)))::int AS "squadMembers",
+             (SELECT season FROM first_squad)::int AS "squadFirst"
+    `;
+    expect(truth.team).toBeGreaterThan(0);
+    expect(truth.squadOnly).toBeGreaterThan(0);
+    expect(truth.squadFirst).toBe(2007);
+    const teamSummary = await solveCellSummary(team(), anyPlayer, 'games_asc');
+    expect(teamSummary.eligible).toBe(truth.team);
+    const squad = await solveCellSummary({ builder: 'all_australian_squad_member', params: {} }, anyPlayer, 'games_asc');
+    expect(squad.eligible).toBe(truth.squadMembers);
+    // The two sets differ in both directions: pre-2007 final teams are not squad members, squad-only players are not final-team members.
+    expect(squad.eligible).not.toBe(teamSummary.eligible);
+  });
+
+  it('repeat selections count distinct seasons, so a two-row 1984 selection is one honour', async () => {
+    const doubles = await sql<{ playerId: number; rows: number; seasons: number }[]>`
+      SELECT w.player_id AS "playerId", count(*)::int AS rows, count(DISTINCT w.season)::int AS seasons
+        FROM award_winners w JOIN awards a ON a.id = w.award_id
+       WHERE a.slug = 'all-australian' AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved')
+       GROUP BY w.player_id HAVING count(*) > count(DISTINCT w.season)
+    `;
+    // The 1984 team lists nine players under both club and state.
+    expect(doubles.length).toBeGreaterThan(0);
+    const [truth] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM (
+        SELECT w.player_id FROM award_winners w JOIN awards a ON a.id = w.award_id
+         WHERE a.slug = 'all-australian' AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved')
+         GROUP BY w.player_id HAVING count(DISTINCT w.season) >= 2) t
+    `;
+    const twice: GridAxisState = { builder: 'all_australian_team_min_times', params: { times: '2' } };
+    expect((await solveCellSummary(twice, anyPlayer, 'games_asc')).eligible).toBe(truth.n);
+    // A player whose only repeat is the same season twice must not qualify.
+    const singleSeason = doubles.filter((r) => r.seasons === 1);
+    if (singleSeason.length > 0) {
+      const page = await solveCellRows(twice, anyPlayer, 'games_asc', { limit: GRID_LIMITS.maxRowsPerCell, offset: 0 });
+      const ids = new Set(page.rows.map((r) => r.id));
+      for (const r of singleSeason) expect(ids.has(r.playerId), String(r.playerId)).toBe(false);
+    }
+  });
+});
+
+describe('height builders (ISSUE-118 reopened)', () => {
+  const anyPlayer: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+
+  it('an unknown height never qualifies on either side of the bound', async () => {
+    const [truth] = await sql<{ known: number; tall: number; short: number }[]>`
+      SELECT count(height_cm)::int AS known,
+             count(*) FILTER (WHERE height_cm >= 195)::int AS tall,
+             count(*) FILTER (WHERE height_cm <= 180)::int AS short
+        FROM players
+    `;
+    const tall = await solveCellSummary({ builder: 'height_min', params: { cm: '195' } }, anyPlayer, 'games_asc');
+    const short = await solveCellSummary({ builder: 'height_max', params: { cm: '180' } }, anyPlayer, 'games_asc');
+    expect(tall.eligible).toBe(truth.tall);
+    expect(short.eligible).toBe(truth.short);
+    // Every player with a recorded height is on exactly one side of a 180/181 split; nobody without one is on either.
+    const under181 = await solveCellSummary({ builder: 'height_max', params: { cm: '180' } }, anyPlayer, 'games_asc');
+    const over180 = await solveCellSummary({ builder: 'height_min', params: { cm: '181' } }, anyPlayer, 'games_asc');
+    expect(under181.eligible + over180.eligible).toBe(truth.known);
+  });
+});
+
 describe('grid solver correctness', () => {
   it('solves the mapped ISSUE-076 won-final grid within the four-second safety margin', async () => {
     const [identity] = await sql<{

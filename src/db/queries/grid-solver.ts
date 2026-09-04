@@ -1144,6 +1144,42 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                            WHERE a.slug IN ('all-australian-squad', 'all-australian') AND w.season = ${seasonYear}
                              AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
     }
+    // The final team (slug all-australian) versus the squad (slug
+    // all-australian-squad) are distinct awards and stay distinct here.
+    case 'all_australian_team':
+      return sql`p.id IN (SELECT w.player_id FROM award_winners w
+                            JOIN awards a ON a.id = w.award_id
+                           WHERE a.slug = 'all-australian'
+                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
+    case 'all_australian_team_min_times': {
+      // DISTINCT seasons, not rows: the 1984 team carries club and state
+      // rows for the same player, and both are one selection.
+      const n = requireInt(axis, 'times', 'Times');
+      return sql`p.id IN (SELECT w.player_id FROM award_winners w
+                            JOIN awards a ON a.id = w.award_id
+                           WHERE a.slug = 'all-australian'
+                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved')
+                           GROUP BY w.player_id HAVING count(DISTINCT w.season) >= ${n})`;
+    }
+    case 'all_australian_team_between_seasons': {
+      const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
+      return sql`p.id IN (SELECT w.player_id FROM award_winners w
+                            JOIN awards a ON a.id = w.award_id
+                           WHERE a.slug = 'all-australian' AND w.season BETWEEN ${lo} AND ${hi}
+                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
+    }
+    case 'all_australian_squad_member':
+      // A squad row, or a final-team row in a season that had a squad
+      // (the squad award's first recorded season, 2007), since the team is
+      // drawn from the squad.
+      return sql`p.id IN (SELECT w.player_id FROM award_winners w
+                            JOIN awards a ON a.id = w.award_id
+                           WHERE (a.slug = 'all-australian-squad'
+                                  OR (a.slug = 'all-australian'
+                                      AND w.season >= (SELECT min(w2.season) FROM award_winners w2
+                                                         JOIN awards a2 ON a2.id = w2.award_id
+                                                        WHERE a2.slug = 'all-australian-squad')))
+                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
     case 'best_and_fairest_in_premiership_season':
       // The club the player represented that season (player_club_season_stats)
       // won the flag (club_seasons.is_premier) in the season of the B&F.
@@ -1229,6 +1265,18 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       // value is the integer's canonical decimal form.
       const number = requireInt(axis, 'number', 'Number');
       return sql`p.id IN (SELECT player_id FROM player_match_stats WHERE jumper_number = ${String(number)})`;
+    }
+
+    // -- Biography ------------------------------------------------------------
+    // NULL height is unknown, not zero: the explicit IS NOT NULL keeps the
+    // intent visible even though a NULL comparison is already never true.
+    case 'height_min': {
+      const cm = requireInt(axis, 'cm', 'Centimetres');
+      return sql`p.height_cm IS NOT NULL AND p.height_cm >= ${cm}`;
+    }
+    case 'height_max': {
+      const cm = requireInt(axis, 'cm', 'Centimetres');
+      return sql`p.height_cm IS NOT NULL AND p.height_cm <= ${cm}`;
     }
 
     default:

@@ -114,8 +114,10 @@ describe('isAxisComplete', () => {
 describe('GRID_BUILDERS catalogue', () => {
   it('offers AFLPA 22Under22 selection as a dedicated fixed criterion', () => {
     // 108 before AFLDB-ISSUE-118, which added the 37 builders the Gridley
-    // corpus needed (tests/gridley-compat.test.ts holds the mapping).
-    expect(Object.keys(GRID_BUILDERS)).toHaveLength(145);
+    // corpus needed (tests/gridley-compat.test.ts holds the mapping), then
+    // 6 more when it was reopened: the All-Australian final team (3), the
+    // 40-man squad in any season, and the two height bounds.
+    expect(Object.keys(GRID_BUILDERS)).toHaveLength(151);
     expect(GRID_BUILDERS.under_22_selection).toEqual({
       key: 'under_22_selection',
       label: 'Selected in AFLPA 22Under22 team',

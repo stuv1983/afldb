@@ -17,8 +17,17 @@
  *
  * A failure names the board, the cell, the source criterion, the AFLDB
  * axis it became and one of the categories: parse (unrecognised),
- * unsupported (data absent; counted, never failed), query failure,
+ * unsupported (data absent), dataset gap, partial dataset, query failure,
  * timeout, empty answer, incorrect known answer. No catch-and-ignore.
+ *
+ * Acceptance (ISSUE-118, reopened 2026-09-05 -- runbook §23): every valid
+ * Gridley criterion must be answered exactly. A criterion AFLDB holds no
+ * data for is therefore a FAILURE of this suite, not an informational
+ * count: `unsupported`, `dataset gap` and `partial dataset` fail by
+ * default. Set AFLDB_GRIDLEY_DIAGNOSTIC=1 to downgrade those three to
+ * counted-and-named while the acquisitions are in progress; the two
+ * documented semantic differences (`time of board`, `list membership`)
+ * stay informational in both modes.
  */
 import './guard';
 
@@ -93,7 +102,8 @@ const PLAYER_OVERRIDES: Record<string, { name: string; debutSeason: number }> = 
  * solver failure, and the list of such criteria is asserted so a gap cannot
  * widen silently. On a database with the data, the list must be empty.
  */
-type DatasetGaps = { maxSeason: number; draftLinks: boolean; matchEvents: boolean };
+type DatasetGaps = { maxSeason: number; draftLinks: boolean; matchEvents: boolean; heights: boolean };
+const HEIGHT_BUILDERS = new Set(['height_min', 'height_max']);
 const DRAFT_BUILDERS = new Set(['national_draft_pick_between', 'draft_pick_between', 'draft_year_between', 'draft_type_is', 'drafted_by_club', 'drafted_by_club_never_played', 'recruited_via', 'traded_min_times']);
 const MATCH_EVENT_BUILDERS = new Set(['match_event_played', 'match_event_min', 'match_event_won', 'match_event_played_between']);
 
@@ -160,7 +170,9 @@ const criteria = new Map<string, CriterionRecord>();
 const findings: CellFinding[] = [];
 const unresolvedLog: string[] = [];
 const gapLog: string[] = [];
-let gaps: DatasetGaps = { maxSeason: 0, draftLinks: true, matchEvents: true };
+let gaps: DatasetGaps = { maxSeason: 0, draftLinks: true, matchEvents: true, heights: true };
+/** Diagnostic mode: dataset-shaped findings are counted and named instead of failing. Never the default. */
+const DIAGNOSTIC = process.env.AFLDB_GRIDLEY_DIAGNOSTIC === '1';
 /** Criteria whose builder reads a dataset this database does not carry. */
 const gappedCriteria = new Set<string>();
 /** Gridley player id -> AFLDB player id, from the corpus' own player-valued criteria. */
@@ -169,13 +181,20 @@ const bridge = new Map<number, number>();
 const finalSeasons = new Map<number, number | null>();
 /** AFLDB player id -> Hall of Fame induction year: an honour a retired player can still gain after a board's date. */
 const hallOfFameYears = new Map<number, number>();
-/** The categories that are reported and counted but do not fail the run, each with its reason. */
+/** Documented semantic differences between Gridley and AFLDB: reported and counted, never failed. */
 const INFORMATIONAL: Record<string, string> = {
-  unsupported: 'the criterion needs data AFLDB does not hold (src/search/gridley-compat.ts names it)',
-  'dataset gap': 'this database lacks a dataset the criterion reads (draft links, marquee tags, a later season)',
-  'partial dataset': 'captaincies has no Geelong, Hawthorn or West Coast rows on any environment',
   'time of board': "Gridley's answer key is frozen at the board's date and the player was still playing then; AFLDB answers for today",
   'list membership': "Gridley's club, decade, teammate, club-count, wooden-spoon and minor-premiership criteria include players merely listed by a club that season (a trade-period move, the suspended 2016 Essendon players); AFLDB models games played",
+};
+/**
+ * Data AFLDB (or this database) does not hold. These FAIL the run: the
+ * acceptance target is zero. In diagnostic mode they are counted and named
+ * so the remaining acquisitions can be tracked without hiding them.
+ */
+const DATA_GAPS: Record<string, string> = {
+  unsupported: 'the criterion needs data AFLDB does not hold (src/search/gridley-compat.ts names it) -- acquisition required',
+  'dataset gap': 'this database lacks a dataset the criterion reads (draft links, marquee tags, a later season, player heights)',
+  'partial dataset': 'captaincies has no Geelong, Hawthorn or West Coast rows on any environment',
 };
 const cellStats: { board: number; cell: string; gridley: number; afldb: number; ms: number }[] = [];
 
@@ -202,11 +221,12 @@ beforeAll(async () => {
                             c.debut_season AS "debutSeason", c.final_season AS "finalSeason"
                        FROM players p LEFT JOIN player_career_stats c ON c.player_id = p.id`,
     sql<{ playerId: number; inductedYear: number | null }[]>`SELECT player_id AS "playerId", inducted_year AS "inductedYear" FROM hall_of_fame WHERE player_id IS NOT NULL`,
-    sql<{ maxSeason: number; draftTotal: string; draftLinked: string; matchEvents: string }[]>`
+    sql<{ maxSeason: number; draftTotal: string; draftLinked: string; matchEvents: string; heights: string }[]>`
       SELECT (SELECT max(season) FROM matches)::int AS "maxSeason",
              (SELECT count(*) FROM draft_picks) AS "draftTotal",
              (SELECT count(*) FROM draft_picks WHERE link_status_value IN ('unique', 'resolved')) AS "draftLinked",
-             (SELECT count(*) FROM matches WHERE match_event IS NOT NULL) AS "matchEvents"`,
+             (SELECT count(*) FROM matches WHERE match_event IS NOT NULL) AS "matchEvents",
+             (SELECT count(*) FROM players WHERE height_cm IS NOT NULL) AS "heights"`,
   ]);
   // A dataset counts as present when at least half of it is usable: afldb_dev
   // links 5,103 of 6,810 draft picks; a rebuilt afldb_test links 5.
@@ -214,6 +234,7 @@ beforeAll(async () => {
     maxSeason: probe.maxSeason,
     draftLinks: Number(probe.draftLinked) * 2 >= Number(probe.draftTotal),
     matchEvents: Number(probe.matchEvents) > 0,
+    heights: Number(probe.heights) > 0,
   };
   for (const p of players) finalSeasons.set(p.id, p.finalSeason);
   for (const h of hof) if (h.inductedYear !== null) hallOfFameYears.set(h.playerId, h.inductedYear);
@@ -235,7 +256,8 @@ beforeAll(async () => {
       criteria.set(item.id, { id: item.id, item, mapping, occurrences: 1, set: null, elapsedMs: null, error: null });
       if (mapping.status === 'mapped') {
         if ((!gaps.draftLinks && DRAFT_BUILDERS.has(mapping.axis.builder))
-          || (!gaps.matchEvents && MATCH_EVENT_BUILDERS.has(mapping.axis.builder))) gappedCriteria.add(item.id);
+          || (!gaps.matchEvents && MATCH_EVENT_BUILDERS.has(mapping.axis.builder))
+          || (!gaps.heights && HEIGHT_BUILDERS.has(mapping.axis.builder))) gappedCriteria.add(item.id);
       } else if (mapping.status === 'unresolved' && gapLog.some((g) => g.startsWith(`${item.id}:`))) {
         gappedCriteria.add(item.id);
       }
@@ -269,7 +291,20 @@ describe('Gridley corpus -- criteria', () => {
     const empty = [...criteria.values()].filter((r) => r.set !== null && r.set.size === 0 && !gappedCriteria.has(r.id));
     expect(empty.map((r) => `${r.id} [${r.occurrences}] -> ${describeAxis(r.mapping)}`)).toEqual([]);
     // And a probed gap must actually be a gap here: on a complete database the list is empty.
-    if (gaps.draftLinks && gaps.matchEvents && gaps.maxSeason >= 2026) expect([...gappedCriteria]).toEqual([]);
+    if (gaps.draftLinks && gaps.matchEvents && gaps.heights && gaps.maxSeason >= 2026) expect([...gappedCriteria]).toEqual([]);
+  });
+
+  it('has no valid criterion left unsupported, and no probed dataset gap, unless run in diagnostic mode', () => {
+    const unsupported = [...criteria.values()].filter((r) => r.mapping.status === 'unsupported')
+      .sort((a, b) => b.occurrences - a.occurrences || a.id.localeCompare(b.id))
+      .map((r) => `${r.id} [${r.occurrences}]: ${'reason' in r.mapping ? r.mapping.reason : ''}`);
+    console.log(`[gridley-corpus] unsupported valid criteria: ${unsupported.length}\n${unsupported.join('\n')}`);
+    if (DIAGNOSTIC) {
+      console.log('[gridley-corpus] AFLDB_GRIDLEY_DIAGNOSTIC=1: unsupported criteria and dataset gaps are counted, not failed. This is NOT an acceptance run.');
+      return;
+    }
+    expect(unsupported).toEqual([]);
+    expect([...gappedCriteria].sort()).toEqual([]);
   });
 
   it('bridges the Gridley player ids the corpus embeds', () => {
@@ -427,8 +462,11 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
     for (const [category, reason] of Object.entries(INFORMATIONAL)) {
       if (byCategory.has(category)) console.log(`[gridley-corpus]   ${category} (${byCategory.get(category)}): ${reason}`);
     }
+    for (const [category, reason] of Object.entries(DATA_GAPS)) {
+      if (byCategory.has(category)) console.log(`[gridley-corpus]   ${category} (${byCategory.get(category)}): ${reason}${DIAGNOSTIC ? ' [diagnostic: not failed]' : ' [FAILS: acceptance is zero]'}`);
+    }
 
-    const failing = findings.filter((f) => !Object.hasOwn(INFORMATIONAL, f.category));
+    const failing = findings.filter((f) => !Object.hasOwn(INFORMATIONAL, f.category) && !(DIAGNOSTIC && Object.hasOwn(DATA_GAPS, f.category)));
     expect(failing.slice(0, 40).map((f) => `#${f.board} ${f.cell} [${f.category}] ${f.row} x ${f.col} :: ${f.rowAxis} x ${f.colAxis} :: ${f.detail}`)).toEqual([]);
     expect(failing).toHaveLength(0);
     // Over 1 s is flagged in the report; over 4 s (the ISSUE-076 margin) fails.

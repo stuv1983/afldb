@@ -1,5 +1,10 @@
 # AFLDB-ISSUE-118 — Persist Gridley history and use it as a Grid Solver compatibility corpus
 
+> **REOPENED 2026-09-05.** The 2026-09-05 closeout (§22.12) counted 28 valid Gridley criteria as
+> acceptable because they were classified `data_absent`. That is an unsupported valid question,
+> not a pass. §23 holds the corrected acceptance contract and the reopened work; §1–§22 are
+> preserved unchanged as the historical record, including the merge and deployment evidence.
+
 **Runbook.** Stages 0–2 (§1–§21) were investigation, persistence and acquisition on
 `opus/gridley-corpus`; §22 (4 September 2026, `claude/issue-118`) recovers that work onto
 current `main`, exports the stored corpus as an offline fixture, maps every criterion, adds the
@@ -2464,3 +2469,258 @@ Operator browser confirmation on PROD (optional, super_admin session):
 
 **Closed 2026-09-05.** Ledger entry Resolved, row retired from `IssuesIndex.md` and the Open Issues
 table (3 → 2), runbook moved to `issues/closed/`. ISSUE-110 and ISSUE-137 untouched.
+
+---
+
+## 23. REOPENED 2026-09-05 — the acceptance definition was too weak
+
+| Field | Value |
+|---|---|
+| Branch / worktree | `claude/issue-118` / `D:\dev\afldb-issue-118` |
+| Base | `main @ 208fd5d` (the closeout commit) |
+| Model / effort | Fable 5.1, Medium |
+| Databases touched this session | none — the `55432` tunnel to `afldb_test` was down; every DB-backed step is listed in §23.8 as the operator's next command. **Production untouched.** |
+
+### 23.1 The acceptance gap
+
+The original acceptance statement was *"every valid Gridley question captured by AFLDB is
+answerable correctly by AFLDB Grid Solver."* §22.2 recorded **28 criteria / 267 occurrences** as
+"data absent in AFLDB (explicit reason each)" and §22.9.1 counted their **795 cells** as
+`unsupported` — *"counted, never failed"*. The closeout therefore certified the corpus while
+one criterion occurrence in 26 (267 / 6,858) and one cell in 13 (795 / 10,287) was not answered
+at all. An explicitly classified gap is still a gap: a valid Gridley question AFLDB cannot answer
+is an unsupported valid question, whatever its label.
+
+Two of those gaps were also mis-shaped, not merely unfilled:
+
+- **All-Australian.** `allAus1953` / `allAus2x` / `allAus3x` and the decade criteria were mapped
+  through the *generic* `award_winner*` builders with the `all-australian` award id injected. On
+  the page that award is only reachable inside the generic award dropdown, grouped under
+  `honour team` and named "All-Australian Team", while "All-Australian 40-Man Squad" sits under
+  `award` — so a user sees the squad and not the final team, and nothing on the page says the two
+  are different honours. `award_winner_min_times` also counted **rows**, not seasons: the 1984 team
+  lists nine players under both their club and their state (§23.2), so a single 1984 selection
+  counted as "2x".
+- **Height.** `height195` / `height180` had no builder at all; the rule simply said the column is
+  empty.
+
+### 23.2 Corrected acceptance contract
+
+| Measure | Required at closeout |
+|---|---:|
+| valid stored Gridley criteria | N |
+| answerable **exactly** by the Grid Solver | **N** |
+| unsupported valid criteria (`data_absent`) | **0** |
+| unresolved / unrecognised valid criteria | **0** |
+| malformed / non-question rows | explicit count only, kept separate from valid questions |
+| timeouts | **0** |
+| incorrect known-answer comparisons (fair comparisons) | **0** |
+
+`data_absent` remains a permitted **intermediate diagnostic** while the issue is open. It never
+counts as a pass. Every valid criterion must either be answered exactly, or be *proven* not to be a
+valid Gridley question / corpus item — nothing is excluded because AFLDB lacks the data.
+
+### 23.3 Stage AA1 — what AFLDB's `all-australian` rows actually are
+
+Established from the checked-in source and its importer, not from the award's name:
+
+- **Source:** `data/awards/all-australian.csv` (parser `tools/migration/all_australian.py`,
+  loaded by `tools/migration/import_awards.py` as award slug `all-australian`, name
+  "All-Australian Team", **category `honour_team`** — `data/awards/award-definitions.csv`).
+  1,158 rows, 53 distinct seasons 1953–2025, **1,078 linked** to a player (80 unlinked: state-league
+  and interstate selections with no AFLDB player), two provenances kept distinct per row:
+  `draftguru` 906 rows (1979, 1980, 1983, 1985–1988, 1991–2025; positions and captaincy on the
+  1991+ rows, 760 with a position) and `wikipedia` 252 rows (1953, 1956, 1958, 1961, 1966, 1969,
+  1972, 1982, 1984, 1989, 1990; no positions).
+- **These are final-team selections, not squad nominations.** Every 1991+ season carries 20–22
+  rows (the selected 22 including interchange), never the 40/44-man squad. The squad is a
+  **separate award**: slug `all-australian-squad`, "All-Australian 40-Man Squad", category
+  `award`, 358 rows 2007–2025 in `data/awards/named-medals.csv`, holding the members **not**
+  selected in the final team (§22.3). The two are never merged in the data.
+- **1991+ completeness:** 35 seasons × 20–22 rows, every season present — complete as a final
+  team.
+- **Pre-1991 rows, per season** (rows / source): 1953 20 w, 1956 20 w, 1958 20 w, 1961 20 w,
+  1966 20 w, 1969 20 w, 1972 20 w, 1979 20 d, 1980 20 d, 1982 20 w, 1983 20 d, **1984 48 w**,
+  1985 20 d, 1986 23 d, 1987 21 d, 1988 22 d, 1989 22 w, 1990 22 w. The 1984 rows are 24
+  club-labelled (Hawthorn, Melbourne, Essendon, …) plus 24 state-labelled (Vic 9, WA 8, SA 5,
+  NT 1, NSW 1); nine players appear under both (the parser documents this as deliberate).
+- **Against Gridley's definition** ("Includes VFL Team of the Year (1982–90), and State of Origin
+  carnivals (1953–1988)"): AFLDB holds a team for **every** year 1982–1990 and for every carnival
+  year (1953, 1956, 1958, 1961, 1966, 1969, 1972, 1979, 1980, 1983, 1986, 1988). **Open question:**
+  in the years that had *both* a carnival team and a VFL Team of the Year (1983, 1986, 1988) AFLDB
+  holds one team of 20–23 rows, i.e. one of the two, and which one is not recorded in the source;
+  and what the second 1984 set of 24 state-labelled rows represents is not recorded either. These
+  are settled by the answer-key comparison in §23.8 step 3, not by assumption.
+- **Corpus denominator for this family:** 12 criterion ids, 172 occurrences, 512 cells, 588
+  distinct Gridley player ids in those cells' answer keys, 141 of them bridgeable to AFLDB players
+  through the corpus's own player-valued criteria (`allAus1953` 101, `allAus2x` 19, `allAusDef`
+  13, `allAus2010s` 8, `allAusFwd` 8, `allAus2000s` 7, `allAus3x` 5, `allAus2020s` 4, `allAusMid`
+  3, `allAus1990s` 2, `allAusRuc` 1, `allAusSquad2024` 1).
+- **Representative answer-key comparison (1x / 2x / 3x, pre-1991 and modern players):** requires
+  `afldb_test` (§23.8 step 3). Not executed this session — the tunnel was down.
+
+### 23.4 Stage AA2 — the final team is now its own question
+
+**Cause of the page defect:** not a missing row and not a naming mismatch in the data — a
+**UI discoverability defect**. `getAwardOptions()` returns every award and the form groups the
+dropdown by `awards.category`; `all-australian` is `honour_team`, the squad is `award`, so the
+final team appears only inside a differently-named optgroup with a label that does not say "final
+team", and the mapping's dependence on the generic dropdown meant nothing on the page distinguished
+the two honours.
+
+**Fix (implemented, DB-free tests green):**
+
+| Builder | Label on the page | Semantics |
+|---|---|---|
+| `all_australian_team` | All-Australian final team (1953 onwards) | slug `all-australian`, linked rows |
+| `all_australian_team_min_times` | All-Australian final team, X+ times | `count(DISTINCT season) >= X` — the 1984 club+state pair is one selection |
+| `all_australian_team_between_seasons` | All-Australian final team, between seasons | season bounds |
+| `all_australian_squad_member` | All-Australian 40-man squad member (2007 onwards) | squad rows ∪ final-team rows from the squad award's first season (2007), since the team is drawn from the squad |
+| `all_australian_squad_in_season` (relabelled) | All-Australian 40-man squad member, in season | unchanged |
+| `all_australian_defender/forward/midfielder` (relabelled) | All-Australian final-team … (1991 onwards) | unchanged |
+
+`src/search/gridley-compat.ts` now maps `allAus1953` → `all_australian_team`, `allAus2x/3x` →
+`all_australian_team_min_times`, the four decade ids → `all_australian_team_between_seasons`;
+`allAusSquad2024` stays on `all_australian_squad_in_season`. The generic `award_winner*` builders
+are untouched. Tests: `tests/gridley-compat.test.ts` ("keeps the All-Australian final team
+distinct from the 40-man squad …" — mapping and label assertions), `tests/grid-solver-spec.test.ts`
+(catalogue 145 → 151), and a DB-backed `describe` in `tests/integration/grid-solver.test.ts`
+(final-team set = the award's linked distinct players; the squad set differs in both directions;
+squad first season 2007; `min_times(2)` equals the distinct-season truth and excludes any
+single-season double row).
+
+### 23.5 Stage H1 — height sources measured
+
+| Source | What it is | Coverage measured | Verdict |
+|---|---|---|---|
+| `players.height_cm` (migration 002) | canonical column | NULL for all players on every environment (§22.3) | target column; the `player_bio` ingest dataset (`src/lib/ingest/datasets.ts`, keyed by player id, COALESCE — never blanks a value) is the repository-standard write path |
+| `draft_picks.height_cm` (migration 006, DraftGuru) | **draft-day** height of drafted players, 1981+ | drafted players only | **not used** as a silent substitute for biographical height |
+| AFL Tables `player_details` via fitzRoy `fetch_player_details_afltables()` | per-club all-time player register: `Player, Team, Cap, #, HT, WT, Games, Wins, Draws, Losses, Goals, Seasons, Debut, Last` | **already acquired**: snapshot `full-history-20260902` (tracked manifest `docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json`, `player_details.csv` sha256 `62171adf…`, 16,731 rows; the git-ignored CSV is on disk in `D:\dev\afldb-issue-102\data\sources\afltables\fitzroy_core\full-history-20260902\`). **15,888 of 16,731 club-player rows carry HT (95%)**; 12,816 distinct names, 12,111 with a height. `tools/migration/import_fitzroy_core.py` deliberately does not import it ("supplemental only, no ID/DOB/URL") | best historical coverage available; **no stable id** — identity is name + Team + Cap + Seasons, so loading it needs a reconciliation to `players` (name, club organization, debut/final season) with fail-closed ambiguity |
+| AFL API `fetch_player_details_afl` (`docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §, probe P4) | current club lists with `heightInCm`, stable `providerId` | current season only (46 rows per club in the probe) | authoritative for current players; no history |
+| DraftGuru person pages (`tools/rebuild/draftguru/profile_person_pages.py`) | regex `height_candidates` from page text | no checked-in snapshot; draft-context height | not a source |
+
+**Gridley denominator for height:** 2 criteria, 142 occurrences, **426 cells, 7,216 distinct
+Gridley player ids in their answer keys** (195 bridgeable). The AFLDB-side coverage figures
+(players total, heights present, answer-key players covered / missing) require `afldb_test` and
+the reconciliation — §23.8.
+
+**Decision required (High):** loading AFL Tables heights is a cross-source reconciliation
+(name/club/seasons → `players.id`), and the alternative — a per-player AFL Tables page acquisition
+keyed by the AFL Tables id AFLDB already holds in `external_identities`, which needs no
+reconciliation but is ~13k rate-limited requests and a new acquisition tool — is a design choice
+with provenance consequences. Per the reopen brief this is a **Fable High** decision; Stage H2 is
+therefore **not started**. Nothing was inferred, no value was written.
+
+### 23.6 Stage H3 — height builders (implemented ahead of the data)
+
+`height_min` ("Height X cm or taller", `p.height_cm IS NOT NULL AND p.height_cm >= X`) and
+`height_max` ("Height X cm or shorter", `… <= X`) in a new `Biography` group; NULL never
+qualifies. `height195` → `height_min(195)`, `height180` → `height_max(180)`. Until H2 lands
+these answer nothing, and the corpus regression **fails on them** (§23.7) instead of passing —
+the probe `heights: count(height_cm IS NOT NULL) > 0` names them as a dataset gap.
+`tests/integration/grid-solver.test.ts` asserts the NULL semantics against the table's own counts
+(taller + shorter across a 180/181 split = players with a known height).
+
+### 23.7 Stage 3 — every previously data-absent criterion, reclassified
+
+All 28 (267 occurrences) — none hidden, low-frequency rows included. **Only "now answerable"
+counts towards acceptance**; every other status is an OPEN failure against the final target.
+
+| Gridley id | Label | Occ. | Current reason | Required capability | Status |
+|---|---|---:|---|---|---|
+| `height195` | 195cm OR TALLER | 87 | `players.height_cm` NULL everywhere | H2: load AFL Tables heights (§23.5) | builder done; **acquisition required** |
+| `height180` | 180cm OR SHORTER | 55 | same | same | builder done; **acquisition required** |
+| `brother` | BROTHER PLAYED | 53 | `player_relationships` (migration 006) never populated | sibling acquisition (AFL Tables "brother of" relations on player pages) + `sibling_played` builder | **acquisition required** |
+| `season2024player` | 2024 LISTED PLAYER | 14 | no season lists | season-list model (club lists per season) + AFL API list acquisition | **schema/model required** |
+| `moty` | MARK OF THE YEAR | 7 | no award rows | award rows incl. Channel Seven / ABC 1970–2000, per Gridley's text | **acquisition required** |
+| `goty` | GOAL OF THE YEAR | 3 | no award rows | award rows since 1976 | **acquisition required** |
+| `showdown-medal` | SHOWDOWN MEDALIST | 5 | no award rows | Showdown Medal rows | **acquisition required** |
+| `anzacmedal` | ANZAC MEDALIST | 3 | no award rows | Anzac Medal rows | **acquisition required** |
+| `glendenning` | GLENDINNING–ALLAN MEDALIST | 2 | no award rows | Glendinning–Allan Medal rows | **acquisition required** |
+| `qclash-medal` | MARCUS ASHCROFT MEDALIST | 1 | no award rows | Marcus Ashcroft Medal rows | **acquisition required** |
+| `battleofthebridge-medal` | BRETT KIRK MEDALIST | 1 | no award rows | Brett Kirk Medal rows | **acquisition required** |
+| `premcoach` | PREMIERSHIP COACH | 4 | no coaching data | coaches + coaching tenures model, acquisition, `premiership_coach` builder | **schema/model required** |
+| `coachedByWorsfold` | COACHED BY WORSFOLD | 3 | no coaching data | coaching tenures + `coached_by` builder | **schema/model required** |
+| `coachedByDaniher` | COACHED BY DANIHER | 2 | same | same | **schema/model required** |
+| `coachedByHardwick` | COACHED BY HARDWICK | 2 | same | same | **schema/model required** |
+| `coachedBySimpson` | COACHED BY SIMPSON | 2 | same | same | **schema/model required** |
+| `coachedByClarkson` | COACHED BY CLARKSON | 1 | same | same | **schema/model required** |
+| `coachedByGoodwin` | COACHED BY GOODWIN (incl. caretaker) | 1 | same | same | **schema/model required** |
+| `coachedByMatthews` | COACHED BY MATTHEWS (VFL/AFL) | 1 | same | same | **schema/model required** |
+| `intrulesplayer` | INT'L RULES PLAYER FOR AUS | 5 | representative careers not modelled | representative-selection model + International Rules squads acquisition | **schema/model required** |
+| `nfl` | NFL PLAYER OR SIGNEE | 1 | other-code careers not modelled | other-code career model + curated source | **schema/model required** |
+| `winaftersiren` | GAME WINNING KICK AFTER SIREN | 4 | no scoring-event timeline | scoring-event data; no free structured source identified for the full history | **source unavailable** (to be verified before closeout) |
+| `fathersonfather` | FATHER OF A FATHER-SON PICK | 3 | `father_son_selections` never populated; `signing_kind` names the son | father→son link acquisition (DraftGuru father-son pages / AFL Tables relations) | **acquisition required** |
+| `irish` | IRISH PLAYER (raised in Ireland) | 2 | no birthplace / nationality | birthplace model + acquisition | **schema/model required** |
+| `tasmanian` | TASMANIAN | 1 | same | same | **schema/model required** |
+| `recruitedByDodoro` | RECRUITED BY DODORO | 2 | recruiters not modelled | recruiter/list-manager tenure model; no structured source identified | **source unavailable** (to be verified) |
+| `spoils5season` | AVG 5+ SPOILS SINCE 2012 | 1 | spoils not a recorded stat | Champion Data–only statistic; not in any free source AFLDB uses | **source unavailable** |
+| `debut22` | 22+ YEARS OLD ON DEBUT | 1 | `players.dob` for 855 of 13,273 | DOB acquisition (the `player_birth_evidence` / ISSUE-090 path) + `age_on_debut_min` builder | **acquisition required** |
+
+Totals: now answerable **0 of 28** (the two height criteria have builders but no data);
+acquisition required 14; schema/model required 11; source unavailable 3. Not one of the 28 is a
+malformed or non-question row: each is a real, well-defined Gridley question. The families the
+brief named are all present above (height, siblings, father–son, coaches, named medals,
+birthplace/state/nationality, International Rules/NFL, after-the-siren, spoils, age on debut,
+recruiter, season lists). Also carried as an open partial-data failure: `captain` / `premcaptain`
+answer from `captaincies` that has **no Geelong, Hawthorn or West Coast rows** on any environment
+(§22.9.1 "partial dataset", 506 checks) — an acquisition of those three clubs' captains.
+
+### 23.8 Stage 4 — the regression can no longer go green on a gap
+
+`tests/integration/gridley-corpus.test.ts` now **fails by default** on any `unsupported`,
+`dataset gap` or `partial dataset` finding, on any unsupported or gapped *criterion* (new test
+"has no valid criterion left unsupported, and no probed dataset gap"), and — as before — on
+`parse`, `query failure`, `timeout`, `empty answer`, `count mismatch` and `incorrect known
+answer`. Only the two documented semantic differences (`time of board`, `list membership`) remain
+informational. `AFLDB_GRIDLEY_DIAGNOSTIC=1` downgrades the three data-gap categories to
+counted-and-named for development runs and prints that the run is not an acceptance run. The
+height gap is probed (`heights`) so the empty height sets are named, not mistaken for a solver
+fault. `tests/gridley-compat.test.ts` pins the data-absent count at **26 criteria / 125
+occurrences** as tracked debt (mapped 812 / 6,732; denominator unchanged at 839 / 6,858).
+
+### 23.9 Stage 5 — UI
+
+The five questions the brief requires are on the page through `GRID_BUILDERS` (the form renders
+the catalogue by group, no bespoke UI): *All-Australian final team (1953 onwards)*,
+*All-Australian final team, X+ times*, *All-Australian 40-man squad member (2007 onwards)* /
+*…, in season*, *Height X cm or taller*, *Height X cm or shorter*. Browser verification on DEV is
+pending deployment (§23.11). No other Grid Solver UI was changed.
+
+### 23.10 Validation executed this session (workstation, DB-free)
+
+- `tests/gridley-compat.test.ts` + `tests/grid-solver-spec.test.ts` + `tests/grid-solver-timeout.test.ts`: **36/36**, then **31/31** for the two after the new tests were added.
+- `npx tsc --noEmit`: exit 0. `eslint` on every changed file: exit 0.
+- Corpus counts above computed from `tests/fixtures/gridley/corpus.json` / `corpus-answers.json.gz`
+  offline; the All-Australian source figures from `data/awards/*.csv`.
+
+### 23.11 Blocked — needs the operator, and the exact next action
+
+The `127.0.0.1:55432` tunnel to `streamanator` (`afldb_test`) was closed, so nothing DB-backed ran.
+In order, once the tunnel is up (from `D:\dev\afldb-issue-118`):
+
+1. **Builders compile and the AA/height semantics hold on real data:**
+   `npx vitest run tests/integration/grid-solver.test.ts` — expect every builder (151) to solve and
+   the two new `describe`s to pass; the height `describe` passes on an all-NULL column (0 = 0).
+2. **Diagnostic corpus run** (development mode, ~5 min):
+   `AFLDB_GRIDLEY_DIAGNOSTIC=1 AFLDB_GRIDLEY_REPORT=<file> npx vitest run tests/integration/gridley-corpus.test.ts`
+   — expect the 12 All-Australian criteria to compile on the new builders, `height195`/`height180`
+   to be named under `dataset gap` (probe `heights: false`), and the unsupported list to print the
+   26 remaining criteria.
+3. **Stage AA1 answer-key comparison** from that report: filter `cellStats` / `findings` to the 512
+   All-Australian cells; compare Gridley's answer count with AFLDB's per cell, and the 141 bridged
+   players' membership in both directions. Specifically settle (a) whether 1983/1986/1988 need the
+   second team of that year, (b) what the 24 state-labelled 1984 rows are and whether Gridley counts
+   a 1984 club+state pair as one selection or two, (c) 2x / 3x on modern players. Record in a
+   §23.3 addendum; if (b) shows Gridley counts two, change `all_australian_team_min_times` back to
+   row counting **with the evidence cited**.
+4. **Strict run** `npx vitest run tests/integration/gridley-corpus.test.ts` — expected to **FAIL**
+   until the acquisitions land; the failure list is the open work.
+5. Then a **Fable High** session for Stage H2 (height acquisition design: reconciliation of the
+   acquired AFL Tables register versus a per-id page acquisition; provenance; `player_bio` load)
+   and for the schema/model families in §23.7, each as its own runbook stage.
+
+Closeout requires §23.2 in full: 100% of valid criteria supported exactly, 0 unsupported, 0
+unresolved, 0 unrecognised, 0 timeouts, the strict run green on a database that carries every
+dataset, and the browser check of §23.9 on DEV. **ISSUE-110 and ISSUE-137 are not touched by this
+branch. Production is not touched.**

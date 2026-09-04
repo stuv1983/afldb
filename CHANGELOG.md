@@ -15,6 +15,29 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-118 (reopened) — All-Australian final team, height builders, strict Gridley regression - 5 September 2026
+
+- **Reopened:** the 5 September closeout counted 28 valid Gridley criteria as acceptable because
+  they were classified data-absent; the acceptance is now zero unsupported valid criteria
+  (`issues/open/AFLDB-ISSUE-118.md` §23). The earlier entry below is retained as history.
+- **Grid Solver catalogue: 137 → 151** (`src/search/grid-solver-spec.ts`,
+  `src/db/queries/grid-solver.ts`): the **All-Australian final team** as its own question —
+  `all_australian_team`, `all_australian_team_min_times` (counts distinct seasons, so the 1984
+  club+state double listing is one selection), `all_australian_team_between_seasons` — kept
+  distinct from the **40-man squad** (`all_australian_squad_member`, and
+  `all_australian_squad_in_season` relabelled "40-man squad member, in season"); position
+  builders relabelled "final-team … (1991 onwards)". New `Biography` group with `height_min` /
+  `height_max` ("Height X cm or taller / shorter"); an unknown height never qualifies.
+- **Gridley mapping** (`src/search/gridley-compat.ts`): the 12 All-Australian criteria map to the
+  final-team builders instead of the generic award dropdown; `height195` / `height180` map to the
+  height builders. Data-absent debt 28 → 26 criteria (267 → 125 occurrences), pinned in
+  `tests/gridley-compat.test.ts`.
+- **`tests/integration/gridley-corpus.test.ts` fails by default** on any unsupported, dataset-gap
+  or partial-data finding (`AFLDB_GRIDLEY_DIAGNOSTIC=1` restores counted-and-named for
+  development); a `heights` probe names the empty height column.
+- No data was loaded: the height source decision (AFL Tables `player_details`, already acquired,
+  needs a cross-source reconciliation) is recorded for a High session.
+
 ### AFLDB-ISSUE-118 — Gridley compatibility corpus and Grid Solver completeness - 4 September 2026
 
 - **Grid Solver catalogue: 108 → 137 builders** (`src/search/grid-solver-spec.ts`,
