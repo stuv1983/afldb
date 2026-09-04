@@ -47,6 +47,11 @@ commit.
   `tests/integration/gridley-corpus.test.ts` (every cell through the production solver,
   checked against Gridley's own answer keys for the 405 bridged players).
 - `docs/search.md` §7 updated.
+- **Deployed 2026-09-05:** merged to `main` (`4efdf70`), DEV build `tmEQ-3b-HBNZtkAw90Aag`, PROD
+  build `pEc4154P6P0QK8Hjoo5Uj`; the ISSUE-076 board, the heaviest corpus pair and the corpus's
+  worst cell resolve with no timeouts on both hosts, and production's journal shows no recurrence
+  of digest `1511510695`. Migration `080` was deliberately not applied on production: the Grid
+  Solver runtime does not read `external_grids` (corpus storage for tests and tools only).
 
 ### AFLDB-ISSUE-126 — production-only state recovered after the 2026-09-02 cutover - 4 September 2026
 

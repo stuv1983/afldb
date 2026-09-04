@@ -4,7 +4,8 @@
 `opus/gridley-corpus`; §22 (4 September 2026, `claude/issue-118`) recovers that work onto
 current `main`, exports the stored corpus as an offline fixture, maps every criterion, adds the
 missing builders, proves the whole corpus through the production solver and resolves the
-`/grid-solver` crash digest. **Read §22 first; earlier sections are history.**
+`/grid-solver` crash digest; §22.12 records the merge, the DEV and PROD deployments and the
+acceptance that closed it on 5 September 2026. **Read §22 first; earlier sections are history.**
 
 ---
 
@@ -2366,7 +2367,8 @@ The branch is complete and green; two things stand between it and closeout, both
    FROM pg_stat_user_tables WHERE relname IN ('player_match_stats','matches','player_clubs')` —
    the promotion of 2026-09-02 ran no `ANALYZE` (§22.11).
 
-2. **Merge and deploy `claude/issue-118` to DEV, then PROD, code first.** Migration `080` is
+2. **DONE 2026-09-05 — merged and deployed to DEV then PROD, code first (§22.12).**
+   Original instruction kept for the record: **Merge and deploy `claude/issue-118` to DEV, then PROD, code first.** Migration `080` is
    for the corpus tables only and is optional on production; it is already on `afldb_dev`.
    No privileges change is required for the app. After deploy, load `/grid-solver` with the
    ISSUE-076 board and one of the corpus's heaviest pairs (`teammates-100` × `disposals30`) and
@@ -2391,3 +2393,74 @@ captaincies; `ANALYZE` in the promotion procedure.
   against test's 643,114. Families that read those tables pass on test only where test has the
   data; the run report lists each affected criterion.
 - `docs/production-promotion.md` runs no `ANALYZE` after the restore (§22.5).
+
+### 22.12 Merge, deployment and acceptance (5 September 2026) — RESOLVED
+
+**Merge.** `claude/issue-118` fast-forwarded onto `main` (`f04e86d` → `4efdf70`, five commits,
+no merge commit, no conflicts); `main` had not moved since the issue's base. The push to `main`
+was the operator's (the agent's push was refused by the auto-mode classifier).
+
+**DEV (`streamanator`, hostname proven on every connection).** `deploy/sync-dev.ps1`:
+`169d738` → `4efdf70` (29 commits; the 24 that are not this issue are closeouts of issues already
+accepted on DEV/PROD, and the only migration among them is `080`, already applied on `afldb_dev`),
+`npm ci`, `db:migrate` **0 pending**, build **`tmEQ-3b-HBNZtkAw90Aag`**, `MainPID` 1594 → 138335 at
+05:25:43 AEST. The script's own health `curl` ran 16 ms after the respawn and got connection
+refused; from a fresh connection: `HTTP 200 {"status":"ok","database":"ok","latencyMs":28}`,
+`x-afldb-build` = `BUILD_ID`. Page-level acceptance with a beta cookie minted from the host secret
+(gate on; the Grid Solver audience is public on DEV), every square resolved and no square "Timed
+out" on any board:
+
+| Board (DEV ids: Cerra 12603, Fitzroy 106, GWS 111, Brisbane 102, MCG 234) | page | cell 0-0 drill-down |
+|---|---:|---:|
+| ISSUE-076 regression (Cerra teammate / 50+ games at 2 clubs / 20+ kicks × Fitzroy / GWS / won final at MCG) | 200, 980 ms, 9 cells (2 legitimately "No answer") | 200, 557 ms |
+| heavy corpus pair `teammates-100` × `disposals30` (+ 200 games / 2010s × 5+ goals / GWS) | 200, 2,391 ms, 9 cells | 200, 2,325 ms |
+| corpus worst cell `won_by_margin_min` × `played_for_club_incl_merged` (+ teammates-100 / disposals30 × Fitzroy / won final at MCG) | 200, 1,869 ms, 9 cells | 200, 1,902 ms |
+| default board | 200, 527 ms | — |
+
+DEV journal since the restart: `57014` 0, `1511510695` 0, `PostgresError` 0, `timed out` 0,
+`status=5xx` 0.
+
+**PROD (`afldb-prod`, hostname asserted by the deploy script itself before any mutation).**
+Pre-flight read-only: `main` @ `169d738`, only untracked files, fast-forwardable, service active,
+health OK, `db:status` **0 pending** at that checkout. Deployed detached (`setsid nohup`) 05:29:29 →
+05:33:39 AEST: `git pull --ff-only` to `4efdf70`, `npm ci --include=dev`, **no `db:migrate`**,
+`npm run build` → **`pEc4154P6P0QK8Hjoo5Uj`**, `MainPID` 803941 → 838666
+(`ExecMainStartTimestamp` 05:33:29), local health OK on the first try,
+`https://beta.afldb.com/api/health` 200.
+
+- **Migration `080_external_grids.sql` deliberately NOT applied on production** — `db:status`
+  after the pull lists it as the single PENDING migration and it stays that way. Reason, verified
+  in code before the deploy: nothing under `src/` reads `external_grids` except the migration
+  itself and a comment in `src/search/gridley-compat.ts`, and no runtime module imports
+  `gridley-compat.ts` (it is used by `tests/` and `tools/gridley/` only). The Grid Solver runtime
+  is unchanged by the table's absence. No privileges change was needed.
+- **Page-level on PROD:** `/grid-solver` answers `307` to a beta-only cookie because the
+  production audience is `super_admin` — the auth gate working, not an error. No admin session
+  was minted (that is a write to production `auth_sessions`), so the browser render on PROD was
+  not exercised by the agent; the three boards are linked below for the operator.
+- **Solver-level on PROD, through the production call chain** (`createAxisSetCache` +
+  `guardCellTimeout(solveCellSummary)` exactly as `page.tsx` composes them, `tsx` with
+  `server-only` stubbed, the host's `DATABASE_URL`, `AFLDB_STATEMENT_TIMEOUT_MS=5000`; PROD ids
+  Cerra 28, Fitzroy 7, GWS 12, Brisbane 3, MCG 26):
+
+| Board | 9 cells | timeouts | top answers (eligible:name) |
+|---|---:|---:|---|
+| ISSUE-076 | 676 ms | 0 | 31:Dean Turner, 22:Rhys Palmer, 282:Stuart Cochrane, 0:—, 11:Caleb Marchbank, 44:Alex Cincotta, 120:Lyle Skinner, 46:Tom Sheridan, 1075:Josh Carmichael |
+| heavy `teammates-100` × `disposals30` | 3,502 ms | 0 | 1057:Daryl Vernon, 1157:Dave Dick, 86:Kristian Jaksch, 488:Neville Fields, 352:George Bennett, 28:Sam Jacobs, 527:Beau Muston, 258:Lewis Johnston, 105:Rhys Cooyou |
+| corpus worst cell | 2,338 ms | 0 | 385:Jack Harrow, 215:Jack Harrow, 1885:Paul Geister, 559:Fred Backway, 383:Fred Backway, 1882:Ern Hazel, 189:Zac OBrien, 85:Graeme Shearer, 848:Daryl Freame |
+
+PROD journal from the restart to the end of acceptance (24 lines): `57014` 0, `1511510695` 0,
+`PostgresError` 0, `timed out` 0, `error` 0. **No recurrence of digest `1511510695`.**
+Transport headers: `prepare-standalone` printed "AFLDB_ENV is not production" because that
+helper runs outside `.env`; `next build` loads `.env` itself, the built `routes-manifest.json`
+carries HSTS and the production CSP, the loopback response serves HSTS, and Caddy sets both at
+the edge. Nothing to fix. Every temporary script/log was removed from both hosts.
+
+Operator browser confirmation on PROD (optional, super_admin session):
+
+- ISSUE-076: `https://beta.afldb.com/grid-solver?g=eyJyb3dzIjpbeyJidWlsZGVyIjoiZ2FtZXNfYXRfbXVsdGlwbGVfY2x1YnNfbWluIiwicGFyYW1zIjp7ImdhbWVzIjoiNTAiLCJjbHVicyI6IjIifX0seyJidWlsZGVyIjoidGVhbW1hdGVfb2YiLCJwYXJhbXMiOnsicGxheWVyIjoiMjgifX0seyJidWlsZGVyIjoic2luZ2xlX2dhbWVfc3RhdF9taW4iLCJwYXJhbXMiOnsic3RhdCI6ImtpY2tzIiwieCI6IjIwIn19XSwiY29scyI6W3siYnVpbGRlciI6InBsYXllZF9mb3JfY2x1YiIsInBhcmFtcyI6eyJjbHViIjoiNyJ9fSx7ImJ1aWxkZXIiOiJwbGF5ZWRfZm9yX2NsdWIiLCJwYXJhbXMiOnsiY2x1YiI6IjEyIn19LHsiYnVpbGRlciI6Indvbl9maW5hbF9hdF92ZW51ZSIsInBhcmFtcyI6eyJ2ZW51ZSI6IjI2In19XSwib3JkZXIiOiJnYW1lc19hc2MifQ`
+- heavy pair: `https://beta.afldb.com/grid-solver?g=eyJyb3dzIjpbeyJidWlsZGVyIjoiY2FyZWVyX3RlYW1tYXRlc19taW4iLCJwYXJhbXMiOnsieCI6IjEwMCJ9fSx7ImJ1aWxkZXIiOiJjYXJlZXJfZ2FtZXNfbWluIiwicGFyYW1zIjp7ImdhbWVzIjoiMjAwIn19LHsiYnVpbGRlciI6InBsYXllZF9pbl9kZWNhZGUiLCJwYXJhbXMiOnsiZGVjYWRlIjoiMjAxMCJ9fV0sImNvbHMiOlt7ImJ1aWxkZXIiOiJzaW5nbGVfZ2FtZV9zdGF0X21pbiIsInBhcmFtcyI6eyJzdGF0IjoiZGlzcG9zYWxzIiwieCI6IjMwIn19LHsiYnVpbGRlciI6InNpbmdsZV9nYW1lX3N0YXRfbWluIiwicGFyYW1zIjp7InN0YXQiOiJnb2FscyIsIngiOiI1In19LHsiYnVpbGRlciI6InBsYXllZF9mb3JfY2x1YiIsInBhcmFtcyI6eyJjbHViIjoiMTIifX1dLCJvcmRlciI6ImdhbWVzX2FzYyJ9`
+- corpus worst cell: `https://beta.afldb.com/grid-solver?g=eyJyb3dzIjpbeyJidWlsZGVyIjoid29uX2J5X21hcmdpbl9taW4iLCJwYXJhbXMiOnsibWFyZ2luIjoiMTAwIn19LHsiYnVpbGRlciI6ImNhcmVlcl90ZWFtbWF0ZXNfbWluIiwicGFyYW1zIjp7IngiOiIxMDAifX0seyJidWlsZGVyIjoic2luZ2xlX2dhbWVfc3RhdF9taW4iLCJwYXJhbXMiOnsic3RhdCI6ImRpc3Bvc2FscyIsIngiOiIzMCJ9fV0sImNvbHMiOlt7ImJ1aWxkZXIiOiJwbGF5ZWRfZm9yX2NsdWJfaW5jbF9tZXJnZWQiLCJwYXJhbXMiOnsiY2x1YiI6IjMifX0seyJidWlsZGVyIjoicGxheWVkX2Zvcl9jbHViIiwicGFyYW1zIjp7ImNsdWIiOiI3In19LHsiYnVpbGRlciI6Indvbl9maW5hbF9hdF92ZW51ZSIsInBhcmFtcyI6eyJ2ZW51ZSI6IjI2In19XSwib3JkZXIiOiJnYW1lc19hc2MifQ`
+
+**Closed 2026-09-05.** Ledger entry Resolved, row retired from `IssuesIndex.md` and the Open Issues
+table (3 → 2), runbook moved to `issues/closed/`. ISSUE-110 and ISSUE-137 untouched.

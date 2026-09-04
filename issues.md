@@ -139,7 +139,6 @@ created, reopened, resolved, or materially reclassified.
      `AFLDB-ISSUE-136` entry below (Resolution, 2026-09-04) and `issues/closed/AFLDB-ISSUE-136.md` §13.
      Follow-up: `AFLDB-ISSUE-137` (production still split). -->
 | `AFLDB-ISSUE-137` | High | Data integrity / Operations / Database (production) | Production `afldb_prod` still holds the four canonical player splits that `AFLDB-ISSUE-136` fixed at rebuild time: Charlie Cameron, Jack Graham, Jack Ross and Jack Williams each exist as a career player and a 2025-only duplicate keyed on the renumbered AFL Tables url (`Charlie_Cameron3`, `Jack_Graham2`, `Jack_Ross3`, `Jack_Williams3`), with the duplicates carrying their 2025 `player_match_stats`, the awards-census rows keyed on the live urls, and every 2026 settle row. The fixed importer HALTs (`external-identity split`) against such a database by design, so production cannot be repaired by re-running it. Allocated 2026-09-04 at ISSUE-136 closeout; **not started; no production mutation authorised yet.** | Operator chooses the repair path: (a) the canonical rebuild-and-promote path (`AFLDB-ISSUE-125` governs preserving production-only state), or (b) a supervised identity reconciliation that re-points each renumbered identity, its `player_match_stats`, award rows and settle-written rows to the career player and retires the duplicate, verified with the ISSUE-136 runbook §10.3 / §13.4 SQL. Until then every 2026 settle keeps writing the four players' rows to the duplicates. |
-| `AFLDB-ISSUE-118` | Medium | Grid Solver / External datasets / Performance | Gridley compatibility corpus. Stage 0–2 (recovered from `opus/gridley-corpus`) captured all 1,143 Gridley boards into `external_grids`; on `claude/issue-118` the corpus is exported as a deterministic fixture (`tests/fixtures/gridley/`), every one of its 839 criteria is mapped to an exact solver axis or an explicit data-absent reason (`src/search/gridley-compat.ts`: 810 mapped, 1 freebie, 28 data-absent, 0 unrecognised), 37 builders were added (108 → 145), and `tests/integration/gridley-corpus.test.ts` replays all 10,287 cells through the production solver against Gridley's own answer keys. The `/grid-solver` crash digest `1511510695` is the PostgreSQL 57014 statement timeout (as ISSUE-076 established from the dev journal): cells now solve set-then-rank (worst corpus cell 10.9 s → 0.06 s) and a timeout is confined to its square. **Implementation and validation complete on the branch; not merged, not deployed.** | Operator: read the production journal for 2026-09-03 05:49 (`journalctl -u afldb --since "2026-09-03 05:45" --until "2026-09-03 05:55"`, read-only) to record which board timed out, then close: move the runbook to `issues/closed/`, retire this row. Deploy order: code only (migration 080 is for the corpus tables and is optional on production). |
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-131` (an upstream match rekey duplicates the canonical match)
      is **Resolved** and is NO LONGER an open issue. The fail-closed rekey-in-place fix is merged
      (`657a875`) and deployed; runbook §8's production acceptance is reconstructed and accepted in
@@ -12047,11 +12046,12 @@ disabling `AFLDB_BETA_GATE` in production.
 
 ## AFLDB-ISSUE-118 — Gridley compatibility corpus: every stored Gridley question answerable by the Grid Solver
 
-- **Status:** Open — implementation and validation complete on `claude/issue-118`; closes on the production journal read in §Next action
+- **Status:** **RESOLVED — 2026-09-05.** Merged to `main` (`4efdf70`, fast-forward from `f04e86d`), deployed to DEV (build `tmEQ-3b-HBNZtkAw90Aag`) and PROD (build `pEc4154P6P0QK8Hjoo5Uj`), accepted on both; migration `080` deliberately not applied on production (runtime does not read `external_grids`). Runbook `issues/closed/AFLDB-ISSUE-118.md` §22.12.
+- **Resolved:** 2026-09-05
 - **Severity:** Medium
 - **Area:** Grid Solver / External datasets / Performance
 - **Found:** 2026-08-31 (Stage 0 on `opus/gridley-corpus`)
-- **Runbook:** `issues/open/AFLDB-ISSUE-118.md` (§22 is current; §1–§21 are the recovered Stage 0–2 history)
+- **Runbook:** `issues/closed/AFLDB-ISSUE-118.md` (§22 is current; §22.12 is the deployment and acceptance record; §1–§21 are the recovered Stage 0–2 history)
 - **Files:** `src/search/grid-solver-spec.ts`, `src/db/queries/grid-solver.ts`, `src/search/gridley-compat.ts`, `src/app/grid-solver/page.tsx`, `src/app/grid-solver/GridSolverForm.tsx`, `tools/gridley/export_corpus.py`, `tests/fixtures/gridley/`, `tests/gridley-compat.test.ts`, `tests/integration/gridley-corpus.test.ts`, `tests/grid-solver-timeout.test.ts`, `src/db/migrations/080_external_grids.sql`, `tools/migration/import_external_grids.py`, `tools/migration/acquire_gridley_boards.py`, `tools/migration/import_gridley_boards.py`
 - **Related:** `AFLDB-ISSUE-076` and `AFLDB-ISSUE-103` (the same statement-timeout digest, two earlier predicates); `AFLDB-ISSUE-119` (renumbered away from 118)
 
@@ -12085,8 +12085,17 @@ Prove that every valid Gridley (gridleygame.com) question AFLDB has captured and
 ### Not modelled (explicit, not approximated)
 Player height, siblings, father–son links, coaches, seven medals AFLDB does not record, birthplace, International Rules/NFL careers, after-the-siren winners, spoils, age on debut, current-season lists (Gridley's club criteria also include "currently on their list", which AFLDB cannot represent). Listed with reasons in `tests/gridley-compat.test.ts` and runbook §22.3.
 
-### Next action
-Operator: read the production journal for 2026-09-03 05:45–05:55 (read-only; runbook §22.10 has the command and what to expect) to name the board that timed out, then merge and deploy the branch (code first; migration `080` optional on production) and close — runbook to `issues/closed/`, this entry Resolved with the board recorded, row retired from `IssuesIndex.md` and the Open Issues table. Do not touch ISSUE-110 or ISSUE-137.
+### Production evidence (2026-09-05, operator, read-only)
+`journalctl -u afldb` on `afldb-prod` for the real incident window **2026-09-03 15:45–15:55 AEST** (the app-health timestamps are UTC; the earlier 05:45 local query was empty for that reason) holds two entries, at **15:49:25** and **15:49:41 AEST**, each `Error [PostgresError]: canceling statement due to statement timeout`, `code: '57014'`, `digest: '1511510695'`. The retained block does not include the `/grid-solver?g=` request line, so the board token is unrecoverable; the failure class is confirmed on production, ISSUE-076 had already tied the digest to it, and this issue reproduced and removed the class at cell level for the whole catalogue.
+
+### Resolution (2026-09-05)
+- **Merge:** `claude/issue-118` fast-forwarded onto `main` (`f04e86d` → `4efdf70`); `main` had not moved.
+- **DEV (`streamanator`):** `deploy/sync-dev.ps1`, `169d738` → `4efdf70`, 0 pending migrations, build `tmEQ-3b-HBNZtkAw90Aag`, health OK. Page-level with a minted beta cookie: the ISSUE-076 board (980 ms), the heavy `teammates-100` × `disposals30` board (2,391 ms) and the corpus worst-cell board (1,869 ms) each rendered nine resolved squares with no "Timed out"; drill-downs 557 / 2,325 / 1,902 ms. Journal since the restart: zero 57014, zero digest, zero driver errors, zero 5xx.
+- **PROD (`afldb-prod`, hostname asserted before mutation):** detached deploy 05:29–05:33 AEST, `169d738` → `4efdf70`, `npm ci --include=dev`, **no `db:migrate`** (`080_external_grids.sql` left PENDING on purpose: nothing under `src/` reads the table at runtime), build `pEc4154P6P0QK8Hjoo5Uj`, `MainPID` 803941 → 838666, local and public health 200. `/grid-solver` answers 307 to a non-admin cookie (production audience `super_admin`; no admin session was minted). Solver proven through the production call chain against `afldb_prod` under the 5 s statement timeout: ISSUE-076 board 676 ms, heavy pair 3,502 ms, worst cell 2,338 ms, **0 timeouts** in 27 cells. Journal from the restart through acceptance: zero 57014, zero `1511510695`, zero errors. Every temporary file removed from both hosts.
+- Full evidence, timings, top answers and the PROD board URLs for an optional operator browser check: runbook §22.12.
+
+### Follow-up (not open issues)
+Runbook §22.11: the 28 data-absent criteria (height, siblings, father–son, coaches, seven medals, birthplace), the `afldb_test` dataset gaps the corpus exposes, and `ANALYZE` after a production promotion.
 
 ---
 

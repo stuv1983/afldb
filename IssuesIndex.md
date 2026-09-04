@@ -6,8 +6,16 @@
 > `issues.md` disagree, trust `issues.md` and immediately synchronize this file
 > and the Open Issues table at the top of `issues.md`.
 
-**Last updated:** 2026-09-04
-**Open issues:** 3 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-118`, `AFLDB-ISSUE-137`.
+**Last updated:** 2026-09-05
+**Open issues:** 2 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-137`.
+
+<!-- UPDATE 2026-09-05 (ISSUE-118 closeout): `AFLDB-ISSUE-118` is **Resolved**. Merged to `main`
+     (`4efdf70`), deployed to DEV (`tmEQ-3b-HBNZtkAw90Aag`) and PROD (`pEc4154P6P0QK8Hjoo5Uj`);
+     the production journal confirmed digest `1511510695` = SQLSTATE 57014 (two entries,
+     2026-09-03 15:49 AEST) and no recurrence after the deploy; migration `080` deliberately NOT
+     applied on production (runtime does not read `external_grids`). Authoritative records:
+     `issues.md` (Resolution, 2026-09-05) and `issues/closed/AFLDB-ISSUE-118.md` §22.12.
+     Next free issue ID is still `AFLDB-ISSUE-138`. -->
 
 <!-- UPDATE 2026-09-04 (ISSUE-125 closeout): `AFLDB-ISSUE-125` is **Resolved**. A rebuilt
      database is now promoted by restoring it into a NEW candidate on the production host,
@@ -488,7 +496,9 @@ closure boundary, and the unrelated query-builder timing regression remains with
      merged. Authoritative records: the `AFLDB-ISSUE-136` entry in `issues.md` (Resolution, 2026-09-04)
      and `issues/closed/AFLDB-ISSUE-136.md` §13. Follow-up: `AFLDB-ISSUE-137`. -->
 | `AFLDB-ISSUE-137` | High | Data integrity / Operations / Database (production) | **NOT STARTED — allocated 2026-09-04 at the ISSUE-136 closeout; no production mutation authorised.** Production `afldb_prod` still holds the four canonical player splits that `AFLDB-ISSUE-136` fixes at rebuild time (Charlie Cameron, Jack Graham, Jack Ross, Jack Williams: a career player plus a 2025-only duplicate keyed on the renumbered AFL Tables url, the duplicate carrying the 2025 match rows, the awards-census rows and every 2026 settle row). The fixed importer HALTs (`external-identity split`) against such a database by design. Key files: `issues/closed/AFLDB-ISSUE-136.md` §10.3/§13.4 (verification SQL), `tools/migration/import_fitzroy_core.py`, `AFLDB-ISSUE-125` (promotion path). | Operator chooses (a) canonical rebuild-and-promote under `AFLDB-ISSUE-125`, or (b) a supervised, reviewed per-player identity reconciliation on production (re-point the renumbered identity, match rows, award rows and settle rows to the career player, recompute derived tables, retire the duplicate) after a production backup; first step of either is a read-only measurement of the production split. |
-| `AFLDB-ISSUE-118` | Medium | Grid Solver / External datasets / Performance | **Implemented and validated on `claude/issue-118` (base `main @ f04e86d`), not merged.** The whole stored Gridley corpus (1,143 boards, 10,287 cells, 839 criteria) is classified: 810 criteria map to exact solver axes (37 builders added, 108 → 145), 28 are explicitly data-absent (height, siblings, coaches, seven medals, birthplace, lists…), 0 unrecognised. `tests/integration/gridley-corpus.test.ts` runs every cell through `solveCellSummary` on `afldb_test` and checks Gridley's answer keys for the 401 bridgeable players (retired-before-board only; board-time drift, list membership and the partial captaincies dataset are reported as informational). Crash digest `1511510695` = SQLSTATE 57014 statement timeout; cells are now set-then-rank and a timeout is confined to one square. Key files: `issues/open/AFLDB-ISSUE-118.md` §22, `src/search/gridley-compat.ts`, `src/db/queries/grid-solver.ts`, `tools/gridley/export_corpus.py`. | **Operator, read-only on PROD:** `journalctl -u afldb --since "2026-09-03 05:45" --until "2026-09-03 05:55" --no-pager` and record the timed-out statement in runbook §22.5; then close (runbook to `issues/closed/`, retire this row). Merge/deploy code only; migration 080 optional on production. |
+<!-- RETIRED 2026-09-05 — `AFLDB-ISSUE-118` is **Resolved** and is NO LONGER an open issue.
+     Merged, deployed to DEV and PROD, accepted on both; see `issues.md` (Resolution,
+     2026-09-05) and `issues/closed/AFLDB-ISSUE-118.md` §22.12. -->
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-131` (an upstream match rekey duplicates the canonical match
      instead of updating it) is **Resolved** and is NO LONGER an open issue. The fail-closed
      rekey-in-place fix is merged (`657a875`) and deployed; runbook §8's production acceptance is
