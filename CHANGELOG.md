@@ -15,6 +15,43 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-134 — a settled season is published to the public cache instead of waiting out its ISR hour - 4 September 2026
+
+- **The limitation.** `/seasons/[year]` is ISR (`revalidate = 3600`, every season prerendered at
+  build), and the nightly in-season settle is an out-of-process systemd job. Nothing connected
+  the two, so a settle that landed real matches was invisible to readers until the page's hour
+  expired. Measured on production in `AFLDB-ISSUE-133`: prerendered 22:14:46, rows committed
+  22:37:47, page regenerated 23:50:48.
+- **The change.** After its transaction commits — and only when the run actually wrote a
+  canonical or ledger row — the settle posts that one season to a loopback route which calls
+  `revalidatePath('/seasons/<year>')`. It reposts on **fresh TCP connections** until every worker
+  ordinal has answered, and reports a failure if it cannot reach them all. That is not belt and
+  braces: Next 16 keeps page invalidation in per-process memory and `deploy/server-cluster.mjs`
+  runs 2–4 independent workers behind one socket, so a single request invalidates a single
+  worker. The idempotent 0/0 rerun — most nights out of season, and any repeat over unchanged
+  source data — makes no request at all.
+- **Behaviour change.** On a host that sets `AFLDB_REVALIDATE_URL` and `AFLDB_REVALIDATE_SECRET`
+  (`docs/deployment.md` §7c), readers see a settled season on their next visit rather than up to
+  an hour later. Until both are set the settle runs and commits exactly as before and the page
+  falls back to expiring on its own. A failed invalidation fails the unit loudly and changes
+  nothing about the data, which is committed and correct.
+- **Security.** The route accepts an integer season and nothing else — the path is composed
+  server-side — so there is no arbitrary path, pattern, layout or tag to purge; the shared
+  secret is compared in constant time; only failed secret checks are rate-limited; an
+  unconfigured host answers 503. Reachability is gated on the **forwarded client address
+  resolving to loopback**. An earlier version of that gate instead required the forwarding
+  headers to be *absent*, which Next 16 makes meaningless — it synthesises `x-forwarded-for` and
+  `x-forwarded-host` on every request before any handler runs — and the route answered 404 to
+  everything, including its own caller. The gate now rests on the deployment contract: both
+  Caddyfiles set `header_up X-Forwarded-For {remote_host}` on every `reverse_proxy` block
+  (overwrite, never append) and drop `X-Real-IP`/`Forwarded`, and `deploy/afldb.service` binds
+  the application to `127.0.0.1`. Chains, non-loopback addresses and malformed values fail
+  closed. Verified on the development host through the real proxy: a client presenting the
+  correct secret **and** a spoofed `X-Forwarded-For: 127.0.0.1` is refused.
+- **Regression cover.** The route's tests now build requests the way the framework actually
+  delivers them, and a static suite asserts the Caddy and systemd lines the security model rests
+  on, so an overwrite-to-append change cannot silently invalidate it.
+
 ### AFLDB-ISSUE-116 — the Data QA search stops after the page instead of reading the whole result set - 4 September 2026
 
 - **The defect.** `/admin/query-builder` (super-admin Data QA search) asked PostgreSQL for the page

@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 6 tracked here — `AFLDB-ISSUE-110`, `-116`, `-125`, `-126`, `-134`, `-137`.
+**Open issues:** 4 tracked here — `AFLDB-ISSUE-110`, `-125`, `-126`, `-137`.
 <!-- Count corrected 2026-09-04: `-104` removed by its own closeout (Resolved — closed as not
      reachable under the current single-owner-per-`issue_type` contract); 7 -> 6. -->
 <!-- Count corrected 2026-09-04: `-124` removed by its own closeout (Resolved, see the RETIRED
@@ -136,7 +136,6 @@ created, reopened, resolved, or materially reclassified.
      `AFLDB-ISSUE-136` entry below (Resolution, 2026-09-04) and `issues/closed/AFLDB-ISSUE-136.md` §13.
      Follow-up: `AFLDB-ISSUE-137` (production still split). -->
 | `AFLDB-ISSUE-137` | High | Data integrity / Operations / Database (production) | Production `afldb_prod` still holds the four canonical player splits that `AFLDB-ISSUE-136` fixed at rebuild time: Charlie Cameron, Jack Graham, Jack Ross and Jack Williams each exist as a career player and a 2025-only duplicate keyed on the renumbered AFL Tables url (`Charlie_Cameron3`, `Jack_Graham2`, `Jack_Ross3`, `Jack_Williams3`), with the duplicates carrying their 2025 `player_match_stats`, the awards-census rows keyed on the live urls, and every 2026 settle row. The fixed importer HALTs (`external-identity split`) against such a database by design, so production cannot be repaired by re-running it. Allocated 2026-09-04 at ISSUE-136 closeout; **not started; no production mutation authorised yet.** | Operator chooses the repair path: (a) the canonical rebuild-and-promote path (`AFLDB-ISSUE-125` governs preserving production-only state), or (b) a supervised identity reconciliation that re-points each renumbered identity, its `player_match_stats`, award rows and settle-written rows to the career player and retires the duplicate, verified with the ISSUE-136 runbook §10.3 / §13.4 SQL. Until then every 2026 settle keeps writing the four players' rows to the duplicates. |
-| `AFLDB-ISSUE-134` | Low | Deployment / Operations / Frontend rendering (ISR) / Current-season settle | **NOT STARTED — allocated 2026-09-03 from the ISSUE-133 closeout (`issues/closed/AFLDB-ISSUE-133.md` §6 F4, §11.4).** A successful in-season settle changes canonical season data (settle batch 735 inserted matches 17381/17382 at 22:37:47 AEST on 2026-09-03), but nothing in the settle path invalidates `/seasons/[year]`: `src/app/seasons/[year]/page.tsx` is ISR with `export const revalidate = 3600` and `generateStaticParams()` prerendering every season at build; the settle (`src/lib/acquisition/settle-afltables.ts`, run by `afldb-settle-afltables.timer`) is an out-of-process job, and `src/lib/acquisition/` and `deploy/` contain no `revalidatePath`/`revalidateTag` call; `docs/deployment.md` "Cache invalidation" prescribes a rebuild after imports, which the automatic nightly settle does not perform. Production can therefore serve season output up to one hour stale after every in-season settle, and for the full window after a deploy that builds before the first settle. Proven on PROD in ISSUE-133: prerender 22:14:46 → rows 22:37:47 → ISR window expired 23:14:46 → entry still stale at 23:42:39 → regenerated 23:50:48 AEST. Product limitation requiring future work, not a defect of ISSUE-129/131/132/133. In-process precedents: `src/app/admin/data-editor/actions.ts` calls `revalidatePath('/', 'layout')`; `src/app/admin/current-season/actions.ts` revalidates only `/admin/current-season`. | (1) Confirm from current code that no settle-path or timer-path invalidation exists and inventory the admin-action precedents. (2) Investigate the correct Next.js mechanism for this deployment — `revalidateTag('_N_T_/seasons/<season>')` (the tag the deployed `2026.meta` carries) versus `revalidatePath('/seasons/<season>')` versus the documented rebuild — and where it can fire from an out-of-process settle (an authenticated loopback internal route, a post-settle step in the systemd unit, or a rebuild), accounting for the cluster's per-worker in-memory ISR LRU in front of the file cache. (3) Define the transaction/deployment boundary: invalidate only after the settle transaction commits, only for the seasons/matches the batch changed (from `canonical_applications`), idempotently on 0/0 reruns. (4) Then write the runbook, implement on a `claude/issue-134` branch, extend the closest settle test, validate on dev before production. Not started; no branch; no migration expected. No production write, purge, rebuild or restart is authorised by this entry. |
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-131` (an upstream match rekey duplicates the canonical match)
      is **Resolved** and is NO LONGER an open issue. The fail-closed rekey-in-place fix is merged
      (`657a875`) and deployed; runbook §8's production acceptance is reconstructed and accepted in
@@ -14227,7 +14226,7 @@ Current-season settle should invalidate/revalidate affected public season ISR: a
 
 ## AFLDB-ISSUE-134 — Current-season settle should invalidate/revalidate affected public season ISR
 
-- **Status:** Open — **NOT STARTED.** Allocated 2026-09-03 from the ISSUE-133 closeout (`issues/closed/AFLDB-ISSUE-133.md` §6 F4, §11.4). No branch, no worktree, no code, no runbook yet. **Uncommitted on `claude/issue-133`.**
+- **Status:** **RESOLVED — 2026-09-04.** Implemented, repaired after the first DEV acceptance found the route unconditionally `404`, and accepted on the real host at the second attempt. Allocated 2026-09-03 from the ISSUE-133 closeout (`issues/closed/AFLDB-ISSUE-133.md` §6 F4, §11.4). Branch `claude/issue-134` (worktree `D:\dev\afldb-issue-134`), pushed to `origin`, base `25c976d`; runbook `issues/closed/AFLDB-ISSUE-134.md`. No migration. **The branch is NOT merged and PROD is NOT deployed** — that is the operator's call; DEV was restored to `main` @ `169d738` after acceptance.
 - **Severity:** Low — public season pages can lag canonical data by up to one hour after an in-season settle; self-corrects when the ISR window expires; no data or code defect.
 - **Area:** Deployment / Operations / Frontend rendering (ISR) / Current-season settle
 - **Found:** 2026-09-03 — ISSUE-133 investigation: the 2026-09-03 production deploy prerendered `/seasons/2026` before the first settle on the new code inserted the two Wildcard Final rows, and the public page stayed stale until the ISR window expired (prerender 22:14:46 → rows 22:37:47 → regenerated 23:50:48 AEST).
@@ -14254,6 +14253,186 @@ Current-season settle should invalidate/revalidate affected public season ISR: a
 3. Define the boundary: invalidate only after commit, only for the seasons/matches the batch actually changed (from `canonical_applications`), and idempotently on the 0/0 reruns.
 4. Then write the runbook, implement on a `claude/issue-134` branch, extend the closest settle/current-season test, and validate on dev before production.
 - **No production write, purge, rebuild or restart is authorised by this entry.**
+
+### 2026-09-04 — implementation, repository validation, and a halted DEV acceptance
+
+**Steps 1–4 above are done.** The mechanism question in step 2 resolved against `revalidateTag`
+and against a rebuild: Next 16 keeps *page* invalidation in per-process memory (a module-level
+tag map plus an in-memory LRU in front of the file cache) and consults the
+`x-next-revalidated-tags` header only for `FETCH` entries, never `APP_PAGE` ones. Since
+`deploy/server-cluster.mjs` runs 2–4 independent workers behind one socket, one request
+invalidates one worker. The implementation therefore posts the committed season to a loopback
+route on **fresh TCP connections** (`agent: false`, `Connection: close`, because `node:cluster`
+round-robins connections, not requests) until every worker ordinal has answered, and fails
+loudly if it cannot reach them all. Step 3's boundary is honoured: after commit only, only when
+the run wrote a canonical or ledger row, so the idempotent 0/0 rerun makes no request at all.
+
+**Repository validation — all green.** `tests/settle-season-revalidation.test.ts` 49/49;
+`tests/current-season-import.test.ts` + `tests/admin-current-season-settle.test.ts` 287/287;
+`npx tsc --noEmit` clean; ESLint clean on all touched files; and
+`tests/integration/settle-afltables.test.ts` **64 passed / 1 skipped in 240.85 s** against
+`afldb_test` over the workstation SSH tunnel on `127.0.0.1:55432`. The single skip is the
+pre-existing restricted importer-role case, gated on `AFLDB_TEST_IMPORT_DATABASE_URL`, which is
+unset here; it skips identically on `main` and is not an ISSUE-134 failure.
+
+**DEV acceptance on `streamanator` (2026-09-04) — HALTED. The deployed route is unconditionally
+`404`, so the feature is inert on a real host.** The branch was deployed to dev (build
+`RxpUfpomgxOwTRCYf2Li2`, MainPID 1052201, health 200), and the worker half of the design was
+confirmed: exactly 4 workers, each carrying a server-assigned `AFLDB_WORKER_ID` of 1–4 plus
+`AFLDB_WORKER_COUNT=4` supplied by the cluster primary, read from `/proc/<pid>/environ`. But
+every `POST` to `/api/internal/revalidate-season` answered `404 {"error":"Not found."}`,
+including correctly-authenticated ones, while `GET` answered 405 — proving the route was loaded
+and that the handler's single 404, its first gate, fires on every request.
+
+**Root cause.** That gate rejects any request carrying `x-forwarded-for` / `x-forwarded-host`,
+on the premise that only Caddy adds them. `node_modules/next/dist/server/base-server.js:606-612`
+synthesises **both** on every request before any handler runs
+(`req.headers['x-forwarded-host'] ??= req.headers['host']`,
+`req.headers['x-forwarded-for'] ??= originalRequest?.socket?.remoteAddress`), so the premise is
+false under Next 16 and the condition is always true. The unit tests missed it because they call
+`POST()` with synthetic `Request` objects that never pass through `base-server.js`; the
+"proxied requests are refused" test passes for the wrong reason, and nothing asserts that a
+realistically-shaped non-proxied request succeeds.
+
+**Recommended fix (IMPLEMENTED — see the stage-5 section below).** Invert
+the gate: require `x-forwarded-for` to **be** a loopback address rather than to be absent. This
+is sound here because `deploy/Caddyfile.production:39` sets `header_up X-Forwarded-For
+{remote_host}` — overwriting, never appending, and dropping `X-Real-IP`/`Forwarded` — so a
+public client cannot forge the value; it is the same property `src/lib/auth/session.ts` already
+relies on. Next's `??=` then fills the header only on a direct connection, from
+`socket.remoteAddress`, and the app binds `127.0.0.1:3100` only. The fix must also replace the
+test that passed for the wrong reason and correct the false premise in `route.ts` and
+`docs/deployment.md` §7c, whose verification `curl` as written returns 404.
+
+**DEV was restored** to `main` @ `169d738` (rebuilt `p0Z_llbWECQxDN2Eo2YMC`, MainPID 1057872,
+health 200, 4 workers, 0 tracked modifications), with both revalidation variables removed from
+`.env` and the settle timer still `not-found` — it was never installed and never triggered.
+**PROD was not touched at any point.** Full evidence: `issues/open/AFLDB-ISSUE-134.md` §10.
+
+### 2026-09-04 — stage 5: the security boundary repaired
+
+**The gate now rests on the deployment contract instead of on a framework accident.** Gate 1 no
+longer asks whether the forwarding headers are absent — it asks whether the **forwarded client
+address resolves to loopback**, and the secret remains mandatory behind it.
+
+**Why that value can be believed, proven from tracked files rather than assumed:**
+
+- `deploy/Caddyfile.production` (both `reverse_proxy` blocks) and `deploy/Caddyfile` (dev)
+  set `header_up X-Forwarded-For {remote_host}` — **overwrite, never append** — and drop
+  `X-Real-IP` and `Forwarded`. A public client that sends `X-Forwarded-For: 127.0.0.1` has it
+  replaced with the address Caddy observed before Node sees it.
+- `deploy/afldb.service` pins `Environment=HOSTNAME=127.0.0.1`, so the application socket is
+  loopback-bound and the proxy is the only way in from the network.
+- Next's `??=` (not `=`) means the framework fills the header **only when the proxy did not**,
+  so a proxied request carries Caddy's value and a direct one carries `socket.remoteAddress`.
+- `src/lib/auth/session.ts` already stakes the audit trail on exactly this property, so this is
+  not a new trust assumption.
+
+**The rule.** `classifyForwardedClient()` (in the Next-free
+`src/lib/acquisition/season-revalidation.ts`, so the settle CLI can still import the module)
+returns `loopback` — `127.0.0.0/8`, `::1`, `[::1]`, `::ffff:127.0.0.1` — or `absent`, `remote`,
+`chained`, `malformed`. Only the first two are served. A comma-separated chain is **refused, not
+parsed**, because this deployment produces exactly one hop; leading zeros are refused rather
+than interpreted; `x-forwarded-host` is no longer consulted at all, since Next fills it from the
+request's own `Host` header, which is client input on both paths. `absent` is served
+deliberately: every proxy block emits the header, so a request with no forwarding identity did
+not come through one — and refusing it would make the feature silently inert again the day a
+framework stops synthesising, which is precisely the defect being repaired.
+
+**Nothing else moved.** Purpose-specific secret, timing-safe comparison, failure-only rate
+limiting, integer-season-only body, server-composed `/seasons/<year>`, no arbitrary path or tag,
+503 when unconfigured — all unchanged, as are the worker-coverage tests.
+
+**Tests — the false premise replaced.** The route suite now builds requests the way Next really
+delivers them (both forwarding headers present, `x-forwarded-for` loopback), so every existing
+case is exercised against the real shape. Added: a loopback caller with the synthesised headers
+**succeeds** (the case that would have caught the defect); every emittable loopback form
+succeeds; `x-forwarded-host` does not change the verdict; a non-loopback client is refused even
+with the correct secret; chains and malformed values are refused; the caller is classified
+before the secret; and the classifier's own five-verdict table. **A static suite asserts the
+deployment contract itself** — one `header_up X-Forwarded-For {remote_host}` per
+`reverse_proxy` block in both Caddyfiles, no append idiom or `trusted_proxies`, `-X-Real-IP` and
+`-Forwarded` per block, `HOSTNAME=127.0.0.1` in `deploy/afldb.service`, and `??=` still in
+`base-server.js` — so an overwrite-to-append change cannot quietly invalidate the model.
+
+**Repository gates — all green:** `tests/settle-season-revalidation.test.ts` **69/69**;
+`tests/current-season-import.test.ts` + `tests/admin-current-season-settle.test.ts` **287/287**;
+`tests/integration/settle-afltables.test.ts` **64 passed / 1 pre-existing skip in 246.7 s**
+against `afldb_test` over the workstation tunnel; `npx tsc --noEmit` clean; ESLint clean on
+`route.ts`, `season-revalidation.ts` and the test file. Repository gates were green before the
+first DEV acceptance too, so they remain necessary and not sufficient.
+
+**Files changed:** `src/lib/acquisition/season-revalidation.ts`,
+`src/app/api/internal/revalidate-season/route.ts`, `tests/settle-season-revalidation.test.ts`,
+`docs/deployment.md` §7c, `issues/open/AFLDB-ISSUE-134.md` §11.
+
+### Resolution — 2026-09-04
+
+**Root cause of the original limitation.** `/seasons/[year]` is ISR (`revalidate = 3600`,
+prerendered by `generateStaticParams()`) and the in-season settle is an out-of-process systemd
+job, so nothing connected a committed settle to the page it changed. Readers saw pre-settle
+output for the rest of the ISR hour.
+
+**Root cause of the defect that halted the first acceptance.** The route's first gate rejected
+any request carrying `x-forwarded-for`/`x-forwarded-host`, on the premise that only Caddy adds
+them. Next 16 synthesises both on **every** request before any handler runs
+(`base-server.js:606-612`), so the condition was unconditionally true and the route answered
+`404` to everything, including correctly-authenticated loopback calls. Every repository gate was
+green because the unit tests built synthetic `Request` objects that never pass through
+`base-server.js` — the "proxied requests are refused" test passed for the wrong reason, and
+nothing asserted that a realistically-shaped local request succeeds.
+
+**The fix.** The settle, having committed, posts the season it changed to a loopback route that
+calls `revalidatePath('/seasons/<year>')`, reposting on **fresh TCP connections**
+(`agent: false`, `Connection: close`) until every worker ordinal has answered — necessary
+because Next 16 keeps page invalidation in per-process memory and `deploy/server-cluster.mjs`
+runs 2–4 workers behind one socket. It fires only after commit and only when the run wrote a
+canonical or ledger row, so the idempotent 0/0 rerun makes no request. The route's first gate
+now requires the **forwarded client address to resolve to loopback** rather than to be absent;
+that value is trustworthy because both Caddyfiles set `header_up X-Forwarded-For {remote_host}`
+(overwrite, never append) on every `reverse_proxy` block and drop `X-Real-IP`/`Forwarded`, and
+`deploy/afldb.service` pins `HOSTNAME=127.0.0.1` so the socket is loopback-bound — the same
+property `src/lib/auth/session.ts` already stakes the audit trail on. Chains, non-loopback
+addresses and malformed values fail closed; `x-forwarded-host` is not consulted at all, being
+client input on every path. The secret stays mandatory and timing-safe, the limiter charges
+failures only, the body is an integer season and nothing else, and an unprovisioned host
+answers 503.
+
+**Validation — repository.** `tests/settle-season-revalidation.test.ts` 69/69 (now built on the
+request shape Next really delivers, plus a static suite asserting the Caddy/systemd/`??=`
+contract so an overwrite→append change cannot silently invalidate the model);
+`tests/current-season-import.test.ts` + `tests/admin-current-season-settle.test.ts` 287/287;
+`tests/integration/settle-afltables.test.ts` 64 passed / 1 pre-existing skip in 246.7 s against
+`afldb_test`; `npx tsc --noEmit` clean; ESLint clean.
+
+**Validation — DEV host (`streamanator`, detached at `479f4f7`, build `vEjD_Ctxh5fLXazgizdjn`).**
+Correct-secret loopback POST → **200**; missing/wrong secret → **401**; every non-loopback,
+chained, malformed or octal-looking forwarded identity → **404**, and the caller check
+demonstrably runs before the secret. **Through the real Caddy proxy, a client presenting the
+correct secret AND a spoofed `X-Forwarded-For: 127.0.0.1` was refused with 404**, because the
+proxy replaced its header with the address it observed. Six fresh-connection POSTs were answered
+by worker ordinals 1, 4, 3, 2, 1, 4 — full coverage of a real four-worker cluster, the
+observation the first acceptance never reached. `/seasons/2026` regenerated inside its hour with
+a control: identical admitted traffic *without* an invalidation left the entry untouched, the
+same traffic *after* one moved it. Two real settle runs of the full acquire→adjudicate→settle
+chain (batches 93 and 94) were genuine `0/0/0` no-ops and made **no** request at all, exiting 0.
+
+**The one item with no host proof, recorded rather than papered over.** A settle that *does*
+change canonical data publishing exactly once was not exercised: dev's 2026 season is fully
+settled, no safe real change was available, and manufacturing one was out of bounds. It is
+covered by `tests/integration/settle-afltables.test.ts` §S6 against real PostgreSQL after a real
+commit, and every link of the chain was proved separately on the host. See
+`issues/closed/AFLDB-ISSUE-134.md` §12.7.
+
+**Follow-up (not defects).** Match and club pages are still not invalidated — explicitly out of
+this issue's scope (§2.4) and a separate decision. No warming request is made: marking the tag
+is enough, and warming would land on one arbitrary worker.
+
+**State on close.** Branch `claude/issue-134` committed and pushed, **not merged**; no migration.
+DEV restored to `main` @ `169d738` with both revalidation variables removed from `.env` (verified
+byte-identical to the pre-test backup), rebuilt, health 200, 4 workers, the route `307` again,
+and the settle timer still `not-found` — never installed, never triggered. **PROD was not touched
+at any point, and ISSUE-137 was not touched.**
 
 ---
 

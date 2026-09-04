@@ -3471,10 +3471,35 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier', () => {
       return root;
     }
 
+    /**
+     * AFLDB-ISSUE-134. Seasons this run asked the running site to invalidate.
+     * The boundary is INJECTED, so nothing here opens a socket or touches a
+     * Next.js cache — what the suite proves is that it is reached only after
+     * a real transaction has really committed, and only when that commit
+     * actually changed canonical data.
+     */
+    let revalidatedS6: number[] = [];
+
     async function cli(args: string[]): Promise<{ outcome: SettleCliOutcome; lines: string[] }> {
       const lines: string[] = [];
+      revalidatedS6 = [];
       const outcome = await runSettleCli(args, {
-        projectRoot: rootS6, sql, log: (line) => lines.push(line),
+        projectRoot: rootS6,
+        sql,
+        log: (line) => lines.push(line),
+        env: {},
+        revalidate: async (season) => {
+          revalidatedS6.push(season);
+          return {
+            ok: true,
+            season,
+            path: `/seasons/${season}`,
+            workersReached: ['1'],
+            workerCount: 1,
+            attempts: 1,
+            failures: [],
+          };
+        },
       });
       return { outcome, lines };
     }
@@ -3594,6 +3619,10 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier', () => {
       expect(counters?.derivedRecomputeRuns).toBe(1);
       expect(lines.some((line) => line.startsWith('Dry run.'))).toBe(true);
       expect(lines.some((line) => line.includes('--apply --auto-apply'))).toBe(true);
+      // AFLDB-ISSUE-134. A rolled-back run publishes nothing, however many
+      // canonical rows the preview says it would have written.
+      expect(revalidatedS6).toEqual([]);
+      expect(outcome.revalidation).toBeNull();
 
       // And every relation is byte-identical to before it ran.
       expect(await stateS6()).toEqual(before);
@@ -3620,6 +3649,14 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier', () => {
       // debutant wrote nothing and has no stats row on the new match.
       expect(counters.derivedRecomputeRuns).toBe(1);
       expect(counters.derivedRecomputePlayers).toBe(1);
+
+      // AFLDB-ISSUE-134. The season was published, once, AFTER the commit:
+      // `runSettleAfltables()` has returned, so its transaction is closed and
+      // the rows below are durable.
+      expect(revalidatedS6).toEqual([SEASON122]);
+      expect(outcome.revalidation?.ok).toBe(true);
+      expect(outcome.revalidation?.path).toBe(`/seasons/${SEASON122}`);
+
       const state = await stateS6();
       expect(state.matches).toBe(1);
       expect(state.ledger).toEqual([
@@ -3718,6 +3755,11 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier', () => {
       // exception, and the report below still says so from the candidate.
       expect(counters.candidatesRefreshed).toBe(0);
       expect(counters.unresolvedIdentityPlayer).toBe(1);
+
+      // AFLDB-ISSUE-134. A run that changed nothing publishes nothing: no
+      // request is made and no page is re-rendered.
+      expect(revalidatedS6).toEqual([]);
+      expect(outcome.revalidation).toBeNull();
 
       const after = await stateS6();
       // The only difference a rerun may make is its own batch row.

@@ -44,9 +44,20 @@ Nice=10
 
 # Unlike afldb-email-intake.service this unit DOES need a database DSN:
 # settle-afltables.ts connects as afldb_import through
-# AFLDB_IMPORT_DATABASE_URL. It is therefore the one name removed from the
-# UnsetEnvironment list below; every other credential .env carries is dropped,
-# so a compromise here cannot reach the owner, auth, backup or app roles.
+# AFLDB_IMPORT_DATABASE_URL. It is therefore one of only two names left off
+# the UnsetEnvironment list below; every other credential .env carries is
+# dropped, so a compromise here cannot reach the owner, auth, backup or app
+# roles.
+#
+# The second is AFLDB_REVALIDATE_SECRET (AFLDB-ISSUE-134), with
+# AFLDB_REVALIDATE_URL beside it. After the settle transaction commits, the
+# tool posts the settled season to the site's own loopback invalidation route
+# so the public /seasons/<year> page stops serving pre-settle output for the
+# rest of its ISR hour. That secret authorises exactly one thing — asking the
+# running site to re-render one season page — and the route refuses anything
+# that arrived through the reverse proxy, so it is not a credential in the
+# sense the DSNs above are. Both are absent on a host that has not been
+# provisioned for this, and the tool is then inert.
 #
 # Honest limitation: settle-afltables.ts also reads .env itself (it fills in
 # only names not already in its environment), so the Node step can still see

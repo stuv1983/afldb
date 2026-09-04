@@ -42,6 +42,13 @@ import postgres from 'postgres';
 import { loadManualAuthority } from '../../src/lib/acquisition/manual-authority';
 import { UNAVAILABLE_MANUAL_AUTHORITY } from '../../src/lib/acquisition/observations';
 import {
+  readRevalidateConfig,
+  renderRevalidateOutcome,
+  revalidateSeason,
+  shouldRevalidateSeason,
+  type RevalidateOutcome,
+} from '../../src/lib/acquisition/season-revalidation';
+import {
   resolveManifestPath,
   runSettleAfltables,
   validateSettleBundle,
@@ -245,6 +252,17 @@ export type SettleCliDeps = {
   sql?: postgres.Sql;
   /** Where the lines go. Defaults to stdout. */
   log?: (line: string) => void;
+  /**
+   * AFLDB-ISSUE-134. The environment the post-settle ISR invalidation reads
+   * its host configuration from. Injected so a test can configure — or
+   * deliberately not configure — the boundary without touching the process.
+   */
+  env?: Record<string, string | undefined>;
+  /**
+   * AFLDB-ISSUE-134. The invalidation boundary itself, injected so no test
+   * ever opens a socket. The default posts to the running site.
+   */
+  revalidate?: (season: number) => Promise<RevalidateOutcome>;
 };
 
 export type SettleCliOutcome = {
@@ -258,7 +276,69 @@ export type SettleCliOutcome = {
    * `--report`, which runs no settle and so measures no source.
    */
   sourceCompleteness: SourceCompletenessVerdict | null;
+  /**
+   * AFLDB-ISSUE-134. The post-commit ISR invalidation for this run.
+   *
+   *   null   nothing was attempted — a dry run, a `--report`, an idempotent
+   *          0/0 rerun, or a host with no invalidation configured. All four
+   *          are correct outcomes, not failures.
+   *   ok     every worker of the running site invalidated the season page.
+   *   !ok    the canonical data is committed and correct; the cache was not
+   *          invalidated. `main()` turns this into a non-zero exit code.
+   */
+  revalidation: RevalidateOutcome | null;
 };
+
+/**
+ * AFLDB-ISSUE-134 — the post-commit ISR invalidation, and every reason not to
+ * perform one.
+ *
+ * Returns null when nothing should be attempted, which is most runs:
+ *
+ *   - the run wrote no canonical row and logged no ledger row, i.e. the
+ *     nightly idempotent rerun over unchanged source data. Re-rendering a
+ *     season page to publish nothing would be work, and load, for nothing;
+ *   - the host has set neither `AFLDB_REVALIDATE_URL` nor
+ *     `AFLDB_REVALIDATE_SECRET`, so it has not been provisioned for this and
+ *     stays on the documented rebuild-and-restart routine.
+ *
+ * A HALF-CONFIGURED or misconfigured host is NOT silent: `readRevalidateConfig`
+ * throws, and that is caught here and reported as a failed invalidation rather
+ * than as a failed settle — the data is already committed either way.
+ */
+async function maybeRevalidate(
+  deps: SettleCliDeps,
+  result: SettleRunResult,
+  season: number,
+  log: (line: string) => void,
+): Promise<RevalidateOutcome | null> {
+  if (!shouldRevalidateSeason(result)) return null;
+
+  let outcome: RevalidateOutcome;
+  try {
+    if (deps.revalidate) {
+      outcome = await deps.revalidate(season);
+    } else {
+      const config = readRevalidateConfig(deps.env ?? process.env);
+      if (!config) return null;
+      outcome = await revalidateSeason(config, season);
+    }
+  } catch (error) {
+    // revalidateSeason() does not throw; this is a bad configuration, or an
+    // injected boundary that did. Either way the settle itself is complete.
+    outcome = {
+      ok: false,
+      season,
+      path: null,
+      workersReached: [],
+      workerCount: 0,
+      attempts: 0,
+      failures: [error instanceof Error ? error.message : String(error)],
+    };
+  }
+  for (const line of renderRevalidateOutcome(outcome)) log(line);
+  return outcome;
+}
 
 /**
  * The CLI, as one callable so the whole path — flag parsing, bundle
@@ -287,7 +367,7 @@ export async function runSettleCli(
     if (args.report) {
       const report = await buildSettleExceptionReport(sql, { season: bundle.season });
       for (const line of renderSettleExceptionReport(report)) log(line);
-      return { args, result: null, report, sourceCompleteness: null };
+      return { args, result: null, report, sourceCompleteness: null, revalidation: null };
     }
 
     const result = await runSettleAfltables(sql, {
@@ -336,7 +416,7 @@ export async function runSettleCli(
         + `import_batches row. Re-run with --apply${args.autoApply ? ' --auto-apply' : ''} `
         + 'to keep it.',
       );
-      return { args, result, report: null, sourceCompleteness };
+      return { args, result, report: null, sourceCompleteness, revalidation: null };
     }
 
     const { counters } = result;
@@ -359,7 +439,16 @@ export async function runSettleCli(
     }
     const report = await buildSettleExceptionReport(sql, { season: bundle.season });
     for (const line of renderSettleExceptionReport(report)) log(line);
-    return { args, result, report, sourceCompleteness };
+
+    // AFLDB-ISSUE-134. Publish the season to the public ISR cache.
+    //
+    // AFTER THE COMMIT, ALWAYS. `runSettleAfltables()` has returned, so its
+    // transaction is closed and every canonical row is durable; nothing below
+    // can roll anything back, and nothing below is allowed to throw into the
+    // chain. A dry run never reaches this line, and an identical 0/0 rerun
+    // makes no request at all.
+    const revalidation = await maybeRevalidate(deps, result, bundle.season, log);
+    return { args, result, report, sourceCompleteness, revalidation };
   } finally {
     if (ownsClient) await sql.end({ timeout: 5 });
   }
@@ -376,6 +465,21 @@ async function main(): Promise<void> {
   //
   // `unknown` fails too. A run that recorded no counters has not shown the
   // source was covered, and "not shown" is not "shown to be fine".
+  // AFLDB-ISSUE-134. Same post-commit shape, same reasoning: a settle that
+  // landed the data but could not publish it has not finished its job, and a
+  // silent success would leave readers on a stale page with nothing in the
+  // journal to say why. The unit goes red; the data stays committed; the next
+  // nightly run is unaffected.
+  if (outcome.revalidation && !outcome.revalidation.ok) {
+    console.error('');
+    console.error(
+      `ISR invalidation failed for season ${outcome.revalidation.season}. The canonical data `
+      + 'IS committed; this exit code reports that the public season page was not invalidated '
+      + 'on every worker and may serve stale output until its ISR window expires.',
+    );
+    process.exitCode = 1;
+  }
+
   if (!outcome.args.requireCompleteSource || outcome.sourceCompleteness === null) return;
   if (outcome.sourceCompleteness.status === 'complete') return;
   console.error('');

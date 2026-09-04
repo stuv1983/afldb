@@ -7,8 +7,25 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-09-04
-**Open issues:** 5 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-125`,
-`AFLDB-ISSUE-126`, `AFLDB-ISSUE-134`, `AFLDB-ISSUE-137`.
+**Open issues:** 4 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-125`,
+`AFLDB-ISSUE-126`, `AFLDB-ISSUE-137`.
+
+<!-- UPDATE 2026-09-04 (ISSUE-134 closeout): `AFLDB-ISSUE-134` is **Resolved**. The settle now
+     publishes the season it committed to the public ISR cache, and the `404`-on-every-request
+     defect the first DEV acceptance found is repaired: gate 1 requires the forwarded client
+     address to RESOLVE TO LOOPBACK rather than requiring the forwarding headers to be absent,
+     which Next 16 makes meaningless by synthesising both on every request. Soundness rests on
+     the tracked proxy contract - both Caddyfiles overwrite `X-Forwarded-For` with
+     `{remote_host}` on every proxy block and drop `X-Real-IP`/`Forwarded`, and
+     `deploy/afldb.service` binds the app to `127.0.0.1` - and that contract is now asserted
+     statically so it cannot drift. Accepted on the real host: correct-secret loopback POST 200,
+     non-loopback/chained/malformed 404, wrong secret 401, four distinct worker ordinals reached
+     on fresh connections, `/seasons/2026` regenerated inside its hour against a control, and a
+     spoofed `X-Forwarded-For: 127.0.0.1` WITH the correct secret still refused through the real
+     Caddy proxy. Two real settle runs were 0/0 and published nothing. Branch
+     `claude/issue-134` is pushed but **NOT merged and NOT deployed to PROD** - that is the
+     operator's call. DEV was restored to `main` @ `169d738`. Evidence:
+     `issues/closed/AFLDB-ISSUE-134.md` §11-§12. -->
 
 <!-- UPDATE 2026-09-04 (ISSUE-127 closeout): `AFLDB-ISSUE-127` is **Resolved** — operator host
      validation completed on dev (`streamanator`, deployed revision `169d738`). The polkit grant
@@ -457,7 +474,6 @@ closure boundary, and the unrelated query-builder timing regression remains with
      merged. Authoritative records: the `AFLDB-ISSUE-136` entry in `issues.md` (Resolution, 2026-09-04)
      and `issues/closed/AFLDB-ISSUE-136.md` §13. Follow-up: `AFLDB-ISSUE-137`. -->
 | `AFLDB-ISSUE-137` | High | Data integrity / Operations / Database (production) | **NOT STARTED — allocated 2026-09-04 at the ISSUE-136 closeout; no production mutation authorised.** Production `afldb_prod` still holds the four canonical player splits that `AFLDB-ISSUE-136` fixes at rebuild time (Charlie Cameron, Jack Graham, Jack Ross, Jack Williams: a career player plus a 2025-only duplicate keyed on the renumbered AFL Tables url, the duplicate carrying the 2025 match rows, the awards-census rows and every 2026 settle row). The fixed importer HALTs (`external-identity split`) against such a database by design. Key files: `issues/closed/AFLDB-ISSUE-136.md` §10.3/§13.4 (verification SQL), `tools/migration/import_fitzroy_core.py`, `AFLDB-ISSUE-125` (promotion path). | Operator chooses (a) canonical rebuild-and-promote under `AFLDB-ISSUE-125`, or (b) a supervised, reviewed per-player identity reconciliation on production (re-point the renumbered identity, match rows, award rows and settle rows to the career player, recompute derived tables, retire the duplicate) after a production backup; first step of either is a read-only measurement of the production split. |
-| `AFLDB-ISSUE-134` | Low | Deployment / Operations / Frontend rendering (ISR) / Current-season settle | **NOT STARTED — allocated 2026-09-03 from the ISSUE-133 closeout (`issues/closed/AFLDB-ISSUE-133.md` §6 F4, §11.4); no branch, no worktree, no runbook.** A successful in-season settle changes canonical season data, but nothing in the settle path invalidates `/seasons/[year]`: `src/app/seasons/[year]/page.tsx` is ISR (`revalidate = 3600`, `generateStaticParams()`), the settle (`src/lib/acquisition/settle-afltables.ts`, `afldb-settle-afltables.timer`) runs out of process and `src/lib/acquisition/`/`deploy/` contain no `revalidatePath`/`revalidateTag` call, and `docs/deployment.md` "Cache invalidation" relies on a rebuild the automatic settle does not perform. Production can therefore serve season output up to one hour stale after every in-season settle. Proven on PROD in ISSUE-133: prerender 22:14:46 → settle batch 735 inserted the Wildcard Final rows 22:37:47 → window expired 23:14:46 → entry regenerated 23:50:48 AEST. In-process precedents: `src/app/admin/data-editor/actions.ts` (`revalidatePath('/', 'layout')`), `src/app/admin/current-season/actions.ts` (revalidates only `/admin/current-season`). Key files: `src/app/seasons/[year]/page.tsx`, `src/lib/acquisition/settle-afltables.ts`, `deploy/` (settle unit/timer, cluster supervisor), `docs/deployment.md`. **Exact next action:** (1) confirm no settle/timer-path invalidation exists and inventory the admin-action precedents; (2) investigate the correct Next.js mechanism — `revalidateTag('_N_T_/seasons/<season>')` (the deployed `2026.meta` tag) versus `revalidatePath` versus the documented rebuild — and where it can fire from an out-of-process settle (authenticated loopback internal route, post-settle systemd step, or rebuild), accounting for the per-worker in-memory ISR LRU; (3) define the transaction/deployment boundary (after commit, only the seasons/matches the batch changed per `canonical_applications`, idempotent on 0/0 reruns); (4) then runbook → implement on `claude/issue-134` → extend the closest settle test → validate on dev before production. No migration expected. No production write, purge, rebuild or restart authorised. |
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-131` (an upstream match rekey duplicates the canonical match
      instead of updating it) is **Resolved** and is NO LONGER an open issue. The fail-closed
      rekey-in-place fix is merged (`657a875`) and deployed; runbook §8's production acceptance is
