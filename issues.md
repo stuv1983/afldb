@@ -7,7 +7,8 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 4 tracked here — `AFLDB-ISSUE-110`, `-125`, `-126`, `-137`.
+**Open issues:** 3 tracked here — `AFLDB-ISSUE-110`, `-126`, `-137`.
+<!-- 2026-09-04: `-125` Resolved (production promotion procedure + read-only checker); 4 -> 3. -->
 <!-- Count corrected 2026-09-04: `-104` removed by its own closeout (Resolved — closed as not
      reachable under the current single-owner-per-`issue_type` contract); 7 -> 6. -->
 <!-- Count corrected 2026-09-04: `-124` removed by its own closeout (Resolved, see the RETIRED
@@ -150,7 +151,6 @@ created, reopened, resolved, or materially reclassified.
      `issues/closed/AFLDB-ISSUE-131.md` §16. Deferred, non-blocking: §9.4/§7 hardening index and
      §9.6/§5.2 `game_id`, both unmeasured and not adopted (§16.8). -->
 | `AFLDB-ISSUE-126` | Medium | Database / Admin / Security / Audit trail / Operations | The 2026-09-02 production canonical DB cutover replaced production-only application state along with the football data. The real super admin (`auth_users` id 1) was recovered from the pre-cutover backup and admin login was verified, but three sets of production-only rows were **not** restored and exist only in the recovery database `afldb_prod_auth_recovery`: `auth_audit_log` **92 rows**, `beta_access_codes` **1 row**, `site_settings` **11 rows** (plus whatever else the pre-cutover dump `/home/arm/afldb_prod_pre_rebuild_20260902-200355.dump` carries). Production currently runs with **0** rows in all three. The application does not break — `src/lib/site-settings.ts` falls back to compiled-in defaults — but 11 deliberate super-admin choices are silently reverted to those defaults, one beta access code is gone, and the admin audit trail has a hard discontinuity at the cutover. Old `auth_sessions` (17) were deliberately not restored and must stay unrestored; a fresh login is the correct posture. | **Not started. Decide, per table, restore vs. intentionally reset — do not restore blindly.** `site_settings`: diff the 11 recovered rows against `src/lib/site-settings.ts` defaults and restore only the rows that encode a real operator decision (note `DEFAULT_GRID_AUDIENCE` is already `super_admin`, matching the production posture). `beta_access_codes`: confirm the code is still wanted before reissuing; treat it as live credential material and never paste it into a tracked file. `auth_audit_log`: **never reconstruct an audit trail retroactively** — either restore the 92 rows with an explicit, auditable cutover marker row that says what happened, or record the gap deliberately in this issue and leave the log starting at the cutover. **`afldb_prod_auth_recovery` MUST NOT be dropped until this issue is resolved.** No password hash or TOTP secret may be reproduced in any tracked file. Requires production DML, so it is operator-supervised work, not a repository change. |
-| `AFLDB-ISSUE-125` | Medium | Operations / Deployment / Database / Data integrity | There is **no documented procedure for preserving production-only state when a clean rebuilt database is promoted to production.** `AFLDB-ISSUE-122`'s 2026-09-02 cutover proved the gap by hitting it: restoring the clean rebuilt `afldb_test` dump over `afldb_prod` replaced the broken 2026 football data correctly, but also replaced every application-owned, auth-owned and operations-owned table, and it promoted a **test fixture super admin** (`email-intake-test-fixture@afldb.test`) into production in place of the real one. The repository documents backup/restore and the migration rollout order (`AFLDB-ISSUE-027`), but nothing enumerates which tables are production-only and must survive a canonical rebuild promotion. Recovery worked only because a pre-cutover dump was taken first, which was operator discipline rather than a documented step. | **Not started. Prevention, not incident documentation.** Enumerate every production-only table — at minimum `auth_users`, `auth_sessions`, `admin_invites`, `auth_audit_log`, `beta_access_codes`, `beta_allowed_emails`, `beta_login_tokens`, `site_settings`, plus any operational/telemetry state (`app_health_events`, `nl_search_log`, `data_edits`, `data_overrides`, `data_issues`) that a rebuild would discard — and classify each as must-preserve, must-reset, or decide-per-promotion. Then write a documented promotion procedure into `docs/` (mandatory pre-cutover dump; restore football data only, or restore-then-reinstate; an explicit **refuse-if-a-test-fixture-identity-is-present** check so `*@afldb.test` can never become a production admin; a post-promotion verification checklist ending in a real admin login). Cross-check against `tools/maintenance/` backup/restore and `privileges.sql`, which is already mandatory after a restore. Related: `AFLDB-ISSUE-126` (the data still held from this incident), `AFLDB-ISSUE-027` (rollout order). |
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-124` is **Resolved** and is NO LONGER an open issue.
      `deploy/afldb.service` moved `StartLimitIntervalSec=120`/`StartLimitBurst=5` from `[Service]`
      to `[Unit]` (commit `146b3e0`, branch `claude/issue-124`), values unchanged; the other four
@@ -12886,13 +12886,19 @@ of already-reviewed tracked configuration, gated the same way production's was, 
 
 ## AFLDB-ISSUE-125 — No documented procedure preserves production-only state when a clean rebuilt database is promoted
 
-- **Status:** Open
+- **Status:** Resolved 2026-09-04
 - **Severity:** Medium
 - **Area:** Operations / Deployment / Database / Data integrity
 - **Found:** 2026-09-03 (`AFLDB-ISSUE-122` closeout; the 2026-09-02 production cutover hit the gap)
-- **Resolved:** N/A
-- **Files:** `docs/deployment.md`, `docs/operations/*`, `tools/maintenance/` (backup/restore), `tools/maintenance/privileges.sql`
-- **Related:** `AFLDB-ISSUE-126` (the data still held from this incident), `AFLDB-ISSUE-122` (the promotion that exposed it), `AFLDB-ISSUE-027` (migration-before-code rollout order)
+- **Resolved:** 2026-09-04 — repository procedure, table contract and read-only checker; DB-free
+  validation only, no production mutation performed or required. Runbook:
+  `issues/closed/AFLDB-ISSUE-125.md`.
+- **Files:** `docs/production-promotion.md` (new, the procedure), `tools/db/promotion-inventory.ts`
+  (new, the contract), `tools/db/promotion-check.ts` (new, `npm run db:promotion:check`),
+  `tests/db-promotion-check.test.ts` (new), `package.json`, `docs/deployment.md` §6b,
+  `docs/backup-restore.md` §5a; unchanged but load-bearing: `tools/maintenance/privileges.sql`,
+  `tools/maintenance/backup.sh`, `tools/maintenance/restore-test.sh`
+- **Related:** `AFLDB-ISSUE-126` (the data still held from this incident — untouched), `AFLDB-ISSUE-122` (the promotion that exposed it), `AFLDB-ISSUE-027` (migration-before-code rollout order), `AFLDB-ISSUE-137` (its path (a) is this procedure)
 
 ### Symptom
 
@@ -12930,6 +12936,52 @@ boundary, and nothing refused it.
    `privileges.sql`, which is already mandatory after any restore.
 4. Never copy test fixture identities into production, and never place a password hash or TOTP
    secret in a tracked file.
+
+### Resolution (2026-09-04)
+
+**Root cause.** The rebuild promotion was a whole-database `pg_restore` over `afldb_prod`, and
+nothing in the repository distinguished rebuilt data from production-owned state or refused a
+test identity at the authentication boundary.
+
+**Inventory.** Built from migrations 001–085, the 039/045 registries and `privileges.sql`, not
+from the issue text. The database already carries the split: every `public` table in
+`afldb_meta.import_writable_tables` (41) is football data the rebuild produces; the other 23
+`public` tables plus `staging` (rebuilt) and `staging_aflw` (**not** produced by the rebuild —
+reinstated) each have an explicit treatment in `tools/db/promotion-inventory.ts`: 18 reinstate
+(`auth_users` first, in FK order, `auth_audit_log` plus an explicit `database.promoted` marker,
+`data_overrides` plus a replay onto the promoted rows), 3 reset (`auth_sessions`,
+`beta_login_tokens`, `promotion_decisions` — the last a recorded gap because its candidates are
+rebuilt), 1 regenerate (`player_link_match_candidates`), 1 rebuilt (`canonical_applications`).
+`site_media`, `beta_join_requests`, submissions, player-link tables, NL review/feedback and AFLW
+were production-only and not in the original list; `data_issues` is import-owned and is not.
+
+**Procedure** (`docs/production-promotion.md`). Restore the rebuilt dump into a NEW
+`afldb_prod_candidate_<stamp>`, truncate every non-rebuilt table there, reinstate
+production-owned rows per table from the mandatory, sha256'd, restore-proven pre-cutover dump,
+re-sync identity sequences, write the audit marker, run `privileges.sql`, accept, then swap by
+`ALTER DATABASE … RENAME` (old kept as `afldb_prod_pre_rebuild_<stamp>`; rollback is the two
+renames reversed). Football-data-only import into the live database was evaluated and rejected
+(§11 of the procedure): production would change at the first truncate, FK/sequence/migration
+state would be hand-managed, and rollback would be a restore.
+
+**Tooling** (`npm run db:promotion:check`, read-only by construction — server-enforced
+`default_transaction_read_only`, no psql/spawn path, asserted by test). Phases `source`,
+`pre-cutover`, `restored`, `candidate`, `production`, each bound to one database shape by name;
+gates: identity, fail-closed classification (a public table in neither set or in both refuses),
+migration parity with the checkout, **test-fixture identities** (reserved-domain predicate —
+`.test`/`.example`/`.invalid`/`.localhost`, `example.com/net/org`, malformed — over every
+email-bearing table, refusing in `pre-cutover`/`candidate`/`production`), expected super admin
+present/enabled/enrolled, `--snapshot`/`--compare` of production-owned counts per rule,
+privileges probes, dangling-reference probe against the old database, optional catalog
+fingerprint; `--plan` writes the truncate/reinstate/re-sync/marker files, `--checklist` prints
+the 18-item acceptance list.
+
+**Validation.** `tests/db-promotion-check.test.ts` 37/37; `tsc --noEmit` and ESLint clean;
+checklist, plan generation and two refusal paths exercised without a database. A live
+read-only `source` run on `afldb_test` was not possible from this session (dev host refuses
+non-interactive SSH; workstation has no PostgreSQL) and is the operator's first step of the
+next promotion (runbook §7). `afldb_prod` was not connected to. ISSUE-126 and ISSUE-137
+untouched.
 
 ---
 

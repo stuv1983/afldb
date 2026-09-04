@@ -245,6 +245,17 @@ contracts and the explicit-decision ledger. **It has no `AFLDB_LEGACY_SQLITE` de
 and the retired `tools/migration/import_draft.py` is never invoked. A Stage B3 person-page
 bridge is optional and absent by default; unbridged persons stay `unmatched`.
 
+## 6b. Promoting a rebuilt database to production (`AFLDB-ISSUE-125`)
+
+A rebuilt `afldb_test` is **never restored over `afldb_prod`**. It is restored into a new
+candidate database on the production host, every production-owned table in the candidate
+is reinstated from the mandatory pre-cutover backup, a read-only checker refuses any
+test-fixture identity, and only then are the two databases renamed. The full procedure,
+the per-table contract and the rollback are in
+[production-promotion.md](production-promotion.md); the checker is
+`npm run db:promotion:check` (`tools/db/promotion-check.ts`, read-only by construction) and
+the contract is `tools/db/promotion-inventory.ts`.
+
 ## 7. Data refresh
 
 Run in this order. Each step is idempotent and safe to repeat.

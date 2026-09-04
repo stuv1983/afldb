@@ -17,6 +17,7 @@
     "db:test:rebuild": "tsx tools/db/rebuild-test.ts",
     "db:test:prove-reset": "tsx tools/db/prove-reset.ts",
     "db:test:fingerprint": "tsx tools/db/fingerprint-test.ts",
+    "db:promotion:check": "tsx tools/db/promotion-check.ts",
     "current-season:update": "tsx tools/current-season/update-current-season.ts",
     "settle:afltables": "tsx tools/current-season/settle-afltables.ts",
     "records:first-kick-goal": "tsx --conditions=react-server tools/records/import-first-kick-goal.ts",

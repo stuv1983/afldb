@@ -15,6 +15,35 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-125 — promoting a rebuilt database to production without losing production-only state - 4 September 2026
+
+- **The gap.** The 2026-09-02 cutover restored the rebuilt `afldb_test` dump over `afldb_prod`,
+  replacing every application-, auth- and operations-owned table along with the football data
+  and promoting a test fixture super admin. Nothing in the repository enumerated
+  production-only tables or refused a test identity.
+- **The procedure** (`docs/production-promotion.md`). The rebuilt dump is restored into a new
+  `afldb_prod_candidate_<stamp>`; every non-rebuilt table in the candidate is truncated and
+  reinstated from the mandatory, hashed, restore-proven pre-cutover backup in foreign-key
+  order; identity sequences are re-synced; a `database.promoted` row is written to the
+  reinstated audit log; `privileges.sql` runs; acceptance passes; then the two databases are
+  renamed (`afldb_prod` → `afldb_prod_pre_rebuild_<stamp>`, kept). Rollback is the renames
+  reversed. `auth_sessions`, `beta_login_tokens` and `promotion_decisions` are reset by
+  decision; `data_overrides` are replayed onto the promoted rows; `staging_aflw` is reinstated
+  because the rebuild never produces it.
+- **The contract** (`tools/db/promotion-inventory.ts`). Every `public` table is either in
+  `afldb_meta.import_writable_tables` (rebuilt data) or has an explicit treatment; the two
+  acquisition schemas are decided by ownership. A table in neither set, or in both, is a refusal.
+- **The checker** (`npm run db:promotion:check`, read-only by construction). Phases `source`,
+  `pre-cutover`, `restored`, `candidate`, `production`, each bound to one database name; gates
+  for identity, classification, migration parity, **test-fixture identities** (any address on a
+  reserved domain — `.test`, `.example`, `.invalid`, `.localhost`, `example.com/net/org` — in
+  any email-bearing table refuses), the expected super admin, counts against the pre-cutover
+  snapshot, reconciled grants and dangling references into rebuilt data; `--plan` generates the
+  truncate/reinstate/re-sync/marker files, `--checklist` prints the acceptance list.
+- **Validation.** 37 DB-free tests (`tests/db-promotion-check.test.ts`) pin the contract against
+  the migration files, the predicate in both its TypeScript and SQL forms, the generated plan
+  and the checker's read-only property. No production database was touched.
+
 ### AFLDB-ISSUE-134 — a settled season is published to the public cache instead of waiting out its ISR hour - 4 September 2026
 
 - **The limitation.** `/seasons/[year]` is ISR (`revalidate = 3600`, every season prerendered at

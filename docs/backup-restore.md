@@ -116,6 +116,16 @@ Backups currently live on the same host as the database, which protects against 
 
 `.env` is the one item with no automated recovery path. Losing it means regenerating role passwords, which the install script does idempotently.
 
+## 5a. Restoring a rebuilt database over production is not a restore
+
+Replacing production's football data with a clean rebuilt `afldb_test` is a **promotion**,
+not a disaster recovery, and §6 below must not be used for it: a whole-database restore
+replaces `auth_users`, `site_settings`, `auth_audit_log`, `site_media`, `staging_aflw` and
+every other production-only table with the test database's content (the 2026-09-02
+incident, `AFLDB-ISSUE-122` §S8). Use [production-promotion.md](production-promotion.md),
+which restores into a candidate, reinstates production-owned state from the pre-cutover
+backup, and checks for test-fixture identities before anything is renamed.
+
 ## 6. Full disaster recovery
 
 ```bash
