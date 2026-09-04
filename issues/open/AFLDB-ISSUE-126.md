@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-126 — Production-only state from the 2026-09-02 cutover, held only in `afldb_prod_auth_recovery`
 
-- **Status:** Open — operator approved T1/T2/T5/T6 (T4 retired) 2026-09-04; **T0 green, rehearsals green, PAUSED before any DML** on a rehearsal side effect (§7.5); no production row written
+- **Status:** Open — **EXECUTED on PROD 2026-09-04 20:33–20:37 AEST** (T1, T2, T5, T6 committed; T4 and every other retirement recorded); database-level acceptance **all PASS** (§8); **awaiting the operator's browser acceptance (super-admin login + admin/home/AFLW pages)** before close-out
 - **Severity:** Medium
 - **Area:** Database / Admin / Security / Audit trail / Operations
 - **Branch:** `claude/issue-126` (worktree `D:\dev\afldb-issue-126`)
@@ -501,9 +501,195 @@ Resume path after (a): `bash /home/arm/i126_run.sh t1` (rehearsal, now sequence-
 `bash /home/arm/i126_run.sh t1 commit` → `t2 commit` → `t5 commit` → `t6` (rehearse, inspect the
 live detail) → `t6 commit` → `bash /home/arm/i126_run.sh verify`, then §8 and close-out.
 
-## 8. Post-checks
+### 7.6 Resume — operator approved §7.5 option (a) (2026-09-04, second approval)
 
-_(not yet run — execution paused at §7.5 before any commit)_
+Verbatim: reset only `SELECT setval('auth_audit_log_id_seq', 26, true);` after verifying hostname,
+database, 11 rows, max id 26, sequence 182 and the recovery database; verify afterwards that no
+audit row was inserted, updated or deleted; then resume T1 → T2 → T5 → T6 exactly as approved,
+keeping every fail-closed assertion; record evidence after each committed unit; T4 and every other
+retirement unchanged; keep the recovery database, the T0 backup, its off-host copy and the export
+artefacts; stop at the browser-login acceptance boundary if it cannot be performed from the session.
+
+#### 7.6.1 Sequence reset (`/home/arm/i126_reset.sh`, log `reset-20260904-203310.log`) — **GREEN**
+
+| | Before (20:33:10 AEST) | After |
+|---|---|---|
+| `hostname` / `current_database()` | `afldb-prod` / `afldb_prod`; read-write session; `afldb_prod_auth_recovery` present | — |
+| `auth_audit_log` rows / ids | **11**, 16–26 | **11**, 16–26 |
+| full-row fingerprint (md5 of every column of every row, ordered by id) | `49f196f1038e6f0169aabe2aad3be2cf` | `49f196f1038e6f0169aabe2aad3be2cf` — **identical: no row inserted, updated or deleted** |
+| `auth_audit_log_id_seq` | 182 (`is_called t`) | **26 (`is_called t`)** — the exact T0 value |
+
+Production mutation performed: one `setval('auth_audit_log_id_seq', 26, true)`. Nothing else.
+
+#### 7.6.2 T1 — `auth_audit_log` (logs `t1-rehearse-20260904-203345.log`, `t1-commit-20260904-203345.log`, `verify-rehearse-20260904-203345.log`) — **COMMITTED, GREEN**
+
+Rehearsal (sequence-safe script, 20:33:45 AEST): `COPY 92`; preconditions OK (staged 92, ids
+90–181; production 11, ids 16–26; sequence 26); `INSERT 0 92`; post-check OK (103 / 92 / 181 / 11);
+`ROLLBACK`; the sequence was not touched.
+
+Commit (20:33:45 AEST, `-v commit=1`): identical preconditions and post-check; `sequence_now 181`;
+`COMMIT`; `T1 COMMITTED`.
+
+| Evidence (read-only verify at 20:33:45) | Before | After |
+|---|---|---|
+| `auth_audit_log` rows | 11 | **103** |
+| restored rows with original ids 90–181 | 0 | **92** |
+| post-cutover rows ids 16–26 | 11 | **11** (untouched) |
+| `max(id)` / `auth_audit_log_id_seq` | 26 / 26 | **181 / 181** (`is_called t`) |
+| `database.recovered` markers | 0 | 0 (T6 pending) |
+| id-order vs `at`-order breaks | — | restored block **0**, post-cutover block **0** |
+| seam in `at` order | — | id 90 (2026-08-16 13:28:19) … id 181 (2026-09-02 10:16:18) → id 16 (2026-09-03 06:23:06) … id 26 (2026-09-04 13:13:42) |
+| last row by `at` | id 26 | id 26 (the marker will follow) |
+
+Action histogram after T1 (19 actions): `admin.login` 24, `admin.login_failed` 14,
+`access.code_created` 2, `beta.code_redeemed` 1, `beta.code_rejected` 2, `settings.saved` 17,
+`content.saved` 11, `content.published` 10, `content.media_uploaded` 1, `beta.join_requested` 3,
+`settings.test_email` 5, `nl_search.exported` 1, `player_link.linked` 3, `data_edit.saved` 2,
+`player_link.confirmed_unlinked` 3, `player_link.suggestions_refreshed` 1, `admin.invited` 1,
+`admin.invite_accepted` 1, `admin.logout` 1. Everything else still as at T0: `site_settings` 0,
+`site_media` 0, `beta_access_codes` 1 (`me`, `use_count` 0), `beta_join_requests` 0,
+`auth_sessions` 7 / 0 pre-cutover / 2 live, `staging_aflw.*` all 0, recovery database present.
+`/api/health` `{"status":"ok","database":"ok","latencyMs":1}`; `/` and `/aflw` 307 → `/beta`
+(beta gate, unchanged); `/beta` 200; `/admin/login` 200.
+
+#### 7.6.3 T2 — `site_settings` + `site_media` (logs `t2-commit-20260904-203450.log`, `verify-rehearse-20260904-203450.log`) — **COMMITTED, GREEN**
+
+Commit (20:34:50 AEST, `-v commit=1`; rehearsed green at 20:19:56, no sequence involved): `COPY 7`,
+`COPY 1`; preconditions OK (production `site_settings` 0 and `site_media` 0; 7 staged rows with
+exactly the §3.3 keys and md5s, `updated_by` 1; media row `screenshot-2026-08-16-175814.png`,
+81,118 = `length(bytes)`, `image/png`, 1903×909; `auth_users` 1 is the super admin); `INSERT 0 7`,
+`INSERT 0 1`; post-check OK (7 / 1); `COMMIT`; `T2 COMMITTED`.
+
+| Evidence (read-only verify at 20:34:50) | Before | After |
+|---|---|---|
+| `site_settings` rows | 0 | **7** — `apex.content` (`ae55790b…5979`, 2026-08-16 21:57:55), `early_access.intro` (`374e60c9…fa61`), `early_access.notify` (`ebc57622…1d2a`), `early_access.questions` (`80997371…1a17`), `home.aflw_leaders` (`5e77934b…12de`), `home.record_of_the_week` (`bbf84626…ce22`) (all 2026-08-19 00:04:12), `site.footer` (`84df03c0…43b2`, 2026-08-16 21:57:55); every `updated_by` = 1; every md5 equals the recovery value |
+| retired default-equal keys (`early_access.notify_to`, `early_access.open`, `grid_solver.audience`, `home.sections`) | absent | **absent** (defaults in force) |
+| `site_media` rows | 0 | **1** — `screenshot-2026-08-16-175814.png`, `image/png`, `byte_size` 81,118 = `length(bytes)` 81,118, 1903×909, uploaded 2026-08-16 17:59:45 by user 1 |
+| `auth_audit_log` | 103 / max 181 / seq 181 | **unchanged** (103 / 181 / 181; 0 markers) |
+| everything else | as after T1 | unchanged: `beta_access_codes` 1 (`me`), `beta_join_requests` 0, `auth_sessions` 7 / 0 pre-cutover / 2 live, `staging_aflw.*` 0, recovery database present |
+
+`/api/health` ok; `/beta` 200, `/admin/login` 200, `/` and `/aflw` 307 → `/beta` (beta gate).
+The `/beta` HTML grep for the restored question keys finds none before or after T2 (the code-entry
+page does not render the early-access questions server-side), so the restored form content is
+confirmed at the database level here and visually in the operator's browser pass.
+
+#### 7.6.4 T5 — `staging_aflw.*` from the pre-cutover dump (logs `t5-commit-20260904-203537.log`, `verify-rehearse-20260904-203541.log`) — **COMMITTED, GREEN**
+
+Commit (20:35:37 → 20:35:41 AEST, `--commit`; rehearsed green at 20:21:45): host `afldb-prod`,
+`current_database()` `afldb_prod`, recovery database present; the dump lists `TABLE DATA` for all
+eight tables and each `--schema=staging_aflw --table=<t>` selection resolves to exactly one entry;
+all eight target tables empty. Eight `pg_restore --data-only --no-owner --no-privileges
+--single-transaction --exit-on-error` runs in FK order, each count asserted immediately after:
+
+| Table | Before | After | Expected |
+|---|---|---|---|
+| `staging_aflw.seasons` | 0 | **11** | 11 |
+| `staging_aflw.fixtures` | 0 | **818** | 818 |
+| `staging_aflw.matches` | 0 | **710** | 710 |
+| `staging_aflw.ladders` | 0 | **144** | 144 |
+| `staging_aflw.player_seasons` | 0 | **3,972** | 3,972 |
+| `staging_aflw.player_match_stats` | 0 | **29,878** | 29,878 |
+| `staging_aflw.scoring_events` | 0 | **15,483** | 15,483 |
+| `staging_aflw.issues` | 0 | **2** | 2 |
+| total | 0 | **51,018** | 51,018 |
+
+`setval('staging_aflw.issues_id_seq', max(id), true)` → 2 (`is_called t`, was 1 / `f`). AFLW read
+model: `aflw.seasons` **11**, `aflw.matches` **710**, `aflw.players` **960** (were 0 / 0 / 0).
+`T5 COMMITTED`. No grants changed (`afldb_app` already held SELECT on the schema).
+
+Read-only verify at 20:35:41: `auth_audit_log` unchanged (103 / 92 restored / 11 post-cutover /
+max 181 / seq 181 / 0 markers); `site_settings` 7 and `site_media` 1 unchanged; `beta_access_codes`
+1 (`me`); `beta_join_requests` 0; `auth_sessions` 7 / 0 pre-cutover / 2 live; recovery database
+present; `/api/health` `{"status":"ok","database":"ok","latencyMs":0}`; `/beta` 200,
+`/admin/login` 200, `/` and `/aflw` 307 → `/beta` (beta gate).
+
+#### 7.6.5 T6 — `database.recovered` marker (logs `t6-preview-20260904-2037*.log`, `t6-commit-20260904-203722.log`, `verify-rehearse-20260904-203722.log`) — **COMMITTED, GREEN**
+
+Rehearsal substitute (20:37:13 AEST, read-only): a literal re-rehearsal of T6 would have consumed
+`nextval` (non-transactional, §7.5) and put the real marker on id 183 with an unexplained hole at
+182, contradicting the approved plan ("the real marker gets 182"). Instead
+`/home/arm/i126_t6preview.sql` — the T6 `jsonb_build_object(...)` expression lifted verbatim from
+the shipped script (lines 45–77) and wrapped in `SELECT jsonb_pretty(...)` — was run under
+`default_transaction_read_only = on`: 0 existing markers, sequence 181 (`is_called t`), and the
+detail computed from live state read `restored_rows 92`, `post_cutover_rows_written_before_recovery
+11`, `site_settings_restored` = the 7 keys, `site_media_restored 1`, `staging_aflw_restored_rows
+51018`, `beta_join_requests_restored 0`, `retired` naming `beta_access_codes`, `auth_sessions`,
+`data_edits`, `player_link_resolutions`, `player_link_suggestions`, `player_link_match_candidates`,
+`nl_search_log` and `beta_join_requests`. (T6 itself had been rehearsed mechanically at 20:21:46.)
+
+Commit (20:37:22 AEST, `-v commit=1`): precondition OK (no marker); `INSERT 0 1` → **id 182**,
+`at` **2026-09-04 20:37:22.755022+10**, `actor_user_id` NULL, `actor_label`
+`operator: cutover recovery (AFLDB-ISSUE-126)`, `action` `database.recovered`; post-check OK
+(exactly one marker and it is the max id); the committed `detail` is identical to the preview
+above; `COMMIT`; `T6 COMMITTED`.
+
+### 7.7 Production mutations performed (complete list, `afldb_prod`, 2026-09-04 AEST)
+
+| # | Time | Unit | Statement(s) | Effect |
+|---|---|---|---|---|
+| 0 | 20:10 | T0 | `backup.sh`, `restore-test.sh` | no change to `afldb_prod`; backup file written; `afldb_restore_test` rebuilt |
+| r | 20:19–20:21 | rehearsals | T1 `setval(181)` (survived ROLLBACK), T6 `nextval` (survived ROLLBACK) | `auth_audit_log_id_seq` 26 → 182; **no row** |
+| 1 | 20:33:10 | reset (§7.5 a) | `setval('auth_audit_log_id_seq', 26, true)` | sequence 182 → 26; rows fingerprint-identical |
+| 2 | 20:33:45 | T1 | `INSERT … OVERRIDING SYSTEM VALUE` 92 rows; `setval('auth_audit_log_id_seq', 181, true)` | `auth_audit_log` 11 → 103; sequence 26 → 181 |
+| 3 | 20:34:50 | T2 | `INSERT` 7 `site_settings`; `INSERT` 1 `site_media` | 0 → 7; 0 → 1 |
+| 4 | 20:35:37–41 | T5 | 8 × `pg_restore --data-only --single-transaction`; `setval('staging_aflw.issues_id_seq', 2, true)` | `staging_aflw.*` 0 → 51,018; sequence 1 (`f`) → 2 (`t`) |
+| 5 | 20:37:22 | T6 | `INSERT` 1 `auth_audit_log` (identity default) | 103 → 104; sequence 181 → 182 |
+
+Nothing else was written to `afldb_prod`. Not touched: `auth_users`, `auth_sessions`,
+`admin_invites`, `beta_access_codes`, `beta_join_requests` (and its sequence, still 1 / `f`),
+`data_edits`, `data_overrides`, `player_link_*`, telemetry, all football data, grants,
+`afldb_prod_auth_recovery`. Rollback of everything above is §5's per-unit rollback or the T0 backup.
+
+## 8. Post-checks — final verification (read-only, `afldb_prod`, 2026-09-04 20:37:22 AEST, log `verify-rehearse-20260904-203722.log`)
+
+| Requirement (operator's acceptance list) | Evidence | Result |
+|---|---|---|
+| Restored historical audit rows present with original ids | 92 rows with ids 90–181, `at` 2026-08-16 13:28:19.054484 → 2026-09-02 10:16:18.319137 | **PASS** |
+| Current post-cutover audit rows still present | 11 rows with ids 16–26, `at` 2026-09-03 06:23:06 → 2026-09-04 13:13:42, byte-identical (fingerprint `49f196f1…e2cf` unchanged through the reset) | **PASS** |
+| Explicit `database.recovered` marker present | exactly 1: id 182, 2026-09-04 20:37:22.755022+10, actor NULL, label `operator: cutover recovery (AFLDB-ISSUE-126)`; detail as §7.6.5 | **PASS** |
+| Audit chronology does not falsely imply uninterrupted continuity | the marker states the cutover, the source, the restored id/`at` ranges, that ids 16–26 were written after 90–181, the gaps (< 90 absent in the source; 1–15 absent here) and every retired set; id order = `at` order inside each block (0 breaks in `restored 90–181`, `post-cutover 16–26`, `after recovery`); by `at` the log reads 90 … 181 → 16 … 26 → 182; last by `at` = max id = marker id = 182 | **PASS** |
+| Exactly the 7 intended `site_settings` overrides restored | `apex.content`, `early_access.intro`, `early_access.notify`, `early_access.questions`, `home.aflw_leaders`, `home.record_of_the_week`, `site.footer`; md5s equal the recovery values; `updated_by` 1; the 4 default-equal keys absent | **PASS** |
+| Required `site_media` row present | `screenshot-2026-08-16-175814.png`, `image/png`, 81,118 bytes = `length(bytes)`, 1903×909 | **PASS** |
+| Spent beta code not restored | `beta_access_codes` = 1 row: id 1 `me`, unlimited, `use_count` 0, created 2026-09-04 12:51; no `screenGrabs` | **PASS** |
+| Recovery sessions not restored | `auth_sessions` with `created_at` < 2026-09-03: **0** | **PASS** |
+| Current production sessions unaffected | `auth_sessions` 7 rows, 2 live, oldest 2026-09-03 06:23:06 — identical to T0 | **PASS** |
+| All eight `staging_aflw` tables restored with expected counts | seasons 11, fixtures 818, matches 710, ladders 144, player_seasons 3,972, player_match_stats 29,878, scoring_events 15,483, issues 2 (= 51,018); `aflw.seasons` 11, `aflw.matches` 710, `aflw.players` 960; `issues_id_seq` 2 | **PASS** |
+| Application health green | `/api/health` `{"status":"ok","database":"ok","latencyMs":1}`; `/beta` 200, `/admin/login` 200; `/` and `/aflw` 307 → `/beta` (beta gate, unchanged) | **PASS** |
+| Real production super-admin login succeeds | **not performed from this session** — no credential is (or should be) available to it; the login path is exercised only indirectly (T6 inserted through the same identity default the app uses; `/admin/login` renders) | **PENDING — operator** |
+| `afldb_prod_auth_recovery` intact | present at every verify; never connected to read-write | **PASS** |
+| Backups intact | T0 dump on host + `.sha256`; off-host copy verified; pre-cutover dump untouched | **PASS** |
+
+Final state: `auth_audit_log` **104** rows (92 + 11 + 1), ids 16–26 and 90–182, `auth_audit_log_id_seq`
+**182** (`is_called t`, next id 183); `site_settings` **7**; `site_media` **1**; `beta_access_codes` 1;
+`beta_join_requests` 0 (sequence 1 / `f`); `auth_sessions` 7; `staging_aflw` **51,018**;
+`afldb_prod_auth_recovery` present; `/home/arm/i126/` holds the 4 export CSVs and every unit log;
+`/home/arm/i126_*` holds the shipped scripts.
+
+### 8.1 Operator browser acceptance (the one open item)
+
+1. `https://beta.afldb.com/admin/login` → sign in as the super admin (password + TOTP). Expect the
+   admin dashboard. This writes a fresh `admin.login` row — it should take **id 183**, after the marker.
+2. Admin dashboard recent-activity list (newest first): your login, then `database.recovered`
+   (2026-09-04 20:37), then `admin.logout` (2026-09-04 13:13), then the ISSUE-137 rows, then the
+   August history should be reachable/visible where the UI lists older rows.
+3. `/admin/settings`: Record of the week = **most Brownlow votes**; AFLW leaders = **games**;
+   early-access intro = "AFLDB is in closed beta. Leave your email and we will be in touch as
+   places open up."; notify = **on** (to `requests@afldb.com`, the default); **14** questions
+   (`interest` … `skills`). Do not press Save unless you mean to (a save rewrites every key,
+   including the four default-equal ones, and bumps `updated_at`).
+4. `/admin/content`: the apex document loads with hero heading "Every player. Every game. Since
+   1897 - Present." and the media library lists `screenshot-2026-08-16-175814.png` (81 KB,
+   1903×909). Do not publish unless you mean to.
+5. `/admin/access`: exactly one code, label `me`, unlimited, 0 uses; no `screenGrabs`.
+6. Home page (with your beta cookie): record of the week shows Brownlow votes, AFLW leaders shows
+   games. If the page still shows the old choice, it is the ISR cache (revalidates on its own
+   schedule) — reload after the window or trigger a revalidation; the database is correct.
+7. `/aflw`: seasons 2017–2026 (incl. 2022 Season 7) listed; a season and a match page render.
+8. Optional SQL cross-check after step 1 (read-only, owner DSN):
+   `SELECT id, at, action FROM auth_audit_log ORDER BY at DESC LIMIT 3;` → 183 `admin.login`,
+   182 `database.recovered`, 26 `admin.logout`.
+
+Report the outcome of 1–7; any deviation is a stop, not something to fix in place.
 
 ## 9. `afldb_prod_auth_recovery` retention
 
@@ -515,11 +701,12 @@ backup retention regardless.
 
 ## 10. Exact next action
 
-**Paused before any DML (§7.5).** Operator: choose (a) or (b) in §7.5 — (a) is a single
-`setval('auth_audit_log_id_seq', 26, true)` on `afldb_prod` as the owner role, restoring the exact
-pre-rehearsal value — and say so. Then, on `afldb-prod`, the resume path in §7.5 (each approved unit
-rehearsed then committed, one at a time, evidence into §7/§8), the §5 post-checks, the operator's
-browser pass (super-admin login; `/admin/settings`, `/admin/content`, `/admin/access`, home,
-`/aflw`), and close-out: resolve the ledger entry, retire the index row, move this file to
-`issues/closed/`, delete `/home/arm/i126/` and `/home/arm/i126_*`, commit on `claude/issue-126`,
-push, do not merge. `afldb_prod_auth_recovery` and the T0 backup stay until then.
+**Operator:** run §8.1 (browser acceptance) and report. **Then, next session (close-out only, no
+further production DML):** mark the ledger entry Resolved with the §7/§8 evidence, retire the
+`IssuesIndex.md` row, move this file and its scripts to `issues/closed/`, update `CHANGELOG.md`'s
+entry to "accepted", delete `/home/arm/i126/` and `/home/arm/i126_*` on the host, commit on
+`claude/issue-126`, push, do not merge. `afldb_prod_auth_recovery` is dropped only under a separate
+approval after that (§9); the T0 backup follows normal retention. Later, through the UI and outside
+this issue: re-apply the Kelly Robinson `dob`/`birth_year` corrections on production player **8065**
+via `/admin/data-editor` (§3.9), redo any wanted player-link decisions and refresh the candidates via
+`/admin/player-links` (§3.10). ISSUE-137 was not touched.

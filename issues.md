@@ -13085,10 +13085,30 @@ per-table selection assertion; T6 green. **Paused before any commit:** the T1 re
 (rows untouched: 11, ids 16–26). T1's `setval` now runs only in its commit branch. Runbook §7
 holds the evidence; §7.5 the decision.
 
-**Next action:** operator chooses runbook §7.5 (a) — `setval('auth_audit_log_id_seq', 26, true)`
-on `afldb_prod` as owner, restoring the exact pre-rehearsal value (recommended) — or (b); then the
-resume path in §7.5 (each unit rehearsed then committed one at a time), §5 post-checks, browser
-pass, close-out.
+### Progress — 2026-09-04 20:33–20:37 AEST (EXECUTED on PROD; database-level acceptance all PASS)
+
+Operator approved runbook §7.5 option (a). On `afldb-prod`/`afldb_prod`, one unit at a time, each
+verified read-only and recorded before the next: sequence reset `setval('auth_audit_log_id_seq',
+26, true)` (182 → 26; every audit row fingerprint-identical before/after); **T1** 92 audit rows
+inserted with original ids 90–181, sequence → 181 (rehearsed first with the sequence-safe script);
+**T2** the 7 override `site_settings` rows and the 1 `site_media` row; **T5** all eight `staging_aflw`
+tables from the pre-cutover dump (11 / 818 / 710 / 144 / 3,972 / 29,878 / 15,483 / 2 = 51,018;
+`aflw.seasons` 11, `aflw.matches` 710, `aflw.players` 960; `issues_id_seq` → 2); **T6** the
+`database.recovered` marker as id 182 at 20:37:22 (its detail, previewed read-only from live state
+instead of re-rehearsed, so as not to burn id 182: 92 restored rows, 11 post-cutover rows, the 7
+keys, 1 media row, 51,018 AFLW rows, every retirement named incl. the join request). Final:
+`auth_audit_log` 104 rows (ids 16–26, 90–182), sequence 182; id order = `at` order in every block;
+by `at` the log reads 90…181 → 16…26 → 182. Not restored, as approved: the join request, the
+spent beta code (`beta_access_codes` still only `me`), the 17 expired sessions (0 pre-cutover
+sessions; the 7 current ones untouched), `data_edits`, player-link rows, telemetry. `/api/health`
+ok. `afldb_prod_auth_recovery`, the T0 backup `afldb_prod-20260904-201037.dump` (host + off-host,
+sha256 verified) and the host export/logs are retained. Runbook §7.6–§7.7 hold every mutation and
+count; §8 the acceptance matrix.
+
+**Next action:** operator runs the browser acceptance in runbook §8.1 (real super-admin login,
+`/admin/settings`, `/admin/content`, `/admin/access`, home, `/aflw`) and reports; then close-out per
+runbook §10 (resolve, retire the index row, move the runbook to `issues/closed/`, delete the host
+scratch, commit, push, no merge). The recovery database is dropped only under a separate approval.
 
 ---
 

@@ -15,6 +15,29 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-126 — production-only state recovered after the 2026-09-02 cutover - 4 September 2026
+
+- **Recovered on `afldb_prod`** (from `afldb_prod_auth_recovery` and the pre-cutover dump,
+  operator-approved per table, every script rehearsed and then committed one unit at a time
+  behind fail-closed count assertions): the 92 pre-cutover `auth_audit_log` rows with their
+  original ids 90–181 plus an explicit `database.recovered` marker (id 182) that names the
+  cutover, the source, the restored and post-cutover id ranges, the gaps and every retired
+  set; the 7 `site_settings` rows that encoded operator choices (apex document and footer,
+  early-access intro/notify/questions, home record-of-the-week and AFLW leaders) together
+  with the `site_media` row the apex page references; and all eight `staging_aflw` tables
+  (51,018 rows), so the public AFLW read model is populated again.
+- **Deliberately not restored:** the 4 default-equal settings, the spent single-use beta
+  code, 17 expired sessions, the pending join request, 2 `data_edits` and 8 player-link rows
+  whose entity ids did not survive the rebuild (to be redone through the admin UI on the
+  current ids), and pre-cutover telemetry whose ids collide.
+- **Scripts** `issues/open/AFLDB-ISSUE-126-*.{sh,sql}` (commit-gated). Rehearsal found and
+  fixed two defects: a `grep -q` under `pipefail` that refused on SIGPIPE, and a `setval`
+  that survived `ROLLBACK` because sequences are non-transactional — it now runs only in the
+  commit branch, and the operator-approved reset restored the sequence before T1.
+- Acceptance is complete at the database level; the operator's browser pass (super-admin
+  login, admin pages, home, `/aflw`) is the remaining step before the issue closes. The
+  recovery database and the T0 backup are retained until then.
+
 ### AFLDB-ISSUE-125 — promoting a rebuilt database to production without losing production-only state - 4 September 2026
 
 - **The gap.** The 2026-09-02 cutover restored the rebuilt `afldb_test` dump over `afldb_prod`,
