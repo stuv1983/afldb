@@ -145,7 +145,6 @@ created, reopened, resolved, or materially reclassified.
      Authoritative records: the `AFLDB-ISSUE-131` entry below (Resolution, 2026-09-04) and
      `issues/closed/AFLDB-ISSUE-131.md` §16. Deferred, non-blocking: §9.4/§7 hardening index and
      §9.6/§5.2 `game_id`, both unmeasured and not adopted (§16.8). -->
-| `AFLDB-ISSUE-127` | Low | Admin tooling / Data acquisition / Deployment / Security | A Super Admin had no way to trigger an AFL Tables current-season refresh on demand: after `AFLDB-ISSUE-122` went live, the only options were to wait for the 04:30 timer or to SSH in and `sudo systemctl start afldb-settle-afltables.service`, which leaves no record in AFLDB's own audit trail. **IMPLEMENTED 2026-09-03** on `codex/issue-127`. `/admin/current-season` gains a Super Admin-only "Fetch current AFL data now" control that starts **the same unit the timer starts** — no second ingestion implementation, no new source authority, no force or bypass input, and both Server Actions declare **zero parameters** so no user value can reach a command line (`execFile` with a fixed argv array, no shell). Concurrency is systemd's job-merge semantics, not an application lock. The result is read from the structured `import_batches` row the settle already writes (`validation_result` counters), never from the journal, on the read-only app pool. **sudo is impossible here** — `deploy/afldb.service` sets `NoNewPrivileges=true`, so the grant is a polkit rule scoped to one action / one verb / one unit / one user, and `afldb.service` is not modified. Fail-closed behind `AFLDB_SETTLE_TRIGGER=systemd`. Validation: focused suite 28/28, four related suites 259/259, `tsc --noEmit` clean, eslint clean. Key files: `src/lib/acquisition/settle-trigger.ts`, `src/db/queries/settle-runs.ts`, `deploy/afldb-settle-afltables-trigger.rules`, `issues/open/AFLDB-ISSUE-127.md`. | **Operator host validation, then close — nothing further is needed in the repository.** On dev first: install the polkit rule and restart polkit; prove `sudo -u arm systemctl start --no-block afldb-settle-afltables.service` succeeds while the same call for any other unit is refused; set `AFLDB_SETTLE_TRIGGER=systemd` and restart `afldb`; then press the control as a Super Admin and confirm start, "already running" on a second press, the counters after commit, one `current_season.settle_triggered` audit row per press, and that the control is inert with the flag unset. Do not change the timer cadence. |
 | `AFLDB-ISSUE-126` | Medium | Database / Admin / Security / Audit trail / Operations | The 2026-09-02 production canonical DB cutover replaced production-only application state along with the football data. The real super admin (`auth_users` id 1) was recovered from the pre-cutover backup and admin login was verified, but three sets of production-only rows were **not** restored and exist only in the recovery database `afldb_prod_auth_recovery`: `auth_audit_log` **92 rows**, `beta_access_codes` **1 row**, `site_settings` **11 rows** (plus whatever else the pre-cutover dump `/home/arm/afldb_prod_pre_rebuild_20260902-200355.dump` carries). Production currently runs with **0** rows in all three. The application does not break — `src/lib/site-settings.ts` falls back to compiled-in defaults — but 11 deliberate super-admin choices are silently reverted to those defaults, one beta access code is gone, and the admin audit trail has a hard discontinuity at the cutover. Old `auth_sessions` (17) were deliberately not restored and must stay unrestored; a fresh login is the correct posture. | **Not started. Decide, per table, restore vs. intentionally reset — do not restore blindly.** `site_settings`: diff the 11 recovered rows against `src/lib/site-settings.ts` defaults and restore only the rows that encode a real operator decision (note `DEFAULT_GRID_AUDIENCE` is already `super_admin`, matching the production posture). `beta_access_codes`: confirm the code is still wanted before reissuing; treat it as live credential material and never paste it into a tracked file. `auth_audit_log`: **never reconstruct an audit trail retroactively** — either restore the 92 rows with an explicit, auditable cutover marker row that says what happened, or record the gap deliberately in this issue and leave the log starting at the cutover. **`afldb_prod_auth_recovery` MUST NOT be dropped until this issue is resolved.** No password hash or TOTP secret may be reproduced in any tracked file. Requires production DML, so it is operator-supervised work, not a repository change. |
 | `AFLDB-ISSUE-125` | Medium | Operations / Deployment / Database / Data integrity | There is **no documented procedure for preserving production-only state when a clean rebuilt database is promoted to production.** `AFLDB-ISSUE-122`'s 2026-09-02 cutover proved the gap by hitting it: restoring the clean rebuilt `afldb_test` dump over `afldb_prod` replaced the broken 2026 football data correctly, but also replaced every application-owned, auth-owned and operations-owned table, and it promoted a **test fixture super admin** (`email-intake-test-fixture@afldb.test`) into production in place of the real one. The repository documents backup/restore and the migration rollout order (`AFLDB-ISSUE-027`), but nothing enumerates which tables are production-only and must survive a canonical rebuild promotion. Recovery worked only because a pre-cutover dump was taken first, which was operator discipline rather than a documented step. | **Not started. Prevention, not incident documentation.** Enumerate every production-only table — at minimum `auth_users`, `auth_sessions`, `admin_invites`, `auth_audit_log`, `beta_access_codes`, `beta_allowed_emails`, `beta_login_tokens`, `site_settings`, plus any operational/telemetry state (`app_health_events`, `nl_search_log`, `data_edits`, `data_overrides`, `data_issues`) that a rebuild would discard — and classify each as must-preserve, must-reset, or decide-per-promotion. Then write a documented promotion procedure into `docs/` (mandatory pre-cutover dump; restore football data only, or restore-then-reinstate; an explicit **refuse-if-a-test-fixture-identity-is-present** check so `*@afldb.test` can never become a production admin; a post-promotion verification checklist ending in a real admin login). Cross-check against `tools/maintenance/` backup/restore and `privileges.sql`, which is already mandatory after a restore. Related: `AFLDB-ISSUE-126` (the data still held from this incident), `AFLDB-ISSUE-027` (rollout order). |
 | `AFLDB-ISSUE-124` | Low | Deployment / Operations | `deploy/afldb.service` declares `StartLimitIntervalSec` in the **`[Service]`** section. systemd only reads `StartLimitIntervalSec`/`StartLimitBurst` from **`[Unit]`**, so it is ignored — `systemd-analyze` on production reports `/etc/systemd/system/afldb.service:65: Unknown key name 'StartLimitIntervalSec' in section 'Service', ignoring.` The crash-loop limiter that the unit's own comment describes is therefore **not in effect** on production. Pre-existing, unrelated to `AFLDB-ISSUE-122`; observed while verifying the new settle units. | **Not started.** Move `StartLimitIntervalSec` (and `StartLimitBurst`, if it is in the same place) from `[Service]` to `[Unit]` in `deploy/afldb.service`, confirm `systemd-analyze verify` no longer warns, reinstall the unit and `systemctl daemon-reload` on production, then validate the limiter actually engages. Check the other units in `deploy/` for the same misplacement while there. Do not change any other directive in the unit. |
@@ -12638,13 +12637,18 @@ operator-supervised work, not a repository change.
 
 ## AFLDB-ISSUE-127 — Super Admin on-demand AFL Tables current-season refresh
 
-- **Status:** Open — implemented, awaiting operator validation on a real host
+- **Status:** Resolved 2026-09-04
 - **Severity:** Low
 - **Area:** Admin tooling / Data acquisition / Deployment / Security
 - **Found:** 2026-09-03 (product gap identified after `AFLDB-ISSUE-122` went live in production)
-- **Resolved:** N/A
+- **Resolved:** 2026-09-04 — operator host validation completed on dev (`streamanator`, deployed
+  revision `169d738`) against the real polkit grant, the real systemd unit and the real
+  `import_batches` rows; see Resolution below and `issues/closed/AFLDB-ISSUE-127.md` §13.
+  **No repository change was required by the validation and none was made.** Production was not
+  touched and is not part of this issue's acceptance.
 - **Files:** `src/lib/acquisition/settle-trigger.ts`, `src/lib/acquisition/settle-status.ts`, `src/db/queries/settle-runs.ts`, `src/app/admin/current-season/{actions.ts,page.tsx,SettleRunPanel.tsx}`, `deploy/afldb-settle-afltables-trigger.rules`, `docs/deployment.md`, `tests/admin-current-season-settle.test.ts`
-- **Runbook:** `issues/open/AFLDB-ISSUE-127.md`
+- **Runbook:** `issues/closed/AFLDB-ISSUE-127.md` — the authoritative evidence ledger; host
+  validation on dev in **§13**, acceptance verdict in **§13.8**
 - **Related:** `AFLDB-ISSUE-122` (the pipeline this starts — unchanged), `AFLDB-ISSUE-123` (settle performance — why this is start+status rather than a held request), `AFLDB-ISSUE-124` (`afldb.service` — deliberately NOT modified here)
 - **Migration:** none claimed. No schema change.
 
@@ -12726,23 +12730,69 @@ non-writing; the retired canonical controls were not restored.
 - `npx eslint` over the seven changed/added TS/TSX files — clean, 0 errors 0 warnings.
 - `git diff --check` — clean.
 
-### Next action
+### Resolution (2026-09-04, dev host `streamanator`, deployed revision `169d738`)
 
-**Operator host validation, then close.** Nothing further is needed in the repository. On a host
-(dev first, never production while it is being tested on):
+Host validation completed; every acceptance condition holds. Full evidence in
+`issues/closed/AFLDB-ISSUE-127.md` §13.
 
-1. Install `deploy/afldb-settle-afltables-trigger.rules` as
-   `/etc/polkit-1/rules.d/50-afldb-settle-afltables.rules`, `sudo systemctl restart polkit`.
-2. Confirm `sudo -u arm /usr/bin/systemctl start --no-block afldb-settle-afltables.service`
-   succeeds **without** sudo inside, and that the same call for any other unit is refused.
-3. Set `AFLDB_SETTLE_TRIGGER=systemd` in `.env`, restart `afldb`.
-4. Press the control as a Super Admin; confirm the run starts, that a second press while it runs
-   reports "already running" and starts nothing, that the counters appear after it commits, and
-   that `auth_audit_log` gained one `current_season.settle_triggered` row per press.
-5. Confirm the control is inert and says so with the flag unset.
+**The polkit grant is exactly as narrow as designed.** Exercised over a non-interactive SSH
+session as `arm` — the web service's own uid, with no tty, so no `pkttyagent` could satisfy an
+`auth_admin` fallback: `systemctl start --no-block afldb-settle-afltables.service` **exit 0**,
+while `systemctl stop` on the *same* unit and `systemctl start` on `afldb.service` both returned
+`Interactive authentication required`. One action, one verb, one unit, one user, proved in
+behaviour rather than on paper. `systemctl show` needed no rule, as §4 predicted.
+`NoNewPrivileges=yes` was re-confirmed on the live `afldb` unit, so the sudo-is-impossible
+premise still holds.
 
-Until steps 1–3 are done the control is inert by design; the nightly timer is unaffected
-throughout.
+**The control does what it claims.** With `AFLDB_SETTLE_TRIGGER=systemd` set and `afldb`
+restarted, a Super Admin press started the real unit; the effective `ExecStart` argv was the
+fixed `/bin/sh …/afldb-settle-afltables.sh` pair with nothing appended, so no user-controlled
+value reached systemd or a shell. Three attempts produced audit rows **636** (`started`), **637**
+(`started`) and **638** (`already-running`) — one `current_season.settle_triggered` row per
+attempt, each carrying `{unit, outcome, batchIdAtStart}`. Two ingestion transactions resulted
+(batches **91** and **92**); the refused attempt started nothing, `NRestarts=0`, no queued job.
+Counters rendered by the panel matched the `import_batches` rows field for field, the journal
+was never read, and the mid-run panel correctly showed the *previous* batch labelled as such
+because the running batch's row was still uncommitted. With the flag unset the control rendered
+disabled behind the exact `SETTLE_TRIGGER_UNCONFIGURED` sentence while the polkit rule stayed
+installed, isolating the application gate.
+
+**Two procedural deviations, both recorded rather than smoothed over.** Dev's `sudo` needs a
+password, so `sudo -u arm systemctl start …` was run as `arm` directly (the stronger form of the
+same check — it removes sudo from the path entirely) and `afldb` was restarted with
+`kill $(systemctl show afldb -p MainPID --value)` under `Restart=always`. And the "second press"
+of step 4 is **unreachable in a single browser tab**: `SettleRunPanel.tsx:183` disables the
+button once the returned status carries `phase === 'running'`, so the click is swallowed by the
+browser and no Server Action runs — proved by the *absence* of a second audit row. Neither layer
+is wrong; the runbook's step was unachievable as written. The corrected procedure is a stale
+second tab, which is the real scenario §6 was written for (a second Super Admin, or a click
+landing during the 04:30 timer run) and which reached the `already-running` branch on the first
+attempt. `issues/closed/AFLDB-ISSUE-127.md` §13.5 carries the mechanism and the corrected steps.
+
+**Timer cadence untouched.** Dev has never had `afldb-settle-afltables.timer` installed and still
+has not; none was installed to make this validation possible, and the settle service unit file
+remains byte-identical to the repository. The only persistent host change is
+`AFLDB_SETTLE_TRIGGER=systemd` in dev's `.env`.
+
+### Follow-up — deliberately not done here
+
+1. **Production is not part of this issue's acceptance and was not touched.** No production
+   command of any kind was run. Enabling the control there is the two ordinary host steps in
+   `docs/deployment.md` §7b — install the rules file and restart `polkit`; set
+   `AFLDB_SETTLE_TRIGGER=systemd` and restart `afldb` — neither of which alters `afldb.service`,
+   the settle service or the 04:30 timer cadence. Until both are done the control is inert and
+   says so. That work sequences behind the existing `main`-to-production deployment tracked
+   elsewhere and needs no issue of its own.
+2. **The installed polkit rule's byte content was not diffed.** `/etc/polkit-1/rules.d/` is mode
+   `700 root`, so `arm` can neither read nor list it. Its *semantics* are proved by the
+   three-way allow/deny result above, which is a stronger statement about behaviour; an operator
+   with sudo can confirm the file matches `deploy/afldb-settle-afltables-trigger.rules` at any
+   time.
+3. **No issue raised for the disabled-button feedback.** After a successful start the panel keeps
+   the previous "Started…" message on screen while the button is disabled, which is what made a
+   swallowed click read as a duplicate success. Nothing false is asserted — the Pipeline line
+   reads "A settle run is in progress" throughout — so this is a UX refinement, not a defect, and
+   it is recorded in the runbook rather than tracked.
 
 ## AFLDB-ISSUE-128 — Current-season settle reported success while silently dropping rows AFL Tables supplied; legacy Kali controls survived the ISSUE-122 retirement
 
