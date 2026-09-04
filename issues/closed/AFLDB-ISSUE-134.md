@@ -1,5 +1,9 @@
 # AFLDB-ISSUE-134 — Current-season settle should invalidate/revalidate affected public season ISR
 
+> **RESOLVED 2026-09-04.** Implemented, repaired after the first DEV acceptance found the
+> route unconditionally 404 (§10), and accepted on the real host at the second attempt
+> (§12). Branch `claude/issue-134`, **not merged**; DEV restored to `main`; PROD untouched.
+
 **Branch:** `claude/issue-134` (worktree `D:\dev\afldb-issue-134`) — **base `25c976d`**
 **Started:** 2026-09-04
 **Migration:** none (confirmed — no persistent schema state is required)
@@ -437,12 +441,13 @@ so the comment is misleading rather than wrong in effect. Out of scope here.)
 | 6. DEV preflight (read-only) | **Complete** — §7 |
 | 7. DEV acceptance (first attempt) | **HALTED ON A DEFECT** — deployed and worker identity proved on the host, but the route is unconditionally 404. DEV restored to `main`. §10 |
 | 8. Security boundary repaired | **Complete** — gate 1 is now a loopback allowlist resting on the tracked proxy contract; tests replaced; docs corrected; all repository gates green. §11 |
-| 9. DEV acceptance (second attempt) | **PENDING** — re-run from §10.1 |
-| 10. Close-out | **BLOCKED on stage 9** — ISSUE-134 stays OPEN |
+| 9. DEV acceptance (second attempt) | **GREEN** — the route works on the real host, the four-worker coverage and the ISR regeneration are both proved, and the spoof through the real proxy is refused. §12 |
+| 10. Close-out | **Complete** — ISSUE-134 **Resolved** 2026-09-04. Branch `claude/issue-134` pushed, **NOT merged** |
 
-**Exact next action:** redeploy the pushed `claude/issue-134` branch to DEV (`streamanator`) by
-the same reversible procedure as §10.1, and re-run the acceptance sequence §9.3–§9.4 that §10.2
-blocked. **ISSUE-134 stays OPEN until that is green. PROD untouched.**
+**Exact next action:** none for this issue. The branch is ready to merge and deploy when the
+operator chooses; §12.7 records the one acceptance item with no safe real trigger (a settle that
+actually changes canonical data), which will be observed on the first such run of a provisioned
+host. **PROD was never touched.**
 
 ## 9. DEV acceptance plan — as proposed (superseded in part by §10)
 
@@ -754,3 +759,171 @@ model — `AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rest
 Repository gates were green before §10 as well. **They are a necessary and not a sufficient
 condition** — the §12 host acceptance is what decides this.
 
+---
+
+## 12. DEV acceptance, second attempt — `streamanator`, 2026-09-04
+
+**The defect of §10.2 is gone: the route works on the real host.** Same reversible procedure as
+§10.1, against the pushed commit.
+
+### 12.1 Deploy
+
+| Step | Evidence |
+|---|---|
+| Host re-confirmed before mutation | `hostname` = `streamanator`; `main` @ `169d738`; build `p0Z_llbWECQxDN2Eo2YMC`; MainPID 1057872; health 200; `AFLDB_REVALIDATE*` count 0; timer `not-found` — i.e. exactly the state §10.5 left |
+| `.env` backed up | `.env.bak-issue134-20260904-184009`, `600 arm` |
+| Checkout | detached at **`479f4f7c70799f4ad77be8719d8d86ecb6ca189a`** (the pushed branch head) |
+| Env added | **only** `AFLDB_REVALIDATE_URL=http://127.0.0.1:3100` and `AFLDB_REVALIDATE_SECRET` (64 hex, `openssl rand -hex 32`, generated on the host); `.env` stayed `600 arm` |
+| `npm ci` / `db:migrate` | **not run, provably unnecessary** — `git diff 169d738..479f4f7 -- package.json package-lock.json` is empty and the branch adds no migration |
+| Build | nvm Node **v22.23.2**; `BUILD_ID` = `vEjD_Ctxh5fLXazgizdjn`; standalone bundle prepared |
+| Restart | MainPID 1057872 → **1086613** (terminate + systemd `Restart=always`) |
+| Health | `/api/health` → 200 `{"status":"ok","database":"ok","latencyMs":29}` |
+| Workers | 4, ordinals `AFLDB_WORKER_ID=1..4` with `AFLDB_WORKER_COUNT=4` on every one (pids 1086620/21/22/24) |
+| Timer | `not-found` throughout. **Never installed.** |
+
+### 12.2 The route now serves the caller it was written for
+
+| Probe | Result |
+|---|---|
+| Correct secret, loopback, `{"season":2026}` | **200** `{"ok":true,"path":"/seasons/2026","workerId":"…","workerCount":4}` |
+| Correct secret + `X-Forwarded-Host: beta.afldb.com` | **200** — the forwarded host is client input on every path and is correctly ignored |
+| Correct secret + `X-Forwarded-For: ::ffff:127.0.0.1` | **200** — the IPv4-mapped form a dual-stack socket produces is accepted |
+| `GET` | **405** — the route exists and only POST is defined |
+
+This is the exact request §10.2 recorded as `404`.
+
+### 12.3 The gates, on the real host
+
+| Probe | Expected | Result |
+|---|---|---|
+| No secret header | 401 | **401** `{"error":"Unauthorized."}` |
+| Wrong secret, same 64-char length | 401 | **401** |
+| Wrong secret, different length | 401 | **401** |
+| Correct secret + `X-Forwarded-For: 203.0.113.9` | 404 | **404** `{"error":"Not found."}` |
+| Correct secret + `X-Forwarded-For: 10.0.40.55` | 404 | **404** |
+| Correct secret + `X-Forwarded-For: 127.0.0.1, 203.0.113.9` | 404 | **404** |
+| Correct secret + `X-Forwarded-For: 203.0.113.9, 127.0.0.1` | 404 | **404** |
+| Correct secret + `X-Forwarded-For: 0177.0.0.1` | 404 | **404** |
+| Correct secret + `X-Forwarded-For: localhost` | 404 | **404** |
+
+A wrong secret on a loopback connection answers **401** while any non-loopback identity answers
+**404** — so the caller check really does run before the secret, and a request that is not from
+this host never learns whether the route is even there.
+
+**The body contract, on the host.** Every one of `{"season":"2026"}`, `2026.5`, `null`, `{}`,
+`"/admin"`, `"2026/../../admin"`, `1896`, `2201`, `{"path":"/admin"}`, `{"tag":"_N_T_/admin"}`
+answered **400** `{"error":"season must be an integer year."}`, and `{not json` answered **400**
+`{"error":"Invalid JSON body."}`. There is no input by which a caller reaches any other path or
+tag.
+
+### 12.4 THE SPOOF, THROUGH THE REAL PROXY
+
+The security argument is the reverse-proxy contract, so it was tested through the reverse proxy
+(Caddy on `:8090`), not only against the handler:
+
+| Probe | Result |
+|---|---|
+| Via Caddy at the host's **LAN** address, **correct secret**, spoofed `X-Forwarded-For: 127.0.0.1` | **404** |
+| Via Caddy at the LAN address, correct secret, no spoof | **404** |
+| Via Caddy at `127.0.0.1:8090` — a caller already on this host | 200 |
+
+The first row is the one that matters: a client that knows the secret **and** sends
+`X-Forwarded-For: 127.0.0.1` is still refused, because `header_up X-Forwarded-For {remote_host}`
+replaced its header with the address Caddy observed before Node saw it. The third row is not a
+weakness: reaching Caddy from `127.0.0.1` requires already being on the host, which is the same
+trust level the loopback contract grants anyway — and the application port itself is bound to
+`127.0.0.1` by `deploy/afldb.service`, so the proxy is the only other way in.
+
+### 12.5 The multi-worker coverage contract, on a real 4-worker cluster
+
+Six consecutive POSTs on fresh connections were answered by `workerId` **1, 4, 3, 2, 1, 4** —
+every ordinal reached, each reporting `workerCount: 4`. This is the observation §10.3 recorded
+as not reached, and it confirms the half of §6 that could not be proved in-process: `node:cluster`
+round-robins **connections**, so `agent: false` + `Connection: close` really does put each
+attempt back through the primary's rotation. The journal shows the same requests landing on
+`worker=1..4` with distinct pids.
+
+### 12.6 `/seasons/2026` regenerated inside the ISR hour — with a control
+
+**First measurement was invalid and is recorded as such.** Dev runs `AFLDB_BETA_GATE=on`, so an
+anonymous `GET /seasons/2026` is a **307** to `/beta` and never renders the page; the warming
+loop in the §9.3 plan therefore proved nothing, and the entry's mtime correctly did not move.
+The probe was redone with an admitted request — a beta cookie minted on the host from the app's
+own claim shape (`src/lib/auth/tokens.ts`), the session secret never leaving the host — which
+returns **200**.
+
+The ISR entry is `.next/standalone/.next/server/app/seasons/2026.{html,meta}`, and its `.meta`
+declares the tag this issue targets:
+
+```
+"x-next-cache-tags":"_N_T_/layout,_N_T_/seasons/layout,_N_T_/seasons/[year]/layout,
+                     _N_T_/seasons/[year]/page,_N_T_/seasons/2026"
+```
+
+| Arm | Traffic | Entry mtime |
+|---|---|---|
+| **Control** — no invalidation | 8 admitted GETs, then 18 s | 18:45:35 → **18:45:35 (unchanged)** |
+| **Test** — same traffic, after 6 POSTs | 8 admitted GETs, then 18 s | 18:45:35 → **18:46:54 (moved)** |
+
+Identical traffic, one variable. The page was prerendered at 18:42 with `revalidate = 3600`, so
+nothing in its own window would have regenerated it at 18:46 — **the invalidation is what
+published it**, which is the whole point of the issue.
+
+### 12.7 The settle, end to end — one half proved, the other honestly not available
+
+The **on-demand** path was used, not the timer: `deploy/afldb-settle-afltables.sh` was run twice
+directly as `arm`, which is the same chain the unit's `ExecStart` invokes, from this checkout.
+Dev's settle timer stayed `not-found` throughout and was never installed.
+
+| Run | Label | Batch | Exit | Canonical ins/upd/logged | Revalidation request |
+|---|---|---|---|---|---|
+| 1 | `settle-2026-2026-09-04-1847` | 93 (18:47:54) | **0** | **0 / 0 / 0** | **none** |
+| 2 | `settle-2026-2026-09-04-1849` | 94 (18:49:45) | **0** | **0 / 0 / 0** | **none** |
+
+Both runs completed the full acquire → adjudicate → settle chain against live AFL Tables and
+both were genuine idempotent no-ops: `import_batches.validation_result` records `0/0/0` for
+each, so `shouldRevalidateSeason()` returned false and the settle made **no HTTP request at
+all**. The journal confirms it independently — every `[revalidate-season]` line in the window
+is from the 18:46:49 manual probe, and there is not one at 18:49 or 18:51.
+
+**PROVED:** an idempotent rerun publishes nothing, and still exits 0. This is the common case —
+most nights out of season, and every repeat over unchanged source data — and it is the one that
+would have been expensive to get wrong.
+
+**NOT PROVED ON THE HOST:** a settle that *does* change canonical data publishing exactly once.
+Dev's 2026 season is fully settled, so no real canonical change was available, and manufacturing
+one was explicitly out of bounds. What stands in for it:
+
+- `tests/integration/settle-afltables.test.ts` §S6 asserts on the same injected boundary against
+  real PostgreSQL, after a real commit and a real idempotent rerun;
+- every link in the chain was proved separately on this host — the CLI reaches the boundary only
+  after `runSettleAfltables()` returns (§11.4, asserted off the source), the route answers a
+  correct-secret loopback POST (§12.2), four fresh connections cover four workers (§12.5), and
+  an invalidation regenerates `/seasons/2026` (§12.6).
+
+The residual risk is therefore the *composition* of proven links on a changing run, not any
+individual link. It will be observed the first time a real in-season settle changes a row on a
+host that has the two variables set.
+
+### 12.8 DEV restored
+
+| Step | Evidence |
+|---|---|
+| `.env` | restored from `.env.bak-issue134-20260904-184009`; `AFLDB_REVALIDATE_URL` count 0, `AFLDB_REVALIDATE_SECRET` count 0; mode `600 arm`. The acceptance secret existed only on dev, only for this window, and is gone |
+| Checkout | back on branch **`main`** @ `169d7380928eb3f58d6c5e2c4f0a2e5db76ee85f`, working tree clean |
+| Rebuild | fresh build of identical source (`next build` is not byte-reproducible, so a new `BUILD_ID` is expected and is not a code difference) |
+| Restart | new MainPID, `active`, health 200, 4 workers |
+| Route | `POST /api/internal/revalidate-season` → **307** (middleware redirect; the route does not exist on `main`) — correct for a restored host |
+| Settle timer | `not-found`; never installed, never triggered |
+| Scratch | the acceptance scripts and logs removed from `~`; the `.env` backup deliberately kept |
+
+**PROD was not touched at any point. ISSUE-137 was not touched.** The two settle runs wrote no
+canonical row, so dev's data is where it was.
+
+### 12.9 Verdict
+
+The defect of §10.2 is repaired and the repair is proved on the real host, including the part
+that matters most — **a client that knows the secret and spoofs `X-Forwarded-For: 127.0.0.1`
+through the real reverse proxy is still refused.** Every acceptance item is green except the
+canonical-changing settle, which had no safe real trigger and is covered by the integration
+suite plus the individually-proved links.
