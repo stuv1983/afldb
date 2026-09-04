@@ -2072,7 +2072,7 @@ identified. §22.9 has the run figures; §22.10 the exact next action.
 | Branch / worktree | `claude/issue-118` / `D:\dev\afldb-issue-118` |
 | Base | `main @ f04e86d` |
 | Recovered commits | `d7e98f0` (Stage 0 doc), `ffba02d` (Stage 1), `084cf2e` (Stage 2) — cherry-picks of `9ecc6fc`/`28fdb2f`/`6e3b38a`; conflicts on `CHANGELOG.md`, `IssuesIndex.md`, `issues.md`, `.gitattributes` resolved by keeping `main`'s files (tracking rewritten in this section; the Gridley `.gitattributes` rule re-added) |
-| Model / effort | Fable 5.1, Medium |
+| Model / effort | Fable 5.1, Medium (first three sessions); Fable 5.1, High (fourth session, §23.16–§23.18) |
 | Databases touched | `afldb_dev` read-only (corpus export, telemetry, reference facts); `afldb_test` read-only (regression); **production untouched** |
 
 ### 22.1 Stage 0 — what survived and what did not
@@ -2478,8 +2478,8 @@ table (3 → 2), runbook moved to `issues/closed/`. ISSUE-110 and ISSUE-137 unto
 |---|---|
 | Branch / worktree | `claude/issue-118` / `D:\dev\afldb-issue-118` |
 | Base | `main @ 208fd5d` (the closeout commit) |
-| Model / effort | Fable 5.1, Medium |
-| Databases touched | first session: none (tunnel down); second session (operator-run validation, then §23.12): `afldb_test` read-only. **Production untouched.** |
+| Model / effort | Fable 5.1, Medium (first three sessions); Fable 5.1, High (fourth session, §23.16–§23.18) |
+| Databases touched | first session: none (tunnel down); second session (operator-run validation, then §23.12): `afldb_test` read-only; third session: `afldb_test` + `afldb_dev` (All-Australian rows); fourth session: migration 086 + heights on `afldb_test` and `afldb_dev`. **Production untouched.** |
 
 ### 23.1 The acceptance gap
 
@@ -2986,7 +2986,7 @@ on distinct-season counting.
 `tests/integration/awards-reload-links.test.ts`, `tools/db/rebuild-test.ts`, this runbook,
 `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`. Production untouched.
 
-### 23.15 Exact next action
+### 23.15 Exact next action (as recorded after §23.14 — superseded by §23.18)
 
 1. **All-Australian family: complete** for Gridley's definition (`AFLDB source missing required
    selection` = 11 entries, all Greg Anderson, documented above as Gridley-side; 0 AFLDB source
@@ -2999,3 +2999,217 @@ on distinct-season counting.
 3. Strict corpus run stays red until the height/draft/marquee/captaincy gaps land; closeout per
    §23.2. Production receives the 86 rows with the next deploy plus `import_awards.py --groups
    all_australian` (ISSUE-137 sequencing applies; not part of this stage).
+
+### 23.16 Stage H2 — heights acquired from the AFL Tables register (5 September 2026, fourth session, Fable High)
+
+**Decision taken (the §23.5 "decision required").** Load the already-acquired AFL Tables
+`player_details` register (snapshot `full-history-20260902`) through a reconciliation that never
+consults AFLDB by name, rather than a ~13k-page per-player acquisition. The reconciliation is
+closed-form because the *same snapshot's* `player_stats` files carry the AFL Tables profile URL —
+the identity `external_identities` already stores (`afltables` / `afltables_profile_url`, 13,275
+rows on `afldb_test`) — on every match row.
+
+**H2.1 Reconciliation algorithm (`tools/migration/enrich_heights.py`).**
+
+1. Every file read is sha256-checked against its tracked manifest
+   (`docs/rebuild-manifests/afltables_fitzroy_core/<label>.json`) before anything else happens.
+2. `player_stats` rows (129 full-history files + the tracked in-season `issue129-t7-20260903`
+   file, because the register was captured on 2026-09-02 and its current players' games include
+   2026) are folded per **(profile URL, register club)** into games (row count), goals (sum), the
+   exact season set, the guernseys worn and the source's own spellings of the name. `Playing.for`
+   is folded onto the register's club page only where the register itself does so
+   (Footscray → Western Bulldogs, Kangaroos → North Melbourne, South Melbourne → Sydney, Greater
+   Western Sydney → GWS); any other unknown club aborts.
+3. A register row maps when **exactly one** aggregate has the same club, games, goals and season
+   set **and** the register's normalised name equals one of that aggregate's names. Zero
+   candidates → `unmatched`; several with the name → `ambiguous`; a unique fact match whose name
+   is spelled differently on the two AFL Tables pages → `name_mismatch`. All three fail closed
+   into `import_rejections` with the full source row. The guernsey is corroboration only
+   (reported, never decisive: the register prints one number, the match rows several).
+4. The profile URL is normalised to the `players/A/Name.html` form `external_identities` stores
+   (`import_fitzroy_core.normalise_profile_url`, the same function) and looked up there. That is
+   the only bridge to `players.id`. A URL with no canonical row is a rejection, not a guess.
+5. Per canonical player, every mapped height is counted. Two distinct values → both kept as
+   evidence, **no fill**, a `data_issues` row (`height_conflict`). One value: fill only where
+   `players.height_cm IS NULL`; an existing equal value is an agreement; an existing different
+   value is kept and opened as a `data_issue`. Unknown (blank or implausible `HT`) stays NULL.
+
+**Ambiguity policy:** no name-only matching, no fuzzy matching, no arbitrary choice between
+candidates or between heights; every non-mapped row is written to `import_rejections` with its
+reason; the run is idempotent (evidence upserted on `(player_id, source_id, height_cm)`, fill
+touches only NULL, an open data_issue is not duplicated).
+
+**Provenance / write model (H2.3).** Migration `086_player_height_evidence.sql`, the smallest
+forward-only change, mirrors 018: `player_height_evidence` (player, source, external_id = profile
+URL path, height_cm CHECK 120–230, evidence_type `afltables_player_details_register`, confidence,
+occurrences, batch, notes; UNIQUE per player/source/height) and `players.height_evidence_id`;
+registered through `grant_app_read` / `grant_import_write` so `privileges.sql` reconciles it. The
+`player_bio` ingest dataset (admin upload, COALESCE) remains the manual path and is untouched; a
+value it sets has `height_evidence_id` NULL, which is how a hand-entered height is told apart. The
+draft-day `draft_picks.height_cm` is still not used as a substitute.
+
+**Reconciliation report (source side, identical on every run):**
+
+| Measure | Count |
+|---|---:|
+| register rows | 16,731 |
+| rows with a height | 15,888 |
+| (url, club) aggregates | 16,734 |
+| **mapped** | **16,713** |
+| unmatched (games/goals/seasons fit no aggregate) | 9 |
+| ambiguous | 0 |
+| name mismatch (facts unique, spelling differs: Jonathon/Jonathan Ross, Steven/Stephen Icke ×2, Jack Patterson/Paterson ×2, Glenn/Glen Scanlon ×2, Lyle/Lyall Anderson, Norman Paternoster) | 9 |
+| mapped rows with a height | 15,870 |
+| distinct profile URLs with a height | 12,580 |
+| **URLs asserting two heights** | **0** |
+| guernsey corroboration checked / disagreeing | 14,639 / 9 |
+
+Without the in-season supplement the same run maps 14,400 + 1,647 and leaves 675 current players
+unmatched (their 2026 games are in the register and not in the full-history rows) — measured
+first, which is why the supplement label is an explicit, manifest-verified input.
+
+**Canonical side on `afldb_test` (batch 165, then batch 166 as the idempotence proof):**
+
+| Measure | Batch 165 | Batch 166 (re-run) |
+|---|---:|---:|
+| mapped rows with no canonical player (all 92 are 2026 debutants; `afldb_test` holds no 2026 identities) | 92 | 92 |
+| canonical players receiving height | **12,487** | 0 |
+| already present and agreeing | 0 | 12,487 |
+| disagree with existing value / two heights for one player | 0 / 0 | 0 / 0 |
+| evidence rows / rejections | 12,487 / 110 | 12,487 (upserted) / 110 |
+
+State after: `players` 13,273, `height_cm` 12,487 (min 155, max 211, mean 181.8), every filled
+height linked to the evidence row that justified it (link consistency 0 mismatches, 0 unlinked),
+≥195 cm 697 players, ≤180 cm 6,072, `data_issues(height_conflict)` 0. 786 players remain NULL:
+the register has no height for 843 rows (pre-war players mostly) and 18 rows failed closed.
+
+**H2.2 Gridley coverage (`tests/integration/gridley-height-oracle.test.ts`, opt-in
+`AFLDB_HEIGHT_REPORT`, `AFLDB_HEIGHT_PLANNED=<dry-run report>` for the before-apply measure).**
+
+| Measure | Before apply (planned) | After apply |
+|---|---:|---:|
+| height criteria / cells | 2 / 426 | 2 / 426 |
+| distinct Gridley answer-key players | 7,216 | 7,216 |
+| bridged to AFLDB (name ∪ fingerprint bridge) | 774 | 941 (the height cells now feed the fingerprint) |
+| bridged with an authoritative height | 0 (774 planned) | **941** |
+| bridged **missing** height | **0** | **0** |
+
+The source covers every bridgeable Gridley height-key player. The unbridged remainder is the
+oracle's limit (a Gridley id seen in fewer than two usable cells cannot be fingerprinted), not a
+height gap: the corpus regression's `heights` probe is now true.
+
+**H2.5 Height oracle — answer-key comparison (420 usable height cells).** False positives and
+false negatives reported separately:
+
+| Kind | Entries | Classification |
+|---|---:|---|
+| false negative (Gridley lists, AFLDB does not) | 3,730 | **AFLDB height fails the bound** — 48 distinct players on `height195` (AFL Tables 194 cm ×34, 193 ×9, 192 ×4, 189 ×1) and 35 on `height180` (181 ×33, 182 ×2) |
+| false negative | 279 | other axis only (height satisfied) — the ISSUE-118 board-time / list-membership differences already documented |
+| false negative | 39 | fails the bound + other axis |
+| false positive (AFLDB lists, Gridley omits) | 171 | board-time effect (player active after the board date) |
+| false positive | 55 | 6 distinct players: Brian Roberts 199 / Ken Beck 198 (1960s–70s, Gridley evidently has no height for them) and Jed Anderson, Bradley Hill, Liam Ryan 179 / Malcolm Rosas 175 |
+
+**What the 83 disagreeing players are.** All are 1997+ debutants. Gridley counts them at ≥195 /
+≤180 while AFL Tables says 189–194 / 181–182. Wikipedia's infobox agrees with **AFL Tables**, not
+Gridley, for the three probed this session (Charlie Curnow 194, Dylan Grimes 193, Brodie Smith
+189 — Gridley lists Smith as 195+ in 48 cells). So Gridley's height data is a third source (most
+likely the AFL website's current listed heights, which this session could not fetch — the
+player URLs return 404 unauthenticated), and AFLDB's answer is exact for its authoritative source.
+This is a **source difference, recorded here, not an AFLDB defect and not a data gap**; no test
+was weakened for it. Whether AFLDB should also hold the AFL API's listed height as a second
+evidence source for current players (the §23.5 row: `fetch_player_details_afl`, `heightInCm`,
+stable `providerId`, no `afl_api` identity bridge yet — migration 077's comment) and which
+source wins when they differ is an **operator decision**; the evidence table is built to hold
+both without overwriting either.
+
+**Applied to DEV (`afldb_dev`)**: migration 086 + `privileges.sql`, then the same two runs —
+batch 96 filled **11,740** players (932 rejections: the same 18 fail-closed rows and 914 rows whose
+profile URL has no canonical identity on DEV — 905 of them pre-2026 Fitzroy / University /
+Brisbane Bears / South Melbourne-era players, because `afldb_dev` holds only 12,472 `afltables`
+identities against `afldb_test`'s 13,275, the ISSUE-090/137 identity split), batch 97 re-run 0
+filled / 11,740 agreeing. Two DEV players (Fred Rodriguez 184, Riley Onley 194) already carried a
+hand-entered height with no evidence row; both untouched, `height_evidence_id` NULL as designed. Production untouched.
+
+**Validation executed (workstation, `afldb_test` through the 55432 tunnel):**
+
+| Check | Result |
+|---|---|
+| `tests/height-reconciliation.test.ts` (pure reconciliation on synthetic rows, through the interpreter) | 6/6 |
+| `tests/db-promotion-check.test.ts` (new football table pinned; **also pins `external_grid_*` from 080, which had never been classified — a pre-existing red on main**) | 37/37 |
+| `tests/gridley-compat.test.ts` | pass (data-absent pin unchanged: the height ids were already `mapped`) |
+| `npm run db:migrate:test` | 086 applied (**and 080, ISSUE-118's own external-grids migration from main, which had never reached `afldb_test`** — additive, non-canonical tables) |
+| `enrich_heights.py --dry-run` → apply → re-run | tables above |
+| `tests/integration/gridley-height-oracle.test.ts` before and after | 16/16 each, ~65 s |
+| `tests/integration/grid-solver.test.ts` | 189/189 (height NULL semantics now hold over 12,487 real values) |
+| `AFLDB_GRIDLEY_DIAGNOSTIC=1 tests/integration/gridley-corpus.test.ts` | **1,163/1,164**, 0 timeouts, 0 cells over the 4 s guard; cells solved 9,141 → **9,560**; `dataset gap` 773 → **354** (the `heights` probe is true; what remains is draft links / marquee tags / post-2025 boards); `unsupported` 375 (26 criteria) and `partial dataset` 506 unchanged; **`incorrect known answer` 299** — every one a height cell, 9 distinct name-bridged retired players (afldb 10175, 9771 Nathan Brown, 10878 Reece Conca, 12659, 4766, 4002 Dylan Grimes, 3258, 2109 Brandon Ellis, …), the retired subset of the 83 source disagreements above. The one failing test is the no-failing-cells gate on exactly those 299; a strict run fails on the same cells plus the draft / marquee / captaincy gaps |
+| `npx tsc --noEmit`, `eslint` on the six touched TS files | clean |
+
+**Side finding in the All-Australian family (from the larger bridge).** With the height cells usable the union bridge grew from 1,838 to 2,162 players, and the refactored AA oracle (output otherwise unchanged: 791 sets, 9,798 cells, 0 bridge disagreements) now reports `AFLDB source missing required selection` = **76 entries / 2 players**: Greg Anderson (11, §23.14, Gridley-side) and **Tony Buhagiar (65 cells, `allAus1953`)**. AFLDB *has* his row — `aa:1979:20` in `data/awards/all-australian.csv`, the 1979 carnival team — but its link is `implausible` because 1979 precedes his VFL debut (1981, a state-league selection). Gridley counts a pre-VFL state selection for a player who later played VFL. Not an acquisition gap: a link-rule decision for pre-debut state-league selections, recorded in §23.18.
+
+**Not done, deliberately.** The `db:test:rebuild` stage plan (`tools/db/rebuild-test.ts`, pinned
+by `tests/db-test-rebuild.test.ts`) does **not** yet run the height stage, so a rebuild of
+`afldb_test` would drop the heights until it is re-run by hand. Adding it means binding a second,
+in-season snapshot label into the rebuild's "no acquisition, tracked inputs only" doctrine
+(§10 order, ISSUE-111/112/113 admissions) — an operator decision on which label and where the
+in-season snapshot must live, recorded in §23.18 as the next action rather than taken here.
+
+**Files:** `src/db/migrations/086_player_height_evidence.sql`, `tools/migration/enrich_heights.py`,
+`tests/height-reconciliation.test.ts`, `tests/integration/gridley-oracle-bridge.ts` (the
+criterion-set / cell / bridge scaffold extracted unchanged from the AA oracle),
+`tests/integration/gridley-aa-oracle.test.ts` (now imports it; output unchanged),
+`tests/integration/gridley-height-oracle.test.ts`, `tests/db-promotion-check.test.ts`,
+`src/search/gridley-compat.ts` (comment), this runbook, `issues.md`, `IssuesIndex.md`,
+`CHANGELOG.md`.
+
+### 23.17 The remaining 26 unsupported criteria, grouped by what each family needs
+
+Inspected on `afldb_test` and in the tracked sources this session (5 September 2026). The
+classifications use the brief's vocabulary. Occurrence counts are §23.7's.
+
+| Group | Gridley ids (occ.) | Classification | Evidence | What lands it |
+|---|---|---|---|---|
+| **Named medals** | `moty` (7), `goty` (3), `showdown-medal` (5), `anzacmedal` (3), `glendenning` (2), `qclash-medal` (1), `battleofthebridge-medal` (1) — 22 | **existing source path, rows not acquired** | `tools/migration/named_medals.py` + `data/awards/named-medals-definitions.csv` / `named-medals.csv` already carry 17 medals (979 rows, Wikipedia-cited, identity through `player-identity.csv`); none of these seven is defined | seven definition rows + the Wikipedia list pages transcribed into `named-medals.csv`; `award_winner` builders already exist; no schema |
+| **Captaincy gaps** | `captain` / `premcaptain` partial-data failures (506 checks) | **existing source path, rows not acquired** | `data/awards/captaincies.csv` (1,375 rows) has no Geelong, Hawthorn, West Coast, Fitzroy, University or Brisbane Bears rows | same transcription path as the 18 clubs present; no schema |
+| **Age on debut / DOB** | `debut22` (1) | **existing table merely unpopulated (test-only lag) + builder** | `players.dob` 855 / 13,273 on `afldb_test`; the birth-evidence path (018/072, `enrich_birth_dates*.py`) recovered ~12,000 dates on the legacy build and is not a rebuild stage | run the DOB enrichment as a tracked stage (same decision as the height stage, §23.16 item 3), then an `age_on_debut_min` builder over `dob` and the debut match date |
+| **Siblings / father–son** | `brother` (53), `fathersonfather` (3) — 56 | **acquisition required; tables exist** | `player_relationships` (006) 0 rows, `father_son_selections` (006) 0 rows; `draft_picks.signing_kind` names the son only | AFL Tables player pages list "Brother of / Son of" relations keyed by the profile URL AFLDB already holds — a ~13k-page acquisition, or the DraftGuru father-son index for the 3-occurrence case; then `sibling_played` / `father_of_father_son` builders |
+| **Coaches** | `premcoach` (4), `coachedByWorsfold` … `coachedByMatthews` (12) — 16 | **schema required + acquisition** | no coaching entity; the fitzRoy `player_stats` rows carry a per-match `Coach` column (e.g. "Bolton, Brendon"), so the snapshot already names every match coach 1897–2026 | a `coaches` / `coaching_tenures` model derived from the snapshot's per-match coach column (no new acquisition), then `coached_by` and `premiership_coach` builders |
+| **Season-list membership** | `season2024player` (14) | **schema required + acquisition** | no club-list-per-season model; the AFL API list acquisition (probe P4) gives current lists only | a `club_season_lists` model; 2024 needs a historical list source (AFL Tables per-season club pages carry the played list, not the full list) — the "played in 2024 for the club" approximation is a documented semantic difference, not the criterion |
+| **Birthplace / state / nationality** | `irish` (2), `tasmanian` (1) — 3 | **schema required + acquisition** | no birthplace column on `players` (checked) | a birthplace/nationality column with evidence; source per player not free in bulk — DraftGuru person pages for drafted players, Wikipedia infoboxes otherwise |
+| **International Rules / NFL** | `intrulesplayer` (5), `nfl` (1) — 6 | **schema required + curated source** | no representative or other-code career model | small curated CSVs (Wikipedia squad lists) into a `representative_selections` table + builder |
+| **After-the-siren** | `winaftersiren` (4) | **fundamentally unavailable (free)** | no scoring-event timeline in any source AFLDB uses; AFL Tables has no play-by-play | only a curated list (Wikipedia "after the siren" article) could answer it — a curated-source decision, not an acquisition |
+| **Recruiters** | `recruitedByDodoro` (2) | **fundamentally unavailable** | no structured source names a recruiter per player | curated-list decision or accept as Gridley-only |
+| **Spoils** | `spoils5season` (1) | **fundamentally unavailable** | Champion Data statistic, not in any free source | accept as Gridley-only |
+| **Test dataset lag** | draft links / marquee tags (`dataset gap` findings) | **test-only dataset lag** | `draftLinks` false / `matchEvents` false on `afldb_test` (§23.12 probes) | a rebuild that includes the draft-link decisions and marquee events, no code |
+
+**Recommended order (safest first).** (1) Named medals and the six missing captaincy clubs:
+tracked CSV transcription through importers that already exist, zero schema, and together they
+retire 22 criterion occurrences plus the 506 partial-data checks. (2) DOB as a tracked stage plus
+the `age_on_debut_min` builder: the evidence path exists. (3) Coaches from the snapshot's own
+per-match coach column: one migration, no acquisition, 16 occurrences. (4) Siblings / father–son
+from AFL Tables player pages keyed by the profile URL: the largest single family (56) and the only
+one needing a new page acquisition. (5) Season lists, birthplace, representative careers: each
+needs a model decision. (6) After-the-siren, recruiters, spoils: record the curated-source or
+Gridley-only decision explicitly so the corrected contract (§23.2) can be met by *proof*, not by
+silence.
+
+### 23.18 Exact next action
+
+1. **Height family — decide Gridley's source.** AFLDB now answers both height criteria exactly
+   from AFL Tables; the oracle disagrees on 83 bridged players whose Gridley height differs from
+   AFL Tables (and from Wikipedia where probed). Next: acquire the AFL API listed heights
+   (`fetch_player_details_afl`, `heightInCm` + `providerId`) as a **second evidence source** for
+   current-list players, compare them with the 83, and take the operator decision on precedence
+   (AFL Tables vs AFL listed height) — `player_height_evidence` already holds both without
+   overwriting. Until that decision the corpus regression fails on those cells as `incorrect known
+   answer` (diagnostic and strict alike); it must not be reclassified without the evidence.
+2. **Rebuild stage.** Admit `enrich_heights.py` to `tools/db/rebuild-test.ts` after `fitzroy`
+   (needs the operator's choice of the tracked in-season label to bind and where that snapshot
+   lives), and update the `tests/db-test-rebuild.test.ts` order pins with it.
+3. **Then the families in §23.17's order**: named medals + captaincy clubs (transcription only),
+   DOB stage + `age_on_debut_min`, coaches from the snapshot's per-match coach column, siblings /
+   father–son, the model decisions, the curated-source decisions.
+4. **All-Australian link rule:** decide whether a pre-VFL-debut state-league selection (Tony
+   Buhagiar, `aa:1979:20`, link `implausible`) counts — Gridley says yes; 65 `allAus1953` cells.
+5. Production receives migration 086 and `enrich_heights.py` with the next deploy (ISSUE-137
+   sequencing applies; prod's identity coverage must be measured with `--dry-run` first — the DEV
+   run shows what a legacy-lineage identity set does to the fill count).

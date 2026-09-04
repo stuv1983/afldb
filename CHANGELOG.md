@@ -15,6 +15,34 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-118 Stage H2 — player heights from the AFL Tables register - 5 September 2026
+
+- **`players.height_cm` is populated** (12,487 players on `afldb_test`, 11,740 on `afldb_dev`;
+  production with the next deploy) from the already-acquired AFL Tables `player_details` register
+  in the tracked fitzRoy snapshot `full-history-20260902`, supplemented by the tracked in-season
+  `issue129-t7-20260903` rows for current players. The Grid Solver's *Height X cm or taller /
+  shorter* builders and Gridley's `195cm OR TALLER` / `180cm OR SHORTER` now answer from real data;
+  a player the register does not cover stays NULL and never qualifies.
+- **Migration `086_player_height_evidence.sql`**: `player_height_evidence` (every asserted height
+  with its source, external id, occurrences and batch; unique per player/source/height) and
+  `players.height_evidence_id`, on the birth-evidence pattern; registered for `afldb_app` read and
+  `afldb_import` write.
+- **`tools/migration/enrich_heights.py`**: manifest-verified, fail-closed reconciliation of the
+  register (no stable id) to canonical players through the snapshot's own per-match profile URLs
+  — club + games + goals + exact season set + the source's spelling of the name → the AFL Tables
+  identity `external_identities` already holds. Nothing is matched against AFLDB by name; zero,
+  several or differently-spelled candidates are rejected with the source row; two heights for one
+  player fill nothing and open a `data_issue`; existing values are never overwritten; re-runs are
+  idempotent and record their counters on the import batch.
+- **Gridley height oracle** (`tests/integration/gridley-height-oracle.test.ts`, opt-in) and the
+  shared oracle scaffold `tests/integration/gridley-oracle-bridge.ts` (extracted from the
+  All-Australian oracle, output unchanged): coverage before/after apply and a false-positive /
+  false-negative answer-key comparison. Result: every bridgeable Gridley height-key player has a
+  height; 83 players differ from Gridley's own height figure (a source difference, recorded in the
+  runbook, left red in the corpus regression rather than reclassified).
+- `tests/db-promotion-check.test.ts` now pins `player_height_evidence` and the three
+  `external_grid_*` tables from migration 080 that had never been classified.
+
 ### AFLDB-ISSUE-118 Stage AA3 — the 1983–1988 VFL Teams of the Year join the All-Australian source - 5 September 2026
 
 - **`data/awards/all-australian.csv`: 1,158 → 1,244 rows.** The VFL Team of the Year for **1983,

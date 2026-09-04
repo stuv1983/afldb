@@ -76,6 +76,7 @@ const PINNED_FOOTBALL_TABLES = [
   'clubs', 'data_issues', 'derived_rebuilds', 'draft_persons', 'draft_picks', 'external_identities',
   'father_son_selections', 'hall_of_fame', 'honour_team_members', 'import_batches', 'import_rejections',
   'match_period_scores', 'matches', 'player_achievements', 'player_birth_evidence', 'player_career_stats',
+  'external_grid_axes', 'external_grid_sources', 'external_grids', 'player_height_evidence',
   'player_club_season_stats', 'player_clubs', 'player_match_period_stats', 'player_match_stats',
   'player_name_aliases', 'player_relationships', 'player_season_stats', 'players', 'promotion_candidates',
   'seasons', 'sources', 'stat_availability', 'stat_definitions', 'venue_aliases', 'venues',

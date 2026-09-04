@@ -500,9 +500,10 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
 
   // -- biography ---------------------------------------------------------------
   // Exact bounds on players.height_cm; an unknown height never qualifies.
-  // The column is unpopulated on every environment until the height
-  // acquisition lands (ISSUE-118 reopened, Stage H2), so these answer
-  // nothing today and the corpus regression says so rather than passing.
+  // The column is filled from the AFL Tables player register through
+  // player_height_evidence (ISSUE-118 Stage H2, tools/migration/
+  // enrich_heights.py); a player the register does not cover stays NULL
+  // and is reported by the corpus regression, never guessed.
   height195: fixed('195cm', mapped('height_min', { cm: '195' })),
   height180: fixed('180cm', mapped('height_max', { cm: '180' })),
 
