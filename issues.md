@@ -7,7 +7,9 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 7 tracked here — `AFLDB-ISSUE-104`, `-110`, `-116`, `-125`, `-126`, `-134`, `-137`.
+**Open issues:** 6 tracked here — `AFLDB-ISSUE-110`, `-116`, `-125`, `-126`, `-134`, `-137`.
+<!-- Count corrected 2026-09-04: `-104` removed by its own closeout (Resolved — closed as not
+     reachable under the current single-owner-per-`issue_type` contract); 7 -> 6. -->
 <!-- Count corrected 2026-09-04: `-124` removed by its own closeout (Resolved, see the RETIRED
      note below); `-127` was already removed from this table by its 2026-09-04 closeout but had
      been left in this count line — 10 -> 8. -->
@@ -185,7 +187,19 @@ created, reopened, resolved, or materially reclassified.
      untouched. Authoritative records: the `AFLDB-ISSUE-123` entry below (Resolution, 2026-09-04)
      and `issues/closed/AFLDB-ISSUE-123.md`. -->
 | `AFLDB-ISSUE-110` | Medium | Natural-language search / deterministic semantics | NL semantic-mapping fixes, merged into dev 2026-08-31; parser v32 including the ranked-career season-bound fail-closed validator revision. Standing evidence: focused parser/validator **182/182**; expanded focused **345/345**; complete DB-free ISSUE-110 matrix **14 suites, 733/733**; typecheck passed; authoritative post-final-revision operator DB gate **2 files, 46/46 in 20.65 s, started 18:52:45** (24/24 + 22/22) — distinct from the earlier pre-revision 17:47 run. The three documented temporary artifacts were removed exactly. Durable record: `issues/open/AFLDB-ISSUE-110.md`. **Latest independent review verdict: REVISE — NOT READY FOR LARGE-SCALE VALIDATION**, with two unresolved HIGH findings: (A) career-predicate season ownership — a career predicate can exist without consuming `seasonMin`/`seasonMax`, so e.g. `players with at least 3 grand finals since 2000` silently ignores the requested period; (B) `clubFor` ownership with career predicates — e.g. `Carlton players who debuted since 2000`: execution bypasses the generic club filter merely because `careerPredicates` exist. | **Fix findings A and B fail-closed, then a fresh independent re-review.** For A, replace the blanket career-predicate exemption with explicit period ownership — only predicates that actually consume the relevant period bounds may permit them. For B, allow the `clubFor` bypass only when a predicate explicitly owns the relevant club semantics; otherwise reject or correctly compile the club constraint. No 480, 1,435/1,440, 100k, telemetry reset, or other large-scale validation before APPROVE; the 22,607-search run remains incomplete. |
-| `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
+<!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-104` is **Resolved** and is NO LONGER an open issue.
+     Closed as **NOT REACHABLE**, not fixed. Re-derived from the current tree, not assumed: a
+     SECOND `issue_key` writer now exists (`canonical_apply_failed`, owner `AFLDB-ISSUE-122`,
+     `settle-afltables.ts:365/393`, written at `:2530` and `:2586`), but it cannot contend for
+     ISSUE-099's index entry — its `issue_type` differs, and `canonicalApplyIssueKey()` (`:372`)
+     emits `afltables|apply|…` which `settleIssueKey()` (`:339`) can never emit because
+     `contractFamilyOf()` (`:126`) is total over `{match, player_match_stats}`. Every other
+     `data_issues` writer leaves `issue_key` NULL and is excluded by the partial index.
+     `writeSettleDataIssue()`'s owner-blind `ON CONFLICT` (`:3291-3312`) is UNCHANGED and remains
+     safe only because each `issue_type` in the keyed namespace has exactly one owner.
+     No code, schema, migration or test change; migration 076 untouched; `086` still next free.
+     Authoritative record: the `AFLDB-ISSUE-104` entry below (Resolution, 2026-09-04) and
+     `issues/closed/AFLDB-ISSUE-104.md`. Reopen trigger is binding — see §6 there. -->
 <!-- RETIRED 2026-09-01 — `AFLDB-ISSUE-120` is **Resolved** and is NO LONGER an open issue.
      F1 (per-IP NL `/search` limiter, 30/60 s, friendly 200 denial, fail-open), F2 (`/api/health-event`
      32 KiB streaming body cap → 413) and F3 (`Object.hasOwn` guards on the two request-derived
@@ -9670,48 +9684,103 @@ None. Retain the focused regression and normal statement-timeout boundary.
 
 ## AFLDB-ISSUE-104 — `data_issues` open-row dedup is not ownership-scoped
 
-- **Status:** Open
+- **Status:** Resolved — **closed as NOT REACHABLE, not fixed**
 - **Severity:** Low
 - **Area:** Data acquisition / Import architecture / Data integrity
 - **Found:** 2026-08-29 (`AFLDB-ISSUE-099` T7, carried to T8 close-out)
-- **Resolved:** N/A
+- **Resolved:** 2026-09-04
 - **Files:** `src/db/migrations/076_afltables_settle_projections.sql` (**applied and
-  checksum-frozen — a change here needs a NEW forward migration**),
-  `src/lib/acquisition/settle-afltables.ts` (`writeDisagreementIssue()`)
-- **Related:** `AFLDB-ISSUE-099` (Resolved — origin)
+  checksum-frozen — NOT edited; a change here needs a NEW forward migration**),
+  `src/lib/acquisition/settle-afltables.ts`
+- **Runbook:** `issues/closed/AFLDB-ISSUE-104.md` (the closure record — writer matrix,
+  reachability proof, binding reopen trigger)
+- **Related:** `AFLDB-ISSUE-099` (Resolved — origin), `AFLDB-ISSUE-122` (Resolved — added the
+  second writer and discharged this issue's precondition by `issue_type` partition),
+  `AFLDB-ISSUE-131` (Resolved — the rekey-refusal finding shares the ISSUE-122 owner)
 
 ### Problem
 Migration 076's partial unique index for one open finding per key is
-`(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL`. It **does not
-include owner**. `writeDisagreementIssue()` infers that index in `ON CONFLICT ... DO UPDATE`,
-so if another writer ever held an **open** row on an identically shaped `issue_key`, a
-recurrence would refresh **that** row — overwriting its `entity_id`, `severity`,
-`description` and `details`, and stamping `details.owner` as `AFLDB-ISSUE-099`. Resolution
-is correctly ownership-scoped (`details->>'owner'`) and is proved never to close a
-foreign-owned row; **the refresh path is not, because the index is not.**
+`(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` (`076:434-436`). It
+**does not include owner**. `writeSettleDataIssue()` infers that index in `ON CONFLICT ... DO
+UPDATE`, so if another writer ever held an **open** row on an identically shaped
+`(issue_type, issue_key)` pair, a recurrence would refresh **that** row — overwriting its
+`entity_id`, `severity`, `description` and `details`. Resolution is correctly ownership-scoped
+(`details->>'owner'`); **the refresh path is not, because the index is not.**
 
-### Current reachability
-**Unreachable today, verified at close-out.** `issue_key` was introduced by migration 076 and
-`settle-afltables.ts` is the only writer that populates it — every other `data_issues` writer
-(`tools/records/import-first-kick-goal.ts`, `tools/migration/enrich_birth_dates.py`,
-`enrich_birth_dates_from_club_lists.py`, migration 020) leaves it NULL, and the index is
-partial on `issue_key IS NOT NULL`. Keys are namespaced
-`afltables|<family>|<record>|<target>`.
+### Resolution (2026-09-04) — not reachable; closed without a fix
+The 2026-08-29 "only ISSUE-099 writes `issue_key`" premise was **not** carried forward. It was
+re-derived from the current tree, and it has changed: **a second writer now exists.** It still
+cannot collide.
 
-### Why it was not fixed in ISSUE-099
-`issues/closed/AFLDB-ISSUE-099.md` §13.3 scoped ownership to **resolution** deliberately, and §26's T7
-instruction specified exactly this upsert, so the writer implements the contract as written.
-Narrowing it needs either a forward migration changing a frozen dedup contract, or a
-pre-read of ownership before the upsert — which introduces a TOCTOU window and requires a new
-undefined behaviour (fail closed? counter? skip?) that no approved contract specifies.
-Improvising that at close-out was refused.
+1. **Second writer, confirmed.** `CANONICAL_APPLY_ISSUE_TYPE = 'canonical_apply_failed'`
+   (`settle-afltables.ts:365`), owner `AFLDB-ISSUE-122` (`:393`), written at `:2530`
+   (apply failure) and `:2586` (`writeRekeyRefusalIssue()`, ISSUE-131 §5.10).
+2. **It cannot contend for ISSUE-099's index entry, on two independent grounds.** The
+   `issue_type` differs, so the index keys differ; and `canonicalApplyIssueKey()` (`:372`) emits
+   `afltables|apply|<family>|<record>|<target>` while `settleIssueKey()` (`:339`) emits
+   `afltables|<family>|<record>|<target>` — and `contractFamilyOf()` (`:126`) is total over
+   `BUNDLE_FAMILIES = {match, player_match_stats}` (`:121-124`) and `fail()`s otherwise, so the
+   literal segment `apply` can never occupy position 2 of a settle key. The strings can never be
+   equal.
+3. **`source_disagreement` still has exactly one producer** — `draftDisagreementIssue()` (`:504`,
+   stamped `AFLDB-ISSUE-099` at `:540`), reached only via
+   `recordOutcome()` → `recordDisagreementFinding()` (`:3395`) → `:3410`.
+4. **Every other `data_issues` writer leaves `issue_key` NULL** and is excluded by the partial
+   index: `import-first-kick-goal.ts:1322/1332`, `enrich_birth_dates.py:265/283/601`,
+   `enrich_birth_dates_from_club_lists.py:320`, `020_attendance_provenance.sql:61`. Their
+   `DELETE`/`UPDATE` paths are scoped to `entity_type IN ('player_achievements','player')`, which
+   is disjoint from `SettleTargetTable` (`:140-146`).
+5. **No later migration touched the table or the index** — `072` and `076` are the only migrations
+   naming `data_issues`.
+6. **Both resolvers are owner-scoped** — `resolveRestoredDisagreements()` (`:3337-3351`) and
+   `resolveAppliedFailureFinding()` (`:3433-3448`) each name their own `issue_type` **and** their
+   own `details->>'owner'`.
 
-### Exact next action
-**Binding precondition: before any second writer begins populating `data_issues.issue_key`,
-ownership must become part of the conflict/dedup contract** — either a forward migration
-adding owner to the partial unique key, or an ownership-scoped persistence path with defined
-behaviour when a foreign-owned open row exists. Until such a writer is proposed there is
-nothing to do. **Do not edit migration 076.**
+**What is explicitly NOT claimed.** The schema is **not** globally safe. `writeSettleDataIssue()`'s
+`ON CONFLICT` (`:3291-3312`) is still owner-blind and the index is still owner-blind; the invariant
+holds only because each `issue_type` in the keyed namespace has exactly one owner. A migration to
+harden an unreachable path would be schema churn against a frozen contract for no behavioural gain,
+so none was added and migration 076 was not edited.
+
+**Not ISSUE-104:** the two `canonical_apply_failed` call sites (`:2530`, `:2586`) share one
+`issue_key`, so a rekey refusal and an apply failure for the same target refresh one row. Both
+carry the same owner and the same resolver; ISSUE-131 §5.10 states that placement deliberately. No
+issue opened.
+
+### Validation
+Source-level throughout; no shell, Git, database or deployment command was executed, and neither
+DEV nor PROD was read or written. Existing coverage carries the claim and is the regression guard:
+
+- `tests/current-season-import.test.ts:3833-3846` — pins `CANONICAL_APPLY_ISSUE_TYPE ===
+  'canonical_apply_failed'`, pins it `not.toBe(SETTLE_ISSUE_TYPE)`, and pins the literal key shape.
+  **This test failing is this closure lapsing.**
+- `tests/integration/settle-afltables.test.ts:1513-1553` — "never resolves an open row another
+  writer owns": a genuinely foreign-owned row on the same `issue_key` survives a settle untouched
+  (resolution-side ownership proof, live PostgreSQL).
+- `tests/integration/settle-afltables.test.ts:3218-3227`, `tests/current-season-import.test.ts:3064-3065/3141-3142`
+  — end-to-end and literal pins for both owners.
+
+There is deliberately **no** test that the refresh path refuses a foreign-owned open row: it does
+not refuse, and cannot be reached with one. That absence is why this is closed as unreachable
+rather than as fixed.
+
+### Reopen trigger (binding)
+Reopen, or allocate a successor, the moment **any** of these becomes true:
+
+1. a **second owner** writes `data_issues` under an `issue_type` another owner already writes with
+   a non-NULL `issue_key`;
+2. `CANONICAL_APPLY_ISSUE_TYPE` and `SETTLE_ISSUE_TYPE` converge, or either loses its distinct
+   `details.owner` stamp;
+3. any writer outside `settle-afltables.ts` starts populating `data_issues.issue_key`.
+
+**Before such a writer ships**, ownership must enter either the uniqueness contract (a **forward**
+migration adding owner to the partial unique key — **do not edit migration 076**) or the write
+predicate (an ownership-scoped persistence path with defined, tested behaviour for a foreign-owned
+open row), with regression coverage mirroring the resolution-side proof above.
+
+### Follow-up
+None. No migration number claimed; `086` remains the next free number. No `CHANGELOG.md` entry —
+tracking-only closure with no retained behavioural change.
 
 ## AFLDB-ISSUE-105 — `import_batches.id` bigint is a string at runtime, typed as number
 
