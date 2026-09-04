@@ -7,9 +7,9 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-09-04
-**Open issues:** 8 tracked here — `AFLDB-ISSUE-104`, `AFLDB-ISSUE-110`,
-`AFLDB-ISSUE-116`, `AFLDB-ISSUE-123`, `AFLDB-ISSUE-125`, `AFLDB-ISSUE-126`,
-`AFLDB-ISSUE-134`, `AFLDB-ISSUE-137`.
+**Open issues:** 7 tracked here — `AFLDB-ISSUE-104`, `AFLDB-ISSUE-110`,
+`AFLDB-ISSUE-116`, `AFLDB-ISSUE-125`, `AFLDB-ISSUE-126`, `AFLDB-ISSUE-134`,
+`AFLDB-ISSUE-137`.
 
 <!-- UPDATE 2026-09-04 (ISSUE-127 closeout): `AFLDB-ISSUE-127` is **Resolved** — operator host
      validation completed on dev (`streamanator`, deployed revision `169d738`). The polkit grant
@@ -497,7 +497,27 @@ closure boundary, and the unrelated query-builder timing regression remains with
      schema, `privileges.sql`, `.env`, timer, polkit or database change; `086` still next free.
      Authoritative records: the `AFLDB-ISSUE-124` entry below (Resolution, 2026-09-04) and
      `issues/closed/AFLDB-ISSUE-124.md` §7.3. -->
-| `AFLDB-ISSUE-123` | Low | Data acquisition / Import architecture / Performance | The first full `AFLDB-ISSUE-122` production pass — `--dry-run --auto-apply` then the real `--apply --auto-apply` over snapshot `settle-2026-09-02-1958` (207 matches, 9522 player-match rows, 10582 canonical rows, 9133 ledger rows) — took roughly **an hour** on a 2 vCPU droplet with PostgreSQL co-located. Diagnosis is negative in the useful sense: continuous forward progress, rapidly changing per-record `source_records`/version/projection/savepoint SQL, **no lock blocking and no long-running single query** — per-record round-trip cost across a season backfill, not a bad plan. Correctness is not in question (the rerun wrote nothing). **Steady-state nightly cost is unmeasured.** Key files: `src/lib/acquisition/settle-afltables.ts`, `src/lib/acquisition/canonical-apply.ts`, `deploy/afldb-settle-afltables.{service,sh}`. | **Not started, correctly low until measured.** First read `journalctl -u afldb-settle-afltables.service` across several in-season firings and record the real nightly runtime — a season backfill is not the scheduled workload. Then **profile before optimizing** (per-record round trips vs. per-target savepoint vs. projection writes vs. version/payload upserts). Any change **must preserve** the ledger row in the same savepoint as its mutation (SC2), the record as the savepoint boundary (SC4), and zero canonical/ledger writes on an identical rerun (SC3). Do not batch across records in a way that lets one bad record take down a family that would otherwise land. |
+<!-- RETIRED 2026-09-04 (ISSUE-123 closeout) — `AFLDB-ISSUE-123` (current-season settle
+     performance is unmeasured at steady state) is **Resolved: measured; no optimisation
+     warranted** and is NO LONGER an open issue. The measurement the issue was held open for now
+     exists. Production's scheduled nightly firing ran **2026-09-04 04:31:21 -> 04:31:56 AEST =
+     35.0 s wall / 21.277 s CPU**, `Result=success`, against `TimeoutStartSec=1h` (**0.97 % of
+     budget**): acquire 14 s, adjudicate 2 s, and **19 s for the entire per-record settle phase
+     over 9,823 records / 209 matches / 9,614 player-match rows**, writing 0 canonical rows, 0
+     ledger rows, source completeness COMPLETE (batch 739), with 0 open pending candidates, 0 open
+     apply failures and 0 open source disagreements. Production shows **0 deadlocks / 0 conflicts**
+     on `afldb_prod`, no settle batch in any status but `completed` in all 25 settle rows, and a
+     next timer elapse of 2026-09-05 04:34:59 — no contention, no long-running query, no timeout,
+     no failed or stuck batch, no backlog, no possible overlap at a 0.04 % duty cycle. The ~1 hour
+     that opened the issue was batch **731**, a one-time whole-season backfill of 10,582 canonical
+     + 9,133 ledger rows preceded by a full dry-run pass; it is not the scheduled workload.
+     **No performance code was changed** — the ISSUE-122 SC2/SC3/SC4 invariants are preserved by
+     construction and were re-confirmed at `413d1d3`. Read-only production inspection only: no
+     settle triggered, no cadence altered, nothing mutated, `AFLDB-ISSUE-137` untouched. No
+     `CHANGELOG.md` entry (measurement and tracking only, no retained behaviour change); `086`
+     still next free migration number. Committed on `claude/issue-123`, not merged. Authoritative
+     records: the `AFLDB-ISSUE-123` entry in `issues.md` (Resolution — 2026-09-04) and
+     `issues/closed/AFLDB-ISSUE-123.md`. -->
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-113` (replace legacy `brownlow_season_votes` acquisition) is
      **Resolved** and is NO LONGER an open issue. Authoritative records: `issues.md` (Resolution —
      2026-09-04) and `issues/closed/AFLDB-ISSUE-113.md` §8.18. Tracked artefact `data/brownlow/`,

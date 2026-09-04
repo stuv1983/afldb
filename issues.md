@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 8 tracked here — `AFLDB-ISSUE-104`, `-110`, `-116`, `-123`, `-125`, `-126`, `-134`, `-137`.
+**Open issues:** 7 tracked here — `AFLDB-ISSUE-104`, `-110`, `-116`, `-125`, `-126`, `-134`, `-137`.
 <!-- Count corrected 2026-09-04: `-124` removed by its own closeout (Resolved, see the RETIRED
      note below); `-127` was already removed from this table by its 2026-09-04 closeout but had
      been left in this count line — 10 -> 8. -->
@@ -167,7 +167,23 @@ created, reopened, resolved, or materially reclassified.
      schema, `privileges.sql`, `.env`, timer, polkit or database change; `086` still next free.
      Authoritative records: the `AFLDB-ISSUE-124` entry below (Resolution, 2026-09-04) and
      `issues/closed/AFLDB-ISSUE-124.md` §7.3. -->
-| `AFLDB-ISSUE-123` | Low | Data acquisition / Import architecture / Performance | The first full `AFLDB-ISSUE-122` production pass — `--dry-run --auto-apply` followed by the real `--apply --auto-apply` over snapshot `settle-2026-09-02-1958` (207 matches, 9522 player-match rows, 10582 canonical rows, 9133 ledger rows) — took roughly **an hour**. Diagnosis so far is negative in the useful sense: PostgreSQL showed continuous forward progress with rapidly changing per-record `source_records` / version / projection / savepoint SQL, **no lock blocking, and no long-running single query**. The shape is per-record round-trip cost across a whole season backfill, not a pathological plan. **Steady-state nightly cost is unmeasured** — a nightly in-season pass sees only the new round, and an unchanged rerun is already proven to write nothing (`import_batches` 732, 0/0/0). | **Not started, and correctly low priority until measured.** First **measure the steady-state nightly runtime** from the timer's own journal (`journalctl -u afldb-settle-afltables.service`) across several in-season firings; a first-pass season backfill is not the workload this job actually runs. **Profile before optimizing** — identify whether the cost is per-record round trips, the per-target savepoint, the projection writes or the version/payload upserts. Any change **must preserve the transaction and idempotence semantics** that `AFLDB-ISSUE-122` SC2/SC3 depend on: the ledger row stays in the same savepoint as its mutation, the record stays the savepoint boundary, and an identical rerun must still write zero canonical and zero ledger rows. Do not batch across records in a way that lets one bad record take down a family that would otherwise land. |
+<!-- RETIRED 2026-09-04 (ISSUE-123 closeout): `AFLDB-ISSUE-123` (current-season settle
+     performance) is **Resolved — measured; no optimisation warranted**, and is NO LONGER an open
+     issue. The steady-state number the issue was held open for now exists: production's scheduled
+     nightly firing on 2026-09-04 ran **04:31:21 -> 04:31:56 AEST = 35.0 s wall / 21.277 s CPU**,
+     `Result=success`, against a `TimeoutStartSec` of 1 h (0.97 % of budget) — acquire 14 s,
+     adjudicate 2 s, and **19 s for the entire per-record settle phase over 9,823 records / 209
+     matches / 9,614 player-match rows**, writing 0 canonical and 0 ledger rows with source
+     completeness COMPLETE (batch 739). Production shows **0 deadlocks, 0 conflicts**, no settle
+     batch in any status but `completed` at any time, no open pending candidates / apply failures /
+     source disagreements, and a next timer elapse of 2026-09-05 04:34:59 — no contention, no
+     failure, no backlog, no overlap. The ~1 hour that opened the issue was batch **731**, a
+     one-time whole-season backfill of 10,582 canonical + 9,133 ledger rows preceded by a full
+     dry-run pass, and is not the scheduled workload. **No performance code was changed**, so the
+     ISSUE-122 SC2/SC3/SC4 invariants are preserved by construction. Read-only production
+     inspection only; no settle triggered, no cadence altered, no row written, `AFLDB-ISSUE-137`
+     untouched. Authoritative records: the `AFLDB-ISSUE-123` entry below (Resolution, 2026-09-04)
+     and `issues/closed/AFLDB-ISSUE-123.md`. -->
 | `AFLDB-ISSUE-110` | Medium | Natural-language search / deterministic semantics | NL semantic-mapping fixes, merged into dev 2026-08-31; parser v32 including the ranked-career season-bound fail-closed validator revision. Standing evidence: focused parser/validator **182/182**; expanded focused **345/345**; complete DB-free ISSUE-110 matrix **14 suites, 733/733**; typecheck passed; authoritative post-final-revision operator DB gate **2 files, 46/46 in 20.65 s, started 18:52:45** (24/24 + 22/22) — distinct from the earlier pre-revision 17:47 run. The three documented temporary artifacts were removed exactly. Durable record: `issues/open/AFLDB-ISSUE-110.md`. **Latest independent review verdict: REVISE — NOT READY FOR LARGE-SCALE VALIDATION**, with two unresolved HIGH findings: (A) career-predicate season ownership — a career predicate can exist without consuming `seasonMin`/`seasonMax`, so e.g. `players with at least 3 grand finals since 2000` silently ignores the requested period; (B) `clubFor` ownership with career predicates — e.g. `Carlton players who debuted since 2000`: execution bypasses the generic club filter merely because `careerPredicates` exist. | **Fix findings A and B fail-closed, then a fresh independent re-review.** For A, replace the blanket career-predicate exemption with explicit period ownership — only predicates that actually consume the relevant period bounds may permit them. For B, allow the `clubFor` bypass only when a predicate explicitly owns the relevant club semantics; otherwise reject or correctly compile the club constraint. No 480, 1,435/1,440, 100k, telemetry reset, or other large-scale validation before APPROVE; the 22,607-search run remains incomplete. |
 | `AFLDB-ISSUE-104` | Low | Data acquisition / Import architecture / Data integrity | Migration 076's open-row unique key `(issue_type, issue_key) WHERE issue_key IS NOT NULL AND resolved_at IS NULL` carries no owner, so `writeDisagreementIssue()`'s `ON CONFLICT` upsert could refresh a foreign-owned open row on an identically shaped key. Resolution *is* ownership-scoped; the refresh path is not, because the index is not. **Unreachable today** — ISSUE-099 is the only writer that populates `issue_key`. | **Nothing to do until a second writer is proposed.** Binding precondition: before any second writer populates `data_issues.issue_key`, ownership must enter the conflict/dedup contract — a forward migration adding owner to the partial unique key, or an ownership-scoped persistence path with defined behaviour for a foreign-owned open row. **Do not edit migration 076.** |
 <!-- RETIRED 2026-09-01 — `AFLDB-ISSUE-120` is **Resolved** and is NO LONGER an open issue.
@@ -12462,15 +12478,21 @@ Full evidence, deviations and the stage-by-stage record: `issues/closed/AFLDB-IS
 
 ---
 
-## AFLDB-ISSUE-123 — Current-season settle performance is unmeasured at steady state
+## AFLDB-ISSUE-123 — Current-season settle performance, measured at steady state
 
-- **Status:** Open
+- **Status:** **Resolved 2026-09-04** — measured on production; the initial full-season backfill
+  was not representative; **no optimisation currently warranted**. The scheduled nightly run takes
+  **35.0 s**, not an hour. No performance code was changed, so this is a *measurement* outcome and
+  not a fix.
 - **Severity:** Low
 - **Area:** Data acquisition / Import architecture / Performance
 - **Found:** 2026-09-03 (`AFLDB-ISSUE-122` closeout; observed during the 2026-09-02 supervised production run)
-- **Resolved:** N/A
-- **Files:** `src/lib/acquisition/settle-afltables.ts`, `src/lib/acquisition/canonical-apply.ts`, `src/lib/acquisition/observation-store.ts`, `deploy/afldb-settle-afltables.{service,sh}`
-- **Related:** `AFLDB-ISSUE-122` (Resolved — introduced this path)
+- **Resolved:** 2026-09-04 — read-only production measurement on `afldb-prod`. See Resolution below
+  and `issues/closed/AFLDB-ISSUE-123.md`.
+- **Files:** `src/lib/acquisition/settle-afltables.ts`, `src/lib/acquisition/canonical-apply.ts`, `src/lib/acquisition/observation-store.ts`, `deploy/afldb-settle-afltables.{service,sh}` — **all unchanged by this closeout**
+- **Runbook:** `issues/closed/AFLDB-ISSUE-123.md` — the production runtime evidence ledger
+- **Related:** `AFLDB-ISSUE-122` (Resolved — introduced this path), `AFLDB-ISSUE-131` (Resolved —
+  re-enabled the timer on 2026-09-03 22:46:55, which is what made a scheduled run measurable)
 
 ### Symptom
 
@@ -12496,19 +12518,94 @@ to perform zero canonical work. The job is `Nice=10`, `Type=oneshot`, bounded by
 `TimeoutStartSec=3600`, and fires at 04:30 — so even the observed duration is inside its budget
 and outside any user-facing window.
 
-### Next action
+### Next action as it stood — step 1 is now done, and it closed the issue
 
 1. **Measure steady state first.** Read `journalctl -u afldb-settle-afltables.service` across
    several in-season firings and record actual nightly runtime. Do not optimize against the
-   backfill number.
+   backfill number. — **DONE 2026-09-04; see Resolution.**
 2. **Profile before optimizing.** Determine whether the cost is per-record round trips, the
-   per-target savepoint, the projection writes, or the version/payload upserts.
+   per-target savepoint, the projection writes, or the version/payload upserts. — **NOT REACHED,
+   deliberately.** Step 1 showed there is nothing to profile at steady state.
 3. **Preserve the semantics `AFLDB-ISSUE-122` depends on.** Any change must keep the ledger row in
    the **same savepoint** as its mutation (SC2), keep the **record** as the savepoint boundary so
    one bad record cannot take down a family that would otherwise land (SC4), and keep an identical
    rerun at **zero** canonical and zero ledger writes (SC3). Do not batch across records in a way
-   that weakens any of those.
-4. Only then consider `TimeoutStartSec` or cadence changes.
+   that weakens any of those. — **PRESERVED by making no change.** Confirmed still present at
+   `413d1d3`: `canonical-apply.ts:829-871` (the record is the savepoint boundary) and
+   `canonical-apply.ts:583` (the ledger row is written inside the same savepoint as its mutation).
+   SC3 is demonstrated on production five times over — batches 732 and 736-739 each wrote 0/0/0.
+4. Only then consider `TimeoutStartSec` or cadence changes. — **NOT REACHED, and not needed.** The
+   run uses 0.97 % of `TimeoutStartSec`; the timer was not altered.
+
+### Resolution — 2026-09-04
+
+**Outcome: measured, not fixed.** No repository file outside issue tracking was changed, and no
+production state was mutated — the whole closeout is `systemctl show`, `journalctl` and `SELECT`
+on `afldb-prod`. No settle was triggered, no cadence altered, `AFLDB-ISSUE-137` untouched.
+
+**The steady-state number.** `afldb-settle-afltables.timer` went active 2026-09-03 22:46:55 AEST
+and has fired once. That firing is the **only** invocation of the service in the persistent journal
+(unbroken back to 2026-08-16, 35 M, nothing rotated away), invocation `b152416669bb`:
+
+    ExecMainStartTimestamp  Fri 2026-09-04 04:31:21 AEST
+    ExecMainExitTimestamp   Fri 2026-09-04 04:31:56 AEST
+    Result=success, NRestarts=0, MainPID 786905 exited 0/SUCCESS, CPU 21.277s
+
+**35.0 s wall / 21.277 s CPU**, against `TimeoutStartSec=3600` — **0.97 % of budget**, at
+`Nice=10`, at 04:31, with no HTTP request waiting on it. Phases, from the unit's own chain markers:
+**acquire 14 s** (04:31:21-04:31:35), **adjudicate/emit 2 s** (04:31:35-04:31:37), **settle apply
+19 s** (04:31:37-04:31:56).
+
+**The 19 s is the answer to the question the issue asked.** That is the whole per-record path —
+`source_records`, versions, projections, savepoints — over **9,823 acquired records** spanning
+**209 matches** and **9,614 player-match rows**, i.e. the entire season, concluding that all of it
+was already canonical. Batch **739**: 9,823 read, 0 rejected, **0 canonical inserted, 0 updated, 0
+ledger rows**, source completeness **COMPLETE**, and an end-of-run report of 0 open pending
+candidates, 0 open canonical apply failures, 0 open source disagreements.
+
+**Why the hour was not representative.** The hour is batch **731** — a one-time whole-season
+backfill writing 10,582 canonical and 9,133 ledger rows, *preceded by a full `--dry-run
+--auto-apply` pass over the same season*. The scheduled workload is a season-wide comparison plus
+whatever one round changed: 0 rows on a settled night, 101 rows on the one active night on record
+(batch 735: 2 matches, 2 `match_period_scores`, 83 `player_match_stats`, 87 ledger rows).
+
+**Health, all read-only on production.** `pg_stat_database` for `afldb_prod`: **0 deadlocks, 0
+conflicts** across 96,919 commits / 39 rollbacks, with `deadlock_timeout` at 1 s so a real one
+would have been counted. At inspection: 0 active backends, 0 waiting on `Lock`, longest active
+query 0 s. **No settle batch has ever held a status other than `completed`** — no `failed`, none
+left `running`, in all 25 settle rows. (The 20 non-completed `import_batches` rows that do exist
+are 2026-09-02 `import_awards.py` / `enrich_birth_dates.py` fail-closed refusals belonging to other
+work.) Next timer elapse 2026-09-05 04:34:59; a 35 s run against a 24 h period is a **0.04 % duty
+cycle**, so overlap is not reachable.
+
+**The one honest limit.** Only *one* scheduled firing exists, and it was a zero-write night, so a
+*writing* nightly run has not been timed under the unit — batch 735, the one run of that shape, was
+executed by hand under ISSUE-131 supervision and systemd never saw it. What is directly measured is
+the part that runs every night regardless of writes: the full-season comparison, 19 s. The write
+component is **bounded** instead: attributing the entire backfill hour to the apply of its 10,582
+rows gives a pessimistic ceiling of 0.34 s per canonical row, so batch 735's shape is <= ~1.1 min
+end to end and a full nine-match home-and-away round is <= ~3.3 min — <= 6 % of `TimeoutStartSec`.
+An upper bound is sufficient here, because the question was whether the backfill hour indicates a
+steady-state defect, and it does not, by two to three orders of magnitude.
+
+**Not available, recorded as a fact about the evidence.** Production PostgreSQL has statement
+logging off (`logging_collector=off`, `log_min_duration_statement=-1`, `log_lock_waits=off`), and
+`/var/log/postgresql/*.log` is `postgres:adm 640` so `arm` cannot read it. There is therefore no
+per-statement duration history to mine. It does not change the conclusion: contention is answered
+by the zero deadlock/conflict counters and runtime by the journal. Separately,
+`import_batches.completed_at` **equals** `started_at` to the microsecond for every settle row —
+the batch row is written inside the run's single transaction, so `now()` is the transaction
+timestamp. The table proves what each run did, never how long it took; the journal is the only
+duration source, which is why step 1 named it.
+
+### Reopen criteria
+
+New production evidence only: a scheduled run over ~10 minutes in the journal; any settle batch
+hitting `TimeoutStartSec`, or landing `failed` or left `running`; a non-zero `deadlocks`/
+`conflicts` count on `afldb_prod` coinciding with the settle window; or the no-op comparison cost
+growing materially faster than the season row count as 2027 accumulates. On any of those, profile
+the dominant component and persist the measurement **before** proposing code — the original
+decomposition in step 2 above is still the right first question.
 
 ---
 
