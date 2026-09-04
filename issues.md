@@ -14227,7 +14227,7 @@ Current-season settle should invalidate/revalidate affected public season ISR: a
 
 ## AFLDB-ISSUE-134 — Current-season settle should invalidate/revalidate affected public season ISR
 
-- **Status:** Open — **NOT STARTED.** Allocated 2026-09-03 from the ISSUE-133 closeout (`issues/closed/AFLDB-ISSUE-133.md` §6 F4, §11.4). No branch, no worktree, no code, no runbook yet. **Uncommitted on `claude/issue-133`.**
+- **Status:** Open — **IMPLEMENTED AND COMMITTED, DEV ACCEPTANCE HALTED ON A DEFECT (2026-09-04). NOT merged; must NOT be deployed.** Allocated 2026-09-03 from the ISSUE-133 closeout (`issues/closed/AFLDB-ISSUE-133.md` §6 F4, §11.4). Branch `claude/issue-134` (worktree `D:\dev\afldb-issue-134`), commit `7c66ae7`, pushed to `origin`, base `25c976d`; runbook `issues/open/AFLDB-ISSUE-134.md`. No migration.
 - **Severity:** Low — public season pages can lag canonical data by up to one hour after an in-season settle; self-corrects when the ISR window expires; no data or code defect.
 - **Area:** Deployment / Operations / Frontend rendering (ISR) / Current-season settle
 - **Found:** 2026-09-03 — ISSUE-133 investigation: the 2026-09-03 production deploy prerendered `/seasons/2026` before the first settle on the new code inserted the two Wildcard Final rows, and the public page stayed stale until the ISR window expired (prerender 22:14:46 → rows 22:37:47 → regenerated 23:50:48 AEST).
@@ -14254,6 +14254,64 @@ Current-season settle should invalidate/revalidate affected public season ISR: a
 3. Define the boundary: invalidate only after commit, only for the seasons/matches the batch actually changed (from `canonical_applications`), and idempotently on the 0/0 reruns.
 4. Then write the runbook, implement on a `claude/issue-134` branch, extend the closest settle/current-season test, and validate on dev before production.
 - **No production write, purge, rebuild or restart is authorised by this entry.**
+
+### 2026-09-04 — implementation, repository validation, and a halted DEV acceptance
+
+**Steps 1–4 above are done.** The mechanism question in step 2 resolved against `revalidateTag`
+and against a rebuild: Next 16 keeps *page* invalidation in per-process memory (a module-level
+tag map plus an in-memory LRU in front of the file cache) and consults the
+`x-next-revalidated-tags` header only for `FETCH` entries, never `APP_PAGE` ones. Since
+`deploy/server-cluster.mjs` runs 2–4 independent workers behind one socket, one request
+invalidates one worker. The implementation therefore posts the committed season to a loopback
+route on **fresh TCP connections** (`agent: false`, `Connection: close`, because `node:cluster`
+round-robins connections, not requests) until every worker ordinal has answered, and fails
+loudly if it cannot reach them all. Step 3's boundary is honoured: after commit only, only when
+the run wrote a canonical or ledger row, so the idempotent 0/0 rerun makes no request at all.
+
+**Repository validation — all green.** `tests/settle-season-revalidation.test.ts` 49/49;
+`tests/current-season-import.test.ts` + `tests/admin-current-season-settle.test.ts` 287/287;
+`npx tsc --noEmit` clean; ESLint clean on all touched files; and
+`tests/integration/settle-afltables.test.ts` **64 passed / 1 skipped in 240.85 s** against
+`afldb_test` over the workstation SSH tunnel on `127.0.0.1:55432`. The single skip is the
+pre-existing restricted importer-role case, gated on `AFLDB_TEST_IMPORT_DATABASE_URL`, which is
+unset here; it skips identically on `main` and is not an ISSUE-134 failure.
+
+**DEV acceptance on `streamanator` (2026-09-04) — HALTED. The deployed route is unconditionally
+`404`, so the feature is inert on a real host.** The branch was deployed to dev (build
+`RxpUfpomgxOwTRCYf2Li2`, MainPID 1052201, health 200), and the worker half of the design was
+confirmed: exactly 4 workers, each carrying a server-assigned `AFLDB_WORKER_ID` of 1–4 plus
+`AFLDB_WORKER_COUNT=4` supplied by the cluster primary, read from `/proc/<pid>/environ`. But
+every `POST` to `/api/internal/revalidate-season` answered `404 {"error":"Not found."}`,
+including correctly-authenticated ones, while `GET` answered 405 — proving the route was loaded
+and that the handler's single 404, its first gate, fires on every request.
+
+**Root cause.** That gate rejects any request carrying `x-forwarded-for` / `x-forwarded-host`,
+on the premise that only Caddy adds them. `node_modules/next/dist/server/base-server.js:606-612`
+synthesises **both** on every request before any handler runs
+(`req.headers['x-forwarded-host'] ??= req.headers['host']`,
+`req.headers['x-forwarded-for'] ??= originalRequest?.socket?.remoteAddress`), so the premise is
+false under Next 16 and the condition is always true. The unit tests missed it because they call
+`POST()` with synthetic `Request` objects that never pass through `base-server.js`; the
+"proxied requests are refused" test passes for the wrong reason, and nothing asserts that a
+realistically-shaped non-proxied request succeeds.
+
+**Recommended fix (NOT implemented — it moves a security boundary and needs approval).** Invert
+the gate: require `x-forwarded-for` to **be** a loopback address rather than to be absent. This
+is sound here because `deploy/Caddyfile.production:39` sets `header_up X-Forwarded-For
+{remote_host}` — overwriting, never appending, and dropping `X-Real-IP`/`Forwarded` — so a
+public client cannot forge the value; it is the same property `src/lib/auth/session.ts` already
+relies on. Next's `??=` then fills the header only on a direct connection, from
+`socket.remoteAddress`, and the app binds `127.0.0.1:3100` only. The fix must also replace the
+test that passed for the wrong reason and correct the false premise in `route.ts` and
+`docs/deployment.md` §7c, whose verification `curl` as written returns 404.
+
+**DEV was restored** to `main` @ `169d738` (rebuilt `p0Z_llbWECQxDN2Eo2YMC`, MainPID 1057872,
+health 200, 4 workers, 0 tracked modifications), with both revalidation variables removed from
+`.env` and the settle timer still `not-found` — it was never installed and never triggered.
+**PROD was not touched at any point.** Full evidence: `issues/open/AFLDB-ISSUE-134.md` §10.
+
+**Exact next action:** operator decides on §10.4 of the runbook — rewrite gate 1, replace the
+test, correct the docs, re-run the §5 gates, then re-run DEV acceptance from §10.1.
 
 ---
 

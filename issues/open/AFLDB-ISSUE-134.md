@@ -4,6 +4,11 @@
 **Started:** 2026-09-04
 **Migration:** none (confirmed — no persistent schema state is required)
 **Production:** no production write, purge, rebuild, restart or deployment is authorised by this runbook.
+**Status:** **OPEN — DEV acceptance HALTED on a defect.** The implementation is committed and
+pushed (`7c66ae7`) and every repository gate is green, but on the real host the route is
+unconditionally `404` and the feature does nothing. Read **§10** before §2 or §6: the security
+argument in §2.3 and the `route.ts`/`docs` comments it summarises rest on a premise that is
+false under Next 16. DEV has been restored to `main`. **Do not merge and do not deploy.**
 
 ---
 
@@ -188,6 +193,10 @@ than assumed.
   The route refuses any request carrying `x-forwarded-for` / `x-forwarded-host`, which Caddy
   always adds (`deploy/Caddyfile.production` proxies to `127.0.0.1:3100`), so a request that
   arrived through the public proxy is rejected before the secret is even compared.
+  > **DISPROVED ON THE HOST — see §10.2.** Next 16 synthesises *both* headers on every request
+  > (`base-server.js:606-612`), so the test is true for loopback callers too and the route can
+  > never succeed. The replacement gate is §10.4. Everything else in this list held up under
+  > the §10 acceptance probes.
 - **No user-controlled path or tag.** The body carries a single integer `season`; the handler
   builds the path itself with `seasonPath()` after bounds-checking the integer. There is no
   input by which any other path, pattern, layout or tag can be reached.
@@ -427,14 +436,15 @@ so the comment is misleading rather than wrong in effect. Out of scope here.)
 | 4. Repository gates | **ALL GREEN** — unit 49/49, focused 287/287, `tsc` clean, ESLint clean, integration 64 passed / 1 pre-existing skip in 240.85 s — §5.2, §5.4 |
 | 5. Coverage-contract scrutiny | **Complete** — §6; two hardening changes made (§5.3) |
 | 6. DEV preflight (read-only) | **Complete** — §7 |
-| 7. DEV acceptance | **IN PROGRESS** — operator approved §9; implementation checkpoint committed and pushed on `claude/issue-134` |
-| 8. Close-out | pending |
+| 7. DEV acceptance | **HALTED ON A DEFECT** — deployed and worker identity proved on the host, but the route is unconditionally 404. DEV restored to `main`. §10 |
+| 8. Close-out | **BLOCKED** — ISSUE-134 stays OPEN; see §10.4 |
 
-**Exact next action:** execute the §9 DEV acceptance on `streamanator` — deploy the pushed
-`claude/issue-134` commit, prove the route fails closed, prove real four-worker coverage, prove
-`/seasons/2026` regenerates, then restore dev to `main`. **PROD is not touched.**
+**Exact next action:** operator decides on §10.4 — invert gate 1 to a loopback allowlist on
+`x-forwarded-for`, replace the test that passed for the wrong reason, correct the false premise
+in `route.ts` and `docs/deployment.md` §7c, re-run the §5 gates, then re-run DEV acceptance
+from §10.1. **ISSUE-134 stays OPEN. PROD untouched.**
 
-## 9. DEV acceptance plan — proposed, NOT executed
+## 9. DEV acceptance plan — as proposed (superseded in part by §10)
 
 **Dev currently serves `main` at `169d738`.** Every step below moves it onto
 `claude/issue-134` and back. Nothing here runs until the operator agrees, and **no production
@@ -516,3 +526,118 @@ branch reverted the route no longer exists and they are inert either way.
 - Moving dev off `main` interrupts anyone testing the current build.
 - Step C is the one irreplaceable observation: it is the only place the per-process invalidation
   finding (§1.6) is confirmed against a real 4-worker cluster rather than a simulated one.
+
+## 10. DEV acceptance - HALTED on a defect (2026-09-04, `streamanator`)
+
+**Outcome: the deployed route is unconditionally unreachable. The feature is inert on a real
+host.** Every repository gate was green (§5); this is the failure only host acceptance could
+find.
+
+### 10.1 What was deployed, and the part that worked
+
+| Step | Evidence |
+|---|---|
+| Host re-confirmed before mutation | `hostname` = `streamanator`; `main` @ `169d738`; build `S6wER-7aEXc_B3EID7XMX`; MainPID 856072; 4 workers; timer `not-found`; both revalidate names absent |
+| `.env` backed up | `.env.bak-issue134-20260904-180343` |
+| Checkout | detached at **`7c66ae78dcbd8a7cf3269e907bb75abbb76b7155`** |
+| Env added | **only** `AFLDB_REVALIDATE_URL=http://127.0.0.1:3100` and `AFLDB_REVALIDATE_SECRET` (64 hex, `openssl rand -hex 32`, generated on the host); `.env` stayed `600 arm` |
+| `npm ci` / `db:migrate` | **not run, provably unnecessary** - `git diff 169d738..7c66ae7 -- package.json package-lock.json` is empty, and the branch adds no migration |
+| Build | `npm run build` on nvm Node **v22.23.2**; `BUILD_ID` = `RxpUfpomgxOwTRCYf2Li2`, standalone identical |
+| Restart | MainPID 856072 -> **1052201** (terminate + systemd `Restart=always`, the documented route in `docs/deployment.md` §3) |
+| Health | `/api/health` -> 200 `{"status":"ok","database":"ok","latencyMs":28}` |
+| **Worker identity - PA§ED** | exactly 4 children, and `/proc/<pid>/environ` shows `AFLDB_WORKER_ID=1..4` with `AFLDB_WORKER_COUNT=4` on **every** one. The primary really does hand each worker its ordinal and the fork count, read from process state. §7.1's design conclusion is confirmed on the real host |
+| Timer | remained `not-found` throughout. **Not installed.** |
+
+### 10.2 The defect
+
+Every `POST` to `/api/internal/revalidate-season` answered **`404 {"error":"Not found."}`** -
+including requests carrying the correct secret and a valid season.
+
+```
+A1 no secret header                          -> 404 {"error":"Not found."}
+B1 wrong secret, same length (64 hex)        -> 404 {"error":"Not found."}
+B2 wrong secret, different length            -> 404 {"error":"Not found."}
+C1 CORRECT secret + X-Forwarded-For          -> 404 {"error":"Not found."}
+C2 CORRECT secret + X-Forwarded-Host         -> 404 {"error":"Not found."}
+C3 WRONG secret + X-Forwarded-For            -> 404 {"error":"Not found."}
+D  every malformed season (9 cases)          -> 404 {"error":"Not found."}
+E1 injected path/tag/paths/type fields       -> 404 {"error":"Not found."}
+F1 GET                                       -> 405
+```
+
+`F1` answering **405** proves the route module is loaded and Next resolved it; and a missing
+route would return an HTML 404, not `{"error":"Not found."}`, which is the handler's own
+literal string. The handler contains exactly one 404 - gate 1 - so gate 1 is firing on every
+request, including a plain loopback one.
+
+**Mechanism - `node_modules/next/dist/server/base-server.js:606-612`.** Next 16 synthesises the
+forwarded headers on *every* request, before any handler runs:
+
+```js
+req.headers['x-forwarded-host'] ??= req.headers['host'] ?? this.hostname;
+req.headers['x-forwarded-port'] ??= this.port ? this.port.toString() : isHttps ? '443' : '80';
+req.headers['x-forwarded-proto'] ??= isHttps ? 'https' : 'http';
+req.headers['x-forwarded-for']  ??= originalRequest?.socket?.remoteAddress;
+```
+
+Gate 1's stated premise - "Caddy adds `X-Forwarded-For` to everything it forwards, so a request
+carrying those headers did not originate on this host" (`route.ts`, and `docs/deployment.md`
+§7c) - is therefore **false under Next**. Both headers are present on a direct loopback request
+too, so the `!== null` test is unconditionally true and the route can never do anything.
+
+**Why every repository gate missed it.** `tests/settle-season-revalidation.test.ts` exercises
+the handler by constructing synthetic `Request` objects and calling `POST()` directly. Those
+never pass through `base-server.js`, so they carry exactly the headers the test sets - the one
+condition production never satisfies. The test asserting "proxied requests are refused" passes
+for the wrong reason, and no test asserts that a *non*-proxied request succeeds against a
+realistically-shaped request.
+
+### 10.3 Consequences for the rest of acceptance
+
+Not reached, because the route never succeeds: real four-worker invalidation coverage (§9.3),
+`/seasons/2026` ISR regeneration (§9.4), and the settle end-to-end and failure-semantics paths.
+**The worker-identity half of the coverage contract was proved on the host (§10.1); the
+connection round-robin half was not.**
+
+### 10.4 Recommended fix - evidence-backed, NOT implemented
+
+Invert gate 1: instead of requiring the forwarded headers to be **absent**, require
+`x-forwarded-for` to be **exactly a loopback address**.
+
+That is sound on this deployment, and is strictly stronger than the current intent:
+
+- `deploy/Caddyfile.production:39` sets `header_up X-Forwarded-For {remote_host}` - Caddy
+  **overwrites, never appends**, and drops `X-Real-IP` and `Forwarded`. A public client that
+  sends its own `X-Forwarded-For: 127.0.0.1` has it replaced with its real address, so the
+  value cannot be forged. `src/lib/auth/session.ts` already depends on exactly this property.
+- Next's `??=` fills the header in only when Caddy did not, i.e. on a direct connection, and
+  then fills it from `socket.remoteAddress`.
+- The app binds `127.0.0.1:3100` only (§7, re-confirmed in §10.1), so a loopback
+  `remoteAddress` means the caller is already on this host.
+
+Scope of the fix. All of it needs operator approval, because it moves a security boundary:
+
+1. `src/app/api/internal/revalidate-season/route.ts` - gate 1 rewritten as a loopback allowlist.
+2. `tests/settle-season-revalidation.test.ts` - add the case that would have caught this: a
+   request shaped the way Next really delivers one (both forwarded headers present,
+   `x-forwarded-for` loopback) must **succeed**; the same with a non-loopback `x-forwarded-for`
+   must be refused.
+3. `docs/deployment.md` §7c and the `route.ts` header comment - both currently assert the false
+   premise and must be corrected. The §7c verification `curl` as written returns 404.
+4. Re-run the full §5 gate set, then re-run this DEV acceptance from §10.1.
+
+### 10.5 DEV restored
+
+| Step | Evidence |
+|---|---|
+| `.env` | restored from `.env.bak-issue134-20260904-180343`; `AFLDB_REVALIDATE_URL` count 0, `AFLDB_REVALIDATE_SECRET` count 0; mode `600 arm`. The acceptance secret existed only on dev, only for this window, and is gone |
+| Checkout | back on branch **`main`** @ `169d7380928eb3f58d6c5e2c4f0a2e5db76ee85f` |
+| Rebuild | `BUILD_ID` = `p0Z_llbWECQxDN2Eo2YMC` - a fresh build of identical source. `next build` is not byte-reproducible, so a changed id here is expected and is not a code difference |
+| Restart | MainPID 1052201 -> **1057872**, `active` |
+| Health | `/api/health` -> 200 `{"status":"ok","database":"ok","latencyMs":29}` |
+| Workers | 4 |
+| Route | `POST /api/internal/revalidate-season` -> **307** (middleware redirect; the route does not exist on `main`) - correct for a restored host |
+| Settle timer | `not-found`; settle service `inactive`. **Never installed, never triggered.** |
+| Working tree | 0 tracked modifications |
+
+**PROD was not touched at any point. I§UE-137 was not touched.**
