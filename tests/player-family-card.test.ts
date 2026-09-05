@@ -140,11 +140,15 @@ describe('PlayerFamilyCard rendering', () => {
     };
 
     const html = renderToStaticMarkup(PlayerFamilyCard({ playerId: 100, family }));
-    expect(html).toContain('Sons selected under the father-son rule');
     expect(html).toContain('Gary Ablett Jr');
+    expect(html).toContain('href="/players/compare?a=100&amp;b=201"');
     expect(html).toContain('Geelong · 2001 National Draft · Pick 40');
     expect(html).toContain('Nathan Ablett');
+    expect(html).toContain('href="/players/compare?a=100&amp;b=202"');
     expect(html).toContain('Geelong · 2004 National Draft');
+    // Each son gets its own label rather than a shared pluralised header --
+    // that keeps the markup identical regardless of how many sons a father has.
+    expect(html.match(/<strong>Son<\/strong>/g)).toHaveLength(2);
   });
 
   it('shows an unlinked relative as plain text without a fabricated URL', () => {
@@ -164,6 +168,54 @@ describe('PlayerFamilyCard rendering', () => {
     const html = renderToStaticMarkup(PlayerFamilyCard({ playerId: 300, family }));
     expect(html).toContain('Unknown (W.G., Mayne)');
     expect(html).not.toContain('<a');
+  });
+
+  it('renders a linked generic relationship with a compare link', () => {
+    const family: PlayerFamilyResult = {
+      ...emptyFamily(),
+      relationships: [{
+        relationshipType: 'sibling',
+        direction: 'from',
+        relatedPlayerId: 400,
+        relatedPlayerSlug: 'jack-example',
+        relatedName: 'Jack Example',
+      }],
+    };
+
+    const html = renderToStaticMarkup(PlayerFamilyCard({ playerId: 300, family }));
+    expect(html).toContain('Brother');
+    expect(html).toContain('href="/players/jack-example-400"');
+    expect(html).toContain('href="/players/compare?a=300&amp;b=400"');
+  });
+
+  it('renders multiple generic relationships, linked and unlinked, without special-casing', () => {
+    const family: PlayerFamilyResult = {
+      ...emptyFamily(),
+      relationships: [
+        {
+          relationshipType: 'sibling',
+          direction: 'from',
+          relatedPlayerId: 401,
+          relatedPlayerSlug: 'jack-example',
+          relatedName: 'Jack Example',
+        },
+        {
+          relationshipType: 'sibling',
+          direction: 'from',
+          relatedPlayerId: null,
+          relatedPlayerSlug: null,
+          relatedName: 'Unlinked Example',
+        },
+      ],
+    };
+
+    const html = renderToStaticMarkup(PlayerFamilyCard({ playerId: 300, family }));
+    expect(html.match(/>Brother</g)).toHaveLength(2);
+    expect(html).toContain('href="/players/jack-example-401"');
+    expect(html).toContain('href="/players/compare?a=300&amp;b=401"');
+    expect(html).toContain('Unlinked Example');
+    // The unlinked relative is plain text and gets no compare link either.
+    expect(html).not.toContain('href="/players/compare?a=300&amp;b=null"');
   });
 
   it('renders nothing for a player with no canonical family data', () => {

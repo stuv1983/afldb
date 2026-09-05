@@ -62,21 +62,14 @@ export function PlayerFamilyCard({
           </li>
         ))}
 
-        {family.fatherSonAsFather.length > 0 && (
-          <li>
-            <strong>
-              {family.fatherSonAsFather.length > 1
-                ? 'Sons selected under the father-son rule'
-                : 'Son selected under the father-son rule'}
-            </strong>
-          </li>
-        )}
         {family.fatherSonAsFather.map((row) => (
           <li key={`father-${row.draftYear}-${row.sonName}`}>
+            <strong>Son</strong>
+            {' — '}
             <RelatedPersonName name={row.sonName} slug={row.sonPlayerSlug} id={row.sonPlayerId} />
             <CompareLink playerId={playerId} relatedId={row.sonPlayerId} />
             <br />
-            <span className="muted">{formatSelectionDetail(row)}</span>
+            <span className="muted">Father-son selection — {formatSelectionDetail(row)}</span>
           </li>
         ))}
 

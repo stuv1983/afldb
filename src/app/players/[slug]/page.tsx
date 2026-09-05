@@ -271,14 +271,6 @@ export default async function PlayerPage({
     ),
   });
 
-  if (hasFamilyContent(family)) {
-    sections.push({
-      id: 'family',
-      label: 'Family',
-      node: <PlayerFamilyCard playerId={player.id} family={family} />,
-    });
-  }
-
   if (draftHistory.length > 0) {
     sections.push({
       id: 'draft',
@@ -463,6 +455,18 @@ export default async function PlayerPage({
           </ul>
         </section>
       ),
+    });
+  }
+
+  // Family and coaching are contextual to the player, not the primary
+  // record -- grouped together after the core Career/Draft/Honours content
+  // rather than interrupting it, so playing achievements stay the first
+  // thing a reader encounters.
+  if (hasFamilyContent(family)) {
+    sections.push({
+      id: 'family',
+      label: 'Family',
+      node: <PlayerFamilyCard playerId={player.id} family={family} />,
     });
   }
 
